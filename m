@@ -1,243 +1,60 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 10 Sep 2014 10:31:39 -0400
-Subject: [PATCH 18/24] ARM64: Add vdso for ILP32 and use it for the signal
- return
-In-Reply-To: <1409779158-30963-19-git-send-email-apinski@cavium.com>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <1409779158-30963-19-git-send-email-apinski@cavium.com>
-Message-ID: <541060CB.6000402@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 15:31:44 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+References: <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+Message-ID: <20140910143144.GF7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Wed, Sep 10, 2014 at 06:06:46AM -0700, Olof Johansson wrote:
+> On Mon, Sep 8, 2014 at 12:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
 
-On 09/03/2014 05:19 PM, Andrew Pinski wrote:
-> This patch adds the VDSO for ILP32. We need to use a different
-> VDSO than LP64 since ILP32 uses ELF32 while LP64 uses ELF64.
-> 
-> After this patch, signal handling works mostly.  In that signals
-> go through their action and then returned correctly.
-> 
-> Signed-off-by: Andrew Pinski <apinski@cavium.com>
-> ---
->  arch/arm64/include/asm/vdso.h                 |    4 +
->  arch/arm64/kernel/Makefile                    |    5 +
->  arch/arm64/kernel/signal.c                    |    4 +
->  arch/arm64/kernel/vdso-ilp32/.gitignore       |    2 +
->  arch/arm64/kernel/vdso-ilp32/Makefile         |   72 ++++++++++++++++++
->  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |   33 ++++++++
->  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |   98 +++++++++++++++++++++++++
->  arch/arm64/kernel/vdso.c                      |   69 ++++++++++++++---
->  8 files changed, 274 insertions(+), 13 deletions(-)
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-> 
-> diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
-> index 839ce00..84050c6 100644
-> --- a/arch/arm64/include/asm/vdso.h
-> +++ b/arch/arm64/include/asm/vdso.h
-> @@ -29,6 +29,10 @@
->  
->  #include <generated/vdso-offsets.h>
->  
-> +#ifdef CONFIG_ARM64_ILP32
-> +#include <generated/vdso-ilp32-offsets.h>
-> +#endif
-> +
->  #define VDSO_SYMBOL(base, name)						   \
->  ({									   \
->  	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 6de85f5..dcb9033 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
->  arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/
-> +obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
->  obj-m					+= $(arm64-obj-m)
->  head-y					:= head.o
->  extra-y					:= $(head-y) vmlinux.lds
-> @@ -38,3 +39,7 @@ extra-y					:= $(head-y) vmlinux.lds
->  # vDSO - this must be built first to generate the symbol offsets
->  $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
->  $(obj)/vdso/vdso-offsets.h: $(obj)/vdso
-> +
-> +# vDSO - this must be built first to generate the symbol offsets
-> +$(call objectify,$(arm64-obj-y)): $(obj)/vdso-ilp32/vdso-ilp32-offsets.h
-> +$(obj)/vdso-ilp32/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index f47c064..5311147 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -242,6 +242,10 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
->  
->  	if (ka->sa.sa_flags & SA_RESTORER)
->  		sigtramp = ka->sa.sa_restorer;
-> +#ifdef CONFIG_ARM64_ILP32
-> +	else if (is_ilp32_compat_task())
-> +		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
-> +#endif
->  	else
->  		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
+> > Well, lets see... We've got a real user complaining about a platform
+> > that used to work on mainline, and no longer does. The only loophole
+> > for ignoring breakage is if there nobody cares that it is broken. That
+> > currently isn't the case. So even though it's based on a patch that
+> > has "DO NOT SUBMIT" in large friendly letters on the front cover, it
+> > doesn't change the situation that mainline has a regression.
 
-In my opinion, moving the ifdef around the definition of
-is_ilp32_compat_task() would make the code easier to read and maintain.
+> Yeah, I'm with you on this Grant, it doesn't matter what the patch is
+> labelled as.
 
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index a777ac3..21b3726 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -41,6 +41,12 @@ extern char vdso_start, vdso_end;
->  static unsigned long vdso_pages;
->  static struct page **vdso_pagelist;
->  
-> +#ifdef CONFIG_ARM64_ILP32
-> +extern char vdso_ilp32_start, vdso_ilp32_end;
-> +static unsigned long vdso_ilp32_pages;
-> +static struct page **vdso_ilp32_pagelist;
-> +#endif
-> +
->  /*
->   * The vDSO data page.
->   */
-> @@ -110,24 +116,31 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
->  }
->  #endif /* CONFIG_AARCH32_EL0 */
->  
-> -static struct vm_special_mapping vdso_spec[2];
-> +static struct vm_special_mapping vdso_spec[2][2];
->  
-> -static int __init vdso_init(void)
-> +static inline int __init vdso_init_common(char *vdso_start, char *vdso_end,
-> +					  unsigned long *vdso_pagesp,
-> +					  struct page ***vdso_pagelistp,
-> +					  bool ilp32)
->  {
->  	int i;
-> +	unsigned long vdso_pages;
-> +	struct page **vdso_pagelist;
->  
-> -	if (memcmp(&vdso_start, "\177ELF", 4)) {
-> +	if (memcmp(vdso_start, "\177ELF", 4)) {
->  		pr_err("vDSO is not a valid ELF object!\n");
->  		return -EINVAL;
->  	}
->  
-> -	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-> +	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
-> +	*vdso_pagesp = vdso_pages;
->  	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-> -		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
-> +		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
->  
->  	/* Allocate the vDSO pagelist, plus a page for the data. */
->  	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
->  				GFP_KERNEL);
-> +	*vdso_pagelistp = vdso_pagelist;
->  	if (vdso_pagelist == NULL)
->  		return -ENOMEM;
->  
-> @@ -136,33 +149,63 @@ static int __init vdso_init(void)
->  
->  	/* Grab the vDSO code pages. */
->  	for (i = 0; i < vdso_pages; i++)
-> -		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
-> +		vdso_pagelist[i + 1] = virt_to_page(vdso_start + i * PAGE_SIZE);
->  
->  	/* Populate the special mapping structures */
-> -	vdso_spec[0] = (struct vm_special_mapping) {
-> +	vdso_spec[ilp32][0] = (struct vm_special_mapping) {
->  		.name	= "[vvar]",
->  		.pages	= vdso_pagelist,
->  	};
->  
-> -	vdso_spec[1] = (struct vm_special_mapping) {
-> +	vdso_spec[ilp32][1] = (struct vm_special_mapping) {
->  		.name	= "[vdso]",
->  		.pages	= &vdso_pagelist[1],
->  	};
->  
->  	return 0;
->  }
-> +
-> +static int __init vdso_init(void)
-> +{
-> +	return vdso_init_common(&vdso_start, &vdso_end,
-> +				&vdso_pages, &vdso_pagelist, 0);
-> +}
->  arch_initcall(vdso_init);
->  
-> +#ifdef CONFIG_ARM64_ILP32
-> +static int __init vdso_ilp32_init(void)
-> +{
-> +	return vdso_init_common(&vdso_ilp32_start, &vdso_ilp32_end,
-> +				&vdso_ilp32_pages, &vdso_ilp32_pagelist, 1);
-> +}
-> +arch_initcall(vdso_ilp32_init);
-> +#endif
-> +
->  int arch_setup_additional_pages(struct linux_binprm *bprm,
->  				int uses_interp)
->  {
->  	struct mm_struct *mm = current->mm;
->  	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
->  	void *ret;
-> -
-> -	vdso_text_len = vdso_pages << PAGE_SHIFT;
-> +	struct page **pagelist;
-> +	unsigned long pages;
-> +	bool ilp32;
-> +
-> +#ifdef CONFIG_ARM64_ILP32
-> +	ilp32 = is_ilp32_compat_task();
-> +	if (is_ilp32_compat_task()) {
-> +		pages = vdso_ilp32_pages;
-> +		pagelist = vdso_ilp32_pagelist;
-> +	} else
-> +#endif
+> One way to deal with this could be to add a quirk at boot time --
+> looking for the simplefb and if found, modifies the regulators to keep
+> them on. That'd go in the kernel, not in firmware.
 
-Same
+Well, we should also be fixing simplefb to manage the resources it uses
+though that doesn't clean up after the broken DTs that are currently
+deployed.
 
-> +	{
-> +		ilp32 = false;
-> +		pages = vdso_pages;
-> +		pagelist = vdso_pagelist;
-> +	}
-> +	vdso_text_len = pages << PAGE_SHIFT;
->  	/* Be sure to map the data page */
-> -	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
-> +	vdso_mapping_len = (pages + 1) << PAGE_SHIFT;
->  
->  	down_write(&mm->mmap_sem);
->  	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
-> @@ -172,7 +215,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
->  	}
->  	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
->  				       VM_READ|VM_MAYREAD,
-> -				       &vdso_spec[0]);
-> +				       &vdso_spec[ilp32][0]);
->  	if (IS_ERR(ret))
->  		goto up_fail;
->  
-> @@ -181,7 +224,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
->  	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
->  				       VM_READ|VM_EXEC|
->  				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-> -				       &vdso_spec[1]);
-> +				       &vdso_spec[ilp32][1]);
->  	if (IS_ERR(ret))
->  		goto up_fail;
->  
-> 
+As well as the regulators we'll also need to fix the clocks.  If we're
+going to start adding these fixups perhaps we want to consider having a
+wrapper stage that deals with rewriting DTs prior to trying to use them?
+I'm not sure if it makes much difference but there's overlap with other
+tools like the ATAGs conversion wrapper and building separately would
+let the fixup code run early without directly going into the early init
+code (which seems a bit scary).
 
-Regards,
-Christopher
+> Much better would have been if the DRM changes worked when they
+> landed, so that the migration form simplefb to drm was invisible to
+> the user. Or at least, to get them working ASAP since they're still
+> broken. :(
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+As far as I can tell the problem here is coming from the decision to
+have simplefb use resources without knowing about them - can we agree
+that this is a bad idea?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/f2ef9bdd/attachment-0001.sig>
