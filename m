@@ -1,36 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Sep 2014 11:21:05 +0100
-Subject: [PATCH v5] spi: spi-imx: add DMA support
-In-Reply-To: <1410312604-31949-1-git-send-email-b38343@freescale.com>
-References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
-Message-ID: <20140910102105.GR2601@sirena.org.uk>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 10 Sep 2014 12:24:53 +0200
+Subject: [PATCH v3 0/9] Tegra xHCI support
+In-Reply-To: <CAL1qeaFUaqs9SDv1p+dYDYLn9hwDxdTQ=K-wo+Qa5+KGY=U47w@mail.gmail.com>
+References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>	<CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>	<CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>	<CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+ <CAL1qeaFUaqs9SDv1p+dYDYLn9hwDxdTQ=K-wo+Qa5+KGY=U47w@mail.gmail.com>
+Message-ID: <541026F5.9000609@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:30:04AM +0800, Robin Gong wrote:
+On 09/09/2014 07:09 PM, Andrew Bresticker wrote:
+> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
+>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
+>>>>>
+>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
+>>>>> recently posted by Andrew Chew [2].
+>>>>
+>>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
+>>>> USB devices I tested with, about half where probed correctly, but the
+>>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
+>>>> right after the reset, the C_PORT_CONNECTION bit is set.
+>>>>
+>>>> I don't see any correlation between the failure and the kind of usb
+>>>> device, but I don't have much experience with USB implementations
+>>>> either.
+>>>
+>>> Hmm... I haven't seen that before.  Which particular devices were you using?
+>>
+>> Here they are:
+>>
+>> work:
+>>
+>> Genius keyboard: 05d5:6782
+>> Logitech mouse: 046d:c06a
+>> Denver MP3 player: 10d6:1100
+>> Atheros Bluetooth dongle: 0cf3:3005
+>>
+>> don't work:
+>>
+>> MCS7830 ethernet dongle: 9710:7830
+>> Genesys Logic hub: 05e3:0608
+>> Alcor flash drive: 058f:6387
+>> JMicron SATA bridge: 152d:2329
+> 
+> I have the same SATA bridge and it is enumerating fine for me, but
+> I've ordered the hub as well and will check that out.
+> 
+> Did you have any other patches applied when testing these?
 
-> +static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
-> +			 struct spi_transfer *transfer)
-> +{
-> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
-> +
-> +	if (spi_imx->dma_is_inited && (transfer->len > spi_imx->rx_wml)
-> +	    && (transfer->len > spi_imx->tx_wml))
-> +		spi_imx->usedma = true;
-> +	else
-> +		spi_imx->usedma = false;
-> +
-> +	return spi_imx->usedma;
-> +}
+Here is the branch, including the .config I used:
 
-This isn't going to work, anything that looks at the usedma flag will
-see the result of the last thing that was checked which may or may not
-be the transfer that it's handling.  The driver should check to see if
-the core mapped the transfer for DMA.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/b5cff6e2/attachment-0001.sig>
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=3.17rc4-xhci
+
+> Were you
+> using either SATA or PCIe at the same time?
+
+Nope, haven't even tried those yet.
+
+> Just trying to figure out
+> if there's anything else different between our setups.
+
+Yeah, I'm afraid I don't have any good suggestion to make. But maybe you
+will find some error on my part in how I have applied the patches or in
+the config.
+
+Regards,
+
+Tomeu
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
