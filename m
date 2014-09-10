@@ -1,62 +1,79 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Wed, 10 Sep 2014 03:31:19 +0000
-Subject: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <3532608.xLS91GQkq4@wuerfel>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <1410253952-15631-6-git-send-email-jingchang.lu@freescale.com>
- <3532608.xLS91GQkq4@wuerfel>
-Message-ID: <daf5ec5b70164b3e9a810def41909c48@BL2PR03MB467.namprd03.prod.outlook.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 10 Sep 2014 09:07:28 +0530
+Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <20140909144225.GF6151@saruman.home>
+References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
+ <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
+ <20140902143438.GB16872@saruman.home>
+ <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
+ <20140903144225.GD31855@saruman.home>
+ <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
+ <20140905175651.GK24449@saruman.home>
+ <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
+ <20140908134454.GK22409@saruman.home>
+ <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
+ <20140909144225.GF6151@saruman.home>
+Message-ID: <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->Sent: Tuesday, September 09, 2014 7:41 PM
->To: linux-arm-kernel at lists.infradead.org
->Cc: Lu Jingchang-B35083; Guo Shawn-R65073; Lu Jingchang-B35083;
->devicetree at vger.kernel.org
->Subject: Re: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale
->LS1021A
->
->On Tuesday 09 September 2014 17:12:31 Jingchang Lu wrote:
->> +#include "common.h"
->> +
->> +static void __init ls1021a_init_machine(void) {
->> +       mxc_arch_reset_init_dt();
->> +       of_platform_populate(NULL, of_default_bus_match_table, NULL,
->> +NULL); }
->> +
->> +static const char *ls1021a_dt_compat[] __initdata = {
->> +       "fsl,ls1021a",
->> +       NULL,
->> +};
->
->Please don't add any new users of mxc_arch_reset_init_dt(). We now have
->infrastructure to register a system-reset handler from the watchdog driver,
->so please do that instead, and clean up the existing users as well.
-I just notice the restart_handler support, I will use that instead, thanks.
-
->
->> +DT_MACHINE_START(LS1021A, "Freescale LS1021A") #ifdef CONFIG_ZONE_DMA
->> +       .dma_zone_size  = SZ_128M,
->> +#endif
->> +       .init_machine   = ls1021a_init_machine,
->> +       .dt_compat      = ls1021a_dt_compat,
->> +       .restart        = mxc_restart,
->> +MACHINE_END
->
->I believe someone recently posted a patch to derive the dma_zone_size from
->device tree. Can yo try to find that and see if that will work for you?
->
->Can you explain what the reason is for needing a DMA zone?
->
->	Arnd
-With LPAE enabled on our SoC, we meet the system complaint of
-"coherent DMA mask 0xffffffff is smaller than system GFP_DMA mask 0xffffffffffffffff",
-and I notice that CONFIG_ZONE_DMA and dma_zone_size is a common resolve for this.
-Thanks.
+adding Julius here,
 
 
+On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
+>> Hi,
+>>
+>>
+>> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
+>> >> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
+>> >> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
+>> >> >> > Don't we have phy_power_on()
+>> >> >> > for that ? It looks like you could just as well do this from
+>> >> >> > phy_power_on() ?
+>> >> >>
+>> >> >> No, unfortunately keeping these calibration settings in phy_power_on()
+>> >> >> doesn't help, since we need to do this after XHCI reset has happened.
+>> >> >
+>> >> > teach xHCI about PHYs ?
+>> >>
+>> >> sorry i couldn't understand you here.
+>> >> Aren't we trying to do the same with Heikki's patch about dwc3 :
+>> >> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
+>> >>
+>> >> and the 2nd patch in this series :
+>> >> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
+>> >>
+>> >> Is there something else that is expected ?
+>> >
+>> > right, use that to call phy_init() at the right time, then you need to
+>> > add a new ->calibrate() method which, likely, will only be used by you
+>> > ;-)
+>>
+>> so you mean, the xhci should itself call phy_init() at a time suitable,
+>> so that ->calibrate() is not required at all ?
+>>
+>> i think you meant there - "then you __do not__ need to
+>
+> right :-)
 
-Best Regards,
-Jingchang
+alright, i will prepare a patch for the suggested change.
+
+But AFAI remember we had discussion for this patch in earlier version,
+and Julius suggested to use a generic approach for such
+change wherein other users in future may be able to use the
+facility.
+Julius any thoughts about the change suggested by Felipe.
+
+[snip]
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
