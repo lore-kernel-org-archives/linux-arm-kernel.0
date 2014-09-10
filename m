@@ -1,58 +1,27 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 10 Sep 2014 09:19:18 -0500
-Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
-In-Reply-To: <20140910110057.GA9354@amd>
-References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
- <20140909141756.GA30100@amd> <4134101.OOENTRabu1@wuerfel>
- <20140909210232.GA539@amd>
- <CAPDyKFr35646zQUDUnv9LYy9jtY7r343hev9FrhxOfjVMb6MJw@mail.gmail.com>
- <20140910083337.GA5178@amd>
- <CAPDyKFoXiNOHQ3W=U08jU2PG-fz4F_7wuW-KNEoDfcQzrLKmVA@mail.gmail.com>
- <20140910110057.GA9354@amd>
-Message-ID: <54105DE6.9070807@opensource.altera.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 10 Sep 2014 16:19:56 +0200
+Subject: [PATCH v5 06/12] sched: add per rq cpu_capacity_orig
+In-Reply-To: <20140910135339.GQ3190@worktop.ger.corp.intel.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-7-git-send-email-vincent.guittot@linaro.org>
+ <20140910135339.GQ3190@worktop.ger.corp.intel.com>
+Message-ID: <CAKfTPtAmUe3GUL51Ow24pVq4Q2pMKJO5A7wG1Mic+akg=ozkjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 9/10/14, 6:00 AM, Pavel Machek wrote:
-> Hi!
-> 
->>>> 2) On the host level, the support for handle multiple slots in DT for
->>>> dw-mmc has been broken. While dw-mmc parsed the DT nodes for slots, it
->>>> screwed up configurations. Thus the support for slots have never
->>>> worked as expected from DT point of view.
->>>
->>> Well, DT is supposed to describe the hardware. From your description,
->>> it seems that linux does not support two slots on one controller and
->>> DT parsing code basically ignores the slots. (Logical, if it can't
->>> support two slots).
->>>
->>> So now we are breaking DT description due to Linux limitations. Which
->>>
->>> a) makes it hard for any other os not having same limitation
->>>
->>> b) makes it hard for people to fix the limitation
->>>
->>> c) does not really solve anything
+On 10 September 2014 15:53, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Aug 26, 2014 at 01:06:49PM +0200, Vincent Guittot wrote:
+>> This new field cpu_capacity_orig reflects the available capacity of a CPUs
+>> unlike the cpu_capacity which reflects the current capacity that can be altered
+>> by frequency and rt tasks.
 >>
->> Yes it does, the problem in 2) gets fixed.
->>
->>>
->>> d) breaks backward compatibility with old dts
->>
->> According to 2), it has never worked - so we don't break anything.
-> 
-> Umm? u-SD worked for me in 3.14, 3.15 and 3.16 with the device tree,
-> and with single-slot described in the device tree. Now I have to
-> change dtb-s to keep working configuration, which is something device
-> tree should never ever do.
+>
+> No real objection to the patch as such, but the Changelog fails to tell
+> us why you want this.
 
-I tested the DTB with and without the patch, and it all works fine.
-
-Dinh
-> 
-> Is it so hard to just fix the multiple slot parsing?
-> 
-> 									Pavel
-> 
+the cpu_capacity_orig  is used in several places in the following
+patches to detect when a CPU's capacity has been noticeably reduced so
+we can trig load balance to look for a CPU with full capacity.
+As an example, we can detect when a CPU handles a significant amount
+of irq (with CONFIG_IRQ_TIME_ACCOUNTING) but is seen as an idle CPU by
+scheduler whereas really idle CPU are available
