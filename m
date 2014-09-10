@@ -1,55 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 10 Sep 2014 16:08:48 +0200
-Subject: [Patch v2 RfT] ARM: Kirkwood: Fix DT based DSA.
-In-Reply-To: <20140909171742.GT30828@titan.lakedaemon.net>
-References: <1409592941-22244-1-git-send-email-andrew@lunn.ch>
- <20140909160635.GR30828@titan.lakedaemon.net>
- <cbad0fa9a53346c4a67863ce924189a4@IL-EXCH02.marvell.com>
- <20140909171742.GT30828@titan.lakedaemon.net>
-Message-ID: <20140910140848.GC13342@lunn.ch>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Wed, 10 Sep 2014 16:15:55 +0200
+Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
+In-Reply-To: <540F57E0.8030404@linutronix.de>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+ <20140908144616.GA22315@ci00147.xsens-tech.local>
+ <20140908151501.GA22584@linutronix.de>
+ <20140908183353.GB4686@ci00147.xsens-tech.local>
+ <540F57E0.8030404@linutronix.de>
+Message-ID: <20140910141554.GC22315@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 01:17:42PM -0400, Jason Cooper wrote:
-> > I've tested v2 of the patch and it worked fine.
-
-Hi Eugene, thanks for testing.
+On Tue, Sep 09, 2014 at 09:41:20PM +0200, Sebastian Andrzej Siewior wrote:
+> On 09/08/2014 08:33 PM, Frans Klaver wrote:
+> > Thanks. I'll give it a spin on Wednesday.
 > 
-> Ok, I'll consider that a Tested-by...
+> Could you please pull the upcoming v9 first?
 > 
-> > Though, I had a couple of comments:
-> > 
-> > 1) I have concerns regarding naming of the boards.
-> > Since distros use those names to identify boards, we should use
-> > shorter and consistent naming.
-
-I agree with Jason here. The filenames don't matter, its the
-description in the compatible string which people should be looking
-at. And it seems Marvell own naming of these boards is not
-particularly good either.
-
-> > other too).  With 3.17rc2 I am not able to get more then ~50Mbps while
-> > same board with in same setup running v3.2 or v3.10 easily pass
-> > 650Mbps mark.
+>  git://git.breakpoint.cc/bigeasy/linux.git uart_v9_pre1
 > 
-> Is this with/without this particular patch?  Or is this a separate
-> issue?
+> This solves a few of my am335x related issues.
 
-I've not looked at this yet, but i guess it is related to TSO and the
-stack trace we are seeing. It is independent of this patch. Without
-this patch, networking is totally borked. With this patch, it somewhat
-works, but i guess with packet loss, causing the low TCP bandwidth.
+Using v9_pre1, I get a kernel panic in edma_dma_pause() on echan->edesc
+being NULL. I do get data before this happens. This is at high speed,
+high rate. No mention of the irq having too much to do, though. The more
+data I transmit, the more likely this is to occur.
 
-Once i'm back home i will take a look at this.
+I don't currently have the setup to lower the baudrate. I would probably
+need to reproduce this on a beaglebone, instead of our custom board.
+I'll see if I can do that.
 
-> Yes, which will be near the end of the window for getting this in.  I'd
-> like to have everything hammered out _before_ he returns so he can Ack a
-> (potentially) new version that I can apply.
+If you need more info, just let me know.
 
-If Eugene wants to produce a version with slightly modified model and
-compatible strings, i can Ack it during the next couple of days. I
-should have internet access. If not, please take the patch as is, with
-the Tested-by added.
-
-    Thanks
-	Andrew
+Thanks,
+Frans
