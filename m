@@ -1,89 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  9 Sep 2014 23:40:41 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_RTC_DRV_ISL1208
-Message-ID: <1410316841-19001-1-git-send-email-festevam@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 9 Sep 2014 21:44:56 -0500
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <20140909154123.GA12906@obsidianresearch.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+ <540E960D.7080408@huawei.com>
+ <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+ <540EC8CB.7010106@huawei.com>
+ <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
+ <20140909154123.GA12906@obsidianresearch.com>
+Message-ID: <CAL_JsqJMRqbwNkB2K6Mg2DU9mSHwAObtD7LLG2_n=4jGDAFhyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Sep 9, 2014 at 10:41 AM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Tue, Sep 09, 2014 at 08:26:19AM -0600, Bjorn Helgaas wrote:
+>
+>> So as long as the DT tells you the ECAM information for each host
+>> bridge, that should be sufficient.  The domain number is then just a
+>> Linux convenience and is not tied to the platform as it is on ia64.
+>
+> I think this is right for DT systems - the domain is purely internal
+> to the kernel and userspace, it is used to locate the proper host
+> bridge driver instance, which contains the proper config accessor (and
+> register bases, etc).
+>
+> AFAIK the main reason to have a DT alias to learn the domain number is
+> to make it stable so things like udev/etc can reliably match on the
+> PCI location.
 
-The rtc isl1208 driver is used by mx6 nitrogen board, so let's enable it by
-default.
+For what purpose?
 
-Generated this patch by doing:
+> This is similar to i2c, etc that use the alias scheme, so IMHO
+> whatever they do to assign ID's to drivers should be copied for domain
+> numbers.
 
-- make imx_v6_v7_defconfig
-- make menuconfig and manually select CONFIG_RTC_DRV_ISL1208
-- make savedefconfig
-- cp defconfig arch/arm/configs/imx_v6_v7_defconfig
+IMO they should not. We really want to move away from aliases, not
+expand their use. They are used for serial because there was no good
+way to not break things like "console=ttyS0". I2C I think was more
+internal, but may have been for i2c-dev. What are we going to break if
+we don't have consistent domain numbering? If the domain goes into the
+DT, I'd rather see it as part of the PCI root node. But I'm not
+convinced it is needed.
 
-,which results in some additional cleanups.
+It doesn't really sound like we have any actual need to solve this for
+DT ATM. It's not clear to me if all buses should be domain 0 or a
+simple incrementing index for each bus in absence of any firmware set
+value.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 16cfec4..f386e05 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -32,8 +32,8 @@ CONFIG_MACH_IMX35_DT=y
- CONFIG_MACH_PCM043=y
- CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_VPR200=y
--CONFIG_SOC_IMX51=y
- CONFIG_SOC_IMX50=y
-+CONFIG_SOC_IMX51=y
- CONFIG_SOC_IMX53=y
- CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
-@@ -105,7 +105,6 @@ CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
- CONFIG_SCSI_CONSTANTS=y
- CONFIG_SCSI_LOGGING=y
- CONFIG_SCSI_SCAN_ASYNC=y
-@@ -153,14 +152,12 @@ CONFIG_SERIAL_IMX_CONSOLE=y
- CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- CONFIG_HW_RANDOM=y
--CONFIG_HW_RANDOM_MXC_RNGA=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
- # CONFIG_I2C_HELPER_AUTO is not set
- CONFIG_I2C_ALGOPCF=m
- CONFIG_I2C_ALGOPCA=m
- CONFIG_I2C_IMX=y
--CONFIG_SPI=y
- CONFIG_SPI_IMX=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MC9S08DZ60=y
-@@ -198,7 +195,6 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_GPIO=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-@@ -240,6 +236,7 @@ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_ISL1208=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
-@@ -254,7 +251,6 @@ CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
- CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_LDB=y
--CONFIG_DRM_IMX_IPUV3_CORE=y
- CONFIG_DRM_IMX_IPUV3=y
- CONFIG_DRM_IMX_HDMI=y
- # CONFIG_IOMMU_SUPPORT is not set
--- 
-1.9.1
+Rob
