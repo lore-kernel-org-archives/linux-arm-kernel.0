@@ -1,29 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Sep 2014 16:26:36 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
-In-Reply-To: <54105765.5090708@antcom.de>
-References: <540F1409.3070206@antcom.de> <4173517.3fBhGIV2aO@wuerfel>
- <54105765.5090708@antcom.de>
-Message-ID: <3900226.tYc6lW0Md4@wuerfel>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 10 Sep 2014 16:27:40 +0200
+Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
+ driver
+In-Reply-To: <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <20140910142740.GC16489@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 September 2014 15:51:33 Roland Stigge wrote:
-> 
-> > You cleaned up the platform a lot when you took
-> > over in 2012, but now we have move other platforms much further
-> > and I wonder if you could do some of the same changes.
-> > Most importantly, I really want most platforms to be part of
-> > ARCH_MULTIPLATFORM and build them into the same image. For
-> > lpc32xx, this is currently not possible because you are not using
-> > the common clk implementation. Would it be possible for you
-> > to look into converting that driver over and moving it to
-> > drivers/clk?
-> 
-> It's certainly possible, but time might be scarce. What would be a good
-> reference platform to have a look into as example? Or a hint/link?
+Hi,
 
-I'll let Linus answer that one, he converted a couple of platform and
-probably has a better idea than I do.
+On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
+> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
+> 
+> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> ---
+>  .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
+>  sound/soc/fsl/Kconfig                              |  13 ++
+>  sound/soc/fsl/Makefile                             |   2 +
+>  sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
+>  4 files changed, 219 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
+>  create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
 
-	Arnd
+Is it possible to use the simple-card
+(Documentation/devicetree/bindings/sound/simple-card.txt) instead of
+adding a new audio card driver? There are also DT bindings for the imx
+audiomultiplexer (imx-audmux.txt).
+
+Best regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/109f31a3/attachment.sig>
