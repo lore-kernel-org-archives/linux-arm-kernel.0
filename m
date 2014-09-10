@@ -1,31 +1,163 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Sep 2014 12:24:57 +0100
-Subject: ARM big endian cpu hotplug
-In-Reply-To: <CAMQ1t3oDaYCQ+Uye3NDcHb8O4bvK=cauOfcqQvHqdieb8e8uEA@mail.gmail.com>
-References: <CAMQ1t3oDaYCQ+Uye3NDcHb8O4bvK=cauOfcqQvHqdieb8e8uEA@mail.gmail.com>
-Message-ID: <54103509.1020206@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 10 Sep 2014 13:29:51 +0200
+Subject: [RFC PATCH v2 1/7] iommu: provide early initialisation hook for
+ IOMMU drivers
+In-Reply-To: <1409680587-29818-2-git-send-email-will.deacon@arm.com>
+References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
+ <1409680587-29818-2-git-send-email-will.deacon@arm.com>
+Message-ID: <5410362F.3010703@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-
-On 10/09/14 12:07, Hemanth Kumar wrote:
-> On ARM VE-A-15 ,When I enable CONFIG_MTD_CFI &
-> CONFIG_MTD_CFI_LE_BYTE_SWAP and try to do cpu hotplug it throw's an
-> error
-> write error: Input/output error,If I enable
-> CONFIG_MTD_CFI_BE_BYTE_SWAP and fix with below  code
-> include/linux/mtd/map.h still it throw's write error: Input/output
-> error when I do cpu hotplug this happening on
-> v3.10,v3.12,v3.14,v3.15,v3.16,
+On 2014-09-02 19:56, Will Deacon wrote:
+> IOMMU drivers must be initialised before any of their upstream devices,
+> otherwise the relevant iommu_ops won't be configured for the bus in
+> question. To solve this, a number of IOMMU drivers use initcalls to
+> initialise the driver before anything has a chance to be probed.
 >
-> If I dont enable CONFIG_MTD_CFI & CONFIG_MTD_CFI_LE_BYTE_SWAP or
-> CONFIG_MTD_CFI_BE_BYTE_SWAP cpu hot plug works fine.
+> Whilst this solves the immediate problem, it leaves the job of probing
+> the IOMMU completely separate from the iommu_ops to configure the IOMMU,
+> which are called on a per-bus basis and require the driver to figure out
+> exactly which instance of the IOMMU is being requested. In particular,
+> the add_device callback simply passes a struct device to the driver,
+> which then has to parse firmware tables or probe buses to identify the
+> relevant IOMMU instance.
 >
+> This patch takes the first step in addressing this problem by adding an
+> early initialisation pass for IOMMU drivers, giving them the ability to
+> set some per-instance data on their of_node in the form of a new
+> iommu_data structure. This can later be used when parsing OF masters to
+> identify the IOMMU instance in question.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   drivers/iommu/of_iommu.c          | 14 ++++++++++++++
+>   include/asm-generic/vmlinux.lds.h |  2 ++
+>   include/linux/iommu.h             |  6 ++++++
+>   include/linux/of_iommu.h          | 23 +++++++++++++++++++++++
+>   4 files changed, 45 insertions(+)
+>
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index e550ccb7634e..f9209666157c 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -89,3 +89,17 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>   	return 0;
+>   }
+>   EXPORT_SYMBOL_GPL(of_get_dma_window);
+> +
+> +void __init of_iommu_init(void)
+> +{
+> +	struct device_node *np;
+> +	const struct of_device_id *match, *matches = &__iommu_of_table;
+> +
+> +	for_each_matching_node_and_match(np, matches, &match) {
+> +		const int (*init_fn)(struct device_node *) = match->data;
+> +
+> +		if (init_fn(np))
+> +			pr_err("Failed to initialise IOMMU %s\n",
+> +				of_node_full_name(np));
+> +	}
+> +}
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index 5ba0360663a7..b75ede8f99ae 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -162,6 +162,7 @@
+>   #define CLKSRC_OF_TABLES()	OF_TABLE(CONFIG_CLKSRC_OF, clksrc)
+>   #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
+>   #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
+> +#define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
+>   #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+>   #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+>   #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+> @@ -495,6 +496,7 @@
+>   	CLK_OF_TABLES()							\
+>   	RESERVEDMEM_OF_TABLES()						\
+>   	CLKSRC_OF_TABLES()						\
+> +	IOMMU_OF_TABLES()						\
+>   	CPU_METHOD_OF_TABLES()						\
+>   	KERNEL_DTB()							\
+>   	IRQCHIP_OF_MATCH_TABLE()					\
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 20f9a527922a..fdddb14cd8f5 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -57,6 +57,12 @@ struct iommu_domain {
+>   	struct iommu_domain_geometry geometry;
+>   };
+>   
+> +struct iommu_data {
+> +	struct iommu_domain *domain;
+> +	struct iova_domain *iovad;
+> +	void *priv;
+> +};
+> +
+>   #define IOMMU_CAP_CACHE_COHERENCY	0x1
+>   #define IOMMU_CAP_INTR_REMAP		0x2	/* isolates device intrs */
+>   
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 51a560f34bca..a39e2d78f735 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -1,12 +1,17 @@
+>   #ifndef __OF_IOMMU_H
+>   #define __OF_IOMMU_H
+>   
+> +#include <linux/iommu.h>
+> +#include <linux/of.h>
+> +
+>   #ifdef CONFIG_OF_IOMMU
+>   
+>   extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+>   			     int index, unsigned long *busno, dma_addr_t *addr,
+>   			     size_t *size);
+>   
+> +extern void of_iommu_init(void);
+> +
+>   #else
+>   
+>   static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+> @@ -16,6 +21,24 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>   	return -EINVAL;
+>   }
+>   
+> +static inline void of_iommu_init(void) { }
+> +
+>   #endif	/* CONFIG_OF_IOMMU */
+>   
+> +static inline void of_iommu_set_data(struct device_node *np,
+> +				     struct iommu_data *data)
+> +{
+> +	np->data = data;
+> +}
+> +
+> +static inline struct iommu_data *of_iommu_get_data(struct device_node *np)
+> +{
+> +	return np->data;
+> +}
+> +
+> +extern struct of_device_id __iommu_of_table;
+> +
+> +#define IOMMU_OF_DECLARE(name, compat, fn) \
+> +	OF_DECLARE_1(iommu, name, compat, fn)
 
-Are you referring to ARM Vexpress platform with TC2/CA15_A7 card ?
-If yes, idle doesn't work with CONFIG_MTD_CFI irrespective of
-endianness, it's platform limitation.
+OF_DECLARE_1 assumes that init_fn doesn't return anything, however in of_iommu_init()
+you expect the init function to return an error code, so the above lines should be
+changed to:
 
-Regards,
-Sudeep
+typedef int (*of_iommu_init_fn)(struct device_node *);
+
+#define IOMMU_OF_DECLARE(name, compat, fn) \
+         _OF_DECLARE(iommu, name, compat, fn, of_iommu_init_fn)
+
+
+> +
+>   #endif /* __OF_IOMMU_H */
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
