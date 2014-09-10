@@ -1,288 +1,122 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 10 Sep 2014 11:49:20 +0800
-Subject: [PATCH v8 2/5] ARM: imx6: gpc: Add PU power domain for GPU/VPU
-In-Reply-To: <1410267915-18126-3-git-send-email-p.zabel@pengutronix.de>
-References: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
- <1410267915-18126-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140910034918.GA28759@Robin-OptiPlex-780>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 10 Sep 2014 11:50:39 +0800
+Subject: [PATCH] regulator: remove unnecessary of_node_get() to parent
+Message-ID: <1410321039-26888-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-  Thanks for your great job, power domain make things clear. But looks your
-patch depend on 'PU regulator', if there is no PU regulator passed down from
-dts, we'll never implement your way for PGC. On i.mx6sx, there is no internal
-PU regulator, so I suggest you consider this case. 
-On Tue, Sep 09, 2014 at 03:05:12PM +0200, Philipp Zabel wrote:
-> When generic pm domain support is enabled, the PGC can be used
-> to completely gate power to the PU power domain containing GPU3D,
-> GPU2D, and VPU cores.
-> This code triggers the PGC powerdown sequence to disable the GPU/VPU
-> isolation cells and gate power and then disables the PU regulator.
-> To reenable, the reverse powerup sequence is triggered after the PU
-> regulator is enabled again.
-> The GPU and VPU devices in the PU power domain temporarily need
-> to be clocked during powerup, so that the reset machinery can work.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> Changes since v7:
->  - Updated to v3 of the OF PM domain series
->  - Made power domain registration depend on CONFIG_PM_GENERIC_DOMAINS
->    instead of CONFIG_PM.
-> ---
->  arch/arm/mach-imx/Kconfig |   1 +
->  arch/arm/mach-imx/gpc.c   | 203 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 204 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 9de84a2..78d69cf 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -50,6 +50,7 @@ config HAVE_IMX_ANATOP
->  
->  config HAVE_IMX_GPC
->  	bool
-> +	select PM_GENERIC_DOMAINS if PM
->  
->  config HAVE_IMX_MMDC
->  	bool
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 82ea74e..ea370b2 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -10,19 +10,41 @@
->   * http://www.gnu.org/copyleft/gpl.html
->   */
->  
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
->  #include <linux/io.h>
->  #include <linux/irq.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_domain.h>
-> +#include <linux/regulator/consumer.h>
->  #include <linux/irqchip/arm-gic.h>
->  #include "common.h"
-> +#include "hardware.h"
->  
-> +#define GPC_CNTR		0x000
->  #define GPC_IMR1		0x008
-> +#define GPC_PGC_GPU_PDN		0x260
-> +#define GPC_PGC_GPU_PUPSCR	0x264
-> +#define GPC_PGC_GPU_PDNSCR	0x268
->  #define GPC_PGC_CPU_PDN		0x2a0
->  
->  #define IMR_NUM			4
->  
-> +#define GPU_VPU_PUP_REQ		BIT(1)
-> +#define GPU_VPU_PDN_REQ		BIT(0)
-> +
-> +#define GPC_CLK_MAX		6
-> +
-> +struct pu_domain {
-> +	struct generic_pm_domain base;
-> +	struct regulator *reg;
-> +	struct clk *clk[GPC_CLK_MAX];
-> +	int num_clks;
-> +};
-> +
->  static void __iomem *gpc_base;
->  static u32 gpc_wake_irqs[IMR_NUM];
->  static u32 gpc_saved_imrs[IMR_NUM];
-> @@ -139,3 +161,184 @@ void __init imx_gpc_init(void)
->  	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
->  	gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
->  }
-> +
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS
-> +
-> +static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
-> +{
-> +	struct pu_domain *pu = container_of(genpd, struct pu_domain, base);
-> +	int iso, iso2sw;
-> +	u32 val;
-> +
-> +	/* Read ISO and ISO2SW power down delays */
-> +	val = readl_relaxed(gpc_base + GPC_PGC_GPU_PDNSCR);
-> +	iso = val & 0x3f;
-> +	iso2sw = (val >> 8) & 0x3f;
-> +
-> +	/* Gate off PU domain when GPU/VPU when powered down */
-> +	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
-> +
-> +	/* Request GPC to power down GPU/VPU */
-> +	val = readl_relaxed(gpc_base + GPC_CNTR);
-> +	val |= GPU_VPU_PDN_REQ;
-> +	writel_relaxed(val, gpc_base + GPC_CNTR);
-> +
-> +	/* Wait ISO + ISO2SW IPG clock cycles */
-> +	ndelay((iso + iso2sw) * 1000 / 66);
-> +
-> +	regulator_disable(pu->reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
-> +{
-> +	struct pu_domain *pu = container_of(genpd, struct pu_domain, base);
-> +	int i, ret, sw, sw2iso;
-> +	u32 val;
-> +
-> +	ret = regulator_enable(pu->reg);
-> +	if (ret) {
-> +		pr_err("%s: failed to enable regulator: %d\n", __func__, ret);
-> +		return ret;
-> +	}
-> +
-> +	/* Enable reset clocks for all devices in the PU domain */
-> +	for (i = 0; i < pu->num_clks; i++)
-> +		clk_prepare_enable(pu->clk[i]);
-> +
-> +	/* Gate off PU domain when GPU/VPU when powered down */
-> +	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
-> +
-> +	/* Read ISO and ISO2SW power down delays */
-> +	val = readl_relaxed(gpc_base + GPC_PGC_GPU_PUPSCR);
-> +	sw = val & 0x3f;
-> +	sw2iso = (val >> 8) & 0x3f;
-> +
-> +	/* Request GPC to power up GPU/VPU */
-> +	val = readl_relaxed(gpc_base + GPC_CNTR);
-> +	val |= GPU_VPU_PUP_REQ;
-> +	writel_relaxed(val, gpc_base + GPC_CNTR);
-> +
-> +	/* Wait ISO + ISO2SW IPG clock cycles */
-> +	ndelay((sw + sw2iso) * 1000 / 66);
-> +
-> +	/* Disable reset clocks for all devices in the PU domain */
-> +	for (i = 0; i < pu->num_clks; i++)
-> +		clk_disable_unprepare(pu->clk[i]);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct generic_pm_domain imx6q_arm_domain = {
-> +	.name = "ARM",
-> +};
-> +
-> +static struct pu_domain imx6q_pu_domain = {
-> +	.base = {
-> +		.name = "PU",
-> +		.power_off = imx6q_pm_pu_power_off,
-> +		.power_on = imx6q_pm_pu_power_on,
-> +		.power_off_latency_ns = 25000,
-> +		.power_on_latency_ns = 2000000,
-> +	},
-> +};
-> +
-> +static struct generic_pm_domain imx6sl_display_domain = {
-> +	.name = "DISPLAY",
-> +};
-> +
-> +static struct generic_pm_domain *imx_gpc_domains[] = {
-> +	&imx6q_arm_domain,
-> +	&imx6q_pu_domain.base,
-> +	&imx6sl_display_domain,
-> +};
-> +
-> +static struct genpd_onecell_data imx_gpc_onecell_data = {
-> +	.domains = imx_gpc_domains,
-> +	.num_domains = ARRAY_SIZE(imx_gpc_domains),
-> +};
-> +
-> +static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
-> +{
-> +	struct clk *clk;
-> +	bool is_off;
-> +	int i;
-> +
-> +	imx6q_pu_domain.base.of_node = dev->of_node;
-> +	imx6q_pu_domain.reg = pu_reg;
-> +
-> +	for (i = 0; ; i++) {
-> +		clk = of_clk_get(dev->of_node, i);
-> +		if (IS_ERR(clk))
-> +			break;
-> +		if (i >= GPC_CLK_MAX) {
-> +			dev_err(dev, "more than %d clocks\n", GPC_CLK_MAX);
-> +			goto clk_err;
-> +		}
-> +		imx6q_pu_domain.clk[i] = clk;
-> +	}
-> +	imx6q_pu_domain.num_clks = i;
-> +
-> +	is_off = IS_ENABLED(CONFIG_PM_RUNTIME);
-> +	if (is_off)
-> +		imx6q_pm_pu_power_off(&imx6q_pu_domain.base);
-> +
-> +	pm_genpd_init(&imx6q_pu_domain.base, NULL, is_off);
-> +	return of_genpd_add_provider_onecell(dev->of_node,
-> +					     &imx_gpc_onecell_data);
-> +
-> +clk_err:
-> +	while (i--)
-> +		clk_put(imx6q_pu_domain.clk[i]);
-> +	return -EINVAL;
-> +}
-> +
-> +#else
-> +static inline int imx_gpc_genpd_init(struct device *dev, struct regulator *reg)
-> +{
-> +	return 0;
-> +}
-> +#endif /* CONFIG_PM_GENERIC_DOMAINS */
-> +
-> +static int imx_gpc_probe(struct platform_device *pdev)
-> +{
-> +	struct regulator *pu_reg;
-> +	int ret;
-> +
-> +	pu_reg = devm_regulator_get(&pdev->dev, "pu");
-> +	if (IS_ERR(pu_reg)) {
-> +		ret = PTR_ERR(pu_reg);
-> +		dev_err(&pdev->dev, "failed to get pu regulator: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	/* The regulator is initially enabled */
-> +	ret = regulator_enable(pu_reg);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to enable pu regulator: %d\n", ret);
-> +		return ret;
-> +	}
-> +	return imx_gpc_genpd_init(&pdev->dev, pu_reg);
-> +}
-> +
-> +static struct of_device_id imx_gpc_dt_ids[] = {
-> +	{ .compatible = "fsl,imx6q-gpc" },
-> +	{ .compatible = "fsl,imx6sl-gpc" },
-> +	{ }
-> +};
-> +
-> +static struct platform_driver imx_gpc_driver = {
-> +	.driver = {
-> +		.name = "imx-gpc",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = imx_gpc_dt_ids,
-> +	},
-> +	.probe = imx_gpc_probe,
-> +};
-> +
-> +static int __init imx_pgc_init(void)
-> +{
-> +	return platform_driver_register(&imx_gpc_driver);
-> +}
-> +subsys_initcall(imx_pgc_init);
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+These of_node_get() were added to balance refcount decrements inside of
+of_find_node_by_name().
+See: commit c92f5dd2c42f ("regulator: Add missing of_node_put()")
+
+However of_find_node_by_name() was then replaced by of_get_child_by_name(),
+which doesn't call of_node_put() against its input parameter.
+
+So, need to remove these unnecessary of_node_get() calls.
+
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+---
+ drivers/regulator/88pm8607.c           | 2 +-
+ drivers/regulator/da9052-regulator.c   | 4 ++--
+ drivers/regulator/max8907-regulator.c  | 2 +-
+ drivers/regulator/max8925-regulator.c  | 2 +-
+ drivers/regulator/max8997.c            | 2 +-
+ drivers/regulator/palmas-regulator.c   | 1 -
+ drivers/regulator/tps65910-regulator.c | 2 +-
+ 7 files changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
+index 337634a..6d77dcd 100644
+--- a/drivers/regulator/88pm8607.c
++++ b/drivers/regulator/88pm8607.c
+@@ -319,7 +319,7 @@ static int pm8607_regulator_dt_init(struct platform_device *pdev,
+ 				    struct regulator_config *config)
+ {
+ 	struct device_node *nproot, *np;
+-	nproot = of_node_get(pdev->dev.parent->of_node);
++	nproot = pdev->dev.parent->of_node;
+ 	if (!nproot)
+ 		return -ENODEV;
+ 	nproot = of_get_child_by_name(nproot, "regulators");
+diff --git a/drivers/regulator/da9052-regulator.c b/drivers/regulator/da9052-regulator.c
+index fdb6ea8..0003362 100644
+--- a/drivers/regulator/da9052-regulator.c
++++ b/drivers/regulator/da9052-regulator.c
+@@ -422,9 +422,9 @@ static int da9052_regulator_probe(struct platform_device *pdev)
+ 		config.init_data = pdata->regulators[pdev->id];
+ 	} else {
+ #ifdef CONFIG_OF
+-		struct device_node *nproot, *np;
++		struct device_node *nproot = da9052->dev->of_node;
++		struct device_node *np;
+ 
+-		nproot = of_node_get(da9052->dev->of_node);
+ 		if (!nproot)
+ 			return -ENODEV;
+ 
+diff --git a/drivers/regulator/max8907-regulator.c b/drivers/regulator/max8907-regulator.c
+index 9623e9e..3426be8 100644
+--- a/drivers/regulator/max8907-regulator.c
++++ b/drivers/regulator/max8907-regulator.c
+@@ -226,7 +226,7 @@ static int max8907_regulator_parse_dt(struct platform_device *pdev)
+ 	struct device_node *np, *regulators;
+ 	int ret;
+ 
+-	np = of_node_get(pdev->dev.parent->of_node);
++	np = pdev->dev.parent->of_node;
+ 	if (!np)
+ 		return 0;
+ 
+diff --git a/drivers/regulator/max8925-regulator.c b/drivers/regulator/max8925-regulator.c
+index dad2bcd..7770777 100644
+--- a/drivers/regulator/max8925-regulator.c
++++ b/drivers/regulator/max8925-regulator.c
+@@ -250,7 +250,7 @@ static int max8925_regulator_dt_init(struct platform_device *pdev,
+ 	struct device_node *nproot, *np;
+ 	int rcount;
+ 
+-	nproot = of_node_get(pdev->dev.parent->of_node);
++	nproot = pdev->dev.parent->of_node;
+ 	if (!nproot)
+ 		return -ENODEV;
+ 	np = of_get_child_by_name(nproot, "regulators");
+diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c
+index 90b4c53..9c31e21 100644
+--- a/drivers/regulator/max8997.c
++++ b/drivers/regulator/max8997.c
+@@ -917,7 +917,7 @@ static int max8997_pmic_dt_parse_pdata(struct platform_device *pdev,
+ 	struct max8997_regulator_data *rdata;
+ 	unsigned int i, dvs_voltage_nr = 1, ret;
+ 
+-	pmic_np = of_node_get(iodev->dev->of_node);
++	pmic_np = iodev->dev->of_node;
+ 	if (!pmic_np) {
+ 		dev_err(&pdev->dev, "could not find pmic sub-node\n");
+ 		return -ENODEV;
+diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
+index a7ce34d..1878e5b 100644
+--- a/drivers/regulator/palmas-regulator.c
++++ b/drivers/regulator/palmas-regulator.c
+@@ -1427,7 +1427,6 @@ static void palmas_dt_to_pdata(struct device *dev,
+ 	u32 prop;
+ 	int idx, ret;
+ 
+-	node = of_node_get(node);
+ 	regulators = of_get_child_by_name(node, "regulators");
+ 	if (!regulators) {
+ 		dev_info(dev, "regulator node not found\n");
+diff --git a/drivers/regulator/tps65910-regulator.c b/drivers/regulator/tps65910-regulator.c
+index 2064507..18fc991 100644
+--- a/drivers/regulator/tps65910-regulator.c
++++ b/drivers/regulator/tps65910-regulator.c
+@@ -1014,7 +1014,7 @@ static struct tps65910_board *tps65910_parse_dt_reg_data(
+ 	if (!pmic_plat_data)
+ 		return NULL;
+ 
+-	np = of_node_get(pdev->dev.parent->of_node);
++	np = pdev->dev.parent->of_node;
+ 	regulators = of_get_child_by_name(np, "regulators");
+ 	if (!regulators) {
+ 		dev_err(&pdev->dev, "regulator node not found\n");
+-- 
+1.9.1
