@@ -1,110 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 09 Sep 2014 18:53:00 -0700
-Subject: [PATCH v10 2/9] clk: Move all drivers to use internal API
-In-Reply-To: <20140909192503.19023.33476@quantum>
-References: <1410271329-26637-1-git-send-email-tomeu.vizoso@collabora.com>
- <1410271497-27148-1-git-send-email-tomeu.vizoso@collabora.com>
- <20140909191205.19023.61366@quantum> <20140909192503.19023.33476@quantum>
-Message-ID: <540FAEFC.9050102@codeaurora.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 10 Sep 2014 09:55:48 +0800
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+ <540E960D.7080408@huawei.com>
+ <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+ <540EC8CB.7010106@huawei.com>
+ <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
+Message-ID: <540FAFA4.1080008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/14 12:25, Mike Turquette wrote:
->
-> I'm starting to get nervous about this Coccinelle script... Seems like a
-> lot of things are slipping through.
->
+>> OK. Sorry, I have one last question, because domain will be used to calculate the address used to
+>> access PCI hardware config registers. So if DTS file doesn't report the domain, how do we know
+>> we would access the right registers when we use the auto increment domain vaule ?
+>> Has there a mechanism to make sure system can access the correct registers by the domain ?
+> 
+> I think you're referring to config access via ECAM (PCIe r3.0, sec
+> 7.2.2).  In that case, I don't think the domain should be used to
+> compute the memory-mapped configuration address.  Each host bridge is
+> in exactly one domain, and each host bridge has an associated ECAM
+> area base.  The address calculation uses the bus number, device
+> number, function number, and register number to compute an offset into
+> the ECAM area.
+> 
+> So as long as the DT tells you the ECAM information for each host
+> bridge, that should be sufficient.  The domain number is then just a
+> Linux convenience and is not tied to the platform as it is on ia64.
 
-Do we need to make this huge invasive change to every clock driver? If
-we gave every clk_hw instance it's own private struct clk pointer at
-registration time and also created a pointer for the parents of the
-clk_hw instance then we could use that pointer throughout the clock
-provider drivers. This way we don't have to change any ops signatures
-and we don't have to go through every clock provider and fix things up.
-The good news is we already have this via hw->clk. We could also make
-this an opt-in behavior where the clock provider could register clkdev
-lookups and clock providers the old way or the new way. The new way
-would be a different registration function and a different clk_src_get
-function:
+Hi Bjorn, you are right, thanks for your detailed explanation! :)
 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 6dec0b306336..e82b3b987f63 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -573,6 +573,10 @@ int of_clk_add_provider(struct device_node *np,
-                        struct clk *(*clk_src_get)(struct of_phandle_args *args,
-                                                   void *data),
-                        void *data);
-+int of_clk_add_provider_hw(struct device_node *np,
-+                       struct clk_hw *(*clk_src_get)(struct of_phandle_args *args,
-+                                                  void *data),
-+                       void *data);
- void of_clk_del_provider(struct device_node *np);
- struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
-                                  void *data);
+Thanks!
+Yijing.
 
-and add a new member to struct of_clk_provider for the new clk_src_get
-prototype. Then the clkdev framework wouldn't even need to know in the
-OF case that the struct clk pointer is dynamically allocated. If we
-really want to pass that con_id and dev_id stuff down into the
-allocation layer we can always change the of_clk_get_from_provider()
-functions to take more arguments. Note that clk_register() stays the
-same here because a clock pointer is always allocated at registration time.
+> 
+> Bjorn
+> 
+> .
+> 
 
-Then we have clkdev_add() and friends to deal with in clkdev. Honestly,
-the current patches make it really ugly inside clkdev.c with all those
-#ifdefs and clk_core_t typedef. clk_get() and clk_put() are pretty much
-different functions depending on if the ccf is used or not, so why even
-combine the two together? The fundamental change here is that the clkdev
-APIs are struct clk focused and they rely on the struct clk pointer
-existing when the lookup is registered. We'd like to change that and
-have clk_get() generate the struct clk on the fly. We can support both
-at the same time if we do something like:
-
-diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-index 94bad77eeb4a..5f8af5ec2565 100644
---- a/include/linux/clkdev.h
-+++ b/include/linux/clkdev.h
-@@ -15,6 +15,7 @@
- #include <asm/clkdev.h>
- 
- struct clk;
-+struct clk_hw;
- struct device;
- 
- struct clk_lookup {
-@@ -22,6 +23,9 @@ struct clk_lookup {
-        const char              *dev_id;
-        const char              *con_id;
-        struct clk              *clk;
-+#ifdef CONFIG_COMMON_CLK
-+       struct clk_hw           *hw;
-+#endif
- };
- 
- #define CLKDEV_INIT(d, n, c)   \
-@@ -41,6 +45,9 @@ void clkdev_add_table(struct clk_lookup *, size_t);
- int clk_add_alias(const char *, const char *, char *, struct device *);
- 
- int clk_register_clkdev(struct clk *, const char *, const char *, ...);
-+#ifdef CONFIG_COMMON_CLK
-+int clk_register_clkdev_hw(struct clk_hw *, const char *, const char *, ...);
-+#endif
- int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
- 
-
-
-And then have the clkdev code look for a struct clk_hw pointer in the
-lookup. If such a pointer exists, call the ccf function to generate a
-struct clk on the fly. Otherwise return the clk pointer that's there.
-
-I must have missed something, perhaps statically allocated struct clk
-pointers exist somewhere? Anyway, it seems possible to make this much
-less invasive. I would think that we want to have struct clk used in the
-clk_ops because that allows us to do per-user constraints for clocks
-within the tree, instead of just supporting constraints at the user
-boundary (basically we want every clk_hw to have a vote too).
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks!
+Yijing
