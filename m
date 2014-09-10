@@ -1,87 +1,193 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 10 Sep 2014 14:43:17 -0700
-Subject: [PATCH v2] clk: Don't hold prepare_lock across debugfs creation
-In-Reply-To: <20140906000000.GB22593@codeaurora.org>
-References: <CAF6AEGtk=KhW+m-jc6VzH=pHGgnE1Uzq0tYiqqnX0sPHV1rbPQ@mail.gmail.com>
- <1409899069-13313-1-git-send-email-sboyd@codeaurora.org>
- <20140906000000.GB22593@codeaurora.org>
-Message-ID: <20140910214317.19023.44430@quantum>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 11 Sep 2014 00:22:35 +0200
+Subject: [PATCH v2] iio: adc: rockchip_saradc: add support for rk3066-tsadc
+ variant
+Message-ID: <1629907.fyghANjlk9@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-09-05 17:00:00)
-> On 09/04, Stephen Boyd wrote:
-> > 
-> > I don't understand why we need to hold the prepare lock around
-> > the kref_put(), so I changed the flow so that we don't do this
-> > when we unregister a clock.
-> 
-> Ok we hold the prepare mutex to make sure get and put are serialized.
-> Good. Here's the interdiff to move the debugfs unregistration before
-> the prepare lock and detect double unregisters without holding
-> the prepare lock.
+Older Rockchip SoCs, at least the rk3066, used a slightly modified saradc
+for temperature measurements. This so called tsadc does not contain any
+active parts like temperature interrupts and only supports polling the
+current temperature. The returned voltage can then be converted by a
+suitable thermal driver to and actual temperature and used for thermal
+handling.
 
-Looks good to me. I've rolled this into the original above and applied
-it to clk-next.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes since v1:
+- use GENMASK instead of creating the mask manually
+  as suggested by Hartmut Knaack
 
-Regards,
-Mike
+I've also opted for simply keeping the indent mismatch in
+struct rockchip_saradc, as I don't think it's worth the churn
+it produces
 
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 3c04d0d69b96..8ca28189e4e9 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -338,10 +338,14 @@ unlock:
->  static void clk_debug_unregister(struct clk *clk)
->  {
->         mutex_lock(&clk_debug_lock);
-> -       hlist_del_init(&clk->debug_node);
-> -       mutex_unlock(&clk_debug_lock);
-> +       if (!clk->dentry)
-> +               goto out;
->  
-> +       hlist_del_init(&clk->debug_node);
->         debugfs_remove_recursive(clk->dentry);
-> +       clk->dentry = NULL;
-> +out:
-> +       mutex_unlock(&clk_debug_lock);
->  }
->  
->  struct dentry *clk_debugfs_add_file(struct clk *clk, char *name, umode_t mode,
-> @@ -2065,14 +2069,15 @@ void clk_unregister(struct clk *clk)
->  {
->         unsigned long flags;
->  
-> -       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
-> -               return;
-> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
-> +               return;
-> +
-> +       clk_debug_unregister(clk);
->  
->         clk_prepare_lock();
->  
->         if (clk->ops == &clk_nodrv_ops) {
->                 pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
-> -               clk_prepare_unlock();
->                 return;
->         }
->         /*
-> @@ -2097,11 +2102,9 @@ void clk_unregister(struct clk *clk)
->         if (clk->prepare_count)
->                 pr_warn("%s: unregistering prepared clock: %s\n",
->                                         __func__, clk->name);
-> -       clk_prepare_unlock();
-> -
-> -       clk_debug_unregister(clk);
-> -
->         kref_put(&clk->ref, __clk_release);
-> +
-> +       clk_prepare_unlock();
->  }
->  EXPORT_SYMBOL_GPL(clk_unregister);
->  
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+ .../bindings/iio/adc/rockchip-saradc.txt           |  2 +-
+ drivers/iio/adc/rockchip_saradc.c                  | 62 +++++++++++++++++-----
+ 2 files changed, 50 insertions(+), 14 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+index 5d3ec1d..a9a5fe1 100644
+--- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+@@ -1,7 +1,7 @@
+ Rockchip Successive Approximation Register (SAR) A/D Converter bindings
+ 
+ Required properties:
+-- compatible: Should be "rockchip,saradc"
++- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
+ - reg: physical base address of the controller and length of memory mapped
+        region.
+ - interrupts: The interrupt number to the cpu. The interrupt specifier format
+diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+index e074a0b..99200b7 100644
+--- a/drivers/iio/adc/rockchip_saradc.c
++++ b/drivers/iio/adc/rockchip_saradc.c
+@@ -18,13 +18,13 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/clk.h>
+ #include <linux/completion.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/iio/iio.h>
+ 
+ #define SARADC_DATA			0x00
+-#define SARADC_DATA_MASK		0x3ff
+ 
+ #define SARADC_STAS			0x04
+ #define SARADC_STAS_BUSY		BIT(0)
+@@ -38,15 +38,22 @@
+ #define SARADC_DLY_PU_SOC		0x0c
+ #define SARADC_DLY_PU_SOC_MASK		0x3f
+ 
+-#define SARADC_BITS			10
+ #define SARADC_TIMEOUT			msecs_to_jiffies(100)
+ 
++struct rockchip_saradc_data {
++	int				num_bits;
++	const struct iio_chan_spec	*channels;
++	int				num_channels;
++	unsigned long			clk_rate;
++};
++
+ struct rockchip_saradc {
+ 	void __iomem		*regs;
+ 	struct clk		*pclk;
+ 	struct clk		*clk;
+ 	struct completion	completion;
+ 	struct regulator	*vref;
++	const struct rockchip_saradc_data *data;
+ 	u16			last_val;
+ };
+ 
+@@ -90,7 +97,7 @@ static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
+ 		}
+ 
+ 		*val = ret / 1000;
+-		*val2 = SARADC_BITS;
++		*val2 = info->data->num_bits;
+ 		return IIO_VAL_FRACTIONAL_LOG2;
+ 	default:
+ 		return -EINVAL;
+@@ -103,7 +110,7 @@ static irqreturn_t rockchip_saradc_isr(int irq, void *dev_id)
+ 
+ 	/* Read value */
+ 	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
+-	info->last_val &= SARADC_DATA_MASK;
++	info->last_val &= GENMASK(info->data->num_bits - 1, 0);
+ 
+ 	/* Clear irq & power down adc */
+ 	writel_relaxed(0, info->regs + SARADC_CTRL);
+@@ -133,12 +140,44 @@ static const struct iio_chan_spec rockchip_saradc_iio_channels[] = {
+ 	ADC_CHANNEL(2, "adc2"),
+ };
+ 
++static const struct rockchip_saradc_data saradc_data = {
++	.num_bits = 10,
++	.channels = rockchip_saradc_iio_channels,
++	.num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels),
++	.clk_rate = 1000000,
++};
++
++static const struct iio_chan_spec rockchip_rk3066_tsadc_iio_channels[] = {
++	ADC_CHANNEL(0, "adc0"),
++	ADC_CHANNEL(1, "adc1"),
++};
++
++static const struct rockchip_saradc_data rk3066_tsadc_data = {
++	.num_bits = 12,
++	.channels = rockchip_rk3066_tsadc_iio_channels,
++	.num_channels = ARRAY_SIZE(rockchip_rk3066_tsadc_iio_channels),
++	.clk_rate = 50000,
++};
++
++static const struct of_device_id rockchip_saradc_match[] = {
++	{
++		.compatible = "rockchip,saradc",
++		.data = &saradc_data,
++	}, {
++		.compatible = "rockchip,rk3066-tsadc",
++		.data = &rk3066_tsadc_data,
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
++
+ static int rockchip_saradc_probe(struct platform_device *pdev)
+ {
+ 	struct rockchip_saradc *info = NULL;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct iio_dev *indio_dev = NULL;
+ 	struct resource	*mem;
++	const struct of_device_id *match;
+ 	int ret;
+ 	int irq;
+ 
+@@ -152,6 +191,9 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+ 	}
+ 	info = iio_priv(indio_dev);
+ 
++	match = of_match_device(rockchip_saradc_match, &pdev->dev);
++	info->data = match->data;
++
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	info->regs = devm_ioremap_resource(&pdev->dev, mem);
+ 	if (IS_ERR(info->regs))
+@@ -195,7 +237,7 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+ 	 * Use a default of 1MHz for the converter clock.
+ 	 * This may become user-configurable in the future.
+ 	 */
+-	ret = clk_set_rate(info->clk, 1000000);
++	ret = clk_set_rate(info->clk, info->data->clk_rate);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "failed to set adc clk rate, %d\n", ret);
+ 		return ret;
+@@ -227,8 +269,8 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+ 	indio_dev->info = &rockchip_saradc_iio_info;
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+ 
+-	indio_dev->channels = rockchip_saradc_iio_channels;
+-	indio_dev->num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels);
++	indio_dev->channels = info->data->channels;
++	indio_dev->num_channels = info->data->num_channels;
+ 
+ 	ret = iio_device_register(indio_dev);
+ 	if (ret)
+@@ -296,12 +338,6 @@ static int rockchip_saradc_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(rockchip_saradc_pm_ops,
+ 			 rockchip_saradc_suspend, rockchip_saradc_resume);
+ 
+-static const struct of_device_id rockchip_saradc_match[] = {
+-	{ .compatible = "rockchip,saradc" },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
+-
+ static struct platform_driver rockchip_saradc_driver = {
+ 	.probe		= rockchip_saradc_probe,
+ 	.remove		= rockchip_saradc_remove,
+-- 
+2.0.1
