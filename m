@@ -1,50 +1,96 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Wed, 10 Sep 2014 19:32:36 +0200
-Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
-In-Reply-To: <20140910151316.GG7960@sirena.org.uk>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
- <1410089869-6611-3-git-send-email-info@lategoodbye.de>
- <20140909182211.GG3896@leverpostej> <540F523D.4010904@lategoodbye.de>
- <20140910141853.GA4994@leverpostej> <20140910151316.GG7960@sirena.org.uk>
-Message-ID: <54108B34.6010701@lategoodbye.de>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 10 Sep 2014 13:12:38 -0400
+Subject: [PATCH v3 1/2] PCI: keystone: remove handle of PCI mode configuration
+Message-ID: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Keystone PCI hardware supports both RC and EP modes and devcfg
+register has bits to boot strap the device to either of these modes.
+It seems proper to add this functionality to the boot loader rather
+than in the driver as device will be operating in either mode, not
+both any time. Currently the driver supports only RC mode and hence
+register configuration in the driver is not needed and driver can
+assume this is a RC hardware.
 
-Am 10.09.2014 17:13, schrieb Mark Brown:
-> On Wed, Sep 10, 2014 at 03:18:53PM +0100, Mark Rutland wrote:
->> On Tue, Sep 09, 2014 at 08:17:17PM +0100, Stefan Wahren wrote:
->
-> Ugh, this looks like it might be a regulator driver but since the
-> subject line was "ARM: " I deleted it unread - if your changelog looks
-> different to all the other changelogs in the subsystem it probably needs
-> changing.
+Also update the DT documentation accordingly.
 
-sorry about the confusion, i will remove ARM in the next version.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+	v3 - No change
+	v2 - Added this separate patch to remove pci mode handling
+ .../devicetree/bindings/pci/pci-keystone.txt       |    4 +---
+ drivers/pci/host/pci-keystone.c                    |   21 ++------------------
+ 2 files changed, 3 insertions(+), 22 deletions(-)
 
-Changelog? I didn't send a changelog because it was my first version.
-
-Should i resend this version only to you?
-
->
->>>>> +       sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
->>>>> +       if (!sreg)
->>>>> +               return -ENOMEM;
->>>>> +       sreg->initdata = initdata;
->>>>> +       sreg->name = of_get_property(np, "regulator-name", NULL);
->
->>>> I'm not keen on using of_get_property here. We have no idea if
->>>> regulator-name is even a string (it should be, but we have no
->>>> guarantee).
->
->>> Better using of_property_read_string?
->
->> Yes. That will check the value is NUL-terminated, at least.
->
-> Or just remove the property entirely...  without having seen the
-> bindings if we're specifying the name of the device via the device tree
-> something seems wrong.
->
-
-BR Stefan
+diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+index ceb3e24..bedacf0 100644
+--- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
++++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+@@ -13,9 +13,7 @@ Required Properties:-
+ 
+ compatibility: "ti,keystone-pcie"
+ reg:	index 1 is the base address and length of DW application registers.
+-	index 2 is the base address and length of PCI mode configuration
+-	register.
+-	index 3 is the base address and length of PCI device ID register.
++	index 2 is the base address and length of PCI device ID register.
+ 
+ pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
+ 	interrupt-cells: should be set to 1
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index ff8ed25..f1119eb 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -35,10 +35,6 @@
+ #define MAX_MSI_HOST_IRQS		8
+ #define MAX_LEGACY_HOST_IRQS		4
+ 
+-/* RC mode settings masks */
+-#define PCIE_RC_MODE		BIT(2)
+-#define PCIE_MODE_MASK		(BIT(1) | BIT(2))
+-
+ /* DEV_STAT_CTRL */
+ #define PCIE_CAP_BASE		0x70
+ 
+@@ -355,7 +351,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	void __iomem *reg_p;
+ 	struct phy *phy;
+ 	int ret = 0;
+-	u32 val;
+ 
+ 	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+ 				GFP_KERNEL);
+@@ -365,18 +360,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	}
+ 	pp = &ks_pcie->pp;
+ 
+-	/* index 2 is the devcfg register for RC mode settings */
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+-	reg_p = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(reg_p))
+-		return PTR_ERR(reg_p);
+-
+-	/* enable RC mode in devcfg */
+-	val = readl(reg_p);
+-	val &= ~PCIE_MODE_MASK;
+-	val |= PCIE_RC_MODE;
+-	writel(val, reg_p);
+-
+ 	/* initialize SerDes Phy if present */
+ 	phy = devm_phy_get(dev, "pcie-phy");
+ 	if (!IS_ERR_OR_NULL(phy)) {
+@@ -385,8 +368,8 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 			return ret;
+ 	}
+ 
+-	/* index 3 is to read PCI DEVICE_ID */
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
++	/* index 2 is to read PCI DEVICE_ID */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	reg_p = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(reg_p))
+ 		return PTR_ERR(reg_p);
+-- 
+1.7.9.5
