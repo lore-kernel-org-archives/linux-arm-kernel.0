@@ -1,25 +1,28 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 10 Sep 2014 11:00:35 +0200
-Subject: [PATCH 2/6] ARM: dts: add hdmi regulators for exynos5800 based
- peach-pi board
-In-Reply-To: <CAD=FV=V+8-zDPu9MhrGV6eMwfb7nvqhCxBnMtDsduc-WUK2Rcg@mail.gmail.com>
-References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>	<1408460913-13863-3-git-send-email-javier.martinez@collabora.co.uk>	<CAD=FV=U+5mHxyT0E6u8wt2qdZVhsB-K_NKprQvRu7XUeh=iCSg@mail.gmail.com>
- <CAD=FV=V+8-zDPu9MhrGV6eMwfb7nvqhCxBnMtDsduc-WUK2Rcg@mail.gmail.com>
-Message-ID: <54101333.3090405@collabora.co.uk>
+Date: Wed, 10 Sep 2014 11:02:38 +0200
+Subject: [PATCH v2 5/5] ARM: dts: Add Peach Pit and Pi dts entry for
+ ISL29018 sensor
+In-Reply-To: <CAD=FV=WdMx=7oLChYz-y2cY=MBpJmT7KXBq_hMV7FS16VT+85w@mail.gmail.com>
+References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>	<1408533593-32346-6-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=WdMx=7oLChYz-y2cY=MBpJmT7KXBq_hMV7FS16VT+85w@mail.gmail.com>
+Message-ID: <541013AE.6090805@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Doug,
 
-On 09/10/2014 06:45 AM, Doug Anderson wrote:
->>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
+On 09/10/2014 06:52 AM, Doug Anderson wrote:
 > 
-> Meant to add this to the v2.  Sorry for the spam...
-> 
+> I would note that the downstream dts file has this i2c bus at 400kHz.
+> ...but that's not a problem with your patch.  Perhaps you could submit
+> that as a separate patch?
+>
 
-No worries, I've to re-spin anyways to fix the issue you pointed on Patch #1
-so I'll include your Reviewed-by tag.
+Indeed, I've to re-spin anyways so I'll include that on the next version as a
+separate patch.
+
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> 
 
 Best regards,
 Javier
