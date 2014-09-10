@@ -1,191 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 10 Sep 2014 10:55:39 +0200
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-Message-ID: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
+Date: Wed, 10 Sep 2014 18:55:41 +1000
+Subject: [PATCH reword] ARM: MVEBU: Netgear RN102: Use Hardware BCH ECC
+Message-ID: <1410339341-3372-1-git-send-email-klightspeed@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several MTD users (either in user or kernel space) expect a valid raw
-access support to NAND chip devices.
-This is particularly true for testing tools which are often touching the
-data stored in a NAND chip in raw mode to artificially generate errors.
+The bootloader on the Netgear ReadyNAS RN102 uses Hardware BCH ECC
+(strength = 4), while the pxa3xx NAND driver by default uses 
+Hamming ECC (strength = 1).
 
-The GPMI drivers do not implemenent raw access functions, and thus rely on
-default HW_ECC scheme implementation.
-The default implementation consider the data and OOB area as properly
-separated in their respective NAND section, which is not true for the GPMI
-controller.
-In this driver/controller some OOB data are stored at the beginning of the
-NAND data area (these data are called metadata in the driver), then ECC
-bytes are interleaved with data chunk (which is similar to the
-HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-OOB data.
+This patch changes the ECC mode on these machines to match that
+of the bootloader and of the stock firmware. That way, it is
+now possible to update the kernel from userland (e.g. using
+standard tools from mtd-utils package); u-boot will happily
+load and boot it.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Fixes: 92beaccd8b49 ("ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts file")
+Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Tested-by: Arnaud Ebalard <arno@natisbad.org>
 ---
-Hello,
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-This patch is providing raw access support to the GPMI driver which is
-particularly useful to run some tests on the NAND (the one coming in
-mind is the mtd_nandbiterrs testsuite).
-
-I know this rework might break several user space tools which are relying
-on the default raw access implementation (I already experienced an issue
-with the kobs-ng tool provided by freescale), but many other tools will
-now work as expected.
-
-Huang, Brian, let me know what you think of this approach ?
-
-Best Regards,
-
-Boris
-
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 119 ++++++++++++++++++++++++++++++++-
- 1 file changed, 118 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 959cb9b..b26e032 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -831,7 +831,13 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
- 	 * power of two and is much larger than four, which guarantees the
- 	 * auxiliary buffer will appear on a 32-bit boundary.
- 	 */
--	this->page_buffer_size = geo->payload_size + geo->auxiliary_size;
-+	if (geo->payload_size + geo->auxiliary_size >
-+	    mtd->writesize + mtd->oobsize)
-+		this->page_buffer_size =
-+				geo->payload_size + geo->auxiliary_size;
-+	else
-+		this->page_buffer_size = mtd->writesize + mtd->oobsize;
-+
- 	this->page_buffer_virt = dma_alloc_coherent(dev, this->page_buffer_size,
- 					&this->page_buffer_phys, GFP_DMA);
- 	if (!this->page_buffer_virt)
-@@ -1347,6 +1353,115 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
- 	return status & NAND_STATUS_FAIL ? -EIO : 0;
- }
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index d6d572e..285524f 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -143,6 +143,10 @@
+ 				marvell,nand-enable-arbiter;
+ 				nand-on-flash-bbt;
  
-+static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
-+				  struct nand_chip *chip, uint8_t *buf,
-+				  int oob_required, int page)
-+{
-+	struct gpmi_nand_data *this = chip->priv;
-+	struct bch_geometry *nfc_geo = &this->bch_geometry;
-+	int eccsize = nfc_geo->ecc_chunk_size;
-+	int eccbytes = DIV_ROUND_UP(nfc_geo->ecc_strength * nfc_geo->gf_len,
-+				    8);
-+	uint8_t *oob = chip->oob_poi;
-+	int step;
-+	int column = 0;
-+	uint8_t *orig_buf = buf;
++				/* Use Hardware BCH ECC */
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
 +
-+	chip->read_buf(mtd, oob, nfc_geo->metadata_size);
-+	oob += nfc_geo->metadata_size;
-+
-+	column += nfc_geo->metadata_size;
-+	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-+		chip->read_buf(mtd, buf, eccsize);
-+		buf += eccsize;
-+		column += eccsize;
-+		chip->read_buf(mtd, oob, eccbytes);
-+		oob += eccbytes;
-+		column += eccbytes;
-+	}
-+
-+	if (column < mtd->writesize + mtd->oobsize)
-+		chip->read_buf(mtd, oob,
-+			       mtd->writesize + mtd->oobsize - column);
-+
-+	block_mark_swapping(this, orig_buf, chip->oob_poi);
-+
-+	return 0;
-+}
-+
-+static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
-+				   struct nand_chip *chip,
-+				   const uint8_t *buf,
-+				   int oob_required)
-+{
-+	struct gpmi_nand_data *this = chip->priv;
-+	struct bch_geometry *nfc_geo = &this->bch_geometry;
-+	int eccsize = nfc_geo->ecc_chunk_size;
-+	int eccbytes = DIV_ROUND_UP(nfc_geo->ecc_strength * nfc_geo->gf_len,
-+				    8);
-+	uint8_t *oob = chip->oob_poi;
-+	int step;
-+	int column = 0;
-+
-+	if (this->swap_block_mark) {
-+		/*
-+		 * If control arrives here, we're doing block mark swapping.
-+		 * Since we can't modify the caller's buffers, we must copy them
-+		 * into our own.
-+		 */
-+		memcpy(this->page_buffer_virt, buf, mtd->writesize);
-+		if (oob_required)
-+			memcpy(this->page_buffer_virt + mtd->writesize,
-+			       chip->oob_poi, mtd->oobsize);
-+		else
-+			memset(this->page_buffer_virt + mtd->writesize,
-+			       0xff, mtd->oobsize);
-+
-+		/* Handle block mark swapping. */
-+		block_mark_swapping(this, this->page_buffer_virt,
-+				    this->page_buffer_virt + mtd->writesize);
-+
-+		oob = this->page_buffer_virt + mtd->writesize;
-+		buf = this->page_buffer_virt;
-+	}
-+
-+	if (oob_required) {
-+		chip->write_buf(mtd, oob, nfc_geo->metadata_size);
-+		oob += nfc_geo->metadata_size;
-+	} else {
-+		/*
-+		 * Write the data byte in the OOB area if BB marker swapping
-+		 * is requested.
-+		 */
-+		if (this->swap_block_mark)
-+			chip->write_buf(mtd, oob, 1);
-+
-+		chip->cmdfunc(mtd, NAND_CMD_SEQIN,
-+			      column, -1);
-+	}
-+	column += nfc_geo->metadata_size;
-+
-+	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-+		chip->write_buf(mtd, buf, eccsize);
-+		buf += eccsize;
-+		column += eccsize;
-+		if (oob_required) {
-+			chip->write_buf(mtd, oob, eccbytes);
-+			oob += eccbytes;
-+		} else {
-+			chip->cmdfunc(mtd, NAND_CMD_SEQIN,
-+				      column + eccbytes, -1);
-+		}
-+		column += eccbytes;
-+	}
-+
-+	if (oob_required && column < mtd->writesize + mtd->oobsize)
-+		chip->write_buf(mtd, oob,
-+				mtd->writesize + mtd->oobsize - column);
-+
-+	return 0;
-+}
-+
- static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
- {
- 	struct nand_chip *chip = mtd->priv;
-@@ -1664,6 +1779,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
- 	ecc->write_page	= gpmi_ecc_write_page;
- 	ecc->read_oob	= gpmi_ecc_read_oob;
- 	ecc->write_oob	= gpmi_ecc_write_oob;
-+	ecc->read_page_raw = gpmi_ecc_read_page_raw;
-+	ecc->write_page_raw = gpmi_ecc_write_page_raw;
- 	ecc->mode	= NAND_ECC_HW;
- 	ecc->size	= bch_geo->ecc_chunk_size;
- 	ecc->strength	= bch_geo->ecc_strength;
+ 				partition at 0 {
+ 					label = "u-boot";
+ 					reg = <0x0000000 0x180000>;  /* 1.5MB */
 -- 
-1.9.1
+1.8.5.5
