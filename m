@@ -1,58 +1,62 @@
-From: B31939@freescale.com (Lian Minghuan-B31939)
-Date: Wed, 10 Sep 2014 11:29:31 +0000
-Subject: =?UTF-8?B?562U5aSNOiBbUEFUQ0ggMi8yXSBQQ0k6IExheWVyc2NhcGU6IEE=?=
- =?UTF-8?B?ZGQgTGF5ZXJzY2FwZSBQQ0llIGRyaXZlcg==?=
-In-Reply-To: <10318509.zOTEUpfc9B@wuerfel>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <60096763.M59cqLJ4gm@wuerfel> <540F51F1.1060909@freescale.com>
- <10318509.zOTEUpfc9B@wuerfel>
-Message-ID: <5410361B.20005@freescale.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Wed, 10 Sep 2014 03:31:19 +0000
+Subject: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale LS1021A
+In-Reply-To: <3532608.xLS91GQkq4@wuerfel>
+References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
+ <1410253952-15631-6-git-send-email-jingchang.lu@freescale.com>
+ <3532608.xLS91GQkq4@wuerfel>
+Message-ID: <daf5ec5b70164b3e9a810def41909c48@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 2014?09?09? 11:58, Arnd Bergmann wrote:
-> On Tuesday 09 September 2014 19:16:01 Lian Minghuan-B31939 wrote:
->> On 2014?09?09? 10:50, Arnd Bergmann wrote:
->>> On Tuesday 09 September 2014 18:46:59 Lian Minghuan-B31939 wrote:
->>>> On 2014?09?09? 09:56, Arnd Bergmann wrote:
->>>>> On Tuesday 09 September 2014 17:25:57 Lian Minghuan-B31939 wrote:
->>>>>> [Minghuan] I discussed with my colleague. They worry about performance
->>>>>> degradation if using regmap API,
->>>>>> because there are some fast device use scfg. We tend to use a simple way
->>>>>> to map andread/write scfg directly.
->>>>> I see. In this case, I would probably create a separate msi controller
->>>>> driver that owns the "fsl,ls1021a-scfg" device, and is referenced
->>>>> through the "msi-parent" property in the pcie controller.
->>>>>
->>>>> You can use of_pci_find_msi_chip_by_node() to get the msi_chip
->>>>> instance and then connect that to your pci host. This will also
->>>>> take care of the case where you may want to use the main GICv3
->>>>> on a future SoC.
->>>> [Minghuan] There is something wrong with LS1021A MSI hardware that it
->>>> only supports one interrupt not 32 interrupts.  Now, I do not want to
->>>> create a separate msi controller driver just for incorrect hardware.
->>>> I may provide complete MSI driver for the new hardware when it is ready.
->>> Would you just leave out MSI support for the LS1021A PCIe variant?
->>> I guess that's fine because all device drivers should also support
->>> legacy interrupts and there is no performance gain in MSI in this
->>> case.
->> [Minghuan] I have added MSI support for LS1021A PCIe just reserved 31
->> interrupts as used.
-> I don't understand your logic then. If LS1021A has an incorrect MSI
-> implementation, and you may want to reuse the PCIe driver with a
-> future chip that either includes a correct MSI implementation, or
-> with one that uses the GICv3 instead, isn't that even more reason
-> to split out the MSI support into a separate driver?
+>-----Original Message-----
+>From: Arnd Bergmann [mailto:arnd at arndb.de]
+>Sent: Tuesday, September 09, 2014 7:41 PM
+>To: linux-arm-kernel at lists.infradead.org
+>Cc: Lu Jingchang-B35083; Guo Shawn-R65073; Lu Jingchang-B35083;
+>devicetree at vger.kernel.org
+>Subject: Re: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale
+>LS1021A
 >
-> That way you can at least separate the normal code path from the
-> broken one and don't need any special run-time or compile-conditionals
-> beyond calling of_pci_find_msi_chip_by_node().
-[Minghuan] The new MSI hardware implementation is not ready, I do not 
-know how to describe its dts node
-and how to implement its driver. When it is ready, I will implement the 
-driver and add a workaround
-for the current incorrect MSI. The current MSI driver is based on 
-pci-designware.
-> 	Arnd
+>On Tuesday 09 September 2014 17:12:31 Jingchang Lu wrote:
+>> +#include "common.h"
+>> +
+>> +static void __init ls1021a_init_machine(void) {
+>> +       mxc_arch_reset_init_dt();
+>> +       of_platform_populate(NULL, of_default_bus_match_table, NULL,
+>> +NULL); }
+>> +
+>> +static const char *ls1021a_dt_compat[] __initdata = {
+>> +       "fsl,ls1021a",
+>> +       NULL,
+>> +};
+>
+>Please don't add any new users of mxc_arch_reset_init_dt(). We now have
+>infrastructure to register a system-reset handler from the watchdog driver,
+>so please do that instead, and clean up the existing users as well.
+I just notice the restart_handler support, I will use that instead, thanks.
+
+>
+>> +DT_MACHINE_START(LS1021A, "Freescale LS1021A") #ifdef CONFIG_ZONE_DMA
+>> +       .dma_zone_size  = SZ_128M,
+>> +#endif
+>> +       .init_machine   = ls1021a_init_machine,
+>> +       .dt_compat      = ls1021a_dt_compat,
+>> +       .restart        = mxc_restart,
+>> +MACHINE_END
+>
+>I believe someone recently posted a patch to derive the dma_zone_size from
+>device tree. Can yo try to find that and see if that will work for you?
+>
+>Can you explain what the reason is for needing a DMA zone?
+>
+>	Arnd
+With LPAE enabled on our SoC, we meet the system complaint of
+"coherent DMA mask 0xffffffff is smaller than system GFP_DMA mask 0xffffffffffffffff",
+and I notice that CONFIG_ZONE_DMA and dma_zone_size is a common resolve for this.
+Thanks.
+
+
+
+Best Regards,
+Jingchang
