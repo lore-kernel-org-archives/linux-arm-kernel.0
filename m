@@ -1,225 +1,87 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 10 Sep 2014 16:27:25 -0500
-Subject: [REPOST PATCHv3 2/2] ARM: dts: OMAP2+: Add #mbox-cells property to
- all mailbox nodes
-In-Reply-To: <1410384445-44894-1-git-send-email-s-anna@ti.com>
-References: <1410384445-44894-1-git-send-email-s-anna@ti.com>
-Message-ID: <1410384445-44894-3-git-send-email-s-anna@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 10 Sep 2014 14:43:17 -0700
+Subject: [PATCH v2] clk: Don't hold prepare_lock across debugfs creation
+In-Reply-To: <20140906000000.GB22593@codeaurora.org>
+References: <CAF6AEGtk=KhW+m-jc6VzH=pHGgnE1Uzq0tYiqqnX0sPHV1rbPQ@mail.gmail.com>
+ <1409899069-13313-1-git-send-email-sboyd@codeaurora.org>
+ <20140906000000.GB22593@codeaurora.org>
+Message-ID: <20140910214317.19023.44430@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The '#mbox-cells' property is added to all the OMAP mailbox
-nodes. This property is mandatory with the new mailbox framework.
+Quoting Stephen Boyd (2014-09-05 17:00:00)
+> On 09/04, Stephen Boyd wrote:
+> > 
+> > I don't understand why we need to hold the prepare lock around
+> > the kref_put(), so I changed the flow so that we don't do this
+> > when we unregister a clock.
+> 
+> Ok we hold the prepare mutex to make sure get and put are serialized.
+> Good. Here's the interdiff to move the debugfs unregistration before
+> the prepare lock and detect double unregisters without holding
+> the prepare lock.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/am33xx.dtsi   |  1 +
- arch/arm/boot/dts/am4372.dtsi   |  1 +
- arch/arm/boot/dts/dra7.dtsi     | 13 +++++++++++++
- arch/arm/boot/dts/omap2420.dtsi |  1 +
- arch/arm/boot/dts/omap2430.dtsi |  1 +
- arch/arm/boot/dts/omap3.dtsi    |  1 +
- arch/arm/boot/dts/omap4.dtsi    |  1 +
- arch/arm/boot/dts/omap5.dtsi    |  1 +
- 8 files changed, 20 insertions(+)
+Looks good to me. I've rolled this into the original above and applied
+it to clk-next.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index e4f165a..5663ff5 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -352,6 +352,7 @@
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <77>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_wkupm3: wkup_m3 {
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index a0503be..77eb92f 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -166,6 +166,7 @@
- 			reg = <0x480C8000 0x200>;
- 			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_wkupm3: wkup_m3 {
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index d678152..fa97040 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -419,6 +419,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4a0f4000 0x200>;
- 			ti,hwmods = "mailbox1";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
- 			status = "disabled";
-@@ -428,6 +429,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4883a000 0x200>;
- 			ti,hwmods = "mailbox2";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -437,6 +439,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4883c000 0x200>;
- 			ti,hwmods = "mailbox3";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -446,6 +449,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4883e000 0x200>;
- 			ti,hwmods = "mailbox4";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -455,6 +459,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48840000 0x200>;
- 			ti,hwmods = "mailbox5";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -464,6 +469,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48842000 0x200>;
- 			ti,hwmods = "mailbox6";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -473,6 +479,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48844000 0x200>;
- 			ti,hwmods = "mailbox7";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -482,6 +489,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48846000 0x200>;
- 			ti,hwmods = "mailbox8";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -491,6 +499,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x4885e000 0x200>;
- 			ti,hwmods = "mailbox9";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -500,6 +509,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48860000 0x200>;
- 			ti,hwmods = "mailbox10";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -509,6 +519,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48862000 0x200>;
- 			ti,hwmods = "mailbox11";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -518,6 +529,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48864000 0x200>;
- 			ti,hwmods = "mailbox12";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-@@ -527,6 +539,7 @@
- 			compatible = "ti,omap4-mailbox";
- 			reg = <0x48802000 0x200>;
- 			ti,hwmods = "mailbox13";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <12>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index ae89aad..e2b2e93 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -157,6 +157,7 @@
- 			interrupts = <26>, <34>;
- 			interrupt-names = "dsp", "iva";
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <6>;
- 			mbox_dsp: dsp {
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index b56d7161..0dc8de2 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -247,6 +247,7 @@
- 			reg = <0x48094000 0x200>;
- 			interrupts = <26>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <6>;
- 			mbox_dsp: dsp {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index b2ae8b8..75c290f 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -332,6 +332,7 @@
- 			ti,hwmods = "mailbox";
- 			reg = <0x48094000 0x200>;
- 			interrupts = <26>;
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <2>;
- 			ti,mbox-num-fifos = <2>;
- 			mbox_dsp: dsp {
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index bc54d66..d08b98a 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -654,6 +654,7 @@
- 			reg = <0x4a0f4000 0x200>;
- 			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_ipu: mbox_ipu {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 43336c2..5562aa0 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -640,6 +640,7 @@
- 			reg = <0x4a0f4000 0x200>;
- 			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mailbox";
-+			#mbox-cells = <1>;
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_ipu: mbox_ipu {
--- 
-2.0.4
+Regards,
+Mike
+
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 3c04d0d69b96..8ca28189e4e9 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -338,10 +338,14 @@ unlock:
+>  static void clk_debug_unregister(struct clk *clk)
+>  {
+>         mutex_lock(&clk_debug_lock);
+> -       hlist_del_init(&clk->debug_node);
+> -       mutex_unlock(&clk_debug_lock);
+> +       if (!clk->dentry)
+> +               goto out;
+>  
+> +       hlist_del_init(&clk->debug_node);
+>         debugfs_remove_recursive(clk->dentry);
+> +       clk->dentry = NULL;
+> +out:
+> +       mutex_unlock(&clk_debug_lock);
+>  }
+>  
+>  struct dentry *clk_debugfs_add_file(struct clk *clk, char *name, umode_t mode,
+> @@ -2065,14 +2069,15 @@ void clk_unregister(struct clk *clk)
+>  {
+>         unsigned long flags;
+>  
+> -       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> -               return;
+> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
+> +               return;
+> +
+> +       clk_debug_unregister(clk);
+>  
+>         clk_prepare_lock();
+>  
+>         if (clk->ops == &clk_nodrv_ops) {
+>                 pr_err("%s: unregistered clock: %s\n", __func__, clk->name);
+> -               clk_prepare_unlock();
+>                 return;
+>         }
+>         /*
+> @@ -2097,11 +2102,9 @@ void clk_unregister(struct clk *clk)
+>         if (clk->prepare_count)
+>                 pr_warn("%s: unregistering prepared clock: %s\n",
+>                                         __func__, clk->name);
+> -       clk_prepare_unlock();
+> -
+> -       clk_debug_unregister(clk);
+> -
+>         kref_put(&clk->ref, __clk_release);
+> +
+> +       clk_prepare_unlock();
+>  }
+>  EXPORT_SYMBOL_GPL(clk_unregister);
+>  
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
