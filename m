@@ -1,77 +1,64 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 11 Sep 2014 19:26:48 +0200
-Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
-In-Reply-To: <20140911161517.GA3190@worktop.ger.corp.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
- <20140911161517.GA3190@worktop.ger.corp.intel.com>
-Message-ID: <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Sep 2014 10:29:25 -0700
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <5411DA67.2040402@arm.com>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com> <5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+Message-ID: <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, Aug 26, 2014 at 01:06:54PM +0200, Vincent Guittot wrote:
->> +static inline int group_has_free_capacity(struct sg_lb_stats *sgs,
->> +                     struct lb_env *env)
->>  {
->> +     if ((sgs->group_capacity_orig * 100) >
->> +                     (sgs->group_utilization * env->sd->imbalance_pct))
->> +             return 1;
->> +
->> +     if (sgs->sum_nr_running < sgs->group_weight)
->> +             return 1;
->>
->> +     return 0;
->> +}
->>
->> +static inline int group_is_overloaded(struct sg_lb_stats *sgs,
->> +                     struct lb_env *env)
->> +{
->> +     if (sgs->sum_nr_running <= sgs->group_weight)
->> +             return 0;
->>
->> +     if ((sgs->group_capacity_orig * 100) <
->> +                     (sgs->group_utilization * env->sd->imbalance_pct))
->> +             return 1;
->>
->> +     return 0;
->>  }
->
-> I'm confused about the utilization vs capacity_orig. I see how we should
+Marc,
 
-1st point is that I should compare utilization vs capacity and not
-capacity_orig.
-I should have replaced capacity_orig by capacity in the functions
-above when i move the utilization statistic from
-rq->avg.runnable_avg_sum to cfs.usage_load_avg.
-rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
-cfs.usage_load_avg integrates only cfs tasks
+On Thu, Sep 11, 2014 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> We would need to run this code potentially at processor bringup and
+>> after suspend/resume, but that seems possible too.
+>
+> Note that this would be an ARMv7 only thing (you can't do that on ARMv8,
+> at all).
 
-With this change, we don't need sgs->group_capacity_orig anymore but
-only sgs->group_capacity. So sgs->group_capacity_orig can be removed
-as it's no more used in the code as sg_capacity_factor has been
-removed
+Yes, of course.
 
-> maybe scale things with the capacity when comparing between CPUs/groups,
-> but not on the same CPU/group.
+
+>> Is the transition to monitor mode and back simple?  Where would you
+>> suggest putting this code?  It would definitely need to be pretty
+>> early.  We'd also need to be able to detect that we're in Secure SVC
+>> and not mess up anyone else who happened to boot in Non Secure SVC.
 >
-> I would have expected something simple like:
->
-> static inline bool group_has_capacity()
-> {
->         /* Is there a spare cycle? */
->         if (sgs->group_utilization < sgs->group_weight * SCHED_LOAD_SCALE)
->                 return true;
->
->         /* Are there less tasks than logical CPUs? */
->         if (sgs->sum_nr_running < sgs->group_weight)
->                 return true;
->
->         return false;
-> }
->
-> Where group_utilization a pure sum of running_avg.
->
-> Now this has a hole when there are RT tasks on the system, in that case
-> the utilization will never hit 1, but we could fix that another way. I
-> don't think the capacity_orig thing is right.
+> This would have to live in some very early platform-specific code. The
+> ugly part is that you cannot find out what world you're in (accessing
+> SCR is going to send you to UNDEF-land if accessed from NS).
+
+Yup, so the question is: would such code be accepted upstream, or are
+we going to embark on a big job for someone to figure out how to do
+this only to get NAKed?
+
+If there was some indication that folks would take this, I think we
+might be able to get it coded up.  If someone else wanted to volunteer
+to code it that would make me even happier, but maybe that's pushing
+my luck.  ;)
+
+
+> If I was suicidal, I'd suggest you could pass a parameter to the command
+> line, interpreted by the timer code... But I since I'm not, let's
+> pretend I haven't said anything... ;-)
+
+I did this in the past (again, see Sonny's thread), but didn't
+consider myself knowledgeable to know if that was truly a good test:
+
+       asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+       pr_info("DOUG: val is %#010x", val);
+       val |= (1 << 2);
+       asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
+       val = 0xffffffff;
+       asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+       pr_info("DOUG: val is %#010x", val);
+
+The idea being that if you can make modifications to the SCR register
+(and see your changes take effect) then you must be in secure mode.
+In my case the first printout was 0x0 and the second was 0x4.
+
+-Doug
