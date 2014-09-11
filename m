@@ -1,109 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 16:38:47 +0200
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20140911142511.GA2543@localhost.localdomain>
-References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911120928.GA1585@localhost.localdomain>
- <20140911143616.3ebb025a@bbrezillon>
- <20140911142511.GA2543@localhost.localdomain>
-Message-ID: <20140911163847.5e2f85c7@bbrezillon>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 11 Sep 2014 16:40:04 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <20140911141257.GC5149@katana>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <1410274470-12712-5-git-send-email-wsa@the-dreams.de>
+ <16809905.2REViph6WO@fb07-iapwap2> <20140911141257.GC5149@katana>
+Message-ID: <20140911144003.GD5149@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
 
-On Thu, 11 Sep 2014 22:25:13 +0800
-Huang Shijie <shijie8@gmail.com> wrote:
+> b) could be seen as a configuration thing since the functionality
+> backend could be changed at runtime even.
 
-> Hi Boris,
-> 
-> On Thu, Sep 11, 2014 at 02:36:16PM +0200, Boris BREZILLON wrote:
-> > Hi Huang,
-> > 
-> > On Thu, 11 Sep 2014 20:09:30 +0800
-> > Huang Shijie <shijie8@gmail.com> wrote:
-> > 
-> > > On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
-> > > > Several MTD users (either in user or kernel space) expect a valid raw
-> > > > access support to NAND chip devices.
-> > > > This is particularly true for testing tools which are often touching the
-> > > > data stored in a NAND chip in raw mode to artificially generate errors.
-> > > > 
-> > > > The GPMI drivers do not implemenent raw access functions, and thus rely on
-> > > > default HW_ECC scheme implementation.
-> > > > The default implementation consider the data and OOB area as properly
-> > > > separated in their respective NAND section, which is not true for the GPMI
-> > > > controller.
-> > > > In this driver/controller some OOB data are stored at the beginning of the
-> > > > NAND data area (these data are called metadata in the driver), then ECC
-> > > > bytes are interleaved with data chunk (which is similar to the
-> > > > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-> > > > OOB data.
-> > > > 
-> > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > > ---
-> > > > Hello,
-> > > > 
-> > > > This patch is providing raw access support to the GPMI driver which is
-> > > > particularly useful to run some tests on the NAND (the one coming in
-> > > > mind is the mtd_nandbiterrs testsuite).
-> > > > 
-> > > > I know this rework might break several user space tools which are relying
-> > > > on the default raw access implementation (I already experienced an issue
-> > > > with the kobs-ng tool provided by freescale), but many other tools will
-> > > > now work as expected.
-> > > If the kobs-ng can not works, there is no meaning that other tools
-> > > works.  So I do not think we need to implement these hooks.
-> > 
-> > Well, I don't know about freescale specific tools, but at least I have
-> > an example with mtd_nandbiterrs module.
-> 
-> The gpmi uses the hardware ECC for the bitflips.
-> I really do not know why the mtd_nandbiterrs is needed.
-> IMHO, the mtd_nandbiterrs is useless for the gpmi.
+Come to think of it, not only the functionality, also the address can be
+changed at runtime. This makes me think it should really not be in DT
+after all.
 
-Because some folks would like to test their NAND controller/chip on
-their system.
+People will probably find out that it is possible to put it in DT, but
+it should not be encouraged and they should do it on their own risk.
 
-Just because you don't need it, doesn't mean others won't, and actually
-the reason I worked on these raw function is becaused I needed to
-validate the ECC capabilities of the GPMI ECC controller.
-
-> 
-> > This module is assuming it can write only the data part of a NAND page
-> > without modifying the OOB area (see [1]), which in GPMI controller case
-> > is impossible because raw write function store the data as if there
-> > were no specific scheme, while there is one:
-> > (metadata + n x (data_chunk + ECC bytes) + remaining_bytes).
-> > 
-> > Moreover, IMHO, nanddump and nandwrite tools (which can use raw
-> > access mode when passing the appropriate option) should always return
-> > the same kind of data no matter what NAND controller is in use on the
-> > system => (DATA + OOB_DATA), and this is definitely not the case with
-> > the GPMI driver.
-> > 
-> > See how raw access on HW_ECC_SYNDROME scheme is implemented in
-> The gpmi uses the NAND_ECC_HW, not the NAND_ECC_HW_SYNDROME.
-
-Yes I know. I pointed out the NAND_ECC_HW_SYNDROME scheme as an example
-to show you that NAND controller specific layout should be hidden to
-the MTD user.
-
-> Even you really want to support the nanddump, i do not agree to add the
-> write hook, it may crash the system.
-
-We can't have an asymetric behaviour here, either we move both read and
-write raw functions or none. Moving only one of them would make the MTD
-user work even more complicated.
-
-I really don't get your point here. What's really bothering you (BTW, I
-fixed kobs-ng to handle this new behaviour) ?
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/b3e4c875/attachment.sig>
