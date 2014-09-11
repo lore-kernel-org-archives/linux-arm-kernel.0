@@ -1,48 +1,44 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 11 Sep 2014 13:42:35 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140911111721.GB17476@xps8300>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300>
-Message-ID: <54118AAB.2010205@linutronix.de>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 11 Sep 2014 17:13:11 +0530
+Subject: [RFC PATCH] arm64:mm: delete max_mapnr init.
+In-Reply-To: <20140911103613.GB6158@arm.com>
+References: <1410426973-32393-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <20140911103613.GB6158@arm.com>
+Message-ID: <CAFpQJXUKgb+58ifb0GNVMywnVU6sWTETiO8K=wdTNqQNzs4sOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2014 01:17 PM, Heikki Krogerus wrote:
->> diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
->> index fbed1636e9c4..09489b391568 100644
->> --- a/drivers/tty/serial/8250/8250.h
->> +++ b/drivers/tty/serial/8250/8250.h
->> @@ -82,6 +82,9 @@ struct serial8250_config {
->>  #define UART_BUG_PARITY	(1 << 4)	/* UART mishandles parity if FIFO enabled */
->>  #define UART_BUG_DMA_RX	(1 << 5)	/* UART needs DMA RX req before there is
->>  					   data in FIFO */
->> +#define UART_BUG_DMA_TX	(1 << 6)	/* UART needs one byte in FIFO for
->> +					   kickstart */
-> 
-> I don't think we should go ahead with this patch. I'm pretty sure
-> this is AM335 specific problem, or at least limited to only few
-> platforms. And I don't think we should take any more "BUG" flags.
-> 
-> We should add hooks like tx_dma and rx_dma to struct uart_8250_dma so
-> that the probe drivers can replace serial8250_tx_dma and
-> seria8250_rx_dma, like I think Alan already suggested.
+Hi Will,
 
-Okay. Wasn't aware that Alan already suggested that.
-I also need a watchdog timer for TX since it seems that on omap3 the
-DMA engine suddenly forgets to continue with DMA?
 
-If this is really what we want, I would need to refactor a few things?
+On Thu, Sep 11, 2014 at 4:06 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Sep 11, 2014 at 10:16:13AM +0100, Ganapatrao Kulkarni wrote:
+>> setting max_mapnr results in to error, if enabled with CONFIG_NUMA,
+>> which i have to replace with function set_max_mapnr.
+>> However this variable is not used in arm64(with default defconfig) and better to
+>> delete instead.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+>> ---
+>>  arch/arm64/mm/init.c | 1 -
+>>  1 file changed, 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 5472c24..548bd01 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -256,7 +256,6 @@ static void __init free_unused_memmap(void)
+>>   */
+>>  void __init mem_init(void)
+>>  {
+>> -     max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
+>
+> I think it's cleaner to call set_max_mapnr in case this grows a use in core
+> code outside of pfn_valid (which we always override).
+agreed, thanks for your comment.
+shall i send you the patch for this?
+>
+> Will
 
-> Let's keep serial8250_tx_dma/rx_dma as the default, and not add any
-> quirks to them. Only if there is a very common case should it be
-> handled in those. The case of RX req needing to be sent before data in
-> FIFO maybe one of those, but I'm no sure.
-
-keep in mind that both (RX & TX bugs/hacks) need also a bit of handling
-in the 8250-core so it works together (like the tx_err member so we
-fall back to manual xmit)
-
-Sebastian
+thanks
+ganapat
