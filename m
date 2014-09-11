@@ -1,33 +1,65 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 11 Sep 2014 12:20:30 -0300
-Subject: [PATCH] mtd: nand: atmel_nand: retrieve NFC clock
-In-Reply-To: <1410446617-29572-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410446617-29572-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140911152029.GA16666@arch>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 11 Sep 2014 16:24:32 +0100
+Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
+In-Reply-To: <20140911142655.GB30828@titan.lakedaemon.net>
+References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140911134323.GB29780@lunn.ch>
+ <20140911160000.55a4de80@free-electrons.com>
+ <20140911142601.GA30828@titan.lakedaemon.net>
+ <20140911142655.GB30828@titan.lakedaemon.net>
+Message-ID: <1410449072.25388.35.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+On Thu, 2014-09-11 at 10:26 -0400, Jason Cooper wrote:
+> merf.  It helps if I actually _add_ Ian to the Cc. :)
+> 
+> On Thu, Sep 11, 2014 at 10:26:01AM -0400, Jason Cooper wrote:
+> > +Ian
+> > 
+> > On Thu, Sep 11, 2014 at 04:00:00PM +0200, Thomas Petazzoni wrote:
+> > > On Thu, 11 Sep 2014 15:43:23 +0200, Andrew Lunn wrote:
+> > > > A point for discussion, triggered by 3/4. We have repeatedly seen
+> > > > issues with modular builds, which we don't see with everything built
+> > > > in. Can we improve our testing? Is there is way to take for example
+> > > > mvebu_v7_defconfig and turn any y tristate options into m? Build and
+> > > > boot? Get this added to the boot test farms?
+> > > 
+> > > I indeed agree that we are not testing much the modular case, but:
+> > > 
+> > >  1/ In my case, a mvebu_v7_defconfig where most the stuff would become
+> > >     enabled as a module would make mvebu_v7_defconfig pretty much
+> > >     useless for my daily work. When I'm doing active development, I
+> > >     typically have everything built-in including the initramfs itself,
+> > >     so that I don't rely on any storage/network to get the rootfs and
+> > >     additional kernel drivers.
+> > > 
+> > >  2/ I don't think it would change much in terms of runtime coverage:
+> > >     the tests done on the boot farm are just boot tests, I don't think
+> > >     they load any kernel module. We could ask Kevin and Olof what
+> > >     rootfs they use, but most likely it's some very small rootfs that
+> > >     doesn't even have udev/mdev for automatic module loading. So no
+> > >     module would be loaded, which would mean that a mvebu_v7_defconfig
+> > >     with everything as a module would actually test *less* thing than a
+> > >     configuration that has everything built in.
+> > > 
+> > > So, I agree on the observation, but I'm unsure the proposed solution
+> > > will really solve or even improve the situation :/
+> > 
+> > Since debian does modular builds on a regular basis, maybe they have
+> > some recommendations.
 
-On 11 Sep 04:43 PM, Alexandre Belloni wrote:
-> @@ -2276,6 +2280,16 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(nfc->clk)) {
-> +		dev_warn(&pdev->dev, "NFC clock is missing");
-> +		return 0;
-> +	}
-> +
+Rather than modularising $socfamily_defconfig perhaps this is something
+which can be achieved by also testing multiplatform defconfigs builds,
+and perhaps making those more modular (if they aren't already)?
 
-The binding documentation makes no mention to a clock.
+It seems like a multiplatform kernel is something which would be more
+naturally quite modular anyway, and certainly distros are mostly
+interested in moving to configurations which are both multiplatform and
+modular (at least in the long run, Debian has some legacy v5 flavours
+which may or may not get moved over).
 
-Anyway, with or without the docs I think this patch breaks DT backward
-compatibility.
+That would avoid needing to mess with mvebu_v7_defconfig, since it seems
+quite reasonable and natural for that to be pretty non-modular.
 
-Or am I missing something?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Ian.
