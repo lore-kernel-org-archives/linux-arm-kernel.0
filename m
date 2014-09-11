@@ -1,64 +1,194 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 Sep 2014 10:05:05 +0900
-Subject: [PATCH] ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig
-In-Reply-To: <5410F40D.7090704@renesas.com>
-References: <1410309887-15492-1-git-send-email-horms+renesas@verge.net.au>
- <5410F40D.7090704@renesas.com>
-Message-ID: <20140911010505.GE10233@verge.net.au>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 11 Sep 2014 09:07:10 +0800
+Subject: [PATCH v4 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <1409730511-16101-8-git-send-email-antoine.tenart@free-electrons.com>
+References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1409730511-16101-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140911010709.GE3609@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 09:59:57AM +0900, Khiem Nguyen wrote:
-> Hi Simon, 
-> cc Ulrich,
+On Wed, Sep 03, 2014 at 09:48:26AM +0200, Antoine Tenart wrote:
+> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> and DMA mask, to support USB2 ChipIdea controllers that don't need
+> specific functions.
 > 
-> Thanks for your patch.
+> Tested on the Marvell Berlin SoCs USB controllers.
 > 
-> I think it's a bit early to enable r8a7794
-> in shmobile_defconfig.
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/usb/chipidea/Makefile       |   1 +
+>  drivers/usb/chipidea/ci_hdrc_usb2.c | 137 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 138 insertions(+)
+>  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
 > 
-> The accepted part of r8a7794 initial code lacked of
-> arch. timer initialization code for Cortex-A7 in r8a7794 SoC.
-> [PATCH 1/3] ARM: shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794
-> http://www.spinics.net/lists/linux-sh/msg34978.html
-> 
-> I guess (at least) that code should be merged (in current form or another)
-> before r8a7794 can be enabled in shmobile_defconfig.
->
-> On 9/10/2014 9:44 AM, Simon Horman wrote:
-> > Support for the r8a7794 was recently added.
-> > Enable it in the shmobile_defconfig to increase build coverage.
-> 
-> IMO, the support is only enabled after the code under that config
-> run correctly.
-> Please correct me if I'm wrong.
+> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
+> index 2f099c7df7b5..1fc86a2ca22d 100644
+> --- a/drivers/usb/chipidea/Makefile
+> +++ b/drivers/usb/chipidea/Makefile
+> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
+>  
+>  # Glue/Bridge layers go here
+>  
+> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
+>  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
+>  
+> diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
+> new file mode 100644
+> index 000000000000..75bdbfa362b9
+> --- /dev/null
+> +++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
+> @@ -0,0 +1,137 @@
+> +/*
+> + * Copyright (C) 2014 Marvell Technology Group Ltd.
+> + *
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/usb/chipidea.h>
+> +#include <linux/usb/hcd.h>
+> +#include <linux/usb/ulpi.h>
+> +
+> +#include "ci.h"
+> +
+> +struct ci_hdrc_usb2_priv {
+> +	struct platform_device	*ci_pdev;
+> +	struct clk		*clk;
+> +};
+> +
+> +static int ci_hdrc_usb2_dt_probe(struct device *dev,
+> +				 struct ci_hdrc_platform_data *ci_pdata)
+> +{
+> +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
+> +	if (IS_ERR(ci_pdata->phy)) {
+> +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +
+> +		/* PHY is optional */
+> +		ci_pdata->phy = NULL;
+> +	}
+> +
+> +	return 0;
+> +}
 
-The purpose of enabling r8a7794 at this point is to increase build
-coverage. As the SoC support is new it doesn't create any regressions
-even though the support may not be in a working form yet.
+You may also need to consider usb_phy case.
 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > 
-> > Based on renesas-devel-20140910v2-v3.17-rc4
-> >  arch/arm/configs/shmobile_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> > index 522275a..d7346ad 100644
-> > --- a/arch/arm/configs/shmobile_defconfig
-> > +++ b/arch/arm/configs/shmobile_defconfig
-> > @@ -16,6 +16,7 @@ CONFIG_ARCH_R8A7740=y
-> >  CONFIG_ARCH_R8A7779=y
-> >  CONFIG_ARCH_R8A7790=y
-> >  CONFIG_ARCH_R8A7791=y
-> > +CONFIG_ARCH_R8A7794=y
-> >  CONFIG_MACH_KOELSCH=y
-> >  CONFIG_MACH_LAGER=y
-> >  CONFIG_MACH_MARZEN=y
-> > 
-> 
+> +
+> +static struct ci_hdrc_platform_data ci_default_pdata = {
+> +	.capoffset	= DEF_CAPOFFSET,
+> +	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
+> +			  CI_HDRC_DISABLE_STREAMING,
+> +};
+> +
+> +static int ci_hdrc_usb2_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct ci_hdrc_usb2_priv *priv;
+> +	struct ci_hdrc_platform_data *ci_pdata = dev_get_platdata(&pdev->dev);
+> +	int ret;
+> +
+> +	if (!ci_pdata)
+> +		ci_pdata = &ci_default_pdata;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->clk = devm_clk_get(dev, NULL);
+> +	if (!IS_ERR(priv->clk)) {
+> +		ret = clk_prepare_enable(priv->clk);
+> +		if (ret) {
+> +			dev_err(dev, "failed to enable the clock: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (dev->of_node) {
+> +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +		if (ret)
+> +			return ret;
+> +	}
+
+You may need to do clk_disable_unprepare for above error cases.
+> +
+> +	ci_pdata->name = dev_name(&pdev->dev);
+> +
+> +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
+> +					   pdev->num_resources, ci_pdata);
+> +	if (IS_ERR(priv->ci_pdev)) {
+> +		ret = PTR_ERR(priv->ci_pdev);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev,
+> +				"failed to register ci_hdrc platform device: %d\n",
+> +				ret);
+
+Why you don't want the error message for deferral probe?
+
+> +		goto clk_err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	pm_runtime_no_callbacks(dev);
+> +	pm_runtime_enable(dev);
+> +
+> +	return 0;
+> +
+> +clk_err:
+> +	if (!IS_ERR(priv->clk))
+> +		clk_disable_unprepare(priv->clk);
+> +	return ret;
+> +}
+> +
+> +static int ci_hdrc_usb2_remove(struct platform_device *pdev)
+> +{
+> +	struct ci_hdrc_usb2_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	pm_runtime_disable(&pdev->dev);
+> +	ci_hdrc_remove_device(priv->ci_pdev);
+> +	clk_disable_unprepare(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ci_hdrc_usb2_of_match[] = {
+> +	{ .compatible = "chipidea,usb2" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
+> +
+> +static struct platform_driver ci_hdrc_usb2_driver = {
+> +	.probe	= ci_hdrc_usb2_probe,
+> +	.remove	= ci_hdrc_usb2_remove,
+> +	.driver	= {
+> +		.name		= "chipidea-usb2",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
+> +	},
+> +};
+> +module_platform_driver(ci_hdrc_usb2_driver);
+> +
+> +MODULE_DESCRIPTION("ChipIdea HDRC USB2 binding for ci13xxx");
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+> +MODULE_LICENSE("GPL");
 > -- 
-> Best regards,
-> KHIEM Nguyen
+> 1.9.1
 > 
+
+-- 
+Best Regards,
+Peter Chen
