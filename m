@@ -1,36 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Sep 2014 12:08:39 +0200
-Subject: [PATCH] ARM: cache-l2x0: optimize aurora range operations
-In-Reply-To: <2885617.4rXk1QzsZ5@wuerfel>
-References: <2852268.nkG1OoBDfE@wuerfel>
- <20140908153946.GB12361@n2100.arm.linux.org.uk>
- <2958731.nsOomQFma0@wuerfel> <2885617.4rXk1QzsZ5@wuerfel>
-Message-ID: <20140911120839.59d4b728@free-electrons.com>
+From: nikhil.badola@freescale.com (nikhil.badola at freescale.com)
+Date: Thu, 11 Sep 2014 10:10:37 +0000
+Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
+ LS1021A
+In-Reply-To: <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
+References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
+ <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <1444adbcf7cd4b578a131db11e662490@BN1PR0301MB0593.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+>-----Original Message-----
+>From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
+>Sent: Tuesday, September 09, 2014 2:42 PM
+>To: Guo Shawn-R65073
+>Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu
+>Jingchang-B35083; Badola Nikhil-B46172; Zhao Chenhui-B35336; Gupta Suresh-
+>B42813; Leekha Shaveta-B20052; Gupta Ruchika-R66431; Sharma Bhupesh-
+>B45370; Fu Chao-B44548; Xiubo Li-B47053; Lu Jingchang-B35083
+>Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for LS1021A
+>
+>From: Jingchang Lu <b35083@freescale.com>
+>
+>Add Freescale LS1021A SoC device tree support
+>+
+>+		usb at 8600000 {
+>+			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
+>+			reg = <0x0 0x8600000 0x0 0x1000>;
+>+			#address-cells = <1>;
+>+			#size-cells = <0>;
+>+			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
+>+			dr_mode = "host";
+>+			phy_type = "ulpi";
+>+		};
+>+
 
-On Mon, 08 Sep 2014 22:43:32 +0200, Arnd Bergmann wrote:
-> The aurora_inv_range(), aurora_clean_range() and aurora_flush_range()
-> functions are highly redundant, both in source and in object code, and
-> they are harder to understand than necessary.
-> 
-> By moving the range loop into the aurora_pa_range() function, they
-> become trivial wrappers, and the object code start looking like what
-> one would expect for an optimal implementation.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mm/cache-l2x0.c | 67 +++++++++++++++++-----------------------------------------
->  1 file changed, 22 insertions(+), 45 deletions(-)
-
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
- (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
- DMA traffic by reading data from a SD card)
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Please remove following from the above node :  
+			#address-cells = <1>;
+			#size-cells = <0>;
