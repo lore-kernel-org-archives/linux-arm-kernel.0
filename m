@@ -1,43 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 11 Sep 2014 00:28:43 +0100
-Subject: [PATCH v3 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot
- add" problem
-In-Reply-To: <53DBB231.5010900@citrix.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <53DBB231.5010900@citrix.com>
-Message-ID: <alpine.DEB.2.02.1409102335490.8137@kaball.uk.xensource.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 11 Sep 2014 09:22:42 +0900
+Subject: [PATCH 00/11] ARM: shmobile: r8a7740/armadillo legacy prototype
+ pm domain support
+In-Reply-To: <CAMuHMdWZ_MZQo5QyZmZCx-EHvxOvO==gnoefDqsipHqfSLPXww@mail.gmail.com>
+References: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
+ <20140909022649.GC31320@verge.net.au>
+ <CAMuHMdWZ_MZQo5QyZmZCx-EHvxOvO==gnoefDqsipHqfSLPXww@mail.gmail.com>
+Message-ID: <20140911002242.GE29858@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Aug 2014, David Vrabel wrote:
-> On 01/08/14 15:55, Stefano Stabellini wrote:
-> > Hi all,
-> > Xen support in Linux for ARM and ARM64 suffers from lack of support for
-> > multiple mfn to pfn mappings: whenever a frontend grants the same page
-> > multiple times to the backend, the mfn to pfn accounting in
-> > arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
-> > when xen-netfront/xen-netback switched from grant copies to grant
-> > mappings, therefore causing the issue to happen much more often.
-> > 
-> > Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
-> > therefore we are looking for alternative solutions. One idea is avoiding
-> > mfn to pfn conversions altogether. The only code path that needs them is
-> > swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
-> > 
-> > To avoid mfn to pfn conversions we rely on a second p2m mapping done by
-> > Xen (a separate patch series will be sent for Xen). In Linux we use it
-> > to perform the cache maintenance operations without mfns conversions.
-> > 
-> > 
-> > The Xen side patch series that introduces XENFEAT_grant_map_identity is:
-> > http://marc.info/?l=xen-devel&m=140690433923855
+On Tue, Sep 09, 2014 at 11:48:23AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon, Magnus,
 > 
-> If the Xen side is in master, you can apply this series to
-> devel/for-linus-3.17
+> On Tue, Sep 9, 2014 at 4:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> > I would like Magnus's opinion but mine is that the non-WIP patches
+> > could be queued up. At least patch 1 and 2. Possibly others if
+> > they don't depend (other than diff noise) on WIP patches.
+> 
+> The legacy platforms are meant to be extinct in the near future, but
+> Armadillo-legacy already has some PM domain support, so adding a
+> little bit more can't hurt much, IMHO.
+> 
+> Besides diff noise, there should not be any dependencies on WIP patches.
+> 
+> > With the WIP patches, I am not entirely opposed to merging them
+> > too, so long as they move things in a good direction. And in particular
+> > don't break anything.
+> 
+> "[PATCH 03/11] [WIP] ARM: shmobile: armadillo800eva legacy: Add
+> missing A3SP pm domain devices" should be OK, as this turned out to be
+> intended behavior.
+> 
+> "[PATCH 10/11] [WIP] ARM: shmobile: r8a7740: Add A4SU pm domain
+>  support" probably introduces a regression for USB, as the domain is now
+> powered down after boot-up. I haven't tried USB on Armadillo yet, though.
+> So don't apply this one.
+> 
+> "[PATCH 11/11] [WIP] ARM: shmobile: r8a7740: Add A3SM pm domain
+>  support" should be safe.
+> 
+> I would not apply the other WIP patches that add C99-commented-out code.
+> These issues must be fixed for DT as well.
 
-The Xen side patch finally went in. Unfortunately it's probably too late
-for 3.17.
-
-I have applied the latest version
-(http://marc.info/?l=linux-arm-kernel&m=140751761520724&w=2) to
-devel/for-linus-3.18.
+Thanks Geert, that all sounds reasonable to me.
+I will confer with Magnus.
