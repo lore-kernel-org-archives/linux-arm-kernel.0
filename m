@@ -1,41 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Sep 2014 23:08:04 +0200
-Subject: [PATCH] ARM: dts: berlin: enable timer 1 for sched_clock
-In-Reply-To: <1410274069-24922-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1410274069-24922-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <54120F34.6010708@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Sep 2014 14:10:18 -0700
+Subject: [GIT PULL] omap regression fixes against v3.17-rc4
+Message-ID: <20140911211018.GJ18849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 04:47 PM, Antoine Tenart wrote:
-> Enable timer 1 to be the source for the sched_clock, allowing to have a
-> more precise value than 1/HZ.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
 
-Applied to berlin/dt.
+  Linux 3.17-rc4 (2014-09-07 16:09:43 -0700)
 
-For the record, I managed to configure UTF-8, so feel free to add the
-accent back to your name ;)
+are available in the git repository at:
 
-I applied the last patches with it already.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-v3.17-rc4
 
-Sebastian
+for you to fetch changes up to 41fc619dd5584d438d1eb673bd82a722d627ad85:
 
-> ---
->  arch/arm/boot/dts/berlin2q.dtsi | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index a216cb621ebc..e22b99a3a796 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -247,7 +247,6 @@
->  				reg = <0x2c14 0x14>;
->  				clocks = <&chip CLKID_CFG>;
->  				clock-names = "timer";
-> -				status = "disabled";
->  			};
->  
->  			timer2: timer at 2c28 {
-> 
+  bus: omap_l3_noc: Fix connID for OMAP4 (2014-09-11 10:43:39 -0700)
+
+----------------------------------------------------------------
+Few regression fixes for omaps for the -rc cycle:
+
+- Fix for omap_l3_noc bus code
+- Serial console fix for cm-t53
+- NAND timings fix for dra7-evm
+
+----------------------------------------------------------------
+Dmitry Lifshitz (1):
+      ARM: dts: cm-t54: fix serial console power supply.
+
+Nishanth Menon (1):
+      bus: omap_l3_noc: Fix connID for OMAP4
+
+Roger Quadros (1):
+      ARM: dts: dra7-evm: Fix NAND GPMC timings
+
+ arch/arm/boot/dts/dra7-evm.dts     | 27 +++++++++-----------
+ arch/arm/boot/dts/omap5-cm-t54.dts |  5 ++--
+ drivers/bus/omap_l3_noc.h          | 50 +++++++++++++++++++-------------------
+ 3 files changed, 39 insertions(+), 43 deletions(-)
