@@ -1,75 +1,72 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Sep 2014 19:32:01 +0200
-Subject: [RFC v2 8/9] KVM: KVM-VFIO: generic KVM_DEV_VFIO_DEVICE command
- and IRQ forwarding control
-In-Reply-To: <54116CFC.1050807@linaro.org>
-References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
- <1409575968-5329-9-git-send-email-eric.auger@linaro.org>
- <20140911031026.GI2784@lvm> <54116CFC.1050807@linaro.org>
-Message-ID: <20140911173201.GG5535@lvm>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 11 Sep 2014 12:14:39 -0500
+Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
+In-Reply-To: <54103E15.3090406@compulab.co.il>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+ <1381402195-29257-2-git-send-email-kishon@ti.com>
+ <52580F34.8030809@ti.com> <20140416161619.GH28035@saruman.home>
+ <540D9449.3090008@compulab.co.il>
+ <20140908132403.GA22409@saruman.home>
+ <54103E15.3090406@compulab.co.il>
+Message-ID: <20140911171439.GG1840@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 11:35:56AM +0200, Eric Auger wrote:
-> On 09/11/2014 05:10 AM, Christoffer Dall wrote:
-> > On Mon, Sep 01, 2014 at 02:52:47PM +0200, Eric Auger wrote:
-
-[...]
-
-> >> +	if (!pfwd)
-> >> +		return -ENOMEM;
-> >> +	pfwd->index = fwd_irq->index;
-> >> +	pfwd->gsi = fwd_irq->gsi;
-> >> +	pfwd->hwirq = hwirq;
-> >> +	pfwd->vcpu = kvm_get_vcpu(kdev->kvm, 0);
-> >> +	ret = kvm_arch_set_fwd_state(pfwd, KVM_VFIO_IRQ_SET_FORWARD);
-> >> +	if (ret < 0) {
-> >> +		kvm_arch_set_fwd_state(pfwd, KVM_VFIO_IRQ_CLEANUP);
-> > 
-> > this whole thing feels incredibly broken to me.  Setting a forward
-> > should either work or not work, not something in between that leaves
-> > something to be cleaned up.  Why this two-stage thingy here?
-> I wanted to exploit the return value of vgic_map_phys_irq which is
-> likely to fail if the phys/virt mapping exists at VGIC level.
-
-then just have the kvm_arch_set_fwd_state return with -EXIST and it is
-the responsibility of that function itself to cleanup from whatever it
-was doing, not to rely on its caller to call a cleanup function.
-
+On Wed, Sep 10, 2014 at 03:03:33PM +0300, Dmitry Lifshitz wrote:
+> Hi,
 > 
-> I already validated the injection from a KVM_VFIO_DEVICE point of view
-> (the device/irq is not known internally). But what if another external
-> component - which does not exist yet - maps the IRQ at VGIC level? Maybe
-> I need to replace the existing validation check by querying the VGIC at
-> low level instead of checking KVM-VFIO local variables.
-
-No need to over-complicate this, in this case, the
-kvm_arch_set_fwd_state() will simply fail (graceously), as I said above,
-and you just return to the user, "sorry, couldn't do what you asked me
-because of this error code".
-
-
-[...]
-
-> >> + *
-> >> + * When this function is called, the vcpu already are destroyed. No
-> >                                     the VPUCs are already destroyed.
-> >> + * vgic manipulation can happen hence the KVM_VFIO_IRQ_CLEANUP
-> >> + * kvm_arch_set_fwd_state action
-> > 
-> > this last bit didn't make any sense to me.  Also, why are we referring
-> > to the vgic in generic code?
-> doesn't make sense anymore indeed. I wanted to emphasize the fact that
-> VGIC KVM device is destroyed before the KVM VFIO device and this
-> explains why I need a special CLEANUP cmd (besides the fact I need to
-> call chip->irq_eoi(d) for the forwarded IRQs);
+> On 09/08/2014 04:24 PM, Felipe Balbi wrote:
+> >Hi,
+> >
+> >On Mon, Sep 08, 2014 at 02:34:33PM +0300, Dmitry Lifshitz wrote:
+> >>Hi Felipe, Roger
+> >>
+> >>On 04/16/2014 07:16 PM, Felipe Balbi wrote:
+> >>>On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
+> >>>>Hi,
+> >>>>
+> >>>>On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
+> >>>>>From: George Cherian <george.cherian@ti.com>
+> >>>>>
+> >>>>>Added dr_mode property in dwc3 and set its default mode to device.
+> >>>>
+> >>>>If there is a specific reason why this is not set to "otg", we need
+> >>>>to explain it here.
+> >>>>
+> >>>>AFAIK the port is meant to be used as OTG port.
+> >>>
+> >>>we still don't have the workaround for dual role ports, I've been
+> >>>working on it but still need to retest and make sure it's working fine
+> >>>before merging upstream.
+> >>>
+> >>
+> >>
+> >>Does the OTG port suppose to work with OMAP5? I mean role switching
+> >>mechanism?
+> >>
+> >>I'm testing kernel v3.16 with OMAP5 based board (CM-T54).
+> >>
+> >>If I set CONFIG_USB_DWC3_DUAL_ROLE, than nothing is going on when I plug
+> >>some device/host cable into micro USB3.0 port (VBUS/ID detection with extcon
+> >>events works fine).
+> >
+> >Dual role does not work. We allow the driver to the built with both Host
+> >and Peripheral support because some platforms have more than one port
+> >and building the driver with dual role allows us to make one port host
+> >and one peripheral.
+> >
 > 
+> Please, can you provide some detail about platforms with several ports.
+> How do that ports are connected to DWC3?
 
-I don't think it explains why you need a special CLEANUP cmd.  When the
-vgic is going away it must cleanup its state.  When the kvm vfio device
-goes away, it must unforward any unforwarded IRQs, and the architecture
-specific implementation MUST correctly unforward such IRQs - as a single
-operation!
+you have several dwc3 instances.
 
-Hope this helps.
--Christoffer
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/68eeddf3/attachment.sig>
