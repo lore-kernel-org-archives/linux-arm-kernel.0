@@ -1,64 +1,188 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Sep 2014 10:29:25 -0700
-Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <5411DA67.2040402@arm.com>
-References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
- <20140911164710.GW6158@arm.com> <5411D528.4050605@arm.com>
- <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
- <5411DA67.2040402@arm.com>
-Message-ID: <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 11 Sep 2014 19:31:28 +0200
+Subject: [RFC v2 2/9] KVM: ARM: VGIC: add forwarded irq rbtree lock
+In-Reply-To: <20140911030953.GD2784@lvm>
+References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
+ <1409575968-5329-3-git-send-email-eric.auger@linaro.org>
+ <20140911030953.GD2784@lvm>
+Message-ID: <5411DC70.5060104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-
-On Thu, Sep 11, 2014 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> We would need to run this code potentially at processor bringup and
->> after suspend/resume, but that seems possible too.
->
-> Note that this would be an ARMv7 only thing (you can't do that on ARMv8,
-> at all).
-
-Yes, of course.
+On 09/11/2014 05:09 AM, Christoffer Dall wrote:
+> On Mon, Sep 01, 2014 at 02:52:41PM +0200, Eric Auger wrote:
+>> add a lock related to the rb tree manipulation. The rb tree can be
+> 
+> Ok, I can't hold myself back any longer. 
 
 
->> Is the transition to monitor mode and back simple?  Where would you
->> suggest putting this code?  It would definitely need to be pretty
->> early.  We'd also need to be able to detect that we're in Secure SVC
->> and not mess up anyone else who happened to boot in Non Secure SVC.
->
-> This would have to live in some very early platform-specific code. The
-> ugly part is that you cannot find out what world you're in (accessing
-> SCR is going to send you to UNDEF-land if accessed from NS).
-
-Yup, so the question is: would such code be accepted upstream, or are
-we going to embark on a big job for someone to figure out how to do
-this only to get NAKed?
-
-If there was some indication that folks would take this, I think we
-might be able to get it coded up.  If someone else wanted to volunteer
-to code it that would make me even happier, but maybe that's pushing
-my luck.  ;)
+ Please begin sentences with a
+> capital letter. You don't do this in French? :)
+Hi Christoffer,
 
 
-> If I was suicidal, I'd suggest you could pass a parameter to the command
-> line, interpreted by the timer code... But I since I'm not, let's
-> pretend I haven't said anything... ;-)
+yep that's understood ;-) Definitively we do. Just that I am discovering
+it is common too in commits and comments ;-)
+> 
+>> searched in one thread (irqfd handler for instance) and map/unmap
+>> happen in another.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  include/kvm/arm_vgic.h |  1 +
+>>  virt/kvm/arm/vgic.c    | 46 +++++++++++++++++++++++++++++++++++++---------
+>>  2 files changed, 38 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 743020f..3da244f 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -177,6 +177,7 @@ struct vgic_dist {
+>>  	unsigned long		irq_pending_on_cpu;
+>>  
+>>  	struct rb_root		irq_phys_map;
+>> +	spinlock_t			rb_tree_lock;
+>>  #endif
+>>  };
+>>  
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 8ef495b..dbc2a5a 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1630,9 +1630,15 @@ static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
+>>  
+>>  int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
+>>  {
+>> -	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
+>> -	struct rb_node **new = &root->rb_node, *parent = NULL;
+>> +	struct rb_root *root;
+>> +	struct rb_node **new, *parent = NULL;
+>>  	struct irq_phys_map *new_map;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +
+>> +	spin_lock(&dist->rb_tree_lock);
+>> +
+>> +	root = vgic_get_irq_phys_map(vcpu, virt_irq);
+>> +	new = &root->rb_node;
+>>  
+>>  	/* Boilerplate rb_tree code */
+>>  	while (*new) {
+>> @@ -1644,13 +1650,17 @@ int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
+>>  			new = &(*new)->rb_left;
+>>  		else if (this->virt_irq > virt_irq)
+>>  			new = &(*new)->rb_right;
+>> -		else
+>> +		else {
+>> +			spin_unlock(&dist->rb_tree_lock);
+>>  			return -EEXIST;
+>> +		}
+> 
+> can you initialize a ret variable to -EEXIST in the beginning of this
+> function, and add an out label above the unlock below, replace this
+> multi-line statement with a goto out, and set ret = 0 after the while
+> loop?
+sure
+> 
+>>  	}
+>>  
+>>  	new_map = kzalloc(sizeof(*new_map), GFP_KERNEL);
+>> -	if (!new_map)
+>> +	if (!new_map) {
+>> +		spin_unlock(&dist->rb_tree_lock);
+>>  		return -ENOMEM;
+> 
+> then this becomes ret = -ENOMEM; goto out;
+OK
+> 
+>> +	}
+>>  
+>>  	new_map->virt_irq = virt_irq;
+>>  	new_map->phys_irq = phys_irq;
+>> @@ -1658,6 +1668,8 @@ int vgic_map_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
+>>  	rb_link_node(&new_map->node, parent, new);
+>>  	rb_insert_color(&new_map->node, root);
+>>  
+>> +	spin_unlock(&dist->rb_tree_lock);
+>> +
+> 
+> aren't you allocating memory with GFP_KERNEL while holding a spinlock
+> here?
+oups. Thanks for noticing. I Will move the lock.
+> 
+>>  	return 0;
+>>  }
+>>  
+>> @@ -1685,24 +1697,39 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
+>>  
+>>  int vgic_get_phys_irq(struct kvm_vcpu *vcpu, int virt_irq)
+>>  {
+>> -	struct irq_phys_map *map = vgic_irq_map_search(vcpu, virt_irq);
+>> +	struct irq_phys_map *map;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	int ret;
+>> +
+>> +	spin_lock(&dist->rb_tree_lock);
+>> +	map = vgic_irq_map_search(vcpu, virt_irq);
+>>  
+>>  	if (map)
+>> -		return map->phys_irq;
+>> +		ret = map->phys_irq;
+>> +	else
+>> +		ret =  -ENOENT;
+> 
+> initialize ret to -ENOENT and avoid the else statement.
+ok
+> 
+>> +
+>> +	spin_unlock(&dist->rb_tree_lock);
+>> +	return ret;
+>>  
+>> -	return -ENOENT;
+>>  }
+>>  
+>>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, int virt_irq, int phys_irq)
+>>  {
+>> -	struct irq_phys_map *map = vgic_irq_map_search(vcpu, virt_irq);
+>> +	struct irq_phys_map *map;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +
+>> +	spin_lock(&dist->rb_tree_lock);
+>> +
+>> +	map = vgic_irq_map_search(vcpu, virt_irq);
+>>  
+>>  	if (map && map->phys_irq == phys_irq) {
+>>  		rb_erase(&map->node, vgic_get_irq_phys_map(vcpu, virt_irq));
+>>  		kfree(map);
+>> +		spin_unlock(&dist->rb_tree_lock);
+> 
+> can kfree sleep?  I don't remember.  In any case, you can unlock before
+> calling kfree.
+no it can't but I will move anyway.
+> 
+>>  		return 0;
+>>  	}
+>> -
+>> +	spin_unlock(&dist->rb_tree_lock);
+>>  	return -ENOENT;
+> 
+> an out label and single unlock location would be preferred here as well
+> I think.
+ok
 
-I did this in the past (again, see Sonny's thread), but didn't
-consider myself knowledgeable to know if that was truly a good test:
+Thansk
 
-       asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
-       pr_info("DOUG: val is %#010x", val);
-       val |= (1 << 2);
-       asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
-       val = 0xffffffff;
-       asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
-       pr_info("DOUG: val is %#010x", val);
-
-The idea being that if you can make modifications to the SCR register
-(and see your changes take effect) then you must be in secure mode.
-In my case the first printout was 0x0 and the second was 0x4.
-
--Doug
+Eric
+> 
+>>  }
+>>  
+>> @@ -1898,6 +1925,7 @@ int kvm_vgic_create(struct kvm *kvm)
+>>  	}
+>>  
+>>  	spin_lock_init(&kvm->arch.vgic.lock);
+>> +	spin_lock_init(&kvm->arch.vgic.rb_tree_lock);
+>>  	kvm->arch.vgic.in_kernel = true;
+>>  	kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
+>>  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+>> -- 
+>> 1.9.1
+>>
