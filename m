@@ -1,77 +1,54 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Sep 2014 08:52:07 -0700
-Subject: [PATCH] clocksource: arch_timer: Allow the device tree to specify the
- physical timer
-Message-ID: <1410450727-8182-1-git-send-email-dianders@chromium.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 11 Sep 2014 11:53:27 -0400
+Subject: [PATCH v4 2/4] dt-bindings: document Rockchip thermal
+In-Reply-To: <40514790.Xc34lyFLGa@wuerfel>
+References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
+ <1410403012.25559.69.camel@rzhang1-toshiba>
+ <20140911121842.GB26715@developer> <40514790.Xc34lyFLGa@wuerfel>
+Message-ID: <20140911155324.GA27076@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some 32-bit (ARMv7) systems are architected like this:
+Arnd,
 
-* The firmware doesn't know and doesn't care about hypervisor mode and
-  we don't want to add the complexity of hypervisor there.
+On Thu, Sep 11, 2014 at 02:32:08PM +0200, Arnd Bergmann wrote:
+> On Thursday 11 September 2014 08:18:43 Eduardo Valentin wrote:
+> > > As what we want is to make thermal driver have a chance to configure the
+> > > hardware shutdown registers, I'm thinking if we can do this without
+> > > representing the hardware shutdown value as a trip point.
+> > > Say,
+> > > 1. parse DT, and get the hardware shutdown temperature value, and store
+> > > it somewhere, e.g. struct __thermal_zone.
+> > > 2. introduce a new parameter, int (*set_hardware_trip)(void *, long *),
+> > > in thermal_zone_of_sensor_register().
+> > > 3. invoke set_hard_trip(tz, hardware_shutdown_temperature_value) in
+> > > thermal_zone_of_sensor_register().
+> > 
+> > The only issue I have with the above proposal is that not all platforms
+> > use DT. Some still boot with boardfiles, for instance. Thus, the
+> > parameter to configure hardware thermal shutdown needs to be common on
+> > thermal core, not specific to of-thermal. Do you agree?
+> 
+> Do you know of a machine that can't yet be converted to DT and that
+> needs this driver? In case of rockchips that is certainly not the
+> case, and we don't care about anybody trying to use board files out
+> of tree, they can just hack the thermal support as well.
 
-* The firmware isn't involved in SMP bringup or resume.
+I see. Again, the only concern I have is to produce thermal framework APIs
+that would be only in the of-thermal. My point is not specific to this
+patch, or this platform, but with a detail in the above proposal. 
 
-* The ARCH timer come up with an uninitialized offset between the
-  virtual and physical counters.  Each core gets a different random
-  offset.
+While I agree to have a trip specific to configurable hardware triggered
+thermal shutdown, I just don't see why it needs to be a feature
+implemented only via of-thermal. It has to be properly defined in
+thermal core.
 
-On systems like the above, it doesn't make sense to use the virtual
-counter.  There's nobody managing the offset and each time a core goes
-down and comes back up it will get reinitialized to some other random
-value.
+The proposal of of-thermal is not to become a separate/competing thermal
+framework.
 
-Let's add a property to the device tree to say that we shouldn't use
-the virtual timer.  Firmware could potentially remove this property
-before passing the device tree to the kernel if it really wants the
-kernel to use a virtual timer.
+> 
+> 	Arnd
 
-Note that it's been said that ARM64 (ARMv8) systems the firmware and
-kernel really can't be architected as described above.  That means
-using the physical timer like this really only makes sense for ARMv7
-systems.
+Cheers,
 
-In order for this patch to do anything useful, we also need Sonny's
-patch at <https://patchwork.kernel.org/patch/4790921/>
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
----
- Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
- drivers/clocksource/arm_arch_timer.c                 | 3 +++
- 2 files changed, 9 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index 37b2caf..876d32b 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
- - always-on : a boolean property. If present, the timer is powered through an
-   always-on power domain, therefore it never loses context.
- 
-+** Optional properties:
-+
-+- arm,use-physical-timer : Don't ever use the virtual timer, just use the
-+  physical one.  Not supported for ARM64.
-+
-+
- Example:
- 
- 	timer {
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5163ec1..8ca07a9 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -649,6 +649,9 @@ static void __init arch_timer_init(struct device_node *np)
- 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
- 	arch_timer_detect_rate(NULL, np);
- 
-+	if (of_property_read_bool(np, "arm,use-physical-timer"))
-+		arch_timer_use_virtual = false;
-+
- 	/*
- 	 * If HYP mode is available, we know that the physical timer
- 	 * has been configured to be accessible from PL1. Use it, so
--- 
-2.1.0.rc2.206.gedb03e5
+Eduardo
