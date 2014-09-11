@@ -1,57 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Sep 2014 19:03:22 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140911092233.CBC5CC40738@trevor.secretlab.ca>
-References: <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
- <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
- <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
- <20140910143144.GF7960@sirena.org.uk>
- <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
- <20140910153919.GH7960@sirena.org.uk>
- <CACxGe6uBcTPMh4p=oi7m_TVpjUrkgbQvxbStAn27HXEJxYe5fw@mail.gmail.com>
- <20140910165723.GK7960@sirena.org.uk>
- <20140911092233.CBC5CC40738@trevor.secretlab.ca>
-Message-ID: <20140911180322.GP4015@sirena.org.uk>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 11 Sep 2014 12:07:43 -0600
+Subject: [RFC v2 4/9] VFIO: platform: handler tests whether the IRQ is
+ forwarded
+In-Reply-To: <20140911170554.GB5535@lvm>
+References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
+ <1409575968-5329-5-git-send-email-eric.auger@linaro.org>
+ <20140911031000.GE2784@lvm> <541160D2.80400@linaro.org>
+ <20140911170554.GB5535@lvm>
+Message-ID: <1410458863.2982.320.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 10:22:32AM +0100, Grant Likely wrote:
-> On Wed, 10 Sep 2014 17:57:23 +0100, Mark Brown <broonie@kernel.org> wrote:
+On Thu, 2014-09-11 at 19:05 +0200, Christoffer Dall wrote:
+> On Thu, Sep 11, 2014 at 10:44:02AM +0200, Eric Auger wrote:
+> > On 09/11/2014 05:10 AM, Christoffer Dall wrote:
+> > > On Mon, Sep 01, 2014 at 02:52:43PM +0200, Eric Auger wrote:
+> > >> In case the IRQ is forwarded, the VFIO platform IRQ handler does not
+> > >> need to disable the IRQ anymore. In that mode, when the handler completes
+> > > 
+> > > add a comma after completes
+> > Hi Christoffer,
+> > ok
+> > > 
+> > >> the IRQ is not deactivated but only its priority is lowered.
+> > >>
+> > >> Some other actor (typically a guest) is supposed to deactivate the IRQ,
+> > >> allowing at that time a new physical IRQ to hit.
+> > >>
+> > >> In virtualization use case, the physical IRQ is automatically completed
+> > >> by the interrupt controller when the guest completes the corresponding
+> > >> virtual IRQ.
+> > >>
+> > >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> > >> ---
+> > >>  drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
+> > >>  1 file changed, 6 insertions(+), 1 deletion(-)
+> > >>
+> > >> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+> > >> index 6768508..1f851b2 100644
+> > >> --- a/drivers/vfio/platform/vfio_platform_irq.c
+> > >> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+> > >> @@ -88,13 +88,18 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+> > >>  	struct vfio_platform_irq *irq_ctx = dev_id;
+> > >>  	unsigned long flags;
+> > >>  	int ret = IRQ_NONE;
+> > >> +	struct irq_data *d;
+> > >> +	bool is_forwarded;
+> > >>  
+> > >>  	spin_lock_irqsave(&irq_ctx->lock, flags);
+> > >>  
+> > >>  	if (!irq_ctx->masked) {
+> > >>  		ret = IRQ_HANDLED;
+> > >> +		d = irq_get_irq_data(irq_ctx->hwirq);
+> > >> +		is_forwarded = irqd_irq_forwarded(d);
+> > >>  
+> > >> -		if (irq_ctx->flags & VFIO_IRQ_INFO_AUTOMASKED) {
+> > >> +		if (irq_ctx->flags & VFIO_IRQ_INFO_AUTOMASKED &&
+> > >> +						!is_forwarded) {
+> > >>  			disable_irq_nosync(irq_ctx->hwirq);
+> > >>  			irq_ctx->masked = true;
+> > >>  		}
+> > >> -- 
+> > >> 1.9.1
+> > >>
+> > > It makes sense that these needs to be all controlled in the kernel, but
+> > > I'm wondering if it would be cleaner / more correct to clear the
+> > > AUTOMASKED flag when the IRQ is forwarded and have vfio refuse setting
+> > > this flag as long as the irq is forwarded?
+> > 
+> > If I am not wrong, even if the user sets AUTOMASKED, this info never is
+> > exploited by the vfio platform driver. AUTOMASKED only is set internally
+> > to the driver, on init, for level sensitive IRQs.
+> > 
+> > It seems to be the same on PCI (for INTx). I do not see anywhere the
+> > user flag curectly copied into a local storage. But I prefer to be
+> > careful ;-)
+> > 
+> > If confirmed, although the flag value is exposed in the user API, the
+> > user set value never is exploited so this removes the need to check.
+> > 
+> > the forwarded IRQ modality being fully dynamic currently, then I would
+> > need to update the irq_ctx->flags on each vfio_irq_handler call. I don't
+> > know if its better?
+> > 
+> I'm not an expert on vfio, so I'll leave that to Alex Williamson to
+> answer, but I'm just worried that we need to special-case the forwarded
+> IRQ here, and if that may get lost elsewhere in the vfio code.  If the
+> AUTOMASKED flag covers specifically this behavior, then why don't we
+> simply clear/set that flag when forwarding/unforwarding the specific
+> IRQ?
 
-> > It's not quite as simple as just disabling PM - for example in the
-> > clocks case we've also got to worry about what happens with rate changes
-> > (which is going to get more and more risky as we get smarter about being
-> > able to push configuration changes back up the tree), regulators have a
-> > similar thing with voltage changes.  With simple enables and disables we
-> > have to worry about things like handling users who actively want to
-> > power things on and and off but may potentially be sharing a resource
-> > with an undeclared dependency.
+The way that VFIO_IRQ_INFO_AUTOMASKED is being used here is unique to
+the platform device vfio backend.  In the rest of VFIO,
+VFIO_IRQ_INFO_AUTOMASKED is simply a flag bit exposed via
+VFIO_DEVICE_GET_IRQ_INFO.  The flags field of struct vfio_irq_info is
+output-only.  vfio-pci knows by the IRQ index whether it is edge or
+level.  I do agree though that changing the flag bit, or better yet a
+bool, rather than adding extra tests that need to be handled as each
+usage seems less error prone.
 
-> I think we can be okay with the above. This is a best-effort situation
-> where we don't want to tear down how firmware has set up the board if
-> it can be reasonably assumed that something depends on it (simplefb).
-> However, if clocks or regulators are shared with other devices and those
-> drivers ask for other settings, then there is simply no recourse. In
-> that situation there must be a driver for the video device that takes
-> care of any constraints.
+Things could get confusing for userspace though if suddenly
+VFIO_DEVICE_GET_IRQ_INFO starts calling the index edge triggered once
+forwarding mode is enabled.  Thanks,
 
-When things break I'm not sure that users are going to understand that
-something that used to work for them was only provided on a best effort
-basis, I think they will expect things to carry on working.  It's not
-going to be great if enabling some driver for a device that happens to
-be in the same power domain as a component used in a framebuffer causes
-the display to vanish, or if better power management in an existing
-driver causes breakage.  It's relatively OK to have a brief hiccup
-during boot but usage seems to have expanded beyond that point and I
-think we need to take robustness more seriously.
-
-Given that we have straightforward ways to communicate resource usage it
-seems sensible to add robustness to the system by making use of them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/3846872b/attachment-0001.sig>
+Alex
