@@ -1,112 +1,120 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 11 Sep 2014 22:03:38 +0800
-Subject: [RFC Part2 v1 11/21] iommu/vt-d: Change prototypes to prepare for
- enabling hierarchy irqdomain
+Date: Thu, 11 Sep 2014 22:03:35 +0800
+Subject: [RFC Part2 v1 08/21] x86,
+ htirq: Use new irqdomain interfaces to allocate/free IRQ
 In-Reply-To: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1410444228-3134-12-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1410444228-3134-9-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for support hierarchy irqdomain by changing function prototypes,
-should be no function changes.
+Use new irqdomain interfaces to allocate/free IRQ for HTIRQ, so we could
+kill GENERIC_IRQ_LEGACY_ALLOC_HWIRQ later.
+
+This patch changes the interfaces between arch independent PCI driver
+and arch specific code. Currently HT_IRQ is only enabled on x86, so it
+shouldn't break other architectures.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- drivers/iommu/intel_irq_remapping.c |   22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/x86/kernel/apic/htirq.c |   26 +++++++++++++-------------
+ drivers/pci/htirq.c          |    7 +++----
+ include/linux/htirq.h        |    2 ++
+ 3 files changed, 18 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/iommu/intel_irq_remapping.c b/drivers/iommu/intel_irq_remapping.c
-index 319b39edcf7e..0c679369e08a 100644
---- a/drivers/iommu/intel_irq_remapping.c
-+++ b/drivers/iommu/intel_irq_remapping.c
-@@ -82,10 +82,10 @@ static int get_irte(int irq, struct irte *entry)
- 	return 0;
- }
+diff --git a/arch/x86/kernel/apic/htirq.c b/arch/x86/kernel/apic/htirq.c
+index 6f527b02ac4c..55cb061a95cb 100644
+--- a/arch/x86/kernel/apic/htirq.c
++++ b/arch/x86/kernel/apic/htirq.c
+@@ -14,6 +14,7 @@
+ #include <linux/device.h>
+ #include <linux/pci.h>
+ #include <linux/htirq.h>
++#include <linux/irqdomain.h>
+ #include <asm/hw_irq.h>
+ #include <asm/apic.h>
+ #include <asm/hypertransport.h>
+@@ -60,31 +61,30 @@ static struct irq_chip ht_irq_chip = {
+ 	.irq_retrigger		= apic_retrigger_irq,
+ };
  
--static int alloc_irte(struct intel_iommu *iommu, int irq, u16 count)
-+static int alloc_irte(struct intel_iommu *iommu, int irq,
-+		      struct irq_2_iommu *irq_iommu, u16 count)
++int arch_alloc_ht_irq(struct pci_dev *dev)
++{
++	return irq_domain_alloc_irqs(NULL, -1, 1, dev_to_node(&dev->dev), NULL);
++}
++
++void arch_free_ht_irq(int irq)
++{
++	irq_domain_free_irqs(irq, 1);
++}
++
+ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
  {
- 	struct ir_table *table = iommu->ir_table;
--	struct irq_2_iommu *irq_iommu = irq_2_iommu(irq);
- 	struct irq_cfg *cfg = irq_cfg(irq);
- 	unsigned int mask = 0;
- 	unsigned long flags;
-@@ -173,9 +173,9 @@ static int set_irte_irq(int irq, struct intel_iommu *iommu, u16 index, u16 subha
- 	return 0;
- }
+ 	struct irq_cfg *cfg;
+ 	struct ht_irq_msg msg;
+-	unsigned dest;
+-	int err;
  
--static int modify_irte(int irq, struct irte *irte_modified)
-+static int modify_irte(struct irq_2_iommu *irq_iommu,
-+		       struct irte *irte_modified)
- {
--	struct irq_2_iommu *irq_iommu = irq_2_iommu(irq);
- 	struct intel_iommu *iommu;
- 	unsigned long flags;
- 	struct irte *irte;
-@@ -242,7 +242,7 @@ static int clear_entries(struct irq_2_iommu *irq_iommu)
- 		return 0;
+ 	if (disable_apic)
+ 		return -ENXIO;
  
- 	iommu = irq_iommu->iommu;
--	index = irq_iommu->irte_index + irq_iommu->sub_handle;
-+	index = irq_iommu->irte_index;
+ 	cfg = irq_cfg(irq);
+-	err = assign_irq_vector(irq, cfg, apic->target_cpus());
+-	if (err)
+-		return err;
+-
+-	err = apic->cpu_mask_to_apicid_and(cfg->domain,
+-					   apic->target_cpus(), &dest);
+-	if (err)
+-		return err;
+-
+-	msg.address_hi = HT_IRQ_HIGH_DEST_ID(dest);
++	msg.address_hi = HT_IRQ_HIGH_DEST_ID(cfg->dest_apicid);
  
- 	start = iommu->ir_table->base + index;
- 	end = start + (1 << irq_iommu->irte_mask);
-@@ -938,7 +938,7 @@ static int intel_setup_ioapic_entry(int irq,
- 		pr_warn("No mapping iommu for ioapic %d\n", ioapic_id);
- 		index = -ENODEV;
- 	} else {
--		index = alloc_irte(iommu, irq, 1);
-+		index = alloc_irte(iommu, irq, irq_2_iommu(irq), 1);
- 		if (index < 0) {
- 			pr_warn("Failed to allocate IRTE for ioapic %d\n",
- 				ioapic_id);
-@@ -954,7 +954,7 @@ static int intel_setup_ioapic_entry(int irq,
- 	/* Set source-id of interrupt request */
- 	set_ioapic_sid(&irte, ioapic_id);
+ 	msg.address_lo =
+ 		HT_IRQ_LOW_BASE |
+-		HT_IRQ_LOW_DEST_ID(dest) |
++		HT_IRQ_LOW_DEST_ID(cfg->dest_apicid) |
+ 		HT_IRQ_LOW_VECTOR(cfg->vector) |
+ 		((apic->irq_dest_mode == 0) ?
+ 			HT_IRQ_LOW_DM_PHYSICAL :
+diff --git a/drivers/pci/htirq.c b/drivers/pci/htirq.c
+index a94dd2c4183a..ceb0ebeb7b5f 100644
+--- a/drivers/pci/htirq.c
++++ b/drivers/pci/htirq.c
+@@ -117,8 +117,8 @@ int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update)
+ 	cfg->msg.address_lo = 0xffffffff;
+ 	cfg->msg.address_hi = 0xffffffff;
  
--	modify_irte(irq, &irte);
-+	modify_irte(irq_2_iommu(irq), &irte);
- 
- 	apic_printk(APIC_VERBOSE, KERN_DEBUG "IOAPIC[%d]: "
- 		"Set IRTE entry (P:%d FPD:%d Dst_Mode:%d "
-@@ -1041,7 +1041,7 @@ intel_ioapic_set_affinity(struct irq_data *data, const struct cpumask *mask,
- 	 * Atomically updates the IRTE with the new destination, vector
- 	 * and flushes the interrupt entry cache.
- 	 */
--	modify_irte(irq, &irte);
-+	modify_irte(irq_2_iommu(irq), &irte);
- 
- 	/*
- 	 * After this point, all the interrupts will start arriving
-@@ -1077,7 +1077,7 @@ static void intel_compose_msi_msg(struct pci_dev *pdev,
- 	else
- 		set_hpet_sid(&irte, hpet_id);
- 
--	modify_irte(irq, &irte);
-+	modify_irte(irq_2_iommu(irq), &irte);
- 
- 	msg->address_hi = MSI_ADDR_BASE_HI;
- 	msg->data = sub_handle;
-@@ -1104,7 +1104,7 @@ static int intel_msi_alloc_irq(struct pci_dev *dev, int irq, int nvec)
- 		       "Unable to map PCI %s to iommu\n", pci_name(dev));
- 		index = -ENOENT;
- 	} else {
--		index = alloc_irte(iommu, irq, nvec);
-+		index = alloc_irte(iommu, irq, irq_2_iommu(irq), nvec);
- 		if (index < 0) {
- 			printk(KERN_ERR
- 			       "Unable to allocate %d IRTE for PCI %s\n",
-@@ -1148,7 +1148,7 @@ static int intel_setup_hpet_msi(unsigned int irq, unsigned int id)
- 	down_read(&dmar_global_lock);
- 	iommu = map_hpet_to_ir(id);
- 	if (iommu) {
--		index = alloc_irte(iommu, irq, 1);
-+		index = alloc_irte(iommu, irq, irq_2_iommu(irq), 1);
- 		if (index >= 0)
- 			ret = 0;
+-	irq = irq_alloc_hwirq(dev_to_node(&dev->dev));
+-	if (!irq) {
++	irq = arch_alloc_ht_irq(dev);
++	if (irq <= 0) {
+ 		kfree(cfg);
+ 		return -EBUSY;
  	}
+@@ -163,8 +163,7 @@ void ht_destroy_irq(unsigned int irq)
+ 	cfg = irq_get_handler_data(irq);
+ 	irq_set_chip(irq, NULL);
+ 	irq_set_handler_data(irq, NULL);
+-	irq_free_hwirq(irq);
+-
++	arch_free_ht_irq(irq);
+ 	kfree(cfg);
+ }
+ EXPORT_SYMBOL(ht_destroy_irq);
+diff --git a/include/linux/htirq.h b/include/linux/htirq.h
+index 70a1dbbf2093..5caa51b7b95c 100644
+--- a/include/linux/htirq.h
++++ b/include/linux/htirq.h
+@@ -15,6 +15,8 @@ void unmask_ht_irq(struct irq_data *data);
+ 
+ /* The arch hook for getting things started */
+ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev);
++int arch_alloc_ht_irq(struct pci_dev *dev);
++void arch_free_ht_irq(int irq);
+ 
+ /* For drivers of buggy hardware */
+ typedef void (ht_irq_update_t)(struct pci_dev *dev, int irq,
 -- 
 1.7.10.4
