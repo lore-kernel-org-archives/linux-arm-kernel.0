@@ -1,74 +1,47 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Thu, 11 Sep 2014 11:15:55 +0300
-Subject: [PATCH v2] Enable gcov support on the ARM architecture
-In-Reply-To: <1410181174-14977-1-git-send-email-riku.voipio@linaro.org>
-References: <1410181174-14977-1-git-send-email-riku.voipio@linaro.org>
-Message-ID: <1410423355-13530-1-git-send-email-riku.voipio@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Sep 2014 10:19:34 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Timers
+ Updates for v3.18
+In-Reply-To: <cover.1410396171.git.horms+renesas@verge.net.au>
+References: <cover.1410396171.git.horms+renesas@verge.net.au>
+Message-ID: <2854153.eROdLK4gCy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable gcov support for ARM based on original patches by David
-Singleton and George G. Davis
+On Thursday 11 September 2014 09:57:01 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these second round of Renesas ARM based SoC DT timers updates for v3.18.
+> 
+> This pull request is based on a merge of:
+> 
+> * The previous round of DT time updates for v3.18,
+>   tagged as renesas-dt-timers-for-v3.18,
+>   which you have already merged.
+> 
+> * Renesas ARM Based SoC r8a7740 Multiplatform Updates for v3.18,
+>   tagged as renesas-r8a7740-ccf-and-timers-for-v3.18,
+>   which you have previously pulled.
+> 
+> 
+> The following changes since commit dcc683aba83cd8db964a9a1d4582d4829d6efcb2:
+> 
+>   Merge tag 'renesas-r8a7740-ccf-and-timers-for-v3.18' into dt-timers-for-v3.18 (2014-09-09 11:50:00 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-timers2-for-v3.18
+> 
+> for you to fetch changes up to 48a0d1e07d99ecfd1e5922dd22986d5813f17207:
+> 
+>   ARM: shmobile: kzm9g-reference: Enable CMT1 in device tree (2014-09-09 11:53:14 +0900)
+> 
+> ----------------------------------------------------------------
+> Second Round of Renesas ARM Based SoC DT Timers Updates for v3.18
+> 
+> * kzm9g-reference: Enable CMT1 in device tree
+> * Use SoC-specific timer compat strings
 
-Riku - updated to patch to current mainline kernel. The patch
-has been submitted in 2010, 2012 - for symmetry, now in 2014 too.
+Pulled into next/soc, thanks!
 
-https://lwn.net/Articles/390419/
-http://marc.info/?l=linux-arm-kernel&m=133823081813044
-
-v2: remove arch/arm/kernel from gcov disabled files
-
-From: Vincent Sanders <vincent.sanders@collabora.co.uk>
-Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Naresh Kamboju <naresh.kamboju@linaro.org>
-Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
----
- arch/arm/boot/bootp/Makefile      | 2 ++
- arch/arm/boot/compressed/Makefile | 2 ++
- kernel/gcov/Kconfig               | 2 +-
- 3 files changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
-index c394e30..5761f00 100644
---- a/arch/arm/boot/bootp/Makefile
-+++ b/arch/arm/boot/bootp/Makefile
-@@ -5,6 +5,8 @@
- # architecture-specific flags and dependencies.
- #
- 
-+GCOV_PROFILE	:= n
-+
- LDFLAGS_bootp	:=-p --no-undefined -X \
- 		 --defsym initrd_phys=$(INITRD_PHYS) \
- 		 --defsym params_phys=$(PARAMS_PHYS) -T
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 76a50ec..3ea230a 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -37,6 +37,8 @@ ifeq ($(CONFIG_ARM_VIRT_EXT),y)
- OBJS		+= hyp-stub.o
- endif
- 
-+GCOV_PROFILE		:= n
-+
- #
- # Architecture dependencies
- #
-diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-index d04ce8a..cf66c5c 100644
---- a/kernel/gcov/Kconfig
-+++ b/kernel/gcov/Kconfig
-@@ -35,7 +35,7 @@ config GCOV_KERNEL
- config GCOV_PROFILE_ALL
- 	bool "Profile entire Kernel"
- 	depends on GCOV_KERNEL
--	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE
-+	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
- 	default n
- 	---help---
- 	This options activates profiling for the entire kernel.
--- 
-2.0.1
+	Arnd
