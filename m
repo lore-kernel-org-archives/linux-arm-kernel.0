@@ -1,72 +1,118 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Sep 2014 12:09:07 +0100
-Subject: [PATCH v4 0/8] arm/arm64: KVM: dynamic VGIC sizing
-Message-ID: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 11 Sep 2014 12:09:13 +0100
+Subject: [PATCH v4 6/8] arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
+In-Reply-To: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1410433755-3612-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the VGIC data structures have been statically sized, meaning
-that we always have to support more interrupts than we actually want,
-and more CPU interfaces than we should. This is a waste of resource,
-and is the kind of things that should be tuneable.
+Nuke VGIC_NR_IRQS entierly, now that the distributor instance
+contains the number of IRQ allocated to this GIC.
 
-This series addresses that issue by changing the data structures to be
-dynamically allocated, and adds a new configuration attribute to
-allocate the number of interrupts. When the attribute is not used, we
-fallback to the old behaviour of allocating a fixed number of
-interrupts.
+Also add VGIC_NR_IRQS_LEGACY to preserve the current API.
 
-This series is also the base for Andre Przywara's GICv3 distributor
-emulation code (which can support far more than 8 vcpus and 1020
-interrupts).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h |  6 +++---
+ virt/kvm/arm/vgic.c    | 17 +++++++++++------
+ 2 files changed, 14 insertions(+), 9 deletions(-)
 
-This has been tested on both ARM (TC2, A20) and arm64 (model and Juno).
-
-The code is available from my kvm-arm64/kvmtool-vgic-dyn branch,
-together with the corresponding kvmtool code.
-
-* From v3 [3]
-  - Number of comments added to the data structures, making slightly more
-    obvious the various mappings
-  - Dropped the nr_irqs field from bitmap and bytemap structures, as
-    it was a leftover from the initial revision that only had a single
-    pointer
-  - Small cleanups all over the place
-  - Dropped the "sub-page offset" patch for now, as this need some
-    serious reworking
-  - Rebased on top of Christoffer "vgic cleanup" series, with 3.17-rc4
-    thrown in for a good measure
-
-* From v2 [2]
-  - Fixed bug that broke QEMU (register access can trigger allocation)
-  - irq_pending_on_cpu is now dynamic (needed for more than 32 or 64 vcpus)
-  - Rebased on top of Victor's BE patches
-
-* From v1 [1]
-  - Rebased on top of 3.16-rc1
-  - Lots of cleanup
-
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/005879.html
-[2]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010050.html
-[3]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010383.html
-
-Marc Zyngier (8):
-  KVM: ARM: vgic: plug irq injection race
-  arm/arm64: KVM: vgic: switch to dynamic allocation
-  arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
-  arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
-  arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
-  arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
-  arm/arm64: KVM: vgic: delay vgic allocation until init time
-  arm/arm64: KVM: vgic: make number of irqs a configurable attribute
-
- Documentation/virtual/kvm/devices/arm-vgic.txt |  10 +
- arch/arm/include/uapi/asm/kvm.h                |   1 +
- arch/arm/kvm/arm.c                             |  10 +-
- arch/arm64/include/uapi/asm/kvm.h              |   1 +
- include/kvm/arm_vgic.h                         |  88 ++++--
- virt/kvm/arm/vgic.c                            | 396 +++++++++++++++++++++----
- 6 files changed, 413 insertions(+), 93 deletions(-)
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 97f5f57..0a27564 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -25,7 +25,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ 
+-#define VGIC_NR_IRQS		256
++#define VGIC_NR_IRQS_LEGACY	256
+ #define VGIC_NR_SGIS		16
+ #define VGIC_NR_PPIS		16
+ #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+@@ -39,11 +39,11 @@
+ #error	Invalid number of CPU interfaces
+ #endif
+ 
+-#if (VGIC_NR_IRQS & 31)
++#if (VGIC_NR_IRQS_LEGACY & 31)
+ #error "VGIC_NR_IRQS must be a multiple of 32"
+ #endif
+ 
+-#if (VGIC_NR_IRQS > VGIC_MAX_IRQS)
++#if (VGIC_NR_IRQS_LEGACY > VGIC_MAX_IRQS)
+ #error "VGIC_NR_IRQS must be <= 1024"
+ #endif
+ 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index ab01cab..dfa6430 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -436,7 +436,7 @@ static bool handle_mmio_misc(struct kvm_vcpu *vcpu,
+ 
+ 	case 4:			/* GICD_TYPER */
+ 		reg  = (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+-		reg |= (VGIC_NR_IRQS >> 5) - 1;
++		reg |= (vcpu->kvm->arch.vgic.nr_irqs >> 5) - 1;
+ 		vgic_reg_access(mmio, &reg, word_offset,
+ 				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+ 		break;
+@@ -1274,13 +1274,14 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_lr vlr;
+ 	int lr;
+ 
+ 	/* Sanitize the input... */
+ 	BUG_ON(sgi_source_id & ~7);
+ 	BUG_ON(sgi_source_id && irq >= VGIC_NR_SGIS);
+-	BUG_ON(irq >= VGIC_NR_IRQS);
++	BUG_ON(irq >= dist->nr_irqs);
+ 
+ 	kvm_debug("Queue IRQ%d\n", irq);
+ 
+@@ -1516,7 +1517,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 
+ 		vlr = vgic_get_lr(vcpu, lr);
+ 
+-		BUG_ON(vlr.irq >= VGIC_NR_IRQS);
++		BUG_ON(vlr.irq >= dist->nr_irqs);
+ 		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
+ 	}
+ 
+@@ -1738,7 +1739,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	if (vcpu->vcpu_id >= dist->nr_cpus)
+ 		return -EBUSY;
+ 
+-	for (i = 0; i < VGIC_NR_IRQS; i++) {
++	for (i = 0; i < dist->nr_irqs; i++) {
+ 		if (i < VGIC_NR_PPIS)
+ 			vgic_bitmap_set_irq_val(&dist->irq_enabled,
+ 						vcpu->vcpu_id, i, 1);
+@@ -1880,7 +1881,11 @@ static int vgic_init_maps(struct kvm *kvm)
+ 	int ret, i;
+ 
+ 	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
+-	nr_irqs = dist->nr_irqs = VGIC_NR_IRQS;
++
++	if (!dist->nr_irqs)
++		dist->nr_irqs = VGIC_NR_IRQS_LEGACY;
++
++	nr_irqs = dist->nr_irqs;
+ 
+ 	ret  = vgic_init_bitmap(&dist->irq_enabled, nr_cpus, nr_irqs);
+ 	ret |= vgic_init_bitmap(&dist->irq_level, nr_cpus, nr_irqs);
+@@ -1964,7 +1969,7 @@ int kvm_vgic_init(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
+-	for (i = VGIC_NR_PRIVATE_IRQS; i < VGIC_NR_IRQS; i += 4)
++	for (i = VGIC_NR_PRIVATE_IRQS; i < kvm->arch.vgic.nr_irqs; i += 4)
+ 		vgic_set_target_reg(kvm, 0, i);
+ 
+ 	kvm->arch.vgic.ready = true;
 -- 
 2.0.4
