@@ -1,82 +1,50 @@
-From: xuwei5@hisilicon.com (xuwei)
-Date: Thu, 11 Sep 2014 19:18:16 +0800
-Subject: [GIT PULL][for 3.18] pull request for the clock update of
- Hisilicon HiX5HD2 soc
-In-Reply-To: <20140910165548.19023.46442@quantum>
-References: <5410136A.4080701@hisilicon.com>
- <20140910165548.19023.46442@quantum>
-Message-ID: <541184F8.8010009@hisilicon.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Thu, 11 Sep 2014 14:19:31 +0300
+Subject: [PATCH 05/16] tty: serial: 8250_core: remove UART_IER_RDI in
+ serial8250_stop_rx()
+In-Reply-To: <1410377411-26656-6-git-send-email-bigeasy@linutronix.de>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-6-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140911111931.GC17476@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 10, 2014 at 09:30:00PM +0200, Sebastian Andrzej Siewior wrote:
+> serial8250_do_startup() adds UART_IER_RDI and UART_IER_RLSI to ier.
+> serial8250_stop_rx() should remove both.
+> This is what the serial-omap driver has been doing and is now moved to
+> the 8250-core since it does no look to be *that* omap specific.
+> 
+> Cc: heikki.krogerus at linux.intel.com
 
+Looks good to me. FWIW...
 
-On 2014/9/11 0:55, Mike Turquette wrote:
-> Quoting xuwei (2014-09-10 02:01:30)
->> Hi Mike,
->>
->> Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
->>
->> Best Regards,
->> Wei
->>
->> The following changes since commit 5162797e4d77414cd9ac863ca58588c10b8f8f3a:
->>
->>   clk: hix5hd2: add complex clk (2014-09-01 16:09:05 +0100)
-> 
-> Small nitpick: it looks like you generated this pull request against
-> commit 5162797e, but I think you really meant to use v3.17-rc1.
-> 
-> Also this pull request contains the complex clock but it is not listed
-> in your tag description below.
-> 
-> Finally, I had some concern about the complex clock implementation (I
-> think it should use the reset framework to control the Ethernet phy) so
-> let's resolve that in the other thread before I pull this.
+Reviewed-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 
-Hi Mike,
+> Reviewed-by: Tony Lindgren <tony@atomide.com>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  drivers/tty/serial/8250/8250_core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+> index ac88e66df65d..139f3d2b8aa9 100644
+> --- a/drivers/tty/serial/8250/8250_core.c
+> +++ b/drivers/tty/serial/8250/8250_core.c
+> @@ -1390,7 +1390,7 @@ static void serial8250_stop_rx(struct uart_port *port)
+>  
+>  	serial8250_rpm_get(up);
+>  
+> -	up->ier &= ~UART_IER_RLSI;
+> +	up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+>  	up->port.read_status_mask &= ~UART_LSR_DR;
+>  	serial_port_out(port, UART_IER, up->ier);
+>  
+> -- 
+> 2.1.0
 
-Thanks!
-We will resolve that in another thread and then I will send a new pull request.
+Thanks,
 
-Best Regards,
-Wei
-
-> 
-> Thanks!
-> Mike
-> 
->>
->> are available in the git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18
->>
->> for you to fetch changes up to b89ffd8e390a9f0812e62c4985b6d3f246669273:
->>
->>   clk: hix5hd2: add I2C clocks (2014-09-01 16:09:33 +0100)
->>
->> ----------------------------------------------------------------
->> Hisilicon HiX5HD2 clock updates for 3.18
->>
->> -Add I2C, watchdog and sd clocks
->> -Add clock drivers for HiX5HD2 to support sata, usb and ethernet
->>
->> ----------------------------------------------------------------
->> Guoxiong Yan (1):
->>       clk: hix5hd2: add watchdog0 clocks
->>
->> Jiancheng Xue (1):
->>       clk: hix5hd2: add sd clk
->>
->> Wei Yan (1):
->>       clk: hix5hd2: add I2C clocks
->>
->>  drivers/clk/hisilicon/clk-hix5hd2.c       | 51 +++++++++++++++++++++++++++++++++++++++++++++------
->>  include/dt-bindings/clock/hix5hd2-clock.h | 18 ++++++++++++++++++
->>  2 files changed, 63 insertions(+), 6 deletions(-)
->>
->>
->>
->>
-> 
-> 
+-- 
+heikki
