@@ -1,51 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Sep 2014 11:45:13 +0100
-Subject: [PATCH arm64-next] net: bpf: arm64: fix module memory leak when
- JIT image build fails
-In-Reply-To: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
-References: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
-Message-ID: <20140911104513.GC6158@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 11 Sep 2014 12:01:46 +0100
+Subject: [PATCH v3 02/17] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <20140910215130.6D448C411AA@trevor.secretlab.ca>
+References: <1409583475-6978-3-git-send-email-hanjun.guo@linaro.org>
+ <20140909162648.GE2910@arm.com> <540F2DCF.1010104@redhat.com>
+ <20140909171541.GD3896@leverpostej>
+ <20140909175010.GF4948@e102568-lin.cambridge.arm.com>
+ <540F4155.4090200@arm.com> <540F4FCF.1090508@redhat.com>
+ <5410326F.8080104@huawei.com> <20140910123352.GA31237@localhost>
+ <20140910215130.6D448C411AA@trevor.secretlab.ca>
+Message-ID: <20140911110146.GB5814@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 10:36:48AM +0100, Daniel Borkmann wrote:
-> On ARM64, when the BPF JIT compiler fills the JIT image body with
-> opcodes during translation of eBPF into ARM64 opcodes, we may fail
-> for several reasons during that phase: one being that we jump to
-> the notyet label for not yet supported eBPF instructions such as
-> BPF_ST. In that case we only free offsets, but not the actual
-> allocated target image where opcodes are being stored. Fix it by
-> calling module_free() on dismantle time in case of errors.
+On Wed, Sep 10, 2014 at 10:51:30PM +0100, Grant Likely wrote:
+> On Wed, 10 Sep 2014 13:33:52 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Sep 10, 2014 at 12:13:51PM +0100, Hanjun Guo wrote:
+> > > I agree that we should rework the ACPI core to make sleep/cache related
+> > > stuff compatible with ARM, but I think we may not do this in one go, it will
+> > > need incremental changes over the next couple of years as real hardware
+> > > starts to appear and we finalise the standards to support this.
+> > > 
+> > > Now, as we list in the arm-acpi.txt doc, power management of sleep states
+> > > and CPU power/frequency control are not well defined in ACPI spec for ARM,
+> > > we need some time to finalize the standard and then we know how to implement
+> > > that in a good shape.
+> > > 
+> > > ACPI 5.1 already fixed lots missing features for ARM64 and provide the
+> > > fundamental needs to bring up the basic system for ARM server, power
+> > > management is not critical at now, so why not fix/implement it later?
+> > 
+> > I don't have a problem with implementing (rather than fixing) power
+> > management later, once the ACPI spec covers it. But the point a few of
+> > us were trying to make is that even when ACPI spec is updated, the
+> > current power management code and hooks still won't make sense on ARM.
+> > The best is to avoid compiling it for ARM now and look at refactoring it
+> > later to accommodate ARM ACPI.
 > 
-> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
-> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
-> Cc: Alexei Starovoitov <ast@plumgrid.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  [ Compile-tested only. ]
-> 
->  arch/arm64/net/bpf_jit_comp.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index 38c4296..7ae3354 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -651,8 +651,10 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
->  	build_prologue(&ctx);
->  
->  	ctx.body_offset = ctx.idx;
-> -	if (build_body(&ctx))
-> +	if (build_body(&ctx)) {
-> +		module_free(NULL, ctx.image);
->  		goto out;
-> +	}
->  
+> I disagree strongly here. We're talking about a library of code that is
+> working on x86 and ia64, but hasn't been tuned for ARM.
 
-Looks good to me:
+I think where we disagree is the "tuning" part. If it's just that, it
+would be fine, but there are fundamental differences in the
+architectures that the above would not even make sense on ARM (so it's
+more like rewriting than tuning).
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+> Trying to
+> refactor it first, and then get it compiling for ARM is entirely the
+> wrong way around.
 
-Catalin, can you apply this on the for-next/core branch, please?
+Note that I explicitly stated "refactoring it later". I have not asked
+for the existing code to be refactored _now_ as it's not even clear how
+it would look like on ARM (what's clear though is that its behaviour is
+_undefined_).
 
-Will
+> The best way to get that code refactored for
+> ARM is to get it compiling first, and then refactor it to remove the
+> unnecessary stubs. That makes it a whole lot easier to make the
+> arguements about why the changes are needed. Otherwise it just shows
+> churn on the ACPICA side without any evidence of why the change is
+> good. Trying to refactor first also has the risk of breaking things
+> that work now in the name of "refactoring" and not being able to easily
+> bisect it for ARM. That's just madness.
+
+I agree with not starting the refactoring now. But is it difficult to
+make it compilable based on something like CONFIG_ACPI_SLEEP and the
+latter depend on !ARM64 until the spec is clear?
+
+> Aside from a slightly larger kernel, there is no downside to using
+> stubs for now.
+
+There is a serious downside - code with _undefined_ behaviour on arm64
+that may get executed depending on the content of the ACPI tables. I'm
+sure it's a lot of fun debugging this.
+
+-- 
+Catalin
