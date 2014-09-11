@@ -1,45 +1,107 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Thu, 11 Sep 2014 13:55:56 +0100
-Subject: [PATCH v3 0/3] xen/arm: fix "xen_add_mach_to_phys_entry: cannot
- add" problem
-In-Reply-To: <alpine.DEB.2.02.1409102335490.8137@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1408011552460.2293@kaball.uk.xensource.com>
- <53DBB231.5010900@citrix.com>
- <alpine.DEB.2.02.1409102335490.8137@kaball.uk.xensource.com>
-Message-ID: <54119BDC.4080402@citrix.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 11 Sep 2014 15:03:50 +0200
+Subject: SPI and module auto-loading
+Message-ID: <54119DB6.8020807@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/14 00:28, Stefano Stabellini wrote:
-> On Fri, 1 Aug 2014, David Vrabel wrote:
->> On 01/08/14 15:55, Stefano Stabellini wrote:
->>> Hi all,
->>> Xen support in Linux for ARM and ARM64 suffers from lack of support for
->>> multiple mfn to pfn mappings: whenever a frontend grants the same page
->>> multiple times to the backend, the mfn to pfn accounting in
->>> arch/arm/xen/p2m.c fails. The issue has become critical since v3.15,
->>> when xen-netfront/xen-netback switched from grant copies to grant
->>> mappings, therefore causing the issue to happen much more often.
->>>
->>> Fixing the mfn to pfn accounting in p2m.c is difficult and expensive,
->>> therefore we are looking for alternative solutions. One idea is avoiding
->>> mfn to pfn conversions altogether. The only code path that needs them is
->>> swiotlb-xen:unmap_page (and single_for_cpu and single_for_device).
->>>
->>> To avoid mfn to pfn conversions we rely on a second p2m mapping done by
->>> Xen (a separate patch series will be sent for Xen). In Linux we use it
->>> to perform the cache maintenance operations without mfns conversions.
->>>
->>>
->>> The Xen side patch series that introduces XENFEAT_grant_map_identity is:
->>> http://marc.info/?l=xen-devel&m=140690433923855
->>
->> If the Xen side is in master, you can apply this series to
->> devel/for-linus-3.17
-> 
-> The Xen side patch finally went in. Unfortunately it's probably too late
-> for 3.17.
+Hello Mark,
 
-Isn't this a bug fix?  I think would be fine to go into 3.17.
+We found an issue with module auto-loading on an I2C driver [0] and it turned
+out to be a problem on how the I2C subsystem reports the module alias to
+user-space. It always report modalias as "i2c:<dev_id>" even when the driver
+is probed via DT. The problem with this particular driver is that the I2C
+device ID table didn't contain an entry that matched what the I2C core was
+reporting as the MODALIAS uevent env var.
 
-David
+I looked at the SPI core and it does the same. It always reports to udev as
+modalias "spi:<dev_id>" so the aliases filled in a module from the OF table
+are never used.
+
+This can be easily worked around (and probably why it never was an issue) if
+the OF and SPI tables are kept in sync but I don't know if that is a hard
+requirement for all use-cases (e.g: a SPI driver that is DT only?).
+
+Now, changing this behavior will break module auto-loading for a lot of
+drivers relies on the current behavior and don't define a struct of_device_id
+or are not using the MODULE_DEVICE_TABLE(of,..) macro but I wonder if that
+means that the drivers are broken and should be fixed?
+
+I'm sending an RFC patch [1] to know what you think about it.
+
+Thanks a lot and best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/9/11/127
+[1]
+>From a7cd35209a597a578df6c801e5ff7b63b584bf3e Mon Sep 17 00:00:00 2001
+From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Date: Thu, 11 Sep 2014 14:31:04 +0200
+Subject: [PATCH RFC] spi: core: report OF style modalias when probing using DT
+
+An SPI driver that supports both OF and legacy platforms, will have
+both an OF and SPI ID table. This means that when built as a module,
+the aliases will be filled from both tables, e.g:
+
+$ modinfo cros_ec_spi | grep alias
+alias:          spi:cros-ec-spi
+alias:          of:N*T*Cgoogle,cros-ec-spi*
+
+But currently always an alias of the form spi:<dev_id> is reported
+even when the it was probed by matching the OF compatible string.
+
+$ cat /sys/devices/12d40000.spi/spi_master/spi2/spi2.0/modalias
+spi:cros-ec-spi
+
+Drivers for IP blocks that are included in DT-only platforms, may not
+have an updated SPI ID table so if a device is probed by matching its
+compatible string, udev can get a MODALIAS uevent env var that doesn't
+match with one of the valid aliases so the module won't be auto-loaded
+by libkmod/modprobe.
+
+This patch reports OF related uevent env vars (e.g: OF_COMPATIBLE) and
+so the module can be auto-loaded and also report the correctly on sysfs:
+
+$ cat /sys/devices/12d40000.spi/spi_master/spi2/spi2.0/modalias
+of:Ncros-ecT<NULL>Cgoogle,cros-ec-spi
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+
+NOTE: this will break module auto-loading for all drivers that rely on the
+current behavior so it should not be applied unless is part of a series that
+fix all the broken drivers.
+
+ drivers/spi/spi.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 95cfe3b..154e1d6 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -63,6 +63,10 @@ modalias_show(struct device *dev, struct device_attribute
+*a, char *buf)
+ 	const struct spi_device	*spi = to_spi_device(dev);
+ 	int len;
+
++	len = of_device_get_modalias(dev, buf, PAGE_SIZE - 1);
++	if (len != -ENODEV)
++		return len;
++
+ 	len = acpi_device_modalias(dev, buf, PAGE_SIZE - 1);
+ 	if (len != -ENODEV)
+ 		return len;
+@@ -124,6 +128,10 @@ static int spi_uevent(struct device *dev, struct
+kobj_uevent_env *env)
+ 	const struct spi_device		*spi = to_spi_device(dev);
+ 	int rc;
+
++	rc = of_device_uevent_modalias(dev, env);
++	if (rc != -ENODEV)
++		return rc;
++
+ 	rc = acpi_device_uevent_modalias(dev, env);
+ 	if (rc != -ENODEV)
+ 		return rc;
+-- 
+2.1.0
