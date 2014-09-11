@@ -1,54 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Sep 2014 16:00:00 +0200
-Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
-In-Reply-To: <20140911134323.GB29780@lunn.ch>
-References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140911134323.GB29780@lunn.ch>
-Message-ID: <20140911160000.55a4de80@free-electrons.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 11 Sep 2014 22:03:27 +0800
+Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
+Message-ID: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+We plan to restructure x86 interrupt code based on hierarchy irqdomain,
+that is to build irqdomains for CPU vector, interrupt remapping unit,
+IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
+Each irqdomain manages corresponding interrupt controller and talks to
+parent interrupt controller through public irqdomain interfaces. We also
+support stacked irq_chip based on hierarchy irqdomain. It will make the
+x86 interrupt architecture much more clear and more easy to maintain
+with hierarchy irqdomain and stacked irq_chip. It may also help ARM
+interrupt management architecture too.
 
-On Thu, 11 Sep 2014 15:43:23 +0200, Andrew Lunn wrote:
+This is the second patch set to enable support of hierarchy irqdomain
+on x86 platforms. It depends on the first part at:
+https://lkml.org/lkml/2014/9/11/101 
+And you may access it at:
+https://github.com/jiangliu/linux.git irqdomain/p2v1
 
-> All looks O.K. to me
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
+And there will be a third patch set to convert IOAPIC driver to support
+hierarchy irqdomain and clean up code.
 
-Thanks!
+The first patch extends irqdomain interfaces to support hierarchy
+irqdomain. Hope this interface could be used by other architectures too,
+such as ARM/ARM64.
+The second patch introduces two helper functions to support stacked
+irq_chip.
+Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
+it's the root irqdomain for x86 platforms.
+Patch 10-13 converts Intel and AMD interrupt remapping drivers to
+support hierarchy irqdomain.
+Patch 14-17 converts HPET, MSI and HT_IRQ drivers to support hierarchy
+irqdomain.
+Patch 18-21 cleans up unsued code in x86 arch and interrupt remapping
+drivers.
 
-> A point for discussion, triggered by 3/4. We have repeatedly seen
-> issues with modular builds, which we don't see with everything built
-> in. Can we improve our testing? Is there is way to take for example
-> mvebu_v7_defconfig and turn any y tristate options into m? Build and
-> boot? Get this added to the boot test farms?
+We have tested this patchset on Intel 32-bit and 64-bit systems. But we
+have only done compilation tests for HT_IRQ and AMD interrupt remapping
+drivers due to hardware resource limitation. Tests on AMD platforms are
+warmly welcomed!
 
-I indeed agree that we are not testing much the modular case, but:
+Jiang Liu (21):
+  irqdomain: Introduce new interfaces to support hierarchy irqdomains
+  genirq: Introduce helper functions to support stacked irq_chip
+  x86, irq: Save destination CPU ID in irq_cfg
+  x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
+  x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
+  x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
+  x86, uv: Use new irqdomain interfaces to allocate/free IRQ
+  x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
+  x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
+  x86: irq_remapping: Introduce new interfaces to support hierarchy
+    irqdomain
+  iommu/vt-d: Change prototypes to prepare for enabling hierarchy
+    irqdomain
+  iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
+  iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
+  x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
+  x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
+  x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
+  x86, htirq: Use hierarchy irqdomain to manage Hypertransport
+    interrupts
+  iommu/vt-d: Clean up unused MSI related code
+  iommu/amd: Clean up unused MSI related code
+  x86: irq_remapping: Clean up unused MSI related code
+  x86, irq: Clean up unused MSI related code and interfaces
 
- 1/ In my case, a mvebu_v7_defconfig where most the stuff would become
-    enabled as a module would make mvebu_v7_defconfig pretty much
-    useless for my daily work. When I'm doing active development, I
-    typically have everything built-in including the initramfs itself,
-    so that I don't rely on any storage/network to get the rootfs and
-    additional kernel drivers.
+ arch/x86/Kconfig                     |    3 +-
+ arch/x86/include/asm/hpet.h          |   16 +-
+ arch/x86/include/asm/hw_irq.h        |   64 +++++
+ arch/x86/include/asm/irq_remapping.h |   66 +++--
+ arch/x86/include/asm/pci.h           |    5 -
+ arch/x86/include/asm/x86_init.h      |    4 -
+ arch/x86/kernel/apic/htirq.c         |  179 +++++++++----
+ arch/x86/kernel/apic/io_apic.c       |    3 -
+ arch/x86/kernel/apic/msi.c           |  430 +++++++++++++++++++++++--------
+ arch/x86/kernel/apic/vector.c        |  158 +++++++++++-
+ arch/x86/kernel/hpet.c               |   57 ++---
+ arch/x86/kernel/x86_init.c           |    2 -
+ arch/x86/platform/uv/uv_irq.c        |   27 +-
+ drivers/iommu/amd_iommu.c            |  385 ++++++++++++++++++++++------
+ drivers/iommu/amd_iommu_init.c       |    4 +
+ drivers/iommu/amd_iommu_proto.h      |    9 +
+ drivers/iommu/amd_iommu_types.h      |    5 +
+ drivers/iommu/intel_irq_remapping.c  |  468 +++++++++++++++++++++++-----------
+ drivers/iommu/irq_remapping.c        |  221 ++++++----------
+ drivers/iommu/irq_remapping.h        |   22 +-
+ drivers/pci/htirq.c                  |   48 +---
+ include/linux/htirq.h                |   22 +-
+ include/linux/intel-iommu.h          |    4 +
+ include/linux/irq.h                  |    8 +
+ include/linux/irqdomain.h            |   60 +++++
+ kernel/irq/Kconfig                   |    3 +
+ kernel/irq/chip.c                    |   21 ++
+ kernel/irq/irqdomain.c               |  349 ++++++++++++++++++++++++-
+ 28 files changed, 1934 insertions(+), 709 deletions(-)
 
- 2/ I don't think it would change much in terms of runtime coverage:
-    the tests done on the boot farm are just boot tests, I don't think
-    they load any kernel module. We could ask Kevin and Olof what
-    rootfs they use, but most likely it's some very small rootfs that
-    doesn't even have udev/mdev for automatic module loading. So no
-    module would be loaded, which would mean that a mvebu_v7_defconfig
-    with everything as a module would actually test *less* thing than a
-    configuration that has everything built in.
-
-So, I agree on the observation, but I'm unsure the proposed solution
-will really solve or even improve the situation :/
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.10.4
