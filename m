@@ -1,44 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 11 Sep 2014 09:57:24 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC PM Cleanups for v3.18
-Message-ID: <cover.1410395620.git.horms+renesas@verge.net.au>
+Date: Thu, 11 Sep 2014 09:57:23 +0900
+Subject: [PATCH 1/5] ARM: shmobile: mackerel: Make domain_devices[] static
+ __initdata
+In-Reply-To: <cover.1410395620.git.horms+renesas@verge.net.au>
+References: <cover.1410395620.git.horms+renesas@verge.net.au>
+Message-ID: <d6dc6ed8540ab8802c6ba31b4292204dd3cb0fee.1410395620.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC PM cleanups for v3.18.
+Make the domain_devices[] array static and __initdata, to reduce kernel
+size:
+  - Making it static gets rid of the code to copy the data to the stack,
+  - Marking it __initdata allows more init memory to be freed.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-mackerel.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pm-cleanups-for-v3.18
-
-for you to fetch changes up to 834720dbf03819a8b2d0ba5fbe01d008267f9da6:
-
-  ARM: shmobile: armadillo800eva legacy: Use rmobile_add_devices_to_domains() (2014-09-09 11:16:08 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC PM Cleanups for v3.18
-
-* Make domain_devices[] static __initdata
-* Add and use rmobile_add_devices_to_domain
-
-----------------------------------------------------------------
-Geert Uytterhoeven (5):
-      ARM: shmobile: mackerel: Make domain_devices[] static __initdata
-      ARM: shmobile: sh7372: Make domain_devices[] static __initdata
-      ARM: shmobile: r8a7740: Use rmobile_add_devices_to_domains()
-      ARM: shmobile: r8a7740: Clean up pm domain table
-      ARM: shmobile: armadillo800eva legacy: Use rmobile_add_devices_to_domains()
-
- arch/arm/mach-shmobile/board-armadillo800eva.c |  8 ++++++--
- arch/arm/mach-shmobile/board-mackerel.c        |  2 +-
- arch/arm/mach-shmobile/pm-r8a7740.c            | 10 ++++------
- arch/arm/mach-shmobile/setup-r8a7740.c         | 26 +++++++++++++++-----------
- arch/arm/mach-shmobile/setup-sh7372.c          |  2 +-
- 5 files changed, 27 insertions(+), 21 deletions(-)
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 79f448e..d47b262 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -1420,7 +1420,7 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
+ #define USCCR1		IOMEM(0xE6058144)
+ static void __init mackerel_init(void)
+ {
+-	struct pm_domain_device domain_devices[] = {
++	static struct pm_domain_device domain_devices[] __initdata = {
+ 		{ "A4LC", &lcdc_device, },
+ 		{ "A4LC", &hdmi_lcdc_device, },
+ 		{ "A4LC", &meram_device, },
+-- 
+2.0.1
