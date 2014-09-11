@@ -1,55 +1,58 @@
-From: d.lavnikevich@sam-solutions.net (Dmitry Lavnikevich)
-Date: Thu, 11 Sep 2014 15:41:56 +0300
-Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
- driver
-In-Reply-To: <20140911064016.GE16489@pengutronix.de>
-References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
- <20140910142740.GC16489@pengutronix.de>
- <CAGoOwPSpkNy6uNVAjG2HgiHHscKZjL5wgVrkyGwWCmyU7x+gWg@mail.gmail.com>
- <20140911064016.GE16489@pengutronix.de>
-Message-ID: <54119894.8040805@sam-solutions.net>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 11 Sep 2014 14:50:50 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <5411967A.6090406@hurleysoftware.com>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5411967A.6090406@hurleysoftware.com>
+Message-ID: <54119AAA.9080907@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/11/2014 02:32 PM, Peter Hurley wrote:
+> On 09/11/2014 07:42 AM, Sebastian Andrzej Siewior wrote:
+>> I also need a watchdog timer for TX since it seems that on omap3 the
+>> DMA engine suddenly forgets to continue with DMA?
+> 
+> One difference I noticed between the omap driver and the 8250 driver is
+> the way modem status interrupts are handled.
+> 
+> The omap driver only checks modem status for the UART_IIR_MSI interrupt type.
+> The 8250 driver checks modem status at every interrupt (other than NO_INT).
+> 
+> I think the UART_MSR_DCTS bit always reflects that the CTS input has changed
+> between reads of the MSR _even if auto CTS is on_. So perhaps the hardware
+> is being stopped by uart_handle_cts_change() when auto CTS is on?
 
-On 11/09/14 09:40, Markus Pargmann wrote:
-> On Wed, Sep 10, 2014 at 11:14:15AM -0700, Nicolin Chen wrote:
->> On Wed, Sep 10, 2014 at 7:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
->>> Hi,
->>>
->>> On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
->>>> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
->>>>
->>>> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
->>>> ---
->>>>   .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
->>>>   sound/soc/fsl/Kconfig                              |  13 ++
->>>>   sound/soc/fsl/Makefile                             |   2 +
->>>>   sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
->>>>   4 files changed, 219 insertions(+)
->>>>   create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
->>>>   create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
->>> Is it possible to use the simple-card
->>> (Documentation/devicetree/bindings/sound/simple-card.txt) instead of
->>> adding a new audio card driver? There are also DT bindings for the imx
->>> audiomultiplexer (imx-audmux.txt).
->> I don't know why my mutt doesn't display this mail.
->>
->> Anyway, if Simple Card supports audmux, yes, it's also a good idea.
-> Simple Card doesn't support it. But there are DT bindings for the audmux
-> device node which allow the definition of a default multiplexer setup.
-> That configuration is applied in the probe() function of the audmux driver.
->
-> Best regards,
->
-> Markus
->
+I doubt that. What I see from a timer debug is that the TX-FIFO level
+is at 0, the DMA transfer for say 1024 bytes start.
+The FIFO is filled to 64bytes and refilled so it doesn't drop below 50.
+At the time of the stall I see that the DMA engine has outstanding
+bytes which it should transfer and the TX FIFO is empty. If hardware
+flow control stops the transfer, I would expect that the DMA engine
+still fills the TX-FIFO until 64 and then waits. But it doesn't.
+Writing bytes into the FIFO leads to bytes beeing sent (and I see them
+on the other side) but the DMA transfer is still on hold. Canceling the
+DMA transfer and re-programming the remaining bytes transfers the
+remaining bytes.
 
-Yes, I've checked - it can be implemented with simple card +
-audmux configuration. Thanks for great suggestion. It will be
-done in next patchset version.
+The odd thing is that I only triggered it with "less file". It doesn't
+happen on regular console interaction or "cat large-file". And it only
+triggers on beagle board xm (omap34xx) and I wasn't able to reproduce
+it on am335x or dra7. The latter shares the same DMA engine as beagle
+board xm.
 
-Best regards,
-Lavnikevich Dmitry
+I remember also that I disabled the HW/SW float control just to make
+sure it is not it.
+
+> 
+> Regards,
+> Peter Hurley
+> 
+> [The UPF_HARD_FLOW thing was pretty much just done for omap even though
+> 8250 already had auto CTS/auto RTS. Serial core hardware flow control support
+> needs a redo as drivers have pretty much tacked stuff on randomly.]
+
+Sebastian
