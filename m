@@ -1,31 +1,71 @@
-From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Thu, 11 Sep 2014 19:07:41 +0530
-Subject: [PATCH] arm64:mm: initialize max_mapnr using function set_max_mapnr
-Message-ID: <1410442661-3383-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+From: kiran.padwal@smartplayin.com (Kiran Padwal)
+Date: Thu, 11 Sep 2014 19:07:36 +0530
+Subject: [PATCH] iommu: Make of_device_id array const
+Message-ID: <1410442656-21112-1-git-send-email-kiran.padwal@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some config cases, max_mapnr is not defined and direct reference
-results in to compilation error.
-This is fixed by using set_max_mapnr() helper.
+Make of_device_id array const, because all OF functions handle it as const.
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
 ---
- arch/arm64/mm/init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iommu/arm-smmu.c   |    2 +-
+ drivers/iommu/omap-iommu.c |    2 +-
+ drivers/iommu/tegra-gart.c |    2 +-
+ drivers/iommu/tegra-smmu.c |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..271e654 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -256,7 +256,7 @@ static void __init free_unused_memmap(void)
-  */
- void __init mem_init(void)
- {
--	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
-+	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ca18d6d..095f4e5 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1993,7 +1993,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ }
  
- #ifndef CONFIG_SPARSEMEM_VMEMMAP
- 	free_unused_memmap();
+ #ifdef CONFIG_OF
+-static struct of_device_id arm_smmu_of_match[] = {
++static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v1", },
+ 	{ .compatible = "arm,smmu-v2", },
+ 	{ .compatible = "arm,mmu-400", },
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index e202b0c..47517cf 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -1006,7 +1006,7 @@ static int omap_iommu_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct of_device_id omap_iommu_of_match[] = {
++static const struct of_device_id omap_iommu_of_match[] = {
+ 	{ .compatible = "ti,omap2-iommu" },
+ 	{ .compatible = "ti,omap4-iommu" },
+ 	{ .compatible = "ti,dra7-iommu"	},
+diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
+index b10a8ec..d6a3a09 100644
+--- a/drivers/iommu/tegra-gart.c
++++ b/drivers/iommu/tegra-gart.c
+@@ -416,7 +416,7 @@ static const struct dev_pm_ops tegra_gart_pm_ops = {
+ 	.resume		= tegra_gart_resume,
+ };
+ 
+-static struct of_device_id tegra_gart_of_match[] = {
++static const struct of_device_id tegra_gart_of_match[] = {
+ 	{ .compatible = "nvidia,tegra20-gart", },
+ 	{ },
+ };
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index 3ded389..05860a4 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -1260,7 +1260,7 @@ static const struct dev_pm_ops tegra_smmu_pm_ops = {
+ 	.resume		= tegra_smmu_resume,
+ };
+ 
+-static struct of_device_id tegra_smmu_of_match[] = {
++static const struct of_device_id tegra_smmu_of_match[] = {
+ 	{ .compatible = "nvidia,tegra30-smmu", },
+ 	{ },
+ };
 -- 
-1.8.1.4
+1.7.9.5
