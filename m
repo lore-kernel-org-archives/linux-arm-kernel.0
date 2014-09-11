@@ -1,58 +1,59 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Thu, 11 Sep 2014 07:53:20 +0200
-Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
-In-Reply-To: <CAOMZO5BEN_DQOyhrx5ZB7y6DoDvqbLvDyJfAabOvtUvKOiGHOA@mail.gmail.com>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>	<1410089869-6611-3-git-send-email-info@lategoodbye.de>	<20140909182211.GG3896@leverpostej>	<540F523D.4010904@lategoodbye.de>	<20140910141853.GA4994@leverpostej>	<20140910151316.GG7960@sirena.org.uk>	<54108B34.6010701@lategoodbye.de>
- <CAOMZO5BEN_DQOyhrx5ZB7y6DoDvqbLvDyJfAabOvtUvKOiGHOA@mail.gmail.com>
-Message-ID: <541138D0.6090808@lategoodbye.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 11 Sep 2014 08:40:16 +0200
+Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
+ driver
+In-Reply-To: <CAGoOwPSpkNy6uNVAjG2HgiHHscKZjL5wgVrkyGwWCmyU7x+gWg@mail.gmail.com>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <20140910142740.GC16489@pengutronix.de>
+ <CAGoOwPSpkNy6uNVAjG2HgiHHscKZjL5wgVrkyGwWCmyU7x+gWg@mail.gmail.com>
+Message-ID: <20140911064016.GE16489@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Wed, Sep 10, 2014 at 11:14:15AM -0700, Nicolin Chen wrote:
+> On Wed, Sep 10, 2014 at 7:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> > Hi,
+> >
+> > On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
+> >> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
+> >>
+> >> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> >> ---
+> >>  .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
+> >>  sound/soc/fsl/Kconfig                              |  13 ++
+> >>  sound/soc/fsl/Makefile                             |   2 +
+> >>  sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
+> >>  4 files changed, 219 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
+> >>  create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
+> >
+> > Is it possible to use the simple-card
+> > (Documentation/devicetree/bindings/sound/simple-card.txt) instead of
+> > adding a new audio card driver? There are also DT bindings for the imx
+> > audiomultiplexer (imx-audmux.txt).
+> 
+> I don't know why my mutt doesn't display this mail.
+> 
+> Anyway, if Simple Card supports audmux, yes, it's also a good idea.
 
-Am 10.09.2014 20:54, schrieb Fabio Estevam:
-> Hi Stefan,
->
-> On Wed, Sep 10, 2014 at 2:32 PM, Stefan Wahren <info@lategoodbye.de> wrote:
->> Hi Mark,
->>
->> Am 10.09.2014 17:13, schrieb Mark Brown:
->>>
->>> On Wed, Sep 10, 2014 at 03:18:53PM +0100, Mark Rutland wrote:
->>>>
->>>> On Tue, Sep 09, 2014 at 08:17:17PM +0100, Stefan Wahren wrote:
->>>
->>>
->>> Ugh, this looks like it might be a regulator driver but since the
->>> subject line was "ARM: " I deleted it unread - if your changelog looks
->>> different to all the other changelogs in the subsystem it probably needs
->>> changing.
->>
->>
->> sorry about the confusion, i will remove ARM in the next version.
->>
->> Changelog? I didn't send a changelog because it was my first version.
->>
->> Should i resend this version only to you?
->
-> In the cover letter of this RFC series you mentioned that this has not
-> been tested on real hardware.
->
-> What about sending a new version of this series (with the RFC prefix
-> removed and with Mark Rutland's suggestion implemented) tested on a
-> mx28 board and also with the Subject of the regulator patch changed to
-> 'regulator: add support for mxs regulator" with Mark Brown on Cc?
->
+Simple Card doesn't support it. But there are DT bindings for the audmux
+device node which allow the definition of a default multiplexer setup.
+That configuration is applied in the probe() function of the audmux driver.
 
-that's the same idea i had about the first real version of my patch. 
-Unfortunately i can do the porting only in my spare time. So i try to 
-avoid with the RFC series the situation, that i spend many days in 
-development and testing, but after it the regulator guys says it went in 
-the complete wrong direction. The advice about the anatop regulator was 
-helpful, but there is still some unsureness.
+Best regards,
 
-I will try to get a Duckbill, so i can do testing at home.
+Markus
 
-Thanks
-
-Stefan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/6d901b31/attachment.sig>
