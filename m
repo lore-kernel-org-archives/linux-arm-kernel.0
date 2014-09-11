@@ -1,71 +1,157 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 11 Sep 2014 12:14:10 -0600
-Subject: [RFC v2 8/9] KVM: KVM-VFIO: generic KVM_DEV_VFIO_DEVICE command
- and IRQ forwarding control
-In-Reply-To: <20140911171033.GD5535@lvm>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 11 Sep 2014 20:17:49 +0200
+Subject: [RFC v2 1/9] KVM: ARM: VGIC: fix multiple injection of level
+ sensitive forwarded IRQ
+In-Reply-To: <20140911030945.GC2784@lvm>
 References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
- <1409575968-5329-9-git-send-email-eric.auger@linaro.org>
- <20140911031026.GI2784@lvm> <1410411949.2982.284.camel@ul30vt.home>
- <20140911171033.GD5535@lvm>
-Message-ID: <1410459250.2982.325.camel@ul30vt.home>
+ <1409575968-5329-2-git-send-email-eric.auger@linaro.org>
+ <20140911030945.GC2784@lvm>
+Message-ID: <5411E74D.4080309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-09-11 at 19:10 +0200, Christoffer Dall wrote:
-> On Wed, Sep 10, 2014 at 11:05:49PM -0600, Alex Williamson wrote:
-> > On Thu, 2014-09-11 at 05:10 +0200, Christoffer Dall wrote:
-> > > On Mon, Sep 01, 2014 at 02:52:47PM +0200, Eric Auger wrote:
+On 09/11/2014 05:09 AM, Christoffer Dall wrote:
+> On Mon, Sep 01, 2014 at 02:52:40PM +0200, Eric Auger wrote:
+>> Fix multiple injection of level sensitive forwarded IRQs.
+>> With current code, the second injection fails since the state bitmaps
+>> are not reset (process_maintenance is not called anymore).
+>> New implementation consists in fully bypassing the vgic state
+>> management for forwarded IRQ (checks are ignored in
+>> vgic_update_irq_pending). This obviously assumes the forwarded IRQ is
+>> injected from kernel side.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> It was attempted to reset the states in __kvm_vgic_sync_hwstate, checking
+>> the emptied LR of forwarded IRQ. However surprisingly this solution does
+>> not seem to work. Some times, a new forwarded IRQ injection is observed
+>> while the LR of the previous instance was not observed as empty.
 > 
-> [...]
+> hmmm, concerning.  It would probably have been helpful overall if you
+> could start by describing the problem with the current implementation in
+> the commit message, and then explain the fix...
 > 
-> > > >  
-> > > > +#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-> > > > +int kvm_arch_set_fwd_state(struct kvm_fwd_irq *pfwd,
-> > > 
-> > > what's the 'p' in pfwd?
-> > 
-> > p is for pointer?
-> > 
+>>
+>> v1 -> v2:
+>> - fix vgic state bypass in vgic_queue_hwirq
+>> ---
+>>  virt/kvm/arm/vgic.c | 13 ++++++++++---
+>>  1 file changed, 10 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 0007300..8ef495b 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1259,7 +1259,9 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+>>  
+>>  static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+>>  {
+>> -	if (vgic_irq_is_queued(vcpu, irq))
+>> +	bool is_forwarded =  (vgic_get_phys_irq(vcpu, irq) > 0);
 > 
-> shouldn't the type declation spell out quite clearly to me that I'm
-> dealing with a pointer?
-
-Sure.  In the cases where I've done similar things it's more a matter of
-not needing to come up with another variable, for instance if I need
-both a struct and a struct* I might call them foo and pfoo if I can't
-come up with anything more meaningful.
-
-
-> [...]
+> can you create a static function to factor this vgic_get_phys_irq check out, please?
+yes sure
 > 
-> > > 
-> > > need some spaceing here, also, I would turn this around, first check if
-> > > the strcmp fails, and then error out, then do you next check etc., to
-> > > avoid so many nested statements.
-> > > 
-> > > > +	/* is a ref to this device already owned by the KVM-VFIO device? */
-> > > 
-> > > this comment is not particularly helpful in its current form, it would
-> > > be helpful if you specified that we're checking whether that particular
-> > > device/irq combo is already registered.
-> > > 
-> > > > +	*kvm_vdev = kvm_vfio_find_device(kv, vdev);
-> > > > +	if (*kvm_vdev) {
-> > > > +		if (kvm_vfio_find_irq(*kvm_vdev, fwd_irq->index)) {
-> > > > +			kvm_err("%s irq %d already forwarded\n",
-> > > > +				__func__, *hwirq);
-> > 
-> > Why didn't we do this first?
-> > 
-> huh?
+>> +
+>> +	if (vgic_irq_is_queued(vcpu, irq) && !is_forwarded)
+>>  		return true; /* level interrupt, already queued */
+> 
+> so essentially if an IRQ is already on a LR so we shouldn't resample the
+> line, then we still resample the line if the IRQ is forwarded?
+> 
+> I think you need to explain this, both to me here, and also in the code
+> by moving the comment following the return statement above the check and
+> comment this clearly.
+Well, I admit it may look a bit pushy! When we discussed this issue with
+Marc, the outcome was that the vgic states were not accurate with
+forwarded IRQs and VGIC state may be fully bypassed. Since the first
+injection still sets the state - and I did not want to modify this - the
+2d one would fail due to that check, and the validate_injection. May be
+cleaner to not update the states when injecting the fwd irq too.
 
-The code is doing:
+> 
+>>  
+>>  	if (vgic_queue_irq(vcpu, 0, irq)) {
+>> @@ -1517,14 +1519,18 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>>  	int edge_triggered, level_triggered;
+>>  	int enabled;
+>>  	bool ret = true;
+>> +	bool is_forwarded;
+>>  
+>>  	spin_lock(&dist->lock);
+>>  
+>>  	vcpu = kvm_get_vcpu(kvm, cpuid);
+>> +	is_forwarded = (vgic_get_phys_irq(vcpu, irq_num) > 0);
+> 
+> use your new function here as well.
+ok
+> 
+>> +
+>>  	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
+>>  	level_triggered = !edge_triggered;
+>>  
+>> -	if (!vgic_validate_injection(vcpu, irq_num, level)) {
+>> +	if (!is_forwarded &&
+>> +		!vgic_validate_injection(vcpu, irq_num, level)) {
+> 
+> I don't see the rationale here either.  If an IRQ is forwarded, why do
+> you need to do anything if the condition of the line hasn't changed for
+> a level-triggered IRQ or if you have a falling edge on an edge-triggered
+> IRQ (assuming active-HIGH)?
+To me this even cannot cannot happen. a second fwd irq can only hit if
+the same virtual IRQ was completed and completed the corresponding phys
+IRQ. Still the problem is that on the 1st injection we updated the VGIC
+state. I aknowledge this is a hack to work around the 1st injection
+update the state and nothing reset them. So on subsequent injections, -
+and even on the 1st one-  I never check the state.
+> 
+>>  		ret = false;
+>>  		goto out;
+>>  	}
+>> @@ -1557,7 +1563,8 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>>  		goto out;
+>>  	}
+>>  
+>> -	if (level_triggered && vgic_irq_is_queued(vcpu, irq_num)) {
+>> +	if (!is_forwarded &&
+>> +		level_triggered && vgic_irq_is_queued(vcpu, irq_num)) {
+> 
+> So here it's making sense for SPIs since you can have an EOIed interrupt
+> on a CPU that didn't exit the VM yet, and this it's still queued, but
+> you still need to resample the line to respect other CPUs.  Only, we
+> ever only target a single CPU for SPIs IIRC (the first in the target
+> list register) so we have to wait for that CPU to to exit the VM anyhow.
+> 
+> This leads me to believe that, given a fowarded irq, you can only have
+> XXX situations at this point:
+> 
+> (1) is_queued && target_vcpu_in_vm:
+> The vcpu should resample this line when it exits the VM, because we
+> check the LRs for IRQs like this one, so we don't have to do anything
+> and go to out here.
+> 
+> (2) is_queued && !target_vcpu_in_vm::
+> You have a bug because you exited the VM which must have done an EOI on
+> the interrupt, otherwise this function shouldn't have been called!  This
+> means that we should have cleared the queued state of the interrupt.
+> 
+> (3) !is_queued && whatever:
+> Set the irq pending bits, so do not goto out.
+> 
+> I'm aware that there's theoretically a race between (1) and (2), but you
+> should consider target_cpu_in_vm as "it hasn't been through
+> __kvm_vgic_sync_hwstate() yet" and this should hold.
+I will prepare something accurate for next week.
 
-1. can the arch forward this irq
-2. are we already forwarding this irq
+Thanks
 
-It's backwards, test for duplicates locally before calling out into arch
-code.  Besides, I think the arch code here should go away and just be
-another error condition for the call-out.  Thanks,
+Best Regards
 
-Alex
+Eric
+> 
+> Tell me where this breaks?
+> 
+> -Christoffer
+> 
