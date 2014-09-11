@@ -1,40 +1,64 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 11 Sep 2014 13:20:54 +0200
-Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20140911100721.GT3190@worktop.ger.corp.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
- <20140911100721.GT3190@worktop.ger.corp.intel.com>
-Message-ID: <CAKfTPtDtw2kE9DtGB-ZHa=0+oWY+1-753eoRFDs=mz0qFuiwiQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 11 Sep 2014 13:22:38 +0200
+Subject: [PATCH v2 0/3] CMA & device tree, another approach
+Message-ID: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2014 12:07, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, Aug 26, 2014 at 01:06:51PM +0200, Vincent Guittot wrote:
->
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 18db43e..60ae1ce 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -6049,6 +6049,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
->>                       return true;
->>       }
->>
->> +     /*
->> +      * The group capacity is reduced probably because of activity from other
->> +      * sched class or interrupts which use part of the available capacity
->> +      */
->> +     if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
->> +                             env->sd->imbalance_pct))
->> +             return true;
->> +
->>       return false;
->>  }
->
-> This is unlikely to have worked as intended. You will never reach this,
-> except on PowerPC >= 7. All other machines will have bailed at the
-> !ASYM_PACKING check above this.
+Hello,
 
-Ah yes, i miss that change while rebasing on rik patches. My use case
-fall in this wider test now that we always select a busiest group
+This is another approach to finish support for reserved memory regions
+defined in device tree. Previous attempts 
+(http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html
+and https://lkml.org/lkml/2014/7/14/108) ended in merging parts of the
+code and documentation. Merged patches allow to reserve memory, but
+there is still no reserved memory drivers nor any code that actually
+uses reserved memory regions.
+
+The final conclusion from the above mentioned threads is that there is
+no automated reserved memory initialization. All drivers that want to
+use reserved memory, should initialize it on their own.
+
+This patch series provides two driver for reserved memory regions (one
+based on CMA and one based on dma_coherent allocator). The main
+improvement comparing to the previous version is removal of automated
+reserved memory for every device and support for named memory regions.
+
+Those patches are for merging, rebased on top of recent linux-next tree.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Changes since v1 (https://lkml.org/lkml/2014/8/26/339):
+- removed patches for named reserved regions - they will be discussed
+  separately
+- added a check for 'no-map' property to dma coherent allocator
+  (suggested by Laura Abbott)
+- removed example code for s5p-mfc driver
+
+Changes since '[PATCH v2 RESEND 0/4] CMA & device tree, once again' version:
+(https://lkml.org/lkml/2014/7/14/108)
+- added return error value to of_reserved_mem_device_init()
+- added support for named memory regions (so more than one region can be
+  defined per device)
+- added usage example - converted custom reserved memory code used by
+  s5p-mfc driver to the generic reserved memory handling code
+
+Patch summary:
+
+Marek Szyprowski (3):
+  drivers: of: add return value to of_reserved_mem_device_init
+  drivers: dma-coherent: add initialization from device tree
+  drivers: dma-contiguous: add initialization from device tree
+
+ drivers/base/dma-coherent.c     | 145 ++++++++++++++++++++++++++++++++++------
+ drivers/base/dma-contiguous.c   |  71 ++++++++++++++++++++
+ drivers/of/of_reserved_mem.c    |   3 +-
+ include/linux/cma.h             |   3 +
+ include/linux/of_reserved_mem.h |   9 ++-
+ mm/cma.c                        |  62 ++++++++++++++---
+ 6 files changed, 259 insertions(+), 34 deletions(-)
+
+-- 
+1.9.2
