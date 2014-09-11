@@ -1,33 +1,48 @@
-From: shengyong1@huawei.com (Sheng Yong)
-Date: Thu, 11 Sep 2014 19:27:30 +0800
-Subject: [PATCH] ARM: remove unused variables
-Message-ID: <1410434850-6656-1-git-send-email-shengyong1@huawei.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 11 Sep 2014 13:42:35 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140911111721.GB17476@xps8300>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300>
+Message-ID: <54118AAB.2010205@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 6fc31d54, __lookup_machine_type was removed.  And the related
-variables, MACHINFO_TYPE, MACHINFO_NAME, SIZEOF_MACHINE_DESC, are no longer
-used. So let's remove them.
+On 09/11/2014 01:17 PM, Heikki Krogerus wrote:
+>> diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+>> index fbed1636e9c4..09489b391568 100644
+>> --- a/drivers/tty/serial/8250/8250.h
+>> +++ b/drivers/tty/serial/8250/8250.h
+>> @@ -82,6 +82,9 @@ struct serial8250_config {
+>>  #define UART_BUG_PARITY	(1 << 4)	/* UART mishandles parity if FIFO enabled */
+>>  #define UART_BUG_DMA_RX	(1 << 5)	/* UART needs DMA RX req before there is
+>>  					   data in FIFO */
+>> +#define UART_BUG_DMA_TX	(1 << 6)	/* UART needs one byte in FIFO for
+>> +					   kickstart */
+> 
+> I don't think we should go ahead with this patch. I'm pretty sure
+> this is AM335 specific problem, or at least limited to only few
+> platforms. And I don't think we should take any more "BUG" flags.
+> 
+> We should add hooks like tx_dma and rx_dma to struct uart_8250_dma so
+> that the probe drivers can replace serial8250_tx_dma and
+> seria8250_rx_dma, like I think Alan already suggested.
 
-Signed-off-by: Sheng Yong <shengyong1@huawei.com>
----
- arch/arm/kernel/asm-offsets.c |    4 ----
- 1 file changed, 4 deletions(-)
+Okay. Wasn't aware that Alan already suggested that.
+I also need a watchdog timer for TX since it seems that on omap3 the
+DMA engine suddenly forgets to continue with DMA?
 
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index 713e807..14a8e34 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -123,10 +123,6 @@ int main(void)
-   BLANK();
-   DEFINE(SYS_ERROR0,		0x9f0000);
-   BLANK();
--  DEFINE(SIZEOF_MACHINE_DESC,	sizeof(struct machine_desc));
--  DEFINE(MACHINFO_TYPE,		offsetof(struct machine_desc, nr));
--  DEFINE(MACHINFO_NAME,		offsetof(struct machine_desc, name));
--  BLANK();
-   DEFINE(PROC_INFO_SZ,		sizeof(struct proc_info_list));
-   DEFINE(PROCINFO_INITFUNC,	offsetof(struct proc_info_list, __cpu_flush));
-   DEFINE(PROCINFO_MM_MMUFLAGS,	offsetof(struct proc_info_list, __cpu_mm_mmu_flags));
--- 
-1.7.9.5
+If this is really what we want, I would need to refactor a few things?
+
+> Let's keep serial8250_tx_dma/rx_dma as the default, and not add any
+> quirks to them. Only if there is a very common case should it be
+> handled in those. The case of RX req needing to be sent before data in
+> FIFO maybe one of those, but I'm no sure.
+
+keep in mind that both (RX & TX bugs/hacks) need also a bit of handling
+in the 8250-core so it works together (like the tx_err member so we
+fall back to manual xmit)
+
+Sebastian
