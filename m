@@ -1,69 +1,173 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 11 Sep 2014 21:10:21 +0530
-Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <CAFp+6iErXKpXgE0tRPB=tEqXxcXgQAeFJP1TpSwRN6fNu9a-qw@mail.gmail.com>
-References: <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>	<20140903144225.GD31855@saruman.home>	<CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>	<20140905175651.GK24449@saruman.home>	<CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>	<20140908134454.GK22409@saruman.home>	<CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>	<20140909144225.GF6151@saruman.home>	<CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>	<CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>	<20140910045328.GA32475@saruman.home>	<CAFp+6iHMhbi4V4LAkNsgzDc192ihT2a1mZHgLbia=K2U8+x=2w@mail.gmail.com>
- <CAFp+6iErXKpXgE0tRPB=tEqXxcXgQAeFJP1TpSwRN6fNu9a-qw@mail.gmail.com>
-Message-ID: <5411C265.2080203@ti.com>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Thu, 11 Sep 2014 09:49:07 -0600
+Subject: [PATCH 00/11 v6] Coresight framework and drivers 
+Message-ID: <1410450558-12358-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-On Wednesday 10 September 2014 01:26 PM, Vivek Gautam wrote:
-> On Wed, Sep 10, 2014 at 10:53 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> On Wed, Sep 10, 2014 at 10:23 AM, Felipe Balbi <balbi@ti.com> wrote:
->>> On Wed, Sep 10, 2014 at 09:09:57AM +0530, Vivek Gautam wrote:
->>>> On Wed, Sep 10, 2014 at 9:07 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->>>>> adding Julius here,
->>>>
->>>> i think i had missed adding Julius for this entire series :-(
->>>> I should be more careful with the CC list in future.
->>>> Added his chromium id, since that seems to be more active.
->>>>
->>>>>
->>>>>
->>>>> On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
->>>>>> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
->>>>>>> Hi,
->>>>>>>
->>>>>>>
->>>>>>> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
->>>>>>>>> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
->>>>>>>>>> On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
->>>>>>>>>>>> Don't we have phy_power_on()
->>>>>>>>>>>> for that ? It looks like you could just as well do this from
->>>>>>>>>>>> phy_power_on() ?
->>>>>>>>>>>
->>>>>>>>>>> No, unfortunately keeping these calibration settings in phy_power_on()
->>>>>>>>>>> doesn't help, since we need to do this after XHCI reset has happened.
->>>>>>>>>>
->>>>>>>>>> teach xHCI about PHYs ?
->>>>>>>>>
->>>>>>>>> sorry i couldn't understand you here.
->>>>>>>>> Aren't we trying to do the same with Heikki's patch about dwc3 :
->>>>>>>>> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
->>>>>>>>>
->>>>>>>>> and the 2nd patch in this series :
->>>>>>>>> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
->>>>>>>>>
->>>>>>>>> Is there something else that is expected ?
->>>>>>>>
->>>>>>>> right, use that to call phy_init() at the right time, then you need to
->>>>>>>> add a new ->calibrate() method which, likely, will only be used by you
->>>>>>>> ;-)
->>>>>>>
->>>>>>> so you mean, the xhci should itself call phy_init() at a time suitable,
->>>>>>> so that ->calibrate() is not required at all ?
-> 
-> but wait, dwc3 does a phy_init() already, then how xhci will be able to
-> do that again. We can't do phy_init() multiple times right ?
+Coresight is an umbrella of technologies allowing for the debugging of ARM
+based SoCs.  It includes solutions for JTAG and HW assisted tracing.  This
+patchset is concerned with the latter.
 
-right. I think we should split and do phy ops separately for dwc3 host and gadget?
+Coresight components are cathegorised as source, link and sinks and are
+(usually) discovered using the AMBA bus.
 
-Thanks
-Kishon
+"Sources" generate a compressed stream representing the processor instruction
+path based on tracing scenarios as configured by users.  From there the stream
+flows through the coresight system (via ATB bus) using links that are connecting
+the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
+implementation, either storing the compressed stream in a memory buffer or
+creating an interface to the outside world where data can be transfered to a
+host without fear of filling up the onboard coresight memory buffer.
+
+At typical coresight system would look like this:
+
+  *****************************************************************
+ **************************** AMBA AXI  ****************************===||
+  *****************************************************************    ||
+        ^                    ^                            |            ||
+        |                    |                            *            **
+     0000000    :::::     0000000    :::::    :::::    @@@@@@@    ||||||||||||
+     0 CPU 0<-->: C :     0 CPU 0<-->: C :    : C :    @ STM @    || System ||
+  |->0000000    : T :  |->0000000    : T :    : T :<--->@@@@@     || Memory ||
+  |  #######<-->: I :  |  #######<-->: I :    : I :      @@@<-|   ||||||||||||
+  |  # ETM #    :::::  |  # PTM #    :::::    :::::       @   |
+  |   #####      ^ ^   |   #####      ^ !      ^ !        .   |   |||||||||
+  | |->###       | !   | |->###       | !      | !        .   |   || DAP ||
+  | |   #        | !   | |   #        | !      | !        .   |   |||||||||
+  | |   .        | !   | |   .        | !      | !        .   |      |  |
+  | |   .        | !   | |   .        | !      | !        .   |      |  *
+  | |   .        | !   | |   .        | !      | !        .   |      | SWD/
+  | |   .        | !   | |   .        | !      | !        .   |      | JTAG
+  *****************************************************************<-|
+ *************************** AMBA Debug ABP ************************
+  *****************************************************************
+   |    .          !         .          !        !        .    |
+   |    .          *         .          *        *        .    |
+  *****************************************************************
+ ******************** Cross Trigger Matrix (CTM) *******************
+  *****************************************************************
+   |    .     ^              .                            .    |
+   |    *     !              *                            *    |
+  *****************************************************************
+ ****************** AMBA Advanced Trace Bus (ATB) ******************
+  *****************************************************************
+   |          !                        ===============         |
+   |          *                         ===== F =====<---------|
+   |   :::::::::                         ==== U ====
+   |-->:: CTI ::<!!                       === N ===
+   |   :::::::::  !                        == N ==
+   |    ^         *                        == E ==
+   |    !  &&&&&&&&&       IIIIIII         == L ==
+   |------>&& ETB &&<......II     I        =======
+   |    !  &&&&&&&&&       II     I           .
+   |    !                    I     I          .
+   |    !                    I REP I<..........
+   |    !                    I     I
+   |    !!>&&&&&&&&&       II     I           *Source: ARM ltd.
+   |------>& TPIU  &<......II    I            DAP = Debug Access Port
+           &&&&&&&&&       IIIIIII            ETM = Embedded Trace Macrocell
+               ;                              PTM = Program Trace Macrocell
+               ;                              CTI = Cross Trigger Interface
+               *                              ETB = Embedded Trace Buffer
+          To trace port                       TPIU= Trace Port Interface Unit
+                                              SWD = Serial Wire Debug
+
+While on target configuration of the components is done via the ABP bus,
+all trace data are carried out-of-band on the ATB bus.  The CTM provides
+a way to aggregate and distribute signals between CoreSight components.
+
+The coresight framework provides a central point to represent, configure and
+manage coresight devices on a platform.  This first wave centers on the basic
+tracing functionnality, enabling components such ETM/PTM, funnel, replicator, TMC,
+TPIU and ETB.  Subsequent submissions will enable more intricate IP blocks such
+as STM and CTI.
+
+Generated traces are encoded in a PFTv1.1 format and can be interpreted
+using the procedure detailed here [1] or ptm2human [2]. STM abides to the
+widely available STPv2 standard.
+
+Bindings for the driver have been sent separately to the devicetree list.
+
+[1].https://wiki.linaro.org/WorklingGroups/Kernel/Coresight/traceDecodingWithDS5
+[2].https://github.com/hwangcc23/ptm2human
+
+New in this patchset:
+. Using krefs for reference accounting
+. New kerneldocs for *all* structures
+. Removal of @of_coresight_is_input_port
+. Removal of @coresight_is_bit_set
+. Code cleanup, specifically related to error paths
+. Simplification of CP14 access methods
+. Standardisation of error messages with @pr_fmt
+. Improved Documentation/tracing/coresight.txt
+
+
+Mathieu Poirier (4):
+  coresight: adding documentation for coresight
+  coresight: adding support for beagle and beagleXM
+  coresight: adding basic support for Vexpress TC2
+  ARM: removing support for etb/etm in "arch/arm/kernel/"
+
+Pratik Patel (7):
+  coresight: add CoreSight core layer framework
+  coresight-tmc: add CoreSight TMC driver
+  coresight-tpiu: add CoreSight TPIU driver
+  coresight-etb: add CoreSight ETB driver
+  coresight-funnel: add CoreSight Funnel driver
+  coresight-replicator: add CoreSight Replicator driver
+  coresight-etm: add CoreSight ETM/PTM driver
+
+ Documentation/trace/coresight.txt          |  300 +++++
+ arch/arm/Kconfig.debug                     |   35 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts      |   28 +
+ arch/arm/boot/dts/omap3-beagle.dts         |   28 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |  199 ++++
+ arch/arm/include/asm/hardware/coresight.h  |  157 ---
+ arch/arm/include/asm/hardware/cp14.h       |  540 +++++++++
+ arch/arm/kernel/Makefile                   |    1 -
+ arch/arm/kernel/etm.c                      |  654 -----------
+ arch/arm/kernel/hw_breakpoint.c            |    4 +-
+ arch/arm/mach-omap2/Kconfig                |    8 -
+ arch/arm/mach-omap2/Makefile               |    1 -
+ arch/arm/mach-omap2/emu.c                  |   50 -
+ drivers/Makefile                           |    1 +
+ drivers/amba/bus.c                         |    2 +-
+ drivers/coresight/Makefile                 |    9 +
+ drivers/coresight/coresight-etb10.c        |  536 +++++++++
+ drivers/coresight/coresight-etm-cp14.c     |  496 ++++++++
+ drivers/coresight/coresight-etm.h          |  250 ++++
+ drivers/coresight/coresight-etm3x.c        | 1722 ++++++++++++++++++++++++++++
+ drivers/coresight/coresight-funnel.c       |  258 +++++
+ drivers/coresight/coresight-priv.h         |   63 +
+ drivers/coresight/coresight-replicator.c   |  153 +++
+ drivers/coresight/coresight-tmc.c          |  756 ++++++++++++
+ drivers/coresight/coresight-tpiu.c         |  218 ++++
+ drivers/coresight/coresight.c              |  663 +++++++++++
+ drivers/coresight/of_coresight.c           |  201 ++++
+ include/linux/amba/bus.h                   |    1 +
+ include/linux/coresight.h                  |  275 +++++
+ 29 files changed, 6727 insertions(+), 882 deletions(-)
+ create mode 100644 Documentation/trace/coresight.txt
+ delete mode 100644 arch/arm/include/asm/hardware/coresight.h
+ create mode 100644 arch/arm/include/asm/hardware/cp14.h
+ delete mode 100644 arch/arm/kernel/etm.c
+ delete mode 100644 arch/arm/mach-omap2/emu.c
+ create mode 100644 drivers/coresight/Makefile
+ create mode 100644 drivers/coresight/coresight-etb10.c
+ create mode 100644 drivers/coresight/coresight-etm-cp14.c
+ create mode 100644 drivers/coresight/coresight-etm.h
+ create mode 100644 drivers/coresight/coresight-etm3x.c
+ create mode 100644 drivers/coresight/coresight-funnel.c
+ create mode 100644 drivers/coresight/coresight-priv.h
+ create mode 100644 drivers/coresight/coresight-replicator.c
+ create mode 100644 drivers/coresight/coresight-tmc.c
+ create mode 100644 drivers/coresight/coresight-tpiu.c
+ create mode 100644 drivers/coresight/coresight.c
+ create mode 100644 drivers/coresight/of_coresight.c
+ create mode 100644 include/linux/coresight.h
+
+-- 
+1.9.1
