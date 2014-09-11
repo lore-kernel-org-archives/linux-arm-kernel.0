@@ -1,78 +1,133 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 11 Sep 2014 22:18:14 +0200
-Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
-Message-ID: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 11 Sep 2014 13:33:44 -0700
+Subject: [PATCH 01/11 v6] coresight: add CoreSight core layer framework
+In-Reply-To: <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
+References: <1410450558-12358-1-git-send-email-mathieu.poirier@linaro.org>
+ <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20140911203344.GA7593@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Some first impressions in glancing at the code, not a complete review at
+all:
 
-Here is an attempt at improving the MMC clock support in the Allwinner
-SoCs.
+On Thu, Sep 11, 2014 at 09:49:08AM -0600, mathieu.poirier at linaro.org wrote:
+> --- /dev/null
+> +++ b/drivers/coresight/coresight.c
+> @@ -0,0 +1,663 @@
+> +/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#define pr_fmt(fmt) "coresight: " fmt
 
-Until now, the MMC clocks were having a custom phase function that was
-directly setting an obscure value in the right register, because we
-were not really having any idea of what these values were.
+MODULE_NAME ?
 
-Now that we have more informations, we can introduce a common function
-call to get and set the phase of a particular clock, and use this in
-both our provider and our client.
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/init.h>
+> +#include <linux/types.h>
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/err.h>
+> +#include <linux/export.h>
+> +#include <linux/slab.h>
+> +#include <linux/semaphore.h>
+> +#include <linux/clk.h>
+> +#include <linux/coresight.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/debugfs.h>
+> +#include <linux/delay.h>
+> +
+> +#include "coresight-priv.h"
+> +
+> +struct dentry *cs_debugfs_parent = NULL;
+> +
+> +static LIST_HEAD(coresight_orph_conns);
+> +static LIST_HEAD(coresight_devs);
 
-Thanks,
-Maxime
+You are a struct device, you don't need a separate list, why not just
+iterate over your bus list of devices?
 
-Changes from v2:
-  - Reworked the get_phase operation handling to call it from
-    _clk_init instead of the ugly hack
-  - Added the clocks to the A23
-  - Modified the output and sample clock names to have a consistent
-    naming
+> +/**
+> + * @id:		unique ID of the component.
+> + * @conns:	list of connections associated to this component.
+> + * @type:	as defined by @coresight_dev_type.
+> + * @subtype:	as defined by @coresight_dev_subtype.
+> + * @ops:	generic operations for this component, as defined
+> +		by @coresight_ops.
+> + * @de:		handle on a component's debugfs entry.
+> + * @dev:	The device entity associated to this component.
+> + * @kref:	keeping count on component references.
+> + * @dev_link:	link of current component into list of all components
+> +		discovered in the system.
+> + * @path_link:	link of current component into the path being enabled.
+> + * @owner:	typically "THIS_MODULE".
+> + * @enable:	'true' if component is currently part of an active path.
+> + * @activated:	'true' only if a _sink_ has been activated.  A sink can be
+> +		activated but not yet enabled.  Enabling for a _sink_
+> +		happens when a source has been selected for that it.
+> + */
+> +struct coresight_device {
+> +	int id;
 
-Changes from v1:
-  - Dropped the patches to enforce rate boundaries on the clocks. This
-    is partly covered by the Tomeu, and should be based on this
-    whenever it will be merged.
-  - Fixed a few typos here and there
-  - Added a patch to include of.h from clk-provider.h
+Why not use the device name instead?
 
-Maxime Ripard (11):
-  clk: Include of.h in clock-provider.h
-  clk: Add a function to retrieve phase
-  clk: sunxi: factors: Invert the probing logic
-  clk: sunxi: Introduce mbus compatible
-  ARM: sunxi: dt: Switch to the new mbus compatible
-  clk: sunxi: Move mod0 clock to a file of its own
-  clk: sunxi: Move mbus to mod0 file
-  ARM: sunxi: dt: Add sample and output mmc clocks
-  clk: sunxi: mod0: Introduce MMC proper phase handling
-  mmc: sunxi: Convert MMC driver to the standard clock phase API
-  clk: sunxi: Remove custom phase function
+> +	struct coresight_connection *conns;
+> +	int nr_conns;
+> +	enum coresight_dev_type type;
+> +	struct coresight_dev_subtype subtype;
+> +	const struct coresight_ops *ops;
+> +	struct dentry *de;
 
-Mike Turquette (1):
-  clk: introduce clk_set_phase function & callback
+All devices have a dentry?  in debugfs?  isn't that overkill?
 
- Documentation/devicetree/bindings/clock/sunxi.txt  |   3 +
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |   8 +-
- arch/arm/boot/dts/sun4i-a10.dtsi                   | 104 +++++++-
- arch/arm/boot/dts/sun5i-a10s.dtsi                  |  81 +++++-
- arch/arm/boot/dts/sun5i-a13.dtsi                   |  82 +++++-
- arch/arm/boot/dts/sun6i-a31.dtsi                   | 104 +++++++-
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 106 +++++++-
- arch/arm/boot/dts/sun8i-a23.dtsi                   |  78 +++++-
- drivers/clk/clk.c                                  |  95 ++++++-
- drivers/clk/sunxi/Makefile                         |   1 +
- drivers/clk/sunxi/clk-factors.c                    | 101 +++++++-
- drivers/clk/sunxi/clk-factors.h                    |  16 +-
- drivers/clk/sunxi/clk-mod0.c                       | 283 +++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                      | 189 +-------------
- drivers/mmc/host/sunxi-mmc.c                       |  72 ++++--
- include/linux/clk-private.h                        |   1 +
- include/linux/clk-provider.h                       |  11 +
- include/linux/clk.h                                |  29 +++
- include/linux/clk/sunxi.h                          |  22 --
- 19 files changed, 1090 insertions(+), 296 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-mod0.c
- delete mode 100644 include/linux/clk/sunxi.h
+> +	struct device dev;
+> +	struct kref kref;
 
--- 
-2.1.0
+You CAN NOT have two reference counts in the same structure, that's a
+huge design mistake.  Stick with one reference count, otherwise they are
+guaranteed to get out of sync and bad things will happen.
+
+> +	struct list_head dev_link;
+
+As discussed above, I don't think you need this.
+
+> +	struct list_head path_link;
+
+Odds are, you don't need this either.
+
+> +	struct module *owner;
+
+devices aren't owned by modules, they are data, not code.
+
+
+> +	bool enable;	/* true only if configured as part of a path */
+> +	bool activated;	/* true only if a sink is part of a path */
+> +};
+> +
+> +#define to_coresight_device(d) container_of(d, struct coresight_device, dev)
+> +
+> +#define source_ops(csdev)	csdev->ops->source_ops
+> +#define sink_ops(csdev)		csdev->ops->sink_ops
+> +#define link_ops(csdev)		csdev->ops->link_ops
+> +
+> +#define CORESIGHT_DEBUGFS_ENTRY(__name, __entry_name,			\
+> +				 __mode, __get, __set, __fmt)		\
+> +DEFINE_SIMPLE_ATTRIBUTE(__name ## _ops, __get, __set, __fmt)		\
+
+Use the RW and RO only versions please.  No need to ever set your own
+mode value.
+
+thanks,
+
+greg k-h
