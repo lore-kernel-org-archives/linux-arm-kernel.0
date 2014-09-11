@@ -1,47 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 12:06:59 +0200
-Subject: [PATCH v3 0/8] rtc: at91sam9: add DT support
-In-Reply-To: <20140911093942.GA12295@localhost>
-References: <1410425767-17874-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911093942.GA12295@localhost>
-Message-ID: <20140911120659.14daa624@bbrezillon>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 11 Sep 2014 12:07:21 +0200
+Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140911100721.GT3190@worktop.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014 11:39:42 +0200
-Johan Hovold <johan@kernel.org> wrote:
+On Tue, Aug 26, 2014 at 01:06:51PM +0200, Vincent Guittot wrote:
 
-> On Thu, Sep 11, 2014 at 10:55:59AM +0200, Boris BREZILLON wrote:
-> 
-> > Johan, let me know if this version addresses part of your concerns.
-> 
-> Looks good to me. I just have a few minor comments on two of the patches.
-> 
-> > I'm open to any suggestion/rework to address other previously discussed
-> > issues, as long as it does not end up in a dead-end (like the discussion
-> > you had last year):
-> >  - the fact that the RTT block could be used for something that is not
-> >    an RTC
-> >  - the fact that referencing the GPBR node and defining a GPBR register
-> >    number to store RTC time info could be considered as an HW config and
-> >    not an HW description and thus should not be described in the DT
-> 
-> No doubt.
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 18db43e..60ae1ce 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6049,6 +6049,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
+>  			return true;
+>  	}
+>  
+> +	/*
+> +	 * The group capacity is reduced probably because of activity from other
+> +	 * sched class or interrupts which use part of the available capacity
+> +	 */
+> +	if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
+> +				env->sd->imbalance_pct))
+> +		return true;
+> +
+>  	return false;
+>  }
 
-Okay then. Any suggestion to do otherwise ?
-Alexandre suggested to pass the GPBR register number through a module
-parameter, and retrieve the GPBR syscon by searching for a gpbr node
-(or atmel,at91sam9260-gpbr compatible node) in the device tree.
-
-I'm not a big fan of this solution, as it implies passing driver
-specific config to the global cmdline (and we'll have to handle the
-9263 case where 2 RTT blocks are availables).
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+This is unlikely to have worked as intended. You will never reach this,
+except on PowerPC >= 7. All other machines will have bailed at the
+!ASYM_PACKING check above this.
