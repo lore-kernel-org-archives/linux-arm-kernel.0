@@ -1,37 +1,45 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 11 Sep 2014 14:06:06 +0200
-Subject: [RFC 0/4] i2c: slave support framework for Linux devices
-In-Reply-To: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <5110809.ZO3zEWmmzZ@fb07-iapwap2>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 11 Sep 2014 14:06:14 +0200
+Subject: [PATCH 1/2] ARM: dts: vf610: Add ARM Global Timer
+Message-ID: <1410437175-6636-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+Add Global Timer support which is part of the Snoop Control Unit
+of the Cortex-A5 processor. This Global Timer is compatible with the
+Cortex-A9 implementation. It's a 64-bit timer and is clocked by the
+peripheral clock, which is typically 133 or 166MHz on Vybrid.
 
-Am Dienstag, 9. September 2014, 16:54:26 schrieb Wolfram Sang:
-> Finally, here is my take on the often desired feature that Linux can not
-> only be an I2C master, but also an I2C slave. Compared to my draft sent out
-> last week, this RFC has been tested on hardware (Renesas Lager board) and
-> works \o/
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf610.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-first, thanks for taking up this job.
-
-> One big part still missing is documentation, so brave ones need to "use the
-> source". However, this approach turned out to be even less intrusive than
-> expected, so that is hopefully a good sign.
-> 
-> Basically, an I2C slave is a standard I2C client providing a callback
-> function. When registering as a slave, the connection to the I2C adapter is
-> made which uses the callback when a slave event happens. That splits the HW
-> support (enabling slave mode on the adapter) and SW support (here a generic
-> eeprom simulator) nicely IMO.
-
->From what I can tell, this approach may also work with our driver 
-(staging/nvec). I especially like the split between the adapter and the client 
-support.
-
-I only have one question so far regarding the device tree representation 
-attached patch 4.
-
-Marc
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 4d2ec32..a03abf6 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -11,6 +11,7 @@
+ #include "vf610-pinfunc.h"
+ #include <dt-bindings/clock/vf610-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ / {
+ 	aliases {
+@@ -83,6 +84,13 @@
+ 				      <0x40002100 0x100>;
+ 			};
+ 
++			global_timer: global-timer at 40002200 {
++				compatible = "arm,cortex-a9-global-timer";
++				reg = <0x40002200 0x20>;
++				interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_PLATFORM_BUS>;
++			};
++
+ 			L2: l2-cache at 40006000 {
+ 				compatible = "arm,pl310-cache";
+ 				reg = <0x40006000 0x1000>;
+-- 
+2.1.0
