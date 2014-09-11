@@ -1,31 +1,55 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Sep 2014 11:56:59 +0200
-Subject: [PATCH 4/4] ARM: mvebu: add gpio-fan to mvebu_v7_defconfig
+Date: Thu, 11 Sep 2014 11:56:57 +0200
+Subject: [PATCH 2/4] ARM: mvebu: add user LED support of Armada 370 RD
 In-Reply-To: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1410429419-29820-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1410429419-29820-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since one of the platforms (Armada 370 RD) is now using the gpio-fan
-driver, it makes sense to enable it in mvebu_v7_defconfig.
+The Armada 370 RD has a GPIO controlled LED connected on MPP32, so
+this commit adds the relevant hardware description to Armada 370 RD
+Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/armada-370-rd.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index 3469c3d9..61ef899 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -77,6 +77,7 @@ CONFIG_MTD_NAND_PXA3xx=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-+CONFIG_SENSORS_GPIO_FAN=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_SOUND=y
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 7af04c4..10a6448 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -55,6 +55,11 @@
+ 					marvell,pins = "mpp8";
+ 					marvell,function = "gpio";
+ 				};
++
++				led_pins: led-pins {
++					marvell,pins = "mpp32";
++					marvell,function = "gpio";
++				};
+ 			};
+ 
+ 			serial at 12000 {
+@@ -121,6 +126,18 @@
+ 				pinctrl-names = "default";
+ 			};
+ 
++			gpio_leds {
++				compatible = "gpio-leds";
++				pinctrl-names = "default";
++				pinctrl-0 = <&led_pins>;
++
++				sw_led {
++					label = "370rd:green:sw";
++					gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
++					default-state = "keep";
++				};
++			};
++
+ 			nand at d0000 {
+ 				status = "okay";
+ 				num-cs = <1>;
 -- 
 2.0.0
