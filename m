@@ -1,162 +1,97 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Sep 2014 10:49:08 +0200
-Subject: [RFC v2 5/9] KVM: KVM-VFIO: update user API to program forwarded
- IRQ
-In-Reply-To: <20140911031005.GF2784@lvm>
+Date: Thu, 11 Sep 2014 10:50:51 +0200
+Subject: [RFC v2 6/9] VFIO: Extend external user API
+In-Reply-To: <20140911031011.GG2784@lvm>
 References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
- <1409575968-5329-6-git-send-email-eric.auger@linaro.org>
- <20140911031005.GF2784@lvm>
-Message-ID: <54116204.6000403@linaro.org>
+ <1409575968-5329-7-git-send-email-eric.auger@linaro.org>
+ <20140911031011.GG2784@lvm>
+Message-ID: <5411626B.4040909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/11/2014 05:10 AM, Christoffer Dall wrote:
-> On Mon, Sep 01, 2014 at 02:52:44PM +0200, Eric Auger wrote:
->> add new device group commands:
->> - KVM_DEV_VFIO_DEVICE_FORWARD_IRQ and
->>   KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ
+> On Mon, Sep 01, 2014 at 02:52:45PM +0200, Eric Auger wrote:
+>> New functions are added to be called from ARM KVM-VFIO device.
+> 
+> This commit message seems somewhat random.  This patch doesn't deal with
+> anything ARM specific, it introduces some generic functions that allows
+> users external to vfio itself to retrieve information about a vfio
+> platform device.
+
+Yes you're right.
+> 
 >>
->> which enable to turn forwarded IRQ mode on/off.
->>
->> the kvm_arch_forwarded_irq struct embodies a forwarded IRQ
+>> - vfio_device_get_external_user enables to get a vfio device from
+>>   its fd
+>> - vfio_device_put_external_user puts the vfio device
+>> - vfio_external_base_device returns the struct device*,
+>>   useful to access the platform_device
 >>
 >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 >>
 >> ---
 >>
 >> v1 -> v2:
->> - struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
->>   to include/uapi/linux/kvm.h
->>   also irq_index renamed into index and guest_irq renamed into gsi
->> - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
->> ---
->>  Documentation/virtual/kvm/devices/vfio.txt | 26 ++++++++++++++++++++++++++
->>  include/uapi/linux/kvm.h                   |  9 +++++++++
->>  2 files changed, 35 insertions(+)
 >>
->> diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
->> index ef51740..048baa0 100644
->> --- a/Documentation/virtual/kvm/devices/vfio.txt
->> +++ b/Documentation/virtual/kvm/devices/vfio.txt
->> @@ -13,6 +13,7 @@ VFIO-group is held by KVM.
+>> - vfio_external_get_base_device renamed into vfio_external_base_device
+>> - vfio_external_get_type removed
+>> ---
+>>  drivers/vfio/vfio.c  | 24 ++++++++++++++++++++++++
+>>  include/linux/vfio.h |  3 +++
+>>  2 files changed, 27 insertions(+)
+>>
+>> diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+>> index 8e84471..282814e 100644
+>> --- a/drivers/vfio/vfio.c
+>> +++ b/drivers/vfio/vfio.c
+>> @@ -1401,6 +1401,30 @@ void vfio_group_put_external_user(struct vfio_group *group)
+>>  }
+>>  EXPORT_SYMBOL_GPL(vfio_group_put_external_user);
 >>  
->>  Groups:
->>    KVM_DEV_VFIO_GROUP
->> +  KVM_DEV_VFIO_DEVICE
+>> +struct vfio_device *vfio_device_get_external_user(struct file *filep)
+>> +{
+>> +	struct vfio_device *vdev = filep->private_data;
+>> +
+>> +	if (filep->f_op != &vfio_device_fops)
+>> +		return ERR_PTR(-EINVAL);
+>> +
+>> +	vfio_device_get(vdev);
+>> +	return vdev;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_device_get_external_user);
+>> +
+>> +void vfio_device_put_external_user(struct vfio_device *vdev)
+>> +{
+>> +	vfio_device_put(vdev);
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_device_put_external_user);
+>> +
+>> +struct device *vfio_external_base_device(struct vfio_device *vdev)
+>> +{
+>> +	return vdev->dev;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_external_base_device);
+>> +
+>>  int vfio_external_user_iommu_id(struct vfio_group *group)
+>>  {
+>>  	return iommu_group_id(group->iommu_group);
+>> diff --git a/include/linux/vfio.h b/include/linux/vfio.h
+>> index ffe04ed..bd4b6cb 100644
+>> --- a/include/linux/vfio.h
+>> +++ b/include/linux/vfio.h
+>> @@ -99,6 +99,9 @@ extern void vfio_group_put_external_user(struct vfio_group *group);
+>>  extern int vfio_external_user_iommu_id(struct vfio_group *group);
+>>  extern long vfio_external_check_extension(struct vfio_group *group,
+>>  					  unsigned long arg);
+>> +extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
+>> +extern void vfio_device_put_external_user(struct vfio_device *vdev);
+>> +extern struct device *vfio_external_base_device(struct vfio_device *vdev);
 >>  
->>  KVM_DEV_VFIO_GROUP attributes:
->>    KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
->> @@ -20,3 +21,28 @@ KVM_DEV_VFIO_GROUP attributes:
->>  
->>  For each, kvm_device_attr.addr points to an int32_t file descriptor
->>  for the VFIO group.
->> +
->> +KVM_DEV_VFIO_DEVICE attributes:
->> +  KVM_DEV_VFIO_DEVICE_FORWARD_IRQ
->> +  KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ
->> +
->> +For each, kvm_device_attr.addr points to a kvm_arch_forwarded_irq struct.
->> +This user API makes possible to create a special IRQ handling mode,
-> 
->   KVM_DEV_VFIO_DEVICE_FORWARD_IRQ enables a special IRQ handling mode on
->   hardware that supports it,
-OK
-> 
->> +where KVM and a VFIO platform driver collaborate to improve IRQ
->> +handling performance.
->> +
->> +'fd represents the file descriptor of a valid VFIO device whose physical
-> 
-> fd is described out of context here.  Can you copy the struct definition
-> into this document, perhaps right after the "For each, ..." line above.
-yes sure
-> 
->> +IRQ, referenced by its index, is injected into the VM guest irq (gsi).
->                                              as a virtual IRQ (specified
-> 					     by the gsi field) into the
-> 					     VM.
-> 
->> +
->> +On FORWARD_IRQ, KVM-VFIO device programs:
->    When setting the  KVM_DEV_VFIO_DEVICE_FORWARD_IRQ attribute, the
->    KVM-VFIO device tells the host (or VFIO?) to not complete the
->    physical IRQ, and instead ensures that KVM (or the VM) completes the
->    physical IRQ.
-> 
->> +- the host, to not complete the physical IRQ itself.
->> +- the GIC, to automatically complete the physical IRQ when the guest
->> +  completes the virtual IRQ.
-> 
-> and drop this bullet form.
-ok
-> 
->> +This avoids trapping the end-of-interrupt for level sensitive IRQ.
-> 
-> avoid this last line, it's specific to ARM.
-ok
-> 
->> +
->> +On UNFORWARD_IRQ, one returns to the mode where the host completes the
->    When setting the KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ attribute, the
->    host (VFIO?) will again complete the physical IRQ and KVM will not...
->  
->> +physical IRQ and the guest completes the virtual IRQ.
->> +
->> +It is up to the caller of this API to make sure the IRQ is not
->> +outstanding when the FORWARD/UNFORWARD is called. This could lead to
-> 
-> outstanding? can you be specific?
-active? and I should add *physical* IRQ
-> 
-> don't refer to FOWARD/UNFORWARD, either refer to these attributes by
-> their full name or use a clear reference in proper English.
-ok
-> 
->> +some inconsistency on who is going to complete the IRQ.
-> 
-> This sounds like the whole thing is fragile and if userspace doesn't do
-> things right, IRQ handling of a piece of hardware is going to be
-> inconsistent?  Is this the case?  If so, we need some stronger
-> semantics.  If not, this should be rephrased.
-Actually the KVM-VFIO device rejects any attempt to change the
-forwarding mode if the physical IRQ is active. So I hope this is robust
-and will change the explanation.
-
-Thanks
-
-Eric
-> 
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index cf3a2ff..8cd7b0e 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -947,6 +947,12 @@ struct kvm_device_attr {
->>  	__u64	addr;		/* userspace address of attr data */
->>  };
->>  
->> +struct kvm_arch_forwarded_irq {
->> +	__u32 fd; /* file desciptor of the VFIO device */
->> +	__u32 index; /* VFIO device IRQ index */
->> +	__u32 gsi; /* gsi, ie. virtual IRQ number */
->> +};
->> +
->>  #define KVM_DEV_TYPE_FSL_MPIC_20	1
->>  #define KVM_DEV_TYPE_FSL_MPIC_42	2
->>  #define KVM_DEV_TYPE_XICS		3
->> @@ -954,6 +960,9 @@ struct kvm_device_attr {
->>  #define  KVM_DEV_VFIO_GROUP			1
->>  #define   KVM_DEV_VFIO_GROUP_ADD			1
->>  #define   KVM_DEV_VFIO_GROUP_DEL			2
->> +#define  KVM_DEV_VFIO_DEVICE			2
->> +#define   KVM_DEV_VFIO_DEVICE_FORWARD_IRQ			1
->> +#define   KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ			2
->>  #define KVM_DEV_TYPE_ARM_VGIC_V2	5
->>  #define KVM_DEV_TYPE_FLIC		6
->>  
+>>  struct pci_dev;
+>>  #ifdef CONFIG_EEH
 >> -- 
 >> 1.9.1
 >>
-> 
-> Thanks,
+> Looks good to me,
 > -Christoffer
 > 
