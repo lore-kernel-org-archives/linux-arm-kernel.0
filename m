@@ -1,98 +1,33 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 11 Sep 2014 12:34:33 +0100
-Subject: [PATCH v3 11/17] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
- register device's gsi
-In-Reply-To: <20140911110846.D152DC408F0@trevor.secretlab.ca>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-12-git-send-email-hanjun.guo@linaro.org>
- <20140911110846.D152DC408F0@trevor.secretlab.ca>
-Message-ID: <CACxGe6vYKyZu0txFZB+HDJaC3onDfwCvXJ44kWCBcXoqLsTvxQ@mail.gmail.com>
+From: shengyong1@huawei.com (Sheng Yong)
+Date: Thu, 11 Sep 2014 19:27:30 +0800
+Subject: [PATCH] ARM: remove unused variables
+Message-ID: <1410434850-6656-1-git-send-email-shengyong1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 12:08 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> On Mon,  1 Sep 2014 22:57:49 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
->> used, and then register device's gsi with the core IRQ subsystem.
->>
->> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
->> since gsi is unique in the system, so use hwirq number directly
->> for the mapping.
->>
->> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  arch/arm64/kernel/acpi.c |   73 ++++++++++++++++++++++++++++++++++++++++++++++
->>  drivers/acpi/bus.c       |    3 ++
->>  include/linux/acpi.h     |    1 +
->>  3 files changed, 77 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 35dff11..354b912 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -37,6 +37,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->>  static int enabled_cpus;     /* Processors (GICC) with enabled flag in MADT */
->>
->>  /*
->> + * Since we're on ARM, the default interrupt routing model
->> + * clearly has to be GIC.
->> + */
->> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
->> +
->> +/*
->>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
->>   * or early_memremap() should be called here to for ACPI table mapping.
->>   */
->> @@ -194,6 +200,73 @@ void __init acpi_smp_init_cpus(void)
->>       pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
->>  }
->>
->> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
->> +{
->> +     *irq = irq_find_mapping(NULL, gsi);
->> +
->> +     return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->
-> Why is this exported? x86 exports it, but ia64 does not. There aren't
-> very many callers, and none of them can be built as a module AFAICS.
->
->> +
->> +/*
->> + * success: return IRQ number (>0)
->> + * failure: return =< 0
->> + */
->> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
->> +{
->> +     unsigned int irq;
->> +     unsigned int irq_type;
->> +
->> +     /*
->> +      * ACPI have no bindings to indicate SPI or PPI, so we
->> +      * use different mappings from DT in ACPI.
->> +      *
->> +      * For FDT
->> +      * PPI interrupt: in the range [0, 15];
->> +      * SPI interrupt: in the range [0, 987];
->> +      *
->> +      * For ACPI, GSI should be unique so using
->> +      * the hwirq directly for the mapping:
->> +      * PPI interrupt: in the range [16, 31];
->> +      * SPI interrupt: in the range [32, 1019];
->> +      */
->
-> Hmmm, so doing it this way means that DT systems will have a different
-> irq_domain setup compared with ACPI systems. I'm not convinced we want
-> to do that, but I need to look at the code that sets up the new domains
-> before I comment further...
+Since commit 6fc31d54, __lookup_machine_type was removed.  And the related
+variables, MACHINFO_TYPE, MACHINFO_NAME, SIZEOF_MACHINE_DESC, are no longer
+used. So let's remove them.
 
-Okay, nevermind. I looked at the setup code. This isn't an issue of
-the irq domain being set up differently, but rather the binding
-translation operates differently between DT and ACPI. ACPI used a
-single integer encapsulating PPI and SPI which just happens to line up
-with the hwirq numbers, whereas DT uses a [type,number] tuple that
-needs translating into the hwirq. This code is fine.
+Signed-off-by: Sheng Yong <shengyong1@huawei.com>
+---
+ arch/arm/kernel/asm-offsets.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-g.
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 713e807..14a8e34 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -123,10 +123,6 @@ int main(void)
+   BLANK();
+   DEFINE(SYS_ERROR0,		0x9f0000);
+   BLANK();
+-  DEFINE(SIZEOF_MACHINE_DESC,	sizeof(struct machine_desc));
+-  DEFINE(MACHINFO_TYPE,		offsetof(struct machine_desc, nr));
+-  DEFINE(MACHINFO_NAME,		offsetof(struct machine_desc, name));
+-  BLANK();
+   DEFINE(PROC_INFO_SZ,		sizeof(struct proc_info_list));
+   DEFINE(PROCINFO_INITFUNC,	offsetof(struct proc_info_list, __cpu_flush));
+   DEFINE(PROCINFO_MM_MMUFLAGS,	offsetof(struct proc_info_list, __cpu_mm_mmu_flags));
+-- 
+1.7.9.5
