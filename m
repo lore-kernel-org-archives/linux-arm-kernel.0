@@ -1,95 +1,185 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 11 Sep 2014 13:17:23 -0700
-Subject: [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle SATA
- controller
-In-Reply-To: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <CAOesGMh_Ku-pReg5LHVFvRM0-s_zEO4rgAvaD5rv-eTfPD71Yw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Sep 2014 22:18:25 +0200
+Subject: [PATCH v3 11/12] mmc: sunxi: Convert MMC driver to the standard clock
+ phase API
+In-Reply-To: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1410466706-27386-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 1:37 PM,  <suravee.suthikulpanit@amd.com> wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> This patch adds ACPI support for non-PCI SATA contoller in ahci_platform driver.
-> It adds ACPI matching table in ahci_platform to support AMD Seattle SATA controller
-> with following ASL structure in DSDT:
->
->     Device (SATA0)
->     {
->       Name(_HID, "AMDI0600")    // Seattle AHSATA
->       Name (_CCA, 1)            // Cache-coherent controller
->       Name (_CRS, ResourceTemplate ()
->       {
->         Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
->         Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
->       })
->     }
->
-> Since ATA driver should not require PCI support for ATA_ACPI,
-> this patch also removes dependency in the driver/ata/Kconfig.
->
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->  drivers/ata/Kconfig         |  2 +-
->  drivers/ata/ahci_platform.c | 13 +++++++++++++
->  2 files changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> index e1b9278..f2e6c9e 100644
-> --- a/drivers/ata/Kconfig
-> +++ b/drivers/ata/Kconfig
-> @@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
->
->  config ATA_ACPI
->         bool "ATA ACPI Support"
-> -       depends on ACPI && PCI
-> +       depends on ACPI
->         default y
->         help
->           This option adds support for ATA-related ACPI objects.
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index f61ddb9..3499bab 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -20,6 +20,9 @@
->  #include <linux/platform_device.h>
->  #include <linux/libata.h>
->  #include <linux/ahci_platform.h>
-> +#ifdef CONFIG_ATA_ACPI
-> +#include <linux/acpi.h>
-> +#endif
->  #include "ahci.h"
->
->  static const struct ata_port_info ahci_port_info = {
-> @@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, ahci_of_match);
->
-> +#ifdef CONFIG_ATA_ACPI
-> +static const struct acpi_device_id ahci_acpi_match[] = {
-> +       { "AMDI0600", 0 }, /* AMD Seattle AHCI */
-> +       { },
-> +};
-> +#endif
-> +
->  static struct platform_driver ahci_driver = {
->         .probe = ahci_probe,
->         .remove = ata_platform_remove_one,
-> @@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
->                 .name = "ahci",
->                 .owner = THIS_MODULE,
->                 .of_match_table = ahci_of_match,
-> +#ifdef CONFIG_ATA_ACPI
-> +               .acpi_match_table = ACPI_PTR(ahci_acpi_match),
-> +#endif
+Now that we have proper support to use the generic phase API in our clock
+driver, switch the MMC driver to use it.
 
-The whole point of having ACPI_PTR() is to avoid having ifdefs like
-these. The structure member is always there, so there's no need to
-have it conditionally compiled out.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
+ drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
+ 2 files changed, 53 insertions(+), 27 deletions(-)
 
-Come to think of it, the match table should be under CONFIG_ACPI
-instead -- why do a separate config option just for this?
-
-
--Olof
+diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+index 91b3a3467150..4bf41d833804 100644
+--- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+@@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
+ Required properties:
+  - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
+  - reg : mmc controller base registers
+- - clocks : a list with 2 phandle + clock specifier pairs
+- - clock-names : must contain "ahb" and "mmc"
++ - clocks : a list with 4 phandle + clock specifier pairs
++ - clock-names : must contain "ahb", "mmc", "output" and "sample"
+  - interrupts : mmc controller interrupt
+ 
+ Optional properties:
+@@ -25,8 +25,8 @@ Examples:
+ 	mmc0: mmc at 01c0f000 {
+ 		compatible = "allwinner,sun5i-a13-mmc";
+ 		reg = <0x01c0f000 0x1000>;
+-		clocks = <&ahb_gates 8>, <&mmc0_clk>;
+-		clock-names = "ahb", "mod";
++		clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
++		clock-names = "ahb", "mod", "output", "sample";
+ 		interrupts = <0 32 4>;
+ 		status = "disabled";
+ 	};
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 024f67c98cdc..8719cefa590d 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -22,7 +22,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/clk-private.h>
+-#include <linux/clk/sunxi.h>
+ 
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
+@@ -230,6 +229,8 @@ struct sunxi_mmc_host {
+ 	/* clock management */
+ 	struct clk	*clk_ahb;
+ 	struct clk	*clk_mmc;
++	struct clk	*clk_sample;
++	struct clk	*clk_output;
+ 
+ 	/* irq */
+ 	spinlock_t	lock;
+@@ -617,7 +618,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 				  struct mmc_ios *ios)
+ {
+-	u32 rate, oclk_dly, rval, sclk_dly, src_clk;
++	u32 rate, oclk_dly, rval, sclk_dly;
+ 	int ret;
+ 
+ 	rate = clk_round_rate(host->clk_mmc, ios->clock);
+@@ -643,34 +644,31 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 
+ 	/* determine delays */
+ 	if (rate <= 400000) {
+-		oclk_dly = 0;
+-		sclk_dly = 7;
++		oclk_dly = 180;
++		sclk_dly = 42;
+ 	} else if (rate <= 25000000) {
+-		oclk_dly = 0;
+-		sclk_dly = 5;
++		oclk_dly = 180;
++		sclk_dly = 75;
+ 	} else if (rate <= 50000000) {
+ 		if (ios->timing == MMC_TIMING_UHS_DDR50) {
+-			oclk_dly = 2;
+-			sclk_dly = 4;
++			oclk_dly = 60;
++			sclk_dly = 120;
+ 		} else {
+-			oclk_dly = 3;
+-			sclk_dly = 5;
++			oclk_dly = 90;
++			sclk_dly = 150;
+ 		}
++	} else if (rate <= 100000000) {
++		oclk_dly = 6;
++		sclk_dly = 24;
++	} else if (rate <= 200000000) {
++		oclk_dly = 3;
++		sclk_dly = 12;
+ 	} else {
+-		/* rate > 50000000 */
+-		oclk_dly = 2;
+-		sclk_dly = 4;
++		return -EINVAL;
+ 	}
+ 
+-	src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
+-	if (src_clk >= 300000000 && src_clk <= 400000000) {
+-		if (oclk_dly)
+-			oclk_dly--;
+-		if (sclk_dly)
+-			sclk_dly--;
+-	}
+-
+-	clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
++	clk_set_phase(host->clk_sample, sclk_dly);
++	clk_set_phase(host->clk_output, oclk_dly);
+ 
+ 	return sunxi_mmc_oclk_onoff(host, 1);
+ }
+@@ -909,6 +907,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 		return PTR_ERR(host->clk_mmc);
+ 	}
+ 
++	host->clk_output = devm_clk_get(&pdev->dev, "output");
++	if (IS_ERR(host->clk_output)) {
++		dev_err(&pdev->dev, "Could not get output clock\n");
++		return PTR_ERR(host->clk_output);
++	}
++
++	host->clk_sample = devm_clk_get(&pdev->dev, "sample");
++	if (IS_ERR(host->clk_sample)) {
++		dev_err(&pdev->dev, "Could not get sample clock\n");
++		return PTR_ERR(host->clk_sample);
++	}
++
+ 	host->reset = devm_reset_control_get(&pdev->dev, "ahb");
+ 
+ 	ret = clk_prepare_enable(host->clk_ahb);
+@@ -923,11 +933,23 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 		goto error_disable_clk_ahb;
+ 	}
+ 
++	ret = clk_prepare_enable(host->clk_output);
++	if (ret) {
++		dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
++		goto error_disable_clk_mmc;
++	}
++
++	ret = clk_prepare_enable(host->clk_sample);
++	if (ret) {
++		dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
++		goto error_disable_clk_output;
++	}
++
+ 	if (!IS_ERR(host->reset)) {
+ 		ret = reset_control_deassert(host->reset);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "reset err %d\n", ret);
+-			goto error_disable_clk_mmc;
++			goto error_disable_clk_sample;
+ 		}
+ 	}
+ 
+@@ -946,6 +968,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ error_assert_reset:
+ 	if (!IS_ERR(host->reset))
+ 		reset_control_assert(host->reset);
++error_disable_clk_sample:
++	clk_disable_unprepare(host->clk_sample);
++error_disable_clk_output:
++	clk_disable_unprepare(host->clk_output);
+ error_disable_clk_mmc:
+ 	clk_disable_unprepare(host->clk_mmc);
+ error_disable_clk_ahb:
+-- 
+2.1.0
