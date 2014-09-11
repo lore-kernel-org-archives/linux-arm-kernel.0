@@ -1,44 +1,144 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 11 Sep 2014 17:13:11 +0530
-Subject: [RFC PATCH] arm64:mm: delete max_mapnr init.
-In-Reply-To: <20140911103613.GB6158@arm.com>
-References: <1410426973-32393-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <20140911103613.GB6158@arm.com>
-Message-ID: <CAFpQJXUKgb+58ifb0GNVMywnVU6sWTETiO8K=wdTNqQNzs4sOA@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 11 Sep 2014 12:48:31 +0100
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <5405AE95.1020201@linaro.org>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
+ <5404AE56.80801@arm.com> <5405AE95.1020201@linaro.org>
+Message-ID: <20140911114831.E22E6C408F0@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, 02 Sep 2014 13:48:37 +0200, Tomasz Nowicki <tomasz.nowicki@linaro.org> wrote:
+> On 01.09.2014 19:35, Marc Zyngier wrote:
+> > On 01/09/14 15:57, Hanjun Guo wrote:
+> >> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>
+> >> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+> >> parse GIC related subtables, collect CPU interface and distributor
+> >> addresses and call driver initialization function (which is hardware
+> >> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+> >>
+> >> NOTE: This commit allow to initialize GICv1/2 only.
+> >
+> > I cannot help but notice that there is no support for KVM here. It'd be
+> > good to add a note to that effect, so that people do not expect
+> > virtualization support to be working when booting with ACPI.
+> 
+> yes, it is worth mentioning!
+> 
+> >
+> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>   arch/arm64/include/asm/acpi.h        |    2 -
+> >>   arch/arm64/kernel/acpi.c             |   23 +++++++
+> >>   arch/arm64/kernel/irq.c              |    5 ++
+> >>   drivers/irqchip/irq-gic.c            |  114 ++++++++++++++++++++++++++++++++++
+> >>   include/linux/irqchip/arm-gic-acpi.h |   33 ++++++++++
+> >>   5 files changed, 175 insertions(+), 2 deletions(-)
+> >>   create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+> >>
+> >> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> >> index a867467..5d2ab63 100644
+> >> --- a/arch/arm64/include/asm/acpi.h
+> >> +++ b/arch/arm64/include/asm/acpi.h
+> >> @@ -97,8 +97,6 @@ void __init acpi_smp_init_cpus(void);
+> >>   extern int (*acpi_suspend_lowlevel)(void);
+> >>   #define acpi_wakeup_address 0
+> >>
+> >> -#define ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES 65535
+> >> -
+> >>   #else
+> >>
+> >>   static inline bool acpi_psci_present(void) { return false; }
+> >> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> >> index 354b912..b3b82b0 100644
+> >> --- a/arch/arm64/kernel/acpi.c
+> >> +++ b/arch/arm64/kernel/acpi.c
+> >> @@ -23,6 +23,7 @@
+> >>   #include <linux/irqdomain.h>
+> >>   #include <linux/bootmem.h>
+> >>   #include <linux/smp.h>
+> >> +#include <linux/irqchip/arm-gic-acpi.h>
+> >>
+> >>   #include <asm/cputype.h>
+> >>   #include <asm/cpu_ops.h>
+> >> @@ -313,6 +314,28 @@ void __init acpi_boot_table_init(void)
+> >>   		pr_err("Can't find FADT or error happened during parsing FADT\n");
+> >>   }
+> >>
+> >> +void __init acpi_gic_init(void)
+> >> +{
+> >> +	struct acpi_table_header *table;
+> >> +	acpi_status status;
+> >> +	acpi_size tbl_size;
+> >> +	int err;
+> >> +
+> >> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
+> >> +	if (ACPI_FAILURE(status)) {
+> >> +		const char *msg = acpi_format_exception(status);
+> >> +
+> >> +		pr_err("Failed to get MADT table, %s\n", msg);
+> >> +		return;
+> >> +	}
+> >> +
+> >> +	err = gic_v2_acpi_init(table);
+> >> +	if (err)
+> >> +		pr_err("Failed to initialize GIC IRQ controller");
+> >
+> > What will happen when you get to implement GICv3 support? Another entry
+> > like this? Why isn't this entirely contained in the GIC driver? Do I
+> > sound like a stuck record?
+> 
+> There will be another call to GICv3 init:
+> [...]
+> 	err = gic_v3_acpi_init(table);
+> 	if (err)
+> 		err = gic_v2_acpi_init(table);
+> 	if (err)
+> 		pr_err("Failed to initialize GIC IRQ controller");
+> [...]
+> This is the main reason I put common code here.
+> 
+> >
+> >> +
+> >> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
+> >> +}
+> >> +
+> >>   /*
+> >>    * acpi_suspend_lowlevel() - save kernel state and suspend.
+> >>    *
+> >> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+> >> index 0f08dfd..c074d60 100644
+> >> --- a/arch/arm64/kernel/irq.c
+> >> +++ b/arch/arm64/kernel/irq.c
+> >> @@ -28,6 +28,7 @@
+> >>   #include <linux/irqchip.h>
+> >>   #include <linux/seq_file.h>
+> >>   #include <linux/ratelimit.h>
+> >> +#include <linux/irqchip/arm-gic-acpi.h>
+> >>
+> >>   unsigned long irq_err_count;
+> >>
+> >> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+> >>   void __init init_IRQ(void)
+> >>   {
+> >>   	irqchip_init();
+> >> +
+> >> +	if (!handle_arch_irq)
+> >> +		acpi_gic_init();
+> >> +
+> >
+> > Why isn't this called from irqchip_init? It would seem like the logical
+> > spot to probe an interrupt controller.
+> 
+> irqchip.c is OF dependent, I want to decouple these from the very 
+> beginning.
 
+It doesn't have to be that way, but given that ARM64 is the only
+platform in the foreseeable future that will use ACPI irq setup, it
+doesn't make sense to put it in there.
 
-On Thu, Sep 11, 2014 at 4:06 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Sep 11, 2014 at 10:16:13AM +0100, Ganapatrao Kulkarni wrote:
->> setting max_mapnr results in to error, if enabled with CONFIG_NUMA,
->> which i have to replace with function set_max_mapnr.
->> However this variable is not used in arm64(with default defconfig) and better to
->> delete instead.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
->> ---
->>  arch/arm64/mm/init.c | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index 5472c24..548bd01 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -256,7 +256,6 @@ static void __init free_unused_memmap(void)
->>   */
->>  void __init mem_init(void)
->>  {
->> -     max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
->
-> I think it's cleaner to call set_max_mapnr in case this grows a use in core
-> code outside of pfn_valid (which we always override).
-agreed, thanks for your comment.
-shall i send you the patch for this?
->
-> Will
-
-thanks
-ganapat
+g.
