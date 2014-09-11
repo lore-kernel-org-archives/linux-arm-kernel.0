@@ -1,49 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Sep 2014 12:36:50 +0200
-Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
- LS1021A
-In-Reply-To: <cd69af536cd248b8add94a468fa97095@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <62651744.c71MLsL3Q5@wuerfel>
- <cd69af536cd248b8add94a468fa97095@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <2944183.HzFlEzpKtu@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Sep 2014 11:36:13 +0100
+Subject: [RFC PATCH] arm64:mm: delete max_mapnr init.
+In-Reply-To: <1410426973-32393-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1410426973-32393-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <20140911103613.GB6158@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 08:21:58 Jingchang Lu wrote:
-> >One more thing: these should all go into the board specific files.
-> >
-> >The installed memory is almost always a property of the board, not the SoC,
-> >and a lot of boards only connect a subset of the serial ports, or they may
-> >have them in a different order.
-> >
-> >In particular, you only provide aliases for the six out of the ten
-> >available uarts, which seems arbitrary.
-> >
+On Thu, Sep 11, 2014 at 10:16:13AM +0100, Ganapatrao Kulkarni wrote:
+> setting max_mapnr results in to error, if enabled with CONFIG_NUMA,
+> which i have to replace with function set_max_mapnr.
+> However this variable is not used in arm64(with default defconfig) and better to
+> delete instead.
 > 
-> The memory size info will be fixed up in u-boot before booting the kernel image,
-> so I add the memory node in the SoC level device tree and keep only one copy. 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+> ---
+>  arch/arm64/mm/init.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 5472c24..548bd01 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -256,7 +256,6 @@ static void __init free_unused_memmap(void)
+>   */
+>  void __init mem_init(void)
+>  {
+> -	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
 
-Right. I wonder if it would make sense to just leave a placeholder in there
-that does not look like a plausible memory size. I believe the common case today
-is that we actually want to have the correct memory size in the board-level
-dts file because the boot loader does not change that value. If your boot loader
-does it, we probably don't want any default that may confuse users at all,
-in particular in the per-soc file.
+I think it's cleaner to call set_max_mapnr in case this grows a use in core
+code outside of pfn_valid (which we always override).
 
-> The lpuart derives the line number from the node's alias id, 8250 serial driver
-> doesn't rely on it, so only aliases for the lpuart are added, not arbitrary.
-
-This is really bad though, for two reasons:
-
-a) you are relying on current behavior of two kernel drivers that we may want to
-change in the future. Unfortunately the two drivers don't do this consistently
-today, but that's something we should fix in the kernel, not work around in
-the hardware description.
-
-b) for the lpuart case, you put a fixed device order in the soc-specific file,
-without any guarantee that the board uses just the first x devices rather than
-another random subset. The alias values are really meant to to correspond to
-how the machine calls things, not how the SoC sees it.
-
-	Arnd
+Will
