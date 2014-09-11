@@ -1,53 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 17:38:54 +0200
-Subject: [PATCH] mtd: nand: atmel_nand: retrieve NFC clock
-In-Reply-To: <20140911152029.GA16666@arch>
-References: <1410446617-29572-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20140911152029.GA16666@arch>
-Message-ID: <20140911173854.73b201e7@bbrezillon>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 11 Sep 2014 11:40:09 -0400
+Subject: [PATCH] ARM: keystone: dts: fix bindings for pcie and usb clock nodes
+Message-ID: <1410450009-19892-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+Fix incorrect clock names for usb1, pcie1 and domain register
+offset for pcie1 clock nodes on K2E EVM
 
-On Thu, 11 Sep 2014 12:20:30 -0300
-Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ arch/arm/boot/dts/k2e-clocks.dtsi |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> Hi Alexandre,
-> 
-> On 11 Sep 04:43 PM, Alexandre Belloni wrote:
-> > @@ -2276,6 +2280,16 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
-> >  		}
-> >  	}
-> >  
-> > +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-> > +	if (IS_ERR(nfc->clk)) {
-> > +		dev_warn(&pdev->dev, "NFC clock is missing");
-> > +		return 0;
-> > +	}
-> > +
-> 
-> The binding documentation makes no mention to a clock.
-
-You're right, I didn't update atmel,nand DT binding doc.
-
-> 
-> Anyway, with or without the docs I think this patch breaks DT backward
-> compatibility.
-> 
-> Or am I missing something?
-
-Indeed, this block of code should be placed at the end of the probe
-function. I'll fix that.
-
-Note that if the clk is missing it just print a warning message and
-return 0, so after moving the code, it should not break DT backward
-compat ;-).
-
-Best Regards,
-
-Boris
+diff --git a/arch/arm/boot/dts/k2e-clocks.dtsi b/arch/arm/boot/dts/k2e-clocks.dtsi
+index 598afe9..4773d6a 100644
+--- a/arch/arm/boot/dts/k2e-clocks.dtsi
++++ b/arch/arm/boot/dts/k2e-clocks.dtsi
+@@ -40,7 +40,7 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk16>;
+-		clock-output-names = "usb";
++		clock-output-names = "usb1";
+ 		reg = <0x02350004 0xb00>, <0x02350000 0x400>;
+ 		reg-names = "control", "domain";
+ 		domain-id = <0>;
+@@ -60,8 +60,8 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,psc-clock";
+ 		clocks = <&chipclk12>;
+-		clock-output-names = "pcie";
+-		reg = <0x0235006c 0xb00>, <0x02350000 0x400>;
++		clock-output-names = "pcie1";
++		reg = <0x0235006c 0xb00>, <0x02350048 0x400>;
+ 		reg-names = "control", "domain";
+ 		domain-id = <18>;
+ 	};
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
