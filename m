@@ -1,77 +1,53 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Thu, 11 Sep 2014 22:25:13 +0800
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20140911143616.3ebb025a@bbrezillon>
-References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911120928.GA1585@localhost.localdomain>
- <20140911143616.3ebb025a@bbrezillon>
-Message-ID: <20140911142511.GA2543@localhost.localdomain>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 11 Sep 2014 10:26:01 -0400
+Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
+In-Reply-To: <20140911160000.55a4de80@free-electrons.com>
+References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140911134323.GB29780@lunn.ch>
+ <20140911160000.55a4de80@free-electrons.com>
+Message-ID: <20140911142601.GA30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
++Ian
 
-On Thu, Sep 11, 2014 at 02:36:16PM +0200, Boris BREZILLON wrote:
-> Hi Huang,
+On Thu, Sep 11, 2014 at 04:00:00PM +0200, Thomas Petazzoni wrote:
+> On Thu, 11 Sep 2014 15:43:23 +0200, Andrew Lunn wrote:
+> > A point for discussion, triggered by 3/4. We have repeatedly seen
+> > issues with modular builds, which we don't see with everything built
+> > in. Can we improve our testing? Is there is way to take for example
+> > mvebu_v7_defconfig and turn any y tristate options into m? Build and
+> > boot? Get this added to the boot test farms?
 > 
-> On Thu, 11 Sep 2014 20:09:30 +0800
-> Huang Shijie <shijie8@gmail.com> wrote:
+> I indeed agree that we are not testing much the modular case, but:
 > 
-> > On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
-> > > Several MTD users (either in user or kernel space) expect a valid raw
-> > > access support to NAND chip devices.
-> > > This is particularly true for testing tools which are often touching the
-> > > data stored in a NAND chip in raw mode to artificially generate errors.
-> > > 
-> > > The GPMI drivers do not implemenent raw access functions, and thus rely on
-> > > default HW_ECC scheme implementation.
-> > > The default implementation consider the data and OOB area as properly
-> > > separated in their respective NAND section, which is not true for the GPMI
-> > > controller.
-> > > In this driver/controller some OOB data are stored at the beginning of the
-> > > NAND data area (these data are called metadata in the driver), then ECC
-> > > bytes are interleaved with data chunk (which is similar to the
-> > > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-> > > OOB data.
-> > > 
-> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > ---
-> > > Hello,
-> > > 
-> > > This patch is providing raw access support to the GPMI driver which is
-> > > particularly useful to run some tests on the NAND (the one coming in
-> > > mind is the mtd_nandbiterrs testsuite).
-> > > 
-> > > I know this rework might break several user space tools which are relying
-> > > on the default raw access implementation (I already experienced an issue
-> > > with the kobs-ng tool provided by freescale), but many other tools will
-> > > now work as expected.
-> > If the kobs-ng can not works, there is no meaning that other tools
-> > works.  So I do not think we need to implement these hooks.
+>  1/ In my case, a mvebu_v7_defconfig where most the stuff would become
+>     enabled as a module would make mvebu_v7_defconfig pretty much
+>     useless for my daily work. When I'm doing active development, I
+>     typically have everything built-in including the initramfs itself,
+>     so that I don't rely on any storage/network to get the rootfs and
+>     additional kernel drivers.
 > 
-> Well, I don't know about freescale specific tools, but at least I have
-> an example with mtd_nandbiterrs module.
+>  2/ I don't think it would change much in terms of runtime coverage:
+>     the tests done on the boot farm are just boot tests, I don't think
+>     they load any kernel module. We could ask Kevin and Olof what
+>     rootfs they use, but most likely it's some very small rootfs that
+>     doesn't even have udev/mdev for automatic module loading. So no
+>     module would be loaded, which would mean that a mvebu_v7_defconfig
+>     with everything as a module would actually test *less* thing than a
+>     configuration that has everything built in.
+> 
+> So, I agree on the observation, but I'm unsure the proposed solution
+> will really solve or even improve the situation :/
 
-The gpmi uses the hardware ECC for the bitflips.
-I really do not know why the mtd_nandbiterrs is needed.
-IMHO, the mtd_nandbiterrs is useless for the gpmi.
+Since debian does modular builds on a regular basis, maybe they have
+some recommendations.
 
-> This module is assuming it can write only the data part of a NAND page
-> without modifying the OOB area (see [1]), which in GPMI controller case
-> is impossible because raw write function store the data as if there
-> were no specific scheme, while there is one:
-> (metadata + n x (data_chunk + ECC bytes) + remaining_bytes).
-> 
-> Moreover, IMHO, nanddump and nandwrite tools (which can use raw
-> access mode when passing the appropriate option) should always return
-> the same kind of data no matter what NAND controller is in use on the
-> system => (DATA + OOB_DATA), and this is definitely not the case with
-> the GPMI driver.
-> 
-> See how raw access on HW_ECC_SYNDROME scheme is implemented in
-The gpmi uses the NAND_ECC_HW, not the NAND_ECC_HW_SYNDROME.
-Even you really want to support the nanddump, i do not agree to add the
-write hook, it may crash the system.
+My thought is that I doubt we're the only SoC family with this issue.
+To avoid the maintenance headache of extra _mod_defconfig's, perhaps we
+could add a ./scripts/config toggle to turn the current .config enabled
+tristates into modules?
 
-thanks
-Huang Shijie
+thx,
+
+Jason.
