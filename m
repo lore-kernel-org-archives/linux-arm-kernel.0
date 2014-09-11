@@ -1,87 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Sep 2014 12:09:10 +0100
-Subject: [PATCH v4 3/8] arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
-In-Reply-To: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
-References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1410433755-3612-4-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 11 Sep 2014 12:09:07 +0100
+Subject: [PATCH v4 0/8] arm/arm64: KVM: dynamic VGIC sizing
+Message-ID: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having a dynamic number of supported interrupts means that we
-cannot relly on VGIC_NR_SHARED_IRQS being fixed anymore.
+So far, the VGIC data structures have been statically sized, meaning
+that we always have to support more interrupts than we actually want,
+and more CPU interfaces than we should. This is a waste of resource,
+and is the kind of things that should be tuneable.
 
-Instead, make it take the distributor structure as a parameter,
-so it can return the right value.
+This series addresses that issue by changing the data structures to be
+dynamically allocated, and adds a new configuration attribute to
+allocate the number of interrupts. When the attribute is not used, we
+fallback to the old behaviour of allocating a fixed number of
+interrupts.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h |  1 -
- virt/kvm/arm/vgic.c    | 16 +++++++++++-----
- 2 files changed, 11 insertions(+), 6 deletions(-)
+This series is also the base for Andre Przywara's GICv3 distributor
+emulation code (which can support far more than 8 vcpus and 1020
+interrupts).
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index bdaac57..bdeb451 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -29,7 +29,6 @@
- #define VGIC_NR_SGIS		16
- #define VGIC_NR_PPIS		16
- #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
--#define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
- #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
- 
- #define VGIC_V2_MAX_LRS		(1 << 6)
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 92c086e..93fe73b 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1083,11 +1083,17 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
- 	}
- }
- 
-+static int vgic_nr_shared_irqs(struct vgic_dist *dist)
-+{
-+	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
-+}
-+
- static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	unsigned long *pending, *enabled, *pend_percpu, *pend_shared;
- 	unsigned long pending_private, pending_shared;
-+	int nr_shared = vgic_nr_shared_irqs(dist);
- 	int vcpu_id;
- 
- 	vcpu_id = vcpu->vcpu_id;
-@@ -1100,15 +1106,15 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
- 
- 	pending = vgic_bitmap_get_shared_map(&dist->irq_pending);
- 	enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
--	bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
-+	bitmap_and(pend_shared, pending, enabled, nr_shared);
- 	bitmap_and(pend_shared, pend_shared,
- 		   vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
--		   VGIC_NR_SHARED_IRQS);
-+		   nr_shared);
- 
- 	pending_private = find_first_bit(pend_percpu, VGIC_NR_PRIVATE_IRQS);
--	pending_shared = find_first_bit(pend_shared, VGIC_NR_SHARED_IRQS);
-+	pending_shared = find_first_bit(pend_shared, nr_shared);
- 	return (pending_private < VGIC_NR_PRIVATE_IRQS ||
--		pending_shared < VGIC_NR_SHARED_IRQS);
-+		pending_shared < vgic_nr_shared_irqs(dist));
- }
- 
- /*
-@@ -1365,7 +1371,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	}
- 
- 	/* SPIs */
--	for_each_set_bit(i, vgic_cpu->pending_shared, VGIC_NR_SHARED_IRQS) {
-+	for_each_set_bit(i, vgic_cpu->pending_shared, vgic_nr_shared_irqs(dist)) {
- 		if (!vgic_queue_hwirq(vcpu, i + VGIC_NR_PRIVATE_IRQS))
- 			overflow = 1;
- 	}
+This has been tested on both ARM (TC2, A20) and arm64 (model and Juno).
+
+The code is available from my kvm-arm64/kvmtool-vgic-dyn branch,
+together with the corresponding kvmtool code.
+
+* From v3 [3]
+  - Number of comments added to the data structures, making slightly more
+    obvious the various mappings
+  - Dropped the nr_irqs field from bitmap and bytemap structures, as
+    it was a leftover from the initial revision that only had a single
+    pointer
+  - Small cleanups all over the place
+  - Dropped the "sub-page offset" patch for now, as this need some
+    serious reworking
+  - Rebased on top of Christoffer "vgic cleanup" series, with 3.17-rc4
+    thrown in for a good measure
+
+* From v2 [2]
+  - Fixed bug that broke QEMU (register access can trigger allocation)
+  - irq_pending_on_cpu is now dynamic (needed for more than 32 or 64 vcpus)
+  - Rebased on top of Victor's BE patches
+
+* From v1 [1]
+  - Rebased on top of 3.16-rc1
+  - Lots of cleanup
+
+[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2013-October/005879.html
+[2]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010050.html
+[3]: https://lists.cs.columbia.edu/pipermail/kvmarm/2014-July/010383.html
+
+Marc Zyngier (8):
+  KVM: ARM: vgic: plug irq injection race
+  arm/arm64: KVM: vgic: switch to dynamic allocation
+  arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
+  arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+  arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
+  arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
+  arm/arm64: KVM: vgic: delay vgic allocation until init time
+  arm/arm64: KVM: vgic: make number of irqs a configurable attribute
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  10 +
+ arch/arm/include/uapi/asm/kvm.h                |   1 +
+ arch/arm/kvm/arm.c                             |  10 +-
+ arch/arm64/include/uapi/asm/kvm.h              |   1 +
+ include/kvm/arm_vgic.h                         |  88 ++++--
+ virt/kvm/arm/vgic.c                            | 396 +++++++++++++++++++++----
+ 6 files changed, 413 insertions(+), 93 deletions(-)
+
 -- 
 2.0.4
