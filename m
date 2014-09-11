@@ -1,29 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 11 Sep 2014 16:51:36 +0200
-Subject: [PATCH] net/macb: Add hardware revision information during probe
-Message-ID: <1410447096-29980-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Thu, 11 Sep 2014 16:51:09 +0200
+Subject: [PATCH v2 2/4] arm64, thunder: Add initial dts for Cavium
+ Thunder SoC
+In-Reply-To: <5017180.kZRPNE71Sv@wuerfel>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-3-git-send-email-rric@kernel.org>
+ <5017180.kZRPNE71Sv@wuerfel>
+Message-ID: <20140911145109.GJ10622@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+Arnd,
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 1 +
- 1 file changed, 1 insertion(+)
+On 05.09.14 13:21:48, Arnd Bergmann wrote:
+> On Friday 05 September 2014 09:46:43 Robert Richter wrote:
+> > diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
+> > new file mode 100644
+> > index 000000000000..4cc1d059d2d9
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/thunder-88xx.dts
+> 
+> Most people end up having a soc.dtsi file and a board.dsi file including
+> the former and adding the machine-specific properties.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index ca5d7798b265..a3b35c146d9c 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2241,6 +2241,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	netif_carrier_off(dev);
- 
-+	netdev_info(dev, "Cadence rev 0x%08x\n", macb_readl(bp, MID));
- 	netdev_info(dev, "Cadence %s at 0x%08lx irq %d (%pM)\n",
- 		    macb_is_gem(bp) ? "GEM" : "MACB", dev->base_addr,
- 		    dev->irq, dev->dev_addr);
--- 
-1.9.1
+thanks for your feedback on the dts file. I already included your
+suggestion into the patches and split the files.
+
+-Robert
