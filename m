@@ -1,46 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Sep 2014 11:24:39 +0100
-Subject: [PATCH v2] ARM/arm64: KVM: fix use of WnR bit in
- kvm_is_write_fault()
-In-Reply-To: <20140911031236.GL2784@lvm>
-References: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
- <540EDE63.6060904@arm.com> <20140911031236.GL2784@lvm>
-Message-ID: <54117867.2010705@arm.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 11 Sep 2014 11:24:36 +0100
+Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
+In-Reply-To: <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140911102436.B6671C40862@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/14 04:12, Christoffer Dall wrote:
-> On Tue, Sep 09, 2014 at 12:02:59PM +0100, Marc Zyngier wrote:
->> [resending, as ARM email server seems to be in some mood]
->>
->> On 09/09/14 11:27, Ard Biesheuvel wrote:
->>> The ISS encoding for an exception from a Data Abort has a WnR
->>> bit[6] that indicates whether the Data Abort was caused by a
->>> read or a write instruction. While there are several fields
->>> in the encoding that are only valid if the ISV bit[24] is set,
->>> WnR is not one of them, so we can read it unconditionally.
->>>
->>> Instead of fixing both implementations of kvm_is_write_fault()
->>> in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
->>> which already does the right thing with respect to the WnR bit.
->>> Also fix up the callers to pass 'vcpu'
->>>
->>> Acked-by: Laszlo Ersek <lersek@redhat.com>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> Because I like that kind of diffstat:
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Christoffer, if you too are happy with that, I'll queue it right away.
->>
-> Extremely happy:
+On Mon,  1 Sep 2014 22:57:47 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> MADT contains the information for MPIDR which is essential for
+> SMP initialization, parse the GIC cpu interface structures to
+> get the MPIDR value and map it to cpu_logical_map(), and add
+> enabled cpu with valid MPIDR into cpu_possible_map.
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
+> Parking protocol, but the Parking protocol is only specified for
+> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
+> before some updates for the ACPI spec or the Parking protocol spec.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> ---
+> +/**
+> + * acpi_map_gic_cpu_interface - generates a logical cpu number
+> + * and map to MPIDR represented by GICC structure
+> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+> + * @enabled: this cpu is enabled or not
+> + *
+> + * Returns the logical cpu number which maps to MPIDR
+> + */
+> +static int acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
+> +{
+> +	int cpu;
+> +
+> +	if (mpidr == INVALID_HWID) {
+> +		pr_info("Skip invalid cpu hardware ID\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	total_cpus++;
+> +	if (!enabled)
+> +		return -EINVAL;
+> +
+> +	if (enabled_cpus >=  NR_CPUS) {
+> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+> +			NR_CPUS, total_cpus, mpidr);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* No need to check duplicate MPIDRs for the first CPU */
+> +	if (enabled_cpus) {
+> +		/*
+> +		 * Duplicate MPIDRs are a recipe for disaster. Scan
+> +		 * all initialized entries and check for
+> +		 * duplicates. If any is found just ignore the CPU.
+> +		 */
+> +		for_each_possible_cpu(cpu) {
+> +			if (cpu_logical_map(cpu) == mpidr) {
+> +				pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+> +				mpidr);
+> +				return -EINVAL;
+> +			}
+> +		}
+> +	} else {
+> +		/* Fist GICC entry must be BSP as ACPI spec said */
+> +		if  (cpu_logical_map(0) != mpidr) {
+> +			pr_err("First GICC entry is not BSP for MPIDR 0x%llx\n",
+> +			       mpidr);
+> +			return -EINVAL;
+> +		}
+> +	}
+> +
+> +	/* allocate a logical cpu id for the new comer */
+> +	if (cpu_logical_map(0) == mpidr) {
+> +		/*
+> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+> +		 * for BSP, no need to allocate again.
+> +		 */
+> +		cpu = 0;
+> +	} else {
+> +		cpu = cpumask_next_zero(-1, cpu_possible_mask);
+> +	}
 
-Added to kvmarm/queue.
+Nit: so the above two if/else blocks are essentially testing for the
+same condition: Is this the first cpu? or a secondary cpu? I would
+merge the two into a single if/else block.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+g.
