@@ -1,41 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 11 Sep 2014 17:54:12 +0200
-Subject: [PATCH 7/7] ARM: at91: add sama5d4 support to sama5_defconfig
-In-Reply-To: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1410450852-1834-8-git-send-email-alexandre.belloni@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Sep 2014 08:54:42 -0700
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <20140911095725.GC5045@arm.com>
+References: <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+ <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+ <20140908135436.GC22717@arm.com>
+ <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
+ <20140910173401.GG1710@arm.com>
+ <CAD=FV=WJpP1aAo-r9bnUQg5xarGQYo8pROvyh0a5dt+m1OOn4g@mail.gmail.com>
+ <20140910184652.GP1710@arm.com>
+ <CAD=FV=W_d=S-N-hguLsH+pf3kT1XqQNMMqGZ4o2wnpWZB9T70g@mail.gmail.com>
+ <20140911095725.GC5045@arm.com>
+Message-ID: <CAD=FV=U55aX4edj3DRvBbFFs0Q23TUHY+D+mr1wcghaJGiRm+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sama5d4 to sama5_defconfig to build kernel booting on both sama5d3 and
-samad4.
+Will,
 
-Note that earlyprintk can only be working for one or the other.
+On Thu, Sep 11, 2014 at 2:57 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Sep 10, 2014 at 08:50:16PM +0100, Doug Anderson wrote:
+>> On Wed, Sep 10, 2014 at 11:46 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > If `where we're at' is trying to boot an ARMv7 product, then you can boot in
+>> > secure svc and lose virtualisation support. Looking forward to ARMv8, this
+>> > isn't going to work, so I'd encourage you to start thinking about getting
+>> > a working bootloader as a requirement.
+>>
+>> Yup, definitely on the same page now.  With everyone working on this
+>> I'd imagine that there will be some nice standards worked out by the
+>> time real ARMv8 is ready to ship?
+>>
+>> ...so would you say that you're in support of landing the patch to
+>> allow physical counters?  I know Olof has Acked the patch above, but
+>> it's nice if there's general agreement that it's OK.
+>
+> I'm in favour of fixing the regression, yes. What I didn't understand from
+> the patch is where arch_timer_use_virtual is set to false for your machine,
+> as we need to be careful not to regress arm64 (the vdso uses the virtual
+> counter there).
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/configs/sama5_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+See <https://patchwork.kernel.org/patch/4889311/>
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 96c15b775d57..a6c2409c4e14 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -19,6 +19,7 @@ CONFIG_MODULE_FORCE_UNLOAD=y
- CONFIG_ARCH_AT91=y
- CONFIG_SOC_SAM_V7=y
- CONFIG_SOC_SAMA5D3=y
-+CONFIG_SOC_SAMA5D4=y
- CONFIG_MACH_SAMA5_DT=y
- CONFIG_AEABI=y
- CONFIG_UACCESS_WITH_MEMCPY=y
-@@ -66,7 +67,6 @@ CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
--CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_SPI_NOR=y
--- 
-1.9.1
+-Doug
