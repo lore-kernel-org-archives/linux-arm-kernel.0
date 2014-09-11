@@ -1,86 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 11 Sep 2014 09:57:04 +0900
-Subject: [PATCH 7/7] ARM: shmobile: kzm9g-reference: Enable CMT1 in device tree
-In-Reply-To: <cover.1410396171.git.horms+renesas@verge.net.au>
-References: <cover.1410396171.git.horms+renesas@verge.net.au>
-Message-ID: <48a0d1e07d99ecfd1e5922dd22986d5813f17207.1410396171.git.horms+renesas@verge.net.au>
+Date: Thu, 11 Sep 2014 09:57:15 +0900
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC DT Updates for v3.18
+Message-ID: <cover.1410396013.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |  4 ++++
- arch/arm/mach-shmobile/setup-sh73a0.c        | 11 +----------
- 2 files changed, 5 insertions(+), 10 deletions(-)
+Please consider these fourth round of Renesas ARM based SoC DT updates for
+v3.18.
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 18662ae..99659db 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -173,6 +173,10 @@
- 	};
- };
- 
-+&cmt1 {
-+	status = "ok";
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	as3711 at 40 {
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 2c802ae..928e96a 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -696,10 +696,6 @@ static struct platform_device irqpin3_device = {
- 	},
- };
- 
--static struct platform_device *sh73a0_devices_dt[] __initdata = {
--	&cmt1_device,
--};
--
- static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -712,6 +708,7 @@ static struct platform_device *sh73a0_early_devices[] __initdata = {
- 	&scif8_device,
- 	&tmu0_device,
- 	&ipmmu_device,
-+	&cmt1_device,
- };
- 
- static struct platform_device *sh73a0_late_devices[] __initdata = {
-@@ -736,8 +733,6 @@ void __init sh73a0_add_standard_devices(void)
- 	/* Clear software reset bit on SY-DMAC module */
- 	__raw_writel(__raw_readl(SRCR2) & ~(1 << 18), SRCR2);
- 
--	platform_add_devices(sh73a0_devices_dt,
--			    ARRAY_SIZE(sh73a0_devices_dt));
- 	platform_add_devices(sh73a0_early_devices,
- 			    ARRAY_SIZE(sh73a0_early_devices));
- 	platform_add_devices(sh73a0_late_devices,
-@@ -762,8 +757,6 @@ void __init sh73a0_earlytimer_init(void)
- 
- void __init sh73a0_add_early_devices(void)
- {
--	early_platform_add_devices(sh73a0_devices_dt,
--				   ARRAY_SIZE(sh73a0_devices_dt));
- 	early_platform_add_devices(sh73a0_early_devices,
- 				   ARRAY_SIZE(sh73a0_early_devices));
- 
-@@ -780,8 +773,6 @@ void __init sh73a0_add_standard_devices_dt(void)
- 	/* clocks are setup late during boot in the case of DT */
- 	sh73a0_clock_init();
- 
--	platform_add_devices(sh73a0_devices_dt,
--			     ARRAY_SIZE(sh73a0_devices_dt));
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	/* Instantiate cpufreq-cpu0 */
--- 
-2.0.1
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt3-for-v3.18,
+which you have already pulled.
+
+
+The following changes since commit 40c488df84f9fbf4b84b4baed6e2cec4a2d946ed:
+
+  ARM: shmobile: kzm9g-reference dts: Use tabs for indentation (2014-09-02 10:22:42 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt4-for-v3.18
+
+for you to fetch changes up to a742795be9ceae2853ca71f216193f29da151da8:
+
+  ARM: shmobile: Initial Alt board device tree (2014-09-09 11:29:27 +0900)
+
+----------------------------------------------------------------
+Fourth Round of Renesas ARM Based SoC DT Updates for v3.18
+
+* Add r8a7794 SoC and Alt board device tree
+* Correct lager memory map
+
+----------------------------------------------------------------
+Simon Horman (1):
+      ARM: shmobile: lager: correct memory map
+
+Ulrich Hecht (2):
+      ARM: shmobile: Initial r8a7794 SoC device tree
+      ARM: shmobile: Initial Alt board device tree
+
+ arch/arm/boot/dts/Makefile                |   3 +-
+ arch/arm/boot/dts/r8a7790-lager.dts       |   2 +-
+ arch/arm/boot/dts/r8a7794-alt.dts         |  47 +++
+ arch/arm/boot/dts/r8a7794.dtsi            | 531 ++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/r8a7794-clock.h |  80 +++++
+ 5 files changed, 661 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7794-alt.dts
+ create mode 100644 arch/arm/boot/dts/r8a7794.dtsi
+ create mode 100644 include/dt-bindings/clock/r8a7794-clock.h
