@@ -1,28 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Sep 2014 13:10:39 -0700
-Subject: [PATCH 1/3] ARM: OMAP2+: make of_device_ids const
-In-Reply-To: <20140911195245.GP3755@pengutronix.de>
-References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1410337579-23466-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140911173943.GB18849@atomide.com>
- <20140911190136.GM3755@pengutronix.de>
- <20140911191449.GF18849@atomide.com>
- <20140911194215.GO3755@pengutronix.de>
- <20140911194716.GG18849@atomide.com>
- <20140911195245.GP3755@pengutronix.de>
-Message-ID: <20140911201039.GH18849@atomide.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 11 Sep 2014 22:11:31 +0200
+Subject: [PATCH v2 0/9] ARM: meson: add preliminary support for MesonX/Meson6
+ SoCs
+Message-ID: <1410466300-19168-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140911 12:53]:
-> Hello Tony,
-> 
-> On Thu, Sep 11, 2014 at 12:47:17PM -0700, Tony Lindgren wrote:
-> > OK great thanks. I'll apply both into omap-for-v3.18/fixes-not-urgent.
-> I would have put "make of_device_ids const" into cleanups, but that's up
-> to you.
+Amlogic AML8726-MX (codename Meson6) is a highly integrated multimedia
+application processor SoC for Multimedia Internet Device (MID), tablet
+and Set Top Box (STB). It integrates a powerful CPU, a 2D/3D graphics
+subsystem and a state-of-the-art video decoding engine together with
+all major peripherals. It is manufactured by Amlogic, inc.
 
-Yes that would have worked too but already applied and building
-randconfigs :)
+This patchset introduces preliminary support for Meson6-based SoCs but
+several IPs and drivers are common among all the MesonX SoCs.
 
-Tony
+Amlogic doesn't release any documentation about their SoCs, so the code
+has been reverse-engineered from the messy source code released at:
+
+http://openlinux.amlogic.com:8000/download/
+
+Notes:
+* The patchset requires https://lkml.org/lkml/2014/7/7/344
+* Patch [3/9] is already in tty-next branch
+
+Changes since v1:
+* clocksource driver: deleted useless pointers to timers not used and code
+  restyling
+* machine file: deleted useless compatibles and .init_machine
+* DTS: addressed several issues
+* defconfigs: deleted meson_defconfig
+* documentation: split documentation patch and added bindings documentation
+
+Carlo Caione (9):
+  ARM: meson: debug: add debug UART for earlyprintk support
+  ARM: meson: documentation: add UART documentation
+  ARM: meson: serial: add MesonX SoC on-chip uart driver
+  ARM: meson: documentation: add timer documentation
+  ARM: meson6: clocksource: add Meson6 timer support
+  ARM: meson: documentation: add bindings documentation
+  ARM: meson: add basic support for MesonX SoCs
+  ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200 DTSI/DTS
+  ARM: meson: update multi_v7_defconfig
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   8 +
+ .../devicetree/bindings/arm/geniatech.txt          |   5 +
+ .../bindings/serial/amlogic,meson-uart.txt         |  17 +
+ .../bindings/timer/amlogic,meson6-timer.txt        |  16 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Kconfig.debug                             |  14 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/meson.dtsi                       |  74 +++
+ arch/arm/boot/dts/meson6-atv1200.dts               |  25 +
+ arch/arm/boot/dts/meson6.dtsi                      |  40 ++
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/include/debug/meson.S                     |  35 ++
+ arch/arm/mach-meson/Kconfig                        |  13 +
+ arch/arm/mach-meson/Makefile                       |   1 +
+ arch/arm/mach-meson/meson.c                        |  27 +
+ drivers/clocksource/Kconfig                        |   3 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/meson6_timer.c                 | 167 ++++++
+ drivers/tty/serial/Kconfig                         |  18 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/meson_uart.c                    | 634 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 24 files changed, 1109 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/geniatech.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+ create mode 100644 arch/arm/boot/dts/meson.dtsi
+ create mode 100644 arch/arm/boot/dts/meson6-atv1200.dts
+ create mode 100644 arch/arm/boot/dts/meson6.dtsi
+ create mode 100644 arch/arm/include/debug/meson.S
+ create mode 100644 arch/arm/mach-meson/Kconfig
+ create mode 100644 arch/arm/mach-meson/Makefile
+ create mode 100644 arch/arm/mach-meson/meson.c
+ create mode 100644 drivers/clocksource/meson6_timer.c
+ create mode 100644 drivers/tty/serial/meson_uart.c
+
+-- 
+1.9.1
