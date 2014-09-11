@@ -1,429 +1,188 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 11 Sep 2014 22:03:44 +0800
-Subject: [RFC Part2 v1 17/21] x86,
- htirq: Use hierarchy irqdomain to manage Hypertransport interrupts
+Date: Thu, 11 Sep 2014 22:03:45 +0800
+Subject: [RFC Part2 v1 18/21] iommu/vt-d: Clean up unused MSI related code
 In-Reply-To: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1410444228-3134-18-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1410444228-3134-19-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use hierarchy irqdomain to manage Hypertransport interrupts.
-We have slightly changed the architecture interfaces to support htirq
-PCI driver, it should be safe because currently Hypertransport interrupt
-is only enabled on x86 platforms.
+Now MSI interrupt has been converted to new hierarchy irqdomain
+interfaces, so kill legacy MSI related code.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- arch/x86/include/asm/hw_irq.h |   13 ++++
- arch/x86/kernel/apic/htirq.c  |  167 +++++++++++++++++++++++++++++++----------
- arch/x86/kernel/apic/vector.c |    1 +
- drivers/pci/htirq.c           |   47 ++----------
- include/linux/htirq.h         |   24 ++++--
- 5 files changed, 165 insertions(+), 87 deletions(-)
+ drivers/iommu/intel_irq_remapping.c |  144 -----------------------------------
+ 1 file changed, 144 deletions(-)
 
-diff --git a/arch/x86/include/asm/hw_irq.h b/arch/x86/include/asm/hw_irq.h
-index 9f705c49f850..1913607f6422 100644
---- a/arch/x86/include/asm/hw_irq.h
-+++ b/arch/x86/include/asm/hw_irq.h
-@@ -148,6 +148,14 @@ struct irq_alloc_info {
- 			u32		ioapic_polarity : 1;
- 		};
- #endif
-+#ifdef	CONFIG_HT_IRQ
-+		struct {
-+			int		ht_pos;
-+			int		ht_idx;
-+			struct pci_dev	*ht_dev;
-+			void		*ht_update;
-+		};
-+#endif
- 	};
- };
+diff --git a/drivers/iommu/intel_irq_remapping.c b/drivers/iommu/intel_irq_remapping.c
+index 8bac5935e0d5..840db5fee320 100644
+--- a/drivers/iommu/intel_irq_remapping.c
++++ b/drivers/iommu/intel_irq_remapping.c
+@@ -146,44 +146,6 @@ static int qi_flush_iec(struct intel_iommu *iommu, int index, int mask)
+ 	return qi_submit_sync(&desc, iommu);
+ }
  
-@@ -204,6 +212,11 @@ extern void arch_init_msi_domain(struct irq_domain *domain);
- #else
- static inline void arch_init_msi_domain(struct irq_domain *domain) { }
- #endif
-+#ifdef	CONFIG_HT_IRQ
-+extern void arch_init_htirq_domain(struct irq_domain *domain);
-+#else
-+static inline void arch_init_htirq_domain(struct irq_domain *domain) { }
-+#endif
- 
- /* Statistics */
- extern atomic_t irq_err_count;
-diff --git a/arch/x86/kernel/apic/htirq.c b/arch/x86/kernel/apic/htirq.c
-index 55cb061a95cb..a67da63996df 100644
---- a/arch/x86/kernel/apic/htirq.c
-+++ b/arch/x86/kernel/apic/htirq.c
-@@ -3,6 +3,8 @@
-  *
-  * Copyright (C) 1997, 1998, 1999, 2000, 2009 Ingo Molnar, Hajnalka Szabo
-  *	Moved from arch/x86/kernel/apic/io_apic.c.
-+ * Jiang Liu <jiang.liu@linux.intel.com>
-+ *	Add support of hierarchy irqdomain
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -19,69 +21,107 @@
- #include <asm/apic.h>
- #include <asm/hypertransport.h>
- 
-+static struct irq_domain *htirq_domain;
-+
- /*
-  * Hypertransport interrupt support
-  */
--static void target_ht_irq(unsigned int irq, unsigned int dest, u8 vector)
+-static int map_irq_to_irte_handle(int irq, u16 *sub_handle)
 -{
--	struct ht_irq_msg msg;
+-	struct irq_2_iommu *irq_iommu = irq_2_iommu(irq);
+-	unsigned long flags;
+-	int index;
 -
--	fetch_ht_irq_msg(irq, &msg);
+-	if (!irq_iommu)
+-		return -1;
 -
--	msg.address_lo &= ~(HT_IRQ_LOW_VECTOR_MASK | HT_IRQ_LOW_DEST_ID_MASK);
--	msg.address_hi &= ~(HT_IRQ_HIGH_DEST_ID_MASK);
--
--	msg.address_lo |= HT_IRQ_LOW_VECTOR(vector) | HT_IRQ_LOW_DEST_ID(dest);
--	msg.address_hi |= HT_IRQ_HIGH_DEST_ID(dest);
--
--	write_ht_irq_msg(irq, &msg);
+-	raw_spin_lock_irqsave(&irq_2_ir_lock, flags);
+-	*sub_handle = irq_iommu->sub_handle;
+-	index = irq_iommu->irte_index;
+-	raw_spin_unlock_irqrestore(&irq_2_ir_lock, flags);
+-	return index;
 -}
 -
- static int
- ht_set_affinity(struct irq_data *data, const struct cpumask *mask, bool force)
- {
--	struct irq_cfg *cfg = irqd_cfg(data);
--	unsigned int dest;
-+	struct irq_data *parent = data->parent_data;
- 	int ret;
- 
--	ret = apic_set_affinity(data, mask, &dest);
--	if (ret)
--		return ret;
+-static int set_irte_irq(int irq, struct intel_iommu *iommu, u16 index, u16 subhandle)
+-{
+-	struct irq_2_iommu *irq_iommu = irq_2_iommu(irq);
+-	struct irq_cfg *cfg = irq_cfg(irq);
+-	unsigned long flags;
 -
--	target_ht_irq(data->irq, dest, cfg->vector);
--	return IRQ_SET_MASK_OK_NOCOPY;
-+	ret = parent->chip->irq_set_affinity(parent, mask, force);
-+	if (ret >= 0) {
-+		struct ht_irq_msg msg;
-+		struct irq_cfg *cfg = data->chip_data;
-+
-+		fetch_ht_irq_msg(data->irq, &msg);
-+		msg.address_lo &= ~(HT_IRQ_LOW_VECTOR_MASK |
-+				    HT_IRQ_LOW_DEST_ID_MASK);
-+		msg.address_lo |= HT_IRQ_LOW_VECTOR(cfg->vector) |
-+				  HT_IRQ_LOW_DEST_ID(cfg->dest_apicid);
-+		msg.address_hi &= ~(HT_IRQ_HIGH_DEST_ID_MASK);
-+		msg.address_hi |= HT_IRQ_HIGH_DEST_ID(cfg->dest_apicid);
-+		write_ht_irq_msg(data->irq, &msg);
-+	}
-+
-+	return ret;
- }
- 
- static struct irq_chip ht_irq_chip = {
- 	.name			= "PCI-HT",
- 	.irq_mask		= mask_ht_irq,
- 	.irq_unmask		= unmask_ht_irq,
--	.irq_ack		= apic_ack_edge,
-+	.irq_ack		= irq_chip_ack_parent,
- 	.irq_set_affinity	= ht_set_affinity,
--	.irq_retrigger		= apic_retrigger_irq,
-+	.irq_retrigger		= irq_chip_retrigger_hierarchy,
- };
- 
--int arch_alloc_ht_irq(struct pci_dev *dev)
-+static int htirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs, void *arg)
- {
--	return irq_domain_alloc_irqs(NULL, -1, 1, dev_to_node(&dev->dev), NULL);
-+	struct ht_irq_cfg *ht_cfg;
-+	struct irq_alloc_info *info = arg;
-+	struct pci_dev *dev;
-+	irq_hw_number_t hwirq;
-+	int ret;
-+
-+	if (nr_irqs > 1 || !info)
-+		return -EINVAL;
-+
-+	dev = info->ht_dev;
-+	hwirq = (info->ht_idx & 0xFF) |
-+		PCI_DEVID(dev->bus->number, dev->devfn) << 8 |
-+		(pci_domain_nr(dev->bus) & 0xFFFFFFFF) << 24;
-+	if (irq_find_mapping(domain, hwirq) > 0)
-+		return -EEXIST;
-+
-+	ht_cfg = kmalloc(sizeof(*ht_cfg), GFP_KERNEL);
-+	if (!ht_cfg)
-+		return -ENOMEM;
-+
-+	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, info);
-+	if (ret < 0) {
-+		kfree(ht_cfg);
-+		return ret;
-+	}
-+
-+	/* Initialize msg to a value that will never match the first write. */
-+	ht_cfg->msg.address_lo = 0xffffffff;
-+	ht_cfg->msg.address_hi = 0xffffffff;
-+	ht_cfg->dev = info->ht_dev;
-+	ht_cfg->update = info->ht_update;
-+	ht_cfg->pos = info->ht_pos;
-+	ht_cfg->idx = 0x10 + (info->ht_idx * 2);
-+	irq_domain_set_hwirq_and_chip(domain, virq, hwirq, &ht_irq_chip,
-+				      ht_cfg);
-+	__irq_set_handler(virq, handle_edge_irq, 0, "edge");
-+
-+	return 0;
- }
- 
--void arch_free_ht_irq(int irq)
-+static void htirq_domain_free(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs)
- {
--	irq_domain_free_irqs(irq, 1);
-+	struct irq_data *irq_data = irq_domain_get_irq_data(domain, virq);
-+
-+	BUG_ON(nr_irqs != 1);
-+	if (irq_data && irq_data->chip_data)
-+		kfree(irq_data->chip_data);
-+	irq_domain_set_hwirq_and_chip(domain, virq, 0, NULL, NULL);
-+	irq_set_handler(virq, NULL);
-+	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
- }
- 
--int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
-+static int htirq_domain_activate(struct irq_domain *domain,
-+				 struct irq_data *irq_data)
- {
--	struct irq_cfg *cfg;
- 	struct ht_irq_msg msg;
-+	struct irq_cfg *cfg = irqd_cfg(irq_data);
- 
--	if (disable_apic)
--		return -ENXIO;
+-	if (!irq_iommu)
+-		return -1;
 -
--	cfg = irq_cfg(irq);
- 	msg.address_hi = HT_IRQ_HIGH_DEST_ID(cfg->dest_apicid);
+-	raw_spin_lock_irqsave(&irq_2_ir_lock, flags);
 -
- 	msg.address_lo =
- 		HT_IRQ_LOW_BASE |
- 		HT_IRQ_LOW_DEST_ID(cfg->dest_apicid) |
-@@ -94,13 +134,60 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
- 			HT_IRQ_LOW_MT_FIXED :
- 			HT_IRQ_LOW_MT_ARBITRATED) |
- 		HT_IRQ_LOW_IRQ_MASKED;
-+	write_ht_irq_msg(irq_data->irq, &msg);
- 
--	write_ht_irq_msg(irq, &msg);
-+	return 0;
-+}
- 
--	irq_set_chip_and_handler_name(irq, &ht_irq_chip,
--				      handle_edge_irq, "edge");
-+static int htirq_domain_deactivate(struct irq_domain *domain,
-+				   struct irq_data *irq_data)
-+{
-+	struct ht_irq_msg msg;
- 
--	dev_dbg(&dev->dev, "irq %d for HT\n", irq);
-+	memset(&msg, 0, sizeof(msg));
-+	write_ht_irq_msg(irq_data->irq, &msg);
- 
+-	cfg->remapped = 1;
+-	irq_iommu->iommu = iommu;
+-	irq_iommu->irte_index = index;
+-	irq_iommu->sub_handle = subhandle;
+-	irq_iommu->irte_mask = 0;
+-
+-	raw_spin_unlock_irqrestore(&irq_2_ir_lock, flags);
+-
+-	return 0;
+-}
+-
+ static int modify_irte(struct irq_2_iommu *irq_iommu,
+ 		       struct irte *irte_modified)
+ {
+@@ -1072,108 +1034,6 @@ intel_ioapic_set_affinity(struct irq_data *data, const struct cpumask *mask,
  	return 0;
  }
-+
-+static struct irq_domain_ops htirq_domain_ops = {
-+	.alloc = htirq_domain_alloc,
-+	.free = htirq_domain_free,
-+	.activate = htirq_domain_activate,
-+	.deactivate = htirq_domain_deactivate,
-+};
-+
-+void arch_init_htirq_domain(struct irq_domain *parent)
-+{
-+	if (disable_apic)
-+		return;
-+
-+	htirq_domain = irq_domain_add_tree(NULL, &htirq_domain_ops, NULL);
-+	if (!htirq_domain)
-+		pr_warn("failed to initialize irqdomain for HTIRQ.\n");
-+	else
-+		htirq_domain->parent = parent;
-+}
-+
-+int arch_setup_ht_irq(int idx, int pos, struct pci_dev *dev,
-+		      ht_irq_update_t *update)
-+{
-+	struct irq_alloc_info info;
-+
-+	if (!htirq_domain)
-+		return -ENOSYS;
-+
-+	init_irq_alloc_info(&info, NULL);
-+	info.ht_idx = idx;
-+	info.ht_pos = pos;
-+	info.ht_dev = dev;
-+	info.ht_update = update;
-+
-+	return irq_domain_alloc_irqs(htirq_domain, -1, 1,
-+				     dev_to_node(&dev->dev), &info);
-+}
-+
-+void arch_teardown_ht_irq(unsigned int irq)
-+{
-+	irq_domain_free_irqs(irq, 1);
-+}
-diff --git a/arch/x86/kernel/apic/vector.c b/arch/x86/kernel/apic/vector.c
-index e9329fc28c63..1ddede9d5be7 100644
---- a/arch/x86/kernel/apic/vector.c
-+++ b/arch/x86/kernel/apic/vector.c
-@@ -358,6 +358,7 @@ int __init arch_early_irq_init(void)
- 	irq_set_default_host(x86_vector_domain);
  
- 	arch_init_msi_domain(x86_vector_domain);
-+	arch_init_htirq_domain(x86_vector_domain);
- 
- 	return arch_early_ioapic_init();
- }
-diff --git a/drivers/pci/htirq.c b/drivers/pci/htirq.c
-index ceb0ebeb7b5f..7eb4109a3df4 100644
---- a/drivers/pci/htirq.c
-+++ b/drivers/pci/htirq.c
-@@ -23,20 +23,11 @@
-  */
- static DEFINE_SPINLOCK(ht_irq_lock);
- 
--struct ht_irq_cfg {
--	struct pci_dev *dev;
--	 /* Update callback used to cope with buggy hardware */
--	ht_irq_update_t *update;
--	unsigned pos;
--	unsigned idx;
--	struct ht_irq_msg msg;
--};
+-static void intel_compose_msi_msg(struct pci_dev *pdev,
+-				  unsigned int irq, unsigned int dest,
+-				  struct msi_msg *msg, u8 hpet_id)
+-{
+-	struct irq_cfg *cfg;
+-	struct irte irte;
+-	u16 sub_handle = 0;
+-	int ir_index;
 -
+-	cfg = irq_cfg(irq);
 -
- void write_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg)
- {
- 	struct ht_irq_cfg *cfg = irq_get_handler_data(irq);
- 	unsigned long flags;
-+
- 	spin_lock_irqsave(&ht_irq_lock, flags);
- 	if (cfg->msg.address_lo != msg->address_lo) {
- 		pci_write_config_byte(cfg->dev, cfg->pos + 2, cfg->idx);
-@@ -55,6 +46,7 @@ void write_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg)
- void fetch_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg)
- {
- 	struct ht_irq_cfg *cfg = irq_get_handler_data(irq);
-+
- 	*msg = cfg->msg;
- }
- 
-@@ -86,7 +78,6 @@ void unmask_ht_irq(struct irq_data *data)
-  */
- int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update)
- {
--	struct ht_irq_cfg *cfg;
- 	int max_irq, pos, irq;
- 	unsigned long flags;
- 	u32 data;
-@@ -105,29 +96,9 @@ int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update)
- 	if (idx > max_irq)
- 		return -EINVAL;
- 
--	cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
--	if (!cfg)
--		return -ENOMEM;
+-	ir_index = map_irq_to_irte_handle(irq, &sub_handle);
+-	BUG_ON(ir_index == -1);
 -
--	cfg->dev = dev;
--	cfg->update = update;
--	cfg->pos = pos;
--	cfg->idx = 0x10 + (idx * 2);
--	/* Initialize msg to a value that will never match the first write. */
--	cfg->msg.address_lo = 0xffffffff;
--	cfg->msg.address_hi = 0xffffffff;
+-	prepare_irte(&irte, cfg->vector, dest);
 -
--	irq = arch_alloc_ht_irq(dev);
--	if (irq <= 0) {
--		kfree(cfg);
--		return -EBUSY;
+-	/* Set source-id of interrupt request */
+-	if (pdev)
+-		set_msi_sid(&irte, pdev);
+-	else
+-		set_hpet_sid(&irte, hpet_id);
+-
+-	modify_irte(irq_2_iommu(irq), &irte);
+-
+-	msg->address_hi = MSI_ADDR_BASE_HI;
+-	msg->data = sub_handle;
+-	msg->address_lo = MSI_ADDR_BASE_LO | MSI_ADDR_IR_EXT_INT |
+-			  MSI_ADDR_IR_SHV |
+-			  MSI_ADDR_IR_INDEX1(ir_index) |
+-			  MSI_ADDR_IR_INDEX2(ir_index);
+-}
+-
+-/*
+- * Map the PCI dev to the corresponding remapping hardware unit
+- * and allocate 'nvec' consecutive interrupt-remapping table entries
+- * in it.
+- */
+-static int intel_msi_alloc_irq(struct pci_dev *dev, int irq, int nvec)
+-{
+-	struct intel_iommu *iommu;
+-	int index;
+-
+-	down_read(&dmar_global_lock);
+-	iommu = map_dev_to_ir(dev);
+-	if (!iommu) {
+-		printk(KERN_ERR
+-		       "Unable to map PCI %s to iommu\n", pci_name(dev));
+-		index = -ENOENT;
+-	} else {
+-		index = alloc_irte(iommu, irq, irq_2_iommu(irq), nvec);
+-		if (index < 0) {
+-			printk(KERN_ERR
+-			       "Unable to allocate %d IRTE for PCI %s\n",
+-			       nvec, pci_name(dev));
+-			index = -ENOSPC;
+-		}
 -	}
--	irq_set_handler_data(irq, cfg);
+-	up_read(&dmar_global_lock);
 -
--	if (arch_setup_ht_irq(irq, dev) < 0) {
--		ht_destroy_irq(irq);
--		return -EBUSY;
+-	return index;
+-}
+-
+-static int intel_msi_setup_irq(struct pci_dev *pdev, unsigned int irq,
+-			       int index, int sub_handle)
+-{
+-	struct intel_iommu *iommu;
+-	int ret = -ENOENT;
+-
+-	down_read(&dmar_global_lock);
+-	iommu = map_dev_to_ir(pdev);
+-	if (iommu) {
+-		/*
+-		 * setup the mapping between the irq and the IRTE
+-		 * base index, the sub_handle pointing to the
+-		 * appropriate interrupt remap table entry.
+-		 */
+-		set_irte_irq(irq, iommu, index, sub_handle);
+-		ret = 0;
 -	}
-+	irq = arch_setup_ht_irq(idx, pos, dev, update);
-+	if (irq > 0)
-+		dev_dbg(&dev->dev, "irq %d for HT\n", irq);
- 
- 	return irq;
- }
-@@ -158,12 +129,6 @@ EXPORT_SYMBOL(ht_create_irq);
-  */
- void ht_destroy_irq(unsigned int irq)
- {
--	struct ht_irq_cfg *cfg;
+-	up_read(&dmar_global_lock);
 -
--	cfg = irq_get_handler_data(irq);
--	irq_set_chip(irq, NULL);
--	irq_set_handler_data(irq, NULL);
--	arch_free_ht_irq(irq);
--	kfree(cfg);
-+	arch_teardown_ht_irq(irq);
- }
- EXPORT_SYMBOL(ht_destroy_irq);
-diff --git a/include/linux/htirq.h b/include/linux/htirq.h
-index 5caa51b7b95c..d4a527e58434 100644
---- a/include/linux/htirq.h
-+++ b/include/linux/htirq.h
-@@ -1,26 +1,38 @@
- #ifndef LINUX_HTIRQ_H
- #define LINUX_HTIRQ_H
- 
-+struct pci_dev;
-+struct irq_data;
-+
- struct ht_irq_msg {
- 	u32	address_lo;	/* low 32 bits of the ht irq message */
- 	u32	address_hi;	/* high 32 bits of the it irq message */
- };
- 
-+typedef void (ht_irq_update_t)(struct pci_dev *dev, int irq,
-+			       struct ht_irq_msg *msg);
-+
-+struct ht_irq_cfg {
-+	struct pci_dev *dev;
-+	 /* Update callback used to cope with buggy hardware */
-+	ht_irq_update_t *update;
-+	unsigned pos;
-+	unsigned idx;
-+	struct ht_irq_msg msg;
-+};
-+
- /* Helper functions.. */
- void fetch_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg);
- void write_ht_irq_msg(unsigned int irq, struct ht_irq_msg *msg);
--struct irq_data;
- void mask_ht_irq(struct irq_data *data);
- void unmask_ht_irq(struct irq_data *data);
- 
- /* The arch hook for getting things started */
--int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev);
--int arch_alloc_ht_irq(struct pci_dev *dev);
--void arch_free_ht_irq(int irq);
-+int arch_setup_ht_irq(int idx, int pos, struct pci_dev *dev,
-+		      ht_irq_update_t *update);
-+void arch_teardown_ht_irq(unsigned int irq);
- 
- /* For drivers of buggy hardware */
--typedef void (ht_irq_update_t)(struct pci_dev *dev, int irq,
--			       struct ht_irq_msg *msg);
- int __ht_create_irq(struct pci_dev *dev, int idx, ht_irq_update_t *update);
- 
- #endif /* LINUX_HTIRQ_H */
+-	return ret;
+-}
+-
+-static int intel_setup_hpet_msi(unsigned int irq, unsigned int id)
+-{
+-	int ret = -1;
+-	struct intel_iommu *iommu;
+-	int index;
+-
+-	down_read(&dmar_global_lock);
+-	iommu = map_hpet_to_ir(id);
+-	if (iommu) {
+-		index = alloc_irte(iommu, irq, irq_2_iommu(irq), 1);
+-		if (index >= 0)
+-			ret = 0;
+-	}
+-	up_read(&dmar_global_lock);
+-
+-	return ret;
+-}
+-
+ static struct irq_domain *intel_get_ir_irq_domain(struct irq_alloc_info *info)
+ {
+ 	struct intel_iommu *iommu = NULL;
+@@ -1247,10 +1107,6 @@ struct irq_remap_ops intel_irq_remap_ops = {
+ 	.setup_ioapic_entry	= intel_setup_ioapic_entry,
+ 	.set_affinity		= intel_ioapic_set_affinity,
+ 	.free_irq		= free_irte,
+-	.compose_msi_msg	= intel_compose_msi_msg,
+-	.msi_alloc_irq		= intel_msi_alloc_irq,
+-	.msi_setup_irq		= intel_msi_setup_irq,
+-	.setup_hpet_msi		= intel_setup_hpet_msi,
+ 	.get_ir_irq_domain	= intel_get_ir_irq_domain,
+ 	.get_irq_domain		= intel_get_irq_domain,
+ 	.get_ioapic_entry	= intel_get_ioapic_entry,
 -- 
 1.7.10.4
