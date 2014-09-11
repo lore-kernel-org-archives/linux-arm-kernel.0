@@ -1,79 +1,51 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 11 Sep 2014 17:31:19 +0200
-Subject: [PATCH v4 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140911010709.GE3609@peterchendt>
-References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
- <1409730511-16101-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140911010709.GE3609@peterchendt>
-Message-ID: <20140911153119.GA11275@kwain>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 11 Sep 2014 16:37:39 +0100
+Subject: [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20140911132935.068DCC408F6@trevor.secretlab.ca>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <20140911132935.068DCC408F6@trevor.secretlab.ca>
+Message-ID: <20140911153739.GA24416@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+On Thu, Sep 11, 2014 at 02:29:34PM +0100, Grant Likely wrote:
+> Regarding the requests to refactor ACPICA to work better for ARM. I
+> completely agree that it should be done, but I do not think it should be
+> a prerequisite to getting this core support merged. That kind of
+> refactoring is far easier to justify when it has immediate improvement
+> on the mainline codebase, and it gives us a working baseline to test
+> against. Doing it the other way around just makes things harder.
 
-On Thu, Sep 11, 2014 at 09:07:10AM +0800, Peter Chen wrote:
-> On Wed, Sep 03, 2014 at 09:48:26AM +0200, Antoine Tenart wrote:
-> > +
-> > +static int ci_hdrc_usb2_dt_probe(struct device *dev,
-> > +				 struct ci_hdrc_platform_data *ci_pdata)
-> > +{
-> > +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
-> > +	if (IS_ERR(ci_pdata->phy)) {
-> > +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +
-> > +		/* PHY is optional */
-> > +		ci_pdata->phy = NULL;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> 
-> You may also need to consider usb_phy case.
+I have to disagree here. As I said, I'm perfectly fine with refactoring
+happening later but I'm not happy with compiling in code with undefined
+behaviour on ARM that may actually be executed at run-time.
 
-Don't we try using the generic PHY framework for new drivers?
+I'm being told one of the main advantages of ACPI is forward
+compatibility: running older kernels on newer hardware (potentially with
+newer ACPI version tables). ACPI 5.1 includes partial support for ARM
+but the S and C states are not defined yet. We therefore assume that
+hardware vendors deploying servers using ACPI would not provide such
+yet to be defined information in ACPI 5.1 tables.
 
-Since there is no need for supporting an usb_phy case I don't think we
-have to consider this case yet. And no doing so could encourage people
-to add PHY drivers to the common PHY framework.
+What if in a year time we get ACPI 5.2 or 6 (or an errata update)
+covering the S and C states for ARM? I would expect hardware vendors
+to take advantage and provide such information in ACPI tables. Can we
+guarantee that a kernel with the current ACPI patches wouldn't blow up
+when it tries to interpret the new tables? If we can't guarantee this,
+we rather fix it now. Some suggestions:
 
-> > +
-> > +	if (dev->of_node) {
-> > +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-> > +		if (ret)
-> > +			return ret;
-> > +	} else {
-> > +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> 
-> You may need to do clk_disable_unprepare for above error cases.
+a) Make sure code which doesn't have a clear behaviour on ARM is not
+   compiled in and doesn't even try to interpret such tables on ARM (you
+   could just go for the latter but I'm not sure how feasible it is)
+b) Ensure that the current patches don't support anything other than
+   ACPI 5.1 (6 or later would not be supported; can we get information
+   about which errata update do vendor tables cover?)
+c) Consider the current ACPI code broken for ARM (rather than feature
+   incomplete) and strongly recommend vendors not to use it
 
-Sure, I'll fix that.
-
-> > +
-> > +	ci_pdata->name = dev_name(&pdev->dev);
-> > +
-> > +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> > +					   pdev->num_resources, ci_pdata);
-> > +	if (IS_ERR(priv->ci_pdev)) {
-> > +		ret = PTR_ERR(priv->ci_pdev);
-> > +		if (ret != -EPROBE_DEFER)
-> > +			dev_err(dev,
-> > +				"failed to register ci_hdrc platform device: %d\n",
-> > +				ret);
-> 
-> Why you don't want the error message for deferral probe?
-
-A driver can return an EPROBE_DEFER error and still probe successfully
-later. This would be confusing to have this kind of error message in
-this case. And when a driver returns -EPROBE_DEFER, there is an error
-message already.
-
-Antoine
+Point (a) looks the sanest to me. Point (b) kind of defeats one of the
+ACPI goals while point (c) would question why we even bother discussing
+merging now.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
