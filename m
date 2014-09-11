@@ -1,43 +1,50 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Thu, 11 Sep 2014 11:53:01 -0700
-Subject: [PATCH 0/2] iommu/arm-smmu: hard iova_to_phys
-In-Reply-To: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
- (Mitchel Humpherys's message of "Thu, 11 Sep 2014 11:30:42 -0700")
-References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <vnkwmwa6vvjm.fsf@mitchelh-linux.qualcomm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 11 Sep 2014 14:52:44 -0400 (EDT)
+Subject: [PATCH v5 05/12] ARM: topology: use new cpu_capacity interface
+In-Reply-To: <1409051215-16788-6-git-send-email-vincent.guittot@linaro.org>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-6-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <alpine.LFD.2.11.1409111452170.16533@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11 2014 at 11:30:42 AM, Mitchel Humpherys <mitchelh@codeaurora.org> wrote:
-> This series introduces support for performing iova-to-phys translations via
-> the ARM SMMU hardware on supported implementations. We also make use of
-> some new generic macros for polling hardware registers.
->
-> The iopoll macros were previously discussed here:
-> http://marc.info/?l=linux-arm-kernel&m=140414727509158
+On Tue, 26 Aug 2014, Vincent Guittot wrote:
 
-Forgot to reference the previous disussion on the iova_to_phys
-patch. Here it is:
+> Use the new arch_scale_cpu_capacity in order to reflect the original capacity
+> of a CPU instead of arch_scale_freq_capacity which is more linked to a scaling
+> of the capacity linked to the frequency.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-    http://marc.info/?m=140789123928103
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
->
->
-> Matt Wagantall (1):
->   iopoll: Introduce memory-mapped IO polling macros
->
-> Mitchel Humpherys (1):
->   iommu/arm-smmu: add support for iova_to_phys through ATS1PR
->
->  drivers/iommu/arm-smmu.c |  73 +++++++++++++++++++++++++++++-
->  include/linux/iopoll.h   | 114 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 186 insertions(+), 1 deletion(-)
->  create mode 100644 include/linux/iopoll.h
-
-
-
--Mitch
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  arch/arm/kernel/topology.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index e35d880..89cfdd6 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -42,7 +42,7 @@
+>   */
+>  static DEFINE_PER_CPU(unsigned long, cpu_scale);
+>  
+> -unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
+> +unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+>  {
+>  	return per_cpu(cpu_scale, cpu);
+>  }
+> @@ -166,7 +166,7 @@ static void update_cpu_capacity(unsigned int cpu)
+>  	set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+>  
+>  	printk(KERN_INFO "CPU%u: update cpu_capacity %lu\n",
+> -		cpu, arch_scale_freq_capacity(NULL, cpu));
+> +		cpu, arch_scale_cpu_capacity(NULL, cpu));
+>  }
+>  
+>  #else
+> -- 
+> 1.9.1
+> 
+> 
