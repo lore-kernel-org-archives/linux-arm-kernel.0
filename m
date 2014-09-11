@@ -1,56 +1,45 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Thu, 11 Sep 2014 11:42:13 +0200
-Subject: [PATCH v3 8/8] rtc: at91sam9: add DT bindings documentation
-In-Reply-To: <1410425767-17874-9-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410425767-17874-1-git-send-email-boris.brezillon@free-electrons.com>
- <1410425767-17874-9-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140911094213.GC12295@localhost>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Thu, 11 Sep 2014 11:44:39 +0200
+Subject: [PATCH v4 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
+ touchpad
+In-Reply-To: <20140910222553.GF38736@core.coreip.homeip.net>
+References: <1410348691-18317-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410348691-18317-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20140910222553.GF38736@core.coreip.homeip.net>
+Message-ID: <54116F07.9090007@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 10:56:07AM +0200, Boris BREZILLON wrote:
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+Hello Dmitry,
+
+On 09/11/2014 12:25 AM, Dmitry Torokhov wrote:
+>>  
+>> +&hsi2c_8 {
+>> +	status = "okay";
+>> +	clock-frequency = <333000>;
+>> +
+>> +	/* Atmel mXT336S */
+>> +	trackpad at 4b {
+>> +		compatible = "atmel,maxtouch";
+>> +		reg = <0x4b>;
+>> +		interrupt-parent = <&gpx1>;
+>> +		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+>> +		wakeup-source;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&trackpad_irq>;
+>> +		linux,gpio-keymap = <KEY_RESERVED
+>> +				     KEY_RESERVED
+>> +				     KEY_RESERVED	/* GPIO0 */
+>> +				     KEY_RESERVED	/* GPIO1 */
+>> +				     KEY_RESERVED	/* GPIO2 */
+>> +				     BTN_LEFT>; 	/* GPIO3 */
 > 
-> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> new file mode 100644
-> index 0000000..258a036
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> @@ -0,0 +1,24 @@
-> +Atmel AT91SAM9260 Real Time Timer
-> +
-> +Required properties:
-> +- compatible: should be: "atmel,at91sam9260-rtt"
-> +- reg: should encode the memory region of the RTT controller
-> +- interrupts: rtc alarm/event interrupt
-> +- clocks: should contain one clock pointing the the slow clk
-> +- atmel,time-reg: should encode the GPBR register used to store the RTC
-> +		  time. The first cell should point to the GPBR node and
-> +		  the second one encode the offset within the GPBR block
-> +		  (or in other terms, the GPBR register used to store the
-> +		  current time value).
-> +
-> +
-> +
-> +Example:
-> +
-> +rtc at fffffe00 {
+> Seems like a single space sneaked between the semicolon and the tab.
+> Maybe whoever applies could squash it.
+> 
 
-This should be rtt@
+Right, I set c-default-style to "linux" on Emacs but seems it gets confused
+sometimes when editing Device Tree source files. Sorry about that.
 
-> +	compatible = "atmel,at91sam9260-rtt";
-> +	reg = <0xfffffd20 0x10>;
-> +	interrupts = <1 4 7>;
-> +	clocks = <&clk32k>;
-> +	atmel,time-reg = <&gpbr 0x0>;
-
-I think the property name could be more descriptive as it is specific to
-when the RTT is used as an RTC. Perhaps, atmel,rtt-rtc-time-reg?
-
-> +};
-
-Johan
+Best regards,
+Javier
