@@ -1,189 +1,331 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 11 Sep 2014 16:08:10 +0800
-Subject: [PATCH v3] ARM: sun5i: Add DT for HSG H702 tablet board
-Message-ID: <1410422890-20284-1-git-send-email-wens@csie.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 11 Sep 2014 10:14:13 +0200
+Subject: [PATCH v3] ARM: KVM: add irqfd support
+In-Reply-To: <20140911030938.GB2784@lvm>
+References: <1409561584-8050-1-git-send-email-eric.auger@linaro.org>
+ <20140911030938.GB2784@lvm>
+Message-ID: <541159D5.40804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a Q8 format 7 inch tablet with an Allwinner A13 SoC.
-It has 512MB DRAM, 4GB NAND flash, an accelerometer, camera,
-RTL8188-based WiFi, and micro SD slot for external storage.
+On 09/11/2014 05:09 AM, Christoffer Dall wrote:
+> On Mon, Sep 01, 2014 at 10:53:04AM +0200, Eric Auger wrote:
+>> This patch enables irqfd on ARM.
+>>
+>> irqfd framework enables to inject a virtual IRQ into a guest upon an
+>> eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
+>> a kvm_irqfd struct that associates a VM, an eventfd, a virtual IRQ number
+>> (aka. the gsi). When an actor signals the eventfd (typically a VFIO
+>> platform driver), the kvm irqfd subsystem injects the provided virtual
+>> IRQ into the guest.
+>>
+>> Resamplefd also is supported for level sensitive interrupts, ie. the
+>> user can provide another eventfd that is triggered when the completion
+>> of the virtual IRQ (gsi) is detected by the GIC.
+>>
+>> The gsi must correspond to a shared peripheral interrupt (SPI), ie the
+>> GIC interrupt ID is gsi+32.
+>>
+>> this patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
+>> CONFIG_HAVE_KVM_IRQCHIP is removed. No IRQ routing table is used
+>> (irqchip.c and irqcomm.c are not used).
+>>
+>> Both KVM_CAP_IRQFD & KVM_CAP_IRQFD_RESAMPLE capabilities are exposed
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> This patch serie deprecates the previous serie featuring GSI routing
+>> (https://patches.linaro.org/32261/)
+>>
+>> The patch serie has the following dependencies:
+>> - arm/arm64: KVM: Various VGIC cleanups and improvements
+>>   https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/009979.html
+>> - "KVM: EVENTFD: remove inclusion of irq.h"
+>>
+>> All pieces can be found on git://git.linaro.org/people/eric.auger/linux.git
+>> branch irqfd_norouting_integ_v3
+>>
+>> This work was tested with Calxeda Midway xgmac main interrupt with
+>> qemu-system-arm and QEMU VFIO platform device.
+>>
+>> v2 -> v3:
+>> - removal of irq.h from eventfd.c put in a separate patch to increase
+>>   visibility
+>> - properly expose KVM_CAP_IRQFD capability in arm.c
+>> - remove CONFIG_HAVE_KVM_IRQCHIP meaningfull only if irq_comm.c is used
+>>
+>> v1 -> v2:
+>> - rebase on 3.17rc1
+>> - move of the dist unlock in process_maintenance
+>> - remove of dist lock in __kvm_vgic_sync_hwstate
+>> - rewording of the commit message (add resamplefd reference)
+>> - remove irq.h
+>> ---
+>>  Documentation/virtual/kvm/api.txt |  5 +++-
+>>  arch/arm/include/uapi/asm/kvm.h   |  3 +++
+>>  arch/arm/kvm/Kconfig              |  4 +--
+>>  arch/arm/kvm/Makefile             |  2 +-
+>>  arch/arm/kvm/arm.c                |  3 +++
+>>  virt/kvm/arm/vgic.c               | 56 ++++++++++++++++++++++++++++++++++++---
+>>  6 files changed, 65 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index beae3fd..8118b12 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -2204,7 +2204,7 @@ into the hash PTE second double word).
+>>  4.75 KVM_IRQFD
+>>  
+>>  Capability: KVM_CAP_IRQFD
+>> -Architectures: x86 s390
+>> +Architectures: x86 s390 arm
+>>  Type: vm ioctl
+>>  Parameters: struct kvm_irqfd (in)
+>>  Returns: 0 on success, -1 on error
+>> @@ -2230,6 +2230,9 @@ Note that closing the resamplefd is not sufficient to disable the
+>>  irqfd.  The KVM_IRQFD_FLAG_RESAMPLE is only necessary on assignment
+>>  and need not be specified with KVM_IRQFD_FLAG_DEASSIGN.
+>>  
+>> +On ARM/arm64 the injected must be a shared peripheral interrupt (SPI).
+>> +This means the programmed GIC interrupt ID is gsi+32.
+>> +
+> 
+> See above comment.
+Hi Christoffer,
 
-It is likely made by a subsidiary of Hanns.G (Hannstar).
+sorry which comment do you refer to?  wrt your last comment do you
+consider PPI injection support is a mandated feature for this patch to
+be upstreamable?
+> 
+>>  4.76 KVM_PPC_ALLOCATE_HTAB
+>>  
+>>  Capability: KVM_CAP_PPC_ALLOC_HTAB
+>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>> index e6ebdd3..3034c66 100644
+>> --- a/arch/arm/include/uapi/asm/kvm.h
+>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>> @@ -194,6 +194,9 @@ struct kvm_arch_memory_slot {
+>>  /* Highest supported SPI, from VGIC_NR_IRQS */
+>>  #define KVM_ARM_IRQ_GIC_MAX		127
+>>  
+>> +/* One single KVM irqchip, ie. the VGIC */
+>> +#define KVM_NR_IRQCHIPS          1
+>> +
+>>  /* PSCI interface */
+>>  #define KVM_PSCI_FN_BASE		0x95c1ba5e
+>>  #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>> index 466bd29..e519a40 100644
+>> --- a/arch/arm/kvm/Kconfig
+>> +++ b/arch/arm/kvm/Kconfig
+>> @@ -24,6 +24,7 @@ config KVM
+>>  	select KVM_MMIO
+>>  	select KVM_ARM_HOST
+>>  	depends on ARM_VIRT_EXT && ARM_LPAE
+>> +	select HAVE_KVM_EVENTFD
+>>  	---help---
+>>  	  Support hosting virtualized guest machines. You will also
+>>  	  need to select one or more of the processor modules below.
+>> @@ -55,7 +56,7 @@ config KVM_ARM_MAX_VCPUS
+>>  config KVM_ARM_VGIC
+>>  	bool "KVM support for Virtual GIC"
+>>  	depends on KVM_ARM_HOST && OF
+>> -	select HAVE_KVM_IRQCHIP
+>> +	select HAVE_KVM_IRQFD
+>>  	default y
+>>  	---help---
+>>  	  Adds support for a hardware assisted, in-kernel GIC emulation.
+>> @@ -63,7 +64,6 @@ config KVM_ARM_VGIC
+>>  config KVM_ARM_TIMER
+>>  	bool "KVM support for Architected Timers"
+>>  	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
+>> -	select HAVE_KVM_IRQCHIP
+>>  	default y
+>>  	---help---
+>>  	  Adds support for the Architected Timers in virtual machines
+>> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+>> index f7057ed..859db09 100644
+>> --- a/arch/arm/kvm/Makefile
+>> +++ b/arch/arm/kvm/Makefile
+>> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+>>  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+>>  
+>>  KVM := ../../../virt/kvm
+>> -kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+>> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
+>>  
+>>  obj-y += kvm-arm.o init.o interrupts.o
+>>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index a99e0cd..6ba454a 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -181,6 +181,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>>  	case KVM_CAP_IRQCHIP:
+>>  		r = vgic_present;
+>>  		break;
+>> +#ifdef CONFIG_HAVE_KVM_IRQFD
+>> +	case KVM_CAP_IRQFD:
+>> +#endif
+>>  	case KVM_CAP_DEVICE_CTRL:
+>>  	case KVM_CAP_USER_MEMORY:
+>>  	case KVM_CAP_SYNC_MMU:
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 7164d2e..586bd11 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1334,7 +1334,10 @@ epilog:
+>>  static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  {
+>>  	u32 status = vgic_get_interrupt_status(vcpu);
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>  	bool level_pending = false;
+>> +	struct kvm *kvm = vcpu->kvm;
+>> +	int is_assigned_irq;
+>>  
+>>  	kvm_debug("STATUS = %08x\n", status);
+>>  
+>> @@ -1351,6 +1354,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
+>>  			BUG_ON(vgic_irq_is_edge(vcpu, vlr.irq));
+>>  
+>> +			spin_lock(&dist->lock);
+>>  			vgic_irq_clear_queued(vcpu, vlr.irq);
+>>  			WARN_ON(vlr.state & LR_STATE_MASK);
+>>  			vlr.state = 0;
+>> @@ -1363,6 +1367,18 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  			 * interrupt.
+>>  			 */
+>>  			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
+>> +			spin_unlock(&dist->lock);
+> 
+> may be worth a small comment saying that we unlock the distributor
+> lock to allow kvm_notify_acked_irq() to come back to injecting an IRQ
+> which grabs the dist->lock again.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+yes sure.
+> 
+>> +
+>> +			is_assigned_irq = kvm_irq_has_notifier(kvm, 0,
+>> +						vlr.irq - VGIC_NR_PRIVATE_IRQS);
+> 
+> is is_assigned_irq really accurately describing the state you are
+> determining here?  Can't you have an irqfd without a resamplefd, or did
+> I get this wrong?  In any case, this code may be simpler if you simply
+> inline the call to kvm_irq_has_notifier or name the variable
+> 'irq_has_notifier'.
+Yes you can have an irqfd without resamplefd, typically for edge
+sensitive IRQs. But in that case you do not need to call the resamplefd
+notifier (kvm_notify_acked_irq). I think this is what is achieved here.
+But I agree is_assigned_irq name is misleading. I should rename it into
+something like has_resampler.
+> 
+>> +
+>> +			if (is_assigned_irq) {
+>> +				kvm_debug("EOI irqchip routed vIRQ %d\n",
+>> +					  vlr.irq);
+> 
+> EOI irqchip routed vIRQ X?
+> 
+> -ECANTPARSE, how about "Guest EOIed vIRQ %d on CPU %d\n" ?
+definitively makes sense all the more so now routing has been removed,
+the message is outdated.
+> 
+>> +				kvm_notify_acked_irq(kvm, 0,
+>> +					vlr.irq - VGIC_NR_PRIVATE_IRQS);
+>> +			}
+>> +			spin_lock(&dist->lock);
+>>  
+>>  			/* Any additional pending interrupt? */
+>>  			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
+>> @@ -1377,6 +1393,8 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  				vgic_cpu_irq_clear(vcpu, vlr.irq);
+>>  			}
+>>  
+>> +			spin_unlock(&dist->lock);
+>> +
+>>  			/*
+>>  			 * Despite being EOIed, the LR may not have
+>>  			 * been marked as empty.
+>> @@ -1441,14 +1459,10 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>>  
+>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>>  {
+>> -	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> -
+>>  	if (!irqchip_in_kernel(vcpu->kvm))
+>>  		return;
+>>  
+>> -	spin_lock(&dist->lock);
+>>  	__kvm_vgic_sync_hwstate(vcpu);
+>> -	spin_unlock(&dist->lock);
+>>  }
+>>  
+>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+>> @@ -2183,3 +2197,37 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>>  	.get_attr = vgic_get_attr,
+>>  	.has_attr = vgic_has_attr,
+>>  };
+>> +
+>> +int kvm_irq_map_gsi(struct kvm *kvm,
+>> +		    struct kvm_kernel_irq_routing_entry *entries,
+>> +		    int gsi)
+>> +{
+>> +	return gsi;
+>> +}
+>> +
+>> +int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
+>> +{
+>> +	return pin;
+>> +}
+>> +
+>> +int kvm_set_irq(struct kvm *kvm, int irq_source_id,
+>> +		u32 irq, int level, bool line_status)
+> 
+> what does line_status indicate?
+well, I am embarrassed to answer. If I am not wrong all the caller set
+the line_status to false (eventfd.c, assigned_dev.c). If seems however
+this param was exploited along with GSI routing when the IRQ is
+eventually routed to the IOAPIC (ioapic_set_irq). is that dead code?
 
-Note that checkpatch.pl is not happy about having the FSF address in
-the file. Given that the dts files are intended to be redistributable
-independent of the kernel, I think this error can be ignored.
+> 
+>> +{
+>> +	int r = -EINVAL;
+>> +	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
+>> +
+>> +	if (spi > KVM_ARM_IRQ_GIC_MAX)
+>> +		return r;
+> 
+> can you just do 'return -EINVAL' here and not initialize r above.
+sure
 
-Changes since v2:
+Many thanks
 
- - Dual license under GPL/X11.
- - Use extra fixed regulator for usb1-vbus.
+Best Regards
 
----
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 138 +++++++++++++++++++++++++++++++
- 2 files changed, 139 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..94e61a6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -406,6 +406,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a10s-olinuxino-micro.dtb \
- 	sun5i-a10s-r7-tv-dongle.dtb \
-+	sun5i-a13-hsg-h702.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb
- dtb-$(CONFIG_MACH_SUN6I) += \
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-new file mode 100644
-index 0000000..68c78e2
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -0,0 +1,138 @@
-+/*
-+ * Copyright 2014 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun5i-a13.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "HSG H702";
-+	compatible = "hsg,h702", "allwinner,sun5i-a13";
-+
-+	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
-+			vmmc-supply = <&reg_vcc3v3>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus_h702>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		pinctrl at 01c20800 {
-+			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_pins_b>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+
-+			pcf8563: rtc at 51 {
-+				compatible = "nxp,pcf8563";
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+
-+	/*
-+	 * There doesn't seem to be a GPIO for controlling
-+	 * vbus, despite the fex file saying otherwise.
-+	 */
-+	reg_usb1_vbus_h702: usb1-vbus-h702 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb1-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		status = "okay";
-+	};
-+};
--- 
-2.1.0
+Eric
+> 
+>> +
+>> +	kvm_debug("Inject irqchip routed vIRQ %d\n", irq);
+>> +	r = kvm_vgic_inject_irq(kvm, 0, spi, level);
+>> +	return r;
+>> +}
+>> +
+>> +/* MSI not implemented yet */
+>> +int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+>> +		struct kvm *kvm, int irq_source_id,
+>> +		int level, bool line_status)
+>> +{
+>> +	return 0;
+>> +}
+>> -- 
+>> 1.9.1
+>>
+> 
+> Besides the cosmetics and the missing PPI support, this is looking good!
+> 
+> Thanks,
+> -Christoffer
+> 
