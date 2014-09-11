@@ -1,78 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 14:36:16 +0200
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20140911120928.GA1585@localhost.localdomain>
-References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911120928.GA1585@localhost.localdomain>
-Message-ID: <20140911143616.3ebb025a@bbrezillon>
+From: d.lavnikevich@sam-solutions.net (Dmitry Lavnikevich)
+Date: Thu, 11 Sep 2014 15:41:56 +0300
+Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
+ driver
+In-Reply-To: <20140911064016.GE16489@pengutronix.de>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <20140910142740.GC16489@pengutronix.de>
+ <CAGoOwPSpkNy6uNVAjG2HgiHHscKZjL5wgVrkyGwWCmyU7x+gWg@mail.gmail.com>
+ <20140911064016.GE16489@pengutronix.de>
+Message-ID: <54119894.8040805@sam-solutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+Hi,
 
-On Thu, 11 Sep 2014 20:09:30 +0800
-Huang Shijie <shijie8@gmail.com> wrote:
+On 11/09/14 09:40, Markus Pargmann wrote:
+> On Wed, Sep 10, 2014 at 11:14:15AM -0700, Nicolin Chen wrote:
+>> On Wed, Sep 10, 2014 at 7:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+>>> Hi,
+>>>
+>>> On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
+>>>> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
+>>>>
+>>>> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+>>>> ---
+>>>>   .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
+>>>>   sound/soc/fsl/Kconfig                              |  13 ++
+>>>>   sound/soc/fsl/Makefile                             |   2 +
+>>>>   sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
+>>>>   4 files changed, 219 insertions(+)
+>>>>   create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
+>>>>   create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
+>>> Is it possible to use the simple-card
+>>> (Documentation/devicetree/bindings/sound/simple-card.txt) instead of
+>>> adding a new audio card driver? There are also DT bindings for the imx
+>>> audiomultiplexer (imx-audmux.txt).
+>> I don't know why my mutt doesn't display this mail.
+>>
+>> Anyway, if Simple Card supports audmux, yes, it's also a good idea.
+> Simple Card doesn't support it. But there are DT bindings for the audmux
+> device node which allow the definition of a default multiplexer setup.
+> That configuration is applied in the probe() function of the audmux driver.
+>
+> Best regards,
+>
+> Markus
+>
 
-> On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
-> > Several MTD users (either in user or kernel space) expect a valid raw
-> > access support to NAND chip devices.
-> > This is particularly true for testing tools which are often touching the
-> > data stored in a NAND chip in raw mode to artificially generate errors.
-> > 
-> > The GPMI drivers do not implemenent raw access functions, and thus rely on
-> > default HW_ECC scheme implementation.
-> > The default implementation consider the data and OOB area as properly
-> > separated in their respective NAND section, which is not true for the GPMI
-> > controller.
-> > In this driver/controller some OOB data are stored at the beginning of the
-> > NAND data area (these data are called metadata in the driver), then ECC
-> > bytes are interleaved with data chunk (which is similar to the
-> > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-> > OOB data.
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> > Hello,
-> > 
-> > This patch is providing raw access support to the GPMI driver which is
-> > particularly useful to run some tests on the NAND (the one coming in
-> > mind is the mtd_nandbiterrs testsuite).
-> > 
-> > I know this rework might break several user space tools which are relying
-> > on the default raw access implementation (I already experienced an issue
-> > with the kobs-ng tool provided by freescale), but many other tools will
-> > now work as expected.
-> If the kobs-ng can not works, there is no meaning that other tools
-> works.  So I do not think we need to implement these hooks.
+Yes, I've checked - it can be implemented with simple card +
+audmux configuration. Thanks for great suggestion. It will be
+done in next patchset version.
 
-Well, I don't know about freescale specific tools, but at least I have
-an example with mtd_nandbiterrs module.
-This module is assuming it can write only the data part of a NAND page
-without modifying the OOB area (see [1]), which in GPMI controller case
-is impossible because raw write function store the data as if there
-were no specific scheme, while there is one:
-(metadata + n x (data_chunk + ECC bytes) + remaining_bytes).
-
-Moreover, IMHO, nanddump and nandwrite tools (which can use raw
-access mode when passing the appropriate option) should always return
-the same kind of data no matter what NAND controller is in use on the
-system => (DATA + OOB_DATA), and this is definitely not the case with
-the GPMI driver.
-
-See how raw access on HW_ECC_SYNDROME scheme is implemented in
-nand_base.c [2]. It hides to the mtd user the fact that DATA and ECC
-bytes are interleaved, and give him the expected (DATA + OOB_DATA)
-representation.
-
-Best Regards,
-
-Boris
-
-[1]http://lxr.free-electrons.com/source/drivers/mtd/tests/nandbiterrs.c#L112
-[2]http://lxr.free-electrons.com/source/drivers/mtd/nand/nand_base.c#L1364
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Lavnikevich Dmitry
