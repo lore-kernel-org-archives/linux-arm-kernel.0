@@ -1,38 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Sep 2014 16:49:56 +0200
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <ae98d68652f1495a857f081c3a6aecb2@HKXPR06MB168.apcprd06.prod.outlook.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <2908259.jgJNuDxCCa@wuerfel>
- <ae98d68652f1495a857f081c3a6aecb2@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <15029597.7ylOekBBOx@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 11 Sep 2014 16:51:36 +0200
+Subject: [PATCH] net/macb: Add hardware revision information during probe
+Message-ID: <1410447096-29980-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 14:11:05 Phil Edworthy wrote:
-> On 10 September 2014 19:20, Arnd wrote:
-> > On Tuesday 09 September 2014 12:20:54 Catalin Marinas wrote:
-> > >
-> > > We can assume that if a domain is not specified and there is a single
-> > > top level PCIe node, the domain defaults to 0. Are there any arm32
-> > > platforms that require multiple domains (and do not specify a number in
-> > > the DT)?
-> > 
-> > In theory, I think all of them could work with a single domain, but then
-> > you need to partition the bus number space between the host controllers,
-> > so you have the exact same situation that you either need to make up
-> > random bus numbers or put them in DT.
-> > 
-> > Using multiple domains is way cleaner for this, even if we have to
-> > make up the numbers.
-> 
-> Maybe this is a stupid question, but why would you want to specify the domain
-> in the DT at all? Doesn't every instance of a driver imply a separate domain?
+From: Bo Shen <voice.shen@atmel.com>
 
-See Jason Gunthorpe's latest reply on the topic. In short, the domain is
-visible to user space and we want it to be stable across boots when
-user configuration refers to devices by domain:bus:device:function
-numbers.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/net/ethernet/cadence/macb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-	Arnd
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index ca5d7798b265..a3b35c146d9c 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -2241,6 +2241,7 @@ static int __init macb_probe(struct platform_device *pdev)
+ 
+ 	netif_carrier_off(dev);
+ 
++	netdev_info(dev, "Cadence rev 0x%08x\n", macb_readl(bp, MID));
+ 	netdev_info(dev, "Cadence %s at 0x%08lx irq %d (%pM)\n",
+ 		    macb_is_gem(bp) ? "GEM" : "MACB", dev->base_addr,
+ 		    dev->irq, dev->dev_addr);
+-- 
+1.9.1
