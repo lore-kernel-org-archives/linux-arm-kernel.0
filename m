@@ -1,45 +1,35 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Sep 2014 00:04:45 +0200
-Subject: [PATCH] clk: don't use __initconst for non-const arrays
-In-Reply-To: <1410469471-31027-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1410469471-31027-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20140911220445.GQ3755@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 12 Sep 2014 00:05:00 +0200
+Subject: [PATCH] mtd: nand: atmel_nand: retrieve NFC clock
+In-Reply-To: <20140911173854.73b201e7@bbrezillon>
+References: <1410446617-29572-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140911152029.GA16666@arch> <20140911173854.73b201e7@bbrezillon>
+Message-ID: <20140912000500.5a1d5f75@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Dear Boris BREZILLON,
 
-On Thu, Sep 11, 2014 at 11:04:31PM +0200, Uwe Kleine-K?nig wrote:
->  /* Mux parent lists. */
-> -static const char *fin_pll_p[] __initconst = {
-> +static const char *fin_pll_p[] __initdata = {
->  	"xxti",
->  	"xusbxti"
->  };
-As discussed with Tomasz on irc: The sad thing here is that for this
-array only 8 bytes are freed when .init.rodata is thrown away (that is
-two pointers). The actual data---5 + 8 bytes + maybe aligning---isn't
-freed though.
+On Thu, 11 Sep 2014 17:38:54 +0200, Boris BREZILLON wrote:
 
-We wondered if there is a nice and easy way to throw away the
-characters, too.
+> > Anyway, with or without the docs I think this patch breaks DT backward
+> > compatibility.
+> > 
+> > Or am I missing something?
+> 
+> Indeed, this block of code should be placed at the end of the probe
+> function. I'll fix that.
+> 
+> Note that if the clk is missing it just print a warning message and
+> return 0, so after moving the code, it should not break DT backward
+> compat ;-).
 
-The only way I currently see is:
+You may want to use:
 
-	const char xxti[] __initconst = "xxti";
-	...
+	dev_warn(FW_WARN "NFC clock missing, update your Device	Tree\n");
 
-	static const char *fin_pll_p[] __initdata = {
-		xxti,
-		...
-	};
-
-but this definitively doesn't qualify as "nice and easy". Is there an
-alternative?
-
-Best regards
-Uwe
-
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
