@@ -1,103 +1,63 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 11 Sep 2014 22:03:27 +0800
-Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
-Message-ID: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+Date: Thu, 11 Sep 2014 22:03:29 +0800
+Subject: [RFC Part2 v1 02/21] genirq: Introduce helper functions to support
+ stacked irq_chip
+In-Reply-To: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1410444228-3134-3-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We plan to restructure x86 interrupt code based on hierarchy irqdomain,
-that is to build irqdomains for CPU vector, interrupt remapping unit,
-IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
-Each irqdomain manages corresponding interrupt controller and talks to
-parent interrupt controller through public irqdomain interfaces. We also
-support stacked irq_chip based on hierarchy irqdomain. It will make the
-x86 interrupt architecture much more clear and more easy to maintain
-with hierarchy irqdomain and stacked irq_chip. It may also help ARM
-interrupt management architecture too.
+Now we already support hierarchy irq_datas, so introduce several helpers
+to support stacked irq_chips.
 
-This is the second patch set to enable support of hierarchy irqdomain
-on x86 platforms. It depends on the first part at:
-https://lkml.org/lkml/2014/9/11/101 
-And you may access it at:
-https://github.com/jiangliu/linux.git irqdomain/p2v1
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+---
+ include/linux/irq.h |    5 +++++
+ kernel/irq/chip.c   |   18 ++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-And there will be a third patch set to convert IOAPIC driver to support
-hierarchy irqdomain and clean up code.
-
-The first patch extends irqdomain interfaces to support hierarchy
-irqdomain. Hope this interface could be used by other architectures too,
-such as ARM/ARM64.
-The second patch introduces two helper functions to support stacked
-irq_chip.
-Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
-it's the root irqdomain for x86 platforms.
-Patch 10-13 converts Intel and AMD interrupt remapping drivers to
-support hierarchy irqdomain.
-Patch 14-17 converts HPET, MSI and HT_IRQ drivers to support hierarchy
-irqdomain.
-Patch 18-21 cleans up unsued code in x86 arch and interrupt remapping
-drivers.
-
-We have tested this patchset on Intel 32-bit and 64-bit systems. But we
-have only done compilation tests for HT_IRQ and AMD interrupt remapping
-drivers due to hardware resource limitation. Tests on AMD platforms are
-warmly welcomed!
-
-Jiang Liu (21):
-  irqdomain: Introduce new interfaces to support hierarchy irqdomains
-  genirq: Introduce helper functions to support stacked irq_chip
-  x86, irq: Save destination CPU ID in irq_cfg
-  x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
-  x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
-  x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
-  x86, uv: Use new irqdomain interfaces to allocate/free IRQ
-  x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
-  x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
-  x86: irq_remapping: Introduce new interfaces to support hierarchy
-    irqdomain
-  iommu/vt-d: Change prototypes to prepare for enabling hierarchy
-    irqdomain
-  iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
-  iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
-  x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
-  x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
-  x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
-  x86, htirq: Use hierarchy irqdomain to manage Hypertransport
-    interrupts
-  iommu/vt-d: Clean up unused MSI related code
-  iommu/amd: Clean up unused MSI related code
-  x86: irq_remapping: Clean up unused MSI related code
-  x86, irq: Clean up unused MSI related code and interfaces
-
- arch/x86/Kconfig                     |    3 +-
- arch/x86/include/asm/hpet.h          |   16 +-
- arch/x86/include/asm/hw_irq.h        |   64 +++++
- arch/x86/include/asm/irq_remapping.h |   66 +++--
- arch/x86/include/asm/pci.h           |    5 -
- arch/x86/include/asm/x86_init.h      |    4 -
- arch/x86/kernel/apic/htirq.c         |  179 +++++++++----
- arch/x86/kernel/apic/io_apic.c       |    3 -
- arch/x86/kernel/apic/msi.c           |  430 +++++++++++++++++++++++--------
- arch/x86/kernel/apic/vector.c        |  158 +++++++++++-
- arch/x86/kernel/hpet.c               |   57 ++---
- arch/x86/kernel/x86_init.c           |    2 -
- arch/x86/platform/uv/uv_irq.c        |   27 +-
- drivers/iommu/amd_iommu.c            |  385 ++++++++++++++++++++++------
- drivers/iommu/amd_iommu_init.c       |    4 +
- drivers/iommu/amd_iommu_proto.h      |    9 +
- drivers/iommu/amd_iommu_types.h      |    5 +
- drivers/iommu/intel_irq_remapping.c  |  468 +++++++++++++++++++++++-----------
- drivers/iommu/irq_remapping.c        |  221 ++++++----------
- drivers/iommu/irq_remapping.h        |   22 +-
- drivers/pci/htirq.c                  |   48 +---
- include/linux/htirq.h                |   22 +-
- include/linux/intel-iommu.h          |    4 +
- include/linux/irq.h                  |    8 +
- include/linux/irqdomain.h            |   60 +++++
- kernel/irq/Kconfig                   |    3 +
- kernel/irq/chip.c                    |   21 ++
- kernel/irq/irqdomain.c               |  349 ++++++++++++++++++++++++-
- 28 files changed, 1934 insertions(+), 709 deletions(-)
-
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 4b74565690ce..bfa027f6814a 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -433,6 +433,11 @@ extern void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc);
+ extern void handle_bad_irq(unsigned int irq, struct irq_desc *desc);
+ extern void handle_nested_irq(unsigned int irq);
+ 
++#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
++extern void irq_chip_ack_parent(struct irq_data *data);
++extern int irq_chip_retrigger_hierarchy(struct irq_data *data);
++#endif
++
+ /* Handling of unhandled and spurious interrupts: */
+ extern void note_interrupt(unsigned int irq, struct irq_desc *desc,
+ 			   irqreturn_t action_ret);
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 46bd5e2190c3..b8ee27efde73 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -821,3 +821,21 @@ void irq_cpu_offline(void)
+ 		raw_spin_unlock_irqrestore(&desc->lock, flags);
+ 	}
+ }
++
++#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
++void irq_chip_ack_parent(struct irq_data *data)
++{
++	data = data->parent_data;
++	if (data && data->chip && data->chip->irq_ack)
++		data->chip->irq_ack(data);
++}
++
++int irq_chip_retrigger_hierarchy(struct irq_data *data)
++{
++	for (data = data->parent_data; data; data = data->parent_data)
++		if (data->chip && data->chip->irq_retrigger)
++			return data->chip->irq_retrigger(data);
++
++	return -ENOSYS;
++}
++#endif
 -- 
 1.7.10.4
