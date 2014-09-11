@@ -1,96 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Sep 2014 11:50:29 +0200
-Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
-In-Reply-To: <20140911105441.7876966a@free-electrons.com>
-References: <2852268.nkG1OoBDfE@wuerfel> <3459745.mC0zoLRDxy@wuerfel>
- <20140911105441.7876966a@free-electrons.com>
-Message-ID: <5286718.xUAA8Uddjq@wuerfel>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Thu, 11 Sep 2014 09:53:56 +0000
+Subject: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale LS1021A
+In-Reply-To: <20140402.o60F9Z4YVe@wuerfel>
+References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
+ <3532608.xLS91GQkq4@wuerfel>
+ <daf5ec5b70164b3e9a810def41909c48@BL2PR03MB467.namprd03.prod.outlook.com>
+ <20140402.o60F9Z4YVe@wuerfel>
+Message-ID: <517628172fb3416ea7b12b4ae24e098a@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 10:54:41 Thomas Petazzoni wrote:
-> 
-> On Mon, 08 Sep 2014 22:42:23 +0200, Arnd Bergmann wrote:
-> 
-> > - The pl310 errata workarounds are not needed on aurora and can be removed
-> > - The cache_wait() macro is never needed since this is not an l210/l220
-> 
-> I am not sure about this change (see below).
-> 
-> > - aurora_pa_range can keep the spinlock while syncing the cache
-> > - We can load the l2x0_base into a local variable across operations
-> 
-> I am fine with this one, but I'm wondering what is the benefit of doing
-> this? The l2x0_base is anyway a global variable that is available for
-> all those functions, so not sure what an additional local variable
-> brings us.
 
-The compiler does not always know if the l2x0_base pointer has changed
-between two accesses. In particular if we do a spin_lock/spin_unlock
-as in aurora_pa_range() it has to reload it.
 
-Using a local variable tells the compiler that the pointer should
-in fact be read once from memory and then used from a register,
-which results in slightly smaller and more efficient object code.
-
-> > -#ifdef CONFIG_CACHE_PL310
-> > -static inline void cache_wait(void __iomem *reg, unsigned long mask)
-> > -{
-> > -     /* cache operations by line are atomic on PL310 */
-> > -}
-> > -#else
-> > -#define cache_wait   l2c_wait_mask
-> > -#endif
-> 
-> How do you conclude from this that cache_wait() does nothing? When
-> we're on PL310, it indeed does nothing, but in our case, we're not on a
-> PL310, so cache_wait is equivalent to l2c_wait_mask, which does:
+>-----Original Message-----
+>From: Arnd Bergmann [mailto:arnd at arndb.de]
+>Sent: Wednesday, September 10, 2014 3:42 PM
+>To: Lu Jingchang-B35083
+>Cc: linux-arm-kernel at lists.infradead.org; Guo Shawn-R65073;
+>devicetree at vger.kernel.org
+>Subject: Re: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale
+>LS1021A
 >
-> /*
->  * Common code for all cache controllers.
->  */
-> static inline void l2c_wait_mask(void __iomem *reg, unsigned long mask)
-> {
->         /* wait for cache operation by line or way to complete */
->         while (readl_relaxed(reg) & mask)
->                 cpu_relax();
-> }
-> 
-> And this does not seem to be in any conditional making it specific to
-> PL210/PL220 as your commit log suggests.
+>On Wednesday 10 September 2014 03:31:19 Jingchang Lu wrote:
+>
+>> >> +DT_MACHINE_START(LS1021A, "Freescale LS1021A")  #ifdef
+>> >> +CONFIG_ZONE_DMA
+>> >> +       .dma_zone_size  = SZ_128M,
+>> >> +#endif
+>> >> +       .init_machine   = ls1021a_init_machine,
+>> >> +       .dt_compat      = ls1021a_dt_compat,
+>> >> +       .restart        = mxc_restart,
+>> >> +MACHINE_END
+>> >
+>> >I believe someone recently posted a patch to derive the dma_zone_size
+>> >from device tree. Can yo try to find that and see if that will work for
+>you?
+>> >
+>> >Can you explain what the reason is for needing a DMA zone?
+>>
+>> With LPAE enabled on our SoC, we meet the system complaint of
+>> "coherent DMA mask 0xffffffff is smaller than system GFP_DMA mask
+>> 0xffffffffffffffff", and I notice that CONFIG_ZONE_DMA and dma_zone_size
+>is a common resolve for this.
+>
+>Ok, I see. The actual point of dma_zone_size however is slightly different,
+>and I think you should not use it like this. We normally only use ZONE_DMA
+>if there are devices that have a limitation smaller than 4GB, and that
+>appear to be the case for your system.
+>
+>The message you quote is only present in arch/powerpc, so I'm not sure
+>what symptoms you are actually seeing. Please try removing the
+>dma_zone_size setting for your platform and report if it works or what the
+>symptom is if it does not work with the latest kernel.
+>
+>We definitely need to get this to work out of the box without a
+>dma_zone_size hack.
+>
+>Can you describe what the memory layout is of your platform? Can you have
+>RAM installed above the 4GB physical address boundary? If you can, are
+>there any devices that are unable to perform DMA into that memory without
+>the use of an IOMMU?
+>
+>	Arnd
+Our first LS1021A support is based on kernel-3.12, where when LPAE enabled
+it will compare the device's coherent_dma_mask with arm_dma_limit, which is
+64-bit 0xffffffffffffffff without CONFIG_ZONE_DMA, with CONFIG_ZONE_DMA can
+limit the comparison and avoid the warning.
+All device can address 32-bit address space on LS1021A, With you comment above,
+I remove the dma_zone_size and only reserve the CONFIG_ZONE_DMA On kernel-3.12,
+finding all works well, so I will remove the dma_zone_size setting on 3.12. Thanks.
 
-Interesting. If that is the intention of the code, it is rather broken
-because CONFIG_CACHE_PL310 gets set automatically on ARMv7:
+I have a look on latest kernel, finding get_coherent_dma_mask() has limited the mask
+to (u64)DMA_BIT_MASK(32), does this mean the CONFIG_ZONE_DMA is not needed for me
+here? Thanks.
 
-if CACHE_L2X0
-
-config CACHE_PL310
-        bool
-        default y if CPU_V7 && !(CPU_V6 || CPU_V6K)
-        help
-          This option enables optimisations for the PL310 cache
-          controller.
-...
-endif
-
-This is from the original l2x0 code that is no longer used by anything
-other than aurora. The idea was apparently that if we are on a v6+v7
-kernel, we might have a l210 and need to wait here, while on a v7-only
-kernel, we know that we have a pl310 and never need to do it.
-
-> > -static inline void cache_sync(void)
-> > -{
-> > -     void __iomem *base = l2x0_base;
-> > -
-> > -     writel_relaxed(0, base + sync_reg_offset);
-> > -     cache_wait(base + L2X0_CACHE_SYNC, 1);
-> 
-> So to me, this line is actually doing something on an Aurora cache
-> controller.
-> 
-> Am I missing something?
-
-It might be needed, I haven't checked the data sheet. However we don't
-run that code today, and my patch does not change that.
-
-	Arnd
+Best Regards,
+Jingchang
