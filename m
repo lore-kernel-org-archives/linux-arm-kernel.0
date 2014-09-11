@@ -1,16 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 11 Sep 2014 12:14:50 -0700
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 11 Sep 2014 21:14:57 +0200
 Subject: [PATCH 1/3] ARM: OMAP2+: make of_device_ids const
 In-Reply-To: <20140911190136.GM3755@pengutronix.de>
 References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
  <1410337579-23466-2-git-send-email-u.kleine-koenig@pengutronix.de>
  <20140911173943.GB18849@atomide.com>
  <20140911190136.GM3755@pengutronix.de>
-Message-ID: <20140911191449.GF18849@atomide.com>
+Message-ID: <20140911191457.GN3755@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140911 12:02]:
+Hello,
+
+On Thu, Sep 11, 2014 at 09:01:36PM +0200, Uwe Kleine-K?nig wrote:
 > On Thu, Sep 11, 2014 at 10:39:43AM -0700, Tony Lindgren wrote:
 > > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140910 01:27]:
 > > > of_device_ids (i.e. compatible strings and the respective data) are not
@@ -35,9 +37,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > 
 > 	static const char * const dra74x_boards_compat[] __initconst = {
 > 		...
-
-Ah OK.
- 
+> 
 > (but then I guess you get another warning because struct machine_desc's
 > dt_compat is declared as
 > 
@@ -48,10 +48,20 @@ Ah OK.
 > With the patch below, arch/arm/mach-omap2/board-generic.c compiles just
 > fine. Don't know yet if the additional const in <asm/mach_desc.h> is
 > problematic ...
+> 
+> diff --git a/arch/arc/include/asm/mach_desc.h b/arch/arc/include/asm/mach_desc.h
+> index e8993a2be6c2..f4a7bc8d8967 100644
+> --- a/arch/arc/include/asm/mach_desc.h
+> +++ b/arch/arc/include/asm/mach_desc.h
+this is obviously non-sense. The definition for arm already has the
+const I added here for arc.
 
-Yes OK thanks. It Would be nice to have those as __initconst to discard
-the unused ones.
+So the patch for board-generic.c below is fine. I will create a proper
+patch for it.
 
-Regards,
+Best regards
+Uwe
 
-Tony
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
