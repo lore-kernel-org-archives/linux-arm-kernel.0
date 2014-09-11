@@ -1,76 +1,45 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 11 Sep 2014 17:21:18 +0800
-Subject: [PATCH v2] arm64: add guard macros of unistd.h to prevent double
- inclusion
-In-Reply-To: <54115583.8080306@huawei.com>
-References: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
- <20140909123938.GL1754@arm.com> <54115583.8080306@huawei.com>
-Message-ID: <5411698E.3000402@huawei.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 11 Sep 2014 10:22:32 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <20140910165723.GK7960@sirena.org.uk>
+References: <540C8577.2070907@gmail.com> <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+ <20140910143144.GF7960@sirena.org.uk>
+ <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+ <20140910153919.GH7960@sirena.org.uk>
+ <CACxGe6uBcTPMh4p=oi7m_TVpjUrkgbQvxbStAn27HXEJxYe5fw@mail.gmail.com>
+ <20140910165723.GK7960@sirena.org.uk>
+Message-ID: <20140911092233.CBC5CC40738@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yang Yingliang <yangyingliang@huawei.com>
+On Wed, 10 Sep 2014 17:57:23 +0100, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Sep 10, 2014 at 05:29:32PM +0100, Grant Likely wrote:
+> 
+> > What we can do is have an inhibit flag for
+> > simplefb/simpleuart/simplewhatever that holds off PM. When a real
+> > driver, or a stub that understands parsing the resource dependencies,
+> > takes ownership of the device (or userspace tells the kernel to stop
+> > caring) it can clear the inhibit.
+> 
+> It's not quite as simple as just disabling PM - for example in the
+> clocks case we've also got to worry about what happens with rate changes
+> (which is going to get more and more risky as we get smarter about being
+> able to push configuration changes back up the tree), regulators have a
+> similar thing with voltage changes.  With simple enables and disables we
+> have to worry about things like handling users who actively want to
+> power things on and and off but may potentially be sharing a resource
+> with an undeclared dependency.
 
-Add guard macros for uapi/asm/unistd.h, asm/unistd.h and
-asm/unistd32.h.
+I think we can be okay with the above. This is a best-effort situation
+where we don't want to tear down how firmware has set up the board if
+it can be reasonably assumed that something depends on it (simplefb).
+However, if clocks or regulators are shared with other devices and those
+drivers ask for other settings, then there is simply no recourse. In
+that situation there must be a driver for the video device that takes
+care of any constraints.
 
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- arch/arm64/include/asm/unistd.h      | 5 +++++
- arch/arm64/include/asm/unistd32.h    | 4 ++++
- arch/arm64/include/uapi/asm/unistd.h | 5 +++++
- 3 files changed, 14 insertions(+)
-
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 6d2bf41..21a7dec 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -13,6 +13,9 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#ifndef __ASM_ARM64_UNISTD_H
-+#define __ASM_ARM64_UNISTD_H
-+
- #ifdef CONFIG_COMPAT
- #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
- #define __ARCH_WANT_COMPAT_STAT64
-@@ -48,3 +51,5 @@
- #include <uapi/asm/unistd.h>
- 
- #define NR_syscalls (__NR_syscalls)
-+
-+#endif /* __ASM_ARM64_UNISTD_H */
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index da1f06b..8f5e78e 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -16,6 +16,8 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#ifndef __ASM_ARM64_UNISTD32_H
-+#define __ASM_ARM64_UNISTD32_H
- 
- #ifndef __SYSCALL
- #define __SYSCALL(x, y)
-@@ -792,3 +794,5 @@ __SYSCALL(__NR_renameat2, sys_renameat2)
- __SYSCALL(__NR_getrandom, sys_getrandom)
- #define __NR_memfd_create 385
- __SYSCALL(__NR_memfd_create, sys_memfd_create)
-+
-+#endif /* __ASM_ARM64_UNISTD32_H */
-diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
-index 1caadc2..ab72cac 100644
---- a/arch/arm64/include/uapi/asm/unistd.h
-+++ b/arch/arm64/include/uapi/asm/unistd.h
-@@ -13,4 +13,9 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#ifndef _UAPI__ASM_ARM64_UNISTD_H
-+#define _UAPI__ASM_ARM64_UNISTD_H
-+
- #include <asm-generic/unistd.h>
-+
-+#endif /* _UAPI__ASM_ARM64_UNISTD_H */
+g.
