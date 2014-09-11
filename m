@@ -1,65 +1,78 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 11 Sep 2014 16:24:32 +0100
-Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
-In-Reply-To: <20140911142655.GB30828@titan.lakedaemon.net>
-References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140911134323.GB29780@lunn.ch>
- <20140911160000.55a4de80@free-electrons.com>
- <20140911142601.GA30828@titan.lakedaemon.net>
- <20140911142655.GB30828@titan.lakedaemon.net>
-Message-ID: <1410449072.25388.35.camel@kazak.uk.xensource.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 11 Sep 2014 08:27:06 -0700
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <20140910175126.GJ1710@arm.com>
+References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+ <1409781429-27593-4-git-send-email-keescook@chromium.org>
+ <20140904170349.GL7156@arm.com>
+ <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
+ <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
+ <20140908215506.GA4759@dator>
+ <CAGXu5jJFB+pcDVkcMoRZ9DnJu7MQuN=kceDhpkGrO=6ZLFy6Kw@mail.gmail.com>
+ <20140909123829.GK1754@arm.com>
+ <CAGXu5jJoW-B7WwuFUhbN4e1aL-HVxa9x4da9hB9DcCGEXVLgzw@mail.gmail.com>
+ <20140910175126.GJ1710@arm.com>
+Message-ID: <CAGXu5jJaML_S+6LUn1uPLrScXxUJL+1N1B+Fa08ioxKt933nCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-09-11 at 10:26 -0400, Jason Cooper wrote:
-> merf.  It helps if I actually _add_ Ian to the Cc. :)
-> 
-> On Thu, Sep 11, 2014 at 10:26:01AM -0400, Jason Cooper wrote:
-> > +Ian
-> > 
-> > On Thu, Sep 11, 2014 at 04:00:00PM +0200, Thomas Petazzoni wrote:
-> > > On Thu, 11 Sep 2014 15:43:23 +0200, Andrew Lunn wrote:
-> > > > A point for discussion, triggered by 3/4. We have repeatedly seen
-> > > > issues with modular builds, which we don't see with everything built
-> > > > in. Can we improve our testing? Is there is way to take for example
-> > > > mvebu_v7_defconfig and turn any y tristate options into m? Build and
-> > > > boot? Get this added to the boot test farms?
-> > > 
-> > > I indeed agree that we are not testing much the modular case, but:
-> > > 
-> > >  1/ In my case, a mvebu_v7_defconfig where most the stuff would become
-> > >     enabled as a module would make mvebu_v7_defconfig pretty much
-> > >     useless for my daily work. When I'm doing active development, I
-> > >     typically have everything built-in including the initramfs itself,
-> > >     so that I don't rely on any storage/network to get the rootfs and
-> > >     additional kernel drivers.
-> > > 
-> > >  2/ I don't think it would change much in terms of runtime coverage:
-> > >     the tests done on the boot farm are just boot tests, I don't think
-> > >     they load any kernel module. We could ask Kevin and Olof what
-> > >     rootfs they use, but most likely it's some very small rootfs that
-> > >     doesn't even have udev/mdev for automatic module loading. So no
-> > >     module would be loaded, which would mean that a mvebu_v7_defconfig
-> > >     with everything as a module would actually test *less* thing than a
-> > >     configuration that has everything built in.
-> > > 
-> > > So, I agree on the observation, but I'm unsure the proposed solution
-> > > will really solve or even improve the situation :/
-> > 
-> > Since debian does modular builds on a regular basis, maybe they have
-> > some recommendations.
+On Wed, Sep 10, 2014 at 10:51 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Kees,
+>
+> On Tue, Sep 09, 2014 at 03:33:11PM +0100, Kees Cook wrote:
+>> On Tue, Sep 9, 2014 at 5:38 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Sep 08, 2014 at 11:40:43PM +0100, Kees Cook wrote:
+>> >> Ah, so it was, yes! Will, which version of this logic would you prefer?
+>> >
+>> > I still don't think we're solving the general problem here -- we're actually
+>> > just making the ftrace case work. It is perfectly possible for another CPU
+>> > to undergo a TLB miss and refill whilst the page table is being modified by
+>> > the CPU with preemption disabled. In this case, a local tlb flush won't
+>> > invalidate that entry on the other core, and we have no way of knowing when
+>> > the original permissions are actually observed across the system.
+>>
+>> The fixmap is used by anything doing patching _except_ ftrace,
+>> actually. It's used by jump labels, kprobes, and kgdb. This code is
+>> the general case. Access to set_fixmap is done via the kernel patching
+>> interface: patch_text().
+>>
+>> Right now, the patch_text interface checks cache_ops_need_broadcast(),
+>> and conditionally runs under stop_machine(). We could make this
+>> unconditional, and we'll avoid any problem with TLB misses on another
+>> CPU.
+>
+> Yes, it we always use stop_machine, that solves the TLB broadcast problem
+> and we could do that if CONFIG_ARM_ERRATA_798181 is set.
 
-Rather than modularising $socfamily_defconfig perhaps this is something
-which can be achieved by also testing multiplatform defconfigs builds,
-and perhaps making those more modular (if they aren't already)?
+Okay, sounds good.
 
-It seems like a multiplatform kernel is something which would be more
-naturally quite modular anyway, and certainly distros are mostly
-interested in moving to configurations which are both multiplatform and
-modular (at least in the long run, Debian has some legacy v5 flavours
-which may or may not get moved over).
+>
+>> > So I think we need to figure out a way to invalidate the TLB properly. What
+>> > do architectures that use IPIs for TLB broadcasting do (x86, some powerpc,
+>> > mips, ...)? They must have exactly the same problem.
+>>
+>> I don't think this should be done at the set_fixmap level, as it is
+>> more a primitive. I think making sure patch_text() always works would
+>> be best. What do you think of using an unconditional stop_machine()
+>> instead?
+>
+> Why not move the TLB invalidation into patch_text, then we can do
+> stop_machine if IS_ENABLED(CONFIG_ARM_ERRATA_798181) ||
+> tlb_ops_need_broadcast()?
 
-That would avoid needing to mess with mvebu_v7_defconfig, since it seems
-quite reasonable and natural for that to be pretty non-modular.
+The (local) TLB flush needs to happen for patch_text to do its work,
+so I'd rather it stay in set_fixmap, otherwise the flush calls will
+have to follow each call of set_fixmap.
 
-Ian.
+Is there a reason tlb_ops_need_broadcast() doesn't check
+IS_ENABLED(CONFIG_ARM_ERRATA_798181) itself?
+
+> Then that just leaves ftrace.
+
+ftrace is already covered by stop_machine. Is there something I missing there?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
