@@ -1,67 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 11 Sep 2014 21:14:57 +0200
-Subject: [PATCH 1/3] ARM: OMAP2+: make of_device_ids const
-In-Reply-To: <20140911190136.GM3755@pengutronix.de>
-References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1410337579-23466-2-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140911173943.GB18849@atomide.com>
- <20140911190136.GM3755@pengutronix.de>
-Message-ID: <20140911191457.GN3755@pengutronix.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 11 Sep 2014 15:17:51 -0400 (EDT)
+Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
+In-Reply-To: <20140911140444.GH4783@worktop.ger.corp.intel.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
+ <20140911123412.GY3190@worktop.ger.corp.intel.com>
+ <CAKfTPtBbjpCFifoyFSh8Hb3nBZFFTjjxdfxnpMk=CHy5aX1qpg@mail.gmail.com>
+ <20140911140444.GH4783@worktop.ger.corp.intel.com>
+Message-ID: <alpine.LFD.2.11.1409111443570.16533@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 11 Sep 2014, Peter Zijlstra wrote:
 
-On Thu, Sep 11, 2014 at 09:01:36PM +0200, Uwe Kleine-K?nig wrote:
-> On Thu, Sep 11, 2014 at 10:39:43AM -0700, Tony Lindgren wrote:
-> > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140910 01:27]:
-> > > of_device_ids (i.e. compatible strings and the respective data) are not
-> > > supposed to change at runtime. All functions working with of_device_ids
-> > > provided by <linux/of.h> work with const of_device_ids. So mark the
-> > > non-const function parameters and structs for OMAP2+ as const, too.
+> On Thu, Sep 11, 2014 at 03:07:52PM +0200, Vincent Guittot wrote:
+> > > Also I'm not entirely sure I like the usage, utilization names/metrics.
+> > > I would suggest to reverse them. Call the pure running number
+> > > 'utilization' and this scaled with capacity 'usage' or so.
 > > 
-> > Hmm this does not seem to compile with omap2plus_defconfig because
-> > of section type conflicts. Looks like there's some issue now with the
-> > use of __initconst:
+> > ok. i can invert 'usage' and 'utilization', which will give
 > > 
-> > arch/arm/mach-omap2/board-generic.c:262:20: error: dra72x_boards_compat causes a section type conflict with omap_dt_match_table
-> > arch/arm/mach-omap2/board-generic.c:30:34: note: ?omap_dt_match_table? was declared here
-> > scripts/Makefile.build:257: recipe for target 'arch/arm/mach-omap2/board-generic.o' failed
-> The problem is dra74x_boards_compat though:
+> > s/get_cpu_utilization/get_cpu_usage/
+> > s/sgs->group_utilization/sgs->group_usage/
+> > s/cfs.usage_load_avg/cfs.utilization_load_avg/
+> > s/se->avg.usage_avg_contrib/se->avg.utilization_avg_contrib
+> > s/__update_task_entity_usage/__update_task_entity_utilization
+> > s/__update_entity_usage_avg_contrib/__update_entity_utilization_avg_contrib
+> > 
 > 
-> 	static const char *dra74x_boards_compat[] __initconst = {
-> 		...
-> 
-> *dra74x_boards_compat is const, but dra74x_boards_compat isn't, so
-> either the variable must go into __initdata or it must be declared as:
-> 
-> 	static const char * const dra74x_boards_compat[] __initconst = {
-> 		...
-> 
-> (but then I guess you get another warning because struct machine_desc's
-> dt_compat is declared as
-> 
-> 	const char **dt_compat;
-> 
-> .)
-> 
-> With the patch below, arch/arm/mach-omap2/board-generic.c compiles just
-> fine. Don't know yet if the additional const in <asm/mach_desc.h> is
-> problematic ...
-> 
-> diff --git a/arch/arc/include/asm/mach_desc.h b/arch/arc/include/asm/mach_desc.h
-> index e8993a2be6c2..f4a7bc8d8967 100644
-> --- a/arch/arc/include/asm/mach_desc.h
-> +++ b/arch/arc/include/asm/mach_desc.h
-this is obviously non-sense. The definition for arm already has the
-const I added here for arc.
+> Any other opinions before Vince goes and applies sed on patches? ;-)
 
-So the patch for board-generic.c below is fine. I will create a proper
-patch for it.
+I don't mind either way, but for sure someone (possibly me) is going to 
+confuse the two soon enough.
 
-Best regards
-Uwe
+Please include in the code some formal definition in the context of the 
+scheduler.  A comment block right before the corresponding get_cpu_* 
+accessors should be good enough.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+Nicolas
