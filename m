@@ -1,107 +1,57 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 11 Sep 2014 15:09:10 -0400
-Subject: [PATCH v3 1/2] PCI: keystone: remove handle of PCI mode
- configuration
-In-Reply-To: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
-References: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5411F356.2090405@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Sep 2014 12:14:50 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: make of_device_ids const
+In-Reply-To: <20140911190136.GM3755@pengutronix.de>
+References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1410337579-23466-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140911173943.GB18849@atomide.com>
+ <20140911190136.GM3755@pengutronix.de>
+Message-ID: <20140911191449.GF18849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 01:12 PM, Murali Karicheri wrote:
-> Keystone PCI hardware supports both RC and EP modes and devcfg
-> register has bits to boot strap the device to either of these modes.
-> It seems proper to add this functionality to the boot loader rather
-> than in the driver as device will be operating in either mode, not
-> both any time. Currently the driver supports only RC mode and hence
-> register configuration in the driver is not needed and driver can
-> assume this is a RC hardware.
->
-> Also update the DT documentation accordingly.
->
-> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> Acked-by: Arnd Bergmann<arnd@arndb.de>
-> ---
-> 	v3 - No change
-> 	v2 - Added this separate patch to remove pci mode handling
->   .../devicetree/bindings/pci/pci-keystone.txt       |    4 +---
->   drivers/pci/host/pci-keystone.c                    |   21 ++------------------
->   2 files changed, 3 insertions(+), 22 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> index ceb3e24..bedacf0 100644
-> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> @@ -13,9 +13,7 @@ Required Properties:-
->
->   compatibility: "ti,keystone-pcie"
->   reg:	index 1 is the base address and length of DW application registers.
-> -	index 2 is the base address and length of PCI mode configuration
-> -	register.
-> -	index 3 is the base address and length of PCI device ID register.
-> +	index 2 is the base address and length of PCI device ID register.
->
->   pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
->   	interrupt-cells: should be set to 1
-> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index ff8ed25..f1119eb 100644
-> --- a/drivers/pci/host/pci-keystone.c
-> +++ b/drivers/pci/host/pci-keystone.c
-> @@ -35,10 +35,6 @@
->   #define MAX_MSI_HOST_IRQS		8
->   #define MAX_LEGACY_HOST_IRQS		4
->
-> -/* RC mode settings masks */
-> -#define PCIE_RC_MODE		BIT(2)
-> -#define PCIE_MODE_MASK		(BIT(1) | BIT(2))
-> -
->   /* DEV_STAT_CTRL */
->   #define PCIE_CAP_BASE		0x70
->
-> @@ -355,7 +351,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->   	void __iomem *reg_p;
->   	struct phy *phy;
->   	int ret = 0;
-> -	u32 val;
->
->   	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
->   				GFP_KERNEL);
-> @@ -365,18 +360,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->   	}
->   	pp =&ks_pcie->pp;
->
-> -	/* index 2 is the devcfg register for RC mode settings */
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-> -	reg_p = devm_ioremap_resource(dev, res);
-> -	if (IS_ERR(reg_p))
-> -		return PTR_ERR(reg_p);
-> -
-> -	/* enable RC mode in devcfg */
-> -	val = readl(reg_p);
-> -	val&= ~PCIE_MODE_MASK;
-> -	val |= PCIE_RC_MODE;
-> -	writel(val, reg_p);
-> -
->   	/* initialize SerDes Phy if present */
->   	phy = devm_phy_get(dev, "pcie-phy");
->   	if (!IS_ERR_OR_NULL(phy)) {
-> @@ -385,8 +368,8 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->   			return ret;
->   	}
->
-> -	/* index 3 is to read PCI DEVICE_ID */
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
-> +	/* index 2 is to read PCI DEVICE_ID */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
->   	reg_p = devm_ioremap_resource(dev, res);
->   	if (IS_ERR(reg_p))
->   		return PTR_ERR(reg_p);
-Bjorn,
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140911 12:02]:
+> On Thu, Sep 11, 2014 at 10:39:43AM -0700, Tony Lindgren wrote:
+> > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140910 01:27]:
+> > > of_device_ids (i.e. compatible strings and the respective data) are not
+> > > supposed to change at runtime. All functions working with of_device_ids
+> > > provided by <linux/of.h> work with const of_device_ids. So mark the
+> > > non-const function parameters and structs for OMAP2+ as const, too.
+> > 
+> > Hmm this does not seem to compile with omap2plus_defconfig because
+> > of section type conflicts. Looks like there's some issue now with the
+> > use of __initconst:
+> > 
+> > arch/arm/mach-omap2/board-generic.c:262:20: error: dra72x_boards_compat causes a section type conflict with omap_dt_match_table
+> > arch/arm/mach-omap2/board-generic.c:30:34: note: ?omap_dt_match_table? was declared here
+> > scripts/Makefile.build:257: recipe for target 'arch/arm/mach-omap2/board-generic.o' failed
+> The problem is dra74x_boards_compat though:
+> 
+> 	static const char *dra74x_boards_compat[] __initconst = {
+> 		...
+> 
+> *dra74x_boards_compat is const, but dra74x_boards_compat isn't, so
+> either the variable must go into __initdata or it must be declared as:
+> 
+> 	static const char * const dra74x_boards_compat[] __initconst = {
+> 		...
 
-These patches need to go onto host-keystone as well for v3.18. If you 
-you have any comments, please let me know so that I can address them. I 
-have incorporated comments from Arnd already.
+Ah OK.
+ 
+> (but then I guess you get another warning because struct machine_desc's
+> dt_compat is declared as
+> 
+> 	const char **dt_compat;
+> 
+> .)
+> 
+> With the patch below, arch/arm/mach-omap2/board-generic.c compiles just
+> fine. Don't know yet if the additional const in <asm/mach_desc.h> is
+> problematic ...
 
-Thanks.
+Yes OK thanks. It Would be nice to have those as __initconst to discard
+the unused ones.
 
-Murali
+Regards,
+
+Tony
