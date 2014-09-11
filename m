@@ -1,86 +1,35 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 11 Sep 2014 15:04:46 +0100
-Subject: [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <61335531.hz91PL2Gdf@vostro.rjw.lan>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <20140911132935.068DCC408F6@trevor.secretlab.ca>
- <61335531.hz91PL2Gdf@vostro.rjw.lan>
-Message-ID: <CACxGe6tkzdpDaTm0J8bzSHev=a7+28cOnWUJxBcwr7z+GUpH4w@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Thu, 11 Sep 2014 14:11:05 +0000
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <2908259.jgJNuDxCCa@wuerfel>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <3780051.0eHpCN6UC9@wuerfel> <20140909112054.GD29639@arm.com>
+ <2908259.jgJNuDxCCa@wuerfel>
+Message-ID: <ae98d68652f1495a857f081c3a6aecb2@HKXPR06MB168.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 3:23 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Thursday, September 11, 2014 02:29:34 PM Grant Likely wrote:
->> On Mon,  1 Sep 2014 22:57:38 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> > ACPI 5.1 has been released and now be freely available for
->> > download [1]. It fixed some major gaps to run ACPI on ARM,
->> > this patch just follow the ACPI 5.1 spec and prepare the
->> > code to run ACPI on ARM64.
->> >
->> > ACPI 5.1 has some major changes for the following tables and
->> > method which are essential for ARM platforms:
->> > 1) MADT table updates.
->> > 2) FADT updates for PSCI
->> > 3) GTDT
->> >
->> > This patch set is the ARM64 ACPI core patches covered MADT, FADT
->> > and GTDT, platform board specific drivers are not covered by this
->> > patch set, but we provide drivers for Juno to boot with ACPI only
->> > in the follwing patch set for review purpose.
->> >
->> > We first introduce acpi.c and its related head file which are needed
->> > by ACPI core, and then get RSDP to extract all the ACPI boot-time tables.
->> > When all the boot-time tables (FADT, MADT, GTDT) are ready, then
->> > parse them to init the sytem when booted. Specifically,
->> > a) we use FADT to init PSCI and use PSCI to boot SMP;
->> > b) Use MADT for GIC init and SMP init;
->> > c) GTDT for arch timer init.
->> >
->> > This patch set is based on 3.17-rc2 and was tested by Graeme on Juno
->> > and FVP base model boot with ACPI only OK, if you want to test them,
->> > you can pull from acpi-5.1-v3 branch in leg/acpi repo:
->> > git://git.linaro.org/leg/acpi/acpi.git
->> >
->> > Updates since v2:
->> >  - Refactor the code to make SMP/PSCI init with less sperated init
->> >    path by Tomasz
->> >  - make ACPI depend on EXPERT
->> >  - Address lots of comments from Catalin, Sudeep, Geoff
->> >  - Add Juno device ACPI driver patches for review
->> >
->> > Updates since v1:
->> >  - Set ACPI default off on ARM64 suggested by Olof;
->> >  - Rebase the patch set on top of linux-next branch/linux-pm tree which
->> >    includes the ACPICA for full ACPI 5.1 support.
->> >  - Update the document as suggested;
->> >  - Adress lots of comments from Mark, Sudeep, Randy, Naresh, Olof, Geoff
->> >    and more...
->> >
->> > [1]: http://www.uefi.org/sites/default/files/resources/ACPI_5_1release.pdf
->>
->> I've read through this entire series now. In my mind, aside from a few
->> comments that I know you're addressing, this is ready.  The hooks into
->> arm64 core code are not terribly invasive, it is nicely organized and
->> manageable. Get the next version out ASAP, but I would also like to see
->> the diffs from this version to the next so I don't need to review the
->> entire series again.
->>
->> Regarding the requests to refactor ACPICA to work better for ARM. I
->> completely agree that it should be done, but I do not think it should be
->> a prerequisite to getting this core support merged. That kind of
->> refactoring is far easier to justify when it has immediate improvement
->> on the mainline codebase, and it gives us a working baseline to test
->> against. Doing it the other way around just makes things harder.
->>
->> I would really like to see the next version of this series go into
->> linux-next. I think this is ready for some wider exposure. Have you got
->> a branch being pulled into Fengguang's autobuilder yet?
->
-> Having looked at the patches recently, I don't see any major problems in
-> them from the ACPI core perspective, so to me they are good to go.
->
-> Question is who's going to handle them?
+Hi,
 
-They should absolutely go via Catalin & Will's tree.
+On 10 September 2014 19:20, Arnd wrote:
+> On Tuesday 09 September 2014 12:20:54 Catalin Marinas wrote:
+> >
+> > We can assume that if a domain is not specified and there is a single
+> > top level PCIe node, the domain defaults to 0. Are there any arm32
+> > platforms that require multiple domains (and do not specify a number in
+> > the DT)?
+> 
+> In theory, I think all of them could work with a single domain, but then
+> you need to partition the bus number space between the host controllers,
+> so you have the exact same situation that you either need to make up
+> random bus numbers or put them in DT.
+> 
+> Using multiple domains is way cleaner for this, even if we have to
+> make up the numbers.
 
-g.
+Maybe this is a stupid question, but why would you want to specify the domain
+in the DT at all? Doesn't every instance of a driver imply a separate domain?
+
+Thanks
+Phil 
