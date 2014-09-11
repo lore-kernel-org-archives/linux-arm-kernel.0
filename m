@@ -1,42 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 11 Sep 2014 09:57:02 +0900
-Subject: [PATCH 5/7] ARM: shmobile: r8a7740: Use SoC-specific 48-bit CMT
- compat string
+Date: Thu, 11 Sep 2014 09:57:03 +0900
+Subject: [PATCH 6/7] ARM: shmobile: sh73a0: Add CMT1 device to DT
 In-Reply-To: <cover.1410396171.git.horms+renesas@verge.net.au>
 References: <cover.1410396171.git.horms+renesas@verge.net.au>
-Message-ID: <a2ffcf87f5ae83dcd02f5b87bf477ce7e474601e.1410396171.git.horms+renesas@verge.net.au>
+Message-ID: <6a5336a77c2caa9b0f8b3aa5c70310291ce2679d.1410396171.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general Renesas hardware is not documented to the extent
-where the relationship between IP blocks on different SoCs can be assumed
-although they may appear to operate the same way. Furthermore the
-documentation typically does not specify a version for individual
-IP blocks. For these reasons a convention of using the SoC name in place
-of a version and providing SoC-specific compat strings has been adopted.
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Although not universally liked this convention is used in the bindings for
-a number of drivers for Renesas hardware. The purpose of this patch is to
-make use of the SoC-specific CMT compat string for the r8a7740 48-bit CMT
-clock source.
-
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sh73a0.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 1067a96..d46c213 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -42,7 +42,7 @@
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 910b790..093e609 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -45,6 +45,16 @@
+ 			     <0 56 IRQ_TYPE_LEVEL_HIGH>;
  	};
  
- 	cmt1: timer at e6138000 {
--		compatible = "renesas,cmt-48";
-+		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
- 		reg = <0xe6138000 0x170>;
- 		interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
++	cmt1: timer at e6138000 {
++		compatible = "renesas,cmt-48-sh73a0", "renesas,cmt-48";
++		reg = <0xe6138000 0x200>;
++		interrupts = <0 65 IRQ_TYPE_LEVEL_HIGH>;
++
++		renesas,channels-mask = <0x3f>;
++
++		status = "disabled";
++	};
++
+ 	irqpin0: irqpin at e6900000 {
+ 		compatible = "renesas,intc-irqpin-sh73a0", "renesas,intc-irqpin";
+ 		#interrupt-cells = <2>;
 -- 
 2.0.1
