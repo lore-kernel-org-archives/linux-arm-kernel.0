@@ -1,43 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Sep 2014 13:13:48 +0100
-Subject: [RFC PATCH] arm64:mm: delete max_mapnr init.
-In-Reply-To: <CAFpQJXUKgb+58ifb0GNVMywnVU6sWTETiO8K=wdTNqQNzs4sOA@mail.gmail.com>
-References: <1410426973-32393-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <20140911103613.GB6158@arm.com>
- <CAFpQJXUKgb+58ifb0GNVMywnVU6sWTETiO8K=wdTNqQNzs4sOA@mail.gmail.com>
-Message-ID: <20140911121348.GE6158@arm.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 11 Sep 2014 14:17:16 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <1410274470-12712-5-git-send-email-wsa@the-dreams.de>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <1410274470-12712-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <16809905.2REViph6WO@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 12:43:11PM +0100, Ganapatrao Kulkarni wrote:
-> On Thu, Sep 11, 2014 at 4:06 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Sep 11, 2014 at 10:16:13AM +0100, Ganapatrao Kulkarni wrote:
-> >> setting max_mapnr results in to error, if enabled with CONFIG_NUMA,
-> >> which i have to replace with function set_max_mapnr.
-> >> However this variable is not used in arm64(with default defconfig) and better to
-> >> delete instead.
-> >>
-> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
-> >> ---
-> >>  arch/arm64/mm/init.c | 1 -
-> >>  1 file changed, 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> >> index 5472c24..548bd01 100644
-> >> --- a/arch/arm64/mm/init.c
-> >> +++ b/arch/arm64/mm/init.c
-> >> @@ -256,7 +256,6 @@ static void __init free_unused_memmap(void)
-> >>   */
-> >>  void __init mem_init(void)
-> >>  {
-> >> -     max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
-> >
-> > I think it's cleaner to call set_max_mapnr in case this grows a use in core
-> > code outside of pfn_valid (which we always override).
-> agreed, thanks for your comment.
-> shall i send you the patch for this?
+cc'ing: devicetree
 
-Yes, please. Given that we don't support NUMA in mainline, the patch will be
-queued for 3.18 (via Catalin).
+Am Dienstag, 9. September 2014, 16:54:30 schrieb Wolfram Sang:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Not for upstream!
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+>  arch/arm/boot/dts/r8a7790-lager.dts | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts
+> b/arch/arm/boot/dts/r8a7790-lager.dts index 856b4236b674..12aa2f21e6fa
+> 100644
+> --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> @@ -205,9 +205,9 @@
+>  		renesas,function = "msiof1";
+>  	};
+> 
+> -	iic1_pins: iic1 {
+> -		renesas,groups = "iic1";
+> -		renesas,function = "iic1";
+> +	i2c1_pins: i2c1 {
+> +		renesas,groups = "i2c1";
+> +		renesas,function = "i2c1";
+>  	};
+> 
+>  	iic2_pins: iic2 {
+> @@ -356,10 +356,15 @@
+>  	status = "ok";
+>  };
+> 
+> -&iic1	{
+> +&i2c1	{
+>  	status = "ok";
+> -	pinctrl-0 = <&iic1_pins>;
+> +	pinctrl-0 = <&i2c1_pins>;
+>  	pinctrl-names = "default";
+> +
+> +	eeprom at 64 {
+> +		compatible = "slave-24c02";
 
-Will
+a "real" compatible value should have vendor,device syntax.
+
+> +		reg = <0x64>;
+
+we had some discussions in the past how to represent i2c master devices in 
+device tree. The outcome was to use to a special representation to distinguish 
+them from slave devices, e.g. something like reg = <0x1 0x64>, where the 0x1 
+would mean "master" device (0x0 -> slave). If nothing is added, then it's also 
+slave. The adapter address cell would also need to be changed if this 
+extension is used.
+
+An alternative would be to use a special property (e.g. slave address), but 
+that would encode the same value twice (or even three times).
+
+Marc
