@@ -1,45 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Sep 2014 15:10:37 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
-In-Reply-To: <13599998.oE5Dh5uM3r@wuerfel>
-References: <541058F7.8060809@antcom.de>
-	<13599998.oE5Dh5uM3r@wuerfel>
-Message-ID: <CACRpkda=ywwvJ+Lc-aHsAS=w+8wOu9dA=1-3oCnr3zCezHStWQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 11 Sep 2014 15:15:18 +0200
+Subject: [PATCH] pinctrl: make of_device_ids const
+In-Reply-To: <CACRpkda1h_GOYh6dJeJJF5pnwLmn5UYCtk-v=b0k56zKy9m8=A@mail.gmail.com>
+References: <1410380437-17960-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkda1h_GOYh6dJeJJF5pnwLmn5UYCtk-v=b0k56zKy9m8=A@mail.gmail.com>
+Message-ID: <20140911131518.GK3755@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 6:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 10 September 2014 15:58:15 Roland Stigge wrote:
->> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
->>
->>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
->>
->> are available in the git repository at:
->>
->>   git://git.antcom.de/linux-2.6 lpc32xx/dt
->>
->> for you to fetch changes up to 280f965674dbc5090147724d90b701f2b81f07e3:
->>
->>   ARM: LPC32xx: Use DMA for both SSP channels (2014-09-10 15:41:30 +0200)
->>
->> ----------------------------------------------------------------
->> Roland Stigge (1):
->>       ARM: LPC32xx: Use DMA for both SSP channels
->>
->>  arch/arm/boot/dts/lpc32xx.dtsi | 11 ++++++++++-
->>  1 file changed, 10 insertions(+), 1 deletion(-)
->
-> This unfortunately uses a binding for pl08x that hasn't been reviewed
-> yet, so I can't pull it. See below for an illustration of how I think
-> the binding should work. There are probably bugs in that code, but
-> hopefully it's not too far off.
+On Thu, Sep 11, 2014 at 03:07:55PM +0200, Linus Walleij wrote:
+> On Wed, Sep 10, 2014 at 10:20 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > of_device_ids (i.e. compatible strings and the respective data) are not
+> > supposed to change at runtime. All functions working with of_device_ids
+> > provided by <linux/of.h> work with const of_device_ids. This allows to
+> > mark all struct of_device_id below drivers/pinctrl const, too.
+> >
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Sorry! This low-hanging fruit was already picked by Kiran by an
+I wouldn't call it low-hanging fruit because verification that nothing
+breaks is manual work. :-\
 
-I have a more complete PL08x DT binding which includes defining
-all signals etc. I will kick my own butt to get it out tonight or so so
-you can compare it with this.
+Uwe
 
-I think Russell want to be involved in reviewing this, his input was
-very important when I defined my bindings.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
