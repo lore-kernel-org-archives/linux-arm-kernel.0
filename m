@@ -1,39 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Sep 2014 11:36:48 +0200
-Subject: [PATCH] ARM: DT: imx53: fix lvds channel 1 port
-In-Reply-To: <1410422216-17977-1-git-send-email-shawn.guo@freescale.com>
-References: <1410422216-17977-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <13929046.KYEeT4CYi1@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Sep 2014 10:39:37 +0100
+Subject: [PATCH v2] arm: perf: Don't sleep while atomic when enabling
+ per-cpu interrupts
+In-Reply-To: <1410376426-5707-1-git-send-email-sboyd@codeaurora.org>
+References: <1410376426-5707-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140911093937.GB5045@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 15:56:56 Shawn Guo wrote:
-> From: Markus Niebel <Markus.Niebel@tq-group.com>
+On Wed, Sep 10, 2014 at 08:13:46PM +0100, Stephen Boyd wrote:
+> Rob Clark reports a sleeping while atomic bug when using perf.
 > 
-> using LVDS channel 1 on an i.MX53 leads to following error:
+> BUG: sleeping function called from invalid context at ../kernel/locking/mutex.c:583
+> in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+> ------------[ cut here ]------------
+> WARNING: CPU: 2 PID: 4828 at ../kernel/locking/mutex.c:479 mutex_lock_nested+0x3a0/0x3e8()
+> DEBUG_LOCKS_WARN_ON(in_interrupt())
+> Modules linked in:
+> CPU: 2 PID: 4828 Comm: Xorg.bin Tainted: G        W      3.17.0-rc3-00234-gd535c45-dirty #819
+> [<c0216690>] (unwind_backtrace) from [<c0212174>] (show_stack+0x10/0x14)
+> [<c0212174>] (show_stack) from [<c0867cc0>] (dump_stack+0x98/0xb8)
+> [<c0867cc0>] (dump_stack) from [<c02492a4>] (warn_slowpath_common+0x70/0x8c)
+> [<c02492a4>] (warn_slowpath_common) from [<c02492f0>] (warn_slowpath_fmt+0x30/0x40)
+> [<c02492f0>] (warn_slowpath_fmt) from [<c086a3f8>] (mutex_lock_nested+0x3a0/0x3e8)
+> [<c086a3f8>] (mutex_lock_nested) from [<c0294d08>] (irq_find_host+0x20/0x9c)
+> [<c0294d08>] (irq_find_host) from [<c0769d50>] (of_irq_get+0x28/0x48)
+> [<c0769d50>] (of_irq_get) from [<c057d104>] (platform_get_irq+0x1c/0x8c)
+> [<c057d104>] (platform_get_irq) from [<c021a06c>] (cpu_pmu_enable_percpu_irq+0x14/0x38)
+> [<c021a06c>] (cpu_pmu_enable_percpu_irq) from [<c02b1634>] (flush_smp_call_function_queue+0x88/0x178)
+> [<c02b1634>] (flush_smp_call_function_queue) from [<c0214dc0>] (handle_IPI+0x88/0x160)
+> [<c0214dc0>] (handle_IPI) from [<c0208930>] (gic_handle_irq+0x64/0x68)
+> [<c0208930>] (gic_handle_irq) from [<c0212d04>] (__irq_svc+0x44/0x5c)
+> Exception stack(0xe63ddea0 to 0xe63ddee8)
+> dea0: 00000001 00000001 00000000 c2f3b200 c16db380 c032d4a0 e63ddf40 60010013
+> dec0: 00000000 001fbfd4 00000100 00000000 00000001 e63ddee8 c0284770 c02a2e30
+> dee0: 20010013 ffffffff
+> [<c0212d04>] (__irq_svc) from [<c02a2e30>] (ktime_get_ts64+0x1c8/0x200)
+> [<c02a2e30>] (ktime_get_ts64) from [<c032d4a0>] (poll_select_set_timeout+0x60/0xa8)
+> [<c032d4a0>] (poll_select_set_timeout) from [<c032df64>] (SyS_select+0xa8/0x118)
+> [<c032df64>] (SyS_select) from [<c020e8e0>] (ret_fast_syscall+0x0/0x48)
+> ---[ end trace 0bb583b46342da6f ]---
+> INFO: lockdep is turned off.
 > 
-> imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
+> We don't really need to get the platform irq again when we're
+> enabling or disabling the per-cpu irq. Furthermore, we don't
+> really need to set and clear bits in the active_irqs bitmask
+> because that's only used in the non-percpu irq case to figure out
+> when the last CPU PMU has been disabled. Just pass the irq
+> directly to the enable/disable functions to clean all this up.
+> This should be slightly more efficient and also fix the
+> scheduling while atomic bug.
 > 
-> This comes from imx_ldb_set_clock with mux = 0. Mux parameter must be "1" for
-> reparenting di1 clock to ldb_di1. The value of the mux param comes from device
-> tree port settings.
-> 
-> On i.MX5, the internal two-input-multiplexer is used. Due to hardware limitations,
-> only one port (port@[0,1]) can be used for each channel (lvds-channel@[0,1],
-> respectively)
-> 
-> Documentation update suggested by Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
-> Fixes: e05c8c9a790a ("ARM: dts: imx53: Add IPU DI ports and endpoints, move imx-drm node to dtsi")
-> Cc: <stable@vger.kernel.org>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> Reported-by: Rob Clark <robdclark@gmail.com>
+> Fixes: bbd64559376f "ARM: perf: support percpu irqs for the CPU PMU"
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
-> Hi arm-soc folks,
 > 
-> Please apply the fix for 3.17, thanks.
+> I'll drop this in the patch tracker tomorrow unless I hear differently.
 
-Applied to fixes branch, thanks!
+Cheers Stephen, don't forget to CC stable.
 
-	Arnd
+Will
