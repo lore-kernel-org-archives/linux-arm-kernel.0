@@ -1,84 +1,109 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 11 Sep 2014 10:35:43 -0400
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <54119AAA.9080907@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
-Message-ID: <5411B33F.10405@hurleysoftware.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 11 Sep 2014 16:38:47 +0200
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140911142511.GA2543@localhost.localdomain>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911120928.GA1585@localhost.localdomain>
+ <20140911143616.3ebb025a@bbrezillon>
+ <20140911142511.GA2543@localhost.localdomain>
+Message-ID: <20140911163847.5e2f85c7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2014 08:50 AM, Sebastian Andrzej Siewior wrote:
-> On 09/11/2014 02:32 PM, Peter Hurley wrote:
->> On 09/11/2014 07:42 AM, Sebastian Andrzej Siewior wrote:
->>> I also need a watchdog timer for TX since it seems that on omap3 the
->>> DMA engine suddenly forgets to continue with DMA?
->>
->> One difference I noticed between the omap driver and the 8250 driver is
->> the way modem status interrupts are handled.
->>
->> The omap driver only checks modem status for the UART_IIR_MSI interrupt type.
->> The 8250 driver checks modem status at every interrupt (other than NO_INT).
->>
->> I think the UART_MSR_DCTS bit always reflects that the CTS input has changed
->> between reads of the MSR _even if auto CTS is on_. So perhaps the hardware
->> is being stopped by uart_handle_cts_change() when auto CTS is on?
+Hi Huang,
+
+On Thu, 11 Sep 2014 22:25:13 +0800
+Huang Shijie <shijie8@gmail.com> wrote:
+
+> Hi Boris,
 > 
-> I doubt that. What I see from a timer debug is that the TX-FIFO level
-> is at 0, the DMA transfer for say 1024 bytes start.
-> The FIFO is filled to 64bytes and refilled so it doesn't drop below 50.
-> At the time of the stall I see that the DMA engine has outstanding
-> bytes which it should transfer and the TX FIFO is empty. If hardware
-> flow control stops the transfer, I would expect that the DMA engine
-> still fills the TX-FIFO until 64 and then waits. But it doesn't.
-> Writing bytes into the FIFO leads to bytes beeing sent (and I see them
-> on the other side) but the DMA transfer is still on hold. Canceling the
-> DMA transfer and re-programming the remaining bytes transfers the
-> remaining bytes.
+> On Thu, Sep 11, 2014 at 02:36:16PM +0200, Boris BREZILLON wrote:
+> > Hi Huang,
+> > 
+> > On Thu, 11 Sep 2014 20:09:30 +0800
+> > Huang Shijie <shijie8@gmail.com> wrote:
+> > 
+> > > On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
+> > > > Several MTD users (either in user or kernel space) expect a valid raw
+> > > > access support to NAND chip devices.
+> > > > This is particularly true for testing tools which are often touching the
+> > > > data stored in a NAND chip in raw mode to artificially generate errors.
+> > > > 
+> > > > The GPMI drivers do not implemenent raw access functions, and thus rely on
+> > > > default HW_ECC scheme implementation.
+> > > > The default implementation consider the data and OOB area as properly
+> > > > separated in their respective NAND section, which is not true for the GPMI
+> > > > controller.
+> > > > In this driver/controller some OOB data are stored at the beginning of the
+> > > > NAND data area (these data are called metadata in the driver), then ECC
+> > > > bytes are interleaved with data chunk (which is similar to the
+> > > > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
+> > > > OOB data.
+> > > > 
+> > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > ---
+> > > > Hello,
+> > > > 
+> > > > This patch is providing raw access support to the GPMI driver which is
+> > > > particularly useful to run some tests on the NAND (the one coming in
+> > > > mind is the mtd_nandbiterrs testsuite).
+> > > > 
+> > > > I know this rework might break several user space tools which are relying
+> > > > on the default raw access implementation (I already experienced an issue
+> > > > with the kobs-ng tool provided by freescale), but many other tools will
+> > > > now work as expected.
+> > > If the kobs-ng can not works, there is no meaning that other tools
+> > > works.  So I do not think we need to implement these hooks.
+> > 
+> > Well, I don't know about freescale specific tools, but at least I have
+> > an example with mtd_nandbiterrs module.
 > 
-> The odd thing is that I only triggered it with "less file". It doesn't
-> happen on regular console interaction or "cat large-file". And it only
-> triggers on beagle board xm (omap34xx) and I wasn't able to reproduce
-> it on am335x or dra7. The latter shares the same DMA engine as beagle
-> board xm.
+> The gpmi uses the hardware ECC for the bitflips.
+> I really do not know why the mtd_nandbiterrs is needed.
+> IMHO, the mtd_nandbiterrs is useless for the gpmi.
+
+Because some folks would like to test their NAND controller/chip on
+their system.
+
+Just because you don't need it, doesn't mean others won't, and actually
+the reason I worked on these raw function is becaused I needed to
+validate the ECC capabilities of the GPMI ECC controller.
+
 > 
-> I remember also that I disabled the HW/SW float control just to make
-> sure it is not it.
+> > This module is assuming it can write only the data part of a NAND page
+> > without modifying the OOB area (see [1]), which in GPMI controller case
+> > is impossible because raw write function store the data as if there
+> > were no specific scheme, while there is one:
+> > (metadata + n x (data_chunk + ECC bytes) + remaining_bytes).
+> > 
+> > Moreover, IMHO, nanddump and nandwrite tools (which can use raw
+> > access mode when passing the appropriate option) should always return
+> > the same kind of data no matter what NAND controller is in use on the
+> > system => (DATA + OOB_DATA), and this is definitely not the case with
+> > the GPMI driver.
+> > 
+> > See how raw access on HW_ECC_SYNDROME scheme is implemented in
+> The gpmi uses the NAND_ECC_HW, not the NAND_ECC_HW_SYNDROME.
 
-Ok.
+Yes I know. I pointed out the NAND_ECC_HW_SYNDROME scheme as an example
+to show you that NAND controller specific layout should be hidden to
+the MTD user.
 
-I do need to find out if omap hardware sets UART_MSR_DCTS when auto CTS
-is on. Would you mind running the debug patch below with HW flow control on?
+> Even you really want to support the nanddump, i do not agree to add the
+> write hook, it may crash the system.
 
-Regards,
-Peter Hurley
+We can't have an asymetric behaviour here, either we move both read and
+write raw functions or none. Moving only one of them would make the MTD
+user work even more complicated.
 
---- >% ---
-Subject: [DEBUG] serial: does OMAP set UART_LSR_DCTS while autoCTS is on?
+I really don't get your point here. What's really bothering you (BTW, I
+fixed kobs-ng to handle this new behaviour) ?
 
-** debug patch only **
+Best Regards,
 
-Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
----
- drivers/tty/serial/serial_core.c | 3 +++
- 1 file changed, 3 insertions(+)
+Boris
 
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index 5a78f69..1579a20 100644
---- a/drivers/tty/serial/serial_core.c
-+++ b/drivers/tty/serial/serial_core.c
-@@ -2783,6 +2783,9 @@ void uart_handle_cts_change(struct uart_port *uport, unsigned int status)
- 	uport->icount.cts++;
- 
- 	if (tty_port_cts_enabled(port)) {
-+
-+		WARN_ON_ONCE(uport->flags & UPF_HARD_FLOW);
-+
- 		if (tty->hw_stopped) {
- 			if (status) {
- 				tty->hw_stopped = 0;
 -- 
-2.1.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
