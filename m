@@ -1,32 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Sep 2014 18:07:16 +0100
-Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <CAD=FV=WECbZ4L=-C+F9K6kfiPUi7ar3a4a7Upq2TqDYYPGoOrA@mail.gmail.com>
-References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
- <20140911164710.GW6158@arm.com>
- <CAD=FV=WECbZ4L=-C+F9K6kfiPUi7ar3a4a7Upq2TqDYYPGoOrA@mail.gmail.com>
-Message-ID: <20140911170716.GA6158@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Sep 2014 19:08:13 +0200
+Subject: [RFC v2 5/9] KVM: KVM-VFIO: update user API to program forwarded
+ IRQ
+In-Reply-To: <54116204.6000403@linaro.org>
+References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
+ <1409575968-5329-6-git-send-email-eric.auger@linaro.org>
+ <20140911031005.GF2784@lvm> <54116204.6000403@linaro.org>
+Message-ID: <20140911170813.GC5535@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 05:59:53PM +0100, Doug Anderson wrote:
-> On Thu, Sep 11, 2014 at 9:47 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > I'd say `Only supported for ARM' to better match what we've done. Probably
-> > also worth mentioning that this relies on the hypervisor/firmware having set
-> > CNTHCTL.PL1PCEN and CNTHCTL.EL1PCTEN (but assumedly made a mess of CNTVOFF
-> > ;) if you want to boot on the non-secure side (e.g. as a guest).
+On Thu, Sep 11, 2014 at 10:49:08AM +0200, Eric Auger wrote:
+> On 09/11/2014 05:10 AM, Christoffer Dall wrote:
+> > On Mon, Sep 01, 2014 at 02:52:44PM +0200, Eric Auger wrote:
+
+[...]
+
+> >> +
+> >> +It is up to the caller of this API to make sure the IRQ is not
+> >> +outstanding when the FORWARD/UNFORWARD is called. This could lead to
+> > 
+> > outstanding? can you be specific?
+> active? and I should add *physical* IRQ
+> > 
+> > don't refer to FOWARD/UNFORWARD, either refer to these attributes by
+> > their full name or use a clear reference in proper English.
+> ok
+> > 
+> >> +some inconsistency on who is going to complete the IRQ.
+> > 
+> > This sounds like the whole thing is fragile and if userspace doesn't do
+> > things right, IRQ handling of a piece of hardware is going to be
+> > inconsistent?  Is this the case?  If so, we need some stronger
+> > semantics.  If not, this should be rephrased.
+> Actually the KVM-VFIO device rejects any attempt to change the
+> forwarding mode if the physical IRQ is active. So I hope this is robust
+> and will change the explanation.
 > 
-> Note that the reset value of CNTHCTL.PL1PCEN and CNTHCTL.PL1PCTEN are
-> both 1 in my version of the ARM ARM.  On the other hand CNTVOFF is
-> documented to have an UNKNOWN reset value.  If only ARM had guaranteed
-> that CNTVOFF started out as 0 (which seems like it would have been
-> sensible) we wouldn't be in this mess.  :-/
+ok, so what is the proposed method if the IRQ is indeed active, should
+user space loop around and try or can user space make sure somehow?  If
+user space should simply retry for a number of times, we should probalby
+return a proper error code for this case -EINTR?
 
-I'm afraid we went the opposite way -- in ARMv8 there are a tiny handful
-of EL3 registers that are well-defined out of reset, then the rest of the
-system is UNKNOWN. The hardware guys prefer that and it can also be useful
-for very low-level debugging (system crashes, do a reset, read out the
-state).
-
-Will
+-Christoffer
