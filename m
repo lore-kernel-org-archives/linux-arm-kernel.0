@@ -1,72 +1,68 @@
-From: sagar.tv@gmail.com (vidya sagar)
-Date: Fri, 12 Sep 2014 01:16:25 +0530
-Subject: [PATCH v4] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
-References: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
-Message-ID: <CAN7O0+K2+5E7LOD8haK3sgpvyPeOZzbgu8VQuQSwOYwYBk3dzg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Sep 2014 12:47:17 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: make of_device_ids const
+In-Reply-To: <20140911194215.GO3755@pengutronix.de>
+References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1410337579-23466-2-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140911173943.GB18849@atomide.com>
+ <20140911190136.GM3755@pengutronix.de>
+ <20140911191449.GF18849@atomide.com>
+ <20140911194215.GO3755@pengutronix.de>
+Message-ID: <20140911194716.GG18849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anyone ???
+* Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140911 12:42]:
+> Hello Tony,
+> 
+> On Thu, Sep 11, 2014 at 12:14:50PM -0700, Tony Lindgren wrote:
+> > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140911 12:02]:
+> > > On Thu, Sep 11, 2014 at 10:39:43AM -0700, Tony Lindgren wrote:
+> > > > * Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [140910 01:27]:
+> > > > > of_device_ids (i.e. compatible strings and the respective data) are not
+> > > > > supposed to change at runtime. All functions working with of_device_ids
+> > > > > provided by <linux/of.h> work with const of_device_ids. So mark the
+> > > > > non-const function parameters and structs for OMAP2+ as const, too.
+> > > > 
+> > > > Hmm this does not seem to compile with omap2plus_defconfig because
+> > > > of section type conflicts. Looks like there's some issue now with the
+> > > > use of __initconst:
+> > > > 
+> > > > arch/arm/mach-omap2/board-generic.c:262:20: error: dra72x_boards_compat causes a section type conflict with omap_dt_match_table
+> > > > arch/arm/mach-omap2/board-generic.c:30:34: note: ?omap_dt_match_table? was declared here
+> > > > scripts/Makefile.build:257: recipe for target 'arch/arm/mach-omap2/board-generic.o' failed
+> > > The problem is dra74x_boards_compat though:
+> > > 
+> > > 	static const char *dra74x_boards_compat[] __initconst = {
+> > > 		...
+> > > 
+> > > *dra74x_boards_compat is const, but dra74x_boards_compat isn't, so
+> > > either the variable must go into __initdata or it must be declared as:
+> > > 
+> > > 	static const char * const dra74x_boards_compat[] __initconst = {
+> > > 		...
+> > 
+> > Ah OK.
+> >  
+> > > (but then I guess you get another warning because struct machine_desc's
+> > > dt_compat is declared as
+> > > 
+> > > 	const char **dt_compat;
+> > > 
+> > > .)
+> > > 
+> > > With the patch below, arch/arm/mach-omap2/board-generic.c compiles just
+> > > fine. Don't know yet if the additional const in <asm/mach_desc.h> is
+> > > problematic ...
+> > 
+> > Yes OK thanks. It Would be nice to have those as __initconst to discard
+> > the unused ones.
+> __initdata is discarded, too, but I already send a patch that adds the
+> additional consts. On top of this one the patch from this thread is
+> fine.
 
-On Sun, Sep 7, 2014 at 3:58 PM, Vidya Sagar <sagar.tv@gmail.com> wrote:
-> From: Vidya Sagar <sagar.tv@gmail.com>
->
-> As per PCIe spec, fast back-to-back transactions feature
-> is not applicable to PCIe devices. Hence, do not print
-> that fast back-to-back trasactions are disabled when
-> there is a PCIe device found on the bus
->
-> Signed-off-by: Vidya Sagar <sagar.tv@gmail.com>
-> ---
-> v4:
-> * initialized 'has_pcie_dev' to 'false'
->
-> v3:
-> * removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
->
-> v2:
-> * Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
-> * replaced printk with pr_info
->
->  arch/arm/kernel/bios32.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 17a26c1..03c56ba 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  {
->         struct pci_dev *dev;
->         u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-> +       bool has_pcie_dev = false;
->
->         /*
->          * Walk the devices on this bus, working out what we can
-> @@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->         list_for_each_entry(dev, &bus->devices, bus_list) {
->                 u16 status;
->
-> +               if (!has_pcie_dev)
-> +                       has_pcie_dev = pci_is_pcie(dev);
->                 pci_read_config_word(dev, PCI_STATUS, &status);
->
->                 /*
-> @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->
->         /*
->          * Report what we did for this bus
-> +        * (only if the bus doesn't have any PCIe devices)
->          */
-> -       printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-> -               bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-> +       if (!has_pcie_dev)
-> +               pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
-> +                       bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
->
-> --
-> 1.8.1.5
->
+OK great thanks. I'll apply both into omap-for-v3.18/fixes-not-urgent.
+
+Regards,
+
+Tony
