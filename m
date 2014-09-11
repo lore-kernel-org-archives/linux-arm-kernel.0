@@ -1,90 +1,54 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 11 Sep 2014 11:24:36 +0100
-Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140911102436.B6671C40862@trevor.secretlab.ca>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Thu, 11 Sep 2014 15:50:44 +0530
+Subject: [PATCH v3 0/8] arch: arm64: enable support for Samsung Exynos7 SoC
+Message-ID: <1410430852-3491-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  1 Sep 2014 22:57:47 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> MADT contains the information for MPIDR which is essential for
-> SMP initialization, parse the GIC cpu interface structures to
-> get the MPIDR value and map it to cpu_logical_map(), and add
-> enabled cpu with valid MPIDR into cpu_possible_map.
-> 
-> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
-> Parking protocol, but the Parking protocol is only specified for
-> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
-> before some updates for the ACPI spec or the Parking protocol spec.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
-> +/**
-> + * acpi_map_gic_cpu_interface - generates a logical cpu number
-> + * and map to MPIDR represented by GICC structure
-> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
-> + * @enabled: this cpu is enabled or not
-> + *
-> + * Returns the logical cpu number which maps to MPIDR
-> + */
-> +static int acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
-> +{
-> +	int cpu;
-> +
-> +	if (mpidr == INVALID_HWID) {
-> +		pr_info("Skip invalid cpu hardware ID\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	total_cpus++;
-> +	if (!enabled)
-> +		return -EINVAL;
-> +
-> +	if (enabled_cpus >=  NR_CPUS) {
-> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
-> +			NR_CPUS, total_cpus, mpidr);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* No need to check duplicate MPIDRs for the first CPU */
-> +	if (enabled_cpus) {
-> +		/*
-> +		 * Duplicate MPIDRs are a recipe for disaster. Scan
-> +		 * all initialized entries and check for
-> +		 * duplicates. If any is found just ignore the CPU.
-> +		 */
-> +		for_each_possible_cpu(cpu) {
-> +			if (cpu_logical_map(cpu) == mpidr) {
-> +				pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
-> +				mpidr);
-> +				return -EINVAL;
-> +			}
-> +		}
-> +	} else {
-> +		/* Fist GICC entry must be BSP as ACPI spec said */
-> +		if  (cpu_logical_map(0) != mpidr) {
-> +			pr_err("First GICC entry is not BSP for MPIDR 0x%llx\n",
-> +			       mpidr);
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	/* allocate a logical cpu id for the new comer */
-> +	if (cpu_logical_map(0) == mpidr) {
-> +		/*
-> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
-> +		 * for BSP, no need to allocate again.
-> +		 */
-> +		cpu = 0;
-> +	} else {
-> +		cpu = cpumask_next_zero(-1, cpu_possible_mask);
-> +	}
+This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
+Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
+ARMv8 RISC processor.
 
-Nit: so the above two if/else blocks are essentially testing for the
-same condition: Is this the first cpu? or a secondary cpu? I would
-merge the two into a single if/else block.
+The following patches are tested based on Kgene's for-next tree.
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
 
-g.
+The following patches are required for this series.
+1- "tty/serial: fix config dependencies for samsung serial"
+   https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36208.html
+
+Alim Akhtar (1):
+  arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
+
+Naveen Krishna Chatradhi (6):
+  clk: samsung: add support for 145xx and 1460x PLLs
+  clk: samsung: Factor out the common code to clk.c
+  clk: samsung: Add fixed_factor_clocks field to struct exynos_cmu_info
+  clk: samsung: add initial clock support for Exynos7 SoC
+  arm64: dts: Add initial device tree support for EXYNOS7
+  tty/serial: samsung: enable usage for 64-bit Exynos platforms
+
+Pankaj Dubey (1):
+  arm64: dts: add <dt-bindings/> symlink
+
+ .../devicetree/bindings/clock/exynos7-clock.txt    |   37 ++
+ arch/arm64/Kconfig                                 |   12 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |   35 ++
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            |  167 ++++++++
+ arch/arm64/boot/dts/include/dt-bindings            |    1 +
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5260.c               |  185 ++-------
+ drivers/clk/samsung/clk-exynos7.c                  |  438 ++++++++++++++++++++
+ drivers/clk/samsung/clk-pll.c                      |   25 +-
+ drivers/clk/samsung/clk-pll.h                      |    4 +
+ drivers/clk/samsung/clk.c                          |   98 +++++
+ drivers/clk/samsung/clk.h                          |   37 ++
+ drivers/tty/serial/Kconfig                         |    2 +-
+ include/dt-bindings/clock/exynos7-clk.h            |   55 +++
+ 15 files changed, 933 insertions(+), 165 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos7-clock.txt
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
+ create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+ create mode 100644 drivers/clk/samsung/clk-exynos7.c
+ create mode 100644 include/dt-bindings/clock/exynos7-clk.h
