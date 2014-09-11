@@ -1,151 +1,40 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Sep 2014 05:10:44 +0200
-Subject: [RFC v2 0/9] KVM-VFIO IRQ forward control
-In-Reply-To: <1409691941.3804.133.camel@ul30vt.home>
-References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
- <1409691941.3804.133.camel@ul30vt.home>
-Message-ID: <20140911031044.GK2784@lvm>
+Date: Thu, 11 Sep 2014 05:12:36 +0200
+Subject: [PATCH v2] ARM/arm64: KVM: fix use of WnR bit in
+ kvm_is_write_fault()
+In-Reply-To: <540EDE63.6060904@arm.com>
+References: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
+ <540EDE63.6060904@arm.com>
+Message-ID: <20140911031236.GL2784@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 03:05:41PM -0600, Alex Williamson wrote:
-> On Mon, 2014-09-01 at 14:52 +0200, Eric Auger wrote:
-> > This RFC proposes an integration of "ARM: Forwarding physical
-> > interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
-> > KVM.
-> > 
-> > It enables to transform a VFIO platform driver IRQ into a forwarded
-> > IRQ. The direct benefit is that, for a level sensitive IRQ, a VM
-> > switch can be avoided on guest virtual IRQ completion. Before this
-> > patch, a maintenance IRQ was triggered on the virtual IRQ completion.
-> > 
-> > When the IRQ is forwarded, the VFIO platform driver does not need to
-> > disable the IRQ anymore. Indeed when returning from the IRQ handler
-> > the IRQ is not deactivated. Only its priority is lowered. This means
-> > the same IRQ cannot hit before the guest completes the virtual IRQ
-> > and the GIC automatically deactivates the corresponding physical IRQ.
-> > 
-> > Besides, the injection still is based on irqfd triggering. The only
-> > impact on irqfd process is resamplefd is not called anymore on
-> > virtual IRQ completion since this latter becomes "transparent".
-> > 
-> > The current integration is based on an extension of the KVM-VFIO
-> > device, previously used by KVM to interact with VFIO groups. The
-> > patch serie now enables KVM to directly interact with a VFIO
-> > platform device. The VFIO external API was extended for that purpose.
-> > 
-> > Th KVM-VFIO device can get/put the vfio platform device, check its
-> > integrity and type, get the IRQ number associated to an IRQ index.
-> > 
-> > The IRQ forward programming is architecture specific (virtual interrupt
-> > controller programming basically). However the whole infrastructure is
-> > kept generic.
-> > 
-> > from a user point of view, the functionality is provided through new
-> > KVM-VFIO device commands, KVM_DEV_VFIO_DEVICE_(UN)FORWARD_IRQ
-> > and the capability can be checked with KVM_HAS_DEVICE_ATTR.
-> > Assignment can only be changed when the physical IRQ is not active.
-> > It is the responsability of the user to do this check.
-> > 
-> > This patch serie has the following dependencies:
-> > - "ARM: Forwarding physical interrupts to a guest VM"
-> >   (http://lwn.net/Articles/603514/) in
-> > - [PATCH v3] irqfd for ARM
-> > - and obviously the VFIO platform driver serie:
-> >   [RFC PATCH v6 00/20] VFIO support for platform devices on ARM
-> >   https://www.mail-archive.com/kvm at vger.kernel.org/msg103247.html
-> > 
-> > Integrated pieces can be found at
-> > ssh://git.linaro.org/people/eric.auger/linux.git
-> > on branch 3.17rc3_irqfd_forward_integ_v2
-> > 
-> > This was was tested on Calxeda Midway, assigning the xgmac main IRQ.
-> > 
-> > v1 -> v2:
-> > - forward control is moved from architecture specific file into generic
-> >   vfio.c module.
-> >   only kvm_arch_set_fwd_state remains architecture specific
-> > - integrate Kim's patch which enables KVM-VFIO for ARM
-> > - fix vgic state bypass in vgic_queue_hwirq
-> > - struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
-> >   to include/uapi/linux/kvm.h
-> >   also irq_index renamed into index and guest_irq renamed into gsi
-> > - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
-> > - vfio_external_get_base_device renamed into vfio_external_base_device
-> > - vfio_external_get_type removed
-> > - kvm_vfio_external_get_base_device renamed into kvm_vfio_external_base_device
-> > - __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-> > 
-> > Eric Auger (8):
-> >   KVM: ARM: VGIC: fix multiple injection of level sensitive forwarded
-> >     IRQ
-> >   KVM: ARM: VGIC: add forwarded irq rbtree lock
-> >   VFIO: platform: handler tests whether the IRQ is forwarded
-> >   KVM: KVM-VFIO: update user API to program forwarded IRQ
-> >   VFIO: Extend external user API
-> >   KVM: KVM-VFIO: add new VFIO external API hooks
-> >   KVM: KVM-VFIO: generic KVM_DEV_VFIO_DEVICE command and IRQ forwarding
-> >     control
-> >   KVM: KVM-VFIO: ARM forwarding control
-> > 
-> > Kim Phillips (1):
-> >   ARM: KVM: Enable the KVM-VFIO device
-> > 
-> >  Documentation/virtual/kvm/devices/vfio.txt |  26 ++
-> >  arch/arm/include/asm/kvm_host.h            |   7 +
-> >  arch/arm/kvm/Kconfig                       |   1 +
-> >  arch/arm/kvm/Makefile                      |   4 +-
-> >  arch/arm/kvm/kvm_vfio_arm.c                |  85 +++++
-> >  drivers/vfio/platform/vfio_platform_irq.c  |   7 +-
-> >  drivers/vfio/vfio.c                        |  24 ++
-> >  include/kvm/arm_vgic.h                     |   1 +
-> >  include/linux/kvm_host.h                   |  27 ++
-> >  include/linux/vfio.h                       |   3 +
-> >  include/uapi/linux/kvm.h                   |   9 +
-> >  virt/kvm/arm/vgic.c                        |  59 +++-
-> >  virt/kvm/vfio.c                            | 497 ++++++++++++++++++++++++++++-
-> >  13 files changed, 733 insertions(+), 17 deletions(-)
-> >  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
-> > 
+On Tue, Sep 09, 2014 at 12:02:59PM +0100, Marc Zyngier wrote:
+> [resending, as ARM email server seems to be in some mood]
 > 
-> Have we ventured too far in the other direction?  I suppose what I was
-> hoping to see was something more like:
+> On 09/09/14 11:27, Ard Biesheuvel wrote:
+> > The ISS encoding for an exception from a Data Abort has a WnR
+> > bit[6] that indicates whether the Data Abort was caused by a
+> > read or a write instruction. While there are several fields
+> > in the encoding that are only valid if the ISV bit[24] is set,
+> > WnR is not one of them, so we can read it unconditionally.
+> > 
+> > Instead of fixing both implementations of kvm_is_write_fault()
+> > in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
+> > which already does the right thing with respect to the WnR bit.
+> > Also fix up the callers to pass 'vcpu'
+> > 
+> > Acked-by: Laszlo Ersek <lersek@redhat.com>
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> 	case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:{
+> Because I like that kind of diffstat:
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> 		/* get vfio_device */
+> Christoffer, if you too are happy with that, I'll queue it right away.
 > 
-> 		/* get mutex */
-> 
-> 		/* verify device+irq isn't already forwarded */
-> 
-> 		/* allocate device/forwarded irq */
-> 
-> 		/* get struct device */
-> 
-> 		/* callout to arch code passing struct device, gsi, ... */
-> 
-> 		/* if success, add to kv, else free and error */
-> 
-> 		/* mutex unlock */
-> 	}
+Extremely happy:
 
-I think that's essentially what this patch set is trying to do, but
-there are just too many complicated intertwining cases right now that
-makes the code hard to read.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-> 
-> Exposing the internal mutex out to arch code, as in v1, was an
-> indication that we were pushing too much out to arch code, but including
-> platform_device.h into virt/kvm/vfio.c tells me we're still not
-> abstracting at the right point.  Thanks,
-> 
-I raised my eyebrows over the platform device bus thingy here as well,
-but on the other hand, there's nothing ARM-specific about referring to
-the platform device bus.
-
-I think perhaps it just has to be made more clear that the generic code
-deals with translating the device resources in the necessary way, and
-currently it only supports vfio-platform devices?
-
+Thanks,
 -Christoffer
