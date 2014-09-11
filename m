@@ -1,84 +1,98 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 11 Sep 2014 12:31:18 +0100
-Subject: [PATCH 3.17-rc4 v5 6/6] arm: smp: Handle ipi_cpu_backtrace() using
- FIQ (if available)
-In-Reply-To: <1410435078-28462-1-git-send-email-daniel.thompson@linaro.org>
-References: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1410435078-28462-7-git-send-email-daniel.thompson@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 11 Sep 2014 12:34:33 +0100
+Subject: [PATCH v3 11/17] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <20140911110846.D152DC408F0@trevor.secretlab.ca>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-12-git-send-email-hanjun.guo@linaro.org>
+ <20140911110846.D152DC408F0@trevor.secretlab.ca>
+Message-ID: <CACxGe6vYKyZu0txFZB+HDJaC3onDfwCvXJ44kWCBcXoqLsTvxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced a replacement default FIQ handler and
-an implementation of arch_trigger_all_cpu_backtrace for ARM but these
-are currently independant.
+On Thu, Sep 11, 2014 at 12:08 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Mon,  1 Sep 2014 22:57:49 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
+>> used, and then register device's gsi with the core IRQ subsystem.
+>>
+>> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
+>> since gsi is unique in the system, so use hwirq number directly
+>> for the mapping.
+>>
+>> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/kernel/acpi.c |   73 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/acpi/bus.c       |    3 ++
+>>  include/linux/acpi.h     |    1 +
+>>  3 files changed, 77 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 35dff11..354b912 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -37,6 +37,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>>  static int enabled_cpus;     /* Processors (GICC) with enabled flag in MADT */
+>>
+>>  /*
+>> + * Since we're on ARM, the default interrupt routing model
+>> + * clearly has to be GIC.
+>> + */
+>> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+>> +
+>> +/*
+>>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>   * or early_memremap() should be called here to for ACPI table mapping.
+>>   */
+>> @@ -194,6 +200,73 @@ void __init acpi_smp_init_cpus(void)
+>>       pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+>>  }
+>>
+>> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+>> +{
+>> +     *irq = irq_find_mapping(NULL, gsi);
+>> +
+>> +     return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>
+> Why is this exported? x86 exports it, but ia64 does not. There aren't
+> very many callers, and none of them can be built as a module AFAICS.
+>
+>> +
+>> +/*
+>> + * success: return IRQ number (>0)
+>> + * failure: return =< 0
+>> + */
+>> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+>> +{
+>> +     unsigned int irq;
+>> +     unsigned int irq_type;
+>> +
+>> +     /*
+>> +      * ACPI have no bindings to indicate SPI or PPI, so we
+>> +      * use different mappings from DT in ACPI.
+>> +      *
+>> +      * For FDT
+>> +      * PPI interrupt: in the range [0, 15];
+>> +      * SPI interrupt: in the range [0, 987];
+>> +      *
+>> +      * For ACPI, GSI should be unique so using
+>> +      * the hwirq directly for the mapping:
+>> +      * PPI interrupt: in the range [16, 31];
+>> +      * SPI interrupt: in the range [32, 1019];
+>> +      */
+>
+> Hmmm, so doing it this way means that DT systems will have a different
+> irq_domain setup compared with ACPI systems. I'm not convinced we want
+> to do that, but I need to look at the code that sets up the new domains
+> before I comment further...
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+Okay, nevermind. I looked at the setup code. This isn't an issue of
+the irq domain being set up differently, but rather the binding
+translation operates differently between DT and ACPI. ACPI used a
+single integer encapsulating PPI and SPI which just happens to line up
+with the hwirq numbers, whereas DT uses a [type,number] tuple that
+needs translating into the hwirq. This code is fine.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 4 +++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 2ec765c..0580270 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -85,6 +87,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 94959f9..7a79d11 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -543,7 +543,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -584,6 +584,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 92c4ea1..40b1de7 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-1.9.3
+g.
