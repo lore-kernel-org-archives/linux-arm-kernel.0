@@ -1,30 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 11 Sep 2014 15:15:18 +0200
-Subject: [PATCH] pinctrl: make of_device_ids const
-In-Reply-To: <CACRpkda1h_GOYh6dJeJJF5pnwLmn5UYCtk-v=b0k56zKy9m8=A@mail.gmail.com>
-References: <1410380437-17960-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkda1h_GOYh6dJeJJF5pnwLmn5UYCtk-v=b0k56zKy9m8=A@mail.gmail.com>
-Message-ID: <20140911131518.GK3755@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 11 Sep 2014 15:18:02 +0200
+Subject: [PATCH v4 0/9] rtc: at91sam9: add DT support
+Message-ID: <1410441491-25207-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 03:07:55PM +0200, Linus Walleij wrote:
-> On Wed, Sep 10, 2014 at 10:20 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > of_device_ids (i.e. compatible strings and the respective data) are not
-> > supposed to change at runtime. All functions working with of_device_ids
-> > provided by <linux/of.h> work with const of_device_ids. This allows to
-> > mark all struct of_device_id below drivers/pinctrl const, too.
-> >
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Sorry! This low-hanging fruit was already picked by Kiran by an
-I wouldn't call it low-hanging fruit because verification that nothing
-breaks is manual work. :-\
+Hello,
 
-Uwe
+This patch series adds DT support to the atmel at91sam9 RTC driver.
+
+It also removes any machine specific inclusions to prepare the migration
+to multi platform kernel support, and retain the slow clock to prevent
+the CCF from disabling it at the end of boot.
+  
+Best Regards,
+
+Boris
+
+Changes since v3:
+ - add GPBR DT bindings doc
+ - fix a coding style issues
+ - add Alexandre's Acked-by
+ - change RTT DT bindings
+
+Changes since v2:
+ - make use of syscon/regmap to avoid directly requesting/mapping a GPBR
+   memory region in the RTT driver
+
+Changes since v1:
+ - remove non CCF specific case by adding the appropriate clk_lookup
+   entries in arch/arm/mach-at91/<soc-name>.c files
+
+
+Boris BREZILLON (9):
+  rtc: at91sam9: remove references to mach specific headers
+  rtc: at91sam9: use standard readl/writel functions instead of raw
+    versions
+  rtc: at91sam9: replace devm_ioremap by devm_ioremap_resource
+  rtc: at91sam9: add DT support
+  rtc: at91sam9: make use of syscon/regmap to access GPBR registers
+  ARM: at91: add clk_lookup entry for RTT devices
+  rtc: at91sam9: use clk API instead of relying on AT91_SLOW_CLOCK
+  rtc: at91sam9: add DT bindings documentation
+  mfd: syscon: add Atmel GPBR DT bindings documention
+
+ .../devicetree/bindings/mfd/atmel,gpbr.txt         |  15 +++
+ .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt |  23 ++++
+ arch/arm/mach-at91/at91sam9260.c                   |   2 +
+ arch/arm/mach-at91/at91sam9261.c                   |   2 +
+ arch/arm/mach-at91/at91sam9263.c                   |   4 +
+ arch/arm/mach-at91/at91sam9g45.c                   |   2 +
+ arch/arm/mach-at91/at91sam9rl.c                    |   2 +
+ arch/arm/mach-at91/clock.c                         |   2 +-
+ arch/arm/mach-at91/clock.h                         |   1 +
+ drivers/rtc/Kconfig                                |   1 +
+ drivers/rtc/rtc-at91sam9.c                         | 133 ++++++++++++++++-----
+ 11 files changed, 157 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
