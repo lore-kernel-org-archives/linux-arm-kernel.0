@@ -1,198 +1,95 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 11 Sep 2014 22:11:39 +0200
-Subject: [PATCH v2 8/9] ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200
- DTSI/DTS
-In-Reply-To: <1410466300-19168-1-git-send-email-carlo@caione.org>
-References: <1410466300-19168-1-git-send-email-carlo@caione.org>
-Message-ID: <1410466300-19168-9-git-send-email-carlo@caione.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 11 Sep 2014 13:17:23 -0700
+Subject: [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle SATA
+ controller
+In-Reply-To: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <CAOesGMh_Ku-pReg5LHVFvRM0-s_zEO4rgAvaD5rv-eTfPD71Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Meson6 SoC is produced by Amlogic inc. and it is based on 2 Cortex
-A9 and an ARM Mali-400 GPU.
-This patch adds two basic DTSI for the preliminary support of Meson and
-Meson6 SoCs. Another DTS is also added for supporting the atv1200 board,
-produced by Geniatech inc.
+On Tue, Sep 9, 2014 at 1:37 PM,  <suravee.suthikulpanit@amd.com> wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>
+> This patch adds ACPI support for non-PCI SATA contoller in ahci_platform driver.
+> It adds ACPI matching table in ahci_platform to support AMD Seattle SATA controller
+> with following ASL structure in DSDT:
+>
+>     Device (SATA0)
+>     {
+>       Name(_HID, "AMDI0600")    // Seattle AHSATA
+>       Name (_CCA, 1)            // Cache-coherent controller
+>       Name (_CRS, ResourceTemplate ()
+>       {
+>         Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
+>         Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
+>       })
+>     }
+>
+> Since ATA driver should not require PCI support for ATA_ACPI,
+> this patch also removes dependency in the driver/ata/Kconfig.
+>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  drivers/ata/Kconfig         |  2 +-
+>  drivers/ata/ahci_platform.c | 13 +++++++++++++
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index e1b9278..f2e6c9e 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
+>
+>  config ATA_ACPI
+>         bool "ATA ACPI Support"
+> -       depends on ACPI && PCI
+> +       depends on ACPI
+>         default y
+>         help
+>           This option adds support for ATA-related ACPI objects.
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index f61ddb9..3499bab 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -20,6 +20,9 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/libata.h>
+>  #include <linux/ahci_platform.h>
+> +#ifdef CONFIG_ATA_ACPI
+> +#include <linux/acpi.h>
+> +#endif
+>  #include "ahci.h"
+>
+>  static const struct ata_port_info ahci_port_info = {
+> @@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, ahci_of_match);
+>
+> +#ifdef CONFIG_ATA_ACPI
+> +static const struct acpi_device_id ahci_acpi_match[] = {
+> +       { "AMDI0600", 0 }, /* AMD Seattle AHCI */
+> +       { },
+> +};
+> +#endif
+> +
+>  static struct platform_driver ahci_driver = {
+>         .probe = ahci_probe,
+>         .remove = ata_platform_remove_one,
+> @@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
+>                 .name = "ahci",
+>                 .owner = THIS_MODULE,
+>                 .of_match_table = ahci_of_match,
+> +#ifdef CONFIG_ATA_ACPI
+> +               .acpi_match_table = ACPI_PTR(ahci_acpi_match),
+> +#endif
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/boot/dts/Makefile           |  1 +
- arch/arm/boot/dts/meson.dtsi         | 74 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/meson6-atv1200.dts | 25 ++++++++++++
- arch/arm/boot/dts/meson6.dtsi        | 40 +++++++++++++++++++
- 4 files changed, 140 insertions(+)
- create mode 100644 arch/arm/boot/dts/meson.dtsi
- create mode 100644 arch/arm/boot/dts/meson6-atv1200.dts
- create mode 100644 arch/arm/boot/dts/meson6.dtsi
+The whole point of having ACPI_PTR() is to avoid having ifdefs like
+these. The structure member is always there, so there's no need to
+have it conditionally compiled out.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9..4e2bb17 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -154,6 +154,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += $(kirkwood)
- dtb-$(CONFIG_MACH_KIRKWOOD) += $(kirkwood)
- dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
-+dtb-$(CONFIG_MACH_MESON6) += meson6-atv1200.dtb
- dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
- dtb-$(CONFIG_ARCH_MXC) += \
- 	imx25-eukrea-mbimxsd25-baseboard.dtb \
-diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-new file mode 100644
-index 0000000..ace5db8
---- /dev/null
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright 2014 Carlo Caione <carlo@caione.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+		serial1 = &uart_A;
-+		serial2 = &uart_B;
-+		serial3 = &uart_C;
-+	};
-+
-+	gic: interrupt-controller at c4301000 {
-+		compatible = "arm,cortex-a9-gic";
-+		reg = <0xc4301000 0x1000>,
-+		      <0xc4300100 0x0100>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+	};
-+
-+	timer at c1109940 {
-+		compatible = "amlogic,meson6-timer";
-+		reg = <0xc1109940 0x14>;
-+		interrupts = <0 10 1>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		uart_AO: serial at c81004c0 {
-+			compatible = "amlogic,meson-uart";
-+			reg = <0xc81004c0 0x14>;
-+			interrupts = <0 90 1>;
-+			clocks = <&clk81>;
-+			status = "disabled";
-+		};
-+
-+		uart_A: serial at c81084c0 {
-+			compatible = "amlogic,meson-uart";
-+			reg = <0xc81084c0 0x14>;
-+			interrupts = <0 90 1>;
-+			clocks = <&clk81>;
-+			status = "disabled";
-+		};
-+
-+		uart_B: serial at c81084dc {
-+			compatible = "amlogic,meson-uart";
-+			reg = <0xc81084dc 0x14>;
-+			interrupts = <0 90 1>;
-+			clocks = <&clk81>;
-+			status = "disabled";
-+		};
-+
-+		uart_C: serial at c8108700 {
-+			compatible = "amlogic,meson-uart";
-+			reg = <0xc8108700 0x14>;
-+			interrupts = <0 90 1>;
-+			clocks = <&clk81>;
-+			status = "disabled";
-+		};
-+	};
-+}; /* end of / */
-diff --git a/arch/arm/boot/dts/meson6-atv1200.dts b/arch/arm/boot/dts/meson6-atv1200.dts
-new file mode 100644
-index 0000000..84576aa
---- /dev/null
-+++ b/arch/arm/boot/dts/meson6-atv1200.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright 2014 Carlo Caione <carlo@caione.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
-+
-+/dts-v1/;
-+/include/ "meson6.dtsi"
-+
-+/ {
-+	model = "Geniatech ATV1200";
-+	compatible = "geniatech,atv1200";
-+
-+	memory {
-+		reg = <0x40000000 0x80000000>;
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
-new file mode 100644
-index 0000000..f9d2cb5
---- /dev/null
-+++ b/arch/arm/boot/dts/meson6.dtsi
-@@ -0,0 +1,40 @@
-+/*
-+ * Copyright 2014 Carlo Caione <carlo@caione.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ */
-+
-+/include/ "meson.dtsi"
-+
-+/ {
-+	model = "Amlogic Meson6 SoC";
-+	compatible = "amlogic,meson6";
-+
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x200>;
-+		};
-+
-+		cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x201>;
-+		};
-+	};
-+
-+	clk81: clk at 0 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <200000000>;
-+	};
-+}; /* end of / */
--- 
-1.9.1
+Come to think of it, the match table should be under CONFIG_ACPI
+instead -- why do a separate config option just for this?
+
+
+-Olof
