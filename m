@@ -1,206 +1,150 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 11 Sep 2014 18:16:39 -0400
-Subject: [PATCH v2] PM / AVS: rockchip-io: add driver handling Rockchip
- io domains
-In-Reply-To: <CAD=FV=VYkf1AuwwSHsdCX2sqzKmZBzWdMZhi-kx3ycKtTcA=pA@mail.gmail.com>
-References: <1410469229-30167-1-git-send-email-dianders@chromium.org>	<541214A7.3040402@ti.com>
- <CAD=FV=VYkf1AuwwSHsdCX2sqzKmZBzWdMZhi-kx3ycKtTcA=pA@mail.gmail.com>
-Message-ID: <54121F47.7060702@ti.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Thu, 11 Sep 2014 15:18:15 -0700
+Subject: [PATCH v2] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+Message-ID: <1410473895-6756-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 06:07 PM, Doug Anderson wrote:
-> Santosh,
-> 
-> On Thu, Sep 11, 2014 at 2:31 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com> wrote:
->>> +Required properties:
->>> +- compatible: should be one of:
->>> +  - "rockchip,rk3188-iodomain" for rk3188
->>> +  - "rockchip,rk3288-iodomain" for rk3288
->> The key word 'voltage' is missing from the compatible. iodomain itself
->> doesn't convey what it is actually.
-> 
-> Sure, so you want "rockchip,rk3288-io-voltage-domain" then?
->
-Sounds good for me.
+This is a bug fix for using physical arch timers when
+the arch_timer_use_virtual boolean is false.  It restores the
+arch_counter_get_cntpct() function after removal in
+
+0d651e4e "clocksource: arch_timer: use virtual counters"
+
+and completes the implementation of memory mapped access for physical
+timers, so if a system is trying to use physical timers, it will
+function properly.
+
+We need this on certain ARMv7 systems which are architected like this:
+
+* The firmware doesn't know and doesn't care about hypervisor mode and
+  we don't want to add the complexity of hypervisor there.
+
+* The firmware isn't involved in SMP bringup or resume.
+
+* The ARCH timer come up with an uninitialized offset between the
+  virtual and physical counters.  Each core gets a different random
+  offset.
+
+* The device boots in "Secure SVC" mode.
+
+* Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+  CNTHCTL.PL1PCTEN (both default to 1 at reset)
+
+One example of such as system is RK3288 where it is much simpler to
+use the physical counter since there's nobody managing the offset and
+each time a core goes down and comes back up it will get reinitialized
+to some other random value.
+
+Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
+Cc: stable at vger.kernel.org
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+Acked-by: Olof Johansson <olof@lixom.net>
+---
+v2: Add fixes tag to commit message, cc stable, copy Doug's
+    description of the systems which need this in commit message.
+---
+ arch/arm/include/asm/arch_timer.h    |  9 +++++++++
+ arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
+ drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
+ 3 files changed, 45 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 0704e0c..e72aa4d 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
+ 	return val;
+ }
  
-[..]
-
->>> diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
->>> new file mode 100644
->>> index 0000000..f4e0ebc
->>> --- /dev/null
->>> +++ b/drivers/power/avs/rockchip-io-domain.c
->>> @@ -0,0 +1,333 @@
->>> +/*
->>> + * Rockchip IO Voltage Domain driver
->>> + *
->>> + * Copyright 2014 MundoReader S.L.
->>> + * Copyright 2014 Google, Inc.
->>> + *
->>> + * This software is licensed under the terms of the GNU General Public
->>> + * License version 2, as published by the Free Software Foundation, and
->>> + * may be copied, distributed, and modified under those terms.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#include <linux/kernel.h>
->>> +#include <linux/module.h>
->>> +#include <linux/err.h>
->>> +#include <linux/mfd/syscon.h>
->> The bindings are not talking about syscon usage. You might
->> want to document it appropriately to make the usage clear.
-> 
-> Doesn't the bindings have this?
-> 
->> +- rockchip,grf: phandle to the syscon managing the "general register files"
-> 
-> I actually forgot that in v1, but I added it to v2.
-> 
-Sorry didn't spot that. Ignore the comment.
-
-> 
->>> +#define MAX_VOLTAGE_1_8              1980000
->> This is close to 2V, Is that intentional.
->>
->>> +#define MAX_VOLTAGE_3_3              3600000
->>> +
->> Same here.
-> 
-> I got these numbers from the document "Rocchip RK3288 datasheet".
-> Under "Recommended Operating Conditions" for "Digital GPIO".  When the
-> typical is 3.3V the max is 3.6V.  When the typical is 1.8V the max is
-> 1.98V.
-> 
-> The way these numbers are used is:
-> 
-> If the voltage on a rail is above the "1.8" voltage (1.98V) we'll tell
-> the SoC we're at 3.3.  If the voltage on a rail is above the "3.3V"
-> we'll consider that to be an error.
-> 
-> There's one secret ulterior motive here though that I'll admit to.
-> When a client uses regulator_set_voltage() they actually specify a min
-> and max voltage.  They might say that they want 3.3V by saying that
-> they want a voltage between 2.7V and 3.6V.  They might say that they
-> want 1.8V by saying that they want a voltage between 1.7V and 1.95V.
-> In our pre-change notification we are only told the possible range.
-> It's nice if things work properly in that case.  If we find some case
-> that doesn't work later we can always get fancier and try to figure
-> out what voltage the regulator will end up at, but I haven't seen the
-> need yet.
-> 
-> Note that the 1.7 - 1.95V is more than hypothetical.  dw_mmc requests
-> those ranges.  I'll admit that I was involved in that code, but I'll
-> also admit to having stolen those numbers from sdhci.
-> 
-Thanks for explaination. I suggest you to document it above those macro's
-so that its not confusing for any reader.
-
-> 
->>> +struct rockchip_iodomain;
->>> +
->>> +/**
->>> + * @supplies: voltage settings matching the register bits.
->>> + */
->>> +struct rockchip_iodomain_soc_data {
->>> +     int grf_offset;
->>> +     const char *supply_names[MAX_SUPPLIES];
->>> +     void (*init)(struct rockchip_iodomain *iod);
->>> +};
->>> +
->>> +struct rockchip_iodomain_supply {
->>> +     struct rockchip_iodomain *iod;
->>> +     struct regulator *reg;
->>> +     struct notifier_block nb;
->>> +     int idx;
->>> +};
->>> +
->>> +struct rockchip_iodomain {
->>> +     struct device *dev;
->>> +     struct regmap *grf;
->>> +     struct rockchip_iodomain_soc_data *soc_data;
->>> +     struct rockchip_iodomain_supply supplies[MAX_SUPPLIES];
->>> +};
->>> +
->>> +static int rockchip_iodomain_write(struct rockchip_iodomain_supply *supply,
->>> +                                int uV)
->>> +{
->>> +     struct rockchip_iodomain *iod = supply->iod;
->>> +     u32 val;
->>> +     int ret;
->>> +
->>> +     /* set value bit */
->>> +     val = (uV > MAX_VOLTAGE_1_8) ? 0 : 1;
->>> +     val <<= supply->idx;
->>> +
->>> +     /* apply hiword-mask */
->>> +     val |= (BIT(supply->idx) << 16);
->>> +
->>> +     ret = regmap_write(iod->grf, iod->soc_data->grf_offset, val);
->>> +     if (ret)
->>> +             dev_err(iod->dev, "Couldn't write to GRF\n");
->>> +
->>> +     return ret;
->>> +}
->>> +
->>> +static int rockchip_iodomain_notify(struct notifier_block *nb,
->>> +                                 unsigned long event,
->>> +                                 void *data)
->>> +{
->>> +     struct rockchip_iodomain_supply *supply =
->>> +                     container_of(nb, struct rockchip_iodomain_supply, nb);
->>> +     int uV;
->>> +     int ret;
->>> +
->>> +     /*
->>> +      * According to Rockchip it's important to keep the SoC IO domain
->>> +      * higher than (or equal to) the external voltage.  That means we need
->>> +      * to change it before external voltage changes happen in the case
->>> +      * of an increase.
->>> +      */
->>> +     if (event & REGULATOR_EVENT_PRE_VOLTAGE_CHANGE) {
->>> +             struct pre_voltage_change_data *pvc_data = data;
->>> +
->>> +             uV = max_t(unsigned long, pvc_data->old_uV, pvc_data->max_uV);
->>> +     } else if (event & (REGULATOR_EVENT_VOLTAGE_CHANGE |
->>> +                         REGULATOR_EVENT_ABORT_VOLTAGE_CHANGE)) {
->>> +             uV = (unsigned long)data;
->>> +     } else {
->>> +             return NOTIFY_OK;
->>> +     }
->>> +
->>> +     dev_dbg(supply->iod->dev, "Setting to %d\n", uV);
->>> +
->>> +     if (uV > MAX_VOLTAGE_3_3) {
->>> +             dev_err(supply->iod->dev, "Voltage too high: %d\n", uV);
->>> +
->>> +             if (event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
->>> +                     return NOTIFY_BAD;
->>> +     }
->>> +
->>> +     ret = rockchip_iodomain_write(supply, uV);
->>> +     if (ret && event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
->>> +             return NOTIFY_BAD;
->>> +
->>> +     dev_info(supply->iod->dev, "Setting to %d done\n", uV);
->>> +     return NOTIFY_OK;
->>> +}
->>> +
->>> +#define RK3288_SOC_CON2                      0x24c
->>> +#define RK3288_SOC_CON2_FLASH0               BIT(7)
->>> +#define RK3288_SOC_FLASH_SUPPLY_NUM  2
->>> +
->> Not a strong opinion but you can club all the defines on top
->> of the file.
-> 
-> Sure, I'll move them.
-> 
-OK. Feel free to add my reviewed-by tag after the updates if you need one.
-
-regards,
-Santosh
++static inline u64 arch_counter_get_cntpct(void)
++{
++	u64 cval;
++
++	isb();
++	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
++	return cval;
++}
++
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 9400596..58657c4 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
+ #endif
+ }
+ 
++static inline u64 arch_counter_get_cntpct(void)
++{
++	u64 cval;
++
++	isb();
++	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
++
++	return cval;
++}
++
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5163ec1..ad723cb 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -30,6 +30,8 @@
+ #define CNTTIDR		0x08
+ #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
+ 
++#define CNTPCT_LO	0x00
++#define CNTPCT_HI	0x04
+ #define CNTVCT_LO	0x08
+ #define CNTVCT_HI	0x0c
+ #define CNTFRQ		0x10
+@@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
+ 	return ((u64) vct_hi << 32) | vct_lo;
+ }
+ 
++static u64 arch_counter_get_cntpct_mem(void)
++{
++	u32 pct_lo, pct_hi, tmp_hi;
++
++	do {
++		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
++		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
++		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
++	} while (pct_hi != tmp_hi);
++
++	return ((u64) pct_hi << 32) | pct_lo;
++}
++
+ /*
+  * Default to cp15 based access because arm64 uses this function for
+  * sched_clock() before DT is probed and the cp15 method is guaranteed
+@@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
+ 	u64 start_count;
+ 
+ 	/* Register the CP15 based counter if we have one */
+-	if (type & ARCH_CP15_TIMER)
+-		arch_timer_read_counter = arch_counter_get_cntvct;
+-	else
+-		arch_timer_read_counter = arch_counter_get_cntvct_mem;
++	if (type & ARCH_CP15_TIMER) {
++		if (arch_timer_use_virtual)
++			arch_timer_read_counter = arch_counter_get_cntvct;
++		else
++			arch_timer_read_counter = arch_counter_get_cntpct;
++	} else {
++		if (arch_timer_use_virtual)
++			arch_timer_read_counter = arch_counter_get_cntvct_mem;
++		else
++			arch_timer_read_counter = arch_counter_get_cntpct_mem;
++	}
+ 
+ 	start_count = arch_timer_read_counter();
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+-- 
+1.8.3.2
