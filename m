@@ -1,123 +1,72 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Thu, 11 Sep 2014 14:41:07 +0800
-Subject: [PATCH v1] ARM: imx6: add pm_power_off support for i.mx6 chips
-Message-ID: <1410417667-6436-1-git-send-email-b38343@freescale.com>
+From: riku.voipio@linaro.org (Riku Voipio)
+Date: Thu, 11 Sep 2014 10:49:18 +0300
+Subject: [PATCH v2] Enable gcov support on the ARM architecture
+Message-ID: <1410421758-13173-1-git-send-email-riku.voipio@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All chips of i.mx6 can be powered off by programming SNVS.
-For example :
-On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
-pmic ON/OFF pin, that will cause the whole PMIC powered off
-except VSNVS. And system can restart once PMIC_ON_REQ goes
-high by push POWRER key.
+Enable gcov support for ARM based on original patches by David
+Singleton and George G. Davis
 
-Signed-off-by: Robin Gong <b38343@freescale.com>
+Riku - updated to patch to current mainline kernel. The patch
+has been submitted in 2010, 2012 - for symmetry, now in 2014 too.
+
+https://lwn.net/Articles/390419/
+http://marc.info/?l=linux-arm-kernel&m=133823081813044
+
+v2: remove arch/arm/kernel from gcov disabled files
+
+From: Vincent Sanders <vincent.sanders@collabora.co.uk>
+Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Naresh Kamboju <naresh.kamboju@linaro.org>
+Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
 ---
- arch/arm/mach-imx/common.h      |  1 +
- arch/arm/mach-imx/mach-imx6q.c  |  2 ++
- arch/arm/mach-imx/mach-imx6sl.c |  2 ++
- arch/arm/mach-imx/mach-imx6sx.c |  2 ++
- arch/arm/mach-imx/system.c      | 22 +++++++++++++++++++++-
- 5 files changed, 28 insertions(+), 1 deletion(-)
+ arch/arm/boot/bootp/Makefile      | 2 ++
+ arch/arm/boot/compressed/Makefile | 2 ++
+ kernel/gcov/Kconfig               | 2 +-
+ 3 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1dabf43..baca11a 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -62,6 +62,7 @@ void mxc_set_cpu_type(unsigned int type);
- void mxc_restart(enum reboot_mode, const char *);
- void mxc_arch_reset_init(void __iomem *);
- void mxc_arch_reset_init_dt(void);
-+void mxc_power_off_init(void);
- int mx51_revision(void);
- int mx53_revision(void);
- void imx_set_aips(void __iomem *);
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index d51c6e9..3d6610d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -270,6 +270,8 @@ static void __init imx6q_init_machine(void)
+diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
+index c394e30..5761f00 100644
+--- a/arch/arm/boot/bootp/Makefile
++++ b/arch/arm/boot/bootp/Makefile
+@@ -5,6 +5,8 @@
+ # architecture-specific flags and dependencies.
+ #
  
- 	mxc_arch_reset_init_dt();
- 
-+	mxc_power_off_init();
++GCOV_PROFILE	:= n
 +
- 	parent = imx_soc_device_init();
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index ed263a2..c07e6e8 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -50,6 +50,8 @@ static void __init imx6sl_init_machine(void)
+ LDFLAGS_bootp	:=-p --no-undefined -X \
+ 		 --defsym initrd_phys=$(INITRD_PHYS) \
+ 		 --defsym params_phys=$(PARAMS_PHYS) -T
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 76a50ec..3ea230a 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -37,6 +37,8 @@ ifeq ($(CONFIG_ARM_VIRT_EXT),y)
+ OBJS		+= hyp-stub.o
+ endif
  
- 	mxc_arch_reset_init_dt();
- 
-+	mxc_power_off_init();
++GCOV_PROFILE		:= n
 +
- 	parent = imx_soc_device_init();
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
-diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-index 3de3b73..68ea070 100644
---- a/arch/arm/mach-imx/mach-imx6sx.c
-+++ b/arch/arm/mach-imx/mach-imx6sx.c
-@@ -20,6 +20,8 @@ static void __init imx6sx_init_machine(void)
- 
- 	mxc_arch_reset_init_dt();
- 
-+	mxc_power_off_init();
-+
- 	parent = imx_soc_device_init();
- 	if (parent == NULL)
- 		pr_warn("failed to initialize soc device\n");
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index d14c33f..925fb29 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -23,6 +23,7 @@
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/pm.h>
- 
- #include <asm/system_misc.h>
- #include <asm/proc-fns.h>
-@@ -32,7 +33,9 @@
- #include "common.h"
- #include "hardware.h"
- 
--static void __iomem *wdog_base;
-+#define SNVS_LPCR               0x04
-+
-+static void __iomem *wdog_base, *snvs_base;
- static struct clk *wdog_clk;
- 
- /*
-@@ -104,6 +107,23 @@ void __init mxc_arch_reset_init_dt(void)
- 		clk_prepare(wdog_clk);
- }
- 
-+static void power_off_snvs(void)
-+{
-+	 u32 value = readl(snvs_base + SNVS_LPCR);
-+	/* set TOP and DP_EN bit */
-+	writel(value | 0x60, snvs_base + SNVS_LPCR);
-+}
-+
-+void __init mxc_power_off_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,sec-v4.0-mon-rtc-lp");
-+	snvs_base = of_iomap(np, 0);
-+	WARN_ON(!snvs_base);
-+	pm_power_off = power_off_snvs;
-+}
-+
- #ifdef CONFIG_CACHE_L2X0
- void __init imx_init_l2cache(void)
- {
+ #
+ # Architecture dependencies
+ #
+diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
+index d04ce8a..cf66c5c 100644
+--- a/kernel/gcov/Kconfig
++++ b/kernel/gcov/Kconfig
+@@ -35,7 +35,7 @@ config GCOV_KERNEL
+ config GCOV_PROFILE_ALL
+ 	bool "Profile entire Kernel"
+ 	depends on GCOV_KERNEL
+-	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE
++	depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
+ 	default n
+ 	---help---
+ 	This options activates profiling for the entire kernel.
 -- 
-1.9.1
+2.0.1
