@@ -1,54 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Sep 2014 11:24:13 +0100
-Subject: [PATCH] KVM: EVENTFD: remove inclusion of irq.h
-In-Reply-To: <54114B21.1080102@redhat.com>
-References: <1409560568-6911-1-git-send-email-eric.auger@linaro.org>
- <54044647.4030605@redhat.com> <20140911030932.GA2784@lvm>
- <54114B21.1080102@redhat.com>
-Message-ID: <5411784D.3010405@arm.com>
+Date: Thu, 11 Sep 2014 11:24:39 +0100
+Subject: [PATCH v2] ARM/arm64: KVM: fix use of WnR bit in
+ kvm_is_write_fault()
+In-Reply-To: <20140911031236.GL2784@lvm>
+References: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
+ <540EDE63.6060904@arm.com> <20140911031236.GL2784@lvm>
+Message-ID: <54117867.2010705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/14 08:11, Paolo Bonzini wrote:
-> Il 11/09/2014 05:09, Christoffer Dall ha scritto:
->> On Mon, Sep 01, 2014 at 12:11:19PM +0200, Paolo Bonzini wrote:
->>> Il 01/09/2014 10:36, Eric Auger ha scritto:
->>>> No more needed. irq.h would be void on ARM.
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>>
->>>> ---
->>>>
->>>> I don't think irq.h is needed anymore since Paul Mackerras' work. However
->>>> I did not compile for all architectures.
->>>> ---
->>>>  virt/kvm/eventfd.c | 1 -
->>>>  1 file changed, 1 deletion(-)
->>>>
->>>> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
->>>> index 3c5981c..0c712a7 100644
->>>> --- a/virt/kvm/eventfd.c
->>>> +++ b/virt/kvm/eventfd.c
->>>> @@ -36,7 +36,6 @@
->>>>  #include <linux/seqlock.h>
->>>>  #include <trace/events/kvm.h>
->>>>  
->>>> -#include "irq.h"
->>>>  #include "iodev.h"
->>>>  
->>>>  #ifdef CONFIG_HAVE_KVM_IRQFD
->>>>
+On 11/09/14 04:12, Christoffer Dall wrote:
+> On Tue, Sep 09, 2014 at 12:02:59PM +0100, Marc Zyngier wrote:
+>> [resending, as ARM email server seems to be in some mood]
+>>
+>> On 09/09/14 11:27, Ard Biesheuvel wrote:
+>>> The ISS encoding for an exception from a Data Abort has a WnR
+>>> bit[6] that indicates whether the Data Abort was caused by a
+>>> read or a write instruction. While there are several fields
+>>> in the encoding that are only valid if the ISV bit[24] is set,
+>>> WnR is not one of them, so we can read it unconditionally.
 >>>
->>> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+>>> Instead of fixing both implementations of kvm_is_write_fault()
+>>> in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
+>>> which already does the right thing with respect to the WnR bit.
+>>> Also fix up the callers to pass 'vcpu'
 >>>
->>> Christoffer, please include this via the ARM tree, together with ARM
->>> irqfd support.  Thanks,
->>>
->> Marc is dealing with the tree this week and the next so he can apply it
->> to kvmarm/queue.  Do you want it to wait and go with the irqfd patch
->> (which has dependencies not yet resolved) or should we just queue it?
+>>> Acked-by: Laszlo Ersek <lersek@redhat.com>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> Because I like that kind of diffstat:
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Christoffer, if you too are happy with that, I'll queue it right away.
+>>
+> Extremely happy:
 > 
-> As you prefer.
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 Added to kvmarm/queue.
 
