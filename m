@@ -1,41 +1,99 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 11 Sep 2014 18:47:27 +0100
-Subject: [PATCH] phy: miphy365x: Select GENERIC_PHY rather than depends on
-Message-ID: <1410457647-14086-1-git-send-email-peter.griffin@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 11 Sep 2014 19:52:17 +0200
+Subject: [PATCHv2] mtd: nand: atmel_nand: retrieve NFC clock
+Message-ID: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change miphy365x over to select GENERIC_PHY like all other phy drivers.
-Also update the help message as the new stih410 SoC doesn't have this
-phy (it is very similar to sti407), so the stih41x naming is sadly no
-longer correct.
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/phy/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index d361d98..68bfe07 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -39,14 +39,14 @@ config PHY_MVEBU_SATA
- 	select GENERIC_PHY
+Changes in v2:
+ - reworked the error path to really make the clock optional
+ - Documented the new optional property
+
+ .../devicetree/bindings/mtd/atmel-nand.txt         |  1 +
+ drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index c4728839d0c1..f71e2ebab15b 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -38,6 +38,7 @@ Optional properties:
+             if don't want to use it.
+   - Optional properties:
+     - atmel,write-by-sram: boolean to enable NFC write by sram.
++    - clocks: phandle to the peripheral clock if it exists
  
- config PHY_MIPHY365X
--	tristate "STMicroelectronics MIPHY365X PHY driver for STiH41x series"
-+	tristate "STMicroelectronics MIPHY365X PHY driver for STiH415/6 series"
- 	depends on ARCH_STI
--	depends on GENERIC_PHY
- 	depends on HAS_IOMEM
- 	depends on OF
-+	select GENERIC_PHY
- 	help
- 	  Enable this to support the miphy transceiver (for SATA/PCIE)
--	  that is part of STMicroelectronics STiH41x SoC series.
-+	  that is part of STMicroelectronics STiH415/6 SoC series.
+ Examples:
+ nand0: nand at 40000000,0 {
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 9c5f717bda54..69e0eb1ace54 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -27,6 +27,7 @@
+  *
+  */
  
- config OMAP_CONTROL_PHY
- 	tristate "OMAP CONTROL PHY Driver"
++#include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+@@ -96,6 +97,8 @@ struct atmel_nfc {
+ 	bool			use_nfc_sram;
+ 	bool			write_by_sram;
+ 
++	struct clk		*clk;
++
+ 	bool			is_initialized;
+ 	struct completion	comp_ready;
+ 	struct completion	comp_cmd_done;
+@@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ {
+ 	struct atmel_nfc *nfc = &nand_nfc;
+ 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
++	int ret;
+ 
+ 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+@@ -2281,6 +2285,26 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ 
+ 	nfc->is_initialized = true;
+ 	dev_info(&pdev->dev, "NFC is probed.\n");
++
++	nfc->clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(nfc->clk)) {
++		ret = clk_prepare_enable(nfc->clk);
++		if (ret)
++			return ret;
++	} else {
++		dev_warn(&pdev->dev, "NFC clock is missing");
++	}
++
++	return 0;
++}
++
++static int atmel_nand_nfc_remove(struct platform_device *pdev)
++{
++	struct atmel_nfc *nfc = &nand_nfc;
++
++	if (!IS_ERR(nfc->clk))
++		clk_disable_unprepare(nfc->clk);
++
+ 	return 0;
+ }
+ 
+@@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
+ 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+ 	},
+ 	.probe = atmel_nand_nfc_probe,
++	.remove = atmel_nand_nfc_remove,
+ };
+ 
+ static struct platform_driver atmel_nand_driver = {
 -- 
 1.9.1
