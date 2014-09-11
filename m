@@ -1,31 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Sep 2014 16:02:12 +0100
-Subject: [PATCH v2] arm64: add guard macros of unistd.h to prevent double
- inclusion
-In-Reply-To: <5411698E.3000402@huawei.com>
-References: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
- <20140909123938.GL1754@arm.com> <54115583.8080306@huawei.com>
- <5411698E.3000402@huawei.com>
-Message-ID: <20140911150212.GP6158@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 11 Sep 2014 17:06:31 +0200
+Subject: [PATCH] irqchip: atmel-aic5: sama5d3 has 48 IRQs
+In-Reply-To: <1410446511-29477-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410446511-29477-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140911170631.58a47ff9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 10:21:18AM +0100, Yang Yingliang wrote:
-> From: Yang Yingliang <yangyingliang@huawei.com>
+On Thu, 11 Sep 2014 16:41:51 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> The FUSE and RAM controllers don't have any connected IRQs, reducing the number
+> of IRQs to 48.
 > 
-> Add guard macros for uapi/asm/unistd.h, asm/unistd.h and
-> asm/unistd32.h.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Hmm, so I applied this and now my machine panics when we hit userspace. I
-think the issue is that we no longer generate our syscall table in
-arch/arm64/kernel/sys.c, because unistd.h is already included via
-linux/syscalls.h but without the __SYSCALL definition.
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-So, a couple of questions:
+> ---
+>  drivers/irqchip/irq-atmel-aic5.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+> index 04fe2c1b5178..dc7d98607a89 100644
+> --- a/drivers/irqchip/irq-atmel-aic5.c
+> +++ b/drivers/irqchip/irq-atmel-aic5.c
+> @@ -341,7 +341,7 @@ static int __init aic5_of_init(struct device_node *node,
+>  	return 0;
+>  }
+>  
+> -#define NR_SAMA5D3_IRQS		50
+> +#define NR_SAMA5D3_IRQS		48
+>  
+>  static int __init sama5d3_aic5_of_init(struct device_node *node,
+>  				       struct device_node *parent)
 
-  (1) Is the lack of header guards actually causing you a problem?
-  (2) How did you test this?
 
-I've dropped the patch.
 
-Will
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
