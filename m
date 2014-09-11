@@ -1,84 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 11 Sep 2014 15:58:04 +0200
-Subject: [PATCH v4 3/4] ARM: dts: add main Thermal info to rk3288
-In-Reply-To: <540FBC21.2090504@rock-chips.com>
-References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
- <3426113.Zcq8V2S7cg@diego> <540FBC21.2090504@rock-chips.com>
-Message-ID: <6563337.jht9ZmlHCg@diego>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Sep 2014 16:00:00 +0200
+Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
+In-Reply-To: <20140911134323.GB29780@lunn.ch>
+References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140911134323.GB29780@lunn.ch>
+Message-ID: <20140911160000.55a4de80@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Dear Andrew Lunn,
 
-Am Mittwoch, 10. September 2014, 10:49:05 schrieb Caesar Wang:
-> Hi Heiko,
+On Thu, 11 Sep 2014 15:43:23 +0200, Andrew Lunn wrote:
+
+> All looks O.K. to me
 > 
-> ? 2014?09?09? 19:37, Heiko St?bner ??:
-> > Am Mittwoch, 3. September 2014, 10:10:38 schrieb Caesar Wang:
-> >> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> >> ---
-> >> 
-> >>   arch/arm/boot/dts/rk3288.dtsi | 18 ++++++++++++++++++
-> >>   1 file changed, 18 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/rk3288.dtsi
-> >> b/arch/arm/boot/dts/rk3288.dtsi
-> >> index 36be7bb..3d672e3 100644
-> >> --- a/arch/arm/boot/dts/rk3288.dtsi
-> >> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-[...]
+Thanks!
 
-> >> @@ -611,5 +622,12 @@
-> >> 
-> >>   				rockchip,pins = <5 15 3 &pcfg_pull_none>;
-> >>   			
-> >>   			};
-> >>   		
-> >>   		};
-> >> 
-> >> +
-> >> +		tsadc {
-> >> +			tsadc_int: tsadc-int {
-> >> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_up>;
-> >> +			};
-> >> +		};
-> > 
-> > After looking this up in the schematics I see that this is the
-> > overtemperature-protection output pin ... labeled OTP_OUT.
-> > So I'd think the pinconfig should reflect this pin-name, especially as
-> > tsadc-int suggests, that this would be an interrupt leading into the
-> > tsadc, while in fact it is an output to a separate circuit.
-> 
-> Maybe,I guess  your mean as the follows .
-> Please correct it and  Laugh out if I got it wrong.
+> A point for discussion, triggered by 3/4. We have repeatedly seen
+> issues with modular builds, which we don't see with everything built
+> in. Can we improve our testing? Is there is way to take for example
+> mvebu_v7_defconfig and turn any y tristate options into m? Build and
+> boot? Get this added to the boot test farms?
 
-I'll never laugh ... just try get the best solution / trying to understand 
-backgrounds.
+I indeed agree that we are not testing much the modular case, but:
 
-> 
-> tsadc {
->              otp_out: otp-out {
->                  rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
->              };
-> 
->              tsadc_int: tsadc-int {
->                  rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
->              };
->          };
-> Then,I deal with the otp_out in thermal driver.
-> I believe The "otp_out" will restart board if it's a high active.
-> 
-> tsadc_int: tsadc-int {
-> +				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> 
-> But,I think the about will be implemented in thermal driver.
+ 1/ In my case, a mvebu_v7_defconfig where most the stuff would become
+    enabled as a module would make mvebu_v7_defconfig pretty much
+    useless for my daily work. When I'm doing active development, I
+    typically have everything built-in including the initramfs itself,
+    so that I don't rely on any storage/network to get the rootfs and
+    additional kernel drivers.
 
-I only meant the pin name (tsadc-int -> otp-out). In the schmatics the pin 
-(controlled by the tsadc) is labeled otp_out and leads to the overtemperature 
-protection circuit as expected. And as it's controlled by the tsadc, it should 
-of course stay as the desired func_1.
+ 2/ I don't think it would change much in terms of runtime coverage:
+    the tests done on the boot farm are just boot tests, I don't think
+    they load any kernel module. We could ask Kevin and Olof what
+    rootfs they use, but most likely it's some very small rootfs that
+    doesn't even have udev/mdev for automatic module loading. So no
+    module would be loaded, which would mean that a mvebu_v7_defconfig
+    with everything as a module would actually test *less* thing than a
+    configuration that has everything built in.
 
+So, I agree on the observation, but I'm unsure the proposed solution
+will really solve or even improve the situation :/
 
-Heiko
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
