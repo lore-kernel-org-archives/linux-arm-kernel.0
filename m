@@ -1,133 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 11 Sep 2014 13:33:44 -0700
-Subject: [PATCH 01/11 v6] coresight: add CoreSight core layer framework
-In-Reply-To: <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1410450558-12358-1-git-send-email-mathieu.poirier@linaro.org>
- <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20140911203344.GA7593@kroah.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Sep 2014 22:36:23 +0200
+Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
+In-Reply-To: <1410000448-9999-1-git-send-email-wens@csie.org>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+Message-ID: <20140911203623.GJ31276@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some first impressions in glancing at the code, not a complete review at
-all:
+Hi Chen-Yu,
 
-On Thu, Sep 11, 2014 at 09:49:08AM -0600, mathieu.poirier at linaro.org wrote:
-> --- /dev/null
-> +++ b/drivers/coresight/coresight.c
-> @@ -0,0 +1,663 @@
-> +/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#define pr_fmt(fmt) "coresight: " fmt
+On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This series unifies the mux and divider parts of the AHB1 clock found
+> on sun6i and sun8i, while also adding support for the pre-divider on
+> the PLL6 input.
+> 
+> The rate calculation logic must factor in which parent it is using to
+> calculate the rate, to decide whether to use the pre-divider or not.
+> This is beyond the original factors clk design in sunxi. To avoid
+> feature bloat, this is implemented as a seperate composite clk.
+> 
+> The new clock driver is registered with a separate OF_CLK_DECLARE.
+> This is done so that assigned-clocks* properties on the clk provider
+> node can actually work. The clock framework arranges the clock setup
+> order by checking whether all clock parents are available, by checking
+> the node matching OF_CLK_DECLARE.
+> 
+> However, the sunxi clk driver is based on the root node compatible,
+> has no defined dependencies (parents), and is setup before the fixed-rate
+> clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
+> There is no way to calculate the required clock factors to set a default
+> clock rate under these circumstances. This happens when we set the
+> defaults in the clock node (provider), rather than a clock consumer.
+>
+> I can think of 2 ways to solve the dependency issue, but neither is
+> pretty. One would be to move the root fixed-rate clocks into the sunxi
+> clk driver. The other would be separating all the clocks into individual
+> OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
 
-MODULE_NAME ?
+I don't know what Mike thinks of this, but I'd prefer the second.
 
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/types.h>
-> +#include <linux/device.h>
-> +#include <linux/io.h>
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/slab.h>
-> +#include <linux/semaphore.h>
-> +#include <linux/clk.h>
-> +#include <linux/coresight.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/debugfs.h>
-> +#include <linux/delay.h>
-> +
-> +#include "coresight-priv.h"
-> +
-> +struct dentry *cs_debugfs_parent = NULL;
-> +
-> +static LIST_HEAD(coresight_orph_conns);
-> +static LIST_HEAD(coresight_devs);
+Maxime
 
-You are a struct device, you don't need a separate list, why not just
-iterate over your bus list of devices?
-
-> +/**
-> + * @id:		unique ID of the component.
-> + * @conns:	list of connections associated to this component.
-> + * @type:	as defined by @coresight_dev_type.
-> + * @subtype:	as defined by @coresight_dev_subtype.
-> + * @ops:	generic operations for this component, as defined
-> +		by @coresight_ops.
-> + * @de:		handle on a component's debugfs entry.
-> + * @dev:	The device entity associated to this component.
-> + * @kref:	keeping count on component references.
-> + * @dev_link:	link of current component into list of all components
-> +		discovered in the system.
-> + * @path_link:	link of current component into the path being enabled.
-> + * @owner:	typically "THIS_MODULE".
-> + * @enable:	'true' if component is currently part of an active path.
-> + * @activated:	'true' only if a _sink_ has been activated.  A sink can be
-> +		activated but not yet enabled.  Enabling for a _sink_
-> +		happens when a source has been selected for that it.
-> + */
-> +struct coresight_device {
-> +	int id;
-
-Why not use the device name instead?
-
-> +	struct coresight_connection *conns;
-> +	int nr_conns;
-> +	enum coresight_dev_type type;
-> +	struct coresight_dev_subtype subtype;
-> +	const struct coresight_ops *ops;
-> +	struct dentry *de;
-
-All devices have a dentry?  in debugfs?  isn't that overkill?
-
-> +	struct device dev;
-> +	struct kref kref;
-
-You CAN NOT have two reference counts in the same structure, that's a
-huge design mistake.  Stick with one reference count, otherwise they are
-guaranteed to get out of sync and bad things will happen.
-
-> +	struct list_head dev_link;
-
-As discussed above, I don't think you need this.
-
-> +	struct list_head path_link;
-
-Odds are, you don't need this either.
-
-> +	struct module *owner;
-
-devices aren't owned by modules, they are data, not code.
-
-
-> +	bool enable;	/* true only if configured as part of a path */
-> +	bool activated;	/* true only if a sink is part of a path */
-> +};
-> +
-> +#define to_coresight_device(d) container_of(d, struct coresight_device, dev)
-> +
-> +#define source_ops(csdev)	csdev->ops->source_ops
-> +#define sink_ops(csdev)		csdev->ops->sink_ops
-> +#define link_ops(csdev)		csdev->ops->link_ops
-> +
-> +#define CORESIGHT_DEBUGFS_ENTRY(__name, __entry_name,			\
-> +				 __mode, __get, __set, __fmt)		\
-> +DEFINE_SIMPLE_ATTRIBUTE(__name ## _ops, __get, __set, __fmt)		\
-
-Use the RW and RO only versions please.  No need to ever set your own
-mode value.
-
-thanks,
-
-greg k-h
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/c5b977f3/attachment.sig>
