@@ -1,43 +1,30 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 11 Sep 2014 16:40:15 +0200
-Subject: [PATCH] pinctrl: at91: disable Pull-Down or Pull-Up property before
- enabling Pull-Up or Pull-Down.
-Message-ID: <1410446415-29410-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 11 Sep 2014 16:41:51 +0200
+Subject: [PATCH] irqchip: atmel-aic5: sama5d3 has 48 IRQs
+Message-ID: <1410446511-29477-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenyou Yang <wenyou.yang@atmel.com>
+The FUSE and RAM controllers don't have any connected IRQs, reducing the number
+of IRQs to 48.
 
-Because the pin's Pull-Up and Pull-Down property is mutually exclusive.
-
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/pinctrl/pinctrl-at91.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/irqchip/irq-atmel-aic5.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index a3d8902438c7..ee9c0b7aad14 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -371,6 +371,9 @@ static unsigned at91_mux_get_pullup(void __iomem *pio, unsigned pin)
- 
- static void at91_mux_set_pullup(void __iomem *pio, unsigned mask, bool on)
- {
-+	if (on)
-+		writel_relaxed(mask, pio + PIO_PPDDR);
-+
- 	writel_relaxed(mask, pio + (on ? PIO_PUER : PIO_PUDR));
+diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+index 04fe2c1b5178..dc7d98607a89 100644
+--- a/drivers/irqchip/irq-atmel-aic5.c
++++ b/drivers/irqchip/irq-atmel-aic5.c
+@@ -341,7 +341,7 @@ static int __init aic5_of_init(struct device_node *node,
+ 	return 0;
  }
  
-@@ -499,6 +502,9 @@ static bool at91_mux_pio3_get_pulldown(void __iomem *pio, unsigned pin)
+-#define NR_SAMA5D3_IRQS		50
++#define NR_SAMA5D3_IRQS		48
  
- static void at91_mux_pio3_set_pulldown(void __iomem *pio, unsigned mask, bool is_on)
- {
-+	if (is_on)
-+		__raw_writel(mask, pio + PIO_PUDR);
-+
- 	__raw_writel(mask, pio + (is_on ? PIO_PPDER : PIO_PPDDR));
- }
- 
+ static int __init sama5d3_aic5_of_init(struct device_node *node,
+ 				       struct device_node *parent)
 -- 
 1.9.1
