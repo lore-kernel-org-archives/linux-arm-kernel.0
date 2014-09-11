@@ -1,70 +1,49 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 11 Sep 2014 16:06:06 +0530
-Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
-In-Reply-To: <20140910135039.GP3190@worktop.ger.corp.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
- <540204DC.5090204@linux.vnet.ibm.com>
- <20140910135039.GP3190@worktop.ger.corp.intel.com>
-Message-ID: <54117B16.9050409@linux.vnet.ibm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Sep 2014 12:36:50 +0200
+Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
+ LS1021A
+In-Reply-To: <cd69af536cd248b8add94a468fa97095@BL2PR03MB467.namprd03.prod.outlook.com>
+References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
+ <62651744.c71MLsL3Q5@wuerfel>
+ <cd69af536cd248b8add94a468fa97095@BL2PR03MB467.namprd03.prod.outlook.com>
+Message-ID: <2944183.HzFlEzpKtu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 07:20 PM, Peter Zijlstra wrote:
-> On Sat, Aug 30, 2014 at 10:37:40PM +0530, Preeti U Murthy wrote:
->>> -	if ((sd->flags & SD_SHARE_CPUCAPACITY) && weight > 1) {
->>> -		if (sched_feat(ARCH_CAPACITY))
->>
->> Aren't you missing this check above? I understand that it is not
->> crucial, but that would also mean removing ARCH_CAPACITY sched_feat
->> altogether, wouldn't it?
+On Thursday 11 September 2014 08:21:58 Jingchang Lu wrote:
+> >One more thing: these should all go into the board specific files.
+> >
+> >The installed memory is almost always a property of the board, not the SoC,
+> >and a lot of boards only connect a subset of the serial ports, or they may
+> >have them in a different order.
+> >
+> >In particular, you only provide aliases for the six out of the ten
+> >available uarts, which seems arbitrary.
+> >
 > 
-> Yes he's missing that, I added the below bit on top.
-> 
-> So the argument last time:
-> lkml.kernel.org/r/20140709105721.GT19379 at twins.programming.kicks-ass.net
-> was that you cannot put sched_feat(ARCH_CAPACITY) inside a weak arch_*
-> function. The test has to be outside, seeing how it needs to decide to
-> call the arch function at all (or revert to the default implementation).
-> 
-> ---
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5700,7 +5700,7 @@ unsigned long __weak arch_scale_freq_cap
->  	return default_scale_capacity(sd, cpu);
->  }
-> 
-> -unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
-> +static unsigned long default_scale_cpu_capacity(struct sched_domain *sd, int cpu)
->  {
->  	if ((sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
->  		return sd->smt_gain / sd->span_weight;
-> @@ -5708,6 +5708,11 @@ unsigned long __weak arch_scale_cpu_capa
->  	return SCHED_CAPACITY_SCALE;
->  }
-> 
-> +unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
-> +{
-> +	return default_scale_cpu_capacity(sd, cpu);
-> +}
-> +
->  static unsigned long scale_rt_capacity(int cpu)
->  {
->  	struct rq *rq = cpu_rq(cpu);
-> @@ -5747,7 +5752,10 @@ static void update_cpu_capacity(struct s
->  	unsigned long capacity = SCHED_CAPACITY_SCALE;
->  	struct sched_group *sdg = sd->groups;
-> 
-> -	capacity *= arch_scale_cpu_capacity(sd, cpu);
-> +	if (sched_feat(ARCH_CAPACITY))
-> +		capacity *= arch_scale_cpu_capacity(sd, cpu);
-> +	else
-> +		capacity *= default_scale_cpu_capacity(sd, cpu);
-> 
->  	capacity >>= SCHED_CAPACITY_SHIFT;
-> 
-> 
-Alright, I see now. Thanks!
+> The memory size info will be fixed up in u-boot before booting the kernel image,
+> so I add the memory node in the SoC level device tree and keep only one copy. 
 
-Regards
-Preeti U Murthy
+Right. I wonder if it would make sense to just leave a placeholder in there
+that does not look like a plausible memory size. I believe the common case today
+is that we actually want to have the correct memory size in the board-level
+dts file because the boot loader does not change that value. If your boot loader
+does it, we probably don't want any default that may confuse users at all,
+in particular in the per-soc file.
+
+> The lpuart derives the line number from the node's alias id, 8250 serial driver
+> doesn't rely on it, so only aliases for the lpuart are added, not arbitrary.
+
+This is really bad though, for two reasons:
+
+a) you are relying on current behavior of two kernel drivers that we may want to
+change in the future. Unfortunately the two drivers don't do this consistently
+today, but that's something we should fix in the kernel, not work around in
+the hardware description.
+
+b) for the lpuart case, you put a fixed device order in the soc-specific file,
+without any guarantee that the board uses just the first x devices rather than
+another random subset. The alias values are really meant to to correspond to
+how the machine calls things, not how the SoC sees it.
+
+	Arnd
