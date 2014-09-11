@@ -1,95 +1,93 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 11 Sep 2014 11:54:28 -0500
-Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <5411C265.2080203@ti.com>
-References: <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
- <20140908134454.GK22409@saruman.home>
- <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
- <20140909144225.GF6151@saruman.home>
- <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
- <CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>
- <20140910045328.GA32475@saruman.home>
- <CAFp+6iHMhbi4V4LAkNsgzDc192ihT2a1mZHgLbia=K2U8+x=2w@mail.gmail.com>
- <CAFp+6iErXKpXgE0tRPB=tEqXxcXgQAeFJP1TpSwRN6fNu9a-qw@mail.gmail.com>
- <5411C265.2080203@ti.com>
-Message-ID: <20140911165428.GD1840@saruman.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 11 Sep 2014 09:59:53 -0700
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <20140911164710.GW6158@arm.com>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com>
+Message-ID: <CAD=FV=WECbZ4L=-C+F9K6kfiPUi7ar3a4a7Upq2TqDYYPGoOrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Will,
 
-On Thu, Sep 11, 2014 at 09:10:21PM +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Wednesday 10 September 2014 01:26 PM, Vivek Gautam wrote:
-> > On Wed, Sep 10, 2014 at 10:53 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> >> On Wed, Sep 10, 2014 at 10:23 AM, Felipe Balbi <balbi@ti.com> wrote:
-> >>> On Wed, Sep 10, 2014 at 09:09:57AM +0530, Vivek Gautam wrote:
-> >>>> On Wed, Sep 10, 2014 at 9:07 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> >>>>> adding Julius here,
-> >>>>
-> >>>> i think i had missed adding Julius for this entire series :-(
-> >>>> I should be more careful with the CC list in future.
-> >>>> Added his chromium id, since that seems to be more active.
-> >>>>
-> >>>>>
-> >>>>>
-> >>>>> On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >>>>>> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
-> >>>>>>> Hi,
-> >>>>>>>
-> >>>>>>>
-> >>>>>>> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >>>>>>>> Hi,
-> >>>>>>>>
-> >>>>>>>> On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
-> >>>>>>>>> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >>>>>>>>>> On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
-> >>>>>>>>>>>> Don't we have phy_power_on()
-> >>>>>>>>>>>> for that ? It looks like you could just as well do this from
-> >>>>>>>>>>>> phy_power_on() ?
-> >>>>>>>>>>>
-> >>>>>>>>>>> No, unfortunately keeping these calibration settings in phy_power_on()
-> >>>>>>>>>>> doesn't help, since we need to do this after XHCI reset has happened.
-> >>>>>>>>>>
-> >>>>>>>>>> teach xHCI about PHYs ?
-> >>>>>>>>>
-> >>>>>>>>> sorry i couldn't understand you here.
-> >>>>>>>>> Aren't we trying to do the same with Heikki's patch about dwc3 :
-> >>>>>>>>> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
-> >>>>>>>>>
-> >>>>>>>>> and the 2nd patch in this series :
-> >>>>>>>>> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
-> >>>>>>>>>
-> >>>>>>>>> Is there something else that is expected ?
-> >>>>>>>>
-> >>>>>>>> right, use that to call phy_init() at the right time, then you need to
-> >>>>>>>> add a new ->calibrate() method which, likely, will only be used by you
-> >>>>>>>> ;-)
-> >>>>>>>
-> >>>>>>> so you mean, the xhci should itself call phy_init() at a time suitable,
-> >>>>>>> so that ->calibrate() is not required at all ?
-> > 
-> > but wait, dwc3 does a phy_init() already, then how xhci will be able to
-> > do that again. We can't do phy_init() multiple times right ?
-> 
-> right. I think we should split and do phy ops separately for dwc3 host
-> and gadget?
+On Thu, Sep 11, 2014 at 9:47 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Sep 11, 2014 at 05:16:44PM +0100, Doug Anderson wrote:
+>> Some 32-bit (ARMv7) systems are architected like this:
+>>
+>> * The firmware doesn't know and doesn't care about hypervisor mode and
+>>   we don't want to add the complexity of hypervisor there.
+>>
+>> * The firmware isn't involved in SMP bringup or resume.
+>>
+>> * The ARCH timer come up with an uninitialized offset between the
+>>   virtual and physical counters.  Each core gets a different random
+>>   offset.
+>>
+>> On systems like the above, it doesn't make sense to use the virtual
+>> counter.  There's nobody managing the offset and each time a core goes
+>> down and comes back up it will get reinitialized to some other random
+>> value.
+>
+> You probably need to rephrase this slightly, as there *is* still a
+> requirement on the hypervisor/firmware (actually, two!). See below.
 
-no, don't do that. We need a better way of handling this. As of now we
-don't support dual-role, so we can just reinitialize the PHY once we
-reach xhci.
+Sure.  I added two more bullet points.
 
-Once we start supporting dual-role, we will need more inteligence in the
-algorithm.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/95110e05/attachment-0001.sig>
+>> Let's add a property to the device tree to say that we shouldn't use
+>> the virtual timer.  Firmware could potentially remove this property
+>> before passing the device tree to the kernel if it really wants the
+>> kernel to use a virtual timer.
+>>
+>> Note that it's been said that ARM64 (ARMv8) systems the firmware and
+>> kernel really can't be architected as described above.  That means
+>> using the physical timer like this really only makes sense for ARMv7
+>> systems.
+>
+> I'd go further: this only makes sense if you're booting in secure SVC
+> mode.
+
+OK.
+
+
+>> In order for this patch to do anything useful, we also need Sonny's
+>> patch at <https://patchwork.kernel.org/patch/4790921/>
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>> ---
+>> Changes in v2:
+>> - Add "#ifdef CONFIG_ARM" as per Will Deacon
+>>
+>>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>>  drivers/clocksource/arm_arch_timer.c                 | 5 +++++
+>>  2 files changed, 11 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> index 37b2caf..876d32b 100644
+>> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> @@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
+>>  - always-on : a boolean property. If present, the timer is powered through an
+>>    always-on power domain, therefore it never loses context.
+>>
+>> +** Optional properties:
+>> +
+>> +- arm,use-physical-timer : Don't ever use the virtual timer, just use the
+>> +  physical one.  Not supported for ARM64.
+>
+> I'd say `Only supported for ARM' to better match what we've done. Probably
+> also worth mentioning that this relies on the hypervisor/firmware having set
+> CNTHCTL.PL1PCEN and CNTHCTL.EL1PCTEN (but assumedly made a mess of CNTVOFF
+> ;) if you want to boot on the non-secure side (e.g. as a guest).
+
+Note that the reset value of CNTHCTL.PL1PCEN and CNTHCTL.PL1PCTEN are
+both 1 in my version of the ARM ARM.  On the other hand CNTVOFF is
+documented to have an UNKNOWN reset value.  If only ARM had guaranteed
+that CNTVOFF started out as 0 (which seems like it would have been
+sensible) we wouldn't be in this mess.  :-/
+
+I've adjusted the wording.  Hopefully it looks good to you.
+
+-Doug
