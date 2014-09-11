@@ -1,48 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Sep 2014 17:09:08 +0100
-Subject: [PATCH] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <CAD=FV=XPqma5sYbn65NLEAipZFq96t_HcX96ym_cEQrqTKddOQ@mail.gmail.com>
-References: <1410450727-8182-1-git-send-email-dianders@chromium.org>
- <5411C68B.6090308@codeaurora.org>
- <CAD=FV=XPqma5sYbn65NLEAipZFq96t_HcX96ym_cEQrqTKddOQ@mail.gmail.com>
-Message-ID: <20140911160908.GT6158@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 11 Sep 2014 17:14:05 +0100
+Subject: [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20140911160627.GU6558@xora-haswell.xora.org.uk>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <20140911132935.068DCC408F6@trevor.secretlab.ca>
+ <20140911153739.GA24416@localhost> <5411C664.4060007@arm.com>
+ <20140911160627.GU6558@xora-haswell.xora.org.uk>
+Message-ID: <5411CA4D.30202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 05:04:11PM +0100, Doug Anderson wrote:
-> On Thu, Sep 11, 2014 at 8:58 AM, Christopher Covington
-> <cov@codeaurora.org> wrote:
-> > On 09/11/2014 11:52 AM, Doug Anderson wrote:
-> >> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> >> index 5163ec1..8ca07a9 100644
-> >> --- a/drivers/clocksource/arm_arch_timer.c
-> >> +++ b/drivers/clocksource/arm_arch_timer.c
-> >> @@ -649,6 +649,9 @@ static void __init arch_timer_init(struct device_node *np)
-> >>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
-> >>       arch_timer_detect_rate(NULL, np);
-> >>
-> >> +     if (of_property_read_bool(np, "arm,use-physical-timer"))
-> >> +             arch_timer_use_virtual = false;
 
-Can you #ifdef CONFIG_ARM here please?
 
-> >>       /*
-> >>        * If HYP mode is available, we know that the physical timer
-> >>        * has been configured to be accessible from PL1. Use it, so
-> >>
-> >
-> > How's the VDSO supposed to deal with this? It currently does:
-> >
-> > cycle_now = arch_counter_get_cntvct()
-> 
-> I don't see that line of code anywhere when I do a "git grep" on linux
-> or linuxnext.  Can you give me a clearer pointer?
+On 11/09/14 17:06, Graeme Gregory wrote:
+> On Thu, Sep 11, 2014 at 04:57:24PM +0100, Sudeep Holla wrote:
+>>
+>>
 
-It's in the actual vdso code (arch/arm64/kernel/vdso/gettimeofday.S):
+[...]
+>> This what we have suggested in past especially for this S-state support.
+>> Currently the core acpi code compiles in sleep support unconditionally.
+>> That doesn't mean we need to do the same on ARM64, we can easily make
+>> sure that's not enabled for ARM64 until we have clarification on how to
+>> support them on ARM in ACPI specification.
+>>
+>> I just pointed out at one "out of spec" workaround done for x86
+>> "unconditionally" in the code just to tell that it won't work on ARM.
+>> That shouldn't be misunderstood as demand for refactoring as we have no
+>> clue how S-state would look on ARM to take up any such task.
+>>
+> For the sleep.c case I worked on this and sent some updates to Hanjun so
+> it should be compiled out in the next version of the patches.
+>
 
-	/* Read the virtual counter. */
-	isb
-	mrs	x15, cntvct_el0
+Thanks Graeme, that's much better than any hooks/stubs which might fail
+depending on ACPI table contents.
 
-Will
+Regards,
+Sudeep
