@@ -1,51 +1,38 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 11 Sep 2014 16:49:39 +0200
-Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
-In-Reply-To: <20140911141257.GC5149@katana>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
- <16809905.2REViph6WO@fb07-iapwap2> <20140911141257.GC5149@katana>
-Message-ID: <1848352.9OlbbQfLfy@fb07-iapwap2>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Sep 2014 16:49:56 +0200
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <ae98d68652f1495a857f081c3a6aecb2@HKXPR06MB168.apcprd06.prod.outlook.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <2908259.jgJNuDxCCa@wuerfel>
+ <ae98d68652f1495a857f081c3a6aecb2@HKXPR06MB168.apcprd06.prod.outlook.com>
+Message-ID: <15029597.7ylOekBBOx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 11. September 2014, 16:12:58 schrieb Wolfram Sang:
-> On Thu, Sep 11, 2014 at 02:17:16PM +0200, Marc Dietrich wrote:
-> > > +		reg = <0x64>;
+On Thursday 11 September 2014 14:11:05 Phil Edworthy wrote:
+> On 10 September 2014 19:20, Arnd wrote:
+> > On Tuesday 09 September 2014 12:20:54 Catalin Marinas wrote:
+> > >
+> > > We can assume that if a domain is not specified and there is a single
+> > > top level PCIe node, the domain defaults to 0. Are there any arm32
+> > > platforms that require multiple domains (and do not specify a number in
+> > > the DT)?
 > > 
-> > we had some discussions in the past how to represent i2c master devices in
-> > device tree. The outcome was to use to a special representation to
-> > distinguish them from slave devices, e.g. something like reg = <0x1
-> > 0x64>, where the 0x1 would mean "master" device (0x0 -> slave). If
-> > nothing is added, then it's also slave. The adapter address cell would
-> > also need to be changed if this extension is used.
+> > In theory, I think all of them could work with a single domain, but then
+> > you need to partition the bus number space between the host controllers,
+> > so you have the exact same situation that you either need to make up
+> > random bus numbers or put them in DT.
+> > 
+> > Using multiple domains is way cleaner for this, even if we have to
+> > make up the numbers.
 > 
-> Please don't change the reg-layout which is around since forever.
-> It will break all existing devicetrees. NAK.
+> Maybe this is a stupid question, but why would you want to specify the domain
+> in the DT at all? Doesn't every instance of a driver imply a separate domain?
 
-it won't break existing device trees. It would only need to be extended for 
-systems where the adapter uses master and slave modes (or if you add a master 
-device to the i2c client list). So you need to change the device tree anyway.
-All other setups can continue to use a single reg.
+See Jason Gunthorpe's latest reply on the topic. In short, the domain is
+visible to user space and we want it to be stable across boots when
+user configuration refers to devices by domain:bus:device:function
+numbers.
 
-Thinking more about it, are there any i2c clients parsing the reg property 
-directly? In this case I would agree, otherwise, only i2c core needs some 
-update - right?
-
-Marc
-
-> > An alternative would be to use a special property (e.g. slave address),
-> > but
-> > that would encode the same value twice (or even three times).
-> 
-> As said, if all breaks we handle it at runtime.
-> 
-> Thanks,
-> 
->    Wolfram
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/6798445d/attachment.sig>
+	Arnd
