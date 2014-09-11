@@ -1,39 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 16:45:36 +0200
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20140911142930.GB2543@localhost.localdomain>
-References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911142930.GB2543@localhost.localdomain>
-Message-ID: <20140911164536.796f1012@bbrezillon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 11 Sep 2014 16:40:40 +0200
+Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
+In-Reply-To: <20140911142655.GB30828@titan.lakedaemon.net>
+References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140911134323.GB29780@lunn.ch>
+ <20140911160000.55a4de80@free-electrons.com>
+ <20140911142601.GA30828@titan.lakedaemon.net>
+ <20140911142655.GB30828@titan.lakedaemon.net>
+Message-ID: <20140911144040.GC29780@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014 22:29:32 +0800
-Huang Shijie <shijie8@gmail.com> wrote:
+> > Since debian does modular builds on a regular basis, maybe they have
+> > some recommendations.
+> > 
+> > My thought is that I doubt we're the only SoC family with this issue.
+> > To avoid the maintenance headache of extra _mod_defconfig's, perhaps we
+> > could add a ./scripts/config toggle to turn the current .config enabled
+> > tristates into modules?
 
-> On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
->  +static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
-> > +				  struct nand_chip *chip, uint8_t *buf,
-> > +				  int oob_required, int page)
-> > +{
-> > +	struct gpmi_nand_data *this = chip->priv;
-> > +	struct bch_geometry *nfc_geo = &this->bch_geometry;
-> > +	int eccsize = nfc_geo->ecc_chunk_size;
-> > +	int eccbytes = DIV_ROUND_UP(nfc_geo->ecc_strength * nfc_geo->gf_len,
-> > +				    8);
-> 
-> In actually, the ECC can be _NOT_ bytes aligned.
-> you should not round up to byte.
+As Thomas pointed out, that is probably the easy bit. We need a test
+system which has access to these modules, and udev in order to get
+them loaded. Do any of the current boot farms support this?
 
-You mean, on the NAND storage ? That would be weird, but I'll check.
+What might be possible is to work on top of the new test initiative,
+kicked off at the last summit.  That is going to need a more capable
+rootfs, so might provide a usable basis. We also need some tests, so
+that once we have finished booting, do we at least have all the
+devices we expect in /sys. That would of at least found the recent SPI
+FLASH breakage.
 
-When accessing in raw mode I'm not using the ECC engine (or at least
-that's what I'm trying to achieve when using read_buf and not
-gpmi_ecc_read_page).
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+      Andrew
