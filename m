@@ -1,70 +1,34 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 11 Sep 2014 11:39:23 +0800
-Subject: [PATCH] mfd: RK808: Add register caching
-In-Reply-To: <1410303964-6943-1-git-send-email-dianders@chromium.org>
-References: <1410303964-6943-1-git-send-email-dianders@chromium.org>
-Message-ID: <5411196B.6000507@rock-chips.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 10 Sep 2014 21:30:15 -0700
+Subject: [PATCH] ARM: dts: Switch i2c0 to 400kHz on rk3288-evb-rk808
+Message-ID: <1410409815-22200-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We should be able to talk to the PMIC at 400kHz.  No need to talk at
+the slow 100kHz.
 
-On 09/10/2014 07:06 AM, Doug Anderson wrote:
-> Let's define the voltatile registers (those that can't be cached) and
-> enable caching.  The rk808 is accessed almost constantly with cpufreq
-> so this is really nice.
->
-> As measured by ftrace:
->    before this change: cpu0_set_target() => ~2200us
->    after this change:  cpu0_set_target() =>  ~500us
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->   drivers/mfd/rk808.c | 30 ++++++++++++++++++++++++++++++
->   1 file changed, 30 insertions(+)
->
-> diff --git a/drivers/mfd/rk808.c b/drivers/mfd/rk808.c
-> index 0324422..bd02150 100644
-> --- a/drivers/mfd/rk808.c
-> +++ b/drivers/mfd/rk808.c
-> @@ -29,10 +29,40 @@ struct rk808_reg_data {
->   	int value;
->   };
->   
-> +static bool rk808_is_volatile_reg(struct device *dev, unsigned int reg)
-> +{
-> +	/*
-> +	 * Notes:
-> +	 * - Technically the ROUND_30s bit makes RTC_CTRL_REG volatile, but
-> +	 *   we don't use that feature.  It's better to cache.
-> +	 * - It's unlikely we care that RK808_DEVCTRL_REG is volatile since
-> +	 *   bits are cleared in case when we shutoff anyway, but better safe.
-> +	 */
-> +
-> +	switch (reg) {
-> +	case RK808_SECONDS_REG ... RK808_WEEKS_REG:
-> +	case RK808_RTC_STATUS_REG:
-> +	case RK808_VB_MON_REG:
-> +	case RK808_THERMAL_REG:
-> +	case RK808_DCDC_UV_STS_REG:
-> +	case RK808_LDO_UV_STS_REG:
-> +	case RK808_DCDC_PG_REG:
-> +	case RK808_LDO_PG_REG:
-> +	case RK808_DEVCTRL_REG:
-> +	case RK808_INT_STS_REG1:
-> +	case RK808_INT_STS_REG2:
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->   static const struct regmap_config rk808_regmap_config = {
->   	.reg_bits = 8,
->   	.val_bits = 8,
->   	.max_register = RK808_IO_POL_REG,
-> +	.cache_type = REGCACHE_RBTREE,
-> +	.volatile_reg = rk808_is_volatile_reg,
->   };
->   
->   static struct resource rtc_resources[] = {
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+As measured by ftrace (with a bunch of extra patches, since cpufreq
+for rk808 hasn't landed yet):
+  before this change: cpu0_set_target() => ~500us
+  after this change:  cpu0_set_target() => ~300us
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/boot/dts/rk3288-evb-rk808.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+index 36db177..ff522f8 100644
+--- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
++++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+@@ -18,6 +18,7 @@
+ };
+ 
+ &i2c0 {
++	clock-frequency = <400000>;
+ 	status = "okay";
+ 
+ 	rk808: pmic at 1b {
+-- 
+2.1.0.rc2.206.gedb03e5
