@@ -1,89 +1,87 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 11 Sep 2014 12:08:46 +0100
-Subject: [PATCH v3 11/17] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
- register device's gsi
-In-Reply-To: <1409583475-6978-12-git-send-email-hanjun.guo@linaro.org>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-12-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140911110846.D152DC408F0@trevor.secretlab.ca>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Sep 2014 12:09:10 +0100
+Subject: [PATCH v4 3/8] arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
+In-Reply-To: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1410433755-3612-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  1 Sep 2014 22:57:49 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
-> used, and then register device's gsi with the core IRQ subsystem.
-> 
-> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
-> since gsi is unique in the system, so use hwirq number directly
-> for the mapping.
-> 
-> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/acpi.c |   73 ++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/bus.c       |    3 ++
->  include/linux/acpi.h     |    1 +
->  3 files changed, 77 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 35dff11..354b912 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -37,6 +37,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->  static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
->  
->  /*
-> + * Since we're on ARM, the default interrupt routing model
-> + * clearly has to be GIC.
-> + */
-> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
-> +
-> +/*
->   * __acpi_map_table() will be called before page_init(), so early_ioremap()
->   * or early_memremap() should be called here to for ACPI table mapping.
->   */
-> @@ -194,6 +200,73 @@ void __init acpi_smp_init_cpus(void)
->  	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
->  }
->  
-> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> +{
-> +	*irq = irq_find_mapping(NULL, gsi);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+Having a dynamic number of supported interrupts means that we
+cannot relly on VGIC_NR_SHARED_IRQS being fixed anymore.
 
-Why is this exported? x86 exports it, but ia64 does not. There aren't
-very many callers, and none of them can be built as a module AFAICS.
+Instead, make it take the distributor structure as a parameter,
+so it can return the right value.
 
-> +
-> +/*
-> + * success: return IRQ number (>0)
-> + * failure: return =< 0
-> + */
-> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
-> +{
-> +	unsigned int irq;
-> +	unsigned int irq_type;
-> +
-> +	/*
-> +	 * ACPI have no bindings to indicate SPI or PPI, so we
-> +	 * use different mappings from DT in ACPI.
-> +	 *
-> +	 * For FDT
-> +	 * PPI interrupt: in the range [0, 15];
-> +	 * SPI interrupt: in the range [0, 987];
-> +	 *
-> +	 * For ACPI, GSI should be unique so using
-> +	 * the hwirq directly for the mapping:
-> +	 * PPI interrupt: in the range [16, 31];
-> +	 * SPI interrupt: in the range [32, 1019];
-> +	 */
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/kvm/arm_vgic.h |  1 -
+ virt/kvm/arm/vgic.c    | 16 +++++++++++-----
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
-Hmmm, so doing it this way means that DT systems will have a different
-irq_domain setup compared with ACPI systems. I'm not convinced we want
-to do that, but I need to look at the code that sets up the new domains
-before I comment further...
-
-g.
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index bdaac57..bdeb451 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -29,7 +29,6 @@
+ #define VGIC_NR_SGIS		16
+ #define VGIC_NR_PPIS		16
+ #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+-#define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
+ #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
+ 
+ #define VGIC_V2_MAX_LRS		(1 << 6)
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 92c086e..93fe73b 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1083,11 +1083,17 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
+ 	}
+ }
+ 
++static int vgic_nr_shared_irqs(struct vgic_dist *dist)
++{
++	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
++}
++
+ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	unsigned long *pending, *enabled, *pend_percpu, *pend_shared;
+ 	unsigned long pending_private, pending_shared;
++	int nr_shared = vgic_nr_shared_irqs(dist);
+ 	int vcpu_id;
+ 
+ 	vcpu_id = vcpu->vcpu_id;
+@@ -1100,15 +1106,15 @@ static int compute_pending_for_cpu(struct kvm_vcpu *vcpu)
+ 
+ 	pending = vgic_bitmap_get_shared_map(&dist->irq_pending);
+ 	enabled = vgic_bitmap_get_shared_map(&dist->irq_enabled);
+-	bitmap_and(pend_shared, pending, enabled, VGIC_NR_SHARED_IRQS);
++	bitmap_and(pend_shared, pending, enabled, nr_shared);
+ 	bitmap_and(pend_shared, pend_shared,
+ 		   vgic_bitmap_get_shared_map(&dist->irq_spi_target[vcpu_id]),
+-		   VGIC_NR_SHARED_IRQS);
++		   nr_shared);
+ 
+ 	pending_private = find_first_bit(pend_percpu, VGIC_NR_PRIVATE_IRQS);
+-	pending_shared = find_first_bit(pend_shared, VGIC_NR_SHARED_IRQS);
++	pending_shared = find_first_bit(pend_shared, nr_shared);
+ 	return (pending_private < VGIC_NR_PRIVATE_IRQS ||
+-		pending_shared < VGIC_NR_SHARED_IRQS);
++		pending_shared < vgic_nr_shared_irqs(dist));
+ }
+ 
+ /*
+@@ -1365,7 +1371,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	/* SPIs */
+-	for_each_set_bit(i, vgic_cpu->pending_shared, VGIC_NR_SHARED_IRQS) {
++	for_each_set_bit(i, vgic_cpu->pending_shared, vgic_nr_shared_irqs(dist)) {
+ 		if (!vgic_queue_hwirq(vcpu, i + VGIC_NR_PRIVATE_IRQS))
+ 			overflow = 1;
+ 	}
+-- 
+2.0.4
