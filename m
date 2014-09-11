@@ -1,43 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Sep 2014 18:24:11 +0200
-Subject: [PATCH 1/7] irqchip: atmel-aic5: Add sama5d4 support
-In-Reply-To: <1410450852-1834-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410450852-1834-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140911182411.0366ad98@free-electrons.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 11 Sep 2014 09:27:03 -0700
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <20140911161636.GU6158@arm.com>
+References: <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
+ <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
+ <20140908215506.GA4759@dator>
+ <CAGXu5jJFB+pcDVkcMoRZ9DnJu7MQuN=kceDhpkGrO=6ZLFy6Kw@mail.gmail.com>
+ <20140909123829.GK1754@arm.com>
+ <CAGXu5jJoW-B7WwuFUhbN4e1aL-HVxa9x4da9hB9DcCGEXVLgzw@mail.gmail.com>
+ <20140910175126.GJ1710@arm.com>
+ <CAGXu5jJaML_S+6LUn1uPLrScXxUJL+1N1B+Fa08ioxKt933nCw@mail.gmail.com>
+ <CAGXu5jJ_wLsKOuVgbS7cb+k-nyA=8XpaMYwov0o3hdFdyjaCmA@mail.gmail.com>
+ <20140911161636.GU6158@arm.com>
+Message-ID: <CAGXu5jJ1zZ3bxJ8B-FR_2STDuMMFp_H3dAKrpJmv+dH7iDSwCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alexandre Belloni,
+On Thu, Sep 11, 2014 at 9:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Sep 11, 2014 at 05:05:14PM +0100, Kees Cook wrote:
+>> Actually, this doesn't make sense. If we're using
+>> local_flush_tlb_kernel_range() in set_fixmap, we must always run under
+>> stop_machine. The needs-broadcast case is solved by using
+>> local_flush_tlb_kernel_range(), and the TLB-miss-on-other-CPU case is
+>> solved by using stop_machine(). This is how the ftrace case work,
+>> though not via fixmap.
+>>
+>> Since we need to flush the TLB on each fixmap change during
+>> patch_text(), if we want to make the local_flush_tlb_... optionally
+>> use flush_tlb_... to avoid calling stop_machine in the
+>> does't-need-broadcast case, then we'd be checking in multiple places,
+>> making this code overly complex for this rare operation. Is there a
+>> good reason to complicate this code to avoid stop_machine()?
+>>
+>> I think we should just do this:
+>>
+>> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+>> index 07314af47733..5038960e3c55 100644
+>> --- a/arch/arm/kernel/patch.c
+>> +++ b/arch/arm/kernel/patch.c
+>> @@ -60,16 +125,5 @@ void __kprobes patch_text(void *addr, unsigned int insn)
+>>                 .insn = insn,
+>>         };
+>>
+>> -       if (cache_ops_need_broadcast()) {
+>> -               stop_machine(patch_text_stop_machine, &patch, cpu_online_mask);
+>> -       } else {
+>> -               bool straddles_word = IS_ENABLED(CONFIG_THUMB2_KERNEL)
+>> -                                     && __opcode_is_thumb32(insn)
+>> -                                     && ((uintptr_t)addr & 2);
+>> -
+>> -               if (straddles_word)
+>> -                       stop_machine(patch_text_stop_machine, &patch, NULL);
+>> -               else
+>> -                       __patch_text(addr, insn);
+>> -       }
+>> +       stop_machine(patch_text_stop_machine, &patch, NULL);
+>
+> The reason not to use stop machine is that it's very expensive and the
+> architecture does provide some guarantees that mean it's not always
+> required...
+>
+> ... however, as I pointed out in a kprobes thread the other day, the code
+> you remove above is actually broken, so I wouldn't be against replacing it
+> all with stop_machine.
 
-On Thu, 11 Sep 2014 17:54:06 +0200, Alexandre Belloni wrote:
-> Add sama5d4 support to irq-atmel-aic5.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
->  drivers/irqchip/irq-atmel-aic5.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
-> index dc7d98607a89..a11aae8fb006 100644
-> --- a/drivers/irqchip/irq-atmel-aic5.c
-> +++ b/drivers/irqchip/irq-atmel-aic5.c
-> @@ -295,6 +295,7 @@ static void __init sama5d3_aic_irq_fixup(struct device_node *root)
->  
->  static const struct of_device_id __initdata aic5_irq_fixups[] = {
->  	{ .compatible = "atmel,sama5d3", .data = sama5d3_aic_irq_fixup },
-> +	{ .compatible = "atmel,sama5d4", .data = sama5d3_aic_irq_fixup },
->  	{ /* sentinel */ },
->  };
+Okay, sounds good.
 
-Sorry for the nitpick, but this seems to lack an updated to the DT
-binding documentation, to add the new compatible string.
+> Is there any way to you can WARN_ON(!called_under_stop_machine) in
+> set_fixmap before doing the local TLBI?
 
-Thanks,
+I'm not sure what the right tests for that would be. As I understand
+it, this can be called during early boot too, but I'm not sure how to
+distinguish either being early or being under stop machine. Rabin or
+Rob, I think you've worked on this from the perspective of early boot,
+any ideas?
 
-Thomas
+In the meantime, I could add a comment on set_fixmap...
+
+>
+> Will
+>
+> P.S. If you plan on doing an equivalent series for arm64, you should do it
+> before we have any broken CPUs, then you can use TLBI without worry ;)
+
+Heh. Hopefully I can start testing arm64 soon. I think Laura sent a
+series for CONFIG_DEBUG_RODATA already, so I'm hoping by the time I
+get 64-bit hardware, this will already be done. ;)
+
+-Kees
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kees Cook
+Chrome OS Security
