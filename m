@@ -1,74 +1,63 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Thu, 11 Sep 2014 17:11:14 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <54119AAA.9080907@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5411967A.6090406@hurleysoftware.com>
- <54119AAA.9080907@linutronix.de>
-Message-ID: <20140911151114.GD28458@ci00147.xsens-tech.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Sep 2014 17:14:36 +0200
+Subject: [PATCH] arm64: add guard macro of unistd.h to prevent double
+ inclusion
+In-Reply-To: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
+References: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <3578303.U9ScbKhEK5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 02:50:50PM +0200, Sebastian Andrzej Siewior wrote:
-> On 09/11/2014 02:32 PM, Peter Hurley wrote:
-> > On 09/11/2014 07:42 AM, Sebastian Andrzej Siewior wrote:
-> >> I also need a watchdog timer for TX since it seems that on omap3 the
-> >> DMA engine suddenly forgets to continue with DMA?
-> > 
-> > One difference I noticed between the omap driver and the 8250 driver is
-> > the way modem status interrupts are handled.
-> > 
-> > The omap driver only checks modem status for the UART_IIR_MSI interrupt type.
-> > The 8250 driver checks modem status at every interrupt (other than NO_INT).
-> > 
-> > I think the UART_MSR_DCTS bit always reflects that the CTS input has changed
-> > between reads of the MSR _even if auto CTS is on_. So perhaps the hardware
-> > is being stopped by uart_handle_cts_change() when auto CTS is on?
+On Tuesday 09 September 2014 11:59:45 Yang Yingliang wrote:
+> Add guard macros in both uapi/asm/unistd.h and asm/unistd.h.
 > 
-> I doubt that. What I see from a timer debug is that the TX-FIFO level
-> is at 0, the DMA transfer for say 1024 bytes start.
-> The FIFO is filled to 64bytes and refilled so it doesn't drop below 50.
-> At the time of the stall I see that the DMA engine has outstanding
-> bytes which it should transfer and the TX FIFO is empty. If hardware
-> flow control stops the transfer, I would expect that the DMA engine
-> still fills the TX-FIFO until 64 and then waits. But it doesn't.
-> Writing bytes into the FIFO leads to bytes beeing sent (and I see them
-> on the other side) but the DMA transfer is still on hold. Canceling the
-> DMA transfer and re-programming the remaining bytes transfers the
-> remaining bytes.
-> 
-> The odd thing is that I only triggered it with "less file". It doesn't
-> happen on regular console interaction or "cat large-file". And it only
-> triggers on beagle board xm (omap34xx) and I wasn't able to reproduce
-> it on am335x or dra7. The latter shares the same DMA engine as beagle
-> board xm.
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  arch/arm64/include/asm/unistd.h      | 5 +++++
+>  arch/arm64/include/uapi/asm/unistd.h | 5 +++++
+>  2 files changed, 10 insertions(+)
 
-I can still reproduce it on am335x. I can get out of it as soon as
-something else gets written to the console though.
+This will lead to an empty system call table, because asm/unistd.h
+is intentionally included multiple times in order to get both the
+syscall definition and the macros, which are defined in pairs in
+this file.
 
-# echo "<3>something" >/dev/kmsg
+How did you come up with this patch?
 
-Frans
+	Arnd
 
-
+> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+> index 6d2bf41..21a7dec 100644
+> --- a/arch/arm64/include/asm/unistd.h
+> +++ b/arch/arm64/include/asm/unistd.h
+> @@ -13,6 +13,9 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> +#ifndef __ASM_ARM64_UNISTD_H
+> +#define __ASM_ARM64_UNISTD_H
+> +
+>  #ifdef CONFIG_COMPAT
+>  #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+>  #define __ARCH_WANT_COMPAT_STAT64
+> @@ -48,3 +51,5 @@
+>  #include <uapi/asm/unistd.h>
+>  
+>  #define NR_syscalls (__NR_syscalls)
+> +
+> +#endif /* __ASM_ARM64_UNISTD_H */
+> diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
+> index 1caadc2..ab72cac 100644
+> --- a/arch/arm64/include/uapi/asm/unistd.h
+> +++ b/arch/arm64/include/uapi/asm/unistd.h
+> @@ -13,4 +13,9 @@
+>   * You should have received a copy of the GNU General Public License
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+> +#ifndef _UAPI__ASM_ARM64_UNISTD_H
+> +#define _UAPI__ASM_ARM64_UNISTD_H
+> +
+>  #include <asm-generic/unistd.h>
+> +
+> +#endif /* _UAPI__ASM_ARM64_UNISTD_H */
 > 
-> I remember also that I disabled the HW/SW float control just to make
-> sure it is not it.
-> 
-> > 
-> > Regards,
-> > Peter Hurley
-> > 
-> > [The UPF_HARD_FLOW thing was pretty much just done for omap even though
-> > 8250 already had auto CTS/auto RTS. Serial core hardware flow control support
-> > needs a redo as drivers have pretty much tacked stuff on randomly.]
-> 
-> Sebastian
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
