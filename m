@@ -1,113 +1,26 @@
-From: kiran.padwal@smartplayin.com (Kiran Padwal)
-Date: Thu, 11 Sep 2014 19:41:43 +0530
-Subject: [PATCH] power: Make of_device_id array const
-Message-ID: <1410444703-27451-1-git-send-email-kiran.padwal@smartplayin.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Sep 2014 15:15:08 +0100
+Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
+In-Reply-To: <540F24FF.2060302@redhat.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
+ <540E80BD.20801@redhat.com> <540E88A2.1000606@linaro.org>
+ <540E93A0.4040306@redhat.com> <540F2422.90105@linaro.org>
+ <540F24FF.2060302@redhat.com>
+Message-ID: <20140911141508.GK6158@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make of_device_id array const, because all OF functions handle it as const.
+On Tue, Sep 09, 2014 at 05:04:15PM +0100, Jon Masters wrote:
+> On 09/09/2014 12:00 PM, Hanjun Guo wrote:
+> > No, you didn't miss it, I'm still working on the new version, sorry I didn't
+> > clarify that in my previous email.
+> 
+> Thanks. If you could copy me on the next posting that would rock. In a
+> few hours we should have another platform posted as an example. In
+> addition, a couple of lower priority patches (building upon the core
+> ACPI pieces) should be posted as well.
 
-Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
----
- drivers/power/charger-manager.c         |    2 +-
- drivers/power/reset/hisi-reboot.c       |    2 +-
- drivers/power/reset/keystone-reset.c    |    2 +-
- drivers/power/reset/sun6i-reboot.c      |    2 +-
- drivers/power/reset/vexpress-poweroff.c |    2 +-
- drivers/power/reset/xgene-reboot.c      |    2 +-
- drivers/power/tps65090-charger.c        |    2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
+Can I breath out yet or did I miss the platform posting?
 
-diff --git a/drivers/power/charger-manager.c b/drivers/power/charger-manager.c
-index 9e4dab4..eea4dad 100644
---- a/drivers/power/charger-manager.c
-+++ b/drivers/power/charger-manager.c
-@@ -1529,7 +1529,7 @@ static int cm_init_thermal_data(struct charger_manager *cm)
- 	return ret;
- }
- 
--static struct of_device_id charger_manager_match[] = {
-+static const struct of_device_id charger_manager_match[] = {
- 	{
- 		.compatible = "charger-manager",
- 	},
-diff --git a/drivers/power/reset/hisi-reboot.c b/drivers/power/reset/hisi-reboot.c
-index 0c91d02..df2ad92 100644
---- a/drivers/power/reset/hisi-reboot.c
-+++ b/drivers/power/reset/hisi-reboot.c
-@@ -52,7 +52,7 @@ static int hisi_reboot_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id hisi_reboot_of_match[] = {
-+static const struct of_device_id hisi_reboot_of_match[] = {
- 	{ .compatible = "hisilicon,sysctrl" },
- 	{}
- };
-diff --git a/drivers/power/reset/keystone-reset.c b/drivers/power/reset/keystone-reset.c
-index 408a18f..a8c22c3 100644
---- a/drivers/power/reset/keystone-reset.c
-+++ b/drivers/power/reset/keystone-reset.c
-@@ -62,7 +62,7 @@ static void rsctrl_restart(enum reboot_mode mode, const char *cmd)
- 			   RSCTRL_RESET_MASK, 0);
- }
- 
--static struct of_device_id rsctrl_of_match[] = {
-+static const struct of_device_id rsctrl_of_match[] = {
- 	{.compatible = "ti,keystone-reset", },
- 	{},
- };
-diff --git a/drivers/power/reset/sun6i-reboot.c b/drivers/power/reset/sun6i-reboot.c
-index af2cd7f..b3b010f 100644
---- a/drivers/power/reset/sun6i-reboot.c
-+++ b/drivers/power/reset/sun6i-reboot.c
-@@ -70,7 +70,7 @@ static int sun6i_reboot_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id sun6i_reboot_of_match[] = {
-+static const struct of_device_id sun6i_reboot_of_match[] = {
- 	{ .compatible = "allwinner,sun6i-a31-wdt" },
- 	{}
- };
-diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
-index 4dc102e2..c199d34 100644
---- a/drivers/power/reset/vexpress-poweroff.c
-+++ b/drivers/power/reset/vexpress-poweroff.c
-@@ -72,7 +72,7 @@ DEVICE_ATTR(active, S_IRUGO | S_IWUSR, vexpress_reset_active_show,
- 
- enum vexpress_reset_func { FUNC_RESET, FUNC_SHUTDOWN, FUNC_REBOOT };
- 
--static struct of_device_id vexpress_reset_of_match[] = {
-+static const struct of_device_id vexpress_reset_of_match[] = {
- 	{
- 		.compatible = "arm,vexpress-reset",
- 		.data = (void *)FUNC_RESET,
-diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
-index ecd55f8..b5542bf 100644
---- a/drivers/power/reset/xgene-reboot.c
-+++ b/drivers/power/reset/xgene-reboot.c
-@@ -83,7 +83,7 @@ static int xgene_reboot_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id xgene_reboot_of_match[] = {
-+static const struct of_device_id xgene_reboot_of_match[] = {
- 	{ .compatible = "apm,xgene-reboot" },
- 	{}
- };
-diff --git a/drivers/power/tps65090-charger.c b/drivers/power/tps65090-charger.c
-index 3e8ba97..48e402f 100644
---- a/drivers/power/tps65090-charger.c
-+++ b/drivers/power/tps65090-charger.c
-@@ -344,7 +344,7 @@ static int tps65090_charger_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id of_tps65090_charger_match[] = {
-+static const struct of_device_id of_tps65090_charger_match[] = {
- 	{ .compatible = "ti,tps65090-charger", },
- 	{ /* end */ }
- };
--- 
-1.7.9.5
+Will
