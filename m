@@ -1,43 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Sep 2014 21:02:55 +0200
-Subject: [PATCH] ARM: sunxi: Remove sun4i reboot code from mach directory
-In-Reply-To: <20140911175426.GA32184@lukather>
-References: <1409332787-23923-1-git-send-email-maxime.ripard@free-electrons.com>
- <201409052215.30171.arnd@arndb.de> <20140911175426.GA32184@lukather>
-Message-ID: <3194253.M0WqeHViJW@wuerfel>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 11 Sep 2014 15:07:30 -0400
+Subject: [PATCH - v4] PCI: keystone: add a pci quirk to limit mrrs
+In-Reply-To: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
+References: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5411F2F2.20102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 19:54:26 Maxime Ripard wrote:
-> On Fri, Sep 05, 2014 at 10:15:29PM +0200, Arnd Bergmann wrote:
-> > On Friday 05 September 2014, Kevin Hilman wrote:
-> > > Maxime Ripard <maxime.ripard@free-electrons.com> writes:
-> > > 
-> > > > Now that the restart code has been merged in the watchdog driver, we don't need
-> > > > the restart code in the mach-sunxi directory anymore.
-> > > >
-> > > > Remove it entirely.
-> > > >
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > ---
-> > > >
-> > > > Hi Arnd, Kevin, Olof,
-> > > >
-> > > > I don't know if this can be considered 3.17 material, but if so, it would be
-> > > > great if you could merge it directly.
-> > > 
-> > > I don't think it's v3.17 material at this point in the cycle because
-> > > it's not a regression fix.
-> > > 
-> > > Please add it to your queue for v3.18.
-> > 
-> > I agree. I had actually put it into my apply-for-3.18 queue already, but
-> > it's better if this comes through the normal cleanups from Maxime, unless
-> > he has nothing else yet and prefers me to apply it to the next/cleanup
-> > branch now.
-> 
-> If possible, yes. I have no other cleanups queued up so far.
+On 09/08/2014 01:03 PM, Murali Karicheri wrote:
+> Keystone PCI controller has a limitation that memory read request
+> size must not exceed 256 bytes. This is a hardware limitation and
+> add a quirk to force this limit on all downstream devices by
+> updating mrrs.
+>
+> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+> ---
+>    -v4: re-send removing extra lines
+>    -v3: added check for vendor id and use pci_matc_id() to do matching
+>    -v2: made the quirk happens after tuning
+>    -v1: changed printk to indicate PCI bdf
+>
+>   drivers/pci/host/pci-keystone.c |   45 +++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 45 insertions(+)
+>
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index c1cfaef..ff8ed25 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -42,8 +42,53 @@
+>   /* DEV_STAT_CTRL */
+>   #define PCIE_CAP_BASE		0x70
+>
+> +/* PCIE controller device IDs */
+> +#define PCIE_RC_K2HK		0xb008
+> +#define PCIE_RC_K2E		0xb009
+> +#define PCIE_RC_K2L		0xb00a
+> +
+>   #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+>
+> +static void quirk_limit_mrrs(struct pci_dev *dev)
+> +{
+> +	struct pci_bus *bus = dev->bus;
+> +	struct pci_dev *bridge = bus->self;
+> +	static const struct pci_device_id rc_pci_devids[] = {
+> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2HK),
+> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
+> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2E),
+> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
+> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2L),
+> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
+> +		{ 0, },
+> +	};
+> +
+> +	if (pci_is_root_bus(bus))
+> +		return;
+> +
+> +	/* look for the host bridge */
+> +	while (!pci_is_root_bus(bus)) {
+> +		bridge = bus->self;
+> +		bus = bus->parent;
+> +	}
+> +
+> +	if (bridge) {
+> +		/*
+> +		 * Keystone PCI controller has a h/w limitation of
+> +		 * 256 bytes maximum read request size. It can't handle
+> +		 * anything higher than this. So force this limit on
+> +		 * all downstream devices
+> +		 */
+> +		if (pci_match_id(rc_pci_devids, bridge)) {
+> +			if (pcie_get_readrq(dev)>  256) {
+> +				dev_info(&dev->dev, "limiting mrrs to 256\n");
+> +				pcie_set_readrq(dev, 256);
+> +			}
+> +		}
+> +	}
+> +}
+> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
+> +
+>   static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+>   {
+>   	struct pcie_port *pp =&ks_pcie->pp;
+Bjorn,
 
-Ok, applied to next/cleanup now.
+If this version looks good, could you please apply this to host-keystone?
 
-	Arnd
+Thanks
+
+Murali
