@@ -1,60 +1,31 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Thu, 11 Sep 2014 07:59:03 -0700
-Subject: [PATCH arm64-next] net: bpf: arm64: fix module memory leak when
- JIT image build fails
-In-Reply-To: <20140911104513.GC6158@arm.com>
-References: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
- <20140911104513.GC6158@arm.com>
-Message-ID: <CABg9mcsqyk5udznitb2=B-M4SjB=ptgV7Z+34zJXqEcP9ia4Gw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Sep 2014 16:02:12 +0100
+Subject: [PATCH v2] arm64: add guard macros of unistd.h to prevent double
+ inclusion
+In-Reply-To: <5411698E.3000402@huawei.com>
+References: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
+ <20140909123938.GL1754@arm.com> <54115583.8080306@huawei.com>
+ <5411698E.3000402@huawei.com>
+Message-ID: <20140911150212.GP6158@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 3:45 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Sep 11, 2014 at 10:36:48AM +0100, Daniel Borkmann wrote:
->> On ARM64, when the BPF JIT compiler fills the JIT image body with
->> opcodes during translation of eBPF into ARM64 opcodes, we may fail
->> for several reasons during that phase: one being that we jump to
->> the notyet label for not yet supported eBPF instructions such as
->> BPF_ST. In that case we only free offsets, but not the actual
->> allocated target image where opcodes are being stored. Fix it by
->> calling module_free() on dismantle time in case of errors.
->>
->> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
->> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
->> Cc: Alexei Starovoitov <ast@plumgrid.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>  [ Compile-tested only. ]
->>
->>  arch/arm64/net/bpf_jit_comp.c | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
->> index 38c4296..7ae3354 100644
->> --- a/arch/arm64/net/bpf_jit_comp.c
->> +++ b/arch/arm64/net/bpf_jit_comp.c
->> @@ -651,8 +651,10 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
->>       build_prologue(&ctx);
->>
->>       ctx.body_offset = ctx.idx;
->> -     if (build_body(&ctx))
->> +     if (build_body(&ctx)) {
->> +             module_free(NULL, ctx.image);
->>               goto out;
->> +     }
->>
->
-> Looks good to me:
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
+On Thu, Sep 11, 2014 at 10:21:18AM +0100, Yang Yingliang wrote:
+> From: Yang Yingliang <yangyingliang@huawei.com>
+> 
+> Add guard macros for uapi/asm/unistd.h, asm/unistd.h and
+> asm/unistd32.h.
 
-Same here:
+Hmm, so I applied this and now my machine panics when we hit userspace. I
+think the issue is that we no longer generate our syscall table in
+arch/arm64/kernel/sys.c, because unistd.h is already included via
+linux/syscalls.h but without the __SYSCALL definition.
 
-    Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
+So, a couple of questions:
 
-Thank you Daniel.
+  (1) Is the lack of header guards actually causing you a problem?
+  (2) How did you test this?
 
->
-> Catalin, can you apply this on the for-next/core branch, please?
->
-> Will
+I've dropped the patch.
+
+Will
