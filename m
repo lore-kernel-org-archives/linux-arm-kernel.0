@@ -1,99 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 11 Sep 2014 19:52:17 +0200
-Subject: [PATCHv2] mtd: nand: atmel_nand: retrieve NFC clock
-Message-ID: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Sep 2014 19:54:26 +0200
+Subject: [PATCH] ARM: sunxi: Remove sun4i reboot code from mach directory
+In-Reply-To: <201409052215.30171.arnd@arndb.de>
+References: <1409332787-23923-1-git-send-email-maxime.ripard@free-electrons.com>
+ <7hoauuyuyl.fsf@paris.lan> <201409052215.30171.arnd@arndb.de>
+Message-ID: <20140911175426.GA32184@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Hi,
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
+On Fri, Sep 05, 2014 at 10:15:29PM +0200, Arnd Bergmann wrote:
+> On Friday 05 September 2014, Kevin Hilman wrote:
+> > Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+> > 
+> > > Now that the restart code has been merged in the watchdog driver, we don't need
+> > > the restart code in the mach-sunxi directory anymore.
+> > >
+> > > Remove it entirely.
+> > >
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >
+> > > Hi Arnd, Kevin, Olof,
+> > >
+> > > I don't know if this can be considered 3.17 material, but if so, it would be
+> > > great if you could merge it directly.
+> > 
+> > I don't think it's v3.17 material at this point in the cycle because
+> > it's not a regression fix.
+> > 
+> > Please add it to your queue for v3.18.
+> 
+> I agree. I had actually put it into my apply-for-3.18 queue already, but
+> it's better if this comes through the normal cleanups from Maxime, unless
+> he has nothing else yet and prefers me to apply it to the next/cleanup
+> branch now.
 
-Changes in v2:
- - reworked the error path to really make the clock optional
- - Documented the new optional property
+If possible, yes. I have no other cleanups queued up so far.
 
- .../devicetree/bindings/mtd/atmel-nand.txt         |  1 +
- drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+Thanks!
+Maxime
 
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index c4728839d0c1..f71e2ebab15b 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -38,6 +38,7 @@ Optional properties:
-             if don't want to use it.
-   - Optional properties:
-     - atmel,write-by-sram: boolean to enable NFC write by sram.
-+    - clocks: phandle to the peripheral clock if it exists
- 
- Examples:
- nand0: nand at 40000000,0 {
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 9c5f717bda54..69e0eb1ace54 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -27,6 +27,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-@@ -96,6 +97,8 @@ struct atmel_nfc {
- 	bool			use_nfc_sram;
- 	bool			write_by_sram;
- 
-+	struct clk		*clk;
-+
- 	bool			is_initialized;
- 	struct completion	comp_ready;
- 	struct completion	comp_cmd_done;
-@@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- {
- 	struct atmel_nfc *nfc = &nand_nfc;
- 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-+	int ret;
- 
- 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-@@ -2281,6 +2285,26 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 
- 	nfc->is_initialized = true;
- 	dev_info(&pdev->dev, "NFC is probed.\n");
-+
-+	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(nfc->clk)) {
-+		ret = clk_prepare_enable(nfc->clk);
-+		if (ret)
-+			return ret;
-+	} else {
-+		dev_warn(&pdev->dev, "NFC clock is missing");
-+	}
-+
-+	return 0;
-+}
-+
-+static int atmel_nand_nfc_remove(struct platform_device *pdev)
-+{
-+	struct atmel_nfc *nfc = &nand_nfc;
-+
-+	if (!IS_ERR(nfc->clk))
-+		clk_disable_unprepare(nfc->clk);
-+
- 	return 0;
- }
- 
-@@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
- 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
- 	},
- 	.probe = atmel_nand_nfc_probe,
-+	.remove = atmel_nand_nfc_remove,
- };
- 
- static struct platform_driver atmel_nand_driver = {
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/92b81b62/attachment.sig>
