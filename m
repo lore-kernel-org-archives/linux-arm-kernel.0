@@ -1,109 +1,121 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Sep 2014 18:31:01 +0200
-Subject: [PATCH 3/7] ARM: at91: introduce basic SAMA5D4 support
-In-Reply-To: <1410450852-1834-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410450852-1834-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140911183101.7a82d291@free-electrons.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 11 Sep 2014 16:31:04 +0000 (UTC)
+Subject: OMAP baseline test results for v3.17-rc4
+Message-ID: <alpine.DEB.2.02.1409111623470.5347@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alexandre Belloni,
 
-On Thu, 11 Sep 2014 17:54:08 +0200, Alexandre Belloni wrote:
+Here are some basic OMAP test results for Linux v3.17-rc4.
+Logs and other details at:
 
-> +#ifdef CONFIG_CACHE_L2X0
-> +static void __init at91_init_l2cache(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-> +	if (!np)
-> +		return;
-> +	of_node_put(np);
-> +
-> +	l2x0_of_init(0, ~0UL);
-> +}
-> +#else
-> +static inline void at91_init_l2cache(void) {}
-> +#endif
-> +
->  static void __init sama5_dt_device_init(void)
->  {
-> +	at91_init_l2cache();
+    http://www.pwsan.com/omap/testlogs/test_v3.17-rc4/20140910234406/
 
-Following Russell's cleanup of the L2 cache code, I don't think this is
-necessary. The l2x0_of_init() function is automatically called for you
-in init_IRQ(), as long as one of the l2c_aux_mask or l2c_aux_val fields
-of your DT_MACHINE structure are non zero:
 
-void __init init_IRQ(void)
-{
-        int ret;
+Test summary
+------------
 
-        if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
-                irqchip_init();
-        else
-                machine_desc->init_irq();
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-        if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
-            (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
-                outer_cache.write_sec = machine_desc->l2c_write_sec;
-                ret = l2x0_of_init(machine_desc->l2c_aux_val,
-                                   machine_desc->l2c_aux_mask);
-                if (ret)
-                        pr_err("L2C: failed to init: %d\n", ret);
-        }
-}
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-Also, l2x0_of_init() already has a stub definition when
-CONFIG_CACHE_L2X0 is not enabled, so the compile time conditional is
-not necessary.
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
 
-> +/* Firmware */
-> +extern void atmel_firmware_init(void);
-> +extern bool atmel_firmware_is_registered(void);
+Boot to userspace:
+    FAIL ( 2/16): 2430sdp, 5430es2sbct54
+    skip ( 1/16): 5912osk
+    Pass (13/16): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3517evm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
 
-What is this firmware?
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 5/11): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm
 
-> diff --git a/arch/arm/mach-at91/include/mach/sama5d4.h b/arch/arm/mach-at91/include/mach/sama5d4.h
-> new file mode 100644
-> index 000000000000..af835e89d4c5
-> --- /dev/null
-> +++ b/arch/arm/mach-at91/include/mach/sama5d4.h
-> @@ -0,0 +1,35 @@
-> +/*
-> + * Chip-specific header file for the SAMA5D4 family
-> + *
-> + *  Copyright (C) 2013 Atmel Corporation,
-> + *                     Nicolas Ferre <nicolas.ferre@atmel.com>
-> + *
-> + * Common definitions.
-> + * Based on SAMA5D4 datasheet.
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#ifndef SAMA5D4_H
-> +#define SAMA5D4_H
-> +
-> +/*
-> + * User Peripheral physical base addresses.
-> + */
-> +#define SAMA5D4_BASE_AIC	0xfc06e000 /* (AIC non-secure) Base Address */
-> +#define SAMA5D4_BASE_USART3	0xfc00c000 /* (USART3 non-secure) Base Address */
-> +#define SAMA5D4_BASE_PMC	0xf0018000 /* (PMC) Base Address */
-> +#define SAMA5D4_BASE_MPDDRC	0xf0010000 /* (MPDDRC) Base Address */
-> +#define SAMA5D4_BASE_PIOD	0xfc068000 /* (PIOD) Base Address */
-> +#define SAMA5D4_BASE_PIOE	0xfc06d000 /* (PIOE) Base Address */
+PM: chip retention via dynamic idle:
+    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460pandaes,
+		  4460varsomom, 3530es3beagle, 2430sdp, 5430es2uevm,
+		  5430es2sbct54
+    Pass ( 3/11): 37xxevm, 3530es31beagle, 3730beaglexm
 
-Are these definitions still all necessary? With the migration of most
-(all?) peripherals to the Device Tree, less and less of those
-definitions should be useful. For example, isn't the AIC fully
-described in the Device Tree now?
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 1/ 3): 3530es3beagle
+    Pass ( 2/ 3): 37xxevm, 3530es31beagle
+
+PM: chip off via dynamic idle:
+    FAIL ( 1/ 3): 3530es3beagle
+    Pass ( 2/ 3): 37xxevm, 3530es31beagle
+
+
+vmlinux object size
+(delta in bytes from test_v3.17-rc3 (69e273c0b0a3c337a521d083374c918dc52c666f)):
+   text     data      bss    total  kernel
+   +831        0        0     +831  multi_v7_defconfig
+   +259        0      -64     +195  omap2plus_defconfig
+   +251        0        0     +251  omap2plus_defconfig_2430sdp_only
+   +263      +64        0     +327  omap2plus_defconfig_am33xx_only
+   +199      +64        0     +263  omap2plus_defconfig_am43xx_only
+   +259        0      -64     +195  omap2plus_defconfig_cpupm
+   +199        0        0     +199  omap2plus_defconfig_dra7xx_only
+   +223      +64       -8     +279  omap2plus_defconfig_n800_multi_omap2xxx
+   +223      +32       -8     +247  omap2plus_defconfig_n800_only_a
+   +191        0        0     +191  omap2plus_defconfig_no_pm
+   +191        0        0     +191  omap2plus_defconfig_omap2_4_only
+   +199        0        0     +199  omap2plus_defconfig_omap3_4_only
+   +199        0        0     +199  omap2plus_defconfig_omap5_only
+    +80        0      +64     +144  rmk_omap3430_ldp_allnoconfig
+   +351       +8        0     +359  rmk_omap3430_ldp_oldconfig
+    +64        0      +80     +144  rmk_omap4430_sdp_allnoconfig
+   +259        0        0     +259  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.17-rc3 (69e273c0b0a3c337a521d083374c918dc52c666f))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
+
+
+A 3530 Beagle C5 has been added as "3530es31beagle".  
+
+PM tests have been enabled for the am335xbonelt and OMAP5-based platforms.
+
+Also, several of the board PM test evaluations that are failing off-mode 
+testing have been restricted to testing for chip retention, for the time 
+being.
