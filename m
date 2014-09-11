@@ -1,224 +1,110 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu, 11 Sep 2014 22:11:36 +0200
-Subject: [PATCH v2 5/9] ARM: meson6: clocksource: add Meson6 timer support
+Date: Thu, 11 Sep 2014 22:11:38 +0200
+Subject: [PATCH v2 7/9] ARM: meson: add basic support for MesonX SoCs
 In-Reply-To: <1410466300-19168-1-git-send-email-carlo@caione.org>
 References: <1410466300-19168-1-git-send-email-carlo@caione.org>
-Message-ID: <1410466300-19168-6-git-send-email-carlo@caione.org>
+Message-ID: <1410466300-19168-8-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Meson6 SoCs are equipped with 5 32-bit timers, called TIMER_A, TIMER_B,
-TIMER_C, TIMER_D and TIMER_E.
-
-The driver is providing clocksource support for the 32-bit counter using
-TIMER_E. Clockevents are also supported using TIMER_A.
+This patch adds the basic machine file for the MesonX SoCs. Only Meson6
+is populated.
 
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- drivers/clocksource/Kconfig        |   3 +
- drivers/clocksource/Makefile       |   1 +
- drivers/clocksource/meson6_timer.c | 167 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 171 insertions(+)
- create mode 100644 drivers/clocksource/meson6_timer.c
+ arch/arm/Kconfig             |  2 ++
+ arch/arm/Makefile            |  1 +
+ arch/arm/mach-meson/Kconfig  | 13 +++++++++++++
+ arch/arm/mach-meson/Makefile |  1 +
+ arch/arm/mach-meson/meson.c  | 27 +++++++++++++++++++++++++++
+ 5 files changed, 44 insertions(+)
+ create mode 100644 arch/arm/mach-meson/Kconfig
+ create mode 100644 arch/arm/mach-meson/Makefile
+ create mode 100644 arch/arm/mach-meson/meson.c
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 065131c..1c80d7e 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -28,6 +28,9 @@ config ARMADA_370_XP_TIMER
- 	bool
- 	select CLKSRC_OF
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 88acf8b..cf7f870 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -956,6 +956,8 @@ source "arch/arm/mach-kirkwood/Kconfig"
  
-+config MESON6_TIMER
-+	bool
+ source "arch/arm/mach-ks8695/Kconfig"
+ 
++source "arch/arm/mach-meson/Kconfig"
 +
- config ORION_TIMER
- 	select CLKSRC_OF
- 	select CLKSRC_MMIO
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 800b130..5a4fc59 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
- obj-$(CONFIG_ARCH_U300)		+= timer-u300.o
- obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
- obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
-+obj-$(CONFIG_MESON6_TIMER)	+= meson6_timer.o
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
- obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
- obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
-diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+ source "arch/arm/mach-msm/Kconfig"
+ 
+ source "arch/arm/mach-moxart/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 6721fab..f998803 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -166,6 +166,7 @@ machine-$(CONFIG_ARCH_KEYSTONE)		+= keystone
+ machine-$(CONFIG_ARCH_KIRKWOOD)		+= kirkwood
+ machine-$(CONFIG_ARCH_KS8695)		+= ks8695
+ machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
++machine-$(CONFIG_ARCH_MESON)		+= meson
+ machine-$(CONFIG_ARCH_MMP)		+= mmp
+ machine-$(CONFIG_ARCH_MOXART)		+= moxart
+ machine-$(CONFIG_ARCH_MSM)		+= msm
+diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
 new file mode 100644
-index 0000000..5c15cba
+index 0000000..2c1154e
 --- /dev/null
-+++ b/drivers/clocksource/meson6_timer.c
-@@ -0,0 +1,167 @@
++++ b/arch/arm/mach-meson/Kconfig
+@@ -0,0 +1,13 @@
++menuconfig ARCH_MESON
++	bool "Amlogic Meson SoCs" if ARCH_MULTI_V7
++	select GENERIC_IRQ_CHIP
++	select ARM_GIC
++
++if ARCH_MESON
++
++config MACH_MESON6
++	bool "Amlogic Meson6 (8726MX) SoCs support"
++	default ARCH_MESON
++	select MESON6_TIMER
++
++endif
+diff --git a/arch/arm/mach-meson/Makefile b/arch/arm/mach-meson/Makefile
+new file mode 100644
+index 0000000..9d7380e
+--- /dev/null
++++ b/arch/arm/mach-meson/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_MESON) += meson.o
+diff --git a/arch/arm/mach-meson/meson.c b/arch/arm/mach-meson/meson.c
+new file mode 100644
+index 0000000..5ee064f
+--- /dev/null
++++ b/arch/arm/mach-meson/meson.c
+@@ -0,0 +1,27 @@
 +/*
-+ * Amlogic Meson6 SoCs timer handling.
-+ *
 + * Copyright (C) 2014 Carlo Caione <carlo@caione.org>
 + *
-+ * Based on code from Amlogic, Inc
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/sched_clock.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
 +
-+#define CED_ID			0
-+#define CSD_ID			4
-+
-+#define TIMER_ISA_MUX		0
-+#define TIMER_ISA_VAL(t)	(((t) + 1) << 2)
-+
-+#define TIMER_INPUT_BIT(t)	(2 * (t))
-+#define TIMER_ENABLE_BIT(t)	(16 + (t))
-+#define TIMER_PERIODIC_BIT(t)	(12 + (t))
-+
-+#define TIMER_CED_INPUT_MASK	(3UL << TIMER_INPUT_BIT(CED_ID))
-+#define TIMER_CSD_INPUT_MASK	(7UL << TIMER_INPUT_BIT(CSD_ID))
-+
-+#define TIMER_CED_UNIT_1US	0
-+#define TIMER_CSD_UNIT_1US	1
-+
-+static void __iomem *timer_base;
-+
-+static u64 notrace meson6_timer_sched_read(void)
-+{
-+	return (u64)readl(timer_base + TIMER_ISA_VAL(CSD_ID));
-+}
-+
-+static void meson6_clkevt_time_stop(unsigned char timer)
-+{
-+	u32 val = readl(timer_base + TIMER_ISA_MUX);
-+
-+	writel(val & ~TIMER_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
-+}
-+
-+static void meson6_clkevt_time_setup(unsigned char timer, unsigned long delay)
-+{
-+	writel(delay, timer_base + TIMER_ISA_VAL(timer));
-+}
-+
-+static void meson6_clkevt_time_start(unsigned char timer, bool periodic)
-+{
-+	u32 val = readl(timer_base + TIMER_ISA_MUX);
-+
-+	if (periodic)
-+		val |= TIMER_PERIODIC_BIT(timer);
-+	else
-+		val &= ~TIMER_PERIODIC_BIT(timer);
-+
-+	writel(val | TIMER_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
-+}
-+
-+static void meson6_clkevt_mode(enum clock_event_mode mode,
-+			       struct clock_event_device *clk)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		meson6_clkevt_time_stop(CED_ID);
-+		meson6_clkevt_time_setup(CED_ID, USEC_PER_SEC/HZ - 1);
-+		meson6_clkevt_time_start(CED_ID, true);
-+		break;
-+	case CLOCK_EVT_MODE_ONESHOT:
-+		meson6_clkevt_time_stop(CED_ID);
-+		meson6_clkevt_time_start(CED_ID, false);
-+		break;
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	default:
-+		meson6_clkevt_time_stop(CED_ID);
-+		break;
-+	}
-+}
-+
-+static int meson6_clkevt_next_event(unsigned long evt,
-+				    struct clock_event_device *unused)
-+{
-+	meson6_clkevt_time_stop(CED_ID);
-+	meson6_clkevt_time_setup(CED_ID, evt);
-+	meson6_clkevt_time_start(CED_ID, false);
-+
-+	return 0;
-+}
-+
-+static struct clock_event_device meson6_clockevent = {
-+	.name		= "meson6_tick",
-+	.rating		= 400,
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode	= meson6_clkevt_mode,
-+	.set_next_event	= meson6_clkevt_next_event,
++static const char * const m6_common_board_compat[] = {
++	"amlogic,meson6",
++	NULL,
 +};
 +
-+static irqreturn_t meson6_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
++DT_MACHINE_START(AML8726_MX, "Amlogic Meson6 platform")
++	.dt_compat	= m6_common_board_compat,
++MACHINE_END
 +
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction meson6_timer_irq = {
-+	.name		= "meson6_timer",
-+	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= meson6_timer_interrupt,
-+	.dev_id		= &meson6_clockevent,
-+};
-+
-+static void __init meson6_timer_init(struct device_node *node)
-+{
-+	u32 val;
-+	int ret, irq;
-+
-+	timer_base = of_io_request_and_map(node, 0, "meson6-timer");
-+	if (IS_ERR(timer_base))
-+		panic("Can't map registers");
-+
-+	irq = irq_of_parse_and_map(node, 0);
-+	if (irq <= 0)
-+		panic("Can't parse IRQ");
-+
-+	/* Set 1us for timer E */
-+	val = readl(timer_base + TIMER_ISA_MUX);
-+	val &= ~TIMER_CSD_INPUT_MASK;
-+	val |= TIMER_CSD_UNIT_1US << TIMER_INPUT_BIT(CSD_ID);
-+	writel(val, timer_base + TIMER_ISA_MUX);
-+
-+	sched_clock_register(meson6_timer_sched_read, 32, USEC_PER_SEC);
-+	clocksource_mmio_init(timer_base + TIMER_ISA_VAL(CSD_ID), node->name,
-+			      1000 * 1000, 300, 32, clocksource_mmio_readl_up);
-+
-+	/* Timer A base 1us */
-+	val &= ~TIMER_CED_INPUT_MASK;
-+	val |= TIMER_CED_UNIT_1US << TIMER_INPUT_BIT(CED_ID);
-+	writel(val, timer_base + TIMER_ISA_MUX);
-+
-+	/* Stop the timer A */
-+	meson6_clkevt_time_stop(CED_ID);
-+
-+	ret = setup_irq(irq, &meson6_timer_irq);
-+	if (ret)
-+		pr_warn("failed to setup irq %d\n", irq);
-+
-+	meson6_clockevent.cpumask = cpu_possible_mask;
-+	meson6_clockevent.irq = irq;
-+
-+	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
-+					1, 0xfffe);
-+}
-+CLOCKSOURCE_OF_DECLARE(meson6, "amlogic,meson6-timer",
-+		       meson6_timer_init);
 -- 
 1.9.1
