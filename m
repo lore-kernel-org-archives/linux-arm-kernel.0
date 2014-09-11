@@ -1,75 +1,35 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 11 Sep 2014 09:28:57 +0800
-Subject: [Xen-devel] [PATCH v1 08/21] x86/xen/MSI: Use MSI chip framework
- to configure MSI/MSI-X irq
-In-Reply-To: <20140910145957.GD12893@laptop.dumpdata.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-9-git-send-email-wangyijing@huawei.com>
- <5409C8C0.8020200@citrix.com> <540E6095.8030409@huawei.com>
- <54104641.7020007@citrix.com> <20140910145957.GD12893@laptop.dumpdata.com>
-Message-ID: <5410FAD9.40702@huawei.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 11 Sep 2014 09:37:38 +0800
+Subject: [PATCH v5] spi: spi-imx: add DMA support
+In-Reply-To: <20140910155216.GI7960@sirena.org.uk>
+References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+ <20140910102105.GR2601@sirena.org.uk>
+ <20140910112258.GA30794@Robin-OptiPlex-780>
+ <20140910114530.GD7960@sirena.org.uk>
+ <20140910151759.GA31462@Robin-OptiPlex-780>
+ <20140910155216.GI7960@sirena.org.uk>
+Message-ID: <20140911013737.GA366@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/10 22:59, Konrad Rzeszutek Wilk wrote:
-> On Wed, Sep 10, 2014 at 01:38:25PM +0100, David Vrabel wrote:
->> On 09/09/14 03:06, Yijing Wang wrote:
->>> On 2014/9/5 22:29, David Vrabel wrote:
->>>> On 05/09/14 11:09, Yijing Wang wrote:
->>>>> Use MSI chip framework instead of arch MSI functions to configure
->>>>> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
->>>> [...]
->>>>> --- a/arch/x86/pci/xen.c
->>>>> +++ b/arch/x86/pci/xen.c
->>>> [...]
->>>>> @@ -418,9 +430,9 @@ int __init pci_xen_init(void)
->>>>>  #endif
->>>>>  
->>>>>  #ifdef CONFIG_PCI_MSI
->>>>> -	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
->>>>> -	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
->>>>> -	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
->>>>> +	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
->>>>> +	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
->>>>> +	x86_msi_chip = &xen_msi_chip;
->>>>>  	msi_chip.irq_mask = xen_nop_msi_mask;
->>>>>  	msi_chip.irq_unmask = xen_nop_msi_mask;
->>>>
->>>> Why have these not been changed to set the x86_msi_chip.mask/unmask
->>>> fields instead?
->>>
->>> Hi David, x86_msi_chip here is struct msi_chip data type, used to configure MSI/MSI-X
->>> irq. msi_chip above is struct irq_chip data type, represent the MSI irq controller. They are
->>> not the same object. Their name easily confusing people.
->>
->> Ok, it all makes sense now.
->>
->> Acked-by: David Vrabel <david.vrabel@citrix.com>
+On Wed, Sep 10, 2014 at 04:52:16PM +0100, Mark Brown wrote:
+> On Wed, Sep 10, 2014 at 11:18:01PM +0800, Robin Gong wrote:
+> > On Wed, Sep 10, 2014 at 12:45:30PM +0100, Mark Brown wrote:
 > 
-> You can also add 'Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>'
+> > > > Yes, you're right. I should use "transfer->tx_sg->sgl == NULL" or
+> > > > "transfer->rx_sg->sgl == NULL" instead of usedma flag in driver, right?
 > 
-> on the whole series - I ran it through on Xen and on baremetal with a mix of 32/64 builds.
+> > > Right.
 > 
-> Oh, and also Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> the Xen parts.
-
-Thanks very much for your test and review!
-
-Thanks!
-Yijing.
-
+> > But looks spi core framework can make sure every rx or tx transfer in sequence.
+> > If so, can_dma will never be called until this transfer finished
+> > (spi_pump_messages), and my usedma flag also never be modified until next
+> > transfer start. Please correct me if I am wrong, thanks.
 > 
->>
->> David
->>
->> _______________________________________________
->> Xen-devel mailing list
->> Xen-devel at lists.xen.org
->> http://lists.xen.org/xen-devel
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+> Even if that were true currently this would still not be good code since
+> it would break in the face of SPI core changes.  In any case the
+> assumption isn't true for the current SPI core, the DMA mapping is done
+> for all transfers in a message before we start running them and it's
+> entirely likely that we will have patterns like a short PIO transfer
+> followed by a big data block.
+Understood, will improve it in v6.Thanks.
