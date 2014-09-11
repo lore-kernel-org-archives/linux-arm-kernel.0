@@ -1,84 +1,28 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 11 Sep 2014 16:23:04 +0200
-Subject: [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20140911132935.068DCC408F6@trevor.secretlab.ca>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <20140911132935.068DCC408F6@trevor.secretlab.ca>
-Message-ID: <61335531.hz91PL2Gdf@vostro.rjw.lan>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 11 Sep 2014 16:04:44 +0200
+Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
+In-Reply-To: <CAKfTPtBbjpCFifoyFSh8Hb3nBZFFTjjxdfxnpMk=CHy5aX1qpg@mail.gmail.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
+ <20140911123412.GY3190@worktop.ger.corp.intel.com>
+ <CAKfTPtBbjpCFifoyFSh8Hb3nBZFFTjjxdfxnpMk=CHy5aX1qpg@mail.gmail.com>
+Message-ID: <20140911140444.GH4783@worktop.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 11, 2014 02:29:34 PM Grant Likely wrote:
-> On Mon,  1 Sep 2014 22:57:38 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > ACPI 5.1 has been released and now be freely available for
-> > download [1]. It fixed some major gaps to run ACPI on ARM,
-> > this patch just follow the ACPI 5.1 spec and prepare the
-> > code to run ACPI on ARM64.
-> > 
-> > ACPI 5.1 has some major changes for the following tables and
-> > method which are essential for ARM platforms:
-> > 1) MADT table updates.
-> > 2) FADT updates for PSCI
-> > 3) GTDT
-> > 
-> > This patch set is the ARM64 ACPI core patches covered MADT, FADT
-> > and GTDT, platform board specific drivers are not covered by this
-> > patch set, but we provide drivers for Juno to boot with ACPI only
-> > in the follwing patch set for review purpose.
-> > 
-> > We first introduce acpi.c and its related head file which are needed
-> > by ACPI core, and then get RSDP to extract all the ACPI boot-time tables.
-> > When all the boot-time tables (FADT, MADT, GTDT) are ready, then
-> > parse them to init the sytem when booted. Specifically, 
-> > a) we use FADT to init PSCI and use PSCI to boot SMP;
-> > b) Use MADT for GIC init and SMP init;
-> > c) GTDT for arch timer init.
-> > 
-> > This patch set is based on 3.17-rc2 and was tested by Graeme on Juno
-> > and FVP base model boot with ACPI only OK, if you want to test them,
-> > you can pull from acpi-5.1-v3 branch in leg/acpi repo:
-> > git://git.linaro.org/leg/acpi/acpi.git
-> > 
-> > Updates since v2:
-> >  - Refactor the code to make SMP/PSCI init with less sperated init
-> >    path by Tomasz
-> >  - make ACPI depend on EXPERT
-> >  - Address lots of comments from Catalin, Sudeep, Geoff
-> >  - Add Juno device ACPI driver patches for review
-> > 
-> > Updates since v1:
-> >  - Set ACPI default off on ARM64 suggested by Olof;
-> >  - Rebase the patch set on top of linux-next branch/linux-pm tree which
-> >    includes the ACPICA for full ACPI 5.1 support.
-> >  - Update the document as suggested;
-> >  - Adress lots of comments from Mark, Sudeep, Randy, Naresh, Olof, Geoff
-> >    and more...
-> > 
-> > [1]: http://www.uefi.org/sites/default/files/resources/ACPI_5_1release.pdf
+On Thu, Sep 11, 2014 at 03:07:52PM +0200, Vincent Guittot wrote:
+> > Also I'm not entirely sure I like the usage, utilization names/metrics.
+> > I would suggest to reverse them. Call the pure running number
+> > 'utilization' and this scaled with capacity 'usage' or so.
 > 
-> I've read through this entire series now. In my mind, aside from a few
-> comments that I know you're addressing, this is ready.  The hooks into
-> arm64 core code are not terribly invasive, it is nicely organized and
-> manageable. Get the next version out ASAP, but I would also like to see
-> the diffs from this version to the next so I don't need to review the
-> entire series again.
+> ok. i can invert 'usage' and 'utilization', which will give
 > 
-> Regarding the requests to refactor ACPICA to work better for ARM. I
-> completely agree that it should be done, but I do not think it should be
-> a prerequisite to getting this core support merged. That kind of
-> refactoring is far easier to justify when it has immediate improvement
-> on the mainline codebase, and it gives us a working baseline to test
-> against. Doing it the other way around just makes things harder.
+> s/get_cpu_utilization/get_cpu_usage/
+> s/sgs->group_utilization/sgs->group_usage/
+> s/cfs.usage_load_avg/cfs.utilization_load_avg/
+> s/se->avg.usage_avg_contrib/se->avg.utilization_avg_contrib
+> s/__update_task_entity_usage/__update_task_entity_utilization
+> s/__update_entity_usage_avg_contrib/__update_entity_utilization_avg_contrib
 > 
-> I would really like to see the next version of this series go into
-> linux-next. I think this is ready for some wider exposure. Have you got
-> a branch being pulled into Fengguang's autobuilder yet?
 
-Having looked at the patches recently, I don't see any major problems in
-them from the ACPI core perspective, so to me they are good to go.
-
-Question is who's going to handle them?
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Any other opinions before Vince goes and applies sed on patches? ;-)
