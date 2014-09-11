@@ -1,28 +1,32 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 12 Sep 2014 00:59:46 +0200
-Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
-In-Reply-To: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <54122962.5020903@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Sep 2014 16:07:49 -0700
+Subject: [PATCH] KVM: arm64: add gic-400 compatible
+In-Reply-To: <20140908222144.4967.80301.stgit@joelaarch64.amd.com>
+References: <20140908222144.4967.80301.stgit@joelaarch64.amd.com>
+Message-ID: <20140911230749.GW5535@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
-
-On 10.09.2014 07:56, Pankaj Dubey wrote:
-> From: Chander Kashyap <k.chander@samsung.com>
+On Mon, Sep 08, 2014 at 10:21:44PM +0000, Joel Schopp wrote:
+> Add a one liner to identify the gic-400.  It's gicv2 with optional MSI extensions.
 > 
-> The parent name added in parent list as
-> mout_phyclk_mipi_dphy_4l_m_txbyte_clkhs_p, is different
-> than the defined parent due to typo.
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> ---
+>  virt/kvm/arm/vgic.c |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-
-Missed your sign-off? You can reply with it inline and I will add it
-when applying this weekend.
-
-P.S. Please keep me on CC when sending patches for Samsung clock drivers.
-
-Best regards,
-Tomasz
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 73eba79..e81444e 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1550,6 +1550,7 @@ static struct notifier_block vgic_cpu_nb = {
+>  
+>  static const struct of_device_id vgic_ids[] = {
+>  	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
+> +	{ .compatible = "arm,gic-400", .data = vgic_v2_probe, },
+>  	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
+>  	{},
+>  };
+> 
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
