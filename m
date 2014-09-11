@@ -1,363 +1,344 @@
-From: xun.ni@intel.com (Ni, Xun)
-Date: Thu, 11 Sep 2014 14:17:29 +0000
-Subject: [RFC Part2 v1 15/21] x86, MSI: Use hierarchy irqdomain to
- manage MSI interrupts
-In-Reply-To: <1410444228-3134-16-git-send-email-jiang.liu@linux.intel.com>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
- <1410444228-3134-16-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <91E2D863603AD4478F101CE81E76E45D01B8E653@SHSMSX103.ccr.corp.intel.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 11 Sep 2014 16:23:40 +0200
+Subject: [PATCH v11 0/9] Per-user clock constraints
+Message-ID: <1410445421-18362-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has mis-understandings in your word" helps to make the and and architecture" ...
+Hi,
 
-Thanks
-Xun
+have rebased on top of 3.17-rc4 and checked for build regressions in a bunch of archs. The only changes from v10 are that 2/9 now converts clk-lpss.h but leaves include/asm-generic/clkdev.h alone. The later is because these series now depend on Mike's patch at [0].
 
------Original Message-----
-From: linux-pci-owner@vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org] On Behalf Of Jiang Liu
-Sent: Thursday, September 11, 2014 10:04 PM
-To: Benjamin Herrenschmidt; Thomas Gleixner; Ingo Molnar; H. Peter Anvin; Rafael J. Wysocki; Bjorn Helgaas; Randy Dunlap; Yinghai Lu; Borislav Petkov; Grant Likely; Marc Zyngier
-Cc: Jiang Liu; Konrad Rzeszutek Wilk; Andrew Morton; Luck, Tony; Joerg Roedel; Greg Kroah-Hartman; x86 at kernel.org; linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-acpi at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: [RFC Part2 v1 15/21] x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
+Follows the original cover letter blurb:
 
-Enhance MSI code to support hierarchy irqdomain, it helps to make the and and architecture more clear.
+I'm retaking Rabin's patches [1] for splitting the clk API in two: one API for
+clk consumers and another for providers. The consumer API uses a clk structure
+that just keeps track of the consumer and has a reference to the actual
+clk_core struct, which is used internally.
 
+I have kept a patch from Rabin that aims to aid in debugging nested
+enable/disable calls, though my personal aim is to allow more than one consumer
+to influence the final, effective frequency rate. For now this is limited to
+setting floor and ceiling constraints, with the short-term aim of allowing
+devfreq and thermal drivers to set floor and ceiling frequencies on the memory
+clock, respectively.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/x86/include/asm/hw_irq.h        |    6 +
- arch/x86/include/asm/irq_remapping.h |    6 +-
- arch/x86/kernel/apic/msi.c           |  225 +++++++++++++++++++++++++++++-----
- arch/x86/kernel/apic/vector.c        |    2 +
- drivers/iommu/irq_remapping.c        |    1 -
- 5 files changed, 204 insertions(+), 36 deletions(-)
+For those functions in the consumer clk API that were called from providers, I
+have added variants to clk-provider.h that are the same only that accept a
+clk_core instead. These functions are prefixed with clk_provider_.
 
-diff --git a/arch/x86/include/asm/hw_irq.h b/arch/x86/include/asm/hw_irq.h index 57f81f5a9686..9f705c49f850 100644
---- a/arch/x86/include/asm/hw_irq.h
-+++ b/arch/x86/include/asm/hw_irq.h
-@@ -199,6 +199,12 @@ static inline void lock_vector_lock(void) {}  static inline void unlock_vector_lock(void) {}
- #endif	/* CONFIG_X86_LOCAL_APIC */
- 
-+#ifdef	CONFIG_PCI_MSI
-+extern void arch_init_msi_domain(struct irq_domain *domain); #else 
-+static inline void arch_init_msi_domain(struct irq_domain *domain) { } 
-+#endif
-+
- /* Statistics */
- extern atomic_t irq_err_count;
- extern atomic_t irq_mis_count;
-diff --git a/arch/x86/include/asm/irq_remapping.h b/arch/x86/include/asm/irq_remapping.h
-index 428b4e6d637c..440053ca7515 100644
---- a/arch/x86/include/asm/irq_remapping.h
-+++ b/arch/x86/include/asm/irq_remapping.h
-@@ -73,11 +73,7 @@ extern void irq_remapping_print_chip(struct irq_data *data, struct seq_file *p);
-  * Create MSI/MSIx irqdomain for interrupt remapping device, use @parent as
-  * parent irqdomain.
-  */
--static inline struct irq_domain *
--arch_create_msi_irq_domain(struct irq_domain *parent) -{
--	return NULL;
--}
-+extern struct irq_domain *arch_create_msi_irq_domain(struct irq_domain 
-+*parent);
- 
- /* Get parent irqdomain for interrupt remapping irqdomain */  static inline struct irq_domain *arch_get_ir_parent_domain(void) diff --git a/arch/x86/kernel/apic/msi.c b/arch/x86/kernel/apic/msi.c index 709fedab44f2..5696703271af 100644
---- a/arch/x86/kernel/apic/msi.c
-+++ b/arch/x86/kernel/apic/msi.c
-@@ -3,6 +3,8 @@
-  *
-  * Copyright (C) 1997, 1998, 1999, 2000, 2009 Ingo Molnar, Hajnalka Szabo
-  *	Moved from arch/x86/kernel/apic/io_apic.c.
-+ * Jiang Liu <jiang.liu@linux.intel.com>
-+ *	Add support of hierarchy irqdomain
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as @@ -21,6 +23,8 @@  #include <asm/apic.h>  #include <asm/irq_remapping.h>
- 
-+static struct irq_domain *msi_default_domain;
-+
- void native_compose_msi_msg(struct pci_dev *pdev,
- 			    unsigned int irq, unsigned int dest,
- 			    struct msi_msg *msg, u8 hpet_id) @@ -76,28 +80,32 @@ static int msi_compose_msg(struct pci_dev *pdev, unsigned int irq,
- 	return 0;
- }
- 
--static int
--msi_set_affinity(struct irq_data *data, const struct cpumask *mask, bool force)
-+static bool msi_remapped(struct irq_domain *domain)
- {
--	struct irq_cfg *cfg = irqd_cfg(data);
--	struct msi_msg msg;
--	unsigned int dest;
--	int ret;
--
--	ret = apic_set_affinity(data, mask, &dest);
--	if (ret)
--		return ret;
-+	return domain->host_data != NULL;
-+}
- 
--	__get_cached_msi_msg(data->msi_desc, &msg);
-+static int msi_set_affinity(struct irq_data *data, const struct cpumask *mask,
-+			    bool force)
-+{
-+	struct irq_data *parent = data->parent_data;
-+	int ret;
- 
--	msg.data &= ~MSI_DATA_VECTOR_MASK;
--	msg.data |= MSI_DATA_VECTOR(cfg->vector);
--	msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
--	msg.address_lo |= MSI_ADDR_DEST_ID(dest);
-+	ret = parent->chip->irq_set_affinity(parent, mask, force);
-+	/* No need to reprogram MSI registers if interrupt is remapped */
-+	if (ret >= 0 && !msi_remapped(data->domain)) {
-+		struct irq_cfg *cfg = irqd_cfg(data);
-+		struct msi_msg msg;
- 
--	__write_msi_msg(data->msi_desc, &msg);
-+		__get_cached_msi_msg(data->msi_desc, &msg);
-+		msg.data &= ~MSI_DATA_VECTOR_MASK;
-+		msg.data |= MSI_DATA_VECTOR(cfg->vector);
-+		msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-+		msg.address_lo |= MSI_ADDR_DEST_ID(cfg->dest_apicid);
-+		__write_msi_msg(data->msi_desc, &msg);
-+	}
- 
--	return IRQ_SET_MASK_OK_NOCOPY;
-+	return ret;
- }
- 
- /*
-@@ -108,9 +116,105 @@ static struct irq_chip msi_chip = {
- 	.name			= "PCI-MSI",
- 	.irq_unmask		= unmask_msi_irq,
- 	.irq_mask		= mask_msi_irq,
--	.irq_ack		= apic_ack_edge,
-+	.irq_ack		= irq_chip_ack_parent,
- 	.irq_set_affinity	= msi_set_affinity,
--	.irq_retrigger		= apic_retrigger_irq,
-+	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-+	.irq_print_chip		= irq_remapping_print_chip,
-+};
-+
-+static inline irq_hw_number_t
-+get_hwirq_from_pcidev(struct pci_dev *pdev, struct msi_desc *msidesc) {
-+	return (irq_hw_number_t)msidesc->msi_attrib.entry_nr |
-+		PCI_DEVID(pdev->bus->number, pdev->devfn) << 11 |
-+		(pci_domain_nr(pdev->bus) & 0xFFFFFFFF) << 27; }
-+
-+static int msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			    unsigned int nr_irqs, void *arg) {
-+	int i, ret;
-+	irq_hw_number_t hwirq;
-+	struct irq_alloc_info *info = arg;
-+
-+	hwirq = get_hwirq_from_pcidev(info->msi_dev, info->msi_desc);
-+	if (irq_find_mapping(domain, hwirq) > 0)
-+		return -EEXIST;
-+
-+	ret = irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, info);
-+	if (ret < 0)
-+		return ret;
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		irq_set_msi_desc_off(virq, i, info->msi_desc);
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-+					      &msi_chip, (void *)(long)i);
-+		__irq_set_handler(virq + i, handle_edge_irq, 0, "edge");
-+		dev_dbg(&info->msi_dev->dev, "irq %d for MSI/MSI-X\n",
-+			virq + i);
-+	}
-+
-+	return ret;
-+}
-+
-+static void msi_domain_free(struct irq_domain *domain, unsigned int virq,
-+			    unsigned int nr_irqs)
-+{
-+	int i;
-+	struct msi_desc *msidesc = irq_get_msi_desc(virq);
-+
-+	if (msidesc)
-+		msidesc->irq = 0;
-+	for (i = 0; i < nr_irqs; i++) {
-+		irq_set_handler(virq + i, NULL);
-+		irq_domain_set_hwirq_and_chip(domain, virq + i, 0, NULL, NULL);
-+	}
-+	irq_domain_free_irqs_parent(domain, virq, nr_irqs); }
-+
-+static int msi_domain_activate(struct irq_domain *domain,
-+			       struct irq_data *irq_data)
-+{
-+	struct msi_msg msg;
-+	struct irq_cfg *cfg = irqd_cfg(irq_data);
-+
-+	/*
-+	 * irq_data->chip_data is MSI/MSIx offset.
-+	 * MSI-X message is written per-IRQ, the offset is always 0.
-+	 * MSI message denotes a contiguous group of IRQs, written for 0th IRQ.
-+	 */
-+	if (irq_data->chip_data)
-+		return 0;
-+
-+	if (msi_remapped(domain))
-+		irq_remapping_get_msi_entry(irq_data->parent_data, &msg);
-+	else
-+		native_compose_msi_msg(NULL, irq_data->irq, cfg->dest_apicid,
-+				       &msg, 0);
-+	write_msi_msg(irq_data->irq, &msg);
-+
-+	return 0;
-+}
-+
-+static int msi_domain_deactivate(struct irq_domain *domain,
-+				 struct irq_data *irq_data)
-+{
-+	struct msi_msg msg;
-+
-+	if (irq_data->chip_data)
-+		return 0;
-+
-+	memset(&msg, 0, sizeof(msg));
-+	write_msi_msg(irq_data->irq, &msg);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops msi_domain_ops = {
-+	.alloc = msi_domain_alloc,
-+	.free = msi_domain_free,
-+	.activate = msi_domain_activate,
-+	.deactivate = msi_domain_deactivate,
- };
- 
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc, @@ -145,25 +249,56 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 
- int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)  {
-+	int irq, cnt, nvec_pow2;
-+	struct irq_domain *domain;
- 	struct msi_desc *msidesc;
--	int irq, ret;
-+	struct irq_alloc_info info;
-+	int node = dev_to_node(&dev->dev);
-+
-+	if (disable_apic)
-+		return -ENOSYS;
- 
--	/* Multiple MSI vectors only supported with interrupt remapping */
--	if (type == PCI_CAP_ID_MSI && nvec > 1)
--		return 1;
-+	init_irq_alloc_info(&info, NULL);
-+	info.msi_dev = dev;
-+	if (type == PCI_CAP_ID_MSI) {
-+		msidesc = list_entry(dev->msi_list.next, struct msi_desc, list);
-+		WARN_ON(!list_is_singular(&dev->msi_list));
-+		WARN_ON(msidesc->irq);
-+		WARN_ON(msidesc->msi_attrib.multiple);
-+		WARN_ON(msidesc->nvec_used);
-+		info.type = X86_IRQ_ALLOC_TYPE_MSI;
-+		cnt = nvec;
-+	} else {
-+		info.type = X86_IRQ_ALLOC_TYPE_MSIX;
-+		cnt = 1;
-+	}
-+
-+	domain = irq_remapping_get_irq_domain(&info);
-+	if (domain == NULL) {
-+		/*
-+		 * Multiple MSI vectors only supported with interrupt
-+		 * remapping
-+		 */
-+		if (type == PCI_CAP_ID_MSI && nvec > 1)
-+			return 1;
-+		domain = msi_default_domain;
-+	}
-+	if (domain == NULL)
-+		return -ENOSYS;
- 
- 	list_for_each_entry(msidesc, &dev->msi_list, list) {
--		irq = irq_domain_alloc_irqs(NULL, -1, 1, NUMA_NO_NODE, NULL);
-+		info.msi_desc = msidesc;
-+		irq = irq_domain_alloc_irqs(domain, -1, cnt, node, &info);
- 		if (irq <= 0)
- 			return -ENOSPC;
-+	}
- 
--		ret = setup_msi_irq(dev, msidesc, irq, 0);
--		if (ret < 0) {
--			irq_domain_free_irqs(irq, 1);
--			return ret;
--		}
--
-+	if (type == PCI_CAP_ID_MSI) {
-+		nvec_pow2 = __roundup_pow_of_two(nvec);
-+		msidesc->msi_attrib.multiple = ilog2(nvec_pow2);
-+		msidesc->nvec_used = nvec;
- 	}
-+
- 	return 0;
- }
- 
-@@ -172,6 +307,36 @@ void native_teardown_msi_irq(unsigned int irq)
- 	irq_domain_free_irqs(irq, 1);
- }
- 
-+static struct irq_domain *msi_create_domain(struct irq_domain *parent,
-+					    int remapped)
-+{
-+	struct irq_domain *domain;
-+
-+	domain = irq_domain_add_tree(NULL, &msi_domain_ops,
-+				     (void *)(long)remapped);
-+	if (domain)
-+		domain->parent = parent;
-+
-+	return domain;
-+}
-+
-+void arch_init_msi_domain(struct irq_domain *parent) {
-+	if (disable_apic)
-+		return;
-+
-+	msi_default_domain = msi_create_domain(parent, 0);
-+	if (!msi_default_domain)
-+		pr_warn("failed to initialize irqdomain for MSI/MSI-x.\n"); }
-+
-+#ifdef CONFIG_IRQ_REMAP
-+struct irq_domain *arch_create_msi_irq_domain(struct irq_domain 
-+*parent) {
-+	return msi_create_domain(parent, 1);
-+}
-+#endif
-+
- #ifdef CONFIG_DMAR_TABLE
- static int
- dmar_msi_set_affinity(struct irq_data *data, const struct cpumask *mask, diff --git a/arch/x86/kernel/apic/vector.c b/arch/x86/kernel/apic/vector.c index 774ab5ba95f2..e9329fc28c63 100644
---- a/arch/x86/kernel/apic/vector.c
-+++ b/arch/x86/kernel/apic/vector.c
-@@ -357,6 +357,8 @@ int __init arch_early_irq_init(void)
- 	BUG_ON(x86_vector_domain == NULL);
- 	irq_set_default_host(x86_vector_domain);
- 
-+	arch_init_msi_domain(x86_vector_domain);
-+
- 	return arch_early_ioapic_init();
- }
- 
-diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c index 7ac44a464be0..bda0d8e73fde 100644
---- a/drivers/iommu/irq_remapping.c
-+++ b/drivers/iommu/irq_remapping.c
-@@ -178,7 +178,6 @@ static void __init irq_remapping_modify_x86_ops(void)
- 	x86_io_apic_ops.set_affinity	= set_remapped_irq_affinity;
- 	x86_io_apic_ops.setup_entry	= setup_ioapic_remapped_entry;
- 	x86_io_apic_ops.eoi_ioapic_pin	= eoi_ioapic_pin_remapped;
--	x86_msi.setup_msi_irqs		= irq_remapping_setup_msi_irqs;
- 	x86_msi.setup_hpet_msi		= setup_hpet_msi_remapped;
- 	x86_msi.compose_msi_msg		= compose_remapped_msi_msg;
- }
---
-1.7.10.4
+Patch 1/9 just adds a bunch of defines with the goal of having all the renames
+in their own commit while preserving git-bisectability, with patch 2/9
+containing the rename itself as generated by the Coccinelle script in [2].  The
+actual implementation of the API split comes in patch 3/9. I will be happy to
+organize the refactoring differently if anybody has a better idea.
 
---
-To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Patch 4/9 warns when there's an unbalanced usage of the enable and disable
+APIs, and patch 5/9 adds the API for setting floor and ceiling frequencies, per
+consumer. Patch 6/9 will warn when prepare/unprepare are used unbalanced,
+printing the code location of the last call to unprepare.
+
+Patches 7/9 and 8/9 add some locking when manipulating shared structures and
+9/9 adds a bit to the API docs.
+
+[0] http://permalink.gmane.org/gmane.linux.kernel/1782807
+[1] http://thread.gmane.org/gmane.linux.kernel/1402006
+[2] http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=clk-refactoring-11
+
+Thanks,
+
+Tomeu
+
+Tomeu Vizoso (9):
+  clk: Add temporary mapping to the existing API
+  clk: Move all drivers to use internal API
+  clk: use struct clk only for external API
+  clk: per-user clock accounting for debug
+  clk: Add floor and ceiling constraints to clock rates
+  clk: Warn of unbalanced clk_prepare() calls
+  clk: Take the prepare lock when updating the list of per-user clks
+  clk: Take the prepare lock when updating the per-user constraints
+  clk: Add docs about calling clk_put after clk_get_parent
+
+ arch/arm/mach-dove/common.c                   |  10 +-
+ arch/arm/mach-imx/clk-busy.c                  |   9 +-
+ arch/arm/mach-imx/clk-fixup-div.c             |   4 +-
+ arch/arm/mach-imx/clk-fixup-mux.c             |   4 +-
+ arch/arm/mach-imx/clk-gate2.c                 |   4 +-
+ arch/arm/mach-imx/clk-imx1.c                  |   3 +-
+ arch/arm/mach-imx/clk-imx21.c                 |   3 +-
+ arch/arm/mach-imx/clk-imx25.c                 |   9 +-
+ arch/arm/mach-imx/clk-imx27.c                 |   5 +-
+ arch/arm/mach-imx/clk-imx31.c                 |  11 +-
+ arch/arm/mach-imx/clk-imx35.c                 |  23 +-
+ arch/arm/mach-imx/clk-imx51-imx53.c           |  78 +--
+ arch/arm/mach-imx/clk-imx6q.c                 |  54 +-
+ arch/arm/mach-imx/clk-imx6sl.c                |  14 +-
+ arch/arm/mach-imx/clk-imx6sx.c                |  98 ++--
+ arch/arm/mach-imx/clk-pfd.c                   |   5 +-
+ arch/arm/mach-imx/clk-pllv1.c                 |   5 +-
+ arch/arm/mach-imx/clk-pllv2.c                 |   5 +-
+ arch/arm/mach-imx/clk-pllv3.c                 |   5 +-
+ arch/arm/mach-imx/clk-vf610.c                 |  43 +-
+ arch/arm/mach-imx/clk.c                       |  11 +-
+ arch/arm/mach-imx/clk.h                       |  42 +-
+ arch/arm/mach-msm/clock-pcom.c                |   2 +-
+ arch/arm/mach-msm/clock.c                     |   2 +-
+ arch/arm/mach-mv78xx0/common.c                |   2 +-
+ arch/arm/mach-omap2/board-cm-t35.c            |   2 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c         | 371 +++++++------
+ arch/arm/mach-omap2/clkt2xxx_dpll.c           |   5 +-
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c       |   5 +-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c  |  11 +-
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c        |   3 +-
+ arch/arm/mach-omap2/clkt_clksel.c             |  46 +-
+ arch/arm/mach-omap2/clkt_dpll.c               |   8 +-
+ arch/arm/mach-omap2/clock.c                   |  52 +-
+ arch/arm/mach-omap2/clock.h                   |  18 +-
+ arch/arm/mach-omap2/clock3xxx.c               |  23 +-
+ arch/arm/mach-omap2/clock3xxx.h               |   4 +-
+ arch/arm/mach-omap2/clock_common_data.c       |   2 +-
+ arch/arm/mach-omap2/clockdomain.c             |   9 +-
+ arch/arm/mach-omap2/clockdomain.h             |   4 +-
+ arch/arm/mach-omap2/display.c                 |   6 +-
+ arch/arm/mach-omap2/dpll3xxx.c                |  29 +-
+ arch/arm/mach-omap2/dpll44xx.c                |   5 +-
+ arch/arm/mach-omap2/mcbsp.c                   |   5 +-
+ arch/arm/mach-omap2/omap_device.c             |  10 +-
+ arch/arm/mach-omap2/omap_hwmod.c              |  42 +-
+ arch/arm/mach-omap2/omap_hwmod.h              |  12 +-
+ arch/arm/mach-omap2/pm24xx.c                  |  12 +-
+ arch/arm/mach-orion5x/common.c                |   2 +-
+ arch/arm/mach-shmobile/clock.c                |  10 +-
+ arch/arm/mach-vexpress/spc.c                  |   4 +-
+ arch/arm/plat-orion/common.c                  |  22 +-
+ arch/arm/plat-orion/include/plat/common.h     |  12 +-
+ arch/mips/alchemy/common/clock.c              |  42 +-
+ arch/powerpc/platforms/512x/clock-commonclk.c |  48 +-
+ drivers/acpi/acpi_lpss.c                      |   7 +-
+ drivers/clk/at91/clk-main.c                   |  24 +-
+ drivers/clk/at91/clk-master.c                 |   6 +-
+ drivers/clk/at91/clk-peripheral.c             |  12 +-
+ drivers/clk/at91/clk-pll.c                    |   6 +-
+ drivers/clk/at91/clk-plldiv.c                 |   6 +-
+ drivers/clk/at91/clk-programmable.c           |  10 +-
+ drivers/clk/at91/clk-slow.c                   |  24 +-
+ drivers/clk/at91/clk-smd.c                    |   6 +-
+ drivers/clk/at91/clk-system.c                 |   6 +-
+ drivers/clk/at91/clk-usb.c                    |  18 +-
+ drivers/clk/at91/clk-utmi.c                   |   6 +-
+ drivers/clk/bcm/clk-kona-setup.c              |   6 +-
+ drivers/clk/bcm/clk-kona.c                    |  12 +-
+ drivers/clk/bcm/clk-kona.h                    |   2 +-
+ drivers/clk/berlin/berlin2-avpll.c            |   4 +-
+ drivers/clk/berlin/berlin2-avpll.h            |   4 +-
+ drivers/clk/berlin/berlin2-div.c              |   2 +-
+ drivers/clk/berlin/berlin2-div.h              |   2 +-
+ drivers/clk/berlin/berlin2-pll.c              |   2 +-
+ drivers/clk/berlin/berlin2-pll.h              |   2 +-
+ drivers/clk/berlin/bg2.c                      |  14 +-
+ drivers/clk/berlin/bg2q.c                     |  10 +-
+ drivers/clk/clk-axi-clkgen.c                  |   3 +-
+ drivers/clk/clk-axm5516.c                     |   4 +-
+ drivers/clk/clk-bcm2835.c                     |   2 +-
+ drivers/clk/clk-clps711x.c                    |   3 +-
+ drivers/clk/clk-composite.c                   |  11 +-
+ drivers/clk/clk-conf.c                        |  18 +-
+ drivers/clk/clk-devres.c                      |  31 ++
+ drivers/clk/clk-divider.c                     |   8 +-
+ drivers/clk/clk-efm32gg.c                     |   3 +-
+ drivers/clk/clk-fixed-factor.c                |   6 +-
+ drivers/clk/clk-fixed-rate.c                  |   8 +-
+ drivers/clk/clk-fractional-divider.c          |   4 +-
+ drivers/clk/clk-gate.c                        |   4 +-
+ drivers/clk/clk-highbank.c                    |   8 +-
+ drivers/clk/clk-ls1x.c                        |  16 +-
+ drivers/clk/clk-max77686.c                    |  10 +-
+ drivers/clk/clk-moxart.c                      |   8 +-
+ drivers/clk/clk-mux.c                         |   7 +-
+ drivers/clk/clk-nomadik.c                     |  15 +-
+ drivers/clk/clk-nspire.c                      |   4 +-
+ drivers/clk/clk-palmas.c                      |   7 +-
+ drivers/clk/clk-ppc-corenet.c                 |   8 +-
+ drivers/clk/clk-s2mps11.c                     |   6 +-
+ drivers/clk/clk-si5351.c                      |  17 +-
+ drivers/clk/clk-si570.c                       |   4 +-
+ drivers/clk/clk-twl6040.c                     |   3 +-
+ drivers/clk/clk-u300.c                        |  13 +-
+ drivers/clk/clk-vt8500.c                      |   4 +-
+ drivers/clk/clk-wm831x.c                      |   7 +-
+ drivers/clk/clk-xgene.c                       |  12 +-
+ drivers/clk/clk.c                             | 741 +++++++++++++++++---------
+ drivers/clk/clk.h                             |  12 +-
+ drivers/clk/clkdev.c                          | 130 ++++-
+ drivers/clk/hisilicon/clk-hi3620.c            |   9 +-
+ drivers/clk/hisilicon/clk-hip04.c             |   1 -
+ drivers/clk/hisilicon/clk.c                   |  17 +-
+ drivers/clk/hisilicon/clk.h                   |   2 +-
+ drivers/clk/hisilicon/clkgate-separated.c     |   5 +-
+ drivers/clk/keystone/gate.c                   |   7 +-
+ drivers/clk/keystone/pll.c                    |  11 +-
+ drivers/clk/mmp/clk-apbc.c                    |   5 +-
+ drivers/clk/mmp/clk-apmu.c                    |   5 +-
+ drivers/clk/mmp/clk-frac.c                    |   4 +-
+ drivers/clk/mmp/clk-mmp2.c                    |  14 +-
+ drivers/clk/mmp/clk-pxa168.c                  |  12 +-
+ drivers/clk/mmp/clk-pxa910.c                  |  12 +-
+ drivers/clk/mmp/clk.h                         |   8 +-
+ drivers/clk/mvebu/clk-corediv.c               |   4 +-
+ drivers/clk/mvebu/clk-cpu.c                   |   8 +-
+ drivers/clk/mvebu/common.c                    |  15 +-
+ drivers/clk/mxs/clk-div.c                     |   5 +-
+ drivers/clk/mxs/clk-frac.c                    |   5 +-
+ drivers/clk/mxs/clk-imx23.c                   |   5 +-
+ drivers/clk/mxs/clk-imx28.c                   |   5 +-
+ drivers/clk/mxs/clk-pll.c                     |   5 +-
+ drivers/clk/mxs/clk-ref.c                     |   5 +-
+ drivers/clk/mxs/clk-ssp.c                     |   3 +-
+ drivers/clk/mxs/clk.h                         |  17 +-
+ drivers/clk/qcom/clk-rcg.c                    |   8 +-
+ drivers/clk/qcom/clk-rcg2.c                   |  14 +-
+ drivers/clk/qcom/clk-regmap.c                 |   2 +-
+ drivers/clk/qcom/clk-regmap.h                 |   2 +-
+ drivers/clk/qcom/common.c                     |   6 +-
+ drivers/clk/qcom/gcc-apq8084.c                |   2 +-
+ drivers/clk/qcom/gcc-ipq806x.c                |   2 +-
+ drivers/clk/qcom/gcc-msm8660.c                |   2 +-
+ drivers/clk/qcom/gcc-msm8960.c                |   2 +-
+ drivers/clk/qcom/gcc-msm8974.c                |   2 +-
+ drivers/clk/qcom/mmcc-msm8960.c               |   6 +-
+ drivers/clk/rockchip/clk-pll.c                |   9 +-
+ drivers/clk/rockchip/clk-rk3188.c             |   2 +-
+ drivers/clk/rockchip/clk-rk3288.c             |   2 +-
+ drivers/clk/rockchip/clk-rockchip.c           |   2 +-
+ drivers/clk/rockchip/clk.c                    |  15 +-
+ drivers/clk/rockchip/clk.h                    |   5 +-
+ drivers/clk/samsung/clk-exynos-audss.c        |  16 +-
+ drivers/clk/samsung/clk-exynos-clkout.c       |   9 +-
+ drivers/clk/samsung/clk-exynos3250.c          |   1 -
+ drivers/clk/samsung/clk-exynos4.c             |   7 +-
+ drivers/clk/samsung/clk-exynos5250.c          |   1 -
+ drivers/clk/samsung/clk-exynos5260.c          |   1 -
+ drivers/clk/samsung/clk-exynos5410.c          |   1 -
+ drivers/clk/samsung/clk-exynos5420.c          |   1 -
+ drivers/clk/samsung/clk-exynos5440.c          |   1 -
+ drivers/clk/samsung/clk-pll.c                 |   6 +-
+ drivers/clk/samsung/clk-pll.h                 |   2 +-
+ drivers/clk/samsung/clk-s3c2410-dclk.c        |  30 +-
+ drivers/clk/samsung/clk-s3c2410.c             |   1 -
+ drivers/clk/samsung/clk-s3c2412.c             |   1 -
+ drivers/clk/samsung/clk-s3c2443.c             |   1 -
+ drivers/clk/samsung/clk-s3c64xx.c             |   1 -
+ drivers/clk/samsung/clk-s5pv210-audss.c       |  16 +-
+ drivers/clk/samsung/clk-s5pv210.c             |   1 -
+ drivers/clk/samsung/clk.c                     |  22 +-
+ drivers/clk/samsung/clk.h                     |   3 +-
+ drivers/clk/shmobile/clk-div6.c               |   2 +-
+ drivers/clk/shmobile/clk-emev2.c              |   4 +-
+ drivers/clk/shmobile/clk-mstp.c               |   6 +-
+ drivers/clk/shmobile/clk-r8a7740.c            |   6 +-
+ drivers/clk/shmobile/clk-r8a7779.c            |   6 +-
+ drivers/clk/shmobile/clk-rcar-gen2.c          |  10 +-
+ drivers/clk/shmobile/clk-rz.c                 |   6 +-
+ drivers/clk/sirf/clk-atlas6.c                 |   3 +-
+ drivers/clk/sirf/clk-common.c                 |  30 +-
+ drivers/clk/sirf/clk-prima2.c                 |   3 +-
+ drivers/clk/socfpga/clk-gate.c                |   3 +-
+ drivers/clk/socfpga/clk-periph.c              |   3 +-
+ drivers/clk/socfpga/clk-pll.c                 |   5 +-
+ drivers/clk/spear/clk-aux-synth.c             |   8 +-
+ drivers/clk/spear/clk-frac-synth.c            |   4 +-
+ drivers/clk/spear/clk-gpt-synth.c             |   4 +-
+ drivers/clk/spear/clk-vco-pll.c               |   8 +-
+ drivers/clk/spear/clk.h                       |  14 +-
+ drivers/clk/spear/spear1310_clock.c           |   3 +-
+ drivers/clk/spear/spear1340_clock.c           |   3 +-
+ drivers/clk/spear/spear3xx_clock.c            |  17 +-
+ drivers/clk/spear/spear6xx_clock.c            |   3 +-
+ drivers/clk/st/clk-flexgen.c                  |  12 +-
+ drivers/clk/st/clkgen-fsyn.c                  |  22 +-
+ drivers/clk/st/clkgen-mux.c                   |  32 +-
+ drivers/clk/st/clkgen-pll.c                   |  34 +-
+ drivers/clk/sunxi/clk-a10-hosc.c              |   2 +-
+ drivers/clk/sunxi/clk-a20-gmac.c              |   2 +-
+ drivers/clk/sunxi/clk-factors.c               |   4 +-
+ drivers/clk/sunxi/clk-sun6i-apb0-gates.c      |   2 +-
+ drivers/clk/sunxi/clk-sun6i-apb0.c            |   2 +-
+ drivers/clk/sunxi/clk-sun6i-ar100.c           |   6 +-
+ drivers/clk/sunxi/clk-sun8i-apb0.c            |   2 +-
+ drivers/clk/sunxi/clk-sunxi.c                 |  18 +-
+ drivers/clk/tegra/clk-audio-sync.c            |   4 +-
+ drivers/clk/tegra/clk-divider.c               |   5 +-
+ drivers/clk/tegra/clk-periph-gate.c           |   5 +-
+ drivers/clk/tegra/clk-periph.c                |   9 +-
+ drivers/clk/tegra/clk-pll-out.c               |   5 +-
+ drivers/clk/tegra/clk-pll.c                   |  41 +-
+ drivers/clk/tegra/clk-super.c                 |   5 +-
+ drivers/clk/tegra/clk-tegra-audio.c           |   5 +-
+ drivers/clk/tegra/clk-tegra-fixed.c           |   9 +-
+ drivers/clk/tegra/clk-tegra-periph.c          |  13 +-
+ drivers/clk/tegra/clk-tegra-pmc.c             |   5 +-
+ drivers/clk/tegra/clk-tegra-super-gen4.c      |   9 +-
+ drivers/clk/tegra/clk-tegra114.c              |  11 +-
+ drivers/clk/tegra/clk-tegra124.c              |   7 +-
+ drivers/clk/tegra/clk-tegra20.c               |  13 +-
+ drivers/clk/tegra/clk-tegra30.c               |   9 +-
+ drivers/clk/tegra/clk.c                       |  25 +-
+ drivers/clk/tegra/clk.h                       |  38 +-
+ drivers/clk/ti/apll.c                         |   8 +-
+ drivers/clk/ti/clk-2xxx.c                     |   8 +-
+ drivers/clk/ti/clk-33xx.c                     |  18 +-
+ drivers/clk/ti/clk-3xxx.c                     |   8 +-
+ drivers/clk/ti/clk-43xx.c                     |   8 +-
+ drivers/clk/ti/clk-44xx.c                     |  16 +-
+ drivers/clk/ti/clk-54xx.c                     |  25 +-
+ drivers/clk/ti/clk-7xx.c                      |  28 +-
+ drivers/clk/ti/clk-dra7-atl.c                 |   6 +-
+ drivers/clk/ti/clk.c                          |   2 +-
+ drivers/clk/ti/clockdomain.c                  |   4 +-
+ drivers/clk/ti/composite.c                    |   2 +-
+ drivers/clk/ti/divider.c                      |   6 +-
+ drivers/clk/ti/dpll.c                         |   8 +-
+ drivers/clk/ti/fixed-factor.c                 |   2 +-
+ drivers/clk/ti/gate.c                         |   2 +-
+ drivers/clk/ti/interface.c                    |   2 +-
+ drivers/clk/ti/mux.c                          |   6 +-
+ drivers/clk/ux500/abx500-clk.c                |   3 +-
+ drivers/clk/ux500/clk-prcc.c                  |   8 +-
+ drivers/clk/ux500/clk-prcmu.c                 |  16 +-
+ drivers/clk/ux500/clk-sysctrl.c               |  10 +-
+ drivers/clk/ux500/clk.h                       |  23 +-
+ drivers/clk/ux500/u8500_clk.c                 |   3 +-
+ drivers/clk/ux500/u8500_of_clk.c              |  13 +-
+ drivers/clk/ux500/u8540_clk.c                 |   3 +-
+ drivers/clk/ux500/u9540_clk.c                 |   1 -
+ drivers/clk/versatile/clk-icst.c              |   5 +-
+ drivers/clk/versatile/clk-icst.h              |   2 +-
+ drivers/clk/versatile/clk-impd1.c             |  19 +-
+ drivers/clk/versatile/clk-realview.c          |   3 +-
+ drivers/clk/versatile/clk-sp810.c             |  30 +-
+ drivers/clk/versatile/clk-versatile.c         |   3 +-
+ drivers/clk/versatile/clk-vexpress-osc.c      |   2 +-
+ drivers/clk/versatile/clk-vexpress.c          |   6 +-
+ drivers/clk/x86/clk-lpt.c                     |   3 +-
+ drivers/clk/zynq/clkc.c                       |  22 +-
+ drivers/clk/zynq/pll.c                        |   4 +-
+ drivers/gpu/drm/msm/hdmi/hdmi_phy_8960.c      |   3 +-
+ drivers/media/platform/exynos4-is/media-dev.c |  18 +-
+ drivers/media/platform/exynos4-is/media-dev.h |   7 +-
+ drivers/media/platform/omap3isp/isp.h         |   2 +-
+ drivers/rtc/rtc-hym8563.c                     |   4 +-
+ drivers/staging/imx-drm/imx-tve.c             |  27 +-
+ include/linux/clk-private.h                   |  51 +-
+ include/linux/clk-provider.h                  | 137 +++--
+ include/linux/clk.h                           |  53 +-
+ include/linux/clk/ti.h                        |  10 +-
+ include/linux/clk/zynq.h                      |   3 +-
+ include/linux/clkdev.h                        |  24 +-
+ include/linux/platform_data/clk-lpss.h        |   2 +-
+ include/linux/platform_data/si5351.h          |   4 +-
+ sound/soc/mxs/mxs-saif.c                      |   4 +-
+ 278 files changed, 2311 insertions(+), 1880 deletions(-)
+
+-- 
+1.9.3
