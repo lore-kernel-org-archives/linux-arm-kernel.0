@@ -1,9 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 11 Sep 2014 09:57:01 +0900
-Subject: [PATCH 4/7] ARM: shmobile: r8a7779: Use SoC-specific TMU compat string
+Date: Thu, 11 Sep 2014 09:57:02 +0900
+Subject: [PATCH 5/7] ARM: shmobile: r8a7740: Use SoC-specific 48-bit CMT
+ compat string
 In-Reply-To: <cover.1410396171.git.horms+renesas@verge.net.au>
 References: <cover.1410396171.git.horms+renesas@verge.net.au>
-Message-ID: <a51b7b38182918d54813b572d6c28d43082d94ff.1410396171.git.horms+renesas@verge.net.au>
+Message-ID: <a2ffcf87f5ae83dcd02f5b87bf477ce7e474601e.1410396171.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,44 +17,26 @@ of a version and providing SoC-specific compat strings has been adopted.
 
 Although not universally liked this convention is used in the bindings for
 a number of drivers for Renesas hardware. The purpose of this patch is to
-make use of the SoC-specific CMT compat string for the r8a7779 TMU
+make use of the SoC-specific CMT compat string for the r8a7740 48-bit CMT
 clock source.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7740.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 463e3fd..72891e5 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -267,7 +267,7 @@
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 1067a96..d46c213 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -42,7 +42,7 @@
  	};
  
- 	tmu0: timer at ffd80000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
- 		reg = <0xffd80000 0x30>;
- 		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
-@@ -281,7 +281,7 @@
- 	};
- 
- 	tmu1: timer at ffd81000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
- 		reg = <0xffd81000 0x30>;
- 		interrupts = <0 36 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 37 IRQ_TYPE_LEVEL_HIGH>,
-@@ -295,7 +295,7 @@
- 	};
- 
- 	tmu2: timer at ffd82000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
- 		reg = <0xffd82000 0x30>;
- 		interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 41 IRQ_TYPE_LEVEL_HIGH>,
+ 	cmt1: timer at e6138000 {
+-		compatible = "renesas,cmt-48";
++		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
+ 		reg = <0xe6138000 0x170>;
+ 		interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
 -- 
 2.0.1
