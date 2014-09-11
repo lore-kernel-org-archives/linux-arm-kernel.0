@@ -1,40 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 11 Sep 2014 14:06:15 +0200
-Subject: [PATCH 2/2] ARM: vf610: Use ARM Global Timer as clocksource
-In-Reply-To: <1410437175-6636-1-git-send-email-stefan@agner.ch>
-References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
-Message-ID: <1410437175-6636-2-git-send-email-stefan@agner.ch>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 11 Sep 2014 20:09:30 +0800
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140911120928.GA1585@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use ARM Global Timer as clocksource instead of the PIT timer. This
-leaves the PIT timer for other users e.g. the secondary Cortex-M4
-core. Also, the Global Timer has double the precission (running at
-pheripheral clock compared to IPG clock) and a 64-bit incrementing
-counter register.
+On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
+> Several MTD users (either in user or kernel space) expect a valid raw
+> access support to NAND chip devices.
+> This is particularly true for testing tools which are often touching the
+> data stored in a NAND chip in raw mode to artificially generate errors.
+> 
+> The GPMI drivers do not implemenent raw access functions, and thus rely on
+> default HW_ECC scheme implementation.
+> The default implementation consider the data and OOB area as properly
+> separated in their respective NAND section, which is not true for the GPMI
+> controller.
+> In this driver/controller some OOB data are stored at the beginning of the
+> NAND data area (these data are called metadata in the driver), then ECC
+> bytes are interleaved with data chunk (which is similar to the
+> HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
+> OOB data.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+> Hello,
+> 
+> This patch is providing raw access support to the GPMI driver which is
+> particularly useful to run some tests on the NAND (the one coming in
+> mind is the mtd_nandbiterrs testsuite).
+> 
+> I know this rework might break several user space tools which are relying
+> on the default raw access implementation (I already experienced an issue
+> with the kobs-ng tool provided by freescale), but many other tools will
+> now work as expected.
+If the kobs-ng can not works, there is no meaning that other tools
+works.  So I do not think we need to implement these hooks. 
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Theoretically we could remove the PIT driver now. But we could also
-enable both drivers, but is having two clock source useful for the
-Kernel at all?
+sorry, I will not Ack this patch.
 
- arch/arm/mach-imx/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 64161aa..adc77180 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -656,7 +656,8 @@ config SOC_VF610
- 	bool "Vybrid Family VF610 support"
- 	select ARM_GIC
- 	select PINCTRL_VF610
--	select VF_PIT_TIMER
-+	select ARM_GLOBAL_TIMER
-+	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	select PL310_ERRATA_769419 if CACHE_L2X0
- 
- 	help
--- 
-2.1.0
+thanks
+Huang Shijie
