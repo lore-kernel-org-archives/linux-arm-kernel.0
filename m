@@ -1,56 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Sep 2014 12:44:34 +0200
-Subject: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <517628172fb3416ea7b12b4ae24e098a@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <20140402.o60F9Z4YVe@wuerfel>
- <517628172fb3416ea7b12b4ae24e098a@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <3005087.EqTxEFbPyU@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Sep 2014 11:45:13 +0100
+Subject: [PATCH arm64-next] net: bpf: arm64: fix module memory leak when
+ JIT image build fails
+In-Reply-To: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
+References: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
+Message-ID: <20140911104513.GC6158@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 September 2014 09:53:56 Jingchang Lu wrote:
-> >From: Arnd Bergmann [mailto:arnd at arndb.de]
-> >
-> >Ok, I see. The actual point of dma_zone_size however is slightly different,
-> >and I think you should not use it like this. We normally only use ZONE_DMA
-> >if there are devices that have a limitation smaller than 4GB, and that
-> >appear to be the case for your system.
-> >
-> >The message you quote is only present in arch/powerpc, so I'm not sure
-> >what symptoms you are actually seeing. Please try removing the
-> >dma_zone_size setting for your platform and report if it works or what the
-> >symptom is if it does not work with the latest kernel.
-> >
-> >We definitely need to get this to work out of the box without a
-> >dma_zone_size hack.
-> >
-> >Can you describe what the memory layout is of your platform? Can you have
-> >RAM installed above the 4GB physical address boundary? If you can, are
-> >there any devices that are unable to perform DMA into that memory without
-> >the use of an IOMMU?
-> >
-> Our first LS1021A support is based on kernel-3.12, where when LPAE enabled
-> it will compare the device's coherent_dma_mask with arm_dma_limit, which is
-> 64-bit 0xffffffffffffffff without CONFIG_ZONE_DMA, with CONFIG_ZONE_DMA can
-> limit the comparison and avoid the warning.
-> All device can address 32-bit address space on LS1021A, With you comment above,
-> I remove the dma_zone_size and only reserve the CONFIG_ZONE_DMA On kernel-3.12,
-> finding all works well, so I will remove the dma_zone_size setting on 3.12. Thanks.
+On Thu, Sep 11, 2014 at 10:36:48AM +0100, Daniel Borkmann wrote:
+> On ARM64, when the BPF JIT compiler fills the JIT image body with
+> opcodes during translation of eBPF into ARM64 opcodes, we may fail
+> for several reasons during that phase: one being that we jump to
+> the notyet label for not yet supported eBPF instructions such as
+> BPF_ST. In that case we only free offsets, but not the actual
+> allocated target image where opcodes are being stored. Fix it by
+> calling module_free() on dismantle time in case of errors.
+> 
+> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+> Cc: Alexei Starovoitov <ast@plumgrid.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  [ Compile-tested only. ]
+> 
+>  arch/arm64/net/bpf_jit_comp.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index 38c4296..7ae3354 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -651,8 +651,10 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
+>  	build_prologue(&ctx);
+>  
+>  	ctx.body_offset = ctx.idx;
+> -	if (build_body(&ctx))
+> +	if (build_body(&ctx)) {
+> +		module_free(NULL, ctx.image);
+>  		goto out;
+> +	}
+>  
 
-Ok, good.
- 
-> I have a look on latest kernel, finding get_coherent_dma_mask() has limited the mask
-> to (u64)DMA_BIT_MASK(32), does this mean the CONFIG_ZONE_DMA is not needed for me
-> here? Thanks.
+Looks good to me:
 
-You only need to enable CONFIG_ZONE_DMA in the case of RAM above the 4GB
-boundary. I would suggest you do the same as some of the other platforms
-by adding
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-	select ZONE_DMA if ARM_LPAE
+Catalin, can you apply this on the for-next/core branch, please?
 
-into your Kconfig file. If LPAE is disabled, you know that you won't
-need ZONE_DMA.
-
-	Arnd
+Will
