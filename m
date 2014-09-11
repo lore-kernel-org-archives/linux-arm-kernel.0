@@ -1,73 +1,47 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 10:56:02 +0200
-Subject: [PATCH v3 3/8] rtc: at91sam9: replace devm_ioremap by
- devm_ioremap_resource
+Date: Thu, 11 Sep 2014 10:56:07 +0200
+Subject: [PATCH v3 8/8] rtc: at91sam9: add DT bindings documentation
 In-Reply-To: <1410425767-17874-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1410425767-17874-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1410425767-17874-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1410425767-17874-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace devm_ioremap calls by devm_ioremap_resource which already check
-resource consistency (resource != NULL) and print an error in case of
-failure.
-
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/rtc/rtc-at91sam9.c | 29 ++++++++++-------------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+ .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 74a9ca0..38a2693 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -306,18 +306,11 @@ static const struct rtc_class_ops at91_rtc_ops = {
-  */
- static int at91_rtc_probe(struct platform_device *pdev)
- {
--	struct resource	*r, *r_gpbr;
-+	struct resource	*r;
- 	struct sam9_rtc	*rtc;
- 	int		ret, irq;
- 	u32		mr;
- 
--	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	r_gpbr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!r || !r_gpbr) {
--		dev_err(&pdev->dev, "need 2 ressources\n");
--		return -ENODEV;
--	}
--
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		dev_err(&pdev->dev, "failed to get interrupt resource\n");
-@@ -335,18 +328,16 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 		device_init_wakeup(&pdev->dev, 1);
- 
- 	platform_set_drvdata(pdev, rtc);
--	rtc->rtt = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (!rtc->rtt) {
--		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
--		return -ENOMEM;
--	}
- 
--	rtc->gpbr = devm_ioremap(&pdev->dev, r_gpbr->start,
--				resource_size(r_gpbr));
--	if (!rtc->gpbr) {
--		dev_err(&pdev->dev, "failed to map gpbr registers, aborting.\n");
--		return -ENOMEM;
--	}
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rtc->rtt = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(rtc->rtt))
-+		return PTR_ERR(rtc->rtt);
+diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+new file mode 100644
+index 0000000..258a036
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+@@ -0,0 +1,24 @@
++Atmel AT91SAM9260 Real Time Timer
 +
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(rtc->gpbr))
-+		return PTR_ERR(rtc->rtt);
- 
- 	mr = rtt_readl(rtc, MR);
- 
++Required properties:
++- compatible: should be: "atmel,at91sam9260-rtt"
++- reg: should encode the memory region of the RTT controller
++- interrupts: rtc alarm/event interrupt
++- clocks: should contain one clock pointing the the slow clk
++- atmel,time-reg: should encode the GPBR register used to store the RTC
++		  time. The first cell should point to the GPBR node and
++		  the second one encode the offset within the GPBR block
++		  (or in other terms, the GPBR register used to store the
++		  current time value).
++
++
++
++Example:
++
++rtc at fffffe00 {
++	compatible = "atmel,at91sam9260-rtt";
++	reg = <0xfffffd20 0x10>;
++	interrupts = <1 4 7>;
++	clocks = <&clk32k>;
++	atmel,time-reg = <&gpbr 0x0>;
++};
 -- 
 1.9.1
