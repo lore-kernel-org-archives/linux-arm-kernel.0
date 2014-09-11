@@ -1,82 +1,188 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 11 Sep 2014 16:26:20 +0200
-Subject: [PATCH v11 6/9] clk: Warn of unbalanced clk_prepare() calls
+Date: Thu, 11 Sep 2014 16:26:18 +0200
+Subject: [PATCH v11 4/9] clk: per-user clock accounting for debug
 In-Reply-To: <1410445583-18626-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1410445421-18362-1-git-send-email-tomeu.vizoso@collabora.com>
  <1410445583-18626-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1410445583-18626-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1410445583-18626-2-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The warning will display the clock user that is trying to unprepare the clock,
-and the location of the last unprepare call.
+When a clock has multiple users, the WARNING on imbalance of
+enable/disable may not show the guilty party since although they may
+have commited the error earlier, the warning is emitted later when some
+other user, presumably innocent, disables the clock.
+
+Provide per-user clock enable/disable accounting and disabler tracking
+in order to help debug these problems.
+
+Based on previous work by Rabin Vincent <rabin@rab.in>.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
-
-v8: * Patch added
----
- drivers/clk/clk.c           | 22 ++++++++++++++++++++--
- include/linux/clk-private.h |  3 +++
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ drivers/clk/clk.c           | 38 ++++++++++++++++++++++++++++++++++----
+ drivers/clk/clk.h           |  3 ++-
+ drivers/clk/clkdev.c        | 14 ++++++++++----
+ include/linux/clk-private.h |  5 +++++
+ 4 files changed, 51 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 3a961c6..3018f37 100644
+index ce84b1f..61a3492 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -834,7 +834,17 @@ void clk_unprepare(struct clk *clk_user)
+@@ -543,7 +543,8 @@ static int clk_disable_unused(void)
+ }
+ late_initcall_sync(clk_disable_unused);
+ 
+-struct clk *__clk_create_clk(struct clk_core *clk_core)
++struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
++			     const char *con)
+ {
+ 	struct clk *clk;
+ 
+@@ -556,6 +557,8 @@ struct clk *__clk_create_clk(struct clk_core *clk_core)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	clk->core = clk_core;
++	clk->dev_id = dev;
++	clk->con_id = con;
+ 
+ 	return clk;
+ }
+@@ -936,10 +939,25 @@ EXPORT_SYMBOL_GPL(clk_provider_disable);
+  */
+ void clk_disable(struct clk *clk_user)
+ {
++	struct clk_core *clk;
++	unsigned long flags;
++
  	if (IS_ERR_OR_NULL(clk_user))
  		return;
  
--	clk_provider_unprepare(clk_to_clk_core(clk_user));
-+	clk_prepare_lock();
-+	if (!WARN(clk_user->prepare_count == 0,
-+		  "incorrect unprepare clk dev %s con %s last caller of unprepare %pF\n",
-+		  clk_user->dev_id, clk_user->con_id, clk_user->last_unprepare)) {
+-	clk_provider_disable(clk_to_clk_core(clk_user));
++	clk = clk_to_clk_core(clk_user);
 +
-+		clk_user->last_unprepare = __builtin_return_address(0);
-+		clk_user->prepare_count--;
++	flags = clk_enable_lock();
++	if (!WARN(clk_user->enable_count == 0,
++		  "incorrect disable clk dev %s con %s last disabler %pF\n",
++		  clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
 +
-+		__clk_unprepare(clk_to_clk_core(clk_user));
++		clk_user->last_disable = __builtin_return_address(0);
++		clk_user->enable_count--;
++
++		__clk_disable(clk);
 +	}
-+	clk_prepare_unlock();
++	clk_enable_unlock(flags);
  }
- EXPORT_SYMBOL_GPL(clk_unprepare);
+ EXPORT_SYMBOL_GPL(clk_disable);
  
-@@ -890,10 +900,18 @@ EXPORT_SYMBOL_GPL(clk_provider_prepare);
+@@ -1000,10 +1018,22 @@ EXPORT_SYMBOL_GPL(clk_provider_enable);
   */
- int clk_prepare(struct clk *clk_user)
+ int clk_enable(struct clk *clk_user)
  {
++	struct clk_core *clk;
++	unsigned long flags;
 +	int ret;
 +
  	if (!clk_user)
  		return 0;
  
--	return clk_provider_prepare(clk_to_clk_core(clk_user));
-+	clk_prepare_lock();
-+	ret = __clk_prepare(clk_to_clk_core(clk_user));
+-	return clk_provider_enable(clk_to_clk_core(clk_user));
++	clk = clk_to_clk_core(clk_user);
++
++	flags = clk_enable_lock();
++	ret = __clk_enable(clk);
 +	if (!ret)
-+		clk_user->prepare_count++;
-+	clk_prepare_unlock();
++		clk_user->enable_count++;
++	clk_enable_unlock(flags);
 +
 +	return ret;
  }
- EXPORT_SYMBOL_GPL(clk_prepare);
+ EXPORT_SYMBOL_GPL(clk_enable);
  
+@@ -1698,7 +1728,7 @@ struct clk *clk_get_parent(struct clk *clk_user)
+ 	clk = clk_to_clk_core(clk_user);
+ 	parent = clk_provider_get_parent(clk);
+ 
+-	return __clk_create_clk(parent);
++	return __clk_create_clk(parent, clk_user->dev_id, clk_user->con_id);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
+ 
+diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+index 3b3068b..49eff38 100644
+--- a/drivers/clk/clk.h
++++ b/drivers/clk/clk.h
+@@ -19,5 +19,6 @@ void of_clk_unlock(void);
+ #endif
+ 
+ #if defined(CONFIG_COMMON_CLK)
+-struct clk *__clk_create_clk(struct clk_core *clk_core);
++struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
++			     const char *con);
+ #endif
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 080b3df..f7b352a 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -76,7 +76,9 @@ struct clk_core *of_clk_provider_get(struct device_node *np, int index)
+ 
+ struct clk *of_clk_get(struct device_node *np, int index)
+ {
+-	return __clk_create_clk(of_clk_provider_get(np, index));
++	struct clk_core *clk = of_clk_provider_get(np, index);
++
++	return __clk_create_clk(clk, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get);
+ 
+@@ -129,7 +131,9 @@ struct clk_core *of_clk_provider_get_by_name(struct device_node *np, const char
+  */
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+ {
+-	return __clk_create_clk(of_clk_provider_get_by_name(np, name));
++	struct clk_core *clk = of_clk_provider_get_by_name(np, name);
++
++	return __clk_create_clk(clk, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get_by_name);
+ #endif
+@@ -201,7 +205,7 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+ #if defined(CONFIG_COMMON_CLK)
+ 	struct clk_core *clk = clk_provider_get_sys(dev_id, con_id);
+ 
+-	return __clk_create_clk(clk);
++	return __clk_create_clk(clk, dev_id, con_id);
+ #else
+ 	struct clk_lookup *cl;
+ 
+@@ -241,7 +245,9 @@ EXPORT_SYMBOL(clk_provider_get);
+ struct clk *clk_get(struct device *dev, const char *con_id)
+ {
+ #if defined(CONFIG_COMMON_CLK)
+-	return __clk_create_clk(clk_provider_get(dev, con_id));
++        const char *dev_id = dev ? dev_name(dev) : NULL;
++
++	return __clk_create_clk(clk_provider_get(dev, con_id), dev_id, con_id);
+ #else
+ 	const char *dev_id = dev ? dev_name(dev) : NULL;
+ 	struct clk *clk;
 diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 8126046..cf93bde 100644
+index 2c1ece9..ce6a528 100644
 --- a/include/linux/clk-private.h
 +++ b/include/linux/clk-private.h
-@@ -64,6 +64,9 @@ struct clk {
- 	unsigned int	enable_count;
- 	void		*last_disable;
+@@ -57,6 +57,11 @@ struct clk_core {
  
-+	unsigned int	prepare_count;
-+	void		*last_unprepare;
+ struct clk {
+ 	struct clk_core	*core;
++	const char	*dev_id;
++	const char	*con_id;
 +
- 	unsigned long	floor_constraint;
- 	unsigned long	ceiling_constraint;
- 	struct hlist_node child_node;
++	unsigned int	enable_count;
++	void		*last_disable;
+ };
+ 
+ /*
 -- 
 1.9.3
