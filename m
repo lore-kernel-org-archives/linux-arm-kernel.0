@@ -1,49 +1,106 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 11 Sep 2014 18:19:27 +0200
-Subject: [PATCH 7/7] ARM: at91: add sama5d4 support to sama5_defconfig
-In-Reply-To: <1410450852-1834-8-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410450852-1834-8-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5411CB8F.4070006@atmel.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 11 Sep 2014 12:20:19 -0400
+Subject: [PATCH] clocksource: arch_timer: Allow the device tree to specify
+ the physical timer
+In-Reply-To: <CAD=FV=XPqma5sYbn65NLEAipZFq96t_HcX96ym_cEQrqTKddOQ@mail.gmail.com>
+References: <1410450727-8182-1-git-send-email-dianders@chromium.org>
+ <5411C68B.6090308@codeaurora.org>
+ <CAD=FV=XPqma5sYbn65NLEAipZFq96t_HcX96ym_cEQrqTKddOQ@mail.gmail.com>
+Message-ID: <5411CBC3.5080308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2014 17:54, Alexandre Belloni :
-> Add sama5d4 to sama5_defconfig to build kernel booting on both sama5d3 and
-> samad4.
+On 09/11/2014 12:04 PM, Doug Anderson wrote:
+> Christopher,
 > 
-> Note that earlyprintk can only be working for one or the other.
+> On Thu, Sep 11, 2014 at 8:58 AM, Christopher Covington
+> <cov@codeaurora.org> wrote:
+>> Hi Doug,
+>>
+>> On 09/11/2014 11:52 AM, Doug Anderson wrote:
+>>> Some 32-bit (ARMv7) systems are architected like this:
+>>>
+>>> * The firmware doesn't know and doesn't care about hypervisor mode and
+>>>   we don't want to add the complexity of hypervisor there.
+>>>
+>>> * The firmware isn't involved in SMP bringup or resume.
+>>>
+>>> * The ARCH timer come up with an uninitialized offset between the
+>>>   virtual and physical counters.  Each core gets a different random
+>>>   offset.
+>>>
+>>> On systems like the above, it doesn't make sense to use the virtual
+>>> counter.  There's nobody managing the offset and each time a core goes
+>>> down and comes back up it will get reinitialized to some other random
+>>> value.
+>>>
+>>> Let's add a property to the device tree to say that we shouldn't use
+>>> the virtual timer.  Firmware could potentially remove this property
+>>> before passing the device tree to the kernel if it really wants the
+>>> kernel to use a virtual timer.
+>>>
+>>> Note that it's been said that ARM64 (ARMv8) systems the firmware and
+>>> kernel really can't be architected as described above.  That means
+>>> using the physical timer like this really only makes sense for ARMv7
+>>> systems.
+>>>
+>>> In order for this patch to do anything useful, we also need Sonny's
+>>> patch at <https://patchwork.kernel.org/patch/4790921/>
+>>>
+>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>>>  drivers/clocksource/arm_arch_timer.c                 | 3 +++
+>>>  2 files changed, 9 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>>> index 37b2caf..876d32b 100644
+>>> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>>> @@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
+>>>  - always-on : a boolean property. If present, the timer is powered through an
+>>>    always-on power domain, therefore it never loses context.
+>>>
+>>> +** Optional properties:
+>>> +
+>>> +- arm,use-physical-timer : Don't ever use the virtual timer, just use the
+>>> +  physical one.  Not supported for ARM64.
+>>> +
+>>> +
+>>>  Example:
+>>>
+>>>       timer {
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>> index 5163ec1..8ca07a9 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -649,6 +649,9 @@ static void __init arch_timer_init(struct device_node *np)
+>>>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>>>       arch_timer_detect_rate(NULL, np);
+>>>
+>>> +     if (of_property_read_bool(np, "arm,use-physical-timer"))
+>>> +             arch_timer_use_virtual = false;
+>>> +
+>>>       /*
+>>>        * If HYP mode is available, we know that the physical timer
+>>>        * has been configured to be accessible from PL1. Use it, so
+>>>
+>>
+>> How's the VDSO supposed to deal with this? It currently does:
+>>
+>> cycle_now = arch_counter_get_cntvct()
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/configs/sama5_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index 96c15b775d57..a6c2409c4e14 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -19,6 +19,7 @@ CONFIG_MODULE_FORCE_UNLOAD=y
->  CONFIG_ARCH_AT91=y
->  CONFIG_SOC_SAM_V7=y
->  CONFIG_SOC_SAMA5D3=y
-> +CONFIG_SOC_SAMA5D4=y
->  CONFIG_MACH_SAMA5_DT=y
->  CONFIG_AEABI=y
->  CONFIG_UACCESS_WITH_MEMCPY=y
-> @@ -66,7 +67,6 @@ CONFIG_MTD=y
->  CONFIG_MTD_CMDLINE_PARTS=y
->  CONFIG_MTD_BLOCK=y
->  CONFIG_MTD_CFI=y
-> -CONFIG_MTD_M25P80=y
+> I don't see that line of code anywhere when I do a "git grep" on linux
+> or linuxnext.  Can you give me a clearer pointer?
 
-Well I would keep this one...
+As Nathan mentioned, the code on the 32 bit side isn't merged yet.
 
->  CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_ATMEL=y
->  CONFIG_MTD_SPI_NOR=y
-> 
+http://www.spinics.net/lists/arm-kernel/msg356336.html
 
+Christopher
 
 -- 
-Nicolas Ferre
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
