@@ -1,153 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 11 Sep 2014 10:56:05 +0200
-Subject: [PATCH v3 6/8] ARM: at91: add clk_lookup entry for RTT devices
-In-Reply-To: <1410425767-17874-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410425767-17874-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1410425767-17874-7-git-send-email-boris.brezillon@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Sep 2014 10:56:42 +0200
+Subject: [PATCH v2] Enable gcov support on the ARM architecture
+In-Reply-To: <1410421758-13173-1-git-send-email-riku.voipio@linaro.org>
+References: <1410421758-13173-1-git-send-email-riku.voipio@linaro.org>
+Message-ID: <4844458.pSrskHNd5e@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First export the clk32k clk.
-Then add clk_lookup entries for RTT devices so that rtc-at91sam9 driver
-can retrieve and manipulate the slow clk.
+On Thursday 11 September 2014 10:49:18 Riku Voipio wrote:
+> Enable gcov support for ARM based on original patches by David
+> Singleton and George G. Davis
+> 
+> Riku - updated to patch to current mainline kernel. The patch
+> has been submitted in 2010, 2012 - for symmetry, now in 2014 too.
+> 
+> https://lwn.net/Articles/390419/
+> http://marc.info/?l=linux-arm-kernel&m=133823081813044
+> 
+> v2: remove arch/arm/kernel from gcov disabled files
+> 
+> From: Vincent Sanders <vincent.sanders@collabora.co.uk>
+> Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Naresh Kamboju <naresh.kamboju@linaro.org>
+> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+> Signed-off-by: Vincent Sanders <vincent.sanders@collabora.co.uk>
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- arch/arm/mach-at91/at91sam9260.c | 2 ++
- arch/arm/mach-at91/at91sam9261.c | 2 ++
- arch/arm/mach-at91/at91sam9263.c | 4 ++++
- arch/arm/mach-at91/at91sam9g45.c | 2 ++
- arch/arm/mach-at91/at91sam9rl.c  | 2 ++
- arch/arm/mach-at91/clock.c       | 2 +-
- arch/arm/mach-at91/clock.h       | 1 +
- 7 files changed, 14 insertions(+), 1 deletion(-)
+This version looks good to me,
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 3477ba9..a853d4c 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -217,6 +217,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more usart lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -237,6 +238,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index fb164a5..3f5a299 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -192,6 +192,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -209,6 +210,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 810fa5f..bef5b96 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -201,6 +201,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.1", &clk32k),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-@@ -227,6 +229,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd50.rtc", &clk32k),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 9d45496..69fdfcc 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "atmel_aes", &aestdessha_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more usart lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
-@@ -279,6 +280,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioDE_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 878d501..a82dc61 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -205,6 +205,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
- 	CLKDEV_CON_ID("pioD", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -223,6 +224,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 	CLKDEV_CON_ID("adc_clk", &tsc_clk),
- };
- 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 034529d..f5cfed75 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -115,7 +115,7 @@ static u32 at91_pllb_usb_init;
-  * 48 MHz (unless no USB function clocks are needed).  The main clock and
-  * both PLLs are turned off to run in "slow clock mode" (system suspend).
-  */
--static struct clk clk32k = {
-+struct clk clk32k = {
- 	.name		= "clk32k",
- 	.rate_hz	= AT91_SLOW_CLOCK,
- 	.users		= 1,		/* always on */
-diff --git a/arch/arm/mach-at91/clock.h b/arch/arm/mach-at91/clock.h
-index a98a39b..6eb825a 100644
---- a/arch/arm/mach-at91/clock.h
-+++ b/arch/arm/mach-at91/clock.h
-@@ -34,6 +34,7 @@ struct clk {
- extern int __init clk_register(struct clk *clk);
- extern struct clk mck;
- extern struct clk utmi_clk;
-+extern struct clk clk32k;
- 
- #define CLKDEV_CON_ID(_id, _clk)			\
- 	{						\
--- 
-1.9.1
+Acked-by: Arnd Bergmann <arnd@arndb.de>
