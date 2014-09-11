@@ -1,46 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 11 Sep 2014 17:16:23 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140911090608.598CFC40862@trevor.secretlab.ca>
-References: <540C7F5B.6070307@gmail.com> <540C83DE.10505@collabora.co.uk>
- <540C8577.2070907@gmail.com> <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
- <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
- <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
- <20140910143144.GF7960@sirena.org.uk>
- <20140911090608.598CFC40862@trevor.secretlab.ca>
-Message-ID: <20140911161623.GN4015@sirena.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 11 Sep 2014 18:17:27 +0200
+Subject: [PATCH 1/7] irqchip: atmel-aic5: Add sama5d4 support
+In-Reply-To: <1410450852-1834-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1410450852-1834-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5411CB17.1060608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 10:06:08AM +0100, Grant Likely wrote:
-> On Wed, 10 Sep 2014 15:31:44 +0100, Mark Brown <broonie@kernel.org> wrote:
+On 11/09/2014 17:54, Alexandre Belloni :
+> Add sama5d4 support to irq-atmel-aic5.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Cc: Jason Cooper <jason@lakedaemon.net>
 
-> > As well as the regulators we'll also need to fix the clocks.  If we're
-> > going to start adding these fixups perhaps we want to consider having a
-> > wrapper stage that deals with rewriting DTs prior to trying to use them?
-> > I'm not sure if it makes much difference but there's overlap with other
-> > tools like the ATAGs conversion wrapper and building separately would
-> > let the fixup code run early without directly going into the early init
-> > code (which seems a bit scary).
+Supposed to be before the "---" ;-)
 
-> We've already got a dt fixup hook in the machine struct, created for
-> exactly this reason. Fixing an incorrect DT provided by firmware:
+>  drivers/irqchip/irq-atmel-aic5.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+> index dc7d98607a89..a11aae8fb006 100644
+> --- a/drivers/irqchip/irq-atmel-aic5.c
+> +++ b/drivers/irqchip/irq-atmel-aic5.c
+> @@ -295,6 +295,7 @@ static void __init sama5d3_aic_irq_fixup(struct device_node *root)
+>  
+>  static const struct of_device_id __initdata aic5_irq_fixups[] = {
+>  	{ .compatible = "atmel,sama5d3", .data = sama5d3_aic_irq_fixup },
+> +	{ .compatible = "atmel,sama5d4", .data = sama5d3_aic_irq_fixup },
+>  	{ /* sentinel */ },
+>  };
+>  
+> @@ -349,3 +350,12 @@ static int __init sama5d3_aic5_of_init(struct device_node *node,
+>  	return aic5_of_init(node, parent, NR_SAMA5D3_IRQS);
+>  }
+>  IRQCHIP_DECLARE(sama5d3_aic5, "atmel,sama5d3-aic", sama5d3_aic5_of_init);
+> +
+> +#define NR_SAMA5D4_IRQS		68
+> +
+> +static int __init sama5d4_aic5_of_init(struct device_node *node,
+> +				       struct device_node *parent)
+> +{
+> +	return aic5_of_init(node, parent, NR_SAMA5D4_IRQS);
+> +}
+> +IRQCHIP_DECLARE(sama5d4_aic5, "atmel,sama5d4-aic", sama5d4_aic5_of_init);
+> 
 
-> arch/arm/include/asm/mach/arch.h:
-> struct machine_desc {
-> 	...
-> 	void (*dt_fixup)(void);
-> 	...
 
-Hrm, that's in the machine descriptor which doesn't seem the ideal
-place - something keying off machine ID would be nicer.  But that's
-relatively speaking just detail.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/e7db3824/attachment.sig>
+-- 
+Nicolas Ferre
