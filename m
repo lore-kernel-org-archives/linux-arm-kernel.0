@@ -1,28 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 11 Sep 2014 17:49:39 -0400
-Subject: [GIT PULL] ARM: Keystone fixes for 3.17-rc4
-Message-ID: <1410472179-12796-1-git-send-email-santosh.shilimkar@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 11 Sep 2014 14:59:08 -0700
+Subject: a case for a common efuse API?
+In-Reply-To: <20140710142616.GD27469@lukather>
+References: <53BC4DD7.20906@codeaurora.org> <20140709083509.GQ13423@lukather>
+ <53BDD0F3.7040906@codeaurora.org> <20140710142616.GD27469@lukather>
+Message-ID: <54121B2C.5090702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
+On 07/10/14 07:26, Maxime Ripard wrote:
+>
+> I guess that the kind of things we could discuss after posting these
+> patches, but yep, it looks reasonnable.
+>
+> I'll try to get things a bit cleaner, and post them in the next days.
+>
 
-  Linux 3.17-rc4 (2014-09-07 16:09:43 -0700)
+I never saw anything. Did you do any cleaning/posting? I'm going to try
+it out today/tomorrow to see if it can make some things cleaner.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/fixes-v3.17-rc4
-
-for you to fetch changes up to 99897500e54560397054aa238c771fa8284d0eb2:
-
-  ARM: keystone: dts: fix bindings for pcie and usb clock nodes (2014-09-11 17:41:25 -0400)
-
-----------------------------------------------------------------
-Keystone Edision dts fix for -rc cycle. Fix the PCIE and USB nodes.
-
-----------------------------------------------------------------
-Murali Karicheri (1):
-      ARM: keystone: dts: fix bindings for pcie and usb clock nodes
-
- arch/arm/boot/dts/k2e-clocks.dtsi |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
