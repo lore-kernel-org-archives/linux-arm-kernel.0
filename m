@@ -1,52 +1,113 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Thu, 11 Sep 2014 15:50:47 +0530
-Subject: [PATCH v3 3/8] clk: samsung: Add fixed_factor_clocks field to struct
- exynos_cmu_info
+Date: Thu, 11 Sep 2014 15:50:45 +0530
+Subject: [PATCH v3 1/8] clk: samsung: add support for 145xx and 1460x PLLs
 In-Reply-To: <1410430852-3491-1-git-send-email-ch.naveen@samsung.com>
 References: <1410430852-3491-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1410430852-3491-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1410430852-3491-2-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the fields "fixed_factor_clks" and "nr_fixed_factor_clks" to
-"struct exynos_cmu_info" to allow registering of fixed factor
-clocks as well with exynos_cmu_register_one().
+PLL145xx is similar to PLL35xx and PLL1460x is almost similar
+to PLL46xx with minor differences in bit positions. Hence,
+reuse the functions defined for pll_35xx and pll_46xx to
+support 145xx and 1460x PLLs respectively.
 
 Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Cc: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/samsung/clk.c |    3 +++
- drivers/clk/samsung/clk.h |    3 +++
- 2 files changed, 6 insertions(+)
+ drivers/clk/samsung/clk-pll.c |   25 ++++++++++++++++++++-----
+ drivers/clk/samsung/clk-pll.h |    4 ++++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index a043654..4b31267 100644
---- a/drivers/clk/samsung/clk.c
-+++ b/drivers/clk/samsung/clk.c
-@@ -402,6 +402,9 @@ void __init exynos_cmu_register_one(struct device_node *np,
- 	if (cmu->fixed_clks)
- 		samsung_clk_register_fixed_rate(ctx, cmu->fixed_clks,
- 			cmu->nr_fixed_clks);
-+	if (cmu->fixed_factor_clks)
-+		samsung_clk_register_fixed_factor(ctx, cmu->fixed_factor_clks,
-+			cmu->nr_fixed_factor_clks);
- 	if (cmu->clk_regs)
- 		exynos_clk_sleep_init(reg_base, cmu->clk_regs,
- 			cmu->nr_clk_regs);
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index 552d155..993b51c 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -347,6 +347,9 @@ struct exynos_cmu_info {
- 	/* list of fixed clocks and respective count */
- 	struct samsung_fixed_rate_clock *fixed_clks;
- 	unsigned int nr_fixed_clks;
-+	/* list of fixed factor clocks and respective count */
-+	struct samsung_fixed_factor_clock *fixed_factor_clks;
-+	unsigned int nr_fixed_factor_clks;
- 	/* total number of clocks with IDs assigned*/
- 	unsigned int nr_clk_ids;
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index b07fad2..9d70e5c 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -482,6 +482,8 @@ static const struct clk_ops samsung_pll45xx_clk_min_ops = {
  
+ #define PLL46XX_VSEL_MASK	(1)
+ #define PLL46XX_MDIV_MASK	(0x1FF)
++#define PLL1460X_MDIV_MASK	(0x3FF)
++
+ #define PLL46XX_PDIV_MASK	(0x3F)
+ #define PLL46XX_SDIV_MASK	(0x7)
+ #define PLL46XX_VSEL_SHIFT	(27)
+@@ -511,13 +513,15 @@ static unsigned long samsung_pll46xx_recalc_rate(struct clk_hw *hw,
+ 
+ 	pll_con0 = __raw_readl(pll->con_reg);
+ 	pll_con1 = __raw_readl(pll->con_reg + 4);
+-	mdiv = (pll_con0 >> PLL46XX_MDIV_SHIFT) & PLL46XX_MDIV_MASK;
++	mdiv = (pll_con0 >> PLL46XX_MDIV_SHIFT) & ((pll->type == pll_1460x) ?
++				PLL1460X_MDIV_MASK : PLL46XX_MDIV_MASK);
+ 	pdiv = (pll_con0 >> PLL46XX_PDIV_SHIFT) & PLL46XX_PDIV_MASK;
+ 	sdiv = (pll_con0 >> PLL46XX_SDIV_SHIFT) & PLL46XX_SDIV_MASK;
+ 	kdiv = pll->type == pll_4650c ? pll_con1 & PLL4650C_KDIV_MASK :
+ 					pll_con1 & PLL46XX_KDIV_MASK;
+ 
+-	shift = pll->type == pll_4600 ? 16 : 10;
++	shift = ((pll->type == pll_4600) || (pll->type == pll_1460x)) ? 16 : 10;
++
+ 	fvco *= (mdiv << shift) + kdiv;
+ 	do_div(fvco, (pdiv << sdiv));
+ 	fvco >>= shift;
+@@ -573,14 +577,21 @@ static int samsung_pll46xx_set_rate(struct clk_hw *hw, unsigned long drate,
+ 		lock = 0xffff;
+ 
+ 	/* Set PLL PMS and VSEL values. */
+-	con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
++	if (pll->type == pll_1460x) {
++		con0 &= ~((PLL1460X_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
++			(PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT) |
++			(PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT));
++	} else {
++		con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
+ 			(PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT) |
+ 			(PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT) |
+ 			(PLL46XX_VSEL_MASK << PLL46XX_VSEL_SHIFT));
++		con0 |=	rate->vsel << PLL46XX_VSEL_SHIFT;
++	}
++
+ 	con0 |= (rate->mdiv << PLL46XX_MDIV_SHIFT) |
+ 			(rate->pdiv << PLL46XX_PDIV_SHIFT) |
+-			(rate->sdiv << PLL46XX_SDIV_SHIFT) |
+-			(rate->vsel << PLL46XX_VSEL_SHIFT);
++			(rate->sdiv << PLL46XX_SDIV_SHIFT);
+ 
+ 	/* Set PLL K, MFR and MRR values. */
+ 	con1 = __raw_readl(pll->con_reg + 0x4);
+@@ -1190,6 +1201,9 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+ 	/* clk_ops for 35xx and 2550 are similar */
+ 	case pll_35xx:
+ 	case pll_2550:
++	case pll_1450x:
++	case pll_1451x:
++	case pll_1452x:
+ 		if (!pll->rate_table)
+ 			init.ops = &samsung_pll35xx_clk_min_ops;
+ 		else
+@@ -1223,6 +1237,7 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+ 	case pll_4600:
+ 	case pll_4650:
+ 	case pll_4650c:
++	case pll_1460x:
+ 		if (!pll->rate_table)
+ 			init.ops = &samsung_pll46xx_clk_min_ops;
+ 		else
+diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+index c0ed4d4..213de9a 100644
+--- a/drivers/clk/samsung/clk-pll.h
++++ b/drivers/clk/samsung/clk-pll.h
+@@ -33,6 +33,10 @@ enum samsung_pll_type {
+ 	pll_s3c2440_mpll,
+ 	pll_2550xx,
+ 	pll_2650xx,
++	pll_1450x,
++	pll_1451x,
++	pll_1452x,
++	pll_1460x,
+ };
+ 
+ #define PLL_35XX_RATE(_rate, _m, _p, _s)			\
 -- 
 1.7.9.5
