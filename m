@@ -1,46 +1,120 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Sep 2014 08:54:42 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <20140911095725.GC5045@arm.com>
-References: <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
- <20140908135436.GC22717@arm.com>
- <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
- <20140910173401.GG1710@arm.com>
- <CAD=FV=WJpP1aAo-r9bnUQg5xarGQYo8pROvyh0a5dt+m1OOn4g@mail.gmail.com>
- <20140910184652.GP1710@arm.com>
- <CAD=FV=W_d=S-N-hguLsH+pf3kT1XqQNMMqGZ4o2wnpWZB9T70g@mail.gmail.com>
- <20140911095725.GC5045@arm.com>
-Message-ID: <CAD=FV=U55aX4edj3DRvBbFFs0Q23TUHY+D+mr1wcghaJGiRm+Q@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 11 Sep 2014 08:55:22 -0700
+Subject: [PATCH] watchdog: imx2_wdt: add restart handler support
+In-Reply-To: <1410421661-15298-1-git-send-email-jingchang.lu@freescale.com>
+References: <1410421661-15298-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20140911155522.GB13052@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+On Thu, Sep 11, 2014 at 03:47:41PM +0800, Jingchang Lu wrote:
+>   Register the watchdog as the system restart function
+> to the new introducing kernel restart call chain in the
+> driver instead of providing the restart in machine desc.
+>   This restart handler function is from the mxc_restart()
+> in arch/arm/mach-imx/system.c
+> 
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+>  drivers/watchdog/imx2_wdt.c | 37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 68c3d37..fa723e8 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -22,14 +22,17 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/delay.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+>  #include <linux/jiffies.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/moduleparam.h>
+> +#include <linux/notifier.h>
+>  #include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+>  #include <linux/regmap.h>
+>  #include <linux/timer.h>
+>  #include <linux/watchdog.h>
+> @@ -59,6 +62,7 @@ struct imx2_wdt_device {
+>  	struct regmap *regmap;
+>  	struct timer_list timer;	/* Pings the watchdog when closed */
+>  	struct watchdog_device wdog;
+> +	struct notifier_block restart_handler;
+>  };
+>  
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+> @@ -77,6 +81,31 @@ static const struct watchdog_info imx2_wdt_info = {
+>  	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+>  };
+>  
+> +static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
+> +				void *cmd)
+> +{
+> +	unsigned int wcr_enable = IMX2_WDT_WCR_WDE;
 
-On Thu, Sep 11, 2014 at 2:57 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 10, 2014 at 08:50:16PM +0100, Doug Anderson wrote:
->> On Wed, Sep 10, 2014 at 11:46 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > If `where we're at' is trying to boot an ARMv7 product, then you can boot in
->> > secure svc and lose virtualisation support. Looking forward to ARMv8, this
->> > isn't going to work, so I'd encourage you to start thinking about getting
->> > a working bootloader as a requirement.
->>
->> Yup, definitely on the same page now.  With everyone working on this
->> I'd imagine that there will be some nice standards worked out by the
->> time real ARMv8 is ready to ship?
->>
->> ...so would you say that you're in support of landing the patch to
->> allow physical counters?  I know Olof has Acked the patch above, but
->> it's nice if there's general agreement that it's OK.
->
-> I'm in favour of fixing the regression, yes. What I didn't understand from
-> the patch is where arch_timer_use_virtual is set to false for your machine,
-> as we need to be careful not to regress arm64 (the vdso uses the virtual
-> counter there).
+In the original code this value is conditional depending on cpu_is_mx1().
+Are there any implications for this reset mechanism ? Does mx1 have a
+different watchdog driver ?
 
-See <https://patchwork.kernel.org/patch/4889311/>
+> +	struct imx2_wdt_device *wdev = container_of(this,
+> +							struct imx2_wdt_device,
+> +							restart_handler);
 
--Doug
+Please align second lines with '('.
+
+> +	/* Assert SRS signal */
+> +	regmap_write(wdev->regmap, 0, wcr_enable);
+> +	/*
+> +	 * Due to imx6q errata ERR004346 (WDOG: WDOG SRS bit requires to be
+> +	 * written twice), we add another two writes to ensure there must be at
+> +	 * least two writes happen in the same one 32kHz clock period.  We save
+> +	 * the target check here, since the writes shouldn't be a huge burden
+> +	 * for other platforms.
+> +	 */
+> +	regmap_write(wdev->regmap, 0, wcr_enable);
+> +	regmap_write(wdev->regmap, 0, wcr_enable);
+> +
+> +	/* wait for reset to assert... */
+> +	mdelay(500);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+>  static inline void imx2_wdt_setup(struct watchdog_device *wdog)
+>  {
+>  	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+> @@ -257,6 +286,12 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	wdev->restart_handler.notifier_call = imx2_restart_handler;
+> +	wdev->restart_handler.priority = 128;
+> +	ret = register_restart_handler(&wdev->restart_handler);
+> +	if (ret)
+> +		dev_err(&pdev->dev, "cannot register restart handler\n");
+> +
+>  	dev_info(&pdev->dev, "timeout %d sec (nowayout=%d)\n",
+>  		 wdog->timeout, nowayout);
+>  
+> @@ -268,6 +303,8 @@ static int __exit imx2_wdt_remove(struct platform_device *pdev)
+>  	struct watchdog_device *wdog = platform_get_drvdata(pdev);
+>  	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+>  
+> +	unregister_restart_handler(&wdev->restart_handler);
+> +
+>  	watchdog_unregister_device(wdog);
+>  
+>  	if (imx2_wdt_is_running(wdev)) {
+> -- 
+> 1.8.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
