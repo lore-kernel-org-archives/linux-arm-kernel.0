@@ -1,47 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 11 Sep 2014 09:22:42 +0900
-Subject: [PATCH 00/11] ARM: shmobile: r8a7740/armadillo legacy prototype
- pm domain support
-In-Reply-To: <CAMuHMdWZ_MZQo5QyZmZCx-EHvxOvO==gnoefDqsipHqfSLPXww@mail.gmail.com>
-References: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
- <20140909022649.GC31320@verge.net.au>
- <CAMuHMdWZ_MZQo5QyZmZCx-EHvxOvO==gnoefDqsipHqfSLPXww@mail.gmail.com>
-Message-ID: <20140911002242.GE29858@verge.net.au>
+Date: Thu, 11 Sep 2014 09:49:36 +0900
+Subject: [PATCH] ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig
+In-Reply-To: <1410309887-15492-1-git-send-email-horms+renesas@verge.net.au>
+References: <1410309887-15492-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140911004936.GA23371@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 11:48:23AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon, Magnus,
+On Wed, Sep 10, 2014 at 09:44:47AM +0900, Simon Horman wrote:
+> Support for the r8a7794 was recently added.
+> Enable it in the shmobile_defconfig to increase build coverage.
 > 
-> On Tue, Sep 9, 2014 at 4:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> > I would like Magnus's opinion but mine is that the non-WIP patches
-> > could be queued up. At least patch 1 and 2. Possibly others if
-> > they don't depend (other than diff noise) on WIP patches.
-> 
-> The legacy platforms are meant to be extinct in the near future, but
-> Armadillo-legacy already has some PM domain support, so adding a
-> little bit more can't hurt much, IMHO.
-> 
-> Besides diff noise, there should not be any dependencies on WIP patches.
-> 
-> > With the WIP patches, I am not entirely opposed to merging them
-> > too, so long as they move things in a good direction. And in particular
-> > don't break anything.
-> 
-> "[PATCH 03/11] [WIP] ARM: shmobile: armadillo800eva legacy: Add
-> missing A3SP pm domain devices" should be OK, as this turned out to be
-> intended behavior.
-> 
-> "[PATCH 10/11] [WIP] ARM: shmobile: r8a7740: Add A4SU pm domain
->  support" probably introduces a regression for USB, as the domain is now
-> powered down after boot-up. I haven't tried USB on Armadillo yet, though.
-> So don't apply this one.
-> 
-> "[PATCH 11/11] [WIP] ARM: shmobile: r8a7740: Add A3SM pm domain
->  support" should be safe.
-> 
-> I would not apply the other WIP patches that add C99-commented-out code.
-> These issues must be fixed for DT as well.
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks Geert, that all sounds reasonable to me.
-I will confer with Magnus.
+I have queued this up.
+
+> ---
+> 
+> Based on renesas-devel-20140910v2-v3.17-rc4
+>  arch/arm/configs/shmobile_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index 522275a..d7346ad 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -16,6 +16,7 @@ CONFIG_ARCH_R8A7740=y
+>  CONFIG_ARCH_R8A7779=y
+>  CONFIG_ARCH_R8A7790=y
+>  CONFIG_ARCH_R8A7791=y
+> +CONFIG_ARCH_R8A7794=y
+>  CONFIG_MACH_KOELSCH=y
+>  CONFIG_MACH_LAGER=y
+>  CONFIG_MACH_MARZEN=y
+> -- 
+> 2.0.1
+> 
