@@ -1,40 +1,81 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 11 Sep 2014 05:12:36 +0200
-Subject: [PATCH v2] ARM/arm64: KVM: fix use of WnR bit in
- kvm_is_write_fault()
-In-Reply-To: <540EDE63.6060904@arm.com>
-References: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
- <540EDE63.6060904@arm.com>
-Message-ID: <20140911031236.GL2784@lvm>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 11 Sep 2014 08:50:30 +0530
+Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <CAODwPW9QOD-7Wyc1Bh8QKfArSmsdqzYTOx6-gc8V5ace9-oPFQ@mail.gmail.com>
+References: <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
+ <20140903144225.GD31855@saruman.home>
+ <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
+ <20140905175651.GK24449@saruman.home>
+ <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
+ <20140908134454.GK22409@saruman.home>
+ <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
+ <20140909144225.GF6151@saruman.home>
+ <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
+ <CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>
+ <20140910045328.GA32475@saruman.home>
+ <CAFp+6iHMhbi4V4LAkNsgzDc192ihT2a1mZHgLbia=K2U8+x=2w@mail.gmail.com>
+ <CAFp+6iErXKpXgE0tRPB=tEqXxcXgQAeFJP1TpSwRN6fNu9a-qw@mail.gmail.com>
+ <CAODwPW9QOD-7Wyc1Bh8QKfArSmsdqzYTOx6-gc8V5ace9-oPFQ@mail.gmail.com>
+Message-ID: <7AFBEAB40137492BBF4D80EBC3E6EBB3@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 12:02:59PM +0100, Marc Zyngier wrote:
-> [resending, as ARM email server seems to be in some mood]
-> 
-> On 09/09/14 11:27, Ard Biesheuvel wrote:
-> > The ISS encoding for an exception from a Data Abort has a WnR
-> > bit[6] that indicates whether the Data Abort was caused by a
-> > read or a write instruction. While there are several fields
-> > in the encoding that are only valid if the ISV bit[24] is set,
-> > WnR is not one of them, so we can read it unconditionally.
-> > 
-> > Instead of fixing both implementations of kvm_is_write_fault()
-> > in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
-> > which already does the right thing with respect to the WnR bit.
-> > Also fix up the callers to pass 'vcpu'
-> > 
-> > Acked-by: Laszlo Ersek <lersek@redhat.com>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> Because I like that kind of diffstat:
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Christoffer, if you too are happy with that, I'll queue it right away.
-> 
-Extremely happy:
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Hi,
 
-Thanks,
--Christoffer
+
+On Thursday, September 11, 2014 1:52 AM, "Julius Werner" 
+<jwerner@google.com> wrote
+
+
+>>> right, use that to call phy_init() at the right time, then you need to
+>>> add a new ->calibrate() method which, likely, will only be used by you
+>>> ;-)
+>
+>> so you mean, the xhci should itself call phy_init() at a time suitable,
+>> so that ->calibrate() is not required at all ?
+>
+> I'm not sure if that's a good idea because it would require phy_init()
+> and calibrate() to always mean the same thing. The calibrate() for
+> Exynos5420 needs to be called both during boot and after system
+> resume, but there might be other platforms that don't want to
+> completely shutdown and reinit their PHYs during suspend/resume with
+> the same functions used for boot. For example, Tegra5 (proposed driver
+> at http://www.spinics.net/lists/linux-usb/msg113093.html) can
+> power-gate the PHY during suspend, but that's not running the same
+> code as in the phy_init()/phy_shutdown() methods (the posted patch
+> doesn't contain all power-gating code yet, but you can get an idea
+> about how it has to work from
+> https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/chromeos-3.10/drivers/usb/host/xhci-tegra.c).
+> It would also mean that the initial phy_init() call must always come
+> after the XHCI reset, and I am not sure if that would fit nicely with
+> all platforms.
+>
+>> right, and what's more generic than adding the support for PHYs straight 
+>> into xHCI ?
+>
+> Well, if we are going to have a calibrate() method (as in "stuff the
+> PHY does after every controller reset if it needs to"), we have to add
+> it either to the XHCI stack or the USB core.
+> I thought the USB core would be more generic, because in theory it's 
+> possible that e.g. an
+> EHCI controller might have a similar requirement.
+
+Atleast on Exynos systems I can see that unless PHY is initialized the 
+controller
+fails to reset. So taking a path wherein we initialize the PHYs after 
+controller resets
+is not going to help us generically across all controllers.
+With XHCI though things are OK while resetting, and we can initialize the 
+PHYs
+after controller reset happens but here too DWC3 is already initializing the 
+PHYs
+for exynos systems too, so it may not be very wise to do that initialization 
+stuff
+once again. Plus the PHY core prevents multiple initialization anyways.
+
+> (Also, we have the gen_phy pointer in a USB core structure (struct 
+> usb_hcd), so I thought
+> making this feature generic to the USB core and thus available to all
+> kinds of host controllers would be more natural.) 
