@@ -1,265 +1,160 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 11 Sep 2014 15:07:03 -0700
-Subject: [PATCH v2] PM / AVS: rockchip-io: add driver handling Rockchip io
- domains
-In-Reply-To: <541214A7.3040402@ti.com>
-References: <1410469229-30167-1-git-send-email-dianders@chromium.org>
- <541214A7.3040402@ti.com>
-Message-ID: <CAD=FV=VYkf1AuwwSHsdCX2sqzKmZBzWdMZhi-kx3ycKtTcA=pA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Sep 2014 15:07:11 -0700
+Subject: qemu
+In-Reply-To: <CAKv+Gu9bzLmPQ=3kU6giSkv7xZCzuD7Yy0m2pPRS0oCk7LwjTA@mail.gmail.com>
+References: <CAKv+Gu9MDEZUW3mkcy3hRj3waAnPwHps9TNici+Fb4HKOMna-A@mail.gmail.com>
+ <5411B725.8090009@arm.com>
+ <CAKv+Gu9qha4LVwsUfxu=_zdDMbLR_m0Ws+AvFQAbb0v9G30mCg@mail.gmail.com>
+ <5411D262.2030800@arm.com>
+ <CAKv+Gu_j5SMeqkgP+CAjOu0quzMBFMMgjBcfx_-Q5ch9SOxpvw@mail.gmail.com>
+ <20140911180904.GI5535@lvm>
+ <CAKv+Gu9bzLmPQ=3kU6giSkv7xZCzuD7Yy0m2pPRS0oCk7LwjTA@mail.gmail.com>
+Message-ID: <20140911220711.GK5535@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
+On Thu, Sep 11, 2014 at 08:35:07PM +0200, Ard Biesheuvel wrote:
+> On 11 September 2014 20:09, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Thu, Sep 11, 2014 at 07:06:17PM +0200, Ard Biesheuvel wrote:
+> >> On 11 September 2014 18:48, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> > On 11/09/14 16:26, Ard Biesheuvel wrote:
+> >> >> On 11 September 2014 16:52, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> >>> On 11/09/14 15:41, Ard Biesheuvel wrote:
+> >> >>>> Hello all,
+> >> >>>>
+> >> >>>> I spent most of the day chasing a particularly weird heisenbug in the
+> >> >>>> QEMU+KVM+UEFI combo.
+> >> >>>> The symptom was that UEFI init would hang on the first write to the
+> >> >>>> second NOR flash (to initialize the variable store) but *only* when
+> >> >>>> using the -bios option (instead of -pflash) and a boot image of
+> >> >>>> exactly 64 MB in size. Note that this implies that the second NOR
+> >> >>>> flash was not file backed.
+> >> >>>>
+> >> >>>> As it turns out, the choice of the -bios option and the size of the
+> >> >>>> file affect whether KVM ends up using sections or pages to back the
+> >> >>>> NOR flash, and in my failure case, it was using the latter. That
+> >> >>>> resulted in KVM going down a code path where the memory backing the
+> >> >>>> NOR was writable, which breaks the MMIO emulation, and resulted in the
+> >> >>>> hang on init of the variable store.
+> >> >>>>
+> >> >>>> The patch below fixes it for me.
+> >> >>>>
+> >> >>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> >>>> index c68ec28f17c3..121abc6fef97 100644
+> >> >>>> --- a/arch/arm/kvm/mmu.c
+> >> >>>> +++ b/arch/arm/kvm/mmu.c
+> >> >>>> @@ -817,7 +817,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu,
+> >> >>>> phys_addr_t fault_ipa,
+> >> >>>>  pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> >> >>>>  if (is_error_pfn(pfn))
+> >> >>>>   return -EFAULT;
+> >> >>>>
+> >> >>>> - if (kvm_is_mmio_pfn(pfn))
+> >> >>>> + if (writable && kvm_is_mmio_pfn(pfn))
+> >> >>>>   mem_type = PAGE_S2_DEVICE;
+> >> >>>>
+> >> >>>>   spin_lock(&kvm->mmu_lock);
+> >> >>>>
+> >> >>>> Here is the definition of kvm_is_mmio() for completeness. I am a bit
+> >> >>>> out of my depth here, so perhaps someone else can shed some light on
+> >> >>>> this?
+> >> >>>>
+> >> >>>> bool kvm_is_mmio_pfn(pfn_t pfn)
+> >> >>>> {
+> >> >>>>         if (pfn_valid(pfn))
+> >> >>>>                 return PageReserved(pfn_to_page(pfn));
+> >> >>>>
+> >> >>>>         return true;
+> >> >>>> }
+> >> >>>>
+> >> >>>> To me, it is particularly puzzling what PageReserved() has to do with
+> >> >>>> anything, as I couldn't find any other uses of it under kvm/
+> >> >>>>
+> >> >>>
+> >> >>> My understanding is that kvm_is_mmio_pfn() is used for *devices* that
+> >> >>> are mapped directly mapped (think device assignment). PageReserved()
+> >> >>> would make sense there.
+> >> >>>
+> >> >>> Now, I'm not familiar with the whole QEMU setup, so maybe you could
+> >> >>> describe how things are mapped, and what is supposed to happen?
+> >> >>>
+> >> >>
+> >> >> When running QEMU using the -bios <file> option, the file is exposed
+> >> >> to the guest as an emulated NOR flash at 0x0, so that you can boot
+> >> >> from it directly.
+> >> >> In my case, the NOR is used for the boot image itself, and for a
+> >> >> non-volatile variable store at 0x400_0000, which is initialized by
+> >> >> UEFI when it boots.
+> >> >>
+> >> >> In order for the NOR emulation to work, writes to the NOR need to
+> >> >> trap, so that QEMU can take down the whole memory region, trapping all
+> >> >> reads and writes, until a command is issued that puts it back into
+> >> >> array mode, and the memory region is created again. In this mode, the
+> >> >> guest reads to the NOR go straight to host RAM. (Or they should: the
+> >> >> patch you merged today fixed and issue where reads were mistaken for
+> >> >> writes and sent to QEMU instead)
+> >> >>
+> >> >> So when UEFI enters it non-volatile variable store driver, it first
+> >> >> issues a read to the base of the second half of the NOR (0x400_0000),
+> >> >> resulting in some host RAM to be pinned to back it up. However, for
+> >> >> some reason, it is mapped as PAGE_S2_DEVICE, which is read-write, so
+> >> >> when subsequently a write is issued to kick the NOR into command mode,
+> >> >> it just gets sent to host RAM as well.
+> >> >>
+> >> >> Indeed, by the looks of it, kvm_is_mmio_pfn() is intended to map host
+> >> >> device memory straight into the guest physical address space, but this
+> >> >> is not what I am doing, so why is it returning 'true' here?
+> >> >
+> >> > That's the bit I do not understand. Any chance you can find out who sets
+> >> > this bit in the page tables?
+> >> >
+> >>
+> >> That is also the bit *I* don't understand, and that is why I am asking
+> >> you guys :-)
+> >>
+> >> Let me first double check that PageReserved is actually the culprit here ...
+> >
+> > Yeah, so assuming that Linux is not broken, we either have a bug in how
+> > we resolve the pfn or QEMU puts an incorrect address for the backing of
+> > the flash into the memory region.
+> >
+> > Another question here is whether we should be always setting the RDWR
+> > bits for PAGE_S2_DEVICE?  Is it conceivable that we would want to expose
+> > some device MMIO region as a read-only region and still fault on writes?
+> >
+> 
+> Let's see if the holes in our knowledge line up :-)
+> 
+> I noticed that the call to kvm_is_mmio_pfn() was only recently added
+> by Kim Phillips (b88657674d39 ARM: KVM: user_mem_abort: support stage
+> 2 MMIO page mapping), and there are no other references to it in
+> KVM/ARM
 
-On Thu, Sep 11, 2014 at 2:31 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->> +Required properties:
->> +- compatible: should be one of:
->> +  - "rockchip,rk3188-iodomain" for rk3188
->> +  - "rockchip,rk3288-iodomain" for rk3288
-> The key word 'voltage' is missing from the compatible. iodomain itself
-> doesn't convey what it is actually.
+right, but KVM/x86 calls this as well...
 
-Sure, so you want "rockchip,rk3288-io-voltage-domain" then?
+> 
+> I am willing to accept that checking for PG_reserved makes sense in
+> the context of deciding whether some pfn is backed by normal RAM
+> (aiui, there may be a hole there), but returning writable RAM when
+> writable = false is arguably a bug.
 
+Agreed, I think the PAGE_S2_DEVICE should not be touching the read/write
+bits, but I still want to figure out why your specific PFN is resolved
+as an MMIO PFN.
 
->> +- rockchip,grf: phandle to the syscon managing the "general register files"
->> +
->> +
->> +You specify supplies using the standard regulator bindings by including
->> +a phandle the the relevant regulator.  All specified supplies must be able
->> +to report their voltage.  The IO Voltage Domain for any non-specified
->> +supplies will be not be touched.
->> +
->> +Possible supplies for rk3188:
->> +- ap0-supply:    The supply connected to AP0_VCC.
->> +- ap1-supply:    The supply connected to AP1_VCC.
->> +- cif-supply:    The supply connected to CIF_VCC.
->> +- flash-supply:  The supply connected to FLASH_VCC.
->> +- lcdc0-supply:  The supply connected to LCD0_VCC.
->> +- lcdc1-supply:  The supply connected to LCD1_VCC.
->> +- vccio0-supply: The supply connected to VCCIO0.
->> +- vccio1-supply: The supply connected to VCCIO1.
->> +                 Sometimes also labeled VCCIO1 and VCCIO2.
->> +
->> +Possible supplies for rk3288:
->> +- audio-supply:  The supply connected to APIO4_VDD.
->> +- bb-supply:     The supply connected to APIO5_VDD.
->> +- dvp-supply:    The supply connected to DVPIO_VDD.
->> +- flash0-supply: The supply connected to FLASH0_VDD.  Typically for eMMC
->> +- flash1-supply: The supply connected to FLASH1_VDD.  Also known as SDIO1.
->> +- gpio30-supply: The supply connected to APIO1_VDD.
->> +- gpio1830       The supply connected to APIO2_VDD.
->> +- lcdc-supply:   The supply connected to LCDC_VDD.
->> +- sdcard-supply: The supply connected to SDMMC0_VDD.
->> +- wifi-supply:   The supply connected to APIO3_VDD.  Also known as SDIO0.
->> +
->> +
->> +Example:
->> +
->> +     io-domains {
->> +             compatible = "rockchip,rk3288-iodomain";
->> +             rockchip,grf = <&grf>;
->> +
->> +             audio-supply = <&vcc18_codec>;
->> +             bb-supply = <&vcc33_io>;
->> +             dvp-supply = <&vcc_18>;
->> +             flash0-supply = <&vcc18_flashio>;
->> +             gpio1830-supply = <&vcc33_io>;
->> +             gpio30-supply = <&vcc33_pmuio>;
->> +             lcdc-supply = <&vcc33_lcd>;
->> +             sdcard-supply = <&vccio_sd>;
->> +             wifi-supply = <&vcc18_wl>;
->> +     };
->> diff --git a/drivers/power/avs/Kconfig b/drivers/power/avs/Kconfig
->> index 2a1008b..7f3d389 100644
->> --- a/drivers/power/avs/Kconfig
->> +++ b/drivers/power/avs/Kconfig
->> @@ -10,3 +10,11 @@ menuconfig POWER_AVS
->>         AVS is also called SmartReflex on OMAP devices.
->>
->>         Say Y here to enable Adaptive Voltage Scaling class support.
->> +
->> +config ROCKCHIP_IODOMAIN
->> +        tristate "Rockchip IO domain support"
->> +        depends on ARCH_ROCKCHIP && OF
->> +        help
->> +          Say y here to enable support io domains on Rockchip SoCs. It is
->> +          necessary for the io domain setting of the SoC to match the
->> +          voltage supplied by the regulators.
->> diff --git a/drivers/power/avs/Makefile b/drivers/power/avs/Makefile
->> index 0843386..ba4c7bc 100644
->> --- a/drivers/power/avs/Makefile
->> +++ b/drivers/power/avs/Makefile
->> @@ -1 +1,2 @@
->>  obj-$(CONFIG_POWER_AVS_OMAP)         += smartreflex.o
->> +obj-$(CONFIG_ROCKCHIP_IODOMAIN)              += rockchip-io-domain.o
->> diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
->> new file mode 100644
->> index 0000000..f4e0ebc
->> --- /dev/null
->> +++ b/drivers/power/avs/rockchip-io-domain.c
->> @@ -0,0 +1,333 @@
->> +/*
->> + * Rockchip IO Voltage Domain driver
->> + *
->> + * Copyright 2014 MundoReader S.L.
->> + * Copyright 2014 Google, Inc.
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/err.h>
->> +#include <linux/mfd/syscon.h>
-> The bindings are not talking about syscon usage. You might
-> want to document it appropriately to make the usage clear.
+> Due to the fact that we are only
+> introducing KVM_CAP_READONLY_MEM now, and due to the
+> read-as-ROM/write-as-control-reg nature of NOR, it is no surprise that
+> this is where the issues present themselves.
+> 
+> So could anyone shed some light on the nature of the memory returned
+> by hva_to_pfn() and why it would have the PG_reserved flag set?
+> 
+So did you verify that it indeed does have the PG_reserved flag set?
 
-Doesn't the bindings have this?
+Can you dump the values for the memory slot that QEMU sets up for your
+region and the PFN that the lookup here resolves to on your particular
+setup so that we can try to see what is happening here?
 
-> +- rockchip,grf: phandle to the syscon managing the "general register files"
-
-I actually forgot that in v1, but I added it to v2.
-
-
->> +#define MAX_VOLTAGE_1_8              1980000
-> This is close to 2V, Is that intentional.
->
->> +#define MAX_VOLTAGE_3_3              3600000
->> +
-> Same here.
-
-I got these numbers from the document "Rocchip RK3288 datasheet".
-Under "Recommended Operating Conditions" for "Digital GPIO".  When the
-typical is 3.3V the max is 3.6V.  When the typical is 1.8V the max is
-1.98V.
-
-The way these numbers are used is:
-
-If the voltage on a rail is above the "1.8" voltage (1.98V) we'll tell
-the SoC we're at 3.3.  If the voltage on a rail is above the "3.3V"
-we'll consider that to be an error.
-
-There's one secret ulterior motive here though that I'll admit to.
-When a client uses regulator_set_voltage() they actually specify a min
-and max voltage.  They might say that they want 3.3V by saying that
-they want a voltage between 2.7V and 3.6V.  They might say that they
-want 1.8V by saying that they want a voltage between 1.7V and 1.95V.
-In our pre-change notification we are only told the possible range.
-It's nice if things work properly in that case.  If we find some case
-that doesn't work later we can always get fancier and try to figure
-out what voltage the regulator will end up at, but I haven't seen the
-need yet.
-
-Note that the 1.7 - 1.95V is more than hypothetical.  dw_mmc requests
-those ranges.  I'll admit that I was involved in that code, but I'll
-also admit to having stolen those numbers from sdhci.
-
-
->> +struct rockchip_iodomain;
->> +
->> +/**
->> + * @supplies: voltage settings matching the register bits.
->> + */
->> +struct rockchip_iodomain_soc_data {
->> +     int grf_offset;
->> +     const char *supply_names[MAX_SUPPLIES];
->> +     void (*init)(struct rockchip_iodomain *iod);
->> +};
->> +
->> +struct rockchip_iodomain_supply {
->> +     struct rockchip_iodomain *iod;
->> +     struct regulator *reg;
->> +     struct notifier_block nb;
->> +     int idx;
->> +};
->> +
->> +struct rockchip_iodomain {
->> +     struct device *dev;
->> +     struct regmap *grf;
->> +     struct rockchip_iodomain_soc_data *soc_data;
->> +     struct rockchip_iodomain_supply supplies[MAX_SUPPLIES];
->> +};
->> +
->> +static int rockchip_iodomain_write(struct rockchip_iodomain_supply *supply,
->> +                                int uV)
->> +{
->> +     struct rockchip_iodomain *iod = supply->iod;
->> +     u32 val;
->> +     int ret;
->> +
->> +     /* set value bit */
->> +     val = (uV > MAX_VOLTAGE_1_8) ? 0 : 1;
->> +     val <<= supply->idx;
->> +
->> +     /* apply hiword-mask */
->> +     val |= (BIT(supply->idx) << 16);
->> +
->> +     ret = regmap_write(iod->grf, iod->soc_data->grf_offset, val);
->> +     if (ret)
->> +             dev_err(iod->dev, "Couldn't write to GRF\n");
->> +
->> +     return ret;
->> +}
->> +
->> +static int rockchip_iodomain_notify(struct notifier_block *nb,
->> +                                 unsigned long event,
->> +                                 void *data)
->> +{
->> +     struct rockchip_iodomain_supply *supply =
->> +                     container_of(nb, struct rockchip_iodomain_supply, nb);
->> +     int uV;
->> +     int ret;
->> +
->> +     /*
->> +      * According to Rockchip it's important to keep the SoC IO domain
->> +      * higher than (or equal to) the external voltage.  That means we need
->> +      * to change it before external voltage changes happen in the case
->> +      * of an increase.
->> +      */
->> +     if (event & REGULATOR_EVENT_PRE_VOLTAGE_CHANGE) {
->> +             struct pre_voltage_change_data *pvc_data = data;
->> +
->> +             uV = max_t(unsigned long, pvc_data->old_uV, pvc_data->max_uV);
->> +     } else if (event & (REGULATOR_EVENT_VOLTAGE_CHANGE |
->> +                         REGULATOR_EVENT_ABORT_VOLTAGE_CHANGE)) {
->> +             uV = (unsigned long)data;
->> +     } else {
->> +             return NOTIFY_OK;
->> +     }
->> +
->> +     dev_dbg(supply->iod->dev, "Setting to %d\n", uV);
->> +
->> +     if (uV > MAX_VOLTAGE_3_3) {
->> +             dev_err(supply->iod->dev, "Voltage too high: %d\n", uV);
->> +
->> +             if (event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
->> +                     return NOTIFY_BAD;
->> +     }
->> +
->> +     ret = rockchip_iodomain_write(supply, uV);
->> +     if (ret && event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
->> +             return NOTIFY_BAD;
->> +
->> +     dev_info(supply->iod->dev, "Setting to %d done\n", uV);
->> +     return NOTIFY_OK;
->> +}
->> +
->> +#define RK3288_SOC_CON2                      0x24c
->> +#define RK3288_SOC_CON2_FLASH0               BIT(7)
->> +#define RK3288_SOC_FLASH_SUPPLY_NUM  2
->> +
-> Not a strong opinion but you can club all the defines on top
-> of the file.
-
-Sure, I'll move them.
-
--Doug
+-Christoffer
