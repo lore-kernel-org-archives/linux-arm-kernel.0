@@ -1,31 +1,38 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 11 Sep 2014 23:04:43 +0200
-Subject: [PATCH] pinctrl: berlin: fix the dt_free_map function
-In-Reply-To: <1410340551-24023-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1410340551-24023-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <54120E6B.4090704@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 11 Sep 2014 23:02:11 +0200
+Subject: [PATCH 3/7] clk: sunxi: unify sun6i AHB1 clock with proper PLL6
+ pre-divider
+In-Reply-To: <1410000448-9999-4-git-send-email-wens@csie.org>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-4-git-send-email-wens@csie.org>
+Message-ID: <20140911210211.GM31276@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 11:15 AM, Antoine Tenart wrote:
-> The berlin_pinctrl_dt_free_map function tries to free memory
-> allocated and handled by the of subsystem. This is wrong and
-> already handled by pinctrl_dt_free_maps() which calls
-> of_node_put().
+Hi,
+
+On Sat, Sep 06, 2014 at 06:47:24PM +0800, Chen-Yu Tsai wrote:
+> This patch unifies the sun6i AHB1 clock, originally supported
+> with separate mux and divider clks. It also adds support for
+> the pre-divider on the PLL6 input, thus allowing the clock to
+> be muxed to PLL6 with proper clock rate calculation.
 > 
-> This patch fixes the Berlin pinctrl way of freeing its maps,
-> avoiding a kernel BUG(), by using the common
-> pinctrl_utils_dt_free_map function instead.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/pinctrl/berlin/berlin.c | 21 +--------------------
->  1 file changed, 1 insertion(+), 20 deletions(-)
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I like the diffstat :)
+It looks fine, but I'd rather see this in a separate file, especially
+since we don't seem to have any order dependency.
 
-I am very short on time, so if it works for you, I am fine with it.
+Thanks!
+Maxime
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Sebastian
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140911/03a0bc3f/attachment.sig>
