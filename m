@@ -1,35 +1,35 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 12 Sep 2014 08:09:28 +1000
-Subject: Move berlin/for-next from github to infradead
-In-Reply-To: <541215D0.2020104@gmail.com>
-References: <541215D0.2020104@gmail.com>
-Message-ID: <20140912080928.4d9ead2b@canb.auug.org.au>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 11 Sep 2014 15:10:32 -0700
+Subject: [PATCH] arm64: pageattr: Correctly adjust unaligned start addresses
+In-Reply-To: <54112831.6010800@codeaurora.org>
+Message-ID: <1410473432-13381-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+The start address needs to be actually updated after it
+is detected to be unaligned. Adjust it and the end address
+properly.
 
-On Thu, 11 Sep 2014 23:36:16 +0200 Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->
-> I moved mach-berlin repositories from github over to infradead
-> a while ago. To save me the extra git push to github,
-> 
-> can you please change berlin's URL from
-> 
-> git://github.com/shesselba/linux-berlin.git#berlin/for-next
-> 
-> to
-> 
-> git://git.infradead.org/users/hesselba/linux-berlin.git#berlin/for-next
+Reported-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm64/mm/pageattr.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Done.
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index 75e744e..bb0ea94 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -46,7 +46,8 @@ static int change_memory_common(unsigned long addr, int numpages,
+ 	struct page_change_data data;
+ 
+ 	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
+-		addr &= PAGE_MASK;
++		start &= PAGE_MASK;
++		end = start + size;
+ 		WARN_ON_ONCE(1);
+ 	}
+ 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/bcfb7bd7/attachment.sig>
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
