@@ -1,39 +1,67 @@
-From: nikhil.badola@freescale.com (nikhil.badola at freescale.com)
-Date: Thu, 11 Sep 2014 10:10:37 +0000
-Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
- LS1021A
-In-Reply-To: <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1444adbcf7cd4b578a131db11e662490@BN1PR0301MB0593.namprd03.prod.outlook.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 11 Sep 2014 12:13:08 +0200
+Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20140911101308.GU3190@worktop.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
->Sent: Tuesday, September 09, 2014 2:42 PM
->To: Guo Shawn-R65073
->Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu
->Jingchang-B35083; Badola Nikhil-B46172; Zhao Chenhui-B35336; Gupta Suresh-
->B42813; Leekha Shaveta-B20052; Gupta Ruchika-R66431; Sharma Bhupesh-
->B45370; Fu Chao-B44548; Xiubo Li-B47053; Lu Jingchang-B35083
->Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for LS1021A
->
->From: Jingchang Lu <b35083@freescale.com>
->
->Add Freescale LS1021A SoC device tree support
->+
->+		usb at 8600000 {
->+			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
->+			reg = <0x0 0x8600000 0x0 0x1000>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
->+			dr_mode = "host";
->+			phy_type = "ulpi";
->+		};
->+
+On Tue, Aug 26, 2014 at 01:06:51PM +0200, Vincent Guittot wrote:
 
-Please remove following from the above node :  
-			#address-cells = <1>;
-			#size-cells = <0>;
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 18db43e..60ae1ce 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6049,6 +6049,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
+>  			return true;
+>  	}
+>  
+> +	/*
+> +	 * The group capacity is reduced probably because of activity from other
+> +	 * sched class or interrupts which use part of the available capacity
+> +	 */
+> +	if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
+> +				env->sd->imbalance_pct))
+> +		return true;
+> +
+>  	return false;
+>  }
+>  
+> @@ -6534,13 +6542,23 @@ static int need_active_balance(struct lb_env *env)
+>  	struct sched_domain *sd = env->sd;
+>  
+>  	if (env->idle == CPU_NEWLY_IDLE) {
+> +		int src_cpu = env->src_cpu;
+>  
+>  		/*
+>  		 * ASYM_PACKING needs to force migrate tasks from busy but
+>  		 * higher numbered CPUs in order to pack all tasks in the
+>  		 * lowest numbered CPUs.
+>  		 */
+> -		if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
+> +		if ((sd->flags & SD_ASYM_PACKING) && src_cpu > env->dst_cpu)
+> +			return 1;
+> +
+> +		/*
+> +		 * If the CPUs share their cache and the src_cpu's capacity is
+> +		 * reduced because of other sched_class or IRQs, we trig an
+> +		 * active balance to move the task
+> +		 */
+> +		if ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
+> +				sd->imbalance_pct))
+>  			return 1;
+>  	}
+
+Should you not also check -- in both cases -- that the destination is
+any better?
+
+Also, there's some obvious repetition going on there, maybe add a
+helper?
+
+Also, both sites should probably ensure they're operating in the
+non-saturated/overloaded scenario. Because as soon as we're completely
+saturated we want SMP nice etc. and that all already works right
+(presumably).
