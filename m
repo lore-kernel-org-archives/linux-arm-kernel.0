@@ -1,159 +1,153 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 10 Sep 2014 23:09:33 -0600
-Subject: [RFC v2 0/9] KVM-VFIO IRQ forward control
-In-Reply-To: <20140911031044.GK2784@lvm>
-References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
- <1409691941.3804.133.camel@ul30vt.home> <20140911031044.GK2784@lvm>
-Message-ID: <1410412173.2982.288.camel@ul30vt.home>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 11 Sep 2014 10:44:52 +0530
+Subject: [PATCH v3 1/2] dma: at_xdmac: creation of the atmel eXtended
+ DMA Controller driver
+In-Reply-To: <20140910132353.GP4434@ldesroches-Latitude-E6320>
+References: <1404825096-15724-1-git-send-email-ludovic.desroches@atmel.com>
+ <1404825096-15724-2-git-send-email-ludovic.desroches@atmel.com>
+ <20140725071631.GH8181@intel.com>
+ <20140728155431.GV2349@ldesroches-Latitude-E6320>
+ <20140728164750.GH8181@intel.com>
+ <20140910132353.GP4434@ldesroches-Latitude-E6320>
+Message-ID: <20140911051452.GC3131@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-09-11 at 05:10 +0200, Christoffer Dall wrote:
-> On Tue, Sep 02, 2014 at 03:05:41PM -0600, Alex Williamson wrote:
-> > On Mon, 2014-09-01 at 14:52 +0200, Eric Auger wrote:
-> > > This RFC proposes an integration of "ARM: Forwarding physical
-> > > interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
-> > > KVM.
-> > > 
-> > > It enables to transform a VFIO platform driver IRQ into a forwarded
-> > > IRQ. The direct benefit is that, for a level sensitive IRQ, a VM
-> > > switch can be avoided on guest virtual IRQ completion. Before this
-> > > patch, a maintenance IRQ was triggered on the virtual IRQ completion.
-> > > 
-> > > When the IRQ is forwarded, the VFIO platform driver does not need to
-> > > disable the IRQ anymore. Indeed when returning from the IRQ handler
-> > > the IRQ is not deactivated. Only its priority is lowered. This means
-> > > the same IRQ cannot hit before the guest completes the virtual IRQ
-> > > and the GIC automatically deactivates the corresponding physical IRQ.
-> > > 
-> > > Besides, the injection still is based on irqfd triggering. The only
-> > > impact on irqfd process is resamplefd is not called anymore on
-> > > virtual IRQ completion since this latter becomes "transparent".
-> > > 
-> > > The current integration is based on an extension of the KVM-VFIO
-> > > device, previously used by KVM to interact with VFIO groups. The
-> > > patch serie now enables KVM to directly interact with a VFIO
-> > > platform device. The VFIO external API was extended for that purpose.
-> > > 
-> > > Th KVM-VFIO device can get/put the vfio platform device, check its
-> > > integrity and type, get the IRQ number associated to an IRQ index.
-> > > 
-> > > The IRQ forward programming is architecture specific (virtual interrupt
-> > > controller programming basically). However the whole infrastructure is
-> > > kept generic.
-> > > 
-> > > from a user point of view, the functionality is provided through new
-> > > KVM-VFIO device commands, KVM_DEV_VFIO_DEVICE_(UN)FORWARD_IRQ
-> > > and the capability can be checked with KVM_HAS_DEVICE_ATTR.
-> > > Assignment can only be changed when the physical IRQ is not active.
-> > > It is the responsability of the user to do this check.
-> > > 
-> > > This patch serie has the following dependencies:
-> > > - "ARM: Forwarding physical interrupts to a guest VM"
-> > >   (http://lwn.net/Articles/603514/) in
-> > > - [PATCH v3] irqfd for ARM
-> > > - and obviously the VFIO platform driver serie:
-> > >   [RFC PATCH v6 00/20] VFIO support for platform devices on ARM
-> > >   https://www.mail-archive.com/kvm at vger.kernel.org/msg103247.html
-> > > 
-> > > Integrated pieces can be found at
-> > > ssh://git.linaro.org/people/eric.auger/linux.git
-> > > on branch 3.17rc3_irqfd_forward_integ_v2
-> > > 
-> > > This was was tested on Calxeda Midway, assigning the xgmac main IRQ.
-> > > 
-> > > v1 -> v2:
-> > > - forward control is moved from architecture specific file into generic
-> > >   vfio.c module.
-> > >   only kvm_arch_set_fwd_state remains architecture specific
-> > > - integrate Kim's patch which enables KVM-VFIO for ARM
-> > > - fix vgic state bypass in vgic_queue_hwirq
-> > > - struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
-> > >   to include/uapi/linux/kvm.h
-> > >   also irq_index renamed into index and guest_irq renamed into gsi
-> > > - ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
-> > > - vfio_external_get_base_device renamed into vfio_external_base_device
-> > > - vfio_external_get_type removed
-> > > - kvm_vfio_external_get_base_device renamed into kvm_vfio_external_base_device
-> > > - __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-> > > 
-> > > Eric Auger (8):
-> > >   KVM: ARM: VGIC: fix multiple injection of level sensitive forwarded
-> > >     IRQ
-> > >   KVM: ARM: VGIC: add forwarded irq rbtree lock
-> > >   VFIO: platform: handler tests whether the IRQ is forwarded
-> > >   KVM: KVM-VFIO: update user API to program forwarded IRQ
-> > >   VFIO: Extend external user API
-> > >   KVM: KVM-VFIO: add new VFIO external API hooks
-> > >   KVM: KVM-VFIO: generic KVM_DEV_VFIO_DEVICE command and IRQ forwarding
-> > >     control
-> > >   KVM: KVM-VFIO: ARM forwarding control
-> > > 
-> > > Kim Phillips (1):
-> > >   ARM: KVM: Enable the KVM-VFIO device
-> > > 
-> > >  Documentation/virtual/kvm/devices/vfio.txt |  26 ++
-> > >  arch/arm/include/asm/kvm_host.h            |   7 +
-> > >  arch/arm/kvm/Kconfig                       |   1 +
-> > >  arch/arm/kvm/Makefile                      |   4 +-
-> > >  arch/arm/kvm/kvm_vfio_arm.c                |  85 +++++
-> > >  drivers/vfio/platform/vfio_platform_irq.c  |   7 +-
-> > >  drivers/vfio/vfio.c                        |  24 ++
-> > >  include/kvm/arm_vgic.h                     |   1 +
-> > >  include/linux/kvm_host.h                   |  27 ++
-> > >  include/linux/vfio.h                       |   3 +
-> > >  include/uapi/linux/kvm.h                   |   9 +
-> > >  virt/kvm/arm/vgic.c                        |  59 +++-
-> > >  virt/kvm/vfio.c                            | 497 ++++++++++++++++++++++++++++-
-> > >  13 files changed, 733 insertions(+), 17 deletions(-)
-> > >  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
-> > > 
-> > 
-> > Have we ventured too far in the other direction?  I suppose what I was
-> > hoping to see was something more like:
-> > 
-> > 	case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:{
-> > 
-> > 		/* get vfio_device */
-> > 
-> > 		/* get mutex */
-> > 
-> > 		/* verify device+irq isn't already forwarded */
-> > 
-> > 		/* allocate device/forwarded irq */
-> > 
-> > 		/* get struct device */
-> > 
-> > 		/* callout to arch code passing struct device, gsi, ... */
-> > 
-> > 		/* if success, add to kv, else free and error */
-> > 
-> > 		/* mutex unlock */
-> > 	}
+On Wed, Sep 10, 2014 at 03:23:53PM +0200, Ludovic Desroches wrote:
+> Hi,
 > 
-> I think that's essentially what this patch set is trying to do, but
-> there are just too many complicated intertwining cases right now that
-> makes the code hard to read.
+> Sorry for the delay. I am about to send a new version but I have still
+> have some questions.
 > 
-> > 
-> > Exposing the internal mutex out to arch code, as in v1, was an
-> > indication that we were pushing too much out to arch code, but including
-> > platform_device.h into virt/kvm/vfio.c tells me we're still not
-> > abstracting at the right point.  Thanks,
-> > 
-> I raised my eyebrows over the platform device bus thingy here as well,
-> but on the other hand, there's nothing ARM-specific about referring to
-> the platform device bus.
+> On Mon, Jul 28, 2014 at 10:17:50PM +0530, Vinod Koul wrote:
+> > On Mon, Jul 28, 2014 at 05:54:31PM +0200, Ludovic Desroches wrote:
+> > > > > +{
+> > > > > +	struct at_xdmac_desc	*desc = txd_to_at_desc(tx);
+> > > > > +	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(tx->chan);
+> > > > > +	dma_cookie_t		cookie;
+> > > > > +	unsigned long		flags;
+> > > > > +
+> > > > > +	spin_lock_irqsave(&atchan->lock, flags);
+> > > > > +	cookie = dma_cookie_assign(tx);
+> > > > > +
+> > > > > +	dev_vdbg(chan2dev(tx->chan), "%s: atchan 0x%p, add desc 0x%p to xfers_list\n",
+> > > > > +		 __func__, atchan, desc);
+> > > > > +	list_add_tail(&desc->xfer_node, &atchan->xfers_list);
+> > > > > +	if (list_is_singular(&atchan->xfers_list))
+> > > > > +		at_xdmac_start_xfer(atchan, desc);
+> > > > so you dont start if list has more than 1 descriptors, why?
+> > > Because I will let at_xdmac_advance_work managing the queue if not
+> > > empty. So the only moment when I have to start the transfer in tx_submit
+> > > is when I have only one transfer in the queue.
+> > So xfers_list is current active descriptors right and if it is always going
+> > to be singular why bother with a list?
 > 
-> I think perhaps it just has to be made more clear that the generic code
-> deals with translating the device resources in the necessary way, and
-> currently it only supports vfio-platform devices?
+> xfers_list won't be always singular. I put all transfers into this list.
+> If it is not singular, I don't have to start this transfer now.
+Okay i think i got it now, you want to start only when its sigular and if
+list is larger then at_xdmac_advance_work() would do so
 
-Ok, you're probably right, looking at it again it is closer than I
-thought.  At the same time, the use of platform device in
-virt/kvm/vfio.c is pointless and can easily be pushed out to the arch
-code as just another error return case.  vfio.c doesn't need to be aware
-of hwirq.  The rest of the code is just overly complicated, with three
-different cleanup functions and validation function bloat.  Thanks,
+> > > > > +static struct dma_async_tx_descriptor *
+> > > > > +at_xdmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+> > > > > +			 size_t len, unsigned long flags)
+> > > > > +{
+> > > > > +	struct at_xdmac_chan 	*atchan = to_at_xdmac_chan(chan);
+> > > > > +	struct at_xdmac_desc	*first = NULL, *prev = NULL;
+> > > > > +	size_t			remaining_size = len, xfer_size = 0, ublen;
+> > > > > +	dma_addr_t		src_addr = src, dst_addr = dest;
+> > > > > +	u32			dwidth;
+> > > > > +	/*
+> > > > > +	 * WARNING: The channel configuration is set here since there is no
+> > > > > +	 * dmaengine_slave_config call in this case. Moreover we don't know the
+> > > > > +	 * direction, it involves we can't dynamically set the source and dest
+> > > > > +	 * interface so we have to use the same one. Only interface 0 allows EBI
+> > > > > +	 * access. Hopefully we can access DDR through both ports (at least on
+> > > > > +	 * SAMA5D4x), so we can use the same interface for source and dest,
+> > > > > +	 * that solves the fact we don't know the direction.
+> > > > and why do you need slave config for memcpy?
+> > > Maybe the comments is not clear. With slave config we have the direction
+> > > per to mem or mem to per. Of course when doing memcpy we don't need this
+> > > information. But I use this information not only to set the transfer
+> > > direction but also to set the interfaces to use for the source and dest
+> > > (these interfaces depend on the connection on the matrix).
+> > > So slave config was useful due to direction field  to tell which interface
+> > > to use as source and which one as dest.
+> > > I am lucky because NAND and DDR are on the same interfaces so it's not a
+> > > problem.
+> > > 
+> > > This comment is more a warning for myself to keep in mind this possible 
+> > > issue in order to not have a device with NAND and DDR on different
+> > > interfaces because it will be difficult to tell which interface is the
+> > > source and which one is the dest.
+> > Well in that case shouldnt NAND be treated like periphral and not memory?
+> 
+> Yes maybe it would be better but it is not needed at the moment.
+> 
+> [...]
+> 
+> > > > > +	 */
+> > > > > +	list_del(&desc->xfer_node);
+> > > > > +	list_splice_init(&desc->descs_list, &atchan->free_descs_list);
+> > > > shouldnt you move all the desc in active list in one shot ?
+> > > > 
+> > > 
+> > > Sorry I don't get it. What are you suggesting by one shot?
+> > Rather than invoking this per descriptor moving descriptors to
+> > free_desc_list one by one, we can move all descriptors togther.
+> 
+> Per descriptor? list_splice_init move all the desc in one shot. Are you
+> talking about the terminate all case? 
+In this case you invoke the function for a descriptor which you delete from
+its list and then join it to free_descs_list.
 
-Alex
+> > > > > +static void at_xdmac_tasklet(unsigned long data)
+> > > > > +{
+> > > > > +	struct at_xdmac_chan	*atchan = (struct at_xdmac_chan *)data;
+> > > > > +	struct at_xdmac_desc	*desc;
+> > > > > +	u32			error_mask;
+> > > > > +
+> > > > > +	dev_dbg(chan2dev(&atchan->chan), "%s: status=0x%08lx\n",
+> > > > > +		 __func__, atchan->status);
+> > > > > +
+> > > > > +	error_mask = AT_XDMAC_CIS_RBEIS
+> > > > > +		     | AT_XDMAC_CIS_WBEIS
+> > > > > +		     | AT_XDMAC_CIS_ROIS;
+> > > > > +
+> > > > > +	if (at_xdmac_chan_is_cyclic(atchan)) {
+> > > > > +		at_xdmac_handle_cyclic(atchan);
+> > > > > +	} else if ((atchan->status & AT_XDMAC_CIS_LIS)
+> > > > > +		   || (atchan->status & error_mask)) {
+> > > > > +		struct dma_async_tx_descriptor  *txd;
+> > > > > +
+> > > > > +		if (atchan->status & AT_XDMAC_CIS_RBEIS)
+> > > > > +			dev_err(chan2dev(&atchan->chan), "read bus error!!!");
+> > > > > +		else if (atchan->status & AT_XDMAC_CIS_WBEIS)
+> > > > > +			dev_err(chan2dev(&atchan->chan), "write bus error!!!");
+> > > > > +		else if (atchan->status & AT_XDMAC_CIS_ROIS)
+> > > > > +			dev_err(chan2dev(&atchan->chan), "request overflow error!!!");
+> > > > > +
+> > > > > +		desc = list_first_entry(&atchan->xfers_list,
+> > > > > +					struct at_xdmac_desc,
+> > > > > +					xfer_node);
+> > > > > +		dev_vdbg(chan2dev(&atchan->chan), "%s: desc 0x%p\n", __func__, desc);
+> > > > > +		BUG_ON(!desc->active_xfer);
+> > > > > +
+> > > > > +		txd = &desc->tx_dma_desc;
+> > > > > +
+> > > > > +		at_xdmac_terminate_xfer(atchan, desc);
+> > > > why terminate here? This looks wrong
+> > > 
+> > > Why? What do you have in mind? It is not obvious for me that it is the
+> > > wrong place.
+> > The descriptor has completed. The terminate has special meaning. The user
+> > can cancel all transactions by invoking terminate_all(). That implies to
+> > clean up the channel and abort the transfers. The transfer is done so what
+> > does it mean to terminate.
+> 
+> So maybe I have to rename this function because I need to remove the
+> transfer from the transfer list and put the transfer descriptors in the
+> free descriptor list once transfer is done.
+ok
+
+-- 
+~Vinod
