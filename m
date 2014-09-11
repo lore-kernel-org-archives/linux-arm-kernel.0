@@ -1,54 +1,52 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Thu, 11 Sep 2014 15:50:44 +0530
-Subject: [PATCH v3 0/8] arch: arm64: enable support for Samsung Exynos7 SoC
-Message-ID: <1410430852-3491-1-git-send-email-ch.naveen@samsung.com>
+Date: Thu, 11 Sep 2014 15:50:47 +0530
+Subject: [PATCH v3 3/8] clk: samsung: Add fixed_factor_clocks field to struct
+ exynos_cmu_info
+In-Reply-To: <1410430852-3491-1-git-send-email-ch.naveen@samsung.com>
+References: <1410430852-3491-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1410430852-3491-4-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
-Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
-ARMv8 RISC processor.
+Add the fields "fixed_factor_clks" and "nr_fixed_factor_clks" to
+"struct exynos_cmu_info" to allow registering of fixed factor
+clocks as well with exynos_cmu_register_one().
 
-The following patches are tested based on Kgene's for-next tree.
-https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+---
+ drivers/clk/samsung/clk.c |    3 +++
+ drivers/clk/samsung/clk.h |    3 +++
+ 2 files changed, 6 insertions(+)
 
-The following patches are required for this series.
-1- "tty/serial: fix config dependencies for samsung serial"
-   https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36208.html
-
-Alim Akhtar (1):
-  arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
-
-Naveen Krishna Chatradhi (6):
-  clk: samsung: add support for 145xx and 1460x PLLs
-  clk: samsung: Factor out the common code to clk.c
-  clk: samsung: Add fixed_factor_clocks field to struct exynos_cmu_info
-  clk: samsung: add initial clock support for Exynos7 SoC
-  arm64: dts: Add initial device tree support for EXYNOS7
-  tty/serial: samsung: enable usage for 64-bit Exynos platforms
-
-Pankaj Dubey (1):
-  arm64: dts: add <dt-bindings/> symlink
-
- .../devicetree/bindings/clock/exynos7-clock.txt    |   37 ++
- arch/arm64/Kconfig                                 |   12 +
- arch/arm64/boot/dts/Makefile                       |    1 +
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |   35 ++
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |  167 ++++++++
- arch/arm64/boot/dts/include/dt-bindings            |    1 +
- drivers/clk/samsung/Makefile                       |    1 +
- drivers/clk/samsung/clk-exynos5260.c               |  185 ++-------
- drivers/clk/samsung/clk-exynos7.c                  |  438 ++++++++++++++++++++
- drivers/clk/samsung/clk-pll.c                      |   25 +-
- drivers/clk/samsung/clk-pll.h                      |    4 +
- drivers/clk/samsung/clk.c                          |   98 +++++
- drivers/clk/samsung/clk.h                          |   37 ++
- drivers/tty/serial/Kconfig                         |    2 +-
- include/dt-bindings/clock/exynos7-clk.h            |   55 +++
- 15 files changed, 933 insertions(+), 165 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/exynos7-clock.txt
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
- create mode 100644 drivers/clk/samsung/clk-exynos7.c
- create mode 100644 include/dt-bindings/clock/exynos7-clk.h
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index a043654..4b31267 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -402,6 +402,9 @@ void __init exynos_cmu_register_one(struct device_node *np,
+ 	if (cmu->fixed_clks)
+ 		samsung_clk_register_fixed_rate(ctx, cmu->fixed_clks,
+ 			cmu->nr_fixed_clks);
++	if (cmu->fixed_factor_clks)
++		samsung_clk_register_fixed_factor(ctx, cmu->fixed_factor_clks,
++			cmu->nr_fixed_factor_clks);
+ 	if (cmu->clk_regs)
+ 		exynos_clk_sleep_init(reg_base, cmu->clk_regs,
+ 			cmu->nr_clk_regs);
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index 552d155..993b51c 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -347,6 +347,9 @@ struct exynos_cmu_info {
+ 	/* list of fixed clocks and respective count */
+ 	struct samsung_fixed_rate_clock *fixed_clks;
+ 	unsigned int nr_fixed_clks;
++	/* list of fixed factor clocks and respective count */
++	struct samsung_fixed_factor_clock *fixed_factor_clks;
++	unsigned int nr_fixed_factor_clks;
+ 	/* total number of clocks with IDs assigned*/
+ 	unsigned int nr_clk_ids;
+ 
+-- 
+1.7.9.5
