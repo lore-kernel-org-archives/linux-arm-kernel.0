@@ -1,86 +1,46 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Sep 2014 12:07:35 +0200
+Date: Thu, 11 Sep 2014 12:08:26 +0200
 Subject: [PATCH 1/2] ARM: cache-l2x0: clean up aurora cache handling
-In-Reply-To: <5286718.xUAA8Uddjq@wuerfel>
-References: <2852268.nkG1OoBDfE@wuerfel> <3459745.mC0zoLRDxy@wuerfel>
- <20140911105441.7876966a@free-electrons.com>
- <5286718.xUAA8Uddjq@wuerfel>
-Message-ID: <20140911120735.127542e7@free-electrons.com>
+In-Reply-To: <3459745.mC0zoLRDxy@wuerfel>
+References: <2852268.nkG1OoBDfE@wuerfel>
+ <20140908153946.GB12361@n2100.arm.linux.org.uk>
+ <2958731.nsOomQFma0@wuerfel> <3459745.mC0zoLRDxy@wuerfel>
+Message-ID: <20140911120826.0ea45cf6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Arnd Bergmann,
 
-On Thu, 11 Sep 2014 11:50:29 +0200, Arnd Bergmann wrote:
-
-> > I am fine with this one, but I'm wondering what is the benefit of doing
-> > this? The l2x0_base is anyway a global variable that is available for
-> > all those functions, so not sure what an additional local variable
-> > brings us.
+On Mon, 08 Sep 2014 22:42:23 +0200, Arnd Bergmann wrote:
+> The aurora cache controller is the only remaining user of a couple
+> of functions in this file and are completely unused when that is
+> disabled, leading to build warnings:
 > 
-> The compiler does not always know if the l2x0_base pointer has changed
-> between two accesses. In particular if we do a spin_lock/spin_unlock
-> as in aurora_pa_range() it has to reload it.
+> arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
+> arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
+> arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
 > 
-> Using a local variable tells the compiler that the pointer should
-> in fact be read once from memory and then used from a register,
-> which results in slightly smaller and more efficient object code.
-
-Ok, thanks for the explanation, makes sense.
-
-> Interesting. If that is the intention of the code, it is rather broken
-> because CONFIG_CACHE_PL310 gets set automatically on ARMv7:
+> With the knowledge that the code is now aurora-specific, we can
+> simplify it noticeably:
 > 
-> if CACHE_L2X0
+> - The pl310 errata workarounds are not needed on aurora and can be removed
+> - The cache_wait() macro is never needed since this is not an l210/l220
+> - aurora_pa_range can keep the spinlock while syncing the cache
+> - We can load the l2x0_base into a local variable across operations
 > 
-> config CACHE_PL310
->         bool
->         default y if CPU_V7 && !(CPU_V6 || CPU_V6K)
->         help
->           This option enables optimisations for the PL310 cache
->           controller.
-> ...
-> endif
+> There should be no functional change in this patch, but readability
+> and the generated object code improves, along with avoiding the
+> warnings.
 > 
-> This is from the original l2x0 code that is no longer used by anything
-> other than aurora. The idea was apparently that if we are on a v6+v7
-> kernel, we might have a l210 and need to wait here, while on a v7-only
-> kernel, we know that we have a pl310 and never need to do it.
-> 
-> > > -static inline void cache_sync(void)
-> > > -{
-> > > -     void __iomem *base = l2x0_base;
-> > > -
-> > > -     writel_relaxed(0, base + sync_reg_offset);
-> > > -     cache_wait(base + L2X0_CACHE_SYNC, 1);
-> > 
-> > So to me, this line is actually doing something on an Aurora cache
-> > controller.
-> > 
-> > Am I missing something?
-> 
-> It might be needed, I haven't checked the data sheet. However we don't
-> run that code today, and my patch does not change that.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ----
+>  arch/arm/mm/cache-l2x0.c | 115 ++++++++++++++++++++++++++-----------------------------------------------
+>  1 file changed, 41 insertions(+), 74 deletions(-)
 
-I just checked the datasheet, and about the L2 Cache Sync register, it
-says:
-
-  Writing to this register performs a draining operation of the L2
-  eviction buffer. The write operation is when all maintenance
-  operations of the issuing CPU are finished, and the eviction buffer
-  is empty. This is an automatic operation, the L2 slave ports are
-  stalled until the operation is completed.
-  The written data is ignored.
-
-So there is indeed no need to poll this register to see when the Sync
-operation has completed: writing to the register already stalls the L2
-slave ports until the operation is completed.
-
-Moreover, I checked Marvell's LSP, and then indeed also only write to
-the L2 Cache Sync register, without any busy wait loop. So your patch
-looks good to me.
-
-Thanks for the additional explanations!
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ (on Armada 370 RD and Armada XP GP, boot tested, plus a little bit of
+ DMA traffic by reading data from a SD card)
 
 Thomas
 -- 
