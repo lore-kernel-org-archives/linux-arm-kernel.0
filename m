@@ -1,54 +1,57 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 11 Sep 2014 11:53:27 -0400
-Subject: [PATCH v4 2/4] dt-bindings: document Rockchip thermal
-In-Reply-To: <40514790.Xc34lyFLGa@wuerfel>
-References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
- <1410403012.25559.69.camel@rzhang1-toshiba>
- <20140911121842.GB26715@developer> <40514790.Xc34lyFLGa@wuerfel>
-Message-ID: <20140911155324.GA27076@developer>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 11 Sep 2014 17:54:05 +0200
+Subject: [PATCH 0/7] Initial support for the Atmel SMART sama5d4
+Message-ID: <1410450852-1834-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Introduce support for the Atmel SMART sama5d4.
 
-On Thu, Sep 11, 2014 at 02:32:08PM +0200, Arnd Bergmann wrote:
-> On Thursday 11 September 2014 08:18:43 Eduardo Valentin wrote:
-> > > As what we want is to make thermal driver have a chance to configure the
-> > > hardware shutdown registers, I'm thinking if we can do this without
-> > > representing the hardware shutdown value as a trip point.
-> > > Say,
-> > > 1. parse DT, and get the hardware shutdown temperature value, and store
-> > > it somewhere, e.g. struct __thermal_zone.
-> > > 2. introduce a new parameter, int (*set_hardware_trip)(void *, long *),
-> > > in thermal_zone_of_sensor_register().
-> > > 3. invoke set_hard_trip(tz, hardware_shutdown_temperature_value) in
-> > > thermal_zone_of_sensor_register().
-> > 
-> > The only issue I have with the above proposal is that not all platforms
-> > use DT. Some still boot with boardfiles, for instance. Thus, the
-> > parameter to configure hardware thermal shutdown needs to be common on
-> > thermal core, not specific to of-thermal. Do you agree?
-> 
-> Do you know of a machine that can't yet be converted to DT and that
-> needs this driver? In case of rockchips that is certainly not the
-> case, and we don't care about anybody trying to use board files out
-> of tree, they can just hack the thermal support as well.
+Note that some drivers will complain that they can't work without DMA and the
+probe will fail. This will be solved when the dma driver hits mainline, it is
+still under review.
 
-I see. Again, the only concern I have is to produce thermal framework APIs
-that would be only in the of-thermal. My point is not specific to this
-patch, or this platform, but with a detail in the above proposal. 
+Alexandre Belloni (3):
+  irqchip: atmel-aic5: Add sama5d4 support
+  clk: at91: add a driver for the h32mx clock
+  ARM: at91: add sama5d4 support to sama5_defconfig
 
-While I agree to have a trip specific to configurable hardware triggered
-thermal shutdown, I just don't see why it needs to be a feature
-implemented only via of-thermal. It has to be properly defined in
-thermal core.
+Nicolas Ferre (4):
+  ARM: at91: introduce basic SAMA5D4 support
+  ARM: at91: SAMA5D4 SoC detection code and low level routines
+  ARM: at91: dt: add device tree file for SAMA5D4 SoC
+  ARM: at91: dt: add device tree file for SAMA5D4ek board
 
-The proposal of of-thermal is not to become a separate/competing thermal
-framework.
+ .../devicetree/bindings/clock/at91-clock.txt       |   15 +
+ arch/arm/Kconfig.debug                             |    4 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/at91-sama5d4ek.dts               |  308 +++++
+ arch/arm/boot/dts/sama5d4.dtsi                     | 1233 ++++++++++++++++++++
+ arch/arm/configs/sama5_defconfig                   |    2 +-
+ arch/arm/mach-at91/Kconfig                         |   21 +
+ arch/arm/mach-at91/Makefile                        |    1 +
+ arch/arm/mach-at91/board-dt-sama5.c                |   35 +-
+ arch/arm/mach-at91/generic.h                       |    5 +
+ arch/arm/mach-at91/include/mach/cpu.h              |   22 +-
+ arch/arm/mach-at91/include/mach/debug-macro.S      |    5 +-
+ arch/arm/mach-at91/include/mach/hardware.h         |   19 +-
+ arch/arm/mach-at91/include/mach/sama5d4.h          |   35 +
+ arch/arm/mach-at91/include/mach/uncompress.h       |   21 +-
+ arch/arm/mach-at91/sama5d4.c                       |   64 +
+ arch/arm/mach-at91/setup.c                         |   97 +-
+ arch/arm/mach-at91/soc.h                           |    5 +
+ drivers/clk/at91/Makefile                          |    1 +
+ drivers/clk/at91/clk-h32mx.c                       |  121 ++
+ drivers/clk/at91/pmc.c                             |    6 +
+ drivers/clk/at91/pmc.h                             |    5 +
+ drivers/irqchip/irq-atmel-aic5.c                   |   10 +
+ include/linux/clk/at91_pmc.h                       |    1 +
+ 24 files changed, 2025 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4ek.dts
+ create mode 100644 arch/arm/boot/dts/sama5d4.dtsi
+ create mode 100644 arch/arm/mach-at91/include/mach/sama5d4.h
+ create mode 100644 arch/arm/mach-at91/sama5d4.c
+ create mode 100644 drivers/clk/at91/clk-h32mx.c
 
-> 
-> 	Arnd
-
-Cheers,
-
-Eduardo
+-- 
+1.9.1
