@@ -1,57 +1,92 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 11 Sep 2014 16:57:24 +0100
-Subject: [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20140911153739.GA24416@localhost>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <20140911132935.068DCC408F6@trevor.secretlab.ca>
- <20140911153739.GA24416@localhost>
-Message-ID: <5411C664.4060007@arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 11 Sep 2014 11:58:03 -0400
+Subject: [PATCH] clocksource: arch_timer: Allow the device tree to specify
+ the physical timer
+In-Reply-To: <1410450727-8182-1-git-send-email-dianders@chromium.org>
+References: <1410450727-8182-1-git-send-email-dianders@chromium.org>
+Message-ID: <5411C68B.6090308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Doug,
 
+On 09/11/2014 11:52 AM, Doug Anderson wrote:
+> Some 32-bit (ARMv7) systems are architected like this:
+> 
+> * The firmware doesn't know and doesn't care about hypervisor mode and
+>   we don't want to add the complexity of hypervisor there.
+> 
+> * The firmware isn't involved in SMP bringup or resume.
+> 
+> * The ARCH timer come up with an uninitialized offset between the
+>   virtual and physical counters.  Each core gets a different random
+>   offset.
+> 
+> On systems like the above, it doesn't make sense to use the virtual
+> counter.  There's nobody managing the offset and each time a core goes
+> down and comes back up it will get reinitialized to some other random
+> value.
+> 
+> Let's add a property to the device tree to say that we shouldn't use
+> the virtual timer.  Firmware could potentially remove this property
+> before passing the device tree to the kernel if it really wants the
+> kernel to use a virtual timer.
+> 
+> Note that it's been said that ARM64 (ARMv8) systems the firmware and
+> kernel really can't be architected as described above.  That means
+> using the physical timer like this really only makes sense for ARMv7
+> systems.
+> 
+> In order for this patch to do anything useful, we also need Sonny's
+> patch at <https://patchwork.kernel.org/patch/4790921/>
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> ---
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>  drivers/clocksource/arm_arch_timer.c                 | 3 +++
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index 37b2caf..876d32b 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
+>  - always-on : a boolean property. If present, the timer is powered through an
+>    always-on power domain, therefore it never loses context.
+>  
+> +** Optional properties:
+> +
+> +- arm,use-physical-timer : Don't ever use the virtual timer, just use the
+> +  physical one.  Not supported for ARM64.
+> +
+> +
+>  Example:
+>  
+>  	timer {
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec1..8ca07a9 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -649,6 +649,9 @@ static void __init arch_timer_init(struct device_node *np)
+>  		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>  	arch_timer_detect_rate(NULL, np);
+>  
+> +	if (of_property_read_bool(np, "arm,use-physical-timer"))
+> +		arch_timer_use_virtual = false;
+> +
+>  	/*
+>  	 * If HYP mode is available, we know that the physical timer
+>  	 * has been configured to be accessible from PL1. Use it, so
+> 
 
-On 11/09/14 16:37, Catalin Marinas wrote:
-> On Thu, Sep 11, 2014 at 02:29:34PM +0100, Grant Likely wrote:
->> Regarding the requests to refactor ACPICA to work better for ARM. I
->> completely agree that it should be done, but I do not think it should be
->> a prerequisite to getting this core support merged. That kind of
->> refactoring is far easier to justify when it has immediate improvement
->> on the mainline codebase, and it gives us a working baseline to test
->> against. Doing it the other way around just makes things harder.
->
-> I have to disagree here. As I said, I'm perfectly fine with refactoring
-> happening later but I'm not happy with compiling in code with undefined
-> behaviour on ARM that may actually be executed at run-time.
->
-> I'm being told one of the main advantages of ACPI is forward
-> compatibility: running older kernels on newer hardware (potentially with
-> newer ACPI version tables). ACPI 5.1 includes partial support for ARM
-> but the S and C states are not defined yet. We therefore assume that
-> hardware vendors deploying servers using ACPI would not provide such
-> yet to be defined information in ACPI 5.1 tables.
->
-> What if in a year time we get ACPI 5.2 or 6 (or an errata update)
-> covering the S and C states for ARM? I would expect hardware vendors
-> to take advantage and provide such information in ACPI tables. Can we
-> guarantee that a kernel with the current ACPI patches wouldn't blow up
-> when it tries to interpret the new tables? If we can't guarantee this,
-> we rather fix it now. Some suggestions:
->
-> a) Make sure code which doesn't have a clear behaviour on ARM is not
->     compiled in and doesn't even try to interpret such tables on ARM (you
->     could just go for the latter but I'm not sure how feasible it is)
+How's the VDSO supposed to deal with this? It currently does:
 
-This what we have suggested in past especially for this S-state support.
-Currently the core acpi code compiles in sleep support unconditionally.
-That doesn't mean we need to do the same on ARM64, we can easily make
-sure that's not enabled for ARM64 until we have clarification on how to
-support them on ARM in ACPI specification.
+cycle_now = arch_counter_get_cntvct()
 
-I just pointed out at one "out of spec" workaround done for x86
-"unconditionally" in the code just to tell that it won't work on ARM.
-That shouldn't be misunderstood as demand for refactoring as we have no
-clue how S-state would look on ARM to take up any such task.
+Christopher
 
-Regards,
-Sudeep
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
