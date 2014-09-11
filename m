@@ -1,35 +1,88 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Thu, 11 Sep 2014 09:37:38 +0800
-Subject: [PATCH v5] spi: spi-imx: add DMA support
-In-Reply-To: <20140910155216.GI7960@sirena.org.uk>
-References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
- <20140910102105.GR2601@sirena.org.uk>
- <20140910112258.GA30794@Robin-OptiPlex-780>
- <20140910114530.GD7960@sirena.org.uk>
- <20140910151759.GA31462@Robin-OptiPlex-780>
- <20140910155216.GI7960@sirena.org.uk>
-Message-ID: <20140911013737.GA366@Robin-OptiPlex-780>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 10 Sep 2014 21:18:53 -0500
+Subject: [PATCH 2/2] dmaengine: qcom_adm: Add device tree binding
+In-Reply-To: <1410401933-20621-1-git-send-email-agross@codeaurora.org>
+References: <1410401933-20621-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1410401933-20621-3-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 04:52:16PM +0100, Mark Brown wrote:
-> On Wed, Sep 10, 2014 at 11:18:01PM +0800, Robin Gong wrote:
-> > On Wed, Sep 10, 2014 at 12:45:30PM +0100, Mark Brown wrote:
-> 
-> > > > Yes, you're right. I should use "transfer->tx_sg->sgl == NULL" or
-> > > > "transfer->rx_sg->sgl == NULL" instead of usedma flag in driver, right?
-> 
-> > > Right.
-> 
-> > But looks spi core framework can make sure every rx or tx transfer in sequence.
-> > If so, can_dma will never be called until this transfer finished
-> > (spi_pump_messages), and my usedma flag also never be modified until next
-> > transfer start. Please correct me if I am wrong, thanks.
-> 
-> Even if that were true currently this would still not be good code since
-> it would break in the face of SPI core changes.  In any case the
-> assumption isn't true for the current SPI core, the DMA mapping is done
-> for all transfers in a message before we start running them and it's
-> entirely likely that we will have patterns like a short PIO transfer
-> followed by a big data block.
-Understood, will improve it in v6.Thanks.
+Add device tree binding support for the QCOM ADM DMA driver.
+
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   62 ++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_adm.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/qcom_adm.txt b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+new file mode 100644
+index 0000000..9bcab91
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+@@ -0,0 +1,62 @@
++QCOM ADM DMA Controller
++
++Required properties:
++- compatible: must contain "qcom,adm" for IPQ/APQ8064 and MSM8960
++- reg: Address range for DMA registers
++- interrupts: Should contain one interrupt shared by all channels
++- #dma-cells: must be <2>.  First cell denotes the channel number.  Second cell
++  denotes CRCI (client rate control interface) flow control assignment.
++- clocks: Should contain the core clock and interface clock.
++- clock-names: Must contain "core" for the core clock and "iface" for the
++  interface clock.
++- resets: Must contain an entry for each entry in reset names.
++- reset-names: Must include the following entries:
++  - clk
++  - c0
++  - c1
++  - c2
++- qcom,ee: indicates the security domain identifier used in the secure world.
++
++Example:
++		adm_dma: dma at 18300000 {
++			compatible = "qcom,adm";
++			reg = <0x18300000 0x100000>;
++			interrupts = <0 170 0>;
++			#dma-cells = <2>;
++
++			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
++			clock-names = "core", "iface";
++
++			resets = <&gcc ADM0_RESET>,
++				<&gcc ADM0_C0_RESET>,
++				<&gcc ADM0_C1_RESET>,
++				<&gcc ADM0_C2_RESET>;
++			reset-names = "clk", "c0", "c1", "c2";
++			qcom,ee = <0>;
++		};
++
++DMA clients must use the format descripted in the dma.txt file, using a three
++cell specifier for each channel.
++
++Each dmas request consists of 3 cells:
++ 1. phandle pointing to the DMA controller
++ 2. channel number
++ 3. CRCI assignment, if applicable.  If no CRCI flow control is required, use 0.
++    The CRCI is used for flow control.  It identifies the peripheral device that
++    is the source/destination for the transferred data.
++
++Example:
++
++	spi4: spi at 1a280000 {
++		status = "ok";
++		spi-max-frequency = <50000000>;
++
++		pinctrl-0 = <&spi_pins>;
++		pinctrl-names = "default";
++
++		cs-gpios = <&qcom_pinmux 20 0>;
++
++		dmas = <&adm_dma 6 9>,
++			<&adm_dma 5 10>;
++		dma-names = "rx", "tx";
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
