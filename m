@@ -1,150 +1,77 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 11 Sep 2014 19:42:09 +0200
-Subject: [PATCH v5 5/9] rtc: at91sam9: make use of syscon/regmap to
- access GPBR registers
-In-Reply-To: <1410443588-9092-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410441525-25258-6-git-send-email-boris.brezillon@free-electrons.com>
- <1410443588-9092-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140911174209.GE3131@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Sep 2014 18:43:57 +0100
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com>	<5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+Message-ID: <5411DF5D.8060906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2014 at 15:53:08 +0200, Boris Brezillon wrote :
-> The GPBR registers are not part of the RTT block and thus should not be
-> defined in the reg property of the rtt node.
+On 11/09/14 18:29, Doug Anderson wrote:
+> Marc,
 > 
-> Use syscon to provide a proper DT representation and reference the GPBR
-> syscon device in a new "atmel,time-reg" property which store both the
-> syscon device phandle and the register offset within the GPBR block.
+> On Thu, Sep 11, 2014 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> We would need to run this code potentially at processor bringup and
+>>> after suspend/resume, but that seems possible too.
+>>
+>> Note that this would be an ARMv7 only thing (you can't do that on ARMv8,
+>> at all).
 > 
-> When using non DT boards, we won't be able to retrieve the syscon regmap,
-> hence we need to create our own regmap using the memory region defined
-> in the 2nd memory resource assigned to the RTT platform device.
+> Yes, of course.
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/rtc/Kconfig        |  1 +
->  drivers/rtc/rtc-at91sam9.c | 59 +++++++++++++++++++++++++++++++++++++++-------
->  2 files changed, 51 insertions(+), 9 deletions(-)
 > 
-> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> index a168e96..7d76da8 100644
-> --- a/drivers/rtc/Kconfig
-> +++ b/drivers/rtc/Kconfig
-> @@ -1081,6 +1081,7 @@ config RTC_DRV_AT91RM9200
->  config RTC_DRV_AT91SAM9
->  	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
->  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
-> +	select MFD_SYSCON
->  	help
->  	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
->  	  (Real Time Timer). These timers are powered by the backup power
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index d72c34d..944e317 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -21,6 +21,8 @@
->  #include <linux/slab.h>
->  #include <linux/platform_data/atmel.h>
->  #include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
->  
->  /*
->   * This driver uses two configurable hardware resources that live in the
-> @@ -72,7 +74,8 @@ struct sam9_rtc {
->  	void __iomem		*rtt;
->  	struct rtc_device	*rtcdev;
->  	u32			imr;
-> -	void __iomem		*gpbr;
-> +	struct regmap		*gpbr;
-> +	unsigned int		gpbr_offset;
->  	int 			irq;
->  };
->  
-> @@ -81,10 +84,19 @@ struct sam9_rtc {
->  #define rtt_writel(rtc, field, val) \
->  	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
->  
-> -#define gpbr_readl(rtc) \
-> -	readl((rtc)->gpbr)
-> -#define gpbr_writel(rtc, val) \
-> -	writel((val), (rtc)->gpbr)
-> +static inline unsigned int gpbr_readl(struct sam9_rtc *rtc)
-> +{
-> +	unsigned int val;
-> +
-> +	regmap_read(rtc->gpbr, rtc->gpbr_offset, &val);
-> +
-> +	return val;
-> +}
-> +
-> +static inline void gpbr_writel(struct sam9_rtc *rtc, unsigned int val)
-> +{
-> +	regmap_write(rtc->gpbr, rtc->gpbr_offset, val);
-> +}
->  
->  /*
->   * Read current time and date in RTC
-> @@ -301,6 +313,12 @@ static const struct rtc_class_ops at91_rtc_ops = {
->  	.alarm_irq_enable = at91_rtc_alarm_irq_enable,
->  };
->  
-> +static struct regmap_config gpbr_regmap_config = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = 4,
-> +};
-> +
->  /*
->   * Initialize and install RTC driver
->   */
-> @@ -334,10 +352,33 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  	if (IS_ERR(rtc->rtt))
->  		return PTR_ERR(rtc->rtt);
->  
-> -	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> -	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
-> -	if (IS_ERR(rtc->gpbr))
-> -		return PTR_ERR(rtc->rtt);
-> +	if (!pdev->dev.of_node) {
-> +		void __iomem *gpbr;
-> +
-> +		r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +		gpbr = devm_ioremap_resource(&pdev->dev, r);
-> +		if (IS_ERR(gpbr))
-> +			return PTR_ERR(gpbr);
-> +
+>>> Is the transition to monitor mode and back simple?  Where would you
+>>> suggest putting this code?  It would definitely need to be pretty
+>>> early.  We'd also need to be able to detect that we're in Secure SVC
+>>> and not mess up anyone else who happened to boot in Non Secure SVC.
+>>
+>> This would have to live in some very early platform-specific code. The
+>> ugly part is that you cannot find out what world you're in (accessing
+>> SCR is going to send you to UNDEF-land if accessed from NS).
+> 
+> Yup, so the question is: would such code be accepted upstream, or are
+> we going to embark on a big job for someone to figure out how to do
+> this only to get NAKed?
+> 
+> If there was some indication that folks would take this, I think we
+> might be able to get it coded up.  If someone else wanted to volunteer
+> to code it that would make me even happier, but maybe that's pushing
+> my luck.  ;)
 
-Maybe you could add a comment here as this is soon to be dead code.
+Writing the code is a 5 minute job. Getting it accepted is another
+story, and I'm not sure everyone would agree on that.
 
-> +		rtc->gpbr = regmap_init_mmio(NULL, gpbr,
-> +					     &gpbr_regmap_config);
-> +	} else {
-> +		struct of_phandle_args args;
-> +
-> +		ret = of_parse_phandle_with_fixed_args(pdev->dev.of_node,
-> +						"atmel,rtt-rtc-time-reg", 1, 0,
-> +						&args);
-> +		if (ret)
-> +			return ret;
-> +
-> +		rtc->gpbr = syscon_node_to_regmap(args.np);
-> +		rtc->gpbr_offset = args.args[0];
-> +	}
-> +
-> +	if (IS_ERR(rtc->gpbr)) {
-> +		dev_err(&pdev->dev, "failed to retrieve gpbr regmap, aborting.\n");
-> +		return -ENOMEM;
-> +	}
->  
->  	mr = rtt_readl(rtc, MR);
->  
-> -- 
-> 1.9.1
+>> If I was suicidal, I'd suggest you could pass a parameter to the command
+>> line, interpreted by the timer code... But I since I'm not, let's
+>> pretend I haven't said anything... ;-)
 > 
+> I did this in the past (again, see Sonny's thread), but didn't
+> consider myself knowledgeable to know if that was truly a good test:
+> 
+>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>        pr_info("DOUG: val is %#010x", val);
+>        val |= (1 << 2);
+>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
+>        val = 0xffffffff;
+>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>        pr_info("DOUG: val is %#010x", val);
+> 
+> The idea being that if you can make modifications to the SCR register
+> (and see your changes take effect) then you must be in secure mode.
+> In my case the first printout was 0x0 and the second was 0x4.
 
+The main issue is when you're *not* in secure mode. It is likely that
+this will explode badly. This is why I suggested something that is set
+by the bootloader (after all. it knows which mode it is booted in), and
+that the timer driver can use when the CPU comes up.
+
+Still, very ugly...
+
+	M.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
