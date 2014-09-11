@@ -1,44 +1,39 @@
-From: dborkman@redhat.com (Daniel Borkmann)
+From: arnd@arndb.de (Arnd Bergmann)
 Date: Thu, 11 Sep 2014 11:36:48 +0200
-Subject: [PATCH arm64-next] net: bpf: arm64: fix module memory leak when JIT
- image build fails
-Message-ID: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
+Subject: [PATCH] ARM: DT: imx53: fix lvds channel 1 port
+In-Reply-To: <1410422216-17977-1-git-send-email-shawn.guo@freescale.com>
+References: <1410422216-17977-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <13929046.KYEeT4CYi1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM64, when the BPF JIT compiler fills the JIT image body with
-opcodes during translation of eBPF into ARM64 opcodes, we may fail
-for several reasons during that phase: one being that we jump to
-the notyet label for not yet supported eBPF instructions such as
-BPF_ST. In that case we only free offsets, but not the actual
-allocated target image where opcodes are being stored. Fix it by
-calling module_free() on dismantle time in case of errors.
+On Thursday 11 September 2014 15:56:56 Shawn Guo wrote:
+> From: Markus Niebel <Markus.Niebel@tq-group.com>
+> 
+> using LVDS channel 1 on an i.MX53 leads to following error:
+> 
+> imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
+> 
+> This comes from imx_ldb_set_clock with mux = 0. Mux parameter must be "1" for
+> reparenting di1 clock to ldb_di1. The value of the mux param comes from device
+> tree port settings.
+> 
+> On i.MX5, the internal two-input-multiplexer is used. Due to hardware limitations,
+> only one port (port@[0,1]) can be used for each channel (lvds-channel@[0,1],
+> respectively)
+> 
+> Documentation update suggested by Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
+> Fixes: e05c8c9a790a ("ARM: dts: imx53: Add IPU DI ports and endpoints, move imx-drm node to dtsi")
+> Cc: <stable@vger.kernel.org>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Hi arm-soc folks,
+> 
+> Please apply the fix for 3.17, thanks.
 
-Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
-Cc: Zi Shen Lim <zlim.lnx@gmail.com>
-Cc: Alexei Starovoitov <ast@plumgrid.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- [ Compile-tested only. ]
+Applied to fixes branch, thanks!
 
- arch/arm64/net/bpf_jit_comp.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 38c4296..7ae3354 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -651,8 +651,10 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 	build_prologue(&ctx);
- 
- 	ctx.body_offset = ctx.idx;
--	if (build_body(&ctx))
-+	if (build_body(&ctx)) {
-+		module_free(NULL, ctx.image);
- 		goto out;
-+	}
- 
- 	build_epilogue(&ctx);
- 
--- 
-1.9.3
+	Arnd
