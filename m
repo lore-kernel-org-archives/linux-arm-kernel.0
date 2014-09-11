@@ -1,42 +1,179 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Sep 2014 12:09:08 +0100
-Subject: [PATCH v4 1/8] KVM: ARM: vgic: plug irq injection race
+Date: Thu, 11 Sep 2014 12:09:12 +0100
+Subject: [PATCH v4 5/8] arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
 In-Reply-To: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
 References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1410433755-3612-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1410433755-3612-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it stands, nothing prevents userspace from injecting an interrupt
-before the guest's GIC is actually initialized.
+Now that we can (almost) dynamically size the number of interrupts,
+we're facing an interesting issue:
 
-This goes unnoticed so far (as everything is pretty much statically
-allocated), but ends up exploding in a spectacular way once we switch
-to a more dynamic allocation (the GIC data structure isn't there yet).
+We have to evaluate at runtime whether or not an access hits a valid
+register, based on the sizing of this particular instance of the
+distributor. Furthermore, the GIC spec says that accessing a reserved
+register is RAZ/WI.
 
-The fix is to test for the "ready" flag in the VGIC distributor before
-trying to inject the interrupt. Note that in order to avoid breaking
-userspace, we have to ignore what is essentially an error.
+For this, add a new field to our range structure, indicating the number
+of bits a single interrupts uses. That allows us to find out whether or
+not the access is in range.
 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ include/kvm/arm_vgic.h |  3 ++-
+ virt/kvm/arm/vgic.c    | 56 ++++++++++++++++++++++++++++++++++++++++----------
+ 2 files changed, 47 insertions(+), 12 deletions(-)
 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 3900e31..97f5f57 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -32,6 +32,7 @@
+ 
+ #define VGIC_V2_MAX_LRS		(1 << 6)
+ #define VGIC_V3_MAX_LRS		16
++#define VGIC_MAX_IRQS		1024
+ 
+ /* Sanity checks... */
+ #if (KVM_MAX_VCPUS > 8)
+@@ -42,7 +43,7 @@
+ #error "VGIC_NR_IRQS must be a multiple of 32"
+ #endif
+ 
+-#if (VGIC_NR_IRQS > 1024)
++#if (VGIC_NR_IRQS > VGIC_MAX_IRQS)
+ #error "VGIC_NR_IRQS must be <= 1024"
+ #endif
+ 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index f7ab1ca..d3299d4 100644
+index 7e6e64d..ab01cab 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1584,7 +1584,8 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	if (vgic_update_irq_pending(kvm, cpuid, irq_num, level))
-+	if (likely(vgic_initialized(kvm)) &&
-+	    vgic_update_irq_pending(kvm, cpuid, irq_num, level))
- 		vgic_kick_vcpus(kvm);
+@@ -892,6 +892,7 @@ static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
+ struct mmio_range {
+ 	phys_addr_t base;
+ 	unsigned long len;
++	int bits_per_irq;
+ 	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+ 			    phys_addr_t offset);
+ };
+@@ -900,56 +901,67 @@ static const struct mmio_range vgic_dist_ranges[] = {
+ 	{
+ 		.base		= GIC_DIST_CTRL,
+ 		.len		= 12,
++		.bits_per_irq	= 0,
+ 		.handle_mmio	= handle_mmio_misc,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_IGROUP,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ENABLE_SET,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_set_enable_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ENABLE_CLEAR,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_clear_enable_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_PENDING_SET,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_set_pending_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_PENDING_CLEAR,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_clear_pending_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ACTIVE_SET,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_ACTIVE_CLEAR,
+-		.len		= VGIC_NR_IRQS / 8,
++		.len		= VGIC_MAX_IRQS / 8,
++		.bits_per_irq	= 1,
+ 		.handle_mmio	= handle_mmio_raz_wi,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_PRI,
+-		.len		= VGIC_NR_IRQS,
++		.len		= VGIC_MAX_IRQS,
++		.bits_per_irq	= 8,
+ 		.handle_mmio	= handle_mmio_priority_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_TARGET,
+-		.len		= VGIC_NR_IRQS,
++		.len		= VGIC_MAX_IRQS,
++		.bits_per_irq	= 8,
+ 		.handle_mmio	= handle_mmio_target_reg,
+ 	},
+ 	{
+ 		.base		= GIC_DIST_CONFIG,
+-		.len		= VGIC_NR_IRQS / 4,
++		.len		= VGIC_MAX_IRQS / 4,
++		.bits_per_irq	= 2,
+ 		.handle_mmio	= handle_mmio_cfg_reg,
+ 	},
+ 	{
+@@ -987,6 +999,22 @@ struct mmio_range *find_matching_range(const struct mmio_range *ranges,
+ 	return NULL;
+ }
  
- 	return 0;
++static bool vgic_validate_access(const struct vgic_dist *dist,
++				 const struct mmio_range *range,
++				 unsigned long offset)
++{
++	int irq;
++
++	if (!range->bits_per_irq)
++		return true;	/* Not an irq-based access */
++
++	irq = offset * 8 / range->bits_per_irq;
++	if (irq >= dist->nr_irqs)
++		return false;
++
++	return true;
++}
++
+ /**
+  * vgic_handle_mmio - handle an in-kernel MMIO access
+  * @vcpu:	pointer to the vcpu performing the access
+@@ -1026,7 +1054,13 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 
+ 	spin_lock(&vcpu->kvm->arch.vgic.lock);
+ 	offset = mmio->phys_addr - range->base - base;
+-	updated_state = range->handle_mmio(vcpu, mmio, offset);
++	if (vgic_validate_access(dist, range, offset)) {
++		updated_state = range->handle_mmio(vcpu, mmio, offset);
++	} else {
++		vgic_reg_access(mmio, NULL, offset,
++				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
++		updated_state = false;
++	}
+ 	spin_unlock(&vcpu->kvm->arch.vgic.lock);
+ 	kvm_prepare_mmio(run, mmio);
+ 	kvm_handle_mmio_return(vcpu, run);
 -- 
 2.0.4
