@@ -1,149 +1,176 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 11 Sep 2014 15:14:04 -0700
-Subject: [PATCH/RESEND] tty: serial: msm: Add DT based earlycon support
-Message-ID: <1410473644-19103-1-git-send-email-sboyd@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 11 Sep 2014 15:14:39 -0700
+Subject: [RFC v2 1/9] KVM: ARM: VGIC: fix multiple injection of level
+ sensitive forwarded IRQ
+In-Reply-To: <5411E74D.4080309@linaro.org>
+References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
+ <1409575968-5329-2-git-send-email-eric.auger@linaro.org>
+ <20140911030945.GC2784@lvm> <5411E74D.4080309@linaro.org>
+Message-ID: <20140911221439.GL5535@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DT based early console on platforms with the msm
-serial hardware.
+On Thu, Sep 11, 2014 at 08:17:49PM +0200, Eric Auger wrote:
+> On 09/11/2014 05:09 AM, Christoffer Dall wrote:
+> > On Mon, Sep 01, 2014 at 02:52:40PM +0200, Eric Auger wrote:
+> >> Fix multiple injection of level sensitive forwarded IRQs.
+> >> With current code, the second injection fails since the state bitmaps
+> >> are not reset (process_maintenance is not called anymore).
+> >> New implementation consists in fully bypassing the vgic state
+> >> management for forwarded IRQ (checks are ignored in
+> >> vgic_update_irq_pending). This obviously assumes the forwarded IRQ is
+> >> injected from kernel side.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >>
+> >> ---
+> >>
+> >> It was attempted to reset the states in __kvm_vgic_sync_hwstate, checking
+> >> the emptied LR of forwarded IRQ. However surprisingly this solution does
+> >> not seem to work. Some times, a new forwarded IRQ injection is observed
+> >> while the LR of the previous instance was not observed as empty.
+> > 
+> > hmmm, concerning.  It would probably have been helpful overall if you
+> > could start by describing the problem with the current implementation in
+> > the commit message, and then explain the fix...
+> > 
+> >>
+> >> v1 -> v2:
+> >> - fix vgic state bypass in vgic_queue_hwirq
+> >> ---
+> >>  virt/kvm/arm/vgic.c | 13 ++++++++++---
+> >>  1 file changed, 10 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> >> index 0007300..8ef495b 100644
+> >> --- a/virt/kvm/arm/vgic.c
+> >> +++ b/virt/kvm/arm/vgic.c
+> >> @@ -1259,7 +1259,9 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+> >>  
+> >>  static bool vgic_queue_hwirq(struct kvm_vcpu *vcpu, int irq)
+> >>  {
+> >> -	if (vgic_irq_is_queued(vcpu, irq))
+> >> +	bool is_forwarded =  (vgic_get_phys_irq(vcpu, irq) > 0);
+> > 
+> > can you create a static function to factor this vgic_get_phys_irq check out, please?
+> yes sure
+> > 
+> >> +
+> >> +	if (vgic_irq_is_queued(vcpu, irq) && !is_forwarded)
+> >>  		return true; /* level interrupt, already queued */
+> > 
+> > so essentially if an IRQ is already on a LR so we shouldn't resample the
+> > line, then we still resample the line if the IRQ is forwarded?
+> > 
+> > I think you need to explain this, both to me here, and also in the code
+> > by moving the comment following the return statement above the check and
+> > comment this clearly.
+> Well, I admit it may look a bit pushy! When we discussed this issue with
+> Marc, the outcome was that the vgic states were not accurate with
+> forwarded IRQs and VGIC state may be fully bypassed.
 
-Cc: Rob Herring <robh@kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/tty/serial/Kconfig      |  1 +
- drivers/tty/serial/msm_serial.c | 72 ++++++++++++++++++++++++++++++++++-------
- 2 files changed, 61 insertions(+), 12 deletions(-)
+Can you explain this in more details?  Perhaps with a concrete example?
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 26cec64dadd7..903a3277fa60 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1051,6 +1051,7 @@ config SERIAL_MSM_CONSOLE
- 	bool "MSM serial console support"
- 	depends on SERIAL_MSM=y
- 	select SERIAL_CORE_CONSOLE
-+	select SERIAL_EARLYCON
- 
- config SERIAL_MSM_HS
- 	tristate "MSM UART High Speed: Serial Driver"
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index c549110509bb..d68faa2e7a6c 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -856,22 +856,15 @@ static inline struct uart_port *get_port_from_line(unsigned int line)
- }
- 
- #ifdef CONFIG_SERIAL_MSM_CONSOLE
--static void msm_console_write(struct console *co, const char *s,
--			      unsigned int count)
-+static void __msm_console_write(struct uart_port *port, const char *s,
-+				unsigned int count, bool is_uartdm)
- {
- 	int i;
--	struct uart_port *port;
--	struct msm_port *msm_port;
- 	int num_newlines = 0;
- 	bool replaced = false;
- 	void __iomem *tf;
- 
--	BUG_ON(co->index < 0 || co->index >= UART_NR);
--
--	port = get_port_from_line(co->index);
--	msm_port = UART_TO_MSM(port);
--
--	if (msm_port->is_uartdm)
-+	if (is_uartdm)
- 		tf = port->membase + UARTDM_TF;
- 	else
- 		tf = port->membase + UART_TF;
-@@ -883,7 +876,7 @@ static void msm_console_write(struct console *co, const char *s,
- 	count += num_newlines;
- 
- 	spin_lock(&port->lock);
--	if (msm_port->is_uartdm)
-+	if (is_uartdm)
- 		reset_dm_count(port, count);
- 
- 	i = 0;
-@@ -892,7 +885,7 @@ static void msm_console_write(struct console *co, const char *s,
- 		unsigned int num_chars;
- 		char buf[4] = { 0 };
- 
--		if (msm_port->is_uartdm)
-+		if (is_uartdm)
- 			num_chars = min(count - i, (unsigned int)sizeof(buf));
- 		else
- 			num_chars = 1;
-@@ -921,6 +914,20 @@ static void msm_console_write(struct console *co, const char *s,
- 	spin_unlock(&port->lock);
- }
- 
-+static void msm_console_write(struct console *co, const char *s,
-+			      unsigned int count)
-+{
-+	struct uart_port *port;
-+	struct msm_port *msm_port;
-+
-+	BUG_ON(co->index < 0 || co->index >= UART_NR);
-+
-+	port = get_port_from_line(co->index);
-+	msm_port = UART_TO_MSM(port);
-+
-+	__msm_console_write(port, s, count, msm_port->is_uartdm);
-+}
-+
- static int __init msm_console_setup(struct console *co, char *options)
- {
- 	struct uart_port *port;
-@@ -963,6 +970,47 @@ static int __init msm_console_setup(struct console *co, char *options)
- 	return uart_set_options(port, co, baud, parity, bits, flow);
- }
- 
-+static void
-+msm_serial_early_write(struct console *con, const char *s, unsigned n)
-+{
-+	struct earlycon_device *dev = con->data;
-+
-+	__msm_console_write(&dev->port, s, n, false);
-+}
-+
-+static int __init
-+msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = msm_serial_early_write;
-+	return 0;
-+}
-+OF_EARLYCON_DECLARE(msm_serial, "qcom,msm-uart",
-+		    msm_serial_early_console_setup);
-+
-+static void
-+msm_serial_early_write_dm(struct console *con, const char *s, unsigned n)
-+{
-+	struct earlycon_device *dev = con->data;
-+
-+	__msm_console_write(&dev->port, s, n, true);
-+}
-+
-+static int __init
-+msm_serial_early_console_setup_dm(struct earlycon_device *device,
-+				  const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = msm_serial_early_write_dm;
-+	return 0;
-+}
-+OF_EARLYCON_DECLARE(msm_serial_dm, "qcom,msm-uartdm",
-+		    msm_serial_early_console_setup_dm);
-+
- static struct uart_driver msm_uart_driver;
- 
- static struct console msm_console = {
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> Since the first
+> injection still sets the state - and I did not want to modify this - the
+> 2d one would fail due to that check, and the validate_injection. May be
+> cleaner to not update the states when injecting the fwd irq too.
+
+Hmmm, I don't think I understand you here.  I think you need to think
+about the whole flow of things here and understand any posible sequence
+of events combined with any potential state you may have.  Perhaps this
+is better deferred to a face-to-face discussion.
+
+> 
+> > 
+> >>  
+> >>  	if (vgic_queue_irq(vcpu, 0, irq)) {
+> >> @@ -1517,14 +1519,18 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> >>  	int edge_triggered, level_triggered;
+> >>  	int enabled;
+> >>  	bool ret = true;
+> >> +	bool is_forwarded;
+> >>  
+> >>  	spin_lock(&dist->lock);
+> >>  
+> >>  	vcpu = kvm_get_vcpu(kvm, cpuid);
+> >> +	is_forwarded = (vgic_get_phys_irq(vcpu, irq_num) > 0);
+> > 
+> > use your new function here as well.
+> ok
+> > 
+> >> +
+> >>  	edge_triggered = vgic_irq_is_edge(vcpu, irq_num);
+> >>  	level_triggered = !edge_triggered;
+> >>  
+> >> -	if (!vgic_validate_injection(vcpu, irq_num, level)) {
+> >> +	if (!is_forwarded &&
+> >> +		!vgic_validate_injection(vcpu, irq_num, level)) {
+> > 
+> > I don't see the rationale here either.  If an IRQ is forwarded, why do
+> > you need to do anything if the condition of the line hasn't changed for
+> > a level-triggered IRQ or if you have a falling edge on an edge-triggered
+> > IRQ (assuming active-HIGH)?
+> To me this even cannot cannot happen. a second fwd irq can only hit if
+> the same virtual IRQ was completed and completed the corresponding phys
+> IRQ. Still the problem is that on the 1st injection we updated the VGIC
+> state. 
+
+Updated teh VGIC state?  Be more specific!
+
+> I aknowledge this is a hack to work around the 1st injection
+> update the state and nothing reset them. So on subsequent injections, -
+> and even on the 1st one-  I never check the state.
+
+Is the case here that you propogate the line state onto the vcpu pending
+state when somebody calls this inject function, so you use this as a
+chance to resample the line?
+
+If so, we need to document this clearly (and you need to convince me
+that this is in fact the right thing we're doing overall), and we may
+have to reword and refactor some of this to not have these weird-looking
+corner cases with outrageously complicated comments describing state in
+what's basically becoming a non-trivial state machine.
+
+> > 
+> >>  		ret = false;
+> >>  		goto out;
+> >>  	}
+> >> @@ -1557,7 +1563,8 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> >>  		goto out;
+> >>  	}
+> >>  
+> >> -	if (level_triggered && vgic_irq_is_queued(vcpu, irq_num)) {
+> >> +	if (!is_forwarded &&
+> >> +		level_triggered && vgic_irq_is_queued(vcpu, irq_num)) {
+> > 
+> > So here it's making sense for SPIs since you can have an EOIed interrupt
+> > on a CPU that didn't exit the VM yet, and this it's still queued, but
+> > you still need to resample the line to respect other CPUs.  Only, we
+> > ever only target a single CPU for SPIs IIRC (the first in the target
+> > list register) so we have to wait for that CPU to to exit the VM anyhow.
+> > 
+> > This leads me to believe that, given a fowarded irq, you can only have
+> > XXX situations at this point:
+> > 
+> > (1) is_queued && target_vcpu_in_vm:
+> > The vcpu should resample this line when it exits the VM, because we
+> > check the LRs for IRQs like this one, so we don't have to do anything
+> > and go to out here.
+> > 
+> > (2) is_queued && !target_vcpu_in_vm::
+> > You have a bug because you exited the VM which must have done an EOI on
+> > the interrupt, otherwise this function shouldn't have been called!  This
+> > means that we should have cleared the queued state of the interrupt.
+> > 
+> > (3) !is_queued && whatever:
+> > Set the irq pending bits, so do not goto out.
+> > 
+> > I'm aware that there's theoretically a race between (1) and (2), but you
+> > should consider target_cpu_in_vm as "it hasn't been through
+> > __kvm_vgic_sync_hwstate() yet" and this should hold.
+> I will prepare something accurate for next week.
+> 
+Yeah, I think we need to talk this through at LCU14.
+
+-Christoffer
