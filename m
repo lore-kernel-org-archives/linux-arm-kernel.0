@@ -1,90 +1,107 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 11 Sep 2014 15:07:30 -0400
-Subject: [PATCH - v4] PCI: keystone: add a pci quirk to limit mrrs
-In-Reply-To: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
-References: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5411F2F2.20102@ti.com>
+Date: Thu, 11 Sep 2014 15:09:10 -0400
+Subject: [PATCH v3 1/2] PCI: keystone: remove handle of PCI mode
+ configuration
+In-Reply-To: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
+References: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5411F356.2090405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2014 01:03 PM, Murali Karicheri wrote:
-> Keystone PCI controller has a limitation that memory read request
-> size must not exceed 256 bytes. This is a hardware limitation and
-> add a quirk to force this limit on all downstream devices by
-> updating mrrs.
+On 09/10/2014 01:12 PM, Murali Karicheri wrote:
+> Keystone PCI hardware supports both RC and EP modes and devcfg
+> register has bits to boot strap the device to either of these modes.
+> It seems proper to add this functionality to the boot loader rather
+> than in the driver as device will be operating in either mode, not
+> both any time. Currently the driver supports only RC mode and hence
+> register configuration in the driver is not needed and driver can
+> assume this is a RC hardware.
+>
+> Also update the DT documentation accordingly.
 >
 > Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+> Acked-by: Arnd Bergmann<arnd@arndb.de>
 > ---
->    -v4: re-send removing extra lines
->    -v3: added check for vendor id and use pci_matc_id() to do matching
->    -v2: made the quirk happens after tuning
->    -v1: changed printk to indicate PCI bdf
+> 	v3 - No change
+> 	v2 - Added this separate patch to remove pci mode handling
+>   .../devicetree/bindings/pci/pci-keystone.txt       |    4 +---
+>   drivers/pci/host/pci-keystone.c                    |   21 ++------------------
+>   2 files changed, 3 insertions(+), 22 deletions(-)
 >
->   drivers/pci/host/pci-keystone.c |   45 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 45 insertions(+)
+> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> index ceb3e24..bedacf0 100644
+> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> @@ -13,9 +13,7 @@ Required Properties:-
 >
+>   compatibility: "ti,keystone-pcie"
+>   reg:	index 1 is the base address and length of DW application registers.
+> -	index 2 is the base address and length of PCI mode configuration
+> -	register.
+> -	index 3 is the base address and length of PCI device ID register.
+> +	index 2 is the base address and length of PCI device ID register.
+>
+>   pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
+>   	interrupt-cells: should be set to 1
 > diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index c1cfaef..ff8ed25 100644
+> index ff8ed25..f1119eb 100644
 > --- a/drivers/pci/host/pci-keystone.c
 > +++ b/drivers/pci/host/pci-keystone.c
-> @@ -42,8 +42,53 @@
+> @@ -35,10 +35,6 @@
+>   #define MAX_MSI_HOST_IRQS		8
+>   #define MAX_LEGACY_HOST_IRQS		4
+>
+> -/* RC mode settings masks */
+> -#define PCIE_RC_MODE		BIT(2)
+> -#define PCIE_MODE_MASK		(BIT(1) | BIT(2))
+> -
 >   /* DEV_STAT_CTRL */
 >   #define PCIE_CAP_BASE		0x70
 >
-> +/* PCIE controller device IDs */
-> +#define PCIE_RC_K2HK		0xb008
-> +#define PCIE_RC_K2E		0xb009
-> +#define PCIE_RC_K2L		0xb00a
-> +
->   #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+> @@ -355,7 +351,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>   	void __iomem *reg_p;
+>   	struct phy *phy;
+>   	int ret = 0;
+> -	u32 val;
 >
-> +static void quirk_limit_mrrs(struct pci_dev *dev)
-> +{
-> +	struct pci_bus *bus = dev->bus;
-> +	struct pci_dev *bridge = bus->self;
-> +	static const struct pci_device_id rc_pci_devids[] = {
-> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2HK),
-> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
-> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2E),
-> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
-> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2L),
-> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
-> +		{ 0, },
-> +	};
-> +
-> +	if (pci_is_root_bus(bus))
-> +		return;
-> +
-> +	/* look for the host bridge */
-> +	while (!pci_is_root_bus(bus)) {
-> +		bridge = bus->self;
-> +		bus = bus->parent;
-> +	}
-> +
-> +	if (bridge) {
-> +		/*
-> +		 * Keystone PCI controller has a h/w limitation of
-> +		 * 256 bytes maximum read request size. It can't handle
-> +		 * anything higher than this. So force this limit on
-> +		 * all downstream devices
-> +		 */
-> +		if (pci_match_id(rc_pci_devids, bridge)) {
-> +			if (pcie_get_readrq(dev)>  256) {
-> +				dev_info(&dev->dev, "limiting mrrs to 256\n");
-> +				pcie_set_readrq(dev, 256);
-> +			}
-> +		}
-> +	}
-> +}
-> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
-> +
->   static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
->   {
->   	struct pcie_port *pp =&ks_pcie->pp;
+>   	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+>   				GFP_KERNEL);
+> @@ -365,18 +360,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>   	}
+>   	pp =&ks_pcie->pp;
+>
+> -	/* index 2 is the devcfg register for RC mode settings */
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+> -	reg_p = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(reg_p))
+> -		return PTR_ERR(reg_p);
+> -
+> -	/* enable RC mode in devcfg */
+> -	val = readl(reg_p);
+> -	val&= ~PCIE_MODE_MASK;
+> -	val |= PCIE_RC_MODE;
+> -	writel(val, reg_p);
+> -
+>   	/* initialize SerDes Phy if present */
+>   	phy = devm_phy_get(dev, "pcie-phy");
+>   	if (!IS_ERR_OR_NULL(phy)) {
+> @@ -385,8 +368,8 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+>   			return ret;
+>   	}
+>
+> -	/* index 3 is to read PCI DEVICE_ID */
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+> +	/* index 2 is to read PCI DEVICE_ID */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+>   	reg_p = devm_ioremap_resource(dev, res);
+>   	if (IS_ERR(reg_p))
+>   		return PTR_ERR(reg_p);
 Bjorn,
 
-If this version looks good, could you please apply this to host-keystone?
+These patches need to go onto host-keystone as well for v3.18. If you 
+you have any comments, please let me know so that I can address them. I 
+have incorporated comments from Arnd already.
 
-Thanks
+Thanks.
 
 Murali
