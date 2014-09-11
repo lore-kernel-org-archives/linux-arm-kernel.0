@@ -1,83 +1,43 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 11 Sep 2014 14:14:52 +0200
-Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <20140911101308.GU3190@worktop.ger.corp.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
- <20140911101308.GU3190@worktop.ger.corp.intel.com>
-Message-ID: <CAKfTPtDtiTFVtgmM+38Ry-=32=o4NDn8LpPaQomug2NfeO_wnw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 11 Sep 2014 13:13:48 +0100
+Subject: [RFC PATCH] arm64:mm: delete max_mapnr init.
+In-Reply-To: <CAFpQJXUKgb+58ifb0GNVMywnVU6sWTETiO8K=wdTNqQNzs4sOA@mail.gmail.com>
+References: <1410426973-32393-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <20140911103613.GB6158@arm.com>
+ <CAFpQJXUKgb+58ifb0GNVMywnVU6sWTETiO8K=wdTNqQNzs4sOA@mail.gmail.com>
+Message-ID: <20140911121348.GE6158@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2014 12:13, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, Aug 26, 2014 at 01:06:51PM +0200, Vincent Guittot wrote:
->
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 18db43e..60ae1ce 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -6049,6 +6049,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
->>                       return true;
->>       }
->>
->> +     /*
->> +      * The group capacity is reduced probably because of activity from other
->> +      * sched class or interrupts which use part of the available capacity
->> +      */
->> +     if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
->> +                             env->sd->imbalance_pct))
->> +             return true;
->> +
->>       return false;
->>  }
->>
->> @@ -6534,13 +6542,23 @@ static int need_active_balance(struct lb_env *env)
->>       struct sched_domain *sd = env->sd;
->>
->>       if (env->idle == CPU_NEWLY_IDLE) {
->> +             int src_cpu = env->src_cpu;
->>
->>               /*
->>                * ASYM_PACKING needs to force migrate tasks from busy but
->>                * higher numbered CPUs in order to pack all tasks in the
->>                * lowest numbered CPUs.
->>                */
->> -             if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
->> +             if ((sd->flags & SD_ASYM_PACKING) && src_cpu > env->dst_cpu)
->> +                     return 1;
->> +
->> +             /*
->> +              * If the CPUs share their cache and the src_cpu's capacity is
->> +              * reduced because of other sched_class or IRQs, we trig an
->> +              * active balance to move the task
->> +              */
->> +             if ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
->> +                             sd->imbalance_pct))
->>                       return 1;
->>       }
->
-> Should you not also check -- in both cases -- that the destination is
-> any better?
+On Thu, Sep 11, 2014 at 12:43:11PM +0100, Ganapatrao Kulkarni wrote:
+> On Thu, Sep 11, 2014 at 4:06 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Sep 11, 2014 at 10:16:13AM +0100, Ganapatrao Kulkarni wrote:
+> >> setting max_mapnr results in to error, if enabled with CONFIG_NUMA,
+> >> which i have to replace with function set_max_mapnr.
+> >> However this variable is not used in arm64(with default defconfig) and better to
+> >> delete instead.
+> >>
+> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+> >> ---
+> >>  arch/arm64/mm/init.c | 1 -
+> >>  1 file changed, 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >> index 5472c24..548bd01 100644
+> >> --- a/arch/arm64/mm/init.c
+> >> +++ b/arch/arm64/mm/init.c
+> >> @@ -256,7 +256,6 @@ static void __init free_unused_memmap(void)
+> >>   */
+> >>  void __init mem_init(void)
+> >>  {
+> >> -     max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
+> >
+> > I think it's cleaner to call set_max_mapnr in case this grows a use in core
+> > code outside of pfn_valid (which we always override).
+> agreed, thanks for your comment.
+> shall i send you the patch for this?
 
-The case should have been solved earlier when calculating the
-imbalance which should be null if the destination is worse than the
-source.
+Yes, please. Given that we don't support NUMA in mainline, the patch will be
+queued for 3.18 (via Catalin).
 
-But i haven't formally check that calculate_imbalance correctly
-handles that case
-
->
-> Also, there's some obvious repetition going on there, maybe add a
-> helper?
-
-yes
-
->
-> Also, both sites should probably ensure they're operating in the
-> non-saturated/overloaded scenario. Because as soon as we're completely
-> saturated we want SMP nice etc. and that all already works right
-> (presumably).
-
-If both are overloaded, calculated_imbalance will cap the max load
-that can be pulled so the busiest_group will not become idle
+Will
