@@ -1,78 +1,80 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 11 Sep 2014 08:27:06 -0700
-Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
-In-Reply-To: <20140910175126.GJ1710@arm.com>
-References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
- <1409781429-27593-4-git-send-email-keescook@chromium.org>
- <20140904170349.GL7156@arm.com>
- <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
- <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
- <20140908215506.GA4759@dator>
- <CAGXu5jJFB+pcDVkcMoRZ9DnJu7MQuN=kceDhpkGrO=6ZLFy6Kw@mail.gmail.com>
- <20140909123829.GK1754@arm.com>
- <CAGXu5jJoW-B7WwuFUhbN4e1aL-HVxa9x4da9hB9DcCGEXVLgzw@mail.gmail.com>
- <20140910175126.GJ1710@arm.com>
-Message-ID: <CAGXu5jJaML_S+6LUn1uPLrScXxUJL+1N1B+Fa08ioxKt933nCw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 11 Sep 2014 11:30:13 -0400
+Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
+In-Reply-To: <541036F0.2030001@mojatatu.com>
+References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140821.163612.282672926741753926.davem@davemloft.net>
+ <53F79DC5.8030003@ti.com> <540DC00F.1080103@ti.com>
+ <540EE809.9020901@mojatatu.com> <540F1A9A.1020309@ti.com>
+ <541036F0.2030001@mojatatu.com>
+Message-ID: <5411C005.10108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 10:51 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Kees,
+On Wednesday 10 September 2014 07:33 AM, Jamal Hadi Salim wrote:
+> On 09/09/14 11:19, Santosh Shilimkar wrote:
+> 
+>> All the documentation is open including packet accelerator offload
+>> in ti.com.
+> 
+> Very nice.
+> Would you do me a kindness and point to the switch interface
+> documentation (and other ones on that soc)?
 >
-> On Tue, Sep 09, 2014 at 03:33:11PM +0100, Kees Cook wrote:
->> On Tue, Sep 9, 2014 at 5:38 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Mon, Sep 08, 2014 at 11:40:43PM +0100, Kees Cook wrote:
->> >> Ah, so it was, yes! Will, which version of this logic would you prefer?
->> >
->> > I still don't think we're solving the general problem here -- we're actually
->> > just making the ftrace case work. It is perfectly possible for another CPU
->> > to undergo a TLB miss and refill whilst the page table is being modified by
->> > the CPU with preemption disabled. In this case, a local tlb flush won't
->> > invalidate that entry on the other core, and we have no way of knowing when
->> > the original permissions are actually observed across the system.
+You can find it here [1], [2], [3]
+
+>> We got such requests from customers but couldn't
+>> support it for Linux.
+> 
+> It has been difficult because every chip vendor is trying
+> to do their own thing. Some have huge (fugly) SDKs in user space
+> which make it worse. Thats the struggle we are trying to
+> deal with. Of course none of those vendors want to open
+> up their specs. You present a nice opportunity to not follow
+> that path.
+> 
+>> We are also looking for such
+>> support and any direction are welcome. Your slide
+>> deck seems to capture the key topics like L2/IPSEC
+>> offload which we are also interested to hear.
 >>
->> The fixmap is used by anything doing patching _except_ ftrace,
->> actually. It's used by jump labels, kprobes, and kgdb. This code is
->> the general case. Access to set_fixmap is done via the kernel patching
->> interface: patch_text().
+> 
+> The slides list the most popular offloads. But not necessarily
+> all known offloads.
+> 
+>> Just to be clear, your point was about L2 switch offload
+>> which the driver don't support at the moment. It might confuse
+>> others. The driver doesn't implements anything non-standard.
 >>
->> Right now, the patch_text interface checks cache_ops_need_broadcast(),
->> and conditionally runs under stop_machine(). We could make this
->> unconditional, and we'll avoid any problem with TLB misses on another
->> CPU.
+> 
+> If i understood you correctly:
+> Your initial patches dont intend to expose any offloads - you are just
+> abstracting this as a NIC. I think that is a legit reason.
+Yes. The NetCP hardware is abstracted as a regular NIC.
+
+> However, the problem is you are also exposing the packet processors
+> and switch offloading in a proprietary way.
+> For a sample of how L2 basic functions like FDB tables are controlled
+> within a NIC - take a look at the Intel NICs.
+> Either that or you hide all the offload interfaces and over time add
+> them (starting with L2 - NICs with L2 are common).
 >
-> Yes, it we always use stop_machine, that solves the TLB broadcast problem
-> and we could do that if CONFIG_ARM_ERRATA_798181 is set.
+Switch offload isn't supported but we do agree that for packet
+accelerator, we are using custom hooks because of lack of other
+mechanism.
 
-Okay, sounds good.
+We will definitely use the new ndo based fdb offload scheme when
+we get to it. We understand that the forward direction is to
+have ndo operation based offloads and its the right way probably.
 
->
->> > So I think we need to figure out a way to invalidate the TLB properly. What
->> > do architectures that use IPIs for TLB broadcasting do (x86, some powerpc,
->> > mips, ...)? They must have exactly the same problem.
->>
->> I don't think this should be done at the set_fixmap level, as it is
->> more a primitive. I think making sure patch_text() always works would
->> be best. What do you think of using an unconditional stop_machine()
->> instead?
->
-> Why not move the TLB invalidation into patch_text, then we can do
-> stop_machine if IS_ENABLED(CONFIG_ARM_ERRATA_798181) ||
-> tlb_ops_need_broadcast()?
+We will update the patch and drop all the custom exports. Anyway
+the current driver doesn't support any offloads now. We can add
+support for it as the frameworks evolves.
 
-The (local) TLB flush needs to happen for patch_text to do its work,
-so I'd rather it stay in set_fixmap, otherwise the flush calls will
-have to follow each call of set_fixmap.
+Thanks a lot for informative discussion and those links.
 
-Is there a reason tlb_ops_need_broadcast() doesn't check
-IS_ENABLED(CONFIG_ARM_ERRATA_798181) itself?
-
-> Then that just leaves ftrace.
-
-ftrace is already covered by stop_machine. Is there something I missing there?
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+Regards,
+Santosh
+[1] http://www.ti.com/lit/pdf/sprugv9
+[2] http://www.ti.com/lit/pdf/spruhj5
+[3] http://www.ti.com/lit/pdf/sprugs4
