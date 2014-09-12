@@ -1,71 +1,74 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 13 Sep 2014 00:48:06 +0800
-Subject: [PATCH 2/2] ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
-In-Reply-To: <1410540486-22243-1-git-send-email-wens@csie.org>
-References: <1410540486-22243-1-git-send-email-wens@csie.org>
-Message-ID: <1410540486-22243-3-git-send-email-wens@csie.org>
+From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
+Date: Fri, 12 Sep 2014 18:47:54 +0200
+Subject: [PATCHv2 8/8] ARM: at91: document Atmel SMART compatibles
+In-Reply-To: <1410536587-24607-9-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410536587-24607-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1410536587-24607-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140912184754.546b26cf@e6520eb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the clock driver supports PLL6 and MBUS on sun8i correctly,
-add the corresponding clock nodes to the dtsi.
+Le Fri, 12 Sep 2014 17:43:07 +0200,
+Alexandre Belloni <alexandre.belloni@free-electrons.com> a ?crit :
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23.dtsi | 29 +++++++++++++++++++++++++++--
- 1 file changed, 27 insertions(+), 2 deletions(-)
+> 
+> Document all the available compatibles for Atmel "SMART" SoCs.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/arm/atmel-at91.txt         | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 6e3e3e5c611f..2ef92e04ed10 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -1,6 +1,46 @@
+>  Atmel AT91 device tree bindings.
+>  ================================
+>  
+> +Boards with a SoC of the Atmel AT91 or SMART family shall have the following
+> +properties:
+> +
+> +Required root node properties:
+> +compatible: must be one of:
+> + * "atmel,rm9200"
+> + * "atmel,at91sam9260"
+> + * "atmel,at91sam9261"
+> + * "atmel,at91sam9263"
+> + * "atmel,at91sam9x5" for the x5 family, shall be extended with the specific SoC
+> +   compatible:
+> +    o "atmel,at91sam9g15"
+> +    o "atmel,at91sam9g25"
+> +    o "atmel,at91sam9g35"
+> +    o "atmel,at91sam9x25"
+> +    o "atmel,at91sam9x35"
+> + * "atmel,at91sam9g20"
+> + * "atmel,at91sam9g45"
+> + * "atmel,at91sam9n12"
+> + * "atmel,at91sam9rl"
+> + * "atmel,sama5" for the cortexA5 family, shall be extended with the specific
+> +   SoC family:
+> +    o "atmel,sama5d3" shal be exteneded with the specific SoC compatible:
+                                 ^ extended
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index fc0d023..c32091e 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -74,13 +74,30 @@
- 		};
- 
- 		/* dummy clock until actually implemented */
--		pll6: pll6_clk {
-+		pll5: pll5_clk {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
--			clock-frequency = <600000000>;
-+			clock-frequency = <0>;
-+			clock-output-names = "pll5";
-+		};
-+
-+		pll6: clk at 01c20028 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun6i-a31-pll6-clk";
-+			reg = <0x01c20028 0x4>;
-+			clocks = <&osc24M>;
- 			clock-output-names = "pll6";
- 		};
- 
-+		pll6x2: pll6x2_clk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <1>;
-+			clock-mult = <2>;
-+			clocks = <&pll6>;
-+			clock-output-names = "pll6x2";
-+		};
-+
- 		cpu: cpu_clk at 01c20050 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-cpu-clk";
-@@ -243,6 +260,14 @@
- 			clocks = <&mmc2_clk>;
- 			clock-output-names = "mmc2_sample";
- 		};
-+
-+		mbus_clk: clk at 01c2015c {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-a23-mbus-clk";
-+			reg = <0x01c2015c 0x4>;
-+			clocks = <&osc24M>, <&pll6x2>, <&pll5>;
-+			clock-output-names = "mbus";
-+		};
- 	};
- 
- 	soc at 01c00000 {
--- 
-2.1.0
+> +       - "atmel,samad31"
+> +       - "atmel,samad33"
+> +       - "atmel,samad34"
+> +       - "atmel,samad35"
+> +       - "atmel,samad36"
+> +    o "atmel,sama5d4"
+> +
+> +
+> +In addition, the above compatible shall be extended with the specific
+> +SoC and board used. Currently known SoC compatibles are:
+> +    "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
+> +    "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
+> +    "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
+> +    "marvell,berlin2q"     for Marvell Armada 1500-pro (BG2Q, 88DE3114)
+> +    "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
+> +
+> +
+maybe remove those 10 last lines ;-)
+
+Eric
