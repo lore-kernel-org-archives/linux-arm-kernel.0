@@ -1,118 +1,268 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 12 Sep 2014 15:20:08 -0500
-Subject: [Patch v9 2/3] usb: dwc3: Add Qualcomm DWC3 glue layer driver
-In-Reply-To: <CAMf-jSm2fPPstFD2h4-gG=MCDty34f-O0ooizDEKyQUd3+CxGQ@mail.gmail.com>
-References: <1410550088-8754-1-git-send-email-agross@codeaurora.org>
- <1410550088-8754-3-git-send-email-agross@codeaurora.org>
- <CAMf-jSm2fPPstFD2h4-gG=MCDty34f-O0ooizDEKyQUd3+CxGQ@mail.gmail.com>
-Message-ID: <20140912202008.GB25500@saruman.home>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 12 Sep 2014 15:24:58 -0500
+Subject: [PATCHv6 4/5] hwspinlock/core: add common OF helpers
+In-Reply-To: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+Message-ID: <1410553499-55951-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 13, 2014 at 01:44:25AM +0530, Pramod Gurav wrote:
-> Andy,
-> Couple of minor comments.
-> 
-> On Sat, Sep 13, 2014 at 12:58 AM, Andy Gross <agross@codeaurora.org> wrote:
-> 
-> > From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> >
-> > DWC3 glue layer is hardware layer around Synopsys DesignWare
-> > USB3 core. Its purpose is to supply Synopsys IP with required
-> > clocks, voltages and interface it with the rest of the SoC.
-> >
-> > Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> > ---
-> >  drivers/usb/dwc3/Kconfig     |    8 +++
-> >  drivers/usb/dwc3/Makefile    |    1 +
-> >  drivers/usb/dwc3/dwc3-qcom.c |  131
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 140 insertions(+)
-> >  create mode 100644 drivers/usb/dwc3/dwc3-qcom.c
-> >
-> >
-> <..>
-> 
-> 
-> > +#include <linux/platform_device.h>
-> > +
-> > +struct dwc3_qcom {
-> > +       struct device           *dev;
-> > +
-> >
-> Extra new line here.
+This patch adds three new OF helper functions to use/request
+locks from a hwspinlock device instantiated through a
+device-tree blob.
 
-that's not an issue however.
+1. The of_hwspin_lock_get_num_locks() is a common OF helper
+   function to read the 'hwlock-num-locks' property.
+2. The of_hwspin_lock_get_base_id() is a common OF helper
+   function to read the 'hwlock-base-id' property.
+3. The of_hwspin_lock_get_id() API can be used by hwspinlock
+   clients to get the id for a specific lock using the phandle
+   + args specifier, so that it can be requested using the
+   available hwspin_lock_request_specific() API.
 
-> > +       struct clk              *core_clk;
-> > +       struct clk              *iface_clk;
-> > +       struct clk              *sleep_clk;
-> > +};
-> > +
-> > +static int dwc3_qcom_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device_node *node = pdev->dev.of_node;
-> > +       struct dwc3_qcom *qdwc;
-> > +       int ret = 0;
-> >
-> Initialization not required.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ Documentation/hwspinlock.txt         |  26 ++++++++
+ drivers/hwspinlock/hwspinlock_core.c | 122 +++++++++++++++++++++++++++++++++++
+ include/linux/hwspinlock.h           |  15 ++++-
+ 3 files changed, 160 insertions(+), 3 deletions(-)
 
-I'll fix this one as I'm already applying this patch.
-
-> > +
-> > +       qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
-> > +       if (!qdwc)
-> > +               return -ENOMEM;
-> > +
-> > +       platform_set_drvdata(pdev, qdwc);
-> > +
-> > +       qdwc->dev = &pdev->dev;
-> > +
-> > +       qdwc->core_clk = devm_clk_get(qdwc->dev, "core");
-> > +       if (IS_ERR(qdwc->core_clk)) {
-> > +               dev_err(qdwc->dev, "failed to get core clock\n");
-> > +               return PTR_ERR(qdwc->core_clk);
-> > +       }
-> > +
-> > +       qdwc->iface_clk = devm_clk_get(qdwc->dev, "iface");
-> > +       if (IS_ERR(qdwc->iface_clk)) {
-> > +               dev_dbg(qdwc->dev, "failed to get optional iface clock\n");
-> > +               qdwc->iface_clk = NULL;
-> > +       }
-> > +
-> > +       qdwc->sleep_clk = devm_clk_get(qdwc->dev, "sleep");
-> > +       if (IS_ERR(qdwc->sleep_clk)) {
-> > +               dev_dbg(qdwc->dev, "failed to get optional sleep clock\n");
-> > +               qdwc->sleep_clk = NULL;
-> > +       }
-> > +
-> > +       ret = clk_prepare_enable(qdwc->core_clk);
-> > +       if (ret) {
-> > +               dev_err(qdwc->dev, "failed to enable core clock\n");
-> > +               goto err_core;
-> > +       }
-> > +
-> > +       ret = clk_prepare_enable(qdwc->iface_clk);
-> >
-> Should not we check if  qdwc->iface_clk is valid?
-
-read the sources luke.
-
-> > +err_clks:
-> > +       clk_disable_unprepare(qdwc->sleep_clk);
-> >
-> IS_ERR check before above statement not needed as we have continued with
-> probe even after failure og devm_clk_get?
-
-read more carefully, there's a detail which you're missing.
-
+diff --git a/Documentation/hwspinlock.txt b/Documentation/hwspinlock.txt
+index 640ae47..c15dc9f 100644
+--- a/Documentation/hwspinlock.txt
++++ b/Documentation/hwspinlock.txt
+@@ -48,6 +48,16 @@ independent, drivers.
+      ids for predefined purposes.
+      Should be called from a process context (might sleep).
+ 
++  int of_hwspin_lock_get_id(struct device_node *np, int index);
++   - retrieve the global lock id for an OF phandle-based specific lock.
++     This function provides a means for DT users of a hwspinlock module
++     to get the global lock id of a specific hwspinlock, so that it can
++     be requested using the normal hwspin_lock_request_specific() API.
++     The function returns a valid lock id number on success, -EPROBE_DEFER
++     if the hwspinlock device is not yet registered with the core, or other
++     error values.
++     Should be called from a process context (might sleep).
++
+   int hwspin_lock_free(struct hwspinlock *hwlock);
+    - free a previously-assigned hwspinlock; returns 0 on success, or an
+      appropriate error code on failure (e.g. -EINVAL if the hwspinlock
+@@ -243,6 +253,22 @@ int hwspinlock_example2(void)
+      Returns the address of hwspinlock on success, or NULL on error (e.g.
+      if the hwspinlock is still in use).
+ 
++  int of_hwspin_lock_get_num_locks(struct device_node *dn);
++   - is a common OF helper function that can be used by some underlying
++     vendor-specific implementations. This can be used by implementations
++     that require and define the number of locks supported within a hwspinlock
++     bank as a device tree node property. This function should be called by
++     needed implementations before registering a hwspinlock device with the
++     core.
++
++  int of_hwspin_lock_get_base_id(struct device_node *dn);
++   - is a common OF helper function that can be used by some underlying
++     vendor-specific implementations. This can be used by implementations
++     that require and define the base index for a block of locks present
++     within a hwspinlock bank as a device tree node property. This function
++     should be called by needed implementations before registering a hwspinlock
++     device with the core.
++
+ 5. Important structs
+ 
+ struct hwspinlock_device is a device which usually contains a bank
+diff --git a/drivers/hwspinlock/hwspinlock_core.c b/drivers/hwspinlock/hwspinlock_core.c
+index 48f7866..7d9f749 100644
+--- a/drivers/hwspinlock/hwspinlock_core.c
++++ b/drivers/hwspinlock/hwspinlock_core.c
+@@ -27,6 +27,7 @@
+ #include <linux/hwspinlock.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/mutex.h>
++#include <linux/of.h>
+ 
+ #include "hwspinlock_internal.h"
+ 
+@@ -262,6 +263,127 @@ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
+ }
+ EXPORT_SYMBOL_GPL(__hwspin_unlock);
+ 
++/**
++ * of_hwspin_lock_simple_xlate - translate hwlock_spec to return a lock id
++ * @bank: the hwspinlock device bank
++ * @hwlock_spec: hwlock specifier as found in the device tree
++ *
++ * This is a simple translation function, suitable for hwspinlock platform
++ * drivers that only has a lock specifier length of 1.
++ *
++ * Returns a negative value on error, and a relative index of the lock within
++ * a specified bank on success.
++ */
++static int of_hwspin_lock_simple_xlate(struct hwspinlock_device *bank,
++				const struct of_phandle_args *hwlock_spec)
++{
++	/* sanity check (these shouldn't happen) */
++	if (WARN_ON(!bank->dev->of_node))
++		return -EINVAL;
++
++	if (WARN_ON(hwlock_spec->args_count != 1))
++		return -EINVAL;
++
++	return hwlock_spec->args[0];
++}
++
++/**
++ * of_hwspin_lock_get_id() - get lock id for an OF phandle-based specific lock
++ * @np: device node from which to request the specific hwlock
++ * @index: index of the hwlock in the list of values
++ *
++ * This function provides a means for DT users of the hwspinlock module to
++ * get the global lock id of a specific hwspinlock using the phandle of the
++ * hwspinlock device, so that it can be requested using the normal
++ * hwspin_lock_request_specific() API.
++ *
++ * Returns the global lock id number on success, -EPROBE_DEFER if the hwspinlock
++ * device is not yet registered, -EINVAL on invalid args specifier value or an
++ * appropriate error as returned from the OF parsing of the DT user node.
++ */
++int of_hwspin_lock_get_id(struct device_node *np, int index)
++{
++	struct hwspinlock_device *bank;
++	struct of_phandle_args args;
++	int id;
++	int ret;
++
++	ret = of_parse_phandle_with_args(np, "hwlocks", "#hwlock-cells", index,
++					 &args);
++	if (ret)
++		return ret;
++
++	mutex_lock(&hwspinlock_tree_lock);
++	list_for_each_entry(bank, &hwspinlock_devices, list)
++		if (bank->dev->of_node == args.np)
++			break;
++	mutex_unlock(&hwspinlock_tree_lock);
++	if (&bank->list == &hwspinlock_devices) {
++		ret = -EPROBE_DEFER;
++		goto out;
++	}
++
++	id = of_hwspin_lock_simple_xlate(bank, &args);
++	if (id < 0 || id >= bank->num_locks) {
++		ret = -EINVAL;
++		goto out;
++	}
++	id += bank->base_id;
++
++out:
++	of_node_put(args.np);
++	return ret ? ret : id;
++}
++EXPORT_SYMBOL_GPL(of_hwspin_lock_get_id);
++
++/**
++ * of_hwspin_lock_get_base_id() - OF helper to retrieve base id
++ * @dn: device node pointer
++ *
++ * This is an OF helper function that can be called by the underlying
++ * platform-specific implementations, to retrieve the base id for the
++ * set of locks present within a hwspinlock device instance.
++ *
++ * Returns the base id value on success, or an appropriate error code
++ * as returned by the OF layer
++ */
++int of_hwspin_lock_get_base_id(struct device_node *dn)
++{
++	unsigned int val;
++	int ret;
++
++	ret = of_property_read_u32(dn, "hwlock-base-id", &val);
++	return ret ? ret : val;
++}
++EXPORT_SYMBOL_GPL(of_hwspin_lock_get_base_id);
++
++/**
++ * of_hwspin_lock_get_num_locks() - OF helper to retrieve number of locks
++ * @dn: device node pointer
++ *
++ * This is an OF helper function that can be called by the underlying
++ * platform-specific implementations, to retrieve the number of locks
++ * present within a hwspinlock device instance. The hwlock-num-locks
++ * DT property may be optional for some platforms, while mandatory for
++ * some others, so this function is typically called only by needed
++ * platform-specific implementations.
++ *
++ * Returns a positive number of locks on success, -ENODEV on generic
++ * failure or an appropriate error code as returned by the OF layer
++ */
++int of_hwspin_lock_get_num_locks(struct device_node *dn)
++{
++	unsigned int val;
++	int ret = -ENODEV;
++
++	ret = of_property_read_u32(dn, "hwlock-num-locks", &val);
++	if (!ret)
++		ret = val ? val : -ENODEV;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_hwspin_lock_get_num_locks);
++
+ static int hwspin_lock_register_single(struct hwspinlock *hwlock, int id)
+ {
+ 	struct hwspinlock *tmp;
+diff --git a/include/linux/hwspinlock.h b/include/linux/hwspinlock.h
+index 3343298..a9eeb4f 100644
+--- a/include/linux/hwspinlock.h
++++ b/include/linux/hwspinlock.h
+@@ -26,6 +26,7 @@
+ #define HWLOCK_IRQ	0x02	/* Disable interrupts, don't save state */
+ 
+ struct device;
++struct device_node;
+ struct hwspinlock;
+ struct hwspinlock_device;
+ struct hwspinlock_ops;
+@@ -60,12 +61,15 @@ struct hwspinlock_pdata {
+ 
+ #if defined(CONFIG_HWSPINLOCK) || defined(CONFIG_HWSPINLOCK_MODULE)
+ 
++int of_hwspin_lock_get_base_id(struct device_node *dn);
++int of_hwspin_lock_get_num_locks(struct device_node *dn);
+ int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
+ 		const struct hwspinlock_ops *ops, int base_id, int num_locks);
+ int hwspin_lock_unregister(struct hwspinlock_device *bank);
+ struct hwspinlock *hwspin_lock_request(void);
+ struct hwspinlock *hwspin_lock_request_specific(unsigned int id);
+ int hwspin_lock_free(struct hwspinlock *hwlock);
++int of_hwspin_lock_get_id(struct device_node *np, int index);
+ int hwspin_lock_get_id(struct hwspinlock *hwlock);
+ int __hwspin_lock_timeout(struct hwspinlock *, unsigned int, int,
+ 							unsigned long *);
+@@ -80,9 +84,9 @@ void __hwspin_unlock(struct hwspinlock *, int, unsigned long *);
+  * code path get compiled away. This way, if CONFIG_HWSPINLOCK is not
+  * required on a given setup, users will still work.
+  *
+- * The only exception is hwspin_lock_register/hwspin_lock_unregister, with which
+- * we _do_ want users to fail (no point in registering hwspinlock instances if
+- * the framework is not available).
++ * The only exception is hwspin_lock_register/hwspin_lock_unregister and
++ * associated OF helpers, with which we _do_ want users to fail (no point
++ * in registering hwspinlock instances if the framework is not available).
+  *
+  * Note: ERR_PTR(-ENODEV) will still be considered a success for NULL-checking
+  * users. Others, which care, can still check this with IS_ERR.
+@@ -120,6 +124,11 @@ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
+ {
+ }
+ 
++static inline int of_hwspin_lock_get_id(struct device_node *np, int index)
++{
++	return 0;
++}
++
+ static inline int hwspin_lock_get_id(struct hwspinlock *hwlock)
+ {
+ 	return 0;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/10f96815/attachment-0001.sig>
+2.0.4
