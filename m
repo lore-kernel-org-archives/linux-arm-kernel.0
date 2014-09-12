@@ -1,55 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Sep 2014 15:39:36 +0100
-Subject: [GIT PULL] arm64: couple of fixes for -rc5
-Message-ID: <20140912143936.GI6871@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Sep 2014 15:51:02 +0100
+Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
+In-Reply-To: <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140912145102.GB5532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Sep 12, 2014 at 03:00:03PM +0100, Hanjun Guo wrote:
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
+>  
+>  # Power management related files
+>  acpi-y				+= wakeup.o
+> +ifeq ($(ARCH), arm64)
+> +acpi-y				+= sleep-arm.o
+> +else # X86, IA64
+>  acpi-y				+= sleep.o
+> +endif
+>  acpi-y				+= device_pm.o
+>  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
 
-Please can you pull these two arm64 fixes for -rc5? The IRQ migration fix
-turned up late last time and there's also a TLS leaking issue that we
-just fixed for arch/arm/ too.
+What about:
 
-To keep things interesting, I've signed the tag using my Yubikey from KS.
-Given that it only supports 2048-bit keys, I've used a new subkey so you
-may need to update your keyring to verify the signature.
+-acpi-y				+= sleep.o
++acpi-$(CONFIG_ACPI_SLEEP)	+= sleep.o
 
-Cheers,
+and make CONFIG_ACPI_SLEEP depend on !ARM64? Does the kernel compile if
+you disable CONFIG_ACPI_SLEEP?
 
-Will
-
---->8
-
-The following changes since commit 5e39977edf6500fd12f169e6c458d33b0ef62feb:
-
-  Revert "arm64: cpuinfo: print info for all CPUs" (2014-09-01 15:55:22 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to eb35bdd7bca29a13c8ecd44e6fd747a84ce675db:
-
-  arm64: flush TLS registers during exec (2014-09-11 18:34:58 +0100)
-
-----------------------------------------------------------------
-arm64 fixes for -rc5
-
-Just a couple of stragglers here:
-
-  - Fix an issue migrating interrupts on CPU hotplug
-  - Fix a potential information leak of TLS registers across an exec
-    (Nathan has sent a corresponding patch for arch/arm/ to rmk)
-
-----------------------------------------------------------------
-Sudeep Holla (1):
-      arm64: use irq_set_affinity with force=false when migrating irqs
-
-Will Deacon (1):
-      arm64: flush TLS registers during exec
-
- arch/arm64/kernel/irq.c        | 12 ++++--------
- arch/arm64/kernel/process.c    | 18 ++++++++++++++++++
- arch/arm64/kernel/sys_compat.c |  6 ++++++
- 3 files changed, 28 insertions(+), 8 deletions(-)
+-- 
+Catalin
