@@ -1,81 +1,146 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 12 Sep 2014 19:32:22 +0200
-Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
-In-Reply-To: <20140912134632.GE1930@katana>
-References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
- <20140912134632.GE1930@katana>
-Message-ID: <CABxcv==OXd+uePcB8zDzB-DDmr9ci6zscHX5TCauWoTO6E4fpg@mail.gmail.com>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Fri, 12 Sep 2014 19:35:08 +0200
+Subject: [PATCH arm64-next v2] net: bpf: arm64: address randomize and write
+ protect JIT code
+Message-ID: <1410543308-27449-1-git-send-email-dborkman@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Sjoerd as cc who was the one that raised the module auto-loading issue]
+This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
+jit against spraying attacks").
 
-Hello,
+Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
+support") which added necessary infrastructure, we can now implement
+RO marking of eBPF generated JIT image pages and randomize start offset
+for the JIT code, so that it does not reside directly on a page boundary
+anymore. Likewise, the holes are filled with illegal instructions.
 
-On Fri, Sep 12, 2014 at 3:46 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
->>
->> Placing this firmly back on your plate.  I truly hope we don't miss
->> another merge-window.  This patch-set has the support of some pretty
->> senior kernel maintainers, so I hope acceptance shouldn't be too
->> difficult.
->>
->> As previously discussed I believe it should be okay for an I2C device
->> driver _not_ supply an I2C ID table to match to.  The I2C subsystem
->> should be able to match via other means, such as via OF tables.  The
->> blocking factor during our previous conversation was to keep
->> registering via sysfs up and running.  This set does that.
->
-> As mentioned in another thread, modaliases are one other possible side
-> effect. As Javier correctly mentions, the beaviour does not really
-> change with your patchset. Yet, if we remove i2c_device_id from drivers
-> too carelessly, they might not be bound anymore.
->
+This is basically the ARM64 variant of what we already have in ARM via
+commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
+JIT code"). Moreover, this commit also presents a merge resolution due to
+conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
+read-only") as we don't use kfree() in bpf_jit_free() anymore to release
+the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
+a different allocator.
 
-Right, removing the I2C ID table even from drivers that don't really
-need it (e.g: IP blocks only present in DT platforms) will as you said
-break module auto-loading. Probing will work since the OF table is
-used to match the device in i2c_device_match() but is the I2C table
-what is used to fill the valid module aliases with the current
-behavior of i2c_device_uevent(), the aliases filled from the OF table
-are never used.
+JIT tested on aarch64 with BPF test suite.
 
-So what I propose is to do it incrementally:
+Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
+Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Alexei Starovoitov <ast@plumgrid.com>
+---
+ v1 -> v2:
+  - Use brk insn as suggested by Catalin, thanks a lot for
+    your feedback! Rest unchanged.
+ Note:
+  - This patch depends on net-next being merged to mainline due
+    to the mentioned merge conflict.
 
-1) Merge Lee's series since that is definitely a step in the right
-direction to not make an I2C table mandatory (still will be needed for
-module auto loading though).
+ arch/arm64/net/bpf_jit_comp.c | 38 +++++++++++++++++++++++++++++---------
+ 1 file changed, 29 insertions(+), 9 deletions(-)
 
-2) On a follow-up series, make sure that all I2C drivers have a proper
-OF table and that are using the MODULE_DEVICE_TABLE(of,...) macro to
-fill the of:<foo> module aliases. That way the modules will have the
-proper aliases of the form "of:<foo>" besides the "i2c:<foo>" one.
-(even when always i2c:<foo> is reported to user-space currently).
-
-3) Apply the patch I posted [0] that changes the behavior of
-i2c_device_uevent() to report the OF uevent env vars to user-space in
-case of DT probing which after 2) should not regress any driver module
-auto-loading since all drivers should fill the of:<foo> aliases.
-
-After this, DT-only drivers will only need an OF table and legacy
-drivers will only need an I2C table. Drivers that support both will
-still need the two tables though which is a drawback of this approach
-since unnecessary duplication will exist on these drivers and can
-cause issues when both tables are not in sync as we saw on the issue
-reported by Sjoerd on [1].
-
-So an alternate approach could be to do the opposite, just remove the
-OF tables entirely from the I2C drivers and only use the I2C table
-even for DT-only drivers. This is possible since i2c_device_match()
-will succeed even without an OF table because i2c_match_id() matches
-for compatible strings and what is reported as uevent is what is in
-the I2C table anyways. I believe that is what Sjoerd suggested but
-I'll let him comment on that in case I misunderstood.
-
-By the way, the SPI subsystem has the same behavior, I raised the issue on [2].
-
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2014/9/11/269
-[1]: https://lkml.org/lkml/2014/9/9/100
-[2]: https://lkml.org/lkml/2014/9/11/458
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index 7ae3354..4b71779 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -19,7 +19,6 @@
+ #define pr_fmt(fmt) "bpf_jit: " fmt
+ 
+ #include <linux/filter.h>
+-#include <linux/moduleloader.h>
+ #include <linux/printk.h>
+ #include <linux/skbuff.h>
+ #include <linux/slab.h>
+@@ -119,6 +118,15 @@ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
+ 	return to - from;
+ }
+ 
++static void jit_fill_hole(void *area, unsigned int size)
++{
++	/* We use brk #0x100 to trigger a fault. */
++	u32 *ptr, fill_ins = 0xd4202000;
++	/* We are guaranteed to have aligned memory. */
++	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
++		*ptr++ = fill_ins;
++}
++
+ static inline int epilogue_offset(const struct jit_ctx *ctx)
+ {
+ 	int to = ctx->offset[ctx->prog->len - 1];
+@@ -613,8 +621,10 @@ void bpf_jit_compile(struct bpf_prog *prog)
+ 
+ void bpf_int_jit_compile(struct bpf_prog *prog)
+ {
++	struct bpf_binary_header *header;
+ 	struct jit_ctx ctx;
+ 	int image_size;
++	u8 *image_ptr;
+ 
+ 	if (!bpf_jit_enable)
+ 		return;
+@@ -636,23 +646,25 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
+ 		goto out;
+ 
+ 	build_prologue(&ctx);
+-
+ 	build_epilogue(&ctx);
+ 
+ 	/* Now we know the actual image size. */
+ 	image_size = sizeof(u32) * ctx.idx;
+-	ctx.image = module_alloc(image_size);
+-	if (unlikely(ctx.image == NULL))
++	header = bpf_jit_binary_alloc(image_size, &image_ptr,
++				      sizeof(u32), jit_fill_hole);
++	if (header == NULL)
+ 		goto out;
+ 
+ 	/* 2. Now, the actual pass. */
+ 
++	ctx.image = (u32 *)image_ptr;
+ 	ctx.idx = 0;
++
+ 	build_prologue(&ctx);
+ 
+ 	ctx.body_offset = ctx.idx;
+ 	if (build_body(&ctx)) {
+-		module_free(NULL, ctx.image);
++		bpf_jit_binary_free(header);
+ 		goto out;
+ 	}
+ 
+@@ -663,17 +675,25 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
+ 		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
+ 
+ 	bpf_flush_icache(ctx.image, ctx.image + ctx.idx);
++
++	set_memory_ro((unsigned long)header, header->pages);
+ 	prog->bpf_func = (void *)ctx.image;
+ 	prog->jited = 1;
+-
+ out:
+ 	kfree(ctx.offset);
+ }
+ 
+ void bpf_jit_free(struct bpf_prog *prog)
+ {
+-	if (prog->jited)
+-		module_free(NULL, prog->bpf_func);
++	unsigned long addr = (unsigned long)prog->bpf_func & PAGE_MASK;
++	struct bpf_binary_header *header = (void *)addr;
++
++	if (!prog->jited)
++		goto free_filter;
++
++	set_memory_rw(addr, header->pages);
++	bpf_jit_binary_free(header);
+ 
+-	kfree(prog);
++free_filter:
++	bpf_prog_unlock_free(prog);
+ }
+-- 
+1.9.3
