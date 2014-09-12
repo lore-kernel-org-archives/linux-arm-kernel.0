@@ -1,66 +1,134 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 11 Sep 2014 21:29:48 -0700
-Subject: Q about driver code for KSZ8873MML
-In-Reply-To: <20140912040744.GD2522@tarshish>
-References: <CAH=J7GMQMGhEgiGQiXru1P4zdZjemFwwWrUjhRWBN+jS-qsF=Q@mail.gmail.com>
- <20140912040744.GD2522@tarshish>
-Message-ID: <541276BC.7000705@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 12 Sep 2014 07:33:06 +0200
+Subject: [PATCH v5 5/9] rtc: at91sam9: make use of syscon/regmap to
+ access GPBR registers
+In-Reply-To: <20140911174209.GE3131@piout.net>
+References: <1410441525-25258-6-git-send-email-boris.brezillon@free-electrons.com>
+ <1410443588-9092-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911174209.GE3131@piout.net>
+Message-ID: <20140912073306.5ac2c295@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/14 21:07, Baruch Siach wrote:
-> Hi Patrick,
->
-> On Thu, Sep 11, 2014 at 10:40:29PM -0400, Patrick Boyle wrote:
->> In the linux/include/micrel_phy.h file the PHY ID for the KSZ8873MML
->> is defined as (0x000e7237)
->>
->> #define MICREL_PHY_ID_MASK     0x00fffff0
->>
->> #define PHY_ID_KSZ8873MLL      0x000e7237
->> #define PHY_ID_KSZ9021         0x00221610
->> #define PHY_ID_KSZ8737         0x00221720
->> /* same id: KS8021, KS8031 */
->> #define PHY_ID_KSZ8021         0x00221555
->> #define PHY_ID_KSZ8041         0x00221510
->> #define PHY_ID_KSZ8051         0x00221550
->> /* same id: ks8001 Rev. A/B, and ks8721 Rev 3. */
->> #define PHY_ID_KSZ8001         0x0022161A
->> /* same id: KS8081, KS8091 */
->> #define PHY_ID_KSZ8081         0x00221560
->> #define PHY_ID_KSZ8061         0x00221570
->> #define PHY_ID_KSZ9031         0x00221620
->>
->> /* struct phy_device dev_flags definitions */
->> #define MICREL_PHY_50MHZ_CLK   0x00000001
->>
->> But the datasheet from Micrel for this part (and using mii to probe
->> the part on my board) shows:
->>
->> 0x00221430
->>
->> So where did 0x000e7237 come from?
->
-> git has a wonderful tool called 'git blame'. This tool indicates that the
->
-> #define PHY_ID_KSZ8873MLL      0x000e7237
->
-> line comes from commit 93272e07d8539c
-> (http://git.kernel.org/linus/93272e07d8539c) by Jean-Christophe
-> PLAGNIOL-VILLARD (added to Cc).
+On Thu, 11 Sep 2014 19:42:09 +0200
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-Since that chip is an Ethernet switch, one possible confusion, which is 
-is easy to get is that the chip will reply with a different value 
-depending on whether you access one of its port PHY address (e.g: 1 
-through 3 for the KSZ8873ML) or if you access the switch 
-pseudo-PHY/global/control address (e.g: 16 for Marvell, 30 for Broadcom).
+> On 11/09/2014 at 15:53:08 +0200, Boris Brezillon wrote :
+> > The GPBR registers are not part of the RTT block and thus should not be
+> > defined in the reg property of the rtt node.
+> > 
+> > Use syscon to provide a proper DT representation and reference the GPBR
+> > syscon device in a new "atmel,time-reg" property which store both the
+> > syscon device phandle and the register offset within the GPBR block.
+> > 
+> > When using non DT boards, we won't be able to retrieve the syscon regmap,
+> > hence we need to create our own regmap using the memory region defined
+> > in the 2nd memory resource assigned to the RTT platform device.
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/rtc/Kconfig        |  1 +
+> >  drivers/rtc/rtc-at91sam9.c | 59 +++++++++++++++++++++++++++++++++++++++-------
+> >  2 files changed, 51 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> > index a168e96..7d76da8 100644
+> > --- a/drivers/rtc/Kconfig
+> > +++ b/drivers/rtc/Kconfig
+> > @@ -1081,6 +1081,7 @@ config RTC_DRV_AT91RM9200
+> >  config RTC_DRV_AT91SAM9
+> >  	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
+> >  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
+> > +	select MFD_SYSCON
+> >  	help
+> >  	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
+> >  	  (Real Time Timer). These timers are powered by the backup power
+> > diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> > index d72c34d..944e317 100644
+> > --- a/drivers/rtc/rtc-at91sam9.c
+> > +++ b/drivers/rtc/rtc-at91sam9.c
+> > @@ -21,6 +21,8 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/platform_data/atmel.h>
+> >  #include <linux/io.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/regmap.h>
+> >  
+> >  /*
+> >   * This driver uses two configurable hardware resources that live in the
+> > @@ -72,7 +74,8 @@ struct sam9_rtc {
+> >  	void __iomem		*rtt;
+> >  	struct rtc_device	*rtcdev;
+> >  	u32			imr;
+> > -	void __iomem		*gpbr;
+> > +	struct regmap		*gpbr;
+> > +	unsigned int		gpbr_offset;
+> >  	int 			irq;
+> >  };
+> >  
+> > @@ -81,10 +84,19 @@ struct sam9_rtc {
+> >  #define rtt_writel(rtc, field, val) \
+> >  	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+> >  
+> > -#define gpbr_readl(rtc) \
+> > -	readl((rtc)->gpbr)
+> > -#define gpbr_writel(rtc, val) \
+> > -	writel((val), (rtc)->gpbr)
+> > +static inline unsigned int gpbr_readl(struct sam9_rtc *rtc)
+> > +{
+> > +	unsigned int val;
+> > +
+> > +	regmap_read(rtc->gpbr, rtc->gpbr_offset, &val);
+> > +
+> > +	return val;
+> > +}
+> > +
+> > +static inline void gpbr_writel(struct sam9_rtc *rtc, unsigned int val)
+> > +{
+> > +	regmap_write(rtc->gpbr, rtc->gpbr_offset, val);
+> > +}
+> >  
+> >  /*
+> >   * Read current time and date in RTC
+> > @@ -301,6 +313,12 @@ static const struct rtc_class_ops at91_rtc_ops = {
+> >  	.alarm_irq_enable = at91_rtc_alarm_irq_enable,
+> >  };
+> >  
+> > +static struct regmap_config gpbr_regmap_config = {
+> > +	.reg_bits = 32,
+> > +	.val_bits = 32,
+> > +	.reg_stride = 4,
+> > +};
+> > +
+> >  /*
+> >   * Initialize and install RTC driver
+> >   */
+> > @@ -334,10 +352,33 @@ static int at91_rtc_probe(struct platform_device *pdev)
+> >  	if (IS_ERR(rtc->rtt))
+> >  		return PTR_ERR(rtc->rtt);
+> >  
+> > -	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > -	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
+> > -	if (IS_ERR(rtc->gpbr))
+> > -		return PTR_ERR(rtc->rtt);
+> > +	if (!pdev->dev.of_node) {
+> > +		void __iomem *gpbr;
+> > +
+> > +		r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> > +		gpbr = devm_ioremap_resource(&pdev->dev, r);
+> > +		if (IS_ERR(gpbr))
+> > +			return PTR_ERR(gpbr);
+> > +
+> 
+> Maybe you could add a comment here as this is soon to be dead code.
 
-The correct value indeed seems to be 0x00221430 when accessing PHYAD1 or 
-PHYAD2. What you can do to prevent the same PHY driver from trying to 
-bind multiple time to the per-port PHYs is to register a PHY fixup 
-similar to these ones:
+Sure. I'll add a TODO comment.
 
-https://dev.openwrt.org/browser/trunk/target/linux/generic/files/drivers/net/phy/mvswitch.c#L389
-https://dev.openwrt.org/browser/trunk/target/linux/generic/files/drivers/net/phy/b53/b53_phy_fixup.c
---
-Florian
+Thanks.
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
