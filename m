@@ -1,134 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 12 Sep 2014 07:33:06 +0200
-Subject: [PATCH v5 5/9] rtc: at91sam9: make use of syscon/regmap to
- access GPBR registers
-In-Reply-To: <20140911174209.GE3131@piout.net>
-References: <1410441525-25258-6-git-send-email-boris.brezillon@free-electrons.com>
- <1410443588-9092-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911174209.GE3131@piout.net>
-Message-ID: <20140912073306.5ac2c295@bbrezillon>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 12 Sep 2014 13:49:58 +0800
+Subject: [PATCH] ARM: imx: fix register offset of pll7_usb_host gate clock
+Message-ID: <1410500998-6222-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014 19:42:09 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+There is a copy&paste error on register offset of pll7_usb_host gate
+clock introduced by i.MX6 PLL bypass support patches.  The error breaks
+the ENET function, because it overwrites the pll6_enet gate bit.
 
-> On 11/09/2014 at 15:53:08 +0200, Boris Brezillon wrote :
-> > The GPBR registers are not part of the RTT block and thus should not be
-> > defined in the reg property of the rtt node.
-> > 
-> > Use syscon to provide a proper DT representation and reference the GPBR
-> > syscon device in a new "atmel,time-reg" property which store both the
-> > syscon device phandle and the register offset within the GPBR block.
-> > 
-> > When using non DT boards, we won't be able to retrieve the syscon regmap,
-> > hence we need to create our own regmap using the memory region defined
-> > in the 2nd memory resource assigned to the RTT platform device.
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/rtc/Kconfig        |  1 +
-> >  drivers/rtc/rtc-at91sam9.c | 59 +++++++++++++++++++++++++++++++++++++++-------
-> >  2 files changed, 51 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> > index a168e96..7d76da8 100644
-> > --- a/drivers/rtc/Kconfig
-> > +++ b/drivers/rtc/Kconfig
-> > @@ -1081,6 +1081,7 @@ config RTC_DRV_AT91RM9200
-> >  config RTC_DRV_AT91SAM9
-> >  	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
-> >  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
-> > +	select MFD_SYSCON
-> >  	help
-> >  	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
-> >  	  (Real Time Timer). These timers are powered by the backup power
-> > diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> > index d72c34d..944e317 100644
-> > --- a/drivers/rtc/rtc-at91sam9.c
-> > +++ b/drivers/rtc/rtc-at91sam9.c
-> > @@ -21,6 +21,8 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/platform_data/atmel.h>
-> >  #include <linux/io.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/regmap.h>
-> >  
-> >  /*
-> >   * This driver uses two configurable hardware resources that live in the
-> > @@ -72,7 +74,8 @@ struct sam9_rtc {
-> >  	void __iomem		*rtt;
-> >  	struct rtc_device	*rtcdev;
-> >  	u32			imr;
-> > -	void __iomem		*gpbr;
-> > +	struct regmap		*gpbr;
-> > +	unsigned int		gpbr_offset;
-> >  	int 			irq;
-> >  };
-> >  
-> > @@ -81,10 +84,19 @@ struct sam9_rtc {
-> >  #define rtt_writel(rtc, field, val) \
-> >  	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
-> >  
-> > -#define gpbr_readl(rtc) \
-> > -	readl((rtc)->gpbr)
-> > -#define gpbr_writel(rtc, val) \
-> > -	writel((val), (rtc)->gpbr)
-> > +static inline unsigned int gpbr_readl(struct sam9_rtc *rtc)
-> > +{
-> > +	unsigned int val;
-> > +
-> > +	regmap_read(rtc->gpbr, rtc->gpbr_offset, &val);
-> > +
-> > +	return val;
-> > +}
-> > +
-> > +static inline void gpbr_writel(struct sam9_rtc *rtc, unsigned int val)
-> > +{
-> > +	regmap_write(rtc->gpbr, rtc->gpbr_offset, val);
-> > +}
-> >  
-> >  /*
-> >   * Read current time and date in RTC
-> > @@ -301,6 +313,12 @@ static const struct rtc_class_ops at91_rtc_ops = {
-> >  	.alarm_irq_enable = at91_rtc_alarm_irq_enable,
-> >  };
-> >  
-> > +static struct regmap_config gpbr_regmap_config = {
-> > +	.reg_bits = 32,
-> > +	.val_bits = 32,
-> > +	.reg_stride = 4,
-> > +};
-> > +
-> >  /*
-> >   * Initialize and install RTC driver
-> >   */
-> > @@ -334,10 +352,33 @@ static int at91_rtc_probe(struct platform_device *pdev)
-> >  	if (IS_ERR(rtc->rtt))
-> >  		return PTR_ERR(rtc->rtt);
-> >  
-> > -	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > -	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
-> > -	if (IS_ERR(rtc->gpbr))
-> > -		return PTR_ERR(rtc->rtt);
-> > +	if (!pdev->dev.of_node) {
-> > +		void __iomem *gpbr;
-> > +
-> > +		r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > +		gpbr = devm_ioremap_resource(&pdev->dev, r);
-> > +		if (IS_ERR(gpbr))
-> > +			return PTR_ERR(gpbr);
-> > +
-> 
-> Maybe you could add a comment here as this is soon to be dead code.
+Correct the offset for all i.MX6 clock drivers.
 
-Sure. I'll add a TODO comment.
+Thanks to Fugang Duan <B38611@freescale.com> for spotting the error.
 
-Thanks.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c  | 2 +-
+ arch/arm/mach-imx/clk-imx6sl.c | 2 +-
+ arch/arm/mach-imx/clk-imx6sx.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Boris
-
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4ee6e77a0fdf..4f8ce60a2e90 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -187,7 +187,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
+ 	clk[IMX6QDL_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
+ 	clk[IMX6QDL_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
+-	clk[IMX6QDL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
++	clk[IMX6QDL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0x20, 13);
+ 
+ 	/*
+ 	 * Bit 20 is the reserved and read-only bit, we do this only for:
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index c8de87bc617f..e982ebe10814 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -243,7 +243,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SL_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
+ 	clks[IMX6SL_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
+ 	clks[IMX6SL_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
+-	clks[IMX6SL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
++	clks[IMX6SL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0x20, 13);
+ 
+ 	clks[IMX6SL_CLK_LVDS1_SEL] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
+ 	clks[IMX6SL_CLK_LVDS1_OUT] = imx_clk_gate_exclusive("lvds1_out", "lvds1_sel", base + 0x160, 10, BIT(12));
+diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
+index 27070a716935..17354a11356f 100644
+--- a/arch/arm/mach-imx/clk-imx6sx.c
++++ b/arch/arm/mach-imx/clk-imx6sx.c
+@@ -198,7 +198,7 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SX_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
+ 	clks[IMX6SX_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
+ 	clks[IMX6SX_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
+-	clks[IMX6SX_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
++	clks[IMX6SX_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0x20, 13);
+ 
+ 	/*
+ 	 * Bit 20 is the reserved and read-only bit, we do this only for:
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
