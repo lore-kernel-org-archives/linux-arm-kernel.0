@@ -1,45 +1,38 @@
-From: cernekee@gmail.com (Kevin Cernekee)
-Date: Thu, 11 Sep 2014 19:22:42 -0700
-Subject: [PATCH 3/3] ARM: Allow either FLATMEM or SPARSEMEM on the multi-v7
- build
-In-Reply-To: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
-References: <1410488562-21863-1-git-send-email-cernekee@gmail.com>
-Message-ID: <1410488562-21863-3-git-send-email-cernekee@gmail.com>
+From: fishgolf@gmail.com (Patrick Boyle)
+Date: Thu, 11 Sep 2014 22:40:29 -0400
+Subject: Q about driver code for KSZ8873MML
+Message-ID: <CAH=J7GMQMGhEgiGQiXru1P4zdZjemFwwWrUjhRWBN+jS-qsF=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv7 chips with LPAE can often benefit from SPARSEMEM, as portions of
-system memory can be located deep in the 36-bit address space.  Allow
-FLATMEM or SPARSEMEM to be selectable at compile time; FLATMEM remains
-the default.
+In the linux/include/micrel_phy.h file the PHY ID for the KSZ8873MML
+is defined as (0x000e7237)
 
-Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
----
- arch/arm/Kconfig |    5 +++++
- 1 file changed, 5 insertions(+)
+#define MICREL_PHY_ID_MASK     0x00fffff0
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c3daeaf..db7614e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -821,6 +821,8 @@ config ARCH_MULTI_V7
- 	bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
- 	default y
- 	select ARCH_MULTI_V6_V7
-+	select ARCH_FLATMEM_ENABLE
-+	select ARCH_SPARSEMEM_ENABLE
- 	select CPU_V7
- 	select HAVE_SMP
- 
-@@ -1632,6 +1634,9 @@ config OABI_COMPAT
- config ARCH_HAS_HOLES_MEMORYMODEL
- 	bool
- 
-+config ARCH_FLATMEM_ENABLE
-+	bool
-+
- config ARCH_SPARSEMEM_ENABLE
- 	bool
- 
--- 
-1.7.9.5
+#define PHY_ID_KSZ8873MLL      0x000e7237
+#define PHY_ID_KSZ9021         0x00221610
+#define PHY_ID_KSZ8737         0x00221720
+/* same id: KS8021, KS8031 */
+#define PHY_ID_KSZ8021         0x00221555
+#define PHY_ID_KSZ8041         0x00221510
+#define PHY_ID_KSZ8051         0x00221550
+/* same id: ks8001 Rev. A/B, and ks8721 Rev 3. */
+#define PHY_ID_KSZ8001         0x0022161A
+/* same id: KS8081, KS8091 */
+#define PHY_ID_KSZ8081         0x00221560
+#define PHY_ID_KSZ8061         0x00221570
+#define PHY_ID_KSZ9031         0x00221620
+
+/* struct phy_device dev_flags definitions */
+#define MICREL_PHY_50MHZ_CLK   0x00000001
+
+But the datasheet from Micrel for this part (and using mii to probe
+the part on my board) shows:
+
+0x00221430
+
+So where did 0x000e7237 come from?
+
+Thanks
+Patrick Boyle
