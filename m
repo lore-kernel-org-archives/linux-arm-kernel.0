@@ -1,121 +1,25 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 12 Sep 2014 15:56:48 -0500
-Subject: [RFC PATCHv2 3/3] hwspinlock/core: add support for reserved locks
-In-Reply-To: <1410555408-56954-1-git-send-email-s-anna@ti.com>
-References: <1410555408-56954-1-git-send-email-s-anna@ti.com>
-Message-ID: <1410555408-56954-4-git-send-email-s-anna@ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 12 Sep 2014 14:05:53 -0700
+Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
+In-Reply-To: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
+References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140912210553.GA27924@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HwSpinlock core allows requesting either a specific lock or an
-available normal lock. The specific locks are usually reserved during
-board init time, while the normal available locks are intended to be
-assigned at runtime for clients that do not care about a specific
-lock.
+Hi Ulf,
 
-The HwSpinlock core has been enhanced to:
-  1. mark certain locks as 'reserved' by parsing the DT blob for any
-     locks used by client nodes.
-  2. restrict the anonymous hwspin_lock_request() API to allocate only
-     from non-reserved locks for DT boots.
-  3. limit these reserved locks to be allocated only using the
-     hwspin_lock_request_specific() API for DT boots.
+On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
+> To give callers the option of acting on a errors while removing the
+> pm_domain ops for the device in the ACPI PM domain, let
+> acpi_dev_pm_detach() return an int to provide the error code.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- drivers/hwspinlock/hwspinlock_core.c | 61 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 59 insertions(+), 2 deletions(-)
+So how would callers handle the errors? As far as I can see
+acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
+there is no meaningful strategy to handle errors as you are past the point of
+no return and you keep on tearing down the device.
 
-diff --git a/drivers/hwspinlock/hwspinlock_core.c b/drivers/hwspinlock/hwspinlock_core.c
-index f0d8475..d49a077 100644
---- a/drivers/hwspinlock/hwspinlock_core.c
-+++ b/drivers/hwspinlock/hwspinlock_core.c
-@@ -474,6 +474,53 @@ static int hwspinlock_device_add(struct hwspinlock_device *bank)
- }
- 
- /**
-+ * hwspin_mark_reserved_locks() - mark reserved locks
-+ *
-+ * This is an internal function that mark all the reserved locks within
-+ * a hwspinlock device during the registration phase, and is applicable
-+ * only for device-tree boots. The locks are marked by browsing through
-+ * all the user nodes with the property "hwlocks", so that a separate
-+ * property is not needed in the hwspinlock device itself. Note that it
-+ * also marks locks used on disabled user nodes.
-+ */
-+static void hwspin_mark_reserved_locks(struct hwspinlock_device *bank)
-+{
-+	struct device_node *np = bank->dev->of_node;
-+	const char *prop_name = "hwlocks";
-+	const char *cells_name = "#hwlock-cells";
-+	struct device_node *node = NULL;
-+	struct of_phandle_args args;
-+	struct hwspinlock *hwlock;
-+	int i, id, count, ret;
-+
-+	for_each_node_with_property(node, prop_name) {
-+		count = of_count_phandle_with_args(node, prop_name, cells_name);
-+		if (count <= 0)
-+			continue;
-+
-+		for (i = 0; i < count; i++, of_node_put(args.np)) {
-+			args.np = NULL;
-+			ret = of_parse_phandle_with_args(node, prop_name,
-+							 cells_name, i, &args);
-+			if (ret || np != args.np)
-+				continue;
-+
-+			id = of_hwspin_lock_simple_xlate(bank, &args);
-+			if (id < 0 || id >= bank->num_locks)
-+				continue;
-+
-+			hwlock = &bank->lock[id];
-+			if (hwlock->type == HWSPINLOCK_RESERVED) {
-+				dev_err(bank->dev, "potential reuse of hwspinlock %d between multiple clients on %s\n",
-+					id, np->full_name);
-+				continue;
-+			}
-+			hwlock->type = HWSPINLOCK_RESERVED;
-+		}
-+	}
-+}
-+
-+/**
-  * hwspin_lock_register() - register a new hw spinlock device
-  * @bank: the hwspinlock device, which usually provides numerous hw locks
-  * @dev: the backing device
-@@ -511,12 +558,16 @@ int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
- 	if (ret)
- 		return ret;
- 
-+	if (dev->of_node)
-+		hwspin_mark_reserved_locks(bank);
-+
- 	for (i = 0; i < num_locks; i++) {
- 		hwlock = &bank->lock[i];
- 
- 		spin_lock_init(&hwlock->lock);
- 		hwlock->bank = bank;
--		hwlock->type = HWSPINLOCK_UNUSED;
-+		if (hwlock->type != HWSPINLOCK_RESERVED)
-+			hwlock->type = HWSPINLOCK_UNUSED;
- 
- 		ret = hwspin_lock_register_single(hwlock, base_id + i);
- 		if (ret)
-@@ -699,7 +750,13 @@ struct hwspinlock *hwspin_lock_request_specific(unsigned int id)
- 	/* sanity check (this shouldn't happen) */
- 	WARN_ON(hwlock_to_id(hwlock) != id);
- 
--	/* make sure this hwspinlock is unused */
-+	if (hwlock->bank->dev->of_node && hwlock->type != HWSPINLOCK_RESERVED) {
-+		pr_warn("hwspinlock %u is not a reserved lock\n", id);
-+		hwlock = NULL;
-+		goto out;
-+	}
-+
-+	/* make sure this hwspinlock is an unused reserved lock */
- 	ret = radix_tree_tag_get(&hwspinlock_tree, id, hwlock->type);
- 	if (ret == 0) {
- 		pr_warn("hwspinlock %u is already in use\n", id);
+Thanks. 
+
 -- 
-2.0.4
+Dmitry
