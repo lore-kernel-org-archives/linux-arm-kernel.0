@@ -1,48 +1,71 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Fri, 12 Sep 2014 18:20:57 +0200
-Subject: [PATCH v2 1/2] ARM: tegra: apalis/colibri t30: integrate audio
- support
-In-Reply-To: <5410C222.2020602@wwwdotorg.org>
-References: <cover.1410362950.git.marcel@ziswiler.com>
- <00f249b3d648d3a8d550c5db0737f3aa6d93f07e.1410362950.git.marcel@ziswiler.com>
- <5410C222.2020602@wwwdotorg.org>
-Message-ID: <1410538857.15150.22.camel@localhost.localdomain>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 12 Sep 2014 09:25:04 -0700
+Subject: [PATCH v3] PM / AVS: rockchip-io: add driver handling Rockchip io
+ domains
+In-Reply-To: <1410475735-10278-1-git-send-email-dianders@chromium.org> (Doug
+ Anderson's message of "Thu, 11 Sep 2014 15:48:55 -0700")
+References: <1410475735-10278-1-git-send-email-dianders@chromium.org>
+Message-ID: <7hy4tog61r.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-09-10 at 15:26 -0600, Stephen Warren wrote:
-> No, definitely not; this patch has significant semantic changes since I 
-> reviewed it.
+Rafael,
 
-OK, sorry. Admittedly this was probably a little bit too quick a shot.
-The solution looked so clean and on first sight worked just fine.
+Doug Anderson <dianders@chromium.org> writes:
 
-> I'm not sure how this can work. Certainly all 3 clocks that are required 
-> for audio are mentioned here. However, the PLL_A clock (which then 
-> trickles down to the other 2) needs to have its rate changed based on 
-> whether the sample rate is 44.1KHz- or 48KHz-based. Semantically, this 
-> can't be something that "simple-audio-card" can imply, since 
-> "simple-audio-card" is something agnostic to any HW, whereas this 
-> clocking requirement is something specific to Tegra HW.
+> From: Heiko St?bner <heiko@sntech.de>
+>
+> IO domain voltages on some Rockchip SoCs are variable but need to be
+> kept in sync between the regulators and the SoC using a special
+> register.
+>
+> A specific example using rk3288:
+> - If the regulator hooked up to a pin like SDMMC0_VDD is 3.3V then
+>   bit 7 of GRF_IO_VSEL needs to be 0.  If the regulator hooked up to
+>   that same pin is 1.8V then bit 7 of GRF_IO_VSEL needs to be 1.
+>
+> Said another way, this driver simply handles keeping bits in the SoC's
+> general register file (GRF) in sync with the actual value of a voltage
+> hooked up to the pins.
+>
+> Note that this driver specifically doesn't include:
+> - any logic for deciding what voltage we should set regulators to
+> - any logic for deciding whether regulators (or internal SoC blocks)
+>   should have power or not have power
+>
+> If there were some other software that had the smarts of making
+> decisions about regulators, it would work in conjunction with this
+> driver.  When that other software adjusted a regulator's voltage then
+> this driver would handle telling the SoC about it.  A good example is
+> vqmmc for SD.  In that case the dw_mmc driver simply is told about a
+> regulator.  It changes the regulator between 3.3V and 1.8V at the
+> right time.  This driver notices the change and makes sure that the
+> SoC is on the same page.
+>
+> Signed-off-by: Heiko St?bner <heiko@sntech.de>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+> Changes in v3:
+> - Changed compatible string as per Santosh.
 
-Yes, now as you mention it I forgot about the whole
-tegra_asoc_utils_set_rate() stuff!
+Thanks, I like the new string better.
 
-> To see the problem, try encoding some audio stream as both 44.1KHz and 
-> 48KHz, then play a few seconds of each and keep switching back and 
-> forth. You'll likely find either the playback pitch is wrong, or you get 
-> drop-outs or stuttering.
+> - Added code docs about the slop in 1.8V and 3.3V as per Santosh.
+> - Moved some #defines to the top as per Santosh.
 
-Yeah, right. Clocks seem to be stuck at the 44.1 kHz setting.
+All nice changes, thanks Santosh!
 
-> I also wonder how "simple-audio-card" can know what rate the EXTERN1 
-> clock to the CODEC should be set to; each CODEC has a different 
-> requirement for the minimum clock input and the Fs multiple usually 
-> varies for different sample rates. See for example 
-> sound/soc/tegra/tegra_wm8903.c:tegra_wm8903_hw_params(). This could be a 
-> solved problem though: Perhaps some API has been added to CODECs to 
-> report this information (or perhaps CODEC drivers now clk_set_rate() on 
-> their input clocks themselves) since I last looked.
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
 
-If there are no objections I will just revive version 1 again and send
-it around as a new version 3 just to prevent any further confusion.
+Rafael, how do you want to handle drivers/avs/* ?  Along with Nishanth,
+I'm maintaining everything there currently (only one driver :)), and
+since I recommended $SUBJECT driver go into drivers/avs[1], I'm happy to
+queue it for you and update MAINTAINERS to cover drivers/avs/* instead
+of just smartreflex.c.
+
+Let me know how you'd like to proceed.
+
+Kevin
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286276.html
