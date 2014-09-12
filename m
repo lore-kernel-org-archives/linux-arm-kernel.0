@@ -1,63 +1,51 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 12 Sep 2014 13:49:58 +0800
-Subject: [PATCH] ARM: imx: fix register offset of pll7_usb_host gate clock
-Message-ID: <1410500998-6222-1-git-send-email-shawn.guo@freescale.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 12 Sep 2014 11:33:07 +0530
+Subject: [PATCH] phy: miphy365x: Select GENERIC_PHY rather than depends on
+In-Reply-To: <1410457647-14086-1-git-send-email-peter.griffin@linaro.org>
+References: <1410457647-14086-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <54128C9B.10904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a copy&paste error on register offset of pll7_usb_host gate
-clock introduced by i.MX6 PLL bypass support patches.  The error breaks
-the ENET function, because it overwrites the pll6_enet gate bit.
+Hi,
 
-Correct the offset for all i.MX6 clock drivers.
+On Thursday 11 September 2014 11:17 PM, Peter Griffin wrote:
+> Change miphy365x over to select GENERIC_PHY like all other phy drivers.
 
-Thanks to Fugang Duan <B38611@freescale.com> for spotting the error.
+A patch for this by Lee Jones has already been merged and should come up in
+this -rc cycle.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c  | 2 +-
- arch/arm/mach-imx/clk-imx6sl.c | 2 +-
- arch/arm/mach-imx/clk-imx6sx.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 4ee6e77a0fdf..4f8ce60a2e90 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -187,7 +187,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
- 	clk[IMX6QDL_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
- 	clk[IMX6QDL_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
--	clk[IMX6QDL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
-+	clk[IMX6QDL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0x20, 13);
- 
- 	/*
- 	 * Bit 20 is the reserved and read-only bit, we do this only for:
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index c8de87bc617f..e982ebe10814 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -243,7 +243,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
- 	clks[IMX6SL_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
- 	clks[IMX6SL_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
--	clks[IMX6SL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
-+	clks[IMX6SL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0x20, 13);
- 
- 	clks[IMX6SL_CLK_LVDS1_SEL] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
- 	clks[IMX6SL_CLK_LVDS1_OUT] = imx_clk_gate_exclusive("lvds1_out", "lvds1_sel", base + 0x160, 10, BIT(12));
-diff --git a/arch/arm/mach-imx/clk-imx6sx.c b/arch/arm/mach-imx/clk-imx6sx.c
-index 27070a716935..17354a11356f 100644
---- a/arch/arm/mach-imx/clk-imx6sx.c
-+++ b/arch/arm/mach-imx/clk-imx6sx.c
-@@ -198,7 +198,7 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
- 	clks[IMX6SX_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
- 	clks[IMX6SX_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
--	clks[IMX6SX_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
-+	clks[IMX6SX_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0x20, 13);
- 
- 	/*
- 	 * Bit 20 is the reserved and read-only bit, we do this only for:
--- 
-1.9.1
+Thanks
+Kishon
+> Also update the help message as the new stih410 SoC doesn't have this
+> phy (it is very similar to sti407), so the stih41x naming is sadly no
+> longer correct.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/phy/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index d361d98..68bfe07 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -39,14 +39,14 @@ config PHY_MVEBU_SATA
+>  	select GENERIC_PHY
+>  
+>  config PHY_MIPHY365X
+> -	tristate "STMicroelectronics MIPHY365X PHY driver for STiH41x series"
+> +	tristate "STMicroelectronics MIPHY365X PHY driver for STiH415/6 series"
+>  	depends on ARCH_STI
+> -	depends on GENERIC_PHY
+>  	depends on HAS_IOMEM
+>  	depends on OF
+> +	select GENERIC_PHY
+>  	help
+>  	  Enable this to support the miphy transceiver (for SATA/PCIE)
+> -	  that is part of STMicroelectronics STiH41x SoC series.
+> +	  that is part of STMicroelectronics STiH415/6 SoC series.
+>  
+>  config OMAP_CONTROL_PHY
+>  	tristate "OMAP CONTROL PHY Driver"
+> 
