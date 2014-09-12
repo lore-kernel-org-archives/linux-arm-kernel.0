@@ -1,42 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 12 Sep 2014 10:23:47 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clk Updates for v3.18
-Message-ID: <cover.1410484748.git.horms+renesas@verge.net.au>
+Date: Fri, 12 Sep 2014 10:23:53 +0900
+Subject: [PATCH] clk: shmobile: Add r8a7740, sh73a0 SoCs to MSTP bindings
+In-Reply-To: <cover.1410484748.git.horms+renesas@verge.net.au>
+References: <cover.1410484748.git.horms+renesas@verge.net.au>
+Message-ID: <b32c44b93af31e9163514df0f3ac2791972eb124.1410484748.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Please consider these second round of Renesas ARM based SoC clk updates for v3.18.
-
-This pull request is based on the previous round of
-such requests, tagged as renesas-clk-for-v3.18,
-which you have already pulled.
-
-I am taking this change through my tree with Mike's Ack
-as it seems to be a smooth way to handle things.
-
-
-The following changes since commit 8de078f189da45453d2ed2a04288e329cc169731:
-
-  clk: shmobile: Add r8a7794 support (2014-08-27 08:40:54 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clk2-for-v3.18
-
-for you to fetch changes up to b32c44b93af31e9163514df0f3ac2791972eb124:
-
-  clk: shmobile: Add r8a7740, sh73a0 SoCs to MSTP bindings (2014-09-10 09:08:10 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Clk Updates for v3.18
-
-* Add r8a7740, sh73a0 SoCs to MSTP bindings
-
-----------------------------------------------------------------
-Ulrich Hecht (1):
-      clk: shmobile: Add r8a7740, sh73a0 SoCs to MSTP bindings
-
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 2 ++
  1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+index 8a92b5fb..8f1424f 100644
+--- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+@@ -11,9 +11,11 @@ Required Properties:
+ 
+   - compatible: Must be one of the following
+     - "renesas,r7s72100-mstp-clocks" for R7S72100 (RZ) MSTP gate clocks
++    - "renesas,r8a7740-mstp-clocks" for R8A7740 (R-Mobile A1) MSTP gate clocks
+     - "renesas,r8a7779-mstp-clocks" for R8A7779 (R-Car H1) MSTP gate clocks
+     - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
+     - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
++    - "renesas,sh73a0-mstp-clocks" for SH73A0 (SH-MobileAG5) MSTP gate clocks
+     - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+   - reg: Base address and length of the I/O mapped registers used by the MSTP
+     clocks. The first register is the clock control register and is mandatory.
+-- 
+2.0.1
