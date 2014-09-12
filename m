@@ -1,53 +1,39 @@
-From: jay.xu@rock-chips.com (Jianqun)
-Date: Fri, 12 Sep 2014 17:10:55 +0800
-Subject: [PATCH 1/2] ASoC: rockchip-max98090: add documentation for
- rockchip-max98090 driver
-In-Reply-To: <1410507036-15442-1-git-send-email-jay.xu@rock-chips.com>
-References: <1410507036-15442-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <1410513055-17775-1-git-send-email-jay.xu@rock-chips.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 12 Sep 2014 11:12:48 +0200
+Subject: [RFC 0/4] i2c: slave support framework for Linux devices
+In-Reply-To: <20140912085836.GS3755@pengutronix.de>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <20140912085836.GS3755@pengutronix.de>
+Message-ID: <20140912091247.GA1930@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for rockchip-max98090 driver, which is need by rockchip
-board using a max98090.
 
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
-changes since v1:
-- modify error text from "Tegra" to "rockchip"
+> - If I understand correctly you cannot register an i2c slave without
+>   also registering a master, right? I don't think this is troubling in
+>   practice, is it?
+>   For abstraction I would prefer to make these different concepts
+>   though.
 
- .../sound/rockchip,rockchip-audio-max98090.txt     | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
+You need to register an adapter, yes. It does not need to populate the
+callback for sending messages, so it could be slave only. But an adapter
+is needed, because it is the glue between a client and the wired lines.
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
-new file mode 100644
-index 0000000..e12d1a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
-@@ -0,0 +1,23 @@
-+ROCKCHIP audio complex, with MAX98090 CODEC
-+
-+Required properties:
-+- compatible : must be "rockchip,rockchip-audio-max98090"
-+- rockchip,model : the user-visible name of this sound complex
-+- rockchip,i2s-controller : The phandle of the rockchip I2S controller
-+  that's connected to the CODEC.
-+- rockchip,audio-codec : The phandle of the MAX98090 audio codec.
-+
-+Optional properties:
-+- rockchip,hp-det-gpios : The GPIO that detect headphones are plugged in
-+- rockchip,mic-det-gpios : The GPIO that detect micphones are plugged in
-+
-+Example:
-+
-+sound {
-+	compatible = "rockchip,rockchip-audio-max98090";
-+	rockchip,model = "ROCKCHIP-I2S";
-+	rockchip,i2s-controller = <&i2s>;
-+	rockchip,audio-codec = <&max98090>;
-+	rockchip,hp-det-gpios = <&gpio6 5 GPIO_ACTIVE_HIGH>;
-+	rockchip,mic-det-gpios = <&gpio6 11 GPIO_ACTIVE_HIGH>;
-+};
--- 
-1.9.1
+> - The IMHO most (even only?) useful slave is "i2cslvdev", i.e. a
+>   userspace device. With that you wouldn't need device tree stuff, the
+>   driver would just offer the device if supported. Userspace then could
+>   care about the rest (slave address, functionality, ...).
+
+I don't think it is the only useful one. A callback into userspace is
+expensive, so stuff like shared memory (my eeprom simulator) or a shared
+ringbuffer will come in handy, too. That being said, a slave device like
+you described is probably the next user we see using the slave interface
+:)
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/cc886d62/attachment.sig>
