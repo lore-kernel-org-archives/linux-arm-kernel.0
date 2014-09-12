@@ -1,194 +1,99 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 12 Sep 2014 15:24:59 -0500
-Subject: [PATCHv6 5/5] hwspinlock/omap: add support for dt nodes
+Date: Fri, 12 Sep 2014 15:24:55 -0500
+Subject: [PATCHv6 1/5] Documentation: dt: add common bindings for hwspinlock
 In-Reply-To: <1410553499-55951-1-git-send-email-s-anna@ti.com>
 References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
-Message-ID: <1410553499-55951-6-git-send-email-s-anna@ti.com>
+Message-ID: <1410553499-55951-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HwSpinlock IP is present only on OMAP4 and other newer SoCs,
-which are all device-tree boot only. This patch adds the
-base support for parsing the DT nodes, and removes the code
-dealing with the traditional platform device instantiation.
+This patch adds the generic common bindings used to represent
+a hwlock device and use/request locks in a device-tree build.
 
+All the platform-specific hwlock driver implementations need the
+number of locks and associated base id for registering the locks
+present within the device with the driver core. This base id
+needs to be unique across multiple IP instances of a hwspinlock
+device, so that each hwlock can be represented uniquely in a
+system.
+
+The number of locks is represented by 'hwlock-num-locks' property,
+and the base id is represented by the 'hwlock-base-id' property.
+The args specifier length is dependent on each vendor-specific
+implementation and is represented through the '#hwlock-cells'
+property. Client users need to use the property 'hwlocks' for
+requesting specific lock(s).
+
+Note that the document is named hwlock.txt deliberately to keep
+it a bit more generic.
+
+Cc: Rob Herring <robh+dt@kernel.org>
 Signed-off-by: Suman Anna <s-anna@ti.com>
-[tony at atomide.com: ack for legacy file removal]
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- MAINTAINERS                          |  1 -
- arch/arm/mach-omap2/Makefile         |  3 --
- arch/arm/mach-omap2/hwspinlock.c     | 60 ------------------------------------
- drivers/hwspinlock/omap_hwspinlock.c | 23 +++++++++++---
- 4 files changed, 18 insertions(+), 69 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/hwspinlock.c
+ .../devicetree/bindings/hwlock/hwlock.txt          | 55 ++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index cf24bb5..351885e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6531,7 +6531,6 @@ M:	Ohad Ben-Cohen <ohad@wizery.com>
- L:	linux-omap at vger.kernel.org
- S:	Maintained
- F:	drivers/hwspinlock/omap_hwspinlock.c
--F:	arch/arm/mach-omap2/hwspinlock.c
- 
- OMAP MMC SUPPORT
- M:	Jarkko Lavinen <jarkko.lavinen@nokia.com>
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 69bbcba..088b6b0 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -286,9 +286,6 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
- 
- smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
- obj-y					+= $(smsc911x-m) $(smsc911x-y)
--ifneq ($(CONFIG_HWSPINLOCK_OMAP),)
--obj-y					+= hwspinlock.o
--endif
- 
- emac-$(CONFIG_TI_DAVINCI_EMAC)		:= am35xx-emac.o
- obj-y					+= $(emac-m) $(emac-y)
-diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
-deleted file mode 100644
-index ef175ac..0000000
---- a/arch/arm/mach-omap2/hwspinlock.c
-+++ /dev/null
-@@ -1,60 +0,0 @@
--/*
-- * OMAP hardware spinlock device initialization
-- *
-- * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
-- *
-- * Contact: Simon Que <sque@ti.com>
-- *          Hari Kanigeri <h-kanigeri2@ti.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/err.h>
--#include <linux/hwspinlock.h>
--
--#include "soc.h"
--#include "omap_hwmod.h"
--#include "omap_device.h"
--
--static struct hwspinlock_pdata omap_hwspinlock_pdata __initdata = {
--	.base_id = 0,
--};
--
--static int __init hwspinlocks_init(void)
--{
--	int retval = 0;
--	struct omap_hwmod *oh;
--	struct platform_device *pdev;
--	const char *oh_name = "spinlock";
--	const char *dev_name = "omap_hwspinlock";
--
--	/*
--	 * Hwmod lookup will fail in case our platform doesn't support the
--	 * hardware spinlock module, so it is safe to run this initcall
--	 * on all omaps
--	 */
--	oh = omap_hwmod_lookup(oh_name);
--	if (oh == NULL)
--		return -EINVAL;
--
--	pdev = omap_device_build(dev_name, 0, oh, &omap_hwspinlock_pdata,
--				sizeof(struct hwspinlock_pdata));
--	if (IS_ERR(pdev)) {
--		pr_err("Can't build omap_device for %s:%s\n", dev_name,
--								oh_name);
--		retval = PTR_ERR(pdev);
--	}
--
--	return retval;
--}
--/* early board code might need to reserve specific hwspinlock instances */
--omap_postcore_initcall(hwspinlocks_init);
-diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
-index c1e2cd4..2e8c7c3 100644
---- a/drivers/hwspinlock/omap_hwspinlock.c
-+++ b/drivers/hwspinlock/omap_hwspinlock.c
-@@ -1,7 +1,7 @@
- /*
-  * OMAP hardware spinlock driver
-  *
-- * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
-+ * Copyright (C) 2010-2014 Texas Instruments Incorporated - http://www.ti.com
-  *
-  * Contact: Simon Que <sque@ti.com>
-  *          Hari Kanigeri <h-kanigeri2@ti.com>
-@@ -27,6 +27,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/hwspinlock.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- 
- #include "hwspinlock_internal.h"
-@@ -80,16 +81,21 @@ static const struct hwspinlock_ops omap_hwspinlock_ops = {
- 
- static int omap_hwspinlock_probe(struct platform_device *pdev)
- {
--	struct hwspinlock_pdata *pdata = pdev->dev.platform_data;
-+	struct device_node *node = pdev->dev.of_node;
- 	struct hwspinlock_device *bank;
- 	struct hwspinlock *hwlock;
- 	struct resource *res;
- 	void __iomem *io_base;
--	int num_locks, i, ret;
-+	int num_locks, i, ret, base_id;
- 
--	if (!pdata)
-+	if (!node)
- 		return -ENODEV;
- 
-+	ret = of_hwspin_lock_get_base_id(node);
-+	if (ret < 0 && ret != -EINVAL)
-+		return -ENODEV;
-+	base_id = (ret > 0 ? ret : 0);
+diff --git a/Documentation/devicetree/bindings/hwlock/hwlock.txt b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+new file mode 100644
+index 0000000..24993dd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwlock/hwlock.txt
+@@ -0,0 +1,55 @@
++Generic hwlock bindings
++=======================
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENODEV;
-@@ -141,7 +147,7 @@ static int omap_hwspinlock_probe(struct platform_device *pdev)
- 		hwlock->priv = io_base + LOCK_BASE_OFFSET + sizeof(u32) * i;
- 
- 	ret = hwspin_lock_register(bank, &pdev->dev, &omap_hwspinlock_ops,
--						pdata->base_id, num_locks);
-+						base_id, num_locks);
- 	if (ret)
- 		goto reg_fail;
- 
-@@ -174,12 +180,19 @@ static int omap_hwspinlock_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id omap_hwspinlock_of_match[] = {
-+	{ .compatible = "ti,omap4-hwspinlock", },
-+	{ /* end */ },
-+};
-+MODULE_DEVICE_TABLE(of, omap_hwspinlock_of_match);
++Generic bindings that are common to all the hwlock platform specific driver
++implementations.
 +
- static struct platform_driver omap_hwspinlock_driver = {
- 	.probe		= omap_hwspinlock_probe,
- 	.remove		= omap_hwspinlock_remove,
- 	.driver		= {
- 		.name	= "omap_hwspinlock",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(omap_hwspinlock_of_match),
- 	},
- };
- 
++The validity and need of these common properties may vary from one platform
++implementation to another. The platform specific bindings should explicitly
++state if an optional property is used. Please also look through the individual
++platform specific hwlock binding documentations for identifying the applicable
++properties.
++
++Common properties:
++- #hwlock-cells:	Specifies the number of cells needed to represent a
++			specific lock. This property is mandatory for all
++			platform implementations.
++- hwlock-num-locks:	Number of locks present in a hwlock device. This
++			property is needed on hwlock devices, where the number
++			of supported locks within a hwlock device cannot be
++			read from a register.
++- hwlock-base-id:	An unique base Id for the locks for a particular hwlock
++			device. This property is mandatory if a SoC has several
++			hwlock devices.
++
++Hwlock Users:
++=============
++
++Nodes that require specific hwlock(s) should specify them using the property
++"hwlocks", each containing a phandle to the hwlock node and an args specifier
++value as indicated by #hwlock-cells. Multiple hwlocks can be requested using
++an array of the phandle and hwlock number specifier tuple.
++
++1. Example of a node using a single specific hwlock:
++
++The following example has a node requesting a hwlock in the bank defined by
++the node hwlock1. hwlock1 is a hwlock provider with an argument specifier
++of length 1.
++
++	node {
++		...
++		hwlocks = <&hwlock1 2>;
++		...
++	};
++
++2. Example of a node using multiple specific hwlocks:
++
++The following example has a node requesting two hwlocks, a hwlock within
++the hwlock device node 'hwlock1' with #hwlock-cells value of 1, and another
++hwlock within the hwlock device node 'hwlock2' with #hwlock-cells value of 2.
++
++	node {
++		...
++		hwlocks = <&hwlock1 2>, <&hwlock2 0 3>;
++		...
++	};
 -- 
 2.0.4
