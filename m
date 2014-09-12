@@ -1,122 +1,46 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 12 Sep 2014 17:21:05 +0800
-Subject: [PATCHv3] mtd: nand: atmel_nand: retrieve NFC clock
-In-Reply-To: <1410512866-24546-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410512866-24546-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5412BB01.6070401@atmel.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 12 Sep 2014 14:57:04 +0530
+Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
+In-Reply-To: <54122962.5020903@gmail.com>
+References: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
+ <54122962.5020903@gmail.com>
+Message-ID: <000e01cfce6b$bf538ca0$3dfaa5e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alexandre
+Hi Tomasz,
 
-On 9/12/2014 5:07 PM, Alexandre Belloni wrote:
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->
-> Changes in v3:
->   - changed the warning message to ask to update the DT
->   - made the clocks property mandatory in the documentation
->   - Stop claiming the NFC is probed if there is an issue when enabling the clock
->
->   .../devicetree/bindings/mtd/atmel-nand.txt         |  2 ++
->   drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
->   2 files changed, 27 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> index c4728839d0c1..cb6cd4f8ae7a 100644
-> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> @@ -36,6 +36,7 @@ Optional properties:
->       - reg : should specify the address and size used for NFC command registers,
->               NFC registers and NFC Sram. NFC Sram address and size can be absent
->               if don't want to use it.
-> +    - clocks: phandle to the peripheral clock
->     - Optional properties:
->       - atmel,write-by-sram: boolean to enable NFC write by sram.
->   
-> @@ -98,6 +99,7 @@ nand0: nand at 40000000 {
->   		compatible = "atmel,sama5d3-nfc";
->   		#address-cells = <1>;
->   		#size-cells = <1>;
-> +		clocks = <&&hsmc_clk>
+> -----Original Message-----
+> From: Tomasz Figa [mailto:tomasz.figa at gmail.com]
+> Sent: Friday, September 12, 2014 4:30 AM
+> To: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; linux-kernel at vger.kernel.org
+> Cc: kgene.kim at samsung.com; s.nawrocki at samsung.com; mturquette at linaro.org;
+> Chander Kashyap; Abhilash Kesavan
+> Subject: Re: [PATCH] clk: samsung: exynos5260: fix typo in clock name
+> 
+> Hi Pankaj,
+> 
+> On 10.09.2014 07:56, Pankaj Dubey wrote:
+> > From: Chander Kashyap <k.chander@samsung.com>
+> >
+> > The parent name added in parent list as
+> > mout_phyclk_mipi_dphy_4l_m_txbyte_clkhs_p, is different than the
+> > defined parent due to typo.
+> >
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Signed-off-by: Chander Kashyap <k.chander@samsung.com>
 
-Is it a typo here? Do you mean
+Please add my sign-off as 
 
-     clocks = <&hsmc_clk>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-
-Best Regards,
-Josh Wu
-
->   		reg = <
->   			0x70000000 0x10000000	/* NFC Command Registers */
->   			0xffffc000 0x00000070	/* NFC HSMC regs */
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 9c5f717bda54..d1e502f8dbd0 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -27,6 +27,7 @@
->    *
->    */
->   
-> +#include <linux/clk.h>
->   #include <linux/dma-mapping.h>
->   #include <linux/slab.h>
->   #include <linux/module.h>
-> @@ -96,6 +97,8 @@ struct atmel_nfc {
->   	bool			use_nfc_sram;
->   	bool			write_by_sram;
->   
-> +	struct clk		*clk;
-> +
->   	bool			is_initialized;
->   	struct completion	comp_ready;
->   	struct completion	comp_cmd_done;
-> @@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->   {
->   	struct atmel_nfc *nfc = &nand_nfc;
->   	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-> +	int ret;
->   
->   	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->   	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-> @@ -2279,8 +2283,28 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->   	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
->   	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
->   
-> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(nfc->clk)) {
-> +		ret = clk_prepare_enable(nfc->clk);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
-> +	}
-> +
->   	nfc->is_initialized = true;
->   	dev_info(&pdev->dev, "NFC is probed.\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_nand_nfc_remove(struct platform_device *pdev)
-> +{
-> +	struct atmel_nfc *nfc = &nand_nfc;
-> +
-> +	if (!IS_ERR(nfc->clk))
-> +		clk_disable_unprepare(nfc->clk);
-> +
->   	return 0;
->   }
->   
-> @@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
->   		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
->   	},
->   	.probe = atmel_nand_nfc_probe,
-> +	.remove = atmel_nand_nfc_remove,
->   };
->   
->   static struct platform_driver atmel_nand_driver = {
+> 
+> Missed your sign-off? You can reply with it inline and I will add it when
+applying this
+> weekend.
+> 
+> P.S. Please keep me on CC when sending patches for Samsung clock drivers.
+> 
+> Best regards,
+> Tomasz
