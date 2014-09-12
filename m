@@ -1,498 +1,727 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Sep 2014 10:13:11 +0100
-Subject: [PATCH v4 2/8] arm/arm64: KVM: vgic: switch to dynamic allocation
-In-Reply-To: <20140911223629.GQ5535@lvm>
-References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
- <1410433755-3612-3-git-send-email-marc.zyngier@arm.com>
- <20140911223629.GQ5535@lvm>
-Message-ID: <5412B927.2010208@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 12 Sep 2014 10:18:16 +0100
+Subject: [PATCH v8 1/4] pci:host: APM X-Gene PCIe host controller driver
+In-Reply-To: <1410476266-29426-2-git-send-email-tinamdar@apm.com>
+References: <1410476266-29426-1-git-send-email-tinamdar@apm.com>
+ <1410476266-29426-2-git-send-email-tinamdar@apm.com>
+Message-ID: <20140912091816.GU27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/14 23:36, Christoffer Dall wrote:
-> On Thu, Sep 11, 2014 at 12:09:09PM +0100, Marc Zyngier wrote:
->> So far, all the VGIC data structures are statically defined by the
->> *maximum* number of vcpus and interrupts it supports. It means that
->> we always have to oversize it to cater for the worse case.
->>
->> Start by changing the data structures to be dynamically sizeable,
->> and allocate them at runtime.
->>
->> The sizes are still very static though.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kvm/arm.c     |   3 +
->>  include/kvm/arm_vgic.h |  76 ++++++++++++----
->>  virt/kvm/arm/vgic.c    | 237 ++++++++++++++++++++++++++++++++++++++++++-------
->>  3 files changed, 267 insertions(+), 49 deletions(-)
->>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index a99e0cd..923a01d 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -172,6 +172,8 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
->>                       kvm->vcpus[i] = NULL;
->>               }
->>       }
->> +
->> +     kvm_vgic_destroy(kvm);
->>  }
->>
->>  int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->> @@ -253,6 +255,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
->>  {
->>       kvm_mmu_free_memory_caches(vcpu);
->>       kvm_timer_vcpu_terminate(vcpu);
->> +     kvm_vgic_vcpu_destroy(vcpu);
->>       kmem_cache_free(kvm_vcpu_cache, vcpu);
->>  }
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index f074539..bdaac57 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -54,19 +54,33 @@
->>   * - a bunch of shared interrupts (SPI)
->>   */
->>  struct vgic_bitmap {
->> -     union {
->> -             u32 reg[VGIC_NR_PRIVATE_IRQS / 32];
->> -             DECLARE_BITMAP(reg_ul, VGIC_NR_PRIVATE_IRQS);
->> -     } percpu[VGIC_MAX_CPUS];
->> -     union {
->> -             u32 reg[VGIC_NR_SHARED_IRQS / 32];
->> -             DECLARE_BITMAP(reg_ul, VGIC_NR_SHARED_IRQS);
->> -     } shared;
->> +     /*
->> +      * - One UL per VCPU for private interrupts (assumes UL is at
->> +      *   least 32 bits)
->> +      * - As many UL as necessary for shared interrupts.
->> +      *
->> +      * The private interrupts are accessed via the "private"
->> +      * field, one UL per vcpu (the state for vcpu n is in
->> +      * private[n]). The shared interrupts are accessed via the
->> +      * "shared" pointer (IRQn state is at bit n-32 in the bitmap).
->> +      */
->> +     unsigned long *private;
->> +     unsigned long *shared;
+On Thu, Sep 11, 2014 at 11:57:43PM +0100, Tanmay Inamdar wrote:
+> This patch adds the AppliedMicro X-Gene SOC PCIe host controller driver.
+> X-Gene PCIe controller supports maximum up to 8 lanes and GEN3 speed.
+> X-Gene SOC supports maximum 5 PCIe ports.
 > 
-> the comment above the define for REG_OFFSET_SWIZZLE still talks about
-> the unions in struct vgic_bitmap, which is no longer true.  Mind
-> updating that comment?
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
 
-Damned, thought I fixed that. Will update it.
+Hi Tanmay,
 
->>  };
->>
->>  struct vgic_bytemap {
->> -     u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
->> -     u32 shared[VGIC_NR_SHARED_IRQS  / 4];
->> +     /*
->> +      * - 8 u32 per VCPU for private interrupts
->> +      * - As many u32 as necessary for shared interrupts.
->> +      *
->> +      * The private interrupts are accessed via the "private"
->> +      * field, (the state for vcpu n is in private[n*8] to
->> +      * private[n*8 + 7]). The shared interrupts are accessed via
->> +      * the "shared" pointer (IRQn state is at byte (n-32)%4 of the
->> +      * shared[(n-32)/4] word).
->> +      */
->> +     u32 *private;
->> +     u32 *shared;
->>  };
->>
->>  struct kvm_vcpu;
->> @@ -127,6 +141,9 @@ struct vgic_dist {
->>       bool                    in_kernel;
->>       bool                    ready;
->>
->> +     int                     nr_cpus;
->> +     int                     nr_irqs;
->> +
->>       /* Virtual control interface mapping */
->>       void __iomem            *vctrl_base;
->>
->> @@ -166,15 +183,36 @@ struct vgic_dist {
->>       /* Level/edge triggered */
->>       struct vgic_bitmap      irq_cfg;
->>
->> -     /* Source CPU per SGI and target CPU */
->> -     u8                      irq_sgi_sources[VGIC_MAX_CPUS][VGIC_NR_SGIS];
->> +     /*
->> +      * Source CPU per SGI and target CPU:
->> +      *
->> +      * Each byte represent a SGI observable on a VCPU, each bit of
->> +      * this byte indicating if the corresponding VCPU has
->> +      * generated this interrupt. This is a GICv2 feature only.
->> +      *
->> +      * For VCPUn (n < 8), irq_sgi_sources[n*16] to [n*16 + 15] are
->> +      * the SGIs observable on VCPUn.
->> +      */
->> +     u8                      *irq_sgi_sources;
->>
->> -     /* Target CPU for each IRQ */
->> -     u8                      irq_spi_cpu[VGIC_NR_SHARED_IRQS];
->> -     struct vgic_bitmap      irq_spi_target[VGIC_MAX_CPUS];
->> +     /*
->> +      * Target CPU for each SPI:
->> +      *
->> +      * Array of available SPI, each byte indicating the target
->> +      * VCPU for SPI. IRQn (n >=32) is at irq_spi_cpu[n-32].
->> +      */
->> +     u8                      *irq_spi_cpu;
->> +
->> +     /*
->> +      * Reverse lookup of irq_spi_cpu for faster compute pending:
->> +      *
->> +      * Array of bitmaps, one per VCPU, describing is IRQn is
+It looks good to me now. You can add if you care:
+
+Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+
+Best regards,
+Liviu
+
+> ---
+>  drivers/pci/host/Kconfig     |  10 +
+>  drivers/pci/host/Makefile    |   1 +
+>  drivers/pci/host/pci-xgene.c | 646 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 657 insertions(+)
+>  create mode 100644 drivers/pci/host/pci-xgene.c
 > 
-> ah, describing *if* ?
-
-Indeed. Will fix.
-
->> +      * routed to a particular VCPU.
->> +      */
->> +     struct vgic_bitmap      *irq_spi_target;
->>
->>       /* Bitmap indicating which CPU has something pending */
->> -     unsigned long           irq_pending_on_cpu;
->> +     unsigned long           *irq_pending_on_cpu;
->>  #endif
->>  };
->>
->> @@ -204,11 +242,11 @@ struct vgic_v3_cpu_if {
->>  struct vgic_cpu {
->>  #ifdef CONFIG_KVM_ARM_VGIC
->>       /* per IRQ to LR mapping */
->> -     u8              vgic_irq_lr_map[VGIC_NR_IRQS];
->> +     u8              *vgic_irq_lr_map;
->>
->>       /* Pending interrupts on this VCPU */
->>       DECLARE_BITMAP( pending_percpu, VGIC_NR_PRIVATE_IRQS);
->> -     DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
->> +     unsigned long   *pending_shared;
->>
->>       /* Bitmap of used/free list registers */
->>       DECLARE_BITMAP( lr_used, VGIC_V2_MAX_LRS);
->> @@ -239,7 +277,9 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
->>  int kvm_vgic_hyp_init(void);
->>  int kvm_vgic_init(struct kvm *kvm);
->>  int kvm_vgic_create(struct kvm *kvm);
->> +void kvm_vgic_destroy(struct kvm *kvm);
->>  int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
->> +void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index d3299d4..92c086e 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -95,6 +95,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->>  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
->>  static void vgic_update_state(struct kvm *kvm);
->>  static void vgic_kick_vcpus(struct kvm *kvm);
->> +static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi);
->>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
->>  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
->>  static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
->> @@ -124,23 +125,45 @@ static const struct vgic_params *vgic;
->>  #define REG_OFFSET_SWIZZLE   0
->>  #endif
->>
->> +static int vgic_init_bitmap(struct vgic_bitmap *b, int nr_cpus, int nr_irqs)
->> +{
->> +     int nr_longs;
->> +
->> +     nr_longs = nr_cpus + BITS_TO_LONGS(nr_irqs - VGIC_NR_PRIVATE_IRQS);
->> +
->> +     b->private = kzalloc(sizeof(unsigned long) * nr_longs, GFP_KERNEL);
->> +     if (!b->private)
->> +             return -ENOMEM;
->> +
->> +     b->shared = b->private + nr_cpus;
->> +
->> +     return 0;
->> +}
->> +
->> +static void vgic_free_bitmap(struct vgic_bitmap *b)
->> +{
->> +     kfree(b->private);
->> +     b->private = NULL;
->> +     b->shared = NULL;
->> +}
->> +
->>  static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
->>                               int cpuid, u32 offset)
->>  {
->>       offset >>= 2;
->>       if (!offset)
->> -             return x->percpu[cpuid].reg + (offset ^ REG_OFFSET_SWIZZLE);
->> +             return (u32 *)(x->private + cpuid) + REG_OFFSET_SWIZZLE;
->>       else
->> -             return x->shared.reg + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
->> +             return (u32 *)(x->shared) + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
->>  }
->>
->>  static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
->>                                  int cpuid, int irq)
->>  {
->>       if (irq < VGIC_NR_PRIVATE_IRQS)
->> -             return test_bit(irq, x->percpu[cpuid].reg_ul);
->> +             return test_bit(irq, x->private + cpuid);
->>
->> -     return test_bit(irq - VGIC_NR_PRIVATE_IRQS, x->shared.reg_ul);
->> +     return test_bit(irq - VGIC_NR_PRIVATE_IRQS, x->shared);
->>  }
->>
->>  static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
->> @@ -149,9 +172,9 @@ static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
->>       unsigned long *reg;
->>
->>       if (irq < VGIC_NR_PRIVATE_IRQS) {
->> -             reg = x->percpu[cpuid].reg_ul;
->> +             reg = x->private + cpuid;
->>       } else {
->> -             reg =  x->shared.reg_ul;
->> +             reg = x->shared;
->>               irq -= VGIC_NR_PRIVATE_IRQS;
->>       }
->>
->> @@ -163,24 +186,49 @@ static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
->>
->>  static unsigned long *vgic_bitmap_get_cpu_map(struct vgic_bitmap *x, int cpuid)
->>  {
->> -     if (unlikely(cpuid >= VGIC_MAX_CPUS))
->> -             return NULL;
->> -     return x->percpu[cpuid].reg_ul;
->> +     return x->private + cpuid;
->>  }
->>
->>  static unsigned long *vgic_bitmap_get_shared_map(struct vgic_bitmap *x)
->>  {
->> -     return x->shared.reg_ul;
->> +     return x->shared;
->> +}
->> +
->> +static int vgic_init_bytemap(struct vgic_bytemap *x, int nr_cpus, int nr_irqs)
->> +{
->> +     int size;
->> +
->> +     size  = nr_cpus * VGIC_NR_PRIVATE_IRQS;
->> +     size += nr_irqs - VGIC_NR_PRIVATE_IRQS;
->> +
->> +     x->private = kzalloc(size, GFP_KERNEL);
->> +     if (!x->private)
->> +             return -ENOMEM;
->> +
->> +     x->shared = x->private + nr_cpus * VGIC_NR_PRIVATE_IRQS / sizeof(u32);
->> +     return 0;
->> +}
->> +
->> +static void vgic_free_bytemap(struct vgic_bytemap *b)
->> +{
->> +     kfree(b->private);
->> +     b->private = NULL;
->> +     b->shared = NULL;
->>  }
->>
->>  static u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset)
->>  {
->> -     offset >>= 2;
->> -     BUG_ON(offset > (VGIC_NR_IRQS / 4));
->> -     if (offset < 8)
->> -             return x->percpu[cpuid] + offset;
->> -     else
->> -             return x->shared + offset - 8;
->> +     u32 *reg;
->> +
->> +     if (offset < VGIC_NR_PRIVATE_IRQS) {
->> +             reg = x->private;
->> +             offset += cpuid * VGIC_NR_PRIVATE_IRQS;
->> +     } else {
->> +             reg = x->shared;
->> +             offset -= VGIC_NR_PRIVATE_IRQS;
->> +     }
->> +
->> +     return reg + (offset / sizeof(u32));
->>  }
->>
->>  #define VGIC_CFG_LEVEL       0
->> @@ -739,7 +787,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
->>                */
->>               vgic_dist_irq_set_pending(vcpu, lr.irq);
->>               if (lr.irq < VGIC_NR_SGIS)
->> -                     dist->irq_sgi_sources[vcpu_id][lr.irq] |= 1 << lr.source;
->> +                     *vgic_get_sgi_sources(dist, vcpu_id, lr.irq) |= 1 << lr.source;
->>               lr.state &= ~LR_STATE_PENDING;
->>               vgic_set_lr(vcpu, i, lr);
->>
->> @@ -773,7 +821,7 @@ static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
->>       /* Copy source SGIs from distributor side */
->>       for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
->>               int shift = 8 * (sgi - min_sgi);
->> -             reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
->> +             reg |= ((u32)*vgic_get_sgi_sources(dist, vcpu_id, sgi)) << shift;
->>       }
->>
->>       mmio_data_write(mmio, ~0, reg);
->> @@ -797,14 +845,15 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
->>       /* Clear pending SGIs on the distributor */
->>       for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
->>               u8 mask = reg >> (8 * (sgi - min_sgi));
->> +             u8 *src = vgic_get_sgi_sources(dist, vcpu_id, sgi);
->>               if (set) {
->> -                     if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
->> +                     if ((*src & mask) != mask)
->>                               updated = true;
->> -                     dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
->> +                     *src |= mask;
->>               } else {
->> -                     if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
->> +                     if (*src & mask)
->>                               updated = true;
->> -                     dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
->> +                     *src &= ~mask;
->>               }
->>       }
->>
->> @@ -988,6 +1037,11 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>       return true;
->>  }
->>
->> +static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
->> +{
->> +     return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
->> +}
->> +
->>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
->>  {
->>       struct kvm *kvm = vcpu->kvm;
->> @@ -1021,7 +1075,7 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
->>               if (target_cpus & 1) {
->>                       /* Flag the SGI as pending */
->>                       vgic_dist_irq_set_pending(vcpu, sgi);
->> -                     dist->irq_sgi_sources[c][sgi] |= 1 << vcpu_id;
->> +                     *vgic_get_sgi_sources(dist, c, sgi) |= 1 << vcpu_id;
->>                       kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
->>               }
->>
->> @@ -1068,14 +1122,14 @@ static void vgic_update_state(struct kvm *kvm)
->>       int c;
->>
->>       if (!dist->enabled) {
->> -             set_bit(0, &dist->irq_pending_on_cpu);
->> +             set_bit(0, dist->irq_pending_on_cpu);
->>               return;
->>       }
->>
->>       kvm_for_each_vcpu(c, vcpu, kvm) {
->>               if (compute_pending_for_cpu(vcpu)) {
->>                       pr_debug("CPU%d has pending interrupts\n", c);
->> -                     set_bit(c, &dist->irq_pending_on_cpu);
->> +                     set_bit(c, dist->irq_pending_on_cpu);
->>               }
->>       }
->>  }
->> @@ -1232,14 +1286,14 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
->>       int vcpu_id = vcpu->vcpu_id;
->>       int c;
->>
->> -     sources = dist->irq_sgi_sources[vcpu_id][irq];
->> +     sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
->>
->>       for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
->>               if (vgic_queue_irq(vcpu, c, irq))
->>                       clear_bit(c, &sources);
->>       }
->>
->> -     dist->irq_sgi_sources[vcpu_id][irq] = sources;
->> +     *vgic_get_sgi_sources(dist, vcpu_id, irq) = sources;
->>
->>       /*
->>        * If the sources bitmap has been cleared it means that we
->> @@ -1327,7 +1381,7 @@ epilog:
->>                * us. Claim we don't have anything pending. We'll
->>                * adjust that if needed while exiting.
->>                */
->> -             clear_bit(vcpu_id, &dist->irq_pending_on_cpu);
->> +             clear_bit(vcpu_id, dist->irq_pending_on_cpu);
->>       }
->>  }
->>
->> @@ -1429,7 +1483,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
->>       /* Check if we still have something up our sleeve... */
->>       pending = find_first_zero_bit(elrsr_ptr, vgic->nr_lr);
->>       if (level_pending || pending < vgic->nr_lr)
->> -             set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
->> +             set_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
->>  }
->>
->>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
->> @@ -1463,7 +1517,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
->>       if (!irqchip_in_kernel(vcpu->kvm))
->>               return 0;
->>
->> -     return test_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
->> +     return test_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
->>  }
->>
->>  static void vgic_kick_vcpus(struct kvm *kvm)
->> @@ -1558,7 +1612,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->>
->>       if (level) {
->>               vgic_cpu_irq_set(vcpu, irq_num);
->> -             set_bit(cpuid, &dist->irq_pending_on_cpu);
->> +             set_bit(cpuid, dist->irq_pending_on_cpu);
->>       }
->>
->>  out:
->> @@ -1602,6 +1656,32 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
->>       return IRQ_HANDLED;
->>  }
->>
->> +void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
->> +{
->> +     struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +
->> +     kfree(vgic_cpu->pending_shared);
->> +     kfree(vgic_cpu->vgic_irq_lr_map);
->> +     vgic_cpu->pending_shared = NULL;
->> +     vgic_cpu->vgic_irq_lr_map = NULL;
->> +}
->> +
->> +static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
->> +{
->> +     struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +
->> +     int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 90f5cca..382fd3d 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -63,4 +63,14 @@ config PCIE_SPEAR13XX
+>         help
+>           Say Y here if you want PCIe support on SPEAr13XX SoCs.
 > 
-> [copying question from last review round, apologies if I'm being stupid]
+> +config PCI_XGENE
+> +       bool "X-Gene PCIe controller"
+> +       depends on ARCH_XGENE
+> +       depends on OF
+> +       select PCIEPORTBUS
+> +       help
+> +         Say Y here if you want internal PCI support on APM X-Gene SoC.
+> +         There are 5 internal PCIe ports available. Each port is GEN3 capable
+> +         and have varied lanes from x1 to x8.
+> +
+>  endmenu
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index d0e88f1..845611f 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -8,3 +8,4 @@ obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
+>  obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
+>  obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
+>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+> +obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> new file mode 100644
+> index 0000000..dae61a6
+> --- /dev/null
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -0,0 +1,646 @@
+> +/**
+> + * APM X-Gene PCIe Driver
+> + *
+> + * Copyright (c) 2014 Applied Micro Circuits Corporation.
+> + *
+> + * Author: Tanmay Inamdar <tinamdar@apm.com>.
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/clk-private.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/jiffies.h>
+> +#include <linux/memblock.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +#define PCIECORE_CTLANDSTATUS          0x50
+> +#define PIM1_1L                                0x80
+> +#define IBAR2                          0x98
+> +#define IR2MSK                         0x9c
+> +#define PIM2_1L                                0xa0
+> +#define IBAR3L                         0xb4
+> +#define IR3MSKL                                0xbc
+> +#define PIM3_1L                                0xc4
+> +#define OMR1BARL                       0x100
+> +#define OMR2BARL                       0x118
+> +#define OMR3BARL                       0x130
+> +#define CFGBARL                                0x154
+> +#define CFGBARH                                0x158
+> +#define CFGCTL                         0x15c
+> +#define RTDID                          0x160
+> +#define BRIDGE_CFG_4                   0x2010
+> +#define BRIDGE_STATUS_0                        0x2600
+> +
+> +#define LINK_UP_MASK                   0x00000100
+> +#define AXI_EP_CFG_ACCESS              0x10000
+> +#define EN_COHERENCY                   0xF0000000
+> +#define EN_REG                         0x00000001
+> +#define OB_LO_IO                       0x00000002
+> +#define XGENE_PCIE_VENDORID            0x10E8
+> +#define XGENE_PCIE_DEVICEID            0xE004
+> +#define SZ_1T                          (SZ_1G*1024ULL)
+> +#define PIPE_PHY_RATE_RD(src)          ((0xc000 & (u32)(src)) >> 0xe)
+> +
+> +struct xgene_pcie_port {
+> +       struct device_node      *node;
+> +       struct device           *dev;
+> +       struct clk              *clk;
+> +       void __iomem            *csr_base;
+> +       void __iomem            *cfg_base;
+> +       unsigned long           cfg_addr;
+> +       bool                    link_up;
+> +};
+> +
+> +static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
+> +{
+> +       return (addr & PCI_BASE_ADDRESS_MEM_MASK) | flags;
+> +}
+> +
+> +/* PCIE Configuration Out/In */
+> +static inline void xgene_pcie_cfg_out32(void __iomem *addr, int offset, u32 val)
+> +{
+> +       writel(val, addr + offset);
+> +}
+> +
+> +static inline void xgene_pcie_cfg_out16(void __iomem *addr, int offset, u16 val)
+> +{
+> +       u32 val32 = readl(addr + (offset & ~0x3));
+> +
+> +       switch (offset & 0x3) {
+> +       case 2:
+> +               val32 &= ~0xFFFF0000;
+> +               val32 |= (u32)val << 16;
+> +               break;
+> +       case 0:
+> +       default:
+> +               val32 &= ~0xFFFF;
+> +               val32 |= val;
+> +               break;
+> +       }
+> +       writel(val32, addr + (offset & ~0x3));
+> +}
+> +
+> +static inline void xgene_pcie_cfg_out8(void __iomem *addr, int offset, u8 val)
+> +{
+> +       u32 val32 = readl(addr + (offset & ~0x3));
+> +
+> +       switch (offset & 0x3) {
+> +       case 0:
+> +               val32 &= ~0xFF;
+> +               val32 |= val;
+> +               break;
+> +       case 1:
+> +               val32 &= ~0xFF00;
+> +               val32 |= (u32)val << 8;
+> +               break;
+> +       case 2:
+> +               val32 &= ~0xFF0000;
+> +               val32 |= (u32)val << 16;
+> +               break;
+> +       case 3:
+> +       default:
+> +               val32 &= ~0xFF000000;
+> +               val32 |= (u32)val << 24;
+> +               break;
+> +       }
+> +       writel(val32, addr + (offset & ~0x3));
+> +}
+> +
+> +static inline void xgene_pcie_cfg_in32(void __iomem *addr, int offset, u32 *val)
+> +{
+> +       *val = readl(addr + offset);
+> +}
+> +
+> +static inline void
+> +xgene_pcie_cfg_in16(void __iomem *addr, int offset, u32 *val)
+> +{
+> +       *val = readl(addr + (offset & ~0x3));
+> +
+> +       switch (offset & 0x3) {
+> +       case 2:
+> +               *val >>= 16;
+> +               break;
+> +       }
+> +
+> +       *val &= 0xFFFF;
+> +}
+> +
+> +static inline void
+> +xgene_pcie_cfg_in8(void __iomem *addr, int offset, u32 *val)
+> +{
+> +       *val = readl(addr + (offset & ~0x3));
+> +
+> +       switch (offset & 0x3) {
+> +       case 3:
+> +               *val = *val >> 24;
+> +               break;
+> +       case 2:
+> +               *val = *val >> 16;
+> +               break;
+> +       case 1:
+> +               *val = *val >> 8;
+> +               break;
+> +       }
+> +       *val &= 0xFF;
+> +}
+> +
+> +/* When the address bit [17:16] is 2'b01, the Configuration access will be
+> + * treated as Type 1 and it will be forwarded to external PCIe device.
+> + */
+> +static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+> +{
+> +       struct xgene_pcie_port *port = bus->sysdata;
+> +
+> +       if (bus->number >= (bus->primary + 1))
+> +               return port->cfg_base + AXI_EP_CFG_ACCESS;
+> +
+> +       return port->cfg_base;
+> +}
+> +
+> +/* For Configuration request, RTDID register is used as Bus Number,
+> + * Device Number and Function number of the header fields.
+> + */
+> +static void xgene_pcie_set_rtdid_reg(struct pci_bus *bus, uint devfn)
+> +{
+> +       struct xgene_pcie_port *port = bus->sysdata;
+> +       unsigned int b, d, f;
+> +       u32 rtdid_val = 0;
+> +
+> +       b = bus->number;
+> +       d = PCI_SLOT(devfn);
+> +       f = PCI_FUNC(devfn);
+> +
+> +       if (!pci_is_root_bus(bus))
+> +               rtdid_val = (b << 8) | (d << 3) | f;
+> +
+> +       writel(rtdid_val, port->csr_base + RTDID);
+> +       /* read the register back to ensure flush */
+> +       readl(port->csr_base + RTDID);
+> +}
+> +
+> +static int xgene_pcie_read_config(struct pci_bus *bus, unsigned int devfn,
+> +                                 int offset, int len, u32 *val)
+> +{
+> +       struct xgene_pcie_port *port = bus->sysdata;
+> +       void __iomem *addr;
+> +
+> +       if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up)
+> +               return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +       xgene_pcie_set_rtdid_reg(bus, devfn);
+> +       addr = xgene_pcie_get_cfg_base(bus);
+> +       switch (len) {
+> +       case 1:
+> +               xgene_pcie_cfg_in8(addr, offset, val);
+> +               break;
+> +       case 2:
+> +               xgene_pcie_cfg_in16(addr, offset, val);
+> +               break;
+> +       default:
+> +               xgene_pcie_cfg_in32(addr, offset, val);
+> +               break;
+> +       }
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static int xgene_pcie_write_config(struct pci_bus *bus, unsigned int devfn,
+> +                                  int offset, int len, u32 val)
+> +{
+> +       struct xgene_pcie_port *port = bus->sysdata;
+> +       void __iomem *addr;
+> +
+> +       if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up)
+> +               return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +       xgene_pcie_set_rtdid_reg(bus, devfn);
+> +       addr = xgene_pcie_get_cfg_base(bus);
+> +       switch (len) {
+> +       case 1:
+> +               xgene_pcie_cfg_out8(addr, offset, (u8)val);
+> +               break;
+> +       case 2:
+> +               xgene_pcie_cfg_out16(addr, offset, (u16)val);
+> +               break;
+> +       default:
+> +               xgene_pcie_cfg_out32(addr, offset, val);
+> +               break;
+> +       }
+> +
+> +       return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static struct pci_ops xgene_pcie_ops = {
+> +       .read = xgene_pcie_read_config,
+> +       .write = xgene_pcie_write_config
+> +};
+> +
+> +static u64 xgene_pcie_set_ib_mask(void __iomem *csr_base, u32 addr,
+> +                                 u32 flags, u64 size)
+> +{
+> +       u64 mask = (~(size - 1) & PCI_BASE_ADDRESS_MEM_MASK) | flags;
+> +       u32 val32 = 0;
+> +       u32 val;
+> +
+> +       val32 = readl(csr_base + addr);
+> +       val = (val32 & 0x0000ffff) | (lower_32_bits(mask) << 16);
+> +       writel(val, csr_base + addr);
+> +
+> +       val32 = readl(csr_base + addr + 0x04);
+> +       val = (val32 & 0xffff0000) | (lower_32_bits(mask) >> 16);
+> +       writel(val, csr_base + addr + 0x04);
+> +
+> +       val32 = readl(csr_base + addr + 0x04);
+> +       val = (val32 & 0x0000ffff) | (upper_32_bits(mask) << 16);
+> +       writel(val, csr_base + addr + 0x04);
+> +
+> +       val32 = readl(csr_base + addr + 0x08);
+> +       val = (val32 & 0xffff0000) | (upper_32_bits(mask) >> 16);
+> +       writel(val, csr_base + addr + 0x08);
+> +
+> +       return mask;
+> +}
+> +
+> +static void xgene_pcie_linkup(struct xgene_pcie_port *port,
+> +                                  u32 *lanes, u32 *speed)
+> +{
+> +       void __iomem *csr_base = port->csr_base;
+> +       u32 val32;
+> +
+> +       port->link_up = false;
+> +       val32 = readl(csr_base + PCIECORE_CTLANDSTATUS);
+> +       if (val32 & LINK_UP_MASK) {
+> +               port->link_up = true;
+> +               *speed = PIPE_PHY_RATE_RD(val32);
+> +               val32 = readl(csr_base + BRIDGE_STATUS_0);
+> +               *lanes = val32 >> 26;
+> +       }
+> +}
+> +
+> +static int xgene_pcie_init_port(struct xgene_pcie_port *port)
+> +{
+> +       int rc;
+> +
+> +       port->clk = clk_get(port->dev, NULL);
+> +       if (IS_ERR(port->clk)) {
+> +               dev_err(port->dev, "clock not available\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       rc = clk_prepare_enable(port->clk);
+> +       if (rc) {
+> +               dev_err(port->dev, "clock enable failed\n");
+> +               return rc;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+> +{
+> +       int i;
+> +
+> +       /* Hide the PCI host BARs from the kernel as their content doesn't
+> +        * fit well in the resource management
+> +        */
+> +       for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+> +               dev->resource[i].start = dev->resource[i].end = 0;
+> +               dev->resource[i].flags = 0;
+> +       }
+> +       dev_info(&dev->dev, "Hiding X-Gene pci host bridge resources %s\n",
+> +                pci_name(dev));
+> +}
+> +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_DEVICEID,
+> +                        xgene_pcie_fixup_bridge);
+> +
+> +static int xgene_pcie_map_reg(struct xgene_pcie_port *port,
+> +                             struct platform_device *pdev)
+> +{
+> +       struct resource *res;
+> +
+> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "csr");
+> +       port->csr_base = devm_ioremap_resource(port->dev, res);
+> +       if (IS_ERR(port->csr_base))
+> +               return PTR_ERR(port->csr_base);
+> +
+> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfg");
+> +       port->cfg_base = devm_ioremap_resource(port->dev, res);
+> +       if (IS_ERR(port->cfg_base))
+> +               return PTR_ERR(port->cfg_base);
+> +       port->cfg_addr = res->start;
+> +
+> +       return 0;
+> +}
+> +
+> +static void xgene_pcie_setup_ob_reg(struct xgene_pcie_port *port,
+> +                                   struct resource *res, u32 offset,
+> +                                   u64 cpu_addr, u64 pci_addr)
+> +{
+> +       void __iomem *base = port->csr_base + offset;
+> +       resource_size_t size = resource_size(res);
+> +       u64 restype = resource_type(res);
+> +       u64 mask = 0;
+> +       u32 min_size;
+> +       u32 flag = EN_REG;
+> +
+> +       if (restype == IORESOURCE_MEM) {
+> +               min_size = SZ_128M;
+> +       } else {
+> +               min_size = 128;
+> +               flag |= OB_LO_IO;
+> +       }
+> +
+> +       if (size >= min_size)
+> +               mask = ~(size - 1) | flag;
+> +       else
+> +               dev_warn(port->dev, "res size 0x%llx less than minimum 0x%x\n",
+> +                        (u64)size, min_size);
+> +
+> +       writel(lower_32_bits(cpu_addr), base);
+> +       writel(upper_32_bits(cpu_addr), base + 0x04);
+> +       writel(lower_32_bits(mask), base + 0x08);
+> +       writel(upper_32_bits(mask), base + 0x0c);
+> +       writel(lower_32_bits(pci_addr), base + 0x10);
+> +       writel(upper_32_bits(pci_addr), base + 0x14);
+> +}
+> +
+> +static void xgene_pcie_setup_cfg_reg(void __iomem *csr_base, u64 addr)
+> +{
+> +       writel(lower_32_bits(addr), csr_base + CFGBARL);
+> +       writel(upper_32_bits(addr), csr_base + CFGBARH);
+> +       writel(EN_REG, csr_base + CFGCTL);
+> +}
+> +
+> +static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+> +                                struct list_head *res,
+> +                                resource_size_t io_base)
+> +{
+> +       struct pci_host_bridge_window *window;
+> +       struct device *dev = port->dev;
+> +       int ret;
+> +
+> +       list_for_each_entry(window, res, list) {
+> +               struct resource *res = window->res;
+> +               u64 restype = resource_type(res);
+> +
+> +               dev_dbg(port->dev, "0x%08lx 0x%016llx...0x%016llx\n",
+> +                       res->flags, res->start, res->end);
+> +
+> +               switch (restype) {
+> +               case IORESOURCE_IO:
+> +                       xgene_pcie_setup_ob_reg(port, res, OMR3BARL, io_base,
+> +                                               res->start - window->offset);
+> +                       ret = pci_remap_iospace(res, io_base);
+> +                       if (ret < 0)
+> +                               return ret;
+> +                       break;
+> +               case IORESOURCE_MEM:
+> +                       xgene_pcie_setup_ob_reg(port, res, OMR1BARL, res->start,
+> +                                               res->start - window->offset);
+> +                       break;
+> +               case IORESOURCE_BUS:
+> +                       break;
+> +               default:
+> +                       dev_err(dev, "invalid io resource!");
+> +                       return -EINVAL;
+> +               }
+> +       }
+> +       xgene_pcie_setup_cfg_reg(port->csr_base, port->cfg_addr);
+> +
+> +       return 0;
+> +}
+> +
+> +static void xgene_pcie_setup_pims(void *addr, u64 pim, u64 size)
+> +{
+> +       writel(lower_32_bits(pim), addr);
+> +       writel(upper_32_bits(pim) | EN_COHERENCY, addr + 0x04);
+> +       writel(lower_32_bits(size), addr + 0x10);
+> +       writel(upper_32_bits(size), addr + 0x14);
+> +}
+> +
+> +/*
+> + * X-Gene PCIe support maximum 3 inbound memory regions
+> + * This function helps to select a region based on size of region
+> + */
+> +static int xgene_pcie_select_ib_reg(u8 *ib_reg_mask, u64 size)
+> +{
+> +       if ((size > 4) && (size < SZ_16M) && !(*ib_reg_mask & (1 << 1))) {
+> +               *ib_reg_mask |= (1 << 1);
+> +               return 1;
+> +       }
+> +
+> +       if ((size > SZ_1K) && (size < SZ_1T) && !(*ib_reg_mask & (1 << 0))) {
+> +               *ib_reg_mask |= (1 << 0);
+> +               return 0;
+> +       }
+> +
+> +       if ((size > SZ_1M) && (size < SZ_1T) && !(*ib_reg_mask & (1 << 2))) {
+> +               *ib_reg_mask |= (1 << 2);
+> +               return 2;
+> +       }
+> +
+> +       return -EINVAL;
+> +}
+> +
+> +static void xgene_pcie_setup_ib_reg(struct xgene_pcie_port *port,
+> +                                   struct of_pci_range *range, u8 *ib_reg_mask)
+> +{
+> +       void __iomem *csr_base = port->csr_base;
+> +       void __iomem *cfg_base = port->cfg_base;
+> +       void *bar_addr;
+> +       void *pim_addr;
+> +       u64 cpu_addr = range->cpu_addr;
+> +       u64 pci_addr = range->pci_addr;
+> +       u64 size = range->size;
+> +       u64 mask = ~(size - 1) | EN_REG;
+> +       u32 flags = PCI_BASE_ADDRESS_MEM_TYPE_64;
+> +       u32 bar_low;
+> +       int region;
+> +
+> +       region = xgene_pcie_select_ib_reg(ib_reg_mask, range->size);
+> +       if (region < 0) {
+> +               dev_warn(port->dev, "invalid pcie dma-range config\n");
+> +               return;
+> +       }
+> +
+> +       if (range->flags & IORESOURCE_PREFETCH)
+> +               flags |= PCI_BASE_ADDRESS_MEM_PREFETCH;
+> +
+> +       bar_low = pcie_bar_low_val((u32)cpu_addr, flags);
+> +       switch (region) {
+> +       case 0:
+> +               xgene_pcie_set_ib_mask(csr_base, BRIDGE_CFG_4, flags, size);
+> +               bar_addr = cfg_base + PCI_BASE_ADDRESS_0;
+> +               writel(bar_low, bar_addr);
+> +               writel(upper_32_bits(cpu_addr), bar_addr + 0x4);
+> +               pim_addr = csr_base + PIM1_1L;
+> +               break;
+> +       case 1:
+> +               bar_addr = csr_base + IBAR2;
+> +               writel(bar_low, bar_addr);
+> +               writel(lower_32_bits(mask), csr_base + IR2MSK);
+> +               pim_addr = csr_base + PIM2_1L;
+> +               break;
+> +       case 2:
+> +               bar_addr = csr_base + IBAR3L;
+> +               writel(bar_low, bar_addr);
+> +               writel(upper_32_bits(cpu_addr), bar_addr + 0x4);
+> +               writel(lower_32_bits(mask), csr_base + IR3MSKL);
+> +               writel(upper_32_bits(mask), csr_base + IR3MSKL + 0x4);
+> +               pim_addr = csr_base + PIM3_1L;
+> +               break;
+> +       }
+> +
+> +       xgene_pcie_setup_pims(pim_addr, pci_addr, ~(size - 1));
+> +}
+> +
+> +static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
+> +                                    struct device_node *node)
+> +{
+> +       const int na = 3, ns = 2;
+> +       int rlen;
+> +
+> +       parser->node = node;
+> +       parser->pna = of_n_addr_cells(node);
+> +       parser->np = parser->pna + na + ns;
+> +
+> +       parser->range = of_get_property(node, "dma-ranges", &rlen);
+> +       if (!parser->range)
+> +               return -ENOENT;
+> +       parser->end = parser->range + rlen / sizeof(__be32);
+> +
+> +       return 0;
+> +}
+> +
+> +static int xgene_pcie_parse_map_dma_ranges(struct xgene_pcie_port *port)
+> +{
+> +       struct device_node *np = port->node;
+> +       struct of_pci_range range;
+> +       struct of_pci_range_parser parser;
+> +       struct device *dev = port->dev;
+> +       u8 ib_reg_mask = 0;
+> +
+> +       if (pci_dma_range_parser_init(&parser, np)) {
+> +               dev_err(dev, "missing dma-ranges property\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       /* Get the dma-ranges from DT */
+> +       for_each_of_pci_range(&parser, &range) {
+> +               u64 end = range.cpu_addr + range.size - 1;
+> +
+> +               dev_dbg(port->dev, "0x%08x 0x%016llx..0x%016llx -> 0x%016llx\n",
+> +                       range.flags, range.cpu_addr, end, range.pci_addr);
+> +               xgene_pcie_setup_ib_reg(port, &range, &ib_reg_mask);
+> +       }
+> +       return 0;
+> +}
+> +
+> +/* clear bar configuration which was done by firmware */
+> +static void xgene_pcie_clear_config(struct xgene_pcie_port *port)
+> +{
+> +       int i;
+> +
+> +       for (i = PIM1_1L; i <= CFGCTL; i += 4)
+> +               writel(0x0, port->csr_base + i);
+> +}
+> +
+> +static int xgene_pcie_setup(struct xgene_pcie_port *port,
+> +                           struct list_head *res,
+> +                           resource_size_t io_base)
+> +{
+> +       u32 lanes = 0, speed = 0;
+> +       int ret;
+> +
+> +       xgene_pcie_clear_config(port);
+> +
+> +       ret = xgene_pcie_map_ranges(port, res, io_base);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = xgene_pcie_parse_map_dma_ranges(port);
+> +       if (ret)
+> +               return ret;
+> +
+> +       xgene_pcie_linkup(port, &lanes, &speed);
+> +       if (!port->link_up)
+> +               dev_info(port->dev, "(rc) link down\n");
+> +       else
+> +               dev_info(port->dev, "(rc) x%d gen-%d link up\n",
+> +                               lanes, speed + 1);
+> +       return 0;
+> +}
+> +
+> +static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+> +{
+> +       struct device_node *dn = pdev->dev.of_node;
+> +       struct xgene_pcie_port *port;
+> +       resource_size_t iobase = 0;
+> +       struct pci_bus *bus;
+> +       int ret;
+> +       LIST_HEAD(res);
+> +
+> +       port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
+> +       if (!port)
+> +               return -ENOMEM;
+> +       port->node = of_node_get(pdev->dev.of_node);
+> +       port->dev = &pdev->dev;
+> +
+> +       ret = xgene_pcie_map_reg(port, pdev);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = xgene_pcie_init_port(port);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = of_pci_get_host_bridge_resources(dn, 0, 0xff, &res, &iobase);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = xgene_pcie_setup(port, &res, iobase);
+> +       if (ret)
+> +               return ret;
+> +
+> +       bus = pci_scan_root_bus(&pdev->dev, 0, &xgene_pcie_ops, port, &res);
+> +       if (!bus)
+> +               return -ENOMEM;
+> +
+> +       platform_set_drvdata(pdev, port);
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id xgene_pcie_match_table[] = {
+> +       {.compatible = "apm,xgene-pcie",},
+> +       {},
+> +};
+> +
+> +static struct platform_driver xgene_pcie_driver = {
+> +       .driver = {
+> +                  .name = "xgene-pcie",
+> +                  .owner = THIS_MODULE,
+> +                  .of_match_table = of_match_ptr(xgene_pcie_match_table),
+> +       },
+> +       .probe = xgene_pcie_probe_bridge,
+> +};
+> +module_platform_driver(xgene_pcie_driver);
+> +
+> +MODULE_AUTHOR("Tanmay Inamdar <tinamdar@apm.com>");
+> +MODULE_DESCRIPTION("APM X-Gene PCIe driver");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 1.9.1
 > 
-> are we guaranteed that the numerator is always a multiple of 8? if not,
-> won't you end up allocating one less byte than needed?
-
-We force the allocation to be a multiple of 32, as per the GIC spec (we
-enforce this in arm_vgic.h for the legacy behaviour, and in the last
-patch for the dynamic case).
-
 > 
->> +     vgic_cpu->pending_shared = kzalloc(sz, GFP_KERNEL);
->> +     vgic_cpu->vgic_irq_lr_map = kzalloc(nr_irqs, GFP_KERNEL);
->> +
->> +     if (!vgic_cpu->pending_shared || !vgic_cpu->vgic_irq_lr_map) {
->> +             kvm_vgic_vcpu_destroy(vcpu);
->> +             return -ENOMEM;
->> +     }
->> +
->> +     return 0;
->> +}
->> +
-> [...]
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
