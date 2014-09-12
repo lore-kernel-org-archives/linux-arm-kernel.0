@@ -1,52 +1,117 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 12 Sep 2014 10:41:14 +0200
-Subject: [RFC PATCH 2/5] devfreq: event: Add exynos-ppmu devfreq evnet
- driver
-In-Reply-To: <1409891419-28560-3-git-send-email-cw00.choi@samsung.com>
-References: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
- <1409891419-28560-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1410511274.31130.7.camel@x220>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 12 Sep 2014 16:48:34 +0800
+Subject: [PATCHv2] mtd: nand: atmel_nand: retrieve NFC clock
+In-Reply-To: <5412A650.60102@atmel.com>
+References: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5412A650.60102@atmel.com>
+Message-ID: <5412B362.1090206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-05 at 13:30 +0900, Chanwoo Choi wrote:
-> This patch add exynos-ppmu devfreq event driver to provider raw data about
-> the utilization of each IP in Exynos SoC series.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/devfreq/Kconfig             |  10 +
->  drivers/devfreq/event/Makefile      |   1 +
->  drivers/devfreq/event/exynos-ppmu.c | 410 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 421 insertions(+)
->  create mode 100644 drivers/devfreq/event/exynos-ppmu.c
-> 
-> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-> index ef839e7..4fbbcea 100644
-> --- a/drivers/devfreq/Kconfig
-> +++ b/drivers/devfreq/Kconfig
-> @@ -90,4 +90,14 @@ config ARM_EXYNOS5_BUS_DEVFREQ
->  
->  comment "DEVFREQ Event Drivers"
->  
-> +config DEVFREQ_EVENT_EXYNOS_PPMU
-> +	bool "EXYNOS PPMU (Performance Profiling Monitoring Unit) DEVFREQ event Driver"
-> +	depends on ARCH_EXYNOS
-> +	select ARCH_HAS_OPP
+Hi, Nicolas
 
-This select statement can be dropped: see commit 78c5e0bb145d ("PM /
-OPP: Remove ARCH_HAS_OPP").
+On 9/12/2014 3:52 PM, Nicolas Ferre wrote:
+> On 11/09/2014 19:52, Alexandre Belloni :
+>> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>>
+>> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> You may need to add Josh Wu to the list because he is the "de-facto"
+> Maintainer of this driver.
 
-By the way: there's a typo in the commit summary ("evnet").
+Thanks for the email.
+I almost miss it.
 
-> +	select PM_OPP
-> +	help
-> +	 This add the DEVFREQ event driver for Exynos SoC. It provides PPMU
-> +	 (Performance Profiling Monitoring Unit) counters to estimate the
-> +	 utilization of each module.
-> +
->  endif # PM_DEVFREQ
-
-
-Paul Bolle
+Best Regards,
+Josh Wu
+>
+> Bye,
+>
+>> ---
+>>
+>> Changes in v2:
+>>   - reworked the error path to really make the clock optional
+>>   - Documented the new optional property
+>>
+>>   .../devicetree/bindings/mtd/atmel-nand.txt         |  1 +
+>>   drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
+>>   2 files changed, 26 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+>> index c4728839d0c1..f71e2ebab15b 100644
+>> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+>> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+>> @@ -38,6 +38,7 @@ Optional properties:
+>>               if don't want to use it.
+>>     - Optional properties:
+>>       - atmel,write-by-sram: boolean to enable NFC write by sram.
+>> +    - clocks: phandle to the peripheral clock if it exists
+>>   
+>>   Examples:
+>>   nand0: nand at 40000000,0 {
+>> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+>> index 9c5f717bda54..69e0eb1ace54 100644
+>> --- a/drivers/mtd/nand/atmel_nand.c
+>> +++ b/drivers/mtd/nand/atmel_nand.c
+>> @@ -27,6 +27,7 @@
+>>    *
+>>    */
+>>   
+>> +#include <linux/clk.h>
+>>   #include <linux/dma-mapping.h>
+>>   #include <linux/slab.h>
+>>   #include <linux/module.h>
+>> @@ -96,6 +97,8 @@ struct atmel_nfc {
+>>   	bool			use_nfc_sram;
+>>   	bool			write_by_sram;
+>>   
+>> +	struct clk		*clk;
+>> +
+>>   	bool			is_initialized;
+>>   	struct completion	comp_ready;
+>>   	struct completion	comp_cmd_done;
+>> @@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>>   {
+>>   	struct atmel_nfc *nfc = &nand_nfc;
+>>   	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
+>> +	int ret;
+>>   
+>>   	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>   	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+>> @@ -2281,6 +2285,26 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>>   
+>>   	nfc->is_initialized = true;
+>>   	dev_info(&pdev->dev, "NFC is probed.\n");
+>> +
+>> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+>> +	if (!IS_ERR(nfc->clk)) {
+>> +		ret = clk_prepare_enable(nfc->clk);
+>> +		if (ret)
+>> +			return ret;
+>> +	} else {
+>> +		dev_warn(&pdev->dev, "NFC clock is missing");
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int atmel_nand_nfc_remove(struct platform_device *pdev)
+>> +{
+>> +	struct atmel_nfc *nfc = &nand_nfc;
+>> +
+>> +	if (!IS_ERR(nfc->clk))
+>> +		clk_disable_unprepare(nfc->clk);
+>> +
+>>   	return 0;
+>>   }
+>>   
+>> @@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
+>>   		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+>>   	},
+>>   	.probe = atmel_nand_nfc_probe,
+>> +	.remove = atmel_nand_nfc_remove,
+>>   };
+>>   
+>>   static struct platform_driver atmel_nand_driver = {
+>>
+>
