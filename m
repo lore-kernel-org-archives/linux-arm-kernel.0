@@ -1,16 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Sep 2014 14:37:23 +0800
-Subject: [PATCH V3 0/3] move gpt per clk parent from ipg_per to OSC
-In-Reply-To: <1410406182-21113-1-git-send-email-b20788@freescale.com>
-References: <1410406182-21113-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140912063721.GH22579@dragon>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 11 Sep 2014 23:44:41 -0700
+Subject: [PATCH V2 2/2] Input: misc: introduce palmas-pwrbutton
+In-Reply-To: <20140911120119.GA17602@kahuna>
+References: <1408636935-29515-1-git-send-email-nm@ti.com>
+ <1408636935-29515-3-git-send-email-nm@ti.com>
+ <00FC9A978A94B7418C33AFAE8A35ED49DF0662@DFLE09.ent.ti.com>
+ <53F62A2B.6010208@ti.com>
+ <00FC9A978A94B7418C33AFAE8A35ED49DF07A2@DFLE09.ent.ti.com>
+ <20140821173715.GA23419@kahuna>
+ <20140821180300.GA5854@core.coreip.homeip.net>
+ <53F64217.5020303@ti.com>
+ <20140910211353.GE38736@core.coreip.homeip.net>
+ <20140911120119.GA17602@kahuna>
+Message-ID: <20140912064441.GC31165@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 11:29:39AM +0800, Anson Huang wrote:
-> Anson Huang (3):
->   ARM: imx: add gpt_3m clk for i.mx6qdl
->   ARM: dts: imx6: make gpt per clock can be from OSC
->   ARM: imx: source gpt per clk from OSC for system timer
+On Thu, Sep 11, 2014 at 07:01:19AM -0500, Nishanth Menon wrote:
+> Hi Dimtry,
+> 
+> On 14:13-20140910, Dmitry Torokhov wrote:
+> > On Thu, Aug 21, 2014 at 02:01:43PM -0500, Nishanth Menon wrote:
+> > > On 08/21/2014 01:03 PM, Dmitry Torokhov wrote:
+> > > 
+> > > I believe I have taken care of other concerns on v2, but..Arrgh.. I
+> > > did not reply to this comment..
+> > > > BTW, I do not think you need to use of_node_get/put here, it's not going anywhere.
+> > > It has been mentioned as a good practice to ensure we use get_put in
+> > > to ensure reference count is appropriately maintained. So, I have'nt
+> > > changed that in v3.
+> > 
+> > You only need to maintain reference count if you pass the handle on.
+> > Otherwise you'd have to do get/put every time you dereference something.
+> > 
+> > Anyway, I did a few changes to the driver (no need to store current
+> > state, do not fre einput device after unregister, etc.), could you
+> > please tell me if the version below still works for you?
+> [...]
+> Thanks for taking the time to do all the changes - they are awesome and
+> the resultant driver does work.
 
-Applied all, thanks.
+Thank you for [re]testing. I queued the driver for the next merge
+window.
+
+-- 
+Dmitry
