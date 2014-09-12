@@ -1,94 +1,133 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 12 Sep 2014 13:47:55 -0500
-Subject: [PATCH v3 0/3] OMAP4+: Get rid of internal SRAM handling
-In-Reply-To: <20140910165643.GA3118@splat>
-References: <cover.1410362895.git.d-gerlach@ti.com>
- <20140910165643.GA3118@splat>
-Message-ID: <54133FDB.9030706@ti.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 12 Sep 2014 13:53:43 -0500
+Subject: [PATCH v8 2/3] usb: dwc3: Add Qualcomm DWC3 glue layer driver
+In-Reply-To: <20140912174704.GG8567@saruman.home>
+References: <1410542986-24419-1-git-send-email-agross@codeaurora.org>
+ <1410542986-24419-3-git-send-email-agross@codeaurora.org>
+ <20140912174704.GG8567@saruman.home>
+Message-ID: <20140912185343.GA8756@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 11:56 AM, Nishanth Menon wrote:
-> On 11:04-20140910, Dave Gerlach wrote:
->> v3:
->> Fix minor issue in last patch to check for null sram_pool if no sram
->> phandle is given in DT.
->>
->> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
->> use drivers/misc/sram.c driver instead of the omap internal
->> implementation for SRAM handling.
->>
->> Previous discussion can be found at [1].
->>
->> Regards,
->> Dave
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195588.html
->>
->> Rajendra Nayak (3):
->>   ARM: AM335x: Get rid of unused sram init function
->>   ARM: OMAP4+: Move SRAM data to DT
->>   ARM: OMAP4+: Remove static iotable mappings for SRAM
->>
->>  Documentation/devicetree/bindings/arm/omap/mpu.txt |  3 ++
->>  arch/arm/boot/dts/am33xx.dtsi                      |  5 ++-
->>  arch/arm/boot/dts/am4372.dtsi                      |  5 +++
->>  arch/arm/boot/dts/omap4.dtsi                       |  6 ++++
->>  arch/arm/boot/dts/omap5.dtsi                       |  8 ++++-
->>  arch/arm/configs/omap2plus_defconfig               |  1 +
->>  arch/arm/mach-omap2/io.c                           | 17 ----------
->>  arch/arm/mach-omap2/omap4-common.c                 | 22 +++++++++++-
->>  arch/arm/mach-omap2/sram.c                         | 39 +---------------------
->>  arch/arm/mach-omap2/sram.h                         |  7 ----
->>  10 files changed, 46 insertions(+), 67 deletions(-)
->>
+On Fri, Sep 12, 2014 at 12:47:04PM -0500, Felipe Balbi wrote:
+> Hi,
 > 
-> Could you please provide logs for the following:
-> a) Low power transition tests for OMAP3,4 on all available platforms as
-> well?
-> b) provide bootlogs on all omap2plus platforms to ensure we have no
-> regressions.
+> On Fri, Sep 12, 2014 at 12:29:45PM -0500, Andy Gross wrote:
+> > From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+> > 
+> > DWC3 glue layer is hardware layer around Synopsys DesignWare
+> > USB3 core. Its purpose is to supply Synopsys IP with required
+> > clocks, voltages and interface it with the rest of the SoC.
+> > 
+> > Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  drivers/usb/dwc3/Kconfig     |    9 +++
+> >  drivers/usb/dwc3/Makefile    |    1 +
+> >  drivers/usb/dwc3/dwc3-qcom.c |  133 ++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 143 insertions(+)
+> >  create mode 100644 drivers/usb/dwc3/dwc3-qcom.c
+> > 
+> > diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+> > index 785510a..e9f258e 100644
+> > --- a/drivers/usb/dwc3/Kconfig
+> > +++ b/drivers/usb/dwc3/Kconfig
+> > @@ -80,6 +80,15 @@ config USB_DWC3_KEYSTONE
+> >  	  Support of USB2/3 functionality in TI Keystone2 platforms.
+> >  	  Say 'Y' or 'M' here if you have one such device
+> >  
+> > +config USB_DWC3_QCOM
+> > +	tristate "Qualcomm Platforms"
+> > +	depends on ARCH_QCOM || COMPILE_TEST
+> > +	default USB_DWC3
+> > +	select PHY_QCOM_DWC3
+> 
+> I would rather steer away from selecting the PHY as it prevents having
+> PHYs as modules. Also, this will add a Kconfig warning for selecting a
+> symbol that doesn't exist (yet).
+
+True.  The one downside is people having to fish around to find the phy config
+option.
+
+> 
+> If it's all the same with you, I can clean this up when applying.
 > 
 
-Here are logs for low power transition, all platforms passed, properly
-transitioned power domains with mem sleep using wakeup_timer to wake.
+Thats fine.
 
-Low Power transition on v3.17-rc4 with patches applied, omap2plus_defconfig
-(OMAP3 and OMAP4):
+> > diff --git a/drivers/usb/dwc3/dwc3-qcom.c b/drivers/usb/dwc3/dwc3-qcom.c
+> > new file mode 100644
+> > index 0000000..2067c04
+> > --- /dev/null
+> > +++ b/drivers/usb/dwc3/dwc3-qcom.c
+> > @@ -0,0 +1,133 @@
+> > +/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regulator/consumer.h>
+> > +#include <linux/usb/phy.h>
+> 
+> doesn't look like you need regulator/consumer.h and usb/phy.h. I can
+> clean it up when applying.
 
- 1: BeagleBoard-XM: http://fpaste.org/133215/
- 2: OMAP3430-Labrador(LDP): http://fpaste.org/133225/
- 3: n900: http://fpaste.org/133244/
- 4: pandaboard-es:  http://fpaste.org/133213/
- 5: pandaboard-vanilla: http://fpaste.org/133214/
- 6: sdp3430: http://fpaste.org/133246/
+Ack, interim changes that should have been removed.  you can do that or I can
+respin.... no big deal.
 
-Boot on v3.17-rc4 with patches applied, omap2plus_defconfig:
+> 
+> > +struct dwc3_qcom {
+> > +	struct device		*dev;
+> > +
+> > +	struct clk		*core_clk;
+> > +	struct clk		*iface_clk;
+> > +	struct clk		*sleep_clk;
+> > +};
+> > +
+> > +static int dwc3_qcom_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device_node *node = pdev->dev.of_node;
+> > +	struct dwc3_qcom *qdwc;
+> > +	int ret = 0;
+> > +
+> > +	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
+> > +	if (!qdwc)
+> > +		return -ENOMEM;
+> > +
+> > +	platform_set_drvdata(pdev, qdwc);
+> > +
+> > +	qdwc->dev = &pdev->dev;
+> > +
+> > +	qdwc->core_clk = devm_clk_get(qdwc->dev, "core");
+> > +	if (IS_ERR(qdwc->core_clk)) {
+> > +		dev_dbg(qdwc->dev, "failed to get core clock\n");
+> 
+> this one would be a dev_err() since core can't work without its clock. I
+> can fix when applying.
 
- 1: am335x-evm:  Boot PASS: http://fpaste.org/133179/
- 2:  am335x-sk:  Boot PASS: http://fpaste.org/133180/
- 3: am3517-evm:  Boot PASS: http://fpaste.org/133181/
- 4:  am37x-evm:  Boot PASS: http://fpaste.org/133182/
- 5: am43xx-epos:  Boot PASS: http://fpaste.org/133183/
- 6: am43xx-gpevm:  Boot PASS: http://fpaste.org/133184/
- 7: BeagleBoard-XM:  Boot PASS: http://fpaste.org/133191/
- 8: beagleboard-vanilla:  Boot PASS: http://fpaste.org/133192/
- 9: beaglebone-black:  Boot PASS: http://fpaste.org/133193/
-10: beaglebone:  Boot PASS: http://fpaste.org/133194/
-11: craneboard:  Boot PASS: http://fpaste.org/133186/
-12: dra7xx-evm:  Boot PASS: http://fpaste.org/131396/
-13: OMAP3430-Labrador(LDP):  Boot PASS: http://fpaste.org/133206/
-14:       n900:  Boot PASS: http://fpaste.org/133207/
-15:  omap5-evm:  Boot PASS: http://fpaste.org/133208/
-16: pandaboard-es:  Boot PASS: http://fpaste.org/133187/
-17: pandaboard-vanilla:  Boot PASS: http://fpaste.org/133188/
-18:    sdp2430:  Boot PASS: http://fpaste.org/133189/
-19:    sdp3430:  Boot PASS: http://fpaste.org/133212/
-TOTAL = 19 boards, Booted Boards = 19, No Boot boards = 0
+Right.  That's fine.
 
-Again, all pass. I have also tested with next AM335x Suspend/Resume
-implementation, next version will use generic sram driver to allocate for
-low-level assembly code, and that works fine as well.
+> 
+> -- 
+> balbi
 
-Regards,
-Dave
+
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
