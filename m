@@ -1,35 +1,37 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 12 Sep 2014 15:13:34 -0700
-Subject: [PATCH RESEND v9 5/5] rtc: Add driver for Maxim 77802 PMIC
- Real-Time-Clock
-In-Reply-To: <1410509864-10019-6-git-send-email-javier.martinez@collabora.co.uk>
-References: <1410509864-10019-1-git-send-email-javier.martinez@collabora.co.uk>
- <1410509864-10019-6-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20140912151334.cd53fca611a7de487f23241b@linux-foundation.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 12 Sep 2014 18:20:52 -0400 (EDT)
+Subject: [PATCH] net/macb: Add hardware revision information during probe
+In-Reply-To: <1410447096-29980-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410447096-29980-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140912.182052.1655150437302824636.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Sep 2014 10:17:43 +0200 Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Thu, 11 Sep 2014 16:51:36 +0200
 
-> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
-> This patch adds support for the RTC and is based on a driver
-> added by Simon Glass to the Chrome OS kernel 3.8 tree.
+> From: Bo Shen <voice.shen@atmel.com>
 > 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index ca5d7798b265..a3b35c146d9c 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -2241,6 +2241,7 @@ static int __init macb_probe(struct platform_device *pdev)
+>  
+>  	netif_carrier_off(dev);
+>  
+> +	netdev_info(dev, "Cadence rev 0x%08x\n", macb_readl(bp, MID));
+>  	netdev_info(dev, "Cadence %s at 0x%08lx irq %d (%pM)\n",
+>  		    macb_is_gem(bp) ? "GEM" : "MACB", dev->base_addr,
+>  		    dev->irq, dev->dev_addr);
 
-Would it be appropriate to gather Simon's signoff?
+This is really sloppy.  The "Cadence %s at ..." is what announces the device,
+therefore it's out of context to print out the device revision beforehand.
 
-> +static inline int max77802_rtc_calculate_wday(u8 shifted)
-> +{
-> +	int counter = -1;
-> +
-> +	while (shifted) {
-> +		shifted >>= 1;
-> +		counter++;
-> +	}
-
-Can't use log2() or similar?
-
-> +	return counter;
-> +}
+Why don't you just add it to the existing printout instead?
