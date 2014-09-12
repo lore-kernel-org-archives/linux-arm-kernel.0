@@ -1,48 +1,31 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Fri, 12 Sep 2014 09:37:17 -0700
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
- <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
-Message-ID: <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 12 Sep 2014 13:40:02 -0300
+Subject: [alsa-devel] [PATCH v2 2/4] ARM: dts: pbab01: enable I2S audio on
+ phyFLEX-i.MX6 boards
+In-Reply-To: <1410539161.314611261@f174.i.mail.ru>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410537872-17274-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410539161.314611261@f174.i.mail.ru>
+Message-ID: <CAOMZO5C9_XwgcLvVWvxB1A306_Ehm17ZE111j6d+7MhudAhT0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
-> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>
->>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>> recently posted by Andrew Chew [2].
->>>
->>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->>> USB devices I tested with, about half where probed correctly, but the
->>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>
->>> I don't see any correlation between the failure and the kind of usb
->>> device, but I don't have much experience with USB implementations
->>> either.
+On Fri, Sep 12, 2014 at 1:26 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Fri, 12 Sep 2014 19:04:30 +0300 ?? Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>:
+>> Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
+>> over SSI interface.
 >>
->> Hmm... I haven't seen that before.  Which particular devices were you using?
+>> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+>> ---
+> ...
+>> +&ssi2 {
+>> +     fsl,mode = "i2s-slave";
+>> +     status = "okay";
+>> +     #sound-dai-cells = <0>;
+>> +};
 >
-> Here they are:
->
-> work:
->
-> Genius keyboard: 05d5:6782
-> Logitech mouse: 046d:c06a
-> Denver MP3 player: 10d6:1100
-> Atheros Bluetooth dongle: 0cf3:3005
->
-> don't work:
->
-> MCS7830 ethernet dongle: 9710:7830
-> Genesys Logic hub: 05e3:0608
+> I have already sent patch to add "#sound-dai-cells" into all i.MX DT-files.
+> Shawn, can you point us to this tree/commit?
 
-I tried the hub and it works just fine for me... Have you tried this
-on any other boards like Big or Blaze?
+https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=for-next&id=36c7e8826cf32dd4dd34c71b526653b800414355
