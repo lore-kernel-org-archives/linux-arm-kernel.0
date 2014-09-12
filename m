@@ -1,117 +1,71 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 12 Sep 2014 12:47:04 -0500
-Subject: [PATCH v8 2/3] usb: dwc3: Add Qualcomm DWC3 glue layer driver
-In-Reply-To: <1410542986-24419-3-git-send-email-agross@codeaurora.org>
-References: <1410542986-24419-1-git-send-email-agross@codeaurora.org>
- <1410542986-24419-3-git-send-email-agross@codeaurora.org>
-Message-ID: <20140912174704.GG8567@saruman.home>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 12 Sep 2014 19:49:43 +0200
+Subject: [PATCH v3 0/4] arm64, thunder: Enable Cavium Thunder SoC Family
+Message-ID: <1410544187-15876-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Robert Richter <rrichter@cavium.com>
 
-On Fri, Sep 12, 2014 at 12:29:45PM -0500, Andy Gross wrote:
-> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> 
-> DWC3 glue layer is hardware layer around Synopsys DesignWare
-> USB3 core. Its purpose is to supply Synopsys IP with required
-> clocks, voltages and interface it with the rest of the SoC.
-> 
-> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  drivers/usb/dwc3/Kconfig     |    9 +++
->  drivers/usb/dwc3/Makefile    |    1 +
->  drivers/usb/dwc3/dwc3-qcom.c |  133 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 143 insertions(+)
->  create mode 100644 drivers/usb/dwc3/dwc3-qcom.c
-> 
-> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
-> index 785510a..e9f258e 100644
-> --- a/drivers/usb/dwc3/Kconfig
-> +++ b/drivers/usb/dwc3/Kconfig
-> @@ -80,6 +80,15 @@ config USB_DWC3_KEYSTONE
->  	  Support of USB2/3 functionality in TI Keystone2 platforms.
->  	  Say 'Y' or 'M' here if you have one such device
->  
-> +config USB_DWC3_QCOM
-> +	tristate "Qualcomm Platforms"
-> +	depends on ARCH_QCOM || COMPILE_TEST
-> +	default USB_DWC3
-> +	select PHY_QCOM_DWC3
+This initial patches enable Cavium Thunder SoC Family. The patches add
+devicetree and Kconfig support and then add Thunder to the defconfig.
 
-I would rather steer away from selecting the PHY as it prevents having
-PHYs as modules. Also, this will add a Kconfig warning for selecting a
-symbol that doesn't exist (yet).
+The Thunder system needs more enablement patches for subsystems and
+devices, this includes network, ahci, gicv3/gicv3-its, pci, smmu, kvm.
+We will send separate patch sets for these. All of them base on this
+initial patches.
 
-If it's all the same with you, I can clean this up when applying.
+I sent a separate patch set independently that introduces support for
+dts vendor subdirs. After both patch sets have been applied I will
+send a patch in addition that moves the dts file into a subdirectory.
 
-> diff --git a/drivers/usb/dwc3/dwc3-qcom.c b/drivers/usb/dwc3/dwc3-qcom.c
-> new file mode 100644
-> index 0000000..2067c04
-> --- /dev/null
-> +++ b/drivers/usb/dwc3/dwc3-qcom.c
-> @@ -0,0 +1,133 @@
-> +/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/usb/phy.h>
+I sent another separate patch that sets NR_CPUS to 64 per default.
 
-doesn't look like you need regulator/consumer.h and usb/phy.h. I can
-clean it up when applying.
+The first patch introduces dts files without having a Kconfig option
+for the soc (ARCH_THUNDER). However, this is introduced in patch 3 and
+added to defconfig in patch 4 as this is my preferred solution. If
+there is still resistance having an ARCH_THUNDER option, just drop
+them.
 
-> +struct dwc3_qcom {
-> +	struct device		*dev;
-> +
-> +	struct clk		*core_clk;
-> +	struct clk		*iface_clk;
-> +	struct clk		*sleep_clk;
-> +};
-> +
-> +static int dwc3_qcom_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct dwc3_qcom *qdwc;
-> +	int ret = 0;
-> +
-> +	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
-> +	if (!qdwc)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, qdwc);
-> +
-> +	qdwc->dev = &pdev->dev;
-> +
-> +	qdwc->core_clk = devm_clk_get(qdwc->dev, "core");
-> +	if (IS_ERR(qdwc->core_clk)) {
-> +		dev_dbg(qdwc->dev, "failed to get core clock\n");
+Patches are available here:
 
-this one would be a dev_err() since core can't work without its clock. I
-can fix when applying.
+ git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git thunder/init
+
+v3 changes:
+* removed setting NR_CPUS for Thunder, I sent a separate patch that
+  increases this to 64 cpus per default
+* reordered patches, dts files changes are know first using dtb-y
+  instead of ARCH_THUNDER option
+* moved soc nodes to thunder-88xx.dtsi
+
+v2 changes:
+* rebased to 3.17
+* placed commas between 32-bit portions of 64 bit addresses
+* removed #address-cells and size-cells in gic node
+* get rid of the clocks node
+* changed to gpl/x11 dual license
+* removed memreserve
+* moved gic to bus node
+
+Radha Mohan Chintakuntla (3):
+  arm64, thunder: Add initial dts for Cavium Thunder SoC
+  arm64, thunder: Document devicetree bindings for Cavium Thunder SoC
+  arm64, thunder: Add Kconfig option for Cavium Thunder SoC Family
+
+Robert Richter (1):
+  arm64, defconfig: Enable Cavium Thunder SoC in defconfig
+
+ .../devicetree/bindings/arm/cavium-thunder.txt     |  10 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm64/Kconfig                                 |   5 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/thunder-88xx.dts               |  67 ++++
+ arch/arm64/boot/dts/thunder-88xx.dtsi              | 401 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ 7 files changed, 486 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx.dtsi
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/360a34a9/attachment.sig>
+2.1.0
