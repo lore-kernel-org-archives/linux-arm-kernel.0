@@ -1,77 +1,71 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 12 Sep 2014 22:00:03 +0800
-Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
+Date: Fri, 12 Sep 2014 22:00:04 +0800
+Subject: [PATCH v4 06/18] ARM64 / ACPI: Introduce early_param for "acpi"
 In-Reply-To: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
 References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1410530416-30200-7-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+From: Al Stone <al.stone@linaro.org>
 
-ACPI 5.1 does not currently support S states for ARM64 hardware but
-ACPI code will call acpi_target_system_state() for device power
-managment, so introduce sleep-arm.c to allow other drivers to function
-until S states are defined.
+Introduce one early parameters "off" for "acpi" to disable ACPI on
+ARM64.
 
+This ensures the kernel uses the DT on a platform that provides both
+ACPI tables and DT.
+
+Signed-off-by: Al Stone <al.stone@linaro.org>
 Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/Makefile    |    4 ++++
- drivers/acpi/sleep-arm.c |   28 ++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
- create mode 100644 drivers/acpi/sleep-arm.c
+ Documentation/kernel-parameters.txt |    3 ++-
+ arch/arm64/kernel/acpi.c            |   15 +++++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 505d4d7..89837f8 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -23,7 +23,11 @@ acpi-y				+= nvs.o
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 5ae8608..9dfb1d8 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+ bytes respectively. Such letter suffixes can also be entirely omitted.
  
- # Power management related files
- acpi-y				+= wakeup.o
-+ifeq ($(ARCH), arm64)
-+acpi-y				+= sleep-arm.o
-+else # X86, IA64
- acpi-y				+= sleep.o
-+endif
- acpi-y				+= device_pm.o
- acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
  
-diff --git a/drivers/acpi/sleep-arm.c b/drivers/acpi/sleep-arm.c
-new file mode 100644
-index 0000000..54578ef
---- /dev/null
-+++ b/drivers/acpi/sleep-arm.c
-@@ -0,0 +1,28 @@
-+/*
-+ *  ARM64 Specific Sleep Functionality
-+ *
-+ *  Copyright (C) 2013-2014, Linaro Ltd.
-+ *      Author: Graeme Gregory <graeme.gregory@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
+-	acpi=		[HW,ACPI,X86]
++	acpi=		[HW,ACPI,X86,ARM]
+ 			Advanced Configuration and Power Interface
+ 			Format: { force | off | strict | noirq | rsdt }
+ 			force -- enable ACPI if default was off
+@@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 				strictly ACPI specification compliant.
+ 			rsdt -- prefer RSDT over (default) XSDT
+ 			copy_dsdt -- copy DSDT to memory
++			For ARM64, ONLY "acpi=off" is available.
+ 
+ 			See also Documentation/power/runtime_pm.txt, pci=noacpi
+ 
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 9252f72..693da7f 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -67,3 +67,18 @@ void __init acpi_boot_table_init(void)
+ 	if (acpi_table_init())
+ 		disable_acpi();
+ }
 +
-+#include <linux/acpi.h>
-+
-+/*
-+ * Currently the ACPI 5.1 standard does not define S states in a
-+ * manner which is usable for ARM64. These two stubs are sufficient
-+ * that system initialises and device PM works.
-+ */
-+u32 acpi_target_system_state(void)
++static int __init parse_acpi(char *arg)
 +{
-+	return ACPI_STATE_S0;
-+}
-+EXPORT_SYMBOL_GPL(acpi_target_system_state);
++	if (!arg)
++		return -EINVAL;
 +
-+int __init acpi_sleep_init(void)
-+{
-+	return -ENOSYS;
++	/* "acpi=off" disables both ACPI table parsing and interpreter */
++	if (strcmp(arg, "off") == 0)
++		disable_acpi();
++	else
++		return -EINVAL;	/* Core will print when we return error */
++
++	return 0;
 +}
++early_param("acpi", parse_acpi);
 -- 
 1.7.9.5
