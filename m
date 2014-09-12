@@ -1,52 +1,29 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 12 Sep 2014 14:03:54 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable Maxim 77693 and I2C GPIO drivers
-Message-ID: <1410523434-10645-1-git-send-email-k.kozlowski@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 12 Sep 2014 14:15:10 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <1921859.32moD2F04k@fb07-iapwap2>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <7627175.tG5quZH0VN@fb07-iapwap2> <20140912095821.GB1930@katana>
+ <1921859.32moD2F04k@fb07-iapwap2>
+Message-ID: <20140912121510.GD1930@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos System-on-Chips have ~7 distinctive I2C IO ports (exact
-number depends on chip). However some integrated circuits on board, also
-using I2C protocol for communication, can be connected to the SoC by
-other GPIO. Enabling the I2C GPIO driver allows using such additional
-integrated circuits.
 
-An example of such chip using I2C and connected over GPIO to SoC is
-Maxim 77693 MUIC on Trats2 board. The regulator driver of Maxim
-77693 offers charger and safeout LDO (necessary for USB OTG).
+> > Am I missing something? Board properties can be encoded within the
+> > compatible entries ("ax100-ec", "ax200-ec"...). I'd think this means
+> > mostly different protocols, though.
+> 
+> well, ac100 is the name of the board and nvec is the name of the protocol. 
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/exynos_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Yes, the driver could be named nvec, yet the compatible-strings should
+be similar to above. From that, the driver can deduce the protocol
+variant and possible initial settings.
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index fc7d1683bf67..6dd5252f73f4 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -71,6 +71,7 @@ CONFIG_I2C=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_ARB_GPIO_CHALLENGE=y
- CONFIG_I2C_EXYNOS5=y
-+CONFIG_I2C_GPIO=y
- CONFIG_I2C_CROS_EC_TUNNEL=y
- CONFIG_SPI=y
- CONFIG_SPI_S3C64XX=y
-@@ -88,6 +89,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_MAX77686=y
-+CONFIG_MFD_MAX77693=y
- CONFIG_MFD_MAX8997=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_TPS65090=y
-@@ -96,6 +98,7 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX8997=y
- CONFIG_REGULATOR_MAX77686=y
-+CONFIG_REGULATOR_MAX77693=y
- CONFIG_REGULATOR_S2MPA01=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
--- 
-1.9.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/28755602/attachment-0001.sig>
