@@ -1,38 +1,88 @@
-From: fishgolf@gmail.com (Patrick Boyle)
-Date: Thu, 11 Sep 2014 22:40:29 -0400
-Subject: Q about driver code for KSZ8873MML
-Message-ID: <CAH=J7GMQMGhEgiGQiXru1P4zdZjemFwwWrUjhRWBN+jS-qsF=Q@mail.gmail.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Fri, 12 Sep 2014 02:42:10 +0000
+Subject: [PATCH] watchdog: imx2_wdt: add restart handler support
+In-Reply-To: <20140911155522.GB13052@roeck-us.net>
+References: <1410421661-15298-1-git-send-email-jingchang.lu@freescale.com>
+ <20140911155522.GB13052@roeck-us.net>
+Message-ID: <299ae9bd88c049ea833e964e4b5f54a0@BL2PR03MB467.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the linux/include/micrel_phy.h file the PHY ID for the KSZ8873MML
-is defined as (0x000e7237)
+>-----Original Message-----
+>From: Guenter Roeck [mailto:groeck7 at gmail.com] On Behalf Of Guenter Roeck
+>Sent: Thursday, September 11, 2014 11:55 PM
+>To: Lu Jingchang-B35083
+>Cc: wim at iguana.be; Guo Shawn-R65073; arnd at arndb.de; linux-
+>watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH] watchdog: imx2_wdt: add restart handler support
+>
+>On Thu, Sep 11, 2014 at 03:47:41PM +0800, Jingchang Lu wrote:
+>>   Register the watchdog as the system restart function
+>> to the new introducing kernel restart call chain in the
+>> driver instead of providing the restart in machine desc.
+>>   This restart handler function is from the mxc_restart()
+>> in arch/arm/mach-imx/system.c
+>>
+>> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+>> ---
+>>  drivers/watchdog/imx2_wdt.c | 37 +++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 37 insertions(+)
+>>
+>> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+>> index 68c3d37..fa723e8 100644
+>> --- a/drivers/watchdog/imx2_wdt.c
+>> +++ b/drivers/watchdog/imx2_wdt.c
+>> @@ -22,14 +22,17 @@
+>>   */
+>>
+>>  #include <linux/clk.h>
+>> +#include <linux/delay.h>
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>>  #include <linux/jiffies.h>
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>>  #include <linux/moduleparam.h>
+>> +#include <linux/notifier.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/reboot.h>
+>>  #include <linux/regmap.h>
+>>  #include <linux/timer.h>
+>>  #include <linux/watchdog.h>
+>> @@ -59,6 +62,7 @@ struct imx2_wdt_device {
+>>  	struct regmap *regmap;
+>>  	struct timer_list timer;	/* Pings the watchdog when closed */
+>>  	struct watchdog_device wdog;
+>> +	struct notifier_block restart_handler;
+>>  };
+>>
+>>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>> @@ -77,6 +81,31 @@ static const struct watchdog_info imx2_wdt_info = {
+>>  	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+>>  };
+>>
+>> +static int imx2_restart_handler(struct notifier_block *this, unsigned
+>long mode,
+>> +				void *cmd)
+>> +{
+>> +	unsigned int wcr_enable = IMX2_WDT_WCR_WDE;
+>
+>In the original code this value is conditional depending on cpu_is_mx1().
+>Are there any implications for this reset mechanism ? Does mx1 have a
+>different watchdog driver ?
+>
+Hi, Shawn, is this driver also used by the mx1 SoC? 
+The imx2_wdt.c says it is for IMX2 and later processors, so when moving the
+restart function, I removed the cpu_is_mx1() condition determination, Thanks.
 
-#define MICREL_PHY_ID_MASK     0x00fffff0
 
-#define PHY_ID_KSZ8873MLL      0x000e7237
-#define PHY_ID_KSZ9021         0x00221610
-#define PHY_ID_KSZ8737         0x00221720
-/* same id: KS8021, KS8031 */
-#define PHY_ID_KSZ8021         0x00221555
-#define PHY_ID_KSZ8041         0x00221510
-#define PHY_ID_KSZ8051         0x00221550
-/* same id: ks8001 Rev. A/B, and ks8721 Rev 3. */
-#define PHY_ID_KSZ8001         0x0022161A
-/* same id: KS8081, KS8091 */
-#define PHY_ID_KSZ8081         0x00221560
-#define PHY_ID_KSZ8061         0x00221570
-#define PHY_ID_KSZ9031         0x00221620
+>> +	struct imx2_wdt_device *wdev = container_of(this,
+>> +							struct imx2_wdt_device,
+>> +							restart_handler);
+>
+>Please align second lines with '('.
+Ok, thanks.
 
-/* struct phy_device dev_flags definitions */
-#define MICREL_PHY_50MHZ_CLK   0x00000001
-
-But the datasheet from Micrel for this part (and using mii to probe
-the part on my board) shows:
-
-0x00221430
-
-So where did 0x000e7237 come from?
-
-Thanks
-Patrick Boyle
+Best Regards,
+Jingchang
