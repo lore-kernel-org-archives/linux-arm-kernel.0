@@ -1,52 +1,96 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Sep 2014 10:33:48 +0200
-Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
-In-Reply-To: <9935938.eKOCvCAtLt@fb07-iapwap2>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
- <1591383.Xdy91rktuP@fb07-iapwap2> <20140911145421.GE5149@katana>
- <9935938.eKOCvCAtLt@fb07-iapwap2>
-Message-ID: <20140912083348.GA1289@katana>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 12 Sep 2014 10:38:31 +0200
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP completely
+In-Reply-To: <1406551632.5397.17.camel@x220>
+References: <1406551632.5397.17.camel@x220>
+Message-ID: <1410511111.31130.4.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
+049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
+removed the only dependency that used it. Setting it had no effect
+anymore.
 
-> > Why do you want DT to be involved at all?
-> 
-> Imagine a device which supports both, slave or master mode. The driver needs 
-> to know in which mode it should operate. This cannot be hard coded, because on 
-> different boards, different modes can be used.
+So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
+some reason that commit did not remove all select statements for that
+symbol. These statements are useless. Remove them too.
 
-Okay, it sounds weird to me that a device is not able to switch between
-master and slave, but if you say so. Also, solving this issue would also
-handle potential weird IP blocks which can be slave only, right?
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Done on top of next-20140912. Tested with git grep only!
 
-What if you use two different adapter drivers or compatibles? One for
-master-mode, one for slave-mode (slave could leave algo->master_xfer
-empty, so the slave mode driver cannot send packets). I'm brainstorming
-here, so while it should work IMO I will probably need a second thought.
+ arch/arm/mach-omap2/Kconfig    | 5 -----
+ arch/arm/mach-shmobile/Kconfig | 1 -
+ drivers/devfreq/Kconfig        | 1 -
+ 3 files changed, 7 deletions(-)
 
-So, in the DT you would have a block registering the I2C slave core
-which binds to a simple driver providing reg_slave/unreg_slave and
-pass on the slave-event. Then you could instantiate slave clients as
-said before.
-
-Maybe we need a real world example?
-
-> The point is, that if we define a dt binding for master device on slave 
-> adapters it will be there forever. So even if it makes no sense for the 
-> example eeprom simulator (or even our embedded controller), it may make sense 
-> for other or future devices.
-
-I don't know what you mean here. Again, an example might help?
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/8a64a17c/attachment.sig>
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 5b103099626d..f138bd33a463 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -22,7 +22,6 @@ config ARCH_OMAP4
+ 	bool "TI OMAP4"
+ 	depends on ARCH_MULTI_V7
+ 	select ARCH_OMAP2PLUS
+-	select ARCH_HAS_OPP
+ 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_ERRATA_720789
+@@ -41,7 +40,6 @@ config SOC_OMAP5
+ 	bool "TI OMAP5"
+ 	depends on ARCH_MULTI_V7
+ 	select ARCH_OMAP2PLUS
+-	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_GIC
+ 	select HAVE_ARM_SCU if SMP
+@@ -53,14 +51,12 @@ config SOC_AM33XX
+ 	bool "TI AM33XX"
+ 	depends on ARCH_MULTI_V7
+ 	select ARCH_OMAP2PLUS
+-	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+ 
+ config SOC_AM43XX
+ 	bool "TI AM43x"
+ 	depends on ARCH_MULTI_V7
+ 	select ARCH_OMAP2PLUS
+-	select ARCH_HAS_OPP
+ 	select ARM_GIC
+ 	select MACH_OMAP_GENERIC
+ 	select MIGHT_HAVE_CACHE_L2X0
+@@ -69,7 +65,6 @@ config SOC_DRA7XX
+ 	bool "TI DRA7XX"
+ 	depends on ARCH_MULTI_V7
+ 	select ARCH_OMAP2PLUS
+-	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_GIC
+ 	select HAVE_ARM_ARCH_TIMER
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 21f457b56c01..f59019dd986e 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_HAS_OPP
+ 
+ if ARCH_SHMOBILE_MULTI
+ 
+diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+index 3dced0a9eae3..2227e9bf3884 100644
+--- a/drivers/devfreq/Kconfig
++++ b/drivers/devfreq/Kconfig
+@@ -80,7 +80,6 @@ config ARM_EXYNOS4_BUS_DEVFREQ
+ config ARM_EXYNOS5_BUS_DEVFREQ
+ 	bool "ARM Exynos5250 Bus DEVFREQ Driver"
+ 	depends on SOC_EXYNOS5250
+-	select ARCH_HAS_OPP
+ 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+ 	select PM_OPP
+ 	help
+-- 
+1.9.3
