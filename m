@@ -1,69 +1,99 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Fri, 12 Sep 2014 21:26:13 +0900
-Subject: [PATCH v3 0/7] Add max77802 support for Peach boards
-In-Reply-To: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <0ae801cfce84$be443620$3acca260$@kernel.org>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Fri, 12 Sep 2014 14:30:50 +0200
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911120928.GA1585@localhost.localdomain>
+ <20140911143616.3ebb025a@bbrezillon>
+ <20140911142511.GA2543@localhost.localdomain>
+ <20140911163847.5e2f85c7@bbrezillon>
+ <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
+Message-ID: <20140912143050.014ad4c3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello Kukjin,
-> 
-Hi Javier,
+On Fri, 12 Sep 2014 08:45:50 +0800
+Huang Shijie <shijie.huang@intel.com> wrote:
 
-> This is a third version of th series that adds max77802 support for
-> the Peach Pit and Pi boards. The series also have all the pending
-> patches that were posted but depended on this support. I've picked
-> all the patches I found and rebased them to be sure that they apply
-> cleanly on top of linux-next. Also I've taken some DT snippets from
-> the downstream Chrome OS 3.8 kernel DTS for devices that use one of
-> these regulators as their input supply.
-> 
-Thanks a lot and looks good to me. I'll take this whole series.
+> On Thu, Sep 11, 2014 at 04:38:47PM +0200, Boris BREZILLON wrote:
+> > Hi Huang,
+> > 
+> > On Thu, 11 Sep 2014 22:25:13 +0800
+> > Huang Shijie <shijie8@gmail.com> wrote:
+> > 
+> > > Hi Boris,
+> > > 
+> > > On Thu, Sep 11, 2014 at 02:36:16PM +0200, Boris BREZILLON wrote:
+> > > > Hi Huang,
+> > > > 
+> > > > On Thu, 11 Sep 2014 20:09:30 +0800
+> > > > Huang Shijie <shijie8@gmail.com> wrote:
+> > > > 
+> > > > > On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
+> > > > > > Several MTD users (either in user or kernel space) expect a valid raw
+> > > > > > access support to NAND chip devices.
+> > > > > > This is particularly true for testing tools which are often touching the
+> > > > > > data stored in a NAND chip in raw mode to artificially generate errors.
+> > > > > > 
+> > > > > > The GPMI drivers do not implemenent raw access functions, and thus rely on
+> > > > > > default HW_ECC scheme implementation.
+> > > > > > The default implementation consider the data and OOB area as properly
+> > > > > > separated in their respective NAND section, which is not true for the GPMI
+> > > > > > controller.
+> > > > > > In this driver/controller some OOB data are stored at the beginning of the
+> > > > > > NAND data area (these data are called metadata in the driver), then ECC
+> > > > > > bytes are interleaved with data chunk (which is similar to the
+> > > > > > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
+> > > > > > OOB data.
+> > > > > > 
+> > > > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > > > ---
+> > > > > > Hello,
+> > > > > > 
+> > > > > > This patch is providing raw access support to the GPMI driver which is
+> > > > > > particularly useful to run some tests on the NAND (the one coming in
+> > > > > > mind is the mtd_nandbiterrs testsuite).
+> > > > > > 
+> > > > > > I know this rework might break several user space tools which are relying
+> > > > > > on the default raw access implementation (I already experienced an issue
+> > > > > > with the kobs-ng tool provided by freescale), but many other tools will
+> > > > > > now work as expected.
+> > > > > If the kobs-ng can not works, there is no meaning that other tools
+> > > > > works.  So I do not think we need to implement these hooks.
+> > > > 
+> > > > Well, I don't know about freescale specific tools, but at least I have
+> > > > an example with mtd_nandbiterrs module.
+> > > 
+> > > The gpmi uses the hardware ECC for the bitflips.
+> > > I really do not know why the mtd_nandbiterrs is needed.
+> > > IMHO, the mtd_nandbiterrs is useless for the gpmi.
+> > 
+> > Because some folks would like to test their NAND controller/chip on
+> > their system.
+> > 
+> > Just because you don't need it, doesn't mean others won't, and actually
+> > the reason I worked on these raw function is becaused I needed to
+> > validate the ECC capabilities of the GPMI ECC controller.
+> The BCH's algorithm is confidential to Freescale. 
+> How can you validate the ECC capabilities?
 
-- Kukjin
+My bad, capabilities might not be the appropriate word in this context.
+I meant ECC algorithm strength, and that's exactly the purpose of
+nandbiterrs testsuite: insert bitflips in in-band data until the MTD
+layer complains about uncorrectable errors.
+This test validates what's returned by ecc_strength file in sysfs
+(which in turn is specified by the NAND controller when initializing
+the NAND chip).
 
-> Changes since v2 [0]:
->  - Remove left over supply on ldo35 regulator, suggested by Doug Anderson.
->  - Add a patch to change the i2c7 clock at 400kHz, suggested by Doug Anderson.
->  - Add a patch from Vivek Gautam to enable max77802 regulator driver support.
-> 
-> Changes sinve v1 [1]:
->  - Dropped patch that added vmmc and vqmmc supplies as suggested
->    by Doug Anderson.
->  - Use IRQ flags define instead of a magic number as suggested by
->    Andreas Faerber.
-> 
-> The series is composed of the following patches:
-> 
-> Javier Martinez Canillas (3):
->   ARM: dts: Add Peach Pit and Pi dts entry for max77802 PMIC
->   ARM: dts: Add Peach Pit and Pi dts entry for ISL29018 sensor
->   ARM: dts: Set i2c7 clock at 400kHz for Peach boards
-> 
-> Naveen Krishna Chatradhi (1):
->   ARM: dts: Add thermistor dts fragment used by exynos based Peach
->     boards
-> 
-> Rahul Sharma (2):
->   ARM: dts: add hdmi regulators for exynos5800 based peach-pi board
->   ARM: dts: add hdmi regulators for exynos5420 based peach-pit board
-> 
-> Vivek Gautam (1):
->   ARM: exynos_defconfig: Enable MAX77802
-> 
->  arch/arm/boot/dts/cros-adc-thermistors.dtsi |  44 ++++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts  | 389 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts   | 389 ++++++++++++++++++++++++++++
->  arch/arm/configs/exynos_defconfig           |   3 +
->  4 files changed, 825 insertions(+)
->  create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
-> 
-> 
-> Best regards,
-> Javier
-> 
-> [0]: https://lkml.org/lkml/2014/8/20/225
-> [1]: https://lkml.org/lkml/2014/8/19/372
+Doing this should not imply knowing the ECC algorithm in use in the
+NAND controller or the layout used to store data on NAND.
+
+Best Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
