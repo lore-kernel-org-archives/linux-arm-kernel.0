@@ -1,111 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 12 Sep 2014 09:52:48 +0200
-Subject: [PATCHv2] mtd: nand: atmel_nand: retrieve NFC clock
-In-Reply-To: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5412A650.60102@atmel.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 12 Sep 2014 15:59:01 +0800
+Subject: [PATCH 1/2] ARM: dts: vf610: Add ARM Global Timer
+In-Reply-To: <1410437175-6636-1-git-send-email-stefan@agner.ch>
+References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
+Message-ID: <20140912075900.GK18566@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2014 19:52, Alexandre Belloni :
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+On Thu, Sep 11, 2014 at 02:06:14PM +0200, Stefan Agner wrote:
+> Add Global Timer support which is part of the Snoop Control Unit
+> of the Cortex-A5 processor. This Global Timer is compatible with the
+> Cortex-A9 implementation. It's a 64-bit timer and is clocked by the
+> peripheral clock, which is typically 133 or 166MHz on Vybrid.
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-You may need to add Josh Wu to the list because he is the "de-facto"
-Maintainer of this driver.
-
-Bye,
-
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
+>  arch/arm/boot/dts/vf610.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> Changes in v2:
->  - reworked the error path to really make the clock optional
->  - Documented the new optional property
-> 
->  .../devicetree/bindings/mtd/atmel-nand.txt         |  1 +
->  drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> index c4728839d0c1..f71e2ebab15b 100644
-> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> @@ -38,6 +38,7 @@ Optional properties:
->              if don't want to use it.
->    - Optional properties:
->      - atmel,write-by-sram: boolean to enable NFC write by sram.
-> +    - clocks: phandle to the peripheral clock if it exists
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 4d2ec32..a03abf6 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -11,6 +11,7 @@
+>  #include "vf610-pinfunc.h"
+>  #include <dt-bindings/clock/vf610-clock.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
 >  
->  Examples:
->  nand0: nand at 40000000,0 {
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 9c5f717bda54..69e0eb1ace54 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -27,6 +27,7 @@
->   *
->   */
+>  / {
+>  	aliases {
+> @@ -83,6 +84,13 @@
+>  				      <0x40002100 0x100>;
+>  			};
 >  
-> +#include <linux/clk.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/slab.h>
->  #include <linux/module.h>
-> @@ -96,6 +97,8 @@ struct atmel_nfc {
->  	bool			use_nfc_sram;
->  	bool			write_by_sram;
->  
-> +	struct clk		*clk;
-> +
->  	bool			is_initialized;
->  	struct completion	comp_ready;
->  	struct completion	comp_cmd_done;
-> @@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->  {
->  	struct atmel_nfc *nfc = &nand_nfc;
->  	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-> +	int ret;
->  
->  	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-> @@ -2281,6 +2285,26 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->  
->  	nfc->is_initialized = true;
->  	dev_info(&pdev->dev, "NFC is probed.\n");
-> +
-> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(nfc->clk)) {
-> +		ret = clk_prepare_enable(nfc->clk);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		dev_warn(&pdev->dev, "NFC clock is missing");
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_nand_nfc_remove(struct platform_device *pdev)
-> +{
-> +	struct atmel_nfc *nfc = &nand_nfc;
-> +
-> +	if (!IS_ERR(nfc->clk))
-> +		clk_disable_unprepare(nfc->clk);
-> +
->  	return 0;
->  }
->  
-> @@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
->  		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
->  	},
->  	.probe = atmel_nand_nfc_probe,
-> +	.remove = atmel_nand_nfc_remove,
->  };
->  
->  static struct platform_driver atmel_nand_driver = {
-> 
+> +			global_timer: global-timer at 40002200 {
 
+I think it's more idiomatic to use the generic name 'timer' for the
+node.
 
--- 
-Nicolas Ferre
+Shawn
+
+> +				compatible = "arm,cortex-a9-global-timer";
+> +				reg = <0x40002200 0x20>;
+> +				interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_PLATFORM_BUS>;
+> +			};
+> +
+>  			L2: l2-cache at 40006000 {
+>  				compatible = "arm,pl310-cache";
+>  				reg = <0x40006000 0x1000>;
+> -- 
+> 2.1.0
+> 
