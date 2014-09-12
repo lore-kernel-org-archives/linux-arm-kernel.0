@@ -1,53 +1,50 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 12 Sep 2014 11:50:23 +0200
-Subject: SPI and module auto-loading
-In-Reply-To: <20140911193325.GT4015@sirena.org.uk>
-References: <54119DB6.8020807@collabora.co.uk>
- <20140911193325.GT4015@sirena.org.uk>
-Message-ID: <5412C1DF.3040707@collabora.co.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 12 Sep 2014 11:51:22 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140912094010.GE28458@ci00147.xsens-tech.local>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
+ <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+Message-ID: <5412C21A.8020203@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2014 09:33 PM, Mark Brown wrote:
-> On Thu, Sep 11, 2014 at 03:03:50PM +0200, Javier Martinez Canillas wrote:
+On 09/12/2014 11:40 AM, Frans Klaver wrote:
+
+> I'm not sure. I just reproduced this on a boneblack, using your uart_v9
+> branch.
 > 
->> This can be easily worked around (and probably why it never was an issue) if
->> the OF and SPI tables are kept in sync but I don't know if that is a hard
->> requirement for all use-cases (e.g: a SPI driver that is DT only?).
+>> This problem only pops-up if you use DMA. With disabled DMA you don't
+>> see this, right?
 > 
-> I'm not sure I see that as an interesting use case, it seems better to
-> have drivers usable without DT and it's trivial to do so.
->
+> I get the lockup both with and without DMA enabled. Here's the 8250
+> config I use. Our full .config is attached in case it may provide
+> something relevant.
 
-Yes, it's trivial but seems like an unnecessary duplication for me. AFAICT the
-OF tables are only used to match the devices in spi_match_device() but if both
-the OF and SPI tables must be kept in sync to properly report the module
-aliases to user-space then I wonder if the OF tables shouldn't just be removed
-from the SPI drivers since spi_match_device() will succeed anyways when
-calling spi_match_id().
+Hmm. I have a bone black here. Can you tell what you did to get this
+lockup? The port configuration (unless 115200 8N1) and what you did to
+get this lockup.
 
->> I'm sending an RFC patch [1] to know what you think about it.
->> [1]
->> From a7cd35209a597a578df6c801e5ff7b63b584bf3e Mon Sep 17 00:00:00 2001
->> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Date: Thu, 11 Sep 2014 14:31:04 +0200
->> Subject: [PATCH RFC] spi: core: report OF style modalias when probing using DT
-> 
-> We already have a perfectly good way of sending patches.
-> 
+> Something that may also help: when I have a lockup on the boneblack, dma
+> is enabled and something is written to console like I described earlier,
+> I get the following bad irq:
 
-Of course I know how to post patches properly but proposing a patch was not my
-intention here since as I said this could break module auto-loading for many
-drivers that rely on the current behavior. What I wanted was to explain with
-code how the SPI core could report uevents in order to be consistent with what
-other subsystems do (e.g: platform drivers):
+> Full dmesg is also attached.
 
-http://lxr.free-electrons.com/source/drivers/base/platform.c#L717
+This one should be stuffed by this:
+	"[RFC] ARM: edma: unconditionally ack the error interrupt"
+	https://lkml.org/lkml/2014/9/10/714
 
-I should probably had used sharing instead of sending but as a non-native
-english speaker sometimes I don't always choose the best wording.
+> Hope you find something useful in there.
 
-Anyway, I was just raising the issue because if a driver only defines an OF
-table and not a SPI table, the driver will be probed correctly but module
-auto-loading will not work. So even when it looks like having a SPI id table
-is not a requirement for OF, it really is and I think that is not documented.
+> Thanks,
+> Frans
+
+Sebastian
