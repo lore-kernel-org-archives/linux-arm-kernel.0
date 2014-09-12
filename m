@@ -1,81 +1,35 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Fri, 12 Sep 2014 00:05:55 +0000
-Subject: [PATCH v4 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140911153119.GA11275@kwain>
-References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
- <1409730511-16101-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140911010709.GE3609@peterchendt> <20140911153119.GA11275@kwain>
-Message-ID: <600c4437f5d14520931aabc242fd69f4@BN1PR0301MB0772.namprd03.prod.outlook.com>
+From: shijie.huang@intel.com (Huang Shijie)
+Date: Fri, 12 Sep 2014 08:40:47 +0800
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140911164536.796f1012@bbrezillon>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911142930.GB2543@localhost.localdomain>
+ <20140911164536.796f1012@bbrezillon>
+Message-ID: <20140912004047.GA26904@shldeISGChi005.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 11, 2014 at 04:45:36PM +0200, Boris BREZILLON wrote:
+> On Thu, 11 Sep 2014 22:29:32 +0800
+> Huang Shijie <shijie8@gmail.com> wrote:
+> 
+> > On Wed, Sep 10, 2014 at 10:55:39AM +0200, Boris BREZILLON wrote:
+> >  +static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
+> > > +				  struct nand_chip *chip, uint8_t *buf,
+> > > +				  int oob_required, int page)
+> > > +{
+> > > +	struct gpmi_nand_data *this = chip->priv;
+> > > +	struct bch_geometry *nfc_geo = &this->bch_geometry;
+> > > +	int eccsize = nfc_geo->ecc_chunk_size;
+> > > +	int eccbytes = DIV_ROUND_UP(nfc_geo->ecc_strength * nfc_geo->gf_len,
+> > > +				    8);
+> > 
+> > In actually, the ECC can be _NOT_ bytes aligned.
+> > you should not round up to byte.
+> 
+> You mean, on the NAND storage ? That would be weird, but I'll check.
 
- 
-> On Thu, Sep 11, 2014 at 09:07:10AM +0800, Peter Chen wrote:
-> > On Wed, Sep 03, 2014 at 09:48:26AM +0200, Antoine Tenart wrote:
-> > > +
-> > > +static int ci_hdrc_usb2_dt_probe(struct device *dev,
-> > > +				 struct ci_hdrc_platform_data *ci_pdata) {
-> > > +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
-> > > +	if (IS_ERR(ci_pdata->phy)) {
-> > > +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
-> > > +			return -EPROBE_DEFER;
-> > > +
-> > > +		/* PHY is optional */
-> > > +		ci_pdata->phy = NULL;
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> >
-> > You may also need to consider usb_phy case.
-> 
-> Don't we try using the generic PHY framework for new drivers?
-> 
-> Since there is no need for supporting an usb_phy case I don't think we have to
-> consider this case yet. And no doing so could encourage people to add PHY
-> drivers to the common PHY framework.
-> 
+yes. it is weird. 
 
-If the common PHY framework is the only right way in future, you don't
-need to change it.
-
-> > > +
-> > > +	if (dev->of_node) {
-> > > +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-> > > +		if (ret)
-> > > +			return ret;
-> > > +	} else {
-> > > +		ret = dma_set_mask_and_coherent(&pdev->dev,
-> DMA_BIT_MASK(32));
-> > > +		if (ret)
-> > > +			return ret;
-> > > +	}
-> >
-> > You may need to do clk_disable_unprepare for above error cases.
-> 
-> Sure, I'll fix that.
-> 
-> > > +
-> > > +	ci_pdata->name = dev_name(&pdev->dev);
-> > > +
-> > > +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> > > +					   pdev->num_resources, ci_pdata);
-> > > +	if (IS_ERR(priv->ci_pdev)) {
-> > > +		ret = PTR_ERR(priv->ci_pdev);
-> > > +		if (ret != -EPROBE_DEFER)
-> > > +			dev_err(dev,
-> > > +				"failed to register ci_hdrc platform
-> device: %d\n",
-> > > +				ret);
-> >
-> > Why you don't want the error message for deferral probe?
-> 
-> A driver can return an EPROBE_DEFER error and still probe successfully later.
-> This would be confusing to have this kind of error message in this case. And
-> when a driver returns -EPROBE_DEFER, there is an error message already.
-> 
-
-OK, agree.
-
-Peter
+thanks
+Huang Shijie
