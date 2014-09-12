@@ -1,78 +1,42 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 12 Sep 2014 11:34:29 +0100
-Subject: [PATCH v10 09/10] PCI: Assign unassigned bus resources in
- pci_scan_root_bus()
-In-Reply-To: <5412C75F.30207@amd.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-10-git-send-email-Liviu.Dudau@arm.com>
- <5412C75F.30207@amd.com>
-Message-ID: <20140912103429.GA1994@e106497-lin.cambridge.arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 12 Sep 2014 12:46:11 +0200
+Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP completely
+In-Reply-To: <CAGo_u6r3jXX2FS-PO5_-+zhHM3i3pVzGYumSYLh7YPNXGV98eg@mail.gmail.com>
+References: <1406551632.5397.17.camel@x220> <1410511111.31130.4.camel@x220>
+ <CAGo_u6r3jXX2FS-PO5_-+zhHM3i3pVzGYumSYLh7YPNXGV98eg@mail.gmail.com>
+Message-ID: <1410518771.31130.22.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 11:13:51AM +0100, Suravee Suthikulpanit wrote:
-> On 9/8/2014 8:54 AM, Liviu Dudau wrote:
-> > If the firmware has not assigned all the bus resources and
-> > we are not just probing the PCIe busses, it makes sense to
-> > assign the unassigned resources in pci_scan_root_bus().
+On Fri, 2014-09-12 at 05:20 -0500, Nishanth Menon wrote:
+> On Fri, Sep 12, 2014 at 3:38 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
+> > 049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
+> > removed the only dependency that used it. Setting it had no effect
+> > anymore.
 > >
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
+> > some reason that commit did not remove all select statements for that
+> > symbol. These statements are useless. Remove them too.
+> >
+> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 > > ---
-> >   drivers/pci/probe.c | 3 +++
-> >   1 file changed, 3 insertions(+)
+> > Done on top of next-20140912. Tested with git grep only!
 > >
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index ef891d2..508cf61 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1953,6 +1953,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
-> >   	if (!found)
-> >   		pci_bus_update_busn_res_end(b, max);
-> >
-> > +	if (!pci_has_flag(PCI_PROBE_ONLY))
-> > +		pci_assign_unassigned_bus_resources(b);
-> > +
-> >   	pci_bus_add_devices(b);
-> >   	return b;
-> >   }
-> >
+> >  arch/arm/mach-omap2/Kconfig    | 5 -----
 > 
-> Liviu,
+> there can be conflict here:
+> https://patchwork.kernel.org/patch/4857231/
 > 
-> Besides the check for PCI_PROBE_ONLY here, I think we also need to avoid calling
-> "pci_enable_resources()" in the "driver/pci/pci.c: pcibios_enable_device()" for
-> PCI_PROBE_ONLY mode since the resource is not assigned by Linux. Otherwise, the
-> "drivers/pci/setup-res.c: pci_enable_resource()" would fail w/ error:
-> 
->      can't enable device: BAR ..... not assigned
+> http://marc.info/?l=linux-omap&m=141047815520894&w=2
 
-Hmm, are you sure that is not because the host bridge resources have not been
-requested? pci-host-generic.c uses PCI_PROBE_ONLY and yet it works with the series as
-is. But it does request_resource() for the host bridge resources inside the driver.
+Thanks.
 
-Best regards,
-Liviu
+> >  arch/arm/mach-shmobile/Kconfig | 1 -
+> >  drivers/devfreq/Kconfig        | 1 -
 
-> 
-> Actually, in "arch/arm/kernel/bios32.c:", the weak "pcibios_enable_device()" function
-> also has the check for PCI_PROBE_ONLY mode before calling pci_enable_resources().
-> 
-> Thanks,
-> 
-> Suravee
-> 
-> 
+Were patches submitted for these two files too? If so, we can probably
+just drop my patch.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+
+Paul Bolle
