@@ -1,35 +1,26 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Fri, 12 Sep 2014 20:56:32 +0530
-Subject: [PATCH v4 8/8] arm64: dts: add <dt-bindings/> symlink
-In-Reply-To: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
-References: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1410535592-5782-10-git-send-email-ch.naveen@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Sep 2014 16:36:10 +0100
+Subject: [PATCH] arm64: pageattr: Correctly adjust unaligned start
+ addresses
+In-Reply-To: <1410473432-13381-1-git-send-email-lauraa@codeaurora.org>
+References: <54112831.6010800@codeaurora.org>
+ <1410473432-13381-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140912153610.GD5532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
+On Thu, Sep 11, 2014 at 11:10:32PM +0100, Laura Abbott wrote:
+> The start address needs to be actually updated after it
+> is detected to be unaligned. Adjust it and the end address
+> properly.
+> 
+> Reported-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm64/mm/pageattr.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
-match the ones in ARM architectures so that preprocessed device
-tree files can include various useful constant definitions.
+Applied. Thanks.
 
-See commit c58299aa8754 ("kbuild: create an "include chroot" for DT bindings")
-merged in v3.10-rc1 for details.
-
-CC: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm64/boot/dts/include/dt-bindings |    1 +
- 1 file changed, 1 insertion(+)
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-
-diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..08c00e4
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings
-\ No newline at end of file
 -- 
-1.7.9.5
+Catalin
