@@ -1,59 +1,48 @@
-From: dborkman@redhat.com (Daniel Borkmann)
-Date: Fri, 12 Sep 2014 18:21:27 +0200
-Subject: [PATCH arm64-next] net: bpf: arm64: address randomize and write
- protect JIT code
-In-Reply-To: <20140912160345.GF5532@arm.com>
-References: <1410505897-20122-1-git-send-email-dborkman@redhat.com>
- <20140912160345.GF5532@arm.com>
-Message-ID: <54131D87.9060008@redhat.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Fri, 12 Sep 2014 18:20:57 +0200
+Subject: [PATCH v2 1/2] ARM: tegra: apalis/colibri t30: integrate audio
+ support
+In-Reply-To: <5410C222.2020602@wwwdotorg.org>
+References: <cover.1410362950.git.marcel@ziswiler.com>
+ <00f249b3d648d3a8d550c5db0737f3aa6d93f07e.1410362950.git.marcel@ziswiler.com>
+ <5410C222.2020602@wwwdotorg.org>
+Message-ID: <1410538857.15150.22.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2014 06:03 PM, Catalin Marinas wrote:
-> Daniel,
->
-> On Fri, Sep 12, 2014 at 08:11:37AM +0100, Daniel Borkmann wrote:
->>   Will, Catalin, Dave, this is more or less a heads-up: when net-next and
->>   arm64-next tree will get both merged into Linus' tree, we will run into
->>   a 'silent' merge conflict until someone actually runs eBPF JIT on ARM64
->>   and might notice (I presume) an oops when JIT is freeing bpf_prog. I'd
->>   assume nobody actually _runs_ linux-next, but not sure about that though.
->
-> Some people do.
->
->>   How do we handle this? Would I need to resend this patch when the time
->>   comes or would you ARM64 guys take care of it automagically? ;)
->
-> I think we could disable BPF for arm64 until -rc1 and re-enable it
-> together with this patch.
+On Wed, 2014-09-10 at 15:26 -0600, Stephen Warren wrote:
+> No, definitely not; this patch has significant semantic changes since I 
+> reviewed it.
 
-Ok, yes, that would mitigate it a bit. Sounds fine to me.
+OK, sorry. Admittedly this was probably a little bit too quick a shot.
+The solution looked so clean and on first sight worked just fine.
 
-> One comment below:
->
->> --- a/arch/arm64/net/bpf_jit_comp.c
->> +++ b/arch/arm64/net/bpf_jit_comp.c
-> [...]
->> +static void jit_fill_hole(void *area, unsigned int size)
->> +{
->> +	/* Insert illegal UND instructions. */
->> +	u32 *ptr, fill_ins = 0xe7ffffff;
->
-> On arm64 we don't have a guaranteed undefined instruction space (and
-> Will tells me that on Thumb-2 for the 32-bit arm port it actually is a
-> valid instruction, it seems that you used the same value).
+> I'm not sure how this can work. Certainly all 3 clocks that are required 
+> for audio are mentioned here. However, the PLL_A clock (which then 
+> trickles down to the other 2) needs to have its rate changed based on 
+> whether the sample rate is 44.1KHz- or 48KHz-based. Semantically, this 
+> can't be something that "simple-audio-card" can imply, since 
+> "simple-audio-card" is something agnostic to any HW, whereas this 
+> clocking requirement is something specific to Tegra HW.
 
-Hm, ok, the boards we've tried out and where Zi tested it too, it worked.
+Yes, now as you mention it I forgot about the whole
+tegra_asoc_utils_set_rate() stuff!
 
-> I think the only guaranteed way is to use the BRK #imm instruction but
-> it requires some changes to the handling code as it is currently used
-> for kgdb (unless you can use two instructions for filling in which could
-> generate a NULL pointer access).
+> To see the problem, try encoding some audio stream as both 44.1KHz and 
+> 48KHz, then play a few seconds of each and keep switching back and 
+> forth. You'll likely find either the playback pitch is wrong, or you get 
+> drop-outs or stuttering.
 
-The trade-off would be that if we align on 8, it would certainly increase
-the probability to jump to the right offset. Note, on x86_64 we have no
-alignment requirements, hence 1, and on s390x only alignment of 2.
+Yeah, right. Clocks seem to be stuck at the 44.1 kHz setting.
 
-So, on that few (?) boards where UND would be a valid instruction [ as
-opposed to crash the kernel ], would it translate into a NOP and just
-'walk' from there into the JIT image?
+> I also wonder how "simple-audio-card" can know what rate the EXTERN1 
+> clock to the CODEC should be set to; each CODEC has a different 
+> requirement for the minimum clock input and the Fs multiple usually 
+> varies for different sample rates. See for example 
+> sound/soc/tegra/tegra_wm8903.c:tegra_wm8903_hw_params(). This could be a 
+> solved problem though: Perhaps some API has been added to CODECs to 
+> report this information (or perhaps CODEC drivers now clk_set_rate() on 
+> their input clocks themselves) since I last looked.
+
+If there are no objections I will just revive version 1 again and send
+it around as a new version 3 just to prevent any further confusion.
