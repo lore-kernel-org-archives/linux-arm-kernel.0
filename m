@@ -1,42 +1,68 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 12 Sep 2014 12:46:11 +0200
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP completely
-In-Reply-To: <CAGo_u6r3jXX2FS-PO5_-+zhHM3i3pVzGYumSYLh7YPNXGV98eg@mail.gmail.com>
-References: <1406551632.5397.17.camel@x220> <1410511111.31130.4.camel@x220>
- <CAGo_u6r3jXX2FS-PO5_-+zhHM3i3pVzGYumSYLh7YPNXGV98eg@mail.gmail.com>
-Message-ID: <1410518771.31130.22.camel@x220>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Fri, 12 Sep 2014 18:54:55 +0800
+Subject: [PATCH v2] ARM: dts: add rk3288 i2s controller
+In-Reply-To: <1410509511-16667-1-git-send-email-jay.xu@rock-chips.com>
+References: <1410509511-16667-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1410519295-18980-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-12 at 05:20 -0500, Nishanth Menon wrote:
-> On Fri, Sep 12, 2014 at 3:38 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> > The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
-> > 049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
-> > removed the only dependency that used it. Setting it had no effect
-> > anymore.
-> >
-> > So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
-> > some reason that commit did not remove all select statements for that
-> > symbol. These statements are useless. Remove them too.
-> >
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > ---
-> > Done on top of next-20140912. Tested with git grep only!
-> >
-> >  arch/arm/mach-omap2/Kconfig    | 5 -----
-> 
-> there can be conflict here:
-> https://patchwork.kernel.org/patch/4857231/
-> 
-> http://marc.info/?l=linux-omap&m=141047815520894&w=2
+Add dt for rk3288 i2s controller, since i2s clock pins and data pins
+default to be GPIO, this patch also add pinctrl to mux them.
 
-Thanks.
+Tested on RK3288 board.
 
-> >  arch/arm/mach-shmobile/Kconfig | 1 -
-> >  drivers/devfreq/Kconfig        | 1 -
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+---
+change since v1:
+- move i2s relate codes later in order by CPU address map
 
-Were patches submitted for these two files too? If so, we can probably
-just drop my patch.
+ arch/arm/boot/dts/rk3288.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-
-Paul Bolle
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 5950b0a..5b17718 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -271,6 +271,21 @@
+ 		status = "disabled";
+ 	};
+ 
++	i2s: i2s at ff890000 {
++		compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
++		reg = <0xff890000 0x10000>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&dmac_bus_s 0>, <&dmac_bus_s 1>;
++		dma-names = "tx", "rx";
++		clock-names = "i2s_hclk", "i2s_clk";
++		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s0_clk>;
++		status = "disabled";
++	};
++
+ 	gic: interrupt-controller at ffc01000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
+@@ -463,6 +478,17 @@
+ 			};
+ 		};
+ 
++		i2s0 {
++			i2s0_clk: i2s0_clk {
++				rockchip,pins = <6 0 RK_FUNC_1 &pcfg_pull_none>,
++						<6 1 RK_FUNC_1 &pcfg_pull_none>,
++						<6 2 RK_FUNC_1 &pcfg_pull_none>,
++						<6 3 RK_FUNC_1 &pcfg_pull_none>,
++						<6 4 RK_FUNC_1 &pcfg_pull_none>,
++						<6 8 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
+ 		sdmmc {
+ 			sdmmc_clk: sdmmc-clk {
+ 				rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none>;
+-- 
+1.9.1
