@@ -1,73 +1,74 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Sep 2014 15:46:32 +0200
-Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
-In-Reply-To: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 12 Sep 2014 15:46:48 +0200
+Subject: [PATCH 2/8] i2c: Add the ability to match device to compatible
+ string without an of_node
+In-Reply-To: <1409236538-21274-3-git-send-email-lee.jones@linaro.org>
 References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140912134632.GE1930@katana>
+ <1409236538-21274-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140912134648.GF1930@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 03:35:30PM +0100, Lee Jones wrote:
-> Hi Wolfram,
+On Thu, Aug 28, 2014 at 03:35:32PM +0100, Lee Jones wrote:
+> A great deal of I2C devices are currently matched via DT node name, and
+> as such the compatible naming convention of '<vendor>,<device>' has gone
+> somewhat awry - some nodes don't supply one, some supply an arbitrary
+> string and others the correct device name with an arbitrary vendor prefix.
 > 
-> Placing this firmly back on your plate.  I truly hope we don't miss
-> another merge-window.  This patch-set has the support of some pretty
-> senior kernel maintainers, so I hope acceptance shouldn't be too
-> difficult.
+> In an effort to correct this problem we have to supply a mechanism to
+> match a device by compatible string AND by simple device name.  This
+> function strips off the '<vendor>,' part of a supplied compatible string
+> and attempts to match without it.
 > 
-> As previously discussed I believe it should be okay for an I2C device
-> driver _not_ supply an I2C ID table to match to.  The I2C subsystem
-> should be able to match via other means, such as via OF tables.  The
-> blocking factor during our previous conversation was to keep
-> registering via sysfs up and running.  This set does that.
+> The plan is to remove this function once all of the compatible strings
+> for each device have been brought into line.
 
-As mentioned in another thread, modaliases are one other possible side
-effect. As Javier correctly mentions, the beaviour does not really
-change with your patchset. Yet, if we remove i2c_device_id from drivers
-too carelessly, they might not be bound anymore.
+Is this really the plan? I mean, the old matching mechanism has been out
+there for ages and I dunno how many already deployed DTs depend on it.
+I'd think we need to keep this around forever.
 
 > 
-> After thinking more deeply about the problem, it occurred to me that
-> any I2C device driver which uses the sysfs method and issues an
-> of_match_device() would also fail their probe().  Bolted on to this
-> set is a new, more generic way for these devices to match against
-> either of the I2C/OF tables.
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/i2c/i2c-core.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 > 
-> I hope this ticks all of your boxes.
-> 
-> v3:
->   - Insist on passing 'struct i2c_client' instead of 'struct device'
->   - Remove hook from of_match_device()
-> 
-> v2:
->   - Removal of ACPI support (this is really an OF issue).
->   - Add a new .probe2( with will seamlessly replace
->   - Supply a warning on devices matching via OF without a suitable compatible
->   - Remove unified match_device() - bad idea as it subverts type-safe behaviour
->   - Provide examples of the kind of clean-up possible after this set.
->     - I already have the full support from the maintainer of these drivers =;-)
-> 
-> Kind regards,
-> Lee
-> 
-> Lee Jones (8):
->   i2c: Add pointer dereference protection to i2c_match_id()
->   i2c: Add the ability to match device to compatible string without an
->     of_node
->   i2c: Match using traditional OF methods, then by vendor-less
->     compatible strings
->   i2c: Make I2C ID tables non-mandatory for DT'ed devices
->   i2c: Export i2c_match_id() for direct use by device drivers
->   i2c: Provide a temporary .probe2() call-back type
->   mfd: 88pm860x: Move over to new I2C device .probe() call
->   mfd: as3722: Rid driver of superfluous I2C device ID structure
-> 
->  drivers/i2c/i2c-core.c      | 72 +++++++++++++++++++++++++++++++++++++++------
->  drivers/mfd/88pm860x-core.c |  5 ++--
->  drivers/mfd/as3722.c        | 12 ++------
->  include/linux/i2c.h         | 22 +++++++++++++-
->  4 files changed, 88 insertions(+), 23 deletions(-)
-> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index d3c8e9f..eb46d15 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -1095,6 +1095,27 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+>  	return i2c_verify_adapter(dev);
+>  }
+>  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+> +
+> +static const struct of_device_id*
+> +i2c_of_match_device_strip_vendor(const struct of_device_id *matches,
+> +				  struct i2c_client *client)
+> +{
+> +	const char *name;
+> +
+> +	for (; matches->compatible[0]; matches++) {
+> +		name = strchr(matches->compatible, ',');
+> +		if (!name)
+> +			name = matches->compatible;
+> +		else
+> +			name++;
+> +
+> +		if (!strnicmp(client->name, name, strlen(client->name)))
+
+Are compatible-properties case-independent? I though they were not.
+
+> +			return matches;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+>  #else
+>  static void of_i2c_register_devices(struct i2c_adapter *adap) { }
+>  #endif /* CONFIG_OF */
 > -- 
 > 1.9.1
 > 
@@ -77,4 +78,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/33a1ade2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/b13801fa/attachment-0001.sig>
