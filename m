@@ -1,197 +1,483 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 12 Sep 2014 11:41:44 -0600
-Subject: [PATCH 01/11 v6] coresight: add CoreSight core layer framework
-In-Reply-To: <20140911203344.GA7593@kroah.com>
-References: <1410450558-12358-1-git-send-email-mathieu.poirier@linaro.org>
- <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
- <20140911203344.GA7593@kroah.com>
-Message-ID: <CANLsYkyPFvOnqRJaWZrvw1aVjBWG=tHuv+V9Tj5RhMy_gD_oiA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 12 Sep 2014 10:43:20 -0700
+Subject: [PATCH v4 2/8] arm/arm64: KVM: vgic: switch to dynamic allocation
+In-Reply-To: <5412B927.2010208@arm.com>
+References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+ <1410433755-3612-3-git-send-email-marc.zyngier@arm.com>
+ <20140911223629.GQ5535@lvm> <5412B927.2010208@arm.com>
+Message-ID: <20140912174320.GX5535@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good morning and thanks for the review.  Pls see comments below.
+On Fri, Sep 12, 2014 at 10:13:11AM +0100, Marc Zyngier wrote:
+> On 11/09/14 23:36, Christoffer Dall wrote:
+> > On Thu, Sep 11, 2014 at 12:09:09PM +0100, Marc Zyngier wrote:
+> >> So far, all the VGIC data structures are statically defined by the
+> >> *maximum* number of vcpus and interrupts it supports. It means that
+> >> we always have to oversize it to cater for the worse case.
+> >>
+> >> Start by changing the data structures to be dynamically sizeable,
+> >> and allocate them at runtime.
+> >>
+> >> The sizes are still very static though.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/kvm/arm.c     |   3 +
+> >>  include/kvm/arm_vgic.h |  76 ++++++++++++----
+> >>  virt/kvm/arm/vgic.c    | 237 ++++++++++++++++++++++++++++++++++++++++++-------
+> >>  3 files changed, 267 insertions(+), 49 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index a99e0cd..923a01d 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -172,6 +172,8 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
+> >>                       kvm->vcpus[i] = NULL;
+> >>               }
+> >>       }
+> >> +
+> >> +     kvm_vgic_destroy(kvm);
+> >>  }
+> >>
+> >>  int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+> >> @@ -253,6 +255,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+> >>  {
+> >>       kvm_mmu_free_memory_caches(vcpu);
+> >>       kvm_timer_vcpu_terminate(vcpu);
+> >> +     kvm_vgic_vcpu_destroy(vcpu);
+> >>       kmem_cache_free(kvm_vcpu_cache, vcpu);
+> >>  }
+> >>
+> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> >> index f074539..bdaac57 100644
+> >> --- a/include/kvm/arm_vgic.h
+> >> +++ b/include/kvm/arm_vgic.h
+> >> @@ -54,19 +54,33 @@
+> >>   * - a bunch of shared interrupts (SPI)
+> >>   */
+> >>  struct vgic_bitmap {
+> >> -     union {
+> >> -             u32 reg[VGIC_NR_PRIVATE_IRQS / 32];
+> >> -             DECLARE_BITMAP(reg_ul, VGIC_NR_PRIVATE_IRQS);
+> >> -     } percpu[VGIC_MAX_CPUS];
+> >> -     union {
+> >> -             u32 reg[VGIC_NR_SHARED_IRQS / 32];
+> >> -             DECLARE_BITMAP(reg_ul, VGIC_NR_SHARED_IRQS);
+> >> -     } shared;
+> >> +     /*
+> >> +      * - One UL per VCPU for private interrupts (assumes UL is at
+> >> +      *   least 32 bits)
+> >> +      * - As many UL as necessary for shared interrupts.
+> >> +      *
+> >> +      * The private interrupts are accessed via the "private"
+> >> +      * field, one UL per vcpu (the state for vcpu n is in
+> >> +      * private[n]). The shared interrupts are accessed via the
+> >> +      * "shared" pointer (IRQn state is at bit n-32 in the bitmap).
+> >> +      */
+> >> +     unsigned long *private;
+> >> +     unsigned long *shared;
+> > 
+> > the comment above the define for REG_OFFSET_SWIZZLE still talks about
+> > the unions in struct vgic_bitmap, which is no longer true.  Mind
+> > updating that comment?
+> 
+> Damned, thought I fixed that. Will update it.
+> 
+> >>  };
+> >>
+> >>  struct vgic_bytemap {
+> >> -     u32 percpu[VGIC_MAX_CPUS][VGIC_NR_PRIVATE_IRQS / 4];
+> >> -     u32 shared[VGIC_NR_SHARED_IRQS  / 4];
+> >> +     /*
+> >> +      * - 8 u32 per VCPU for private interrupts
+> >> +      * - As many u32 as necessary for shared interrupts.
+> >> +      *
+> >> +      * The private interrupts are accessed via the "private"
+> >> +      * field, (the state for vcpu n is in private[n*8] to
+> >> +      * private[n*8 + 7]). The shared interrupts are accessed via
+> >> +      * the "shared" pointer (IRQn state is at byte (n-32)%4 of the
+> >> +      * shared[(n-32)/4] word).
+> >> +      */
+> >> +     u32 *private;
+> >> +     u32 *shared;
+> >>  };
+> >>
+> >>  struct kvm_vcpu;
+> >> @@ -127,6 +141,9 @@ struct vgic_dist {
+> >>       bool                    in_kernel;
+> >>       bool                    ready;
+> >>
+> >> +     int                     nr_cpus;
+> >> +     int                     nr_irqs;
+> >> +
+> >>       /* Virtual control interface mapping */
+> >>       void __iomem            *vctrl_base;
+> >>
+> >> @@ -166,15 +183,36 @@ struct vgic_dist {
+> >>       /* Level/edge triggered */
+> >>       struct vgic_bitmap      irq_cfg;
+> >>
+> >> -     /* Source CPU per SGI and target CPU */
+> >> -     u8                      irq_sgi_sources[VGIC_MAX_CPUS][VGIC_NR_SGIS];
+> >> +     /*
+> >> +      * Source CPU per SGI and target CPU:
+> >> +      *
+> >> +      * Each byte represent a SGI observable on a VCPU, each bit of
+> >> +      * this byte indicating if the corresponding VCPU has
+> >> +      * generated this interrupt. This is a GICv2 feature only.
+> >> +      *
+> >> +      * For VCPUn (n < 8), irq_sgi_sources[n*16] to [n*16 + 15] are
+> >> +      * the SGIs observable on VCPUn.
+> >> +      */
+> >> +     u8                      *irq_sgi_sources;
+> >>
+> >> -     /* Target CPU for each IRQ */
+> >> -     u8                      irq_spi_cpu[VGIC_NR_SHARED_IRQS];
+> >> -     struct vgic_bitmap      irq_spi_target[VGIC_MAX_CPUS];
+> >> +     /*
+> >> +      * Target CPU for each SPI:
+> >> +      *
+> >> +      * Array of available SPI, each byte indicating the target
+> >> +      * VCPU for SPI. IRQn (n >=32) is at irq_spi_cpu[n-32].
+> >> +      */
+> >> +     u8                      *irq_spi_cpu;
+> >> +
+> >> +     /*
+> >> +      * Reverse lookup of irq_spi_cpu for faster compute pending:
+> >> +      *
+> >> +      * Array of bitmaps, one per VCPU, describing is IRQn is
+> > 
+> > ah, describing *if* ?
+> 
+> Indeed. Will fix.
+> 
+> >> +      * routed to a particular VCPU.
+> >> +      */
+> >> +     struct vgic_bitmap      *irq_spi_target;
+> >>
+> >>       /* Bitmap indicating which CPU has something pending */
+> >> -     unsigned long           irq_pending_on_cpu;
+> >> +     unsigned long           *irq_pending_on_cpu;
+> >>  #endif
+> >>  };
+> >>
+> >> @@ -204,11 +242,11 @@ struct vgic_v3_cpu_if {
+> >>  struct vgic_cpu {
+> >>  #ifdef CONFIG_KVM_ARM_VGIC
+> >>       /* per IRQ to LR mapping */
+> >> -     u8              vgic_irq_lr_map[VGIC_NR_IRQS];
+> >> +     u8              *vgic_irq_lr_map;
+> >>
+> >>       /* Pending interrupts on this VCPU */
+> >>       DECLARE_BITMAP( pending_percpu, VGIC_NR_PRIVATE_IRQS);
+> >> -     DECLARE_BITMAP( pending_shared, VGIC_NR_SHARED_IRQS);
+> >> +     unsigned long   *pending_shared;
+> >>
+> >>       /* Bitmap of used/free list registers */
+> >>       DECLARE_BITMAP( lr_used, VGIC_V2_MAX_LRS);
+> >> @@ -239,7 +277,9 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+> >>  int kvm_vgic_hyp_init(void);
+> >>  int kvm_vgic_init(struct kvm *kvm);
+> >>  int kvm_vgic_create(struct kvm *kvm);
+> >> +void kvm_vgic_destroy(struct kvm *kvm);
+> >>  int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu);
+> >> +void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+> >>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+> >>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+> >>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+> >> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> >> index d3299d4..92c086e 100644
+> >> --- a/virt/kvm/arm/vgic.c
+> >> +++ b/virt/kvm/arm/vgic.c
+> >> @@ -95,6 +95,7 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
+> >>  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
+> >>  static void vgic_update_state(struct kvm *kvm);
+> >>  static void vgic_kick_vcpus(struct kvm *kvm);
+> >> +static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi);
+> >>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
+> >>  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
+> >>  static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
+> >> @@ -124,23 +125,45 @@ static const struct vgic_params *vgic;
+> >>  #define REG_OFFSET_SWIZZLE   0
+> >>  #endif
+> >>
+> >> +static int vgic_init_bitmap(struct vgic_bitmap *b, int nr_cpus, int nr_irqs)
+> >> +{
+> >> +     int nr_longs;
+> >> +
+> >> +     nr_longs = nr_cpus + BITS_TO_LONGS(nr_irqs - VGIC_NR_PRIVATE_IRQS);
+> >> +
+> >> +     b->private = kzalloc(sizeof(unsigned long) * nr_longs, GFP_KERNEL);
+> >> +     if (!b->private)
+> >> +             return -ENOMEM;
+> >> +
+> >> +     b->shared = b->private + nr_cpus;
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static void vgic_free_bitmap(struct vgic_bitmap *b)
+> >> +{
+> >> +     kfree(b->private);
+> >> +     b->private = NULL;
+> >> +     b->shared = NULL;
+> >> +}
+> >> +
+> >>  static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
+> >>                               int cpuid, u32 offset)
+> >>  {
+> >>       offset >>= 2;
+> >>       if (!offset)
+> >> -             return x->percpu[cpuid].reg + (offset ^ REG_OFFSET_SWIZZLE);
+> >> +             return (u32 *)(x->private + cpuid) + REG_OFFSET_SWIZZLE;
+> >>       else
+> >> -             return x->shared.reg + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
+> >> +             return (u32 *)(x->shared) + ((offset - 1) ^ REG_OFFSET_SWIZZLE);
+> >>  }
+> >>
+> >>  static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
+> >>                                  int cpuid, int irq)
+> >>  {
+> >>       if (irq < VGIC_NR_PRIVATE_IRQS)
+> >> -             return test_bit(irq, x->percpu[cpuid].reg_ul);
+> >> +             return test_bit(irq, x->private + cpuid);
+> >>
+> >> -     return test_bit(irq - VGIC_NR_PRIVATE_IRQS, x->shared.reg_ul);
+> >> +     return test_bit(irq - VGIC_NR_PRIVATE_IRQS, x->shared);
+> >>  }
+> >>
+> >>  static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
+> >> @@ -149,9 +172,9 @@ static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
+> >>       unsigned long *reg;
+> >>
+> >>       if (irq < VGIC_NR_PRIVATE_IRQS) {
+> >> -             reg = x->percpu[cpuid].reg_ul;
+> >> +             reg = x->private + cpuid;
+> >>       } else {
+> >> -             reg =  x->shared.reg_ul;
+> >> +             reg = x->shared;
+> >>               irq -= VGIC_NR_PRIVATE_IRQS;
+> >>       }
+> >>
+> >> @@ -163,24 +186,49 @@ static void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
+> >>
+> >>  static unsigned long *vgic_bitmap_get_cpu_map(struct vgic_bitmap *x, int cpuid)
+> >>  {
+> >> -     if (unlikely(cpuid >= VGIC_MAX_CPUS))
+> >> -             return NULL;
+> >> -     return x->percpu[cpuid].reg_ul;
+> >> +     return x->private + cpuid;
+> >>  }
+> >>
+> >>  static unsigned long *vgic_bitmap_get_shared_map(struct vgic_bitmap *x)
+> >>  {
+> >> -     return x->shared.reg_ul;
+> >> +     return x->shared;
+> >> +}
+> >> +
+> >> +static int vgic_init_bytemap(struct vgic_bytemap *x, int nr_cpus, int nr_irqs)
+> >> +{
+> >> +     int size;
+> >> +
+> >> +     size  = nr_cpus * VGIC_NR_PRIVATE_IRQS;
+> >> +     size += nr_irqs - VGIC_NR_PRIVATE_IRQS;
+> >> +
+> >> +     x->private = kzalloc(size, GFP_KERNEL);
+> >> +     if (!x->private)
+> >> +             return -ENOMEM;
+> >> +
+> >> +     x->shared = x->private + nr_cpus * VGIC_NR_PRIVATE_IRQS / sizeof(u32);
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static void vgic_free_bytemap(struct vgic_bytemap *b)
+> >> +{
+> >> +     kfree(b->private);
+> >> +     b->private = NULL;
+> >> +     b->shared = NULL;
+> >>  }
+> >>
+> >>  static u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset)
+> >>  {
+> >> -     offset >>= 2;
+> >> -     BUG_ON(offset > (VGIC_NR_IRQS / 4));
+> >> -     if (offset < 8)
+> >> -             return x->percpu[cpuid] + offset;
+> >> -     else
+> >> -             return x->shared + offset - 8;
+> >> +     u32 *reg;
+> >> +
+> >> +     if (offset < VGIC_NR_PRIVATE_IRQS) {
+> >> +             reg = x->private;
+> >> +             offset += cpuid * VGIC_NR_PRIVATE_IRQS;
+> >> +     } else {
+> >> +             reg = x->shared;
+> >> +             offset -= VGIC_NR_PRIVATE_IRQS;
+> >> +     }
+> >> +
+> >> +     return reg + (offset / sizeof(u32));
+> >>  }
+> >>
+> >>  #define VGIC_CFG_LEVEL       0
+> >> @@ -739,7 +787,7 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+> >>                */
+> >>               vgic_dist_irq_set_pending(vcpu, lr.irq);
+> >>               if (lr.irq < VGIC_NR_SGIS)
+> >> -                     dist->irq_sgi_sources[vcpu_id][lr.irq] |= 1 << lr.source;
+> >> +                     *vgic_get_sgi_sources(dist, vcpu_id, lr.irq) |= 1 << lr.source;
+> >>               lr.state &= ~LR_STATE_PENDING;
+> >>               vgic_set_lr(vcpu, i, lr);
+> >>
+> >> @@ -773,7 +821,7 @@ static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+> >>       /* Copy source SGIs from distributor side */
+> >>       for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> >>               int shift = 8 * (sgi - min_sgi);
+> >> -             reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
+> >> +             reg |= ((u32)*vgic_get_sgi_sources(dist, vcpu_id, sgi)) << shift;
+> >>       }
+> >>
+> >>       mmio_data_write(mmio, ~0, reg);
+> >> @@ -797,14 +845,15 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+> >>       /* Clear pending SGIs on the distributor */
+> >>       for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
+> >>               u8 mask = reg >> (8 * (sgi - min_sgi));
+> >> +             u8 *src = vgic_get_sgi_sources(dist, vcpu_id, sgi);
+> >>               if (set) {
+> >> -                     if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
+> >> +                     if ((*src & mask) != mask)
+> >>                               updated = true;
+> >> -                     dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
+> >> +                     *src |= mask;
+> >>               } else {
+> >> -                     if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
+> >> +                     if (*src & mask)
+> >>                               updated = true;
+> >> -                     dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
+> >> +                     *src &= ~mask;
+> >>               }
+> >>       }
+> >>
+> >> @@ -988,6 +1037,11 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+> >>       return true;
+> >>  }
+> >>
+> >> +static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
+> >> +{
+> >> +     return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
+> >> +}
+> >> +
+> >>  static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
+> >>  {
+> >>       struct kvm *kvm = vcpu->kvm;
+> >> @@ -1021,7 +1075,7 @@ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
+> >>               if (target_cpus & 1) {
+> >>                       /* Flag the SGI as pending */
+> >>                       vgic_dist_irq_set_pending(vcpu, sgi);
+> >> -                     dist->irq_sgi_sources[c][sgi] |= 1 << vcpu_id;
+> >> +                     *vgic_get_sgi_sources(dist, c, sgi) |= 1 << vcpu_id;
+> >>                       kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
+> >>               }
+> >>
+> >> @@ -1068,14 +1122,14 @@ static void vgic_update_state(struct kvm *kvm)
+> >>       int c;
+> >>
+> >>       if (!dist->enabled) {
+> >> -             set_bit(0, &dist->irq_pending_on_cpu);
+> >> +             set_bit(0, dist->irq_pending_on_cpu);
+> >>               return;
+> >>       }
+> >>
+> >>       kvm_for_each_vcpu(c, vcpu, kvm) {
+> >>               if (compute_pending_for_cpu(vcpu)) {
+> >>                       pr_debug("CPU%d has pending interrupts\n", c);
+> >> -                     set_bit(c, &dist->irq_pending_on_cpu);
+> >> +                     set_bit(c, dist->irq_pending_on_cpu);
+> >>               }
+> >>       }
+> >>  }
+> >> @@ -1232,14 +1286,14 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+> >>       int vcpu_id = vcpu->vcpu_id;
+> >>       int c;
+> >>
+> >> -     sources = dist->irq_sgi_sources[vcpu_id][irq];
+> >> +     sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
+> >>
+> >>       for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
+> >>               if (vgic_queue_irq(vcpu, c, irq))
+> >>                       clear_bit(c, &sources);
+> >>       }
+> >>
+> >> -     dist->irq_sgi_sources[vcpu_id][irq] = sources;
+> >> +     *vgic_get_sgi_sources(dist, vcpu_id, irq) = sources;
+> >>
+> >>       /*
+> >>        * If the sources bitmap has been cleared it means that we
+> >> @@ -1327,7 +1381,7 @@ epilog:
+> >>                * us. Claim we don't have anything pending. We'll
+> >>                * adjust that if needed while exiting.
+> >>                */
+> >> -             clear_bit(vcpu_id, &dist->irq_pending_on_cpu);
+> >> +             clear_bit(vcpu_id, dist->irq_pending_on_cpu);
+> >>       }
+> >>  }
+> >>
+> >> @@ -1429,7 +1483,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+> >>       /* Check if we still have something up our sleeve... */
+> >>       pending = find_first_zero_bit(elrsr_ptr, vgic->nr_lr);
+> >>       if (level_pending || pending < vgic->nr_lr)
+> >> -             set_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+> >> +             set_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
+> >>  }
+> >>
+> >>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+> >> @@ -1463,7 +1517,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+> >>       if (!irqchip_in_kernel(vcpu->kvm))
+> >>               return 0;
+> >>
+> >> -     return test_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
+> >> +     return test_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
+> >>  }
+> >>
+> >>  static void vgic_kick_vcpus(struct kvm *kvm)
+> >> @@ -1558,7 +1612,7 @@ static bool vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> >>
+> >>       if (level) {
+> >>               vgic_cpu_irq_set(vcpu, irq_num);
+> >> -             set_bit(cpuid, &dist->irq_pending_on_cpu);
+> >> +             set_bit(cpuid, dist->irq_pending_on_cpu);
+> >>       }
+> >>
+> >>  out:
+> >> @@ -1602,6 +1656,32 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+> >>       return IRQ_HANDLED;
+> >>  }
+> >>
+> >> +void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +     struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> >> +
+> >> +     kfree(vgic_cpu->pending_shared);
+> >> +     kfree(vgic_cpu->vgic_irq_lr_map);
+> >> +     vgic_cpu->pending_shared = NULL;
+> >> +     vgic_cpu->vgic_irq_lr_map = NULL;
+> >> +}
+> >> +
+> >> +static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
+> >> +{
+> >> +     struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> >> +
+> >> +     int sz = (nr_irqs - VGIC_NR_PRIVATE_IRQS) / 8;
+> > 
+> > [copying question from last review round, apologies if I'm being stupid]
+> > 
+> > are we guaranteed that the numerator is always a multiple of 8? if not,
+> > won't you end up allocating one less byte than needed?
+> 
+> We force the allocation to be a multiple of 32, as per the GIC spec (we
+> enforce this in arm_vgic.h for the legacy behaviour, and in the last
+> patch for the dynamic case).
+> 
+right, in that case, with the tiny doc fixes:
 
-Mathieu
-
-On 11 September 2014 14:33, Greg KH <gregkh@linuxfoundation.org> wrote:
-> Some first impressions in glancing at the code, not a complete review at
-> all:
->
-> On Thu, Sep 11, 2014 at 09:49:08AM -0600, mathieu.poirier at linaro.org wrote:
->> --- /dev/null
->> +++ b/drivers/coresight/coresight.c
->> @@ -0,0 +1,663 @@
->> +/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#define pr_fmt(fmt) "coresight: " fmt
->
-> MODULE_NAME ?
-
-Is this what you had in mind?
-
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
->
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/init.h>
->> +#include <linux/types.h>
->> +#include <linux/device.h>
->> +#include <linux/io.h>
->> +#include <linux/err.h>
->> +#include <linux/export.h>
->> +#include <linux/slab.h>
->> +#include <linux/semaphore.h>
->> +#include <linux/clk.h>
->> +#include <linux/coresight.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/debugfs.h>
->> +#include <linux/delay.h>
->> +
->> +#include "coresight-priv.h"
->> +
->> +struct dentry *cs_debugfs_parent = NULL;
->> +
->> +static LIST_HEAD(coresight_orph_conns);
->> +static LIST_HEAD(coresight_devs);
->
-> You are a struct device, you don't need a separate list, why not just
-> iterate over your bus list of devices?
-
-Because coresight devices are not powered on the bus.  As such, every
-time we iterate over the bus we'd need to setup the clock for the
-device, power up its domain (if necessary) and lookup the device ID.
-Isn't better to simply keep a list of the devices that were found at
-boot time and use that whenever we want to make configuration changes?
-
-With regards to @coresight_orph_conns, on top of the above problem
-we'd also have to add a flag in the @coresight_device structure to
-indicate that a device has been connected to the topology or not. To
-me using a list is much cleaner.
-
->
->> +/**
->> + * @id:              unique ID of the component.
->> + * @conns:   list of connections associated to this component.
->> + * @type:    as defined by @coresight_dev_type.
->> + * @subtype: as defined by @coresight_dev_subtype.
->> + * @ops:     generic operations for this component, as defined
->> +             by @coresight_ops.
->> + * @de:              handle on a component's debugfs entry.
->> + * @dev:     The device entity associated to this component.
->> + * @kref:    keeping count on component references.
->> + * @dev_link:        link of current component into list of all components
->> +             discovered in the system.
->> + * @path_link:       link of current component into the path being enabled.
->> + * @owner:   typically "THIS_MODULE".
->> + * @enable:  'true' if component is currently part of an active path.
->> + * @activated:       'true' only if a _sink_ has been activated.  A sink can be
->> +             activated but not yet enabled.  Enabling for a _sink_
->> +             happens when a source has been selected for that it.
->> + */
->> +struct coresight_device {
->> +     int id;
->
-> Why not use the device name instead?
-
-With regards to memory footprint it is better to keep a single "int"
-as ID (which is the their memory map start address) than the full
-string associated with the device name.  Let's take a funnel for
-example that has up to 8 input port.  To build a path between source
-and sink we need to keep information about device that are connected
-to each port.  At this time we use the component's ID, i.e 4 byte.  If
-we were to use device names, ex "20040000.funnel_cluster0", we are
-using 24 byte and that, 8 times.
-
-Moreover using device names would also mean that we have to used
-@stcmp everytime we want do lookups.  To me using a single integer to
-identify coresight components is a much better solution.
-
->
->> +     struct coresight_connection *conns;
->> +     int nr_conns;
->> +     enum coresight_dev_type type;
->> +     struct coresight_dev_subtype subtype;
->> +     const struct coresight_ops *ops;
->> +     struct dentry *de;
->
-> All devices have a dentry?  in debugfs?  isn't that overkill?
-
-All devices along a "path" can require specific configuration, which
-can only be made by a user.  Exposing the registers via debugfs seemed
-like the most plausible solution.
-
->
->> +     struct device dev;
->> +     struct kref kref;
->
-> You CAN NOT have two reference counts in the same structure, that's a
-> huge design mistake.  Stick with one reference count, otherwise they are
-> guaranteed to get out of sync and bad things will happen.
-
-In this case the additional @kref is for accounting of components
-within the coresight framework only.  When the amba framework calls
-the driver's _probe() routine the kref count is already equal to '2'
-(as expected), even if no other coresight components have used that
-device.  Knowing when a component is no longer in use by the framework
-(but still available in the system) is important for coresight cleanup
-consideration, i.e switch off the component to save power.
-
-The kref helpers don't expose the refcount and @kref_sub will only
-call the cleanup method when refcount is '1'.  How else should I
-proceed?
-
->
->> +     struct list_head dev_link;
->
-> As discussed above, I don't think you need this.
->
->> +     struct list_head path_link;
->
-> Odds are, you don't need this either.
->
->> +     struct module *owner;
->
-> devices aren't owned by modules, they are data, not code.
-
-Ok
-
->
->
->> +     bool enable;    /* true only if configured as part of a path */
->> +     bool activated; /* true only if a sink is part of a path */
->> +};
->> +
->> +#define to_coresight_device(d) container_of(d, struct coresight_device, dev)
->> +
->> +#define source_ops(csdev)    csdev->ops->source_ops
->> +#define sink_ops(csdev)              csdev->ops->sink_ops
->> +#define link_ops(csdev)              csdev->ops->link_ops
->> +
->> +#define CORESIGHT_DEBUGFS_ENTRY(__name, __entry_name,                        \
->> +                              __mode, __get, __set, __fmt)           \
->> +DEFINE_SIMPLE_ATTRIBUTE(__name ## _ops, __get, __set, __fmt)         \
->
-> Use the RW and RO only versions please.  No need to ever set your own
-> mode value.
-
-I think I get your point but not quite sure how you want me to go
-about it.  Can you give me a couple more line pls?
-
-Again, very grateful for the review.
-
->
-> thanks,
->
-> greg k-h
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
