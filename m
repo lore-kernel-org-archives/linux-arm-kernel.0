@@ -1,41 +1,81 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 12 Sep 2014 13:43:39 -0300
-Subject: [PATCH V1 1/3] ARM: clk-imx6sl: refine clock tree for SSI
-In-Reply-To: <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
-References: <cover.1410253534.git.shengjiu.wang@freescale.com>
- <7ed21195ebff8b3ccbecaeb492504edd28deea2d.1410253534.git.shengjiu.wang@freescale.com>
- <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
-Message-ID: <CAOMZO5DJZHKAV4Y9aUwMNWZqhoLrKrsZdYnKqPem2ZSy=-oAYw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 12 Sep 2014 17:46:57 +0100
+Subject: [PATCH arm64-next] net: bpf: arm64: address randomize and write
+ protect JIT code
+In-Reply-To: <54131D87.9060008@redhat.com>
+References: <1410505897-20122-1-git-send-email-dborkman@redhat.com>
+ <20140912160345.GF5532@arm.com> <54131D87.9060008@redhat.com>
+Message-ID: <20140912164656.GH5532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 1:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Sep 9, 2014 at 6:13 AM, Shengjiu Wang
-> <shengjiu.wang@freescale.com> wrote:
->> Each SSI has "ssi", "ssi_ipg" clocks, and they share same gate bits.
->>
->> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
->
-> This patch breaks audio playback on imx6q-sabresd:
->
-> root at freescale /$ aplay /home/clarinet.wav
-> Playing WAVE '/home/clarinet.wav' : Signed 16 bit Little Endian, Rate 44100 Hz,
-> Mono
-> underrun!!! (at least -1585992.581 ms long)
-> underrun!!! (at least -1585992.585 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
-> underrun!!! (at least -1585992.586 ms long)
->
-> If I revert this commit, then I am able to play it well again.
+On Fri, Sep 12, 2014 at 05:21:27PM +0100, Daniel Borkmann wrote:
+> On 09/12/2014 06:03 PM, Catalin Marinas wrote:
+> > On Fri, Sep 12, 2014 at 08:11:37AM +0100, Daniel Borkmann wrote:
+> >>   Will, Catalin, Dave, this is more or less a heads-up: when net-next and
+> >>   arm64-next tree will get both merged into Linus' tree, we will run into
+> >>   a 'silent' merge conflict until someone actually runs eBPF JIT on ARM64
+> >>   and might notice (I presume) an oops when JIT is freeing bpf_prog. I'd
+> >>   assume nobody actually _runs_ linux-next, but not sure about that though.
+> >
+> > Some people do.
+> >
+> >>   How do we handle this? Would I need to resend this patch when the time
+> >>   comes or would you ARM64 guys take care of it automagically? ;)
+> >
+> > I think we could disable BPF for arm64 until -rc1 and re-enable it
+> > together with this patch.
+> 
+> Ok, yes, that would mitigate it a bit. Sounds fine to me.
+> 
+> > One comment below:
+> >
+> >> --- a/arch/arm64/net/bpf_jit_comp.c
+> >> +++ b/arch/arm64/net/bpf_jit_comp.c
+> > [...]
+> >> +static void jit_fill_hole(void *area, unsigned int size)
+> >> +{
+> >> +	/* Insert illegal UND instructions. */
+> >> +	u32 *ptr, fill_ins = 0xe7ffffff;
+> >
+> > On arm64 we don't have a guaranteed undefined instruction space (and
+> > Will tells me that on Thumb-2 for the 32-bit arm port it actually is a
+> > valid instruction, it seems that you used the same value).
+> 
+> Hm, ok, the boards we've tried out and where Zi tested it too, it worked.
 
-Ops, I replied in the wrong patch.
+So, if I try this:
 
-The one that breaks imx6q-sabresd is:
+$ echo 0xffffffe7 | xxd -r > test.bin
+$ arm-linux-gnueabihf-objdump -m arm -D -b binary test.bin
+...
+   0:   e7ffffff        udf     #65535  ; 0xffff
 
-   commit 48e1c2255 "ARM: clk-imx6q: refine clock tree for SSI"
+Do you use the same constant on arm32?
+
+> > I think the only guaranteed way is to use the BRK #imm instruction but
+> > it requires some changes to the handling code as it is currently used
+> > for kgdb (unless you can use two instructions for filling in which could
+> > generate a NULL pointer access).
+> 
+> The trade-off would be that if we align on 8, it would certainly increase
+> the probability to jump to the right offset. Note, on x86_64 we have no
+> alignment requirements, hence 1, and on s390x only alignment of 2.
+> 
+> So, on that few (?) boards where UND would be a valid instruction [ as
+> opposed to crash the kernel ], would it translate into a NOP and just
+> 'walk' from there into the JIT image?
+
+On current ARMv8 CPU implementations, the above constant is unallocated
+in the A64 instruction space. But you never know, it may be allocated in
+the future.
+
+I think it's easier if you just use something like BRK #0x100 (opcode
+0xd4202000) which would trigger a fault in the kernel (kgdb uses #imm
+0x400 and 0x401).
+
+An unallocated BRK would trigger a fault via do_debug_exception ->
+brk_handler and panic the kernel.
+
+-- 
+Catalin
