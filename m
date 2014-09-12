@@ -1,37 +1,27 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 12 Sep 2014 19:36:49 +0200
-Subject: [PATCHv2 8/8] ARM: at91: document Atmel SMART compatibles
-In-Reply-To: <20140912184754.546b26cf@e6520eb>
-References: <1410536587-24607-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410536587-24607-9-git-send-email-alexandre.belloni@free-electrons.com>
- <20140912184754.546b26cf@e6520eb>
-Message-ID: <20140912173648.GA26281@piout.net>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Fri, 12 Sep 2014 19:39:21 +0200
+Subject: [PATCH arm64-next] net: bpf: arm64: address randomize and write
+ protect JIT code
+In-Reply-To: <20140912172151.GI5532@arm.com>
+References: <1410505897-20122-1-git-send-email-dborkman@redhat.com>
+ <20140912160345.GF5532@arm.com> <54131D87.9060008@redhat.com>
+ <20140912164656.GH5532@arm.com> <54132A76.4070501@redhat.com>
+ <20140912172151.GI5532@arm.com>
+Message-ID: <54132FC9.5040201@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/12/2014 07:21 PM, Catalin Marinas wrote:
+...
+> We don't have a brk instruction for arm32 but we have guaranteed
+> undefined space. Have a look at the kgdb support for example (or grep
+> for register_undef_hook under arch/arm) to get an idea.
 
-On 12/09/2014 at 18:47:54 +0200, Eric B?nard wrote :
-> > +
-> > +
-> > +In addition, the above compatible shall be extended with the specific
-> > +SoC and board used. Currently known SoC compatibles are:
-> > +    "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
-> > +    "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
-> > +    "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
-> > +    "marvell,berlin2q"     for Marvell Armada 1500-pro (BG2Q, 88DE3114)
-> > +    "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
-> > +
-> > +
-> maybe remove those 10 last lines ;-)
-> 
+Will do, thanks!
 
-I don't even know what they are doing here, I probably misclicked in the
-wrong window at some point ;)
+>> Last but not least ;), if I would resend it today, would you queue
+>> it for later on, or do you want to handle it differently?
+>
+> You can send it now, it will be pushed upstream at the right time.
 
-Thanks!
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Just did, thanks a lot for your help!
