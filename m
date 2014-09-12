@@ -1,130 +1,31 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 12 Sep 2014 15:15:18 +0200
-Subject: [PATCH 2/4] irqchip: renesas-intc-irqpin: Add minimal runtime PM
- support
-In-Reply-To: <1410527720-18061-1-git-send-email-geert+renesas@glider.be>
-References: <1410527720-18061-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1410527720-18061-3-git-send-email-geert+renesas@glider.be>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 12 Sep 2014 15:21:36 +0200
+Subject: [PATCH v3 0/7] Add max77802 support for Peach boards
+In-Reply-To: <0ae801cfce84$be443620$3acca260$@kernel.org>
+References: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
+ <0ae801cfce84$be443620$3acca260$@kernel.org>
+Message-ID: <5412F360.3020600@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just enough to let pm_clk_*() enable the functional clock, and
-manage it for suspend/resume, if present.
-Before, it was assumed enabled by the bootloader or reset state.
+Hello Kukjin,
 
-To prevent the clock from being disabled while the module is needed for
-wake-up, implement irq_chip.irq_set_wake(), which increments/decrements
-the clock's enable_count when needed.
+On 09/12/2014 02:26 PM, kgene at kernel.org wrote:
+>> This is a third version of th series that adds max77802 support for
+>> the Peach Pit and Pi boards. The series also have all the pending
+>> patches that were posted but depended on this support. I've picked
+>> all the patches I found and rebased them to be sure that they apply
+>> cleanly on top of linux-next. Also I've taken some DT snippets from
+>> the downstream Chrome OS 3.8 kernel DTS for devices that use one of
+>> these regulators as their input supply.
+>> 
+> Thanks a lot and looks good to me. I'll take this whole series.
+> 
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/irqchip/irq-renesas-intc-irqpin.c | 38 +++++++++++++++++++++++++++----
- 1 file changed, 34 insertions(+), 4 deletions(-)
+Great, thanks a lot!
 
-diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-index a6b205b72c9b..542e850f4946 100644
---- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-+++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-@@ -17,6 +17,7 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
- 
-+#include <linux/clk.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-@@ -30,6 +31,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/platform_data/irq-renesas-intc-irqpin.h>
-+#include <linux/pm_runtime.h>
- 
- #define INTC_IRQPIN_MAX 8 /* maximum 8 interrupts per driver instance */
- 
-@@ -75,6 +77,7 @@ struct intc_irqpin_priv {
- 	struct platform_device *pdev;
- 	struct irq_chip irq_chip;
- 	struct irq_domain *irq_domain;
-+	struct clk *clk;
- 	bool shared_irqs;
- 	u8 shared_irq_mask;
- };
-@@ -270,6 +273,21 @@ static int intc_irqpin_irq_set_type(struct irq_data *d, unsigned int type)
- 				     value ^ INTC_IRQ_SENSE_VALID);
- }
- 
-+static int intc_irqpin_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	struct intc_irqpin_priv *p = irq_data_get_irq_chip_data(d);
-+
-+	if (!p->clk)
-+		return 0;
-+
-+	if (on)
-+		clk_enable(p->clk);
-+	else
-+		clk_disable(p->clk);
-+
-+	return 0;
-+}
-+
- static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
- {
- 	struct intc_irqpin_irq *i = dev_id;
-@@ -346,8 +364,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 	p = devm_kzalloc(dev, sizeof(*p), GFP_KERNEL);
- 	if (!p) {
- 		dev_err(dev, "failed to allocate driver data\n");
--		ret = -ENOMEM;
--		goto err0;
-+		return -ENOMEM;
- 	}
- 
- 	/* deal with driver instance configuration */
-@@ -365,6 +382,15 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 	p->pdev = pdev;
- 	platform_set_drvdata(pdev, p);
- 
-+	p->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(p->clk)) {
-+		dev_warn(dev, "unable to get clock\n");
-+		p->clk = NULL;
-+	}
-+
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
-+
- 	/* get hold of manadatory IOMEM */
- 	for (k = 0; k < INTC_IRQPIN_REG_NR; k++) {
- 		io[k] = platform_get_resource(pdev, IORESOURCE_MEM, k);
-@@ -456,7 +482,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 	irq_chip->irq_mask = disable_fn;
- 	irq_chip->irq_unmask = enable_fn;
- 	irq_chip->irq_set_type = intc_irqpin_irq_set_type;
--	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
-+	irq_chip->irq_set_wake = intc_irqpin_irq_set_wake;
-+	irq_chip->flags	= IRQCHIP_MASK_ON_SUSPEND;
- 
- 	p->irq_domain = irq_domain_add_simple(dev->of_node,
- 					      p->number_of_irqs,
-@@ -508,6 +535,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- err1:
- 	irq_domain_remove(p->irq_domain);
- err0:
-+	pm_runtime_put(dev);
-+	pm_runtime_disable(dev);
- 	return ret;
- }
- 
-@@ -516,7 +545,8 @@ static int intc_irqpin_remove(struct platform_device *pdev)
- 	struct intc_irqpin_priv *p = platform_get_drvdata(pdev);
- 
- 	irq_domain_remove(p->irq_domain);
--
-+	pm_runtime_put(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	return 0;
- }
- 
--- 
-1.9.1
+> - Kukjin
+> 
+
+Best regards,
+Javier
