@@ -1,96 +1,120 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 12 Sep 2014 10:38:31 +0200
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP completely
-In-Reply-To: <1406551632.5397.17.camel@x220>
-References: <1406551632.5397.17.camel@x220>
-Message-ID: <1410511111.31130.4.camel@x220>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 12 Sep 2014 16:40:22 +0800
+Subject: [PATCHv2] mtd: nand: atmel_nand: retrieve NFC clock
+In-Reply-To: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5412B176.9020507@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
-049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
-removed the only dependency that used it. Setting it had no effect
-anymore.
+Hi, Alexandre
 
-So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
-some reason that commit did not remove all select statements for that
-symbol. These statements are useless. Remove them too.
+On 9/12/2014 1:52 AM, Alexandre Belloni wrote:
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>
+> Changes in v2:
+>   - reworked the error path to really make the clock optional
+>   - Documented the new optional property
+>
+>   .../devicetree/bindings/mtd/atmel-nand.txt         |  1 +
+>   drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
+>   2 files changed, 26 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> index c4728839d0c1..f71e2ebab15b 100644
+> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> @@ -38,6 +38,7 @@ Optional properties:
+>               if don't want to use it.
+>     - Optional properties:
+>       - atmel,write-by-sram: boolean to enable NFC write by sram.
+> +    - clocks: phandle to the peripheral clock if it exists
+>   
+>   Examples:
+>   nand0: nand at 40000000,0 {
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 9c5f717bda54..69e0eb1ace54 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -27,6 +27,7 @@
+>    *
+>    */
+>   
+> +#include <linux/clk.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/slab.h>
+>   #include <linux/module.h>
+> @@ -96,6 +97,8 @@ struct atmel_nfc {
+>   	bool			use_nfc_sram;
+>   	bool			write_by_sram;
+>   
+> +	struct clk		*clk;
+> +
+>   	bool			is_initialized;
+>   	struct completion	comp_ready;
+>   	struct completion	comp_cmd_done;
+> @@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>   {
+>   	struct atmel_nfc *nfc = &nand_nfc;
+>   	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
+> +	int ret;
+>   
+>   	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+> @@ -2281,6 +2285,26 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>   
+>   	nfc->is_initialized = true;
+>   	dev_info(&pdev->dev, "NFC is probed.\n");
+> +
+> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(nfc->clk)) {
+> +		ret = clk_prepare_enable(nfc->clk);
+> +		if (ret)
+> +			return ret;
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Done on top of next-20140912. Tested with git grep only!
+In this case, the NFC clock is not enabled, so I think 
+nfc->is_initialized should set to false.
+Otherwise, the nand driver will try to use the NFC without enabled the 
+clock.
 
- arch/arm/mach-omap2/Kconfig    | 5 -----
- arch/arm/mach-shmobile/Kconfig | 1 -
- drivers/devfreq/Kconfig        | 1 -
- 3 files changed, 7 deletions(-)
+Is it better to move the code block
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 5b103099626d..f138bd33a463 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -22,7 +22,6 @@ config ARCH_OMAP4
- 	bool "TI OMAP4"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_ERRATA_720789
-@@ -41,7 +40,6 @@ config SOC_OMAP5
- 	bool "TI OMAP5"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_GIC
- 	select HAVE_ARM_SCU if SMP
-@@ -53,14 +51,12 @@ config SOC_AM33XX
- 	bool "TI AM33XX"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
- 
- config SOC_AM43XX
- 	bool "TI AM43x"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_GIC
- 	select MACH_OMAP_GENERIC
- 	select MIGHT_HAVE_CACHE_L2X0
-@@ -69,7 +65,6 @@ config SOC_DRA7XX
- 	bool "TI DRA7XX"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_GIC
- 	select HAVE_ARM_ARCH_TIMER
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 21f457b56c01..f59019dd986e 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select ARCH_REQUIRE_GPIOLIB
--	select ARCH_HAS_OPP
- 
- if ARCH_SHMOBILE_MULTI
- 
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index 3dced0a9eae3..2227e9bf3884 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -80,7 +80,6 @@ config ARM_EXYNOS4_BUS_DEVFREQ
- config ARM_EXYNOS5_BUS_DEVFREQ
- 	bool "ARM Exynos5250 Bus DEVFREQ Driver"
- 	depends on SOC_EXYNOS5250
--	select ARCH_HAS_OPP
- 	select DEVFREQ_GOV_SIMPLE_ONDEMAND
- 	select PM_OPP
- 	help
--- 
-1.9.3
+    nfc->is_initialized = true;
+    dev_info(&pdev->dev, "NFC is probed.\n");
+
+to just before the:
+
+    return 0;
+
+
+Best Regards,
+Josh Wu
+> +	} else {
+> +		dev_warn(&pdev->dev, "NFC clock is missing");
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int atmel_nand_nfc_remove(struct platform_device *pdev)
+> +{
+> +	struct atmel_nfc *nfc = &nand_nfc;
+> +
+> +	if (!IS_ERR(nfc->clk))
+> +		clk_disable_unprepare(nfc->clk);
+> +
+>   	return 0;
+>   }
+>   
+> @@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
+>   		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+>   	},
+>   	.probe = atmel_nand_nfc_probe,
+> +	.remove = atmel_nand_nfc_remove,
+>   };
+>   
+>   static struct platform_driver atmel_nand_driver = {
