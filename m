@@ -1,62 +1,46 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Fri, 12 Sep 2014 17:32:54 +0100
-Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
-In-Reply-To: <20140912154903.GE5532@arm.com>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
- <20140912145102.GB5532@arm.com>
- <20140912151850.GB9234@xora-haswell.xora.org.uk>
- <20140912154903.GE5532@arm.com>
-Message-ID: <20140912163254.GC9234@xora-haswell.xora.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Sep 2014 17:34:51 +0100
+Subject: [RFC PATCH v3 3/7] iommu: add new iommu_ops callback for adding an OF
+ device
+In-Reply-To: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1410539695-29128-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 04:49:03PM +0100, Catalin Marinas wrote:
-> On Fri, Sep 12, 2014 at 04:18:51PM +0100, Graeme Gregory wrote:
-> > On Fri, Sep 12, 2014 at 03:51:02PM +0100, Catalin Marinas wrote:
-> > > On Fri, Sep 12, 2014 at 03:00:03PM +0100, Hanjun Guo wrote:
-> > > > --- a/drivers/acpi/Makefile
-> > > > +++ b/drivers/acpi/Makefile
-> > > > @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
-> > > >  
-> > > >  # Power management related files
-> > > >  acpi-y				+= wakeup.o
-> > > > +ifeq ($(ARCH), arm64)
-> > > > +acpi-y				+= sleep-arm.o
-> > > > +else # X86, IA64
-> > > >  acpi-y				+= sleep.o
-> > > > +endif
-> > > >  acpi-y				+= device_pm.o
-> > > >  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
-> > > 
-> > > What about:
-> > > 
-> > > -acpi-y				+= sleep.o
-> > > +acpi-$(CONFIG_ACPI_SLEEP)	+= sleep.o
-> > > 
-> > > and make CONFIG_ACPI_SLEEP depend on !ARM64? Does the kernel compile if
-> > > you disable CONFIG_ACPI_SLEEP?
-> > 
-> > sleep.c is still needed in the case CONFIG_ACPI_SLEEP=n
-> > 
-> > basically the two functions I stubbed are always called by bus.c
-> 
-> So the two functions are:
-> 
-> acpi_target_system_state() - already defined in acpi_bus.h when
-> CONFIG_ACPI_SLEEP is off.
-> 
-> acpi_sleep_init() - this one doesn't have a dummy implementation for
-> !ACPI_SLEEP.
-> 
-> Now, for x86, do we need acpi_sleep_init() when CONFIG_ACPI_SLEEP is
-> off? If not, we could simply add a dummy acpi_sleep_init() function when
-> !ACPI_SLEEP and don't enable the config option for arm64.
-> 
-It looks to me that it still does processing for the S5 state which is
-soft off.
+This patch adds a new function to the iommu_ops structure to allow an
+OF device to be added to a specific IOMMU instance using the recently
+merged generic devicetree binding for IOMMUs. The callback (of_xlate)
+takes a struct device representing the master and an of_phandle_args
+representing the IOMMU and the correspondong IDs for the new master.
 
-It sets up the operations to be called when entering this state and also
-sets up a notifier.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ include/linux/iommu.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Graeme
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 4256f3ce1673..821eb0bd9f6c 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/err.h>
++#include <linux/of.h>
+ #include <linux/types.h>
+ #include <trace/events/iommu.h>
+ 
+@@ -140,6 +141,10 @@ struct iommu_ops {
+ 	/* Get the numer of window per domain */
+ 	u32 (*domain_get_windows)(struct iommu_domain *domain);
+ 
++#ifdef CONFIG_OF_IOMMU
++	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
++#endif
++
+ 	unsigned long pgsize_bitmap;
+ };
+ 
+-- 
+2.1.0
