@@ -1,118 +1,79 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 12 Sep 2014 17:54:46 +0800
-Subject: [PATCHv4] mtd: nand: atmel_nand: retrieve NFC clock
-In-Reply-To: <1410514809-25650-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410514809-25650-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5412C2E6.8030602@atmel.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 12 Sep 2014 11:58:21 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <7627175.tG5quZH0VN@fb07-iapwap2>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <9935938.eKOCvCAtLt@fb07-iapwap2> <20140912083348.GA1289@katana>
+ <7627175.tG5quZH0VN@fb07-iapwap2>
+Message-ID: <20140912095821.GB1930@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alexandre
 
-On 9/12/2014 5:40 PM, Alexandre Belloni wrote:
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
->
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
+> ok, take our embedded controller driver (in staging/nvec) as an example. It's 
+> basicly an MFD connecting keyboard, mouse, power, gpio, and some other stuff 
+> to the soc. The MFD operates in master mode while the SOC is the I2C slave. 
+> Theoretically, these roles could also switch (but that's not defined in the 
+> nvec protocol).
 
-Thanks for the patch.
-Acked-by: Josh Wu <josh.wu@atmel.com>
+I see these cases currently:
 
-Best Regards,
-Josh Wu
+1) my current case
 
->
-> Changes in v4:
->   - fix typo in the documentation
->
->   .../devicetree/bindings/mtd/atmel-nand.txt         |  2 ++
->   drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
->   2 files changed, 27 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> index c4728839d0c1..6edc3b616e98 100644
-> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> @@ -36,6 +36,7 @@ Optional properties:
->       - reg : should specify the address and size used for NFC command registers,
->               NFC registers and NFC Sram. NFC Sram address and size can be absent
->               if don't want to use it.
-> +    - clocks: phandle to the peripheral clock
->     - Optional properties:
->       - atmel,write-by-sram: boolean to enable NFC write by sram.
->   
-> @@ -98,6 +99,7 @@ nand0: nand at 40000000 {
->   		compatible = "atmel,sama5d3-nfc";
->   		#address-cells = <1>;
->   		#size-cells = <1>;
-> +		clocks = <&hsmc_clk>
->   		reg = <
->   			0x70000000 0x10000000	/* NFC Command Registers */
->   			0xffffc000 0x00000070	/* NFC HSMC regs */
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 9c5f717bda54..d1e502f8dbd0 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -27,6 +27,7 @@
->    *
->    */
->   
-> +#include <linux/clk.h>
->   #include <linux/dma-mapping.h>
->   #include <linux/slab.h>
->   #include <linux/module.h>
-> @@ -96,6 +97,8 @@ struct atmel_nfc {
->   	bool			use_nfc_sram;
->   	bool			write_by_sram;
->   
-> +	struct clk		*clk;
-> +
->   	bool			is_initialized;
->   	struct completion	comp_ready;
->   	struct completion	comp_cmd_done;
-> @@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->   {
->   	struct atmel_nfc *nfc = &nand_nfc;
->   	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-> +	int ret;
->   
->   	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->   	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-> @@ -2279,8 +2283,28 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
->   	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
->   	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
->   
-> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(nfc->clk)) {
-> +		ret = clk_prepare_enable(nfc->clk);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
-> +	}
-> +
->   	nfc->is_initialized = true;
->   	dev_info(&pdev->dev, "NFC is probed.\n");
-> +
-> +	return 0;
-> +}
-> +
-> +static int atmel_nand_nfc_remove(struct platform_device *pdev)
-> +{
-> +	struct atmel_nfc *nfc = &nand_nfc;
-> +
-> +	if (!IS_ERR(nfc->clk))
-> +		clk_disable_unprepare(nfc->clk);
-> +
->   	return 0;
->   }
->   
-> @@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
->   		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
->   	},
->   	.probe = atmel_nand_nfc_probe,
-> +	.remove = atmel_nand_nfc_remove,
->   };
->   
->   static struct platform_driver atmel_nand_driver = {
+The I2C slave is not needed for board bringup, mainly for development or
+playing around. It can have this or that functionality on this or that
+address. -> does not belong into DT, should be done in userspace
+
+2) Slave mode is needed for board bringup
+
+Some other components need a specific I2C slave to be present before
+userspace is available, otherwise the system is unusable. This is IMO
+then a hardware description and justifies DT entries:
+
+DT pseudocode:
+
+	i2c {
+		compatible = "nvidia, tegra-i2c";
+
+		ec-slave at 42 {
+			compatible = "nvidia, ax100-ec-slave";
+			reg = <0x42>;
+		};
+	};
+
+Of course, an MFD driver providing "nvidia, ax100-ec-slave" is needed
+which uses the I2C slave mode of the tegra controller.
+
+3) Master + slave mode is needed for board bringup:
+
+Again, IMO a hardware description, so we could use:
+
+	i2c {
+		compatible = "nvidia, tegra-i2c";
+
+		ec at 64 {
+			compatible = "nvidia, ax100-ec";
+			reg = <0x64>;
+		};
+	};
+
+This is a standard I2C device driver (using the MFD framework) where
+i2c-tegra would act as a master on the client for 0x64. However, its
+probe function can fill an i2c_board_device (the driver should know the
+slave device address because of the protocol), get a new client using
+i2c_new_device, and register that as a I2C slave client. It then has an
+address where it listens and an address where it can send to. When to do
+what is protocol implementation.
+
+
+Am I missing something? Board properties can be encoded within the
+compatible entries ("ax100-ec", "ax200-ec"...). I'd think this means
+mostly different protocols, though.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/d2c9f1b4/attachment.sig>
