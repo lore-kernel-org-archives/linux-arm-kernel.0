@@ -1,50 +1,93 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Sat, 13 Sep 2014 05:00:45 +0800
-Subject: [Patch v4 net-next 00/12] net: fec: imx6sx multiqueue support
-Message-ID: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+Date: Sat, 13 Sep 2014 05:00:46 +0800
+Subject: [Patch v4 net-next 01/12] net:fec: add enet refrence clock for i.MX
+ 6SX chip
+In-Reply-To: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1410555657-10744-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+From: Fugang Duan <B38611@freescale.com>
 
-These patches enable i.MX6SX multi queue support.
-i.MX6SX support 3 queue and AVB feature.
+i.MX6sx enet has below clocks for user config:
+clk_ipg: ipg_clk_s, ipg_clk_mac0_s, 66Mhz
+clk_ahb: enet system clock, it is enet AXI clock for imx6sx.
+	 For imx6sx, it alos is the clock source of interrupt coalescing.
+	 The clock range: 200Mhz ~ 266Mhz.
+clk_ref: refrence clock for tx and rx. For imx6sx enet RGMII mode,
+	 the refrence clock is 125Mhz coming from internal PLL or external.
+	 In i.MX6sx-arm2 board, the clock is from internal PLL.
+	 clk_ref is optional, depends on board.
+clk_enet_out: The clock can be output from internal PLL. It can supply 50Mhz
+	 clock for phy. clk_enet_out is optional, depends on chip and board.
+clk_ptp: 1588 ts clock. It is optional, depends on chip.
 
-Change from v3 to v4
- - use "unsigned int" instead of "unsigned"
+The patch add clk_ref to distiguish the different clocks.
 
-Change from v2 to v3
- - fixed alignment requirement for ARM and NO-ARM platform
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ drivers/net/ethernet/freescale/fec.h      |  1 +
+ drivers/net/ethernet/freescale/fec_main.c | 17 +++++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-Change from v1 to v2.
- - Change num_tx_queue to unsigned int
- - Avoid block non-dt platform
- - remove call netif_set_real_num_rx_queues
- - seperate multi queue patch two part, one is tx and rx handle, with fixed queue 0
-   then other one is initilized multiqueue
- - use two difference alignment for tx and rx path
-
-Frank Li (4):
-  net: fec: init multi queue date structure
-  net: fec: add enet-avb IP support
-  ARM: Documentation: Update fec dts binding doc
-  ARM: dts: imx6sx: add multi-queue support enet
-
-Fugang Duan (8):
-  net:fec: add enet refrence clock for i.MX 6SX chip
-  net:fec: add enet AVB feature macro define for imx6sx
-  net: fec: change data structure to support multiqueue
-  net: fec: parser max queue number from dt file
-  net:fec: Disable enet-avb MAC instead of reset MAC
-  net:fec: Add fsl,imx6sx-fec  compatible strings
-  net: fec: change FEC alignment according to i.mx6 sx requirement
-  net: fec: init complete variable in early to avoid kernel dump
-
- Documentation/devicetree/bindings/net/fsl-fec.txt |   6 +
- arch/arm/boot/dts/imx6sx.dtsi                     |   2 +
- drivers/net/ethernet/freescale/fec.h              | 154 +++-
- drivers/net/ethernet/freescale/fec_main.c         | 853 ++++++++++++++++------
- 4 files changed, 756 insertions(+), 259 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index ee41d98..635772b 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -272,6 +272,7 @@ struct fec_enet_private {
+ 
+ 	struct clk *clk_ipg;
+ 	struct clk *clk_ahb;
++	struct clk *clk_ref;
+ 	struct clk *clk_enet_out;
+ 	struct clk *clk_ptp;
+ 
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 89355a7..c21ecff1 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1621,6 +1621,11 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
+ 			}
+ 			mutex_unlock(&fep->ptp_clk_mutex);
+ 		}
++		if (fep->clk_ref) {
++			ret = clk_prepare_enable(fep->clk_ref);
++			if (ret)
++				goto failed_clk_ref;
++		}
+ 	} else {
+ 		clk_disable_unprepare(fep->clk_ahb);
+ 		clk_disable_unprepare(fep->clk_ipg);
+@@ -1632,9 +1637,15 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
+ 			fep->ptp_clk_on = false;
+ 			mutex_unlock(&fep->ptp_clk_mutex);
+ 		}
++		if (fep->clk_ref)
++			clk_disable_unprepare(fep->clk_ref);
+ 	}
+ 
+ 	return 0;
++
++failed_clk_ref:
++	if (fep->clk_ref)
++		clk_disable_unprepare(fep->clk_ref);
+ failed_clk_ptp:
+ 	if (fep->clk_enet_out)
+ 		clk_disable_unprepare(fep->clk_enet_out);
+@@ -2637,6 +2648,12 @@ fec_probe(struct platform_device *pdev)
+ 
+ 	fep->ptp_clk_on = false;
+ 	mutex_init(&fep->ptp_clk_mutex);
++
++	/* clk_ref is optional, depends on board */
++	fep->clk_ref = devm_clk_get(&pdev->dev, "enet_clk_ref");
++	if (IS_ERR(fep->clk_ref))
++		fep->clk_ref = NULL;
++
+ 	fep->clk_ptp = devm_clk_get(&pdev->dev, "ptp");
+ 	fep->bufdesc_ex =
+ 		pdev->id_entry->driver_data & FEC_QUIRK_HAS_BUFDESC_EX;
 -- 
 1.9.1
