@@ -1,100 +1,219 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Sep 2014 09:36:47 +0200
-Subject: [PATCH 1/4] dma: pl08x: support fixed signal assignment
-Message-ID: <1410507407-32408-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 12 Sep 2014 09:37:22 +0200
+Subject: [PATCH 2/4] dmaengine: device tree bindings for PL08x
+Message-ID: <1410507442-32451-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some implementations such as the Nomadik do not place a mux
-in front of the DMA single/burst request signals into the
-PL08x DMA controller, instead they lock a certain signal to
-a certain device. This makes things simpler and the platform
-does not need to implement a muxing function.
+This introduces device tree bindings for the PL08x DMA controllers
+when used with fixed signal assignment per channel, i.e. if each
+channel on the PL08x is assigned precisely one burst/single signal
+set.
 
-Implement this scheme and flag that the Nomadik uses this
-method.
+In many incarnations that exist in the wild, a mux had been put
+in front of the signals so that the system has to select a subset
+of signals to handle from a larger set. This is not described in
+the current binding: instead this is assumed to be handled with
+a more elaborate binding especially for muxed signal cases.
+
+I imagine things like adding the property dma-mux = <&phandle>;
+for the DMA controller in such cases, and not specifying any
+signals for the channels, and provide a separate binding for
+the mux to enlist its signals.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/amba-pl08x.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ .../devicetree/bindings/dma/arm-pl08x.txt          | 182 +++++++++++++++++++++
+ 1 file changed, 182 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/arm-pl08x.txt
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index e34024b000a4..1e523a094cc5 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -109,6 +109,11 @@ struct pl08x_driver_data;
-  *	missing
-  * @pl080s: whether this version is a PL080S, which has separate register and
-  *	LLI word for transfer size.
-+ * @fixed_signals: if the channel signal allocation on the PL08x is fixed,
-+ *	i.e. each device burst/single control signals are connected directly
-+ *	to the DMAC signal lines without any mux.
-+ * @max_transfer_size: the maximum single element transfer size for this
-+ *	PL08x variant.
-  */
- struct vendor_data {
- 	u8 config_offset;
-@@ -116,6 +121,7 @@ struct vendor_data {
- 	bool dualmaster;
- 	bool nomadik;
- 	bool pl080s;
-+	bool fixed_signals;
- 	u32 max_transfer_size;
- };
- 
-@@ -315,6 +321,15 @@ static int pl08x_request_mux(struct pl08x_dma_chan *plchan)
- 	const struct pl08x_platform_data *pd = plchan->host->pd;
- 	int ret;
- 
-+	/*
-+	 * For engines with fixed signal assignment for slave transfers,
-+	 * this signal is assigned during probe.
-+	 */
-+	if (plchan->host->vd->fixed_signals) {
-+		BUG_ON(plchan->signal < 0);
-+		return 0;
-+	}
+diff --git a/Documentation/devicetree/bindings/dma/arm-pl08x.txt b/Documentation/devicetree/bindings/dma/arm-pl08x.txt
+new file mode 100644
+index 000000000000..5e0aca09b56b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/arm-pl08x.txt
+@@ -0,0 +1,182 @@
++* ARM PrimeCells PL080 and PL081 and derivatives DMA controller
 +
- 	if (plchan->mux_use++ == 0 && pd->get_xfer_signal) {
- 		ret = pd->get_xfer_signal(plchan->cd);
- 		if (ret < 0) {
-@@ -331,6 +346,9 @@ static void pl08x_release_mux(struct pl08x_dma_chan *plchan)
- {
- 	const struct pl08x_platform_data *pd = plchan->host->pd;
- 
-+	if (plchan->host->vd->fixed_signals)
-+		return;
++Required properties:
++- compatible: "arm,pl080", "arm,pl081", "arm,primecell"
++- reg: Address range of the PL08x registers
++- interrupt: The PL08x interrupt number
++- clocks: The clock running the IP core clock
++- clock-names: A list with one element with the name of the core clock
++- lli-bus-interface-ahb1: if AHB master 1 is eligible for fetching LLIs
++- lli-bus-interface-ahb2: if AHB master 2 is eligible for fetching LLIs
++- mem-bus-interface-ahb1: if AHB master 1 is eligible for fetching memory contents
++- mem-bus-interface-ahb2: if AHB master 2 is eligible for fetching memory contents
++- #dma-cells: must be <3>
 +
- 	if (plchan->signal >= 0) {
- 		WARN_ON(plchan->mux_use == 0);
- 
-@@ -1892,6 +1910,18 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
- 
- 		if (slave) {
- 			chan->cd = &pl08x->pd->slave_channels[i];
-+			/*
-+			 * Some implementations have muxed signals, whereas some
-+			 * use a mux in front of the signals and need dynamic
-+			 * assignment of signals.
-+			 */
-+			if (pl08x->vd->fixed_signals) {
-+				chan->signal = i;
-+				chan->name = chan->cd->bus_id;
-+				dev_dbg(&pl08x->adev->dev,
-+					"assign fixed signal %u to channel %s",
-+					chan->signal, chan->name);
-+			}
- 			pl08x_dma_slave_init(chan);
- 		} else {
- 			chan->cd = &pl08x->pd->memcpy_channel;
-@@ -2236,6 +2266,7 @@ static struct vendor_data vendor_nomadik = {
- 	.channels = 8,
- 	.dualmaster = true,
- 	.nomadik = true,
-+	.fixed_signals = true,
- 	.max_transfer_size = PL080_CONTROL_TRANSFER_SIZE_MASK,
- };
- 
++Optional properties:
++- memcpy-burst-size: the size of the bursts for memcpy: 1, 4, 8, 16, 32
++  64, 128 or 256 bytes are legal values
++- memcpy-bus-width: the bus width used for memcpy: 8, 16 or 32 are legal
++  values
++
++Optional sub-nodes:
++The slave transfer channels are assigned in consecutive order and
++identified by one child node per channel, assuming a fixed-signal
++per channel assignment and each with the following properties:
++
++Required properties:
++- signal: the name of the on-chip signal line handled by this channel
++- bus-interface-ahb1 or bus-interface-ahb2: tells the driver which
++  bus interface(s) that is eligible for this specific channel. At least
++  one of the interfaces must be specified, it is perfectly legal to
++  specify both if the hardware supports using either interface.
++
++Clients
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Example:
++
++dmac0: dma-controller at 10130000 {
++	compatible = "arm,pl080", "arm,primecell";
++	reg = <0x10130000 0x1000>;
++	interrupt-parent = <&vica>;
++	interrupts = <15>;
++	clocks = <&hclkdma0>;
++	clock-names = "apb_pclk";
++	lli-bus-interface-ahb1;
++	lli-bus-interface-ahb2;
++	mem-bus-interface-ahb2;
++	memcpy-burst-size = <256>;
++	memcpy-bus-width = <32>;
++	#dma-cells = <1>;
++	/* Assignments for the 32 channels */
++	saa0 at dmac0 {
++		signal = "saa0";
++		bus-interface-ahb1;
++	};
++	saa1 at dmac0 {
++		signal = "saa1";
++		bus-interface-ahb1;
++	};
++	saa2 at dmac0 {
++		signal = "saa2";
++		bus-interface-ahb1;
++	};
++	saa3 at dmac0 {
++		signal = "saa3";
++		bus-interface-ahb1;
++	};
++	saa4 at dmac0 {
++		signal = "saa4";
++		bus-interface-ahb1;
++	};
++	saa5 at dmac0 {
++		signal = "saa5";
++		bus-interface-ahb1;
++	};
++	saa6 at dmac0 {
++		signal = "saa6";
++		bus-interface-ahb1;
++	};
++	saa7 at dmac0 {
++		signal = "saa7";
++		bus-interface-ahb1;
++	};
++	unused at dmac0 {
++		signal = "unused";
++		bus-interface-ahb1;
++	};
++	fir at dmac0 {
++		signal = "firdatxrx";
++		bus-interface-ahb1;
++	};
++	msp0rx at dmac0 {
++		signal = "msp0rx";
++		bus-interface-ahb1;
++	};
++	msp0tx at dmac0 {
++		signal = "msp0tx";
++		bus-interface-ahb1;
++	};
++	ssprx at dmac0 {
++		signal = "ssprx";
++		bus-interface-ahb1;
++	};
++	ssptx at dmac0 {
++		signal = "ssptx";
++		bus-interface-ahb1;
++	};
++	uart0rx at dmac0 {
++		signal = "uart0rx";
++		bus-interface-ahb1;
++	};
++	uart0tx at dmac0 {
++		signal = "uart0tx";
++		bus-interface-ahb1;
++	};
++	hsirxch0 at dmac0 {
++		signal = "hsirxch0";
++		bus-interface-ahb1;
++	};
++	hsirxch1 at dmac0 {
++		signal = "hsirxch1";
++		bus-interface-ahb1;
++	};
++	hsirxch2 at dmac0 {
++		signal = "hsirxch2";
++		bus-interface-ahb1;
++	};
++	hsirxch3 at dmac0 {
++		signal = "hsirxch3";
++		bus-interface-ahb1;
++	};
++	hsirxch4 at dmac0 {
++		signal = "hsirxch4";
++		bus-interface-ahb1;
++	};
++	hsirxch5 at dmac0 {
++		signal = "hsirxch5";
++		bus-interface-ahb1;
++	};
++	hsirxch6 at dmac0 {
++		signal = "hsirxch6";
++		bus-interface-ahb1;
++	};
++	hsirxch7 at dmac0 {
++		signal = "hsirxch7";
++		bus-interface-ahb1;
++	};
++	hsitxch0 at dmac0 {
++		signal = "hsitxch0";
++		bus-interface-ahb1;
++	};
++	hsitxch1 at dmac0 {
++		signal = "hsitxch1";
++		bus-interface-ahb1;
++	};
++	hsitxch2 at dmac0 {
++		signal = "hsitxch2";
++		bus-interface-ahb1;
++	};
++	hsitxch3 at dmac0 {
++		signal = "hsitxch3";
++		bus-interface-ahb1;
++	};
++	hsitxch4 at dmac0 {
++		signal = "hsitxch4";
++		bus-interface-ahb1;
++	};
++	hsitxch5 at dmac0 {
++		signal = "hsitxch5";
++		bus-interface-ahb1;
++	};
++	hsitxch6 at dmac0 {
++		signal = "hsitxch6";
++		bus-interface-ahb1;
++	};
++	hsitxch7 at dmac0 {
++		signal = "hsitxch7";
++		bus-interface-ahb1;
++	};
++};
 -- 
 1.9.3
