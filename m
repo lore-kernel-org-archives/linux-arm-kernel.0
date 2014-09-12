@@ -1,199 +1,208 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 12 Sep 2014 12:50:23 -0500
-Subject: [PATCH v8 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
-In-Reply-To: <1410542986-24419-4-git-send-email-agross@codeaurora.org>
-References: <1410542986-24419-1-git-send-email-agross@codeaurora.org>
- <1410542986-24419-4-git-send-email-agross@codeaurora.org>
-Message-ID: <20140912175023.GR3749@joshc.qualcomm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 12 Sep 2014 11:16:01 -0700
+Subject: [PATCH 01/11 v6] coresight: add CoreSight core layer framework
+In-Reply-To: <CANLsYkyPFvOnqRJaWZrvw1aVjBWG=tHuv+V9Tj5RhMy_gD_oiA@mail.gmail.com>
+References: <1410450558-12358-1-git-send-email-mathieu.poirier@linaro.org>
+ <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
+ <20140911203344.GA7593@kroah.com>
+ <CANLsYkyPFvOnqRJaWZrvw1aVjBWG=tHuv+V9Tj5RhMy_gD_oiA@mail.gmail.com>
+Message-ID: <20140912181601.GA21033@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Andy-
-
-Mostly cosmetic things below:
-
-On Fri, Sep 12, 2014 at 12:29:46PM -0500, Andy Gross wrote:
-> This patch adds a new driver for the Qualcomm USB 3.0 PHY that exists on some
-> Qualcomm platforms.  This driver uses the generic PHY framework and will
-> interact with the DWC3 controller.
+On Fri, Sep 12, 2014 at 11:41:44AM -0600, Mathieu Poirier wrote:
+> Good morning and thanks for the review.  Pls see comments below.
 > 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  drivers/phy/Kconfig         |   11 +
->  drivers/phy/Makefile        |    1 +
->  drivers/phy/phy-qcom-dwc3.c |  500 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 512 insertions(+)
->  create mode 100644 drivers/phy/phy-qcom-dwc3.c
+> Mathieu
 > 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 0dd7427..5d56161 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -230,4 +230,15 @@ config PHY_XGENE
->  	help
->  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
->  
-> +config PHY_QCOM_DWC3
-> +	tristate "QCOM DWC3 USB PHY support"
-> +	depends on ARCH_QCOM
-> +	depends on HAS_IOMEM
-> +	depends on OF
-> +	select GENERIC_PHY
-> +	help
-> +	  This option enables support for the Synopsis PHYs present inside the
-> +	  Qualcomm USB3.0 DWC3 controller.  This driver supports both HS and SS
-> +	  PHY controllers.
-> +
->  endmenu
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 95c69ed..aa16f30 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -28,3 +28,4 @@ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
->  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
->  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
->  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-> +obj-$(CONFIG_PHY_QCOM_DWC3)		+= phy-qcom-dwc3.o
-> diff --git a/drivers/phy/phy-qcom-dwc3.c b/drivers/phy/phy-qcom-dwc3.c
-> new file mode 100644
-> index 0000000..05b8e1d
-> --- /dev/null
-> +++ b/drivers/phy/phy-qcom-dwc3.c
-[..]
-> +/* TX OVRD DRV LO register bits */
-> +#define TX_OVRD_DRV_LO_AMPLITUDE_MASK	0x007F
-> +#define TX_OVRD_DRV_LO_PREEMPH_MASK	0x3F80
-> +#define TX_OVRD_DRV_LO_PREEMPH_SHIFT	7
-> +#define TX_OVRD_DRV_LO_EN		BIT(14)
-> +
-> +struct qcom_dwc3_usb_phy;
+> On 11 September 2014 14:33, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > Some first impressions in glancing at the code, not a complete review at
+> > all:
+> >
+> > On Thu, Sep 11, 2014 at 09:49:08AM -0600, mathieu.poirier at linaro.org wrote:
+> >> --- /dev/null
+> >> +++ b/drivers/coresight/coresight.c
+> >> @@ -0,0 +1,663 @@
+> >> +/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 and
+> >> + * only version 2 as published by the Free Software Foundation.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + */
+> >> +
+> >> +#define pr_fmt(fmt) "coresight: " fmt
+> >
+> > MODULE_NAME ?
+> 
+> Is this what you had in mind?
+> 
+> #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-Do you need this?
+Sorry, yes, that's much better and "portable".
 
-> +
-> +enum qcom_dwc3_phy_id {
-> +	QCOM_DWC3_PHY_UTMI = 0,
-> +	QCOM_DWC3_PHY_PIPE,
-> +	QCOM_DWC3_PHYS_NUM,
-> +};
-> +
-> +struct qcom_dwc3_usb_phy {
-> +	void __iomem		*base;
-> +	struct device		*dev;
-> +	struct phy *phy;
-> +	enum qcom_dwc3_phy_id	index;
-> +
-> +	struct clk		*xo_clk;
-> +	struct clk		*ref_clk;
-> +};
-> +
-> +/**
-> + * Write register and read back masked value to confirm it is written
-> + *
-> + * @base - QCOM DWC3 PHY base virtual address.
-> + * @offset - register offset.
-> + * @mask - register bitmask specifying what should be updated
-> + * @val - value to write.
-> + */
-> +static inline void qcom_dwc3_phy_write_readback(
-> +	struct qcom_dwc3_usb_phy *phy_dwc3, u32 offset,
-> +	const u32 mask, u32 val)
-> +{
-> +	u32 write_val, tmp = readl(phy_dwc3->base + offset);
-> +
-> +	tmp &= ~mask;		/* retain other bits */
-> +	write_val = tmp | val;
-> +
-> +	writel(write_val, phy_dwc3->base + offset);
-> +
-> +	/* Read back to see if val was written */
-> +	tmp = readl(phy_dwc3->base + offset);
-> +	tmp &= mask;		/* clear other bits */
-> +
-> +	if (tmp != val)
-> +		dev_err(phy_dwc3->dev, "write: %x to QSCRATCH: %x FAILED\n",
-> +			val, offset);
-> +}
-> +
-> +static int wait_for_latch(void __iomem *addr)
-> +{
-> +	u32 retry = 10;
-> +
-> +	while (true) {
-> +		if (!readl(addr))
-> +			break;
-> +
-> +		if (--retry == 0)
-> +			return -ETIMEDOUT;
-> +
-> +		usleep_range(10, 20);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * Write SSPHY register
-> + *
-> + * @base - QCOM DWC3 PHY base virtual address.
-> + * @addr - SSPHY address to write.
-> + * @val - value to write.
-> + */
-> +static int qcom_dwc3_ss_write_phycreg(void __iomem *base, u32 addr, u32 val)
-> +{
-> +	writel(addr, base + CR_PROTOCOL_DATA_IN_REG);
-> +	writel(0x1, base + CR_PROTOCOL_CAP_ADDR_REG);
-> +
-> +	if (wait_for_latch(base + CR_PROTOCOL_CAP_ADDR_REG))
-> +		return 1;
+But as you are using the driver model, the odds of you ever using a pr_*
+call is all but none, so why do you even need this?
 
-I'm not too familiar with the GENERIC_PHY infrastructure, does it
-understand that '1' is an error case?  I'm wondering if you should
-instead propogate the -ETIMEDOUT up.
+> 
+> >
+> >> +
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/module.h>
+> >> +#include <linux/init.h>
+> >> +#include <linux/types.h>
+> >> +#include <linux/device.h>
+> >> +#include <linux/io.h>
+> >> +#include <linux/err.h>
+> >> +#include <linux/export.h>
+> >> +#include <linux/slab.h>
+> >> +#include <linux/semaphore.h>
+> >> +#include <linux/clk.h>
+> >> +#include <linux/coresight.h>
+> >> +#include <linux/of_platform.h>
+> >> +#include <linux/debugfs.h>
+> >> +#include <linux/delay.h>
+> >> +
+> >> +#include "coresight-priv.h"
+> >> +
+> >> +struct dentry *cs_debugfs_parent = NULL;
+> >> +
+> >> +static LIST_HEAD(coresight_orph_conns);
+> >> +static LIST_HEAD(coresight_devs);
+> >
+> > You are a struct device, you don't need a separate list, why not just
+> > iterate over your bus list of devices?
+> 
+> Because coresight devices are not powered on the bus.  As such, every
+> time we iterate over the bus we'd need to setup the clock for the
+> device, power up its domain (if necessary) and lookup the device ID.
+> Isn't better to simply keep a list of the devices that were found at
+> boot time and use that whenever we want to make configuration changes?
 
-> +
-> +	writel(val, base + CR_PROTOCOL_DATA_IN_REG);
-> +	writel(0x1, base + CR_PROTOCOL_CAP_DATA_REG);
-> +
-> +	if (wait_for_latch(base + CR_PROTOCOL_CAP_DATA_REG))
-> +		return 1;
-> +
-> +	writel(0x1, base + CR_PROTOCOL_WRITE_REG);
-> +
-> +	if (wait_for_latch(base + CR_PROTOCOL_WRITE_REG))
-> +		return 1;
-> +
-> +	return 0;
-> +}
-> +
-[..]
-> +
-> +static struct phy_ops qcom_dwc3_phy_ops = {
-> +	.init		= qcom_dwc3_phy_init,
-> +	.exit		= qcom_dwc3_phy_exit,
-> +	.power_on	= qcom_dwc3_phy_power_on,
-> +	.power_off	= qcom_dwc3_phy_power_off,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static const struct of_device_id qcom_dwc3_phy_table[] = {
-> +	{
-> +		.compatible = "qcom,dwc3-hs-usb-phy",
-> +		.data = (void *)QCOM_DWC3_PHY_UTMI,
-> +	},
-> +	{
-> +		.compatible = "qcom,dwc3-ss-usb-phy",
-> +		.data = (void *)QCOM_DWC3_PHY_PIPE,
-> +	},
-> +	{ /* Sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, qcom_dwc3_phy_table);
+You have that list already, as part of the bus list in the driver core.
+I'm not asking you to "power up" anything, just use the data structures
+the kernel already provides for you.
 
-I'd suggest just creating a separate ops table, and have '.data' point
-to it.  Might cleanup all of the switch() statements above.  You could
-also probably drop the 'index' member of 'struct qcom_dwc3_usb_phy', and
-maybe even 'enum qcom_dwc3_phy_id' altogether.
+> With regards to @coresight_orph_conns, on top of the above problem
+> we'd also have to add a flag in the @coresight_device structure to
+> indicate that a device has been connected to the topology or not. To
+> me using a list is much cleaner.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+A single flag is "cleaner" than a whole separate list, not to mention
+simpler to understand :)
+
+> >> +/**
+> >> + * @id:              unique ID of the component.
+> >> + * @conns:   list of connections associated to this component.
+> >> + * @type:    as defined by @coresight_dev_type.
+> >> + * @subtype: as defined by @coresight_dev_subtype.
+> >> + * @ops:     generic operations for this component, as defined
+> >> +             by @coresight_ops.
+> >> + * @de:              handle on a component's debugfs entry.
+> >> + * @dev:     The device entity associated to this component.
+> >> + * @kref:    keeping count on component references.
+> >> + * @dev_link:        link of current component into list of all components
+> >> +             discovered in the system.
+> >> + * @path_link:       link of current component into the path being enabled.
+> >> + * @owner:   typically "THIS_MODULE".
+> >> + * @enable:  'true' if component is currently part of an active path.
+> >> + * @activated:       'true' only if a _sink_ has been activated.  A sink can be
+> >> +             activated but not yet enabled.  Enabling for a _sink_
+> >> +             happens when a source has been selected for that it.
+> >> + */
+> >> +struct coresight_device {
+> >> +     int id;
+> >
+> > Why not use the device name instead?
+> 
+> With regards to memory footprint it is better to keep a single "int"
+> as ID (which is the their memory map start address) than the full
+> string associated with the device name.  Let's take a funnel for
+> example that has up to 8 input port.  To build a path between source
+> and sink we need to keep information about device that are connected
+> to each port.  At this time we use the component's ID, i.e 4 byte.  If
+> we were to use device names, ex "20040000.funnel_cluster0", we are
+> using 24 byte and that, 8 times.
+> 
+> Moreover using device names would also mean that we have to used
+> @stcmp everytime we want do lookups.  To me using a single integer to
+> identify coresight components is a much better solution.
+
+Don't try to optimize for something that isn't an issue at all.  You
+aren't searching for devices based on id in any time-critical section,
+and you already have the device id string, so you aren't saving any
+memory, but the opposite, wasting some.  See, your "optimization" ended
+up taking more memory :)
+
+> >> +     struct coresight_connection *conns;
+> >> +     int nr_conns;
+> >> +     enum coresight_dev_type type;
+> >> +     struct coresight_dev_subtype subtype;
+> >> +     const struct coresight_ops *ops;
+> >> +     struct dentry *de;
+> >
+> > All devices have a dentry?  in debugfs?  isn't that overkill?
+> 
+> All devices along a "path" can require specific configuration, which
+> can only be made by a user.  Exposing the registers via debugfs seemed
+> like the most plausible solution.
+
+configuration is not to be done through debugfs, especially as that is
+restricted to root, and lots of systems don't even have it.  debugfs is
+always optional, don't make your code depend on it to work properly.
+
+> >> +     struct device dev;
+> >> +     struct kref kref;
+> >
+> > You CAN NOT have two reference counts in the same structure, that's a
+> > huge design mistake.  Stick with one reference count, otherwise they are
+> > guaranteed to get out of sync and bad things will happen.
+> 
+> In this case the additional @kref is for accounting of components
+> within the coresight framework only.  When the amba framework calls
+> the driver's _probe() routine the kref count is already equal to '2'
+> (as expected), even if no other coresight components have used that
+> device.  Knowing when a component is no longer in use by the framework
+> (but still available in the system) is important for coresight cleanup
+> consideration, i.e switch off the component to save power.
+> 
+> The kref helpers don't expose the refcount and @kref_sub will only
+> call the cleanup method when refcount is '1'.  How else should I
+> proceed?
+
+Don't use a kref at all, you should never need to "know" a refcount
+value.  If you do, your logic is incorrect, sorry.  Just use the normal
+driver core functions for when to cleanup memory and the like and you
+will be fine.
+
+> >> +#define to_coresight_device(d) container_of(d, struct coresight_device, dev)
+> >> +
+> >> +#define source_ops(csdev)    csdev->ops->source_ops
+> >> +#define sink_ops(csdev)              csdev->ops->sink_ops
+> >> +#define link_ops(csdev)              csdev->ops->link_ops
+> >> +
+> >> +#define CORESIGHT_DEBUGFS_ENTRY(__name, __entry_name,                        \
+> >> +                              __mode, __get, __set, __fmt)           \
+> >> +DEFINE_SIMPLE_ATTRIBUTE(__name ## _ops, __get, __set, __fmt)         \
+> >
+> > Use the RW and RO only versions please.  No need to ever set your own
+> > mode value.
+> 
+> I think I get your point but not quite sure how you want me to go
+> about it.  Can you give me a couple more line pls?
+
+Why not just use DEVICE_ATTR_RW()?  and DEVICE_ATTR_RO()? Why create
+your own attribute type?  And if you do, at the very least, use
+__ATTR_RO() and __ATTR_RW(), don't roll your own macros.
+
+And again, you should not need any other mode values other than RO or
+RW, don't make a developer have to think about mode values for any
+attributes.
+
+thanks,
+
+greg k-h
