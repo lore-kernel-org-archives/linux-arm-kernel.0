@@ -1,112 +1,38 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 12 Sep 2014 03:12:33 +0000
-Subject: [PATCH] watchdog: imx2_wdt: add restart handler support
-In-Reply-To: <54125F1E.3050605@roeck-us.net>
-References: <1410421661-15298-1-git-send-email-jingchang.lu@freescale.com>
- <20140911155522.GB13052@roeck-us.net>
- <299ae9bd88c049ea833e964e4b5f54a0@BL2PR03MB467.namprd03.prod.outlook.com>
- <54125F1E.3050605@roeck-us.net>
-Message-ID: <acdcac2e7fe3468aac8c97aafff47103@BL2PR03MB467.namprd03.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 12 Sep 2014 11:16:26 +0800
+Subject: [PATCH 3/7] clk: sunxi: unify sun6i AHB1 clock with proper PLL6
+ pre-divider
+In-Reply-To: <20140911210211.GM31276@lukather>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-4-git-send-email-wens@csie.org>
+ <20140911210211.GM31276@lukather>
+Message-ID: <CAGb2v66L36nsoucSgLY8pV8f=wjKTvtjJby43Z=Ct+NiRonptQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
->-----Original Message-----
->From: Guenter Roeck [mailto:linux at roeck-us.net]
->Sent: Friday, September 12, 2014 10:49 AM
->To: Lu Jingchang-B35083
->Cc: wim at iguana.be; Guo Shawn-R65073; arnd at arndb.de; linux-
->watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH] watchdog: imx2_wdt: add restart handler support
+On Fri, Sep 12, 2014 at 5:02 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
 >
->On 09/11/2014 07:42 PM, Jingchang Lu wrote:
->>> -----Original Message-----
->>> From: Guenter Roeck [mailto:groeck7 at gmail.com] On Behalf Of Guenter
->>> Roeck
->>> Sent: Thursday, September 11, 2014 11:55 PM
->>> To: Lu Jingchang-B35083
->>> Cc: wim at iguana.be; Guo Shawn-R65073; arnd at arndb.de; linux-
->>> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->>> Subject: Re: [PATCH] watchdog: imx2_wdt: add restart handler support
->>>
->>> On Thu, Sep 11, 2014 at 03:47:41PM +0800, Jingchang Lu wrote:
->>>>    Register the watchdog as the system restart function to the new
->>>> introducing kernel restart call chain in the driver instead of
->>>> providing the restart in machine desc.
->>>>    This restart handler function is from the mxc_restart() in
->>>> arch/arm/mach-imx/system.c
->>>>
->>>> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
->>>> ---
->>>>   drivers/watchdog/imx2_wdt.c | 37
->+++++++++++++++++++++++++++++++++++++
->>>>   1 file changed, 37 insertions(+)
->>>>
->>>> diff --git a/drivers/watchdog/imx2_wdt.c
->>>> b/drivers/watchdog/imx2_wdt.c index 68c3d37..fa723e8 100644
->>>> --- a/drivers/watchdog/imx2_wdt.c
->>>> +++ b/drivers/watchdog/imx2_wdt.c
->>>> @@ -22,14 +22,17 @@
->>>>    */
->>>>
->>>>   #include <linux/clk.h>
->>>> +#include <linux/delay.h>
->>>>   #include <linux/init.h>
->>>>   #include <linux/io.h>
->>>>   #include <linux/jiffies.h>
->>>>   #include <linux/kernel.h>
->>>>   #include <linux/module.h>
->>>>   #include <linux/moduleparam.h>
->>>> +#include <linux/notifier.h>
->>>>   #include <linux/of_address.h>
->>>>   #include <linux/platform_device.h>
->>>> +#include <linux/reboot.h>
->>>>   #include <linux/regmap.h>
->>>>   #include <linux/timer.h>
->>>>   #include <linux/watchdog.h>
->>>> @@ -59,6 +62,7 @@ struct imx2_wdt_device {
->>>>   	struct regmap *regmap;
->>>>   	struct timer_list timer;	/* Pings the watchdog when
->closed */
->>>>   	struct watchdog_device wdog;
->>>> +	struct notifier_block restart_handler;
->>>>   };
->>>>
->>>>   static bool nowayout = WATCHDOG_NOWAYOUT; @@ -77,6 +81,31 @@
->>>> static const struct watchdog_info imx2_wdt_info = {
->>>>   	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT |
->WDIOF_MAGICCLOSE,
->>>>   };
->>>>
->>>> +static int imx2_restart_handler(struct notifier_block *this,
->>>> +unsigned
->>> long mode,
->>>> +				void *cmd)
->>>> +{
->>>> +	unsigned int wcr_enable = IMX2_WDT_WCR_WDE;
->>>
->>> In the original code this value is conditional depending on
->cpu_is_mx1().
->>> Are there any implications for this reset mechanism ? Does mx1 have a
->>> different watchdog driver ?
->>>
->> Hi, Shawn, is this driver also used by the mx1 SoC?
->> The imx2_wdt.c says it is for IMX2 and later processors, so when
->> moving the restart function, I removed the cpu_is_mx1() condition
->determination, Thanks.
+> On Sat, Sep 06, 2014 at 06:47:24PM +0800, Chen-Yu Tsai wrote:
+>> This patch unifies the sun6i AHB1 clock, originally supported
+>> with separate mux and divider clks. It also adds support for
+>> the pre-divider on the PLL6 input, thus allowing the clock to
+>> be muxed to PLL6 with proper clock rate calculation.
 >>
->I assumed that the original code would be removed. If you have to keep it
->around for mx1, the conversion doesn't seem to make much sense as you just
->end up having the code twice. Am I missing something ?
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >
->Thanks,
->Guenter
- 
-Do you mean removing the code of mxc_restart() in arch/arm/mach-imx/system.c ?
-Yes, when this patch is accepted, all platform compatible with the imx2_wdt can
-migrate to the restart handler. I only add the restart handler for imx2_wdt and
-reserve the original code for that still uses it currently. Thanks.
+> It looks fine, but I'd rather see this in a separate file, especially
+> since we don't seem to have any order dependency.
 
-Best Regards,
-Jingchang
+Sorry, just to be clear, separate file under clk/sunxi?
+
+This cannot be in a separate file, as it shares a spinlock with apb1
+divider. They share the same register.
+
+We could move apb1 out though. But i would prefer to do that when
+we split out all the clocks into individual OF_CLK_DECLAREs.
+
+ChenYu
