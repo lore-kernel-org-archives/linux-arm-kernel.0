@@ -1,27 +1,43 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Fri, 12 Sep 2014 15:48:23 -0400
-Subject: [PATCH v4 14/18] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <1410530416-30200-15-git-send-email-hanjun.guo@linaro.org>
+Date: Fri, 12 Sep 2014 15:34:06 -0400
+Subject: [PATCH v4 01/18] ARM64: Move the init of cpu_logical_map(0) before
+ unflatten_device_tree()
+In-Reply-To: <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
 References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-15-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54134E07.6010508@redhat.com>
+ <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <54134AAE.8090106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2014 10:00 AM, Hanjun Guo wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On 09/12/2014 09:59 AM, Hanjun Guo wrote:
+> It always make sense to initialize CPU0's logical map entry from the
+> hardware values, so move the initialization of cpu_logical_map(0)
+> before unflatten_device_tree() which is needed by ACPI code later.
 > 
-> ACPI kernel uses MADT table for proper GIC initialization. It needs to
-> parse GIC related subtables, collect CPU interface and distributor
-> addresses and call driver initialization function (which is hardware
-> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/setup.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> NOTE: This commit allow to initialize GICv1/2 basic functionality.
-> GICv2 vitalization extension, GICv3/4 and ITS are considered as next
-> steps.
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index edb146d..8f33f72 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -393,11 +393,11 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	efi_idmap_init();
+>  
+> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>  	unflatten_device_tree();
+>  
+>  	psci_init();
+>  
+> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>  	cpu_read_bootcpu_ops();
+>  #ifdef CONFIG_SMP
+>  	smp_init_cpus();
 
-Aside: A request to specifically update the flags in ACPI to indicate
-GICv3/v4 systems has been filed for a future spec revision.
+Thanks - this is a good fix to ensure we're always dealing with the
+masked value of the MPIDR Aff bits that we care about.
 
 Jon.
