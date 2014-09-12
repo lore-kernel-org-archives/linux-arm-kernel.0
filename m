@@ -1,185 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Sep 2014 18:23:37 +0100
-Subject: [PATCH 3.17-rc4 v5 2/6] arm: fiq: Replace default FIQ handler
-In-Reply-To: <20140912171908.GP12361@n2100.arm.linux.org.uk>
-References: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-3-git-send-email-daniel.thompson@linaro.org>
- <20140912171404.GO12361@n2100.arm.linux.org.uk>
- <20140912171908.GP12361@n2100.arm.linux.org.uk>
-Message-ID: <20140912172337.GQ12361@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 12 Sep 2014 10:26:20 -0700
+Subject: [PATCH/RESEND] tty: serial: msm: Add DT based earlycon support
+In-Reply-To: <CAL_JsqLtx9+P1-O+gVRRhpjntHuNQZp4ASV8ScBhZB7gWDsGFw@mail.gmail.com>
+References: <1410473644-19103-1-git-send-email-sboyd@codeaurora.org>
+ <CAL_JsqLtx9+P1-O+gVRRhpjntHuNQZp4ASV8ScBhZB7gWDsGFw@mail.gmail.com>
+Message-ID: <54132CBC.6030003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 06:19:08PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 12, 2014 at 06:14:04PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Sep 11, 2014 at 12:31:14PM +0100, Daniel Thompson wrote:
-> > > This patch introduces a new default FIQ handler that is structured in a
-> > > similar way to the existing ARM exception handler and result in the FIQ
-> > > being handled by C code running on the SVC stack (despite this code run
-> > > in the FIQ handler is subject to severe limitations with respect to
-> > > locking making normal interaction with the kernel impossible).
-> > > 
-> > > This default handler allows concepts that on x86 would be handled using
-> > > NMIs to be realized on ARM.
-> > 
-> > Okay, lastly... I sent you my version of this change, which contained
-> > the changes I've detailed in the previous three emails, which are absent
-> > from your version.
-> > 
-> > However, you've taken on board the "trace" thing to svc_entry, and
-> > renamed it to "call_trace".
-> > 
-> > Now if I add this to usr_entry, "call_trace" doesn't make any sense,
-> > nor does the .if/.endif placement because it's not just trace_hardirqs_off
-> > which needs to be disabled there, but also ct_user_exit as well.
-> > 
-> > I'm beginning to wonder why I tried to be nice here... it would've been
-> > a lot faster for me to take your patch, make my own changes and commit
-> > that instead.
-> > 
-> > Frustrated.
-> 
-> And another thing you're missing are the updates to arch/arm/kernel/fiq.c
-> to ensure that the FIQ registers are preserved when we restore this new
-> default FIQ handler.
+On 09/11/14 18:56, Rob Herring wrote:
+> On Thu, Sep 11, 2014 at 5:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> Add support for DT based early console on platforms with the msm
+>> serial hardware.
+>>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> One comment, but looks good to me.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Right, here's my remaining delta from your patch addressing all the points
-from the last five emails.  If you have any disagreements with any of these
-changes, then please discuss rather than choosing to ignore them.
+Thanks.
 
-107e32b0b4ef5fa4191c9fc8415ca172b886e958
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 0c70fee9a7c9..3f6293ce0f2d 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -146,7 +146,7 @@ ENDPROC(__und_invalid)
- #define SPFIX(code...)
- #endif
+>> +static int __init
+>> +msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
+>> +{
+>> +       if (!device->port.membase)
+>> +               return -ENODEV;
+>> +
+>> +       device->con->write = msm_serial_early_write;
+>> +       return 0;
+>> +}
+>> +OF_EARLYCON_DECLARE(msm_serial, "qcom,msm-uart",
+>> +                   msm_serial_early_console_setup);
+> Don't you want to support kernel command line as well? Then if you
+> can't change the DT or bootloader's command line, you can add it into
+> the kernel build with the appended command line. Don't forget to
+> document it in kernel-parameters.txt if you do.
+>
+>
+
+Ok. Here's the interdiff. I'll send a v2.
+
+---8<----
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 5ae8608ca9f5..22302931e9d4 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -936,6 +936,18 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			must already be setup and configured. Options are not
+ 			yet supported.
  
--	.macro	svc_entry, stack_hole=0, call_trace=1
-+	.macro	svc_entry, stack_hole=0, trace=1
-  UNWIND(.fnstart		)
-  UNWIND(.save {r0 - pc}		)
- 	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
-@@ -182,11 +182,11 @@ ENDPROC(__und_invalid)
- 	@
- 	stmia	r7, {r2 - r6}
- 
-+	.if \trace
- #ifdef CONFIG_TRACE_IRQFLAGS
--	.if \call_trace
- 	bl	trace_hardirqs_off
--	.endif
- #endif
-+	.endif
- 	.endm
- 
- 	.align	5
-@@ -298,7 +298,7 @@ ENDPROC(__pabt_svc)
- 
- 	.align	5
- __fiq_svc:
--	svc_entry 0, 0
-+	svc_entry trace=0
- 	mov	r0, sp				@ struct pt_regs *regs
- 	bl	handle_fiq_as_nmi
- 	svc_exit_via_fiq
-@@ -326,7 +326,7 @@ ENDPROC(__fiq_svc)
- @
- 	.align 5
- __fiq_abt:
--	svc_entry 0, 0
-+	svc_entry trace=0
- 
-  ARM(	msr	cpsr_c, #ABT_MODE | PSR_I_BIT | PSR_F_BIT )
-  THUMB( mov	r0, #ABT_MODE | PSR_I_BIT | PSR_F_BIT )
-@@ -353,7 +353,7 @@ __fiq_abt:
- 
- 	svc_exit_via_fiq
-  UNWIND(.fnend		)
--ENDPROC(__fiq_svc)
-+ENDPROC(__fiq_abt)
- 
- /*
-  * User mode handlers
-@@ -365,7 +365,7 @@ ENDPROC(__fiq_svc)
- #error "sizeof(struct pt_regs) must be a multiple of 8"
- #endif
- 
--	.macro	usr_entry
-+	.macro	usr_entry, trace=1
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)	@ don't unwind the user space
- 	sub	sp, sp, #S_FRAME_SIZE
-@@ -402,10 +402,12 @@ ENDPROC(__fiq_svc)
- 	@
- 	zero_fp
- 
-+	.if	\trace
- #ifdef CONFIG_IRQSOFF_TRACER
- 	bl	trace_hardirqs_off
- #endif
- 	ct_user_exit save = 0
-+	.endif
- 	.endm
- 
- 	.macro	kuser_cmpxchg_check
-@@ -736,13 +738,13 @@ ENDPROC(ret_from_exception)
- 
- 	.align	5
- __fiq_usr:
--	usr_entry
-+	usr_entry trace=0
- 	kuser_cmpxchg_check
- 	mov	r0, sp				@ struct pt_regs *regs
- 	bl	handle_fiq_as_nmi
- 	get_thread_info tsk
--	mov	why, #0
--	b	ret_to_user_from_irq
-+	restore_user_regs fast = 0, offset = 0
-+ UNWIND(.cantunwind	)
-  UNWIND(.fnend		)
- ENDPROC(__fiq_usr)
- 
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 918875d96d5d..1743049c433b 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -53,6 +53,7 @@
- 	})
- 
- static unsigned long no_fiq_insn;
-+static struct pt_regs def_fiq_regs;
- 
- /* Default reacquire function
-  * - we always relinquish FIQ control
-@@ -60,8 +61,15 @@ static unsigned long no_fiq_insn;
-  */
- static int fiq_def_op(void *ref, int relinquish)
- {
--	if (!relinquish)
-+	if (!relinquish) {
-+		/* Restore default handler and registers */
-+		local_fiq_disable();
-+		set_fiq_regs(&dfl_fiq_regs);
- 		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
-+		local_fiq_enable();
++		msm_serial,<addr>
++			Start an early, polled-mode console on an msm serial
++			port at the specified address. The serial port
++			must already be setup and configured. Options are not
++			yet supported.
 +
-+		/* FIXME: notify irq controller to standard enable FIQs */
-+	}
++		msm_serial_dm,<addr>
++			Start an early, polled-mode console on an msm serial
++			dm port at the specified address. The serial port
++			must already be setup and configured. Options are not
++			yet supported.
++
+ 		smh	Use ARM semihosting calls for early console.
  
+ 	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index d3881991e8d3..4b6c78331a64 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -976,6 +976,7 @@ msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
+ 	device->con->write = msm_serial_early_write;
  	return 0;
  }
-@@ -151,5 +159,6 @@ void __init init_FIQ(int start)
- {
- 	unsigned offset = FIQ_OFFSET;
- 	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
-+	get_fiq_regs(&dfl_fiq_regs);
- 	fiq_start = start;
++EARLYCON_DECLARE(msm_serial, msm_serial_early_console_setup);
+ OF_EARLYCON_DECLARE(msm_serial, "qcom,msm-uart",
+ 		    msm_serial_early_console_setup);
+ 
+@@ -997,6 +998,7 @@ msm_serial_early_console_setup_dm(struct earlycon_device *device,
+ 	device->con->write = msm_serial_early_write_dm;
+ 	return 0;
  }
-
++EARLYCON_DECLARE(msm_serial_dm, msm_serial_early_console_setup_dm);
+ OF_EARLYCON_DECLARE(msm_serial_dm, "qcom,msm-uartdm",
+ 		    msm_serial_early_console_setup_dm);
+ 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
