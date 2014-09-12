@@ -1,38 +1,55 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 12 Sep 2014 22:00:05 +0800
-Subject: [PATCH v4 07/18] ARM64 / ACPI: If we chose to boot from acpi then
- disable FDT
-In-Reply-To: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1410530416-30200-8-git-send-email-hanjun.guo@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 12 Sep 2014 15:39:36 +0100
+Subject: [GIT PULL] arm64: couple of fixes for -rc5
+Message-ID: <20140912143936.GI6871@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+Hi Linus,
 
-If the early boot methods of acpi are happy that we have valid ACPI
-tables and acpi=off has not been passed. Then do not unflat
-devicetree effectively disabling further hardware probing from DT.
+Please can you pull these two arm64 fixes for -rc5? The IRQ migration fix
+turned up late last time and there's also a TLS leaking issue that we
+just fixed for arch/arm/ too.
 
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/kernel/setup.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+To keep things interesting, I've signed the tag using my Yubikey from KS.
+Given that it only supports 2048-bit keys, I've used a new subkey so you
+may need to update your keyring to verify the signature.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 5b05227..5796734 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -398,7 +398,8 @@ void __init setup_arch(char **cmdline_p)
- 	efi_idmap_init();
- 
- 	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
--	unflatten_device_tree();
-+	if (acpi_disabled)
-+		unflatten_device_tree();
- 
- 	psci_init();
- 
--- 
-1.7.9.5
+Cheers,
+
+Will
+
+--->8
+
+The following changes since commit 5e39977edf6500fd12f169e6c458d33b0ef62feb:
+
+  Revert "arm64: cpuinfo: print info for all CPUs" (2014-09-01 15:55:22 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to eb35bdd7bca29a13c8ecd44e6fd747a84ce675db:
+
+  arm64: flush TLS registers during exec (2014-09-11 18:34:58 +0100)
+
+----------------------------------------------------------------
+arm64 fixes for -rc5
+
+Just a couple of stragglers here:
+
+  - Fix an issue migrating interrupts on CPU hotplug
+  - Fix a potential information leak of TLS registers across an exec
+    (Nathan has sent a corresponding patch for arch/arm/ to rmk)
+
+----------------------------------------------------------------
+Sudeep Holla (1):
+      arm64: use irq_set_affinity with force=false when migrating irqs
+
+Will Deacon (1):
+      arm64: flush TLS registers during exec
+
+ arch/arm64/kernel/irq.c        | 12 ++++--------
+ arch/arm64/kernel/process.c    | 18 ++++++++++++++++++
+ arch/arm64/kernel/sys_compat.c |  6 ++++++
+ 3 files changed, 28 insertions(+), 8 deletions(-)
