@@ -1,38 +1,57 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Sep 2014 12:26:08 +0200
-Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
-In-Reply-To: <CAMuHMdVi+6TXH68ddQ-UWfUif0Mv=ETu6dnpiy1Apike6zfAbg@mail.gmail.com>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
- <9935938.eKOCvCAtLt@fb07-iapwap2> <20140912083348.GA1289@katana>
- <7627175.tG5quZH0VN@fb07-iapwap2> <20140912095821.GB1930@katana>
- <CAMuHMdVi+6TXH68ddQ-UWfUif0Mv=ETu6dnpiy1Apike6zfAbg@mail.gmail.com>
-Message-ID: <20140912102607.GC1930@katana>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Fri, 12 Sep 2014 12:28:16 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <5412C21A.8020203@linutronix.de>
+References: <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5411967A.6090406@hurleysoftware.com>
+ <54119AAA.9080907@linutronix.de>
+ <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+Message-ID: <20140912102816.GF28458@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > DT pseudocode:
-> >
-> >         i2c {
-> >                 compatible = "nvidia, tegra-i2c";
-> >
-> >                 ec-slave at 42 {
-> >                         compatible = "nvidia, ax100-ec-slave";
-> >                         reg = <0x42>;
-> >                 };
-> >         };
+On Fri, Sep 12, 2014 at 11:51:22AM +0200, Sebastian Andrzej Siewior wrote:
+> On 09/12/2014 11:40 AM, Frans Klaver wrote:
 > 
-> So distinguishing between drivers providing slave services (using slave
-> mode) and drivers driving actual slave hardware (using master mode) is
-> done based on the compatible-property.
+> > I'm not sure. I just reproduced this on a boneblack, using your uart_v9
+> > branch.
+> > 
+> >> This problem only pops-up if you use DMA. With disabled DMA you don't
+> >> see this, right?
+> > 
+> > I get the lockup both with and without DMA enabled. Here's the 8250
+> > config I use. Our full .config is attached in case it may provide
+> > something relevant.
+> 
+> Hmm. I have a bone black here. Can you tell what you did to get this
+> lockup? The port configuration (unless 115200 8N1) and what you did to
+> get this lockup.
 
-We describe users of one specific I2C bus. And the drivers that go along
-with them. No?
+port config is 115200 8N1. I don't recall doing anything special. I
+boot, login, less file and get a lock.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/411a8946/attachment.sig>
+
+> > Something that may also help: when I have a lockup on the boneblack, dma
+> > is enabled and something is written to console like I described earlier,
+> > I get the following bad irq:
+> 
+> > Full dmesg is also attached.
+> 
+> This one should be stuffed by this:
+> 	"[RFC] ARM: edma: unconditionally ack the error interrupt"
+> 	https://lkml.org/lkml/2014/9/10/714
+
+OK, that makes the console usable again after I write something to kmsg.
+
+> > Hope you find something useful in there.
+> 
+> > Thanks,
+> > Frans
+> 
+> Sebastian
