@@ -1,36 +1,39 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 12 Sep 2014 16:52:40 -0700
-Subject: [PATCH v2 4/7] clk: rockchip: make tightly bound armclk
- child-clocks read-only
-In-Reply-To: <1410561030-19127-5-git-send-email-heiko@sntech.de>
-References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
- <1410561030-19127-5-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=W3Ua5VSQxHXyCBkAjhToUFcNEgmqQm4=50RzCk0ft9Yg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 13 Sep 2014 01:57:49 +0200
+Subject: [PATCHv2] net/macb: Add hardware revision information during probe
+Message-ID: <1410566269-16445-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+From: Bo Shen <voice.shen@atmel.com>
 
-On Fri, Sep 12, 2014 at 3:30 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Rockchip SoCs contain clocks tightly bound to the armclk, where the best
-> rate / divider is supplied by the vendor after careful measuring.
-> Often this ideal rate may be greater than the current rate.
->
-> Therefore prevent the ccf from trying to set these dividers itself by
-> setting them to read-only.
->
-> In the case of the rk3066, this also includes the aclk_cpu, which makes it
-> necessary to also split its direct child-clocks (pclk_cpu, hclk_cpu, ...)
-> into individual definitions for rk3066 and rk3188.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/rockchip/clk-rk3188.c | 26 ++++++++++++++++++--------
->  drivers/clk/rockchip/clk-rk3288.c | 18 +++++++++---------
->  2 files changed, 27 insertions(+), 17 deletions(-)
+Print the IP revision when probing.
 
-This seems pretty reasonable to me.  I only glanced at rk3188 / rk3066
-code quickly, but for rk3288 I can say:
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Changes in v2:
+ - condense information on one line
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+ drivers/net/ethernet/cadence/macb.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index ca5d7798b265..d9b8e94b805f 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -2241,9 +2241,9 @@ static int __init macb_probe(struct platform_device *pdev)
+ 
+ 	netif_carrier_off(dev);
+ 
+-	netdev_info(dev, "Cadence %s at 0x%08lx irq %d (%pM)\n",
+-		    macb_is_gem(bp) ? "GEM" : "MACB", dev->base_addr,
+-		    dev->irq, dev->dev_addr);
++	netdev_info(dev, "Cadence %s rev 0x%08x at 0x%08lx irq %d (%pM)\n",
++		    macb_is_gem(bp) ? "GEM" : "MACB", macb_readl(bp, MID),
++		    dev->base_addr, dev->irq, dev->dev_addr);
+ 
+ 	phydev = bp->phy_dev;
+ 	netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
+-- 
+1.9.1
