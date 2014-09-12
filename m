@@ -1,34 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 12 Sep 2014 09:22:06 +0200
-Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
-In-Reply-To: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54129F1E.30207@redhat.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 12 Sep 2014 09:23:24 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
+ <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+Message-ID: <54129F6C.7040508@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/11/2014 10:18 PM, Maxime Ripard wrote:
-> Hi everyone,
+On 09/11/2014 07:04 PM, Frans Klaver wrote:
+> On 11 September 2014 18:04:32 CEST, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+>> On 09/11/2014 05:11 PM, Frans Klaver wrote:
+>>
+>>> I can still reproduce it on am335x. I can get out of it as soon as
+>>> something else gets written to the console though.
+>>>
+>>> # echo "<3>something" >/dev/kmsg
+>>
+>> Is this to stall it or to get out of it?
 > 
-> Here is an attempt at improving the MMC clock support in the Allwinner
-> SoCs.
-> 
-> Until now, the MMC clocks were having a custom phase function that was
-> directly setting an obscure value in the right register, because we
-> were not really having any idea of what these values were.
-> 
-> Now that we have more informations, we can introduce a common function
-> call to get and set the phase of a particular clock, and use this in
-> both our provider and our client.
-> 
-> Thanks,
-> Maxime
+> This is to get out of it. I do this from an ssh connection after the console got stuck. The 3 kind of ensures the message is actually sent to ttyS0.
 
-I've not done a full review this time around (-ENOTIME), but I've taken
-a look at the changed bits, and those look good to me.
+Interesting. This shouldn't do anything. If there is a TX operation in
+progress then ->start_tx() will simply return and the xmit buffer will
+be send once the current TX operation completes.
 
-Regards,
+Is there anything I can do to reproduce this behavior?
+This problem only pops-up if you use DMA. With disabled DMA you don't
+see this, right?
 
-Hans
+Sebastian
