@@ -1,75 +1,135 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Sep 2014 15:50:24 +0200
-Subject: [PATCH 6/8] i2c: Provide a temporary .probe2() call-back type
-In-Reply-To: <1409236538-21274-7-git-send-email-lee.jones@linaro.org>
-References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
- <1409236538-21274-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140912135023.GG1930@katana>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 12 Sep 2014 21:59:58 +0800
+Subject: [PATCH v4 00/18] Introduce ACPI for ARM64 based on ACPI 5.1
+Message-ID: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 79b674d..c8240e5 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -125,7 +125,8 @@ extern s32 i2c_smbus_write_i2c_block_data(const struct i2c_client *client,
->   * struct i2c_driver - represent an I2C device driver
->   * @class: What kind of i2c device we instantiate (for detect)
->   * @attach_adapter: Callback for bus addition (deprecated)
-> - * @probe: Callback for device binding
-> + * @probe: Callback for device binding - soon to be deprecated
-> + * @probe2: New callback for device binding
+ACPI 5.1 has been released and now be freely available for
+download [1]. It fixed some major gaps to run ACPI on ARM,
+this patch just follow the ACPI 5.1 spec and prepare the
+code to run ACPI on ARM64.
 
-I don't like the naming. What about 'simplified_probe' instead of
-'probe2'? The old 'probe' would be deprecated immediately, I guess.
+ACPI 5.1 has some major changes for the following tables and
+method which are essential for ARM platforms:
+1) MADT table updates.
+2) FADT updates for PSCI
+3) GTDT
 
-Also, this needs more information in the kernel docs. Come to think of
-it, I'd like to see some more documentation in general. A document in
-Documentation/i2c should explain the differences between the
-probe-functions, the reason why they are there, the intended path to
-migrate over and examples how to convert drivers and what to keep in
-mind doing so.
+This patch set is the ARM64 ACPI core patches covered MADT, FADT
+and GTDT, platform board specific drivers are not covered by this
+patch set, but we provided drivers for Juno to boot with ACPI only
+for review purpose.
 
->   * @remove: Callback for device unbinding
->   * @shutdown: Callback for device shutdown
->   * @suspend: Callback for device suspend
-> @@ -170,6 +171,11 @@ struct i2c_driver {
->  	int (*probe)(struct i2c_client *, const struct i2c_device_id *);
->  	int (*remove)(struct i2c_client *);
->  
-> +	/* New driver model interface to aid the seamless removal of the
-> +	 * current probe()'s, more commonly unused than used second parameter.
+We first introduce acpi.c and its related head file which are needed
+by ACPI core, and then get RSDP to extract all the ACPI boot-time tables.
+When all the boot-time tables (FADT, MADT, GTDT) are ready, then
+parse them to init the sytem when booted. Specifically, 
+a) we use FADT to init PSCI and use PSCI to boot SMP;
+b) Use MADT for GIC init and SMP init;
+c) GTDT for arch timer init.
 
-"largely unused second parameter"? Maybe more readable? At least, I
-needed to read this sentence more than once to get it. BTW have you
-measured how often it was used/unused?
+This patch set is based on 3.17-rc4 and was tested by Graeme on Juno
+and FVP base model boot with ACPI only OK, if you want to test them,
+you can pull from acpi-5.1-v4 branch in leg/acpi repo:
+git://git.linaro.org/leg/acpi/acpi.git
 
-> +	 */
-> +	int (*probe2)(struct i2c_client *);
-> +
->  	/* driver model interfaces that don't relate to enumeration  */
->  	void (*shutdown)(struct i2c_client *);
->  	int (*suspend)(struct i2c_client *, pm_message_t mesg);
+Updates since v3:
+ - Compile out sleep.c on ARM64 when ACPI enabled
+ - refactor the GIC init code to address the comments from Marc and
+   Arnd
+ - refactor the SMP init code to fix some logic problem when PSCI is
+   not present, also address some of Grant and Lorenzo's comments
+ - reorder the patch series and move ACPI table changes to the front
+   of patch set
+ - rebase on top of 3.17-rc4
 
-What I like in general: After your series I2C does more like what other
-subsystems (especially SPI) do.
+Updates since v2:
+ - Refactor the code to make SMP/PSCI init with less sperated init
+   path by Tomasz
+ - make ACPI depend on EXPERT
+ - Address lots of comments from Catalin, Sudeep, Geoff
+ - Add Juno device ACPI driver patches for review
 
-What I dislike about this in general: Putting to the drivers that they
-should find out about the matching. I mean the core already did the
-matching, so why should a driver do that again? Especially since it can
-get very cumbersome to do so with platform_data, DT and ACPI around
-which need to be checked. This is why I stopped my implementation to
-fix this issue. I felt the need for a helper function to assist the
-drivers how they were matched. Ideally by just retrieving the
-information which the subsystem cores already gathered. Making such a
-thing generic was where I stopped working on that.
+Updates since v1:
+ - Set ACPI default off on ARM64 suggested by Olof;
+ - Rebase the patch set on top of linux-next branch/linux-pm tree which
+   includes the ACPICA for full ACPI 5.1 support.
+ - Update the document as suggested;
+ - Adress lots of comments from Mark, Sudeep, Randy, Naresh, Olof, Geoff
+   and more...
 
-Has this been discussed somewhere already?
+[1]: http://www.uefi.org/sites/default/files/resources/ACPI_5_1release.pdf
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/84f9e089/attachment.sig>
+Al Stone (3):
+  ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+  ARM64 / ACPI: Introduce early_param for "acpi"
+  ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
+    ARM64
+
+Ashwin Chaugule (1):
+  ACPI / table: Add new function to get table entries
+
+Graeme Gregory (4):
+  ARM64 / ACPI: Introduce sleep-arm.c
+  ARM64 / ACPI: If we chose to boot from acpi then disable FDT
+  ARM64 / ACPI: Enable ARM64 in Kconfig
+  Documentation: ACPI for ARM64
+
+Hanjun Guo (8):
+  ARM64: Move the init of cpu_logical_map(0) before
+    unflatten_device_tree()
+  ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+  ARM64 / ACPI: Parse FADT table to get PSCI flags for PSCI init
+  ACPI / table: Print GIC information when MADT is parsed
+  ARM64 / ACPI: Parse MADT for SMP initialization
+  ACPI / processor: Make it possible to get CPU hardware ID via GICC
+  ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
+  ARM64 / ACPI: Parse GTDT to initialize arch timer
+
+Tomasz Nowicki (2):
+  ACPI / table: Count matched and successfully parsed entries without
+    specifying max entries
+  ARM64 / ACPI: Add GICv2 specific ACPI boot support
+
+ Documentation/arm64/arm-acpi.txt     |  218 +++++++++++++++++++++
+ Documentation/kernel-parameters.txt  |    3 +-
+ arch/arm64/Kconfig                   |    3 +
+ arch/arm64/include/asm/acenv.h       |   18 ++
+ arch/arm64/include/asm/acpi.h        |   96 ++++++++++
+ arch/arm64/include/asm/cpu_ops.h     |    1 +
+ arch/arm64/include/asm/pci.h         |   11 ++
+ arch/arm64/include/asm/psci.h        |    3 +-
+ arch/arm64/include/asm/smp.h         |    5 +-
+ arch/arm64/kernel/Makefile           |    1 +
+ arch/arm64/kernel/acpi.c             |  351 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu_ops.c          |    4 +-
+ arch/arm64/kernel/psci.c             |   78 +++++---
+ arch/arm64/kernel/setup.c            |   23 ++-
+ arch/arm64/kernel/smp.c              |    2 +-
+ arch/arm64/kernel/time.c             |    7 +
+ drivers/acpi/Kconfig                 |    6 +-
+ drivers/acpi/Makefile                |    6 +-
+ drivers/acpi/bus.c                   |    3 +
+ drivers/acpi/internal.h              |    5 +
+ drivers/acpi/processor_core.c        |   37 ++++
+ drivers/acpi/sleep-arm.c             |   28 +++
+ drivers/acpi/tables.c                |  115 +++++++++--
+ drivers/clocksource/arm_arch_timer.c |  117 ++++++++++--
+ drivers/irqchip/irq-gic.c            |  106 ++++++++++
+ drivers/irqchip/irqchip.c            |    3 +
+ include/linux/acpi.h                 |    5 +
+ include/linux/clocksource.h          |    6 +
+ include/linux/irqchip/arm-gic-acpi.h |   31 +++
+ include/linux/pci.h                  |   37 +++-
+ 30 files changed, 1238 insertions(+), 91 deletions(-)
+ create mode 100644 Documentation/arm64/arm-acpi.txt
+ create mode 100644 arch/arm64/include/asm/acenv.h
+ create mode 100644 arch/arm64/include/asm/acpi.h
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/acpi.c
+ create mode 100644 drivers/acpi/sleep-arm.c
+ create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+
+-- 
+1.7.9.5
