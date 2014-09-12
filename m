@@ -1,54 +1,42 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 12 Sep 2014 19:49:46 +0200
-Subject: [PATCH v3 3/4] arm64,
- thunder: Add Kconfig option for Cavium Thunder SoC Family
-In-Reply-To: <1410544187-15876-1-git-send-email-rric@kernel.org>
-References: <1410544187-15876-1-git-send-email-rric@kernel.org>
-Message-ID: <1410544187-15876-4-git-send-email-rric@kernel.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Sat, 13 Sep 2014 02:50:14 +0900
+Subject: [PATCH] ahci_xgene: Fix the error print invalid resource for APM
+ X-Gene SoC AHCI SATA Host Controller driver.
+In-Reply-To: <1410508448-25111-2-git-send-email-stripathi@apm.com>
+References: <1410508448-25111-1-git-send-email-stripathi@apm.com>
+ <1410508448-25111-2-git-send-email-stripathi@apm.com>
+Message-ID: <20140912175014.GA6298@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On Fri, Sep 12, 2014 at 01:24:08PM +0530, Suman Tripathi wrote:
+> This patch fixes the error print invalid resource for the APM X-Gene
+> SoC AHCI SATA Host Controller driver. This print was due to the fact
+> that the controller 3 don't have a mux resource. This didn't result
+> in any errors but the print seems like meaningless.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  drivers/ata/ahci_xgene.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index 40d0a76..9404db0c 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+> @@ -434,7 +434,7 @@ static int xgene_ahci_mux_select(struct xgene_ahci_context *ctx)
+>  	u32 val;
+> 
+>  	/* Check for optional MUX resource */
+> -	if (IS_ERR(ctx->csr_mux))
+> +	if (!ctx->csr_mux)
+>  		return 0;
 
-This introduces ARCH_THUNDER to enable soc specific drivers and dtb
-files.
+Hmmm?  So, if devm_ioremap_resource() call actually fails, now the
+function tries to operation on ERR_PTR() value as a real pointer?
 
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/Kconfig           | 5 +++++
- arch/arm64/boot/dts/Makefile | 3 +--
- 2 files changed, 6 insertions(+), 2 deletions(-)
+Thanks.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 67fca2ea81a7..ff9179ba63fb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -134,6 +134,11 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_THUNDER
-+	bool "Cavium Inc. Thunder SoC Family"
-+	help
-+	  This enables support for Cavium's Thunder Family of SoCs.
-+
- config ARCH_VEXPRESS
- 	bool "ARMv8 software model (Versatile Express)"
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index c2e8e4661a90..f8001a62029c 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,8 +1,7 @@
-+dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
- 
--dtb-y += thunder-88xx.dtb
--
- targets += dtbs
- targets += $(dtb-y)
- 
 -- 
-2.1.0
+tejun
