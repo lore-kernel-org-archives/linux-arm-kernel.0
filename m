@@ -1,43 +1,30 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 12 Sep 2014 15:34:06 -0400
-Subject: [PATCH v4 01/18] ARM64: Move the init of cpu_logical_map(0) before
- unflatten_device_tree()
-In-Reply-To: <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Fri, 12 Sep 2014 21:03:55 +0100
+Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
+In-Reply-To: <54134CE8.8070506@redhat.com>
 References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <54134AAE.8090106@redhat.com>
+ <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
+ <54134CE8.8070506@redhat.com>
+Message-ID: <20140912200355.GD9234@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2014 09:59 AM, Hanjun Guo wrote:
-> It always make sense to initialize CPU0's logical map entry from the
-> hardware values, so move the initialization of cpu_logical_map(0)
-> before unflatten_device_tree() which is needed by ACPI code later.
+On Fri, Sep 12, 2014 at 03:43:36PM -0400, Jon Masters wrote:
+> On 09/12/2014 10:00 AM, Hanjun Guo wrote:
+> > From: Graeme Gregory <graeme.gregory@linaro.org>
+> > 
+> > ACPI 5.1 does not currently support S states for ARM64 hardware but
+> > ACPI code will call acpi_target_system_state() for device power
+> > managment, so introduce sleep-arm.c to allow other drivers to function
+> > until S states are defined.
 > 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/setup.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Aside: ACPI5.1 does define the Platform Communication Channel and CPC
+> (Collaborative Processor Performance Control). Some details need to be
+> fleshed out there for practical 64-bit ARMv8 server systems, but the
+> underpinnings and mechanisms are in place in the 5.1 specification that
+> can be built upon over time to achieve practical S-State equivalence.
 > 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index edb146d..8f33f72 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -393,11 +393,11 @@ void __init setup_arch(char **cmdline_p)
->  
->  	efi_idmap_init();
->  
-> +	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->  	unflatten_device_tree();
->  
->  	psci_init();
->  
-> -	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->  	cpu_read_bootcpu_ops();
->  #ifdef CONFIG_SMP
->  	smp_init_cpus();
+Disagree, S-States are about going to sleep or hibernating, that is
+nothing to do with CPU Performance.
 
-Thanks - this is a good fix to ensure we're always dealing with the
-masked value of the MPIDR Aff bits that we care about.
-
-Jon.
+Graeme
