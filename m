@@ -1,87 +1,86 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Sep 2014 12:03:44 -0700
-Subject: [PATCH v8 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
-In-Reply-To: <1410542986-24419-4-git-send-email-agross@codeaurora.org>
-References: <1410542986-24419-1-git-send-email-agross@codeaurora.org>
- <1410542986-24419-4-git-send-email-agross@codeaurora.org>
-Message-ID: <54134390.5030206@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 12 Sep 2014 14:28:05 -0500
+Subject: [Patch v9 0/3] DWC3 USB support for Qualcomm platform
+Message-ID: <1410550088-8754-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yay nitpicks!
+These patches add basic support for USB3.0 controllers found
+on MSM platforms. USB3.0 core is based on Synopsys DesignWare
+SuperSpeed IP.
 
-On 09/12/14 10:29, Andy Gross wrote:
-> +
-> +struct qcom_dwc3_usb_phy {
-> +	void __iomem		*base;
-> +	struct device		*dev;
-> +	struct phy *phy;
+This work was started by Ivan Ivanov and went through a number of iterations.  I
+picked these patches up and did a little rework to get them working.
 
-Align with other members?
+Changes since v8:
+* Fixed minor comments from reviewers.
 
->
-> +
-> +static int wait_for_latch(void __iomem *addr)
-> +{
-> +	u32 retry = 10;
+Changes since v7:
+* Reworked phy driver to conform to the generic phy framework.
+* Collapsed HS and SS phy drivers into same source file.
+* Dropped regulators from the drivers.  The only platform where we can utilize
+  this driver has regulators on all the time.  Will add regulators back in when
+  they are required.
+* Added timeouts to the phy register accesses
+* Put in definitions for the phy specific registers and bitfields
+* Removed unnecessary workarounds.
 
-Why not just int?
+Changes since v6:
+* Renamed all MSM references to qcom, including file names
+* Removed direct TCSR manipulation.  This done from new TCSR driver.
+* Added defines for register bits
+* XO clk is optional on some platforms.  Corrected logic to handle this.
+* Ignore set_voltage failures.  This allows us to support dummy regulators on
+  platforms where there is no voltage control.
+* Reworked devicetree binding to remove TCSR reg resources
 
-> +
-> +	while (true) {
-> +		if (!readl(addr))
-> +			break;
-> +
-> +		if (--retry == 0)
-> +			return -ETIMEDOUT;
-> +
-> +		usleep_range(10, 20);
-> +	}
-> +
-> +	return 0;
-> +}
-[...]
-> +
-> +static int qcom_dwc3_ss_phy_init(struct qcom_dwc3_usb_phy *phy_dwc3)
-> +{
-> +	u32 data = 0;
-> +
+Changes since v5:
+* devicetree bindings descriptions fixes
+* Fixed NULL pointer dereferences in dev_prink's
+* Removed extra space in "sleep " clock name
 
-Unnecessary initialization.
+Changes since v4:
+* Substitute references to "wc3" with just "dw" in USB PHY drivers and
+  file names. This is to indicate that the PHY's are DesignWare, but
+  not necessarily related to DWC3 IP core.
 
->
->
-> +
-> +static struct phy_ops qcom_dwc3_phy_ops = {
+Changes since v3:
+* Remove "_clk" suffix from clock names
+* Clarify required child node for qcom,dwc3
+* Fix comments in functions headers
+* Use dbg instead err in drivers probe functions.
 
-Can this be const?
+Changes since v2:
+* Several improvements in devicetree bindings description
+* Disable regulators in glue layer if there is error during
+  ioremap.
 
-> +	.init		= qcom_dwc3_phy_init,
-> +	.exit		= qcom_dwc3_phy_exit,
-> +	.power_on	= qcom_dwc3_phy_power_on,
-> +	.power_off	= qcom_dwc3_phy_power_off,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-[...]
-> +
-> +static int qcom_dwc3_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct qcom_dwc3_usb_phy	*phy_dwc3;
-> +	struct phy_provider		*phy_provider;
-> +	struct resource			*res;
-> +	const struct of_device_id	*match;
-> +
-> +
+Changes since first version:
+* Split devicetree bindings description file to separate patch
+* Address comments for device bindings description
+* Fix typo in 'gdsc' requlator name.
 
-Weird two newlines here.
+Andy Gross (1):
+  phy: Add Qualcomm DWC3 HS/SS PHY driver
 
-> +	phy_dwc3 = devm_kzalloc(&pdev->dev, sizeof(*phy_dwc3), GFP_KERNEL);
-> +	if (!phy_dwc3)
-> +		return -ENOMEM;
-> +
->
+Ivan T. Ivanov (2):
+  usb: dwc3: qcom: Add device tree binding
+  usb: dwc3: Add Qualcomm DWC3 glue layer driver
+
+ .../devicetree/bindings/phy/qcom-dwc3-usb-phy.txt  |   39 ++
+ .../devicetree/bindings/usb/qcom,dwc3.txt          |   66 +++
+ drivers/phy/Kconfig                                |   11 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-qcom-dwc3.c                        |  483 ++++++++++++++++++++
+ drivers/usb/dwc3/Kconfig                           |    8 +
+ drivers/usb/dwc3/Makefile                          |    1 +
+ drivers/usb/dwc3/dwc3-qcom.c                       |  131 ++++++
+ 8 files changed, 740 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/qcom-dwc3-usb-phy.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+ create mode 100644 drivers/phy/phy-qcom-dwc3.c
+ create mode 100644 drivers/usb/dwc3/dwc3-qcom.c
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
