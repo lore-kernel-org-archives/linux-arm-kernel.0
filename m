@@ -1,56 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Sep 2014 16:33:37 +0100
-Subject: [PATCH arm64-next] net: bpf: arm64: fix module memory leak when
- JIT image build fails
-In-Reply-To: <20140911104513.GC6158@arm.com>
-References: <1410428208-2446-1-git-send-email-dborkman@redhat.com>
- <20140911104513.GC6158@arm.com>
-Message-ID: <20140912153337.GC5532@arm.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Fri, 12 Sep 2014 20:56:31 +0530
+Subject: [PATCH v4 7/8] tty/serial: samsung: enable usage for 64-bit Exynos
+ platforms
+In-Reply-To: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
+References: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1410535592-5782-9-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 11:45:13AM +0100, Will Deacon wrote:
-> On Thu, Sep 11, 2014 at 10:36:48AM +0100, Daniel Borkmann wrote:
-> > On ARM64, when the BPF JIT compiler fills the JIT image body with
-> > opcodes during translation of eBPF into ARM64 opcodes, we may fail
-> > for several reasons during that phase: one being that we jump to
-> > the notyet label for not yet supported eBPF instructions such as
-> > BPF_ST. In that case we only free offsets, but not the actual
-> > allocated target image where opcodes are being stored. Fix it by
-> > calling module_free() on dismantle time in case of errors.
-> > 
-> > Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
-> > Cc: Zi Shen Lim <zlim.lnx@gmail.com>
-> > Cc: Alexei Starovoitov <ast@plumgrid.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  [ Compile-tested only. ]
-> > 
-> >  arch/arm64/net/bpf_jit_comp.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> > index 38c4296..7ae3354 100644
-> > --- a/arch/arm64/net/bpf_jit_comp.c
-> > +++ b/arch/arm64/net/bpf_jit_comp.c
-> > @@ -651,8 +651,10 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
-> >  	build_prologue(&ctx);
-> >  
-> >  	ctx.body_offset = ctx.idx;
-> > -	if (build_body(&ctx))
-> > +	if (build_body(&ctx)) {
-> > +		module_free(NULL, ctx.image);
-> >  		goto out;
-> > +	}
-> >  
-> 
-> Looks good to me:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Catalin, can you apply this on the for-next/core branch, please?
+Allow Samsung serial driver to be usable on Exynos 64-bit SoC based
+platforms.
 
-Applied, thanks.
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/tty/serial/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 26cec64..3383744 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -220,7 +220,7 @@ config SERIAL_CLPS711X_CONSOLE
+ 
+ config SERIAL_SAMSUNG
+ 	tristate "Samsung SoC serial support"
+-	depends on PLAT_SAMSUNG
++	depends on PLAT_SAMSUNG || ARCH_EXYNOS
+ 	select SERIAL_CORE
+ 	help
+ 	  Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
 -- 
-Catalin
+1.7.9.5
