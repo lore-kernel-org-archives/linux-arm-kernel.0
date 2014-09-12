@@ -1,29 +1,91 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 12 Sep 2014 14:15:10 +0200
-Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
-In-Reply-To: <1921859.32moD2F04k@fb07-iapwap2>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
- <7627175.tG5quZH0VN@fb07-iapwap2> <20140912095821.GB1930@katana>
- <1921859.32moD2F04k@fb07-iapwap2>
-Message-ID: <20140912121510.GD1930@katana>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Sep 2014 13:14:51 +0100
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <5412DC48.7030708@codeaurora.org>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com>	<5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+ <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
+Message-ID: <5412E3BB.9030800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christopher,
 
-> > Am I missing something? Board properties can be encoded within the
-> > compatible entries ("ax100-ec", "ax200-ec"...). I'd think this means
-> > mostly different protocols, though.
+On 12/09/14 12:43, Christopher Covington wrote:
+> Hi Marc,
 > 
-> well, ac100 is the name of the board and nvec is the name of the protocol. 
+> On 09/11/2014 01:43 PM, Marc Zyngier wrote:
+>> On 11/09/14 18:29, Doug Anderson wrote:
+>>> Marc,
+>>>
+>>> On Thu, Sep 11, 2014 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> We would need to run this code potentially at processor bringup and
+>>>>> after suspend/resume, but that seems possible too.
+>>>>
+>>>> Note that this would be an ARMv7 only thing (you can't do that on ARMv8,
+>>>> at all).
+>>>
+>>> Yes, of course.
+>>>
+>>>
+>>>>> Is the transition to monitor mode and back simple?  Where would you
+>>>>> suggest putting this code?  It would definitely need to be pretty
+>>>>> early.  We'd also need to be able to detect that we're in Secure SVC
+>>>>> and not mess up anyone else who happened to boot in Non Secure SVC.
+>>>>
+>>>> This would have to live in some very early platform-specific code. The
+>>>> ugly part is that you cannot find out what world you're in (accessing
+>>>> SCR is going to send you to UNDEF-land if accessed from NS).
+>>>
+>>> Yup, so the question is: would such code be accepted upstream, or are
+>>> we going to embark on a big job for someone to figure out how to do
+>>> this only to get NAKed?
+>>>
+>>> If there was some indication that folks would take this, I think we
+>>> might be able to get it coded up.  If someone else wanted to volunteer
+>>> to code it that would make me even happier, but maybe that's pushing
+>>> my luck.  ;)
+>>
+>> Writing the code is a 5 minute job. Getting it accepted is another
+>> story, and I'm not sure everyone would agree on that.
+>>
+>>>> If I was suicidal, I'd suggest you could pass a parameter to the command
+>>>> line, interpreted by the timer code... But I since I'm not, let's
+>>>> pretend I haven't said anything... ;-)
+>>>
+>>> I did this in the past (again, see Sonny's thread), but didn't
+>>> consider myself knowledgeable to know if that was truly a good test:
+>>>
+>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>>>        pr_info("DOUG: val is %#010x", val);
+>>>        val |= (1 << 2);
+>>>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
+>>>        val = 0xffffffff;
+>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>>>        pr_info("DOUG: val is %#010x", val);
+>>>
+>>> The idea being that if you can make modifications to the SCR register
+>>> (and see your changes take effect) then you must be in secure mode.
+>>> In my case the first printout was 0x0 and the second was 0x4.
+>>
+>> The main issue is when you're *not* in secure mode. It is likely that
+>> this will explode badly. This is why I suggested something that is set
+>> by the bootloader (after all. it knows which mode it is booted in), and
+>> that the timer driver can use when the CPU comes up.
+> 
+> What exactly does "exploding badly" look like? Causing and undefined
+> instruction exception? That's just a branch with a mode switch. Any reason the
+> code couldn't deal with that or even use that to its advantage?
 
-Yes, the driver could be named nvec, yet the compatible-strings should
-be similar to above. From that, the driver can deduce the protocol
-variant and possible initial settings.
+We surely can handle the UNDEF and do something there. We just can't do
+it the way Doug described it above.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/28755602/attachment-0001.sig>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
