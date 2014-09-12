@@ -1,41 +1,30 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Fri, 12 Sep 2014 17:10:32 -0400
-Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
-In-Reply-To: <20140912200355.GD9234@xora-haswell.xora.org.uk>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
- <54134CE8.8070506@redhat.com>
- <20140912200355.GD9234@xora-haswell.xora.org.uk>
-Message-ID: <54136148.40106@redhat.com>
+Date: Fri, 12 Sep 2014 17:30:01 -0400
+Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
+In-Reply-To: <20140911141508.GK6158@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
+ <540E80BD.20801@redhat.com> <540E88A2.1000606@linaro.org>
+ <540E93A0.4040306@redhat.com> <540F2422.90105@linaro.org>
+ <540F24FF.2060302@redhat.com> <20140911141508.GK6158@arm.com>
+Message-ID: <541365D9.4050908@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2014 04:03 PM, Graeme Gregory wrote:
-> On Fri, Sep 12, 2014 at 03:43:36PM -0400, Jon Masters wrote:
->> On 09/12/2014 10:00 AM, Hanjun Guo wrote:
->>> From: Graeme Gregory <graeme.gregory@linaro.org>
->>>
->>> ACPI 5.1 does not currently support S states for ARM64 hardware but
->>> ACPI code will call acpi_target_system_state() for device power
->>> managment, so introduce sleep-arm.c to allow other drivers to function
->>> until S states are defined.
+On 09/11/2014 10:15 AM, Will Deacon wrote:
+> On Tue, Sep 09, 2014 at 05:04:15PM +0100, Jon Masters wrote:
+>> On 09/09/2014 12:00 PM, Hanjun Guo wrote:
+>>> No, you didn't miss it, I'm still working on the new version, sorry I didn't
+>>> clarify that in my previous email.
 >>
->> Aside: ACPI5.1 does define the Platform Communication Channel and CPC
->> (Collaborative Processor Performance Control). Some details need to be
->> fleshed out there for practical 64-bit ARMv8 server systems, but the
->> underpinnings and mechanisms are in place in the 5.1 specification that
->> can be built upon over time to achieve practical S-State equivalence.
-                                                    ^ meant C/P sorry
+>> Thanks. If you could copy me on the next posting that would rock. In a
+>> few hours we should have another platform posted as an example. In
+>> addition, a couple of lower priority patches (building upon the core
+>> ACPI pieces) should be posted as well.
+> 
+> Can I breath out yet or did I miss the platform posting?
 
-> Disagree, S-States are about going to sleep or hibernating, that is
-> nothing to do with CPU Performance.
-
-Correct. In replying to the above, I was thinking about power and
-performance management of components  - CPU (C/P), and device (D)
-specific power/performance states - not the overall system (S) state,
-and I went off on a tangent. That was off-topic. For the actual topic at
-hand, that of global sleep, you are correct that only G0 (S0) and S5 are
-really defined today. Though I do think that the PCC might be used to
-actually implement overall system sleep state transitions later.
+There's a posting for AMD Seattle coming soon as an example. Also, there
+should be some hardware at Connect on which patches can run.
 
 Jon.
