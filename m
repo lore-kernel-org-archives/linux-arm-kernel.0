@@ -1,46 +1,112 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 12 Sep 2014 14:57:04 +0530
-Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
-In-Reply-To: <54122962.5020903@gmail.com>
-References: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
- <54122962.5020903@gmail.com>
-Message-ID: <000e01cfce6b$bf538ca0$3dfaa5e0$@samsung.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 12 Sep 2014 10:30:18 +0100
+Subject: [PATCH v10 00/10] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <5412ADE9.2050708@amd.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <5412ADE9.2050708@amd.com>
+Message-ID: <20140912093018.GX27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-> -----Original Message-----
-> From: Tomasz Figa [mailto:tomasz.figa at gmail.com]
-> Sent: Friday, September 12, 2014 4:30 AM
-> To: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; linux-kernel at vger.kernel.org
-> Cc: kgene.kim at samsung.com; s.nawrocki at samsung.com; mturquette at linaro.org;
-> Chander Kashyap; Abhilash Kesavan
-> Subject: Re: [PATCH] clk: samsung: exynos5260: fix typo in clock name
-> 
-> Hi Pankaj,
-> 
-> On 10.09.2014 07:56, Pankaj Dubey wrote:
-> > From: Chander Kashyap <k.chander@samsung.com>
+On Fri, Sep 12, 2014 at 09:25:13AM +0100, Suravee Suthikulpanit wrote:
+> On 9/8/2014 8:54 AM, Liviu Dudau wrote:
+> > This is my version 10 of the attempt at adding support for generic PCI host
+> > bridge controllers that make use of device tree information to
+> > configure themselves. This version reverses v9's attempt to create one function
+> > to drive the whole process of extracting the host bridge ranges, setup the
+> > host bridge driver and then scan the root bus behind the host bridge. While it
+> > would've been quite user friendly, I agree that it would've caused a lot of pain
+> > in the future.
 > >
-> > The parent name added in parent list as
-> > mout_phyclk_mipi_dphy_4l_m_txbyte_clkhs_p, is different than the
-> > defined parent due to typo.
+> > I would like to get ACKs for the remaining patches as I would like to integrate
+> > this into -next in the following week.
 > >
-> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> > Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> > This version marks an implementation break with the previous versions as
+> > of_create_pci_host_bridge() is now gone. It gets replaced by
+> > of_pci_get_host_bridge_resources() that only parses the DT and extracts the
+> > relevant ranges and converts them to resources. The updated host bridge drivers
+> > will have to follow the guidelines in this example code:
+> >
+> > static int foohb_probe(struct platform_device *pdev)
+> > {
+> > 	struct device_node *dn = pdev->dev.of_node;
+> > 	struct foohb_drv *drv;
+> > 	resource_size_t io_base = 0;  /* phys address for start of IO */
+> > 	struct pci_bus *bus;
+> > 	int err = 0;
+> > 	LIST_HEAD(res);
+> >
+> > 	.....
+> > 	err = of_pci_get_host_bridge_resources(dn, 0, 255, &res, &io_base);
+> > 	if (err)
+> > 		goto err_handling;
+> > 	err = foohb_setup(drv, ...., &res, &io_base);
+> > 	if (err)
+> > 		goto err_handling;
 
-Please add my sign-off as 
-
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Hi Suravee,
 
 > 
-> Missed your sign-off? You can reply with it inline and I will add it when
-applying this
-> weekend.
+> My understanding is that the "foohb_setup" above is supposed to be equivalent
+> to the "int (*setup)(struct pci_host_bridge *, resource_size_t)" in V9 that was
+> passed in as an argument of "of_create_pci_hot_bridge()".
+
+Correct. Parameters are probably different, but it is internal to your driver so
+you can do whatever you want there.
+
 > 
-> P.S. Please keep me on CC when sending patches for Samsung clock drivers.
+> The problem I have is I need an intermediate step between "pci_create_root_bus()"
+> and "pci_scan_child_bus()" in order to update the information such as the "pci_bus->msi"
+> before this is propagate down to the child bus during the "pci_scan_child_bus"
+> which is also called in the pci_scan_root_bus() function.
+
+How did that work with my v9 patchset? How does it work for other MSI-aware platforms?
+Are they not using pci_scan_child_bus()?
+
 > 
-> Best regards,
-> Tomasz
+> Does this mean that I should not be calling the pci_scan_root_bus(), and tries to
+> re-implement the same logic in my driver?
+
+Bjorn can comment here, but there seems to be a long standing desire to make
+pci_scan_root_bus() more useful. If your change is generic enough, how about proposing
+a patch for pci_scan_root_bus() and see what feedback you get.
+
+Judging by the complete silence I'm getting on my change (patch 9/10) of the same function,
+we might be lucky enough and no one will notice ;) (Bjorn, I'm kidding and I know you
+are busy).
+
+Best regards,
+Liviu
+
+> 
+> Thanks,
+> 
+> Suravee
+> 
+> > 	.....
+> > 	pci_add_flags(....);
+> > 	bus = pci_scan_root_bus(&pdev->dev, 0, &foohb_ops, drv, &res);
+> > 	if (!bus)
+> > 		goto err_handling;
+> > 	....
+> > 	return 0;
+> >
+> > err_handling:
+> > 	......
+> > 	return err;
+> > }
+> >
+> 
+> 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
