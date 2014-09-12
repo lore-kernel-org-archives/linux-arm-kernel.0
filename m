@@ -1,29 +1,62 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 12 Sep 2014 20:26:01 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAyLzRdIEFSTTogZHRzOiBwYmFiMDE6IGVuYWJsZSBJ?=
- =?UTF-8?B?MlMgYXVkaW8gb24gcGh5RkxFWC1pLk1YNiBib2FyZHM=?=
-In-Reply-To: <1410537872-17274-3-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410537872-17274-3-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1410539161.314611261@f174.i.mail.ru>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Fri, 12 Sep 2014 17:32:54 +0100
+Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
+In-Reply-To: <20140912154903.GE5532@arm.com>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
+ <20140912145102.GB5532@arm.com>
+ <20140912151850.GB9234@xora-haswell.xora.org.uk>
+ <20140912154903.GE5532@arm.com>
+Message-ID: <20140912163254.GC9234@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fri, 12 Sep 2014 19:04:30 +0300 ?? Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>:
-> Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
-> over SSI interface.
+On Fri, Sep 12, 2014 at 04:49:03PM +0100, Catalin Marinas wrote:
+> On Fri, Sep 12, 2014 at 04:18:51PM +0100, Graeme Gregory wrote:
+> > On Fri, Sep 12, 2014 at 03:51:02PM +0100, Catalin Marinas wrote:
+> > > On Fri, Sep 12, 2014 at 03:00:03PM +0100, Hanjun Guo wrote:
+> > > > --- a/drivers/acpi/Makefile
+> > > > +++ b/drivers/acpi/Makefile
+> > > > @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
+> > > >  
+> > > >  # Power management related files
+> > > >  acpi-y				+= wakeup.o
+> > > > +ifeq ($(ARCH), arm64)
+> > > > +acpi-y				+= sleep-arm.o
+> > > > +else # X86, IA64
+> > > >  acpi-y				+= sleep.o
+> > > > +endif
+> > > >  acpi-y				+= device_pm.o
+> > > >  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
+> > > 
+> > > What about:
+> > > 
+> > > -acpi-y				+= sleep.o
+> > > +acpi-$(CONFIG_ACPI_SLEEP)	+= sleep.o
+> > > 
+> > > and make CONFIG_ACPI_SLEEP depend on !ARM64? Does the kernel compile if
+> > > you disable CONFIG_ACPI_SLEEP?
+> > 
+> > sleep.c is still needed in the case CONFIG_ACPI_SLEEP=n
+> > 
+> > basically the two functions I stubbed are always called by bus.c
 > 
-> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
-> ---
-...
-> +&ssi2 {
-> +	fsl,mode = "i2s-slave";
-> +	status = "okay";
-> +	#sound-dai-cells = <0>;
-> +};
+> So the two functions are:
+> 
+> acpi_target_system_state() - already defined in acpi_bus.h when
+> CONFIG_ACPI_SLEEP is off.
+> 
+> acpi_sleep_init() - this one doesn't have a dummy implementation for
+> !ACPI_SLEEP.
+> 
+> Now, for x86, do we need acpi_sleep_init() when CONFIG_ACPI_SLEEP is
+> off? If not, we could simply add a dummy acpi_sleep_init() function when
+> !ACPI_SLEEP and don't enable the config option for arm64.
+> 
+It looks to me that it still does processing for the S5 state which is
+soft off.
 
-I have already sent patch to add "#sound-dai-cells" into all i.MX DT-files.
-Shawn, can you point us to this tree/commit?
+It sets up the operations to be called when entering this state and also
+sets up a notifier.
 
----
+Graeme
