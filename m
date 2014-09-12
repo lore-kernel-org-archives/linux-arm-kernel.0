@@ -1,94 +1,75 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 12 Sep 2014 09:59:10 +0000
-Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
- LS1021A
-In-Reply-To: <20140911111202.GA4958@pengutronix.de>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <62651744.c71MLsL3Q5@wuerfel>
- <cd69af536cd248b8add94a468fa97095@BL2PR03MB467.namprd03.prod.outlook.com>
- <2944183.HzFlEzpKtu@wuerfel> <20140911111202.GA4958@pengutronix.de>
-Message-ID: <de5dbb877d09447498c8c3cabce67f7e@BL2PR03MB467.namprd03.prod.outlook.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Fri, 12 Sep 2014 05:00:49 -0500
+Subject: [PATCH v10 00/10] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <20140912093018.GX27864@e106497-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <5412ADE9.2050708@amd.com>
+ <20140912093018.GX27864@e106497-lin.cambridge.arm.com>
+Message-ID: <5412C451.609@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
->-----Original Message-----
->From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
->Sent: Thursday, September 11, 2014 7:12 PM
->To: Arnd Bergmann
->Cc: Lu Jingchang-B35083; linux-arm-kernel at lists.infradead.org; Guo Shawn-
->R65073; devicetree at vger.kernel.org; Zhao Chenhui-B35336; Fu Chao-B44548;
->Leekha Shaveta-B20052; Gupta Suresh-B42813; Sharma Bhupesh-B45370; Xiubo
->Li-B47053; Gupta Ruchika-R66431; Badola Nikhil-B46172
->Subject: Re: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
->LS1021A
+On 9/12/2014 4:30 AM, Liviu Dudau wrote:
+> On Fri, Sep 12, 2014 at 09:25:13AM +0100, Suravee Suthikulpanit wrote:
+>> On 9/8/2014 8:54 AM, Liviu Dudau wrote:
+>>> This is my version 10 of the attempt at adding support for generic PCI host
+>>> bridge controllers that make use of device tree information to
+>>> configure themselves. This version reverses v9's attempt to create one function
+>>> to drive the whole process of extracting the host bridge ranges, setup the
+>>> host bridge driver and then scan the root bus behind the host bridge. While it
+>>> would've been quite user friendly, I agree that it would've caused a lot of pain
+>>> in the future.
+>>>
+>>> I would like to get ACKs for the remaining patches as I would like to integrate
+>>> this into -next in the following week.
+>>>
+>>> This version marks an implementation break with the previous versions as
+>>> of_create_pci_host_bridge() is now gone. It gets replaced by
+>>> of_pci_get_host_bridge_resources() that only parses the DT and extracts the
+>>> relevant ranges and converts them to resources. The updated host bridge drivers
+>>> will have to follow the guidelines in this example code:
+>>>
+>>> static int foohb_probe(struct platform_device *pdev)
+>>> {
+>>> 	struct device_node *dn = pdev->dev.of_node;
+>>> 	struct foohb_drv *drv;
+>>> 	resource_size_t io_base = 0;  /* phys address for start of IO */
+>>> 	struct pci_bus *bus;
+>>> 	int err = 0;
+>>> 	LIST_HEAD(res);
+>>>
+>>> 	.....
+>>> 	err = of_pci_get_host_bridge_resources(dn, 0, 255, &res, &io_base);
+>>> 	if (err)
+>>> 		goto err_handling;
+>>> 	err = foohb_setup(drv, ...., &res, &io_base);
+>>> 	if (err)
+>>> 		goto err_handling;
 >
->On Thu, Sep 11, 2014 at 12:36:50PM +0200, Arnd Bergmann wrote:
->> On Thursday 11 September 2014 08:21:58 Jingchang Lu wrote:
->> > >One more thing: these should all go into the board specific files.
->> > >
->> > >The installed memory is almost always a property of the board, not
->> > >the SoC, and a lot of boards only connect a subset of the serial
->> > >ports, or they may have them in a different order.
->> > >
->> > >In particular, you only provide aliases for the six out of the ten
->> > >available uarts, which seems arbitrary.
->> > >
->> >
->> > The memory size info will be fixed up in u-boot before booting the
->> > kernel image, so I add the memory node in the SoC level device tree
->and keep only one copy.
+> Hi Suravee,
+>
 >>
->> Right. I wonder if it would make sense to just leave a placeholder in
->> there that does not look like a plausible memory size.
+>> My understanding is that the "foohb_setup" above is supposed to be equivalent
+>> to the "int (*setup)(struct pci_host_bridge *, resource_size_t)" in V9 that was
+>> passed in as an argument of "of_create_pci_hot_bridge()".
 >
->The placeholder is already in skeleton.dtsi, no need to add it at SoC
->level.
-Thanks, I will remove the node in the SoC dtsi and use just that in
-the skeleton64.dtsi instead.
+> Correct. Parameters are probably different, but it is internal to your driver so
+> you can do whatever you want there.
+>
+>>
+>> The problem I have is I need an intermediate step between "pci_create_root_bus()"
+>> and "pci_scan_child_bus()" in order to update the information such as the "pci_bus->msi"
+>> before this is propagate down to the child bus during the "pci_scan_child_bus"
+>> which is also called in the pci_scan_root_bus() function.
+>
+> How did that work with my v9 patchset? How does it work for other MSI-aware platforms?
+> Are they not using pci_scan_child_bus()?
 
->
->> I believe the common case today
->> is that we actually want to have the correct memory size in the
->> board-level dts file because the boot loader does not change that
->> value. If your boot loader does it, we probably don't want any default
->> that may confuse users at all, in particular in the per-soc file.
->>
->> > The lpuart derives the line number from the node's alias id, 8250
->> > serial driver doesn't rely on it, so only aliases for the lpuart are
->added, not arbitrary.
->>
->> This is really bad though, for two reasons:
->>
->> a) you are relying on current behavior of two kernel drivers that we
->> may want to change in the future. Unfortunately the two drivers don't
->> do this consistently today, but that's something we should fix in the
->> kernel, not work around in the hardware description.
->>
->> b) for the lpuart case, you put a fixed device order in the
->> soc-specific file, without any guarantee that the board uses just the
->> first x devices rather than another random subset. The alias values
->> are really meant to to correspond to how the machine calls things, not
->how the SoC sees it.
->
->All i.MX SoCs have the aliases defined how the SoC sees the devices and
->i.MX is not alone here.
->
->I know that some people rather like to see the aliases correspond to the
->numbers printed on the case or PCB, thus dropping the aliases from the SoC
->dtsi and putting them into the board dts instead.
->
->I think both the UART number from the datasheet and the number printed on
->the case are valuable informations, we should come up with a way to
->express both informations instead of argueing about the meaning of the
->'serialx' alias. This shouldn't even be too hard, we could create multiple
->aliases for the same device and let udev create links for all of them.
->
->Sascha
+In the of_create_pci_host_bridge of V9, you call the setup function between "pci_create_root_bus()"
+and "pci_scan_child_bus()". At that point, I can update the "root_bus->msi" to point to my
+"struct msi_chip" which was created during GICv2m initialization
+(Please see http://marc.info/?l=linux-kernel&m=141034053331632&w=2).
+Then, when a child bus is created, it propagate this msi_chip pointer from the parent bus.
 
-Then I will keep the only alias for the lpuart to make them working well currently.
-Thanks.
-
-Best Regards,
-Jingchang
+Suravee
