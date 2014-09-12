@@ -1,55 +1,129 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 13 Sep 2014 00:30:23 +0200
-Subject: [PATCH v2 0/7] ARM: Rockchip: add cpuclk handling - clock-tree part
-Message-ID: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+Date: Sat, 13 Sep 2014 00:30:27 +0200
+Subject: [PATCH v2 4/7] clk: rockchip: make tightly bound armclk child-clocks
+ read-only
+In-Reply-To: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+Message-ID: <1410561030-19127-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements cpu frequency-scaling for Rockchip SoCs.
-The whole handling of the armclk frequency changes and therefore
-the implementention is very similar to the recent series for
-Samsung SoCs from Thomas Abraham.
+Rockchip SoCs contain clocks tightly bound to the armclk, where the best
+rate / divider is supplied by the vendor after careful measuring.
+Often this ideal rate may be greater than the current rate.
 
-Tested on a
-- rk3066 Marsboard
-- rk3188 Radxa Rock
-- rk3288 Evaluation board
+Therefore prevent the ccf from trying to set these dividers itself by
+setting them to read-only.
 
-This is the part that would go through the clock tree and the patches
-are build against current clk-next.
+In the case of the rk3066, this also includes the aclk_cpu, which makes it
+necessary to also split its direct child-clocks (pclk_cpu, hclk_cpu, ...)
+into individual definitions for rk3066 and rk3188.
 
-On the arm-soc side we would need the ARMCLK id in an exported branch
-from the clk tree so that the devicetree changes can use this new id.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/rockchip/clk-rk3188.c | 26 ++++++++++++++++++--------
+ drivers/clk/rockchip/clk-rk3288.c | 18 +++++++++---------
+ 2 files changed, 27 insertions(+), 17 deletions(-)
 
-The series also is split, as clk-next and the arm-soc parts have diverged
-so much, that it's not possible to create one series against one tree
-and stay sane.
-
-changes since v1:
-- address comments received concerning smaller issues
-- split series into two, one for clk-next and one for arm-soc
-
-Heiko Stuebner (6):
-  clk: rockchip: fix rk3066 pll status register location
-  clk: rockchip: reparent aclk_cpu_pre to the gpll
-  clk: rockchip: make tightly bound armclk child-clocks read-only
-  clk: rockchip: add new clock-type for the cpuclk
-  clk: rockchip: add binding id for ARMCLK
-  clk: rockchip: switch to using the new cpuclk type for armclk
-
-Jianqun (1):
-  clk: rockchip: fix rk3288 pll status register location
-
- drivers/clk/rockchip/Makefile                 |   1 +
- drivers/clk/rockchip/clk-cpu.c                | 316 ++++++++++++++++++++++++++
- drivers/clk/rockchip/clk-rk3188.c             | 161 +++++++++++--
- drivers/clk/rockchip/clk-rk3288.c             |  93 ++++++--
- drivers/clk/rockchip/clk.c                    |  20 ++
- drivers/clk/rockchip/clk.h                    |  36 +++
- include/dt-bindings/clock/rk3188-cru-common.h |   1 +
- include/dt-bindings/clock/rk3288-cru.h        |   1 +
- 8 files changed, 601 insertions(+), 28 deletions(-)
- create mode 100644 drivers/clk/rockchip/clk-cpu.c
-
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index 6a81bc9..adfbfef 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -174,17 +174,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+ 	GATE(0, "aclk_cpu", "aclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 3, GFLAGS),
+ 
+-	DIV(0, "pclk_cpu_pre", "aclk_cpu_pre", 0,
+-			RK2928_CLKSEL_CON(1), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
+ 	GATE(0, "atclk_cpu", "pclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 6, GFLAGS),
+ 	GATE(0, "pclk_cpu", "pclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 5, GFLAGS),
+-	DIV(0, "hclk_cpu_pre", "aclk_cpu_pre", 0,
+-			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
+-	COMPOSITE_NOMUX(0, "hclk_ahb2apb", "hclk_cpu_pre", 0,
+-			RK2928_CLKSEL_CON(1), 14, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
+-			RK2928_CLKGATE_CON(4), 9, GFLAGS),
+ 	GATE(0, "hclk_cpu", "hclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 4, GFLAGS),
+ 
+@@ -416,7 +409,17 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
+ 	COMPOSITE_NOGATE(0, "armclk", mux_armclk_p, 0,
+ 			RK2928_CLKSEL_CON(0), 8, 1, MFLAGS, 0, 5, DFLAGS),
+ 	DIVTBL(0, "aclk_cpu_pre", "armclk", 0,
+-			RK2928_CLKSEL_CON(1), 0, 3, DFLAGS, div_aclk_cpu_t),
++			RK2928_CLKSEL_CON(1), 0, 3, DFLAGS | CLK_DIVIDER_READ_ONLY, div_aclk_cpu_t),
++	DIV(0, "pclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO
++							    | CLK_DIVIDER_READ_ONLY),
++	DIV(0, "hclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO
++							   | CLK_DIVIDER_READ_ONLY),
++	COMPOSITE_NOMUX(0, "hclk_ahb2apb", "hclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 14, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO
++							    | CLK_DIVIDER_READ_ONLY,
++			RK2928_CLKGATE_CON(4), 9, GFLAGS),
+ 
+ 	GATE(CORE_L2C, "core_l2c", "aclk_cpu", 0,
+ 			RK2928_CLKGATE_CON(9), 4, GFLAGS),
+@@ -534,6 +537,13 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
+ 	/* do not source aclk_cpu_pre from the apll, to keep complexity down */
+ 	COMPOSITE_NOGATE(0, "aclk_cpu_pre", mux_aclk_cpu_p, CLK_SET_RATE_NO_REPARENT,
+ 			RK2928_CLKSEL_CON(0), 5, 1, MFLAGS, 0, 5, DFLAGS),
++	DIV(0, "pclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
++	DIV(0, "hclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
++	COMPOSITE_NOMUX(0, "hclk_ahb2apb", "hclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 14, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
++			RK2928_CLKGATE_CON(4), 9, GFLAGS),
+ 
+ 	GATE(CORE_L2C, "core_l2c", "armclk", 0,
+ 			RK2928_CLKGATE_CON(9), 4, GFLAGS),
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index b023425..2b23719 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -170,31 +170,31 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKSEL_CON(0), 15, 1, MFLAGS, 8, 5, DFLAGS),
+ 
+ 	COMPOSITE_NOMUX(0, "armcore0", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 0, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 0, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 0, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "armcore1", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 4, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 4, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 1, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "armcore2", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 8, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 8, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 2, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "armcore3", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 12, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 12, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 3, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "l2ram", "armclk", 0,
+-			RK3288_CLKSEL_CON(37), 0, 3, DFLAGS,
++			RK3288_CLKSEL_CON(37), 0, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 4, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "aclk_core_m0", "armclk", 0,
+-			RK3288_CLKSEL_CON(0), 0, 4, DFLAGS,
++			RK3288_CLKSEL_CON(0), 0, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 5, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "aclk_core_mp", "armclk", 0,
+-			RK3288_CLKSEL_CON(0), 4, 4, DFLAGS,
++			RK3288_CLKSEL_CON(0), 4, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 6, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "atclk", "armclk", 0,
+-			RK3288_CLKSEL_CON(37), 4, 5, DFLAGS,
++			RK3288_CLKSEL_CON(37), 4, 5, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 7, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "pclk_dbg_pre", "armclk", 0,
+-			RK3288_CLKSEL_CON(37), 9, 5, DFLAGS,
++			RK3288_CLKSEL_CON(37), 9, 5, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 8, GFLAGS),
+ 	GATE(0, "pclk_dbg", "pclk_dbg_pre", 0,
+ 			RK3288_CLKGATE_CON(12), 9, GFLAGS),
 -- 
 2.0.1
