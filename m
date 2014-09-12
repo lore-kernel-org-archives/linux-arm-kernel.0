@@ -1,42 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Sep 2014 10:55:19 +0200
-Subject: [PATCH 3/7 v6] power: reset: driver for the Versatile syscon
- reboot
-In-Reply-To: <1410176286-32533-4-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 12 Sep 2014 10:56:52 +0200
+Subject: [PATCH 1/7 v6] leds: add a driver for syscon-based LEDs
+In-Reply-To: <1410176286-32533-2-git-send-email-linus.walleij@linaro.org>
 References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
- <1410176286-32533-4-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdbE8z3N_7FQzooVsd=UvUeoRhPqO5=foTGn7U=ag0ML9g@mail.gmail.com>
+ <1410176286-32533-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdaZhzaA4RxO7fsUSzxquqF4M0g3WXHXPeG5YyF9HttdHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Sep 8, 2014 at 1:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> This driver enabled us to drive the reboot of the Versatile family
-> of ARM reference boards. Even though only the RealView boards are
-> supported initially, these boards all have the same procedure for
-> reboot:
+> This makes it possible to create a set of LEDs from a syscon
+> MFD instance, which is lean mean and clean on the ARM
+> reference designs and can replace the Versatile LEDs driver
+> in the long run, as well as other custom syscon LEDs drivers.
 >
-> - Write a magic value into an unlocking register
-> - Write another magic value into a reset control register
->
-> The driver will be reusable for Versatile and possibly also the
-> Integrator family of reference boards.
->
-> Cc: Sebastian Reichel <sre@kernel.org>
-> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bryan Wu <cooloney@gmail.com>
+> Cc: Richard Purdie <rpurdie@rpsys.net>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
 > ChangeLog v1->v2:
-> - Do not probe from a platform device, instead use a device_initcall()
->   and look up the syscon device from its node. If that device is
->   not yet registered, the call will be deferred. This is done so that
->   the Linux driver model is not reflected into the device tree, as
->   the reboot property of the syscon is not a separate device.
+> - Augment driver to probe all nodes of a syscon to see if they
+>   are "register-bit-led"s, and then allocate them under the syscon
+>   if that is the case.
+> - Switch compatible string from "syscon-leds" to "register-bit-led"
 
-Can any of the power maintainers please ACK this patch if it
-looks OK, so it can be pulled in through ARM SoC?
+Bryan can you please ACK this patch if you're OK with it so
+it can be pulled in through ARM SoC?
 
 Yours,
 Linus Walleij
