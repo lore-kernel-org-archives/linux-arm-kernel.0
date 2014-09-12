@@ -1,110 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 12 Sep 2014 11:07:46 +0200
-Subject: [PATCHv3] mtd: nand: atmel_nand: retrieve NFC clock
-Message-ID: <1410512866-24546-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Fri, 12 Sep 2014 17:10:55 +0800
+Subject: [PATCH 1/2] ASoC: rockchip-max98090: add documentation for
+ rockchip-max98090 driver
+In-Reply-To: <1410507036-15442-1-git-send-email-jay.xu@rock-chips.com>
+References: <1410507036-15442-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1410513055-17775-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Add documentation for rockchip-max98090 driver, which is need by rockchip
+board using a max98090.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 ---
+changes since v1:
+- modify error text from "Tegra" to "rockchip"
 
-Changes in v3:
- - changed the warning message to ask to update the DT
- - made the clocks property mandatory in the documentation
- - Stop claiming the NFC is probed if there is an issue when enabling the clock
+ .../sound/rockchip,rockchip-audio-max98090.txt     | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
 
- .../devicetree/bindings/mtd/atmel-nand.txt         |  2 ++
- drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index c4728839d0c1..cb6cd4f8ae7a 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -36,6 +36,7 @@ Optional properties:
-     - reg : should specify the address and size used for NFC command registers,
-             NFC registers and NFC Sram. NFC Sram address and size can be absent
-             if don't want to use it.
-+    - clocks: phandle to the peripheral clock
-   - Optional properties:
-     - atmel,write-by-sram: boolean to enable NFC write by sram.
- 
-@@ -98,6 +99,7 @@ nand0: nand at 40000000 {
- 		compatible = "atmel,sama5d3-nfc";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		clocks = <&&hsmc_clk>
- 		reg = <
- 			0x70000000 0x10000000	/* NFC Command Registers */
- 			0xffffc000 0x00000070	/* NFC HSMC regs */
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 9c5f717bda54..d1e502f8dbd0 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -27,6 +27,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-@@ -96,6 +97,8 @@ struct atmel_nfc {
- 	bool			use_nfc_sram;
- 	bool			write_by_sram;
- 
-+	struct clk		*clk;
+diff --git a/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
+new file mode 100644
+index 0000000..e12d1a0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
+@@ -0,0 +1,23 @@
++ROCKCHIP audio complex, with MAX98090 CODEC
 +
- 	bool			is_initialized;
- 	struct completion	comp_ready;
- 	struct completion	comp_cmd_done;
-@@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- {
- 	struct atmel_nfc *nfc = &nand_nfc;
- 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-+	int ret;
- 
- 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-@@ -2279,8 +2283,28 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
- 	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
- 
-+	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(nfc->clk)) {
-+		ret = clk_prepare_enable(nfc->clk);
-+		if (ret)
-+			return ret;
-+	} else {
-+		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
-+	}
++Required properties:
++- compatible : must be "rockchip,rockchip-audio-max98090"
++- rockchip,model : the user-visible name of this sound complex
++- rockchip,i2s-controller : The phandle of the rockchip I2S controller
++  that's connected to the CODEC.
++- rockchip,audio-codec : The phandle of the MAX98090 audio codec.
 +
- 	nfc->is_initialized = true;
- 	dev_info(&pdev->dev, "NFC is probed.\n");
++Optional properties:
++- rockchip,hp-det-gpios : The GPIO that detect headphones are plugged in
++- rockchip,mic-det-gpios : The GPIO that detect micphones are plugged in
 +
-+	return 0;
-+}
++Example:
 +
-+static int atmel_nand_nfc_remove(struct platform_device *pdev)
-+{
-+	struct atmel_nfc *nfc = &nand_nfc;
-+
-+	if (!IS_ERR(nfc->clk))
-+		clk_disable_unprepare(nfc->clk);
-+
- 	return 0;
- }
- 
-@@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
- 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
- 	},
- 	.probe = atmel_nand_nfc_probe,
-+	.remove = atmel_nand_nfc_remove,
- };
- 
- static struct platform_driver atmel_nand_driver = {
++sound {
++	compatible = "rockchip,rockchip-audio-max98090";
++	rockchip,model = "ROCKCHIP-I2S";
++	rockchip,i2s-controller = <&i2s>;
++	rockchip,audio-codec = <&max98090>;
++	rockchip,hp-det-gpios = <&gpio6 5 GPIO_ACTIVE_HIGH>;
++	rockchip,mic-det-gpios = <&gpio6 11 GPIO_ACTIVE_HIGH>;
++};
 -- 
 1.9.1
