@@ -1,95 +1,28 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 12 Sep 2014 17:54:00 +0300
-Subject: [PATCH] spi: davinci: request cs_gpio's from probe
-Message-ID: <1410533640-21469-1-git-send-email-grygorii.strashko@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 12 Sep 2014 08:12:04 -0700
+Subject: [PATCH RESEND v9 1/5] rtc: max77686: Allow the max77686 rtc to
+ wakeup the system
+In-Reply-To: <1410509864-10019-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1410509864-10019-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410509864-10019-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=Vu3u=KfUNUpL6qcr0Fp42WbY8AqfOXyWr-D3KW1PucxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now CS GPIOs are requested from struct spi_master.setup() callback
-and that causes failures when Client SPI device is getting accessed
-through SPIDEV driver. The failure happens, because .setup() callback
-may be called many times from IOCTL handler and when it's called
-second time gpio_request() will fail and return -EBUSY.
+Hi,
 
-Hence, fix it by moving CS GPIOs requesting code in .probe().
+On Fri, Sep 12, 2014 at 1:17 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> From: Doug Anderson <dianders@chromium.org>
+>
+> The max77686 includes an RTC that keeps power during suspend.  It's
+> convenient to be able to use it as a wakeup source.
+>
+> NOTE: due to wakeup ordering problems this patch alone doesn't work so
+> well on exynos5250-snow.  You also need something that brings the i2c
+> bus up before the max77686 wakeup runs.
 
-Reported-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Tested using spidev_test utility.
+This note made sense when the patch was first submitted, but no longer
+does since the i2c change landed.  See:
 
- drivers/spi/spi-davinci.c | 34 +++++++++++++++++++++++++---------
- 1 file changed, 25 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 48f1d26..d493507 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -397,24 +397,21 @@ static int davinci_spi_setup(struct spi_device *spi)
- 	struct spi_master *master = spi->master;
- 	struct device_node *np = spi->dev.of_node;
- 	bool internal_cs = true;
--	unsigned long flags = GPIOF_DIR_OUT;
- 
- 	dspi = spi_master_get_devdata(spi->master);
- 	pdata = &dspi->pdata;
- 
--	flags |= (spi->mode & SPI_CS_HIGH) ? GPIOF_INIT_LOW : GPIOF_INIT_HIGH;
--
- 	if (!(spi->mode & SPI_NO_CS)) {
- 		if (np && (master->cs_gpios != NULL) && (spi->cs_gpio >= 0)) {
--			retval = gpio_request_one(spi->cs_gpio,
--						  flags, dev_name(&spi->dev));
-+			retval = gpio_direction_output(
-+				      spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
- 			internal_cs = false;
- 		} else if (pdata->chip_sel &&
- 			   spi->chip_select < pdata->num_chipselect &&
- 			   pdata->chip_sel[spi->chip_select] != SPI_INTERN_CS) {
- 			spi->cs_gpio = pdata->chip_sel[spi->chip_select];
--			retval = gpio_request_one(spi->cs_gpio,
--						  flags, dev_name(&spi->dev));
-+			retval = gpio_direction_output(
-+				      spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
- 			internal_cs = false;
- 		}
- 
-@@ -441,8 +438,6 @@ static int davinci_spi_setup(struct spi_device *spi)
- 
- static void davinci_spi_cleanup(struct spi_device *spi)
- {
--	if (spi->cs_gpio >= 0)
--		gpio_free(spi->cs_gpio);
- }
- 
- static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
-@@ -967,6 +962,27 @@ static int davinci_spi_probe(struct platform_device *pdev)
- 	if (dspi->version == SPI_VERSION_2)
- 		dspi->bitbang.flags |= SPI_READY;
- 
-+	if (pdev->dev.of_node) {
-+		int i;
-+
-+		for (i = 0; i < pdata->num_chipselect; i++) {
-+			int cs_gpio = of_get_named_gpio(pdev->dev.of_node,
-+							"cs-gpios", i);
-+
-+			if (cs_gpio == -EPROBE_DEFER) {
-+				ret = cs_gpio;
-+				goto free_clk;
-+			}
-+
-+			if (gpio_is_valid(cs_gpio)) {
-+				ret = devm_gpio_request(&pdev->dev, cs_gpio,
-+							dev_name(&pdev->dev));
-+				if (ret)
-+					goto free_clk;
-+			}
-+		}
-+	}
-+
- 	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
- 	if (r)
- 		dma_rx_chan = r->start;
--- 
-1.9.1
+b19c195 i2c: s3c2410: resume the I2C controller earlier
