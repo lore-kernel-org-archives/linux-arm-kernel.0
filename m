@@ -1,37 +1,22 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Sat, 13 Sep 2014 08:36:53 -0700
-Subject: [PATCH v4 1/1] iommu/arm-smmu: Do not access non-existing S2CR
- registers
-In-Reply-To: <20140828105552.GI22580@arm.com>
-References: <1408752752-15601-1-git-send-email-ohaugan@codeaurora.org>
- <20140826103730.GE23445@arm.com> <20140828105552.GI22580@arm.com>
-Message-ID: <54146495.8020609@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Sep 2014 14:57:38 +0100
+Subject: [PATCH] regmap:change struct regmap's internal locks as union
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103CDBFBFB01A@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103CDBFBFB01A@CNBJMBX05.corpusers.net>
+Message-ID: <20140912135738.GX7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/28/2014 3:55 AM, Will Deacon wrote:
-> On Tue, Aug 26, 2014 at 11:37:30AM +0100, Will Deacon wrote:
->> On Sat, Aug 23, 2014 at 01:12:32AM +0100, Olav Haugan wrote:
->>> The number of S2CR registers is not properly set when stream
->>> matching is not supported. Fix this and add check that we do not try to
->>> access outside of the number of S2CR regisrers.
->>
->> Sorry for the bother, but could you base this on either iommu/devel or
->> iommu/staging please? Now that the merge window is well and truly over, I
->> moved those branches forward, so you needn't worry about iommu/pci anymore
->> (which, as you pointed out, contains a bunch of WIP patches which should
->> hold-up useful fixes like this one).
-> 
-> Actually, it looks like this was eaten by our sorry excuse for an email
-> service. I've managed to apply a version from the archive, thanks.
-> 
+On Thu, Sep 11, 2014 at 04:19:49PM +0800, Wang, Yalin wrote:
+> this patch change struct regmap->mutex and struct regmap->spinlock
+> as an union, because these 2 members are only used one of them,
+> we change it to shrink the struct size.
 
-Thanks Will. Sorry for the late reply. I have been OoO.
-
-Thanks,
-
-Olav
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/da7860fd/attachment.sig>
