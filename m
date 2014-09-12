@@ -1,73 +1,95 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 12 Sep 2014 03:17:44 +0000
-Subject: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale LS1021A
-In-Reply-To: <3005087.EqTxEFbPyU@wuerfel>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <20140402.o60F9Z4YVe@wuerfel>
- <517628172fb3416ea7b12b4ae24e098a@BL2PR03MB467.namprd03.prod.outlook.com>
- <3005087.EqTxEFbPyU@wuerfel>
-Message-ID: <0133655fbf2d45ee9936ff4baba65b50@BL2PR03MB467.namprd03.prod.outlook.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Thu, 11 Sep 2014 20:25:27 -0700
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <541249B8.301@codeaurora.org>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com> <5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+ <5411DF5D.8060906@arm.com> <54123697.4070804@codeaurora.org>
+ <CAPz6YkUTXU9_b2BU5QghKTHVTJ3ngVX9EOzsMWnjigtV9TioHw@mail.gmail.com>
+ <541249B8.301@codeaurora.org>
+Message-ID: <CAPz6YkUOR-+CEx__FGZkR42RRcn7hjdR_B95MBBe2zfR-70fqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->Sent: Thursday, September 11, 2014 6:45 PM
->To: Lu Jingchang-B35083
->Cc: linux-arm-kernel at lists.infradead.org; Guo Shawn-R65073;
->devicetree at vger.kernel.org
->Subject: Re: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale
->LS1021A
+On Thu, Sep 11, 2014 at 6:17 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 09/11/14 17:14, Sonny Rao wrote:
 >
->On Thursday 11 September 2014 09:53:56 Jingchang Lu wrote:
->> >From: Arnd Bergmann [mailto:arnd at arndb.de]
->> >
->> >Ok, I see. The actual point of dma_zone_size however is slightly
->> >different, and I think you should not use it like this. We normally
->> >only use ZONE_DMA if there are devices that have a limitation smaller
->> >than 4GB, and that appear to be the case for your system.
->> >
->> >The message you quote is only present in arch/powerpc, so I'm not
->> >sure what symptoms you are actually seeing. Please try removing the
->> >dma_zone_size setting for your platform and report if it works or
->> >what the symptom is if it does not work with the latest kernel.
->> >
->> >We definitely need to get this to work out of the box without a
->> >dma_zone_size hack.
->> >
->> >Can you describe what the memory layout is of your platform? Can you
->> >have RAM installed above the 4GB physical address boundary? If you
->> >can, are there any devices that are unable to perform DMA into that
->> >memory without the use of an IOMMU?
->> >
->> Our first LS1021A support is based on kernel-3.12, where when LPAE
->> enabled it will compare the device's coherent_dma_mask with
->> arm_dma_limit, which is 64-bit 0xffffffffffffffff without
->> CONFIG_ZONE_DMA, with CONFIG_ZONE_DMA can limit the comparison and avoid
->the warning.
->> All device can address 32-bit address space on LS1021A, With you
->> comment above, I remove the dma_zone_size and only reserve the
->> CONFIG_ZONE_DMA On kernel-3.12, finding all works well, so I will remove
->the dma_zone_size setting on 3.12. Thanks.
+> On Thu, Sep 11, 2014 at 4:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>
+>>
+>> Where does this platform jump to when a CPU comes up? Is it
+>> rockchip_secondary_startup()? I wonder if that path could have this
+>> little bit of assembly to poke the cntvoff in monitor mode and then jump
+>> to secondary_startup()? Before we boot any secondary CPUs we could also
+>> read the cntvoff for CPU0 in the platform specific layer (where we know
+>> we're running in secure mode) and then use that value as the "reset"
+>> value for the secondaries. Or does this platform boot up in secure mode
+>> some times and non-secure mode other times?
 >
->Ok, good.
 >
->> I have a look on latest kernel, finding get_coherent_dma_mask() has
->> limited the mask to (u64)DMA_BIT_MASK(32), does this mean the
->> CONFIG_ZONE_DMA is not needed for me here? Thanks.
+> Yes, In our case, with our firmware, we will go through some internal Rom
+> code and then jump to rockchip_secondary_startup, but I don't think it's
+> correct to force all users of this SoC to do it that way.
 >
->You only need to enable CONFIG_ZONE_DMA in the case of RAM above the 4GB
->boundary. I would suggest you do the same as some of the other platforms
->by adding
 >
->	select ZONE_DMA if ARM_LPAE
->
->into your Kconfig file. If LPAE is disabled, you know that you won't need
->ZONE_DMA.
->
->	Arnd
+> What's being forced? The way internal rom jumps to sram? Is there any other
+> way that secondary CPUs come out of reset on this SoC? From looking at the
+> code it seems like the only path is internal rom jumps to sram (where
+> rockchip_secondary_trampoline lives) which jumps to
+> rockchip_secondary_startup() which then does an invalidate and jump to
+> secondary_startup(). Linux controls everything besides the internal rom. Is
+> something different in your case?
 
-I will do that. Thanks.
 
-Best Regards,
-Jingchang
+There are other ways it can be done, and I don't know all of the
+possibilities, but there seems to be some protocol with the iROM that
+tells it where to go, which the current SMP patches are using by
+putting a magic number and an address in SRAM.  I think it's true that
+in our case, it really is pretty simple and we have secure SVC mode
+and not much else runs (besides the iROM).
+
+Since I don't know all of the possibilities, I didn't want to preclude
+the possibility that someone else handled things differently and
+entered the kernel in non-secure mode, and have some code there that
+broke in that instance, that's all I meant by "forced".
+
+>
+>  If there were a reasonable way to determine for sure that we are in secure
+> mode, then yes we could do what you're suggesting, and I'd be happy to code
+> that up.
+>
+>
+> I think the problem is that there isn't a great way to determine whether
+> we're in secure mode or not, and this is maybe by design?  I don't
+> particularly understand that design choice.  It would be nice to hear some
+> rationale from ARM folks.
+>
+>
+> I'm thinking we would have a different boot-method for secure vs. non-secure
+> and then we would know to configure cntvoff or not based on the boot method.
+> Isn't that a reasonable way of knowing what should be done? It seems like we
+> can at least modify the DT for this SoC.
+
+Putting something into the device-tree is in fact the point of this
+patch, so it is sort of doing what you're suggesting, although this
+patch is about being able use to physical counters and doesn't
+indicate anything about secure vs non-secure.  What else do you think
+could be used to differentiate between the two cases, besides putting
+it into the DT?
+
+>
+> I still wonder if there is such a bootloader/hypervisor/rom that's putting
+> this SoC into non-secure mode and not configuring cntvoff. Doug's comments
+> seem to suggest that the whole world would be different if this were true.
+> Maybe Heiko knows?
+
+As far as I'm aware, there's no bootloader/firmware that's ever
+putting the CPU into non-secure mode for our case.
+
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
