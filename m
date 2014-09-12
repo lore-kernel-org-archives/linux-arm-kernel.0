@@ -1,119 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 12 Sep 2014 17:34:50 +0100
-Subject: [RFC PATCH v3 2/7] dma-mapping: replace set_arch_dma_coherent_ops
- with arch_setup_dma_ops
+Date: Fri, 12 Sep 2014 17:34:54 +0100
+Subject: [RFC PATCH v3 6/7] arm: call iommu_init before of_platform_populate
 In-Reply-To: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
 References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1410539695-29128-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1410539695-29128-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set_arch_dma_coherent_ops is called from of_dma_configure in order to
-swizzle the architectural dma-mapping functions over to a cache-coherent
-implementation. This is currently implemented only for ARM.
+We need to ensure that the IOMMUs in the system have a chance to perform
+some basic initialisation before we start adding masters to them.
 
-In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
-ops too, this patch replaces the function with a broader
-arch_setup_dma_ops callback which will be extended in future.
+This patch adds a call to of_iommu_init before of_platform_populate.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/dma-mapping.h |  8 ++++----
- drivers/of/platform.c              | 31 +++++++++++++------------------
- include/linux/dma-mapping.h        |  7 ++-----
- 3 files changed, 19 insertions(+), 27 deletions(-)
+ arch/arm/kernel/setup.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index c45b61a4b4a5..7e9ac4f604c3 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -121,12 +121,12 @@ static inline unsigned long dma_max_pfn(struct device *dev)
- }
- #define dma_max_pfn(dev) dma_max_pfn(dev)
- 
--static inline int set_arch_dma_coherent_ops(struct device *dev)
-+static inline void arch_setup_dma_ops(struct device *dev, bool coherent)
- {
--	set_dma_ops(dev, &arm_coherent_dma_ops);
--	return 0;
-+	if (coherent)
-+		set_dma_ops(dev, &arm_coherent_dma_ops);
- }
--#define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
-+#define arch_setup_dma_ops arch_setup_dma_ops
- 
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
- {
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 0197725e033a..946dd7ae0394 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -164,6 +164,8 @@ static void of_dma_configure(struct platform_device *pdev)
- {
- 	u64 dma_addr, paddr, size;
- 	int ret;
-+	bool coherent;
-+	unsigned long offset;
- 	struct device *dev = &pdev->dev;
- 
- 	/*
-@@ -179,28 +181,21 @@ static void of_dma_configure(struct platform_device *pdev)
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
- 
--	/*
--	 * if dma-coherent property exist, call arch hook to setup
--	 * dma coherent operations.
--	 */
--	if (of_dma_is_coherent(dev->of_node)) {
--		set_arch_dma_coherent_ops(dev);
--		dev_dbg(dev, "device is dma coherent\n");
--	}
--
--	/*
--	 * if dma-ranges property doesn't exist - just return else
--	 * setup the dma offset
--	 */
- 	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
- 	if (ret < 0) {
--		dev_dbg(dev, "no dma range information to setup\n");
--		return;
-+		dma_addr = offset = 0;
-+		size = dev->coherent_dma_mask;
-+	} else {
-+		offset = PFN_DOWN(paddr - dma_addr);
-+		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
- 	}
-+	dev->dma_pfn_offset = offset;
-+
-+	coherent = of_dma_is_coherent(dev->of_node);
-+	dev_dbg(dev, "device is%sdma coherent\n",
-+		coherent ? " " : " not ");
- 
--	/* DMA ranges found. Calculate and set dma_pfn_offset */
--	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
--	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-+	arch_setup_dma_ops(dev, coherent);
- }
- 
- /**
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 931b70986272..1e944e77d38d 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -129,11 +129,8 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
- 
- extern u64 dma_get_required_mask(struct device *dev);
- 
--#ifndef set_arch_dma_coherent_ops
--static inline int set_arch_dma_coherent_ops(struct device *dev)
--{
--	return 0;
--}
-+#ifndef arch_setup_dma_ops
-+static inline void arch_setup_dma_ops(struct device *dev, bool coherent) { }
- #endif
- 
- static inline unsigned int dma_get_max_seg_size(struct device *dev)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 84db893dedc2..495e29697a67 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -18,6 +18,7 @@
+ #include <linux/bootmem.h>
+ #include <linux/seq_file.h>
+ #include <linux/screen_info.h>
++#include <linux/of_iommu.h>
+ #include <linux/of_platform.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+@@ -800,6 +801,7 @@ static int __init customize_machine(void)
+ 	 * machine from the device tree, if no callback is provided,
+ 	 * otherwise we would always need an init_machine callback.
+ 	 */
++	of_iommu_init();
+ 	if (machine_desc->init_machine)
+ 		machine_desc->init_machine();
+ #ifdef CONFIG_OF
 -- 
 2.1.0
