@@ -1,43 +1,73 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Fri, 12 Sep 2014 17:03:42 +0800
-Subject: [PATCH v2] arm64: add guard macros of unistd.h to prevent double
- inclusion
-In-Reply-To: <20140911150212.GP6158@arm.com>
-References: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
- <20140909123938.GL1754@arm.com> <54115583.8080306@huawei.com>
- <5411698E.3000402@huawei.com> <20140911150212.GP6158@arm.com>
-Message-ID: <5412B6EE.1040405@huawei.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Fri, 12 Sep 2014 11:06:49 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <20140912083348.GA1289@katana>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <9935938.eKOCvCAtLt@fb07-iapwap2> <20140912083348.GA1289@katana>
+Message-ID: <7627175.tG5quZH0VN@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/11 23:02, Will Deacon wrote:
-> On Thu, Sep 11, 2014 at 10:21:18AM +0100, Yang Yingliang wrote:
->> From: Yang Yingliang <yangyingliang@huawei.com>
->>
->> Add guard macros for uapi/asm/unistd.h, asm/unistd.h and
->> asm/unistd32.h.
+Am Freitag, 12. September 2014, 10:33:48 schrieb Wolfram Sang:
+> > > Why do you want DT to be involved at all?
+> > 
+> > Imagine a device which supports both, slave or master mode. The driver
+> > needs to know in which mode it should operate. This cannot be hard coded,
+> > because on different boards, different modes can be used.
 > 
-> Hmm, so I applied this and now my machine panics when we hit userspace. I
-> think the issue is that we no longer generate our syscall table in
-> arch/arm64/kernel/sys.c, because unistd.h is already included via
-> linux/syscalls.h but without the __SYSCALL definition.
-> 
-> So, a couple of questions:
-> 
->   (1) Is the lack of header guards actually causing you a problem?
->   (2) How did you test this?
-> 
-> I've dropped the patch.
-> 
-> Will
-> 
-> 
-Oh, my bad, sorry for that.
+> Okay, it sounds weird to me that a device is not able to switch between
+> master and slave, but if you say so. Also, solving this issue would also
+> handle potential weird IP blocks which can be slave only, right?
 
-I found asm/unistd.h have no guard macro when I was migrate a userspace
-program from x86_64 to arm64. The program uses the macro _ASM_X86_UNISTD_64_H,
-but arm64 does not have this(arm has __ASM_ARM_UNISTD_H). So I tried to add
-the guard macro.
+I didn't said device. I meant the driver (software) needs to know if which 
+mode to operate the device. DT has to provide just enough information to 
+select the right mode depending on the board implementation.
 
-Regards,
-Yang
+> What if you use two different adapter drivers or compatibles? One for
+> master-mode, one for slave-mode (slave could leave algo->master_xfer
+> empty, so the slave mode driver cannot send packets). I'm brainstorming
+> here, so while it should work IMO I will probably need a second thought.
+> 
+> So, in the DT you would have a block registering the I2C slave core
+> which binds to a simple driver providing reg_slave/unreg_slave and
+> pass on the slave-event. Then you could instantiate slave clients as
+> said before.
+> 
+> Maybe we need a real world example?
+
+ok, take our embedded controller driver (in staging/nvec) as an example. It's 
+basicly an MFD connecting keyboard, mouse, power, gpio, and some other stuff 
+to the soc. The MFD operates in master mode while the SOC is the I2C slave. 
+Theoretically, these roles could also switch (but that's not defined in the 
+nvec protocol).
+
+So the i2c client driver sits in between the adapter (in slave or master mode) 
+and the the MFD children (keyboard, mouse, ...) and provides read/write/cb 
+functions (nvec uses a side channel gpio to be able to initiate writes on its 
+own) to its children. The MFD children don't care about how the i2c 
+communication is done, but the client driver needs to decide in which mode it 
+should talk to the EC. If this is not autodetectable, the mode needs to be 
+provided by the device tree.
+
+In this case you cannot use separate drivers for master and slave mode (or you 
+would need another layer to hide the driver multiplexing).
+
+> > The point is, that if we define a dt binding for master device on slave
+> > adapters it will be there forever. So even if it makes no sense for the
+> > example eeprom simulator (or even our embedded controller), it may make
+> > sense for other or future devices.
+> 
+> I don't know what you mean here. Again, an example might help?
+
+I just wanted to say that the discussion here should find a *generic* way to 
+distinguish slave and master clients on the i2c bus by using a proper DT 
+binding.
+
+Marc
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/af2acdf2/attachment.sig>
