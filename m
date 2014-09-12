@@ -1,39 +1,28 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Fri, 12 Sep 2014 00:27:15 -0700 (PDT)
-Subject: [periperi] How to set default GPIO pin ?
-In-Reply-To: <2862746.g5u9pdpKDi@avalon>
-References: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
- <2862746.g5u9pdpKDi@avalon>
-Message-ID: <874mwdmh7z.wl%kuninori.morimoto.gx@gmail.com>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Fri, 12 Sep 2014 15:26:46 +0800
+Subject: [PATCH 0/2] rockchip-max98090: add driver for rockchip board with
+ max98090
+Message-ID: <1410506806-15327-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch to add driver for rockchip board using a max98090.
 
-Hi Laurent, Linus (Walleij)
+Tested on RK3288 using a max98090.
 
-Thank you for your help
+Jianqun (2):
+  ASoC: rockchip-max98090: add documentation for rockchip-max98090
+    driver
+  ASoC: rockchip-max98090: add driver for rockchip board using a
+    max98090
 
-> (Moving this thread to linux-sh and linux-arm and CC'ing Linus Walleij)
-> 
-> On Sunday 31 August 2014 22:08:52 Kuninori Morimoto wrote:
-> > 
-> > I know we can use "defalt" PFC settings on DT.
-> > But, how to use "defalt" GPIO pin settings on DT ?
-> > 
-> > We would like to use GPIO 7-17 as Low output,
-> > and do nothing after boot.
-> 
-> From a DT point of view I believe this is supposed to be done by specifying 
-> the output-low or output-high properties in the pinctrl configuration node. 
-> However, these properties are not supported by the PFC driver, and there's no 
-> easy way for the PFC driver to configure GPIOs handled by a different driver 
-> such as the gpio-rcar driver for instance.
-> 
-> Linus, do you have any hindsight on how this should be implemented ?
+ .../sound/rockchip,rockchip-audio-max98090.txt     |  23 ++
+ sound/soc/rockchip/Kconfig                         |   9 +
+ sound/soc/rockchip/Makefile                        |   5 +-
+ sound/soc/rockchip/rockchip_max98090.c             | 308 +++++++++++++++++++++
+ 4 files changed, 344 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.txt
+ create mode 100644 sound/soc/rockchip/rockchip_max98090.c
 
-I'm happy if we can use this "defalt" GPIO on DT.
-Linus, we need your opinion
-
-Best regards
----
-Kuninori Morimoto
+-- 
+1.9.1
