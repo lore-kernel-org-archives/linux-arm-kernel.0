@@ -1,7 +1,9 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Fri, 12 Sep 2014 20:56:23 +0530
+Date: Fri, 12 Sep 2014 20:56:24 +0530
 Subject: [PATCH v4 0/8] arch: arm64: enable support for Samsung Exynos7 SoC
-Message-ID: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
+In-Reply-To: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
+References: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1410535592-5782-2-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -63,3 +65,6 @@ Pankaj Dubey (1):
  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
  create mode 100644 drivers/clk/samsung/clk-exynos7.c
  create mode 100644 include/dt-bindings/clock/exynos7-clk.h
+
+-- 
+1.7.9.5
