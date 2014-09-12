@@ -1,60 +1,86 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 12 Sep 2014 11:59:29 -0700
-Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <5412E3BB.9030800@arm.com>
-References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
- <20140911164710.GW6158@arm.com>	<5411D528.4050605@arm.com>
- <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
- <5411DA67.2040402@arm.com>
- <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
- <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
- <5412E3BB.9030800@arm.com>
-Message-ID: <54134291.3040700@codeaurora.org>
+Date: Fri, 12 Sep 2014 12:03:44 -0700
+Subject: [PATCH v8 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
+In-Reply-To: <1410542986-24419-4-git-send-email-agross@codeaurora.org>
+References: <1410542986-24419-1-git-send-email-agross@codeaurora.org>
+ <1410542986-24419-4-git-send-email-agross@codeaurora.org>
+Message-ID: <54134390.5030206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/14 05:14, Marc Zyngier wrote:
-> Hi Christopher,
->
-> On 12/09/14 12:43, Christopher Covington wrote:
->> Hi Marc,
->>
->> On 09/11/2014 01:43 PM, Marc Zyngier wrote:
->>> On 11/09/14 18:29, Doug Anderson wrote:
->>>
->>>> I did this in the past (again, see Sonny's thread), but didn't
->>>> consider myself knowledgeable to know if that was truly a good test:
->>>>
->>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
->>>>        pr_info("DOUG: val is %#010x", val);
->>>>        val |= (1 << 2);
->>>>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
->>>>        val = 0xffffffff;
->>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
->>>>        pr_info("DOUG: val is %#010x", val);
->>>>
->>>> The idea being that if you can make modifications to the SCR register
->>>> (and see your changes take effect) then you must be in secure mode.
->>>> In my case the first printout was 0x0 and the second was 0x4.
->>> The main issue is when you're *not* in secure mode. It is likely that
->>> this will explode badly. This is why I suggested something that is set
->>> by the bootloader (after all. it knows which mode it is booted in), and
->>> that the timer driver can use when the CPU comes up.
->> What exactly does "exploding badly" look like? Causing and undefined
->> instruction exception? That's just a branch with a mode switch. Any reason the
->> code couldn't deal with that or even use that to its advantage?
-> We surely can handle the UNDEF and do something there. We just can't do
-> it the way Doug described it above.
->
->
+Yay nitpicks!
 
-I suggested doing that for something else a while ago and Will and Dave
-we're not thrilled[1]. The suggestion back then was to use DT to
-indicate what mode the kernel is running in.
+On 09/12/14 10:29, Andy Gross wrote:
+> +
+> +struct qcom_dwc3_usb_phy {
+> +	void __iomem		*base;
+> +	struct device		*dev;
+> +	struct phy *phy;
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
+Align with other members?
+
+>
+> +
+> +static int wait_for_latch(void __iomem *addr)
+> +{
+> +	u32 retry = 10;
+
+Why not just int?
+
+> +
+> +	while (true) {
+> +		if (!readl(addr))
+> +			break;
+> +
+> +		if (--retry == 0)
+> +			return -ETIMEDOUT;
+> +
+> +		usleep_range(10, 20);
+> +	}
+> +
+> +	return 0;
+> +}
+[...]
+> +
+> +static int qcom_dwc3_ss_phy_init(struct qcom_dwc3_usb_phy *phy_dwc3)
+> +{
+> +	u32 data = 0;
+> +
+
+Unnecessary initialization.
+
+>
+>
+> +
+> +static struct phy_ops qcom_dwc3_phy_ops = {
+
+Can this be const?
+
+> +	.init		= qcom_dwc3_phy_init,
+> +	.exit		= qcom_dwc3_phy_exit,
+> +	.power_on	= qcom_dwc3_phy_power_on,
+> +	.power_off	= qcom_dwc3_phy_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+[...]
+> +
+> +static int qcom_dwc3_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct qcom_dwc3_usb_phy	*phy_dwc3;
+> +	struct phy_provider		*phy_provider;
+> +	struct resource			*res;
+> +	const struct of_device_id	*match;
+> +
+> +
+
+Weird two newlines here.
+
+> +	phy_dwc3 = devm_kzalloc(&pdev->dev, sizeof(*phy_dwc3), GFP_KERNEL);
+> +	if (!phy_dwc3)
+> +		return -ENOMEM;
+> +
+>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
