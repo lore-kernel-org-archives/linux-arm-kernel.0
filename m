@@ -1,167 +1,127 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 12 Sep 2014 15:24:57 -0500
-Subject: [PATCHv6 3/5] hwspinlock/core: maintain a list of registered
- hwspinlock banks
-In-Reply-To: <1410553499-55951-1-git-send-email-s-anna@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
-Message-ID: <1410553499-55951-4-git-send-email-s-anna@ti.com>
+Date: Fri, 12 Sep 2014 15:24:54 -0500
+Subject: [PATCHv6 0/5] hwspinlock core/omap dt support
+Message-ID: <1410553499-55951-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hwspinlock_device structure is used for registering a bank of
-locks with the driver core. The structure already contains the
-necessary members to identify the bank of locks. The core does not
-maintain the hwspinlock_devices itself, but maintains only a radix
-tree for all the registered locks. A specific lock can be requested
-by users using a global lock id, and any device-specific fields
-can be retrieved through a reference to the hwspinlock_device in
-each lock.
+Hi Ohad,
 
-The global lock id, however, is not friendly to be requested for
-users using the device-tree model. The device-tree representation
-will typically have each of the hwspinlock devices represented as
-a DT node, and a specific lock can be requested using the device's
-phandle and a lock specifier. Add support to the core therefore to
-maintain all the registered hwspinlock_devices, so that a device
-can be looked up and a specific lock belonging to the device
-requested through a phandle + args approach.
+This is an update to the hwspinlock dt support series. The series
+is rebased onto v3.17-rc3, and addresses the review comments on the
+previous v5 series. I have also split and left out the RFC patches
+about the support for reserved locks (will post these as a separate
+series) and return code convention changes in the hwspinlock core
+(will not be needed anymore). The support for deferred probing of
+clients is supported in the new of_hwspin_lock_get_id() function
+itself.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
+Following are the main changes in v6 w.r.t v5:
+- [Patch 1] Updated generic hwspinlock bindings after folding back
+  the hwlock-base-id property from v5 Patch 8 [1]. [Patch 1]
+- [Patch 4] Updated the common OF helpers patch based on review
+  comments on v5. of_hwspin_lock_request_specific() is replaced
+  with of_hwspin_lock_get_id(). of_hwspin_lock_simple_xlate() is
+  made internal, and of_hwspin_lock_get_base_id() is added.
+- [Patch 5] Updated the OMAP hwspinlock DT support patch to address
+  review comments about hard-coded base-id, it is parsed from DT
+  if present.
+- Patches 2 and 3 are unchanged from previous version.
+- Support patches for AM335x and AM437x SoCs (v5 patches 6 and 7)
+  have been dropped as they are merged in separately for 3.17
+- RFC patches (v5 patches 9 through 15) adding the concept of
+  reserved locks and return code change convention dropped.
+
+I had looked into dropping the patch to maintain the list of registered
+spinlocks, but had to retain the patch as it was needed to perform the
+validity of the args-specifier value in of_hwspin_lock_get_id().
+
+The validation logs on all the applicable OMAP SoCs are at:
+  OMAP4  - http://pastebin.ubuntu.com/8329228
+  OMAP5  - http://pastebin.ubuntu.com/8329301
+  DRA74x - http://pastebin.ubuntu.com/8329261
+  AM33xx - http://pastebin.ubuntu.com/8329199
+  AM43xx - http://pastebin.ubuntu.com/8329273
+
+The above logs are generated with some additional test patches staged
+here for reference:
+https://github.com/sumananna/omap-kernel/commits/hwspinlock/test/3.17-rc3-dt-v6
+https://github.com/sumananna/omap-kernel/commits/hwspinlock/submit/3.17-rc3-dt-v6
+
+regards
+Suman
+
+[1] https://patchwork.kernel.org/patch/4096741/
+
 ---
- Documentation/hwspinlock.txt             |  2 ++
- drivers/hwspinlock/hwspinlock_core.c     | 51 ++++++++++++++++++++++++++++++++
- drivers/hwspinlock/hwspinlock_internal.h |  2 ++
- 3 files changed, 55 insertions(+)
+v5:
+http://marc.info/?l=linux-omap&m=139890478402807&w=2
+- Rebased v4 patches plus additional RFC patches.
+- Added back the patch to support DT-based hwlock-base-id property,
+  for registration purposes.
+- RFC patches introducing the concept of reserved locks.
+- Staged patches for converting return convention to better support
+  deferred probing of client drivers.
 
-diff --git a/Documentation/hwspinlock.txt b/Documentation/hwspinlock.txt
-index 62f7d4e..640ae47 100644
---- a/Documentation/hwspinlock.txt
-+++ b/Documentation/hwspinlock.txt
-@@ -251,6 +251,7 @@ implementation using the hwspin_lock_register() API.
- 
- /**
-  * struct hwspinlock_device - a device which usually spans numerous hwspinlocks
-+ * @list: list element to link hwspinlock devices together
-  * @dev: underlying device, will be used to invoke runtime PM api
-  * @ops: platform-specific hwspinlock handlers
-  * @base_id: id index of the first lock in this device
-@@ -258,6 +259,7 @@ implementation using the hwspin_lock_register() API.
-  * @lock: dynamically allocated array of 'struct hwspinlock'
-  */
- struct hwspinlock_device {
-+	struct list_head list;
- 	struct device *dev;
- 	const struct hwspinlock_ops *ops;
- 	int base_id;
-diff --git a/drivers/hwspinlock/hwspinlock_core.c b/drivers/hwspinlock/hwspinlock_core.c
-index 461a0d7..48f7866 100644
---- a/drivers/hwspinlock/hwspinlock_core.c
-+++ b/drivers/hwspinlock/hwspinlock_core.c
-@@ -59,6 +59,11 @@ static RADIX_TREE(hwspinlock_tree, GFP_KERNEL);
-  */
- static DEFINE_MUTEX(hwspinlock_tree_lock);
- 
-+/*
-+ * A linked list for maintaining all the registered hwspinlock devices.
-+ * The list is maintained in an ordered-list of the supported locks group.
-+ */
-+static LIST_HEAD(hwspinlock_devices);
- 
- /**
-  * __hwspin_trylock() - attempt to lock a specific hwspinlock
-@@ -307,6 +312,40 @@ out:
- 	return hwlock;
- }
- 
-+/*
-+ * Add a new hwspinlock device to the global list, keeping the list of
-+ * devices sorted by base order.
-+ *
-+ * Returns 0 on success, or -EBUSY if the new device overlaps with some
-+ * other device's lock space.
-+ */
-+static int hwspinlock_device_add(struct hwspinlock_device *bank)
-+{
-+	struct list_head *entry = &hwspinlock_devices;
-+	struct hwspinlock_device *_bank;
-+	int ret = 0;
-+
-+	list_for_each(entry, &hwspinlock_devices) {
-+		_bank = list_entry(entry, struct hwspinlock_device, list);
-+		if (_bank->base_id >= bank->base_id + bank->num_locks)
-+			break;
-+	}
-+
-+	if (entry != &hwspinlock_devices &&
-+	    entry->prev != &hwspinlock_devices) {
-+		_bank = list_entry(entry->prev, struct hwspinlock_device, list);
-+		if (_bank->base_id + _bank->num_locks > bank->base_id) {
-+			dev_err(bank->dev, "hwlock space overlap, cannot add device\n");
-+			ret = -EBUSY;
-+		}
-+	}
-+
-+	if (!ret)
-+		list_add_tail(&bank->list, entry);
-+
-+	return ret;
-+}
-+
- /**
-  * hwspin_lock_register() - register a new hw spinlock device
-  * @bank: the hwspinlock device, which usually provides numerous hw locks
-@@ -339,6 +378,12 @@ int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
- 	bank->base_id = base_id;
- 	bank->num_locks = num_locks;
- 
-+	mutex_lock(&hwspinlock_tree_lock);
-+	ret = hwspinlock_device_add(bank);
-+	mutex_unlock(&hwspinlock_tree_lock);
-+	if (ret)
-+		return ret;
-+
- 	for (i = 0; i < num_locks; i++) {
- 		hwlock = &bank->lock[i];
- 
-@@ -355,6 +400,9 @@ int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
- reg_failed:
- 	while (--i >= 0)
- 		hwspin_lock_unregister_single(base_id + i);
-+	mutex_lock(&hwspinlock_tree_lock);
-+	list_del(&bank->list);
-+	mutex_unlock(&hwspinlock_tree_lock);
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(hwspin_lock_register);
-@@ -386,6 +434,9 @@ int hwspin_lock_unregister(struct hwspinlock_device *bank)
- 		WARN_ON(tmp != hwlock);
- 	}
- 
-+	mutex_lock(&hwspinlock_tree_lock);
-+	list_del(&bank->list);
-+	mutex_unlock(&hwspinlock_tree_lock);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(hwspin_lock_unregister);
-diff --git a/drivers/hwspinlock/hwspinlock_internal.h b/drivers/hwspinlock/hwspinlock_internal.h
-index d26f78b..aff560c 100644
---- a/drivers/hwspinlock/hwspinlock_internal.h
-+++ b/drivers/hwspinlock/hwspinlock_internal.h
-@@ -53,6 +53,7 @@ struct hwspinlock {
- 
- /**
-  * struct hwspinlock_device - a device which usually spans numerous hwspinlocks
-+ * @list: list element to link hwspinlock devices together
-  * @dev: underlying device, will be used to invoke runtime PM api
-  * @ops: platform-specific hwspinlock handlers
-  * @base_id: id index of the first lock in this device
-@@ -60,6 +61,7 @@ struct hwspinlock {
-  * @lock: dynamically allocated array of 'struct hwspinlock'
-  */
- struct hwspinlock_device {
-+	struct list_head list;
- 	struct device *dev;
- 	const struct hwspinlock_ops *ops;
- 	int base_id;
+v4:
+- The DT bindings are split into separate patches, and updated to
+  add comments about #hwlock-cells
+- Fixed a registration issue with repeated module installation and
+  removal.
+- Added a new OF helper to support #hwlock-cells in addition to the
+  previous OF functions. The OMAP adaptation patch is updated to use
+  the default translate function
+- Updated hwspinlock documentation to adjust for the structure
+  changes and the new api additions.
+- Added build support for AM335x, AM43xx and DRA7xx
+http://marc.info/?l=linux-omap&m=138965904015225&w=2
+
+v3:
+- Removed the DT property hwlock-base-id and associated OF helper
+- Added changes in core to support requesting a specific hwlock using
+  phandle + args approach
+- Revised both the common and OMAP DT bindings document
+http://marc.info/?l=linux-omap&m=138143992932197&w=2
+
+v2:
+- Added a new common DT binding documentation and OF helpers.
+- Revised OMAP DT parse support to use the new OF helper (Patch2)
+- OMAP5 hwspinlock support including the hwmod entry and DT node
+- Add AM335x support to OMAP hwspinlock driver, including a fix
+  needed in driver given that AM335 spinlock module requires s/w wakeup
+- AM335 DT node for spinlock, and a hwmod change to enable smart-idle
+  for AM335.
+- OMAP4 DT node patch is unchanged
+http://marc.info/?l=linux-omap&m=137944644112727&w=2
+
+v1:
+- Add DT parse support to OMAP hwspinlock driver
+- Add OMAP4 DT node and bindings information
+http://marc.info/?l=linux-omap&m=137823082308009&w=2
+
+---
+
+Suman Anna (5):
+  Documentation: dt: add common bindings for hwspinlock
+  Documentation: dt: add the omap hwspinlock bindings document
+  hwspinlock/core: maintain a list of registered hwspinlock banks
+  hwspinlock/core: add common OF helpers
+  hwspinlock/omap: add support for dt nodes
+
+ .../devicetree/bindings/hwlock/hwlock.txt          |  55 +++++++
+ .../devicetree/bindings/hwlock/omap-hwspinlock.txt |  24 +++
+ Documentation/hwspinlock.txt                       |  28 ++++
+ MAINTAINERS                                        |   1 -
+ arch/arm/mach-omap2/Makefile                       |   3 -
+ arch/arm/mach-omap2/hwspinlock.c                   |  60 -------
+ drivers/hwspinlock/hwspinlock_core.c               | 173 +++++++++++++++++++++
+ drivers/hwspinlock/hwspinlock_internal.h           |   2 +
+ drivers/hwspinlock/omap_hwspinlock.c               |  23 ++-
+ include/linux/hwspinlock.h                         |  15 +-
+ 10 files changed, 312 insertions(+), 72 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
+ create mode 100644 Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
+ delete mode 100644 arch/arm/mach-omap2/hwspinlock.c
+
 -- 
 2.0.4
