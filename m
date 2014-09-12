@@ -1,91 +1,69 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 12 Sep 2014 13:14:51 +0100
-Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <5412DC48.7030708@codeaurora.org>
-References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
- <20140911164710.GW6158@arm.com>	<5411D528.4050605@arm.com>
- <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
- <5411DA67.2040402@arm.com>
- <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
- <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
-Message-ID: <5412E3BB.9030800@arm.com>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Fri, 12 Sep 2014 21:26:13 +0900
+Subject: [PATCH v3 0/7] Add max77802 support for Peach boards
+In-Reply-To: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <0ae801cfce84$be443620$3acca260$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
-
-On 12/09/14 12:43, Christopher Covington wrote:
-> Hi Marc,
+Javier Martinez Canillas wrote:
 > 
-> On 09/11/2014 01:43 PM, Marc Zyngier wrote:
->> On 11/09/14 18:29, Doug Anderson wrote:
->>> Marc,
->>>
->>> On Thu, Sep 11, 2014 at 10:22 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> We would need to run this code potentially at processor bringup and
->>>>> after suspend/resume, but that seems possible too.
->>>>
->>>> Note that this would be an ARMv7 only thing (you can't do that on ARMv8,
->>>> at all).
->>>
->>> Yes, of course.
->>>
->>>
->>>>> Is the transition to monitor mode and back simple?  Where would you
->>>>> suggest putting this code?  It would definitely need to be pretty
->>>>> early.  We'd also need to be able to detect that we're in Secure SVC
->>>>> and not mess up anyone else who happened to boot in Non Secure SVC.
->>>>
->>>> This would have to live in some very early platform-specific code. The
->>>> ugly part is that you cannot find out what world you're in (accessing
->>>> SCR is going to send you to UNDEF-land if accessed from NS).
->>>
->>> Yup, so the question is: would such code be accepted upstream, or are
->>> we going to embark on a big job for someone to figure out how to do
->>> this only to get NAKed?
->>>
->>> If there was some indication that folks would take this, I think we
->>> might be able to get it coded up.  If someone else wanted to volunteer
->>> to code it that would make me even happier, but maybe that's pushing
->>> my luck.  ;)
->>
->> Writing the code is a 5 minute job. Getting it accepted is another
->> story, and I'm not sure everyone would agree on that.
->>
->>>> If I was suicidal, I'd suggest you could pass a parameter to the command
->>>> line, interpreted by the timer code... But I since I'm not, let's
->>>> pretend I haven't said anything... ;-)
->>>
->>> I did this in the past (again, see Sonny's thread), but didn't
->>> consider myself knowledgeable to know if that was truly a good test:
->>>
->>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
->>>        pr_info("DOUG: val is %#010x", val);
->>>        val |= (1 << 2);
->>>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
->>>        val = 0xffffffff;
->>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
->>>        pr_info("DOUG: val is %#010x", val);
->>>
->>> The idea being that if you can make modifications to the SCR register
->>> (and see your changes take effect) then you must be in secure mode.
->>> In my case the first printout was 0x0 and the second was 0x4.
->>
->> The main issue is when you're *not* in secure mode. It is likely that
->> this will explode badly. This is why I suggested something that is set
->> by the bootloader (after all. it knows which mode it is booted in), and
->> that the timer driver can use when the CPU comes up.
+> Hello Kukjin,
 > 
-> What exactly does "exploding badly" look like? Causing and undefined
-> instruction exception? That's just a branch with a mode switch. Any reason the
-> code couldn't deal with that or even use that to its advantage?
+Hi Javier,
 
-We surely can handle the UNDEF and do something there. We just can't do
-it the way Doug described it above.
+> This is a third version of th series that adds max77802 support for
+> the Peach Pit and Pi boards. The series also have all the pending
+> patches that were posted but depended on this support. I've picked
+> all the patches I found and rebased them to be sure that they apply
+> cleanly on top of linux-next. Also I've taken some DT snippets from
+> the downstream Chrome OS 3.8 kernel DTS for devices that use one of
+> these regulators as their input supply.
+> 
+Thanks a lot and looks good to me. I'll take this whole series.
 
-Thanks,
+- Kukjin
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Changes since v2 [0]:
+>  - Remove left over supply on ldo35 regulator, suggested by Doug Anderson.
+>  - Add a patch to change the i2c7 clock at 400kHz, suggested by Doug Anderson.
+>  - Add a patch from Vivek Gautam to enable max77802 regulator driver support.
+> 
+> Changes sinve v1 [1]:
+>  - Dropped patch that added vmmc and vqmmc supplies as suggested
+>    by Doug Anderson.
+>  - Use IRQ flags define instead of a magic number as suggested by
+>    Andreas Faerber.
+> 
+> The series is composed of the following patches:
+> 
+> Javier Martinez Canillas (3):
+>   ARM: dts: Add Peach Pit and Pi dts entry for max77802 PMIC
+>   ARM: dts: Add Peach Pit and Pi dts entry for ISL29018 sensor
+>   ARM: dts: Set i2c7 clock at 400kHz for Peach boards
+> 
+> Naveen Krishna Chatradhi (1):
+>   ARM: dts: Add thermistor dts fragment used by exynos based Peach
+>     boards
+> 
+> Rahul Sharma (2):
+>   ARM: dts: add hdmi regulators for exynos5800 based peach-pi board
+>   ARM: dts: add hdmi regulators for exynos5420 based peach-pit board
+> 
+> Vivek Gautam (1):
+>   ARM: exynos_defconfig: Enable MAX77802
+> 
+>  arch/arm/boot/dts/cros-adc-thermistors.dtsi |  44 ++++
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts  | 389 ++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts   | 389 ++++++++++++++++++++++++++++
+>  arch/arm/configs/exynos_defconfig           |   3 +
+>  4 files changed, 825 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
+> 
+> 
+> Best regards,
+> Javier
+> 
+> [0]: https://lkml.org/lkml/2014/8/20/225
+> [1]: https://lkml.org/lkml/2014/8/19/372
