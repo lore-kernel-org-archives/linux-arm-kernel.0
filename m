@@ -1,151 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Sep 2014 19:44:33 +0100
-Subject: [PATCH 01/11 v6] coresight: add CoreSight core layer framework
-In-Reply-To: <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1410450558-12358-1-git-send-email-mathieu.poirier@linaro.org>
- <1410450558-12358-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20140912184432.GR12361@n2100.arm.linux.org.uk>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 12 Sep 2014 13:47:55 -0500
+Subject: [PATCH v3 0/3] OMAP4+: Get rid of internal SRAM handling
+In-Reply-To: <20140910165643.GA3118@splat>
+References: <cover.1410362895.git.d-gerlach@ti.com>
+ <20140910165643.GA3118@splat>
+Message-ID: <54133FDB.9030706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Further to Greg's comments...
+On 09/10/2014 11:56 AM, Nishanth Menon wrote:
+> On 11:04-20140910, Dave Gerlach wrote:
+>> v3:
+>> Fix minor issue in last patch to check for null sram_pool if no sram
+>> phandle is given in DT.
+>>
+>> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
+>> use drivers/misc/sram.c driver instead of the omap internal
+>> implementation for SRAM handling.
+>>
+>> Previous discussion can be found at [1].
+>>
+>> Regards,
+>> Dave
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195588.html
+>>
+>> Rajendra Nayak (3):
+>>   ARM: AM335x: Get rid of unused sram init function
+>>   ARM: OMAP4+: Move SRAM data to DT
+>>   ARM: OMAP4+: Remove static iotable mappings for SRAM
+>>
+>>  Documentation/devicetree/bindings/arm/omap/mpu.txt |  3 ++
+>>  arch/arm/boot/dts/am33xx.dtsi                      |  5 ++-
+>>  arch/arm/boot/dts/am4372.dtsi                      |  5 +++
+>>  arch/arm/boot/dts/omap4.dtsi                       |  6 ++++
+>>  arch/arm/boot/dts/omap5.dtsi                       |  8 ++++-
+>>  arch/arm/configs/omap2plus_defconfig               |  1 +
+>>  arch/arm/mach-omap2/io.c                           | 17 ----------
+>>  arch/arm/mach-omap2/omap4-common.c                 | 22 +++++++++++-
+>>  arch/arm/mach-omap2/sram.c                         | 39 +---------------------
+>>  arch/arm/mach-omap2/sram.h                         |  7 ----
+>>  10 files changed, 46 insertions(+), 67 deletions(-)
+>>
+> 
+> Could you please provide logs for the following:
+> a) Low power transition tests for OMAP3,4 on all available platforms as
+> well?
+> b) provide bootlogs on all omap2plus platforms to ensure we have no
+> regressions.
+> 
 
-On Thu, Sep 11, 2014 at 09:49:08AM -0600, mathieu.poirier at linaro.org wrote:
-> +int coresight_enable(struct coresight_device *csdev)
-> +{
-> +	int ret = 0;
-> +	LIST_HEAD(path);
-> +
-> +	WARN_ON(IS_ERR_OR_NULL(csdev));
+Here are logs for low power transition, all platforms passed, properly
+transitioned power domains with mem sleep using wakeup_timer to wake.
 
-Please don't do this kind of checking, it just makes stuff a lot more
-noisy than it needs to be, and it doesn't give any value what so ever.
+Low Power transition on v3.17-rc4 with patches applied, omap2plus_defconfig
+(OMAP3 and OMAP4):
 
-I've seen code where it seems the coding style required that quite
-literally every function does extensive checking of function arguments,
-and every function returns a status.  This does nothing to stop bugs.
-In fact, it makes things a /lot/ worse because there is then soo much
-junk in every function that you can't read what the function is doing
-anymore.  Imagine memset() validating its arguments and returning a
-status value... I kid not.
+ 1: BeagleBoard-XM: http://fpaste.org/133215/
+ 2: OMAP3430-Labrador(LDP): http://fpaste.org/133225/
+ 3: n900: http://fpaste.org/133244/
+ 4: pandaboard-es:  http://fpaste.org/133213/
+ 5: pandaboard-vanilla: http://fpaste.org/133214/
+ 6: sdp3430: http://fpaste.org/133246/
 
-The point here is that if a NULL pointer is passed to this function,
-the above WARN_ON gets triggered, and we get a backtrace.  We then
-continue on, take the semaphore, and then dereference the NULL pointer
-causing another backtrace.  So the WARN_ON was utterly pointless.
+Boot on v3.17-rc4 with patches applied, omap2plus_defconfig:
 
-Just reference the pointer and don't bother with these silly checks.
+ 1: am335x-evm:  Boot PASS: http://fpaste.org/133179/
+ 2:  am335x-sk:  Boot PASS: http://fpaste.org/133180/
+ 3: am3517-evm:  Boot PASS: http://fpaste.org/133181/
+ 4:  am37x-evm:  Boot PASS: http://fpaste.org/133182/
+ 5: am43xx-epos:  Boot PASS: http://fpaste.org/133183/
+ 6: am43xx-gpevm:  Boot PASS: http://fpaste.org/133184/
+ 7: BeagleBoard-XM:  Boot PASS: http://fpaste.org/133191/
+ 8: beagleboard-vanilla:  Boot PASS: http://fpaste.org/133192/
+ 9: beaglebone-black:  Boot PASS: http://fpaste.org/133193/
+10: beaglebone:  Boot PASS: http://fpaste.org/133194/
+11: craneboard:  Boot PASS: http://fpaste.org/133186/
+12: dra7xx-evm:  Boot PASS: http://fpaste.org/131396/
+13: OMAP3430-Labrador(LDP):  Boot PASS: http://fpaste.org/133206/
+14:       n900:  Boot PASS: http://fpaste.org/133207/
+15:  omap5-evm:  Boot PASS: http://fpaste.org/133208/
+16: pandaboard-es:  Boot PASS: http://fpaste.org/133187/
+17: pandaboard-vanilla:  Boot PASS: http://fpaste.org/133188/
+18:    sdp2430:  Boot PASS: http://fpaste.org/133189/
+19:    sdp3430:  Boot PASS: http://fpaste.org/133212/
+TOTAL = 19 boards, Booted Boards = 19, No Boot boards = 0
 
-> +
-> +	down(&coresight_semaphore);
+Again, all pass. I have also tested with next AM335x Suspend/Resume
+implementation, next version will use generic sram driver to allocate for
+low-level assembly code, and that works fine as well.
 
-What is your reason for using a semaphore rather than a mutex?
-
-...
-> +/**
-> + * coresight_timeout - loop until a bit has changed to a specific state.
-> + * @addr: base address of the area of interest.
-> + * @offset: address of a register, starting from @addr.
-> + * @position: the position of the bit of interest.
-> + * @value: the value the bit should have.
-> + *
-> + * Returns as soon as the bit has taken the desired state or TIMEOU_US has
-
-Typo?
-
-> + * elapsed, which ever happens first.
-> + */
-> +
-> +void coresight_timeout(void __iomem *addr, u32 offset, int position, int value)
-> +{
-> +	int i;
-> +	u32 val;
-> +
-> +	for (i = TIMEOUT_US; i > 0; i--) {
-> +		val = __raw_readl(addr + offset);
-> +		/* waiting on the bit to go from 0 to 1 */
-> +		if (value) {
-> +			if (val & BIT(position))
-> +				return;
-> +		/* waiting on the bit to go from 1 to 0 */
-> +		} else {
-> +			if (!(val & BIT(position)))
-> +				return;
-> +		}
-> +
-> +		/* The specification doesn't say how long we are expected
-> +		 * to wait.
-> +		 */
-
-		/*
-		 * The kernel commeting style for multi-line comments is
-		 * like this.  Note the line opening the comment has no
-		 * comment text.
-		 */
-
-> +		udelay(1);
-
-So the duration is arbitary.
-
-> +	}
-> +
-> +	WARN(1,
-> +	     "coresight: timeout observed when proving at offset %#x\n",
-> +	     offset);
-
-This is also buggy.  On the last loop iteration, we delay 1us, decrement
-i, and then test for it being greater than zero.  If it isn't, print
-this message and do a backtrace (why is a backtrace useful here?)
-The important point here is that we waited for 1us, and /didn't/ test
-for success before claiming timeout.  That makes the final 1us wait
-entirely useless.
-
-> diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
-> new file mode 100644
-> index 0000000..c780b4b
-> --- /dev/null
-> +++ b/drivers/coresight/of_coresight.c
-> @@ -0,0 +1,201 @@
-...
-> +struct coresight_platform_data *of_get_coresight_platform_data(
-> +				struct device *dev, struct device_node *node)
-> +{
-> +	int id, i = 0, ret = 0;
-> +	struct device_node *cpu;
-> +	struct coresight_platform_data *pdata;
-> +	struct of_endpoint endpoint, rendpoint;
-> +	struct device_node *ep = NULL;
-> +	struct device_node *rparent = NULL;
-> +	struct device_node *rport = NULL;
-> +
-> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata)
-> +		return ERR_PTR(-ENOMEM);
-
-So, what are the rules for calling this function?  What is the expected
-lifetime of this pdata structure in relation to 'dev' ?
-
-You do realise that when a driver unbinds from 'dev', this allocation
-will be freed.  If you hold on to the pointer and dereference it, you
-could be accessing memory allocated for other purposes at that point.
-
-> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-> new file mode 100644
-> index 0000000..5b22287
-> --- /dev/null
-> +++ b/include/linux/coresight.h
-> @@ -0,0 +1,275 @@
-...
-> +/**
-> + * @name:	name of the entry to appear under the component's
-> +		debugfs sub-directory.
-> + * @mode:	what operation can be performed on the entry.
-> + * @ops:	specific manipulation to be done using this entry.
-> + */
-
-Wrong commenting style.  Please read Documentation/kernel-doc-nano-HOWTO.txt
-for information how to document structures.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Dave
