@@ -1,31 +1,41 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 12 Sep 2014 13:40:02 -0300
-Subject: [alsa-devel] [PATCH v2 2/4] ARM: dts: pbab01: enable I2S audio on
- phyFLEX-i.MX6 boards
-In-Reply-To: <1410539161.314611261@f174.i.mail.ru>
-References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410537872-17274-3-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410539161.314611261@f174.i.mail.ru>
-Message-ID: <CAOMZO5C9_XwgcLvVWvxB1A306_Ehm17ZE111j6d+7MhudAhT0g@mail.gmail.com>
+Date: Fri, 12 Sep 2014 13:43:39 -0300
+Subject: [PATCH V1 1/3] ARM: clk-imx6sl: refine clock tree for SSI
+In-Reply-To: <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
+References: <cover.1410253534.git.shengjiu.wang@freescale.com>
+ <7ed21195ebff8b3ccbecaeb492504edd28deea2d.1410253534.git.shengjiu.wang@freescale.com>
+ <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
+Message-ID: <CAOMZO5DJZHKAV4Y9aUwMNWZqhoLrKrsZdYnKqPem2ZSy=-oAYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 1:26 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Fri, 12 Sep 2014 19:04:30 +0300 ?? Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>:
->> Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
->> over SSI interface.
+On Fri, Sep 12, 2014 at 1:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Sep 9, 2014 at 6:13 AM, Shengjiu Wang
+> <shengjiu.wang@freescale.com> wrote:
+>> Each SSI has "ssi", "ssi_ipg" clocks, and they share same gate bits.
 >>
->> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
->> ---
-> ...
->> +&ssi2 {
->> +     fsl,mode = "i2s-slave";
->> +     status = "okay";
->> +     #sound-dai-cells = <0>;
->> +};
+>> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
 >
-> I have already sent patch to add "#sound-dai-cells" into all i.MX DT-files.
-> Shawn, can you point us to this tree/commit?
+> This patch breaks audio playback on imx6q-sabresd:
+>
+> root at freescale /$ aplay /home/clarinet.wav
+> Playing WAVE '/home/clarinet.wav' : Signed 16 bit Little Endian, Rate 44100 Hz,
+> Mono
+> underrun!!! (at least -1585992.581 ms long)
+> underrun!!! (at least -1585992.585 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+> underrun!!! (at least -1585992.586 ms long)
+>
+> If I revert this commit, then I am able to play it well again.
 
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=for-next&id=36c7e8826cf32dd4dd34c71b526653b800414355
+Ops, I replied in the wrong patch.
+
+The one that breaks imx6q-sabresd is:
+
+   commit 48e1c2255 "ARM: clk-imx6q: refine clock tree for SSI"
