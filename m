@@ -1,55 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Sep 2014 10:03:16 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
-In-Reply-To: <3900226.tYc6lW0Md4@wuerfel>
-References: <540F1409.3070206@antcom.de> <4173517.3fBhGIV2aO@wuerfel>
- <54105765.5090708@antcom.de> <3900226.tYc6lW0Md4@wuerfel>
-Message-ID: <CACRpkda66Wo1GMWB6XD76rV14O--gre434cwc1tRw-w2ro0N6Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 12 Sep 2014 10:08:12 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <9935938.eKOCvCAtLt@fb07-iapwap2>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <1591383.Xdy91rktuP@fb07-iapwap2> <20140911145421.GE5149@katana>
+ <9935938.eKOCvCAtLt@fb07-iapwap2>
+Message-ID: <CAMuHMdWHDks85oFdE1zhRBFxoVdQuU0XCT0vFkdJwTxK-0w9QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 4:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 10 September 2014 15:51:33 Roland Stigge wrote:
+Hi Marc,
+
+On Fri, Sep 12, 2014 at 9:51 AM, Marc Dietrich <marvin24@gmx.de> wrote:
+> Am Donnerstag, 11. September 2014, 16:54:22 schrieb Wolfram Sang:
+>> On Thu, Sep 11, 2014 at 04:52:22PM +0200, Marc Dietrich wrote:
+>> > Am Donnerstag, 11. September 2014, 16:40:04 schrieb Wolfram Sang:
+>> > > > b) could be seen as a configuration thing since the functionality
+>> > > > backend could be changed at runtime even.
+>> > >
+>> > > Come to think of it, not only the functionality, also the address can be
+>> > > changed at runtime. This makes me think it should really not be in DT
+>> > > after all.
+>> >
+>> > even worse, there can be multiple masters and slaves changing their role
+>> > on
+>> > the fly AFAIK. So the best dt can do is to provide an initial
+>> > configuration, so all drivers know where they are and where to start.
+>> > Everything else can be changed during runtime.
 >>
->> > For
->> > lpc32xx, this is currently not possible because you are not using
->> > the common clk implementation. Would it be possible for you
->> > to look into converting that driver over and moving it to
->> > drivers/clk?
->>
->> It's certainly possible, but time might be scarce. What would be a good
->> reference platform to have a look into as example? Or a hint/link?
+>> Why do you want DT to be involved at all?
 >
-> I'll let Linus answer that one, he converted a couple of platform and
-> probably has a better idea than I do.
+> Imagine a device which supports both, slave or master mode. The driver needs
+> to know in which mode it should operate. This cannot be hard coded, because on
+> different boards, different modes can be used.
+>
+> The point is, that if we define a dt binding for master device on slave
+> adapters it will be there forever. So even if it makes no sense for the
+> example eeprom simulator (or even our embedded controller), it may make sense
+> for other or future devices.
 
-Step-wise conversion on U300:
+DT describes the hardware. The most you can do is describe an i2c
+adapter, and an i2c bus with (physical) i2c slaves, if any, and (other)
+i2c masters[*], if any.
 
-commit 50667d63085af108f625c83102430c1d74931d78
-"ARM: u300: convert to common clock"
-converts to common clock *without* using device tree.
+If the description contains i2c slaves, the i2c adapter can operate in
+(but may be not limited to) master mode.
 
-commit 14c2607144c11653b27a423ead0703ffaa65d0b1
-"clk: move the U300 fixed and fixed-factor to DT"
-commit bba5f2cc2f0fe4191ad2699c7c03a6def31f54e2
-"ARM: u300: move the gated system controller clocks to DT"
-commit 85fb28bed813469ba56706a7e48fba596f47c253
-"ARM: u300: convert MMC/SD clock to device tree"
+I2c slaves implemented in Linux are not physical i2c slaves, but just
+a piece of software. They can appear/disappear/change at any time.
+Hence I think this is something to be configured by userspace, like
+"tie the i2c-eeprom-slave driver to address 64 on i2c bus 3".
 
-Then gradually moves those clocks over to being handled
-from the device tree.
+And then you can have the mixed case, where the i2c adapter is both
+a master, talking to the physical slaves, and a slave, being talked to by
+another master. But that's just a superposition of the two cases above,
+right?
 
-For an example on a platform lacking clock implementation,
-look at:
+[*] Are there bindings for other masters on an i2c bus?
 
-commit ef6eb322ce574ba73658a677e83e5da3cfab301b
-"clk: nomadik: implement the Nomadik clocks properly"
-where I implement the Nomadik per-bit enabled clocks
-This includes device tree bindings.
+Just my 0.02? (as long as those coins still exist).
 
-commit c641d4dfef6d462c6d66a6fb57700086cd2f0106
-"ARM: nomadik: add the new clocks to the device tree"
-adds them to the device tree and make use of them.
+Gr{oetje,eeting}s,
 
-Yours,
-Linus Walleij
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
