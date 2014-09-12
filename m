@@ -1,44 +1,47 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Thu, 11 Sep 2014 20:40:16 -0700
-Subject: [PATCH] arm64: pageattr: Correctly adjust unaligned start
- addresses
-In-Reply-To: <1410473432-13381-1-git-send-email-lauraa@codeaurora.org>
-References: <54112831.6010800@codeaurora.org>
- <1410473432-13381-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <CABg9mcs7ZhsyK6rZGORS1GoFB7V1vXwMJa-Bsnp4kwu5GSTB2g@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 12 Sep 2014 09:23:50 +0530
+Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
+In-Reply-To: <54122962.5020903@gmail.com>
+References: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
+ <54122962.5020903@gmail.com>
+Message-ID: <000401cfce3d$3fc3b0b0$bf4b1210$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 3:10 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> The start address needs to be actually updated after it
-> is detected to be unaligned. Adjust it and the end address
-> properly.
->
-> Reported-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm64/mm/pageattr.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index 75e744e..bb0ea94 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -46,7 +46,8 @@ static int change_memory_common(unsigned long addr, int numpages,
->         struct page_change_data data;
->
->         if (!IS_ALIGNED(addr, PAGE_SIZE)) {
-> -               addr &= PAGE_MASK;
-> +               start &= PAGE_MASK;
-> +               end = start + size;
->                 WARN_ON_ONCE(1);
->         }
->
+Hi Tomasz,
 
-Looks good to me.
-Reviewed-by: Zi Shen Lim <zlim.lnx@gmail.com>
+On Friday, September 12, 2014, Tomasz Figa wrote,
+> To: Pankaj Dubey; linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; linux-kernel at vger.kernel.org
+> Cc: kgene.kim at samsung.com; s.nawrocki at samsung.com; mturquette at linaro.org;
+> Chander Kashyap; Abhilash Kesavan
+> Subject: Re: [PATCH] clk: samsung: exynos5260: fix typo in clock name
+> 
+> Hi Pankaj,
+> 
+> On 10.09.2014 07:56, Pankaj Dubey wrote:
+> > From: Chander Kashyap <k.chander@samsung.com>
+> >
+> > The parent name added in parent list as
+> > mout_phyclk_mipi_dphy_4l_m_txbyte_clkhs_p, is different than the
+> > defined parent due to typo.
+> >
+> > Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> 
+> Missed your sign-off? You can reply with it inline and I will add it when
+applying this
+> weekend.
+> 
 
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
+OK.
+
+> P.S. Please keep me on CC when sending patches for Samsung clock drivers.
+
+Sure.
+
+Thanks,
+Pankaj Dubey
+> 
+> Best regards,
+> Tomasz
