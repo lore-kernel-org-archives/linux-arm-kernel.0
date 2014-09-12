@@ -1,25 +1,41 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 12 Sep 2014 14:05:53 -0700
-Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
-In-Reply-To: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
-References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140912210553.GA27924@core.coreip.homeip.net>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 12 Sep 2014 17:10:32 -0400
+Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
+In-Reply-To: <20140912200355.GD9234@xora-haswell.xora.org.uk>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
+ <54134CE8.8070506@redhat.com>
+ <20140912200355.GD9234@xora-haswell.xora.org.uk>
+Message-ID: <54136148.40106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On 09/12/2014 04:03 PM, Graeme Gregory wrote:
+> On Fri, Sep 12, 2014 at 03:43:36PM -0400, Jon Masters wrote:
+>> On 09/12/2014 10:00 AM, Hanjun Guo wrote:
+>>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>>
+>>> ACPI 5.1 does not currently support S states for ARM64 hardware but
+>>> ACPI code will call acpi_target_system_state() for device power
+>>> managment, so introduce sleep-arm.c to allow other drivers to function
+>>> until S states are defined.
+>>
+>> Aside: ACPI5.1 does define the Platform Communication Channel and CPC
+>> (Collaborative Processor Performance Control). Some details need to be
+>> fleshed out there for practical 64-bit ARMv8 server systems, but the
+>> underpinnings and mechanisms are in place in the 5.1 specification that
+>> can be built upon over time to achieve practical S-State equivalence.
+                                                    ^ meant C/P sorry
 
-On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
-> To give callers the option of acting on a errors while removing the
-> pm_domain ops for the device in the ACPI PM domain, let
-> acpi_dev_pm_detach() return an int to provide the error code.
+> Disagree, S-States are about going to sleep or hibernating, that is
+> nothing to do with CPU Performance.
 
-So how would callers handle the errors? As far as I can see
-acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
-there is no meaningful strategy to handle errors as you are past the point of
-no return and you keep on tearing down the device.
+Correct. In replying to the above, I was thinking about power and
+performance management of components  - CPU (C/P), and device (D)
+specific power/performance states - not the overall system (S) state,
+and I went off on a tangent. That was off-topic. For the actual topic at
+hand, that of global sleep, you are correct that only G0 (S0) and S5 are
+really defined today. Though I do think that the PCC might be used to
+actually implement overall system sleep state transitions later.
 
-Thanks. 
-
--- 
-Dmitry
+Jon.
