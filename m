@@ -1,55 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 12 Sep 2014 16:49:03 +0100
-Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
-In-Reply-To: <20140912151850.GB9234@xora-haswell.xora.org.uk>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
- <20140912145102.GB5532@arm.com>
- <20140912151850.GB9234@xora-haswell.xora.org.uk>
-Message-ID: <20140912154903.GE5532@arm.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 12 Sep 2014 17:54:34 +0200
+Subject: [PATCH RESEND v9 1/5] rtc: max77686: Allow the max77686 rtc to
+ wakeup the system
+In-Reply-To: <CAD=FV=Vu3u=KfUNUpL6qcr0Fp42WbY8AqfOXyWr-D3KW1PucxA@mail.gmail.com>
+References: <1410509864-10019-1-git-send-email-javier.martinez@collabora.co.uk>	<1410509864-10019-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=Vu3u=KfUNUpL6qcr0Fp42WbY8AqfOXyWr-D3KW1PucxA@mail.gmail.com>
+Message-ID: <5413173A.9070705@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 04:18:51PM +0100, Graeme Gregory wrote:
-> On Fri, Sep 12, 2014 at 03:51:02PM +0100, Catalin Marinas wrote:
-> > On Fri, Sep 12, 2014 at 03:00:03PM +0100, Hanjun Guo wrote:
-> > > --- a/drivers/acpi/Makefile
-> > > +++ b/drivers/acpi/Makefile
-> > > @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
-> > >  
-> > >  # Power management related files
-> > >  acpi-y				+= wakeup.o
-> > > +ifeq ($(ARCH), arm64)
-> > > +acpi-y				+= sleep-arm.o
-> > > +else # X86, IA64
-> > >  acpi-y				+= sleep.o
-> > > +endif
-> > >  acpi-y				+= device_pm.o
-> > >  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
-> > 
-> > What about:
-> > 
-> > -acpi-y				+= sleep.o
-> > +acpi-$(CONFIG_ACPI_SLEEP)	+= sleep.o
-> > 
-> > and make CONFIG_ACPI_SLEEP depend on !ARM64? Does the kernel compile if
-> > you disable CONFIG_ACPI_SLEEP?
+Hello Doug,
+
+On 09/12/2014 05:12 PM, Doug Anderson wrote:
+> Hi,
 > 
-> sleep.c is still needed in the case CONFIG_ACPI_SLEEP=n
+> On Fri, Sep 12, 2014 at 1:17 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> From: Doug Anderson <dianders@chromium.org>
+>>
+>> The max77686 includes an RTC that keeps power during suspend.  It's
+>> convenient to be able to use it as a wakeup source.
+>>
+>> NOTE: due to wakeup ordering problems this patch alone doesn't work so
+>> well on exynos5250-snow.  You also need something that brings the i2c
+>> bus up before the max77686 wakeup runs.
 > 
-> basically the two functions I stubbed are always called by bus.c
+> This note made sense when the patch was first submitted, but no longer
+> does since the i2c change landed.  See:
+> 
+> b19c195 i2c: s3c2410: resume the I2C controller earlier
+> 
 
-So the two functions are:
+You are right, I completely forgot to check if that actually landed and to
+remove the note in that case...
 
-acpi_target_system_state() - already defined in acpi_bus.h when
-CONFIG_ACPI_SLEEP is off.
+Maybe when the set is applied the note can be removed from this patch or do
+you think that I should re-spin the series for that?
 
-acpi_sleep_init() - this one doesn't have a dummy implementation for
-!ACPI_SLEEP.
-
-Now, for x86, do we need acpi_sleep_init() when CONFIG_ACPI_SLEEP is
-off? If not, we could simply add a dummy acpi_sleep_init() function when
-!ACPI_SLEEP and don't enable the config option for arm64.
-
--- 
-Catalin
+Best regards,
+Javier
