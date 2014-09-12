@@ -1,63 +1,116 @@
-From: jay.xu@rock-chips.com (Jianqun)
-Date: Fri, 12 Sep 2014 16:11:51 +0800
-Subject: [PATCH] ARM: dts: add rk3288 i2s controller
-Message-ID: <1410509511-16667-1-git-send-email-jay.xu@rock-chips.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 12 Sep 2014 10:14:18 +0200
+Subject: [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle
+ SATA controller
+In-Reply-To: <CAOesGMh_Ku-pReg5LHVFvRM0-s_zEO4rgAvaD5rv-eTfPD71Yw@mail.gmail.com>
+References: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <CAOesGMh_Ku-pReg5LHVFvRM0-s_zEO4rgAvaD5rv-eTfPD71Yw@mail.gmail.com>
+Message-ID: <5412AB5A.3090801@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dt for rk3288 i2s controller, since i2s clock pins and data pins
-default to be GPIO, this patch also add pinctrl to mux them.
+Hi,
 
-Tested on RK3288 board.
+On 09/11/2014 10:17 PM, Olof Johansson wrote:
+> On Tue, Sep 9, 2014 at 1:37 PM,  <suravee.suthikulpanit@amd.com> wrote:
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> This patch adds ACPI support for non-PCI SATA contoller in ahci_platform driver.
+>> It adds ACPI matching table in ahci_platform to support AMD Seattle SATA controller
+>> with following ASL structure in DSDT:
+>>
+>>     Device (SATA0)
+>>     {
+>>       Name(_HID, "AMDI0600")    // Seattle AHSATA
+>>       Name (_CCA, 1)            // Cache-coherent controller
+>>       Name (_CRS, ResourceTemplate ()
+>>       {
+>>         Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
+>>         Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
+>>       })
+>>     }
+>>
+>> Since ATA driver should not require PCI support for ATA_ACPI,
+>> this patch also removes dependency in the driver/ata/Kconfig.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> ---
+>>  drivers/ata/Kconfig         |  2 +-
+>>  drivers/ata/ahci_platform.c | 13 +++++++++++++
+>>  2 files changed, 14 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+>> index e1b9278..f2e6c9e 100644
+>> --- a/drivers/ata/Kconfig
+>> +++ b/drivers/ata/Kconfig
+>> @@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
+>>
+>>  config ATA_ACPI
+>>         bool "ATA ACPI Support"
+>> -       depends on ACPI && PCI
+>> +       depends on ACPI
+>>         default y
+>>         help
+>>           This option adds support for ATA-related ACPI objects.
+>> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+>> index f61ddb9..3499bab 100644
+>> --- a/drivers/ata/ahci_platform.c
+>> +++ b/drivers/ata/ahci_platform.c
+>> @@ -20,6 +20,9 @@
+>>  #include <linux/platform_device.h>
+>>  #include <linux/libata.h>
+>>  #include <linux/ahci_platform.h>
+>> +#ifdef CONFIG_ATA_ACPI
+>> +#include <linux/acpi.h>
+>> +#endif
+>>  #include "ahci.h"
+>>
+>>  static const struct ata_port_info ahci_port_info = {
+>> @@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
+>>  };
+>>  MODULE_DEVICE_TABLE(of, ahci_of_match);
+>>
+>> +#ifdef CONFIG_ATA_ACPI
+>> +static const struct acpi_device_id ahci_acpi_match[] = {
+>> +       { "AMDI0600", 0 }, /* AMD Seattle AHCI */
+>> +       { },
+>> +};
+>> +#endif
+>> +
+>>  static struct platform_driver ahci_driver = {
+>>         .probe = ahci_probe,
+>>         .remove = ata_platform_remove_one,
+>> @@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
+>>                 .name = "ahci",
+>>                 .owner = THIS_MODULE,
+>>                 .of_match_table = ahci_of_match,
+>> +#ifdef CONFIG_ATA_ACPI
+>> +               .acpi_match_table = ACPI_PTR(ahci_acpi_match),
+>> +#endif
+> 
+> The whole point of having ACPI_PTR() is to avoid having ifdefs like
+> these. The structure member is always there, so there's no need to
+> have it conditionally compiled out.
+> 
+> Come to think of it, the match table should be under CONFIG_ACPI
+> instead -- why do a separate config option just for this?
 
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+To clarify this for people like me who were under the impression
+that ACPI_PTR() does some kind of cast, this is the definition
+of ACPI_PTR:
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 5950b0a..0e2a815 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -130,6 +130,21 @@
- 		status = "disabled";
- 	};
- 
-+	i2s: i2s at ff890000 {
-+		compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
-+		reg = <0xff890000 0x10000>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		dmas = <&dmac_bus_s 0>, <&dmac_bus_s 1>;
-+		dma-names = "tx", "rx";
-+		clock-names = "i2s_hclk", "i2s_clk";
-+		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2s0_clk>;
-+		status = "disabled";
-+	};
-+
- 	uart0: serial at ff180000 {
- 		compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart";
- 		reg = <0xff180000 0x100>;
-@@ -463,6 +478,17 @@
- 			};
- 		};
- 
-+		i2s0 {
-+			i2s0_clk: i2s0_clk {
-+				rockchip,pins = <6 0 RK_FUNC_1 &pcfg_pull_none>,
-+						<6 1 RK_FUNC_1 &pcfg_pull_none>,
-+						<6 2 RK_FUNC_1 &pcfg_pull_none>,
-+						<6 3 RK_FUNC_1 &pcfg_pull_none>,
-+						<6 4 RK_FUNC_1 &pcfg_pull_none>,
-+						<6 8 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		sdmmc {
- 			sdmmc_clk: sdmmc-clk {
- 				rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none>;
--- 
-1.9.1
+#ifdef  CONFIG_ACPI
+#define ACPI_PTR(_ptr)  (_ptr)
+#else
+#define ACPI_PTR(_ptr)  (NULL)
+#endif
+
+Regards,
+
+Hans
+
+
+> 
+> 
+> -Olof
+> 
