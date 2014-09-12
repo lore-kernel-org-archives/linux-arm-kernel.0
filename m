@@ -1,33 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 12 Sep 2014 13:35:48 -0300
-Subject: [PATCH V1 1/3] ARM: clk-imx6sl: refine clock tree for SSI
-In-Reply-To: <7ed21195ebff8b3ccbecaeb492504edd28deea2d.1410253534.git.shengjiu.wang@freescale.com>
-References: <cover.1410253534.git.shengjiu.wang@freescale.com>
- <7ed21195ebff8b3ccbecaeb492504edd28deea2d.1410253534.git.shengjiu.wang@freescale.com>
-Message-ID: <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Fri, 12 Sep 2014 09:37:17 -0700
+Subject: [PATCH v3 0/9] Tegra xHCI support
+In-Reply-To: <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
+ <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
+ <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
+ <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+Message-ID: <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 6:13 AM, Shengjiu Wang
-<shengjiu.wang@freescale.com> wrote:
-> Each SSI has "ssi", "ssi_ipg" clocks, and they share same gate bits.
+On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
+>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
+>>>>
+>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
+>>>> recently posted by Andrew Chew [2].
+>>>
+>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
+>>> USB devices I tested with, about half where probed correctly, but the
+>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
+>>> right after the reset, the C_PORT_CONNECTION bit is set.
+>>>
+>>> I don't see any correlation between the failure and the kind of usb
+>>> device, but I don't have much experience with USB implementations
+>>> either.
+>>
+>> Hmm... I haven't seen that before.  Which particular devices were you using?
 >
-> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> Here they are:
+>
+> work:
+>
+> Genius keyboard: 05d5:6782
+> Logitech mouse: 046d:c06a
+> Denver MP3 player: 10d6:1100
+> Atheros Bluetooth dongle: 0cf3:3005
+>
+> don't work:
+>
+> MCS7830 ethernet dongle: 9710:7830
+> Genesys Logic hub: 05e3:0608
 
-This patch breaks audio playback on imx6q-sabresd:
-
-root at freescale /$ aplay /home/clarinet.wav
-Playing WAVE '/home/clarinet.wav' : Signed 16 bit Little Endian, Rate 44100 Hz,
-Mono
-underrun!!! (at least -1585992.581 ms long)
-underrun!!! (at least -1585992.585 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-underrun!!! (at least -1585992.586 ms long)
-
-If I revert this commit, then I am able to play it well again.
+I tried the hub and it works just fine for me... Have you tried this
+on any other boards like Big or Blaze?
