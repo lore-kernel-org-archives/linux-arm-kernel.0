@@ -1,49 +1,111 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Fri, 12 Sep 2014 09:51:31 +0200
-Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
-In-Reply-To: <20140911145421.GE5149@katana>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
- <1591383.Xdy91rktuP@fb07-iapwap2> <20140911145421.GE5149@katana>
-Message-ID: <9935938.eKOCvCAtLt@fb07-iapwap2>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 12 Sep 2014 09:52:48 +0200
+Subject: [PATCHv2] mtd: nand: atmel_nand: retrieve NFC clock
+In-Reply-To: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410457937-14575-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5412A650.60102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 11. September 2014, 16:54:22 schrieb Wolfram Sang:
-> On Thu, Sep 11, 2014 at 04:52:22PM +0200, Marc Dietrich wrote:
-> > Am Donnerstag, 11. September 2014, 16:40:04 schrieb Wolfram Sang:
-> > > > b) could be seen as a configuration thing since the functionality
-> > > > backend could be changed at runtime even.
-> > > 
-> > > Come to think of it, not only the functionality, also the address can be
-> > > changed at runtime. This makes me think it should really not be in DT
-> > > after all.
-> > 
-> > even worse, there can be multiple masters and slaves changing their role
-> > on
-> > the fly AFAIK. So the best dt can do is to provide an initial
-> > configuration, so all drivers know where they are and where to start.
-> > Everything else can be changed during runtime.
+On 11/09/2014 19:52, Alexandre Belloni :
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 > 
-> Why do you want DT to be involved at all?
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Imagine a device which supports both, slave or master mode. The driver needs 
-to know in which mode it should operate. This cannot be hard coded, because on 
-different boards, different modes can be used.
+You may need to add Josh Wu to the list because he is the "de-facto"
+Maintainer of this driver.
 
-The point is, that if we define a dt binding for master device on slave 
-adapters it will be there forever. So even if it makes no sense for the 
-example eeprom simulator (or even our embedded controller), it may make sense 
-for other or future devices.
+Bye,
 
-On the other hand, we had some painful discussion about that issue in the 
-past, so if no one else steps up to propose a good alternative binding, I will 
-be the last to criticize your approach.
+> ---
+> 
+> Changes in v2:
+>  - reworked the error path to really make the clock optional
+>  - Documented the new optional property
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         |  1 +
+>  drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> index c4728839d0c1..f71e2ebab15b 100644
+> --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> @@ -38,6 +38,7 @@ Optional properties:
+>              if don't want to use it.
+>    - Optional properties:
+>      - atmel,write-by-sram: boolean to enable NFC write by sram.
+> +    - clocks: phandle to the peripheral clock if it exists
+>  
+>  Examples:
+>  nand0: nand at 40000000,0 {
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 9c5f717bda54..69e0eb1ace54 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -27,6 +27,7 @@
+>   *
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/slab.h>
+>  #include <linux/module.h>
+> @@ -96,6 +97,8 @@ struct atmel_nfc {
+>  	bool			use_nfc_sram;
+>  	bool			write_by_sram;
+>  
+> +	struct clk		*clk;
+> +
+>  	bool			is_initialized;
+>  	struct completion	comp_ready;
+>  	struct completion	comp_cmd_done;
+> @@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>  {
+>  	struct atmel_nfc *nfc = &nand_nfc;
+>  	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
+> +	int ret;
+>  
+>  	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+> @@ -2281,6 +2285,26 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+>  
+>  	nfc->is_initialized = true;
+>  	dev_info(&pdev->dev, "NFC is probed.\n");
+> +
+> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(nfc->clk)) {
+> +		ret = clk_prepare_enable(nfc->clk);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		dev_warn(&pdev->dev, "NFC clock is missing");
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int atmel_nand_nfc_remove(struct platform_device *pdev)
+> +{
+> +	struct atmel_nfc *nfc = &nand_nfc;
+> +
+> +	if (!IS_ERR(nfc->clk))
+> +		clk_disable_unprepare(nfc->clk);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
+>  		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+>  	},
+>  	.probe = atmel_nand_nfc_probe,
+> +	.remove = atmel_nand_nfc_remove,
+>  };
+>  
+>  static struct platform_driver atmel_nand_driver = {
+> 
 
-Marc
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/47dbeea6/attachment.sig>
+
+-- 
+Nicolas Ferre
