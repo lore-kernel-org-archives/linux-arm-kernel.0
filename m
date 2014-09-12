@@ -1,38 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Sep 2014 20:56:12 -0500
-Subject: [PATCH/RESEND] tty: serial: msm: Add DT based earlycon support
-In-Reply-To: <1410473644-19103-1-git-send-email-sboyd@codeaurora.org>
-References: <1410473644-19103-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAL_JsqLtx9+P1-O+gVRRhpjntHuNQZp4ASV8ScBhZB7gWDsGFw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 12 Sep 2014 10:10:25 +0800
+Subject: [PATCH 6/7] ARM: dts: sun6i: Add required ahb1 clock parent and
+ rates for dma controller
+In-Reply-To: <20140911211531.GN31276@lukather>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-7-git-send-email-wens@csie.org>
+ <20140911211531.GN31276@lukather>
+Message-ID: <CAGb2v64+RxJ52DzawhAtYCn=sw+28e4Q11jzG02KQE=8hxa0tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 5:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Add support for DT based early console on platforms with the msm
-> serial hardware.
+On Fri, Sep 12, 2014 at 5:15 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Sep 06, 2014 at 06:47:27PM +0800, Chen-Yu Tsai wrote:
+>> The DMA controller requires AHB1 bus clock to be clocked from PLL6.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index 8eb2c6d..1117989 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -317,6 +317,11 @@
+>>                       clocks = <&ahb1_gates 6>;
+>>                       resets = <&ahb1_rst 6>;
+>>                       #dma-cells = <1>;
+>> +
+>> +                     /* DMA controller requires AHB1 clocked from PLL6 */
+>> +                     assigned-clocks = <&ahb1>;
+>> +                     assigned-clock-parents = <&pll6>;
+>> +                     assigned-clock-rates = <200000000>;
 >
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Where did you get that from?
+>
+> The user manual says that it should be clocked at 600MHz, and I'm not
+> sure it should be enforced there either.
 
-One comment, but looks good to me.
+The bindings mean that ahb1 should be clocked from pll6 and at 200 MHz,
+not "pll6 should be 200 MHz". I assume you were misled by them.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Clocking ahb1 from pll6 and at 200 MHz with the /3 pre-divider is the
+vendor BSP default:
 
-> +static int __init
-> +msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
-> +{
-> +       if (!device->port.membase)
-> +               return -ENODEV;
-> +
-> +       device->con->write = msm_serial_early_write;
-> +       return 0;
-> +}
-> +OF_EARLYCON_DECLARE(msm_serial, "qcom,msm-uart",
-> +                   msm_serial_early_console_setup);
+On sun6i, the clock init code calls aw_ccu_switch_ahb_2_pll6(), which muxes
+ahb1 from pll6 with the highest dividers, then sets the rate for ahb1 to
+pll6, which sets pre-divider to /3 and divider to /1.
 
-Don't you want to support kernel command line as well? Then if you
-can't change the DT or bootloader's command line, you can add it into
-the kernel build with the appended command line. Don't forget to
-document it in kernel-parameters.txt if you do.
+Hope this clears it up. :)
 
-Rob
+
+Cheers
+ChenYu
