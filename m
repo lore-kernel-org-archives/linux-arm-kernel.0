@@ -1,40 +1,65 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Fri, 12 Sep 2014 16:18:51 +0100
-Subject: [PATCH v4 05/18] ARM64 / ACPI: Introduce sleep-arm.c
-In-Reply-To: <20140912145102.GB5532@arm.com>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-6-git-send-email-hanjun.guo@linaro.org>
- <20140912145102.GB5532@arm.com>
-Message-ID: <20140912151850.GB9234@xora-haswell.xora.org.uk>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Fri, 12 Sep 2014 20:56:23 +0530
+Subject: [PATCH v4 0/8] arch: arm64: enable support for Samsung Exynos7 SoC
+Message-ID: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 03:51:02PM +0100, Catalin Marinas wrote:
-> On Fri, Sep 12, 2014 at 03:00:03PM +0100, Hanjun Guo wrote:
-> > --- a/drivers/acpi/Makefile
-> > +++ b/drivers/acpi/Makefile
-> > @@ -23,7 +23,11 @@ acpi-y				+= nvs.o
-> >  
-> >  # Power management related files
-> >  acpi-y				+= wakeup.o
-> > +ifeq ($(ARCH), arm64)
-> > +acpi-y				+= sleep-arm.o
-> > +else # X86, IA64
-> >  acpi-y				+= sleep.o
-> > +endif
-> >  acpi-y				+= device_pm.o
-> >  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
-> 
-> What about:
-> 
-> -acpi-y				+= sleep.o
-> +acpi-$(CONFIG_ACPI_SLEEP)	+= sleep.o
-> 
-> and make CONFIG_ACPI_SLEEP depend on !ARM64? Does the kernel compile if
-> you disable CONFIG_ACPI_SLEEP?
-> 
-sleep.c is still needed in the case CONFIG_ACPI_SLEEP=n
+Changes since v3:
+- Removed aliases for serial controllers from dtsi file and moved it
+  into board specific dts file as suggested by Arnd.
+- Based this series on Robert Richter's patches for adding vendor
+  device tree sub-directories for arm64.
+  http://comments.gmane.org/gmane.linux.kbuild.devel/12131
 
-basically the two functions I stubbed are always called by bus.c
+This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
+Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
+ARMv8 RISC processor.
 
-Graeme
+The following patches are tested based on Kgene's for-next tree.
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+
+The following patches are required for this series.
+1- "tty/serial: fix config dependencies for samsung serial"
+   https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36208.html
+2- "dts, kbuild: Implement support for dtb vendor subdirs" patch set 
+   http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+
+Alim Akhtar (1):
+  arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
+
+Naveen Krishna Chatradhi (6):
+  clk: samsung: add support for 145xx and 1460x PLLs
+  clk: samsung: Factor out the common code to clk.c
+  clk: samsung: Add fixed_factor_clocks field to struct exynos_cmu_info
+  clk: samsung: add initial clock support for Exynos7 SoC
+  arm64: dts: Add initial device tree support for EXYNOS7
+  tty/serial: samsung: enable usage for 64-bit Exynos platforms
+
+Pankaj Dubey (1):
+  arm64: dts: add <dt-bindings/> symlink
+
+ .../devicetree/bindings/clock/exynos7-clock.txt    |   37 ++
+ arch/arm64/Kconfig                                 |   12 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/exynos/Makefile                |    5 +
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |   39 ++
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            |  160 ++++++++
+ arch/arm64/boot/dts/include/dt-bindings            |    1 +
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5260.c               |  185 ++-------
+ drivers/clk/samsung/clk-exynos7.c                  |  417 ++++++++++++++++++++
+ drivers/clk/samsung/clk-pll.c                      |   25 +-
+ drivers/clk/samsung/clk-pll.h                      |    4 +
+ drivers/clk/samsung/clk.c                          |   98 +++++
+ drivers/clk/samsung/clk.h                          |   37 ++
+ drivers/tty/serial/Kconfig                         |    2 +-
+ include/dt-bindings/clock/exynos7-clk.h            |   39 ++
+ 16 files changed, 898 insertions(+), 165 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos7-clock.txt
+ create mode 100644 arch/arm64/boot/dts/exynos/Makefile
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
+ create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+ create mode 100644 drivers/clk/samsung/clk-exynos7.c
+ create mode 100644 include/dt-bindings/clock/exynos7-clk.h
