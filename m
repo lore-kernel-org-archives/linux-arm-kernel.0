@@ -1,112 +1,108 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 12 Sep 2014 10:30:18 +0100
-Subject: [PATCH v10 00/10] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <5412ADE9.2050708@amd.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <5412ADE9.2050708@amd.com>
-Message-ID: <20140912093018.GX27864@e106497-lin.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 12 Sep 2014 11:40:09 +0200
+Subject: [PATCHv4] mtd: nand: atmel_nand: retrieve NFC clock
+Message-ID: <1410514809-25650-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 09:25:13AM +0100, Suravee Suthikulpanit wrote:
-> On 9/8/2014 8:54 AM, Liviu Dudau wrote:
-> > This is my version 10 of the attempt at adding support for generic PCI host
-> > bridge controllers that make use of device tree information to
-> > configure themselves. This version reverses v9's attempt to create one function
-> > to drive the whole process of extracting the host bridge ranges, setup the
-> > host bridge driver and then scan the root bus behind the host bridge. While it
-> > would've been quite user friendly, I agree that it would've caused a lot of pain
-> > in the future.
-> >
-> > I would like to get ACKs for the remaining patches as I would like to integrate
-> > this into -next in the following week.
-> >
-> > This version marks an implementation break with the previous versions as
-> > of_create_pci_host_bridge() is now gone. It gets replaced by
-> > of_pci_get_host_bridge_resources() that only parses the DT and extracts the
-> > relevant ranges and converts them to resources. The updated host bridge drivers
-> > will have to follow the guidelines in this example code:
-> >
-> > static int foohb_probe(struct platform_device *pdev)
-> > {
-> > 	struct device_node *dn = pdev->dev.of_node;
-> > 	struct foohb_drv *drv;
-> > 	resource_size_t io_base = 0;  /* phys address for start of IO */
-> > 	struct pci_bus *bus;
-> > 	int err = 0;
-> > 	LIST_HEAD(res);
-> >
-> > 	.....
-> > 	err = of_pci_get_host_bridge_resources(dn, 0, 255, &res, &io_base);
-> > 	if (err)
-> > 		goto err_handling;
-> > 	err = foohb_setup(drv, ...., &res, &io_base);
-> > 	if (err)
-> > 		goto err_handling;
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Hi Suravee,
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-> 
-> My understanding is that the "foohb_setup" above is supposed to be equivalent
-> to the "int (*setup)(struct pci_host_bridge *, resource_size_t)" in V9 that was
-> passed in as an argument of "of_create_pci_hot_bridge()".
+Changes in v4:
+ - fix typo in the documentation
 
-Correct. Parameters are probably different, but it is internal to your driver so
-you can do whatever you want there.
+ .../devicetree/bindings/mtd/atmel-nand.txt         |  2 ++
+ drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-> 
-> The problem I have is I need an intermediate step between "pci_create_root_bus()"
-> and "pci_scan_child_bus()" in order to update the information such as the "pci_bus->msi"
-> before this is propagate down to the child bus during the "pci_scan_child_bus"
-> which is also called in the pci_scan_root_bus() function.
-
-How did that work with my v9 patchset? How does it work for other MSI-aware platforms?
-Are they not using pci_scan_child_bus()?
-
-> 
-> Does this mean that I should not be calling the pci_scan_root_bus(), and tries to
-> re-implement the same logic in my driver?
-
-Bjorn can comment here, but there seems to be a long standing desire to make
-pci_scan_root_bus() more useful. If your change is generic enough, how about proposing
-a patch for pci_scan_root_bus() and see what feedback you get.
-
-Judging by the complete silence I'm getting on my change (patch 9/10) of the same function,
-we might be lucky enough and no one will notice ;) (Bjorn, I'm kidding and I know you
-are busy).
-
-Best regards,
-Liviu
-
-> 
-> Thanks,
-> 
-> Suravee
-> 
-> > 	.....
-> > 	pci_add_flags(....);
-> > 	bus = pci_scan_root_bus(&pdev->dev, 0, &foohb_ops, drv, &res);
-> > 	if (!bus)
-> > 		goto err_handling;
-> > 	....
-> > 	return 0;
-> >
-> > err_handling:
-> > 	......
-> > 	return err;
-> > }
-> >
-> 
-> 
-> 
-
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index c4728839d0c1..6edc3b616e98 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -36,6 +36,7 @@ Optional properties:
+     - reg : should specify the address and size used for NFC command registers,
+             NFC registers and NFC Sram. NFC Sram address and size can be absent
+             if don't want to use it.
++    - clocks: phandle to the peripheral clock
+   - Optional properties:
+     - atmel,write-by-sram: boolean to enable NFC write by sram.
+ 
+@@ -98,6 +99,7 @@ nand0: nand at 40000000 {
+ 		compatible = "atmel,sama5d3-nfc";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		clocks = <&hsmc_clk>
+ 		reg = <
+ 			0x70000000 0x10000000	/* NFC Command Registers */
+ 			0xffffc000 0x00000070	/* NFC HSMC regs */
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 9c5f717bda54..d1e502f8dbd0 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -27,6 +27,7 @@
+  *
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+@@ -96,6 +97,8 @@ struct atmel_nfc {
+ 	bool			use_nfc_sram;
+ 	bool			write_by_sram;
+ 
++	struct clk		*clk;
++
+ 	bool			is_initialized;
+ 	struct completion	comp_ready;
+ 	struct completion	comp_cmd_done;
+@@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ {
+ 	struct atmel_nfc *nfc = &nand_nfc;
+ 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
++	int ret;
+ 
+ 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
+@@ -2279,8 +2283,28 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
+ 	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
+ 	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
+ 
++	nfc->clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(nfc->clk)) {
++		ret = clk_prepare_enable(nfc->clk);
++		if (ret)
++			return ret;
++	} else {
++		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
++	}
++
+ 	nfc->is_initialized = true;
+ 	dev_info(&pdev->dev, "NFC is probed.\n");
++
++	return 0;
++}
++
++static int atmel_nand_nfc_remove(struct platform_device *pdev)
++{
++	struct atmel_nfc *nfc = &nand_nfc;
++
++	if (!IS_ERR(nfc->clk))
++		clk_disable_unprepare(nfc->clk);
++
+ 	return 0;
+ }
+ 
+@@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
+ 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
+ 	},
+ 	.probe = atmel_nand_nfc_probe,
++	.remove = atmel_nand_nfc_remove,
+ };
+ 
+ static struct platform_driver atmel_nand_driver = {
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.9.1
