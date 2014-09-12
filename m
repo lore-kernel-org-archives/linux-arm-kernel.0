@@ -1,46 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Sep 2014 19:00:30 +0200
-Subject: [PATCH] spi: pl022: Add support for chip select extension
-In-Reply-To: <CAE0=X_1YMs1OUx3H65qbZ9CX-oSiW4Uo65Z7qCW8-6ksc4ovvQ@mail.gmail.com>
-References: <1410360030-26634-1-git-send-email-anders.berg@avagotech.com>
- <CACRpkdavQBJkaC40GJkD396JkwPjSr_dzWegn8veLpG-Fcn-SQ@mail.gmail.com>
- <CAE0=X_1YMs1OUx3H65qbZ9CX-oSiW4Uo65Z7qCW8-6ksc4ovvQ@mail.gmail.com>
-Message-ID: <CACRpkdZfzsg-upNJaWX5CO6dJn3mg=wzhKhX-koask4ckxVTmQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 12 Sep 2014 18:03:07 +0100
+Subject: [PATCH 3.17-rc4 v5 2/6] arm: fiq: Replace default FIQ handler
+In-Reply-To: <1410435078-28462-3-git-send-email-daniel.thompson@linaro.org>
+References: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
+ <1410435078-28462-1-git-send-email-daniel.thompson@linaro.org>
+ <1410435078-28462-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140912170307.GL12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 10:10 PM, Anders Berg <anders.berg@avagotech.com> wrote:
-> On Thu, Sep 11, 2014 at 3:26 PM, Linus Walleij <linus.walleij@linaro.org>
-> wrote:
->> On Wed, Sep 10, 2014 at 4:40 PM, Anders Berg <anders.berg@avagotech.com>
->> wrote:
->> (...)
->> > +               /*
->> > +                * PL022 variant that has a chip select control register
->> > whih
->> > +                * allows control of 5 output signals nCS[0:4].
->> > +                */
->> > +               .id     = 0x000b6022,
->>
->> OK so you're defining 0xb6 to the the 8bit ID for LSI.
->>
->> Do you have some special reason for this, like that it appears
->> in some other silicon block from LSI? Otherwise I suggest using
->> 0x4c (uppercase 'L') so as to follow the pattern of the other
->> vendor IDs.
->
->
-> I picked 0xb6 since I've seen some reference manuals for other AMBA
-> peripherals the use of JEDEC assigned vendor IDs in this register field (see
-> the PL390 TRM for example). So I put the LSI Logic 7-bit JEDEC ID (0x36)
-> there: [0:6] = 0x36, [7] = 1 (the MSB set to '1' to signify the use of JEDEC
-> ID instead of a "classic" AMBA vendor).
+On Thu, Sep 11, 2014 at 12:31:14PM +0100, Daniel Thompson wrote:
+> -	.macro	svc_entry, stack_hole=0
+> +	.macro	svc_entry, stack_hole=0, call_trace=1
+>   UNWIND(.fnstart		)
+>   UNWIND(.save {r0 - pc}		)
+>  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
+> @@ -183,7 +183,9 @@ ENDPROC(__und_invalid)
+>  	stmia	r7, {r2 - r6}
+>  
+>  #ifdef CONFIG_TRACE_IRQFLAGS
+> +	.if \call_trace
+>  	bl	trace_hardirqs_off
+> +	.endif
+>  #endif
 
-Hey that's very observant, I had no clue about that scheme!
+Good, you picked this up from my patch.  But what about the call into
+lockdep from usr_entry?
 
-Can you write a comment about this in <linux/amba/bus.h> when
-you patch it (like above the enum) so we know that in the future
-when people need to pick new IDs?
+Yes, it should be safe if we're entering from user mode, because by
+definition, the kernel can't be holding any locks at that point.
+However, I'd much prefer to keep to a set of simple rules here: avoid
+lockdep in FIQ code altogether.
 
-Yours,
-Linus Walleij
+That's much easier to understand than "we can call into lockdep provided
+we've been entered from user mode".
+
+The other thing you miss is that /potentially/ call into the scheduler
+as well from a FIQ.  Do we /really/ want to do that kind of work here?
+
+Not happy.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
