@@ -1,114 +1,85 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 13 Sep 2014 00:34:29 +0200
-Subject: [PATCH 1/3] ARM: dts: rockchip: add operating points and armclk
- references
+Date: Sat, 13 Sep 2014 00:34:30 +0200
+Subject: [PATCH 2/3] ARM: dts: rockchip: add cpu supplies to boards
 In-Reply-To: <1410561271-19197-1-git-send-email-heiko@sntech.de>
 References: <1410561271-19197-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410561271-19197-2-git-send-email-heiko@sntech.de>
+Message-ID: <1410561271-19197-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic OPP entries for current supported Rockchip SoCs.
-The operating points are currently very conservative, so individual
-boards may opt to redefine them.
+This adds the cpu-supplies to the curie2, radxarock and rk3288-evb-rk808 boards.
+The rk3288-evb-act8846 variant cannot provide the cpu-regulator at the moment
+so will get its supply later.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
 ---
- arch/arm/boot/dts/rk3066a.dtsi | 12 +++++++++++-
- arch/arm/boot/dts/rk3188.dtsi  | 15 ++++++++++++++-
- arch/arm/boot/dts/rk3288.dtsi  | 19 ++++++++++++++++++-
- 3 files changed, 43 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts | 4 ++++
+ arch/arm/boot/dts/rk3188-radxarock.dts | 6 +++++-
+ arch/arm/boot/dts/rk3288-evb-rk808.dts | 6 +++++-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 879a818..572c30b 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -26,11 +26,21 @@
- 		#size-cells = <0>;
- 		enable-method = "rockchip,rk3066-smp";
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index 665dd56..5974a09 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -60,6 +60,10 @@
+ 	};
+ };
  
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0x0>;
-+			operating-points = <
-+				/* kHz    uV */
-+				1008000 1075000
-+				 816000 1025000
-+				 600000 1025000
-+				 504000 1000000
-+				 312000  975000
-+			>;
-+			clock-latency = <40000>;
-+			clocks = <&cru ARMCLK>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index ee801a9..e237216 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -26,11 +26,24 @@
- 		#size-cells = <0>;
- 		enable-method = "rockchip,rk3066-smp";
++&cpu0 {
++	cpu0-supply = <&vdd_arm>;
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index ff35acfa..8cbd5a2 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -76,6 +76,10 @@
+ 	};
+ };
  
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0x0>;
-+			operating-points = <
-+				/* kHz    uV */
-+				1608000 1350000
-+				1416000 1250000
-+				1200000 1150000
-+				1008000 1075000
-+				 816000  975000
-+				 600000  950000
-+				 504000  925000
-+				 312000  875000
-+			>;
-+			clock-latency = <40000>;
-+			clocks = <&cru ARMCLK>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 37a8ac8..7db8432 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -47,10 +47,27 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
++&cpu0 {
++	cpu0-supply = <&vdd_arm>;
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+@@ -117,7 +121,7 @@
+ 			vdd_arm: REG3 {
+ 				regulator-name = "VDD_ARM";
+ 				regulator-min-microvolt = <875000>;
+-				regulator-max-microvolt = <1300000>;
++				regulator-max-microvolt = <1350000>;
+ 				regulator-always-on;
+ 			};
  
--		cpu at 500 {
-+		cpu0: cpu at 500 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a12";
- 			reg = <0x500>;
-+			operating-points = <
-+				/* KHz    uV */
-+				1608000 1350000
-+				1512000 1300000
-+				1416000 1200000
-+				1200000 1100000
-+				1008000 1050000
-+				 816000 1000000
-+				 696000  950000
-+				 600000  900000
-+				 408000  900000
-+				 312000  900000
-+				 216000  900000
-+				 126000  900000
-+			>;
-+			clock-latency = <40000>;
-+			clocks = <&cru ARMCLK>;
- 		};
- 		cpu at 501 {
- 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+index ff522f8..d8c775e6 100644
+--- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
++++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+@@ -17,6 +17,10 @@
+ 	compatible = "rockchip,rk3288-evb-rk808", "rockchip,rk3288";
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&vdd_cpu>;
++};
++
+ &i2c0 {
+ 	clock-frequency = <400000>;
+ 	status = "okay";
+@@ -44,7 +48,7 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-min-microvolt = <750000>;
+-				regulator-max-microvolt = <1300000>;
++				regulator-max-microvolt = <1350000>;
+ 				regulator-name = "vdd_arm";
+ 			};
+ 
 -- 
 2.0.1
