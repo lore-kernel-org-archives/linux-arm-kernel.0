@@ -1,74 +1,52 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 12 Sep 2014 03:25:13 -0500
-Subject: [PATCH v10 00/10] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <5412ADE9.2050708@amd.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 12 Sep 2014 10:33:48 +0200
+Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+In-Reply-To: <9935938.eKOCvCAtLt@fb07-iapwap2>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+ <1591383.Xdy91rktuP@fb07-iapwap2> <20140911145421.GE5149@katana>
+ <9935938.eKOCvCAtLt@fb07-iapwap2>
+Message-ID: <20140912083348.GA1289@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/8/2014 8:54 AM, Liviu Dudau wrote:
-> This is my version 10 of the attempt at adding support for generic PCI host
-> bridge controllers that make use of device tree information to
-> configure themselves. This version reverses v9's attempt to create one function
-> to drive the whole process of extracting the host bridge ranges, setup the
-> host bridge driver and then scan the root bus behind the host bridge. While it
-> would've been quite user friendly, I agree that it would've caused a lot of pain
-> in the future.
->
-> I would like to get ACKs for the remaining patches as I would like to integrate
-> this into -next in the following week.
->
-> This version marks an implementation break with the previous versions as
-> of_create_pci_host_bridge() is now gone. It gets replaced by
-> of_pci_get_host_bridge_resources() that only parses the DT and extracts the
-> relevant ranges and converts them to resources. The updated host bridge drivers
-> will have to follow the guidelines in this example code:
->
-> static int foohb_probe(struct platform_device *pdev)
-> {
-> 	struct device_node *dn = pdev->dev.of_node;
-> 	struct foohb_drv *drv;
-> 	resource_size_t io_base = 0;  /* phys address for start of IO */
-> 	struct pci_bus *bus;
-> 	int err = 0;
-> 	LIST_HEAD(res);
->
-> 	.....
-> 	err = of_pci_get_host_bridge_resources(dn, 0, 255, &res, &io_base);
-> 	if (err)
-> 		goto err_handling;
-> 	err = foohb_setup(drv, ...., &res, &io_base);
-> 	if (err)
-> 		goto err_handling;
 
-My understanding is that the "foohb_setup" above is supposed to be equivalent
-to the "int (*setup)(struct pci_host_bridge *, resource_size_t)" in V9 that was
-passed in as an argument of "of_create_pci_hot_bridge()".
+> > Why do you want DT to be involved at all?
+> 
+> Imagine a device which supports both, slave or master mode. The driver needs 
+> to know in which mode it should operate. This cannot be hard coded, because on 
+> different boards, different modes can be used.
 
-The problem I have is I need an intermediate step between "pci_create_root_bus()"
-and "pci_scan_child_bus()" in order to update the information such as the "pci_bus->msi"
-before this is propagate down to the child bus during the "pci_scan_child_bus"
-which is also called in the pci_scan_root_bus() function.
+Okay, it sounds weird to me that a device is not able to switch between
+master and slave, but if you say so. Also, solving this issue would also
+handle potential weird IP blocks which can be slave only, right?
 
-Does this mean that I should not be calling the pci_scan_root_bus(), and tries to
-re-implement the same logic in my driver?
+What if you use two different adapter drivers or compatibles? One for
+master-mode, one for slave-mode (slave could leave algo->master_xfer
+empty, so the slave mode driver cannot send packets). I'm brainstorming
+here, so while it should work IMO I will probably need a second thought.
+
+So, in the DT you would have a block registering the I2C slave core
+which binds to a simple driver providing reg_slave/unreg_slave and
+pass on the slave-event. Then you could instantiate slave clients as
+said before.
+
+Maybe we need a real world example?
+
+> The point is, that if we define a dt binding for master device on slave 
+> adapters it will be there forever. So even if it makes no sense for the 
+> example eeprom simulator (or even our embedded controller), it may make sense 
+> for other or future devices.
+
+I don't know what you mean here. Again, an example might help?
 
 Thanks,
 
-Suravee
+   Wolfram
 
-> 	.....
-> 	pci_add_flags(....);
-> 	bus = pci_scan_root_bus(&pdev->dev, 0, &foohb_ops, drv, &res);
-> 	if (!bus)
-> 		goto err_handling;
-> 	....
-> 	return 0;
->
-> err_handling:
-> 	......
-> 	return err;
-> }
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140912/8a64a17c/attachment.sig>
