@@ -1,31 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 12 Sep 2014 15:43:25 -0700
-Subject: [PATCH 00/16 v9] omap 8250 based uart + DMA
-In-Reply-To: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140912224324.GK18849@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 13 Sep 2014 00:15:14 +0100
+Subject: [PATCH 2/2] pstore-ram: Allow optional mapping with
+ pgprot_noncached
+In-Reply-To: <1410546745-919-2-git-send-email-tony@atomide.com>
+References: <1410546745-919-1-git-send-email-tony@atomide.com>
+ <1410546745-919-2-git-send-email-tony@atomide.com>
+Message-ID: <20140912231514.GB12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140910 12:30]:
-> the diff of v8?v9 is small:
-> - rebased on top's of Greg's tty-next branch
-> - fixed #10 where we might have THRE interrupt enabled for longer than
->   needed
-> - re-did register setup in #10. Before this "less file" could freeze the
->   am335x-evm.
+On Fri, Sep 12, 2014 at 11:32:25AM -0700, Tony Lindgren wrote:
+> On some ARMs at least the memory can be mapped pgprot_noncached()
+> and still be working for atomic operations. As pointed out by
+> Colin Cross <ccross@android.com>, in some cases you do want to use
+> pgprot_noncached() if the SoC supports it to see a debug printk
+> just before a write hanging the system.
+> 
+> On ARMs, the atomic operations on strongly ordered memory are
+> implementation defined. So let's provide an optional kernel parameter
+> for configuring noncached memory, and use pgprot_writecombine() by
+> default.
 
-FYI, looks like merging in your uart_v9 branch for testing
-with my hwmod changes now fails to produce RX characters on omap3.
+Can we clean up this terminology please?
 
-The device wakes up just fine to the wake-up interrupt, and then
-serial8250_handle_irq() gets called, but I'm not seeing anything
-in the console getting printed out. It's like all the RX characters
-are getting lost instead of just the first one. The RX characters
-work fine when the system is running.
+Writecombine memory is not cached - write combine memory bypasses the
+caches entirely.  What it doesn't bypass are store buffers, which may
+combine two writes together.  So, calling it "cached" is misleading.
 
-So it seems there's been some kind of regression since v8?
+Secondly, memory returned by ioremap() is not strongly ordered, it is
+device memory.  There's three main classifications of memory on ARM:
+strongly ordered, device and normal memory.  Normal memory has attributes
+which define whether it is write combining, or cacheable in some way (and
+if so, how it's cacheable.)
 
-Regards,
+Exclusives are always permitted to normal memory.  The other two are
+implementation defined.  While an implementation may offer it on
+strongly ordered, that doesn't mean that it also supports it on device
+memory.
 
-Tony
+Lastly, aliased mappings are something that ARM has always strongly
+discouraged on ARMv6+ (it was plain down-right unpredictable, but it's
+now "strongly discouraged") and remapping memory with different memory
+type should be avoided.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
