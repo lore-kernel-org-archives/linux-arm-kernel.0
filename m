@@ -1,112 +1,30 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 13 Sep 2014 01:23:59 +0200
-Subject: [PATCHv5] mtd: nand: atmel_nand: retrieve NFC clock
-Message-ID: <1410564239-8411-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 12 Sep 2014 16:46:36 -0700
+Subject: [PATCH v2 2/7] clk: rockchip: fix rk3288 pll status register
+ location
+In-Reply-To: <1410561030-19127-3-git-send-email-heiko@sntech.de>
+References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+ <1410561030-19127-3-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=Uu1z+zbKjW5gPtTpDRh5=WXpBcnuwc7GuUKvKTG0sNZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Heiko,
 
-Retrieve the NFC clock to make sure it is enabled. Make that optional to ensure
-compatibility with previous device trees but document it as mandatory so newer
-device trees will include it.
+On Fri, Sep 12, 2014 at 3:30 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> From: Jianqun <jay.xu@rock-chips.com>
+>
+> In RK3288, APLL lock status bit is in GRF_SOC_STATUS1,
+> but in RK3188, is GRFSOC_STATUS0.
+>
+> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+>
+> Also name the constant accordingly as GRF_SOC_STATUS1
+> to prevent confusion.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/rockchip/clk-rk3288.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Josh Wu <josh.wu@atmel.com>
----
-Changes in v5:
- - Added a proper commit log
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |  2 ++
- drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index c4728839d0c1..6edc3b616e98 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -36,6 +36,7 @@ Optional properties:
-     - reg : should specify the address and size used for NFC command registers,
-             NFC registers and NFC Sram. NFC Sram address and size can be absent
-             if don't want to use it.
-+    - clocks: phandle to the peripheral clock
-   - Optional properties:
-     - atmel,write-by-sram: boolean to enable NFC write by sram.
- 
-@@ -98,6 +99,7 @@ nand0: nand at 40000000 {
- 		compatible = "atmel,sama5d3-nfc";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		clocks = <&hsmc_clk>
- 		reg = <
- 			0x70000000 0x10000000	/* NFC Command Registers */
- 			0xffffc000 0x00000070	/* NFC HSMC regs */
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 9c5f717bda54..d1e502f8dbd0 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -27,6 +27,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-@@ -96,6 +97,8 @@ struct atmel_nfc {
- 	bool			use_nfc_sram;
- 	bool			write_by_sram;
- 
-+	struct clk		*clk;
-+
- 	bool			is_initialized;
- 	struct completion	comp_ready;
- 	struct completion	comp_cmd_done;
-@@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- {
- 	struct atmel_nfc *nfc = &nand_nfc;
- 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-+	int ret;
- 
- 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-@@ -2279,8 +2283,28 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
- 	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
- 
-+	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(nfc->clk)) {
-+		ret = clk_prepare_enable(nfc->clk);
-+		if (ret)
-+			return ret;
-+	} else {
-+		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
-+	}
-+
- 	nfc->is_initialized = true;
- 	dev_info(&pdev->dev, "NFC is probed.\n");
-+
-+	return 0;
-+}
-+
-+static int atmel_nand_nfc_remove(struct platform_device *pdev)
-+{
-+	struct atmel_nfc *nfc = &nand_nfc;
-+
-+	if (!IS_ERR(nfc->clk))
-+		clk_disable_unprepare(nfc->clk);
-+
- 	return 0;
- }
- 
-@@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
- 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
- 	},
- 	.probe = atmel_nand_nfc_probe,
-+	.remove = atmel_nand_nfc_remove,
- };
- 
- static struct platform_driver atmel_nand_driver = {
--- 
-1.9.1
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
