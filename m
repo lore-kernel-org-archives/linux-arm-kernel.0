@@ -1,34 +1,35 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Sat, 13 Sep 2014 05:00:57 +0800
-Subject: [Patch v4 net-next 12/12] ARM: dts: imx6sx: add multi-queue support
- enet
-In-Reply-To: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
-References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1410555657-10744-13-git-send-email-Frank.Li@freescale.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 12 Sep 2014 15:13:34 -0700
+Subject: [PATCH RESEND v9 5/5] rtc: Add driver for Maxim 77802 PMIC
+ Real-Time-Clock
+In-Reply-To: <1410509864-10019-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1410509864-10019-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410509864-10019-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140912151334.cd53fca611a7de487f23241b@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+On Fri, 12 Sep 2014 10:17:43 +0200 Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
 
-Enable 3 queues suppport for ethernet
+> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
+> This patch adds support for the RTC and is based on a driver
+> added by Simon Glass to the Chrome OS kernel 3.8 tree.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Would it be appropriate to gather Simon's signoff?
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index f4b9da6..0a03260 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -776,6 +776,8 @@
- 					 <&clks IMX6SX_CLK_ENET_PTP>;
- 				clock-names = "ipg", "ahb", "ptp",
- 					      "enet_clk_ref", "enet_out";
-+				fsl,num-tx-queues=<3>;
-+				fsl,num-rx-queues=<3>;
- 				status = "disabled";
-                         };
- 
--- 
-1.9.1
+> +static inline int max77802_rtc_calculate_wday(u8 shifted)
+> +{
+> +	int counter = -1;
+> +
+> +	while (shifted) {
+> +		shifted >>= 1;
+> +		counter++;
+> +	}
+
+Can't use log2() or similar?
+
+> +	return counter;
+> +}
