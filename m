@@ -1,211 +1,61 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 12 Sep 2014 13:57:12 -0500
-Subject: [PATCH v8 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
-In-Reply-To: <20140912175023.GR3749@joshc.qualcomm.com>
-References: <1410542986-24419-1-git-send-email-agross@codeaurora.org>
- <1410542986-24419-4-git-send-email-agross@codeaurora.org>
- <20140912175023.GR3749@joshc.qualcomm.com>
-Message-ID: <20140912185712.GB8756@qualcomm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 12 Sep 2014 11:59:29 -0700
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <5412E3BB.9030800@arm.com>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com>	<5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+ <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
+ <5412E3BB.9030800@arm.com>
+Message-ID: <54134291.3040700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 12:50:23PM -0500, Josh Cartwright wrote:
-> Hey Andy-
-> 
-> Mostly cosmetic things below:
-> 
-> On Fri, Sep 12, 2014 at 12:29:46PM -0500, Andy Gross wrote:
-> > This patch adds a new driver for the Qualcomm USB 3.0 PHY that exists on some
-> > Qualcomm platforms.  This driver uses the generic PHY framework and will
-> > interact with the DWC3 controller.
-> > 
-> > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> > ---
-> >  drivers/phy/Kconfig         |   11 +
-> >  drivers/phy/Makefile        |    1 +
-> >  drivers/phy/phy-qcom-dwc3.c |  500 +++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 512 insertions(+)
-> >  create mode 100644 drivers/phy/phy-qcom-dwc3.c
-> > 
-> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> > index 0dd7427..5d56161 100644
-> > --- a/drivers/phy/Kconfig
-> > +++ b/drivers/phy/Kconfig
-> > @@ -230,4 +230,15 @@ config PHY_XGENE
-> >  	help
-> >  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
-> >  
-> > +config PHY_QCOM_DWC3
-> > +	tristate "QCOM DWC3 USB PHY support"
-> > +	depends on ARCH_QCOM
-> > +	depends on HAS_IOMEM
-> > +	depends on OF
-> > +	select GENERIC_PHY
-> > +	help
-> > +	  This option enables support for the Synopsis PHYs present inside the
-> > +	  Qualcomm USB3.0 DWC3 controller.  This driver supports both HS and SS
-> > +	  PHY controllers.
-> > +
-> >  endmenu
-> > diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> > index 95c69ed..aa16f30 100644
-> > --- a/drivers/phy/Makefile
-> > +++ b/drivers/phy/Makefile
-> > @@ -28,3 +28,4 @@ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
-> >  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
-> >  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
-> >  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-> > +obj-$(CONFIG_PHY_QCOM_DWC3)		+= phy-qcom-dwc3.o
-> > diff --git a/drivers/phy/phy-qcom-dwc3.c b/drivers/phy/phy-qcom-dwc3.c
-> > new file mode 100644
-> > index 0000000..05b8e1d
-> > --- /dev/null
-> > +++ b/drivers/phy/phy-qcom-dwc3.c
-> [..]
-> > +/* TX OVRD DRV LO register bits */
-> > +#define TX_OVRD_DRV_LO_AMPLITUDE_MASK	0x007F
-> > +#define TX_OVRD_DRV_LO_PREEMPH_MASK	0x3F80
-> > +#define TX_OVRD_DRV_LO_PREEMPH_SHIFT	7
-> > +#define TX_OVRD_DRV_LO_EN		BIT(14)
-> > +
-> > +struct qcom_dwc3_usb_phy;
-> 
-> Do you need this?
+On 09/12/14 05:14, Marc Zyngier wrote:
+> Hi Christopher,
+>
+> On 12/09/14 12:43, Christopher Covington wrote:
+>> Hi Marc,
+>>
+>> On 09/11/2014 01:43 PM, Marc Zyngier wrote:
+>>> On 11/09/14 18:29, Doug Anderson wrote:
+>>>
+>>>> I did this in the past (again, see Sonny's thread), but didn't
+>>>> consider myself knowledgeable to know if that was truly a good test:
+>>>>
+>>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>>>>        pr_info("DOUG: val is %#010x", val);
+>>>>        val |= (1 << 2);
+>>>>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
+>>>>        val = 0xffffffff;
+>>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>>>>        pr_info("DOUG: val is %#010x", val);
+>>>>
+>>>> The idea being that if you can make modifications to the SCR register
+>>>> (and see your changes take effect) then you must be in secure mode.
+>>>> In my case the first printout was 0x0 and the second was 0x4.
+>>> The main issue is when you're *not* in secure mode. It is likely that
+>>> this will explode badly. This is why I suggested something that is set
+>>> by the bootloader (after all. it knows which mode it is booted in), and
+>>> that the timer driver can use when the CPU comes up.
+>> What exactly does "exploding badly" look like? Causing and undefined
+>> instruction exception? That's just a branch with a mode switch. Any reason the
+>> code couldn't deal with that or even use that to its advantage?
+> We surely can handle the UNDEF and do something there. We just can't do
+> it the way Doug described it above.
+>
+>
 
-No, this was a set of interim changes that should have been squashed.
-Incidently, this was used when I had a separate ops table for the phys.
+I suggested doing that for something else a while ago and Will and Dave
+we're not thrilled[1]. The suggestion back then was to use DT to
+indicate what mode the kernel is running in.
 
-> > +
-> > +enum qcom_dwc3_phy_id {
-> > +	QCOM_DWC3_PHY_UTMI = 0,
-> > +	QCOM_DWC3_PHY_PIPE,
-> > +	QCOM_DWC3_PHYS_NUM,
-> > +};
-> > +
-> > +struct qcom_dwc3_usb_phy {
-> > +	void __iomem		*base;
-> > +	struct device		*dev;
-> > +	struct phy *phy;
-> > +	enum qcom_dwc3_phy_id	index;
-> > +
-> > +	struct clk		*xo_clk;
-> > +	struct clk		*ref_clk;
-> > +};
-> > +
-> > +/**
-> > + * Write register and read back masked value to confirm it is written
-> > + *
-> > + * @base - QCOM DWC3 PHY base virtual address.
-> > + * @offset - register offset.
-> > + * @mask - register bitmask specifying what should be updated
-> > + * @val - value to write.
-> > + */
-> > +static inline void qcom_dwc3_phy_write_readback(
-> > +	struct qcom_dwc3_usb_phy *phy_dwc3, u32 offset,
-> > +	const u32 mask, u32 val)
-> > +{
-> > +	u32 write_val, tmp = readl(phy_dwc3->base + offset);
-> > +
-> > +	tmp &= ~mask;		/* retain other bits */
-> > +	write_val = tmp | val;
-> > +
-> > +	writel(write_val, phy_dwc3->base + offset);
-> > +
-> > +	/* Read back to see if val was written */
-> > +	tmp = readl(phy_dwc3->base + offset);
-> > +	tmp &= mask;		/* clear other bits */
-> > +
-> > +	if (tmp != val)
-> > +		dev_err(phy_dwc3->dev, "write: %x to QSCRATCH: %x FAILED\n",
-> > +			val, offset);
-> > +}
-> > +
-> > +static int wait_for_latch(void __iomem *addr)
-> > +{
-> > +	u32 retry = 10;
-> > +
-> > +	while (true) {
-> > +		if (!readl(addr))
-> > +			break;
-> > +
-> > +		if (--retry == 0)
-> > +			return -ETIMEDOUT;
-> > +
-> > +		usleep_range(10, 20);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * Write SSPHY register
-> > + *
-> > + * @base - QCOM DWC3 PHY base virtual address.
-> > + * @addr - SSPHY address to write.
-> > + * @val - value to write.
-> > + */
-> > +static int qcom_dwc3_ss_write_phycreg(void __iomem *base, u32 addr, u32 val)
-> > +{
-> > +	writel(addr, base + CR_PROTOCOL_DATA_IN_REG);
-> > +	writel(0x1, base + CR_PROTOCOL_CAP_ADDR_REG);
-> > +
-> > +	if (wait_for_latch(base + CR_PROTOCOL_CAP_ADDR_REG))
-> > +		return 1;
-> 
-> I'm not too familiar with the GENERIC_PHY infrastructure, does it
-> understand that '1' is an error case?  I'm wondering if you should
-> instead propogate the -ETIMEDOUT up.
-
-Actually, yeah I need to return something < 0.  Let me respin to fix that.
-
- 
-> > +
-> > +	writel(val, base + CR_PROTOCOL_DATA_IN_REG);
-> > +	writel(0x1, base + CR_PROTOCOL_CAP_DATA_REG);
-> > +
-> > +	if (wait_for_latch(base + CR_PROTOCOL_CAP_DATA_REG))
-> > +		return 1;
-> > +
-> > +	writel(0x1, base + CR_PROTOCOL_WRITE_REG);
-> > +
-> > +	if (wait_for_latch(base + CR_PROTOCOL_WRITE_REG))
-> > +		return 1;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> [..]
-> > +
-> > +static struct phy_ops qcom_dwc3_phy_ops = {
-> > +	.init		= qcom_dwc3_phy_init,
-> > +	.exit		= qcom_dwc3_phy_exit,
-> > +	.power_on	= qcom_dwc3_phy_power_on,
-> > +	.power_off	= qcom_dwc3_phy_power_off,
-> > +	.owner		= THIS_MODULE,
-> > +};
-> > +
-> > +static const struct of_device_id qcom_dwc3_phy_table[] = {
-> > +	{
-> > +		.compatible = "qcom,dwc3-hs-usb-phy",
-> > +		.data = (void *)QCOM_DWC3_PHY_UTMI,
-> > +	},
-> > +	{
-> > +		.compatible = "qcom,dwc3-ss-usb-phy",
-> > +		.data = (void *)QCOM_DWC3_PHY_PIPE,
-> > +	},
-> > +	{ /* Sentinel */ }
-> > +};
-> > +MODULE_DEVICE_TABLE(of, qcom_dwc3_phy_table);
-> 
-> I'd suggest just creating a separate ops table, and have '.data' point
-> to it.  Might cleanup all of the switch() statements above.  You could
-> also probably drop the 'index' member of 'struct qcom_dwc3_usb_phy', and
-> maybe even 'enum qcom_dwc3_phy_id' altogether.
-
-Or just put in two function handlers that I point to in the probe and key off of
-the compat.
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
