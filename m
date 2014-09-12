@@ -1,35 +1,55 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Fri, 12 Sep 2014 15:45:01 -0500
-Subject: [Patch v3 net-next 09/12] net: fec: change FEC alignment
- according to i.mx6 sx requirement
-In-Reply-To: <20140912.164047.810313458974612565.davem@davemloft.net>
-References: <1410373845-5801-1-git-send-email-Frank.Li@freescale.com>
- <1410373845-5801-10-git-send-email-Frank.Li@freescale.com>
- <20140912.164047.810313458974612565.davem@davemloft.net>
-Message-ID: <CAHrpEqTV=5phAOkOMLoi2kzxNpBAp5g=pVDj9G8CkUmHp9dTwQ@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 12 Sep 2014 15:56:45 -0500
+Subject: [RFC PATCHv2 0/3] Support for HwSpinlock reserved locks
+Message-ID: <1410555408-56954-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 3:40 PM, David Miller <davem@davemloft.net> wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> Date: Thu, 11 Sep 2014 02:30:42 +0800
->
->> +
->> +     unsigned tx_align;
->> +     unsigned rx_align;
->>  };
->
-> Please always fully write out "unsigned int" rather than just "unsigned".
->
->> @@ -2399,6 +2393,7 @@ fec_enet_alloc_rxq_buffers(struct net_device *ndev, unsigned int queue)
->>       struct sk_buff *skb;
->>       struct bufdesc  *bdp;
->>       struct fec_enet_priv_rx_q *rxq;
->> +     unsigned off;
->
-> Likewise.
+Hi Ohad,
 
-Okay, I will fix it next version.
+This series is an RFC patchset that adds the support for reserved locks
+to the HwSpinlock core to restrict the dynamic hwspin_lock_request() API
+from allocating reserved locks (specific locks requested by DT client
+users). The patches are split away from the v5 hwspinlock/omap dt
+series [1] to not block the dt support patches. The series builds
+on top of the refreshed hwspinlock core/omap dt series [2], and are
+baselined on 3.17-rc3.
 
-best regards
-Frank Li
+Following are the summary of changes:
+- Patches 1 and 2 are equivalent patches of Patch 9 and 10
+  from [1]. Only change is an update to hwspinlock.txt documentation.
+- Patch 3 is an updated version of the reworked patch 12 [3] from v5.
+  Changes include some additional function documentation, switch to
+  internal of_xlate function and a fix for of_node reference maintainance.
+
+The validation logs on all the applicable OMAP SoCs are at:
+  OMAP4  - http://pastebin.ubuntu.com/8329417
+  OMAP5  - http://pastebin.ubuntu.com/8329420
+  DRA74x - http://pastebin.ubuntu.com/8329519
+  AM33xx - http://pastebin.ubuntu.com/8329454
+  AM43xx - http://pastebin.ubuntu.com/8329400
+
+The above logs are generated with some additional test patches staged
+here for reference:
+https://github.com/sumananna/omap-kernel/commits/hwspinlock/test/3.17-rc3-dtv6-rsrvdlocks
+https://github.com/sumananna/omap-kernel/commits/hwspinlock/submit/3.17-rc3-dtv6-rsrvdlocks
+
+regards
+Suman
+
+[1] http://marc.info/?l=linux-arm-kernel&m=139890465902747&w=2
+[2] http://marc.info/?l=linux-arm-kernel&m=141055363113881&w=2
+[3] http://marc.info/?l=linux-arm-kernel&m=139968477508013&w=2
+
+Suman Anna (3):
+  hwspinlock/core: prepare unregister code to support reserved locks
+  hwspinlock/core: prepare core to support reserved locks
+  hwspinlock/core: add support for reserved locks
+
+ Documentation/hwspinlock.txt             |   2 +
+ drivers/hwspinlock/hwspinlock_core.c     | 108 ++++++++++++++++++++++++-------
+ drivers/hwspinlock/hwspinlock_internal.h |   2 +
+ 3 files changed, 89 insertions(+), 23 deletions(-)
+
+-- 
+2.0.4
