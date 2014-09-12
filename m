@@ -1,272 +1,339 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 12 Sep 2014 09:37:36 +0200
-Subject: [PATCH 3/4] dmaengine: support device tree channel assignment
-Message-ID: <1410507456-32491-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri, 12 Sep 2014 09:37:52 +0200
+Subject: [PATCH 4/4] ARM: nomadik: add DMA support
+Message-ID: <1410507472-32530-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the fixed signal case, support assigning channels with
-specific signals taken from the device tree. For more information
-see the device tree binding patch.
+This adds DMA controller entries for the two PL08x blocks on the
+Nomadik, assigns the fixed signal names, and defines channels
+for UART and MMC/SD. Tested on the S8815 USB dongle.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/dma/amba-pl08x.c | 225 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 222 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 296 +++++++++++++++++++++++++++++
+ 1 file changed, 296 insertions(+)
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 1e523a094cc5..f2300e5ed55c 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -91,6 +91,8 @@
- #include <linux/seq_file.h>
- #include <linux/slab.h>
- #include <linux/amba/pl080.h>
-+#include <linux/of.h>
-+#include <linux/of_dma.h>
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index dbcf521b017f..8ffe68d9f670 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -794,6 +794,10 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_default_mux>;
++			dmas = <&dmac0 14>,
++			       <&dmac0 15>;
++			dma-names = "rx", "tx";
++
+ 		};
  
- #include "dmaengine.h"
- #include "virt-dma.h"
-@@ -2045,10 +2047,221 @@ static inline void init_pl08x_debugfs(struct pl08x_driver_data *pl08x)
- }
- #endif
+ 		uart1: uart at 101fb000 {
+@@ -805,6 +809,9 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart1_default_mux>;
++			dmas = <&dmac1 22>,
++			       <&dmac1 23>;
++			dma-names = "rx", "tx";
+ 		};
  
-+#ifdef CONFIG_OF
-+static int pl08x_of_parse_channel(struct amba_device *adev,
-+				  struct device_node *np,
-+				  struct pl08x_channel_data *chan)
-+{
-+	const char *signal_name;
-+	int ret;
+ 		uart2: uart at 101f2000 {
+@@ -848,6 +855,295 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&mmcsd_default_mux>, <&mmcsd_default_mode>;
+ 			vmmc-supply = <&vmmc_regulator>;
++			dmas = <&dmac1 21>;
++			dma-names = "rx";
++		};
 +
-+	ret = of_property_read_string(np, "signal", &signal_name);
-+	if (ret) {
-+		dev_err(&adev->dev, "no signal name for channel\n");
-+		return ret;
-+	}
-+	chan->bus_id = signal_name;
-+
-+	/* Parse the channel settings */
-+	chan->bus_id = signal_name;
-+	if (of_property_read_bool(np, "bus-interface-ahb1"))
-+		chan->periph_buses |= PL08X_AHB1;
-+	if (of_property_read_bool(np, "bus-interface-ahb2"))
-+		chan->periph_buses |= PL08X_AHB2;
-+	if (!chan->periph_buses) {
-+		dev_err(&adev->dev, "no bus master for channel %s!\n",
-+			signal_name);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct dma_chan *pl08x_of_xlate(struct of_phandle_args *dma_spec,
-+				       struct of_dma *ofdma)
-+{
-+	struct pl08x_driver_data *pl08x = ofdma->of_dma_data;
-+	u32 index = dma_spec->args[0];
-+	const char *channel_name;
-+	dma_cap_mask_t cap;
-+	dma_cap_zero(cap);
-+	dma_cap_set(DMA_SLAVE, cap);
-+
-+	if (index > pl08x->pd->num_slave_channels) {
-+		dev_err(&pl08x->adev->dev, "undefined channel requested (%u)\n",
-+			index);
-+		return NULL;
-+	}
-+	channel_name = pl08x->pd->slave_channels[index].bus_id;
-+	dev_dbg(&pl08x->adev->dev, "requested channel %u \"%s\"\n",
-+		index, channel_name);
-+
-+	return dma_request_channel(cap, pl08x_filter_id, (void *) channel_name);
-+}
-+
-+static int pl08x_of_probe(struct amba_device *adev,
-+			  struct pl08x_driver_data *pl08x,
-+			  struct device_node *np)
-+{
-+	struct device_node *child;
-+	struct pl08x_channel_data *chanp = NULL;
-+	struct pl08x_platform_data *pd;
-+	u32 cctl_memcpy = 0;
-+	u32 val;
-+	int channels;
-+	int ret;
-+
-+	pd = devm_kzalloc(&adev->dev,
-+			sizeof(struct pl08x_platform_data),
-+			GFP_KERNEL);
-+	if (!pd)
-+		return -ENOMEM;
-+
-+
-+	/* Eligible bus masters for fetching LLIs */
-+	if (of_property_read_bool(np, "lli-bus-interface-ahb1"))
-+		pd->lli_buses |= PL08X_AHB1;
-+	if (of_property_read_bool(np, "lli-bus-interface-ahb2"))
-+		pd->lli_buses |= PL08X_AHB2;
-+	if (!pd->lli_buses) {
-+		dev_info(&adev->dev, "no bus masters for LLIs stated, assume all\n");
-+	        pd->lli_buses |= PL08X_AHB1 | PL08X_AHB2;
-+	}
-+
-+	/* Eligible bus masters for memory access */
-+	if (of_property_read_bool(np, "mem-bus-interface-ahb1"))
-+		pd->mem_buses |= PL08X_AHB1;
-+	if (of_property_read_bool(np, "mem-bus-interface-ahb2"))
-+		pd->mem_buses |= PL08X_AHB2;
-+	if (!pd->mem_buses) {
-+		dev_info(&adev->dev, "no bus masters for memory stated, assume all\n");
-+	        pd->mem_buses |= PL08X_AHB1 | PL08X_AHB2;
-+	}
-+
-+	/* Parse the memcpy channel properties */
-+	ret = of_property_read_u32(np, "memcpy-burst-size", &val);
-+	if (ret) {
-+		dev_info(&adev->dev, "no memcpy burst size specified, using 1 byte\n");
-+		val = 1;
-+	}
-+	switch (val) {
-+	default:
-+		dev_err(&adev->dev, "illegal burst size for memcpy, set to 1\n");
-+		/* Fall through */
-+	case 1:
-+		cctl_memcpy |= PL080_BSIZE_1 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_1 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 4:
-+		cctl_memcpy |= PL080_BSIZE_4 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_4 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 8:
-+		cctl_memcpy |= PL080_BSIZE_8 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_8 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 16:
-+		cctl_memcpy |= PL080_BSIZE_16 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_16 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 32:
-+		cctl_memcpy |= PL080_BSIZE_32 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_32 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 64:
-+		cctl_memcpy |= PL080_BSIZE_64 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_64 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 128:
-+		cctl_memcpy |= PL080_BSIZE_128 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_128 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	case 256:
-+		cctl_memcpy |= PL080_BSIZE_256 << PL080_CONTROL_SB_SIZE_SHIFT |
-+			PL080_BSIZE_256 << PL080_CONTROL_DB_SIZE_SHIFT;
-+		break;
-+	}
-+
-+	ret = of_property_read_u32(np, "memcpy-bus-width", &val);
-+	if (ret) {
-+		dev_info(&adev->dev, "no memcpy bus width specified, using 8 bits\n");
-+		val = 8;
-+	}
-+	switch (val) {
-+	default:
-+		dev_err(&adev->dev, "illegal bus width for memcpy, set to 8 bits\n");
-+		/* Fall through */
-+	case 8:
-+		cctl_memcpy |= PL080_WIDTH_8BIT << PL080_CONTROL_SWIDTH_SHIFT |
-+			PL080_WIDTH_8BIT << PL080_CONTROL_DWIDTH_SHIFT;
-+		break;
-+	case 16:
-+		cctl_memcpy |= PL080_WIDTH_16BIT << PL080_CONTROL_SWIDTH_SHIFT |
-+			PL080_WIDTH_16BIT << PL080_CONTROL_DWIDTH_SHIFT;
-+		break;
-+	case 32:
-+		cctl_memcpy |= PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT |
-+			PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT;
-+		break;
-+	}
-+
-+	/* This is currently the only thing making sense */
-+	cctl_memcpy |= PL080_CONTROL_PROT_SYS;
-+
-+	/* Set up memcpy channel */
-+	pd->memcpy_channel.bus_id = "memcpy";
-+	pd->memcpy_channel.cctl_memcpy = cctl_memcpy;
-+	/* Use the buses that can access memory, obviously */
-+	pd->memcpy_channel.periph_buses = pd->mem_buses;
-+
-+	channels = of_get_child_count(np);
-+	if (!channels)
-+		goto out_no_slaves;
-+	if (channels > 32) {
-+		dev_info(&adev->dev, "more than 32 channels specified, ignoring the surplus channels\n");
-+		channels = 32;
-+	}
-+
-+	pd->num_slave_channels = channels;
-+	chanp = devm_kzalloc(&adev->dev,
-+			channels *
-+			sizeof(struct pl08x_channel_data),
-+			GFP_KERNEL);
-+	if (!chanp)
-+		return -ENOMEM;
-+	pd->slave_channels = chanp;
-+
-+	/* Parse all children, defining the channels */
-+	for_each_child_of_node(np, child) {
-+		ret = pl08x_of_parse_channel(adev, child, chanp);
-+		if (ret)
-+			return ret;
-+		chanp++;
-+	}
-+
-+	ret = of_dma_controller_register(adev->dev.of_node, pl08x_of_xlate,
-+					 pl08x);
-+	if (ret)
-+		return ret;
-+
-+out_no_slaves:
-+	pl08x->pd = pd;
-+	return 0;
-+}
-+#else
-+static inline int pl08x_of_probe(struct amba_device *adev,
-+				 struct pl08x_driver_data *pl08x,
-+				 struct device_node *np)
-+{
-+	return -EINVAL;
-+}
-+#endif
-+
- static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	struct pl08x_driver_data *pl08x;
- 	const struct vendor_data *vd = id->data;
-+	struct device_node *np = adev->dev.of_node;
- 	u32 tsfr_size;
- 	int ret = 0;
- 	int i;
-@@ -2096,9 +2309,15 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	/* Get the platform data */
- 	pl08x->pd = dev_get_platdata(&adev->dev);
- 	if (!pl08x->pd) {
--		dev_err(&adev->dev, "no platform data supplied\n");
--		ret = -EINVAL;
--		goto out_no_platdata;
-+		if (np) {
-+			ret = pl08x_of_probe(adev, pl08x, np);
-+			if (ret)
-+				goto out_no_platdata;
-+		} else {
-+			dev_err(&adev->dev, "no platform data supplied\n");
-+			ret = -EINVAL;
-+			goto out_no_platdata;
-+		}
- 	}
- 
- 	/* Assign useful pointers to the driver state */
++		dmac0: dma-controller at 10130000 {
++			compatible = "arm,pl080", "arm,primecell";
++			reg = <0x10130000 0x1000>;
++			interrupt-parent = <&vica>;
++			interrupts = <15>;
++			clocks = <&hclkdma0>;
++			clock-names = "apb_pclk";
++			lli-bus-interface-ahb1;
++			lli-bus-interface-ahb2;
++			mem-bus-interface-ahb2;
++			memcpy-burst-size = <256>;
++			memcpy-bus-width = <32>;
++			#dma-cells = <1>;
++			/* Assignments for the 32 channels */
++			saa0 at dmac0 {
++				signal = "saa0";
++				bus-interface-ahb1;
++			};
++			saa1 at dmac0 {
++				signal = "saa1";
++				bus-interface-ahb1;
++			};
++			saa2 at dmac0 {
++				signal = "saa2";
++				bus-interface-ahb1;
++			};
++			saa3 at dmac0 {
++				signal = "saa3";
++				bus-interface-ahb1;
++			};
++			saa4 at dmac0 {
++				signal = "saa4";
++				bus-interface-ahb1;
++			};
++			saa5 at dmac0 {
++				signal = "saa5";
++				bus-interface-ahb1;
++			};
++			saa6 at dmac0 {
++				signal = "saa6";
++				bus-interface-ahb1;
++			};
++			saa7 at dmac0 {
++				signal = "saa7";
++				bus-interface-ahb1;
++			};
++			unused at dmac0 {
++				signal = "unused";
++				bus-interface-ahb1;
++			};
++			fir at dmac0 {
++				signal = "firdatxrx";
++				bus-interface-ahb1;
++			};
++			msp0rx at dmac0 {
++				signal = "msp0rx";
++				bus-interface-ahb1;
++			};
++			msp0tx at dmac0 {
++				signal = "msp0tx";
++				bus-interface-ahb1;
++			};
++			ssprx at dmac0 {
++				signal = "ssprx";
++				bus-interface-ahb1;
++			};
++			ssptx at dmac0 {
++				signal = "ssptx";
++				bus-interface-ahb1;
++			};
++			uart0rx at dmac0 {
++				signal = "uart0rx";
++				bus-interface-ahb1;
++			};
++			uart0tx at dmac0 {
++				signal = "uart0tx";
++				bus-interface-ahb1;
++			};
++			hsirxch0 at dmac0 {
++				signal = "hsirxch0";
++				bus-interface-ahb1;
++			};
++			hsirxch1 at dmac0 {
++				signal = "hsirxch1";
++				bus-interface-ahb1;
++			};
++			hsirxch2 at dmac0 {
++				signal = "hsirxch2";
++				bus-interface-ahb1;
++			};
++			hsirxch3 at dmac0 {
++				signal = "hsirxch3";
++				bus-interface-ahb1;
++			};
++			hsirxch4 at dmac0 {
++				signal = "hsirxch4";
++				bus-interface-ahb1;
++			};
++			hsirxch5 at dmac0 {
++				signal = "hsirxch5";
++				bus-interface-ahb1;
++			};
++			hsirxch6 at dmac0 {
++				signal = "hsirxch6";
++				bus-interface-ahb1;
++			};
++			hsirxch7 at dmac0 {
++				signal = "hsirxch7";
++				bus-interface-ahb1;
++			};
++			hsitxch0 at dmac0 {
++				signal = "hsitxch0";
++				bus-interface-ahb1;
++			};
++			hsitxch1 at dmac0 {
++				signal = "hsitxch1";
++				bus-interface-ahb1;
++			};
++			hsitxch2 at dmac0 {
++				signal = "hsitxch2";
++				bus-interface-ahb1;
++			};
++			hsitxch3 at dmac0 {
++				signal = "hsitxch3";
++				bus-interface-ahb1;
++			};
++			hsitxch4 at dmac0 {
++				signal = "hsitxch4";
++				bus-interface-ahb1;
++			};
++			hsitxch5 at dmac0 {
++				signal = "hsitxch5";
++				bus-interface-ahb1;
++			};
++			hsitxch6 at dmac0 {
++				signal = "hsitxch6";
++				bus-interface-ahb1;
++			};
++			hsitxch7 at dmac0 {
++				signal = "hsitxch7";
++				bus-interface-ahb1;
++			};
++		};
++		dmac1: dma-controller at 10150000 {
++			compatible = "arm,pl080", "arm,primecell";
++			reg = <0x10150000 0x1000>;
++			interrupt-parent = <&vica>;
++			interrupts = <13>;
++			clocks = <&hclkdma1>;
++			clock-names = "apb_pclk";
++			lli-bus-interface-ahb1;
++			lli-bus-interface-ahb2;
++			mem-bus-interface-ahb2;
++			memcpy-burst-size = <256>;
++			memcpy-bus-width = <32>;
++			#dma-cells = <1>;
++			/* Assignments for the 32 channels */
++			saa0 at dmac1 {
++				signal = "saa0";
++				bus-interface-ahb1;
++			};
++			saa1 at dmac1 {
++				signal = "saa1";
++				bus-interface-ahb1;
++			};
++			saa2 at dmac1 {
++				signal = "saa2";
++				bus-interface-ahb1;
++			};
++			saa3 at dmac1 {
++				signal = "saa3";
++				bus-interface-ahb1;
++			};
++			saa4 at dmac1 {
++				signal = "saa4";
++				bus-interface-ahb1;
++			};
++			saa5 at dmac1 {
++				signal = "saa5";
++				bus-interface-ahb1;
++			};
++			saa6 at dmac1 {
++				signal = "saa6";
++				bus-interface-ahb1;
++			};
++			saa7 at dmac1 {
++				signal = "saa7";
++				bus-interface-ahb1;
++			};
++			unused at dmac1 {
++				signal = "unused";
++				bus-interface-ahb1;
++			};
++			fir at dmac1 {
++				signal = "firdatxrx";
++				bus-interface-ahb1;
++			};
++			msp0rx at dmac1 {
++				signal = "msp0rx";
++				bus-interface-ahb1;
++			};
++			msp0tx at dmac1 {
++				signal = "msp0tx";
++				bus-interface-ahb1;
++			};
++			ssprx at dmac1 {
++				signal = "ssprx";
++				bus-interface-ahb1;
++			};
++			ssptx at dmac1 {
++				signal = "ssptx";
++				bus-interface-ahb1;
++			};
++			uart0rx at dmac1 {
++				signal = "uart0rx";
++				bus-interface-ahb1;
++			};
++			uart0tx at dmac1 {
++				signal = "uart0tx";
++				bus-interface-ahb1;
++			};
++			tdesin at dmac1 {
++				signal = "tdesin";
++				bus-interface-ahb1;
++			};
++			tdesout at dmac1 {
++				signal = "tdesout";
++				bus-interface-ahb1;
++			};
++			i2c1rxtx at dmac1 {
++				signal = "i2c1rxtx";
++				bus-interface-ahb1;
++			};
++			i2c0rxtx at dmac1 {
++				signal = "i2c0rxtx";
++				bus-interface-ahb1;
++			};
++			sha1 at dmac1 {
++				signal = "sha1";
++				bus-interface-ahb1;
++			};
++			sdirxtx at dmac1 {
++				signal = "sdirxtx";
++				bus-interface-ahb1;
++			};
++			uart1rxdmac1 {
++				signal = "uart1rx";
++				bus-interface-ahb1;
++			};
++			uart1tx at dmac1 {
++				signal = "uart1tx";
++				bus-interface-ahb1;
++			};
++			usbotg0 at dmac1 {
++				signal = "usbotg0";
++				bus-interface-ahb1;
++			};
++			usbotg1 at dmac1 {
++				signal = "usbotg1";
++				bus-interface-ahb1;
++			};
++			usbotg2 at dmac1 {
++				signal = "usbotg2";
++				bus-interface-ahb1;
++			};
++			usbotg3 at dmac1 {
++				signal = "usbotg3";
++				bus-interface-ahb1;
++			};
++			usbotg4 at dmac1 {
++				signal = "usbotg4";
++				bus-interface-ahb1;
++			};
++			usbotg5 at dmac1 {
++				signal = "usbotg5";
++				bus-interface-ahb1;
++			};
++			usbotg6 at dmac1 {
++				signal = "usbotg6";
++				bus-interface-ahb1;
++			};
++			usbotg7 at dmac1 {
++				signal = "usbotg7";
++				bus-interface-ahb1;
++			};
+ 		};
+ 	};
+ };
 -- 
 1.9.3
