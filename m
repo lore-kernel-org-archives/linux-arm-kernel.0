@@ -1,73 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 12 Sep 2014 09:59:52 +0200
-Subject: [PATCH] clk: don't use __initconst for non-const arrays
-In-Reply-To: <CAKv+Gu9LubyPHoYJsRfRoqgONAApb3nEoXAxUa9g6tecP=McOw@mail.gmail.com>
-References: <1410469471-31027-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140911220445.GQ3755@pengutronix.de>
- <CAKv+Gu9LubyPHoYJsRfRoqgONAApb3nEoXAxUa9g6tecP=McOw@mail.gmail.com>
-Message-ID: <20140912075952.GR3755@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 12 Sep 2014 10:03:16 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
+In-Reply-To: <3900226.tYc6lW0Md4@wuerfel>
+References: <540F1409.3070206@antcom.de> <4173517.3fBhGIV2aO@wuerfel>
+ <54105765.5090708@antcom.de> <3900226.tYc6lW0Md4@wuerfel>
+Message-ID: <CACRpkda66Wo1GMWB6XD76rV14O--gre434cwc1tRw-w2ro0N6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ard,
+On Wed, Sep 10, 2014 at 4:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 10 September 2014 15:51:33 Roland Stigge wrote:
+>>
+>> > For
+>> > lpc32xx, this is currently not possible because you are not using
+>> > the common clk implementation. Would it be possible for you
+>> > to look into converting that driver over and moving it to
+>> > drivers/clk?
+>>
+>> It's certainly possible, but time might be scarce. What would be a good
+>> reference platform to have a look into as example? Or a hint/link?
+>
+> I'll let Linus answer that one, he converted a couple of platform and
+> probably has a better idea than I do.
 
-On Fri, Sep 12, 2014 at 09:42:29AM +0200, Ard Biesheuvel wrote:
-> On 12 September 2014 00:04, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > Hello,
-> >
-> > On Thu, Sep 11, 2014 at 11:04:31PM +0200, Uwe Kleine-K?nig wrote:
-> >>  /* Mux parent lists. */
-> >> -static const char *fin_pll_p[] __initconst = {
-> >> +static const char *fin_pll_p[] __initdata = {
-> >>       "xxti",
-> >>       "xusbxti"
-> >>  };
-> > As discussed with Tomasz on irc: The sad thing here is that for this
-> > array only 8 bytes are freed when .init.rodata is thrown away (that is
-> > two pointers). The actual data---5 + 8 bytes + maybe aligning---isn't
-> > freed though.
-> >
-> > We wondered if there is a nice and easy way to throw away the
-> > characters, too.
-> >
-> > The only way I currently see is:
-> >
-> >         const char xxti[] __initconst = "xxti";
-> >         ...
-> >
-> >         static const char *fin_pll_p[] __initdata = {
-> >                 xxti,
-> >                 ...
-> >         };
-> >
-> > but this definitively doesn't qualify as "nice and easy". Is there an
-> > alternative?
-> >
-> 
-> What about doing
-> 
-> static const char fin_pll_p[][8] __initconst = {
->      "xxti",
->      "xusbxti"
-> };
-This results in the strings being moved to .init.rodata and so they are
-discarded. But it also results in:
+Step-wise conversion on U300:
 
-	drivers/clk/samsung/clk-s5pv210.c:412:2: warning: initialization from incompatible pointer type [enabled by default]
-	  MUX_F(FIN_PLL, "fin_pll", fin_pll_p, OM_STAT, 0, 1,
-	  ^
-	drivers/clk/samsung/clk-s5pv210.c:412:2: warning: (near initialization for 'early_mux_clks[0].parent_names') [enabled by default]
+commit 50667d63085af108f625c83102430c1d74931d78
+"ARM: u300: convert to common clock"
+converts to common clock *without* using device tree.
 
-That's because early_mux_clks[0].parent_names is of type const char **
-while fin_pll_p as suggested doesn't provide an array of pointers to the
-start of the contained strings.
-I don't see a way to fix that unless we fix the maximal clock name
-length globally and so waste much memory.
+commit 14c2607144c11653b27a423ead0703ffaa65d0b1
+"clk: move the U300 fixed and fixed-factor to DT"
+commit bba5f2cc2f0fe4191ad2699c7c03a6def31f54e2
+"ARM: u300: move the gated system controller clocks to DT"
+commit 85fb28bed813469ba56706a7e48fba596f47c253
+"ARM: u300: convert MMC/SD clock to device tree"
 
-Best regards
-Uwe
+Then gradually moves those clocks over to being handled
+from the device tree.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+For an example on a platform lacking clock implementation,
+look at:
+
+commit ef6eb322ce574ba73658a677e83e5da3cfab301b
+"clk: nomadik: implement the Nomadik clocks properly"
+where I implement the Nomadik per-bit enabled clocks
+This includes device tree bindings.
+
+commit c641d4dfef6d462c6d66a6fb57700086cd2f0106
+"ARM: nomadik: add the new clocks to the device tree"
+adds them to the device tree and make use of them.
+
+Yours,
+Linus Walleij
