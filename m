@@ -1,108 +1,67 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 12 Sep 2014 11:40:09 +0200
-Subject: [PATCHv4] mtd: nand: atmel_nand: retrieve NFC clock
-Message-ID: <1410514809-25650-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 12 Sep 2014 17:42:30 +0800
+Subject: [PATCH v3 11/17] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <20140911110846.D152DC408F0@trevor.secretlab.ca>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-12-git-send-email-hanjun.guo@linaro.org>
+ <20140911110846.D152DC408F0@trevor.secretlab.ca>
+Message-ID: <5412C006.6060207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+On 2014?09?11? 19:08, Grant Likely wrote:
+> On Mon,  1 Sep 2014 22:57:49 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
+>> used, and then register device's gsi with the core IRQ subsystem.
+>>
+>> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
+>> since gsi is unique in the system, so use hwirq number directly
+>> for the mapping.
+>>
+>> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/kernel/acpi.c |   73 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/acpi/bus.c       |    3 ++
+>>  include/linux/acpi.h     |    1 +
+>>  3 files changed, 77 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 35dff11..354b912 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -37,6 +37,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>>  static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
+>>  
+>>  /*
+>> + * Since we're on ARM, the default interrupt routing model
+>> + * clearly has to be GIC.
+>> + */
+>> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+>> +
+>> +/*
+>>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>   * or early_memremap() should be called here to for ACPI table mapping.
+>>   */
+>> @@ -194,6 +200,73 @@ void __init acpi_smp_init_cpus(void)
+>>  	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+>>  }
+>>  
+>> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+>> +{
+>> +	*irq = irq_find_mapping(NULL, gsi);
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> Why is this exported? x86 exports it, but ia64 does not. There aren't
+> very many callers, and none of them can be built as a module AFAICS.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
+It will be called by Generic Hardware Error Source driver which
+can be built as module, and it provides a way to report platform
+hardware errors (such as that from chipset) which can also used
+by ARM platform, so I think we can keep it as exported.
 
-Changes in v4:
- - fix typo in the documentation
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |  2 ++
- drivers/mtd/nand/atmel_nand.c                      | 25 ++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-index c4728839d0c1..6edc3b616e98 100644
---- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-@@ -36,6 +36,7 @@ Optional properties:
-     - reg : should specify the address and size used for NFC command registers,
-             NFC registers and NFC Sram. NFC Sram address and size can be absent
-             if don't want to use it.
-+    - clocks: phandle to the peripheral clock
-   - Optional properties:
-     - atmel,write-by-sram: boolean to enable NFC write by sram.
- 
-@@ -98,6 +99,7 @@ nand0: nand at 40000000 {
- 		compatible = "atmel,sama5d3-nfc";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		clocks = <&hsmc_clk>
- 		reg = <
- 			0x70000000 0x10000000	/* NFC Command Registers */
- 			0xffffc000 0x00000070	/* NFC HSMC regs */
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 9c5f717bda54..d1e502f8dbd0 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -27,6 +27,7 @@
-  *
-  */
- 
-+#include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
- #include <linux/module.h>
-@@ -96,6 +97,8 @@ struct atmel_nfc {
- 	bool			use_nfc_sram;
- 	bool			write_by_sram;
- 
-+	struct clk		*clk;
-+
- 	bool			is_initialized;
- 	struct completion	comp_ready;
- 	struct completion	comp_cmd_done;
-@@ -2248,6 +2251,7 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- {
- 	struct atmel_nfc *nfc = &nand_nfc;
- 	struct resource *nfc_cmd_regs, *nfc_hsmc_regs, *nfc_sram;
-+	int ret;
- 
- 	nfc_cmd_regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	nfc->base_cmd_regs = devm_ioremap_resource(&pdev->dev, nfc_cmd_regs);
-@@ -2279,8 +2283,28 @@ static int atmel_nand_nfc_probe(struct platform_device *pdev)
- 	nfc_writel(nfc->hsmc_regs, IDR, 0xffffffff);
- 	nfc_readl(nfc->hsmc_regs, SR);	/* clear the NFC_SR */
- 
-+	nfc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(nfc->clk)) {
-+		ret = clk_prepare_enable(nfc->clk);
-+		if (ret)
-+			return ret;
-+	} else {
-+		dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
-+	}
-+
- 	nfc->is_initialized = true;
- 	dev_info(&pdev->dev, "NFC is probed.\n");
-+
-+	return 0;
-+}
-+
-+static int atmel_nand_nfc_remove(struct platform_device *pdev)
-+{
-+	struct atmel_nfc *nfc = &nand_nfc;
-+
-+	if (!IS_ERR(nfc->clk))
-+		clk_disable_unprepare(nfc->clk);
-+
- 	return 0;
- }
- 
-@@ -2297,6 +2321,7 @@ static struct platform_driver atmel_nand_nfc_driver = {
- 		.of_match_table = of_match_ptr(atmel_nand_nfc_match),
- 	},
- 	.probe = atmel_nand_nfc_probe,
-+	.remove = atmel_nand_nfc_remove,
- };
- 
- static struct platform_driver atmel_nand_driver = {
--- 
-1.9.1
+Thanks
+Hanjun
