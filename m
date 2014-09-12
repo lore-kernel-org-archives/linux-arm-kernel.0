@@ -1,75 +1,73 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 12 Sep 2014 05:00:49 -0500
-Subject: [PATCH v10 00/10] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <20140912093018.GX27864@e106497-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <5412ADE9.2050708@amd.com>
- <20140912093018.GX27864@e106497-lin.cambridge.arm.com>
-Message-ID: <5412C451.609@amd.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 12 Sep 2014 12:04 +0200
+Subject: [PATCH 1/2] ASoC: rockchip-max98090: add documentation for
+ rockchip-max98090 driver
+In-Reply-To: <1410513055-17775-1-git-send-email-jay.xu@rock-chips.com>
+References: <1410507036-15442-1-git-send-email-jay.xu@rock-chips.com>
+ <1410513055-17775-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <3774516.jOvxH1lgyQ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/12/2014 4:30 AM, Liviu Dudau wrote:
-> On Fri, Sep 12, 2014 at 09:25:13AM +0100, Suravee Suthikulpanit wrote:
->> On 9/8/2014 8:54 AM, Liviu Dudau wrote:
->>> This is my version 10 of the attempt at adding support for generic PCI host
->>> bridge controllers that make use of device tree information to
->>> configure themselves. This version reverses v9's attempt to create one function
->>> to drive the whole process of extracting the host bridge ranges, setup the
->>> host bridge driver and then scan the root bus behind the host bridge. While it
->>> would've been quite user friendly, I agree that it would've caused a lot of pain
->>> in the future.
->>>
->>> I would like to get ACKs for the remaining patches as I would like to integrate
->>> this into -next in the following week.
->>>
->>> This version marks an implementation break with the previous versions as
->>> of_create_pci_host_bridge() is now gone. It gets replaced by
->>> of_pci_get_host_bridge_resources() that only parses the DT and extracts the
->>> relevant ranges and converts them to resources. The updated host bridge drivers
->>> will have to follow the guidelines in this example code:
->>>
->>> static int foohb_probe(struct platform_device *pdev)
->>> {
->>> 	struct device_node *dn = pdev->dev.of_node;
->>> 	struct foohb_drv *drv;
->>> 	resource_size_t io_base = 0;  /* phys address for start of IO */
->>> 	struct pci_bus *bus;
->>> 	int err = 0;
->>> 	LIST_HEAD(res);
->>>
->>> 	.....
->>> 	err = of_pci_get_host_bridge_resources(dn, 0, 255, &res, &io_base);
->>> 	if (err)
->>> 		goto err_handling;
->>> 	err = foohb_setup(drv, ...., &res, &io_base);
->>> 	if (err)
->>> 		goto err_handling;
->
-> Hi Suravee,
->
->>
->> My understanding is that the "foohb_setup" above is supposed to be equivalent
->> to the "int (*setup)(struct pci_host_bridge *, resource_size_t)" in V9 that was
->> passed in as an argument of "of_create_pci_hot_bridge()".
->
-> Correct. Parameters are probably different, but it is internal to your driver so
-> you can do whatever you want there.
->
->>
->> The problem I have is I need an intermediate step between "pci_create_root_bus()"
->> and "pci_scan_child_bus()" in order to update the information such as the "pci_bus->msi"
->> before this is propagate down to the child bus during the "pci_scan_child_bus"
->> which is also called in the pci_scan_root_bus() function.
->
-> How did that work with my v9 patchset? How does it work for other MSI-aware platforms?
-> Are they not using pci_scan_child_bus()?
+Hi Jianqun,
 
-In the of_create_pci_host_bridge of V9, you call the setup function between "pci_create_root_bus()"
-and "pci_scan_child_bus()". At that point, I can update the "root_bus->msi" to point to my
-"struct msi_chip" which was created during GICv2m initialization
-(Please see http://marc.info/?l=linux-kernel&m=141034053331632&w=2).
-Then, when a child bus is created, it propagate this msi_chip pointer from the parent bus.
+Am Freitag, 12. September 2014, 17:10:55 schrieb Jianqun:
+> Add documentation for rockchip-max98090 driver, which is need by rockchip
+> board using a max98090.
+> 
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> ---
+> changes since v1:
 
-Suravee
+please make sure to also include the version in the patch subject, so that
+people can always see which is which. This one should've been
+
+[PATCH v2 1/2] ASoC: rockchip-max98090: add documentation for rockchip-max98090 driver
+
+Because without this identification, people can only try to guess which one is the
+newest version.
+
+
+Heiko
+
+> - modify error text from "Tegra" to "rockchip"
+> 
+>  .../sound/rockchip,rockchip-audio-max98090.txt     | 23
+> ++++++++++++++++++++++ 1 file changed, 23 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.tx
+> t
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.
+> txt
+> b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.
+> txt new file mode 100644
+> index 0000000..e12d1a0
+> --- /dev/null
+> +++
+> b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-max98090.
+> txt @@ -0,0 +1,23 @@
+> +ROCKCHIP audio complex, with MAX98090 CODEC
+> +
+> +Required properties:
+> +- compatible : must be "rockchip,rockchip-audio-max98090"
+> +- rockchip,model : the user-visible name of this sound complex
+> +- rockchip,i2s-controller : The phandle of the rockchip I2S controller
+> +  that's connected to the CODEC.
+> +- rockchip,audio-codec : The phandle of the MAX98090 audio codec.
+> +
+> +Optional properties:
+> +- rockchip,hp-det-gpios : The GPIO that detect headphones are plugged in
+> +- rockchip,mic-det-gpios : The GPIO that detect micphones are plugged in
+> +
+> +Example:
+> +
+> +sound {
+> +	compatible = "rockchip,rockchip-audio-max98090";
+> +	rockchip,model = "ROCKCHIP-I2S";
+> +	rockchip,i2s-controller = <&i2s>;
+> +	rockchip,audio-codec = <&max98090>;
+> +	rockchip,hp-det-gpios = <&gpio6 5 GPIO_ACTIVE_HIGH>;
+> +	rockchip,mic-det-gpios = <&gpio6 11 GPIO_ACTIVE_HIGH>;
+> +};
