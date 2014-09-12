@@ -1,95 +1,71 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 13 Sep 2014 00:48:05 +0800
-Subject: [PATCH 1/2] clk: sunxi: Add sun8i MBUS clock support
+Date: Sat, 13 Sep 2014 00:48:06 +0800
+Subject: [PATCH 2/2] ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
 In-Reply-To: <1410540486-22243-1-git-send-email-wens@csie.org>
 References: <1410540486-22243-1-git-send-email-wens@csie.org>
-Message-ID: <1410540486-22243-2-git-send-email-wens@csie.org>
+Message-ID: <1410540486-22243-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that the clock driver supports PLL6 and MBUS on sun8i correctly,
+add the corresponding clock nodes to the dtsi.
+
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-mod0.c                      | 55 +++++++++++++++++++++++
- 2 files changed, 56 insertions(+)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 29 +++++++++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 425b109..fb3b7aa 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -50,6 +50,7 @@ Required properties:
- 	"allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
- 	"allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
- 	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
-+	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
- 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
- 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
- 	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
-diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-index 4a56385..9850887 100644
---- a/drivers/clk/sunxi/clk-mod0.c
-+++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -94,6 +94,61 @@ static void __init sun5i_a13_mbus_setup(struct device_node *node)
- }
- CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index fc0d023..c32091e 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -74,13 +74,30 @@
+ 		};
  
-+/**
-+ * sun8i_a23_get_mbus_factors() - calculates m factor for MBUS clocks
-+ * MBUS rate is calculated as follows
-+ * rate = parent_rate / (m + 1);
-+ */
+ 		/* dummy clock until actually implemented */
+-		pll6: pll6_clk {
++		pll5: pll5_clk {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+-			clock-frequency = <600000000>;
++			clock-frequency = <0>;
++			clock-output-names = "pll5";
++		};
 +
-+static void sun8i_a23_get_mbus_factors(u32 *freq, u32 parent_rate,
-+				       u8 *n, u8 *k, u8 *m, u8 *p)
-+{
-+	u8 div;
++		pll6: clk at 01c20028 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun6i-a31-pll6-clk";
++			reg = <0x01c20028 0x4>;
++			clocks = <&osc24M>;
+ 			clock-output-names = "pll6";
+ 		};
+ 
++		pll6x2: pll6x2_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clock-div = <1>;
++			clock-mult = <2>;
++			clocks = <&pll6>;
++			clock-output-names = "pll6x2";
++		};
 +
-+	/* These clocks can only divide, so we will never be able to achieve
-+	 * frequencies higher than the parent frequency */
-+	if (*freq > parent_rate)
-+		*freq = parent_rate;
+ 		cpu: cpu_clk at 01c20050 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-cpu-clk";
+@@ -243,6 +260,14 @@
+ 			clocks = <&mmc2_clk>;
+ 			clock-output-names = "mmc2_sample";
+ 		};
 +
-+	div = DIV_ROUND_UP(parent_rate, *freq);
-+
-+	if (div > 8)
-+		div = 8;
-+
-+	*freq = parent_rate / div;
-+
-+	/* we were called to round the frequency, we can now return */
-+	if (m == NULL)
-+		return;
-+
-+	*m = div - 1;
-+}
-+
-+static struct clk_factors_config sun8i_a23_mbus_config = {
-+	.mshift = 0,
-+	.mwidth = 3,
-+};
-+
-+static const struct factors_data sun8i_a23_mbus_data __initconst = {
-+	.enable = 31,
-+	.mux = 24,
-+	.table = &sun8i_a23_mbus_config,
-+	.getter = sun8i_a23_get_mbus_factors,
-+};
-+
-+static DEFINE_SPINLOCK(sun8i_a23_mbus_lock);
-+
-+static void __init sun8i_a23_mbus_setup(struct device_node *node)
-+{
-+	struct clk *mbus = sunxi_factors_register(node, &sun8i_a23_mbus_data,
-+						  &sun8i_a23_mbus_lock);
-+
-+	/* The MBUS clocks needs to be always enabled */
-+	__clk_get(mbus);
-+	clk_prepare_enable(mbus);
-+}
-+CLK_OF_DECLARE(sun8i_a23_mbus, "allwinner,sun8i-a23-mbus-clk", sun8i_a23_mbus_setup);
-+
- struct mmc_phase_data {
- 	u8	offset;
- };
++		mbus_clk: clk at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun8i-a23-mbus-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6x2>, <&pll5>;
++			clock-output-names = "mbus";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
 -- 
 2.1.0
