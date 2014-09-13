@@ -1,45 +1,57 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 13 Sep 2014 23:57:10 +0300
-Subject: [PATCH 4/5] ASoC: rockchip-i2s: fix registers' property of
- rockchip i2s controller
-In-Reply-To: <1410568932-21823-1-git-send-email-jay.xu@rock-chips.com>
-References: <1410568723-21559-1-git-send-email-jay.xu@rock-chips.com>
- <1410568932-21823-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <5414AFA6.9060904@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 13 Sep 2014 17:06:13 -0400
+Subject: [Patch v2 RfT] ARM: Kirkwood: Fix DT based DSA.
+In-Reply-To: <1409592941-22244-1-git-send-email-andrew@lunn.ch>
+References: <1409592941-22244-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140913210613.GH30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Andrew,
 
-On 9/13/2014 3:42 AM, Jianqun wrote:
-
-> Reference rockchip I2S controller TRM, modify some registers' property
-> I2S_FIFOLR: read / write, but not volatile, not precious
-> I2S_INTSR: read / write
-> I2S_CLR: volatile, register value will be cleared by read
-
-> Test on RK3288 with max98090.
-
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+On Mon, Sep 01, 2014 at 07:35:41PM +0200, Andrew Lunn wrote:
+> During the conversion of boards to use DT to instantiate Distributed
+> Switch Architecture, nobody volunteered to test. As to be expected,
+> the conversion was flawed. Testers and access to hardware has now
+> become available, and this patch hopefully fixes the problems.
+> 
+> dsa,mii-bus must be a phandle to the top level mdio node, not the port
+> specific subnode of the mdio device.
+> 
+> dsa,ethernet must be a phandle to the port subnode within the ethernet
+> DT node, not the ethernet node.
+> 
+> Don't pinctrl hog the card detect gpio for mvsdio.
+> 
+> Rename the .dts files to make it clearer which file is for the Z0
+> stepping and which for the A0 or later stepping.
+> 
+> Fixes: e2eaa339af441b3d51cdaa16870065c4154ce13c
+> Fixes: e7c8f3808be854379c9784745663a55371cbf232
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Cc: seugene at marvell.com
 > ---
->   sound/soc/rockchip/rockchip_i2s.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
+> v2:
+>   Fix duplex typo
+>   Feedback after testing
+>   Fix mvsdio card detect gpio
+> ---
+>  arch/arm/boot/dts/Makefile                         |  4 +-
+>  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     | 16 +++-----
+>  arch/arm/boot/dts/kirkwood-rd88f6281-a.dts         | 43 ++++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts        | 26 -------------
+>  ...-rd88f6281-a1.dts => kirkwood-rd88f6281-z0.dts} | 18 +++++----
+>  arch/arm/boot/dts/kirkwood-rd88f6281.dtsi          | 27 +++-----------
+>  arch/arm/boot/dts/kirkwood.dtsi                    |  4 +-
+>  7 files changed, 69 insertions(+), 69 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
+>  delete mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts
+>  rename arch/arm/boot/dts/{kirkwood-rd88f6281-a1.dts => kirkwood-rd88f6281-z0.dts} (57%)
 
-> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-> index 1b9b404..6595383 100644
-> --- a/sound/soc/rockchip/rockchip_i2s.c
-> +++ b/sound/soc/rockchip/rockchip_i2s.c
-[...]
-> @@ -385,8 +387,6 @@ static bool rockchip_i2s_volatile_reg(struct device *dev, unsigned int reg)
->   static bool rockchip_i2s_precious_reg(struct device *dev, unsigned int reg)
->   {
->   	switch (reg) {
-> -	case I2S_FIFOLR:
-> -		return true;
->   	default:
->   		return false;
->   	}
+Applied to mvebu/fixes with Eugene's Tested-by and Cc'd to stable,
+v3.15+.
 
-    Shouldn't this be folded into simple *return* false now?
+thx,
 
-WBR, Sergei
+Jason.
