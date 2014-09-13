@@ -1,84 +1,67 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Sat, 13 Sep 2014 12:52:21 -0700
-Subject: [PATCH V3] arm: fix get_user BE behavior for target variable with
- size of 8 bytes
-In-Reply-To: <CAA3XUr3Lvh8fosS1usdojYYr5rkcq3=i8L80iwe=efyztbus1A@mail.gmail.com>
-References: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
- <1409291466-4064-2-git-send-email-victor.kamensky@linaro.org>
- <20140913081642.GS12361@n2100.arm.linux.org.uk>
- <CAA3XUr3Lvh8fosS1usdojYYr5rkcq3=i8L80iwe=efyztbus1A@mail.gmail.com>
-Message-ID: <CAA3XUr19zyh684-PTZt0tyKi8TQD8N60aseZiJfkS3HWPDMz5w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 13 Sep 2014 16:07:16 -0400
+Subject: [PATCH v3 0/3] net: Add Keystone NetCP ethernet driver support
+Message-ID: <1410638839-14792-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Update v3 after incorporating Jamal and David Miller's comment/suggestion
+from earlier versions [1] [2]. I would like to get these merged for upcoming
+3.18 merge window if there are no concerns on this version.
 
-Please see inline.
+After per the discussion here [3], the controversial custom exports have
+been dropped now. And for future future offload support additions, we will
+plug into generic frameworks as an when they are available.
 
-On 13 September 2014 09:55, Victor Kamensky <victor.kamensky@linaro.org> wrote:
-> Hi Russell,
->
-> I am looking into it.
->
-> Thanks,
-> Victor
->
->
-> On 13 September 2014 01:16, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Aug 28, 2014 at 10:51:06PM -0700, Victor Kamensky wrote:
->>> e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
->>> broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
->>> is 32 bit or smaller. e38361d changed type of __r2 from 'register
->>> unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
->>> even when target variable size was 64 bit, __r2 was still 32 bit.
->>> But after e38361d commit, for target var of 64 bit size, __r2 became 64
->>> bit and now it should occupy 2 registers r2, and r3. The issue in BE case
->>> that r3 register is least significant word of __r2 and r2 register is most
->>> significant word of __r2. But __get_user_4 still copies result into r2 (most
->>> significant word of __r2). Subsequent code copies from __r2 into x, but
->>> for situation described it will pick up only garbage from r3 register.
->>>
->>> Special __get_user_64t_(124) functions are introduced. They are similar to
->>> corresponding __get_user_(124) function but result stored in r3 register
->>> (lsw in case of 64 bit __r2 in BE image). Those function are used by
->>> get_user macro in case of BE and target var size is 64bit.
->>>
->>> Also changed __get_user_lo8 name into __get_user_32t_8 to get consistent
->>> naming accross all cases.
->>>
->>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->>> Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
->>
->> This patch isn't quite right, since it causes compile regressions:
->>
->> ERROR: "__get_user_64t_4" [fs/ext4/ext4.ko] undefined!
->> ERROR: "__get_user_64t_4" [fs/cifs/cifs.ko] undefined!
->>
->> This was noticed by Olof's builder, with his allmodconfig.  I don't
->> have the configuration to reproduce these failures.
->>
->> Could you look into these please?
+The network coprocessor (NetCP) is a hardware accelerator that processes
+Ethernet packets. NetCP has a gigabit Ethernet (GbE) subsystem with a ethernet
+switch sub-module to send and receive packets. NetCP also includes a packet
+accelerator (PA) module to perform packet classification operations such as
+header matching, and packet modification operations such as checksum
+generation. NetCP can also optionally include a Security Accelerator(SA)
+capable of performing IPSec operations on ingress/egress packets.
+    
+Keystone SoC's also have a 10 Gigabit Ethernet Subsystem (XGbE) which
+includes a 3-port Ethernet switch sub-module capable of 10Gb/s and
+1Gb/s rates per Ethernet port.
+    
+Both GBE and XGBE network processors supported using common driver. It
+is also designed to handle future variants of NetCP.
 
-I've posted proposed fix as [1]. The issue was that few
-new asm functions used by new version of get_user macro were
-not exported. It got exposed with allmodconfig for big endian
-image. I am sorry about the breakage. It is very good that
-Olof's builder tests big endian images build. Appreciate that
-very much.
+Cc: David Miller <davem@davemloft.net>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Sandeep Nair <sandeep_n@ti.com>
 
-What are next steps, should I put [1] into your patch system
-(if you or someone else can Ack the fix)? Or do I need repost
-revised original diff that would include [1] fix? Please advise.
+Sandeep Nair (3):
+  Documentation: dt: net: Add binding doc for Keystone NetCP ethernet
+    driver
+  net: Add Keystone NetCP ethernet driver
+  MAINTAINER: net: Add TI NETCP Ethernet driver entry
 
-Thanks,
-Victor
+ .../devicetree/bindings/net/keystone-netcp.txt     |  197 ++
+ MAINTAINERS                                        |    6 +
+ drivers/net/ethernet/ti/Kconfig                    |   16 +-
+ drivers/net/ethernet/ti/Makefile                   |    4 +
+ drivers/net/ethernet/ti/netcp.h                    |  227 ++
+ drivers/net/ethernet/ti/netcp_core.c               | 2266 ++++++++++++++++++++
+ drivers/net/ethernet/ti/netcp_ethss.c              | 2178 +++++++++++++++++++
+ drivers/net/ethernet/ti/netcp_sgmii.c              |  130 ++
+ drivers/net/ethernet/ti/netcp_xgbepcsr.c           |  502 +++++
+ 9 files changed, 5523 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/keystone-netcp.txt
+ create mode 100644 drivers/net/ethernet/ti/netcp.h
+ create mode 100644 drivers/net/ethernet/ti/netcp_core.c
+ create mode 100644 drivers/net/ethernet/ti/netcp_ethss.c
+ create mode 100644 drivers/net/ethernet/ti/netcp_sgmii.c
+ create mode 100644 drivers/net/ethernet/ti/netcp_xgbepcsr.c
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287238.html
-     http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287239.html
 
->>
->> --
->> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
->> according to speedtest.net.
+Regards,
+Santosh
+
+[1] https://lkml.org/lkml/2014/4/22/805
+[2] https://lkml.org/lkml/2014/8/15/218
+[3] https://lkml.org/lkml/2014/9/11/691
+-- 
+1.7.9.5
