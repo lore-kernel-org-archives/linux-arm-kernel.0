@@ -1,42 +1,64 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Sat, 13 Sep 2014 13:03:23 +0100
-Subject: [PATCH 3.17-rc4 v5 2/6] arm: fiq: Replace default FIQ handler
-In-Reply-To: <20140912171404.GO12361@n2100.arm.linux.org.uk>
-References: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-3-git-send-email-daniel.thompson@linaro.org>
- <20140912171404.GO12361@n2100.arm.linux.org.uk>
-Message-ID: <5414328B.6010307@linaro.org>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Sat, 13 Sep 2014 18:29:58 +0530
+Subject: exynos5420/arndale-octa: imprecise external aborts on
+ exynos_defconfig
+In-Reply-To: <7h7g1bwbyh.fsf@deeprootsystems.com>
+References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
+ <7h7g1bwbyh.fsf@deeprootsystems.com>
+Message-ID: <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/14 18:14, Russell King - ARM Linux wrote:
-> On Thu, Sep 11, 2014 at 12:31:14PM +0100, Daniel Thompson wrote:
->> This patch introduces a new default FIQ handler that is structured in a
->> similar way to the existing ARM exception handler and result in the FIQ
->> being handled by C code running on the SVC stack (despite this code run
->> in the FIQ handler is subject to severe limitations with respect to
->> locking making normal interaction with the kernel impossible).
->>
->> This default handler allows concepts that on x86 would be handled using
->> NMIs to be realized on ARM.
-> 
-> Okay, lastly... I sent you my version of this change, which contained
-> the changes I've detailed in the previous three emails, which are absent
-> from your version.
-> 
-> However, you've taken on board the "trace" thing to svc_entry, and
-> renamed it to "call_trace".
-> 
-> Now if I add this to usr_entry, "call_trace" doesn't make any sense,
-> nor does the .if/.endif placement because it's not just trace_hardirqs_off
-> which needs to be disabled there, but also ct_user_exit as well.
-> 
-> I'm beginning to wonder why I tried to be nice here... it would've been
-> a lot faster for me to take your patch, make my own changes and commit
-> that instead.
+On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Tyler Baker <tyler.baker@linaro.org> writes:
+>
+>> Exynos5420-based Arndale octa boards have recently started failing boot
+>> tests due to imprecise external aborts.  This only appears to happen
+>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
+>> issue seems to be intermittent, so is not reliably reproducable and
+>> difficult to bisect.  Here are a few boot logs from recent
+>> mainline/linux-next kernels that are failing:
+>
+> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
+> of next-20140910:
+> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+>
+> However, my userspace is much simpler and doesn't seem to cause a panic,
+> so my boot tests report passing. (I should fixup my scripts so these
+> imprecise aborts are reported as a FAIL.)
+>
+> I'm glad you pointed out that it happens only with exynos_defconfig and
+> not multi_v7_defconfig because I noticed that too.  I haven't had the
+> time to track it any further than that, so maybe the exynos folks can
+> help track it down from here.
+>
+> Thanks for reporting this,
+>
+> Kevin
 
-I did not do a side by side diff of your FYI patch with my current code
-and hence overlooked all these changes.
+Hi Tyler, Kevin,
 
-Sorry. I should have done that.
+>From the bootlog you have shared,
+
+[    1.060016] CPU4: failed to come online
+[    2.070031] CPU5: failed to come online
+[    3.080049] CPU6: failed to come online
+[    4.090066] CPU7: failed to come online
+[    4.090099] Brought up 4 CPUs
+[    4.090109] SMP: Total of 4 processors activated.
+[    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
+modes (primary CPU mode 0x13)
+[    4.090128] CPU: This may indicate a broken bootloader or firmware.
+
+Would it be possible to set max cpus to 1, disable switcher and try
+again. I don't have a arndale octa board but I have tested mainline
+kernel with smdk5420 board. It boots all eight CPUs, switcher works
+fine and there are no imprecise aborts seen.
+
+Thanks,
+Thomas.
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
