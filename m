@@ -1,79 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 13 Sep 2014 10:06:38 -0700
-Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
- default
-In-Reply-To: <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
-References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
- <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
- <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
-Message-ID: <20140913170638.GA3348@lvm>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 14 Sep 2014 02:22:54 +0900
+Subject: [PATCH V3 1/2] ARM: dts: Add DT changes for display on snow
+In-Reply-To: <1409567792-8281-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1409567792-8281-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <54147D6E.2030103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 13, 2014 at 01:15:45PM +0200, Ard Biesheuvel wrote:
-> On 13 September 2014 12:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Hi Ard,
-> >
-> > On 2014-09-13 11:17, Ard Biesheuvel wrote:
-> >>
-> >> Now that we support read-only memslots, we need to make sure that
-> >> pass-through device mappings are not mapped writable if the guest
-> >> has requested them to be read-only. The existing implementation
-> >> already honours this by calling kvm_set_s2pte_writable() on the new
-> >> pte in case of writable mappings, so all we need to do is define
-> >> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> >
-> > I feel very uncomfortable with this change. Why would we map a device RO? Is
-> > that only for completeness sake?
-> >
-> 
-> We would map a device RO so that QEMU (or whatever is managing KVM)
-> can emulate the writes. I don't have a clear cut use case, to be
-> honest, but setting up a writable mapping for a memslot that was
-> explicitly set up as read-only seems wrong in any case.
+On 09/01/14 19:36, Ajay Kumar wrote:
+> Add DT nodes for ptn3460 bridge chip and panel.
+> Add backlight enable pin and backlight power supply for pwm-backlight.
+> Also add bridge phandle needed by dp to enable display on snow.
+>
+> Signed-off-by: Ajay Kumar<ajaykumar.rs@samsung.com>
+> ---
+> Changes since V1:
+> 	-- Remove "simple-panel" compatible string.
+> 	-- Use GPIO_ACTIVE_HIGH instead of 0.
+> 	-- Change panel node naming from "panel-simple" to "panel".
+>
+> Changes since V2:
+> 	-- Use proper compatible string: "auo,b116xw03"
+>
+>   arch/arm/boot/dts/exynos5250-snow.dts |   41 ++++++++++++++++++---------------
+>   1 file changed, 22 insertions(+), 19 deletions(-)
+>
+Applied this and 2nd one.
 
-Agreed, if it doesn't ever make sense to do so, then we should return an
-error to user space if userspace attempts such a configuration.  The
-current code is just weird.
-
-> 
-> Note that the particular problem I was seeing was primarily caused by
-> kvm_is_mmio_pfn()'s false positive on the zero page, but it unveiled
-> this particular issue as well.
-> 
-> > Note that we also use PAGE_S2_DEVICE for things that are not mapped through
-> > a memslot, such as the GIC.
-> >
-> 
-> Yes, and I realize now that this breaks it.
-> My apologies: I have an additional patch locally that sets up MMIO
-> ranges in one go instead of faulting them in one page at a time as we
-> do now, and there the read-write case is handled correctly in
-> kvm_phys_addr_ioremap(). However, I thought it was better to send
-> these out separately first, but apparently not.
-
-I think it is better to change this separately, and then add the ioremap
-stuff.  However, you need to change all places that call PAGE_S2_DEVICE
-and expect a RDWR memory region, this happens to be only
-kvm_phys_addr_ioremap() for now.
-
-> 
-> So if we can agree on whether or not MMIO backed mappings should be
-> read-write even if the memslot says no, I will follow up with a proper
-> series if there are still changes required.
-> 
-
-I guess it could be theoretically useful to have read-only device memory
-regions, and I can't think of why it would violate the architecture.
-
-That said, I don't have any more clear use cases in mind, and we
-definitely shouldn't just silently ignore the read-only flag from user
-space and make the region writeable.  If we don't want to allow this
-behavior, we can return an error in kvm_arch_create_memslot(), which
-will cause the KVM_CREATE_USER_MEMORY_REGION ioctl to return -ENOMEM.
+BTW, I resolved conflict when I applied. Please check my tree and then 
+if any problems, please let me know.
 
 Thanks,
--Christoffer
+Kukjin
