@@ -1,51 +1,36 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Sat, 13 Sep 2014 17:13:18 +0200
-Subject: [PATCH 1/2] bcma: register bcma as device tree driver
-In-Reply-To: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
-References: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <54145F0E.8000506@broadcom.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Sat, 13 Sep 2014 23:36:24 +0800
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140912143050.014ad4c3@bbrezillon>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911120928.GA1585@localhost.localdomain>
+ <20140911143616.3ebb025a@bbrezillon>
+ <20140911142511.GA2543@localhost.localdomain>
+ <20140911163847.5e2f85c7@bbrezillon>
+ <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
+ <20140912143050.014ad4c3@bbrezillon>
+Message-ID: <20140913153622.GA10132@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/14 15:37, Hauke Mehrtens wrote:
-> This driver is used by the bcm53xx ARM SoC code. Now it is possible to
-> give the address of the chipcommon core in device tree and bcma will
-> search for all the other cores.
->
-> Signed-off-by: Hauke Mehrtens<hauke@hauke-m.de>
-> ---
->   Documentation/devicetree/bindings/bus/bcma.txt | 41 +++++++++++++
->   drivers/bcma/bcma_private.h                    | 16 +++++
->   drivers/bcma/host_soc.c                        | 82 ++++++++++++++++++++++++++
->   drivers/bcma/main.c                            | 10 ++++
->   include/linux/bcma/bcma.h                      |  2 +
->   5 files changed, 151 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
->
-> This is based on wireless-testing and should go into that tree.
->
-> changes since:
-> RFC:
->   - reworded the irq description
->   - improved the example
->   - hocked into bcma_modeinit() and bcma_modexit()
->
-> diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
-> new file mode 100644
-> index 0000000..17e095f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/bus/bcma.txt
-> @@ -0,0 +1,41 @@
-> +Broadcom AIX SoC bcma bus driver
+On Fri, Sep 12, 2014 at 02:30:50PM +0200, Boris BREZILLON wrote:
+> On Fri, 12 Sep 2014 08:45:50 +0800
+> 
+> My bad, capabilities might not be the appropriate word in this context.
+> I meant ECC algorithm strength, and that's exactly the purpose of
+> nandbiterrs testsuite: insert bitflips in in-band data until the MTD
+> layer complains about uncorrectable errors.
+okay. 
 
-Hi Hauke,
+> This test validates what's returned by ecc_strength file in sysfs
+> (which in turn is specified by the NAND controller when initializing
+> the NAND chip).
+> 
+> Doing this should not imply knowing the ECC algorithm in use in the
+> NAND controller or the layout used to store data on NAND.
+the difficulty is that the ECC parity area can be not byte aligned.
 
-First of all a typo used all over the place: AIX should be AXI.
+As I ever said, it is hard to implement the two hooks.
 
-The backplane in Broadcom SoC is ARM AXI with additional plugin option 
-to make it discoverable. Indeed the IRQ info is not included, but I see 
-no reason for specifying the register space for the cores in device-tree 
-as that is discoverable by bcma.
-
-Regards,
-Arend
+thanks
+Huang Shijie
