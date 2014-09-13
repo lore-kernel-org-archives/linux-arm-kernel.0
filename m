@@ -1,49 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 13 Sep 2014 09:16:42 +0100
-Subject: [PATCH V3] arm: fix get_user BE behavior for target variable
- with size of 8 bytes
-In-Reply-To: <1409291466-4064-2-git-send-email-victor.kamensky@linaro.org>
-References: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
- <1409291466-4064-2-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140913081642.GS12361@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 13 Sep 2014 10:18:04 +0200
+Subject: [PATCH v3 09/12] ARM: sunxi: dt: Add sample and output mmc clocks
+In-Reply-To: <CAGb2v676B=pbKDnAfb3yUdL1ORgbacNTo=5EsTauNo+H993Agw@mail.gmail.com>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1410466706-27386-10-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v676B=pbKDnAfb3yUdL1ORgbacNTo=5EsTauNo+H993Agw@mail.gmail.com>
+Message-ID: <20140913081804.GY31276@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 10:51:06PM -0700, Victor Kamensky wrote:
-> e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
-> broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
-> is 32 bit or smaller. e38361d changed type of __r2 from 'register
-> unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
-> even when target variable size was 64 bit, __r2 was still 32 bit.
-> But after e38361d commit, for target var of 64 bit size, __r2 became 64
-> bit and now it should occupy 2 registers r2, and r3. The issue in BE case
-> that r3 register is least significant word of __r2 and r2 register is most
-> significant word of __r2. But __get_user_4 still copies result into r2 (most
-> significant word of __r2). Subsequent code copies from __r2 into x, but
-> for situation described it will pick up only garbage from r3 register.
+On Fri, Sep 12, 2014 at 06:23:02PM +0800, Chen-Yu Tsai wrote:
+> >                 mmc0: mmc at 01c0f000 {
+> >                         compatible = "allwinner,sun4i-a10-mmc";
+> >                         reg = <0x01c0f000 0x1000>;
+> > -                       clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> > -                       clock-names = "ahb", "mmc";
+> > +                       clocks = <&ahb_gates 8>,
+> > +                                <&mmc0_clk>,
+> > +                                <&mmc0_sample_clk>,
+> > +                                <&mmc0_output_clk>;
+> > +                       clock-names = "ahb",
+> > +                                     "mmc",
+> > +                                     "sample",
+> > +                                     "output";
 > 
-> Special __get_user_64t_(124) functions are introduced. They are similar to
-> corresponding __get_user_(124) function but result stored in r3 register
-> (lsw in case of 64 bit __r2 in BE image). Those function are used by
-> get_user macro in case of BE and target var size is 64bit.
-> 
-> Also changed __get_user_lo8 name into __get_user_32t_8 to get consistent
-> naming accross all cases.
-> 
-> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
-> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Just a stylish nitpick. All the other resources in these files
+> are listed inline if possible, not one phandle/value per line.
 
-This patch isn't quite right, since it causes compile regressions:
+Look at the PIO interrupts, every USB PHY resources, etc. ;)
 
-ERROR: "__get_user_64t_4" [fs/ext4/ext4.ko] undefined!
-ERROR: "__get_user_64t_4" [fs/cifs/cifs.ko] undefined!
-
-This was noticed by Olof's builder, with his allmodconfig.  I don't
-have the configuration to reproduce these failures.
-
-Could you look into these please?
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140913/3cf98b29/attachment.sig>
