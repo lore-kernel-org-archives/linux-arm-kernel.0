@@ -1,60 +1,79 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Sat, 13 Sep 2014 09:55:20 -0700
-Subject: [PATCH V3] arm: fix get_user BE behavior for target variable with
- size of 8 bytes
-In-Reply-To: <20140913081642.GS12361@n2100.arm.linux.org.uk>
-References: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
- <1409291466-4064-2-git-send-email-victor.kamensky@linaro.org>
- <20140913081642.GS12361@n2100.arm.linux.org.uk>
-Message-ID: <CAA3XUr3Lvh8fosS1usdojYYr5rkcq3=i8L80iwe=efyztbus1A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 13 Sep 2014 10:06:38 -0700
+Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
+ default
+In-Reply-To: <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
+References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
+ <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
+ <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
+Message-ID: <20140913170638.GA3348@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sat, Sep 13, 2014 at 01:15:45PM +0200, Ard Biesheuvel wrote:
+> On 13 September 2014 12:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Hi Ard,
+> >
+> > On 2014-09-13 11:17, Ard Biesheuvel wrote:
+> >>
+> >> Now that we support read-only memslots, we need to make sure that
+> >> pass-through device mappings are not mapped writable if the guest
+> >> has requested them to be read-only. The existing implementation
+> >> already honours this by calling kvm_set_s2pte_writable() on the new
+> >> pte in case of writable mappings, so all we need to do is define
+> >> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> >
+> > I feel very uncomfortable with this change. Why would we map a device RO? Is
+> > that only for completeness sake?
+> >
+> 
+> We would map a device RO so that QEMU (or whatever is managing KVM)
+> can emulate the writes. I don't have a clear cut use case, to be
+> honest, but setting up a writable mapping for a memslot that was
+> explicitly set up as read-only seems wrong in any case.
 
-I am looking into it.
+Agreed, if it doesn't ever make sense to do so, then we should return an
+error to user space if userspace attempts such a configuration.  The
+current code is just weird.
+
+> 
+> Note that the particular problem I was seeing was primarily caused by
+> kvm_is_mmio_pfn()'s false positive on the zero page, but it unveiled
+> this particular issue as well.
+> 
+> > Note that we also use PAGE_S2_DEVICE for things that are not mapped through
+> > a memslot, such as the GIC.
+> >
+> 
+> Yes, and I realize now that this breaks it.
+> My apologies: I have an additional patch locally that sets up MMIO
+> ranges in one go instead of faulting them in one page at a time as we
+> do now, and there the read-write case is handled correctly in
+> kvm_phys_addr_ioremap(). However, I thought it was better to send
+> these out separately first, but apparently not.
+
+I think it is better to change this separately, and then add the ioremap
+stuff.  However, you need to change all places that call PAGE_S2_DEVICE
+and expect a RDWR memory region, this happens to be only
+kvm_phys_addr_ioremap() for now.
+
+> 
+> So if we can agree on whether or not MMIO backed mappings should be
+> read-write even if the memslot says no, I will follow up with a proper
+> series if there are still changes required.
+> 
+
+I guess it could be theoretically useful to have read-only device memory
+regions, and I can't think of why it would violate the architecture.
+
+That said, I don't have any more clear use cases in mind, and we
+definitely shouldn't just silently ignore the read-only flag from user
+space and make the region writeable.  If we don't want to allow this
+behavior, we can return an error in kvm_arch_create_memslot(), which
+will cause the KVM_CREATE_USER_MEMORY_REGION ioctl to return -ENOMEM.
 
 Thanks,
-Victor
-
-
-On 13 September 2014 01:16, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Aug 28, 2014 at 10:51:06PM -0700, Victor Kamensky wrote:
->> e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
->> broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
->> is 32 bit or smaller. e38361d changed type of __r2 from 'register
->> unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
->> even when target variable size was 64 bit, __r2 was still 32 bit.
->> But after e38361d commit, for target var of 64 bit size, __r2 became 64
->> bit and now it should occupy 2 registers r2, and r3. The issue in BE case
->> that r3 register is least significant word of __r2 and r2 register is most
->> significant word of __r2. But __get_user_4 still copies result into r2 (most
->> significant word of __r2). Subsequent code copies from __r2 into x, but
->> for situation described it will pick up only garbage from r3 register.
->>
->> Special __get_user_64t_(124) functions are introduced. They are similar to
->> corresponding __get_user_(124) function but result stored in r3 register
->> (lsw in case of 64 bit __r2 in BE image). Those function are used by
->> get_user macro in case of BE and target var size is 64bit.
->>
->> Also changed __get_user_lo8 name into __get_user_32t_8 to get consistent
->> naming accross all cases.
->>
->> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
->> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
->
-> This patch isn't quite right, since it causes compile regressions:
->
-> ERROR: "__get_user_64t_4" [fs/ext4/ext4.ko] undefined!
-> ERROR: "__get_user_64t_4" [fs/cifs/cifs.ko] undefined!
->
-> This was noticed by Olof's builder, with his allmodconfig.  I don't
-> have the configuration to reproduce these failures.
->
-> Could you look into these please?
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+-Christoffer
