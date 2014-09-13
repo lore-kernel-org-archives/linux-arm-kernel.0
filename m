@@ -1,121 +1,390 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 13 Sep 2014 21:16:12 +0200
-Subject: [PATCH 6/8] arm: mach-orion5x: Convert pr_warning to pr_warn
-In-Reply-To: <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
-References: <cover.1410632834.git.joe@perches.com>
- <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
-Message-ID: <20140913191612.GB24502@lunn.ch>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Sat, 13 Sep 2014 12:39:20 -0700
+Subject: [PATCH] arm: add missing exports for asm functions required by
+ get_user macro
+Message-ID: <1410637161-4865-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 13, 2014 at 11:31:17AM -0700, Joe Perches wrote:
-> Use the more common pr_warn.
-> 
-> Other miscellanea:
-> 
-> o Realign arguments
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
+Hi Russell,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Patch following this cover latter fixes issue that you reported [1]
+with '[PATCH V3] arm: fix get_user BE behavior for target variable with 
+size of 8 bytes' patch:
 
-	  Andrew
+ERROR: "__get_user_64t_4" [fs/ext4/ext4.ko] undefined!
+ERROR: "__get_user_64t_4" [fs/cifs/cifs.ko] undefined!
 
-> ---
->  arch/arm/mach-orion5x/dns323-setup.c           | 8 ++++----
->  arch/arm/mach-orion5x/terastation_pro2-setup.c | 2 +-
->  arch/arm/mach-orion5x/ts209-setup.c            | 2 +-
->  arch/arm/mach-orion5x/ts409-setup.c            | 2 +-
->  arch/arm/mach-orion5x/ts78xx-setup.c           | 4 ++--
->  5 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-> index 56edeab..09d2a26 100644
-> --- a/arch/arm/mach-orion5x/dns323-setup.c
-> +++ b/arch/arm/mach-orion5x/dns323-setup.c
-> @@ -550,7 +550,7 @@ static int __init dns323_identify_rev(void)
->  			break;
->  	}
->  	if (i >= 1000) {
-> -		pr_warning("DNS-323: Timeout accessing PHY, assuming rev B1\n");
-> +		pr_warn("DNS-323: Timeout accessing PHY, assuming rev B1\n");
->  		return DNS323_REV_B1;
->  	}
->  	writel((3 << 21)	/* phy ID reg */ |
-> @@ -562,7 +562,7 @@ static int __init dns323_identify_rev(void)
->  			break;
->  	}
->  	if (i >= 1000) {
-> -		pr_warning("DNS-323: Timeout reading PHY, assuming rev B1\n");
-> +		pr_warn("DNS-323: Timeout reading PHY, assuming rev B1\n");
->  		return DNS323_REV_B1;
->  	}
->  	pr_debug("DNS-323: Ethernet PHY ID 0x%x\n", reg & 0xffff);
-> @@ -577,8 +577,8 @@ static int __init dns323_identify_rev(void)
->  	case 0x0e10: /* MV88E1118 */
->  		return DNS323_REV_C1;
->  	default:
-> -		pr_warning("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
-> -			   reg & 0xffff);
-> +		pr_warn("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
-> +			reg & 0xffff);
->  	}
->  	return DNS323_REV_B1;
->  }
-> diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
-> index 6208d12..1208674 100644
-> --- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
-> +++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
-> @@ -349,7 +349,7 @@ static void __init tsp2_init(void)
->  			gpio_free(TSP2_RTC_GPIO);
->  	}
->  	if (tsp2_i2c_rtc.irq == 0)
-> -		pr_warning("tsp2_init: failed to get RTC IRQ\n");
-> +		pr_warn("tsp2_init: failed to get RTC IRQ\n");
->  	i2c_register_board_info(0, &tsp2_i2c_rtc, 1);
->  
->  	/* register Terastation Pro II specific power-off method */
-> diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
-> index 9136797..c725b7c 100644
-> --- a/arch/arm/mach-orion5x/ts209-setup.c
-> +++ b/arch/arm/mach-orion5x/ts209-setup.c
-> @@ -314,7 +314,7 @@ static void __init qnap_ts209_init(void)
->  			gpio_free(TS209_RTC_GPIO);
->  	}
->  	if (qnap_ts209_i2c_rtc.irq == 0)
-> -		pr_warning("qnap_ts209_init: failed to get RTC IRQ\n");
-> +		pr_warn("qnap_ts209_init: failed to get RTC IRQ\n");
->  	i2c_register_board_info(0, &qnap_ts209_i2c_rtc, 1);
->  
->  	/* register tsx09 specific power-off method */
-> diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
-> index 5c079d31..cf2ab53 100644
-> --- a/arch/arm/mach-orion5x/ts409-setup.c
-> +++ b/arch/arm/mach-orion5x/ts409-setup.c
-> @@ -302,7 +302,7 @@ static void __init qnap_ts409_init(void)
->  			gpio_free(TS409_RTC_GPIO);
->  	}
->  	if (qnap_ts409_i2c_rtc.irq == 0)
-> -		pr_warning("qnap_ts409_init: failed to get RTC IRQ\n");
-> +		pr_warn("qnap_ts409_init: failed to get RTC IRQ\n");
->  	i2c_register_board_info(0, &qnap_ts409_i2c_rtc, 1);
->  	platform_device_register(&ts409_leds);
->  
-> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-> index db16dae..1b704d3 100644
-> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
-> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-> @@ -403,8 +403,8 @@ static void ts78xx_fpga_supports(void)
->  		/* enable devices if magic matches */
->  		switch ((ts78xx_fpga.id >> 8) & 0xffffff) {
->  		case TS7800_FPGA_MAGIC:
-> -			pr_warning("unrecognised FPGA revision 0x%.2x\n",
-> -					ts78xx_fpga.id & 0xff);
-> +			pr_warn("unrecognised FPGA revision 0x%.2x\n",
-> +				ts78xx_fpga.id & 0xff);
->  			ts78xx_fpga.supports.ts_rtc.present = 1;
->  			ts78xx_fpga.supports.ts_nand.present = 1;
->  			ts78xx_fpga.supports.ts_rng.present = 1;
-> -- 
-> 1.8.1.2.459.gbcd45b4.dirty
-> 
+The issue is that newly introduced get_user macro helper asm
+functions were not exported. So in case of ext4 and cifs compiled
+as kernel modules in BE image the issue got exposed.
+
+While looking at this I realized that __get_user_8 helper
+function added by other commit is not exported too. It would
+affect LE image as well but fortunately currently there is 
+no module that use get_user in such combination.
+
+The proposed patch adds export for all recently added
+asm helper functions used by get_user macro.
+
+I've tested all combinations of target variable types 
+(1, 2, 4, 8 bytes), value pointer type (1, 2, 4, 8 bytes), 
+kernel/module, and BE/LE with test patch provided below.
+It all looks good now abd it addresses reported issue.
+
+Thanks,
+Victor
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287167.html
+
+Appendix 1
+----------
+
+Patch that was used for testing of get_user macro export fix.
+It is provided just for reference only.
+
+>From d34a035769fae6a6dff9f407daa7f0e65bfe55a9 Mon Sep 17 00:00:00 2001
+From: Victor Kamensky <victor.kamensky@linaro.org>
+Date: Wed, 20 Aug 2014 19:31:28 -0700
+Subject: [PATCH] arm: get_user tests
+
+Test different combinations of value and pointers passed to
+get_user macro.
+
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+---
+ arch/arm/kernel/Makefile         |   3 +
+ arch/arm/kernel/get_user_test.h  |  54 ++++++++++++++
+ arch/arm/kernel/get_user_test1.c |  77 ++++++++++++++++++++
+ arch/arm/kernel/get_user_test2.c | 151 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 285 insertions(+)
+ create mode 100644 arch/arm/kernel/get_user_test.h
+ create mode 100644 arch/arm/kernel/get_user_test1.c
+ create mode 100644 arch/arm/kernel/get_user_test2.c
+
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 38ddd9f..193e581 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -30,6 +30,9 @@ else
+ obj-y		+= entry-armv.o
+ endif
+ 
++obj-m		+= test-get_user.o
++test-get_user-objs += get_user_test1.o get_user_test2.o
++
+ obj-$(CONFIG_OC_ETM)		+= etm.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+diff --git a/arch/arm/kernel/get_user_test.h b/arch/arm/kernel/get_user_test.h
+new file mode 100644
+index 0000000..723f03a
+--- /dev/null
++++ b/arch/arm/kernel/get_user_test.h
+@@ -0,0 +1,54 @@
++typedef char	   tint8_t;
++typedef short	  tint16_t;
++typedef int	  tint32_t;
++typedef long long tint64_t;
++
++#define GUT_LOWER_TEST_DECLARE(vs, ps)			\
++	tint8_t gut_lower_v ## vs ## _p ## ps		\
++	(tint ## ps ## _t *ptr);
++
++GUT_LOWER_TEST_DECLARE(64, 8)
++GUT_LOWER_TEST_DECLARE(64, 16)
++GUT_LOWER_TEST_DECLARE(64, 32)
++GUT_LOWER_TEST_DECLARE(64, 64)
++
++GUT_LOWER_TEST_DECLARE(32, 8)
++GUT_LOWER_TEST_DECLARE(32, 16)
++GUT_LOWER_TEST_DECLARE(32, 32)
++GUT_LOWER_TEST_DECLARE(32, 64)
++
++GUT_LOWER_TEST_DECLARE(16, 8)
++GUT_LOWER_TEST_DECLARE(16, 16)
++GUT_LOWER_TEST_DECLARE(16, 32)
++GUT_LOWER_TEST_DECLARE(16, 64)
++
++GUT_LOWER_TEST_DECLARE(8, 8)
++GUT_LOWER_TEST_DECLARE(8, 16)
++GUT_LOWER_TEST_DECLARE(8, 32)
++GUT_LOWER_TEST_DECLARE(8, 64)
++
++
++#define GUT_UPPER_TEST_DECLARE(vs, ps)			\
++	tint8_t gut_upper_v ## vs ## _p ## ps		\
++	(tint ## ps ## _t *ptr);
++
++GUT_UPPER_TEST_DECLARE(64, 8)
++GUT_UPPER_TEST_DECLARE(64, 16)
++GUT_UPPER_TEST_DECLARE(64, 32)
++GUT_UPPER_TEST_DECLARE(64, 64)
++
++GUT_UPPER_TEST_DECLARE(32, 8)
++GUT_UPPER_TEST_DECLARE(32, 16)
++GUT_UPPER_TEST_DECLARE(32, 32)
++GUT_UPPER_TEST_DECLARE(32, 64)
++
++GUT_UPPER_TEST_DECLARE(16, 8)
++GUT_UPPER_TEST_DECLARE(16, 16)
++GUT_UPPER_TEST_DECLARE(16, 32)
++GUT_UPPER_TEST_DECLARE(16, 64)
++
++GUT_UPPER_TEST_DECLARE(8, 8)
++GUT_UPPER_TEST_DECLARE(8, 16)
++GUT_UPPER_TEST_DECLARE(8, 32)
++GUT_UPPER_TEST_DECLARE(8, 64)
++
+diff --git a/arch/arm/kernel/get_user_test1.c b/arch/arm/kernel/get_user_test1.c
+new file mode 100644
+index 0000000..e34b168
+--- /dev/null
++++ b/arch/arm/kernel/get_user_test1.c
+@@ -0,0 +1,77 @@
++#include <asm/uaccess.h>
++
++#include "get_user_test.h"
++
++#define GUT_LOWER_TEST(vs, ps)				\
++	tint8_t gut_lower_v ## vs ## _p ## ps		\
++	(tint ## ps ## _t *ptr)				\
++{							\
++	tint ## vs ## _t value = 0;			\
++							\
++	mm_segment_t fs;				\
++	fs = get_fs();					\
++	set_fs(KERNEL_DS);				\
++							\
++	get_user(value, ptr);				\
++							\
++	set_fs(fs);					\
++	return 0xff & value;				\
++}							\
++
++GUT_LOWER_TEST(64, 8)
++GUT_LOWER_TEST(64, 16)
++GUT_LOWER_TEST(64, 32)
++GUT_LOWER_TEST(64, 64)
++
++GUT_LOWER_TEST(32, 8)
++GUT_LOWER_TEST(32, 16)
++GUT_LOWER_TEST(32, 32)
++GUT_LOWER_TEST(32, 64)
++
++GUT_LOWER_TEST(16, 8)
++GUT_LOWER_TEST(16, 16)
++GUT_LOWER_TEST(16, 32)
++GUT_LOWER_TEST(16, 64)
++
++GUT_LOWER_TEST(8, 8)
++GUT_LOWER_TEST(8, 16)
++GUT_LOWER_TEST(8, 32)
++GUT_LOWER_TEST(8, 64)
++
++
++#define GUT_UPPER_TEST(vs, ps)				\
++	tint8_t gut_upper_v ## vs ## _p ## ps		\
++	(tint ## ps ## _t *ptr)				\
++{							\
++	tint ## vs ## _t value = 0;			\
++							\
++	mm_segment_t fs;				\
++	fs = get_fs();					\
++	set_fs(KERNEL_DS);				\
++							\
++	get_user(value, ptr);				\
++							\
++	set_fs(fs);					\
++	return 0xff & (value >> ((vs > ps) ? (ps - 8) : (vs - 8)));	\
++}							\
++
++
++GUT_UPPER_TEST(64, 8)
++GUT_UPPER_TEST(64, 16)
++GUT_UPPER_TEST(64, 32)
++GUT_UPPER_TEST(64, 64)
++
++GUT_UPPER_TEST(32, 8)
++GUT_UPPER_TEST(32, 16)
++GUT_UPPER_TEST(32, 32)
++GUT_UPPER_TEST(32, 64)
++
++GUT_UPPER_TEST(16, 8)
++GUT_UPPER_TEST(16, 16)
++GUT_UPPER_TEST(16, 32)
++GUT_UPPER_TEST(16, 64)
++
++GUT_UPPER_TEST(8, 8)
++GUT_UPPER_TEST(8, 16)
++GUT_UPPER_TEST(8, 32)
++GUT_UPPER_TEST(8, 64)
+diff --git a/arch/arm/kernel/get_user_test2.c b/arch/arm/kernel/get_user_test2.c
+new file mode 100644
+index 0000000..e483464
+--- /dev/null
++++ b/arch/arm/kernel/get_user_test2.c
+@@ -0,0 +1,151 @@
++#include <linux/module.h>
++#include "get_user_test.h"
++
++tint8_t gut_data8 = 0x12;
++tint16_t gut_data16 = 0x1234;
++tint32_t gut_data32 = 0x12345678;
++tint64_t gut_data64 = 0x1234567890abcdef;
++
++#define GUT_RUN_LOWER_TEST(vs, ps, expect)				\
++	void gut_run_lower_v ## vs ## _p ## ps				\
++	(void)								\
++{									\
++	tint8_t ret = gut_lower_v ## vs ## _p ## ps (&gut_data ## ps);	\
++	if (ret == expect) {						\
++		printk("GUT_TEST: lower v" #vs "_" #ps ": PASS\n");	\
++	} else {							\
++		printk("GUT_TEST: lower v" #vs "_" #ps			\
++		       ": FAILED: expected 0x%x got 0x%x\n",		\
++		       expect, ret);					\
++	}								\
++}
++
++
++GUT_RUN_LOWER_TEST(64, 8, 0x12)
++GUT_RUN_LOWER_TEST(64, 16, 0x34)
++GUT_RUN_LOWER_TEST(64, 32, 0x78)
++GUT_RUN_LOWER_TEST(64, 64, 0xef)
++
++GUT_RUN_LOWER_TEST(32, 8, 0x12)
++GUT_RUN_LOWER_TEST(32, 16, 0x34)
++GUT_RUN_LOWER_TEST(32, 32, 0x78)
++GUT_RUN_LOWER_TEST(32, 64, 0xef)
++
++GUT_RUN_LOWER_TEST(16, 8, 0x12)
++GUT_RUN_LOWER_TEST(16, 16, 0x34)
++GUT_RUN_LOWER_TEST(16, 32, 0x78)
++GUT_RUN_LOWER_TEST(16, 64, 0xef)
++
++GUT_RUN_LOWER_TEST(8, 8, 0x12)
++GUT_RUN_LOWER_TEST(8, 16, 0x34)
++GUT_RUN_LOWER_TEST(8, 32, 0x78)
++GUT_RUN_LOWER_TEST(8, 64, 0xef)
++
++#define GUT_RUN_UPPER_TEST(vs, ps, expect)				\
++	void gut_run_upper_v ## vs ## _p ## ps				\
++	(void)								\
++{									\
++	tint8_t ret = gut_upper_v ## vs ## _p ## ps (&gut_data ## ps);	\
++	if (ret == expect) {						\
++		printk("GUT_TEST: upper v" #vs "_" #ps ": PASS\n");	\
++	} else {							\
++		printk("GUT_TEST: upper v" #vs "_" #ps			\
++		       ": FAILED: expected 0x%x got 0x%x\n",		\
++		       expect, ret);					\
++	}								\
++}
++
++GUT_RUN_UPPER_TEST(64, 8, 0x12)
++GUT_RUN_UPPER_TEST(64, 16, 0x12)
++GUT_RUN_UPPER_TEST(64, 32, 0x12)
++GUT_RUN_UPPER_TEST(64, 64, 0x12)
++
++GUT_RUN_UPPER_TEST(32, 8, 0x12)
++GUT_RUN_UPPER_TEST(32, 16, 0x12)
++GUT_RUN_UPPER_TEST(32, 32, 0x12)
++GUT_RUN_UPPER_TEST(32, 64, 0x90)
++
++GUT_RUN_UPPER_TEST(16, 8, 0x12)
++GUT_RUN_UPPER_TEST(16, 16, 0x12)
++GUT_RUN_UPPER_TEST(16, 32, 0x56)
++GUT_RUN_UPPER_TEST(16, 64, 0xcd)
++
++GUT_RUN_UPPER_TEST(8, 8, 0x12)
++GUT_RUN_UPPER_TEST(8, 16, 0x34)
++GUT_RUN_UPPER_TEST(8, 32, 0x78)
++GUT_RUN_UPPER_TEST(8, 64, 0xef)
++
++
++#define GUT_RUN_LOWER_TEST_CALL(vs, ps) gut_run_lower_v ## vs ## _p ## ps ()
++#define GUT_RUN_UPPER_TEST_CALL(vs, ps) gut_run_upper_v ## vs ## _p ## ps ()
++
++static int
++run_all_tests (void)
++{
++	printk("GUT_TEST: start\n");
++
++	GUT_RUN_LOWER_TEST_CALL(64, 8);
++	GUT_RUN_LOWER_TEST_CALL(64, 16);
++	GUT_RUN_LOWER_TEST_CALL(64, 32);
++	GUT_RUN_LOWER_TEST_CALL(64, 64);
++
++	GUT_RUN_LOWER_TEST_CALL(32, 8);
++	GUT_RUN_LOWER_TEST_CALL(32, 16);
++	GUT_RUN_LOWER_TEST_CALL(32, 32);
++	GUT_RUN_LOWER_TEST_CALL(32, 64);
++
++	GUT_RUN_LOWER_TEST_CALL(16, 8);
++	GUT_RUN_LOWER_TEST_CALL(16, 16);
++	GUT_RUN_LOWER_TEST_CALL(16, 32);
++	GUT_RUN_LOWER_TEST_CALL(16, 64);
++
++	GUT_RUN_LOWER_TEST_CALL(8, 8);
++	GUT_RUN_LOWER_TEST_CALL(8, 16);
++	GUT_RUN_LOWER_TEST_CALL(8, 32);
++	GUT_RUN_LOWER_TEST_CALL(8, 64);
++
++
++	GUT_RUN_UPPER_TEST_CALL(64, 8);
++	GUT_RUN_UPPER_TEST_CALL(64, 16);
++	GUT_RUN_UPPER_TEST_CALL(64, 32);
++	GUT_RUN_UPPER_TEST_CALL(64, 64);
++
++	GUT_RUN_UPPER_TEST_CALL(32, 8);
++	GUT_RUN_UPPER_TEST_CALL(32, 16);
++	GUT_RUN_UPPER_TEST_CALL(32, 32);
++	GUT_RUN_UPPER_TEST_CALL(32, 64);
++
++	GUT_RUN_UPPER_TEST_CALL(16, 8);
++	GUT_RUN_UPPER_TEST_CALL(16, 16);
++	GUT_RUN_UPPER_TEST_CALL(16, 32);
++	GUT_RUN_UPPER_TEST_CALL(16, 64);
++
++	GUT_RUN_UPPER_TEST_CALL(8, 8);
++	GUT_RUN_UPPER_TEST_CALL(8, 16);
++	GUT_RUN_UPPER_TEST_CALL(8, 32);
++	GUT_RUN_UPPER_TEST_CALL(8, 64);
++
++	printk("GUT_TEST: finished\n");
++	return 0;
++}
++
++/*
++ * Module setup
++ */
++
++#ifdef MODULE
++
++static void
++test_exit(void)
++{
++}
++
++module_init(run_all_tests)
++module_exit(test_exit)
++MODULE_LICENSE("GPL");
++
++#else /* !MODULE */
++
++late_initcall(run_all_tests);
++
++#endif
+-- 
+1.8.1.4
+
+
+Victor Kamensky (1):
+  arm: add missing exports for asm functions required by get_user macro
+
+ arch/arm/kernel/armksyms.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+-- 
+1.8.1.4
