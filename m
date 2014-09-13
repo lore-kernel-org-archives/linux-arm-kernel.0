@@ -1,9 +1,9 @@
 From: joe@perches.com (Joe Perches)
-Date: Sat, 13 Sep 2014 11:31:17 -0700
-Subject: [PATCH 6/8] arm: mach-orion5x: Convert pr_warning to pr_warn
+Date: Sat, 13 Sep 2014 11:31:18 -0700
+Subject: [PATCH 7/8] arm: mach-pxa: Convert pr_warning to pr_warn
 In-Reply-To: <cover.1410632834.git.joe@perches.com>
 References: <cover.1410632834.git.joe@perches.com>
-Message-ID: <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
+Message-ID: <70f104441791b08aadef9d7b72018161e9e773b0.1410632835.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,103 +11,247 @@ Use the more common pr_warn.
 
 Other miscellanea:
 
+o Coalesce formats
 o Realign arguments
 
 Signed-off-by: Joe Perches <joe@perches.com>
 ---
- arch/arm/mach-orion5x/dns323-setup.c           | 8 ++++----
- arch/arm/mach-orion5x/terastation_pro2-setup.c | 2 +-
- arch/arm/mach-orion5x/ts209-setup.c            | 2 +-
- arch/arm/mach-orion5x/ts409-setup.c            | 2 +-
- arch/arm/mach-orion5x/ts78xx-setup.c           | 4 ++--
- 5 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-pxa/em-x270.c     |  4 ++--
+ arch/arm/mach-pxa/gumstix.c     |  3 +--
+ arch/arm/mach-pxa/mfp-pxa2xx.c  | 12 +++++-------
+ arch/arm/mach-pxa/poodle.c      |  2 +-
+ arch/arm/mach-pxa/pxa3xx-ulpi.c |  6 +++---
+ arch/arm/mach-pxa/raumfeld.c    | 26 +++++++++++++-------------
+ 6 files changed, 25 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-index 56edeab..09d2a26 100644
---- a/arch/arm/mach-orion5x/dns323-setup.c
-+++ b/arch/arm/mach-orion5x/dns323-setup.c
-@@ -550,7 +550,7 @@ static int __init dns323_identify_rev(void)
- 			break;
+diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
+index 6915a9f..51531ec 100644
+--- a/arch/arm/mach-pxa/em-x270.c
++++ b/arch/arm/mach-pxa/em-x270.c
+@@ -378,7 +378,7 @@ static void __init em_x270_init_nand(void)
+ 
+ 	err = gpio_request(GPIO11_NAND_CS, "NAND CS");
+ 	if (err) {
+-		pr_warning("EM-X270: failed to request NAND CS gpio\n");
++		pr_warn("EM-X270: failed to request NAND CS gpio\n");
+ 		return;
  	}
- 	if (i >= 1000) {
--		pr_warning("DNS-323: Timeout accessing PHY, assuming rev B1\n");
-+		pr_warn("DNS-323: Timeout accessing PHY, assuming rev B1\n");
- 		return DNS323_REV_B1;
+ 
+@@ -386,7 +386,7 @@ static void __init em_x270_init_nand(void)
+ 
+ 	err = gpio_request(nand_rb, "NAND R/B");
+ 	if (err) {
+-		pr_warning("EM-X270: failed to request NAND R/B gpio\n");
++		pr_warn("EM-X270: failed to request NAND R/B gpio\n");
+ 		gpio_free(GPIO11_NAND_CS);
+ 		return;
  	}
- 	writel((3 << 21)	/* phy ID reg */ |
-@@ -562,7 +562,7 @@ static int __init dns323_identify_rev(void)
- 			break;
- 	}
- 	if (i >= 1000) {
--		pr_warning("DNS-323: Timeout reading PHY, assuming rev B1\n");
-+		pr_warn("DNS-323: Timeout reading PHY, assuming rev B1\n");
- 		return DNS323_REV_B1;
- 	}
- 	pr_debug("DNS-323: Ethernet PHY ID 0x%x\n", reg & 0xffff);
-@@ -577,8 +577,8 @@ static int __init dns323_identify_rev(void)
- 	case 0x0e10: /* MV88E1118 */
- 		return DNS323_REV_C1;
+diff --git a/arch/arm/mach-pxa/gumstix.c b/arch/arm/mach-pxa/gumstix.c
+index 00b92da..f6c76a3 100644
+--- a/arch/arm/mach-pxa/gumstix.c
++++ b/arch/arm/mach-pxa/gumstix.c
+@@ -140,8 +140,7 @@ static void gumstix_setup_bt_clock(void)
+ 	int timeout = 500;
+ 
+ 	if (!(OSCC & OSCC_OOK))
+-		pr_warning("32kHz clock was not on. Bootloader may need to "
+-				"be updated\n");
++		pr_warn("32kHz clock was not on. Bootloader may need to be updated\n");
+ 	else
+ 		return;
+ 
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index ef0426a..666b789 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -93,8 +93,8 @@ static int __mfp_config_gpio(unsigned gpio, unsigned long c)
+ 		break;
  	default:
--		pr_warning("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
--			   reg & 0xffff);
-+		pr_warn("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
-+			reg & 0xffff);
+ 		/* warning and fall through, treat as MFP_LPM_DEFAULT */
+-		pr_warning("%s: GPIO%d: unsupported low power mode\n",
+-				__func__, gpio);
++		pr_warn("%s: GPIO%d: unsupported low power mode\n",
++			__func__, gpio);
+ 		break;
  	}
- 	return DNS323_REV_B1;
+ 
+@@ -107,14 +107,12 @@ static int __mfp_config_gpio(unsigned gpio, unsigned long c)
+ 	 * configurations of those pins not able to wakeup
+ 	 */
+ 	if ((c & MFP_LPM_CAN_WAKEUP) && !gpio_desc[gpio].can_wakeup) {
+-		pr_warning("%s: GPIO%d unable to wakeup\n",
+-				__func__, gpio);
++		pr_warn("%s: GPIO%d unable to wakeup\n", __func__, gpio);
+ 		return -EINVAL;
+ 	}
+ 
+ 	if ((c & MFP_LPM_CAN_WAKEUP) && is_out) {
+-		pr_warning("%s: output GPIO%d unable to wakeup\n",
+-				__func__, gpio);
++		pr_warn("%s: output GPIO%d unable to wakeup\n", __func__, gpio);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -126,7 +124,7 @@ static inline int __mfp_validate(int mfp)
+ 	int gpio = mfp_to_gpio(mfp);
+ 
+ 	if ((mfp > MFP_PIN_GPIO127) || !gpio_desc[gpio].valid) {
+-		pr_warning("%s: GPIO%d is invalid pin\n", __func__, gpio);
++		pr_warn("%s: GPIO%d is invalid pin\n", __func__, gpio);
+ 		return -1;
+ 	}
+ 
+diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+index 1319916..29019be 100644
+--- a/arch/arm/mach-pxa/poodle.c
++++ b/arch/arm/mach-pxa/poodle.c
+@@ -446,7 +446,7 @@ static void __init poodle_init(void)
+ 
+ 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	if (ret)
+-		pr_warning("poodle: Unable to register LoCoMo device\n");
++		pr_warn("poodle: Unable to register LoCoMo device\n");
+ 
+ 	pxa_set_fb_info(&poodle_locomo_device.dev, &poodle_fb_info);
+ 	pxa_set_udc_info(&udc_info);
+diff --git a/arch/arm/mach-pxa/pxa3xx-ulpi.c b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+index e329cce..614003e 100644
+--- a/arch/arm/mach-pxa/pxa3xx-ulpi.c
++++ b/arch/arm/mach-pxa/pxa3xx-ulpi.c
+@@ -74,7 +74,7 @@ static int pxa310_ulpi_poll(void)
+ 		cpu_relax();
+ 	}
+ 
+-	pr_warning("%s: ULPI access timed out!\n", __func__);
++	pr_warn("%s: ULPI access timed out!\n", __func__);
+ 
+ 	return -ETIMEDOUT;
  }
-diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
-index 6208d12..1208674 100644
---- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
-+++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
-@@ -349,7 +349,7 @@ static void __init tsp2_init(void)
- 			gpio_free(TSP2_RTC_GPIO);
- 	}
- 	if (tsp2_i2c_rtc.irq == 0)
--		pr_warning("tsp2_init: failed to get RTC IRQ\n");
-+		pr_warn("tsp2_init: failed to get RTC IRQ\n");
- 	i2c_register_board_info(0, &tsp2_i2c_rtc, 1);
+@@ -84,7 +84,7 @@ static int pxa310_ulpi_read(struct usb_phy *otg, u32 reg)
+ 	int err;
  
- 	/* register Terastation Pro II specific power-off method */
-diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
-index 9136797..c725b7c 100644
---- a/arch/arm/mach-orion5x/ts209-setup.c
-+++ b/arch/arm/mach-orion5x/ts209-setup.c
-@@ -314,7 +314,7 @@ static void __init qnap_ts209_init(void)
- 			gpio_free(TS209_RTC_GPIO);
+ 	if (pxa310_ulpi_get_phymode() != SYNCH) {
+-		pr_warning("%s: PHY is not in SYNCH mode!\n", __func__);
++		pr_warn("%s: PHY is not in SYNCH mode!\n", __func__);
+ 		return -EBUSY;
  	}
- 	if (qnap_ts209_i2c_rtc.irq == 0)
--		pr_warning("qnap_ts209_init: failed to get RTC IRQ\n");
-+		pr_warn("qnap_ts209_init: failed to get RTC IRQ\n");
- 	i2c_register_board_info(0, &qnap_ts209_i2c_rtc, 1);
  
- 	/* register tsx09 specific power-off method */
-diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
-index 5c079d31..cf2ab53 100644
---- a/arch/arm/mach-orion5x/ts409-setup.c
-+++ b/arch/arm/mach-orion5x/ts409-setup.c
-@@ -302,7 +302,7 @@ static void __init qnap_ts409_init(void)
- 			gpio_free(TS409_RTC_GPIO);
+@@ -101,7 +101,7 @@ static int pxa310_ulpi_read(struct usb_phy *otg, u32 reg)
+ static int pxa310_ulpi_write(struct usb_phy *otg, u32 val, u32 reg)
+ {
+ 	if (pxa310_ulpi_get_phymode() != SYNCH) {
+-		pr_warning("%s: PHY is not in SYNCH mode!\n", __func__);
++		pr_warn("%s: PHY is not in SYNCH mode!\n", __func__);
+ 		return -EBUSY;
  	}
- 	if (qnap_ts409_i2c_rtc.irq == 0)
--		pr_warning("qnap_ts409_init: failed to get RTC IRQ\n");
-+		pr_warn("qnap_ts409_init: failed to get RTC IRQ\n");
- 	i2c_register_board_info(0, &qnap_ts409_i2c_rtc, 1);
- 	platform_device_register(&ts409_leds);
  
-diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-index db16dae..1b704d3 100644
---- a/arch/arm/mach-orion5x/ts78xx-setup.c
-+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-@@ -403,8 +403,8 @@ static void ts78xx_fpga_supports(void)
- 		/* enable devices if magic matches */
- 		switch ((ts78xx_fpga.id >> 8) & 0xffffff) {
- 		case TS7800_FPGA_MAGIC:
--			pr_warning("unrecognised FPGA revision 0x%.2x\n",
--					ts78xx_fpga.id & 0xff);
-+			pr_warn("unrecognised FPGA revision 0x%.2x\n",
-+				ts78xx_fpga.id & 0xff);
- 			ts78xx_fpga.supports.ts_rtc.present = 1;
- 			ts78xx_fpga.supports.ts_nand.present = 1;
- 			ts78xx_fpga.supports.ts_rng.present = 1;
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 8386dc3..a762b23 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -521,7 +521,7 @@ static void __init raumfeld_w1_init(void)
+ 				"W1 external pullup enable");
+ 
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_W1_PULLUP_ENABLE\n");
++		pr_warn("Unable to request GPIO_W1_PULLUP_ENABLE\n");
+ 	else
+ 		gpio_direction_output(GPIO_W1_PULLUP_ENABLE, 0);
+ 
+@@ -600,7 +600,7 @@ static void __init raumfeld_lcd_init(void)
+ 
+ 	ret = gpio_request(GPIO_TFT_VA_EN, "display VA enable");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_TFT_VA_EN\n");
++		pr_warn("Unable to request GPIO_TFT_VA_EN\n");
+ 	else
+ 		gpio_direction_output(GPIO_TFT_VA_EN, 1);
+ 
+@@ -608,7 +608,7 @@ static void __init raumfeld_lcd_init(void)
+ 
+ 	ret = gpio_request(GPIO_DISPLAY_ENABLE, "display enable");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_DISPLAY_ENABLE\n");
++		pr_warn("Unable to request GPIO_DISPLAY_ENABLE\n");
+ 	else
+ 		gpio_direction_output(GPIO_DISPLAY_ENABLE, 1);
+ 
+@@ -814,17 +814,17 @@ static void __init raumfeld_power_init(void)
+ 	/* Set PEN2 high to enable maximum charge current */
+ 	ret = gpio_request(GPIO_CHRG_PEN2, "CHRG_PEN2");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_CHRG_PEN2\n");
++		pr_warn("Unable to request GPIO_CHRG_PEN2\n");
+ 	else
+ 		gpio_direction_output(GPIO_CHRG_PEN2, 1);
+ 
+ 	ret = gpio_request(GPIO_CHARGE_DC_OK, "CABLE_DC_OK");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_CHARGE_DC_OK\n");
++		pr_warn("Unable to request GPIO_CHARGE_DC_OK\n");
+ 
+ 	ret = gpio_request(GPIO_CHARGE_USB_SUSP, "CHARGE_USB_SUSP");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_CHARGE_USB_SUSP\n");
++		pr_warn("Unable to request GPIO_CHARGE_USB_SUSP\n");
+ 	else
+ 		gpio_direction_output(GPIO_CHARGE_USB_SUSP, 0);
+ 
+@@ -976,19 +976,19 @@ static void __init raumfeld_audio_init(void)
+ 
+ 	ret = gpio_request(GPIO_CODEC_RESET, "cs4270 reset");
+ 	if (ret < 0)
+-		pr_warning("unable to request GPIO_CODEC_RESET\n");
++		pr_warn("unable to request GPIO_CODEC_RESET\n");
+ 	else
+ 		gpio_direction_output(GPIO_CODEC_RESET, 1);
+ 
+ 	ret = gpio_request(GPIO_SPDIF_RESET, "ak4104 s/pdif reset");
+ 	if (ret < 0)
+-		pr_warning("unable to request GPIO_SPDIF_RESET\n");
++		pr_warn("unable to request GPIO_SPDIF_RESET\n");
+ 	else
+ 		gpio_direction_output(GPIO_SPDIF_RESET, 1);
+ 
+ 	ret = gpio_request(GPIO_MCLK_RESET, "MCLK reset");
+ 	if (ret < 0)
+-		pr_warning("unable to request GPIO_MCLK_RESET\n");
++		pr_warn("unable to request GPIO_MCLK_RESET\n");
+ 	else
+ 		gpio_direction_output(GPIO_MCLK_RESET, 1);
+ 
+@@ -1019,20 +1019,20 @@ static void __init raumfeld_common_init(void)
+ 
+ 	ret = gpio_request(GPIO_W2W_RESET, "Wi2Wi reset");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_W2W_RESET\n");
++		pr_warn("Unable to request GPIO_W2W_RESET\n");
+ 	else
+ 		gpio_direction_output(GPIO_W2W_RESET, 0);
+ 
+ 	ret = gpio_request(GPIO_W2W_PDN, "Wi2Wi powerup");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_W2W_PDN\n");
++		pr_warn("Unable to request GPIO_W2W_PDN\n");
+ 	else
+ 		gpio_direction_output(GPIO_W2W_PDN, 0);
+ 
+ 	/* this can be used to switch off the device */
+ 	ret = gpio_request(GPIO_SHUTDOWN_SUPPLY, "supply shutdown");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_SHUTDOWN_SUPPLY\n");
++		pr_warn("Unable to request GPIO_SHUTDOWN_SUPPLY\n");
+ 	else
+ 		gpio_direction_output(GPIO_SHUTDOWN_SUPPLY, 0);
+ 
+@@ -1051,7 +1051,7 @@ static void __init raumfeld_controller_init(void)
+ 
+ 	ret = gpio_request(GPIO_SHUTDOWN_BATT, "battery shutdown");
+ 	if (ret < 0)
+-		pr_warning("Unable to request GPIO_SHUTDOWN_BATT\n");
++		pr_warn("Unable to request GPIO_SHUTDOWN_BATT\n");
+ 	else
+ 		gpio_direction_output(GPIO_SHUTDOWN_BATT, 0);
+ 
 -- 
 1.8.1.2.459.gbcd45b4.dirty
