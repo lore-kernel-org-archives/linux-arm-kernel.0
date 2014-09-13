@@ -1,62 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 13 Sep 2014 12:26:03 +0200
-Subject: [PATCH 3/7] clk: sunxi: unify sun6i AHB1 clock with proper PLL6
- pre-divider
-In-Reply-To: <CAGb2v66L36nsoucSgLY8pV8f=wjKTvtjJby43Z=Ct+NiRonptQ@mail.gmail.com>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <1410000448-9999-4-git-send-email-wens@csie.org>
- <20140911210211.GM31276@lukather>
- <CAGb2v66L36nsoucSgLY8pV8f=wjKTvtjJby43Z=Ct+NiRonptQ@mail.gmail.com>
-Message-ID: <20140913102603.GZ31276@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 13 Sep 2014 11:41:35 +0100
+Subject: [PATCH 1/2] ARM: kvm: define =?UTF-8?Q?PAGE=5FS=32=5FDEVICE?=
+ =?UTF-8?Q?=20as=20read-only=20by=20default?=
+In-Reply-To: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 11:16:26AM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Fri, Sep 12, 2014 at 5:02 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Sat, Sep 06, 2014 at 06:47:24PM +0800, Chen-Yu Tsai wrote:
-> >> This patch unifies the sun6i AHB1 clock, originally supported
-> >> with separate mux and divider clks. It also adds support for
-> >> the pre-divider on the PLL6 input, thus allowing the clock to
-> >> be muxed to PLL6 with proper clock rate calculation.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> > It looks fine, but I'd rather see this in a separate file, especially
-> > since we don't seem to have any order dependency.
-> 
-> Sorry, just to be clear, separate file under clk/sunxi?
+Hi Ard,
 
-Yes
+On 2014-09-13 11:17, Ard Biesheuvel wrote:
+> Now that we support read-only memslots, we need to make sure that
+> pass-through device mappings are not mapped writable if the guest
+> has requested them to be read-only. The existing implementation
+> already honours this by calling kvm_set_s2pte_writable() on the new
+> pte in case of writable mappings, so all we need to do is define
+> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-> This cannot be in a separate file, as it shares a spinlock with apb1
-> divider. They share the same register.
-> 
-> We could move apb1 out though. But i would prefer to do that when
-> we split out all the clocks into individual OF_CLK_DECLAREs.
+I feel very uncomfortable with this change. Why would we map a device 
+RO? Is that only for completeness sake?
 
-Ah right, my bad :)
+Note that we also use PAGE_S2_DEVICE for things that are not mapped 
+through a memslot, such as the GIC.
 
-My plan on the long term is to kill clk-sunxi as a place where all the
-clocks are defined, and only leave the "policy" there, for example the
-clock protection code (even if that should probably be removed too,
-together with clkdev), the various rates / parenting enforcements,
-etc.
+Thanks,
 
-Maxime
+         M.
+
+> ---
+>  arch/arm/include/asm/pgtable.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/pgtable.h 
+> b/arch/arm/include/asm/pgtable.h
+> index 01baef07cd0c..92b2fbe18868 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -100,7 +100,7 @@ extern pgprot_t		pgprot_s2_device;
+>  #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>  #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>  #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+> -#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDWR)
+> +#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
+>
+>  #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY |
+> L_PTE_XN | L_PTE_NONE)
+>  #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | 
+> L_PTE_XN)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140913/364cc588/attachment.sig>
+Fast, cheap, reliable. Pick two.
