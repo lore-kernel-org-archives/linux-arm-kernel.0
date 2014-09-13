@@ -1,27 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 13 Sep 2014 09:40:32 -0700
-Subject: [PATCH] ASoC: rockchip-i2s: dt: swap tx and rx channed request
- number
-In-Reply-To: <1410570281-23681-1-git-send-email-jay.xu@rock-chips.com>
-References: <1410570281-23681-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20140913164032.GN7960@sirena.org.uk>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Sat, 13 Sep 2014 09:55:20 -0700
+Subject: [PATCH V3] arm: fix get_user BE behavior for target variable with
+ size of 8 bytes
+In-Reply-To: <20140913081642.GS12361@n2100.arm.linux.org.uk>
+References: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
+ <1409291466-4064-2-git-send-email-victor.kamensky@linaro.org>
+ <20140913081642.GS12361@n2100.arm.linux.org.uk>
+Message-ID: <CAA3XUr3Lvh8fosS1usdojYYr5rkcq3=i8L80iwe=efyztbus1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 13, 2014 at 09:04:41AM +0800, Jianqun wrote:
-> Reference to RK3288 TRM, fix an error channel id for i2s tx and rx
-> Table 10-1 DMAC_BUS Request Mapping Table
-> Req number	Source	Polarity
-> 0		I2S tx	High level
-> 1		I2S rx	High level
+Hi Russell,
 
-Applied, thanks.  The changelog should've just noted that this is an
-error in the example rather than the code or the binding, I was a bit
-confused about this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140913/cbda250e/attachment-0001.sig>
+I am looking into it.
+
+Thanks,
+Victor
+
+
+On 13 September 2014 01:16, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Aug 28, 2014 at 10:51:06PM -0700, Victor Kamensky wrote:
+>> e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
+>> broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
+>> is 32 bit or smaller. e38361d changed type of __r2 from 'register
+>> unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
+>> even when target variable size was 64 bit, __r2 was still 32 bit.
+>> But after e38361d commit, for target var of 64 bit size, __r2 became 64
+>> bit and now it should occupy 2 registers r2, and r3. The issue in BE case
+>> that r3 register is least significant word of __r2 and r2 register is most
+>> significant word of __r2. But __get_user_4 still copies result into r2 (most
+>> significant word of __r2). Subsequent code copies from __r2 into x, but
+>> for situation described it will pick up only garbage from r3 register.
+>>
+>> Special __get_user_64t_(124) functions are introduced. They are similar to
+>> corresponding __get_user_(124) function but result stored in r3 register
+>> (lsw in case of 64 bit __r2 in BE image). Those function are used by
+>> get_user macro in case of BE and target var size is 64bit.
+>>
+>> Also changed __get_user_lo8 name into __get_user_32t_8 to get consistent
+>> naming accross all cases.
+>>
+>> Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
+>
+> This patch isn't quite right, since it causes compile regressions:
+>
+> ERROR: "__get_user_64t_4" [fs/ext4/ext4.ko] undefined!
+> ERROR: "__get_user_64t_4" [fs/cifs/cifs.ko] undefined!
+>
+> This was noticed by Olof's builder, with his allmodconfig.  I don't
+> have the configuration to reproduce these failures.
+>
+> Could you look into these please?
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
