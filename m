@@ -1,39 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 13 Sep 2014 01:57:49 +0200
-Subject: [PATCHv2] net/macb: Add hardware revision information during probe
-Message-ID: <1410566269-16445-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 12 Sep 2014 17:10:46 -0700
+Subject: [PATCH v2 6/7] clk: rockchip: add binding id for ARMCLK
+In-Reply-To: <1410561030-19127-7-git-send-email-heiko@sntech.de>
+References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+ <1410561030-19127-7-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=XWG1+PktkJUjSMaswRnJ-d6WVcf5AnVyKPp1=c4vn1eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+Heiko,
 
-Print the IP revision when probing.
+On Fri, Sep 12, 2014 at 3:30 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  include/dt-bindings/clock/rk3188-cru-common.h | 1 +
+>  include/dt-bindings/clock/rk3288-cru.h        | 1 +
+>  2 files changed, 2 insertions(+)
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Changes in v2:
- - condense information on one line
+A little silly to say that I tested adding #defines, but it does
+compile and later patches work...
 
- drivers/net/ethernet/cadence/macb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index ca5d7798b265..d9b8e94b805f 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -2241,9 +2241,9 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	netif_carrier_off(dev);
- 
--	netdev_info(dev, "Cadence %s at 0x%08lx irq %d (%pM)\n",
--		    macb_is_gem(bp) ? "GEM" : "MACB", dev->base_addr,
--		    dev->irq, dev->dev_addr);
-+	netdev_info(dev, "Cadence %s rev 0x%08x at 0x%08lx irq %d (%pM)\n",
-+		    macb_is_gem(bp) ? "GEM" : "MACB", macb_readl(bp, MID),
-+		    dev->base_addr, dev->irq, dev->dev_addr);
- 
- 	phydev = bp->phy_dev;
- 	netdev_info(dev, "attached PHY driver [%s] (mii_bus:phy_addr=%s, irq=%d)\n",
--- 
-1.9.1
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
