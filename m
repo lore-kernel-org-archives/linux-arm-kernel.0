@@ -1,9 +1,9 @@
 From: joe@perches.com (Joe Perches)
-Date: Sat, 13 Sep 2014 11:31:16 -0700
-Subject: [PATCH 5/8] arm: mach-omap2: Convert pr_warning to pr_warn
+Date: Sat, 13 Sep 2014 11:31:17 -0700
+Subject: [PATCH 6/8] arm: mach-orion5x: Convert pr_warning to pr_warn
 In-Reply-To: <cover.1410632834.git.joe@perches.com>
 References: <cover.1410632834.git.joe@perches.com>
-Message-ID: <1f7bd81d1a391defa61327143d258e6cda23ead6.1410632835.git.joe@perches.com>
+Message-ID: <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,352 +15,99 @@ o Realign arguments
 
 Signed-off-by: Joe Perches <joe@perches.com>
 ---
- arch/arm/mach-omap2/display.c            |  2 +-
- arch/arm/mach-omap2/hdq1w.c              |  4 ++--
- arch/arm/mach-omap2/i2c.c                |  2 +-
- arch/arm/mach-omap2/msdi.c               |  4 ++--
- arch/arm/mach-omap2/mux.c                |  2 +-
- arch/arm/mach-omap2/omap_hwmod.c         | 26 +++++++++++++-------------
- arch/arm/mach-omap2/pdata-quirks.c       |  4 ++--
- arch/arm/mach-omap2/pm34xx.c             |  2 +-
- arch/arm/mach-omap2/smartreflex-class3.c |  4 ++--
- arch/arm/mach-omap2/sr_device.c          |  2 +-
- arch/arm/mach-omap2/vc.c                 |  2 +-
- arch/arm/mach-omap2/voltage.c            | 22 +++++++++++-----------
- arch/arm/mach-omap2/wd_timer.c           |  4 ++--
- 13 files changed, 40 insertions(+), 40 deletions(-)
+ arch/arm/mach-orion5x/dns323-setup.c           | 8 ++++----
+ arch/arm/mach-orion5x/terastation_pro2-setup.c | 2 +-
+ arch/arm/mach-orion5x/ts209-setup.c            | 2 +-
+ arch/arm/mach-orion5x/ts409-setup.c            | 2 +-
+ arch/arm/mach-orion5x/ts78xx-setup.c           | 4 ++--
+ 5 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index bf852d7..7a050f9 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -544,7 +544,7 @@ int omap_dss_reset(struct omap_hwmod *oh)
- 			MAX_MODULE_SOFTRESET_WAIT, c);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
--		pr_warning("dss_core: waiting for reset to finish failed\n");
-+		pr_warn("dss_core: waiting for reset to finish failed\n");
- 	else
- 		pr_debug("dss_core: softreset done\n");
- 
-diff --git a/arch/arm/mach-omap2/hdq1w.c b/arch/arm/mach-omap2/hdq1w.c
-index f78b4a1..f3897d8 100644
---- a/arch/arm/mach-omap2/hdq1w.c
-+++ b/arch/arm/mach-omap2/hdq1w.c
-@@ -67,8 +67,8 @@ int omap_hdq1w_reset(struct omap_hwmod *oh)
- 			  MAX_MODULE_SOFTRESET_WAIT, c);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
--		pr_warning("%s: %s: softreset failed (waited %d usec)\n",
--			   __func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
-+		pr_warn("%s: %s: softreset failed (waited %d usec)\n",
-+			__func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
- 	else
- 		pr_debug("%s: %s: softreset in %d usec\n", __func__,
- 			 oh->name, c);
-diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
-index b456b44..b9d8e47 100644
---- a/arch/arm/mach-omap2/i2c.c
-+++ b/arch/arm/mach-omap2/i2c.c
-@@ -99,7 +99,7 @@ int omap_i2c_reset(struct omap_hwmod *oh)
- 				MAX_MODULE_SOFTRESET_WAIT, c);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
--		pr_warning("%s: %s: softreset failed (waited %d usec)\n",
-+		pr_warn("%s: %s: softreset failed (waited %d usec)\n",
- 			__func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
- 	else
- 		pr_debug("%s: %s: softreset in %d usec\n", __func__,
-diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
-index 828e0db..8bdf182 100644
---- a/arch/arm/mach-omap2/msdi.c
-+++ b/arch/arm/mach-omap2/msdi.c
-@@ -76,8 +76,8 @@ int omap_msdi_reset(struct omap_hwmod *oh)
- 			  MAX_MODULE_SOFTRESET_WAIT, c);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
--		pr_warning("%s: %s: softreset failed (waited %d usec)\n",
--			   __func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
-+		pr_warn("%s: %s: softreset failed (waited %d usec)\n",
-+			__func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
- 	else
- 		pr_debug("%s: %s: softreset in %d usec\n", __func__,
- 			 oh->name, c);
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index ac8a249..78064b0 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -814,7 +814,7 @@ int __init omap_mux_late_init(void)
- 			"hwmod_io", omap_mux_late_init);
- 
- 	if (ret)
--		pr_warning("mux: Failed to setup hwmod io irq %d\n", ret);
-+		pr_warn("mux: Failed to setup hwmod io irq %d\n", ret);
- 
- 	return 0;
+diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+index 56edeab..09d2a26 100644
+--- a/arch/arm/mach-orion5x/dns323-setup.c
++++ b/arch/arm/mach-orion5x/dns323-setup.c
+@@ -550,7 +550,7 @@ static int __init dns323_identify_rev(void)
+ 			break;
+ 	}
+ 	if (i >= 1000) {
+-		pr_warning("DNS-323: Timeout accessing PHY, assuming rev B1\n");
++		pr_warn("DNS-323: Timeout accessing PHY, assuming rev B1\n");
+ 		return DNS323_REV_B1;
+ 	}
+ 	writel((3 << 21)	/* phy ID reg */ |
+@@ -562,7 +562,7 @@ static int __init dns323_identify_rev(void)
+ 			break;
+ 	}
+ 	if (i >= 1000) {
+-		pr_warning("DNS-323: Timeout reading PHY, assuming rev B1\n");
++		pr_warn("DNS-323: Timeout reading PHY, assuming rev B1\n");
+ 		return DNS323_REV_B1;
+ 	}
+ 	pr_debug("DNS-323: Ethernet PHY ID 0x%x\n", reg & 0xffff);
+@@ -577,8 +577,8 @@ static int __init dns323_identify_rev(void)
+ 	case 0x0e10: /* MV88E1118 */
+ 		return DNS323_REV_C1;
+ 	default:
+-		pr_warning("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
+-			   reg & 0xffff);
++		pr_warn("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
++			reg & 0xffff);
+ 	}
+ 	return DNS323_REV_B1;
  }
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 8fd87a3..98f8ec0 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -769,8 +769,8 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 
- 	oh->_clk = clk_get(NULL, oh->main_clk);
- 	if (IS_ERR(oh->_clk)) {
--		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
--			   oh->name, oh->main_clk);
-+		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
-+			oh->name, oh->main_clk);
- 		return -EINVAL;
+diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+index 6208d12..1208674 100644
+--- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
++++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+@@ -349,7 +349,7 @@ static void __init tsp2_init(void)
+ 			gpio_free(TSP2_RTC_GPIO);
  	}
- 	/*
-@@ -814,8 +814,8 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+ 	if (tsp2_i2c_rtc.irq == 0)
+-		pr_warning("tsp2_init: failed to get RTC IRQ\n");
++		pr_warn("tsp2_init: failed to get RTC IRQ\n");
+ 	i2c_register_board_info(0, &tsp2_i2c_rtc, 1);
  
- 		c = clk_get(NULL, os->clk);
- 		if (IS_ERR(c)) {
--			pr_warning("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
--				   oh->name, os->clk);
-+			pr_warn("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
-+				oh->name, os->clk);
- 			ret = -EINVAL;
- 			continue;
- 		}
-@@ -851,8 +851,8 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
- 		c = clk_get(NULL, oc->clk);
- 		if (IS_ERR(c)) {
--			pr_warning("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
--				   oh->name, oc->clk);
-+			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
-+				oh->name, oc->clk);
- 			ret = -EINVAL;
- 			continue;
- 		}
-@@ -1576,7 +1576,7 @@ static int _init_clkdm(struct omap_hwmod *oh)
- 
- 	oh->clkdm = clkdm_lookup(oh->clkdm_name);
- 	if (!oh->clkdm) {
--		pr_warning("omap_hwmod: %s: could not associate to clkdm %s\n",
-+		pr_warn("omap_hwmod: %s: could not associate to clkdm %s\n",
- 			oh->name, oh->clkdm_name);
- 		return 0;
+ 	/* register Terastation Pro II specific power-off method */
+diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
+index 9136797..c725b7c 100644
+--- a/arch/arm/mach-orion5x/ts209-setup.c
++++ b/arch/arm/mach-orion5x/ts209-setup.c
+@@ -314,7 +314,7 @@ static void __init qnap_ts209_init(void)
+ 			gpio_free(TS209_RTC_GPIO);
  	}
-@@ -1616,7 +1616,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
- 	if (!ret)
- 		oh->_state = _HWMOD_STATE_CLKS_INITED;
- 	else
--		pr_warning("omap_hwmod: %s: cannot _init_clocks\n", oh->name);
-+		pr_warn("omap_hwmod: %s: cannot _init_clocks\n", oh->name);
+ 	if (qnap_ts209_i2c_rtc.irq == 0)
+-		pr_warning("qnap_ts209_init: failed to get RTC IRQ\n");
++		pr_warn("qnap_ts209_init: failed to get RTC IRQ\n");
+ 	i2c_register_board_info(0, &qnap_ts209_i2c_rtc, 1);
  
- 	return ret;
- }
-@@ -1739,7 +1739,7 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
- 	_disable_clocks(oh);
- 
- 	if (ret == -EBUSY)
--		pr_warning("omap_hwmod: %s: failed to hardreset\n", oh->name);
-+		pr_warn("omap_hwmod: %s: failed to hardreset\n", oh->name);
- 
- 	if (!ret) {
- 		/*
-@@ -1953,8 +1953,8 @@ static int _ocp_softreset(struct omap_hwmod *oh)
- 
- 	c = _wait_softreset_complete(oh);
- 	if (c == MAX_MODULE_SOFTRESET_WAIT) {
--		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
--			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
-+		pr_warn("omap_hwmod: %s: softreset failed (waited %d usec)\n",
-+			oh->name, MAX_MODULE_SOFTRESET_WAIT);
- 		ret = -ETIMEDOUT;
- 		goto dis_opt_clks;
- 	} else {
-@@ -2618,8 +2618,8 @@ static int __init _setup_reset(struct omap_hwmod *oh)
- 	if (oh->rst_lines_cnt == 0) {
- 		r = _enable(oh);
- 		if (r) {
--			pr_warning("omap_hwmod: %s: cannot be enabled for reset (%d)\n",
--				   oh->name, oh->_state);
-+			pr_warn("omap_hwmod: %s: cannot be enabled for reset (%d)\n",
-+				oh->name, oh->_state);
- 			return -EINVAL;
- 		}
+ 	/* register tsx09 specific power-off method */
+diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
+index 5c079d31..cf2ab53 100644
+--- a/arch/arm/mach-orion5x/ts409-setup.c
++++ b/arch/arm/mach-orion5x/ts409-setup.c
+@@ -302,7 +302,7 @@ static void __init qnap_ts409_init(void)
+ 			gpio_free(TS409_RTC_GPIO);
  	}
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 90c88d4..73b333f 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -244,8 +244,8 @@ static void __init nokia_n900_legacy_init(void)
- 			/* set IBE to 1 */
- 			rx51_secure_update_aux_cr(BIT(6), 0);
- 		} else {
--			pr_warning("RX-51: Not enabling ARM errata 430973 workaround\n");
--			pr_warning("Thumb binaries may crash randomly without this workaround\n");
-+			pr_warn("RX-51: Not enabling ARM errata 430973 workaround\n");
-+			pr_warn("Thumb binaries may crash randomly without this workaround\n");
- 		}
+ 	if (qnap_ts409_i2c_rtc.irq == 0)
+-		pr_warning("qnap_ts409_init: failed to get RTC IRQ\n");
++		pr_warn("qnap_ts409_init: failed to get RTC IRQ\n");
+ 	i2c_register_board_info(0, &qnap_ts409_i2c_rtc, 1);
+ 	platform_device_register(&ts409_leds);
  
- 		pr_info("RX-51: Registring OMAP3 HWRNG device\n");
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 3f80929..175564c 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -465,7 +465,7 @@ int __init omap3_pm_init(void)
- 	int ret;
- 
- 	if (!omap3_has_io_chain_ctrl())
--		pr_warning("PM: no software I/O chain control; some wakeups may be lost\n");
-+		pr_warn("PM: no software I/O chain control; some wakeups may be lost\n");
- 
- 	pm_errata_configure();
- 
-diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
-index 7a42e19..d3a588c 100644
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -20,8 +20,8 @@ static int sr_class3_enable(struct omap_sr *sr)
- 	unsigned long volt = voltdm_get_voltage(sr->voltdm);
- 
- 	if (!volt) {
--		pr_warning("%s: Curr voltage unknown. Cannot enable %s\n",
--				__func__, sr->name);
-+		pr_warn("%s: Curr voltage unknown. Cannot enable %s\n",
-+			__func__, sr->name);
- 		return -ENODATA;
- 	}
- 
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-index 1b91ef0..d7cff26 100644
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -154,7 +154,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
- 
- 	pdev = omap_device_build(name, i, oh, sr_data, sizeof(*sr_data));
- 	if (IS_ERR(pdev))
--		pr_warning("%s: Could not build omap_device for %s: %s.\n\n",
-+		pr_warn("%s: Could not build omap_device for %s: %s\n",
- 			__func__, name, oh->name);
- exit:
- 	i++;
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index a4628a9..be9ef83 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -198,7 +198,7 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
- 		loop_cnt++;
- 
- 		if (retries_cnt > 10) {
--			pr_warning("%s: Retry count exceeded\n", __func__);
-+			pr_warn("%s: Retry count exceeded\n", __func__);
- 			return -ETIMEDOUT;
- 		}
- 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 3ac8fe1..3783b86 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -55,7 +55,7 @@ static LIST_HEAD(voltdm_list);
- unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
- {
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return 0;
- 	}
- 
-@@ -77,7 +77,7 @@ int voltdm_scale(struct voltagedomain *voltdm,
- 	unsigned long volt = 0;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return -EINVAL;
- 	}
- 
-@@ -96,8 +96,8 @@ int voltdm_scale(struct voltagedomain *voltdm,
- 	}
- 
- 	if (!volt) {
--		pr_warning("%s: not scaling. OPP voltage for %lu, not found.\n",
--			   __func__, target_volt);
-+		pr_warn("%s: not scaling. OPP voltage for %lu, not found.\n",
-+			__func__, target_volt);
- 		return -EINVAL;
- 	}
- 
-@@ -122,7 +122,7 @@ void voltdm_reset(struct voltagedomain *voltdm)
- 	unsigned long target_volt;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return;
- 	}
- 
-@@ -152,7 +152,7 @@ void omap_voltage_get_volttable(struct voltagedomain *voltdm,
- 				struct omap_volt_data **volt_data)
- {
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return;
- 	}
- 
-@@ -180,12 +180,12 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
- 	int i;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return ERR_PTR(-EINVAL);
- 	}
- 
- 	if (!voltdm->volt_data) {
--		pr_warning("%s: voltage table does not exist for vdd_%s\n",
-+		pr_warn("%s: voltage table does not exist for vdd_%s\n",
- 			__func__, voltdm->name);
- 		return ERR_PTR(-ENODATA);
- 	}
-@@ -214,7 +214,7 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- 			       struct omap_voltdm_pmic *pmic)
- {
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return -EINVAL;
- 	}
- 
-@@ -237,7 +237,7 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
- 				  int voltscale_method)
- {
- 	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
-+		pr_warn("%s: VDD specified does not exist!\n", __func__);
- 		return;
- 	}
- 
-@@ -279,7 +279,7 @@ int __init omap_voltage_late_init(void)
- 
- 		sys_ck = clk_get(NULL, voltdm->sys_clk.name);
- 		if (IS_ERR(sys_ck)) {
--			pr_warning("%s: Could not get sys clk.\n", __func__);
-+			pr_warn("%s: Could not get sys clk.\n", __func__);
- 			return -EINVAL;
- 		}
- 		voltdm->sys_clk.rate = clk_get_rate(sys_ck);
-diff --git a/arch/arm/mach-omap2/wd_timer.c b/arch/arm/mach-omap2/wd_timer.c
-index 97d6607..ff0a68c 100644
---- a/arch/arm/mach-omap2/wd_timer.c
-+++ b/arch/arm/mach-omap2/wd_timer.c
-@@ -93,8 +93,8 @@ int omap2_wd_timer_reset(struct omap_hwmod *oh)
- 		udelay(oh->class->sysc->srst_udelay);
- 
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
--		pr_warning("%s: %s: softreset failed (waited %d usec)\n",
--			   __func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
-+		pr_warn("%s: %s: softreset failed (waited %d usec)\n",
-+			__func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
- 	else
- 		pr_debug("%s: %s: softreset in %d usec\n", __func__,
- 			 oh->name, c);
+diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+index db16dae..1b704d3 100644
+--- a/arch/arm/mach-orion5x/ts78xx-setup.c
++++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+@@ -403,8 +403,8 @@ static void ts78xx_fpga_supports(void)
+ 		/* enable devices if magic matches */
+ 		switch ((ts78xx_fpga.id >> 8) & 0xffffff) {
+ 		case TS7800_FPGA_MAGIC:
+-			pr_warning("unrecognised FPGA revision 0x%.2x\n",
+-					ts78xx_fpga.id & 0xff);
++			pr_warn("unrecognised FPGA revision 0x%.2x\n",
++				ts78xx_fpga.id & 0xff);
+ 			ts78xx_fpga.supports.ts_rtc.present = 1;
+ 			ts78xx_fpga.supports.ts_nand.present = 1;
+ 			ts78xx_fpga.supports.ts_rng.present = 1;
 -- 
 1.8.1.2.459.gbcd45b4.dirty
