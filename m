@@ -1,34 +1,36 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 13 Sep 2014 17:08:29 -0400
-Subject: [PATCH reword] ARM: MVEBU: Netgear RN102: Use Hardware BCH ECC
-In-Reply-To: <1410339341-3372-1-git-send-email-klightspeed@killerwolves.net>
-References: <1410339341-3372-1-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <20140913210829.GI30828@titan.lakedaemon.net>
+Date: Sat, 13 Sep 2014 17:27:53 -0400
+Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
+In-Reply-To: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140913212752.GJ30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 06:55:41PM +1000, klightspeed at killerwolves.net wrote:
-> The bootloader on the Netgear ReadyNAS RN102 uses Hardware BCH ECC
-> (strength = 4), while the pxa3xx NAND driver by default uses 
-> Hamming ECC (strength = 1).
+On Thu, Sep 11, 2014 at 11:56:55AM +0200, Thomas Petazzoni wrote:
+> Jason, Andrew, Gregory, Sebastian,
 > 
-> This patch changes the ECC mode on these machines to match that
-> of the bootloader and of the stock firmware. That way, it is
-> now possible to update the kernel from userland (e.g. using
-> standard tools from mtd-utils package); u-boot will happily
-> load and boot it.
+> Here are four small patches to make minor improvements to the support
+> of the Armada 370 RD platform.
 > 
-> Fixes: 92beaccd8b49 ("ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts file")
-> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
-> Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Tested-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 4 ++++
->  1 file changed, 4 insertions(+)
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (4):
+>   ARM: mvebu: add gpio fan support to Armada 370 RD
+>   ARM: mvebu: add user LED support of Armada 370 RD
 
-I've already applied this the mvebu/fixes:
+Applied to mvebu/dt with Andrew's Acks.
 
-  500abb6ccb9e ARM: mvebu: Netgear RN2120: Use Hardware BCH ECC
+>   ARM: mvebu: add LED class support built-in in mvebu_v7_defconfig
+>   ARM: mvebu: add gpio-fan to mvebu_v7_defconfig
+
+Applied to mvebu/defconfig with Andrew's Acks.
+
+>  arch/arm/boot/dts/armada-370-rd.dts | 32 ++++++++++++++++++++++++++++++++
+>  arch/arm/configs/mvebu_v7_defconfig |  3 ++-
+>  2 files changed, 34 insertions(+), 1 deletion(-)
 
 thx,
 
