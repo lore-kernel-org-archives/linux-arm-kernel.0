@@ -1,23 +1,33 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 13 Sep 2014 17:34:57 -0400 (EDT)
-Subject: [PATCHv2] net/macb: Add hardware revision information during probe
-In-Reply-To: <1410566269-16445-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410566269-16445-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140913.173457.1906099694506405149.davem@davemloft.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 13 Sep 2014 17:51:23 -0400
+Subject: [PATCH 6/8] arm: mach-orion5x: Convert pr_warning to pr_warn
+In-Reply-To: <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
+References: <cover.1410632834.git.joe@perches.com>
+ <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
+Message-ID: <20140913215123.GK30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Date: Sat, 13 Sep 2014 01:57:49 +0200
+Joe,
 
-> From: Bo Shen <voice.shen@atmel.com>
+On Sat, Sep 13, 2014 at 11:31:17AM -0700, Joe Perches wrote:
+> Use the more common pr_warn.
 > 
-> Print the IP revision when probing.
+> Other miscellanea:
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> o Realign arguments
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 > ---
-> Changes in v2:
->  - condense information on one line
+>  arch/arm/mach-orion5x/dns323-setup.c           | 8 ++++----
+>  arch/arm/mach-orion5x/terastation_pro2-setup.c | 2 +-
+>  arch/arm/mach-orion5x/ts209-setup.c            | 2 +-
+>  arch/arm/mach-orion5x/ts409-setup.c            | 2 +-
+>  arch/arm/mach-orion5x/ts78xx-setup.c           | 4 ++--
+>  5 files changed, 9 insertions(+), 9 deletions(-)
 
-Applied, thanks.
+Applied to mvebu/soc with Andrew's Ack.
+
+thx,
+
+Jason.
