@@ -1,101 +1,250 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 13 Sep 2014 15:37:26 +0200
-Subject: [PATCH 2/2] bcma: get IRQ numbers from dt
-In-Reply-To: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
-References: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1410615446-7639-2-git-send-email-hauke@hauke-m.de>
+Date: Sat, 13 Sep 2014 15:37:25 +0200
+Subject: [PATCH 1/2] bcma: register bcma as device tree driver
+Message-ID: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not possible to auto detect the irq numbers used by the cores on
-an arm SoC. If bcma was registered with device tree it will search for
-some device tree nodes with the irq number and add it to the core
-configuration.
+This driver is used by the bcm53xx ARM SoC code. Now it is possible to
+give the address of the chipcommon core in device tree and bcma will
+search for all the other cores.
 
 Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
- drivers/bcma/main.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/bus/bcma.txt | 41 +++++++++++++
+ drivers/bcma/bcma_private.h                    | 16 +++++
+ drivers/bcma/host_soc.c                        | 82 ++++++++++++++++++++++++++
+ drivers/bcma/main.c                            | 10 ++++
+ include/linux/bcma/bcma.h                      |  2 +
+ 5 files changed, 151 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
 
 This is based on wireless-testing and should go into that tree.
 
 changes since:
 RFC:
- - add #ifdef CONFIG_OF
+ - reworded the irq description
+ - improved the example
+ - hocked into bcma_modeinit() and bcma_modexit()
 
-diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-index e5d578c..b8731ee 100644
---- a/drivers/bcma/main.c
-+++ b/drivers/bcma/main.c
-@@ -10,6 +10,8 @@
- #include <linux/platform_device.h>
- #include <linux/bcma/bcma.h>
- #include <linux/slab.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
+diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+new file mode 100644
+index 0000000..17e095f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/bcma.txt
+@@ -0,0 +1,41 @@
++Broadcom AIX SoC bcma bus driver
++
++
++Required properties:
++
++- compatible : brcm,bus-aix
++
++- reg : iomem address range of chipcommon core
++
++The cores on the AIX bus are auto detected by bcma. bcma automatically 
++detects the cores and the memory ranges they are using and they get 
++registered afterwards. Automatic detection of the IRQ number is not 
++possible on BCM47xx/BCM53xx ARM and MIPS SoCs. To assign IRQ number to 
++the cores, provide them manually through device tree. The IRQ number 
++and the device tree child entry will get assigned to the core with the 
++matching reg address.
++
++Example:
++
++	aix at 18000000 {
++		compatible = "brcm,bus-aix";
++		reg = <0x18000000 0x1000>;
++		ranges = <0x00000000 0x18000000 0x00100000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		ethernet at 18024000 {
++			reg = <0x18024000 0x1000>;
++			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		ethernet at 18025000 {
++			reg = <0x18025000 0x1000>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		pcie at 18012000 {
++			reg = <0x18012000 0x1000>;
++			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
++		};
++	};
+diff --git a/drivers/bcma/bcma_private.h b/drivers/bcma/bcma_private.h
+index b40be43..b8728f0 100644
+--- a/drivers/bcma/bcma_private.h
++++ b/drivers/bcma/bcma_private.h
+@@ -88,6 +88,22 @@ extern int __init bcma_host_pci_init(void);
+ extern void __exit bcma_host_pci_exit(void);
+ #endif /* CONFIG_BCMA_HOST_PCI */
  
- MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
- MODULE_LICENSE("GPL");
-@@ -131,6 +133,45 @@ static bool bcma_is_core_needed_early(u16 core_id)
- 	return false;
- }
- 
++#ifdef CONFIG_BCMA_HOST_SOC
++/* host_pci.c */
 +#ifdef CONFIG_OF
-+static struct device_node *bcma_of_find_child_device(struct platform_device *parent,
-+						     struct bcma_device *core)
-+{
-+	struct device_node *node;
-+	u64 size;
-+	const __be32 *reg;
-+
-+	if (!parent || !parent->dev.of_node)
-+		return NULL;
-+
-+	for_each_child_of_node(parent->dev.of_node, node) {
-+		reg = of_get_address(node, 0, &size, NULL);
-+		if (!reg)
-+			continue;
-+		if (be32_to_cpup(reg) == core->addr)
-+			return node;
-+	}
-+	return NULL;
-+}
-+
-+static void bcma_of_fill_device(struct platform_device *parent,
-+				struct bcma_device *core)
-+{
-+	struct device_node *node;
-+
-+	node = bcma_of_find_child_device(parent, core);
-+	if (!node)
-+		return;
-+	core->dev.of_node = node;
-+	core->irq = irq_of_parse_and_map(node, 0);
-+}
++extern int __init bcma_host_soc_register_driver(void);
++extern void __exit bcma_host_soc_unregister_driver(void);
 +#else
-+static void bcma_of_fill_device(struct platform_device *parent,
-+				struct bcma_device *core)
++static inline int __init bcma_host_soc_register_driver(void)
++{
++	return 0;
++}
++static inline void __exit bcma_host_soc_unregister_driver(void)
 +{
 +}
 +#endif /* CONFIG_OF */
++#endif /* CONFIG_BCMA_HOST_SOC */
 +
- static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
- {
- 	int err;
-@@ -147,7 +188,13 @@ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
- 		break;
- 	case BCMA_HOSTTYPE_SOC:
- 		core->dev.dma_mask = &core->dev.coherent_dma_mask;
--		core->dma_dev = &core->dev;
-+		if (bus->host_pdev) {
-+			core->dma_dev = &bus->host_pdev->dev;
-+			core->dev.parent = &bus->host_pdev->dev;
-+			bcma_of_fill_device(bus->host_pdev, core);
-+		} else {
-+			core->dma_dev = &core->dev;
-+		}
- 		break;
- 	case BCMA_HOSTTYPE_SDIO:
- 		break;
+ /* driver_pci.c */
+ u32 bcma_pcie_read(struct bcma_drv_pci *pc, u32 address);
+ 
+diff --git a/drivers/bcma/host_soc.c b/drivers/bcma/host_soc.c
+index 718e054..dd170d0 100644
+--- a/drivers/bcma/host_soc.c
++++ b/drivers/bcma/host_soc.c
+@@ -7,6 +7,9 @@
+ 
+ #include "bcma_private.h"
+ #include "scan.h"
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
+ #include <linux/bcma/bcma.h>
+ #include <linux/bcma/bcma_soc.h>
+ 
+@@ -176,6 +179,7 @@ int __init bcma_host_soc_register(struct bcma_soc *soc)
+ 	/* Host specific */
+ 	bus->hosttype = BCMA_HOSTTYPE_SOC;
+ 	bus->ops = &bcma_host_soc_ops;
++	bus->host_pdev = NULL;
+ 
+ 	/* Initialize struct, detect chip */
+ 	bcma_init_bus(bus);
+@@ -195,3 +199,81 @@ int __init bcma_host_soc_init(struct bcma_soc *soc)
+ 
+ 	return err;
+ }
++
++#ifdef CONFIG_OF
++static int bcma_host_soc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct bcma_bus *bus;
++	int err;
++
++	/* Alloc */
++	bus = devm_kzalloc(dev, sizeof(*bus), GFP_KERNEL);
++	if (!bus)
++		return -ENOMEM;
++
++	/* Map MMIO */
++	bus->mmio = of_iomap(np, 0);
++	if (!bus->mmio)
++		return -ENOMEM;
++
++	/* Host specific */
++	bus->hosttype = BCMA_HOSTTYPE_SOC;
++	bus->ops = &bcma_host_soc_ops;
++	bus->host_pdev = pdev;
++
++	/* Initialize struct, detect chip */
++	bcma_init_bus(bus);
++
++	/* Register */
++	err = bcma_bus_register(bus);
++	if (err)
++		goto err_unmap_mmio;
++
++	platform_set_drvdata(pdev, bus);
++
++	return err;
++
++err_unmap_mmio:
++	iounmap(bus->mmio);
++	return err;
++}
++
++static int bcma_host_soc_remove(struct platform_device *pdev)
++{
++	struct bcma_bus *bus = platform_get_drvdata(pdev);
++
++	bcma_bus_unregister(bus);
++	iounmap(bus->mmio);
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++static const struct of_device_id bcma_host_soc_of_match[] = {
++	{ .compatible = "brcm,bus-aix", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, bcma_host_soc_of_match);
++
++static struct platform_driver bcma_host_soc_driver = {
++	.driver = {
++		.name = "bcma-host-soc",
++		.owner = THIS_MODULE,
++		.of_match_table = bcma_host_soc_of_match,
++	},
++	.probe		= bcma_host_soc_probe,
++	.remove		= bcma_host_soc_remove,
++};
++
++int __init bcma_host_soc_register_driver(void)
++{
++	return platform_driver_register(&bcma_host_soc_driver);
++}
++
++void __exit bcma_host_soc_unregister_driver(void)
++{
++	platform_driver_unregister(&bcma_host_soc_driver);
++}
++#endif /* CONFIG_OF */
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index c421403..e5d578c 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -528,6 +528,13 @@ static int __init bcma_modinit(void)
+ 	if (err)
+ 		return err;
+ 
++#ifdef CONFIG_BCMA_HOST_SOC
++	err = bcma_host_soc_register_driver();
++	if (err) {
++		pr_err("SoC host initialization failed\n");
++		err = 0;
++	}
++#endif
+ #ifdef CONFIG_BCMA_HOST_PCI
+ 	err = bcma_host_pci_init();
+ 	if (err) {
+@@ -545,6 +552,9 @@ static void __exit bcma_modexit(void)
+ #ifdef CONFIG_BCMA_HOST_PCI
+ 	bcma_host_pci_exit();
+ #endif
++#ifdef CONFIG_BCMA_HOST_SOC
++	bcma_host_soc_unregister_driver();
++#endif
+ 	bus_unregister(&bcma_bus_type);
+ }
+ module_exit(bcma_modexit)
+diff --git a/include/linux/bcma/bcma.h b/include/linux/bcma/bcma.h
+index 6345979..729f48e 100644
+--- a/include/linux/bcma/bcma.h
++++ b/include/linux/bcma/bcma.h
+@@ -323,6 +323,8 @@ struct bcma_bus {
+ 		struct pci_dev *host_pci;
+ 		/* Pointer to the SDIO device (only for BCMA_HOSTTYPE_SDIO) */
+ 		struct sdio_func *host_sdio;
++		/* Pointer to platform device (only for BCMA_HOSTTYPE_SOC) */
++		struct platform_device *host_pdev;
+ 	};
+ 
+ 	struct bcma_chipinfo chipinfo;
 -- 
 1.9.1
