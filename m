@@ -1,63 +1,47 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 13 Sep 2014 20:40:58 +0200
-Subject: [GIT PULL] second bunch of dts changes for 3.18
-Message-ID: <2327307.ElC8r2sVBq@diego>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Sun, 14 Sep 2014 00:17:21 +0530
+Subject: [PATCH V3 1/2] ARM: dts: Add DT changes for display on snow
+In-Reply-To: <54147D6E.2030103@samsung.com>
+References: <1409567792-8281-1-git-send-email-ajaykumar.rs@samsung.com>
+ <54147D6E.2030103@samsung.com>
+Message-ID: <CAEC9eQNPipVNGjsjc+etCY-w4BErqLxeC5kFStM14rE+wtQvHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
-
-here is a second stack of dts changes for Rockchip SoCs adding usb, spi
-and emmc support. So please pull
+Hi Kukjin,
 
 
-The following changes since commit f23a6179d45e9d144bf2eb2bd82b2f1270f85fcf:
+On Sat, Sep 13, 2014 at 10:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 09/01/14 19:36, Ajay Kumar wrote:
+>>
+>> Add DT nodes for ptn3460 bridge chip and panel.
+>> Add backlight enable pin and backlight power supply for pwm-backlight.
+>> Also add bridge phandle needed by dp to enable display on snow.
+>>
+>> Signed-off-by: Ajay Kumar<ajaykumar.rs@samsung.com>
+>> ---
+>> Changes since V1:
+>>         -- Remove "simple-panel" compatible string.
+>>         -- Use GPIO_ACTIVE_HIGH instead of 0.
+>>         -- Change panel node naming from "panel-simple" to "panel".
+>>
+>> Changes since V2:
+>>         -- Use proper compatible string: "auo,b116xw03"
+>>
+>>   arch/arm/boot/dts/exynos5250-snow.dts |   41
+>> ++++++++++++++++++---------------
+>>   1 file changed, 22 insertions(+), 19 deletions(-)
+>>
+> Applied this and 2nd one.
+>
+> BTW, I resolved conflict when I applied. Please check my tree and then if
+> any problems, please let me know.
 
-  ARM: dts: rockchip: add saradc nodes (2014-08-27 23:43:01 +0200)
+This patchset has dependency on driver patches.
+But, no harm merging it since DT bindings are almost agreed.
 
-are available in the git repository at:
+The below patch should be merged ASAP. Because, driver changes are already in
+for this patch:
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35182.html
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-dts2
-
-for you to fetch changes up to 71557d70b3c1c391ade6622a1369a3f2b695a1d8:
-
-  ARM: dts: rockchip: clean up rk3xxx mmc nodes (2014-09-13 20:28:20 +0200)
-
-----------------------------------------------------------------
-More peripheral support for Rockchip SoCs
-- dwc2 usb controllers
-- spi controllers
-- emmc controller
-
-----------------------------------------------------------------
-Addy Ke (1):
-      ARM: dts: Add sdio0 and sdio1 to the rk3288
-
-Doug Anderson (3):
-      ARM: dts: Add mshc aliases for rk3288
-      ARM: dts: Add rk808 PMIC to rk3288-evb-rk808
-      ARM: dts: Switch i2c0 to 400kHz on rk3288-evb-rk808
-
-Heiko Stuebner (6):
-      ARM: dts: rockchip: remove rockchip,bus-index from rk3xxx i2c0
-      ARM: dts: rockchip: add dwc2 controllers for rk3066 and rk3188
-      ARM: dts: rockchip: enable usb ports on Radxa Rock
-      ARM: dts: rockchip: add Cortex-A9 SPI controller nodes
-      ARM: dts: rockchip: add emmc nodes for rk3066 and rk3188
-      ARM: dts: rockchip: clean up rk3xxx mmc nodes
-
-Kever Yang (2):
-      ARM: dts: add rk3288 dwc2 controller support
-      ARM: dts: Enable USB host1(dwc) on rk3288-evb
-
-huang lin (1):
-      ARM: dts: Add SPI nodes to rk3288
-
- arch/arm/boot/dts/rk3066a.dtsi         |  67 ++++++++++
- arch/arm/boot/dts/rk3188-radxarock.dts |  43 +++++++
- arch/arm/boot/dts/rk3188.dtsi          |  69 +++++++++++
- arch/arm/boot/dts/rk3288-evb-rk808.dts | 132 ++++++++++++++++++++
- arch/arm/boot/dts/rk3288-evb.dtsi      |   4 +
- arch/arm/boot/dts/rk3288.dtsi          | 218 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi          |  61 ++++++++-
- 7 files changed, 589 insertions(+), 5 deletions(-)
+Ajay
