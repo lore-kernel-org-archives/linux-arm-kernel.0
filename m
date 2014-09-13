@@ -1,26 +1,38 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 13 Sep 2014 12:57:40 +0200
-Subject: [PATCH 00/14] Support 64bit Cortex A57 based Exynos7 SoC
-In-Reply-To: <53FDC25A.2010806@samsung.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <53FDC25A.2010806@samsung.com>
-Message-ID: <54142324.600@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 13 Sep 2014 12:59:14 +0200
+Subject: [PATCHv5] mtd: nand: atmel_nand: retrieve NFC clock
+In-Reply-To: <CAAEAJfD_Kujcf7m9RAbRrjA82A08N81rVwy6sXY_PORdrH0VkA@mail.gmail.com>
+References: <1410564239-8411-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAAEAJfD_Kujcf7m9RAbRrjA82A08N81rVwy6sXY_PORdrH0VkA@mail.gmail.com>
+Message-ID: <20140913105914.GD26281@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.08.2014 13:34, Tomasz Figa wrote:
-> Hi Naveen,
-> 
-> On 27.08.2014 11:44, Naveen Krishna Chatradhi wrote:
->> This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
->> Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
->> ARMv8 RISC processor.
-> 
-> A general issue with this series is that it introduces a very generic
-> name for a very specific single SoC. We remember exactly the same cases
-> for Exynos4 (original name used for Exynos5250) and Exynos5 (Exynos5250)
-> and we should have learned that it is better to use a specific name
-> first and only then try to make things common if it turns out to be
-> appropriate.
+Hi,
 
-Any comments on this?
+On 13/09/2014 at 10:26:18 +0100, Ezequiel Garcia wrote :
+> > +       nfc->clk = devm_clk_get(&pdev->dev, NULL);
+> > +       if (!IS_ERR(nfc->clk)) {
+> > +               ret = clk_prepare_enable(nfc->clk);
+> > +               if (ret)
+> > +                       return ret;
+> > +       } else {
+> > +               dev_warn(&pdev->dev, "NFC clock missing, update your Device Tree");
+> 
+> Looks much better now thanks. If the clock is not really optional, you
+> can consider this a firmware bug. We've used FW_BUG messages for these
+> cases
+> (see vim drivers/watchdog/orion_wdt.c), so you could write something like:
+> 
+> dev_warn(..., FW_BUG "devicetree clock missing");
+> 
+
+Yeah, I've considered using FW_WARN like Thomas suggested but I'm not
+sure it really relates to device tree. Apart from x86, FW_WARN and
+FW_BUG are only used on mvebu stuff ;)
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
