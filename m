@@ -1,47 +1,121 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Sun, 14 Sep 2014 00:17:21 +0530
-Subject: [PATCH V3 1/2] ARM: dts: Add DT changes for display on snow
-In-Reply-To: <54147D6E.2030103@samsung.com>
-References: <1409567792-8281-1-git-send-email-ajaykumar.rs@samsung.com>
- <54147D6E.2030103@samsung.com>
-Message-ID: <CAEC9eQNPipVNGjsjc+etCY-w4BErqLxeC5kFStM14rE+wtQvHA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 13 Sep 2014 21:16:12 +0200
+Subject: [PATCH 6/8] arm: mach-orion5x: Convert pr_warning to pr_warn
+In-Reply-To: <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
+References: <cover.1410632834.git.joe@perches.com>
+ <b438c7c54306f095a150e50df41fbba4d515c2f8.1410632835.git.joe@perches.com>
+Message-ID: <20140913191612.GB24502@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Sat, Sep 13, 2014 at 11:31:17AM -0700, Joe Perches wrote:
+> Use the more common pr_warn.
+> 
+> Other miscellanea:
+> 
+> o Realign arguments
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-On Sat, Sep 13, 2014 at 10:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 09/01/14 19:36, Ajay Kumar wrote:
->>
->> Add DT nodes for ptn3460 bridge chip and panel.
->> Add backlight enable pin and backlight power supply for pwm-backlight.
->> Also add bridge phandle needed by dp to enable display on snow.
->>
->> Signed-off-by: Ajay Kumar<ajaykumar.rs@samsung.com>
->> ---
->> Changes since V1:
->>         -- Remove "simple-panel" compatible string.
->>         -- Use GPIO_ACTIVE_HIGH instead of 0.
->>         -- Change panel node naming from "panel-simple" to "panel".
->>
->> Changes since V2:
->>         -- Use proper compatible string: "auo,b116xw03"
->>
->>   arch/arm/boot/dts/exynos5250-snow.dts |   41
->> ++++++++++++++++++---------------
->>   1 file changed, 22 insertions(+), 19 deletions(-)
->>
-> Applied this and 2nd one.
->
-> BTW, I resolved conflict when I applied. Please check my tree and then if
-> any problems, please let me know.
+	  Andrew
 
-This patchset has dependency on driver patches.
-But, no harm merging it since DT bindings are almost agreed.
-
-The below patch should be merged ASAP. Because, driver changes are already in
-for this patch:
-https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35182.html
-
-Ajay
+> ---
+>  arch/arm/mach-orion5x/dns323-setup.c           | 8 ++++----
+>  arch/arm/mach-orion5x/terastation_pro2-setup.c | 2 +-
+>  arch/arm/mach-orion5x/ts209-setup.c            | 2 +-
+>  arch/arm/mach-orion5x/ts409-setup.c            | 2 +-
+>  arch/arm/mach-orion5x/ts78xx-setup.c           | 4 ++--
+>  5 files changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+> index 56edeab..09d2a26 100644
+> --- a/arch/arm/mach-orion5x/dns323-setup.c
+> +++ b/arch/arm/mach-orion5x/dns323-setup.c
+> @@ -550,7 +550,7 @@ static int __init dns323_identify_rev(void)
+>  			break;
+>  	}
+>  	if (i >= 1000) {
+> -		pr_warning("DNS-323: Timeout accessing PHY, assuming rev B1\n");
+> +		pr_warn("DNS-323: Timeout accessing PHY, assuming rev B1\n");
+>  		return DNS323_REV_B1;
+>  	}
+>  	writel((3 << 21)	/* phy ID reg */ |
+> @@ -562,7 +562,7 @@ static int __init dns323_identify_rev(void)
+>  			break;
+>  	}
+>  	if (i >= 1000) {
+> -		pr_warning("DNS-323: Timeout reading PHY, assuming rev B1\n");
+> +		pr_warn("DNS-323: Timeout reading PHY, assuming rev B1\n");
+>  		return DNS323_REV_B1;
+>  	}
+>  	pr_debug("DNS-323: Ethernet PHY ID 0x%x\n", reg & 0xffff);
+> @@ -577,8 +577,8 @@ static int __init dns323_identify_rev(void)
+>  	case 0x0e10: /* MV88E1118 */
+>  		return DNS323_REV_C1;
+>  	default:
+> -		pr_warning("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
+> -			   reg & 0xffff);
+> +		pr_warn("DNS-323: Unknown PHY ID 0x%04x, assuming rev B1\n",
+> +			reg & 0xffff);
+>  	}
+>  	return DNS323_REV_B1;
+>  }
+> diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+> index 6208d12..1208674 100644
+> --- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
+> +++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
+> @@ -349,7 +349,7 @@ static void __init tsp2_init(void)
+>  			gpio_free(TSP2_RTC_GPIO);
+>  	}
+>  	if (tsp2_i2c_rtc.irq == 0)
+> -		pr_warning("tsp2_init: failed to get RTC IRQ\n");
+> +		pr_warn("tsp2_init: failed to get RTC IRQ\n");
+>  	i2c_register_board_info(0, &tsp2_i2c_rtc, 1);
+>  
+>  	/* register Terastation Pro II specific power-off method */
+> diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
+> index 9136797..c725b7c 100644
+> --- a/arch/arm/mach-orion5x/ts209-setup.c
+> +++ b/arch/arm/mach-orion5x/ts209-setup.c
+> @@ -314,7 +314,7 @@ static void __init qnap_ts209_init(void)
+>  			gpio_free(TS209_RTC_GPIO);
+>  	}
+>  	if (qnap_ts209_i2c_rtc.irq == 0)
+> -		pr_warning("qnap_ts209_init: failed to get RTC IRQ\n");
+> +		pr_warn("qnap_ts209_init: failed to get RTC IRQ\n");
+>  	i2c_register_board_info(0, &qnap_ts209_i2c_rtc, 1);
+>  
+>  	/* register tsx09 specific power-off method */
+> diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
+> index 5c079d31..cf2ab53 100644
+> --- a/arch/arm/mach-orion5x/ts409-setup.c
+> +++ b/arch/arm/mach-orion5x/ts409-setup.c
+> @@ -302,7 +302,7 @@ static void __init qnap_ts409_init(void)
+>  			gpio_free(TS409_RTC_GPIO);
+>  	}
+>  	if (qnap_ts409_i2c_rtc.irq == 0)
+> -		pr_warning("qnap_ts409_init: failed to get RTC IRQ\n");
+> +		pr_warn("qnap_ts409_init: failed to get RTC IRQ\n");
+>  	i2c_register_board_info(0, &qnap_ts409_i2c_rtc, 1);
+>  	platform_device_register(&ts409_leds);
+>  
+> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+> index db16dae..1b704d3 100644
+> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
+> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+> @@ -403,8 +403,8 @@ static void ts78xx_fpga_supports(void)
+>  		/* enable devices if magic matches */
+>  		switch ((ts78xx_fpga.id >> 8) & 0xffffff) {
+>  		case TS7800_FPGA_MAGIC:
+> -			pr_warning("unrecognised FPGA revision 0x%.2x\n",
+> -					ts78xx_fpga.id & 0xff);
+> +			pr_warn("unrecognised FPGA revision 0x%.2x\n",
+> +				ts78xx_fpga.id & 0xff);
+>  			ts78xx_fpga.supports.ts_rtc.present = 1;
+>  			ts78xx_fpga.supports.ts_nand.present = 1;
+>  			ts78xx_fpga.supports.ts_rng.present = 1;
+> -- 
+> 1.8.1.2.459.gbcd45b4.dirty
+> 
