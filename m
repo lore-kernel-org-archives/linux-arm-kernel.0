@@ -1,64 +1,101 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Sat, 13 Sep 2014 18:29:58 +0530
-Subject: exynos5420/arndale-octa: imprecise external aborts on
- exynos_defconfig
-In-Reply-To: <7h7g1bwbyh.fsf@deeprootsystems.com>
-References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
- <7h7g1bwbyh.fsf@deeprootsystems.com>
-Message-ID: <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 13 Sep 2014 15:37:26 +0200
+Subject: [PATCH 2/2] bcma: get IRQ numbers from dt
+In-Reply-To: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
+References: <1410615446-7639-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1410615446-7639-2-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Tyler Baker <tyler.baker@linaro.org> writes:
->
->> Exynos5420-based Arndale octa boards have recently started failing boot
->> tests due to imprecise external aborts.  This only appears to happen
->> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
->> issue seems to be intermittent, so is not reliably reproducable and
->> difficult to bisect.  Here are a few boot logs from recent
->> mainline/linux-next kernels that are failing:
->
-> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
-> of next-20140910:
-> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
->
-> However, my userspace is much simpler and doesn't seem to cause a panic,
-> so my boot tests report passing. (I should fixup my scripts so these
-> imprecise aborts are reported as a FAIL.)
->
-> I'm glad you pointed out that it happens only with exynos_defconfig and
-> not multi_v7_defconfig because I noticed that too.  I haven't had the
-> time to track it any further than that, so maybe the exynos folks can
-> help track it down from here.
->
-> Thanks for reporting this,
->
-> Kevin
+It is not possible to auto detect the irq numbers used by the cores on
+an arm SoC. If bcma was registered with device tree it will search for
+some device tree nodes with the irq number and add it to the core
+configuration.
 
-Hi Tyler, Kevin,
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ drivers/bcma/main.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 1 deletion(-)
 
->From the bootlog you have shared,
+This is based on wireless-testing and should go into that tree.
 
-[    1.060016] CPU4: failed to come online
-[    2.070031] CPU5: failed to come online
-[    3.080049] CPU6: failed to come online
-[    4.090066] CPU7: failed to come online
-[    4.090099] Brought up 4 CPUs
-[    4.090109] SMP: Total of 4 processors activated.
-[    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
-modes (primary CPU mode 0x13)
-[    4.090128] CPU: This may indicate a broken bootloader or firmware.
+changes since:
+RFC:
+ - add #ifdef CONFIG_OF
 
-Would it be possible to set max cpus to 1, disable switcher and try
-again. I don't have a arndale octa board but I have tested mainline
-kernel with smdk5420 board. It boots all eight CPUs, switcher works
-fine and there are no imprecise aborts seen.
-
-Thanks,
-Thomas.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index e5d578c..b8731ee 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -10,6 +10,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/bcma/bcma.h>
+ #include <linux/slab.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
+ 
+ MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
+ MODULE_LICENSE("GPL");
+@@ -131,6 +133,45 @@ static bool bcma_is_core_needed_early(u16 core_id)
+ 	return false;
+ }
+ 
++#ifdef CONFIG_OF
++static struct device_node *bcma_of_find_child_device(struct platform_device *parent,
++						     struct bcma_device *core)
++{
++	struct device_node *node;
++	u64 size;
++	const __be32 *reg;
++
++	if (!parent || !parent->dev.of_node)
++		return NULL;
++
++	for_each_child_of_node(parent->dev.of_node, node) {
++		reg = of_get_address(node, 0, &size, NULL);
++		if (!reg)
++			continue;
++		if (be32_to_cpup(reg) == core->addr)
++			return node;
++	}
++	return NULL;
++}
++
++static void bcma_of_fill_device(struct platform_device *parent,
++				struct bcma_device *core)
++{
++	struct device_node *node;
++
++	node = bcma_of_find_child_device(parent, core);
++	if (!node)
++		return;
++	core->dev.of_node = node;
++	core->irq = irq_of_parse_and_map(node, 0);
++}
++#else
++static void bcma_of_fill_device(struct platform_device *parent,
++				struct bcma_device *core)
++{
++}
++#endif /* CONFIG_OF */
++
+ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
+ {
+ 	int err;
+@@ -147,7 +188,13 @@ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
+ 		break;
+ 	case BCMA_HOSTTYPE_SOC:
+ 		core->dev.dma_mask = &core->dev.coherent_dma_mask;
+-		core->dma_dev = &core->dev;
++		if (bus->host_pdev) {
++			core->dma_dev = &bus->host_pdev->dev;
++			core->dev.parent = &bus->host_pdev->dev;
++			bcma_of_fill_device(bus->host_pdev, core);
++		} else {
++			core->dma_dev = &core->dev;
++		}
+ 		break;
+ 	case BCMA_HOSTTYPE_SDIO:
+ 		break;
+-- 
+1.9.1
