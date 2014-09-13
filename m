@@ -1,37 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 13 Sep 2014 17:27:53 -0400
-Subject: [PATCH 0/4] ARM: mvebu: minor Armada 370 RD improvements
-In-Reply-To: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1410429419-29820-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140913212752.GJ30828@titan.lakedaemon.net>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 13 Sep 2014 17:32:53 -0400 (EDT)
+Subject: [Patch v4 net-next 00/12] net: fec: imx6sx multiqueue support
+In-Reply-To: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20140913.173253.463259197219785898.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 11:56:55AM +0200, Thomas Petazzoni wrote:
-> Jason, Andrew, Gregory, Sebastian,
+From: <Frank.Li@freescale.com>
+Date: Sat, 13 Sep 2014 05:00:45 +0800
+
+> From: Frank Li <Frank.Li@freescale.com>
 > 
-> Here are four small patches to make minor improvements to the support
-> of the Armada 370 RD platform.
+> These patches enable i.MX6SX multi queue support.
+> i.MX6SX support 3 queue and AVB feature.
 > 
-> Thanks,
+> Change from v3 to v4
+>  - use "unsigned int" instead of "unsigned"
 > 
-> Thomas
+> Change from v2 to v3
+>  - fixed alignment requirement for ARM and NO-ARM platform
 > 
-> Thomas Petazzoni (4):
->   ARM: mvebu: add gpio fan support to Armada 370 RD
->   ARM: mvebu: add user LED support of Armada 370 RD
+> Change from v1 to v2.
+>  - Change num_tx_queue to unsigned int
+>  - Avoid block non-dt platform
+>  - remove call netif_set_real_num_rx_queues
+>  - seperate multi queue patch two part, one is tx and rx handle, with fixed queue 0
+>    then other one is initilized multiqueue
+>  - use two difference alignment for tx and rx path
 
-Applied to mvebu/dt with Andrew's Acks.
-
->   ARM: mvebu: add LED class support built-in in mvebu_v7_defconfig
->   ARM: mvebu: add gpio-fan to mvebu_v7_defconfig
-
-Applied to mvebu/defconfig with Andrew's Acks.
-
->  arch/arm/boot/dts/armada-370-rd.dts | 32 ++++++++++++++++++++++++++++++++
->  arch/arm/configs/mvebu_v7_defconfig |  3 ++-
->  2 files changed, 34 insertions(+), 1 deletion(-)
-
-thx,
-
-Jason.
+Series applied, thanks Frank.
