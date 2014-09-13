@@ -1,36 +1,37 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sat, 13 Sep 2014 23:36:24 +0800
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20140912143050.014ad4c3@bbrezillon>
-References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140911120928.GA1585@localhost.localdomain>
- <20140911143616.3ebb025a@bbrezillon>
- <20140911142511.GA2543@localhost.localdomain>
- <20140911163847.5e2f85c7@bbrezillon>
- <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
- <20140912143050.014ad4c3@bbrezillon>
-Message-ID: <20140913153622.GA10132@localhost.localdomain>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Sat, 13 Sep 2014 08:36:53 -0700
+Subject: [PATCH v4 1/1] iommu/arm-smmu: Do not access non-existing S2CR
+ registers
+In-Reply-To: <20140828105552.GI22580@arm.com>
+References: <1408752752-15601-1-git-send-email-ohaugan@codeaurora.org>
+ <20140826103730.GE23445@arm.com> <20140828105552.GI22580@arm.com>
+Message-ID: <54146495.8020609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 02:30:50PM +0200, Boris BREZILLON wrote:
-> On Fri, 12 Sep 2014 08:45:50 +0800
+On 8/28/2014 3:55 AM, Will Deacon wrote:
+> On Tue, Aug 26, 2014 at 11:37:30AM +0100, Will Deacon wrote:
+>> On Sat, Aug 23, 2014 at 01:12:32AM +0100, Olav Haugan wrote:
+>>> The number of S2CR registers is not properly set when stream
+>>> matching is not supported. Fix this and add check that we do not try to
+>>> access outside of the number of S2CR regisrers.
+>>
+>> Sorry for the bother, but could you base this on either iommu/devel or
+>> iommu/staging please? Now that the merge window is well and truly over, I
+>> moved those branches forward, so you needn't worry about iommu/pci anymore
+>> (which, as you pointed out, contains a bunch of WIP patches which should
+>> hold-up useful fixes like this one).
 > 
-> My bad, capabilities might not be the appropriate word in this context.
-> I meant ECC algorithm strength, and that's exactly the purpose of
-> nandbiterrs testsuite: insert bitflips in in-band data until the MTD
-> layer complains about uncorrectable errors.
-okay. 
-
-> This test validates what's returned by ecc_strength file in sysfs
-> (which in turn is specified by the NAND controller when initializing
-> the NAND chip).
+> Actually, it looks like this was eaten by our sorry excuse for an email
+> service. I've managed to apply a version from the archive, thanks.
 > 
-> Doing this should not imply knowing the ECC algorithm in use in the
-> NAND controller or the layout used to store data on NAND.
-the difficulty is that the ECC parity area can be not byte aligned.
 
-As I ever said, it is hard to implement the two hooks.
+Thanks Will. Sorry for the late reply. I have been OoO.
 
-thanks
-Huang Shijie
+Thanks,
+
+Olav
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
