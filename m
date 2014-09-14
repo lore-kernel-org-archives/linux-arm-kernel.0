@@ -1,32 +1,104 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 14 Sep 2014 09:23:46 +0900
-Subject: [PATCH V3] ARM: dts: Add DT changes for display on peach_pi
-In-Reply-To: <CAEC9eQNSPKdTKbAnNpj1ssc==NHkLUUAb+02wZiO+v41XEvutQ@mail.gmail.com>
-References: <1407145638-3803-1-git-send-email-ajaykumar.rs@samsung.com>
- <CAEC9eQNSPKdTKbAnNpj1ssc==NHkLUUAb+02wZiO+v41XEvutQ@mail.gmail.com>
-Message-ID: <5414E012.3060701@samsung.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Sun, 14 Sep 2014 03:00:09 +0100
+Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
+In-Reply-To: <20140910060004.GA5732@norris-Latitude-E6410>
+References: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+ <1409796689.27524.34.camel@decadent.org.uk>
+ <CAMuHMdWBr=B0_Xivti9K5ReryHHEunQj2P26FjhmzhO-L9t+9g@mail.gmail.com>
+ <20140910060004.GA5732@norris-Latitude-E6410>
+Message-ID: <1410660009.3040.29.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/14 15:13, Ajay kumar wrote:
-> On Mon, Aug 4, 2014 at 3:17 PM, Ajay Kumar<ajaykumar.rs@samsung.com>  wrote:
->> Add DT nodes for panel-simple "auo,b133htn01" panel.
->> Add backlight enable pin and backlight power supply for pwm-backlight.
->> Also, add panel phandle needed by dp to enable display on peach_pi.
->>
->> Signed-off-by: Ajay Kumar<ajaykumar.rs@samsung.com>
->> ---
->> Changes since V1:
->> Remove "simple-panel" compatible string and use only ""auo,b133htn01".
->>
->> Changes since V2:
->> As suggested by Andreas,
->> Use GPIO_ACTIVE_HIGH for backlight enable-gpios instead of using 0.
->> Change panel node naming from "panel-simple" to "panel".
->>
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
->>   1 file changed, 10 insertions(+), 17 deletions(-)
->>
-Applied, thanks.
+On Tue, 2014-09-09 at 23:00 -0700, Brian Norris wrote:
+> On Thu, Sep 04, 2014 at 09:02:04AM +0200, Geert Uytterhoeven wrote:
+> > On Thu, Sep 4, 2014 at 4:11 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+> > >> I noticed that many platforms declare the flash chip as compatible =
+> > >> "st,m25pXXX" whereas the ts219.dtsi just said m25p128 but I tried
+> > >> changing that and it didn't help. In any case without spi-nor.ko being
+> > >> autoloaded I don't support m25p80.ko ever would be.
+> > >
+> > > m25p80.c has:
+> > >
+> > > static struct spi_driver m25p80_driver = {
+> > >         ...
+> > >         .id_table       = spi_nor_ids,
+> > >         ...
+> > > };
+> > >
+> > > while spi_nor_ids is defined in spi-nor.c.  Since they end up as two
+> > > separate modules, modpost can't read the ID table and add the device ID
+> > > aliases to m25p80.ko.
+> > 
+> > Woops. This indeed doesn't work.
+> > Note that the MODULE_DEVICE_TABLE() is also gone from m25p80.c
+> > 
+> > So m25p80.c needs to contain the IDs, while spi-nor.c also needs the IDs
+> > because it's a framework/library.
+> 
+> Actually, m25p80.c only needs the strings (i.e., the named aliases --
+> character data), and for the most part, spi-nor.c only needs the IDs (i.e.,
+> the identification bytes).
 
-- Kukjin
+Unfortunately, spi-nor.c also needs the strings to implement
+spi_nor_match_id() (which is only used by fsl-quadspi.c) and to report
+mismatches in spi_nor_scan().
+
+But spi_nor_match_id(), spi_nor_scan() and spi_nor::read_id should work
+with something like struct flash_info, not struct spi_device_id.
+
+> What's more, I don't think that any modern SPI NOR user really needs to
+> be specifying exactly which SPI device it is via a specific string. Our
+> driver code pretty much always re-detects the device by reading its
+> device ID. All the SPI NOR code needs to know is how to read its ID.
+>
+> > A quick solution would be to move the ID table to a header file, and include
+> > that by both, and re-add the lost MODULE_DEVICE_TABLE() to m25p80.c.
+> > That duplicates the data, though.
+> > 
+> > Hmm, for the built-in case, we can avoid the duplication by letting m25p80.c
+> > refer to the table in spi-nor.c if !MODULE.
+> > Does anyone see a better solution?
+> 
+> A little bit of a shot in the dark, as I haven't fleshed this one out:
+> 
+> Would it work to just copy the SPI ID strings into m25p80.c, keep the
+> full table in spi-nor.c, stop adding SPI ID string (and DT) bindings to
+> the m25p80 table (force platforms to use "m25p80"-compatible probing, or
+> maybe something generic like "spi-nor-rdid", "spi-nor-sfdp", etc.) and
+> eventually kill the strings from spi-nor.c entirely?
+
+I think that a DT node is always supposed to include a compatible string
+for the specific device.  It could also include a generic compatible
+string for SPI NOR chips, but the *only* thing a driver can do with that
+is to use the JEDEC ID command.  It can't even generically read a single
+byte, since addresses may be either 3 or 4 bytes long!  So I think that
+if a generic compatible string is defined, the DT binding must also
+define the properties that spi-nor currently reads out of its static
+table.
+
+> I really don't want
+> to propagate string-binding much further into the SPI NOR library, since
+> everything should be auto-detectable--partly just by an ID table as we
+> have now, but eventually we can use CFI or SFDP parameters provided by
+> relatively new SPI NOR chips.
+>
+> I'm not sure if this is great for the short-term problem of fixing
+> module-autoloading. Perhaps we should do a short-term hack to duplicate
+> the SPI ID strings to m25p80.c by including them in a header (and
+> backport for 3.16.y stable?), but I'd like to disentangle this.
+
+I'll have a go at doing that.
+
+Ben.
+
+-- 
+Ben Hutchings
+The world is coming to an end.	Please log off.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140914/4dc0dc57/attachment.sig>
