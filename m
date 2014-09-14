@@ -1,43 +1,148 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Sun, 14 Sep 2014 19:15:14 +0530
-Subject: [PATCH 00/14] Support 64bit Cortex A57 based Exynos7 SoC
-In-Reply-To: <54142324.600@gmail.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <53FDC25A.2010806@samsung.com> <54142324.600@gmail.com>
-Message-ID: <CAJuA9ahjdZw23CyEJBO8wwypR0QCf=4+QXB1LXUSzc5rRoDe_w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Sun, 14 Sep 2014 16:07:52 +0200
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140913173841.GA18093@brian-ubuntu>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911120928.GA1585@localhost.localdomain>
+ <20140911143616.3ebb025a@bbrezillon>
+ <20140911142511.GA2543@localhost.localdomain>
+ <20140911163847.5e2f85c7@bbrezillon>
+ <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
+ <20140912143050.014ad4c3@bbrezillon>
+ <20140913153622.GA10132@localhost.localdomain>
+ <20140913173841.GA18093@brian-ubuntu>
+Message-ID: <20140914160752.1cb404cc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Brian, Huang,
 
-On Sat, Sep 13, 2014 at 4:27 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 27.08.2014 13:34, Tomasz Figa wrote:
->> Hi Naveen,
->>
->> On 27.08.2014 11:44, Naveen Krishna Chatradhi wrote:
->>> This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
->>> Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
->>> ARMv8 RISC processor.
->>
->> A general issue with this series is that it introduces a very generic
->> name for a very specific single SoC. We remember exactly the same cases
->> for Exynos4 (original name used for Exynos5250) and Exynos5 (Exynos5250)
->> and we should have learned that it is better to use a specific name
->> first and only then try to make things common if it turns out to be
->> appropriate.
->
-> Any comments on this?
+On Sat, 13 Sep 2014 10:38:41 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-The name of the SoC is Exynos7 and so all these patches are using
-Exynos7 in dt compatible string and file names. If there are any
-variants of Exynos7 SoC in future, support those variants will be
-based on what is already merged for Exynos7 SoC. There is no specific
-generalization targeted in this series by using Exynos7 name.
+> On Sat, Sep 13, 2014 at 11:36:24PM +0800, Huang Shijie wrote:
+> > On Fri, Sep 12, 2014 at 02:30:50PM +0200, Boris BREZILLON wrote:
+> > > This test validates what's returned by ecc_strength file in sysfs
+> > > (which in turn is specified by the NAND controller when initializing
+> > > the NAND chip).
+> > > 
+> > > Doing this should not imply knowing the ECC algorithm in use in the
+> > > NAND controller or the layout used to store data on NAND.
+> > the difficulty is that the ECC parity area can be not byte aligned.
+> 
+> Is there a problem with just rounding up to the nearest byte alignment
+> and ignoring the few bits that are wasted?
+> 
+> > As I ever said, it is hard to implement the two hooks.
+> 
+> "Hard" doesn't mean we shouldn't. I really would like to encourage more
+> NAND drivers to be programmed against the expected MTD behavior -- that
+> (if possible with the given hardware) they can pass the MTD tests
+> (drivers/mtd/tests/*).
 
-Thanks,
-Thomas.
+Here is a draft for a gpmi_move_bits function we could use to move bits
+(not bytes :-) from one memory region to another:
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
+		    const u8 *src, size_t src_bit_off,
+		    size_t nbits)
+{
+	size_t i;
+	size_t nbytes;
+	u32 src_byte = 0;
+
+	src += src_bit_off / 8;
+	src_bit_off %= 8;
+
+	dst += dst_bit_off / 8;
+	dst_bit_off %= 8;
+
+	if (src_bit_off) {
+		src_byte = src[0] >> src_bit_off;
+		nbits -= 8 - src_bit_off;
+		src++;
+	}
+
+	nbytes = nbits / 8;
+
+	if (src_bit_off <= dst_bit_off) {
+		dst[0] &= GENMASK(dst_bit_off - 1, 0);
+		dst[0] |= src_byte << dst_bit_off;
+		src_bit_off += (8 - dst_bit_off);
+		src_byte >>= (8 - dst_bit_off);
+		dst_bit_off = 0;
+		dst++;
+	} else if (nbytes) {
+		src_byte |= src[0] << (8 - src_bit_off);
+		dst[0] &= GENMASK(dst_bit_off - 1, 0);
+		dst[0] |= src_byte << dst_bit_off;
+		src_bit_off += dst_bit_off;
+		src_byte >>= (8 - dst_bit_off);
+		dst_bit_off = 0;
+		dst++;
+		nbytes--;
+		src++;
+		if (src_bit_off > 7) {
+			src_bit_off -= 8;
+			dst[0] = src_byte;
+			dst++;
+			src_byte >>= 8;
+		}
+	}
+
+	if (!src_bit_off && !dst_bit_off) {
+		if (nbytes)
+			memcpy(dst, src, nbytes);
+	} else {
+		for (i = 0; i < nbytes; i++) {
+			src_byte |= src[i] << (8 - src_bit_off);
+			dst[i] = src_byte;
+			src_byte >>= 8;
+		}
+	}
+
+	dst += nbytes;
+	src += nbytes;
+	nbits %= 8;
+
+	if (!nbits && !src_bit_off)
+		return;
+
+	if (nbits)
+		src_byte |= (*src & GENMASK(nbits - 1, 0)) <<
+			    ((8 - src_bit_off) % 8);
+	nbits += (8 - src_bit_off) % 8;
+
+	if (dst_bit_off)
+		src_byte = (src_byte << dst_bit_off) |
+			   (*dst & GENMASK(dst_bit_off - 1, 0));
+	nbits += dst_bit_off;
+
+	if (nbits % 8)
+		src_byte |= (dst[nbits / 8] & GENMASK(7, nbits % 8)) <<
+			    (nbits / 8);
+
+	nbytes = DIV_ROUND_UP(nbits, 8);
+	for (i = 0; i < nbytes; i++) {
+		dst[i] = src_byte;
+		src_byte >>= 8;
+	}
+}
+
+I haven't tested it, and I think there is room for optimization.
+
+My point is that performance is not a key aspect of raw functions
+(those are often used by testing and debugging tools), hence we could
+rely on this move_bits function to address the ECC bit alignment
+problem.
+
+Let me know what's your opinion on this approach.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
