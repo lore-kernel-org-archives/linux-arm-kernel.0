@@ -1,106 +1,88 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 14 Sep 2014 18:19:55 +0100
-Subject: [PATCH v3] iio: adc: at91: don't use the last converted data
- register
-In-Reply-To: <54105A65.3040009@atmel.com>
-References: <1410357747-29797-1-git-send-email-ludovic.desroches@atmel.com>
- <54105A65.3040009@atmel.com>
-Message-ID: <5415CE3B.4090000@kernel.org>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Sun, 14 Sep 2014 22:58:58 +0530
+Subject: [PATCH 1/5] uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+In-Reply-To: <20140909192910.GA7885@kroah.com>
+References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
+ <1410256619-3213-2-git-send-email-ankit.jindal@linaro.org>
+ <20140909192910.GA7885@kroah.com>
+Message-ID: <CAPTm99XaXYhJYHypFt2pQwBHAQ9_wAxZp_NjdiuGtWs6TY0bBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/14 15:04, Nicolas Ferre wrote:
-> On 10/09/2014 16:02, Ludovic Desroches :
->> If touchscreen mode is enabled and a conversion is requested on another
->> channel, the result in the last converted data register can be a
->> touchscreen relative value. Starting a conversion involves to do a
->> conversion for all active channel. It starts with ADC channels and ends
->> with touchscreen channels. Then if ADC_LCD register is not read quickly,
->> its content may be a touchscreen conversion.
->> To remove this temporal constraint, the conversion value is taken from
->> the channel data register.
+On 10 September 2014 00:59, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Tue, Sep 09, 2014 at 03:26:55PM +0530, Ankit Jindal wrote:
+>> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
+>> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
+>> UIO driver export physcial memory to user space as non-cacheable
+>> user memory. Typcially memory-mapped registers of a device are exported
+>> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
+>> is not useful if dma-capable devices are capable of maintaining coherency
+>> with CPU caches becasue we can allow cacheable access to memory shared
+>> between such devices and user space.
 >>
->> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Applied with 2 lines of fuzz to the fixes-togreg branch of iio.git
+>> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
+>> cacheable access to physical memory from user space.
+>>
+>> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+>> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+>> ---
+>>  drivers/uio/uio.c          |   22 +++++++++++++---------
+>>  include/linux/uio_driver.h |    7 ++++---
+>>  2 files changed, 17 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
+>> index a673e5b..ff5b6c0 100644
+>> --- a/drivers/uio/uio.c
+>> +++ b/drivers/uio/uio.c
+>> @@ -644,7 +644,7 @@ static const struct vm_operations_struct uio_physical_vm_ops = {
+>>  #endif
+>>  };
+>>
+>> -static int uio_mmap_physical(struct vm_area_struct *vma)
+>> +static int uio_mmap_physical(struct vm_area_struct *vma, bool cacheable)
+>>  {
+>>       struct uio_device *idev = vma->vm_private_data;
+>>       int mi = uio_find_mem_index(vma);
+>> @@ -659,7 +659,9 @@ static int uio_mmap_physical(struct vm_area_struct *vma)
+>>               return -EINVAL;
+>>
+>>       vma->vm_ops = &uio_physical_vm_ops;
+>> -     vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+>> +
+>> +     if (!cacheable)
+>> +             vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+>>
+>>       /*
+>>        * We cannot use the vm_iomap_memory() helper here,
+>> @@ -706,13 +708,15 @@ static int uio_mmap(struct file *filep, struct vm_area_struct *vma)
+>>       }
+>>
+>>       switch (idev->info->mem[mi].memtype) {
+>> -             case UIO_MEM_PHYS:
+>> -                     return uio_mmap_physical(vma);
+>> -             case UIO_MEM_LOGICAL:
+>> -             case UIO_MEM_VIRTUAL:
+>> -                     return uio_mmap_logical(vma);
+>> -             default:
+>> -                     return -EINVAL;
+>> +     case UIO_MEM_PHYS:
+>> +             return uio_mmap_physical(vma, false);
+>> +     case UIO_MEM_LOGICAL:
+>> +     case UIO_MEM_VIRTUAL:
+>> +             return uio_mmap_logical(vma);
+>> +     case UIO_MEM_PHYS_CACHE:
+>> +             return uio_mmap_physical(vma, true);
+>> +     default:
+>> +             return -EINVAL;
+>
+> Please don't do code style cleanups in the same patch you are adding new
+> functionality.  I can't take this because of this, sorry.
+
+Sure, I will separate out the patch for code style cleanups.
+
+>
+> greg k-h
 
 Thanks,
-
-Jonathan
-> 
->> ---
->>
->> Changes from v2:
->> - fix GENMASK indexes
->>
->> Changes from v1:
->> - use GENMASK and BIT macros
->>
->>  drivers/iio/adc/at91_adc.c |   12 +++++++-----
->>  1 file changed, 7 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->> index 3b5bacd..ad51808 100644
->> --- a/drivers/iio/adc/at91_adc.c
->> +++ b/drivers/iio/adc/at91_adc.c
->> @@ -196,6 +196,7 @@ struct at91_adc_state {
->>  	bool			done;
->>  	int			irq;
->>  	u16			last_value;
->> +	int			chnb;
->>  	struct mutex		lock;
->>  	u8			num_channels;
->>  	void __iomem		*reg_base;
->> @@ -274,7 +275,7 @@ void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
->>  		disable_irq_nosync(irq);
->>  		iio_trigger_poll(idev->trig, iio_get_time_ns());
->>  	} else {
->> -		st->last_value = at91_adc_readl(st, AT91_ADC_LCDR);
->> +		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
->>  		st->done = true;
->>  		wake_up_interruptible(&st->wq_data_avail);
->>  	}
->> @@ -351,7 +352,7 @@ static irqreturn_t at91_adc_rl_interrupt(int irq, void *private)
->>  	unsigned int reg;
->>  
->>  	status &= at91_adc_readl(st, AT91_ADC_IMR);
->> -	if (status & st->registers->drdy_mask)
->> +	if (status & GENMASK(st->num_channels - 1, 0))
->>  		handle_adc_eoc_trigger(irq, idev);
->>  
->>  	if (status & AT91RL_ADC_IER_PEN) {
->> @@ -418,7 +419,7 @@ static irqreturn_t at91_adc_9x5_interrupt(int irq, void *private)
->>  		AT91_ADC_IER_YRDY |
->>  		AT91_ADC_IER_PRDY;
->>  
->> -	if (status & st->registers->drdy_mask)
->> +	if (status & GENMASK(st->num_channels - 1, 0))
->>  		handle_adc_eoc_trigger(irq, idev);
->>  
->>  	if (status & AT91_ADC_IER_PEN) {
->> @@ -689,9 +690,10 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->>  	case IIO_CHAN_INFO_RAW:
->>  		mutex_lock(&st->lock);
->>  
->> +		st->chnb = chan->channel;
->>  		at91_adc_writel(st, AT91_ADC_CHER,
->>  				AT91_ADC_CH(chan->channel));
->> -		at91_adc_writel(st, AT91_ADC_IER, st->registers->drdy_mask);
->> +		at91_adc_writel(st, AT91_ADC_IER, BIT(chan->channel));
->>  		at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
->>  
->>  		ret = wait_event_interruptible_timeout(st->wq_data_avail,
->> @@ -708,7 +710,7 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->>  
->>  		at91_adc_writel(st, AT91_ADC_CHDR,
->>  				AT91_ADC_CH(chan->channel));
->> -		at91_adc_writel(st, AT91_ADC_IDR, st->registers->drdy_mask);
->> +		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
->>  
->>  		st->last_value = 0;
->>  		st->done = false;
->>
-> 
-> 
+Ankit
