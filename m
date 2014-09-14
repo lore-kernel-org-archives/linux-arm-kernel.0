@@ -1,58 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 13 Sep 2014 21:24:52 -0500
-Subject: [Patch v9 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
-In-Reply-To: <5413E829.8020804@ti.com>
-References: <1410550088-8754-1-git-send-email-agross@codeaurora.org>
- <1410550088-8754-4-git-send-email-agross@codeaurora.org>
- <5413E829.8020804@ti.com>
-Message-ID: <20140914022452.GA16652@saruman.home>
+From: xjq@rock-chips.com (Jianqun)
+Date: Sun, 14 Sep 2014 10:27:43 +0800
+Subject: [PATCH 5/5] ASoC: rockchip-i2s: enable "hclk" for rockchip I2S
+ controller
+In-Reply-To: <20140913163749.GK7960@sirena.org.uk>
+References: <1410568723-21559-1-git-send-email-jay.xu@rock-chips.com>
+ <1410568993-21874-1-git-send-email-jay.xu@rock-chips.com>
+ <20140913163749.GK7960@sirena.org.uk>
+Message-ID: <5414FD1F.6020603@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Sat, Sep 13, 2014 at 12:16:01PM +0530, Kishon Vijay Abraham I wrote:
-> On Saturday 13 September 2014 12:58 AM, Andy Gross wrote:
-> > This patch adds a new driver for the Qualcomm USB 3.0 PHY that exists on some
-> > Qualcomm platforms.  This driver uses the generic PHY framework and will
-> > interact with the DWC3 controller.
+
+? 09/14/2014 12:37 AM, Mark Brown ??:
+> On Sat, Sep 13, 2014 at 08:43:13AM +0800, Jianqun wrote:
 > 
-> Do you have dt documentation for this driver?
-
-see patch 1
-
-> > +static inline void qcom_dwc3_phy_write_readback(
-> > +	struct qcom_dwc3_usb_phy *phy_dwc3, u32 offset,
-> > +	const u32 mask, u32 val)
-> > +{
-> > +	u32 write_val, tmp = readl(phy_dwc3->base + offset);
-> > +
-> > +	tmp &= ~mask;		/* retain other bits */
-> > +	write_val = tmp | val;
-> > +
-> > +	writel(write_val, phy_dwc3->base + offset);
-> > +
-> > +	/* Read back to see if val was written */
+>> +++ b/sound/soc/rockchip/rockchip_i2s.c
+>> @@ -423,6 +423,11 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+>>  		dev_err(&pdev->dev, "Can't retrieve i2s bus clock\n");
+>>  		return PTR_ERR(i2s->hclk);
+>>  	}
+>> +	ret = clk_prepare_enable(i2s->hclk);
+>> +	if (ret) {
+>> +		dev_err(i2s->dev, "hclock enable failed %d\n", ret);
+>> +		return ret;
+>> +	}
 > 
-> Does it fail sometime? I'm not sure if this should be present in the
-> driver since this looks more of a debug code.
+> BTW: you're also missing a clk_disable_unprepare() in the remove path
+> here, please send a followup fixing that.
+remove function has done the clk_disable_unprepare for "hclk".
 
-this was mentioned before. Silicon bug.
-
-> > +	writel_relaxed(data | SSUSB_CTRL_SS_PHY_RESET,
-> > +		phy_dwc3->base + SSUSB_PHY_CTRL_REG);
-> > +	usleep_range(2000, 2200);
+One more thing, since "i2s_clk" is enabled at runtime_resume, and is disabled in runtime_suspend,
+hasn't enable in probe, so do the "i2s_clk" to be disabled in remove ?
+The current driver has disable in remove.
 > 
-> use msleep here..
-
-why ? usleep_range() gives the scheduler oportunity to group timers.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140913/c5a41db9/attachment.sig>
