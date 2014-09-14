@@ -1,118 +1,74 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Sun, 14 Sep 2014 12:27:28 +0100
-Subject: [PATCH 3.17-rc4 v5 2/6] arm: fiq: Replace default FIQ handler
-In-Reply-To: <20140912172337.GQ12361@n2100.arm.linux.org.uk>
-References: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-1-git-send-email-daniel.thompson@linaro.org>
- <1410435078-28462-3-git-send-email-daniel.thompson@linaro.org>
- <20140912171404.GO12361@n2100.arm.linux.org.uk>
- <20140912171908.GP12361@n2100.arm.linux.org.uk>
- <20140912172337.GQ12361@n2100.arm.linux.org.uk>
-Message-ID: <54157BA0.2080800@linaro.org>
+Date: Sun, 14 Sep 2014 12:53:10 +0100
+Subject: [PATCH v3 5/5] irqchip: gic: Add support for IPI FIQ
+In-Reply-To: <540EB930.6010404@linaro.org>
+References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+ <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
+ <1410190115-32604-6-git-send-email-daniel.thompson@linaro.org>
+ <20140908162316.GC12361@n2100.arm.linux.org.uk> <540EB930.6010404@linaro.org>
+Message-ID: <541581A6.6090803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/14 18:23, Russell King - ARM Linux wrote:
-> On Fri, Sep 12, 2014 at 06:19:08PM +0100, Russell King - ARM Linux wrote:
->> On Fri, Sep 12, 2014 at 06:14:04PM +0100, Russell King - ARM Linux wrote:
->>> On Thu, Sep 11, 2014 at 12:31:14PM +0100, Daniel Thompson wrote:
->>>> This patch introduces a new default FIQ handler that is structured in a
->>>> similar way to the existing ARM exception handler and result in the FIQ
->>>> being handled by C code running on the SVC stack (despite this code run
->>>> in the FIQ handler is subject to severe limitations with respect to
->>>> locking making normal interaction with the kernel impossible).
->>>>
->>>> This default handler allows concepts that on x86 would be handled using
->>>> NMIs to be realized on ARM.
->>>
->>> Okay, lastly... I sent you my version of this change, which contained
->>> the changes I've detailed in the previous three emails, which are absent
->>> from your version.
->>>
->>> However, you've taken on board the "trace" thing to svc_entry, and
->>> renamed it to "call_trace".
->>>
->>> Now if I add this to usr_entry, "call_trace" doesn't make any sense,
->>> nor does the .if/.endif placement because it's not just trace_hardirqs_off
->>> which needs to be disabled there, but also ct_user_exit as well.
->>>
->>> I'm beginning to wonder why I tried to be nice here... it would've been
->>> a lot faster for me to take your patch, make my own changes and commit
->>> that instead.
->>>
->>> Frustrated.
+On 09/09/14 09:24, Daniel Thompson wrote:
+> On 08/09/14 17:23, Russell King - ARM Linux wrote:
+>> On Mon, Sep 08, 2014 at 04:28:35PM +0100, Daniel Thompson wrote:
+>>> @@ -604,8 +731,19 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>>  {
+>>>  	int cpu;
+>>>  	unsigned long flags, map = 0;
+>>> +	unsigned long softint;
+>>>  
+>>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>>> +	/*
+>>> +	 * The locking in this function ensures we don't use stale cpu mappings
+>>> +	 * and thus we never route an IPI to the wrong physical core during a
+>>> +	 * big.LITTLE switch. The switch code takes both of these locks meaning
+>>> +	 * we can choose whichever lock is safe to use from our current calling
+>>> +	 * context.
+>>> +	 */
+>>> +	if (in_nmi())
+>>> +		raw_spin_lock(&fiq_safe_migration_lock);
+>>> +	else
+>>> +		raw_spin_lock_irqsave(&irq_controller_lock, flags);
 >>
->> And another thing you're missing are the updates to arch/arm/kernel/fiq.c
->> to ensure that the FIQ registers are preserved when we restore this new
->> default FIQ handler.
+>> Firstly, why would gic_raise_softirq() be called in FIQ context?
 > 
-> Right, here's my remaining delta from your patch addressing all the points
-> from the last five emails.  If you have any disagreements with any of these
-> changes, then please discuss rather than choosing to ignore them.
+> Oops.
 > 
-> 107e32b0b4ef5fa4191c9fc8415ca172b886e958
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 0c70fee9a7c9..3f6293ce0f2d 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> <snip>
-> @@ -736,13 +738,13 @@ ENDPROC(ret_from_exception)
->  
->  	.align	5
->  __fiq_usr:
-> -	usr_entry
-> +	usr_entry trace=0
->  	kuser_cmpxchg_check
->  	mov	r0, sp				@ struct pt_regs *regs
->  	bl	handle_fiq_as_nmi
->  	get_thread_info tsk
-> -	mov	why, #0
-> -	b	ret_to_user_from_irq
-> +	restore_user_regs fast = 0, offset = 0
-> + UNWIND(.cantunwind	)
+> This code should have been removed. It *is* required for kgdb (which
+> needs to send FIQ to other processors via IPI and may itself be running
+> from FIQ) but it not needed for the currently targeted use case.
 
-.cantunwind is already provided by the usr_entry macro (also adding
-.cantunwind here causes my assembler (2.24) to fail).
+I'm afraid I was wrong about this. gic_raise_softitq() is called during
+console unlocking inside wake_up_klogd(). This means it is required even
+to support arch_trigger_all_cpu_backtrace.
+
+I'm trying to get a (tested) refresh of the FIQ + trigger_backtrace out
+today. Thus for now I plan to reinstate the code above (which I believe
+to be safe because FIQ is disabled throughout a b.L switch).
+
+Nevertheless I won't ignore this comment! I think a using a r/w lock
+here can be made FIQ-safe without having to rely on in_nmi() based
+conditional branches.
 
 
->   UNWIND(.fnend		)
->  ENDPROC(__fiq_usr)
->  
-> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-> index 918875d96d5d..1743049c433b 100644
-> --- a/arch/arm/kernel/fiq.c
-> +++ b/arch/arm/kernel/fiq.c
-> @@ -53,6 +53,7 @@
->  	})
->  
->  static unsigned long no_fiq_insn;
-> +static struct pt_regs def_fiq_regs;
->  
->  /* Default reacquire function
->   * - we always relinquish FIQ control
-> @@ -60,8 +61,15 @@ static unsigned long no_fiq_insn;
->   */
->  static int fiq_def_op(void *ref, int relinquish)
->  {
-> -	if (!relinquish)
-> +	if (!relinquish) {
-> +		/* Restore default handler and registers */
-> +		local_fiq_disable();
-> +		set_fiq_regs(&dfl_fiq_regs);
->  		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
-> +		local_fiq_enable();
-> +
-> +		/* FIXME: notify irq controller to standard enable FIQs */
-> +	}
->  
->  	return 0;
->  }
-> @@ -151,5 +159,6 @@ void __init init_FIQ(int start)
->  {
->  	unsigned offset = FIQ_OFFSET;
->  	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
-> +	get_fiq_regs(&dfl_fiq_regs);
->  	fiq_start = start;
->  }
+Daniel.
+
+
+>> Secondly,
+>> this doesn't save you.  If you were in the middle of gic_migrate_target()
+>> when the FIQ happened that (for some reason prompted you to call this),
+>> you would immediately deadlock trying to that this IRQ.
 > 
+> This cannot happen because gic_migrate_target() runs with FIQ disabled.
+> 
+> 
+>> I suggest not even trying to solve this "race" which I don't think is
+>> one which needs to even be considered (due to the first point.)
+> 
+> As mentioned above I believe it eventually needs to be addressed by some
+> means but it certainly doesn't belong in the current patchset.
+> 
+> I will remove it.
 > 
