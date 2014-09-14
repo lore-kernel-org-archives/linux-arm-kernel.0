@@ -1,140 +1,78 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Sun, 14 Sep 2014 23:27:27 +0530
-Subject: [PATCH 4/5] dt-bindings: Add binding info for Xgene QMTM UIO
- driver
-In-Reply-To: <20140909105310.GC27786@leverpostej>
-References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
- <1410256619-3213-5-git-send-email-ankit.jindal@linaro.org>
- <20140909105310.GC27786@leverpostej>
-Message-ID: <CAPTm99XzJe8RWCaMCauGA9fgzRDNzk4bhZoKFtH3jiDHYek2fA@mail.gmail.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Sun, 14 Sep 2014 23:47:26 +0530
+Subject: [RFC][PATCH] devicetree: Add master-id-bits property to the iommu
+ device
+Message-ID: <1410718646-9710-1-git-send-email-Varun.Sethi@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2014 16:23, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Sep 09, 2014 at 10:56:58AM +0100, Ankit Jindal wrote:
->> This patch adds device tree binding documentation for
->> Xgene QMTM UIO driver.
->>
->> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
->> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
->> ---
->>  .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   45 ++++++++++++++++++++
->>  1 file changed, 45 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
->>
->> diff --git a/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt b/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
->> new file mode 100644
->> index 0000000..b71831b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
->> @@ -0,0 +1,45 @@
->> +APM X-Gene QMTM UIO nodes
->> +
->> +QMTM UIO nodes are defined for user space access to on-chip QMTM device
->> +on APM X-Gene SOC using UIO framework.
->> +
->
-> Userspace vs kernel space has precisely _nothing_ to do with a HW
-> description.
->
-> This doesn't describe at all what the device is (e.g. what does QMTM
-> stand for, what is it used for?).
->
-> NAK.
+"master-id-bits" property added to the IOMMU device node. This property can
+be used by the IOMMU driver to match relevan bits in the master id expressed
+by a DMA master.
 
-QMTM stands for queue manager and traffic manager. It is device managing
-the hardware queues. It also implements QoS among hardware queues hence
-term "traffic" manager is present in its name.
+This can be used to mask out certain bits that get added to the device master id
+due to IOMMU topology. For example, in case of MMU-500 the TBUID gets appended to
+the master id. This prevents sharing of a stream ID, amongst devices which are
+connected to different TBUs. 
 
-Sure, I will add more info about the device in the next revision.
+Signed-off-by: Varun Sethi <Varun.Sethi@freescale.com>
+---
+ Documentation/devicetree/bindings/iommu/iommu.txt |   29 +++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-The primary purpose of QMTM UIO driver is to expose QMTM HW to
-user space so that frameworks like ODP (OpenDataPlane) can use
-this from user space.
-
->
-> Please ensure you Cc the devicetree list (devicetree at vger.kernel.org) in
-> future.
-
-Sure, will do.
-
->
->> +Required properties:
->> +- compatible: Should be "apm,xgene-qmtm-uio"
->
-> This should definitely not have "uio" in the name.
-
-I added "uio" in compatible string because in future APM might
-add separate driver for accessing QMTM from kernel space.
-
-Can you suggest better compatible strings for this UIO driver?
-
->
->> +- reg: Address and length of the register set for the device. It contains the
->> +  information of registers in the same order as described by reg-names.
->> +- reg-names: Should contain the register set names
->> +  - "csr": QMTM control and status register address space.
->> +  - "fabric": QMTM memory mapped access to queue states.
->
-> These look ok, I guess.
->
->> +  - "qpool": Memory location for creating QMTM queues. This could be some
->> +    SRAM or reserved portion of RAM. It is expected that size and location
->> +    of qpool memory will be configurable via bootloader.
->
-> I don't follow why this should be described in a reg entry. This is not
-> a property of the device; this is a separate resource being assigned to
-> the device.
-
-Ok, I will remove it from reg and add "qpool-addr" and "qpool-size"
-attributes to
-point the location of qpool.
-
->
-> Why can the kernel not allocate this dynamically?
-
-For faster access, this can be on-chip memory as well.
-
->
-> If you need a specific fixed pool, use the reserved-memory bindings.
-
-reserved-memory only apply to RAM, it does not apply to on-chip
-SRAMs. Right ?
-
->
->> +- clocks: Reference to the clock entry.
->
-> There is only one clock input to the IP block?
-
-Yes.
-
->
->> +- num_queues: Number of queues under this QMTM device.
->
-> s/_/-/, property names should use '-' rather than '_'.
-
-Sure, will rename it in next revision.
-
->
->> +- devid: QMTM identification number for the system having multiple QMTM devices
->
-> What exactly is this used for? Why is the reg entry not sufficient?
-
-When there are multiple QMTM devices, the devid is used to form a
-unique id (a tuple of queue number and device id) for the queues
-belonging to this device. Unfortunately, we don't have any register
-providing the devid of the device.
-
->
->> +Optional properties:
->> +- status: Should be "ok" or "disabled" for enabled/disabled. Default is "ok".
->
-> This is so standard I don't see the point in documenting it.
-
-Ok, I will remove it in next revision.
-
->
-> Mark.
-
-Thanks,
-Ankit
+diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
+index 5a8b462..f7c8623 100644
+--- a/Documentation/devicetree/bindings/iommu/iommu.txt
++++ b/Documentation/devicetree/bindings/iommu/iommu.txt
+@@ -63,6 +63,23 @@ Note that these are merely examples and real-world use-cases may use different
+ definitions to represent their individual needs. Always refer to the specific
+ IOMMU binding for the exact meaning of the cells that make up the specifier.
+ 
++Optional properties:
++--------------------
++- master-id-bits: This specifies number of master id bits used by the iommu, to
++  match master id expressed by the DMA master device. This would be typically used
++  in cases where we need DMA memory isolation between multiple masters. Each master
++  would specify a master id associated with a DMA trasaction.
++
++  The IOMMU driver can use this property to generate a mask to match only relevant
++  bits in the master id. This can be used for masking out certain bits that get
++  added to the master id as a part of the IOMMU topology.
++
++  For example, in case of MMU-500 the TBU identifier is also appended to the master id.
++  This posese issues for software implementations requiring dynamic master id allocation
++  for supporting hot pluggable devices. It's possible to have a device group, with
++  devices connected to different TBUs. Without masking the additional TBU ID bits, we
++  can't share the master id across all devices in the device group.
++
+ 
+ IOMMU master node:
+ ==================
+@@ -147,6 +164,12 @@ Multiple-master IOMMU:
+ 	iommu {
+ 		/* the specifier represents the ID of the master */
+ 		#iommu-cells = <1>;
++
++		/*
++		 * This specifies number of master id bits used by
++		 * the iommu for matching the master id.
++		 */
++		master-id-bits = <7>
+ 	};
+ 
+ 	master at 1 {
+@@ -173,6 +196,12 @@ Multiple-master IOMMU with configurable DMA window:
+ 			 * master (i.e. the I/O virtual address space).
+ 			 */
+ 			#iommu-cells = <4>;
++
++			/*
++			 * This specifies number of master id bits used by
++			 * the iommu for matching the master id.
++			 */
++			master-id-bits = <7>
+ 		};
+ 
+ 		master {
+-- 
+1.7.9.5
