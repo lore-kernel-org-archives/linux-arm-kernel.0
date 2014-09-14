@@ -1,260 +1,109 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 14 Sep 2014 21:23:23 +0100
-Subject: [PATCH 3/5] drivers: uio: Add Xgene QMTM UIO driver
-In-Reply-To: <1410256619-3213-4-git-send-email-ankit.jindal@linaro.org>
-References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
- <1410256619-3213-4-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <20140914202323.GW12361@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 14 Sep 2014 22:59:22 +0100
+Subject: [PATCH v3 02/17] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <20140914154056.84AA3C40FCB@trevor.secretlab.ca>
+References: <1409583475-6978-3-git-send-email-hanjun.guo@linaro.org>
+ <20140909162648.GE2910@arm.com> <540F2DCF.1010104@redhat.com>
+ <20140909171541.GD3896@leverpostej>
+ <20140909175010.GF4948@e102568-lin.cambridge.arm.com>
+ <540F4155.4090200@arm.com> <540F4FCF.1090508@redhat.com>
+ <5410326F.8080104@huawei.com> <20140910123352.GA31237@localhost>
+ <20140910215130.6D448C411AA@trevor.secretlab.ca>
+ <20140911110146.GB5814@localhost>
+ <20140914154056.84AA3C40FCB@trevor.secretlab.ca>
+Message-ID: <FB6C7D97-826E-4130-A46D-F32F96353404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 03:26:57PM +0530, Ankit Jindal wrote:
-> diff --git a/drivers/uio/uio_xgene_qmtm.c b/drivers/uio/uio_xgene_qmtm.c
-...
-> +/* QMTM CSR read/write routine */
-> +static inline void qmtm_csr_write(struct uio_qmtm_dev *qmtm_dev, u32 offset,
-> +		u32 data)
-> +{
-> +	void __iomem *addr = (u8 *)qmtm_dev->info->mem[0].internal_addr +
-> +		offset;
-> +
-> +	writel(data, addr);
+On 14 Sep 2014, at 16:40, Grant Likely <grant.likely@linaro.org> wrote:
+> On Thu, 11 Sep 2014 12:01:46 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Wed, Sep 10, 2014 at 10:51:30PM +0100, Grant Likely wrote:
+>>> On Wed, 10 Sep 2014 13:33:52 +0100, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>>> On Wed, Sep 10, 2014 at 12:13:51PM +0100, Hanjun Guo wrote:
+>>>>> I agree that we should rework the ACPI core to make sleep/cache related
+>>>>> stuff compatible with ARM, but I think we may not do this in one go, it will
+>>>>> need incremental changes over the next couple of years as real hardware
+>>>>> starts to appear and we finalise the standards to support this.
+>>>>> 
+>>>>> Now, as we list in the arm-acpi.txt doc, power management of sleep states
+>>>>> and CPU power/frequency control are not well defined in ACPI spec for ARM,
+>>>>> we need some time to finalize the standard and then we know how to implement
+>>>>> that in a good shape.
+>>>>> 
+>>>>> ACPI 5.1 already fixed lots missing features for ARM64 and provide the
+>>>>> fundamental needs to bring up the basic system for ARM server, power
+>>>>> management is not critical at now, so why not fix/implement it later?
+>>>> 
+>>>> I don't have a problem with implementing (rather than fixing) power
+>>>> management later, once the ACPI spec covers it. But the point a few of
+>>>> us were trying to make is that even when ACPI spec is updated, the
+>>>> current power management code and hooks still won't make sense on ARM.
+>>>> The best is to avoid compiling it for ARM now and look at refactoring it
+>>>> later to accommodate ARM ACPI.
+>>> 
+>>> I disagree strongly here. We're talking about a library of code that is
+>>> working on x86 and ia64, but hasn't been tuned for ARM.
+>> 
+>> I think where we disagree is the "tuning" part. If it's just that, it
+>> would be fine, but there are fundamental differences in the
+>> architectures that the above would not even make sense on ARM (so it's
+>> more like rewriting than tuning).
+>> 
+>>> Trying to
+>>> refactor it first, and then get it compiling for ARM is entirely the
+>>> wrong way around.
+>> 
+>> Note that I explicitly stated "refactoring it later". I have not asked
+>> for the existing code to be refactored _now_ as it's not even clear how
+>> it would look like on ARM (what's clear though is that its behaviour is
+>> _undefined_).
+>> 
+>>> The best way to get that code refactored for
+>>> ARM is to get it compiling first, and then refactor it to remove the
+>>> unnecessary stubs. That makes it a whole lot easier to make the
+>>> arguements about why the changes are needed. Otherwise it just shows
+>>> churn on the ACPICA side without any evidence of why the change is
+>>> good. Trying to refactor first also has the risk of breaking things
+>>> that work now in the name of "refactoring" and not being able to easily
+>>> bisect it for ARM. That's just madness.
+>> 
+>> I agree with not starting the refactoring now. But is it difficult to
+>> make it compilable based on something like CONFIG_ACPI_SLEEP and the
+>> latter depend on !ARM64 until the spec is clear?
+> 
+> This particular issue is pretty much moot now. The latest series was
+> able to compile out the sleep functions.
 
-Why not...
-	void __iomem *base = qmtm_dev->info->mem[0].internal_addr;
+That?s what I was looking for.
 
-	writel(data, addr + offset);
+> If they hadn't however, we
+> weren't at any risk. Empty hooks have no impact, and even if the
+> behaviour is defined in a future revision of the spec, they will remain
+> noops for ACPI 5.1 systems.
 
-We permit void pointer arithmetic in the kernel.
+It?s not the hooks I?m worried about but the code that calls those
+hooks. As Sudeep pointed out, the kernel will probably panic before even
+reaching the hooks. IOW, would you have been OK with simply defining
+these hooks as BUG()?
 
-> +static int qmtm_reset(struct uio_qmtm_dev *qmtm_dev)
-> +{
-...
-> +	/* check whether device is out of reset or not */
-> +	do {
-> +		val = qmtm_csr_read(qmtm_dev, QMTM_CFG_MEM_RAM_SHUTDOWN);
-> +
-> +		if (!wait--)
-> +			return -1;
-> +		udelay(1);
-> +	} while (val == 0xffffffff);
+In principle, I?m against compiling in code paths that you can never
+test, it just goes against the idea of a ?robust" system.
 
-There's two points about the above:
+>>> Aside from a slightly larger kernel, there is no downside to using
+>>> stubs for now.
+>> 
+>> There is a serious downside - code with _undefined_ behaviour on arm64
+>> that may get executed depending on the content of the ACPI tables. I'm
+>> sure it's a lot of fun debugging this.
+> 
+> It's really easy for us to deal with this. For ACPI 5.1, we don't do
+> anything, and we should never try to do anything with those states.  If
+> and when a future revision of the ACPI spec appears that does define
+> those states, then we will use them, but only if the reported ACPI
+> version is high enough.
 
-1. The loop is buggy.  A correct implementation would:
-	- test for the success condition
-	- on success, break out of the loop
-	- decrement the timeout, and break out of the loop if we have timed out
-	- delay the required delay
-	- repeat
+It?s the other way around: the reported ACPI version (by firmware) is
+high enough but the kernel code is not updated beyond 5.1 and may run
+the current ARM-undefined ACPI sleep code.
 
-   Note that this means that we will always check for success before
-   deciding whether we've failed or not, /and/ without penalty of an
-   unnecessary delay (as you have.)
-
-2. returning -1 here is not on.  This value can (via your probe
-   function) be propagated to userspace, where it will be interpreted
-   as an -EPERM error.  Wouldn't a proper errno be better?
-
-> +static void qmtm_cleanup(struct platform_device *pdev,
-> +		struct uio_qmtm_dev *qmtm_dev)
-> +{
-> +	struct uio_info *info = qmtm_dev->info;
-> +
-> +	uio_unregister_device(info);
-> +
-> +	kfree(info->name);
-> +
-> +	if (!IS_ERR(info->mem[0].internal_addr))
-> +		devm_iounmap(&pdev->dev, info->mem[0].internal_addr);
-
-So what if we hit a failure at
-
-	platform_get_resource(pdev, IORESOURCE_MEM, 0);
-
-in the probe function below, and call this function.  The purpose of the
-devm_* stuff is to avoid these kinds of error-cleanup errors by automating
-that stuff.  devm_* APIs record the resource allocations against the
-device, and when the probe function fails, or the driver is unbound, the
-devm_* resources claimed in the probe function are freed.
-
-> +
-> +	kfree(info);
-> +	clk_put(qmtm_dev->qmtm_clk);
-> +	kfree(qmtm_dev);
-
-All of the above, with the exception of uio_unregister_device() and the
-missing clk_unprepare_disable() can be left to the devm_* stuff to deal
-with, if you'd used the devm_* functions in the probe function.
-
-> +}
-> +
-> +static int qmtm_probe(struct platform_device *pdev)
-> +{
-> +	struct uio_info *info;
-> +	struct uio_qmtm_dev *qmtm_dev;
-> +	struct resource *csr;
-> +	struct resource *fabric;
-> +	struct resource *qpool;
-> +	unsigned int num_queues;
-> +	unsigned int devid;
-> +	int ret = -ENODEV;
-
-Probably a bad idea to use a standard value.  You probably have some
-error codes you've forgotten to propagate.
-
-> +
-> +	qmtm_dev = kzalloc(sizeof(struct uio_qmtm_dev), GFP_KERNEL);
-
-devm_kzalloc
-
-> +	if (!qmtm_dev)
-> +		return -ENOMEM;
-> +
-> +	qmtm_dev->info = kzalloc(sizeof(*info), GFP_KERNEL);
-
-devm_kzalloc
-
-> +	if (!qmtm_dev->info) {
-> +		kfree(qmtm_dev);
-
-No need for this free.
-
-> +		return -ENOMEM;
-> +	}
-> +
-> +	/* Power on qmtm in case its not done as part of boot-loader */
-> +	qmtm_dev->qmtm_clk = clk_get(&pdev->dev, NULL);
-
-devm_clk_get
-
-> +	if (IS_ERR(qmtm_dev->qmtm_clk)) {
-> +		dev_err(&pdev->dev, "Failed to get clock\n");
-> +		ret = PTR_ERR(qmtm_dev->qmtm_clk);
-> +		kfree(qmtm_dev->info);
-> +		kfree(qmtm_dev);
-
-Both kfree's can be removed.
-
-> +		return ret;
-> +	} else {
-> +		clk_prepare_enable(qmtm_dev->qmtm_clk);
-> +	}
-> +
-> +	csr = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!csr) {
-> +		dev_err(&pdev->dev, "No QMTM CSR resource specified\n");
-> +		goto out_free;
-> +	}
-> +
-> +	if (!csr->start) {
-> +		dev_err(&pdev->dev, "Invalid CSR resource\n");
-> +		goto out_free;
-> +	}
-> +
-> +	fabric = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	if (!fabric) {
-> +		dev_err(&pdev->dev, "No QMTM Fabric resource specified\n");
-> +		goto out_free;
-> +	}
-> +
-> +	if (!fabric->start) {
-> +		dev_err(&pdev->dev, "Invalid Fabric resource\n");
-> +		goto out_free;
-> +	}
-> +
-> +	qpool = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-> +	if (!qpool) {
-> +		dev_err(&pdev->dev, "No QMTM Qpool resource specified\n");
-> +		goto out_free;
-> +	}
-> +
-> +	if (!qpool->start) {
-> +		dev_err(&pdev->dev, "Invalid Qpool resource\n");
-> +		goto out_free;
-> +	}
-> +
-> +	ret = of_property_read_u32(pdev->dev.of_node, "num_queues",
-> +			&num_queues);
-
-You may wish to consider checking that you have a pdev->dev.of_node and
-cleanly error if you don't.
-
-> +
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "No num_queues resource specified\n");
-> +		goto out_free;
-> +	}
-> +
-> +	/* check whether sufficient memory is provided for the given queues */
-> +	if (!((num_queues * QMTM_DEFAULT_QSIZE) <= resource_size(qpool))) {
-> +		dev_err(&pdev->dev, "Insufficient Qpool for the given queues\n");
-> +		goto out_free;
-> +	}
-> +
-> +	ret = of_property_read_u32(pdev->dev.of_node, "devid", &devid);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "No devid resource specified\n");
-> +		goto out_free;
-> +	}
-> +
-> +	info = qmtm_dev->info;
-> +	info->mem[0].name = "csr";
-> +	info->mem[0].addr = csr->start;
-> +	info->mem[0].size = resource_size(csr);
-> +	info->mem[0].memtype = UIO_MEM_PHYS;
-> +	info->mem[0].internal_addr = devm_ioremap_resource(&pdev->dev, csr);
-> +
-> +	if (IS_ERR(info->mem[0].internal_addr)) {
-> +		dev_err(&pdev->dev, "Failed to ioremap CSR region\n");
-
-How about printing the error code, and propagating that error code to your
-caller?
-
-> +		goto out_free;
-> +	}
-> +
-> +	info->mem[1].name = "fabric";
-> +	info->mem[1].addr = fabric->start;
-> +	info->mem[1].size = resource_size(fabric);
-> +	info->mem[1].memtype = UIO_MEM_PHYS;
-> +
-> +	info->mem[2].name = "qpool";
-> +	info->mem[2].addr = qpool->start;
-> +	info->mem[2].size = resource_size(qpool);
-> +	info->mem[2].memtype = UIO_MEM_PHYS_CACHE;
-> +
-> +	info->name = kasprintf(GFP_KERNEL, "qmtm%d", devid);
-
-devm_kasprintf
-
-> +	info->version = DRV_VERSION;
-> +
-> +	info->priv = qmtm_dev;
-> +	info->open = qmtm_open;
-> +	info->release = qmtm_release;
-> +
-> +	/* get the qmtm out of reset */
-> +	ret = qmtm_reset(qmtm_dev);
-> +	if (ret < 0)
-> +		goto out_free;
-
-Here you propagate that -1 value out of your probe function to userspace.
-If you want to do this, please choose a reasonable error code, rather
-than -EPERM.
-
-> +
-> +	/* register with uio framework */
-> +	ret = uio_register_device(&pdev->dev, info);
-> +	if (ret < 0)
-> +		goto out_free;
-> +
-> +	dev_info(&pdev->dev, "%s registered as UIO device.\n", info->name);
-
-Does this printk serve a useful purpose?  Most other UIO drivers don't
-bother printing anything, though if you do print something, it may be
-useful to mention which uio device it is associated with.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
