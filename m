@@ -1,24 +1,41 @@
-From: xjq@rock-chips.com (Jianqun)
-Date: Sun, 14 Sep 2014 11:00:50 +0800
-Subject: [PATCH 0/2] rockchip-max98090: add driver for rockchip board
- with max98090
-In-Reply-To: <20140912134234.GS7960@sirena.org.uk>
-References: <1410506806-15327-1-git-send-email-jay.xu@rock-chips.com>
- <20140912134234.GS7960@sirena.org.uk>
-Message-ID: <541504E2.3050200@rock-chips.com>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Sun, 14 Sep 2014 11:39:59 +0800
+Subject: [PATCH v2] ASoC: rockchip-i2s: dt: fix an error in the example
+In-Reply-To: <1410570281-23681-1-git-send-email-jay.xu@rock-chips.com>
+References: <1410570281-23681-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1410665999-16718-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Reference to RK3288 TRM, fix an error in the example by swap "tx" and "rx".
 
+Table 10-1 DMAC_BUS Request Mapping Table
+Req number	Source	Polarity
+0		I2S tx	High level
+1		I2S rx	High level
 
-? 09/12/2014 09:42 PM, Mark Brown ??:
-> On Fri, Sep 12, 2014 at 03:26:46PM +0800, Jianqun wrote:
->> This patch to add driver for rockchip board using a max98090.
->>
->> Tested on RK3288 using a max98090.
-> 
-> This appears to have two slightly different copies of the patches
-> threaded to it...  that's a bit confusing.
-> 
-So sorry for all in the mail thread, I have made a stupid thing ~ since I made many
-patches at a meantime ~
+Tested on RK3288 board.
+
+Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+---
+change since v1:
+- modify patch's changelog as Mark's suggestion
+
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index 6c55fcf..9b82c20 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -31,7 +31,7 @@ i2s at ff890000 {
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 	dmas = <&pdma1 0>, <&pdma1 1>;
+-	dma-names = "rx", "tx";
++	dma-names = "tx", "rx";
+ 	clock-names = "i2s_hclk", "i2s_clk";
+ 	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
+ };
+-- 
+1.9.1
