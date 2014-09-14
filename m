@@ -1,28 +1,129 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sun, 14 Sep 2014 18:39:11 +0900
-Subject: [PATCH] ahci_xgene: Fix the error print invalid resource for APM
- X-Gene SoC AHCI SATA Host Controller driver.
-In-Reply-To: <CAOHikRA8LiNkMuzqe-Kgrf4QWbJ_jpXRGHdf+rsrCmq6R0GjDg@mail.gmail.com>
-References: <1410508448-25111-1-git-send-email-stripathi@apm.com>
- <1410508448-25111-2-git-send-email-stripathi@apm.com>
- <20140912175014.GA6298@mtj.dyndns.org>
- <CAOHikRA8LiNkMuzqe-Kgrf4QWbJ_jpXRGHdf+rsrCmq6R0GjDg@mail.gmail.com>
-Message-ID: <20140914093911.GB9028@mtj.dyndns.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 14 Sep 2014 11:43:39 +0200
+Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
+ default
+In-Reply-To: <fdc415c79e617d4e9102acc12a4c0d65@www.loen.fr>
+References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
+ <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
+ <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
+ <20140913170638.GA3348@lvm>
+ <CAKv+Gu93FkRWXd96gKdN+OCrUgjF0sXWL4ohishVWAO-XeR9Ww@mail.gmail.com>
+ <fdc415c79e617d4e9102acc12a4c0d65@www.loen.fr>
+Message-ID: <CAKv+Gu-kce_1cg2fgj5Qj_kRMtzzHctofZ108531-UrcFLZAog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 14 September 2014 11:09, Marc Zyngier <maz@misterjones.org> wrote:
+> On 2014-09-14 05:49, Ard Biesheuvel wrote:
+>>
+>> On 13 September 2014 19:06, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>>
+>>> On Sat, Sep 13, 2014 at 01:15:45PM +0200, Ard Biesheuvel wrote:
+>>>>
+>>>> On 13 September 2014 12:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> > Hi Ard,
+>>>> >
+>>>> > On 2014-09-13 11:17, Ard Biesheuvel wrote:
+>>>> >>
+>>>> >> Now that we support read-only memslots, we need to make sure that
+>>>> >> pass-through device mappings are not mapped writable if the guest
+>>>> >> has requested them to be read-only. The existing implementation
+>>>> >> already honours this by calling kvm_set_s2pte_writable() on the new
+>>>> >> pte in case of writable mappings, so all we need to do is define
+>>>> >> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+>>>> >>
+>>>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> >
+>>>> >
+>>>> > I feel very uncomfortable with this change. Why would we map a device
+>>>> > RO? Is
+>>>> > that only for completeness sake?
+>>>> >
+>>>>
+>>>> We would map a device RO so that QEMU (or whatever is managing KVM)
+>>>> can emulate the writes. I don't have a clear cut use case, to be
+>>>> honest, but setting up a writable mapping for a memslot that was
+>>>> explicitly set up as read-only seems wrong in any case.
+>>>
+>>>
+>>> Agreed, if it doesn't ever make sense to do so, then we should return an
+>>> error to user space if userspace attempts such a configuration.  The
+>>> current code is just weird.
+>>>
+>>>>
+>>>> Note that the particular problem I was seeing was primarily caused by
+>>>> kvm_is_mmio_pfn()'s false positive on the zero page, but it unveiled
+>>>> this particular issue as well.
+>>>>
+>>>> > Note that we also use PAGE_S2_DEVICE for things that are not mapped
+>>>> > through
+>>>> > a memslot, such as the GIC.
+>>>> >
+>>>>
+>>>> Yes, and I realize now that this breaks it.
+>>>> My apologies: I have an additional patch locally that sets up MMIO
+>>>> ranges in one go instead of faulting them in one page at a time as we
+>>>> do now, and there the read-write case is handled correctly in
+>>>> kvm_phys_addr_ioremap(). However, I thought it was better to send
+>>>> these out separately first, but apparently not.
+>>>
+>>>
+>>> I think it is better to change this separately, and then add the ioremap
+>>> stuff.  However, you need to change all places that call PAGE_S2_DEVICE
+>>> and expect a RDWR memory region, this happens to be only
+>>> kvm_phys_addr_ioremap() for now.
+>>>
+>>>>
+>>>> So if we can agree on whether or not MMIO backed mappings should be
+>>>> read-write even if the memslot says no, I will follow up with a proper
+>>>> series if there are still changes required.
+>>>>
+>>>
+>>> I guess it could be theoretically useful to have read-only device memory
+>>> regions, and I can't think of why it would violate the architecture.
+>>>
+>>
+>> We have to handle it either way. But after reading D4.5.3 (Table
+>> D4-40) of the ARM ARM, I am wondering why we needed patch b88657674d39
+>> "ARM: KVM: user_mem_abort: support stage 2 MMIO page mapping" in the
+>> first place, and we could just revert that patch and everything would
+>> work as expected. (In short, D4.5.3 says that MT_DEVICE trumps
+>> MT_NORMAL, so if the stage 1 translation is MT_DEVICE, it doesn't
+>> matter what memtype the S2 translation specifies)
+>
+>
+> We've been there before:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/004420.html
+>
 
-On Sun, Sep 14, 2014 at 11:36:51AM +0530, Suman Tripathi wrote:
-> We can  maintain same piece (IS_ERR(ctx->csr_mux)), then we can do the
-> below instead of NULL ??
-> 
-> ctx->csr_mux = res ? devm_ioremap_resource(dev, res) : ERR_PTR(-EINVAL);
+Ah right. So why did those patches not make it in?
 
-Setting it to NULL on failure would probably make more sense.  No need
-to carry around ERR_PTR() value around.
+Any way, in this case, we have to choose between either dropping the
+special case for kvm_is_mmio_pfn(), or fix it honor the writable.
+My vote would be to get rid of it.
 
-Thanks.
+>>> That said, I don't have any more clear use cases in mind, and we
+>>> definitely shouldn't just silently ignore the read-only flag from user
+>>> space and make the region writeable.  If we don't want to allow this
+>>> behavior, we can return an error in kvm_arch_create_memslot(), which
+>>> will cause the KVM_CREATE_USER_MEMORY_REGION ioctl to return -ENOMEM.
+>>>
+>>
+>> Well, I am not sure how easy it is to find out beforehand (i.e., at
+>> ioctl time) what the nature of the backing is, and you have to deal
+>> with hva_to_pfn() potentially returning a VM_PFNMAP pfn or
+>> PageReserved pages anyway.
+>> So just mapping everything as MT_NORMAL actually seems like the sanest
+>> thing to do, so imo we should revert the patch. The only other
+>> question I had is whether it would be better to map a MMIO region in
+>> one go, but we can discuss that separately.
+>
+>
+> Aside from the MT_NORMAL thing, the only saving we'd get by dynamically
+> maping MMIO regions would be the page tables. Not very useful in my opinion.
+>
 
--- 
-tejun
+OK, so you agree faulting it in entirely upon the first abort is a
+sane thing to do then.
+So 1 patch to change that and 1 to revert the PAGE_S2_DEVICE thing then?
