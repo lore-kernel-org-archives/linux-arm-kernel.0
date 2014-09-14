@@ -1,39 +1,50 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 14 Sep 2014 21:43:40 +0200
-Subject: [PATCH] ARM: BCM5301X: fix early serial console
-Message-ID: <1410723820-23813-1-git-send-email-hauke@hauke-m.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 14 Sep 2014 22:53:28 +0400
+Subject: [PATCH 4/5] ASoC: rockchip-i2s: fix registers' property of
+ rockchip i2s controller
+In-Reply-To: <5414FD6E.2050006@rock-chips.com>
+References: <1410568723-21559-1-git-send-email-jay.xu@rock-chips.com>
+ <1410568932-21823-1-git-send-email-jay.xu@rock-chips.com>
+ <5414AFA6.9060904@cogentembedded.com> <5414FD6E.2050006@rock-chips.com>
+Message-ID: <5415E428.10101@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device actually has a 8250 serial with a shift of 0.
-Tested this on a BCM4708.
+Hello.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- arch/arm/Kconfig.debug | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 09/14/2014 06:29 AM, Jianqun wrote:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..ac14418 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -109,7 +109,7 @@ choice
- 	config DEBUG_BCM_5301X
- 		bool "Kernel low-level debugging on BCM5301X UART1"
- 		depends on ARCH_BCM_5301X
--		select DEBUG_UART_PL01X
-+		select DEBUG_UART_8250
- 
- 	config DEBUG_BCM_KONA_UART
- 		bool "Kernel low-level debugging messages via BCM KONA UART"
-@@ -1199,7 +1199,7 @@ config DEBUG_UART_VIRT
- config DEBUG_UART_8250_SHIFT
- 	int "Register offset shift for the 8250 debug UART"
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
--	default 0 if FOOTBRIDGE || ARCH_IOP32X
-+	default 0 if FOOTBRIDGE || ARCH_IOP32X || DEBUG_BCM_5301X
- 	default 2
- 
- config DEBUG_UART_8250_WORD
--- 
-1.9.1
+>>> Reference rockchip I2S controller TRM, modify some registers' property
+>>> I2S_FIFOLR: read / write, but not volatile, not precious
+>>> I2S_INTSR: read / write
+>>> I2S_CLR: volatile, register value will be cleared by read
+
+>>> Test on RK3288 with max98090.
+
+>>> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+>>> ---
+>>>    sound/soc/rockchip/rockchip_i2s.c | 6 +++---
+>>>    1 file changed, 3 insertions(+), 3 deletions(-)
+
+>>> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+>>> index 1b9b404..6595383 100644
+>>> --- a/sound/soc/rockchip/rockchip_i2s.c
+>>> +++ b/sound/soc/rockchip/rockchip_i2s.c
+>> [...]
+>>> @@ -385,8 +387,6 @@ static bool rockchip_i2s_volatile_reg(struct device *dev, unsigned int reg)
+>>>    static bool rockchip_i2s_precious_reg(struct device *dev, unsigned int reg)
+>>>    {
+>>>        switch (reg) {
+>>> -    case I2S_FIFOLR:
+>>> -        return true;
+>>>        default:
+>>>            return false;
+>>>        }
+
+>>     Shouldn't this be folded into simple *return* false now?
+
+> That is more reasonable, thank you.
+
+    Moreover, this function may be completely eliminated.
+
+WBR, Sergei
