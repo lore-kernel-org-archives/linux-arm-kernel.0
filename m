@@ -1,26 +1,37 @@
-From: xjq@rock-chips.com (Jianqun)
-Date: Sun, 14 Sep 2014 10:29:50 +0800
-Subject: [PATCH] ASoC: rockchip-i2s: dt: swap tx and rx channed request
- number
-In-Reply-To: <20140913164032.GN7960@sirena.org.uk>
-References: <1410570281-23681-1-git-send-email-jay.xu@rock-chips.com>
- <20140913164032.GN7960@sirena.org.uk>
-Message-ID: <5414FD9E.4000602@rock-chips.com>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Sun, 14 Sep 2014 12:54:01 +1000
+Subject: [PATCH reword] ARM: MVEBU: Netgear RN102: Use Hardware BCH ECC
+In-Reply-To: <20140913210829.GI30828@titan.lakedaemon.net>
+References: <1410339341-3372-1-git-send-email-klightspeed@killerwolves.net>
+ <20140913210829.GI30828@titan.lakedaemon.net>
+Message-ID: <54150349.7050503@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 09/14/2014 12:40 AM, Mark Brown ??:
-> On Sat, Sep 13, 2014 at 09:04:41AM +0800, Jianqun wrote:
->> Reference to RK3288 TRM, fix an error channel id for i2s tx and rx
->> Table 10-1 DMAC_BUS Request Mapping Table
->> Req number	Source	Polarity
->> 0		I2S tx	High level
->> 1		I2S rx	High level
+On 14/09/14 07:08, Jason Cooper wrote:
+> On Wed, Sep 10, 2014 at 06:55:41PM +1000, klightspeed at killerwolves.net wrote:
+>> The bootloader on the Netgear ReadyNAS RN102 uses Hardware BCH ECC
+>> (strength = 4), while the pxa3xx NAND driver by default uses 
+>> Hamming ECC (strength = 1).
+>>
+>> This patch changes the ECC mode on these machines to match that
+>> of the bootloader and of the stock firmware. That way, it is
+>> now possible to update the kernel from userland (e.g. using
+>> standard tools from mtd-utils package); u-boot will happily
+>> load and boot it.
+>>
+>> Fixes: 92beaccd8b49 ("ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts file")
+>> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
+>> Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>> Tested-by: Arnaud Ebalard <arno@natisbad.org>
+>> ---
+>>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 4 ++++
+>>  1 file changed, 4 insertions(+)
 > 
-> Applied, thanks.  The changelog should've just noted that this is an
-> error in the example rather than the code or the binding, I was a bit
-> confused about this.
+> I've already applied this the mvebu/fixes:
 > 
-ok, I will do it
+>   500abb6ccb9e ARM: mvebu: Netgear RN2120: Use Hardware BCH ECC
+
+That patch only affects arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+
+The patch I posted affects arch/arm/boot/dts/armada-370-netgear-rn102.dts
