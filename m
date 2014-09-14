@@ -1,50 +1,58 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Sun, 14 Sep 2014 20:29:41 +0100
-Subject: [PATCH] ARM: dts: exynos: Only build DTS files for subarches which
- are enabled
-Message-ID: <1410722981-6600-1-git-send-email-ijc@hellion.org.uk>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Sun, 14 Sep 2014 21:41:56 +0200
+Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
+In-Reply-To: <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
+ <20140911161517.GA3190@worktop.ger.corp.intel.com>
+ <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+Message-ID: <20140914194156.GC2832@worktop.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we build all Exynos dtb files if CONFIG_ARCH_EXYNOS is enabled, even
-if the corresponding CONFIG_ARCH_EXYNOS[345] subarch is not enabled, meaning we
-may build dtbs for things which can't actually run in a particular
-configuration.
+On Thu, Sep 11, 2014 at 07:26:48PM +0200, Vincent Guittot wrote:
+> On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Tue, Aug 26, 2014 at 01:06:54PM +0200, Vincent Guittot wrote:
+> >> +static inline int group_has_free_capacity(struct sg_lb_stats *sgs,
+> >> +                     struct lb_env *env)
+> >>  {
+> >> +     if ((sgs->group_capacity_orig * 100) >
+> >> +                     (sgs->group_utilization * env->sd->imbalance_pct))
+> >> +             return 1;
+> >> +
+> >> +     if (sgs->sum_nr_running < sgs->group_weight)
+> >> +             return 1;
+> >>
+> >> +     return 0;
+> >> +}
+> >>
+> >> +static inline int group_is_overloaded(struct sg_lb_stats *sgs,
+> >> +                     struct lb_env *env)
+> >> +{
+> >> +     if (sgs->sum_nr_running <= sgs->group_weight)
+> >> +             return 0;
+> >>
+> >> +     if ((sgs->group_capacity_orig * 100) <
+> >> +                     (sgs->group_utilization * env->sd->imbalance_pct))
+> >> +             return 1;
+> >>
+> >> +     return 0;
+> >>  }
+> >
+> > I'm confused about the utilization vs capacity_orig. I see how we should
+> 
+> 1st point is that I should compare utilization vs capacity and not
+> capacity_orig.
+> I should have replaced capacity_orig by capacity in the functions
+> above when i move the utilization statistic from
+> rq->avg.runnable_avg_sum to cfs.usage_load_avg.
+> rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
+> cfs.usage_load_avg integrates only cfs tasks
+> 
+> With this change, we don't need sgs->group_capacity_orig anymore but
+> only sgs->group_capacity. So sgs->group_capacity_orig can be removed
+> as it's no more used in the code as sg_capacity_factor has been
+> removed
 
-Switch instead to using the subarch option, based purely on the filename which
-I assume matches. Note that there doesn't apear to be any Exynos3 board files
-right now (or I have somehow missed them).
-
-Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
----
- arch/arm/boot/dts/Makefile |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index adb5ed9..1538378 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -62,7 +62,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
- dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
--dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
-+dtb-$(CONFIG_ARCH_EXYNOS4) += exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
- 	exynos4210-universal_c210.dtb \
-@@ -71,7 +71,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4412-smdk4412.dtb \
- 	exynos4412-tiny4412.dtb \
- 	exynos4412-trats2.dtb \
--	exynos5250-arndale.dtb \
-+dtb-$(CONFIG_ARCH_EXYNOS5) += exynos5250-arndale.dtb \
- 	exynos5250-smdk5250.dtb \
- 	exynos5250-snow.dtb \
- 	exynos5260-xyref5260.dtb \
--- 
-1.7.10.4
+Yes, but.. so I suppose we need to add DVFS accounting and remove
+cpufreq from the capacity thing. Otherwise I don't see it make sense.
