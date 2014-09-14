@@ -1,64 +1,43 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Sun, 14 Sep 2014 21:51:02 +0200
-Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
-In-Reply-To: <20140914194156.GC2832@worktop.localdomain>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
- <20140911161517.GA3190@worktop.ger.corp.intel.com>
- <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
- <20140914194156.GC2832@worktop.localdomain>
-Message-ID: <20140914195102.GA3037@worktop.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Sep 2014 21:01:52 +0100
+Subject: [PATCH 2/5] Documentation: Update documentation for
+ UIO_MEM_PHYS_CACHE
+In-Reply-To: <1410256619-3213-3-git-send-email-ankit.jindal@linaro.org>
+References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
+ <1410256619-3213-3-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <20140914200152.GV12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 14, 2014 at 09:41:56PM +0200, Peter Zijlstra wrote:
-> On Thu, Sep 11, 2014 at 07:26:48PM +0200, Vincent Guittot wrote:
-> > On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
-> > > On Tue, Aug 26, 2014 at 01:06:54PM +0200, Vincent Guittot wrote:
-> > >> +static inline int group_has_free_capacity(struct sg_lb_stats *sgs,
-> > >> +                     struct lb_env *env)
-> > >>  {
-> > >> +     if ((sgs->group_capacity_orig * 100) >
-> > >> +                     (sgs->group_utilization * env->sd->imbalance_pct))
-> > >> +             return 1;
-> > >> +
-> > >> +     if (sgs->sum_nr_running < sgs->group_weight)
-> > >> +             return 1;
-> > >>
-> > >> +     return 0;
-> > >> +}
-> > >>
-> > >> +static inline int group_is_overloaded(struct sg_lb_stats *sgs,
-> > >> +                     struct lb_env *env)
-> > >> +{
-> > >> +     if (sgs->sum_nr_running <= sgs->group_weight)
-> > >> +             return 0;
-> > >>
-> > >> +     if ((sgs->group_capacity_orig * 100) <
-> > >> +                     (sgs->group_utilization * env->sd->imbalance_pct))
-> > >> +             return 1;
-> > >>
-> > >> +     return 0;
-> > >>  }
-> > >
-> > > I'm confused about the utilization vs capacity_orig. I see how we should
-> > 
-> > 1st point is that I should compare utilization vs capacity and not
-> > capacity_orig.
-> > I should have replaced capacity_orig by capacity in the functions
-> > above when i move the utilization statistic from
-> > rq->avg.runnable_avg_sum to cfs.usage_load_avg.
-> > rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
-> > cfs.usage_load_avg integrates only cfs tasks
-> > 
-> > With this change, we don't need sgs->group_capacity_orig anymore but
-> > only sgs->group_capacity. So sgs->group_capacity_orig can be removed
-> > as it's no more used in the code as sg_capacity_factor has been
-> > removed
+On Tue, Sep 09, 2014 at 03:26:56PM +0530, Ankit Jindal wrote:
+> This patch update UIO documentation for new mem region
+> type UIO_MEM_PHYS_CACHE.
 > 
-> Yes, but.. so I suppose we need to add DVFS accounting and remove
-> cpufreq from the capacity thing. Otherwise I don't see it make sense.
+> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+> ---
+>  Documentation/DocBook/uio-howto.tmpl |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/DocBook/uio-howto.tmpl b/Documentation/DocBook/uio-howto.tmpl
+> index bbe9c1f..49e47d4 100644
+> --- a/Documentation/DocBook/uio-howto.tmpl
+> +++ b/Documentation/DocBook/uio-howto.tmpl
+> @@ -530,7 +530,8 @@ the memory region, it will show up in the corresponding sysfs node.
+>  <varname>UIO_MEM_PHYS</varname> if you you have physical memory on your
+>  card to be mapped. Use <varname>UIO_MEM_LOGICAL</varname> for logical
+>  memory (e.g. allocated with <function>kmalloc()</function>). There's also
+> -<varname>UIO_MEM_VIRTUAL</varname> for virtual memory.
+> +<varname>UIO_MEM_VIRTUAL</varname> for virtual memory and
+> +<varname>UIO_MEM_PHYS_CACHE</varname> for physical cacheable memory.
 
-That is to say, please also explain these details in the changelog, and
-preferably also in a XXX/FIXME/TODO comment near wherever so we don't
-forget about it.
+When I read this, I wondered what "physical cacheable memory" was.
+Then I found that what you're doing with this is mapping physical
+memory into userspace with cacheable attributes.
+
+So, to avoid confusion, this should be "for physical memory, which
+will be cacheably mapped" or similar.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
