@@ -1,88 +1,72 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Sun, 14 Sep 2014 22:58:58 +0530
-Subject: [PATCH 1/5] uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
-In-Reply-To: <20140909192910.GA7885@kroah.com>
-References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
- <1410256619-3213-2-git-send-email-ankit.jindal@linaro.org>
- <20140909192910.GA7885@kroah.com>
-Message-ID: <CAPTm99XaXYhJYHypFt2pQwBHAQ9_wAxZp_NjdiuGtWs6TY0bBg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 14 Sep 2014 19:47:20 +0200
+Subject: [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+In-Reply-To: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
+References: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
+Message-ID: <5415D4A8.4010304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2014 00:59, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Tue, Sep 09, 2014 at 03:26:55PM +0530, Ankit Jindal wrote:
->> Currently, three types of mem regions are supported: UIO_MEM_PHYS,
->> UIO_MEM_LOGICAL and UIO_MEM_VIRTUAL. Among these UIO_MEM_PHYS helps
->> UIO driver export physcial memory to user space as non-cacheable
->> user memory. Typcially memory-mapped registers of a device are exported
->> to user space as UIO_MEM_PHYS type mem region. The UIO_MEM_PHYS type
->> is not useful if dma-capable devices are capable of maintaining coherency
->> with CPU caches becasue we can allow cacheable access to memory shared
->> between such devices and user space.
->>
->> This patch adds new type UIO_MEM_PHYS_CACHE for mem regions to enable
->> cacheable access to physical memory from user space.
->>
->> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
->> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
->> ---
->>  drivers/uio/uio.c          |   22 +++++++++++++---------
->>  include/linux/uio_driver.h |    7 ++++---
->>  2 files changed, 17 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
->> index a673e5b..ff5b6c0 100644
->> --- a/drivers/uio/uio.c
->> +++ b/drivers/uio/uio.c
->> @@ -644,7 +644,7 @@ static const struct vm_operations_struct uio_physical_vm_ops = {
->>  #endif
->>  };
->>
->> -static int uio_mmap_physical(struct vm_area_struct *vma)
->> +static int uio_mmap_physical(struct vm_area_struct *vma, bool cacheable)
->>  {
->>       struct uio_device *idev = vma->vm_private_data;
->>       int mi = uio_find_mem_index(vma);
->> @@ -659,7 +659,9 @@ static int uio_mmap_physical(struct vm_area_struct *vma)
->>               return -EINVAL;
->>
->>       vma->vm_ops = &uio_physical_vm_ops;
->> -     vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
->> +
->> +     if (!cacheable)
->> +             vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
->>
->>       /*
->>        * We cannot use the vm_iomap_memory() helper here,
->> @@ -706,13 +708,15 @@ static int uio_mmap(struct file *filep, struct vm_area_struct *vma)
->>       }
->>
->>       switch (idev->info->mem[mi].memtype) {
->> -             case UIO_MEM_PHYS:
->> -                     return uio_mmap_physical(vma);
->> -             case UIO_MEM_LOGICAL:
->> -             case UIO_MEM_VIRTUAL:
->> -                     return uio_mmap_logical(vma);
->> -             default:
->> -                     return -EINVAL;
->> +     case UIO_MEM_PHYS:
->> +             return uio_mmap_physical(vma, false);
->> +     case UIO_MEM_LOGICAL:
->> +     case UIO_MEM_VIRTUAL:
->> +             return uio_mmap_logical(vma);
->> +     case UIO_MEM_PHYS_CACHE:
->> +             return uio_mmap_physical(vma, true);
->> +     default:
->> +             return -EINVAL;
->
-> Please don't do code style cleanups in the same patch you are adding new
-> functionality.  I can't take this because of this, sorry.
+Hi Kukjin,
 
-Sure, I will separate out the patch for code style cleanups.
+On 26.08.2014 16:10, Tomasz Figa wrote:
+> On Exynos-based boards running secure firmware the sequence of low level
+> operations to enter and leave system-wide sleep mode is different than
+> on those without the firmware. Namely:
+>  - CP15 power control and diagnostic registers cannot be written directly,
+>  - the way of setting boot address and boot flag is different,
+>  - different resume handler needs to be used,
+>  - dedicated SMC call needs to be performed instead of letting the CPU enter
+>    WFI.
+> 
+> This series introduces .suspend() and .resume() firmware operations to
+> perform low level firmware-specific suspend and resume and then leverages
+> them to provide suspend-resume path meeting the above requirements. Three
+> additional patches extend device tree sources of Trats2 board with necessary
+> setup to enable suspend/resume support.
+> 
+> This series has been tested on Exynos4412-based Trats2 board, without any
+> additional patches. Unfortunately v3.17-rc1 regressed ODROID support and
+> suspend stopped working on those boards, due to unknown reasons still being
+> investigated. It does not seem to be related to anything in this series,
+> though, so I would not consider this as a stopper.
+> 
+> Changes since v2:
+> (https://lkml.org/lkml/2014/7/17/431)
+>  - added board-specific fixes for device tree sources of Trats2 board,
+>  - rebased on next-20140826 of linux-next tree.
+> 
+> Changes since v1:
+>  - dropped outer_resume() - will be handled in assembly in further patches,
+>    as support for L2C in non-secure mode gets added,
+>  - moved CP15 resume to assembly as it needs to be done before MMU is enabled,
+>  - surrounded CP15 save with a check for cpuid part, because it is valid only
+>    on Cortex A9,
+>  - rebased on next-20140717 tag of linux-next tree.
+> 
+> Tomasz Figa (5):
+>   ARM: firmware: Introduce suspend and resume operations
+>   ARM: EXYNOS: Add support for firmware-assisted suspend/resume
+>   ARM: dts: exynos4412-trats2: Keep eMMC regulators soft-disabled
+>   ARM: dts: exynos4x12: Add utility macro to define pin sleep states
+>   ARM: dts: exynos4412-trats2: Add sleep mode pin configuration
+> 
+>  Documentation/arm/firmware.txt            |  28 +--
+>  arch/arm/boot/dts/exynos4412-trats2.dts   | 320 +++++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |  16 ++
+>  arch/arm/include/asm/firmware.h           |   8 +
+>  arch/arm/mach-exynos/Makefile             |   1 +
+>  arch/arm/mach-exynos/common.h             |   4 +
+>  arch/arm/mach-exynos/firmware.c           |  45 +++++
+>  arch/arm/mach-exynos/pm.c                 |  16 +-
+>  arch/arm/mach-exynos/sleep.S              |  28 +++
+>  arch/arm/mach-exynos/smc.h                |   4 +
+>  10 files changed, 438 insertions(+), 32 deletions(-)
+> 
 
->
-> greg k-h
+Would you consider applying this series? It has been waiting on the ML
+long enough (note no changes in core patches since last revision, just
+few more board specific patches). Thanks in advance.
 
-Thanks,
-Ankit
+Best regards,
+Tomasz
