@@ -1,26 +1,67 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 16 Sep 2014 01:12:53 +0800
-Subject: [Patch net-next 0/4] net: fec: add interrupt coalescence
-Message-ID: <1410801177-15872-1-git-send-email-Frank.Li@freescale.com>
+Date: Tue, 16 Sep 2014 01:12:54 +0800
+Subject: [Patch net-next 1/4] net: fec: refine error handle of parser queue
+ number from DT
+In-Reply-To: <1410801177-15872-1-git-send-email-Frank.Li@freescale.com>
+References: <1410801177-15872-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1410801177-15872-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-improve error handle when parse queue number.
-add interrupt coalescence feature.
+check tx and rx queue seperately.
+fix typo, "Invalidate" and "fail".
+change pr_err to pr_warn.
 
-Frank Li (1):
-  net: fec: refine error handle of parser queue number from DT
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Fugang Duan (3):
-  net: fec: add interrupt coalescence feature support
-  net:fec: increase DMA queue number
-  net: fec: Workaround for imx6sx enet tx hang when enable three queues
-
- drivers/net/ethernet/freescale/fec.h      |  16 +++-
- drivers/net/ethernet/freescale/fec_main.c | 144 ++++++++++++++++++++++++++++--
- 2 files changed, 150 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 8f8e55e..f958e91 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -2890,22 +2890,22 @@ fec_enet_get_queue_num(struct platform_device *pdev, int *num_tx, int *num_rx)
+ 
+ 	/* parse the num of tx and rx queues */
+ 	err = of_property_read_u32(np, "fsl,num-tx-queues", num_tx);
+-	err |= of_property_read_u32(np, "fsl,num-rx-queues", num_rx);
+-	if (err) {
++	if (err)
+ 		*num_tx = 1;
++
++	err = of_property_read_u32(np, "fsl,num-rx-queues", num_rx);
++	if (err)
+ 		*num_rx = 1;
+-		return;
+-	}
+ 
+ 	if (*num_tx < 1 || *num_tx > FEC_ENET_MAX_TX_QS) {
+-		dev_err(&pdev->dev, "Invalidate num_tx(=%d), fail back to 1\n",
++		dev_warn(&pdev->dev, "Invalid num_tx(=%d), fall back to 1\n",
+ 			*num_tx);
+ 		*num_tx = 1;
+ 		return;
+ 	}
+ 
+ 	if (*num_rx < 1 || *num_rx > FEC_ENET_MAX_RX_QS) {
+-		dev_err(&pdev->dev, "Invalidate num_rx(=%d), fail back to 1\n",
++		dev_warn(&pdev->dev, "Invalid num_rx(=%d), fall back to 1\n",
+ 			*num_rx);
+ 		*num_rx = 1;
+ 		return;
+@@ -2924,8 +2924,8 @@ fec_probe(struct platform_device *pdev)
+ 	const struct of_device_id *of_id;
+ 	static int dev_id;
+ 	struct device_node *np = pdev->dev.of_node, *phy_node;
+-	int num_tx_qs = 1;
+-	int num_rx_qs = 1;
++	int num_tx_qs;
++	int num_rx_qs;
+ 
+ 	of_id = of_match_device(fec_dt_ids, &pdev->dev);
+ 	if (of_id)
 -- 
 1.9.1
