@@ -1,163 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Sep 2014 19:42:18 +0100
-Subject: [PATCH 06/13] arm64: Add new routine read_cpu_properties
-In-Reply-To: <b68073fb2e816f97311b9a3547e3656164ae85d0.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
- <b68073fb2e816f97311b9a3547e3656164ae85d0.1410302383.git.geoff@infradead.org>
-Message-ID: <20140915184217.GA14191@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Sep 2014 19:50:27 +0100
+Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
+In-Reply-To: <20140915184023.GF12361@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
+ <20140915183334.GA30737@arm.com>
+ <20140915184023.GF12361@n2100.arm.linux.org.uk>
+Message-ID: <20140915185027.GC30737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
-
-On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> The kexec re-boot support that will be added in a subsequent patch in this
-> series will need to read the device tree CPU properties, and it is expected
-> that a rework of the SMP spin table code to handle cpu_die will also need this
-> functionality, so add two new common arm64 files cpu-properties.h and
-> cpu-properties.c that define a new structure cpu_properties that hold the
-> various CPU properties from a device tree, and the new routine
-> read_cpu_properties() that fills the structure from a device tree CPU node.
-
-I'm very much not keen on placing all this information in a single
-structure -- that adds a new tight coupling that we didn't have before,
-and it looks like it's going to be painful to maintain.
-
-If kexec uses the existing high-level hotplug infrastructure, it has no
-reason to go anywhere near this information.
-
-So I really don't like this patch.
-
-Why do you think we need this information to be centralized in this way?
-
-Thanks,
-Mark.
-
+On Mon, Sep 15, 2014 at 07:40:23PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 15, 2014 at 07:33:34PM +0100, Will Deacon wrote:
+> > On Fri, Sep 12, 2014 at 11:17:18AM +0100, Wang, Yalin wrote:
+> > > this patch fix the memblock statics for memblock
+> > > in file /sys/kernel/debug/memblock/reserved
+> > > if we don't call memblock_free the initrd will still
+> > > be marked as reserved, even they are freed.
+> > > 
+> > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> > > ---
+> > >  arch/arm64/mm/init.c | 4 +++-
+> > >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > > index 5472c24..34605c8 100644
+> > > --- a/arch/arm64/mm/init.c
+> > > +++ b/arch/arm64/mm/init.c
+> > > @@ -334,8 +334,10 @@ static int keep_initrd;
+> > >  
+> > >  void free_initrd_mem(unsigned long start, unsigned long end)
+> > >  {
+> > > -	if (!keep_initrd)
+> > > +	if (!keep_initrd) {
+> > >  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
+> > > +		memblock_free(__pa(start), end - start);
+> > > +	}
+> > 
+> > I don't think it makes any technical difference, but doing the memblock_free
+> > before the free_reserved_area makes more sense to me.
 > 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/kernel/cpu-properties.c | 58 ++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/cpu-properties.h | 39 +++++++++++++++++++++++++
->  2 files changed, 97 insertions(+)
->  create mode 100644 arch/arm64/kernel/cpu-properties.c
->  create mode 100644 arch/arm64/kernel/cpu-properties.h
+> A better question is... should we even be doing this.  The memblock
+> information is used as a method to bring up the kernel and provide
+> early allocation.  Once the memory is handed over from memblock to
+> the normal kernel page allocators, we no longer care what happens to
+> memblock.
 > 
-> diff --git a/arch/arm64/kernel/cpu-properties.c b/arch/arm64/kernel/cpu-properties.c
-> new file mode 100644
-> index 0000000..e64b34b
-> --- /dev/null
-> +++ b/arch/arm64/kernel/cpu-properties.c
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Copyright (C) Linaro.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "cpu-properties.h"
-> +
-> +int read_cpu_properties(struct cpu_properties *p, const struct device_node *dn)
-> +{
-> +	const u32 *cell;
-> +
-> +	memset(p, 0, sizeof(*p));
-> +	p->hwid = INVALID_HWID;
-> +	p->cpu_release_addr = INVALID_ADDR;
-> +
-> +	cell = of_get_property(dn, "reg", NULL);
-> +
-> +	if (!cell) {
-> +		pr_err("%s: Error: %s: invalid reg property\n",
-> +		       __func__, dn->full_name);
-> +		return -1;
-> +	}
-> +
-> +	p->hwid = of_read_number(cell,
-> +		of_n_addr_cells((struct device_node *)dn)) & MPIDR_HWID_BITMASK;
-> +
-> +	p->enable_method = of_get_property(dn, "enable-method", NULL);
-> +
-> +	if (!p->enable_method) {
-> +		pr_err("%s: Error: %s: invalid enable-method\n",
-> +		       __func__, dn->full_name);
-> +		return -1;
-> +	}
-> +
-> +	if (!strcmp(p->enable_method, "psci")) {
-> +		p->type = cpu_enable_method_psci;
-> +		return 0;
-> +	}
-> +
-> +	if (strcmp(p->enable_method, "spin-table")) {
-> +		p->type = cpu_enable_method_unknown;
-> +		return -1;
-> +	}
-> +
-> +	p->type = cpu_enable_method_spin_table;
-> +
-> +	if (of_property_read_u64(dn, "cpu-release-addr",
-> +				 &p->cpu_release_addr)) {
-> +		pr_err("%s: Error: %s: invalid cpu-return-addr property\n",
-> +		       __func__, dn->full_name);
-> +		return -1;
-> +	}
-> +
-> +	return 0;
-> +}
-> diff --git a/arch/arm64/kernel/cpu-properties.h b/arch/arm64/kernel/cpu-properties.h
-> new file mode 100644
-> index 0000000..b4218ef
-> --- /dev/null
-> +++ b/arch/arm64/kernel/cpu-properties.h
-> @@ -0,0 +1,39 @@
-> +/*
-> + * Copyright (C) Linaro.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#if !defined(__ARM64_CPU_PROPERTIES_H)
-> +#define __ARM64_CPU_PROPERTIES_H
-> +
-> +#include <asm/memory.h>
-> +#include <asm/cputype.h>
-> +
-> +#define INVALID_ADDR UL(~0)
-> +
-> +#if !defined(__ASSEMBLY__)
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +
-> +enum cpu_enable_method {
-> +	cpu_enable_method_unknown,
-> +	cpu_enable_method_psci,
-> +	cpu_enable_method_spin_table,
-> +};
-> +
-> +struct cpu_properties {
-> +	u64 hwid;
-> +	u64 cpu_release_addr;
-> +	const char *enable_method;
-> +	enum cpu_enable_method type;
-> +};
-> +
-> +int read_cpu_properties(struct cpu_properties *p, const struct device_node *dn);
-> +
-> +#endif /* !defined(__ASSEMBLY__) */
-> +
-> +#endif
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> There is no need to free the initrd memory back into memblock.  In
+> fact, seeing the initrd location in /sys/kernel/debug/memblock/reserved
+> can be useful debug information in itself.
+
+That's a fair point. Yang: do you have a specific use-case in mind for this?
+
+I wondered if it might interact with our pfn_valid implementation, which
+uses memblock_is_memory, however memblock_free only deals with the reserved
+regions, so I now I can't see why this change is required either.
+
+Will
