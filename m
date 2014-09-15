@@ -1,78 +1,79 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 15 Sep 2014 15:07:44 -0400 (EDT)
-Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
-In-Reply-To: <20140915114229.GB3037@worktop.localdomain>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
- <20140911161517.GA3190@worktop.ger.corp.intel.com>
- <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
- <20140914194156.GC2832@worktop.localdomain>
- <20140915114229.GB3037@worktop.localdomain>
-Message-ID: <alpine.LFD.2.11.1409151451540.8647@knanqh.ubzr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Sep 2014 20:10:17 +0100
+Subject: [PATCH 09/13] arm64/kexec: Kexec expects cpu_die
+In-Reply-To: <8760d3e11621065a78236e91724875f0e1cfadf4.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <8760d3e11621065a78236e91724875f0e1cfadf4.1410302383.git.geoff@infradead.org>
+Message-ID: <20140915191017.GD14191@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Sep 2014, Peter Zijlstra wrote:
+On Tue, Sep 09, 2014 at 11:49:05PM +0100, Geoff Levand wrote:
+> The arm64 implementation of kexec expects an operational cpu_die method of
+> struct cpu_operations, so add defined(CONFIG_KEXEC) to the preprocessor
+> conditional that enables cpu_die.
 
-> On Sun, Sep 14, 2014 at 09:41:56PM +0200, Peter Zijlstra wrote:
-> > On Thu, Sep 11, 2014 at 07:26:48PM +0200, Vincent Guittot wrote:
-> > > On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
-> 
-> > > > I'm confused about the utilization vs capacity_orig. I see how we should
-> > > 
-> > > 1st point is that I should compare utilization vs capacity and not
-> > > capacity_orig.
-> > > I should have replaced capacity_orig by capacity in the functions
-> > > above when i move the utilization statistic from
-> > > rq->avg.runnable_avg_sum to cfs.usage_load_avg.
-> > > rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
-> > > cfs.usage_load_avg integrates only cfs tasks
-> > > 
-> > > With this change, we don't need sgs->group_capacity_orig anymore but
-> > > only sgs->group_capacity. So sgs->group_capacity_orig can be removed
-> > > as it's no more used in the code as sg_capacity_factor has been
-> > > removed
-> > 
-> > Yes, but.. so I suppose we need to add DVFS accounting and remove
-> > cpufreq from the capacity thing. Otherwise I don't see it make sense.
-> 
-> OK, I've reconsidered _again_, I still don't get it.
-> 
-> So fundamentally I think its wrong to scale with the capacity; it just
-> doesn't make any sense. Consider big.little stuff, their CPUs are
-> inherently asymmetric in capacity, but that doesn't matter one whit for
-> utilization numbers. If a core is fully consumed its fully consumed, no
-> matter how much work it can or can not do.
+I very much do not like this, as I explained in previous postings and my
+comments on other patches in this series.
 
-Let's suppose a task running on a 1GHz CPU producing a load of 100.
+Please use the hotplug infrastructure, and have kexec depend on
+CPU_HOTPLUG || !SMP.
 
-The same task on a 100MHz CPU would produce a load of 1000 because that 
-CPU is 10x slower.  So to properly evaluate the load of a task when 
-moving it around, we want to normalize its load based on the CPU 
-performance.  In this case the correction factor would be 0.1.
+There is no reason for these files to have any knowledge of kexec
+whatsoever.
 
-Given those normalized loads, we need to scale CPU capacity as well.  If 
-the 1GHz CPU can handle 50 of those tasks it has a capacity of 5000.
-
-In theory the 100MHz CPU could handle only 5 of those tasks, meaning it 
-has a normalized capacity of 500, but only if the load metric is already 
-normalized as well.
-
-Or am I completely missing the point here?
-
-
-Nicolas
-
-
-
-
+Thanks,
+Mark
 
 > 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/include/asm/cpu_ops.h | 2 +-
+>  arch/arm64/kernel/psci.c         | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> So the only thing that needs correcting is the fact that these
-> statistics are based on clock_task and some of that time can end up in
-> other scheduling classes, at which point we'll never get 100% even
-> though we're 'saturated'. But correcting for that using capacity doesn't
-> 'work'.
+> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+> index d7b4b38..9fd7281 100644
+> --- a/arch/arm64/include/asm/cpu_ops.h
+> +++ b/arch/arm64/include/asm/cpu_ops.h
+> @@ -50,7 +50,7 @@ struct cpu_operations {
+>  	int		(*cpu_prepare)(unsigned int);
+>  	int		(*cpu_boot)(unsigned int);
+>  	void		(*cpu_postboot)(void);
+> -#ifdef CONFIG_HOTPLUG_CPU
+> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+>  	int		(*cpu_disable)(unsigned int cpu);
+>  	void		(*cpu_die)(unsigned int cpu);
+>  	int		(*cpu_kill)(unsigned int cpu);
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 5539547..81dbbc9 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -380,7 +380,7 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
+>  	return err;
+>  }
+>  
+> -#ifdef CONFIG_HOTPLUG_CPU
+> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+>  static int cpu_psci_cpu_disable(unsigned int cpu)
+>  {
+>  	/* Fail early if we don't have CPU_OFF support */
+> @@ -442,7 +442,7 @@ const struct cpu_operations cpu_psci_ops = {
+>  	.cpu_init	= cpu_psci_cpu_init,
+>  	.cpu_prepare	= cpu_psci_cpu_prepare,
+>  	.cpu_boot	= cpu_psci_cpu_boot,
+> -#ifdef CONFIG_HOTPLUG_CPU
+> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+>  	.cpu_disable	= cpu_psci_cpu_disable,
+>  	.cpu_die	= cpu_psci_cpu_die,
+>  	.cpu_kill	= cpu_psci_cpu_kill,
+> -- 
+> 1.9.1
 > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
