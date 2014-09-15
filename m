@@ -1,34 +1,40 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 15 Sep 2014 16:06:49 +0300
-Subject: [PATCH v3] spi: davinci: add support for adding delay between
- word's transmissions
-In-Reply-To: <20140913160628.GF7960@sirena.org.uk>
-References: <1410536892-22775-1-git-send-email-grygorii.strashko@ti.com>
- <20140913160628.GF7960@sirena.org.uk>
-Message-ID: <5416E469.3020806@ti.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 15 Sep 2014 15:11:30 +0200
+Subject: [PATCH 1/2] ARM: meson: documentation: add timer documentation
+In-Reply-To: <1410786691-30302-1-git-send-email-carlo@caione.org>
+References: <1410786691-30302-1-git-send-email-carlo@caione.org>
+Message-ID: <1410786691-30302-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2014 07:06 PM, Mark Brown wrote:
-> On Fri, Sep 12, 2014 at 06:48:12PM +0300, Grygorii Strashko wrote:
->> From: Murali Karicheri <m-karicheri2@ti.com>
->>
->> This patch adds ability to configure delay between transmission of
->> words over SPI bus if it's required by SPI slave devices.
-> 
-> This is fine but it doesn't appear to apply against current code.  Can
-> you please check and resend?
-> 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ .../devicetree/bindings/timer/amlogic,meson6-timer.txt   | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
 
-This one should be applied without conflicts on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git
-branch: for-next
-
-since you've applied the patch:
-"[PATCH] spi: davinci: request cs_gpio's from probe"
-http://www.spinics.net/lists/linux-spi/msg01811.html
-
-I have to mention about this dependency, sorry for that.
-
-Regards,
--grygorii
+diff --git a/Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt b/Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+new file mode 100644
+index 0000000..d79be27
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+@@ -0,0 +1,16 @@
++Amlogic Meson6 SoCs Timer Controller
++
++Required properties:
++
++- compatible : should be "amlogic,meson6-timer"
++- reg : Specifies base physical address and size of the registers.
++- interrupts : The interrupt of the first timer
++
++Example:
++
++timer at c1109940 {
++	compatible = "amlogic,meson6-timer";
++	reg = <0xc1109940 0x14>;
++	interrupts = <0 10 1>;
++};
++
+-- 
+1.9.1
