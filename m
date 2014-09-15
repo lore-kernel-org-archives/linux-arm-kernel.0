@@ -1,112 +1,37 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 15 Sep 2014 12:30:53 -0700
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <54172B3F.9030901@wwwdotorg.org>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
- <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
- <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
- <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
- <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
- <54172B3F.9030901@wwwdotorg.org>
-Message-ID: <CAL1qeaEK=C4j+G5CA_91xJNe25d=-y47EyZAYnaMh46fNYVDAw@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 15 Sep 2014 15:35:45 -0400 (EDT)
+Subject: [PATCH v3 5/9] net: pxa168_eth: get and set the mac address on
+ the Ethernet controller
+In-Reply-To: <1410789713-15341-6-git-send-email-antoine.tenart@free-electrons.com>
+References: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1410789713-15341-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140915.153545.2175311588825407387.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 11:09 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/15/2014 11:06 AM, Andrew Bresticker wrote:
->>
->> On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net>
->> wrote:
->>>
->>> On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org>
->>> wrote:
->>>>
->>>> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net>
->>>> wrote:
->>>>>
->>>>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org>
->>>>> wrote:
->>>>>>
->>>>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net>
->>>>>> wrote:
->>>>>>>
->>>>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org>
->>>>>>> wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>>>>> recently posted by Andrew Chew [2].
->>>>>>>
->>>>>>>
->>>>>>> I have had mixed results when testing this on a Jetson TK1 board. Of
->>>>>>> 8
->>>>>>> USB devices I tested with, about half where probed correctly, but the
->>>>>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>>>>>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>>>>>
->>>>>>> I don't see any correlation between the failure and the kind of usb
->>>>>>> device, but I don't have much experience with USB implementations
->>>>>>> either.
->>>>>>
->>>>>>
->>>>>> Hmm... I haven't seen that before.  Which particular devices were you
->>>>>> using?
->>>>>
->>>>>
->>>>> Here they are:
->>>>>
->>>>> work:
->>>>>
->>>>> Genius keyboard: 05d5:6782
->>>>> Logitech mouse: 046d:c06a
->>>>> Denver MP3 player: 10d6:1100
->>>>> Atheros Bluetooth dongle: 0cf3:3005
->>>>>
->>>>> don't work:
->>>>>
->>>>> MCS7830 ethernet dongle: 9710:7830
->>>>> Genesys Logic hub: 05e3:0608
->>>>
->>>>
->>>> I tried the hub and it works just fine for me... Have you tried this
->>>> on any other boards like Big or Blaze?
->>>
->>>
->>> I have a Blaze here, but haven't been able to get the external ports
->>> to power up. I don't have schematics nor a strong interest to get that
->>> fixed myself, as I can test my code just fine with the Blaze's
->>> internal camera and the devices that do work on the Jetson.
->>
->>
->> Ok, since Blaze has been announced, hopefully we can post a
->> device-tree for it soon.
->>
->>> I'm using the firmware file that was posted recently:
->>>
->>> xhci-tegra 70090000.usb: Firmware timestamp: 2014-05-02 02:22:50 UTC,
->>> Falcon state 0x20
->>
->>
->> Yup, I'm using the same firmware.
->>
->>> If things work for you with the same sources, .config and firmware, I
->>> can only think of the hw being different (other hw revision?).
->>
->>
->> That, or perhaps bootloader differences?  I'm using mainline U-Boot.
->>
->> Stephen, Thierry, have either of you had a chance to test this series?
->
->
-> I haven't had a chance to yet. I just went to try it out, and found that it
-> depends on a whole slew of other patches that I don't have. Is there a git
-> branch somewhere to save me having to track down all the dependencies?
+From: Antoine Tenart <antoine.tenart@free-electrons.com>
+Date: Mon, 15 Sep 2014 16:01:49 +0200
 
-Yes, Tomeu has the branch he used for testing here:
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=3.17rc4-xhci
+> +static void pxa168_eth_get_mac_address(struct net_device *dev,
+> +				       unsigned char *addr)
+> +{
+> +	struct pxa168_eth_private *pep = netdev_priv(dev);
+> +	unsigned int mac_h = rdl(pep, MAC_ADDR_HIGH);
+> +	unsigned int mac_l = rdl(pep, MAC_ADDR_LOW);
+> +
+> +	addr[0] = (mac_h >> 24) & 0xff;
+> +	addr[1] = (mac_h >> 16) & 0xff;
+> +	addr[2] = (mac_h >> 8) & 0xff;
+> +	addr[3] = mac_h & 0xff;
+> +	addr[4] = (mac_l >> 8) & 0xff;
+> +	addr[5] = mac_l & 0xff;
+> +}
 
-You'll also need the firmware Andrew Chew posted:
-https://patchwork.ozlabs.org/patch/384013/
+This function is not used in this patch and thus will result in a compile
+warning.
+
+The tree must be fully functional and compile with no new warnings after
+each patch in a patch series.
+
+Therefore you must add this new function in the first patch which actually
+makes use of the new function.
