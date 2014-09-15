@@ -1,50 +1,62 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 15 Sep 2014 22:48:05 +0800
-Subject: [PATCH V1 1/3] ARM: clk-imx6sl: refine clock tree for SSI
-In-Reply-To: <20140915115855.GC23877@audiosh1>
-References: <cover.1410253534.git.shengjiu.wang@freescale.com>
- <7ed21195ebff8b3ccbecaeb492504edd28deea2d.1410253534.git.shengjiu.wang@freescale.com>
- <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
- <CAOMZO5DJZHKAV4Y9aUwMNWZqhoLrKrsZdYnKqPem2ZSy=-oAYw@mail.gmail.com>
- <20140915115855.GC23877@audiosh1>
-Message-ID: <20140915144803.GL18566@dragon>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 15 Sep 2014 16:50:20 +0200
+Subject: [PATCH v4 0/2] new Atmel DMA controller
+Message-ID: <1410792622-22621-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 07:58:56PM +0800, Shengjiu Wang wrote:
-> I add IMX6QDL_CLK_SSIx in this patch, which use share count with 
-> IMX6QDL_CLK_SSIx_IPG. The SSI driver sound/soc/fsl/fsl_ssi.c will enable
-> IMX6QDL_CLK_SSIx_IPG clock in probe, but don't disable it. In the end of kernel
-> boot up, some one(it is not ssi driver, maybe is the clock tree) will disable
-> the IMX6QDL_CLK_SSIx clock, which is not enabled. IMX6QDL_CLK_SSIx_IPG share
-> the enable/disable bit with IMX6QDL_CLK_SSIx, So IMX6QDL_CLK_SSIx_IPG is 
-> disabled, the aplay will fail.
-> 
-> Is this the issue of imx_clk_gate2_shared()? When we want to disable IMX6QDL_CLK_SSIx,
-> but IMX6QDL_CLK_SSIx_IPG is enabled, can IMX6QDL_CLK_SSIx be disabled?
-> 
-> 
-> Shawn
-> 
->    How do you think about this?
+Hi,
 
-Shengjiu,
+This set of patches introduces support for the new Atmel DMA controller know as
+XDMAC and available on SAMA5D4.
 
-Your analysis is right.  I hope the following change will get the shared
-gate clock code eventually does the right thing.
+Driver updated according to Vinod's comments.
 
-Shawn
+Still wondering if a new binding is needed or not. It's very close to hdma
+binding, the only change is the content of the second cell.
 
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index 84acdfd1d715..89abdf738dc9 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -97,7 +97,7 @@ static int clk_gate2_is_enabled(struct clk_hw *hw)
-        struct clk_gate2 *gate = to_clk_gate2(hw);
+Changes from:
+- v3
+  - use dma_get_any_slave_channel instead of dma_request_channel
+  - fix tx_status behavior for non active transfers
+  - rename at_xdmac_terminate_xfer
+  - replace suspend/resume no irq variants by late/early variants
+  - no more use dev res to request the irq, use the legacy way
+  - add slave capabilities
+- v2
+  - documentation updated
+  - fix locking issues
+- v1
+  - add power management stuff
+  - check maxburst value
+  - revert subsys_initcall remove, EPROBE_DEFER not yet available on the kernel
+  version I use to do the tests, moreover other devices are not ready to use it
+- RFC:
+  - DMA_SUCCESS replaced by DMA_COMPLETE
+  - fix memcpy issue caused by a mistake in interfaces used
+  - add filter function
+  - remove some parameters from device tree since we can get them through the
+  dma slave configuration
+  - use readl/writel relaxed
+  - remove subsys_initcall
+  - synchronize irq before killing tasklets
+  - use BIT macro
+  - misc cleanup
 
-        if (gate->share_count)
--               return !!(*gate->share_count);
-+               return !!__clk_get_enable_count(hw->clk);
-        else
-                return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
- }
+Ludovic Desroches (2):
+  dma: at_xdmac: creation of the atmel eXtended DMA Controller driver
+  ARM: dts: at_xdmac: add bindings documentation
+
+ .../devicetree/bindings/dma/atmel-xdma.txt         |   48 +
+ drivers/dma/Kconfig                                |    7 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/at_xdmac.c                             | 1210 ++++++++++++++++++++
+ drivers/dma/at_xdmac.h                             |  308 +++++
+ include/dt-bindings/dma/at91.h                     |   25 +
+ 6 files changed, 1599 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+ create mode 100644 drivers/dma/at_xdmac.c
+ create mode 100644 drivers/dma/at_xdmac.h
+
+-- 
+2.0.3
