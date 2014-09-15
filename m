@@ -1,182 +1,49 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Mon, 15 Sep 2014 13:38:52 +0200
-Subject: [PATCH v2] spi: pl022: Add support for chip select extension
-Message-ID: <1410781132-16223-1-git-send-email-anders.berg@avagotech.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 15 Sep 2014 13:42:29 +0200
+Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
+In-Reply-To: <20140914194156.GC2832@worktop.localdomain>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
+ <20140911161517.GA3190@worktop.ger.corp.intel.com>
+ <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+ <20140914194156.GC2832@worktop.localdomain>
+Message-ID: <20140915114229.GB3037@worktop.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for a extended PL022 which has an extra register for controlling up
-to five chip select signals. This controller is found on the AXM5516 SoC.
-Unfortunately the PrimeCell identification registers are identical to a
-standard ARM PL022. To work around this, the peripheral ID must be overridden
-in the device tree using the "arm,primecell-periphid" property with the value
-0x000b6022.
+On Sun, Sep 14, 2014 at 09:41:56PM +0200, Peter Zijlstra wrote:
+> On Thu, Sep 11, 2014 at 07:26:48PM +0200, Vincent Guittot wrote:
+> > On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
 
-Signed-off-by: Anders Berg <anders.berg@avagotech.com>
----
-Changelog:
+> > > I'm confused about the utilization vs capacity_orig. I see how we should
+> > 
+> > 1st point is that I should compare utilization vs capacity and not
+> > capacity_orig.
+> > I should have replaced capacity_orig by capacity in the functions
+> > above when i move the utilization statistic from
+> > rq->avg.runnable_avg_sum to cfs.usage_load_avg.
+> > rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
+> > cfs.usage_load_avg integrates only cfs tasks
+> > 
+> > With this change, we don't need sgs->group_capacity_orig anymore but
+> > only sgs->group_capacity. So sgs->group_capacity_orig can be removed
+> > as it's no more used in the code as sg_capacity_factor has been
+> > removed
+> 
+> Yes, but.. so I suppose we need to add DVFS accounting and remove
+> cpufreq from the capacity thing. Otherwise I don't see it make sense.
 
-v2:
-    - added constant to <linux/amba/bus.h>
+OK, I've reconsidered _again_, I still don't get it.
 
- drivers/spi/spi-pl022.c  | 59 +++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/amba/bus.h |  5 ++++
- 2 files changed, 63 insertions(+), 1 deletion(-)
+So fundamentally I think its wrong to scale with the capacity; it just
+doesn't make any sense. Consider big.little stuff, their CPUs are
+inherently asymmetric in capacity, but that doesn't matter one whit for
+utilization numbers. If a core is fully consumed its fully consumed, no
+matter how much work it can or can not do.
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 1189cfd..b395489 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -82,6 +82,7 @@
- #define SSP_MIS(r)	(r + 0x01C)
- #define SSP_ICR(r)	(r + 0x020)
- #define SSP_DMACR(r)	(r + 0x024)
-+#define SSP_CSR(r)	(r + 0x030) /* vendor extension */
- #define SSP_ITCR(r)	(r + 0x080)
- #define SSP_ITIP(r)	(r + 0x084)
- #define SSP_ITOP(r)	(r + 0x088)
-@@ -198,6 +199,12 @@
- #define SSP_DMACR_MASK_TXDMAE		(0x1UL << 1)
- 
- /*
-+ * SSP Chip Select Control Register - SSP_CSR
-+ * (vendor extension)
-+ */
-+#define SSP_CSR_CSVALUE_MASK		(0x1FUL << 0)
-+
-+/*
-  * SSP Integration Test control Register - SSP_ITCR
-  */
- #define SSP_ITCR_MASK_ITEN		(0x1UL << 0)
-@@ -313,6 +320,7 @@ enum ssp_writing {
-  * @extended_cr: 32 bit wide control register 0 with extra
-  * features and extra features in CR1 as found in the ST variants
-  * @pl023: supports a subset of the ST extensions called "PL023"
-+ * @internal_cs_ctrl: supports chip select control register
-  */
- struct vendor_data {
- 	int fifodepth;
-@@ -321,6 +329,7 @@ struct vendor_data {
- 	bool extended_cr;
- 	bool pl023;
- 	bool loopback;
-+	bool internal_cs_ctrl;
- };
- 
- /**
-@@ -440,9 +449,32 @@ static void null_cs_control(u32 command)
- 	pr_debug("pl022: dummy chip select control, CS=0x%x\n", command);
- }
- 
-+/**
-+ * internal_cs_control - Control chip select signals via SSP_CSR.
-+ * @pl022: SSP driver private data structure
-+ * @command: select/delect the chip
-+ *
-+ * Used on controller with internal chip select control via SSP_CSR register
-+ * (vendor extension). Each of the 5 LSB in the register controls one chip
-+ * select signal.
-+ */
-+static void internal_cs_control(struct pl022 *pl022, u32 command)
-+{
-+	u32 tmp;
-+
-+	tmp = readw(SSP_CSR(pl022->virtbase));
-+	if (command == SSP_CHIP_SELECT)
-+		tmp &= ~BIT(pl022->cur_cs);
-+	else
-+		tmp |= BIT(pl022->cur_cs);
-+	writew(tmp, SSP_CSR(pl022->virtbase));
-+}
-+
- static void pl022_cs_control(struct pl022 *pl022, u32 command)
- {
--	if (gpio_is_valid(pl022->cur_cs))
-+	if (pl022->vendor->internal_cs_ctrl)
-+		internal_cs_control(pl022, command);
-+	else if (gpio_is_valid(pl022->cur_cs))
- 		gpio_set_value(pl022->cur_cs, command);
- 	else
- 		pl022->cur_chip->cs_control(command);
-@@ -2118,6 +2150,9 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (platform_info->num_chipselect && platform_info->chipselects) {
- 		for (i = 0; i < num_cs; i++)
- 			pl022->chipselects[i] = platform_info->chipselects[i];
-+	} else if (pl022->vendor->internal_cs_ctrl) {
-+		for (i = 0; i < num_cs; i++)
-+			pl022->chipselects[i] = i;
- 	} else if (IS_ENABLED(CONFIG_OF)) {
- 		for (i = 0; i < num_cs; i++) {
- 			int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
-@@ -2347,6 +2382,7 @@ static struct vendor_data vendor_arm = {
- 	.extended_cr = false,
- 	.pl023 = false,
- 	.loopback = true,
-+	.internal_cs_ctrl = false,
- };
- 
- static struct vendor_data vendor_st = {
-@@ -2356,6 +2392,7 @@ static struct vendor_data vendor_st = {
- 	.extended_cr = true,
- 	.pl023 = false,
- 	.loopback = true,
-+	.internal_cs_ctrl = false,
- };
- 
- static struct vendor_data vendor_st_pl023 = {
-@@ -2365,6 +2402,17 @@ static struct vendor_data vendor_st_pl023 = {
- 	.extended_cr = true,
- 	.pl023 = true,
- 	.loopback = false,
-+	.internal_cs_ctrl = false,
-+};
-+
-+static struct vendor_data vendor_lsi = {
-+	.fifodepth = 8,
-+	.max_bpw = 16,
-+	.unidir = false,
-+	.extended_cr = false,
-+	.pl023 = false,
-+	.loopback = true,
-+	.internal_cs_ctrl = true,
- };
- 
- static struct amba_id pl022_ids[] = {
-@@ -2398,6 +2446,15 @@ static struct amba_id pl022_ids[] = {
- 		.mask	= 0xffffffff,
- 		.data	= &vendor_st_pl023,
- 	},
-+	{
-+		/*
-+		 * PL022 variant that has a chip select control register whih
-+		 * allows control of 5 output signals nCS[0:4].
-+		 */
-+		.id	= 0x000b6022,
-+		.mask	= 0x000fffff,
-+		.data	= &vendor_lsi,
-+	},
- 	{ 0, 0 },
- };
- 
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index fdd7e1b..c324f57 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -44,10 +44,15 @@ struct amba_driver {
- 	const struct amba_id	*id_table;
- };
- 
-+/*
-+ * Constants for the designer field of the Peripheral ID register. When bit 7
-+ * is set to '1', bits [6:0] should be the JEP106 manufacturer identity code.
-+ */
- enum amba_vendor {
- 	AMBA_VENDOR_ARM = 0x41,
- 	AMBA_VENDOR_ST = 0x80,
- 	AMBA_VENDOR_QCOM = 0x51,
-+	AMBA_VENDOR_LSI = 0xb6,
- };
- 
- extern struct bus_type amba_bustype;
--- 
-1.9.1
+
+So the only thing that needs correcting is the fact that these
+statistics are based on clock_task and some of that time can end up in
+other scheduling classes, at which point we'll never get 100% even
+though we're 'saturated'. But correcting for that using capacity doesn't
+'work'.
