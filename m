@@ -1,47 +1,25 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 15 Sep 2014 09:31:16 +0200
-Subject: [Patch v4 net-next 12/12] ARM: dts: imx6sx: add multi-queue
- support enet
-In-Reply-To: <1410555657-10744-13-git-send-email-Frank.Li@freescale.com>
-References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
- <1410555657-10744-13-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20140915093116.3a9b7cb0@ipc1.ka-ro>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 14 Sep 2014 23:16:32 -0700
+Subject: [PATCH v4 01/18] ARM64: Move the init of cpu_logical_map(0)
+ before unflatten_device_tree()
+In-Reply-To: <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140915061632.GA26649@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
+On Fri, Sep 12, 2014 at 09:59:59PM +0800, Hanjun Guo wrote:
+> It always make sense to initialize CPU0's logical map entry from the
+> hardware values, so move the initialization of cpu_logical_map(0)
+> before unflatten_device_tree() which is needed by ACPI code later.
 > 
-> Enable 3 queues suppport for ethernet
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6sx.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index f4b9da6..0a03260 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -776,6 +776,8 @@
->  					 <&clks IMX6SX_CLK_ENET_PTP>;
->  				clock-names = "ipg", "ahb", "ptp",
->  					      "enet_clk_ref", "enet_out";
-> +				fsl,num-tx-queues=<3>;
-> +				fsl,num-rx-queues=<3>;
-missing spaces around '='
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Acked-by: Olof Johansson <olof@lixom.net>
+
+With or without needs for ACPI, I don't think there's any reason for
+this code to not go in now.
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+-Olof
