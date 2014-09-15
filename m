@@ -1,39 +1,50 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 15 Sep 2014 12:32:05 -0400
-Subject: "dma-coherent" property inheritance (arm vs arm64)
-In-Reply-To: <20140915155216.GG5415@arm.com>
-References: <5414FF8F.5040409@redhat.com> <20140915155216.GG5415@arm.com>
-Message-ID: <54171485.5010803@redhat.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 15 Sep 2014 18:34:34 +0200
+Subject: [PATCH v8 6/9] arm: netx: Migrate DEBUG_LL macros to shared
+ directory
+In-Reply-To: <1408459715-10151-7-git-send-email-daniel.thompson@linaro.org>
+References: <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
+ <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
+ <1408459715-10151-7-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1410798874.31130.57.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 11:52 AM, Catalin Marinas wrote:
-> Hi Jon,
+On Tue, 2014-08-19 at 15:48 +0100, Daniel Thompson wrote:
+> As part of the migration we introduce DEBUG_UART_PHYS/DEBUG_UART_VIRT
+> which default to UART1 but allow a user to configure UART2 or UART3.
+> We also introduce symbolic names for the registers and flags.
 > 
-> On Sun, Sep 14, 2014 at 03:38:07AM +0100, Jon Masters wrote:
->> commit 6ecba8eb51b7d23fda66388a5420be7d8688b186
->> Author: Catalin Marinas <catalin.marinas@arm.com>
->> Date:   Fri Apr 25 15:31:45 2014 +0100
->>
->>     arm64: Use bus notifiers to set per-device coherent DMA ops
->>
->> Thus at this point, on 32-bit systems, we have defined this function:
->>
->> 	set_arch_dma_coherent_ops
-> 
-> It was a timing issue that they are not in sync. I would have used
-> set_arch_dma_coherent_ops() but it wasn't very clear when it gets merged
-> and changing the default on arm64 broke some other assumptions, so a
-> temporary fix.
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Acked-by: Arnd Bergmann <arnd.bergmann@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Ok. So arm64 will automatically switch over to set_arch_dma_coherent_ops
-(once it's there, it will be called automatically anyway because it's in
-the callchain anyway already).
+This patch landed in today's linux-next, as 880fa9b6fd73 ("ARM: 8144/1:
+netx: Migrate DEBUG_LL macros to shared directory").
 
-For the moment, on our internal PCI trees, we'll add a notifier and wait
-for upstream to get PCI support and figure this out as part of that
-activity. In the case of ACPI, I'm still pushing for _CCA methods to be
-added by default because it makes sense to be verbose in describing
-platform hardware devices, even in spite of default.
+> [...]
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -447,6 +447,14 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  on Vybrid based platforms.
+>  
+> +	config DEBUG_NETX_UART
+> +		bool "Kernel low-level debugging messages via NetX UART"
+> +		depends on ARCH_NETX
+> +		select DEBUG_UART_NETX
 
-Jon.
+There's no Kconfig symbol DEBUG_UART_NETX in next-20140915. So in
+linux-next this is currently a nop. Is this symbol queued somewhere?
+
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on Hilscher NetX based platforms.
+> +
+>  	config DEBUG_NOMADIK_UART
+>  		bool "Kernel low-level debugging messages via NOMADIK UART"
+>  		depends on ARCH_NOMADIK
+
+
+Paul Bolle
