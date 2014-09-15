@@ -1,66 +1,71 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 15 Sep 2014 20:15:41 +0100
-Subject: [PATCH v5 09/12] sched: add usage_load_avg
-In-Reply-To: <1409051215-16788-10-git-send-email-vincent.guittot@linaro.org>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-10-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140915191541.GA28083@e103687>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Sep 2014 20:20:21 +0100
+Subject: [PATCH 10/13] arm64/kexec: Revert change to machine_shutdown()
+In-Reply-To: <de2fda64cc5eebcf96d9d845b185c6382c900ac3.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <de2fda64cc5eebcf96d9d845b185c6382c900ac3.1410302383.git.geoff@infradead.org>
+Message-ID: <20140915192020.GE14191@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 12:06:52PM +0100, Vincent Guittot wrote:
-> Add new statistics which reflect the average time a task is running on the
-> CPU and the sum of the tasks' running on a runqueue. The latter is named
-> usage_avg_contrib.
+Hi Geoff,
+
+On Tue, Sep 09, 2014 at 11:49:05PM +0100, Geoff Levand wrote:
+> Commit 90f51a09ef83 ("arm64: Fix machine_shutdown() definition") changed the
+> implementation of machine_shutdown() from calling smp_send_stop() to
+> calling disable_nonboot_cpus().  Revert that part of the commit so that
+> machine_shutdown() once again calls smp_send_stop().
+
+I don't think this is the right way to go. I think we should be using
+the hotplug infrastructure (i.e. disable_nonboot_cpus()) rather than
+rolling our own, and we should be paying attention to the return value.
+
+So as far as I can tell, disable_nonboot_cpus is the right thing to
+call, but machine_shutdown is the wrong place to call it (due to not
+returning an error code). We need to call it when we can still abort the
+kexec.
+
+Mark.
+ 
+> With the application of another patch in this series, (arm64: Use cpu_ops for
+> smp_stop), smp_send_stop() will do the correct thing for a kexec reboot. This
+> change also corrects the source code comment for the machine_shutdown() routine.
 > 
-> This patch is based on the usage metric that was proposed in the 1st
-> versions of the per-entity load tracking patchset but that has be removed
-> afterward. This version differs from the original one in the sense that it's
-> not linked to task_group.
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/process.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> The rq's usage_avg_contrib will be used to check if a rq is overloaded or not
-> instead of trying to compute how many task a group of CPUs can handle
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 0a3414b..cd0ae9d 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -101,15 +101,12 @@ void arch_cpu_idle_dead(void)
+>  /*
+>   * Called by kexec, immediately prior to machine_kexec().
+>   *
+> - * This must completely disable all secondary CPUs; simply causing those CPUs
+> - * to execute e.g. a RAM-based pin loop is not sufficient. This allows the
+> - * kexec'd kernel to use any and all RAM as it sees fit, without having to
+> - * avoid any code or data used by any SW CPU pin loop. The CPU hotplug
+> - * functionality embodied in disable_nonboot_cpus() to achieve this.
+> + * This must shutdown all secondary CPUs.  The functionality
+> + * embodied in smp_send_stop() will achieve this.
+>   */
+>  void machine_shutdown(void)
+>  {
+> -	disable_nonboot_cpus();
+> +	smp_send_stop();
+>  }
+>  
+>  /*
+> -- 
+> 1.9.1
 > 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-
-I should have read this patch before I did almost the same patch for as
-part a series to introduce scale-invariance which I am about to post :(
-
-The only difference I see is slightly different naming and that, AFAICT,
-task group usage is not accounted for in this patch. Can we add the
-support for task groups as well? I can provide a patch based on this one
-if you want.
-
-Also, since more than half this patch comes directly from PJT's original
-patch I would add "by Paul Turner <pjt@google.com>" somewhere in the
-text above.
-
-[...]
-
-> +static inline void __update_task_entity_usage(struct sched_entity *se)
-> +{
-> +	u32 contrib;
-> +
-> +	/* avoid overflowing a 32-bit type w/ SCHED_LOAD_SCALE */
-> +	contrib = se->avg.running_avg_sum * scale_load_down(SCHED_LOAD_SCALE);
-> +	contrib /= (se->avg.runnable_avg_period + 1);
-> +	se->avg.usage_avg_contrib = scale_load(contrib);
-> +}
-> +
-> +static long __update_entity_usage_avg_contrib(struct sched_entity *se)
-> +{
-> +	long old_contrib = se->avg.usage_avg_contrib;
-> +
-> +	if (entity_is_task(se))
-> +		__update_task_entity_usage(se);
-
-Groups are never updated?
-
-As said above. I have code that does it.
-
-Morten
-
-> +
-> +	return se->avg.usage_avg_contrib - old_contrib;
-> +}
-> +
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
