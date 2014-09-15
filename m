@@ -1,35 +1,45 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 15 Sep 2014 10:52:50 -0700
-Subject: [PATCH v4 10/18] ACPI / table: Print GIC information when MADT
- is parsed
-In-Reply-To: <20140915064010.GD26649@localhost>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-11-git-send-email-hanjun.guo@linaro.org>
- <20140915064010.GD26649@localhost>
-Message-ID: <20140915175250.8177DC40A42@trevor.secretlab.ca>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 15 Sep 2014 12:55:58 -0500
+Subject: [PATCH] Input: palmas-pwrbutton: Fix IRQ flags for using threaded
+ handler alone.
+Message-ID: <1410803758-26906-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 14 Sep 2014 23:40:10 -0700, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Sep 12, 2014 at 10:00:08PM +0800, Hanjun Guo wrote:
-> > When MADT is parsed, print GIC information to make the boot
-> > log look pretty.
-> 
-> If you do this for prettiness, having an example output in the commit
-> message would be a nice touch.
+make C=2 CHECK="scripts/coccicheck" MODE=report COCCI=scripts/coccinelle/misc/irqf_oneshot.cocci ./drivers/input/misc/palmas-pwrbutton.o
+Reports:
+drivers/input/misc/palmas-pwrbutton.c:213:9-29: ERROR: Threaded IRQ with no primary handler requested without IRQF_ONESHOT
 
-Agreed.
+Palmas powerbutton just needs threaded IRQ handler since I2C
+operations are involved and there is nothing in non-threaded primary
+handler we could do.
 
-> The question is why it's needed though? Do we really need all this verbose
-> information in dmesg when it could be found out in other ways instead?
-> 
-> x86 is notoriously verbose in some of these aspects, I'm not sure it's
-> something we need to mimic here?
+So mark the request with ONESHOT as it should have been done in these
+cases.
 
-For consistency, it does make sense to have the common x86 and ARM64
-code outputing information in the same way, so I think the patch still
-makes sense. All of them could be moved to KERN_DEBUG as a separate
-patch if we want to cull early boot output. I would split that off and
-discuss it separately.
+Cc: Julia Lawal <julia.lawall@lip6.fr>
+Cc: Dan Carpenter <dan.carpenter@oracle.com>
+Fixes: adff5962fdd2 ("Input: introduce palmas-pwrbutton")
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ drivers/input/misc/palmas-pwrbutton.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-g.
+diff --git a/drivers/input/misc/palmas-pwrbutton.c b/drivers/input/misc/palmas-pwrbutton.c
+index 4ed6f78..c0c4636 100644
+--- a/drivers/input/misc/palmas-pwrbutton.c
++++ b/drivers/input/misc/palmas-pwrbutton.c
+@@ -211,8 +211,8 @@ static int palmas_pwron_probe(struct platform_device *pdev)
+ 
+ 	pwron->irq = platform_get_irq(pdev, 0);
+ 	error = request_threaded_irq(pwron->irq, NULL, pwron_irq,
+-				     IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW,
+-				     dev_name(dev), pwron);
++				     IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW |
++				     IRQF_ONESHOT, dev_name(dev), pwron);
+ 	if (error) {
+ 		dev_err(dev, "Can't get IRQ for pwron: %d\n", error);
+ 		goto err_free_input;
+-- 
+1.7.9.5
