@@ -1,63 +1,85 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 15 Sep 2014 15:34:03 +0200
-Subject: [PATCH v2 0/9] Zynq PM updates
-In-Reply-To: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <c64f6993-2f83-455e-b542-4c78eb39906f@BL2FFO11FD031.protection.gbl>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Mon, 15 Sep 2014 15:52:40 +0200
+Subject: [PATCH arm64-next v2] net: bpf: arm64: address randomize and
+ write protect JIT code
+In-Reply-To: <CABg9mcv6cSXZLPNH3Dvhr6XatA33VAPwgHyKgQ35f0DSmsObRQ@mail.gmail.com>
+References: <1410543308-27449-1-git-send-email-dborkman@redhat.com>
+ <CABg9mcv6cSXZLPNH3Dvhr6XatA33VAPwgHyKgQ35f0DSmsObRQ@mail.gmail.com>
+Message-ID: <5416EF28.8020900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2014 11:19 PM, Soren Brinkmann wrote:
-> Hi all,
-> 
-> here is v2 of this series. It's mostly the same and most changes are
-> related to reformatting comments. The only functional change is in 'ARM:
-> zynq: PM: Enable DDR clock stop' which does no longer enable
-> self-refresh too. It seems self-refresh is inflicting a non-negligible
-> amount of latency that degrades memory performance if enabled throughout
-> the whole run time.
-> 
-> 	Thanks,
-> 	S?ren
-> 
-> Daniel Lezcano (2):
->   ARM: zynq: Remove invalidate cache for cpu die
->   ARM: zynq: cpuidle: Remove pointless code
-> 
-> Soren Brinkmann (7):
->   ARM: zynq: PM: Enable A9 internal clock gating feature
->   Documentation: devicetree: Add binding for Synopsys DDR controller
->   ARM: zynq: DT: Add DDRC node
->   ARM: zynq: PM: Enable DDR clock stop
->   ARM: zynq: Synchronise zynq_cpu_die/kill
->   ARM: zynq: Remove hotplug.c
->   ARM: zynq: Rename 'zynq_platform_cpu_die'
-> 
->  .../bindings/memory-controllers/synopsys.txt       | 11 +++
->  arch/arm/boot/dts/zynq-7000.dtsi                   |  5 ++
->  arch/arm/mach-zynq/Makefile                        |  3 +-
->  arch/arm/mach-zynq/common.c                        |  7 ++
->  arch/arm/mach-zynq/common.h                        | 16 ++++-
->  arch/arm/mach-zynq/hotplug.c                       | 47 +-----------
->  arch/arm/mach-zynq/platsmp.c                       | 41 ++++++++++-
->  arch/arm/mach-zynq/pm.c                            | 83 ++++++++++++++++++++++
->  arch/arm/mach-zynq/slcr.c                          | 43 ++++++++++-
->  drivers/cpuidle/cpuidle-zynq.c                     | 10 +--
->  10 files changed, 205 insertions(+), 61 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/synopsys.txt
->  create mode 100644 arch/arm/mach-zynq/pm.c
-> 
+On 09/13/2014 06:32 AM, Z Lim wrote:
+> On Fri, Sep 12, 2014 at 10:35 AM, Daniel Borkmann <dborkman@redhat.com> wrote:
+>> This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
+>> jit against spraying attacks").
+>>
+>> Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
+>> support") which added necessary infrastructure, we can now implement
+>> RO marking of eBPF generated JIT image pages and randomize start offset
+>> for the JIT code, so that it does not reside directly on a page boundary
+>> anymore. Likewise, the holes are filled with illegal instructions.
+>>
+>> This is basically the ARM64 variant of what we already have in ARM via
+>> commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
+>> JIT code"). Moreover, this commit also presents a merge resolution due to
+>> conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
+>> read-only") as we don't use kfree() in bpf_jit_free() anymore to release
+>> the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
+>> a different allocator.
+>>
+>> JIT tested on aarch64 with BPF test suite.
+>>
+>> Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
+>> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+>> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: David S. Miller <davem@davemloft.net>
+>> Cc: Alexei Starovoitov <ast@plumgrid.com>
+>> ---
+>>   v1 -> v2:
+>>    - Use brk insn as suggested by Catalin, thanks a lot for
+>>      your feedback! Rest unchanged.
+>>   Note:
+>>    - This patch depends on net-next being merged to mainline due
+>>      to the mentioned merge conflict.
+>>
+>>   arch/arm64/net/bpf_jit_comp.c | 38 +++++++++++++++++++++++++++++---------
+>>   1 file changed, 29 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+>> index 7ae3354..4b71779 100644
+>> --- a/arch/arm64/net/bpf_jit_comp.c
+>> +++ b/arch/arm64/net/bpf_jit_comp.c
+>> @@ -19,7 +19,6 @@
+>>   #define pr_fmt(fmt) "bpf_jit: " fmt
+>>
+>>   #include <linux/filter.h>
+>> -#include <linux/moduleloader.h>
+>>   #include <linux/printk.h>
+>>   #include <linux/skbuff.h>
+>>   #include <linux/slab.h>
+>> @@ -119,6 +118,15 @@ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
+>>          return to - from;
+>>   }
+>>
+>> +static void jit_fill_hole(void *area, unsigned int size)
+>> +{
+>> +       /* We use brk #0x100 to trigger a fault. */
+>> +       u32 *ptr, fill_ins = 0xd4202000;
+>
+> Missed this on first round of review, I think we also need
+> cpu_to_le32(...) here.
 
-Applied all.
+Just wondering ... so that would also hold true in case I build/run my
+kernel in big-endian (CPU_BIG_ENDIAN)?
 
-Thanks,
-Michal
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/44223b5e/attachment.sig>
+>> +       /* We are guaranteed to have aligned memory. */
+>> +       for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
+>> +               *ptr++ = fill_ins;
+>> +}
+>> +
+> [...]
+>
+> Thanks Daniel.
