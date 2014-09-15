@@ -1,22 +1,51 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 15 Sep 2014 09:02:12 -0700
-Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
-In-Reply-To: <20140915155656.GA29744@arm.com>
-References: <cover.1410632834.git.joe@perches.com>
- <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
- <20140915155656.GA29744@arm.com>
-Message-ID: <1410796932.18787.7.camel@joe-AO725>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Sep 2014 17:02:41 +0100
+Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
+ clang
+In-Reply-To: <1410759015-15642-1-git-send-email-behanw@converseincode.com>
+References: <20140909101515.GB1754@arm.com>
+ <1410759015-15642-1-git-send-email-behanw@converseincode.com>
+Message-ID: <20140915160240.GC29744@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-15 at 16:56 +0100, Will Deacon wrote:
-> On Sat, Sep 13, 2014 at 07:31:12PM +0100, Joe Perches wrote:
-> > Use the more common pr_warn.
-[]
-> It's Russell's call on this, but it really looks like more trouble than it's
-> worth imo. Having git blame identify the person who wrote the original code
-> is considerably more useful than being pointed at somebody making cosmetic
-> changes.
+On Mon, Sep 15, 2014 at 06:30:15AM +0100, behanw at converseincode.com wrote:
+> From: Mark Charlebois <charlebm@gmail.com>
+> 
+> Remove '#' from immediate parameter in AARCH64 inline assembly in mmu.
+> 
+> This code now works with both gcc and clang.
+> 
+> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+> Signed-off-by: Behan Webster <behanw@converseincode.com>
+> ---
+>  arch/arm64/mm/mmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-The general idea is to standardize the printk mechanisms
-and eventually remove pr_warning.
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks, Behan!
+
+Catalin: please can you pick this up for 3.18? It's probably not worth me
+merging it as a fix, since there are other patches needed to get us building
+under clang anyway.
+
+Will
+
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index c555672..6894ef3 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -94,7 +94,7 @@ static int __init early_cachepolicy(char *p)
+>  	 */
+>  	asm volatile(
+>  	"	mrs	%0, mair_el1\n"
+> -	"	bfi	%0, %1, #%2, #8\n"
+> +	"	bfi	%0, %1, %2, #8\n"
+>  	"	msr	mair_el1, %0\n"
+>  	"	isb\n"
+>  	: "=&r" (tmp)
+> -- 
+> 1.9.1
+> 
+> 
