@@ -1,79 +1,72 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Sep 2014 12:09:03 -0600
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>	<CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>	<CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>	<CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>	<CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>	<CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
- <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
-Message-ID: <54172B3F.9030901@wwwdotorg.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Sep 2014 19:11:01 +0100
+Subject: [PATCH 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+Message-ID: <20140915181101.GE13789@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 11:06 AM, Andrew Bresticker wrote:
-> On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->> On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org> wrote:
->>> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>>>
->>>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>>>> recently posted by Andrew Chew [2].
->>>>>>
->>>>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->>>>>> USB devices I tested with, about half where probed correctly, but the
->>>>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>>>>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>>>>
->>>>>> I don't see any correlation between the failure and the kind of usb
->>>>>> device, but I don't have much experience with USB implementations
->>>>>> either.
->>>>>
->>>>> Hmm... I haven't seen that before.  Which particular devices were you using?
->>>>
->>>> Here they are:
->>>>
->>>> work:
->>>>
->>>> Genius keyboard: 05d5:6782
->>>> Logitech mouse: 046d:c06a
->>>> Denver MP3 player: 10d6:1100
->>>> Atheros Bluetooth dongle: 0cf3:3005
->>>>
->>>> don't work:
->>>>
->>>> MCS7830 ethernet dongle: 9710:7830
->>>> Genesys Logic hub: 05e3:0608
->>>
->>> I tried the hub and it works just fine for me... Have you tried this
->>> on any other boards like Big or Blaze?
->>
->> I have a Blaze here, but haven't been able to get the external ports
->> to power up. I don't have schematics nor a strong interest to get that
->> fixed myself, as I can test my code just fine with the Blaze's
->> internal camera and the devices that do work on the Jetson.
->
-> Ok, since Blaze has been announced, hopefully we can post a
-> device-tree for it soon.
->
->> I'm using the firmware file that was posted recently:
->>
->> xhci-tegra 70090000.usb: Firmware timestamp: 2014-05-02 02:22:50 UTC,
->> Falcon state 0x20
->
-> Yup, I'm using the same firmware.
->
->> If things work for you with the same sources, .config and firmware, I
->> can only think of the hw being different (other hw revision?).
->
-> That, or perhaps bootloader differences?  I'm using mainline U-Boot.
->
-> Stephen, Thierry, have either of you had a chance to test this series?
+On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
+> Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+> During CPU reset the CPU must be brought to the exception level it had on
+> entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+> needed for this exception level switch.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/include/asm/virt.h | 11 +++++++++++
+>  arch/arm64/kernel/hyp-stub.S  | 10 ++++++++++
+>  2 files changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 894fe53..b217fbc 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -41,6 +41,17 @@
+>  
+>  #define HVC_KVM_CALL_HYP 3
+>  
+> +/*
+> + * HVC_CALL_FUNC - Execute a function at EL2.
+> + *
+> + * @x0: Physical address of the funtion to be executed.
+> + * @x1: Passed as the first argument to @fn.
+> + * @x2: Passed as the second argument to @fn.
+> + * @x3: Passed as the third argument to @fn.
+> + */
+> +
+> +#define HVC_CALL_FUNC 4
+> +
 
-I haven't had a chance to yet. I just went to try it out, and found that 
-it depends on a whole slew of other patches that I don't have. Is there 
-a git branch somewhere to save me having to track down all the dependencies?
+Can't we use the HVC_KVM_CALL_HYP for this as well? I thought we already
+added the code to the stub to do that in the last patch.
 
-Thierry is on vacation right now. I think he was expecting to return 
-sometime this week, but the start of his vacation was delayed, so 
-perhaps he'll be back a bit later too.
+Is there a difference between the two that I'm missing?
+
+>  #ifndef __ASSEMBLY__
+>  
+>  /*
+> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> index 9ab5f70..a21cf51 100644
+> --- a/arch/arm64/kernel/hyp-stub.S
+> +++ b/arch/arm64/kernel/hyp-stub.S
+> @@ -75,7 +75,17 @@ el1_sync:
+>  1:	cmp	x10, #HVC_SET_VECTORS
+>  	b.ne	1f
+>  	msr	vbar_el2, x0
+> +	b	2f
+>  
+> +1:	cmp	x10, #HVC_CALL_FUNC
+> +	b.ne    1f
+> +	mov	x29, lr
+
+What's the contract for functions we call through the stub?
+
+If they can use all the caller-saved registers, then we need to stach
+the original LR before issuing the HVC. Otherwise we can stash it in
+x18 at EL2.
+
+Thanks,
+Mark.
