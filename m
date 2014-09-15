@@ -1,36 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Sep 2014 11:30:13 +0100
-Subject: [RFC] arm:extend the reserved mrmory for initrd to be page aligned
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB491606@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103D6DB4915FC@CNBJMBX05.corpusers.net>
- <20140915084616.GX12361@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103D6DB491604@CNBJMBX05.corpusers.net>
- <20140915093014.GZ12361@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103D6DB491605@CNBJMBX05.corpusers.net>
- <20140915101632.GA12361@n2100.arm.linux.org.uk>
- <35FD53F367049845BC99AC72306C23D103D6DB491606@CNBJMBX05.corpusers.net>
-Message-ID: <20140915103013.GB12361@n2100.arm.linux.org.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 15 Sep 2014 12:36:10 +0200
+Subject: [PATCH v5 04/12] ARM: dts: berlin: add a required reset property in
+ the chip controller node
+In-Reply-To: <1410777378-12726-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1410777378-12726-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1410777378-12726-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 06:22:12PM +0800, Wang, Yalin wrote:
-> Oh, I see your meaning,
-> Yeah , my initrd is a cpio image,
-> And it can still work after apply this patch.
+The chip controller node now also describes the Marvell Berlin reset
+controller. Add the required 'reset-cells' property.
 
-Okay, that's what I wanted to know.  However, I believe your patch to
-be incorrect.  You delete the assignments to initrd_start and initrd_end
-in arm_memblock_init(), which will result in non-OF platforms having
-no initrd.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/berlin2.dtsi   | 1 +
+ arch/arm/boot/dts/berlin2cd.dtsi | 1 +
+ arch/arm/boot/dts/berlin2q.dtsi  | 1 +
+ 3 files changed, 3 insertions(+)
 
-The reason is that OF platforms set initrd_start and initrd_size from
-the OF code (drivers/of/fdt.c), but ATAG platforms only set our private
-phys_* versions.
-
-The reason I went with phys_* stuff was to permit better verification
-of the addresses passed - that the addresses were indeed memory locations
-before passing them through something like __va().
-
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 9d7c810ebd0b..d7e81e124de0 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -249,6 +249,7 @@
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2-chip-ctrl";
+ 			#clock-cells = <1>;
++			#reset-cells = <2>;
+ 			reg = <0xea0000 0x400>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index cc1df65da504..68f7032b4686 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -231,6 +231,7 @@
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2cd-chip-ctrl";
+ 			#clock-cells = <1>;
++			#reset-cells = <2>;
+ 			reg = <0xea0000 0x400>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 400c40fceccc..ffba5c3bdab8 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -332,6 +332,7 @@
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2q-chip-ctrl";
+ 			#clock-cells = <1>;
++			#reset-cells = <2>;
+ 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
