@@ -1,60 +1,38 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 15 Sep 2014 12:16:21 -0400
-Subject: [PATCH v4 14/18] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <20140915150136.GF5415@arm.com>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-15-git-send-email-hanjun.guo@linaro.org>
- <20140915150136.GF5415@arm.com>
-Message-ID: <541710D5.3030001@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Sep 2014 17:26:25 +0100
+Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
+ clang
+In-Reply-To: <20140915160240.GC29744@arm.com>
+References: <20140909101515.GB1754@arm.com>
+ <1410759015-15642-1-git-send-email-behanw@converseincode.com>
+ <20140915160240.GC29744@arm.com>
+Message-ID: <20140915162624.GH5415@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 11:01 AM, Catalin Marinas wrote:
-> On Fri, Sep 12, 2014 at 03:00:12PM +0100, Hanjun Guo wrote:
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 5b3546b..9869377 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/irqdomain.h>
->>  #include <linux/bootmem.h>
->>  #include <linux/smp.h>
->> +#include <linux/irqchip/arm-gic-acpi.h>
->>  
->>  #include <asm/cputype.h>
->>  #include <asm/cpu_ops.h>
->> @@ -312,6 +313,28 @@ void __init acpi_boot_table_init(void)
->>  		pr_err("Can't find FADT or error happened during parsing FADT\n");
->>  }
->>  
->> +void __init acpi_gic_init(void)
->> +{
->> +	struct acpi_table_header *table;
->> +	acpi_status status;
->> +	acpi_size tbl_size;
->> +	int err;
->> +
->> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
->> +	if (ACPI_FAILURE(status)) {
->> +		const char *msg = acpi_format_exception(status);
->> +
->> +		pr_err("Failed to get MADT table, %s\n", msg);
->> +		return;
->> +	}
->> +
->> +	err = gic_v2_acpi_init(table);
->> +	if (err)
->> +		pr_err("Failed to initialize GIC IRQ controller");
->> +
->> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
->> +}
+On Mon, Sep 15, 2014 at 05:02:41PM +0100, Will Deacon wrote:
+> On Mon, Sep 15, 2014 at 06:30:15AM +0100, behanw at converseincode.com wrote:
+> > From: Mark Charlebois <charlebm@gmail.com>
+> > 
+> > Remove '#' from immediate parameter in AARCH64 inline assembly in mmu.
+> > 
+> > This code now works with both gcc and clang.
+> > 
+> > Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+> > Signed-off-by: Behan Webster <behanw@converseincode.com>
+> > ---
+> >  arch/arm64/mm/mmu.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Maybe this was discussed already but why does this function need to live
-> under arch/arm64? Isn't the driver code more appropriate?
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Thanks, Behan!
+> 
+> Catalin: please can you pick this up for 3.18? It's probably not worth me
+> merging it as a fix, since there are other patches needed to get us building
+> under clang anyway.
 
-Well there's two halves to this, right? There's the MADT parsing/setup,
-which is architecture specific, and then there's the GIC irqchip
-initialization which lives under drivers.
+I agree, it will go in for 3.18 rather than 3.17.
 
-Jon.
+-- 
+Catalin
