@@ -1,66 +1,33 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 15 Sep 2014 16:01:50 +0200
-Subject: [PATCH v3 6/9] net: pxa168_eth: rework the MAC address setup
+Date: Mon, 15 Sep 2014 16:01:51 +0200
+Subject: [PATCH v3 7/9] net: pxa168_eth: allow Berlin SoCs to use the
+ pxa168_eth driver
 In-Reply-To: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1410789713-15341-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1410789713-15341-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rework the way the MAC address is retrieved. The MAC address
-can now, in addition to being random, be set in the device tree or
-retrieved from the Ethernet controller MAC address registers. The
-probing function will try to get a MAC address in the following order:
-- From the device tree.
-- From the Ethernet controller MAC address registers.
-- Generate a random one.
+Berlin SoCs have an Ethernet controller compatible with the pxa168.
+Allow these SoCs to use the pxa168_eth driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/pxa168_eth.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/marvell/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index d9f4f7d05a1e..4a57f640b424 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -35,6 +35,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_net.h>
- #include <linux/phy.h>
- #include <linux/platform_device.h>
- #include <linux/pxa168_eth.h>
-@@ -1481,6 +1482,7 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 	struct net_device *dev = NULL;
- 	struct resource *res;
- 	struct clk *clk;
-+	const unsigned char *mac_addr = NULL;
- 	int err;
+diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
+index 1b4fc7c639e6..48b9466d1781 100644
+--- a/drivers/net/ethernet/marvell/Kconfig
++++ b/drivers/net/ethernet/marvell/Kconfig
+@@ -64,7 +64,7 @@ config MVPP2
  
- 	printk(KERN_NOTICE "PXA168 10/100 Ethernet Driver\n");
-@@ -1522,8 +1524,19 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 
- 	INIT_WORK(&pep->tx_timeout_task, pxa168_eth_tx_timeout_task);
- 
--	dev_info(&pdev->dev, "Using random mac address\n");
--	eth_hw_addr_random(dev);
-+	if (pdev->dev.of_node)
-+		mac_addr = of_get_mac_address(pdev->dev.of_node);
-+
-+	if (mac_addr && is_valid_ether_addr(mac_addr)) {
-+		ether_addr_copy(dev->dev_addr, mac_addr);
-+	} else {
-+		/* try reading the mac address, if set by the bootloader */
-+		pxa168_eth_get_mac_address(dev, dev->dev_addr);
-+		if (!is_valid_ether_addr(dev->dev_addr)) {
-+			dev_info(&pdev->dev, "Using random mac address\n");
-+			eth_hw_addr_random(dev);
-+		}
-+	}
- 
- 	pep->rx_ring_size = NUM_RX_DESCS;
- 	pep->tx_ring_size = NUM_TX_DESCS;
+ config PXA168_ETH
+ 	tristate "Marvell pxa168 ethernet support"
+-	depends on CPU_PXA168
++	depends on CPU_PXA168 || ARCH_BERLIN
+ 	select PHYLIB
+ 	---help---
+ 	  This driver supports the pxa168 Ethernet ports.
 -- 
 1.9.1
