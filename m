@@ -1,38 +1,52 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Mon, 15 Sep 2014 19:19:49 -0400
-Subject: [PATCH v4 11/18] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <20140915145630.GE5415@arm.com>
+Date: Mon, 15 Sep 2014 19:24:36 -0400
+Subject: [PATCH v4 09/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <20140915145410.GD5415@arm.com>
 References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-12-git-send-email-hanjun.guo@linaro.org>
- <54134DB4.6010705@redhat.com> <20140915145630.GE5415@arm.com>
-Message-ID: <54177415.6070306@redhat.com>
+ <1410530416-30200-10-git-send-email-hanjun.guo@linaro.org>
+ <20140915063808.GC26649@localhost> <20140915145410.GD5415@arm.com>
+Message-ID: <54177534.806@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 10:56 AM, Catalin Marinas wrote:
-> On Fri, Sep 12, 2014 at 08:47:00PM +0100, Jon Masters wrote:
->> On 09/12/2014 10:00 AM, Hanjun Guo wrote:
->>> MADT contains the information for MPIDR which is essential for
->>> SMP initialization, parse the GIC cpu interface structures to
->>> get the MPIDR value and map it to cpu_logical_map(), and add
->>> enabled cpu with valid MPIDR into cpu_possible_map.
->>>
->>> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
->>> Parking protocol, but the Parking protocol is only specified for
->>> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
->>> before some updates for the ACPI spec or the Parking protocol spec.
+On 09/15/2014 10:54 AM, Catalin Marinas wrote:
+> On Mon, Sep 15, 2014 at 07:38:08AM +0100, Olof Johansson wrote:
+>> On Fri, Sep 12, 2014 at 10:00:07PM +0800, Hanjun Guo wrote:
+>>> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>> +{
+>>> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+>>> +
+>>> +	/*
+>>> +	 * Revision in table header is the FADT Major revision,
+>>> +	 * and there is a minor revision of FADT which was introduced
+>>> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher revision
+>>> +	 * to get arm boot flags, or we will disable ACPI.
+>>> +	 */
+>>> +	if (table->revision > 5 ||
+>>> +	    (table->revision == 5 && fadt->minor_revision >= 1))
+>>> +		return 0;
 >>
->> As an aside, initial support for the Parking Protocol is working on test
->> systems within Red Hat at this time.
+>> The commend and code disagree. The code says 5.1 or newer, while the comment say
+>> _only_ 5.1. One or the other needs to change.
 > 
-> BTW, have the details of the parking protocol been updated for ARMv8
-> yet?
+> I don't think the comment and code disagree, it says "we only deal with
+> ACPI 5.1 _or_ higher revision".
+> 
+> But since you mention it and following my other thread with Grant, I
+> think at least for now we should make this check 5.1 only.
 
-There's an interim specification for which initial (test, in
-development) patches are currently in the fedorahosted development
-kernel. Mark is planning to followup on that once he's had chance to
-polish and clean things up. But the parking protocol is not required for
-initial ACPI enablement (we really want everyone to be doing PSCI
-anyway, it's only a small subset that will ever do parking protocol).
+The problem with making this 5.1 only is that the specification will
+move forward. The way the specification works is that the version
+increments, structures grow new members, but additions are done in a
+backward-compatible way. Therefore there's no reason why an ACPI6.0
+system (in theory) should not be able to boot a 5.1 kernel[0]. By
+artificially restricting this compatibility, users are worse off.
 
 Jon.
+
+[0] There will be examples where this is not true - let's say there's a
+GICvX specification that's incompatible with GICv3+ and GICvX folks
+don't necessarily choose to implement backward compatibility for GICv3.
+If there's a new MADT subtype record handling GICvX then the OS would
+need to support minimally the ACPI rev that adds this type.
