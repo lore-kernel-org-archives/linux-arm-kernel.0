@@ -1,166 +1,43 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 15 Sep 2014 21:39:22 -0500
-Subject: [PATCH v3] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-In-Reply-To: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
-References: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
-Message-ID: <20140916023922.GB2386@qualcomm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 15 Sep 2014 22:01:59 +0200
+Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
+In-Reply-To: <alpine.LFD.2.11.1409151451540.8647@knanqh.ubzr>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
+ <20140911161517.GA3190@worktop.ger.corp.intel.com>
+ <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+ <20140914194156.GC2832@worktop.localdomain>
+ <20140915114229.GB3037@worktop.localdomain>
+ <alpine.LFD.2.11.1409151451540.8647@knanqh.ubzr>
+Message-ID: <20140915200159.GE2840@worktop.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 05:00:45PM +0530, Kiran Padwal wrote:
-> This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
-> It also adds necessary DT support for i2c eeprom which is present on
-> IFC6410.
-> 
-> Tested on IFC6410 board.
+On Mon, Sep 15, 2014 at 03:07:44PM -0400, Nicolas Pitre wrote:
+> On Mon, 15 Sep 2014, Peter Zijlstra wrote:
 
-Looks fine
+> Let's suppose a task running on a 1GHz CPU producing a load of 100.
+> 
+> The same task on a 100MHz CPU would produce a load of 1000 because that 
+> CPU is 10x slower.  So to properly evaluate the load of a task when 
+> moving it around, we want to normalize its load based on the CPU 
+> performance.  In this case the correction factor would be 0.1.
+> 
+> Given those normalized loads, we need to scale CPU capacity as well.  If 
+> the 1GHz CPU can handle 50 of those tasks it has a capacity of 5000.
+> 
+> In theory the 100MHz CPU could handle only 5 of those tasks, meaning it 
+> has a normalized capacity of 500, but only if the load metric is already 
+> normalized as well.
+> 
+> Or am I completely missing the point here?
 
-> 
-> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
-> ---
-> Changes since v2:
->  - Renamed pinmux i2c subnode "i2c1_pinmux" to "i2c1".
->  - Removed labes of node.
->  - Used canonical value as "okay" instead of "ok".
->  - Used macros.
-> 
-> Changes since v1:
->  - Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
->  - Updated pinmux interrupt.
-> 
->  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   27 ++++++++++++++
->  arch/arm/boot/dts/qcom-apq8064.dtsi        |   53 ++++++++++++++++++++++++++++
->  2 files changed, 80 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> index 7c2441d..ef0857e 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> @@ -5,6 +5,24 @@
->  	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
->  
->  	soc {
-> +		gsbi at 12440000 {
-> +			status = "okay";
-> +			qcom,mode = <GSBI_PROT_I2C>;
-> +
-> +			i2c at 12460000 {
-> +				status = "okay";
-> +				clock-frequency = <200000>;
-> +				pinctrl-0 = <&i2c1_pins>;
-> +				pinctrl-names = "default";
-> +
-> +				eeprom: eeprom at 52 {
-> +					compatible = "atmel,24c128";
-> +					reg = <0x52>;
-> +					pagesize = <32>;
-> +				};
+So I was thinking of the usage as per the next patch; where we decide if
+a cpu is 'full' or not based on the utilization measure. For this
+measure we're not interested in inter CPU relations at all, and any use
+of capacity scaling simply doesn't make sense.
 
-don't need read only here.  the eeprom is not being used by anything....
-thankfully.
-
-> +			};
-> +		};
-> +
->  		gsbi at 16600000 {
->  			status = "ok";
->  			qcom,mode = <GSBI_PROT_I2C_UART>;
-> @@ -12,5 +30,14 @@
->  				status = "ok";
->  			};
->  		};
-> +
-> +		pinmux at 800000 {
-> +			i2c1_pins: i2c1 {
-> +				mux {
-> +					pins = "gpio20", "gpio21";
-> +					function = "gsbi1";
-> +				};
-> +			};
-> +		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index 92bf793..5dddbf3 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -89,6 +89,17 @@
->  			cpu-offset = <0x80000>;
->  		};
->  
-> +		tlmm_pinmux: pinmux at 800000 {
-> +			compatible = "qcom,apq8064-pinctrl";
-> +			reg = <0x800000 0x4000>;
-> +
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			interrupts = <0 16 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
->  		acc0: clock-controller at 2088000 {
->  			compatible = "qcom,kpss-acc-v1";
->  			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-> @@ -133,6 +144,48 @@
->  			regulator;
->  		};
->  
-> +		gsbi1: gsbi at 12440000 {
-> +			status = "disabled";
-> +			compatible = "qcom,gsbi-v1.0.0";
-> +			reg = <0x12440000 0x100>;
-> +			clocks = <&gcc GSBI1_H_CLK>;
-> +			clock-names = "iface";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			i2c1: i2c at 12460000 {
-> +				compatible = "qcom,i2c-qup-v1.1.1";
-> +				reg = <0x12460000 0x1000>;
-> +				interrupts = <0 194 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +			};
-> +		};
-> +
-> +		gsbi2: gsbi at 12480000 {
-> +			status = "disabled";
-> +			compatible = "qcom,gsbi-v1.0.0";
-> +			reg = <0x12480000 0x100>;
-> +			clocks = <&gcc GSBI2_H_CLK>;
-> +			clock-names = "iface";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			i2c2: i2c at 124a0000 {
-> +				compatible = "qcom,i2c-qup-v1.1.1";
-> +				reg = <0x124a0000 0x1000>;
-> +				interrupts = <0 196 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +			};
-> +		};
-> +
->  		gsbi7: gsbi at 16600000 {
->  			status = "disabled";
->  			compatible = "qcom,gsbi-v1.0.0";
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+But I think you asking this question shows a 'bigger' problem in that
+the Changelogs are entirely failing at describing the actual problem and
+proposed solution. Because if that were clear, I don't think we would be
+having this particular discussion.
