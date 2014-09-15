@@ -1,108 +1,107 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 15 Sep 2014 10:33:45 -0500
-Subject: [Patch v4 net-next 04/12] net: fec: parser max queue number from
- dt file
-In-Reply-To: <20140915170804.39061c0d@ipc1.ka-ro>
-References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
- <1410555657-10744-5-git-send-email-Frank.Li@freescale.com>
- <20140915093926.11bdbc32@ipc1.ka-ro>
- <CAHrpEqTCBMn-P2O7VZOOLUN=Zbc8h_Ow9MKrv5cV5gZPENRqUw@mail.gmail.com>
- <20140915170804.39061c0d@ipc1.ka-ro>
-Message-ID: <CAHrpEqQHf7wDYhivq9MMY6cqFu73SEQEu+-YhVsyeeKO-An+zw@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 15 Sep 2014 11:39:15 -0400
+Subject: [PATCH 3/4] tty: omap-serial: use threaded interrupt handler
+In-Reply-To: <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
+References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
+ <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
+Message-ID: <54170823.7040801@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 10:08 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> Hi,
->
-> Zhi Li wrote:
->> On Mon, Sep 15, 2014 at 2:39 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
->> > Hi,
->> >
->> > Frank.Li at freescale.com wrote:
->> >> From: Fugang Duan <B38611@freescale.com>
->> >>
->> >> By default, the tx/rx queue number is 1, user can config the queue number
->> >> at DTS file like this:
->> >>       fsl,num-tx-queues=<3>;
->> >>       fsl,num-rx-queues=<3>
->> >>
->> >> Since i.MX6SX enet-AVB IP support multi queues, so use multi queues
->> >> interface to allocate and set up an Ethernet device.
->> >>
->> >> Signed-off-by: Fugang Duan <B38611@freescale.com>
->> >> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> >> ---
->> >>  drivers/net/ethernet/freescale/fec.h      |  2 ++
->> >>  drivers/net/ethernet/freescale/fec_main.c | 46 ++++++++++++++++++++++++++++++-
->> >>  2 files changed, 47 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
->> >> index b2b91f8..72fb90f 100644
->> >> --- a/drivers/net/ethernet/freescale/fec.h
->> >> +++ b/drivers/net/ethernet/freescale/fec.h
->> >> @@ -356,6 +356,8 @@ struct fec_enet_private {
->> >>
->> >>       bool ptp_clk_on;
->> >>       struct mutex ptp_clk_mutex;
->> >> +     unsigned int num_tx_queues;
->> >> +     unsigned int num_rx_queues;
->> >>
->> >>       /* The saved address of a sent-in-place packet/buffer, for skfree(). */
->> >>       struct fec_enet_priv_tx_q *tx_queue[FEC_ENET_MAX_TX_QS];
->> >> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
->> >> index 4c0d2ee..2240df0 100644
->> >> --- a/drivers/net/ethernet/freescale/fec_main.c
->> >> +++ b/drivers/net/ethernet/freescale/fec_main.c
->> >> @@ -2709,6 +2709,42 @@ static void fec_reset_phy(struct platform_device *pdev)
->> >>  }
->> >>  #endif /* CONFIG_OF */
->> >>
->> >> +static void
->> >> +fec_enet_get_queue_num(struct platform_device *pdev, int *num_tx, int *num_rx)
->> >> +{
->> >> +     struct device_node *np = pdev->dev.of_node;
->> >> +     int err;
->> >> +
->> >> +     *num_tx = *num_rx = 1;
->> >> +
->> >> +     if (!np || !of_device_is_available(np))
->> >> +             return;
->> >> +
->> >> +     /* parse the num of tx and rx queues */
->> >> +     err = of_property_read_u32(np, "fsl,num-tx-queues", num_tx);
->> >> +     err |= of_property_read_u32(np, "fsl,num-rx-queues", num_rx);
->> >> +     if (err) {
->> >> +             *num_tx = 1;
->> >> +             *num_rx = 1;
->> > Shouldn't these be handled seperately? So that if only one of those
->> > properties is given in DT the specified value for that property should
->> > be used?
->>
->> I worry about asymmetric design in future.
->>
-> Then why do you use two distinct properties in the first place?
+On 09/15/2014 10:00 AM, Frans Klaver wrote:
+> At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
+> rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
+> this to about 170 overflows in 10 minutes.
 
-Sorry, I miss understand your means firstly.
-I see now.
-You are right.
+Why is the threadirqs kernel boot option not sufficient?
+Or conversely, shouldn't this be selectable?
 
-Because David has applied this patch, I will create a new patch to fix it.
+Regards,
+Peter Hurley
 
->
->> And use two property is the easy debug two directory.
->>
-> I don't understand this sentence.
->
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
+PS - To overflow the 64 byte RX FIFO at those data rates means interrupt
+latency in excess of 250us?
+
+> In practice this therefore reduces the need for hardware flow control,
+> meaning the sending side doesn't have to buffer as much either.
+> 
+> Signed-off-by: Frans Klaver <frans.klaver@xsens.com>
+> ---
+>  drivers/tty/serial/omap-serial.c | 30 +++++++++++++++++++++++-------
+>  1 file changed, 23 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 7d3f557..398139a 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -575,6 +575,20 @@ static void serial_omap_rdi(struct uart_omap_port *up, unsigned int lsr)
+>  }
+>  
+>  /**
+> + * serial_omap_fast_irq() - schedule interrupt handling
+> + */
+> +static irqreturn_t serial_omap_fast_irq(int irq, void *dev_id)
+> +{
+> +	struct uart_omap_port *up = dev_id;
+> +	unsigned int iir = serial_in(up, UART_IIR);
+> +
+> +	if (iir & UART_IIR_NO_INT)
+> +		return IRQ_NONE;
+> +
+> +	return IRQ_WAKE_THREAD;
+> +}
+> +
+> +/**
+>   * serial_omap_irq() - This handles the interrupt from one port
+>   * @irq: uart port irq number
+>   * @dev_id: uart port info
+> @@ -584,7 +598,6 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
+>  	struct uart_omap_port *up = dev_id;
+>  	unsigned int iir, lsr;
+>  	unsigned int type;
+> -	irqreturn_t ret = IRQ_NONE;
+>  	int max_count = 256;
+>  
+>  	spin_lock(&up->port.lock);
+> @@ -595,7 +608,6 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
+>  		if (iir & UART_IIR_NO_INT)
+>  			break;
+>  
+> -		ret = IRQ_HANDLED;
+>  		lsr = serial_in(up, UART_LSR);
+>  
+>  		/* extract IRQ type from IIR register */
+> @@ -634,7 +646,7 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
+>  	pm_runtime_put_autosuspend(up->dev);
+>  	up->port_activity = jiffies;
+>  
+> -	return ret;
+> +	return IRQ_HANDLED;
+>  }
+>  
+>  static unsigned int serial_omap_tx_empty(struct uart_port *port)
+> @@ -731,15 +743,19 @@ static int serial_omap_startup(struct uart_port *port)
+>  	/*
+>  	 * Allocate the IRQ
+>  	 */
+> -	retval = request_irq(up->port.irq, serial_omap_irq, up->port.irqflags,
+> -				up->name, up);
+> +	retval = request_threaded_irq(up->port.irq, serial_omap_fast_irq,
+> +						serial_omap_irq,
+> +						IRQF_ONESHOT | up->port.irqflags,
+> +						up->name, up);
+>  	if (retval)
+>  		return retval;
+>  
+>  	/* Optional wake-up IRQ */
+>  	if (up->wakeirq) {
+> -		retval = request_irq(up->wakeirq, serial_omap_irq,
+> -				     up->port.irqflags, up->name, up);
+> +		retval = request_threaded_irq(up->wakeirq, serial_omap_fast_irq,
+> +						serial_omap_irq,
+> +						IRQF_ONESHOT | up->port.irqflags,
+> +						up->name, up);
+>  		if (retval) {
+>  			free_irq(up->port.irq, up);
+>  			return retval;
+> 
