@@ -1,47 +1,38 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 15 Sep 2014 12:37:55 -0400 (EDT)
-Subject: [PATCH v3 2/3] net: Add Keystone NetCP ethernet driver
-In-Reply-To: <1410638839-14792-3-git-send-email-santosh.shilimkar@ti.com>
-References: <1410638839-14792-1-git-send-email-santosh.shilimkar@ti.com>
- <1410638839-14792-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140915.123755.1868053059646672094.davem@davemloft.net>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 15 Sep 2014 18:42:04 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140912102816.GF28458@ci00147.xsens-tech.local>
+References: <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
+ <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+Message-ID: <541716DC.9020904@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Sat, 13 Sep 2014 16:07:18 -0400
+On 09/12/2014 12:28 PM, Frans Klaver wrote:
+> port config is 115200 8N1. I don't recall doing anything special. I
+> boot, login, less file and get a lock.
 
-> +	/* Find this module in the sub-tree for this device */
-> +	devices = of_get_child_by_name(node, "netcp-devices");
-> +	if (!devices) {
-> +		dev_err(dev, "could not find netcp-devices node\n");
-> +		return NETCP_MOD_PROBE_SKIPPED;
-> +	}
-> +
-> +	for_each_available_child_of_node(devices, child) {
-> +		const char *name = netcp_node_name(child);
-> +
-> +		if (!strcasecmp(module->name, name))
-> +			break;
-> +	}
-> +
-> +	/* If module not used for this device, skip it */
-> +	if (child == NULL) {
-> +		dev_warn(dev, "module(%s) not used for device\n", module->name);
-> +		return NETCP_MOD_PROBE_SKIPPED;
-> +	}
+So I booted my mini Debian 7.6 (basic system + openssh) on my beagle
+bone black which is:
 
-of_get_child_by_name() takes a reference to an OF node, you must release
-it in the error path.
+[    0.000000] AM335X ES2.0 (neon )
 
-> +	inst_modpriv = devm_kzalloc(dev, sizeof(*inst_modpriv), GFP_KERNEL);
-> +	if (!inst_modpriv) {
-> +		dev_err(dev, "Failed to allocate instance for %s\n",
-> +			module->name);
-> +		return -ENOMEM;
-> +	}
+configured a console, login, invoked "less file". The file was shown, I
+hit on the space key so less shows me more of the file. No lock-up.
+I tried booting via NFS and MMC. I tried various files with less.
 
-Likewise, but here you have to release both "devices" and "child".
+My dot config is here
+	https://breakpoint.cc/config-am335x-bb.txt.xz
 
-You're going to have to fix this OF node refcount problem for this
-entire probe routine.
+If there is nothing specific to the file you do less on I have no idea
+what else it could if it is not the config.
+
+Sebastian
