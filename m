@@ -1,37 +1,28 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 15 Sep 2014 23:31:18 +0200
-Subject: [PATCH v4 6/7] ARM: EXYNOS: Add support for non-secure L2X0 resume
-In-Reply-To: <20140915090353.GD12379@n2100.arm.linux.org.uk>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-7-git-send-email-t.figa@samsung.com>
- <20140915090353.GD12379@n2100.arm.linux.org.uk>
-Message-ID: <54175AA6.3050702@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 15 Sep 2014 17:32:47 -0400 (EDT)
+Subject: [Patch net-next 1/4] net: fec: refine error handle of parser
+ queue number from DT
+In-Reply-To: <1410801177-15872-2-git-send-email-Frank.Li@freescale.com>
+References: <1410801177-15872-1-git-send-email-Frank.Li@freescale.com>
+ <1410801177-15872-2-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20140915.173247.59215420475562894.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.09.2014 11:03, Russell King - ARM Linux wrote:
->> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
->> index 554b350..71bcfbd 100644
->> --- a/arch/arm/mach-exynos/firmware.c
->> +++ b/arch/arm/mach-exynos/firmware.c
->> @@ -102,7 +102,9 @@ static int exynos_suspend(void)
->>  	writel(EXYNOS_SLEEP_MAGIC, sysram_ns_base_addr + EXYNOS_BOOT_FLAG);
->>  	writel(virt_to_phys(exynos_cpu_resume_ns),
->>  		sysram_ns_base_addr + EXYNOS_BOOT_ADDR);
->> -
->> +#ifdef CONFIG_CACHE_L2X0
->> +	l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
->> +#endif
-> 
-> NAK.  Please look at how arch/arm/mm/l2c-l2x0-resume.S gets the address
-> of this structure in assembly code.  The name of this variable is crap
-> in any case.  It's not the registers, it's the saved registers.  So even
-> more reason to kill this abomination, which incidentally, I've already
-> killed off once before in the exynos code.
-> 
+From: <Frank.Li@freescale.com>
+Date: Tue, 16 Sep 2014 01:12:54 +0800
 
-Right. The way l2c-l2x0-resume.S does this is much better. Somehow I
-overlooked it when implementing this.
+> -		dev_err(&pdev->dev, "Invalidate num_tx(=%d), fail back to 1\n",
+> +		dev_warn(&pdev->dev, "Invalid num_tx(=%d), fall back to 1\n",
+>  			*num_tx);
 
-Best regards,
-Tomasz
+Any time you change the function name of a multi-line function call, you must
+be mindful to adjust the indention of the subsequent argument lines, if
+necessary.
+
+>  	if (*num_rx < 1 || *num_rx > FEC_ENET_MAX_RX_QS) {
+> -		dev_err(&pdev->dev, "Invalidate num_rx(=%d), fail back to 1\n",
+> +		dev_warn(&pdev->dev, "Invalid num_rx(=%d), fall back to 1\n",
+>  			*num_rx);
+
+Likewise.
