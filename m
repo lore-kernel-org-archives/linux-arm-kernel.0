@@ -1,66 +1,65 @@
 From: ben@decadent.org.uk (Ben Hutchings)
-Date: Mon, 15 Sep 2014 16:07:07 +0100
-Subject: [PATCH 5/5] m25p80,spi-nor: Share the list of supported chip
- type names again
-In-Reply-To: <CAMuHMdUs+7uidcD6tivnq6+TbD4_piixLVqwuSa0Z1u3sF7EoA@mail.gmail.com>
+Date: Mon, 15 Sep 2014 16:08:00 +0100
+Subject: [PATCH 2/5] spi-nor: Remove spi_nor::read_id operation
+In-Reply-To: <20140915145523.GA1963@localhost.localdomain>
 References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714708.3040.43.camel@decadent.org.uk>
- <CAMuHMdUs+7uidcD6tivnq6+TbD4_piixLVqwuSa0Z1u3sF7EoA@mail.gmail.com>
-Message-ID: <1410793627.3040.61.camel@decadent.org.uk>
+ <1410714676.3040.40.camel@decadent.org.uk>
+ <20140915145523.GA1963@localhost.localdomain>
+Message-ID: <1410793680.3040.62.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-15 at 09:55 +0200, Geert Uytterhoeven wrote:
-> Hi Ben,
-> 
-> On Sun, Sep 14, 2014 at 7:11 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
-> > Move the list of chip type names to spi-nor.h.  To avoid putting all
-> > the chip type information there, we define this list as a macro
-> > SPI_NOR_ENUM_TYPES() that invokes another macro SPI_NOR_ENUM_TYPE()
-> > that must be defined to expand each name to whatever form it's needed.
-> >
-> > In spi-nor.c, use it to define enumerators, then use the enumerators
-> > as indices when defining spi_nor_info so that we cannot accidentally
-> > use a name that's not on the list.
-> >
-> > This is somewhat complicated by the fact that some names include
-> > hyphens.  SPI_NOR_ENUM_TYPE() therefore takes separate string and C
-> > identifier parameters.
-> 
-> Thanks for doing this!
-> 
-> However, the table generation still looks overly complicated to me, with
-> too much duplication which needs to be kept in sync.
-
-It does need to be kept in sync, but the compiler will check that.
-
-[...]
+On Mon, 2014-09-15 at 22:55 +0800, Huang Shijie wrote:
+> On Sun, Sep 14, 2014 at 06:11:16PM +0100, Ben Hutchings wrote:
+> > There is currently no useful way to override the default
+> > implementation of this operation.  The returned struct spi_device_id
+> > must have a pointer to struct flash_info in its private data, but this
+> > structure is defined inside spi-nor.
+> > 
+> > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> > ---
+> >  drivers/mtd/spi-nor/spi-nor.c | 4 +---
+> >  include/linux/mtd/spi-nor.h   | 3 ---
+> >  2 files changed, 1 insertion(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> > index 6b1bda2..6f699c5 100644
+> > --- a/drivers/mtd/spi-nor/spi-nor.c
+> > +++ b/drivers/mtd/spi-nor/spi-nor.c
+> > @@ -902,8 +902,6 @@ static int spi_nor_check(struct spi_nor *nor)
+> >  		return -EINVAL;
+> >  	}
+> >  
+> > -	if (!nor->read_id)
+> > -		nor->read_id = spi_nor_read_id;
+> >  	if (!nor->wait_till_ready)
+> >  		nor->wait_till_ready = spi_nor_wait_till_ready;
+> >  
+> > @@ -952,7 +950,7 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+> >  	if (info->jedec_id) {
+> >  		const struct spi_device_id *jid;
+> >  
+> > -		jid = nor->read_id(nor);
+> > +		jid = spi_nor_read_id(nor);
+> >  		if (IS_ERR(jid)) {
+> >  			return PTR_ERR(jid);
+> >  		} else if (jid != id) {
+> > diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+> > index 5ec84cc..66af67a 100644
 > > --- a/include/linux/mtd/spi-nor.h
 > > +++ b/include/linux/mtd/spi-nor.h
-> > @@ -198,4 +198,76 @@ struct spi_nor {
-> >   */
-> >  int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode);
-> >
-> > +#define __SPI_NOR_ENUM_TYPES(c_id, str_and_c_id)                         \
-> > +       c_id(at25fs010)         c_id(at25fs040)         c_id(at25df041a)  \
-> > +       c_id(at25df321a)        c_id(at25df641)         c_id(at26f004)    \
+> > @@ -139,8 +139,6 @@ enum spi_nor_ops {
+> >   * @write_xfer:		[OPTIONAL] the writefundamental primitive
+> >   * @read_reg:		[DRIVER-SPECIFIC] read out the register
+> >   * @write_reg:		[DRIVER-SPECIFIC] write data to the register
+> > - * @read_id:		[REPLACEABLE] read out the ID data, and find
+> > - *			the proper spi_device_id
+> If we remove this hook, i guess we will add it back in the later.
+> Other new drivers will use this hook.
 > 
-> Can't you just have the IDs in a header file only, and let the header file
-> generate either a struct flash_info or a struct spi_device_id table, using
-> a macro defined by the file that includes it?
+> so i suggest to keep it as it is.
 
-How would we match up the rest of the struct flash_info to the name?
-
-> Cfr. include/uapi/asm-generic/unistd.h and its use of __SYSCALL()?
-> 
-> Or am I missing something (e.g. this is impossible due to the hyphens in the
-> names?).
-
-Well the hyphens are only a problem because we want C identifiers.  But
-we only need C identifiers so we can enforce that each struct flash_info
-matches a name on the list.  If you can find a way to match them up
-without having to define enumerators, that would of course be
-preferable.
+It may well be needed, but it can't be implemented in its current form.
 
 Ben.
 
@@ -73,4 +72,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 811 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/90366ebe/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/950cc586/attachment.sig>
