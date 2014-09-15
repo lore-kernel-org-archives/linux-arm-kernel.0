@@ -1,67 +1,110 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 15 Sep 2014 16:44:59 +0200
-Subject: [PATCH 2/6] ARM: meson: documentation: add bindings documentation
+Date: Mon, 15 Sep 2014 16:45:00 +0200
+Subject: [PATCH 3/6] ARM: meson: add basic support for MesonX SoCs
 In-Reply-To: <1410792303-23275-1-git-send-email-carlo@caione.org>
 References: <1410792303-23275-1-git-send-email-carlo@caione.org>
-Message-ID: <1410792303-23275-3-git-send-email-carlo@caione.org>
+Message-ID: <1410792303-23275-4-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vendor prefixes and basic documentation for MesonX SoCs bindings
+This patch adds the basic machine file for the MesonX SoCs. Only Meson6
+is populated.
 
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- Documentation/devicetree/bindings/arm/amlogic.txt     | 8 ++++++++
- Documentation/devicetree/bindings/arm/geniatech.txt   | 5 +++++
- Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
- 3 files changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/geniatech.txt
+ arch/arm/Kconfig             |  2 ++
+ arch/arm/Makefile            |  1 +
+ arch/arm/mach-meson/Kconfig  | 13 +++++++++++++
+ arch/arm/mach-meson/Makefile |  1 +
+ arch/arm/mach-meson/meson.c  | 27 +++++++++++++++++++++++++++
+ 5 files changed, 44 insertions(+)
+ create mode 100644 arch/arm/mach-meson/Kconfig
+ create mode 100644 arch/arm/mach-meson/Makefile
+ create mode 100644 arch/arm/mach-meson/meson.c
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 32cbbd5..f1946c7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -888,6 +888,8 @@ source "arch/arm/mach-keystone/Kconfig"
+ 
+ source "arch/arm/mach-ks8695/Kconfig"
+ 
++source "arch/arm/mach-meson/Kconfig"
++
+ source "arch/arm/mach-msm/Kconfig"
+ 
+ source "arch/arm/mach-moxart/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0ce9d0f..320aa57 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -168,6 +168,7 @@ machine-$(CONFIG_ARCH_IXP4XX)		+= ixp4xx
+ machine-$(CONFIG_ARCH_KEYSTONE)		+= keystone
+ machine-$(CONFIG_ARCH_KS8695)		+= ks8695
+ machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
++machine-$(CONFIG_ARCH_MESON)		+= meson
+ machine-$(CONFIG_ARCH_MMP)		+= mmp
+ machine-$(CONFIG_ARCH_MOXART)		+= moxart
+ machine-$(CONFIG_ARCH_MSM)		+= msm
+diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
 new file mode 100644
-index 0000000..7eece72
+index 0000000..2c1154e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -0,0 +1,8 @@
-+Amlogic MesonX device tree bindings
-+-------------------------------------------
++++ b/arch/arm/mach-meson/Kconfig
+@@ -0,0 +1,13 @@
++menuconfig ARCH_MESON
++	bool "Amlogic Meson SoCs" if ARCH_MULTI_V7
++	select GENERIC_IRQ_CHIP
++	select ARM_GIC
 +
-+Boards with the Amlogic Meson6 SoC shall have the following properties:
++if ARCH_MESON
 +
-+Required root node property:
++config MACH_MESON6
++	bool "Amlogic Meson6 (8726MX) SoCs support"
++	default ARCH_MESON
++	select MESON6_TIMER
 +
-+compatible = "amlogic,meson6";
-diff --git a/Documentation/devicetree/bindings/arm/geniatech.txt b/Documentation/devicetree/bindings/arm/geniatech.txt
++endif
+diff --git a/arch/arm/mach-meson/Makefile b/arch/arm/mach-meson/Makefile
 new file mode 100644
-index 0000000..74ccba4
+index 0000000..9d7380e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/geniatech.txt
-@@ -0,0 +1,5 @@
-+Geniatech platforms device tree bindings
-+-------------------------------------------
++++ b/arch/arm/mach-meson/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_MESON) += meson.o
+diff --git a/arch/arm/mach-meson/meson.c b/arch/arm/mach-meson/meson.c
+new file mode 100644
+index 0000000..5ee064f
+--- /dev/null
++++ b/arch/arm/mach-meson/meson.c
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2014 Carlo Caione <carlo@caione.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
 +
-+Geniatech ATV1200
-+    - compatible = "geniatech,atv1200"
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..17078cb 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -14,6 +14,7 @@ allwinner	Allwinner Technology Co., Ltd.
- altr	Altera Corp.
- amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
- amd	Advanced Micro Devices (AMD), Inc.
-+amlogic	Amlogic, Inc.
- ams	AMS AG
- amstaos	AMS-Taos Inc.
- apm	Applied Micro Circuits Corporation (APM)
-@@ -52,6 +53,7 @@ excito	Excito
- fsl	Freescale Semiconductor
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
-+geniatech	Geniatech, Inc.
- globalscale	Globalscale Technologies, Inc.
- gmt	Global Mixed-mode Technology, Inc.
- google	Google, Inc.
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++
++static const char * const m6_common_board_compat[] = {
++	"amlogic,meson6",
++	NULL,
++};
++
++DT_MACHINE_START(AML8726_MX, "Amlogic Meson6 platform")
++	.dt_compat	= m6_common_board_compat,
++MACHINE_END
++
 -- 
 1.9.1
