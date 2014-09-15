@@ -1,37 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Sep 2014 16:56:56 +0100
-Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
-In-Reply-To: <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
-References: <cover.1410632834.git.joe@perches.com>
- <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
-Message-ID: <20140915155656.GA29744@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 15 Sep 2014 16:56:41 +0100
+Subject: [PATCH 0/2] KVM API documentation patches
+In-Reply-To: <20140911225802.GU5535@lvm>
+References: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
+ <54101B3D.20000@redhat.com> <20140911225802.GU5535@lvm>
+Message-ID: <877g14q3ly.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 13, 2014 at 07:31:12PM +0100, Joe Perches wrote:
-> Use the more common pr_warn.
-> 
-> Other miscellanea:
-> 
-> o Coalesce formats
-> o Realign arguments
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  arch/arm/include/asm/syscall.h   |  8 ++++----
->  arch/arm/kernel/atags_parse.c    |  2 +-
->  arch/arm/kernel/hw_breakpoint.c  | 18 +++++++++---------
->  arch/arm/kernel/irq.c            |  4 ++--
->  arch/arm/kernel/perf_event_cpu.c |  4 ++--
->  arch/arm/kernel/smp.c            |  2 +-
->  arch/arm/kernel/unwind.c         | 24 ++++++++++++------------
->  arch/arm/mm/idmap.c              |  2 +-
->  arch/arm/mm/mmu.c                |  4 ++--
->  9 files changed, 34 insertions(+), 34 deletions(-)
 
-It's Russell's call on this, but it really looks like more trouble than it's
-worth imo. Having git blame identify the person who wrote the original code
-is considerably more useful than being pointed at somebody making cosmetic
-changes.
+Christoffer Dall writes:
 
-Will
+> On Wed, Sep 10, 2014 at 11:34:53AM +0200, Paolo Bonzini wrote:
+>> Il 09/09/2014 18:27, Alex Benn?e ha scritto:
+>> > Hi,
+>> > 
+>> > I'm preparing to add ARM KVM GDB support and I went to read the API
+>> > documentation and found it surprisingly mute on the subject ;-)
+>> > 
+>> > The first patch documents the "new" KVM_SET_GUEST_DEBUG ioctl based on
+>> > reviewing the code.
+>> 
+> ha, read this after reviewing his text.  Was I too nit-picky? ;)
+
+Well I can send in a clean-up patch for the docs when I submit some
+working code ;-)
+
+-- 
+Alex Benn?e
