@@ -1,47 +1,91 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 15 Sep 2014 23:27:55 +0200
-Subject: [PATCH v4 5/7] ARM: EXYNOS: Add .write_sec outer cache callback
- for L2C-310
-In-Reply-To: <20140915085845.GC12379@n2100.arm.linux.org.uk>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-6-git-send-email-t.figa@samsung.com>
- <20140915085845.GC12379@n2100.arm.linux.org.uk>
-Message-ID: <541759DB.8090408@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Sep 2014 22:30:04 +0100
+Subject: [PATCH arm64-next v3] net: bpf: arm64: address randomize and
+ write protect JIT code
+In-Reply-To: <1410812423-11818-1-git-send-email-dborkman@redhat.com>
+References: <1410812423-11818-1-git-send-email-dborkman@redhat.com>
+Message-ID: <20140915213004.GA31150@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static void exynos_l2_write_sec(unsigned long val, unsigned reg)
->> +{
->> +	switch (reg) {
->> +	case L2X0_CTRL:
->> +		if (val & L2X0_CTRL_EN)
->> +			exynos_smc(SMC_CMD_L2X0INVALL, 0, 0, 0);
+Hi Daniel,
+
+One small comment than I forgot to mention before (see below).
+
+On Mon, Sep 15, 2014 at 09:20:23PM +0100, Daniel Borkmann wrote:
+> This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
+> jit against spraying attacks").
 > 
-> If we're calling this with the cache already enabled, presumably you're
-> doing this to cover the case where we're disabling the cache.
-
-Can we ever call this with L2X0_CTRL_EN set in val, while the cache is
-already enabled?
-
-Anyway, calling of this firmware operation is necessary before enabling
-the cache and this code is here to cover this requirement. Whether this
-function simply invalidates the cache or does something else is unknown
-to me, as all the information I got is that this needs to be done.
-
+> Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
+> support") which added necessary infrastructure, we can now implement
+> RO marking of eBPF generated JIT image pages and randomize start offset
+> for the JIT code, so that it does not reside directly on a page boundary
+> anymore. Likewise, the holes are filled with illegal instructions: here
+> we use BRK #0x100 (opcode 0xd4202000) to trigger a fault in the kernel
+> (unallocated BRKs would trigger a fault through do_debug_exception). This
+> seems more reliable as we don't have a guaranteed undefined instruction
+> space on ARM64.
 > 
-> 1. Do you really want to *invalidate* the L2 cache, discarding its
->    contents?
-> 2. Don't you think that... if you needed something like this here, then
->    it could be a defficiency in the common code?
+> This is basically the ARM64 variant of what we already have in ARM via
+> commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
+> JIT code"). Moreover, this commit also presents a merge resolution due to
+> conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
+> read-only") as we don't use kfree() in bpf_jit_free() anymore to release
+> the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
+> a different allocator.
 > 
-> If (2) doesn't apply, then should be a comment here why this is needed.
+> JIT tested on aarch64 with BPF test suite.
 > 
+> Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
+> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Alexei Starovoitov <ast@plumgrid.com>
+> ---
+>  v2->v3:
+>   - Use cpu_to_le32() as suggested by Zi/Will
+>  v1->v2:
+>   - Use brk insn as suggested by Catalin
+>  Note:
+>   - This patch depends on net-next being merged to mainline due
+>     to the mentioned merge conflict.
+> 
+>  arch/arm64/net/bpf_jit_comp.c | 38 +++++++++++++++++++++++++++++---------
+>  1 file changed, 29 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index 7ae3354..4b71779 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -19,7 +19,6 @@
+>  #define pr_fmt(fmt) "bpf_jit: " fmt
+>  
+>  #include <linux/filter.h>
+> -#include <linux/moduleloader.h>
+>  #include <linux/printk.h>
+>  #include <linux/skbuff.h>
+>  #include <linux/slab.h>
+> @@ -119,6 +118,15 @@ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
+>  	return to - from;
+>  }
+>  
+> +static void jit_fill_hole(void *area, unsigned int size)
+> +{
+> +	/* We use brk #0x100 to trigger a fault. */
+> +	u32 *ptr;
+> +	/* We are guaranteed to have aligned memory. */
+> +	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
+> +		*ptr++ = cpu_to_le32(0xd4202000);
+> +}
 
-This is a quirk specific to Exynos firmware and I suspect it doesn't
-even have anything to do with cache invalidation, but rather some
-internal logic inside the firmware.
+Please can you use the existing macros in debug-monitors.h for constructing
+this value? We have AARCH64_BREAK_MON to get the BRK encoding, then you can
+add an immediate to that file to reserve something for bpf. That way, we
+make sure that other parts of the kernel don't accidentally repurpose your
+fault code.
 
-I agree, though, that a comment might be useful here.
+Cheers,
 
-Best regards,
-Tomasz
+Will
