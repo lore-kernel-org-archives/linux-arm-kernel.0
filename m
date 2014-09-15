@@ -1,51 +1,72 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 14 Sep 2014 21:08:44 -0700
-Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add
- support for probing from ACPI
-In-Reply-To: <20140901152854.GJ2953@xora-haswell.xora.org.uk>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
- <2861461.8zNpLC3I2n@wuerfel>
- <20140901152854.GJ2953@xora-haswell.xora.org.uk>
-Message-ID: <20140915040844.12D19C40A02@trevor.secretlab.ca>
+From: agross@codeaurora.org (Andy Gross)
+Date: Sun, 14 Sep 2014 23:12:12 -0500
+Subject: [PATCH] clk: qcom: Add IPQ8064 PLL required for USB
+Message-ID: <1410754332-26699-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Sep 2014 16:28:54 +0100, Graeme Gregory <graeme.gregory@linaro.org> wrote:
-> On Mon, Sep 01, 2014 at 05:17:51PM +0200, Arnd Bergmann wrote:
-> > On Monday 01 September 2014 23:06:00 Hanjun Guo wrote:
-> > > +#ifdef CONFIG_ACPI
-> > > +/* Configure some sensible defaults for ACPI mode */
-> > > +static int smsc911x_probe_config_acpi(struct smsc911x_platform_config *config,
-> > > +                                   acpi_handle *ahandle)
-> > > +{
-> > > +       if (!ahandle)
-> > > +               return -ENOSYS;
-> > > +
-> > > +       config->phy_interface = PHY_INTERFACE_MODE_MII;
-> > > 
-> > 
-> > Please remove the #ifdef and use 
-> > 
-> > 	if (!IS_ENABLED(CONFIG_ACPI) || !ahandle)
-> > 
-> > to check for ACPI support. This should result in the same object code
-> > in all cases, but give better compile-time coverage when ACPI is
-> > disabled.
-> > 
-> struct acpi_handle does not exist in the case !CONFIG_ACPI
-> 
-> > Also, -ENOSYS is probably the wrong return value. I think you mean
-> > -ENXIO.
-> > 
-> Yes that would make sense thanks.
-> 
-> Not sure if we are planning to actually upstream this patch, I guess it
-> depends if ARM start shipping Junos with the ACPI tables loaded on them.
+This patch adds the PLL0 that is required for the USB clocks to work properly.
 
-I think we do want this upstreamed. Juno is intended to be a readily
-available reference platform, regardless of the firmware loaded when
-shipped. There will be users who use it as a test platform for ACPI
-development.
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ drivers/clk/qcom/gcc-ipq806x.c |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-g.
+diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
+index 4032e51..21f9187 100644
+--- a/drivers/clk/qcom/gcc-ipq806x.c
++++ b/drivers/clk/qcom/gcc-ipq806x.c
+@@ -32,6 +32,33 @@
+ #include "clk-branch.h"
+ #include "reset.h"
+ 
++static struct clk_pll pll0 = {
++	.l_reg = 0x30c4,
++	.m_reg = 0x30c8,
++	.n_reg = 0x30cc,
++	.config_reg = 0x30d4,
++	.mode_reg = 0x30c0,
++	.status_reg = 0x30d8,
++	.status_bit = 16,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "pll0",
++		.parent_names = (const char *[]){ "pxo" },
++		.num_parents = 1,
++		.ops = &clk_pll_ops,
++	},
++};
++
++static struct clk_regmap pll0_vote = {
++	.enable_reg = 0x34c0,
++	.enable_mask = BIT(0),
++	.hw.init = &(struct clk_init_data){
++		.name = "pll0_vote",
++		.parent_names = (const char *[]){ "pll0" },
++		.num_parents = 1,
++		.ops = &clk_pll_vote_ops,
++	},
++};
++
+ static struct clk_pll pll3 = {
+ 	.l_reg = 0x3164,
+ 	.m_reg = 0x3168,
+@@ -155,6 +182,7 @@ static const char *gcc_pxo_pll8_pll0_map[] = {
+ 	"pxo",
+ 	"pll8_vote",
+ 	"pll0",
++	"pll0_vote",
+ };
+ 
+ static struct freq_tbl clk_tbl_gsbi_uart[] = {
+@@ -2133,6 +2161,8 @@ static struct clk_branch usb_fs1_h_clk = {
+ };
+ 
+ static struct clk_regmap *gcc_ipq806x_clks[] = {
++	[PLL0] = &pll0.clkr,
++	[PLL0_VOTE] = &pll0_vote,
+ 	[PLL3] = &pll3.clkr,
+ 	[PLL8] = &pll8.clkr,
+ 	[PLL8_VOTE] = &pll8_vote,
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
