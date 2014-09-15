@@ -1,208 +1,95 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 15 Sep 2014 14:45:42 -0700
-Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
-In-Reply-To: <20140904220126.GC28256@codeaurora.org>
-References: <1409752622-7564-1-git-send-email-sboyd@codeaurora.org>
- <5407F364.9030303@samsung.com>
- <CAPDyKFp0LwK=DABHaP-Ke=QZFP8bY5MO9RnYmUBqeEdDKp63BA@mail.gmail.com>
- <5408D81C.7070602@codeaurora.org> <5408E074.7090008@samsung.com>
- <20140904220126.GC28256@codeaurora.org>
-Message-ID: <54175E06.1030203@codeaurora.org>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Mon, 15 Sep 2014 23:46:55 +0200
+Subject: [PATCH arm64-next v3] net: bpf: arm64: address randomize and
+ write protect JIT code
+In-Reply-To: <20140915213004.GA31150@arm.com>
+References: <1410812423-11818-1-git-send-email-dborkman@redhat.com>
+ <20140915213004.GA31150@arm.com>
+Message-ID: <54175E4F.2030200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/14 15:01, Stephen Boyd wrote:
+On 09/15/2014 11:30 PM, Will Deacon wrote:
+> Hi Daniel,
 >
-> ----8<----
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] mmc: Consolidate emmc tuning blocks
+> One small comment than I forgot to mention before (see below).
 >
-> The same tuning block array exists in the dw_mmc h.c and sdhci-msm.c
-> files. Move these into mmc.c so that they can be shared across
-> drivers.
+> On Mon, Sep 15, 2014 at 09:20:23PM +0100, Daniel Borkmann wrote:
+>> This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
+>> jit against spraying attacks").
+>>
+>> Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
+>> support") which added necessary infrastructure, we can now implement
+>> RO marking of eBPF generated JIT image pages and randomize start offset
+>> for the JIT code, so that it does not reside directly on a page boundary
+>> anymore. Likewise, the holes are filled with illegal instructions: here
+>> we use BRK #0x100 (opcode 0xd4202000) to trigger a fault in the kernel
+>> (unallocated BRKs would trigger a fault through do_debug_exception). This
+>> seems more reliable as we don't have a guaranteed undefined instruction
+>> space on ARM64.
+>>
+>> This is basically the ARM64 variant of what we already have in ARM via
+>> commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
+>> JIT code"). Moreover, this commit also presents a merge resolution due to
+>> conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
+>> read-only") as we don't use kfree() in bpf_jit_free() anymore to release
+>> the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
+>> a different allocator.
+>>
+>> JIT tested on aarch64 with BPF test suite.
+>>
+>> Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
+>> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+>> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: David S. Miller <davem@davemloft.net>
+>> Cc: Alexei Starovoitov <ast@plumgrid.com>
+>> ---
+>>   v2->v3:
+>>    - Use cpu_to_le32() as suggested by Zi/Will
+>>   v1->v2:
+>>    - Use brk insn as suggested by Catalin
+>>   Note:
+>>    - This patch depends on net-next being merged to mainline due
+>>      to the mentioned merge conflict.
+>>
+>>   arch/arm64/net/bpf_jit_comp.c | 38 +++++++++++++++++++++++++++++---------
+>>   1 file changed, 29 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+>> index 7ae3354..4b71779 100644
+>> --- a/arch/arm64/net/bpf_jit_comp.c
+>> +++ b/arch/arm64/net/bpf_jit_comp.c
+>> @@ -19,7 +19,6 @@
+>>   #define pr_fmt(fmt) "bpf_jit: " fmt
+>>
+>>   #include <linux/filter.h>
+>> -#include <linux/moduleloader.h>
+>>   #include <linux/printk.h>
+>>   #include <linux/skbuff.h>
+>>   #include <linux/slab.h>
+>> @@ -119,6 +118,15 @@ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
+>>   	return to - from;
+>>   }
+>>
+>> +static void jit_fill_hole(void *area, unsigned int size)
+>> +{
+>> +	/* We use brk #0x100 to trigger a fault. */
+>> +	u32 *ptr;
+>> +	/* We are guaranteed to have aligned memory. */
+>> +	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
+>> +		*ptr++ = cpu_to_le32(0xd4202000);
+>> +}
 >
-> Reported-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> Please can you use the existing macros in debug-monitors.h for constructing
+> this value? We have AARCH64_BREAK_MON to get the BRK encoding, then you can
+> add an immediate to that file to reserve something for bpf. That way, we
+> make sure that other parts of the kernel don't accidentally repurpose your
+> fault code.
 
-Hi Ulf,
-
-Can this and the previous patch be picked up for 3.18?
+Okay, no problem, I'll do that and respin tomorrow.
 
 Thanks,
-Stephen
 
->  drivers/mmc/core/mmc.c       | 32 ++++++++++++++++++++++++++++++++
->  drivers/mmc/host/dw_mmc.c    | 30 ------------------------------
->  drivers/mmc/host/sdhci-msm.c | 38 ++++----------------------------------
->  include/linux/mmc/mmc.h      |  5 +++++
->  4 files changed, 41 insertions(+), 64 deletions(-)
->
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 793c6f7ddb04..9608cc8a1f65 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1135,6 +1135,38 @@ bus_speed:
->  	return err;
->  }
->  
-> +const u8 tuning_blk_pattern_4bit[MMC_TUNING_BLK_PATTERN_4BIT_SIZE] = {
-> +	0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
-> +	0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
-> +	0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
-> +	0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
-> +	0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
-> +	0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
-> +	0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
-> +	0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
-> +};
-> +EXPORT_SYMBOL(tuning_blk_pattern_4bit);
-> +
-> +const u8 tuning_blk_pattern_8bit[MMC_TUNING_BLK_PATTERN_8BIT_SIZE] = {
-> +	0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
-> +	0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
-> +	0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
-> +	0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
-> +	0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
-> +	0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
-> +	0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
-> +	0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
-> +	0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
-> +	0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
-> +	0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
-> +	0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
-> +	0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
-> +	0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
-> +	0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
-> +	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
-> +};
-> +EXPORT_SYMBOL(tuning_blk_pattern_8bit);
-> +
->  /*
->   * Execute tuning sequence to seek the proper bus operating
->   * conditions for HS200 and HS400, which sends CMD21 to the device.
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 1ac227c603b7..f1cefdf5e2d0 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -81,36 +81,6 @@ struct idmac_desc {
->  };
->  #endif /* CONFIG_MMC_DW_IDMAC */
->  
-> -static const u8 tuning_blk_pattern_4bit[] = {
-> -	0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
-> -	0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
-> -	0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
-> -	0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
-> -	0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
-> -	0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
-> -	0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
-> -	0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
-> -};
-> -
-> -static const u8 tuning_blk_pattern_8bit[] = {
-> -	0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
-> -	0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
-> -	0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
-> -	0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
-> -	0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
-> -	0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
-> -	0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
-> -	0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
-> -	0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
-> -	0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
-> -	0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
-> -	0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
-> -	0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
-> -	0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
-> -	0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
-> -	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
-> -};
-> -
->  static inline bool dw_mci_fifo_reset(struct dw_mci *host);
->  static inline bool dw_mci_ctrl_all_reset(struct dw_mci *host);
->  
-> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-> index 5aabffc15ae8..da74c77f34cc 100644
-> --- a/drivers/mmc/host/sdhci-msm.c
-> +++ b/drivers/mmc/host/sdhci-msm.c
-> @@ -47,36 +47,6 @@
->  #define CMUX_SHIFT_PHASE_SHIFT	24
->  #define CMUX_SHIFT_PHASE_MASK	(7 << CMUX_SHIFT_PHASE_SHIFT)
->  
-> -static const u8 tuning_block_64[] = {
-> -	0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
-> -	0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
-> -	0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
-> -	0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
-> -	0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
-> -	0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
-> -	0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
-> -	0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
-> -};
-> -
-> -static const u8 tuning_block_128[] = {
-> -	0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
-> -	0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
-> -	0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
-> -	0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
-> -	0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
-> -	0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
-> -	0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
-> -	0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
-> -	0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
-> -	0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
-> -	0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
-> -	0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
-> -	0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
-> -	0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
-> -	0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
-> -	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
-> -};
-> -
->  struct sdhci_msm_host {
->  	struct platform_device *pdev;
->  	void __iomem *core_mem;	/* MSM SDCC mapped address */
-> @@ -371,8 +341,8 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
->  {
->  	int tuning_seq_cnt = 3;
->  	u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
-> -	const u8 *tuning_block_pattern = tuning_block_64;
-> -	int size = sizeof(tuning_block_64);	/* Pattern size in bytes */
-> +	const u8 *tuning_block_pattern = tuning_blk_pattern_4bit;
-> +	int size = sizeof(tuning_blk_pattern_4bit);
->  	int rc;
->  	struct mmc_host *mmc = host->mmc;
->  	struct mmc_ios ios = host->mmc->ios;
-> @@ -388,8 +358,8 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
->  
->  	if ((opcode == MMC_SEND_TUNING_BLOCK_HS200) &&
->  	    (mmc->ios.bus_width == MMC_BUS_WIDTH_8)) {
-> -		tuning_block_pattern = tuning_block_128;
-> -		size = sizeof(tuning_block_128);
-> +		tuning_block_pattern = tuning_blk_pattern_8bit;
-> +		size = sizeof(tuning_blk_pattern_8bit);
->  	}
->  
->  	data_buf = kmalloc(size, GFP_KERNEL);
-> diff --git a/include/linux/mmc/mmc.h b/include/linux/mmc/mmc.h
-> index 64ec963ed347..cff1f2622061 100644
-> --- a/include/linux/mmc/mmc.h
-> +++ b/include/linux/mmc/mmc.h
-> @@ -53,6 +53,11 @@
->  #define MMC_SEND_TUNING_BLOCK    19   /* adtc                    R1  */
->  #define MMC_SEND_TUNING_BLOCK_HS200	21	/* adtc R1  */
->  
-> +#define MMC_TUNING_BLK_PATTERN_4BIT_SIZE	 64
-> +#define MMC_TUNING_BLK_PATTERN_8BIT_SIZE	128
-> +extern const u8 tuning_blk_pattern_4bit[MMC_TUNING_BLK_PATTERN_4BIT_SIZE];
-> +extern const u8 tuning_blk_pattern_8bit[MMC_TUNING_BLK_PATTERN_8BIT_SIZE];
-> +
->    /* class 3 */
->  #define MMC_WRITE_DAT_UNTIL_STOP 20   /* adtc [31:0] data addr   R1  */
->  
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Daniel
