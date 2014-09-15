@@ -1,55 +1,39 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 15 Sep 2014 16:07:46 +0200
-Subject: [PATCH RESEND v9 5/5] rtc: Add driver for Maxim 77802 PMIC
- Real-Time-Clock
-In-Reply-To: <20140912151334.cd53fca611a7de487f23241b@linux-foundation.org>
-References: <1410509864-10019-1-git-send-email-javier.martinez@collabora.co.uk>	<1410509864-10019-6-git-send-email-javier.martinez@collabora.co.uk>
- <20140912151334.cd53fca611a7de487f23241b@linux-foundation.org>
-Message-ID: <5416F2B2.1060300@collabora.co.uk>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 15 Sep 2014 10:11:20 -0400 (EDT)
+Subject: [PATCH v4 10/18] ACPI / table: Print GIC information when MADT
+ is parsed
+In-Reply-To: <20140915064010.GD26649@localhost>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-11-git-send-email-hanjun.guo@linaro.org>
+ <20140915064010.GD26649@localhost>
+Message-ID: <110210623.13993550.1410790280170.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+Hi Olof,
 
-On 09/13/2014 12:13 AM, Andrew Morton wrote:
-> On Fri, 12 Sep 2014 10:17:43 +0200 Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
-> 
->> The MAX7802 PMIC has a Real-Time-Clock (RTC) with two alarms.
->> This patch adds support for the RTC and is based on a driver
->> added by Simon Glass to the Chrome OS kernel 3.8 tree.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Would it be appropriate to gather Simon's signoff?
-> 
+How about having it verbose in the initial implementation (in case there are any fun times bringing up early systems) and then revisiting this? x86 is very verbose but it can be helpful.
 
-I don't know. The original driver written by Simon supported 2 devices:
-max77686 and max77802. I split the max77802 bits and addressed all the issues
-pointed out on early revisions so even when Simon is mentioned as the
-MODULE_AUTHOR(), I didn't know if he would like his s-o-b to remain in the
-patch since it was quite different than the original one from which was based.
+Jon.
 
->> +static inline int max77802_rtc_calculate_wday(u8 shifted)
->> +{
->> +	int counter = -1;
->> +
->> +	while (shifted) {
->> +		shifted >>= 1;
->> +		counter++;
->> +	}
-> 
-> Can't use log2() or similar?
-> 
+-- 
+Computer Architect | Sent from my #ARM Powered Mobile device
 
-Yes, ffs() - 1 can be used instead of this function indeed.
+On Sep 15, 2014 12:34 AM, Olof Johansson <olof@lixom.net> wrote:
+>
+> On Fri, Sep 12, 2014 at 10:00:08PM +0800, Hanjun Guo wrote: 
+> > When MADT is parsed, print GIC information to On Fri, Sep 12, 2014 at 10:00:08PM +0800, Hanjun Guo wrote:
+> When MADT is parsed, print GIC information to make the boot
+> log look pretty.
 
-I see that you already included this patch to your -mm tree [0]. Does it mean
-that I've to send a follow-up patch on top of this to remove this function or
-should I send a new version of this patch?
+If you do this for prettiness, having an example output in the commit
+message would be a nice touch.
 
-Best regards,
-Javier
+The question is why it's needed though? Do we really need all this verbose
+information in dmesg when it could be found out in other ways instead?
 
-[0]:
-http://ozlabs.org/~akpm/mmots/broken-out/rtc-add-driver-for-maxim-77802-pmic-real-time-clock.patch
+x86 is notoriously verbose in some of these aspects, I'm not sure it's
+something we need to mimic here?
+
+
+-Olof
