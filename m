@@ -1,60 +1,122 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 15 Sep 2014 16:44:57 +0200
-Subject: [PATCH 0/6] ARM: meson: initial support for MesonX SoCs
-Message-ID: <1410792303-23275-1-git-send-email-carlo@caione.org>
+Date: Mon, 15 Sep 2014 16:44:58 +0200
+Subject: [PATCH 1/6] ARM: meson: debug: add debug UART for earlyprintk support
+In-Reply-To: <1410792303-23275-1-git-send-email-carlo@caione.org>
+References: <1410792303-23275-1-git-send-email-carlo@caione.org>
+Message-ID: <1410792303-23275-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is taken from http://www.spinics.net/lists/devicetree/msg48979.html
-and contains the preliminary support for MesonX-based SoCs.
-I would like to get these merged for upcoming 3.18 merge window if there are no
-concerns on this version.
+Add the UART definitions needed to support earlyprintk for MesonX SoCs
+on UARTAO.
 
-Amlogic AML8726-MX (codename Meson6) is a highly integrated multimedia
-application processor SoC for Multimedia Internet Device (MID), tablet
-and Set Top Box (STB). It integrates a powerful CPU, a 2D/3D graphics
-subsystem and a state-of-the-art video decoding engine together with
-all major peripherals. It is manufactured by Amlogic, inc.
-
-Amlogic doesn't release any documentation about their SoCs, so the code
-has been reverse-engineered from the messy source code released at:
-
-http://openlinux.amlogic.com:8000/download/ 
-
-Carlo Caione (6):
-  ARM: meson: debug: add debug UART for earlyprintk support
-  ARM: meson: documentation: add bindings documentation
-  ARM: meson: add basic support for MesonX SoCs
-  ARM: meson: dts: add basic Meson/Meson6/Meson6-atv1200 DTSI/DTS
-  ARM: meson: update multi_v7_defconfig
-  MAINTAINERS: Add entry for the Amlogic MesonX SoCs
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |   8 ++
- .../devicetree/bindings/arm/geniatech.txt          |   5 +
- .../devicetree/bindings/vendor-prefixes.txt        |   2 +
- MAINTAINERS                                        |   6 ++
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Kconfig.debug                             |  14 ++-
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/meson.dtsi                       | 105 +++++++++++++++++++++
- arch/arm/boot/dts/meson6-atv1200.dts               |  66 +++++++++++++
- arch/arm/boot/dts/meson6.dtsi                      |  78 +++++++++++++++
- arch/arm/configs/multi_v7_defconfig                |   3 +
- arch/arm/include/debug/meson.S                     |  35 +++++++
- arch/arm/mach-meson/Kconfig                        |  13 +++
- arch/arm/mach-meson/Makefile                       |   1 +
- arch/arm/mach-meson/meson.c                        |  27 ++++++
- 16 files changed, 365 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/geniatech.txt
- create mode 100644 arch/arm/boot/dts/meson.dtsi
- create mode 100644 arch/arm/boot/dts/meson6-atv1200.dts
- create mode 100644 arch/arm/boot/dts/meson6.dtsi
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ arch/arm/Kconfig.debug         | 14 ++++++++++++--
+ arch/arm/include/debug/meson.S | 35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+), 2 deletions(-)
  create mode 100644 arch/arm/include/debug/meson.S
- create mode 100644 arch/arm/mach-meson/Kconfig
- create mode 100644 arch/arm/mach-meson/Makefile
- create mode 100644 arch/arm/mach-meson/meson.c
 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..16079c5 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -348,6 +348,13 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to UART1 serial port on KEYSTONE2 devices.
+ 
++	config DEBUG_MESON_UARTAO
++		bool "Kernel low-level debugging via Meson6 UARTAO"
++		depends on ARCH_MESON
++		help
++		  Say Y here if you want kernel low-lever debugging support
++		  on Amlogic Meson6 based platforms on the UARTAO.
++
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+ 		depends on ARCH_MMP
+@@ -1011,6 +1018,7 @@ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default "debug/clps711x.S" if DEBUG_CLPS711X_UART1 || DEBUG_CLPS711X_UART2
++	default "debug/meson.S" if DEBUG_MESON_UARTAO
+ 	default "debug/pl01x.S" if DEBUG_LL_UART_PL01X || DEBUG_UART_PL01X
+ 	default "debug/exynos.S" if DEBUG_EXYNOS_UART
+ 	default "debug/efm32.S" if DEBUG_LL_UART_EFM32
+@@ -1106,6 +1114,7 @@ config DEBUG_UART_PHYS
+ 	default 0xc8000003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+ 	default 0xd0000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+ 	default 0xd0012000 if DEBUG_MVEBU_UART
++	default 0xc81004c0 if DEBUG_MESON_UARTAO
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
+@@ -1125,7 +1134,7 @@ config DEBUG_UART_PHYS
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_VIRT
+@@ -1162,6 +1171,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfd012000 if ARCH_MV78XX0
+ 	default 0xfde12000 if ARCH_DOVE
+ 	default 0xfe012000 if ARCH_ORION5X
++	default 0xf31004c0 if DEBUG_MESON_UARTAO
+ 	default 0xfe017000 if DEBUG_MMP_UART2
+ 	default 0xfe018000 if DEBUG_MMP_UART3
+ 	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
+@@ -1193,7 +1203,7 @@ config DEBUG_UART_VIRT
+ 	default 0xff003000 if DEBUG_U300_UART
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+-		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
++		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
+ 		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+diff --git a/arch/arm/include/debug/meson.S b/arch/arm/include/debug/meson.S
+new file mode 100644
+index 0000000..1bae99b
+--- /dev/null
++++ b/arch/arm/include/debug/meson.S
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2014 Carlo Caione
++ * Carlo Caione <carlo@caione.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define MESON_AO_UART_WFIFO		0x0
++#define MESON_AO_UART_STATUS		0xc
++
++#define MESON_AO_UART_TX_FIFO_EMPTY	(1 << 22)
++#define MESON_AO_UART_TX_FIFO_FULL	(1 << 21)
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =(CONFIG_DEBUG_UART_PHYS)		@ physical
++	ldr	\rv, =(CONFIG_DEBUG_UART_VIRT)		@ virtual
++	.endm
++
++	.macro	senduart,rd,rx
++	str	\rd, [\rx, #MESON_AO_UART_WFIFO]
++	.endm
++
++	.macro	busyuart,rd,rx
++1002:	ldr	\rd, [\rx, #MESON_AO_UART_STATUS]
++	tst	\rd, #MESON_AO_UART_TX_FIFO_EMPTY
++	beq	1002b
++	.endm
++
++	.macro	waituart,rd,rx
++1001:	ldr	\rd, [\rx, #MESON_AO_UART_STATUS]
++	tst	\rd, #MESON_AO_UART_TX_FIFO_FULL
++	bne	1001b
++	.endm
 -- 
 1.9.1
