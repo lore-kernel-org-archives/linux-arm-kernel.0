@@ -1,79 +1,95 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 15 Sep 2014 15:33:09 -0700
-Subject: [PATCH v5 09/12] sched: add usage_load_avg
-In-Reply-To: <20140915191541.GA28083@e103687>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-10-git-send-email-vincent.guittot@linaro.org>
- <20140915191541.GA28083@e103687>
-Message-ID: <CAKfTPtCj-PzeKb2yMWT64oYe-EoR8rdeAyyJerYOuSgVgzJS5A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 15 Sep 2014 23:46:21 +0100
+Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
+In-Reply-To: <CABxcv==OXd+uePcB8zDzB-DDmr9ci6zscHX5TCauWoTO6E4fpg@mail.gmail.com>
+References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
+ <20140912134632.GE1930@katana>
+ <CABxcv==OXd+uePcB8zDzB-DDmr9ci6zscHX5TCauWoTO6E4fpg@mail.gmail.com>
+Message-ID: <20140915224621.GG25162@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2014 21:15, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Tue, Aug 26, 2014 at 12:06:52PM +0100, Vincent Guittot wrote:
->> Add new statistics which reflect the average time a task is running on the
->> CPU and the sum of the tasks' running on a runqueue. The latter is named
->> usage_avg_contrib.
->>
->> This patch is based on the usage metric that was proposed in the 1st
->> versions of the per-entity load tracking patchset but that has be removed
->> afterward. This version differs from the original one in the sense that it's
->> not linked to task_group.
->>
->> The rq's usage_avg_contrib will be used to check if a rq is overloaded or not
->> instead of trying to compute how many task a group of CPUs can handle
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->
-> I should have read this patch before I did almost the same patch for as
-> part a series to introduce scale-invariance which I am about to post :(
->
-> The only difference I see is slightly different naming and that, AFAICT,
-> task group usage is not accounted for in this patch. Can we add the
-> support for task groups as well? I can provide a patch based on this one
-> if you want.
->
-> Also, since more than half this patch comes directly from PJT's original
-> patch I would add "by Paul Turner <pjt@google.com>" somewhere in the
-> text above.
+On Fri, 12 Sep 2014, Javier Martinez Canillas wrote:
 
-Sorry, It was obvious for me that per-entity load tracking patchset
-were done by pjt but i can surely replace
-"the per-entity load tracking patchset" by "the per-entity load
-tracking patchset by Paul Turner <pjt@google.com>"
+> [adding Sjoerd as cc who was the one that raised the module auto-loading issue]
+> 
+> Hello,
+> 
+> On Fri, Sep 12, 2014 at 3:46 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> >>
+> >> Placing this firmly back on your plate.  I truly hope we don't miss
+> >> another merge-window.  This patch-set has the support of some pretty
+> >> senior kernel maintainers, so I hope acceptance shouldn't be too
+> >> difficult.
+> >>
+> >> As previously discussed I believe it should be okay for an I2C device
+> >> driver _not_ supply an I2C ID table to match to.  The I2C subsystem
+> >> should be able to match via other means, such as via OF tables.  The
+> >> blocking factor during our previous conversation was to keep
+> >> registering via sysfs up and running.  This set does that.
+> >
+> > As mentioned in another thread, modaliases are one other possible side
+> > effect. As Javier correctly mentions, the beaviour does not really
+> > change with your patchset. Yet, if we remove i2c_device_id from drivers
+> > too carelessly, they might not be bound anymore.
+> >
+> 
+> Right, removing the I2C ID table even from drivers that don't really
+> need it (e.g: IP blocks only present in DT platforms) will as you said
+> break module auto-loading. Probing will work since the OF table is
+> used to match the device in i2c_device_match() but is the I2C table
+> what is used to fill the valid module aliases with the current
+> behavior of i2c_device_uevent(), the aliases filled from the OF table
+> are never used.
+> 
+> So what I propose is to do it incrementally:
+> 
+> 1) Merge Lee's series since that is definitely a step in the right
+> direction to not make an I2C table mandatory (still will be needed for
+> module auto loading though).
+> 
+> 2) On a follow-up series, make sure that all I2C drivers have a proper
+> OF table and that are using the MODULE_DEVICE_TABLE(of,...) macro to
+> fill the of:<foo> module aliases. That way the modules will have the
+> proper aliases of the form "of:<foo>" besides the "i2c:<foo>" one.
+> (even when always i2c:<foo> is reported to user-space currently).
+> 
+> 3) Apply the patch I posted [0] that changes the behavior of
+> i2c_device_uevent() to report the OF uevent env vars to user-space in
+> case of DT probing which after 2) should not regress any driver module
+> auto-loading since all drivers should fill the of:<foo> aliases.
 
->
-> [...]
->
->> +static inline void __update_task_entity_usage(struct sched_entity *se)
->> +{
->> +     u32 contrib;
->> +
->> +     /* avoid overflowing a 32-bit type w/ SCHED_LOAD_SCALE */
->> +     contrib = se->avg.running_avg_sum * scale_load_down(SCHED_LOAD_SCALE);
->> +     contrib /= (se->avg.runnable_avg_period + 1);
->> +     se->avg.usage_avg_contrib = scale_load(contrib);
->> +}
->> +
->> +static long __update_entity_usage_avg_contrib(struct sched_entity *se)
->> +{
->> +     long old_contrib = se->avg.usage_avg_contrib;
->> +
->> +     if (entity_is_task(se))
->> +             __update_task_entity_usage(se);
->
-> Groups are never updated?
->
-> As said above. I have code that does it.
+This sounds resonable.
 
-Yes, feel free to send a patch above this one that add group
+> After this, DT-only drivers will only need an OF table and legacy
+> drivers will only need an I2C table. Drivers that support both will
+> still need the two tables though which is a drawback of this approach
+> since unnecessary duplication will exist on these drivers and can
+> cause issues when both tables are not in sync as we saw on the issue
+> reported by Sjoerd on [1].
+> 
+> So an alternate approach could be to do the opposite, just remove the
+> OF tables entirely from the I2C drivers and only use the I2C table
+> even for DT-only drivers. This is possible since i2c_device_match()
+> will succeed even without an OF table because i2c_match_id() matches
+> for compatible strings and what is reported as uevent is what is in
+> the I2C table anyways. I believe that is what Sjoerd suggested but
+> I'll let him comment on that in case I misunderstood.
 
-Vincent
->
-> Morten
->
->> +
->> +     return se->avg.usage_avg_contrib - old_contrib;
->> +}
->> +
->
+This would be really bad.  It would go completely against what I have
+working to achieve and OF conventions.
+
+> By the way, the SPI subsystem has the same behavior, I raised the issue on [2].
+> 
+> Best regards,
+> Javier
+> 
+> [0]: https://lkml.org/lkml/2014/9/11/269
+> [1]: https://lkml.org/lkml/2014/9/9/100
+> [2]: https://lkml.org/lkml/2014/9/11/458
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
