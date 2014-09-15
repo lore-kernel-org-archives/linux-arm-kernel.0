@@ -1,27 +1,45 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 15 Sep 2014 19:01:57 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <5411B33F.10405@hurleysoftware.com>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
- <5411B33F.10405@hurleysoftware.com>
-Message-ID: <54171B85.5060209@linutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Sep 2014 09:54:36 -0700
+Subject: [PATCH 5/5] ASoC: rockchip-i2s: enable "hclk" for rockchip I2S
+ controller
+In-Reply-To: <5414FD1F.6020603@rock-chips.com>
+References: <1410568723-21559-1-git-send-email-jay.xu@rock-chips.com>
+ <1410568993-21874-1-git-send-email-jay.xu@rock-chips.com>
+ <20140913163749.GK7960@sirena.org.uk>
+ <5414FD1F.6020603@rock-chips.com>
+Message-ID: <20140915165436.GW7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2014 04:35 PM, Peter Hurley wrote:
-> I do need to find out if omap hardware sets UART_MSR_DCTS when auto CTS
-> is on. Would you mind running the debug patch below with HW flow control on?
+On Sun, Sep 14, 2014 at 10:27:43AM +0800, Jianqun wrote:
+> ? 09/14/2014 12:37 AM, Mark Brown ??:
 
-I didn't forget about this. However I told minicom to use hardware flow
-control (and I see the driver set the HW bit) but I haven't seen that
-uart_handle_cts_change() has been invoked at all. I'm going to check
-two other boards and report then.
+> >> +	ret = clk_prepare_enable(i2s->hclk);
+> >> +	if (ret) {
+> >> +		dev_err(i2s->dev, "hclock enable failed %d\n", ret);
+> >> +		return ret;
+> >> +	}
 
-> Regards,
-> Peter Hurley
+> > BTW: you're also missing a clk_disable_unprepare() in the remove path
+> > here, please send a followup fixing that.
+> remove function has done the clk_disable_unprepare for "hclk".
 
-Sebastian
+> One more thing, since "i2s_clk" is enabled at runtime_resume, and is disabled in runtime_suspend,
+> hasn't enable in probe, so do the "i2s_clk" to be disabled in remove ?
+> The current driver has disable in remove.
+
+Again, please try to write clear changelogs which describe what the goal
+of the patch is and cover obvious questions like this which a reviewer
+might ask.
+
+This is all extremely unclear - you're adding an enable here with no
+matching disable.  It seems that what you saying that there was
+previously a bug where the clock was disabled without being enabled?
+I had to look at the code to work that out...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/4f25d2fa/attachment-0001.sig>
