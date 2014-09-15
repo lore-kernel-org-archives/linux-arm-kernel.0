@@ -1,58 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Sep 2014 19:50:27 +0100
-Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
-In-Reply-To: <20140915184023.GF12361@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
- <20140915183334.GA30737@arm.com>
- <20140915184023.GF12361@n2100.arm.linux.org.uk>
-Message-ID: <20140915185027.GC30737@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Sep 2014 19:56:26 +0100
+Subject: [PATCH 07/13] arm64: Add new routine local_disable
+In-Reply-To: <8db284c1443918ca692a5c2e30a0c7f13b37428f.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <8db284c1443918ca692a5c2e30a0c7f13b37428f.1410302383.git.geoff@infradead.org>
+Message-ID: <20140915185625.GB14191@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 07:40:23PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 15, 2014 at 07:33:34PM +0100, Will Deacon wrote:
-> > On Fri, Sep 12, 2014 at 11:17:18AM +0100, Wang, Yalin wrote:
-> > > this patch fix the memblock statics for memblock
-> > > in file /sys/kernel/debug/memblock/reserved
-> > > if we don't call memblock_free the initrd will still
-> > > be marked as reserved, even they are freed.
-> > > 
-> > > Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> > > ---
-> > >  arch/arm64/mm/init.c | 4 +++-
-> > >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > index 5472c24..34605c8 100644
-> > > --- a/arch/arm64/mm/init.c
-> > > +++ b/arch/arm64/mm/init.c
-> > > @@ -334,8 +334,10 @@ static int keep_initrd;
-> > >  
-> > >  void free_initrd_mem(unsigned long start, unsigned long end)
-> > >  {
-> > > -	if (!keep_initrd)
-> > > +	if (!keep_initrd) {
-> > >  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-> > > +		memblock_free(__pa(start), end - start);
-> > > +	}
-> > 
-> > I don't think it makes any technical difference, but doing the memblock_free
-> > before the free_reserved_area makes more sense to me.
+Hi Geoff,
+
+On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
+> Add the new arm64 routine local_disable() to allow the masking of several DAIF
+> flags in one operation.  Currently, we only have routines to mask individual
+> flags, and to mask several flags multiple calls to daifset are required.
+>
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/include/asm/irqflags.h | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> A better question is... should we even be doing this.  The memblock
-> information is used as a method to bring up the kernel and provide
-> early allocation.  Once the memory is handed over from memblock to
-> the normal kernel page allocators, we no longer care what happens to
-> memblock.
-> 
-> There is no need to free the initrd memory back into memblock.  In
-> fact, seeing the initrd location in /sys/kernel/debug/memblock/reserved
-> can be useful debug information in itself.
+> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> index 11cc941..28521d4 100644
+> --- a/arch/arm64/include/asm/irqflags.h
+> +++ b/arch/arm64/include/asm/irqflags.h
+> @@ -113,5 +113,18 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+>  #define local_dbg_enable()	asm("msr	daifclr, #8" : : : "memory")
+>  #define local_dbg_disable()	asm("msr	daifset, #8" : : : "memory")
+>  
+> +enum daif_flag {
 
-That's a fair point. Yang: do you have a specific use-case in mind for this?
+Is there any reason for this to be an enum rather than a set of
+#defines?
 
-I wondered if it might interact with our pfn_valid implementation, which
-uses memblock_is_memory, however memblock_free only deals with the reserved
-regions, so I now I can't see why this change is required either.
+It would be nice to be able to use these in asm.
 
-Will
+> +	DAIF_FIQ   = (1UL << 6),
+> +	DAIF_IRQ   = (1UL << 7),
+> +	DAIF_ASYNC = (1UL << 8),
+> +	DAIF_DBG   = (1UL << 9),
+> +	DAIF_ALL   = (0xffUL << 6),
+
+Not 0xf?
+
+It would be nicer to OR the other flags.
+
+> +};
+> +
+> +static inline void local_disable(unsigned long daif_flags)
+> +{
+> +	arch_local_irq_restore(daif_flags | arch_local_save_flags());
+
+If we knew the value was a constant (which we could check with
+__builting_constant_p) we could use daifset here, rather than having a
+RMW sequence.
+
+With that, the other local_*_{enable,disable} calls could be rewritten
+in terms of this, without affecting the generated code. That would
+require some shifting to account for the difference between pstate and
+daif{clr,set} layout, but for constants that shouldn't be a problem.
+
+Thanks,
+Mark.
