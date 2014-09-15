@@ -1,46 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 15 Sep 2014 14:02:56 -0700
-Subject: [PATCH 0/2] ARM: meson: add clocksource support
-In-Reply-To: <1410786691-30302-1-git-send-email-carlo@caione.org>
-References: <1410786691-30302-1-git-send-email-carlo@caione.org>
-Message-ID: <54175400.6000504@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 15 Sep 2014 16:15:00 -0500
+Subject: [PATCH 0/9] arm: omap: intc: remaining patches
+Message-ID: <1410815709-462-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 06:11 AM, Carlo Caione wrote:
-> Two patches taken from patchset http://www.spinics.net/lists/devicetree/msg48979.html
-> adding support for clocksource and clockevents driver.
->
-> Daniel and Thomas,
-> if it's fine with you, could you please take these patches in the clocksource
-> tree?
+Hi Tony,
 
-Hi Carlo,
+Here are the remaining INTC patches rebased on your omap-for-v3.18/intc-v2
+branch.
 
-just a head up to tell you I saw your patchset. I am right now traveling 
-so I will review the patches and pick them up as soon as I come back.
+Based on our IRC chat, I kept irq-omap-intc.h header, but included it
+on common.h instead of modifying every board-file.
 
-Thanks
+cheers
 
-   -- Daniel
+Felipe Balbi (9):
+  irqchip: add irq-omap-intc.h header
+  arm: omap: irq: move irq.c to drivers/irqchip/
+  irqchip: omap-intc: minor improvement to omap_irq_pending()
+  irqchip: omap-intc: comment style cleanup
+  irqchip: omap-intc: remove unnecesary of_address_to_resource() call
+  irqchip: omap-intc: enable IP protection
+  irqchip: omap-intc: enable TURBO idle mode
+  irqchip: omap-intc: correct maximum number or MIR registers
+  irqchip: omap-intc: remove unnecessary comments
 
-> Carlo Caione (2):
->    ARM: meson: documentation: add timer documentation
->    ARM: meson6: clocksource: add Meson6 timer support
->
->   .../bindings/timer/amlogic,meson6-timer.txt        |  16 ++
->   drivers/clocksource/Kconfig                        |   3 +
->   drivers/clocksource/Makefile                       |   1 +
->   drivers/clocksource/meson6_timer.c                 | 167 +++++++++++++++++++++
->   4 files changed, 187 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
->   create mode 100644 drivers/clocksource/meson6_timer.c
->
-
+ arch/arm/mach-omap2/Kconfig                        |  1 +
+ arch/arm/mach-omap2/Makefile                       |  3 +-
+ arch/arm/mach-omap2/common.h                       | 10 +---
+ drivers/irqchip/Kconfig                            |  5 ++
+ drivers/irqchip/Makefile                           |  1 +
+ .../irq.c => drivers/irqchip/irq-omap-intc.c       | 64 +++++++++++++---------
+ include/linux/irqchip/irq-omap-intc.h              | 32 +++++++++++
+ 7 files changed, 78 insertions(+), 38 deletions(-)
+ rename arch/arm/mach-omap2/irq.c => drivers/irqchip/irq-omap-intc.c (89%)
+ create mode 100644 include/linux/irqchip/irq-omap-intc.h
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.0.1.563.g66f467c
