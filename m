@@ -1,48 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 15 Sep 2014 16:01:44 +0200
-Subject: [PATCH v3 0/9] ARM: Berlin: Ethernet support
-Message-ID: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Mon, 15 Sep 2014 16:01:48 +0200
+Subject: [PATCH v3 4/9] net: pxa168_eth: fix Ethernet flow control status
+In-Reply-To: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1410789713-15341-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+IEEE 802.3x Ethernet flow control is disabled when bit (1 << 2) is set
+in the port status register. Fix the flow control detection in the link
+event handling function which was relying on the opposite assumption.
 
-This series introduce support for the Ethernet controller on Berlin SoCs,
-using the existing pxa168 Ethernet driver. In order to do this, DT
-support is added to the driver alongside some other modifications and
-fixes.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/pxa168_eth.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This has been tested on a Berlin BG2Q DMP board.
-
-Changes since v2:
-	- reworked how the MAC address is configured
-	- made the clock anonymous
-
-Changes since v1:
-        - removed custom Berlin Ethernet driver
-        - used the pxa168 Ethernet driver instead
-        - made modifications to the pxa168 driver (DT support, fixes)
-
-Antoine Tenart (9):
-  net: pxa168_eth: clean up
-  net: pxa168_eth: add device tree support
-  Documentation: bindings: net: add the Marvell PXA168 Ethernet
-    controller
-  net: pxa168_eth: fix Ethernet flow control status
-  net: pxa168_eth: get and set the mac address on the Ethernet
-    controller
-  net: pxa168_eth: rework the MAC address setup
-  net: pxa168_eth: allow Berlin SoCs to use the pxa168_eth driver
-  ARM: dts: berlin: add the Ethernet node
-  ARM: dts: berlin: enable the Ethernet port on the BG2Q DMP
-
- .../devicetree/bindings/net/marvell-pxa168.txt     |  21 ++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   4 +
- arch/arm/boot/dts/berlin2q.dtsi                    |  10 +
- drivers/net/ethernet/marvell/Kconfig               |   2 +-
- drivers/net/ethernet/marvell/pxa168_eth.c          | 216 +++++++++++++--------
- 5 files changed, 174 insertions(+), 79 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/marvell-pxa168.txt
-
+diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
+index a27cd85c030d..5aa2ce2625b4 100644
+--- a/drivers/net/ethernet/marvell/pxa168_eth.c
++++ b/drivers/net/ethernet/marvell/pxa168_eth.c
+@@ -163,7 +163,7 @@
+ /* Bit definitions for Port status */
+ #define PORT_SPEED_100		(1 << 0)
+ #define FULL_DUPLEX		(1 << 1)
+-#define FLOW_CONTROL_ENABLED	(1 << 2)
++#define FLOW_CONTROL_DISABLED	(1 << 2)
+ #define LINK_UP			(1 << 3)
+ 
+ /* Bit definitions for work to be done */
+@@ -885,7 +885,7 @@ static void handle_link_event(struct pxa168_eth_private *pep)
+ 		speed = 10;
+ 
+ 	duplex = (port_status & FULL_DUPLEX) ? 1 : 0;
+-	fc = (port_status & FLOW_CONTROL_ENABLED) ? 1 : 0;
++	fc = (port_status & FLOW_CONTROL_DISABLED) ? 0 : 1;
+ 	netdev_info(dev, "link up, %d Mb/s, %s duplex, flow control %sabled\n",
+ 		    speed, duplex ? "full" : "half", fc ? "en" : "dis");
+ 	if (!netif_carrier_ok(dev))
 -- 
 1.9.1
