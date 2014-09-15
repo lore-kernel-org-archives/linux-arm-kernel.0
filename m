@@ -1,75 +1,99 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Mon, 15 Sep 2014 16:08:00 +0100
-Subject: [PATCH 2/5] spi-nor: Remove spi_nor::read_id operation
-In-Reply-To: <20140915145523.GA1963@localhost.localdomain>
-References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714676.3040.40.camel@decadent.org.uk>
- <20140915145523.GA1963@localhost.localdomain>
-Message-ID: <1410793680.3040.62.camel@decadent.org.uk>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 15 Sep 2014 17:08:04 +0200
+Subject: [Patch v4 net-next 04/12] net: fec: parser max queue number
+ from dt file
+In-Reply-To: <CAHrpEqTCBMn-P2O7VZOOLUN=Zbc8h_Ow9MKrv5cV5gZPENRqUw@mail.gmail.com>
+References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+ <1410555657-10744-5-git-send-email-Frank.Li@freescale.com>
+ <20140915093926.11bdbc32@ipc1.ka-ro>
+ <CAHrpEqTCBMn-P2O7VZOOLUN=Zbc8h_Ow9MKrv5cV5gZPENRqUw@mail.gmail.com>
+Message-ID: <20140915170804.39061c0d@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-15 at 22:55 +0800, Huang Shijie wrote:
-> On Sun, Sep 14, 2014 at 06:11:16PM +0100, Ben Hutchings wrote:
-> > There is currently no useful way to override the default
-> > implementation of this operation.  The returned struct spi_device_id
-> > must have a pointer to struct flash_info in its private data, but this
-> > structure is defined inside spi-nor.
-> > 
-> > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> > ---
-> >  drivers/mtd/spi-nor/spi-nor.c | 4 +---
-> >  include/linux/mtd/spi-nor.h   | 3 ---
-> >  2 files changed, 1 insertion(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> > index 6b1bda2..6f699c5 100644
-> > --- a/drivers/mtd/spi-nor/spi-nor.c
-> > +++ b/drivers/mtd/spi-nor/spi-nor.c
-> > @@ -902,8 +902,6 @@ static int spi_nor_check(struct spi_nor *nor)
-> >  		return -EINVAL;
-> >  	}
-> >  
-> > -	if (!nor->read_id)
-> > -		nor->read_id = spi_nor_read_id;
-> >  	if (!nor->wait_till_ready)
-> >  		nor->wait_till_ready = spi_nor_wait_till_ready;
-> >  
-> > @@ -952,7 +950,7 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
-> >  	if (info->jedec_id) {
-> >  		const struct spi_device_id *jid;
-> >  
-> > -		jid = nor->read_id(nor);
-> > +		jid = spi_nor_read_id(nor);
-> >  		if (IS_ERR(jid)) {
-> >  			return PTR_ERR(jid);
-> >  		} else if (jid != id) {
-> > diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-> > index 5ec84cc..66af67a 100644
-> > --- a/include/linux/mtd/spi-nor.h
-> > +++ b/include/linux/mtd/spi-nor.h
-> > @@ -139,8 +139,6 @@ enum spi_nor_ops {
-> >   * @write_xfer:		[OPTIONAL] the writefundamental primitive
-> >   * @read_reg:		[DRIVER-SPECIFIC] read out the register
-> >   * @write_reg:		[DRIVER-SPECIFIC] write data to the register
-> > - * @read_id:		[REPLACEABLE] read out the ID data, and find
-> > - *			the proper spi_device_id
-> If we remove this hook, i guess we will add it back in the later.
-> Other new drivers will use this hook.
+Hi,
+
+Zhi Li wrote:
+> On Mon, Sep 15, 2014 at 2:39 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> > Hi,
+> >
+> > Frank.Li at freescale.com wrote:
+> >> From: Fugang Duan <B38611@freescale.com>
+> >>
+> >> By default, the tx/rx queue number is 1, user can config the queue number
+> >> at DTS file like this:
+> >>       fsl,num-tx-queues=<3>;
+> >>       fsl,num-rx-queues=<3>
+> >>
+> >> Since i.MX6SX enet-AVB IP support multi queues, so use multi queues
+> >> interface to allocate and set up an Ethernet device.
+> >>
+> >> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> >> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> >> ---
+> >>  drivers/net/ethernet/freescale/fec.h      |  2 ++
+> >>  drivers/net/ethernet/freescale/fec_main.c | 46 ++++++++++++++++++++++++++++++-
+> >>  2 files changed, 47 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+> >> index b2b91f8..72fb90f 100644
+> >> --- a/drivers/net/ethernet/freescale/fec.h
+> >> +++ b/drivers/net/ethernet/freescale/fec.h
+> >> @@ -356,6 +356,8 @@ struct fec_enet_private {
+> >>
+> >>       bool ptp_clk_on;
+> >>       struct mutex ptp_clk_mutex;
+> >> +     unsigned int num_tx_queues;
+> >> +     unsigned int num_rx_queues;
+> >>
+> >>       /* The saved address of a sent-in-place packet/buffer, for skfree(). */
+> >>       struct fec_enet_priv_tx_q *tx_queue[FEC_ENET_MAX_TX_QS];
+> >> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+> >> index 4c0d2ee..2240df0 100644
+> >> --- a/drivers/net/ethernet/freescale/fec_main.c
+> >> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> >> @@ -2709,6 +2709,42 @@ static void fec_reset_phy(struct platform_device *pdev)
+> >>  }
+> >>  #endif /* CONFIG_OF */
+> >>
+> >> +static void
+> >> +fec_enet_get_queue_num(struct platform_device *pdev, int *num_tx, int *num_rx)
+> >> +{
+> >> +     struct device_node *np = pdev->dev.of_node;
+> >> +     int err;
+> >> +
+> >> +     *num_tx = *num_rx = 1;
+> >> +
+> >> +     if (!np || !of_device_is_available(np))
+> >> +             return;
+> >> +
+> >> +     /* parse the num of tx and rx queues */
+> >> +     err = of_property_read_u32(np, "fsl,num-tx-queues", num_tx);
+> >> +     err |= of_property_read_u32(np, "fsl,num-rx-queues", num_rx);
+> >> +     if (err) {
+> >> +             *num_tx = 1;
+> >> +             *num_rx = 1;
+> > Shouldn't these be handled seperately? So that if only one of those
+> > properties is given in DT the specified value for that property should
+> > be used?
 > 
-> so i suggest to keep it as it is.
+> I worry about asymmetric design in future.
+>
+Then why do you use two distinct properties in the first place?
 
-It may well be needed, but it can't be implemented in its current form.
+> And use two property is the easy debug two directory.
+> 
+I don't understand this sentence.
 
-Ben.
 
+Lothar Wa?mann
 -- 
-Ben Hutchings
-Make three consecutive correct guesses and you will be considered an expert.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/950cc586/attachment.sig>
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
