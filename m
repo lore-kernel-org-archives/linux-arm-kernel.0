@@ -1,55 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Sep 2014 16:01:36 +0100
-Subject: [PATCH v4 14/18] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <1410530416-30200-15-git-send-email-hanjun.guo@linaro.org>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-15-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140915150136.GF5415@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 15 Sep 2014 17:06:04 +0200
+Subject: [PATCH v2] ARM: dts: Add Maxim 77693 PMIC to the Trats2 board
+Message-ID: <1410793564-30445-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 03:00:12PM +0100, Hanjun Guo wrote:
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 5b3546b..9869377 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -23,6 +23,7 @@
->  #include <linux/irqdomain.h>
->  #include <linux/bootmem.h>
->  #include <linux/smp.h>
-> +#include <linux/irqchip/arm-gic-acpi.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
-> @@ -312,6 +313,28 @@ void __init acpi_boot_table_init(void)
->  		pr_err("Can't find FADT or error happened during parsing FADT\n");
->  }
->  
-> +void __init acpi_gic_init(void)
-> +{
-> +	struct acpi_table_header *table;
-> +	acpi_status status;
-> +	acpi_size tbl_size;
-> +	int err;
-> +
-> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
-> +	if (ACPI_FAILURE(status)) {
-> +		const char *msg = acpi_format_exception(status);
-> +
-> +		pr_err("Failed to get MADT table, %s\n", msg);
-> +		return;
-> +	}
-> +
-> +	err = gic_v2_acpi_init(table);
-> +	if (err)
-> +		pr_err("Failed to initialize GIC IRQ controller");
-> +
-> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
-> +}
+The MAX77693 is a companion power management IC for smart phones and tablets.
 
-Maybe this was discussed already but why does this function need to live
-under arch/arm64? Isn't the driver code more appropriate?
+The MAX77693 contains input over-voltage protection (OVP),
+a fully-integrated 2.5A switching charger for Lithium Ion battery with
+integrated battery disconnect, OTG/accessory 5V output power,
+a high-current white LED driver for camera flash, two safeout LDOs,
+a haptic motor driver, Model Gauge m3 battery fuel gauge and MicroUSB
+Interface Controller (MUIC). I2C serial interface is used for
+communicating.
 
+Add MAX77693 node to the Trats2 board. This allows using:
+ - charger regulator,
+ - 2 safeout LDO regulators (for USB OTG),
+ - extcon.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+---
+
+Changes since v1:
+==================
+1. Use GPIO_ACTIVE_HIGH for gpio flags (suggested by Javier Martinez
+   Canillas).
+2. Use regulator node name instead of deprecated regulator-compatible
+   property (suggested by Javier Martinez Canillas).
+3. Add Javier Martinez Canillas' reviewed-by tag.
+---
+ arch/arm/boot/dts/exynos4412-trats2.dts | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 11967f4561e0..1953317bd658 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -14,6 +14,7 @@
+ 
+ /dts-v1/;
+ #include "exynos4412.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Samsung Trats 2 based on Exynos4412";
+@@ -22,6 +23,7 @@
+ 	aliases {
+ 		i2c9 = &i2c_ak8975;
+ 		i2c10 = &i2c_cm36651;
++		i2c11 = &i2c_max77693;
+ 	};
+ 
+ 	memory {
+@@ -518,6 +520,36 @@
+ 		};
+ 	};
+ 
++	i2c_max77693: i2c-gpio-1 {
++		compatible = "i2c-gpio";
++		gpios = <&gpm2 0 GPIO_ACTIVE_HIGH>, <&gpm2 1 GPIO_ACTIVE_HIGH>;
++		i2c-gpio,delay-us = <2>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++
++		max77693 at 66 {
++			compatible = "maxim,max77693";
++			interrupt-parent = <&gpx1>;
++			interrupts = <5 2>;
++			reg = <0x66>;
++
++			regulators {
++				esafeout1_reg: ESAFEOUT1 at 1 {
++					regulator-name = "ESAFEOUT1";
++				};
++				esafeout2_reg: ESAFEOUT2 at 2 {
++					regulator-name = "ESAFEOUT2";
++				};
++				charger_reg: CHARGER at 0 {
++					regulator-name = "CHARGER";
++					regulator-min-microamp = <60000>;
++					regulator-max-microamp = <2580000>;
++				};
++			};
++		};
++	};
++
+ 	mmc at 12550000 {
+ 		num-slots = <1>;
+ 		supports-highspeed;
 -- 
-Catalin
+1.9.1
