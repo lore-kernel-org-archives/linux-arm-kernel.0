@@ -1,50 +1,47 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 15 Sep 2014 18:34:34 +0200
-Subject: [PATCH v8 6/9] arm: netx: Migrate DEBUG_LL macros to shared
- directory
-In-Reply-To: <1408459715-10151-7-git-send-email-daniel.thompson@linaro.org>
-References: <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
- <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
- <1408459715-10151-7-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1410798874.31130.57.camel@x220>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 15 Sep 2014 12:37:55 -0400 (EDT)
+Subject: [PATCH v3 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <1410638839-14792-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1410638839-14792-1-git-send-email-santosh.shilimkar@ti.com>
+ <1410638839-14792-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140915.123755.1868053059646672094.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-08-19 at 15:48 +0100, Daniel Thompson wrote:
-> As part of the migration we introduce DEBUG_UART_PHYS/DEBUG_UART_VIRT
-> which default to UART1 but allow a user to configure UART2 or UART3.
-> We also introduce symbolic names for the registers and flags.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Acked-by: Arnd Bergmann <arnd.bergmann@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Sat, 13 Sep 2014 16:07:18 -0400
 
-This patch landed in today's linux-next, as 880fa9b6fd73 ("ARM: 8144/1:
-netx: Migrate DEBUG_LL macros to shared directory").
-
-> [...]
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -447,6 +447,14 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on Vybrid based platforms.
->  
-> +	config DEBUG_NETX_UART
-> +		bool "Kernel low-level debugging messages via NetX UART"
-> +		depends on ARCH_NETX
-> +		select DEBUG_UART_NETX
-
-There's no Kconfig symbol DEBUG_UART_NETX in next-20140915. So in
-linux-next this is currently a nop. Is this symbol queued somewhere?
-
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on Hilscher NetX based platforms.
+> +	/* Find this module in the sub-tree for this device */
+> +	devices = of_get_child_by_name(node, "netcp-devices");
+> +	if (!devices) {
+> +		dev_err(dev, "could not find netcp-devices node\n");
+> +		return NETCP_MOD_PROBE_SKIPPED;
+> +	}
 > +
->  	config DEBUG_NOMADIK_UART
->  		bool "Kernel low-level debugging messages via NOMADIK UART"
->  		depends on ARCH_NOMADIK
+> +	for_each_available_child_of_node(devices, child) {
+> +		const char *name = netcp_node_name(child);
+> +
+> +		if (!strcasecmp(module->name, name))
+> +			break;
+> +	}
+> +
+> +	/* If module not used for this device, skip it */
+> +	if (child == NULL) {
+> +		dev_warn(dev, "module(%s) not used for device\n", module->name);
+> +		return NETCP_MOD_PROBE_SKIPPED;
+> +	}
 
+of_get_child_by_name() takes a reference to an OF node, you must release
+it in the error path.
 
-Paul Bolle
+> +	inst_modpriv = devm_kzalloc(dev, sizeof(*inst_modpriv), GFP_KERNEL);
+> +	if (!inst_modpriv) {
+> +		dev_err(dev, "Failed to allocate instance for %s\n",
+> +			module->name);
+> +		return -ENOMEM;
+> +	}
+
+Likewise, but here you have to release both "devices" and "child".
+
+You're going to have to fix this OF node refcount problem for this
+entire probe routine.
