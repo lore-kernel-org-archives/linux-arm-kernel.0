@@ -1,97 +1,76 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 15 Sep 2014 17:06:04 +0200
-Subject: [PATCH v2] ARM: dts: Add Maxim 77693 PMIC to the Trats2 board
-Message-ID: <1410793564-30445-1-git-send-email-k.kozlowski@samsung.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 15 Sep 2014 16:07:07 +0100
+Subject: [PATCH 5/5] m25p80,spi-nor: Share the list of supported chip
+ type names again
+In-Reply-To: <CAMuHMdUs+7uidcD6tivnq6+TbD4_piixLVqwuSa0Z1u3sF7EoA@mail.gmail.com>
+References: <1410714624.3040.38.camel@decadent.org.uk>
+ <1410714708.3040.43.camel@decadent.org.uk>
+ <CAMuHMdUs+7uidcD6tivnq6+TbD4_piixLVqwuSa0Z1u3sF7EoA@mail.gmail.com>
+Message-ID: <1410793627.3040.61.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MAX77693 is a companion power management IC for smart phones and tablets.
+On Mon, 2014-09-15 at 09:55 +0200, Geert Uytterhoeven wrote:
+> Hi Ben,
+> 
+> On Sun, Sep 14, 2014 at 7:11 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
+> > Move the list of chip type names to spi-nor.h.  To avoid putting all
+> > the chip type information there, we define this list as a macro
+> > SPI_NOR_ENUM_TYPES() that invokes another macro SPI_NOR_ENUM_TYPE()
+> > that must be defined to expand each name to whatever form it's needed.
+> >
+> > In spi-nor.c, use it to define enumerators, then use the enumerators
+> > as indices when defining spi_nor_info so that we cannot accidentally
+> > use a name that's not on the list.
+> >
+> > This is somewhat complicated by the fact that some names include
+> > hyphens.  SPI_NOR_ENUM_TYPE() therefore takes separate string and C
+> > identifier parameters.
+> 
+> Thanks for doing this!
+> 
+> However, the table generation still looks overly complicated to me, with
+> too much duplication which needs to be kept in sync.
 
-The MAX77693 contains input over-voltage protection (OVP),
-a fully-integrated 2.5A switching charger for Lithium Ion battery with
-integrated battery disconnect, OTG/accessory 5V output power,
-a high-current white LED driver for camera flash, two safeout LDOs,
-a haptic motor driver, Model Gauge m3 battery fuel gauge and MicroUSB
-Interface Controller (MUIC). I2C serial interface is used for
-communicating.
+It does need to be kept in sync, but the compiler will check that.
 
-Add MAX77693 node to the Trats2 board. This allows using:
- - charger regulator,
- - 2 safeout LDO regulators (for USB OTG),
- - extcon.
+[...]
+> > --- a/include/linux/mtd/spi-nor.h
+> > +++ b/include/linux/mtd/spi-nor.h
+> > @@ -198,4 +198,76 @@ struct spi_nor {
+> >   */
+> >  int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode);
+> >
+> > +#define __SPI_NOR_ENUM_TYPES(c_id, str_and_c_id)                         \
+> > +       c_id(at25fs010)         c_id(at25fs040)         c_id(at25df041a)  \
+> > +       c_id(at25df321a)        c_id(at25df641)         c_id(at26f004)    \
+> 
+> Can't you just have the IDs in a header file only, and let the header file
+> generate either a struct flash_info or a struct spi_device_id table, using
+> a macro defined by the file that includes it?
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+How would we match up the rest of the struct flash_info to the name?
 
----
+> Cfr. include/uapi/asm-generic/unistd.h and its use of __SYSCALL()?
+> 
+> Or am I missing something (e.g. this is impossible due to the hyphens in the
+> names?).
 
-Changes since v1:
-==================
-1. Use GPIO_ACTIVE_HIGH for gpio flags (suggested by Javier Martinez
-   Canillas).
-2. Use regulator node name instead of deprecated regulator-compatible
-   property (suggested by Javier Martinez Canillas).
-3. Add Javier Martinez Canillas' reviewed-by tag.
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Well the hyphens are only a problem because we want C identifiers.  But
+we only need C identifiers so we can enforce that each struct flash_info
+matches a name on the list.  If you can find a way to match them up
+without having to define enumerators, that would of course be
+preferable.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 11967f4561e0..1953317bd658 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -14,6 +14,7 @@
- 
- /dts-v1/;
- #include "exynos4412.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Samsung Trats 2 based on Exynos4412";
-@@ -22,6 +23,7 @@
- 	aliases {
- 		i2c9 = &i2c_ak8975;
- 		i2c10 = &i2c_cm36651;
-+		i2c11 = &i2c_max77693;
- 	};
- 
- 	memory {
-@@ -518,6 +520,36 @@
- 		};
- 	};
- 
-+	i2c_max77693: i2c-gpio-1 {
-+		compatible = "i2c-gpio";
-+		gpios = <&gpm2 0 GPIO_ACTIVE_HIGH>, <&gpm2 1 GPIO_ACTIVE_HIGH>;
-+		i2c-gpio,delay-us = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+
-+		max77693 at 66 {
-+			compatible = "maxim,max77693";
-+			interrupt-parent = <&gpx1>;
-+			interrupts = <5 2>;
-+			reg = <0x66>;
-+
-+			regulators {
-+				esafeout1_reg: ESAFEOUT1 at 1 {
-+					regulator-name = "ESAFEOUT1";
-+				};
-+				esafeout2_reg: ESAFEOUT2 at 2 {
-+					regulator-name = "ESAFEOUT2";
-+				};
-+				charger_reg: CHARGER at 0 {
-+					regulator-name = "CHARGER";
-+					regulator-min-microamp = <60000>;
-+					regulator-max-microamp = <2580000>;
-+				};
-+			};
-+		};
-+	};
-+
- 	mmc at 12550000 {
- 		num-slots = <1>;
- 		supports-highspeed;
+Ben.
+
 -- 
-1.9.1
+Ben Hutchings
+Make three consecutive correct guesses and you will be considered an expert.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/90366ebe/attachment.sig>
