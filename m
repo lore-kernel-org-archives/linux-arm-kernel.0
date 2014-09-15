@@ -1,97 +1,38 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Sep 2014 16:15:01 -0500
-Subject: [PATCH 1/9] irqchip: add irq-omap-intc.h header
+Date: Mon, 15 Sep 2014 16:15:04 -0500
+Subject: [PATCH 4/9] irqchip: omap-intc: comment style cleanup
 In-Reply-To: <1410815709-462-1-git-send-email-balbi@ti.com>
 References: <1410815709-462-1-git-send-email-balbi@ti.com>
-Message-ID: <1410815709-462-2-git-send-email-balbi@ti.com>
+Message-ID: <1410815709-462-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP INTC irqchip driver will be moved under
-drivers/irqchip/ soon but we still have a dependency
-with mach-omap2 when it comes to idle functions.
+no functional changes, just making sure comment
+follows Coding Style.
 
-In order to make it easy to share those function
-prototypes with OMAP PM code, we introduce this new
-header.
-
-To avoid modifying several board-files and some of
-the PM-related code, we just include the new header
-from common.h which was already included by all
-users of IRQ-related PM code.
-
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/common.h          | 10 +---------
- include/linux/irqchip/irq-omap-intc.h | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+), 9 deletions(-)
- create mode 100644 include/linux/irqchip/irq-omap-intc.h
+ drivers/irqchip/irq-omap-intc.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 1800093..377eea8 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -32,6 +32,7 @@
- #include <linux/i2c/twl.h>
- #include <linux/i2c-omap.h>
- #include <linux/reboot.h>
-+#include <linux/irqchip/irq-omap-intc.h>
+diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+index 2933760..f4d562e 100644
+--- a/drivers/irqchip/irq-omap-intc.c
++++ b/drivers/irqchip/irq-omap-intc.c
+@@ -326,9 +326,11 @@ out:
+ 		}
+ 	} while (irqnr);
  
- #include <asm/proc-fns.h>
- 
-@@ -210,15 +211,6 @@ extern struct device *omap2_get_iva_device(void);
- extern struct device *omap2_get_l3_device(void);
- extern struct device *omap4_get_dsp_device(void);
- 
--void omap2_init_irq(void);
--void omap3_init_irq(void);
--void ti81xx_init_irq(void);
--extern int omap_irq_pending(void);
--void omap_intc_save_context(void);
--void omap_intc_restore_context(void);
--void omap3_intc_suspend(void);
--void omap3_intc_prepare_idle(void);
--void omap3_intc_resume_idle(void);
- void omap_gic_of_init(void);
- 
- #ifdef CONFIG_CACHE_L2X0
-diff --git a/include/linux/irqchip/irq-omap-intc.h b/include/linux/irqchip/irq-omap-intc.h
-new file mode 100644
-index 0000000..e06b370
---- /dev/null
-+++ b/include/linux/irqchip/irq-omap-intc.h
-@@ -0,0 +1,32 @@
-+/**
-+ * irq-omap-intc.h - INTC Idle Functions
-+ *
-+ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * Author: Felipe Balbi <balbi@ti.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2  of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __INCLUDE_LINUX_IRQCHIP_IRQ_OMAP_INTC_H
-+#define __INCLUDE_LINUX_IRQCHIP_IRQ_OMAP_INTC_H
-+
-+void omap2_init_irq(void);
-+void omap3_init_irq(void);
-+void ti81xx_init_irq(void);
-+
-+int omap_irq_pending(void);
-+void omap_intc_save_context(void);
-+void omap_intc_restore_context(void);
-+void omap3_intc_suspend(void);
-+void omap3_intc_prepare_idle(void);
-+void omap3_intc_resume_idle(void);
-+
-+#endif /* __INCLUDE_LINUX_IRQCHIP_IRQ_OMAP_INTC_H */
+-	/* If an irq is masked or deasserted while active, we will
++	/*
++	 * If an irq is masked or deasserted while active, we will
+ 	 * keep ending up here with no irq handled. So remove it from
+-	 * the INTC with an ack.*/
++	 * the INTC with an ack.
++	 */
+ 	if (!handled_irq)
+ 		omap_ack_irq(NULL);
+ }
 -- 
 2.0.1.563.g66f467c
