@@ -1,56 +1,74 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 15 Sep 2014 20:28:50 +0100
-Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
-In-Reply-To: <20140911123412.GY3190@worktop.ger.corp.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
- <20140911123412.GY3190@worktop.ger.corp.intel.com>
-Message-ID: <20140915192850.GB28083@e103687>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 15 Sep 2014 14:29:46 -0500
+Subject: [PATCH 30/35] irqchip: add irq-omap-intc.h header
+In-Reply-To: <20140911210800.GI18849@atomide.com>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <1406582183-696-31-git-send-email-balbi@ti.com>
+ <20140911210800.GI18849@atomide.com>
+Message-ID: <20140915192946.GG20655@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 01:34:12PM +0100, Peter Zijlstra wrote:
-> > @@ -4514,6 +4519,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
-> >  	return target;
-> >  }
-> >  
-> > +static int get_cpu_utilization(int cpu)
-> > +{
-> > +	unsigned long usage = cpu_rq(cpu)->cfs.usage_load_avg;
-> > +	unsigned long capacity = capacity_of(cpu);
-> > +
-> > +	if (usage >= SCHED_LOAD_SCALE)
-> > +		return capacity + 1;
-> > +
-> > +	return (usage * capacity) >> SCHED_LOAD_SHIFT;
-> > +}
+Hi,
+
+On Thu, Sep 11, 2014 at 02:08:01PM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> > OMAP INTC irqchip driver will be moved under
+> > drivers/irqchip/ soon but we still have a dependency
+> > with mach-omap2 when it comes to idle functions.
+> > 
+> > In order to make it easy to share those function
+> > prototypes with OMAP PM code, we introduce this new
+> > header.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/board-3430sdp.c        |  1 +
+> >  arch/arm/mach-omap2/board-am3517crane.c    |  1 +
+> >  arch/arm/mach-omap2/board-am3517evm.c      |  1 +
+> >  arch/arm/mach-omap2/board-cm-t35.c         |  1 +
+> >  arch/arm/mach-omap2/board-cm-t3517.c       |  1 +
+> >  arch/arm/mach-omap2/board-devkit8000.c     |  1 +
+> >  arch/arm/mach-omap2/board-ldp.c            |  1 +
+> >  arch/arm/mach-omap2/board-omap3beagle.c    |  1 +
+> >  arch/arm/mach-omap2/board-omap3logic.c     |  1 +
+> >  arch/arm/mach-omap2/board-omap3pandora.c   |  1 +
+> >  arch/arm/mach-omap2/board-omap3stalker.c   |  1 +
+> >  arch/arm/mach-omap2/board-omap3touchbook.c |  1 +
+> >  arch/arm/mach-omap2/board-overo.c          |  1 +
+> >  arch/arm/mach-omap2/board-rx51.c           |  1 +
+> >  arch/arm/mach-omap2/board-ti8168evm.c      |  1 +
+> >  arch/arm/mach-omap2/common.h               |  9 ---------
+> >  arch/arm/mach-omap2/cpuidle34xx.c          |  1 +
+> >  arch/arm/mach-omap2/irq.c                  |  1 +
+> >  arch/arm/mach-omap2/pm24xx.c               |  1 +
+> >  arch/arm/mach-omap2/pm34xx.c               |  1 +
+> >  include/linux/irqchip/irq-omap-intc.h      | 32 ++++++++++++++++++++++++++++++
+> >  21 files changed, 51 insertions(+), 9 deletions(-)
 > 
-> So if I understood patch 9 correct, your changelog is iffy.
-> usage_load_avg should never get > 1 (of whatever unit), no matter how
-> many tasks are on the rq. You can only maximally run all the time.
+> I ended up setting up another branch without this patch
+> at omap-for-v3.12/intc-v2. It now has dependency to the
+> SoC changes from Nishant and the const cleanup fix from Uwe.
 > 
-> Therefore I can only interpret the if (usage >= SCHED_LOAD_SCALE) as
-> numerical error handling, nothing more.
+> This patch is not needed, let's leave this out, the functions
 
-That is not entirely true unless you also classify transient usage
-spikes due to task migrations as numerical errors as well.
+so, if we don't add that header, we will have to include soc.h and
+common.h with full (relative) path from drivers/irqchip/irq-omap-intc.c.
+IOW:
 
-Since each task sched_entity is carrying around 350ms worth of execution
-history with it between different cpus and cpu utilization is based on
-the sum of task entity usage_avg_contrib on the runqueue you may get
-cfs.usage_load_avg > 1 temporarily after task migrations. It will
-eventually converge to 1.
+#include "../../arch/arm/mach-omap2/common.h"
 
-The same goes for new tasks which are initialized to have a
-usage_avg_contrib of 1 and may be queued on cpu with tasks already
-running. In that case cfs.usage_load_avg is temporarily unbounded.
+Neither soc.h nor common.h are part of the include path. I'd rather not
+go down that route and just add this extra header. Even if you ask me to
+move soc.h and common.h under <asm/mach/{soc,common}.h> we will already
+have to modify every board file anyway.
 
-> Also I'm not entirely sure I like the usage, utilization names/metrics.
-> I would suggest to reverse them. Call the pure running number
-> 'utilization' and this scaled with capacity 'usage' or so.
-
-I can agree with calling running for utilization, but I'm not convienced
-about capacity. What does it exactly cover here? I'm confused and
-jetlagged.
-
-Morten
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/6a18c2e2/attachment.sig>
