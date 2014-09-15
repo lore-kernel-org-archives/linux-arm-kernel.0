@@ -1,51 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Sep 2014 17:02:41 +0100
-Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
- clang
-In-Reply-To: <1410759015-15642-1-git-send-email-behanw@converseincode.com>
-References: <20140909101515.GB1754@arm.com>
- <1410759015-15642-1-git-send-email-behanw@converseincode.com>
-Message-ID: <20140915160240.GC29744@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 15 Sep 2014 18:06:31 +0200
+Subject: [PATCH 3/7 v6] power: reset: driver for the Versatile syscon
+ reboot
+In-Reply-To: <CACRpkdbE8z3N_7FQzooVsd=UvUeoRhPqO5=foTGn7U=ag0ML9g@mail.gmail.com>
+References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+ <1410176286-32533-4-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdbE8z3N_7FQzooVsd=UvUeoRhPqO5=foTGn7U=ag0ML9g@mail.gmail.com>
+Message-ID: <20140915160630.GA19960@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 06:30:15AM +0100, behanw at converseincode.com wrote:
-> From: Mark Charlebois <charlebm@gmail.com>
+On Fri, Sep 12, 2014 at 10:55:19AM +0200, Linus Walleij wrote:
+> On Mon, Sep 8, 2014 at 1:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > This driver enabled us to drive the reboot of the Versatile family
+> > of ARM reference boards. Even though only the RealView boards are
+> > supported initially, these boards all have the same procedure for
+> > reboot:
+> >
+> > - Write a magic value into an unlocking register
+> > - Write another magic value into a reset control register
+> >
+> > The driver will be reusable for Versatile and possibly also the
+> > Integrator family of reference boards.
+> >
+> > Cc: Sebastian Reichel <sre@kernel.org>
+> > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> > Cc: David Woodhouse <dwmw2@infradead.org>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > ChangeLog v1->v2:
+> > - Do not probe from a platform device, instead use a device_initcall()
+> >   and look up the syscon device from its node. If that device is
+> >   not yet registered, the call will be deferred. This is done so that
+> >   the Linux driver model is not reflected into the device tree, as
+> >   the reboot property of the syscon is not a separate device.
 > 
-> Remove '#' from immediate parameter in AARCH64 inline assembly in mmu.
-> 
-> This code now works with both gcc and clang.
-> 
-> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-> Signed-off-by: Behan Webster <behanw@converseincode.com>
-> ---
->  arch/arm64/mm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Can any of the power maintainers please ACK this patch if it
+> looks OK, so it can be pulled in through ARM SoC?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Sorry for the delay:
 
-Thanks, Behan!
+Acked-By: Sebastian Reichel <sre@kernel.org>
 
-Catalin: please can you pick this up for 3.18? It's probably not worth me
-merging it as a fix, since there are other patches needed to get us building
-under clang anyway.
-
-Will
-
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index c555672..6894ef3 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -94,7 +94,7 @@ static int __init early_cachepolicy(char *p)
->  	 */
->  	asm volatile(
->  	"	mrs	%0, mair_el1\n"
-> -	"	bfi	%0, %1, #%2, #8\n"
-> +	"	bfi	%0, %1, %2, #8\n"
->  	"	msr	mair_el1, %0\n"
->  	"	isb\n"
->  	: "=&r" (tmp)
-> -- 
-> 1.9.1
-> 
-> 
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/decd54cf/attachment.sig>
