@@ -1,48 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 16 Sep 2014 01:36:15 +0200
-Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
-In-Reply-To: <20140915165359.GA13080@core.coreip.homeip.net>
-References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
- <6318611.DnX9cEgMjk@vostro.rjw.lan>
- <20140915165359.GA13080@core.coreip.homeip.net>
-Message-ID: <4451285.EDb1j6ttbA@vostro.rjw.lan>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 15 Sep 2014 19:19:49 -0400
+Subject: [PATCH v4 11/18] ARM64 / ACPI: Parse MADT for SMP initialization
+In-Reply-To: <20140915145630.GE5415@arm.com>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-12-git-send-email-hanjun.guo@linaro.org>
+ <54134DB4.6010705@redhat.com> <20140915145630.GE5415@arm.com>
+Message-ID: <54177415.6070306@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 15, 2014 09:53:59 AM Dmitry Torokhov wrote:
-> On Sun, Sep 14, 2014 at 06:38:58PM +0200, Rafael J. Wysocki wrote:
-> > On Friday, September 12, 2014 02:05:53 PM Dmitry Torokhov wrote:
-> > > Hi Ulf,
-> > > 
-> > > On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
-> > > > To give callers the option of acting on a errors while removing the
-> > > > pm_domain ops for the device in the ACPI PM domain, let
-> > > > acpi_dev_pm_detach() return an int to provide the error code.
-> > > 
-> > > So how would callers handle the errors? As far as I can see
-> > > acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
-> > > there is no meaningful strategy to handle errors as you are past the point of
-> > > no return and you keep on tearing down the device.
-> > 
-> > This is specifically for what patch [3/9] is doing AFAICS.  
-> > 
-> > The existing callers don't need to worry about this.
+On 09/15/2014 10:56 AM, Catalin Marinas wrote:
+> On Fri, Sep 12, 2014 at 08:47:00PM +0100, Jon Masters wrote:
+>> On 09/12/2014 10:00 AM, Hanjun Guo wrote:
+>>> MADT contains the information for MPIDR which is essential for
+>>> SMP initialization, parse the GIC cpu interface structures to
+>>> get the MPIDR value and map it to cpu_logical_map(), and add
+>>> enabled cpu with valid MPIDR into cpu_possible_map.
+>>>
+>>> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
+>>> Parking protocol, but the Parking protocol is only specified for
+>>> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
+>>> before some updates for the ACPI spec or the Parking protocol spec.
+>>
+>> As an aside, initial support for the Parking Protocol is working on test
+>> systems within Red Hat at this time.
 > 
-> OK, so I have the very same comment about patch 3 then: we have
-> dev_pm_domain_detach() returning error. How would the callers handle errors?
+> BTW, have the details of the parking protocol been updated for ARMv8
+> yet?
 
-Ulf?
+There's an interim specification for which initial (test, in
+development) patches are currently in the fedorahosted development
+kernel. Mark is planning to followup on that once he's had chance to
+polish and clean things up. But the parking protocol is not required for
+initial ACPI enablement (we really want everyone to be doing PSCI
+anyway, it's only a small subset that will ever do parking protocol).
 
-> WRT this patch: I'd rater we did not just return generic "error code" just
-> because we do not know who manages PD for the device. Can we add API to check
-> if we are using ACPI to manage power domains? Then patch #3 could check if it
-> needs to use ACPI or generic power domain API.
-
-The rule is that if there is an ACPI companion object for the given device, then
-ACPI is used.  So the API is ACPI_COMPANION(dev) and we have that check around
-until someone realized that acpi_dev_pm_attach/detach() made it too.  We can
-restore it, I suppose, but I'm not sure how much better it is going to be.
-
-Either way, I have no strong preferences here.
-
-Rafael
+Jon.
