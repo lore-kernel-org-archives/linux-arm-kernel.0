@@ -1,134 +1,84 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 15 Sep 2014 19:07:20 +0800
-Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page aligned
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Sep 2014 12:10:56 +0100
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <54134291.3040700@codeaurora.org>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com> <5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+ <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
+ <5412E3BB.9030800@arm.com> <54134291.3040700@codeaurora.org>
+Message-ID: <20140915111055.GD1577@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch extend the start and end address of initrd to be page aligned,
-so that we can free all memory including the un-page aligned head or tail
-page of initrd, if the start or end address of initrd are not page
-aligned, the page can't be freed by free_initrd_mem() function.
+On Fri, Sep 12, 2014 at 07:59:29PM +0100, Stephen Boyd wrote:
+> On 09/12/14 05:14, Marc Zyngier wrote:
+> > On 12/09/14 12:43, Christopher Covington wrote:
+> >> On 09/11/2014 01:43 PM, Marc Zyngier wrote:
+> >>> On 11/09/14 18:29, Doug Anderson wrote:
+> >>>
+> >>>> I did this in the past (again, see Sonny's thread), but didn't
+> >>>> consider myself knowledgeable to know if that was truly a good test:
+> >>>>
+> >>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+> >>>>        pr_info("DOUG: val is %#010x", val);
+> >>>>        val |= (1 << 2);
+> >>>>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
+> >>>>        val = 0xffffffff;
+> >>>>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+> >>>>        pr_info("DOUG: val is %#010x", val);
+> >>>>
+> >>>> The idea being that if you can make modifications to the SCR register
+> >>>> (and see your changes take effect) then you must be in secure mode.
+> >>>> In my case the first printout was 0x0 and the second was 0x4.
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/mm/init.c   | 19 +++++++++++++++++--
- arch/arm64/mm/init.c | 37 +++++++++++++++++++++++++++++++++----
- 2 files changed, 50 insertions(+), 6 deletions(-)
+BTW, if you want to change the SCR.NS bit (and CNTVOFF), the kernel must
+run in Monitor mode (by setting the CPSR mode bits, 32-bit only).
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..8490b70 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -277,6 +277,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
- void __init arm_memblock_init(const struct machine_desc *mdesc)
- {
- 	/* Register the kernel text, kernel data and initrd with memblock. */
-+	phys_addr_t phys_initrd_start_orig __maybe_unused;
-+	phys_addr_t phys_initrd_size_orig __maybe_unused;
- #ifdef CONFIG_XIP_KERNEL
- 	memblock_reserve(__pa(_sdata), _end - _sdata);
- #else
-@@ -289,6 +291,13 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- 		phys_initrd_size = initrd_end - initrd_start;
- 	}
- 	initrd_start = initrd_end = 0;
-+	phys_initrd_start_orig = phys_initrd_start;
-+	phys_initrd_size_orig = phys_initrd_size;
-+	/* make sure the start and end address are page aligned */
-+	phys_initrd_size = round_up(phys_initrd_start + phys_initrd_size, PAGE_SIZE);
-+	phys_initrd_start = round_down(phys_initrd_start, PAGE_SIZE);
-+	phys_initrd_size -= phys_initrd_start;
-+
- 	if (phys_initrd_size &&
- 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
- 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-@@ -305,9 +314,10 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- 		memblock_reserve(phys_initrd_start, phys_initrd_size);
- 
- 		/* Now convert initrd to virtual addresses */
--		initrd_start = __phys_to_virt(phys_initrd_start);
--		initrd_end = initrd_start + phys_initrd_size;
-+		initrd_start = __phys_to_virt(phys_initrd_start_orig);
-+		initrd_end = initrd_start + phys_initrd_size_orig;
- 	}
-+
- #endif
- 
- 	arm_mm_memblock_reserve();
-@@ -636,6 +646,11 @@ static int keep_initrd;
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
- 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
- 	}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..9dfd9a6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -138,15 +138,38 @@ static void arm64_memory_present(void)
- void __init arm64_memblock_init(void)
- {
- 	phys_addr_t dma_phys_limit = 0;
--
-+	phys_addr_t phys_initrd_start;
-+	phys_addr_t phys_initrd_size;
- 	/*
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
- 	 */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start)
--		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
-+	if (initrd_start) {
-+		phys_initrd_start = __virt_to_phys(initrd_start);
-+		phys_initrd_size = initrd_end - initrd_start;
-+		/* make sure the start and end address are page aligned */
-+		phys_initrd_size = round_up(phys_initrd_start + phys_initrd_size, PAGE_SIZE);
-+		phys_initrd_start = round_down(phys_initrd_start, PAGE_SIZE);
-+		phys_initrd_size -= phys_initrd_start;
-+		if (phys_initrd_size &&
-+				!memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
-+			pr_err("INITRD: %pa+%pa is not a memory region - disabling initrd\n",
-+					&phys_initrd_start, &phys_initrd_size);
-+			phys_initrd_start = phys_initrd_size = 0;
-+		}
-+		if (phys_initrd_size &&
-+				memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
-+			pr_err("INITRD: %pa+%pa overlaps in-use memory region - disabling initrd\n",
-+					&phys_initrd_start, &phys_initrd_size);
-+			phys_initrd_start = phys_initrd_size = 0;
-+		}
-+		if (phys_initrd_size)
-+			memblock_reserve(phys_initrd_start, phys_initrd_size);
-+		else
-+			initrd_start = initrd_end = 0;
-+	}
- #endif
- 
- 	if (!efi_enabled(EFI_MEMMAP))
-@@ -334,8 +357,14 @@ static int keep_initrd;
- 
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
--	if (!keep_initrd)
-+	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-+	}
- }
- 
- static int __init keepinitrd_setup(char *__unused)
+> >>> The main issue is when you're *not* in secure mode. It is likely that
+> >>> this will explode badly. This is why I suggested something that is set
+> >>> by the bootloader (after all. it knows which mode it is booted in), and
+> >>> that the timer driver can use when the CPU comes up.
+> >>
+> >> What exactly does "exploding badly" look like? Causing and undefined
+> >> instruction exception? That's just a branch with a mode switch. Any reason the
+> >> code couldn't deal with that or even use that to its advantage?
+> >
+> > We surely can handle the UNDEF and do something there. We just can't do
+> > it the way Doug described it above.
+> 
+> I suggested doing that for something else a while ago and Will and Dave
+> we're not thrilled[1]. The suggestion back then was to use DT to
+> indicate what mode the kernel is running in.
+> 
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
+
+I think the context was slightly different. As I re-read the thread, it
+seems that the discussion was around whether to use some SMC interface
+or not based on whether the kernel is running secure or non-secure. The
+argument made by Will was to actually specify the type of the firmware
+SMC interface in the DT and use it in the kernel (and probably assume
+the kernel is running in secure mode if no smc interface is specified in
+the DT; you could have both though, running in secure mode and also
+having firmware).
+
+In this arch timer case, we need to work around a firmware bug (or
+feature as 32-bit ARM kernels never required CNTVOFF initialisation by
+firmware, no matter how small such firmware is). We don't expect a
+specific SMC call to initialise CNTVOFF, so we can't describe it in the
+DT.
+
+One problem with undef for detecting whether the core is in secure or
+non-secure mode is that sometimes the initialisation code needs to run
+very early when the kernel hooks may not be fully initialised. We could
+only detect this mode on the booting CPU and save it in a global
+variable (of course, assuming the other CPUs boot in the same mode).
+Other code could make use of such information as appropriate. Of course,
+there is always a risk that it will be abused.
+
 -- 
-2.1.0
+Catalin
