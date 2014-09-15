@@ -1,68 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Sep 2014 17:14:51 +0100
-Subject: [PATCH 02/13] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <CAKv+Gu_uU3cQZbsa2w=GtXCGd59PhD-conRn3szLkOFKmTngSA@mail.gmail.com>
-References: <cover.1410302383.git.geoff@infradead.org>
- <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
- <CAKv+Gu_hs-Sv=Bg6uyKc41OV9sKS0sfM1YAcCMaTF7aTH9YPwA@mail.gmail.com>
- <1410366914.11440.16.camel@smoke>
- <CAKv+Gu_uU3cQZbsa2w=GtXCGd59PhD-conRn3szLkOFKmTngSA@mail.gmail.com>
-Message-ID: <20140915161451.GC13789@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Sep 2014 17:15:07 +0100
+Subject: [PATCH arm64-next v2] net: bpf: arm64: address randomize and
+ write protect JIT code
+In-Reply-To: <5416EF28.8020900@redhat.com>
+References: <1410543308-27449-1-git-send-email-dborkman@redhat.com>
+ <CABg9mcv6cSXZLPNH3Dvhr6XatA33VAPwgHyKgQ35f0DSmsObRQ@mail.gmail.com>
+ <5416EF28.8020900@redhat.com>
+Message-ID: <20140915161507.GD29744@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 06:09:07PM +0100, Ard Biesheuvel wrote:
-> On 10 September 2014 18:35, Geoff Levand <geoff@infradead.org> wrote:
-> > On Wed, 2014-09-10 at 10:40 +0200, Ard Biesheuvel wrote:
-> >> On 10 September 2014 00:49, Geoff Levand <geoff@infradead.org> wrote:
-> >> > Some of the macros defined in kvm_arm.h are useful in the exception vector
-> >> > routines, but they are not compatible with the assembler.  Change the
-> >> > definition of ESR_EL2_ISS to be compatible.
-> >> >
-> >> > Fixes build errors like these when using kvm_arm.h in assembly
-> >> > source files:
-> >> >
-> >> >   Error: unexpected characters following instruction at operand 3 -- `add x0,x1,#((1U<<25)-1)'
-> >> >
-> >> > Signed-off-by: Geoff Levand <geoff@infradead.org>
-> >> > ---
-> >> >  arch/arm64/include/asm/kvm_arm.h | 2 +-
-> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> >> > index cc83520..e0e7e64 100644
-> >> > --- a/arch/arm64/include/asm/kvm_arm.h
-> >> > +++ b/arch/arm64/include/asm/kvm_arm.h
-> >> > @@ -176,7 +176,7 @@
-> >> >  #define ESR_EL2_EC_SHIFT       (26)
-> >> >  #define ESR_EL2_EC             (0x3fU << ESR_EL2_EC_SHIFT)
-> >> >  #define ESR_EL2_IL             (1U << 25)
-> >> > -#define ESR_EL2_ISS            (ESR_EL2_IL - 1)
-> >> > +#define ESR_EL2_ISS            (0xffff)
+On Mon, Sep 15, 2014 at 02:52:40PM +0100, Daniel Borkmann wrote:
+> On 09/13/2014 06:32 AM, Z Lim wrote:
+> > On Fri, Sep 12, 2014 at 10:35 AM, Daniel Borkmann <dborkman@redhat.com> wrote:
+> >> This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
+> >> jit against spraying attacks").
 > >>
-> >> Don't you mean 0x1ffffff?
+> >> Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
+> >> support") which added necessary infrastructure, we can now implement
+> >> RO marking of eBPF generated JIT image pages and randomize start offset
+> >> for the JIT code, so that it does not reside directly on a page boundary
+> >> anymore. Likewise, the holes are filled with illegal instructions.
+> >>
+> >> This is basically the ARM64 variant of what we already have in ARM via
+> >> commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
+> >> JIT code"). Moreover, this commit also presents a merge resolution due to
+> >> conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
+> >> read-only") as we don't use kfree() in bpf_jit_free() anymore to release
+> >> the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
+> >> a different allocator.
+> >>
+> >> JIT tested on aarch64 with BPF test suite.
+> >>
+> >> Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
+> >> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+> >> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: David S. Miller <davem@davemloft.net>
+> >> Cc: Alexei Starovoitov <ast@plumgrid.com>
+> >> ---
+> >>   v1 -> v2:
+> >>    - Use brk insn as suggested by Catalin, thanks a lot for
+> >>      your feedback! Rest unchanged.
+> >>   Note:
+> >>    - This patch depends on net-next being merged to mainline due
+> >>      to the mentioned merge conflict.
+> >>
+> >>   arch/arm64/net/bpf_jit_comp.c | 38 +++++++++++++++++++++++++++++---------
+> >>   1 file changed, 29 insertions(+), 9 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> >> index 7ae3354..4b71779 100644
+> >> --- a/arch/arm64/net/bpf_jit_comp.c
+> >> +++ b/arch/arm64/net/bpf_jit_comp.c
+> >> @@ -19,7 +19,6 @@
+> >>   #define pr_fmt(fmt) "bpf_jit: " fmt
+> >>
+> >>   #include <linux/filter.h>
+> >> -#include <linux/moduleloader.h>
+> >>   #include <linux/printk.h>
+> >>   #include <linux/skbuff.h>
+> >>   #include <linux/slab.h>
+> >> @@ -119,6 +118,15 @@ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
+> >>          return to - from;
+> >>   }
+> >>
+> >> +static void jit_fill_hole(void *area, unsigned int size)
+> >> +{
+> >> +       /* We use brk #0x100 to trigger a fault. */
+> >> +       u32 *ptr, fill_ins = 0xd4202000;
 > >
-> > Hcalls have a 16 bit 'payload', the upper bits of the ISS field
-> > are specified as zero by the architecture so 0xffff is the same
-> > as 0x1ffffff.
-> >
+> > Missed this on first round of review, I think we also need
+> > cpu_to_le32(...) here.
 > 
-> Even if HVC is currently the only exception we are taking in EL2 (is
-> that the case btw?), it seems wrong to define this field in such a way
-> that it
-> (a) deviates from how the architecture specifies ESR_ELx.ISS and
-> (b) may cause surprises once someone unsuspectingly starts and'ing his
-> ESR values produced by another exception class with it, expecting the
-> macro's value to reflect its name
+> Just wondering ... so that would also hold true in case I build/run my
+> kernel in big-endian (CPU_BIG_ENDIAN)?
 
-Agreed. A macro called ESR_EL2_ISS should return the ISS field, and
-nothing less.
+Yes, the instruction stream is always little endian so the conversion is
+required.
 
-> >> And, there is a macro UL() for this purpose, so I suppose you could
-> >> redefine ESR_EL2_IL as (UL(1) << 25) as well. I know it is not
-> >> strictly the same thing, but it should be good enough as this is arm64
-> >> only
+Will
 
-This sounds good to me.
-
-Mark.
+> >> +       /* We are guaranteed to have aligned memory. */
+> >> +       for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
+> >> +               *ptr++ = fill_ins;
+> >> +}
+> >> +
+> > [...]
+> >
+> > Thanks Daniel.
+> 
