@@ -1,41 +1,35 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 15 Sep 2014 16:45:02 +0200
-Subject: [PATCH 5/6] ARM: meson: update multi_v7_defconfig
+Date: Mon, 15 Sep 2014 16:45:03 +0200
+Subject: [PATCH 6/6] MAINTAINERS: Add entry for the Amlogic MesonX SoCs
 In-Reply-To: <1410792303-23275-1-git-send-email-carlo@caione.org>
 References: <1410792303-23275-1-git-send-email-carlo@caione.org>
-Message-ID: <1410792303-23275-6-git-send-email-carlo@caione.org>
+Message-ID: <1410792303-23275-7-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the multi_v7_defconfig with the CONFIG_* needed by
-the just added Meson anch. It also adds a new defconfig specifically for
-the Meson SoCs.
+I'm going to maintain the platform.
 
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fb95fb..5b44796 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -29,6 +29,7 @@ CONFIG_ARCH_HISI=y
- CONFIG_ARCH_HI3xxx=y
- CONFIG_ARCH_HIX5HD2=y
- CONFIG_ARCH_KEYSTONE=y
-+CONFIG_ARCH_MESON=y
- CONFIG_ARCH_MXC=y
- CONFIG_SOC_IMX51=y
- CONFIG_SOC_IMX53=y
-@@ -173,6 +174,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_MESON=y
-+CONFIG_SERIAL_MESON_CONSOLE=y
- CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
- CONFIG_SERIAL_SIRFSOC=y
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 809ecd6..b1e1cf6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -835,6 +835,12 @@ M:	Emilio L?pez <emilio@elopez.com.ar>
+ S:	Maintained
+ F:	drivers/clk/sunxi/
+ 
++ARM/Amlogic MesonX SoC support
++M:	Carlo Caione <carlo@caione.org>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++N:	meson[x68]
++
+ ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
+ M:	Andrew Victor <linux@maxim.org.za>
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
 -- 
 1.9.1
