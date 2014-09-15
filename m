@@ -1,31 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Sep 2014 04:38:29 +0200
-Subject: [RFC][PATCH] devicetree: Add master-id-bits property to the iommu
- device
-In-Reply-To: <1410718646-9710-1-git-send-email-Varun.Sethi@freescale.com>
-References: <1410718646-9710-1-git-send-email-Varun.Sethi@freescale.com>
-Message-ID: <201409150438.29649.arnd@arndb.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Sun, 14 Sep 2014 20:37:53 -0700
+Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
+ default
+In-Reply-To: <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
+References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
+ <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
+ <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
+ <20140913170638.GA3348@lvm>
+ <CAKv+Gu93FkRWXd96gKdN+OCrUgjF0sXWL4ohishVWAO-XeR9Ww@mail.gmail.com>
+ <fdc415c79e617d4e9102acc12a4c0d65@www.loen.fr>
+ <CAKv+Gu-kce_1cg2fgj5Qj_kRMtzzHctofZ108531-UrcFLZAog@mail.gmail.com>
+ <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
+Message-ID: <CAFEAcA_TDxQj+9pfObJdsr_ubcNnv-OOEy5=a46YaVsQhEy7gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 14 September 2014, Varun Sethi wrote:
-> "master-id-bits" property added to the IOMMU device node. This property can
-> be used by the IOMMU driver to match relevan bits in the master id expressed
-> by a DMA master.
-> 
-> This can be used to mask out certain bits that get added to the device master id
-> due to IOMMU topology. For example, in case of MMU-500 the TBUID gets appended to
-> the master id. This prevents sharing of a stream ID, amongst devices which are
-> connected to different TBUs. 
-> 
-> Signed-off-by: Varun Sethi <Varun.Sethi@freescale.com>
+On 14 September 2014 15:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> So, in summary, there is a concern that a malicious guest may request
+> a cachable mapping for a device range, in an attempt to manipulate the
+> VGIC or other device memory of another VM.
+> I think that concern only applies to writable mappings
 
-This seems rather specific to MMU-500. I don't think that most IOMMUs would
-use the term 'master ID', 'stream ID' or even the general concept, and you don't
-expand the acronym 'TBU'. I've seen many IOMMUs and I don't even know what
-that means.
+I think it also applies to read-only mappings, because it would
+still be permitting the guest to set up a situation with mismatched
+memory attributes with potentially unpleasant effects for the
+other guest (which no longer gets the guarantees it should
+get from the fact it has mapped the VGIC as Device memory).
 
-Why do you think this is something that is needed to be known at the global
-level, rather than a property for some individual drivers?
-
-	Arnd
+thanks
+-- PMM
