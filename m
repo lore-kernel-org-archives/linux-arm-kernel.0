@@ -1,45 +1,35 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 15 Sep 2014 16:00:10 +0200
-Subject: [PATCH 4/4] tty: omap-serial: support setting of hardware flow
- control in dts
-In-Reply-To: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
-References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
-Message-ID: <1410789610-23059-5-git-send-email-frans.klaver@xsens.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Sep 2014 16:02:22 +0200
+Subject: [PATCH 0/2] ARM: at91: Further PIT improvements
+Message-ID: <1410789744-23975-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes hardware flow control availability configurable from the
-device tree.
+Hi,
 
-Signed-off-by: Frans Klaver <frans.klaver@xsens.com>
----
- Documentation/devicetree/bindings/serial/omap_serial.txt | 1 +
- drivers/tty/serial/omap-serial.c                         | 4 ++++
- 2 files changed, 5 insertions(+)
+These patches are meant to address Arnd comments and are based on
+Nicolas' at91-3.18-drivers2 branch.
 
-diff --git a/Documentation/devicetree/bindings/serial/omap_serial.txt b/Documentation/devicetree/bindings/serial/omap_serial.txt
-index 342eedd..1b629e9 100644
---- a/Documentation/devicetree/bindings/serial/omap_serial.txt
-+++ b/Documentation/devicetree/bindings/serial/omap_serial.txt
-@@ -8,3 +8,4 @@ Required properties:
- 
- Optional properties:
- - clock-frequency : frequency of the clock input to the UART
-+- has-hw-flow-control : the hardware has flow control capability
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 398139a..bff6874 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1597,6 +1597,10 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
- 
- 	of_property_read_u32(dev->of_node, "clock-frequency",
- 					 &omap_up_info->uartclk);
-+
-+	if (of_property_read_bool(dev->of_node, "has-hw-flow-control"))
-+		omap_up_info->flags |= UPF_HARD_FLOW;
-+
- 	return omap_up_info;
- }
- 
+They basically just remove the early_platform devices, and keep the
+old mechanism with a function exported by the PIT timer and called by
+the board files.
+
+Thanks!
+Maxime
+
+Maxime Ripard (2):
+  ARM: at91: Revert "ARM: at91: PIT: Convert to an
+    early_platform_device"
+  ARM: at91: Give the PIT irq as an argument of at91sam926x_pit_init
+
+ arch/arm/mach-at91/at91sam9260.c      | 30 ++-------------------------
+ arch/arm/mach-at91/at91sam9261.c      | 30 ++-------------------------
+ arch/arm/mach-at91/at91sam9263.c      | 30 ++-------------------------
+ arch/arm/mach-at91/at91sam9g45.c      | 30 ++-------------------------
+ arch/arm/mach-at91/at91sam9rl.c       | 30 ++-------------------------
+ arch/arm/mach-at91/generic.h          |  2 ++
+ drivers/clocksource/timer-atmel-pit.c | 38 ++++++++++++++---------------------
+ 7 files changed, 27 insertions(+), 163 deletions(-)
+
 -- 
 2.1.0
