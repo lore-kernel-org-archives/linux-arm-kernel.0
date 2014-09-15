@@ -1,64 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Sep 2014 19:56:26 +0100
-Subject: [PATCH 07/13] arm64: Add new routine local_disable
-In-Reply-To: <8db284c1443918ca692a5c2e30a0c7f13b37428f.1410302383.git.geoff@infradead.org>
+Date: Mon, 15 Sep 2014 20:06:17 +0100
+Subject: [PATCH 08/13] arm64: Use cpu_ops for smp_stop
+In-Reply-To: <36ad9302497338a34cc7174a72a2ac99ceb16fdb.1410302383.git.geoff@infradead.org>
 References: <cover.1410302383.git.geoff@infradead.org>
- <8db284c1443918ca692a5c2e30a0c7f13b37428f.1410302383.git.geoff@infradead.org>
-Message-ID: <20140915185625.GB14191@leverpostej>
+ <36ad9302497338a34cc7174a72a2ac99ceb16fdb.1410302383.git.geoff@infradead.org>
+Message-ID: <20140915190616.GC14191@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Geoff,
 
-On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> Add the new arm64 routine local_disable() to allow the masking of several DAIF
-> flags in one operation.  Currently, we only have routines to mask individual
-> flags, and to mask several flags multiple calls to daifset are required.
->
+On Tue, Sep 09, 2014 at 11:49:05PM +0100, Geoff Levand wrote:
+> The current implementation of ipi_cpu_stop() is just a tight infinite loop
+> around cpu_relax().  This infinite loop implementation is OK if the machine
+> will soon do a poweroff, but it doesn't have any mechanism to allow a CPU
+> to be brought back on-line, nor is it compatible with kexec re-boot.
+
+I don't see why we should use this when we have disable_nonboot_cpus.
+
+If the kernel is alive and well, disable_nonboot_cpus will correctly
+shut down all but one CPU, returning an error if that fails, whereupon
+we can respect the error code and halt the kexec.
+
+If the kernel is not alive and well, we have no idea what CPUs are
+executing anyway, so all we can expect to do is to boot a (UP) crash
+kernel in some previously reserved memory. Trying to actually kill the
+CPUs is nice, but possibly not necessary.
+
+> Add a check for a valid cpu_die method of the appropriate cpu_ops structure,
+> and if a valid method is found, transfer control to that method.  It is
+> expected that the cpu_die method puts the CPU into a state such that they can
+> be brought back on-line or progress through a kexec re-boot.
+> 
 > Signed-off-by: Geoff Levand <geoff@infradead.org>
 > ---
->  arch/arm64/include/asm/irqflags.h | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  arch/arm64/kernel/smp.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-> index 11cc941..28521d4 100644
-> --- a/arch/arm64/include/asm/irqflags.h
-> +++ b/arch/arm64/include/asm/irqflags.h
-> @@ -113,5 +113,18 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
->  #define local_dbg_enable()	asm("msr	daifclr, #8" : : : "memory")
->  #define local_dbg_disable()	asm("msr	daifset, #8" : : : "memory")
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 4743397..002aa8a 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -555,6 +555,15 @@ static void ipi_cpu_stop(unsigned int cpu)
 >  
-> +enum daif_flag {
-
-Is there any reason for this to be an enum rather than a set of
-#defines?
-
-It would be nice to be able to use these in asm.
-
-> +	DAIF_FIQ   = (1UL << 6),
-> +	DAIF_IRQ   = (1UL << 7),
-> +	DAIF_ASYNC = (1UL << 8),
-> +	DAIF_DBG   = (1UL << 9),
-> +	DAIF_ALL   = (0xffUL << 6),
-
-Not 0xf?
-
-It would be nicer to OR the other flags.
-
-> +};
+>  	local_irq_disable();
+>  
+> +	/* If we have the cpu ops use them. */
 > +
-> +static inline void local_disable(unsigned long daif_flags)
-> +{
-> +	arch_local_irq_restore(daif_flags | arch_local_save_flags());
+> +	if (cpu_ops[cpu]->cpu_disable &&
+> +	    cpu_ops[cpu]->cpu_die &&
+> +	    !cpu_ops[cpu]->cpu_disable(cpu))
+> +		cpu_ops[cpu]->cpu_die(cpu);
 
-If we knew the value was a constant (which we could check with
-__builting_constant_p) we could use daifset here, rather than having a
-RMW sequence.
+I don't think kexec should handle this. The hotplug code already does
+this, better (calling cpu_kill and returning an error code), and having
+two callers of these functions is only going to lead to hard-to-debug
+drift between the two.
 
-With that, the other local_*_{enable,disable} calls could be rewritten
-in terms of this, without affecting the generated code. That would
-require some shifting to account for the difference between pstate and
-daif{clr,set} layout, but for constants that shouldn't be a problem.
+>  	while (1)
+>  		cpu_relax();
+
+Any CPUs left here are a major problem.
+
+We absolutely must fail kexec if a CPU is still in the kernel (in the
+pen or in the kernel proper), or they can do arbitrarily bad things when
+the kernel image gets clobbered. SO this is insufficient.
+
+As I mention above, a crash kernel might be an exception to that rule,
+but we shouldn't treat that as the usual case.
 
 Thanks,
 Mark.
