@@ -1,64 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 15 Sep 2014 19:36:24 +0100
-Subject: [PATCH 2/7] iommu/arm-smmu: add support for multi-master iommu
- groups
-In-Reply-To: <20140915152257.GX28786@8bytes.org>
-References: <1409849405-17347-1-git-send-email-will.deacon@arm.com>
- <1409849405-17347-3-git-send-email-will.deacon@arm.com>
- <20140915152257.GX28786@8bytes.org>
-Message-ID: <20140915183624.GB30737@arm.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 16 Sep 2014 00:07:36 +0530
+Subject: [PATCH] arm64:mm: initialize max_mapnr using function
+ set_max_mapnr
+In-Reply-To: <20140915171134.GK5415@arm.com>
+References: <1410442661-3383-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <20140915171134.GK5415@arm.com>
+Message-ID: <CAFpQJXVf_6P-kFv+qq-NiAuna_Y-wNsKFOkbE929F8chRFcujg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi Catalin,
 
-On Mon, Sep 15, 2014 at 04:22:57PM +0100, Joerg Roedel wrote:
-> On Thu, Sep 04, 2014 at 05:50:00PM +0100, Will Deacon wrote:
-> >  static struct arm_smmu_master_cfg *
-> > -find_smmu_master_cfg(struct arm_smmu_device *smmu, struct device *dev)
-> > +find_smmu_master_cfg(struct device *dev)
-> >  {
-> > -	struct arm_smmu_master *master;
-> > -
-> > -	if (dev_is_pci(dev))
-> > -		return dev->archdata.iommu;
-> > -
-> > -	master = find_smmu_master(smmu, dev->of_node);
-> > -	return master ? &master->cfg : NULL;
-> > +	struct iommu_group *group = iommu_group_get(dev);
-> > +	return group ? iommu_group_get_iommudata(group) : NULL;
-> 
-> Using iommu_group_get requires the call-sites to do an iommu_group_put
-> in the end, but I don't see the call-sites updated.
+On Mon, Sep 15, 2014 at 10:41 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Sep 11, 2014 at 02:37:41PM +0100, Ganapatrao Kulkarni wrote:
+>> In some config cases, max_mapnr is not defined and direct reference
+>> results in to compilation error.
+>> This is fixed by using set_max_mapnr() helper.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+>> ---
+>>  arch/arm64/mm/init.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 5472c24..271e654 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -256,7 +256,7 @@ static void __init free_unused_memmap(void)
+>>   */
+>>  void __init mem_init(void)
+>>  {
+>> -     max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
+>> +     set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
+>
+> These are not equivalent as PHYS_PFN_OFFSET is dropped (which looks like
+> the correct thing to do but the commit log should reflect this as well).
+is below comment ok for the change? if so i can resend the patch.
 
-Well spotted, thanks. Given that we have a reference on the group thanks to
-iommu_group_alloc, I think it's better just having the put in this helper.
+Initializing max_mapnr using set_max_mapnr() helper function instead
+of direct reference.
+Also not adding PHYS_PFN_OFFSET to max_pfn, since it already contains it.
 
-diff below. Unfortunately, I'm at a conference this week and so testing is
-going to be difficult. I'll test early next week and try to get you a pull
-request later that week for 3.18.
+>
+> --
+> Catalin
 
-Will
-
---->8
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index d2d8cdaf..939242c 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -474,8 +474,15 @@ static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
- static struct arm_smmu_master_cfg *
- find_smmu_master_cfg(struct device *dev)
- {
-+       struct arm_smmu_master_cfg *cfg = NULL;
-        struct iommu_group *group = iommu_group_get(dev);
--       return group ? iommu_group_get_iommudata(group) : NULL;
-+
-+       if (group) {
-+               cfg = iommu_group_get_iommudata(group);
-+               iommu_group_put(group);
-+       }
-+
-+       return cfg;
- }
- 
+thanks
+ganapat
