@@ -1,25 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 15 Sep 2014 11:18:20 -0700
-Subject: [PATCH] clk: qcom: Add IPQ8064 PLL required for USB
-In-Reply-To: <1410754332-26699-1-git-send-email-agross@codeaurora.org>
-References: <1410754332-26699-1-git-send-email-agross@codeaurora.org>
-Message-ID: <54172D6C.10902@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 15 Sep 2014 19:33:34 +0100
+Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
+Message-ID: <20140915183334.GA30737@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/14 21:12, Andy Gross wrote:
->  static struct clk_pll pll3 = {
->  	.l_reg = 0x3164,
->  	.m_reg = 0x3168,
-> @@ -155,6 +182,7 @@ static const char *gcc_pxo_pll8_pll0_map[] = {
->  	"pxo",
->  	"pll8_vote",
->  	"pll0",
-> +	"pll0_vote",
->  };
+On Fri, Sep 12, 2014 at 11:17:18AM +0100, Wang, Yalin wrote:
+> this patch fix the memblock statics for memblock
+> in file /sys/kernel/debug/memblock/reserved
+> if we don't call memblock_free the initrd will still
+> be marked as reserved, even they are freed.
+> 
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> ---
+>  arch/arm64/mm/init.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 5472c24..34605c8 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -334,8 +334,10 @@ static int keep_initrd;
+>  
+>  void free_initrd_mem(unsigned long start, unsigned long end)
+>  {
+> -	if (!keep_initrd)
+> +	if (!keep_initrd) {
+>  		free_reserved_area((void *)start, (void *)end, 0, "initrd");
+> +		memblock_free(__pa(start), end - start);
+> +	}
 
-This is wrong. We should be removing pll0 and adding pll0_vote.
+I don't think it makes any technical difference, but doing the memblock_free
+before the free_reserved_area makes more sense to me.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Will
