@@ -1,37 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 15 Sep 2014 15:35:45 -0400 (EDT)
-Subject: [PATCH v3 5/9] net: pxa168_eth: get and set the mac address on
- the Ethernet controller
-In-Reply-To: <1410789713-15341-6-git-send-email-antoine.tenart@free-electrons.com>
-References: <1410789713-15341-1-git-send-email-antoine.tenart@free-electrons.com>
- <1410789713-15341-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140915.153545.2175311588825407387.davem@davemloft.net>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 15 Sep 2014 14:39:46 -0500
+Subject: [PATCH 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <CAK=WgbZ+NhA5AAhURUOojwnCbi2wYkJ11i-C5e7-kpZL5vD_3g@mail.gmail.com>
+References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
+ <1404836521-59637-3-git-send-email-s-anna@ti.com>
+ <CAK=WgbY-WmcJdnLHDf1CSkJqNBUeUMPTLcEZyLGKnECbxH1OAQ@mail.gmail.com>
+ <53D7F6F3.9020804@ti.com>
+ <CAK=WgbZ+NhA5AAhURUOojwnCbi2wYkJ11i-C5e7-kpZL5vD_3g@mail.gmail.com>
+Message-ID: <54174082.4010008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antoine Tenart <antoine.tenart@free-electrons.com>
-Date: Mon, 15 Sep 2014 16:01:49 +0200
+Hi Ohad,
 
-> +static void pxa168_eth_get_mac_address(struct net_device *dev,
-> +				       unsigned char *addr)
-> +{
-> +	struct pxa168_eth_private *pep = netdev_priv(dev);
-> +	unsigned int mac_h = rdl(pep, MAC_ADDR_HIGH);
-> +	unsigned int mac_l = rdl(pep, MAC_ADDR_LOW);
-> +
-> +	addr[0] = (mac_h >> 24) & 0xff;
-> +	addr[1] = (mac_h >> 16) & 0xff;
-> +	addr[2] = (mac_h >> 8) & 0xff;
-> +	addr[3] = mac_h & 0xff;
-> +	addr[4] = (mac_l >> 8) & 0xff;
-> +	addr[5] = mac_l & 0xff;
-> +}
+> On Tue, Jul 29, 2014 at 10:33 PM, Suman Anna <s-anna@ti.com> wrote:
+>> We currently have two usecases. The primary usecase is the WkupM3
+>> processor on TI Sitara AM335x/AM437x SoCs used for suspend/resume
+>> management. This series is a dependency for the WkupM3 remoteproc driver
+>> that Dave posted [1]. More details are in section 8.1.4.6 of the AM335x
+>> TRM [2]. The program/data sections for this processor all _needs_ to be
+>> in the two internal memory RAMS (16K Unified RAM and 8K Data RAM), and
+>> there is no MMU for this processor. The current RSC_CARVEOUT and
+>> RSC_DEVMEM do not fit to describe this type of memory (we neither
+>> allocate memory through dma api nor do we need to map these into an MMU).
+> 
+> Thanks for the details.
+> 
+> Can we define a CMA block for these regions, and then just use
+> carveout resource entries instead of the ioremap approach?
 
-This function is not used in this patch and thus will result in a compile
-warning.
+I am looking at refreshing these patches, and found that I missed
+responding to this message.
 
-The tree must be fully functional and compile with no new warnings after
-each patch in a patch series.
+These processors need to use their internal RAM for loading, which is
+not for generic usage by the kernel, so defining a CMA block for this
+memory doesn't make sense.
 
-Therefore you must add this new function in the first patch which actually
-makes use of the new function.
+> This may require some changes in remoteproc which we'll need to think
+> about, but it sounds like it may fit the problem better instead of
+> forcing ioremap to provide a regular pointer (we're supposed to use
+> ioremaped memory only with memory primitives such as readl/writel/..).
+
+Will it suffice to replace the memcpy() with memcpy_toio()?
+
+regards
+Suman
