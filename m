@@ -1,45 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 15 Sep 2014 13:00:44 -0500
-Subject: [PATCH] Input: palmas-pwrbutton: Fix typo in License
-In-Reply-To: <1410803937-27022-1-git-send-email-nm@ti.com>
-References: <1410803937-27022-1-git-send-email-nm@ti.com>
-Message-ID: <5417294C.2010506@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 15 Sep 2014 11:01:40 -0700
+Subject: [PATCH v4 10/18] ACPI / table: Print GIC information when MADT is
+ parsed
+In-Reply-To: <20140915175250.8177DC40A42@trevor.secretlab.ca>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-11-git-send-email-hanjun.guo@linaro.org>
+ <20140915064010.GD26649@localhost>
+ <20140915175250.8177DC40A42@trevor.secretlab.ca>
+Message-ID: <CAOesGMjcXYjmUzZqGncnkN-uhnLC1ey2vqeqE4MQ5UDm8BaYTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 12:58 PM, Nishanth Menon wrote:
-> Follow the license string convention indicated in include/linux/module.h
-> (don't capitalize v).
-> 
-> This fixes following randconfig warning:
-> FATAL: modpost: GPL-incompatible module palmas-pwrbutton.ko uses GPL-only symbol 'platform_driver_unregister'
-> 
-Uggh.. forgot to add:
+On Mon, Sep 15, 2014 at 10:52 AM, Grant Likely <grant.likely@linaro.org> wrote:
+> On Sun, 14 Sep 2014 23:40:10 -0700, Olof Johansson <olof@lixom.net> wrote:
+>> On Fri, Sep 12, 2014 at 10:00:08PM +0800, Hanjun Guo wrote:
+>> > When MADT is parsed, print GIC information to make the boot
+>> > log look pretty.
+>>
+>> If you do this for prettiness, having an example output in the commit
+>> message would be a nice touch.
+>
+> Agreed.
+>
+>> The question is why it's needed though? Do we really need all this verbose
+>> information in dmesg when it could be found out in other ways instead?
+>>
+>> x86 is notoriously verbose in some of these aspects, I'm not sure it's
+>> something we need to mimic here?
+>
+> For consistency, it does make sense to have the common x86 and ARM64
+> code outputing information in the same way, so I think the patch still
+> makes sense. All of them could be moved to KERN_DEBUG as a separate
+> patch if we want to cull early boot output. I would split that off and
+> discuss it separately.
 
-Fixes: adff5962fdd2 ("Input: introduce palmas-pwrbutton")
+Yeah, pr_debug() makes sense here -- in particular if you're going to
+have a potentially slow serial console to print all this to at info
+level.
 
-> Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-> Reported-by: Jim Davis <jim.epost@gmail.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> Reported thread http://marc.info/?l=linux-input&m=141080223209150&w=2
-> 
->  drivers/input/misc/palmas-pwrbutton.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/misc/palmas-pwrbutton.c b/drivers/input/misc/palmas-pwrbutton.c
-> index 3f90211..4ed6f78 100644
-> --- a/drivers/input/misc/palmas-pwrbutton.c
-> +++ b/drivers/input/misc/palmas-pwrbutton.c
-> @@ -326,5 +326,5 @@ module_platform_driver(palmas_pwron_driver);
->  
->  MODULE_ALIAS("platform:palmas-pwrbutton");
->  MODULE_DESCRIPTION("Palmas Power Button");
-> -MODULE_LICENSE("GPL V2");
-> +MODULE_LICENSE("GPL v2");
->  MODULE_AUTHOR("Texas Instruments Inc.");
-> 
+I disagree on order though, there's no reason to hold off fixing this
+and doing it as a separate patch.
 
--- 
-Regards,
-Nishanth Menon
+
+-Olof
