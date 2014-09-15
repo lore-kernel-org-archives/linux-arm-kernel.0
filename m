@@ -1,109 +1,265 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 15 Sep 2014 22:20:14 +0800
-Subject: [RFC v2] arm:extend the reserved mrmory for initrd to be page
- aligned
-In-Reply-To: <20140915113325.GD12361@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491609@CNBJMBX05.corpusers.net>,
- <20140915113325.GD12361@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB4D6F19@CNBJMBX05.corpusers.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 15 Sep 2014 16:28:11 +0200
+Subject: [PATCH v2] iio: adc: rockchip_saradc: add support for
+ rk3066-tsadc variant
+In-Reply-To: <5414CB03.1000104@gmx.de>
+References: <1629907.fyghANjlk9@diego> <5414CB03.1000104@gmx.de>
+Message-ID: <1853847.FBXYEe6Y9k@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Great!
-yeah, you are right,
-just keep the change in free_initrd_mem( ) is ok.
-we don't need keep reserved memory to be aligned ,
+Am Sonntag, 14. September 2014, 00:53:55 schrieb Hartmut Knaack:
+> Heiko St?bner schrieb, Am 11.09.2014 00:22:
+> > Older Rockchip SoCs, at least the rk3066, used a slightly modified saradc
+> > for temperature measurements. This so called tsadc does not contain any
+> > active parts like temperature interrupts and only supports polling the
+> > current temperature. The returned voltage can then be converted by a
+> > suitable thermal driver to and actual temperature and used for thermal
+> > handling.
+> 
+> Looking over it again, I have a two more comments inline.
+> 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > changes since v1:
+> > - use GENMASK instead of creating the mask manually
+> > 
+> >   as suggested by Hartmut Knaack
+> > 
+> > I've also opted for simply keeping the indent mismatch in
+> > struct rockchip_saradc, as I don't think it's worth the churn
+> > it produces
+> > 
+> >  .../bindings/iio/adc/rockchip-saradc.txt           |  2 +-
+> >  drivers/iio/adc/rockchip_saradc.c                  | 62
+> >  +++++++++++++++++----- 2 files changed, 50 insertions(+), 14
+> >  deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> > b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt index
+> > 5d3ec1d..a9a5fe1 100644
+> > --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> > +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> > @@ -1,7 +1,7 @@
+> > 
+> >  Rockchip Successive Approximation Register (SAR) A/D Converter bindings
+> > 
+> >  Required properties:
+> > -- compatible: Should be "rockchip,saradc"
+> > +- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
+> > 
+> >  - reg: physical base address of the controller and length of memory
+> >  mapped
+> >  
+> >         region.
+> >  
+> >  - interrupts: The interrupt number to the cpu. The interrupt specifier
+> >  format> 
+> > diff --git a/drivers/iio/adc/rockchip_saradc.c
+> > b/drivers/iio/adc/rockchip_saradc.c index e074a0b..99200b7 100644
+> > --- a/drivers/iio/adc/rockchip_saradc.c
+> > +++ b/drivers/iio/adc/rockchip_saradc.c
+> > @@ -18,13 +18,13 @@
+> > 
+> >  #include <linux/interrupt.h>
+> >  #include <linux/io.h>
+> >  #include <linux/of.h>
+> > 
+> > +#include <linux/of_device.h>
+> > 
+> >  #include <linux/clk.h>
+> >  #include <linux/completion.h>
+> >  #include <linux/regulator/consumer.h>
+> >  #include <linux/iio/iio.h>
+> >  
+> >  #define SARADC_DATA			0x00
+> > 
+> > -#define SARADC_DATA_MASK		0x3ff
+> > 
+> >  #define SARADC_STAS			0x04
+> >  #define SARADC_STAS_BUSY		BIT(0)
+> > 
+> > @@ -38,15 +38,22 @@
+> > 
+> >  #define SARADC_DLY_PU_SOC		0x0c
+> >  #define SARADC_DLY_PU_SOC_MASK		0x3f
+> > 
+> > -#define SARADC_BITS			10
+> > 
+> >  #define SARADC_TIMEOUT			msecs_to_jiffies(100)
+> > 
+> > +struct rockchip_saradc_data {
+> > +	int				num_bits;
+> > +	const struct iio_chan_spec	*channels;
+> > +	int				num_channels;
+> > +	unsigned long			clk_rate;
+> > +};
+> > +
+> > 
+> >  struct rockchip_saradc {
+> >  
+> >  	void __iomem		*regs;
+> >  	struct clk		*pclk;
+> >  	struct clk		*clk;
+> >  	struct completion	completion;
+> >  	struct regulator	*vref;
+> > 
+> > +	const struct rockchip_saradc_data *data;
+> > 
+> >  	u16			last_val;
+> >  
+> >  };
+> > 
+> > @@ -90,7 +97,7 @@ static int rockchip_saradc_read_raw(struct iio_dev
+> > *indio_dev,> 
+> >  		}
+> >  		
+> >  		*val = ret / 1000;
+> > 
+> > -		*val2 = SARADC_BITS;
+> > +		*val2 = info->data->num_bits;
+> > 
+> >  		return IIO_VAL_FRACTIONAL_LOG2;
+> >  	
+> >  	default:
+> >  		return -EINVAL;
+> > 
+> > @@ -103,7 +110,7 @@ static irqreturn_t rockchip_saradc_isr(int irq, void
+> > *dev_id)> 
+> >  	/* Read value */
+> >  	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
+> > 
+> > -	info->last_val &= SARADC_DATA_MASK;
+> > +	info->last_val &= GENMASK(info->data->num_bits - 1, 0);
+> > 
+> >  	/* Clear irq & power down adc */
+> >  	writel_relaxed(0, info->regs + SARADC_CTRL);
+> > 
+> > @@ -133,12 +140,44 @@ static const struct iio_chan_spec
+> > rockchip_saradc_iio_channels[] = {> 
+> >  	ADC_CHANNEL(2, "adc2"),
+> >  
+> >  };
+> > 
+> > +static const struct rockchip_saradc_data saradc_data = {
+> > +	.num_bits = 10,
+> > +	.channels = rockchip_saradc_iio_channels,
+> > +	.num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels),
+> > +	.clk_rate = 1000000,
+> > +};
+> > +
+> > +static const struct iio_chan_spec rockchip_rk3066_tsadc_iio_channels[] =
+> > {
+> > +	ADC_CHANNEL(0, "adc0"),
+> > +	ADC_CHANNEL(1, "adc1"),
+> > +};
+> > +
+> > +static const struct rockchip_saradc_data rk3066_tsadc_data = {
+> > +	.num_bits = 12,
+> > +	.channels = rockchip_rk3066_tsadc_iio_channels,
+> > +	.num_channels = ARRAY_SIZE(rockchip_rk3066_tsadc_iio_channels),
+> > +	.clk_rate = 50000,
+> > +};
+> > +
+> > +static const struct of_device_id rockchip_saradc_match[] = {
+> > +	{
+> > +		.compatible = "rockchip,saradc",
+> > +		.data = &saradc_data,
+> > +	}, {
+> > +		.compatible = "rockchip,rk3066-tsadc",
+> > +		.data = &rk3066_tsadc_data,
+> > +	},
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
+> > +
+> > 
+> >  static int rockchip_saradc_probe(struct platform_device *pdev)
+> >  {
+> >  
+> >  	struct rockchip_saradc *info = NULL;
+> >  	struct device_node *np = pdev->dev.of_node;
+> >  	struct iio_dev *indio_dev = NULL;
+> >  	struct resource	*mem;
+> > 
+> > +	const struct of_device_id *match;
+> > 
+> >  	int ret;
+> >  	int irq;
+> > 
+> > @@ -152,6 +191,9 @@ static int rockchip_saradc_probe(struct
+> > platform_device *pdev)> 
+> >  	}
+> >  	info = iio_priv(indio_dev);
+> > 
+> > +	match = of_match_device(rockchip_saradc_match, &pdev->dev);
+> 
+> Is it 100% safe to go on without checking match for validity?
 
-Thanks!
+In this case yes :-)
 
-________________________________________
-From: Russell King - ARM Linux [linux at arm.linux.org.uk]
-Sent: Monday, September 15, 2014 7:33 PM
-To: Wang, Yalin
-Cc: 'Will Deacon'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-mm at kvack.org'; 'linux-arm-msm at vger.kernel.org'
-Subject: Re: [RFC v2] arm:extend the reserved mrmory for initrd to be page      aligned
+The very first check in _probe is against (!np), so at this point we're sure we 
+were already matched against one of the entries in the match-table.
 
-On Mon, Sep 15, 2014 at 07:07:20PM +0800, Wang, Yalin wrote:
-> this patch extend the start and end address of initrd to be page aligned,
-> so that we can free all memory including the un-page aligned head or tail
-> page of initrd, if the start or end address of initrd are not page
-> aligned, the page can't be freed by free_initrd_mem() function.
 
-Better, but I think it's more complicated than it needs to be:
+> 
+> > +	info->data = match->data;
+> > +
+> > 
+> >  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	info->regs = devm_ioremap_resource(&pdev->dev, mem);
+> >  	if (IS_ERR(info->regs))
+> > 
+> > @@ -195,7 +237,7 @@ static int rockchip_saradc_probe(struct
+> > platform_device *pdev)> 
+> >  	 * Use a default of 1MHz for the converter clock.
+> >  	 * This may become user-configurable in the future.
+> >  	 */
+> 
+> This comment becomes invalid and should be adjusted or droped.
 
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm/mm/init.c   | 19 +++++++++++++++++--
->  arch/arm64/mm/init.c | 37 +++++++++++++++++++++++++++++++++----
->  2 files changed, 50 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 659c75d..8490b70 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -277,6 +277,8 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
->  void __init arm_memblock_init(const struct machine_desc *mdesc)
->  {
->       /* Register the kernel text, kernel data and initrd with memblock. */
-> +     phys_addr_t phys_initrd_start_orig __maybe_unused;
-> +     phys_addr_t phys_initrd_size_orig __maybe_unused;
->  #ifdef CONFIG_XIP_KERNEL
->       memblock_reserve(__pa(_sdata), _end - _sdata);
->  #else
-> @@ -289,6 +291,13 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
->               phys_initrd_size = initrd_end - initrd_start;
->       }
->       initrd_start = initrd_end = 0;
-> +     phys_initrd_start_orig = phys_initrd_start;
-> +     phys_initrd_size_orig = phys_initrd_size;
-> +     /* make sure the start and end address are page aligned */
-> +     phys_initrd_size = round_up(phys_initrd_start + phys_initrd_size, PAGE_SIZE);
-> +     phys_initrd_start = round_down(phys_initrd_start, PAGE_SIZE);
-> +     phys_initrd_size -= phys_initrd_start;
-> +
->       if (phys_initrd_size &&
->           !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
->               pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-> @@ -305,9 +314,10 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
->               memblock_reserve(phys_initrd_start, phys_initrd_size);
->
->               /* Now convert initrd to virtual addresses */
-> -             initrd_start = __phys_to_virt(phys_initrd_start);
-> -             initrd_end = initrd_start + phys_initrd_size;
-> +             initrd_start = __phys_to_virt(phys_initrd_start_orig);
-> +             initrd_end = initrd_start + phys_initrd_size_orig;
->       }
-> +
+I'll adapt it and send a v3
 
-I think all the above is entirely unnecessary.  The memblock APIs
-(especially memblock_reserve()) will mark the overlapped pages as reserved
-- they round down the starting address, and round up the end address
-(calculated from start + size).
 
-Hence, this:
+Heiko
 
-> @@ -636,6 +646,11 @@ static int keep_initrd;
->  void free_initrd_mem(unsigned long start, unsigned long end)
->  {
->       if (!keep_initrd) {
-> +             if (start == initrd_start)
-> +                     start = round_down(start, PAGE_SIZE);
-> +             if (end == initrd_end)
-> +                     end = round_up(end, PAGE_SIZE);
-> +
->               poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
->               free_reserved_area((void *)start, (void *)end, -1, "initrd");
->       }
 
-is the only bit of code you likely need to achieve your goal.
-
-Thinking about this, I think that you are quite right to align these.
-The memory around the initrd is defined to be system memory, and we
-already free the pages around it, so it *is* wrong not to free the
-partial initrd pages.
-
-Good catch.
-
---
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> 
+> > -	ret = clk_set_rate(info->clk, 1000000);
+> > +	ret = clk_set_rate(info->clk, info->data->clk_rate);
+> > 
+> >  	if (ret < 0) {
+> >  	
+> >  		dev_err(&pdev->dev, "failed to set adc clk rate, %d\n", ret);
+> >  		return ret;
+> > 
+> > @@ -227,8 +269,8 @@ static int rockchip_saradc_probe(struct
+> > platform_device *pdev)> 
+> >  	indio_dev->info = &rockchip_saradc_iio_info;
+> >  	indio_dev->modes = INDIO_DIRECT_MODE;
+> > 
+> > -	indio_dev->channels = rockchip_saradc_iio_channels;
+> > -	indio_dev->num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels);
+> > +	indio_dev->channels = info->data->channels;
+> > +	indio_dev->num_channels = info->data->num_channels;
+> > 
+> >  	ret = iio_device_register(indio_dev);
+> >  	if (ret)
+> > 
+> > @@ -296,12 +338,6 @@ static int rockchip_saradc_resume(struct device *dev)
+> > 
+> >  static SIMPLE_DEV_PM_OPS(rockchip_saradc_pm_ops,
+> >  
+> >  			 rockchip_saradc_suspend, rockchip_saradc_resume);
+> > 
+> > -static const struct of_device_id rockchip_saradc_match[] = {
+> > -	{ .compatible = "rockchip,saradc" },
+> > -	{},
+> > -};
+> > -MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
+> > -
+> > 
+> >  static struct platform_driver rockchip_saradc_driver = {
+> >  
+> >  	.probe		= rockchip_saradc_probe,
+> >  	.remove		= rockchip_saradc_remove,
