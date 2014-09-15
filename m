@@ -1,67 +1,57 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Mon, 15 Sep 2014 09:00:22 +0200
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
- <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
- <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
-Message-ID: <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 15 Sep 2014 00:14:50 -0700
+Subject: [GIT PULL 3.18] ARM: BCM: Broadcom BCM63138 support
+In-Reply-To: <54167614.7030806@gmail.com>
+References: <1409953475-23130-1-git-send-email-f.fainelli@gmail.com>
+ <8641708.a9SSBxeRCZ@wuerfel>
+ <CAEPRUYpS=yqR8SvUb34eSMfOPMM4HErf4jKZK_Z9jbWvBH9vEg@mail.gmail.com>
+ <54167614.7030806@gmail.com>
+Message-ID: <CAEPRUYrcpaUmLvr4k5GK11wRbQ8XwFQdxRJPeunH7p-w7jL2-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org> wrote:
-> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>
->>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>> recently posted by Andrew Chew [2].
->>>>
->>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->>>> USB devices I tested with, about half where probed correctly, but the
->>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>>
->>>> I don't see any correlation between the failure and the kind of usb
->>>> device, but I don't have much experience with USB implementations
->>>> either.
+On Sun, Sep 14, 2014 at 10:16 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 09/14/14 21:56, Christian Daudt wrote:
+>>
+>> On Sat, Sep 6, 2014 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 >>>
->>> Hmm... I haven't seen that before.  Which particular devices were you using?
->>
->> Here they are:
->>
->> work:
->>
->> Genius keyboard: 05d5:6782
->> Logitech mouse: 046d:c06a
->> Denver MP3 player: 10d6:1100
->> Atheros Bluetooth dongle: 0cf3:3005
->>
->> don't work:
->>
->> MCS7830 ethernet dongle: 9710:7830
->> Genesys Logic hub: 05e3:0608
+>>> On Friday 05 September 2014 14:44:35 Florian Fainelli wrote:
+>>>>
+>>>> Arnd, Olof,
+>>>>
+>>>> This pull request contains the basic Broadcom BCM63138 DSL SoC support
+>>>> that has been posted a few weeks ago. Arnd has reviewed those changes,
+>>>> and
+>>>> I was expecting Matt to carry these changes for me, but I did not get an
+>>>> answer so far and I don't want these patches to be held much longer.
+>>>
+>>>
+>> Hi Florian,
+>>   Apologies for the untimeliness of replies, I've been leaning heavily
+>> on Matt to lead mach-bcm maintainership but given recent changes at
+>> Broadcom he's found himself pressed for time to do this also.
 >
-> I tried the hub and it works just fine for me... Have you tried this
-> on any other boards like Big or Blaze?
+>
+> Based on our earlier conversations on IRC this week, I was expecting you to
+> send an update to the MAINTAINERS file reflecting the fact that we (Brian,
+> Gregory, Marc and myself) should be listed as mach-bcm maintainers as well.
+>
 
-I have a Blaze here, but haven't been able to get the external ports
-to power up. I don't have schematics nor a strong interest to get that
-fixed myself, as I can test my code just fine with the Blaze's
-internal camera and the devices that do work on the Jetson.
+Yes, I do plan update the MAINTAINERS to include you. I don't see a
+need to include 4 more people at this point. That patch is coming.
 
-I'm using the firmware file that was posted recently:
+>>   I'm looking at this patchset to pull it, but I don't see any acks on
+>> the patches (the git commits in your repo do not have them, and
+>> searching through linux-arm-kernel doesn't seem to indicate
+>> acks/sign-offs for them). Have they been reviewed ? If not, I'll have
+>> to review them prior to pulling.
+>
+>
+> Arnd has reviewed v2, and v3 addresses his former comments, he has not
+> replied with an Ack though I do not mind waiting for this.
 
-xhci-tegra 70090000.usb: Firmware timestamp: 2014-05-02 02:22:50 UTC,
-Falcon state 0x20
+Ok - explicit is better than implicit. Arnd - can you pls confirm your
+ack to these patches ?
 
-If things work for you with the same sources, .config and firmware, I
-can only think of the hw being different (other hw revision?).
-
-Regards,
-
-Tomeu
+ Thanks,
+   csd
