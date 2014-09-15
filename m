@@ -1,225 +1,501 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 16 Sep 2014 07:34:16 +0800
-Subject: [PATCH v4 09/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
- for PSCI init
-In-Reply-To: <20140915063808.GC26649@localhost>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-10-git-send-email-hanjun.guo@linaro.org>
- <20140915063808.GC26649@localhost>
-Message-ID: <54177778.2050103@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Sep 2014 16:58:08 -0700
+Subject: [PATCH v2 5/7] clk: rockchip: add new clock-type for the cpuclk
+In-Reply-To: <1410561030-19127-6-git-send-email-heiko@sntech.de>
+References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+ <1410561030-19127-6-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=XJEL1QDRHUGL=g5BKEhLWve0uUko7ZH=dM7btWkU4+1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?09?15? 14:38, Olof Johansson wrote:
-> On Fri, Sep 12, 2014 at 10:00:07PM +0800, Hanjun Guo wrote:
->> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
->> index e5312ea..2454bc5 100644
->> --- a/arch/arm64/include/asm/psci.h
->> +++ b/arch/arm64/include/asm/psci.h
->> @@ -14,6 +14,7 @@
->>  #ifndef __ASM_PSCI_H
->>  #define __ASM_PSCI_H
->>  
->> -int psci_init(void);
->> +int psci_dt_init(void);
->> +int psci_acpi_init(void);
->>  
->>  #endif /* __ASM_PSCI_H */
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 693da7f..9e1ae37 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -13,6 +13,8 @@
->>   *  published by the Free Software Foundation.
->>   */
->>  
->> +#define pr_fmt(fmt) "ACPI: " fmt
->> +
->>  #include <linux/init.h>
->>  #include <linux/acpi.h>
->>  #include <linux/cpumask.h>
->> @@ -49,10 +51,32 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
->>  	early_memunmap(map, size);
->>  }
->>  
->> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
->> +{
->> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
->> +
->> +	/*
->> +	 * Revision in table header is the FADT Major revision,
->> +	 * and there is a minor revision of FADT which was introduced
->> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher revision
->> +	 * to get arm boot flags, or we will disable ACPI.
->> +	 */
->> +	if (table->revision > 5 ||
->> +	    (table->revision == 5 && fadt->minor_revision >= 1))
->> +		return 0;
-> The commend and code disagree. The code says 5.1 or newer, while the comment say
-> _only_ 5.1. One or the other needs to change.
+Heiko,
 
-I describe it in the comments "ACPI 5.1 or higher revision", maybe
-"newer revision" will be more explicit.
-
+On Fri, Sep 12, 2014 at 3:30 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> When changing the armclk on Rockchip SoCs it is supposed to be reparented
+> to an alternate parent before changing the underlying pll and back after
+> the change. Additionally there exist clocks that are very tightly bound to
+> the armclk whose divider values are set according to the armclk rate.
 >
-> [...]
+> Add a special clock-type to handle all that. The rate table and divider
+> values will be supplied from the soc-specific clock controllers.
 >
->> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
->> index 5539547..15ba470 100644
->> --- a/arch/arm64/kernel/psci.c
->> +++ b/arch/arm64/kernel/psci.c
->> @@ -15,6 +15,7 @@
->>  
->>  #define pr_fmt(fmt) "psci: " fmt
->>  
->> +#include <linux/acpi.h>
->>  #include <linux/init.h>
->>  #include <linux/of.h>
->>  #include <linux/smp.h>
->> @@ -23,6 +24,7 @@
->>  #include <linux/delay.h>
->>  #include <uapi/linux/psci.h>
->>  
->> +#include <asm/acpi.h>
->>  #include <asm/compiler.h>
->>  #include <asm/cpu_ops.h>
->>  #include <asm/errno.h>
->> @@ -231,6 +233,33 @@ static void psci_sys_poweroff(void)
->>  	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
->>  }
->>  
->> +static void psci_0_2_set_functions(void)
->> +{
->> +	pr_info("Using standard PSCI v0.2 function IDs\n");
->> +	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
->> +	psci_ops.cpu_suspend = psci_cpu_suspend;
->> +
->> +	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
->> +	psci_ops.cpu_off = psci_cpu_off;
->> +
->> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
->> +	psci_ops.cpu_on = psci_cpu_on;
->> +
->> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
->> +	psci_ops.migrate = psci_migrate;
->> +
->> +	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
->> +	psci_ops.affinity_info = psci_affinity_info;
->> +
->> +	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
->> +		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->> +	psci_ops.migrate_info_type = psci_migrate_info_type;
->> +
->> +	arm_pm_restart = psci_sys_reset;
->> +
->> +	pm_power_off = psci_sys_poweroff;
->> +}
->> +
->>  /*
->>   * PSCI Function IDs for v0.2+ are well defined so use
->>   * standard values.
->> @@ -264,29 +293,7 @@ static int __init psci_0_2_init(struct device_node *np)
->>  		}
->>  	}
->>  
->> -	pr_info("Using standard PSCI v0.2 function IDs\n");
->> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
->> -	psci_ops.cpu_suspend = psci_cpu_suspend;
->> -
->> -	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
->> -	psci_ops.cpu_off = psci_cpu_off;
->> -
->> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
->> -	psci_ops.cpu_on = psci_cpu_on;
->> -
->> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
->> -	psci_ops.migrate = psci_migrate;
->> -
->> -	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
->> -	psci_ops.affinity_info = psci_affinity_info;
->> -
->> -	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
->> -		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->> -	psci_ops.migrate_info_type = psci_migrate_info_type;
->> -
->> -	arm_pm_restart = psci_sys_reset;
->> -
->> -	pm_power_off = psci_sys_poweroff;
->> +	psci_0_2_set_functions();
->>  
->>  out_put_node:
->>  	of_node_put(np);
->> @@ -339,7 +346,7 @@ static const struct of_device_id psci_of_match[] __initconst = {
->>  	{},
->>  };
->>  
->> -int __init psci_init(void)
->> +int __init psci_dt_init(void)
->>  {
->>  	struct device_node *np;
->>  	const struct of_device_id *matched_np;
->> @@ -354,6 +361,29 @@ int __init psci_init(void)
->>  	return init_fn(np);
->>  }
->>  
->> +/*
->> + * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
->> + * explicitly clarified in SBBR
->> + */
->> +int __init psci_acpi_init(void)
->> +{
->> +	if (!acpi_psci_present()) {
->> +		pr_info("is not implemented in ACPI.\n");
->> +		return -EOPNOTSUPP;
->> +	}
->> +
->> +	pr_info("probing for conduit method from ACPI.\n");
->> +
->> +	if (acpi_psci_use_hvc())
->> +		invoke_psci_fn = __invoke_psci_fn_hvc;
->> +	else
->> +		invoke_psci_fn = __invoke_psci_fn_smc;
->> +
->> +	psci_0_2_set_functions();
->> +
->> +	return 0;
->> +}
->> +
->>  #ifdef CONFIG_SMP
->>  
->>  static int __init cpu_psci_cpu_init(struct device_node *dn, unsigned int cpu)
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 5796734..7ba20d4 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -398,10 +398,12 @@ void __init setup_arch(char **cmdline_p)
->>  	efi_idmap_init();
->>  
->>  	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->> -	if (acpi_disabled)
->> +	if (acpi_disabled) {
->>  		unflatten_device_tree();
->> -
->> -	psci_init();
->> +		psci_dt_init();
->> +	} else {
->> +		psci_acpi_init();
->> +	}
-> This is slightly nitty now, but I think it'd be slightly easier to follow
-> boot path if the switch for acpi disabled/enabled was in psci.c. It'd also allow
-> psci_dt_init() and psci_acpi_init() to be static.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/clk/rockchip/Makefile  |   1 +
+>  drivers/clk/rockchip/clk-cpu.c | 316 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/rockchip/clk.c     |  20 +++
+>  drivers/clk/rockchip/clk.h     |  36 +++++
+>  4 files changed, 373 insertions(+)
+>  create mode 100644 drivers/clk/rockchip/clk-cpu.c
 >
-> I.e. keep a psci_init() and just make it call one or the other.
+> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
+> index ee6b077..bd8514d 100644
+> --- a/drivers/clk/rockchip/Makefile
+> +++ b/drivers/clk/rockchip/Makefile
+> @@ -5,6 +5,7 @@
+>  obj-y  += clk-rockchip.o
+>  obj-y  += clk.o
+>  obj-y  += clk-pll.o
+> +obj-y  += clk-cpu.o
+>  obj-$(CONFIG_RESET_CONTROLLER) += softrst.o
+>
+>  obj-y  += clk-rk3188.o
+> diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
+> new file mode 100644
+> index 0000000..b8382b1
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-cpu.c
+> @@ -0,0 +1,316 @@
+> +/*
+> + * Copyright (c) 2014 MundoReader S.L.
+> + * Author: Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * based on clk/samsung/clk-cpu.c
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + * Author: Thomas Abraham <thomas.ab@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This file contains the utility function to register CPU clock for Samsung
+> + * Exynos platforms. A CPU clock is defined as a clock supplied to a CPU or a
+> + * group of CPUs. The CPU clock is typically derived from a hierarchy of clock
+> + * blocks which includes mux and divider blocks. There are a number of other
+> + * auxiliary clocks supplied to the CPU domain such as the debug blocks and AXI
+> + * clock for CPU domain. The rates of these auxiliary clocks are related to the
+> + * CPU clock rate and this relation is usually specified in the hardware manual
+> + * of the SoC or supplied after the SoC characterization.
+> + *
+> + * The below implementation of the CPU clock allows the rate changes of the CPU
+> + * clock and the corresponding rate changes of the auxillary clocks of the CPU
+> + * domain. The platform clock driver provides a clock register configuration
+> + * for each configurable rate which is then used to program the clock hardware
+> + * registers to acheive a fast co-oridinated rate change for all the CPU domain
+> + * clocks.
+> + *
+> + * On a rate change request for the CPU clock, the rate change is propagated
+> + * upto the PLL supplying the clock to the CPU domain clock blocks. While the
+> + * CPU domain PLL is reconfigured, the CPU domain clocks are driven using an
+> + * alternate clock source. If required, the alternate clock source is divided
+> + * down in order to keep the output clock rate within the previous OPP limits.
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <linux/slab.h>
+> +#include <linux/io.h>
+> +#include <linux/clk-provider.h>
+> +#include "clk.h"
+> +
+> +/**
+> + * struct rockchip_cpuclk: information about clock supplied to a CPU core.
+> + * @hw:                handle between ccf and cpu clock.
+> + * @alt_parent:        alternate parent clock to use when switching the speed
+> + *             of the primary parent clock.
+> + * @reg_base:  base register for cpu-clock values.
+> + * @clk_nb:    clock notifier registered for changes in clock speed of the
+> + *             primary parent clock.
+> + * @rate_count:        number of rates in the rate_table
+> + * @rate_table:        pll-rates and their associated dividers
+> + * @reg_data:  cpu-specific register settings
+> + * @lock:      clock lock
+> + */
+> +struct rockchip_cpuclk {
+> +       struct clk_hw                           hw;
+> +
+> +       struct clk_mux                          cpu_mux;
+> +       const struct clk_ops                    *cpu_mux_ops;
+> +
+> +       struct clk                              *alt_parent;
+> +       void __iomem                            *reg_base;
+> +       struct notifier_block                   clk_nb;
+> +       unsigned int                            rate_count;
+> +       struct rockchip_cpuclk_rate_table       *rate_table;
+> +       const struct rockchip_cpuclk_reg_data   *reg_data;
+> +       spinlock_t                              *lock;
+> +};
+> +
+> +#define to_rockchip_cpuclk_hw(hw) container_of(hw, struct rockchip_cpuclk, hw)
+> +#define to_rockchip_cpuclk_nb(nb) \
+> +                       container_of(nb, struct rockchip_cpuclk, clk_nb)
+> +
+> +static const struct rockchip_cpuclk_rate_table *rockchip_get_cpuclk_settings(
+> +                           struct rockchip_cpuclk *cpuclk, unsigned long rate)
+> +{
+> +       const struct rockchip_cpuclk_rate_table *rate_table =
+> +                                                       cpuclk->rate_table;
+> +       int i;
+> +
+> +       for (i = 0; i < cpuclk->rate_count; i++) {
+> +               if (rate == rate_table[i].prate)
+> +                       return &rate_table[i];
+> +       }
+> +
+> +       return NULL;
+> +}
+> +
+> +static unsigned long rockchip_cpuclk_recalc_rate(struct clk_hw *hw,
+> +                                       unsigned long parent_rate)
+> +{
+> +       struct rockchip_cpuclk *cpuclk = to_rockchip_cpuclk_hw(hw);
+> +       const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+> +       u32 clksel0 = readl_relaxed(cpuclk->reg_base + reg_data->core_reg);
+> +
+> +       clksel0 >>= reg_data->div_core_shift;
+> +       clksel0 &= reg_data->div_core_mask;
+> +       return parent_rate / (clksel0 + 1);
+> +}
+> +
+> +static const struct clk_ops rockchip_cpuclk_ops = {
+> +       .recalc_rate = rockchip_cpuclk_recalc_rate,
+> +};
+> +
+> +static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
+> +                                          struct clk_notifier_data *ndata)
+> +{
+> +       const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+> +       const struct rockchip_cpuclk_rate_table *rate;
+> +       unsigned long alt_prate, alt_div;
+> +       int i;
+> +
+> +       rate = rockchip_get_cpuclk_settings(cpuclk, ndata->new_rate);
+> +       if (!rate) {
+> +               pr_err("%s: Invalid rate : %lu for cpuclk\n",
+> +                      __func__, ndata->new_rate);
+> +               return -EINVAL;
+> +       }
+> +
+> +       alt_prate = clk_get_rate(cpuclk->alt_parent);
+> +
+> +       spin_lock(cpuclk->lock);
+> +
+> +       /*
+> +        * If the old parent clock speed is less than the clock speed
+> +        * of the alternate parent, then it should be ensured that at no point
+> +        * the armclk speed is more than the old_rate until the dividers are
+> +        * set.
+> +        */
+> +       if (alt_prate > ndata->old_rate) {
+> +               alt_div =  DIV_ROUND_UP(alt_prate, ndata->old_rate) - 1;
+> +               if (alt_div > reg_data->div_core_mask) {
+> +                       pr_warn("%s: limiting alt-divider %lu to %d\n",
+> +                               __func__, alt_div, reg_data->div_core_mask);
+> +                       alt_div = reg_data->div_core_mask;
+> +               }
+> +
+> +               pr_debug("%s: setting div %lu as alt-rate %lu > old-rate %lu\n",
+> +                        __func__, alt_div, alt_prate, ndata->old_rate);
+> +               writel_relaxed(HIWORD_UPDATE(alt_div,
+> +                                            reg_data->div_core_mask,
+> +                                            reg_data->div_core_shift),
+> +                             cpuclk->reg_base + reg_data->core_reg);
+> +       }
+> +
+> +       /* select alternate parent */
+> +       writel(HIWORD_UPDATE(1, 1, reg_data->mux_core_shift),
+> +              cpuclk->reg_base + reg_data->core_reg);
 
-Do you mean something like blow in psci.c?
+In the "alt_prate > ndata->old_rate" case there's a period of time
+where you can be running super slow.
 
-int __init psci_init(void)
-{
-if (acpi_disabled)
-return psci_dt_init();
-else
-return psci_acpi_init();
-}
+If we start as 126000 and we're going to switch to 594000, we decide
+we need a divide by 5.  We apply the divide by 5 in one statement and
+switch to 594MHz in a second statement.  That means there's a very
+short period of time where we're at 126000 / 5 = 25200.  That's 25MHz.
 
-Thanks
-Hanjun
+I've found that when I stress out CPUfreq and have a lot of interrupts
+coming in (like from USB) the my system hangs here.
+
+Since the "alt div" and reparenting touch the same register, I think
+we can do them in a single operation.  That works for me.
+
+...but something isn't adding up for me, so I'm hesitant to suggest
+this.  Somehow I only end up with the hang here and not down in the
+post_rate_change().  I'll keep debugging...  It strangely enough seems
+related to the rockchip_pll_notifier_cb()???
+
+
+> +
+> +       /* alternate parent is active now. set the dividers */
+> +       for (i = 0; i < ARRAY_SIZE(rate->divs); i++) {
+> +               const struct rockchip_cpuclk_clksel *clksel = &rate->divs[i];
+> +
+> +               if (!clksel->reg)
+> +                       continue;
+> +
+> +               pr_debug("%s: setting reg 0x%x to 0x%x\n",
+> +                        __func__, clksel->reg, clksel->val);
+> +               writel(clksel->val , cpuclk->reg_base + clksel->reg);
+> +       }
+> +
+> +       spin_unlock(cpuclk->lock);
+> +       return 0;
+> +}
+> +
+> +static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
+> +                                           struct clk_notifier_data *ndata)
+> +{
+> +       const struct rockchip_cpuclk_reg_data *reg_data = cpuclk->reg_data;
+> +
+> +       spin_lock(cpuclk->lock);
+> +
+> +       /* post-rate change event, re-mux back to primary parent */
+> +       writel(HIWORD_UPDATE(0, 1, reg_data->mux_core_shift),
+> +              cpuclk->reg_base + reg_data->core_reg);
+> +
+> +       /* remove any core dividers */
+> +       writel(HIWORD_UPDATE(0, reg_data->div_core_mask,
+> +                            reg_data->div_core_shift),
+> +              cpuclk->reg_base + reg_data->core_reg);
+
+I think we can combine the two writes above too.  If we combine the
+pre, we should also combine here...
+
+
+> +
+> +       spin_unlock(cpuclk->lock);
+> +       return 0;
+> +}
+> +
+> +/*
+> + * This clock notifier is called when the frequency of the parent clock
+> + * of cpuclk is to be changed. This notifier handles the setting up all
+> + * the divider clocks, remux to temporary parent and handling the safe
+> + * frequency levels when using temporary parent.
+> + */
+> +static int rockchip_cpuclk_notifier_cb(struct notifier_block *nb,
+> +                                       unsigned long event, void *data)
+> +{
+> +       struct clk_notifier_data *ndata = data;
+> +       struct rockchip_cpuclk *cpuclk = to_rockchip_cpuclk_nb(nb);
+> +       int ret = 0;
+> +
+> +       pr_debug("%s: event %lu, old_rate %lu, new_rate: %lu\n",
+> +                __func__, event, ndata->old_rate, ndata->new_rate);
+> +       if (event == PRE_RATE_CHANGE)
+> +               ret = rockchip_cpuclk_pre_rate_change(cpuclk, ndata);
+> +       else if (event == POST_RATE_CHANGE)
+> +               ret = rockchip_cpuclk_post_rate_change(cpuclk, ndata);
+> +
+> +       return notifier_from_errno(ret);
+> +}
+> +
+> +struct clk *rockchip_clk_register_cpuclk(const char *name,
+> +                       const char **parent_names, u8 num_parents,
+> +                       const struct rockchip_cpuclk_reg_data *reg_data,
+> +                       struct rockchip_cpuclk_rate_table *rate_table,
+> +                       void __iomem *reg_base, spinlock_t *lock)
+> +{
+> +       struct rockchip_cpuclk *cpuclk;
+> +       struct clk_init_data init;
+> +       struct clk *clk, *cclk;
+> +       int ret;
+> +
+> +       if (!reg_data) {
+> +               pr_err("%s: no soc register information\n", __func__);
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       if (num_parents != 2) {
+> +               pr_err("%s: needs two parent clocks\n", __func__);
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       cpuclk = kzalloc(sizeof(*cpuclk), GFP_KERNEL);
+> +       if (!cpuclk)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       init.parent_names = &parent_names[0];
+> +       init.num_parents = 1;
+> +       init.ops = &rockchip_cpuclk_ops;
+> +
+> +       /* only allow rate changes when we have a rate table */
+> +       init.flags = rate_table ? CLK_SET_RATE_PARENT : 0;
+> +
+> +       /* disallow automatic parent changes by ccf */
+> +       init.flags |= CLK_SET_RATE_NO_REPARENT;
+
+For me it was important to add "CLK_GET_RATE_NOCACHE" here.  We're
+mucking with this divider ourselves (above) so we need to make sure
+that the clock framework isn't doing something wonky.
+
+If I don't do that and I run this:
+
+cd /sys/devices/system/cpu/cpu0/cpufreq
+echo userspace > scaling_governor
+while true; do
+  echo 126000 > scaling_setspeed
+  sleep .1
+  echo 216000 > scaling_setspeed
+  sleep .1
+done
+
+...and then in another session I run:
+
+cd /sys/devices/system/cpu/cpu0/cpufreq
+while true; do cat cpuinfo_cur_freq; sleep .2; done
+
+...I see all sorts of wonky results.
+
+> +
+> +       cpuclk->reg_base = reg_base;
+> +       cpuclk->lock = lock;
+> +       cpuclk->reg_data = reg_data;
+> +       cpuclk->clk_nb.notifier_call = rockchip_cpuclk_notifier_cb;
+> +       cpuclk->hw.init = &init;
+> +
+> +       cpuclk->alt_parent = __clk_lookup(parent_names[1]);
+> +       if (!cpuclk->alt_parent) {
+> +               pr_err("%s: could not lookup alternate parent\n",
+> +                      __func__);
+> +               ret = -EINVAL;
+> +               goto free_cpuclk;
+> +       }
+> +
+> +       ret = clk_prepare_enable(cpuclk->alt_parent);
+> +       if (ret) {
+> +               pr_err("%s: could not enable alternate parent\n",
+> +                      __func__);
+> +               goto free_cpuclk;
+> +       }
+> +
+> +       clk = __clk_lookup(parent_names[0]);
+> +       if (!clk) {
+> +               pr_err("%s: could not lookup parent clock %s\n",
+> +                      __func__, parent_names[0]);
+> +               ret = -EINVAL;
+> +               goto free_cpuclk;
+> +       }
+> +
+> +       ret = clk_notifier_register(clk, &cpuclk->clk_nb);
+> +       if (ret) {
+> +               pr_err("%s: failed to register clock notifier for %s\n",
+> +                               __func__, name);
+> +               goto free_cpuclk;
+> +       }
+> +
+> +       if (rate_table) {
+> +               int nrates;
+> +
+> +               /* find count of rates in rate_table */
+> +               for (nrates = 0; rate_table[nrates].prate != 0; )
+> +                       nrates++;
+> +
+> +               cpuclk->rate_count = nrates;
+> +               cpuclk->rate_table = kmemdup(rate_table,
+> +                                            sizeof(*rate_table) * nrates,
+> +                                            GFP_KERNEL);
+> +               if (!cpuclk->rate_table) {
+> +                       pr_err("%s: could not allocate memory for cpuclk rates\n",
+> +                              __func__);
+> +                       ret = -ENOMEM;
+> +                       goto unregister_notifier;
+> +               }
+> +       }
+> +
+> +       cclk = clk_register(NULL, &cpuclk->hw);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("%s: could not register cpuclk %s\n", __func__,  name);
+> +               ret = PTR_ERR(clk);
+> +               goto free_rate_table;
+> +       }
+> +
+> +       return cclk;
+> +
+> +free_rate_table:
+> +       kfree(cpuclk->rate_table);
+> +unregister_notifier:
+> +       clk_notifier_unregister(clk, &cpuclk->clk_nb);
+> +free_cpuclk:
+> +       kfree(cpuclk);
+> +       return ERR_PTR(ret);
+> +}
+> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+> index d9c6db2..f87ac4a 100644
+> --- a/drivers/clk/rockchip/clk.c
+> +++ b/drivers/clk/rockchip/clk.c
+> @@ -297,6 +297,26 @@ void __init rockchip_clk_register_branches(
+>         }
+>  }
+>
+> +void __init rockchip_clk_register_armclk(unsigned int lookup_id,
+> +                       const char *name, const char **parent_names,
+> +                       u8 num_parents,
+> +                       const struct rockchip_cpuclk_reg_data *reg_data,
+> +                       struct rockchip_cpuclk_rate_table *rate_table)
+> +{
+> +       struct clk *clk;
+> +
+> +       clk = rockchip_clk_register_cpuclk(name, parent_names, num_parents,
+> +                                          reg_data, rate_table, reg_base,
+> +                                          &clk_lock);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("%s: failed to register clock %s: %ld\n",
+> +                      __func__, name, PTR_ERR(clk));
+> +               return;
+> +       }
+> +
+> +       rockchip_clk_add_lookup(clk, lookup_id);
+> +}
+> +
+>  void __init rockchip_clk_protect_critical(const char *clocks[], int nclocks)
+>  {
+>         int i;
+> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+> index 2b0bca1..e0ea61e 100644
+> --- a/drivers/clk/rockchip/clk.h
+> +++ b/drivers/clk/rockchip/clk.h
+> @@ -120,6 +120,38 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
+>                 struct rockchip_pll_rate_table *rate_table,
+>                 spinlock_t *lock);
+>
+> +struct rockchip_cpuclk_clksel {
+> +       int reg;
+> +       u32 val;
+> +};
+> +
+> +#define ROCKCHIP_CPUCLK_NUM_DIVIDERS   2
+> +struct rockchip_cpuclk_rate_table {
+> +       unsigned long prate;
+> +       struct rockchip_cpuclk_clksel divs[ROCKCHIP_CPUCLK_NUM_DIVIDERS];
+> +};
+> +
+> +/**
+> + * struct rockchip_cpuclk_reg_data: describes register offsets and masks of the cpuclock
+> + * @core_reg:          register offset of the core settings register
+> + * @div_core_shift:    core divider offset used to divide the pll value
+> + * @div_core_mask:     core divider mask
+> + * @mux_core_shift:    offset of the core multiplexer
+> + */
+> +struct rockchip_cpuclk_reg_data {
+> +       int             core_reg;
+> +       u8              div_core_shift;
+> +       u32             div_core_mask;
+> +       int             mux_core_reg;
+> +       u8              mux_core_shift;
+> +};
+> +
+> +struct clk *rockchip_clk_register_cpuclk(const char *name,
+> +                       const char **parent_names, u8 num_parents,
+> +                       const struct rockchip_cpuclk_reg_data *reg_data,
+> +                       struct rockchip_cpuclk_rate_table *rate_table,
+> +                       void __iomem *reg_base, spinlock_t *lock);
+> +
+>  #define PNAME(x) static const char *x[] __initconst
+>
+>  enum rockchip_clk_branch_type {
+> @@ -329,6 +361,10 @@ void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
+>                                     unsigned int nr_clk);
+>  void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
+>                                 unsigned int nr_pll, int grf_lock_offset);
+> +void rockchip_clk_register_armclk(unsigned int lookup_id, const char *name,
+> +                       const char **parent_names, u8 num_parents,
+> +                       const struct rockchip_cpuclk_reg_data *reg_data,
+> +                       struct rockchip_cpuclk_rate_table *rate_table);
+>  void rockchip_clk_protect_critical(const char *clocks[], int nclocks);
+>
+>  #define ROCKCHIP_SOFTRST_HIWORD_MASK   BIT(0)
+> --
+> 2.0.1
+>
