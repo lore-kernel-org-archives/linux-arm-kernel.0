@@ -1,42 +1,55 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 15 Sep 2014 15:57:35 -0700
-Subject: [RFC PATCH for Juno 0/2] Drivers for Juno to boot from ACPI
-In-Reply-To: <3840839.IPB3Ru8Evk@wuerfel>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <353732273.2TKdyNJ83M@wuerfel> <540EA446.7010200@redhat.com>
- <3840839.IPB3Ru8Evk@wuerfel>
-Message-ID: <20140915225735.1C5A9C40B84@trevor.secretlab.ca>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 15 Sep 2014 15:58:20 -0700
+Subject: SPI and module auto-loading
+In-Reply-To: <1410768612.22941.1.camel@collabora.co.uk>
+References: <54119DB6.8020807@collabora.co.uk>
+ <20140911193325.GT4015@sirena.org.uk>
+ <5412C1DF.3040707@collabora.co.uk>
+ <20140912101442.GR7960@sirena.org.uk>
+ <1410768612.22941.1.camel@collabora.co.uk>
+Message-ID: <20140915225820.GI7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Sep 2014 12:55:09 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 09 September 2014 02:55:02 Jon Masters wrote:
-> > On 09/01/2014 11:29 AM, Arnd Bergmann wrote:
-> > > On Monday 01 September 2014 23:05:59 Hanjun Guo wrote:
-> > >> This patch set is example of the sort of driver changes needed to boot
-> > >> Juno using ACPI tables, which using the ACPI tables devloped for MS
-> > >> Windows and published by ARM [1].
-> > > 
-> > > What about platform support?
-> > 
-> > I think Juno is just serving as an example here since it's from ARM and
-> > thus various people have access to it already, etc. It's not the best
-> > example of a server platform out there, since that wasn't its original
-> > design purpose (but it's a wonderful platform nonetheless). There is
-> > work currently in flight to offer other reference ACPI examples.
-> 
-> Ok, I see. This is a bit disappointing because it's actually the third
-> attempt to come up with a reference platform (after Exynos and X-Gene),
-> and it always seems to come down to deciding that this particular
-> platform doesn't really work with ACPI beyond basic booting.
-> 
-> Which platform(s) are you talking about? Are you sure it will be better
-> suited than the first three?
+On Mon, Sep 15, 2014 at 10:10:12AM +0200, Sjoerd Simons wrote:
+> On Fri, 2014-09-12 at 11:14 +0100, Mark Brown wrote:
 
-Juno is actually working out as a good reference platform. It works and
-there aren't horrible things that need to be done to get the system into
-a working state. AMD Seattle is a second system that will boot with
-Hanjun's ACPI series with a couple of device driver patches (the SBSA
-driver which is common with Juno and an Ethernet driver IIRC).
+> > The vendor identifier is an important part of the OF device ID, vendors
+> > can and do end up with different devices of the same name.
 
-g.
+> Indeed, which actually points at a problem with module loading for SPI
+> as the vendor prefix gets dropped when generating the modalias for the
+> uevent. So if there is a case where we have two SPI devices with the
+> same device name (but a different vendor identifier), module loading
+> can't work as the generated modalias for both will be spi:devicename
+> even if OF can properly distinguish between both.
+
+It's a relatively minor risk on that front though.
+
+> So for things to be consistent for both cases the options are to either:
+> a) the generated MODALIAS uevent variable should be an OF based alias
+>   + Upside is that both kernel and userspace can use the full OF
+>     information for matching
+>   + Downside is that that would mean adding OF match tables to all
+>     drivers that can possible used on a DT based system otherwise module
+>     auto-loading for those will be broken.
+
+This isn't a disadvantage for the drivers, anything being used with OF
+should have an explicit match table defined.
+
+> b) Stop using OF style matching and rely solely on the SPI id table
+>   + Downside here is that the vendor prefix isn't used anymore for
+>     matching. Otoh that's the current status quo for drivers without an
+>     OF match table and for how userspace matches modules currently.
+>   + Upside is that no extra work is required for drivers that currently
+>     work with DT even if they don't have any direct OF support.
+
+There's also the option of providing both bits of information in the
+event which is less disruptive all round.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/5584b002/attachment.sig>
