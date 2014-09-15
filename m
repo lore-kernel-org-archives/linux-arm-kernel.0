@@ -1,38 +1,225 @@
-From: Catalin.Marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Sep 2014 14:11:49 +0100
-Subject: [PATCH 3/3] ARM64: make of_device_ids const
-In-Reply-To: <1410337579-23466-4-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1410337579-23466-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20140915131149.GA5415@arm.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 15 Sep 2014 15:11:31 +0200
+Subject: [PATCH 2/2] ARM: meson6: clocksource: add Meson6 timer support
+In-Reply-To: <1410786691-30302-1-git-send-email-carlo@caione.org>
+References: <1410786691-30302-1-git-send-email-carlo@caione.org>
+Message-ID: <1410786691-30302-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:26:19AM +0100, Uwe Kleine-K?nig wrote:
-> of_device_ids (i.e. compatible strings and the respective data) are not
-> supposed to change at runtime. All functions working with of_device_ids
-> provided by <linux/of.h> work with const of_device_ids. So mark the
-> only non-const struct in arch/arm64 as const, too.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm64/kernel/perf_event.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index baf5afb7e6a0..aa29ecb4f800 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -1276,7 +1276,7 @@ arch_initcall(cpu_pmu_reset);
->  /*
->   * PMU platform driver and devicetree bindings.
->   */
-> -static struct of_device_id armpmu_of_device_ids[] = {
-> +static const struct of_device_id armpmu_of_device_ids[] = {
->  	{.compatible = "arm,armv8-pmuv3"},
->  	{},
->  };
+Meson6 SoCs are equipped with 5 32-bit timers, called TIMER_A, TIMER_B,
+TIMER_C, TIMER_D and TIMER_E.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+The driver is providing clocksource support for the 32-bit counter using
+TIMER_E. Clockevents are also supported using TIMER_A.
 
-(I guess you could upstream the patches via the arm-soc tree)
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ drivers/clocksource/Kconfig        |   3 +
+ drivers/clocksource/Makefile       |   1 +
+ drivers/clocksource/meson6_timer.c | 167 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 171 insertions(+)
+ create mode 100644 drivers/clocksource/meson6_timer.c
+
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index cfd6519..38029ca 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -30,6 +30,9 @@ config ARMADA_370_XP_TIMER
+ 	bool
+ 	select CLKSRC_OF
+ 
++config MESON6_TIMER
++	bool
++
+ config ORION_TIMER
+ 	select CLKSRC_OF
+ 	select CLKSRC_MMIO
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7fd9fd1..e4ae987 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+ obj-$(CONFIG_ARCH_U300)		+= timer-u300.o
+ obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+ obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
++obj-$(CONFIG_MESON6_TIMER)	+= meson6_timer.o
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
+ obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+ obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
+diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+new file mode 100644
+index 0000000..5c15cba
+--- /dev/null
++++ b/drivers/clocksource/meson6_timer.c
+@@ -0,0 +1,167 @@
++/*
++ * Amlogic Meson6 SoCs timer handling.
++ *
++ * Copyright (C) 2014 Carlo Caione <carlo@caione.org>
++ *
++ * Based on code from Amlogic, Inc
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqreturn.h>
++#include <linux/sched_clock.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++
++#define CED_ID			0
++#define CSD_ID			4
++
++#define TIMER_ISA_MUX		0
++#define TIMER_ISA_VAL(t)	(((t) + 1) << 2)
++
++#define TIMER_INPUT_BIT(t)	(2 * (t))
++#define TIMER_ENABLE_BIT(t)	(16 + (t))
++#define TIMER_PERIODIC_BIT(t)	(12 + (t))
++
++#define TIMER_CED_INPUT_MASK	(3UL << TIMER_INPUT_BIT(CED_ID))
++#define TIMER_CSD_INPUT_MASK	(7UL << TIMER_INPUT_BIT(CSD_ID))
++
++#define TIMER_CED_UNIT_1US	0
++#define TIMER_CSD_UNIT_1US	1
++
++static void __iomem *timer_base;
++
++static u64 notrace meson6_timer_sched_read(void)
++{
++	return (u64)readl(timer_base + TIMER_ISA_VAL(CSD_ID));
++}
++
++static void meson6_clkevt_time_stop(unsigned char timer)
++{
++	u32 val = readl(timer_base + TIMER_ISA_MUX);
++
++	writel(val & ~TIMER_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
++}
++
++static void meson6_clkevt_time_setup(unsigned char timer, unsigned long delay)
++{
++	writel(delay, timer_base + TIMER_ISA_VAL(timer));
++}
++
++static void meson6_clkevt_time_start(unsigned char timer, bool periodic)
++{
++	u32 val = readl(timer_base + TIMER_ISA_MUX);
++
++	if (periodic)
++		val |= TIMER_PERIODIC_BIT(timer);
++	else
++		val &= ~TIMER_PERIODIC_BIT(timer);
++
++	writel(val | TIMER_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
++}
++
++static void meson6_clkevt_mode(enum clock_event_mode mode,
++			       struct clock_event_device *clk)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		meson6_clkevt_time_stop(CED_ID);
++		meson6_clkevt_time_setup(CED_ID, USEC_PER_SEC/HZ - 1);
++		meson6_clkevt_time_start(CED_ID, true);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		meson6_clkevt_time_stop(CED_ID);
++		meson6_clkevt_time_start(CED_ID, false);
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		meson6_clkevt_time_stop(CED_ID);
++		break;
++	}
++}
++
++static int meson6_clkevt_next_event(unsigned long evt,
++				    struct clock_event_device *unused)
++{
++	meson6_clkevt_time_stop(CED_ID);
++	meson6_clkevt_time_setup(CED_ID, evt);
++	meson6_clkevt_time_start(CED_ID, false);
++
++	return 0;
++}
++
++static struct clock_event_device meson6_clockevent = {
++	.name		= "meson6_tick",
++	.rating		= 400,
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_mode	= meson6_clkevt_mode,
++	.set_next_event	= meson6_clkevt_next_event,
++};
++
++static irqreturn_t meson6_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
++
++	evt->event_handler(evt);
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction meson6_timer_irq = {
++	.name		= "meson6_timer",
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= meson6_timer_interrupt,
++	.dev_id		= &meson6_clockevent,
++};
++
++static void __init meson6_timer_init(struct device_node *node)
++{
++	u32 val;
++	int ret, irq;
++
++	timer_base = of_io_request_and_map(node, 0, "meson6-timer");
++	if (IS_ERR(timer_base))
++		panic("Can't map registers");
++
++	irq = irq_of_parse_and_map(node, 0);
++	if (irq <= 0)
++		panic("Can't parse IRQ");
++
++	/* Set 1us for timer E */
++	val = readl(timer_base + TIMER_ISA_MUX);
++	val &= ~TIMER_CSD_INPUT_MASK;
++	val |= TIMER_CSD_UNIT_1US << TIMER_INPUT_BIT(CSD_ID);
++	writel(val, timer_base + TIMER_ISA_MUX);
++
++	sched_clock_register(meson6_timer_sched_read, 32, USEC_PER_SEC);
++	clocksource_mmio_init(timer_base + TIMER_ISA_VAL(CSD_ID), node->name,
++			      1000 * 1000, 300, 32, clocksource_mmio_readl_up);
++
++	/* Timer A base 1us */
++	val &= ~TIMER_CED_INPUT_MASK;
++	val |= TIMER_CED_UNIT_1US << TIMER_INPUT_BIT(CED_ID);
++	writel(val, timer_base + TIMER_ISA_MUX);
++
++	/* Stop the timer A */
++	meson6_clkevt_time_stop(CED_ID);
++
++	ret = setup_irq(irq, &meson6_timer_irq);
++	if (ret)
++		pr_warn("failed to setup irq %d\n", irq);
++
++	meson6_clockevent.cpumask = cpu_possible_mask;
++	meson6_clockevent.irq = irq;
++
++	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
++					1, 0xfffe);
++}
++CLOCKSOURCE_OF_DECLARE(meson6, "amlogic,meson6-timer",
++		       meson6_timer_init);
+-- 
+1.9.1
