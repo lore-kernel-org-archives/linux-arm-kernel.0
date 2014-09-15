@@ -1,132 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 15 Sep 2014 22:24:02 +0200
-Subject: [PATCH v2 1/2] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <1410812643-14041-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410812643-14041-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1410812643-14041-2-git-send-email-boris.brezillon@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 15 Sep 2014 13:33:03 -0700
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <20140915111055.GD1577@arm.com>
+References: <1410452204-7277-1-git-send-email-dianders@chromium.org>
+ <20140911164710.GW6158@arm.com> <5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+ <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
+ <5412E3BB.9030800@arm.com> <54134291.3040700@codeaurora.org>
+ <20140915111055.GD1577@arm.com>
+Message-ID: <54174CFF.7050504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new function to move bits (not bytes) from a memory region to
-another one.
-This function is similar to memmove except it acts at bit level.
-This function is needed to implement GPMI raw access functions, given the
-fact that ECC engine does not pad ECC bits to the next byte boundary.
+On 09/15/14 04:10, Catalin Marinas wrote:
+> On Fri, Sep 12, 2014 at 07:59:29PM +0100, Stephen Boyd wrote:
+>> On 09/12/14 05:14, Marc Zyngier wrote:
+>>> We surely can handle the UNDEF and do something there. We just can't do
+>>> it the way Doug described it above.
+>> I suggested doing that for something else a while ago and Will and Dave
+>> we're not thrilled[1]. The suggestion back then was to use DT to
+>> indicate what mode the kernel is running in.
+>>
+>> [1]
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
+> I think the context was slightly different. As I re-read the thread, it
+> seems that the discussion was around whether to use some SMC interface
+> or not based on whether the kernel is running secure or non-secure. The
+> argument made by Will was to actually specify the type of the firmware
+> SMC interface in the DT and use it in the kernel (and probably assume
+> the kernel is running in secure mode if no smc interface is specified in
+> the DT; you could have both though, running in secure mode and also
+> having firmware).
+>
+> In this arch timer case, we need to work around a firmware bug (or
+> feature as 32-bit ARM kernels never required CNTVOFF initialisation by
+> firmware, no matter how small such firmware is). We don't expect a
+> specific SMC call to initialise CNTVOFF, so we can't describe it in the
+> DT.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 86 ++++++++++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
- 2 files changed, 90 insertions(+)
+Agreed, we can't described SMC calls that don't exist. From my
+perspective it's just another part of the cpu boot sequence that needs
+to be handled in the kernel, so describing the requirement via the
+cpu-boot method seems appropriate. It seems like we're making it harder
+than it should be by handling the undef when we could have slightly
+different SMP boot code (and suspend/resume code) depending on the boot
+method property.
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 87e658c..5a83f0f 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -1353,3 +1353,89 @@ int gpmi_read_page(struct gpmi_nand_data *this,
- 	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
- 	return start_dma_with_bch_irq(this, desc);
- }
-+
-+void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-+		    const u8 *src, size_t src_bit_off,
-+		    size_t nbits)
-+{
-+	size_t i;
-+	size_t nbytes;
-+	u32 src_byte = 0;
-+
-+	src += src_bit_off / 8;
-+	src_bit_off %= 8;
-+
-+	dst += dst_bit_off / 8;
-+	dst_bit_off %= 8;
-+
-+	if (src_bit_off) {
-+		src_byte = src[0] >> src_bit_off;
-+		nbits -= 8 - src_bit_off;
-+		src++;
-+	}
-+
-+	nbytes = nbits / 8;
-+
-+	if (src_bit_off <= dst_bit_off) {
-+		dst[0] &= GENMASK(dst_bit_off - 1, 0);
-+		dst[0] |= src_byte << dst_bit_off;
-+		src_bit_off += (8 - dst_bit_off);
-+		src_byte >>= (8 - dst_bit_off);
-+		dst_bit_off = 0;
-+		dst++;
-+	} else if (nbytes) {
-+		src_byte |= src[0] << (8 - src_bit_off);
-+		dst[0] &= GENMASK(dst_bit_off - 1, 0);
-+		dst[0] |= src_byte << dst_bit_off;
-+		src_bit_off += dst_bit_off;
-+		src_byte >>= (8 - dst_bit_off);
-+		dst_bit_off = 0;
-+		dst++;
-+		nbytes--;
-+		src++;
-+		if (src_bit_off > 7) {
-+			src_bit_off -= 8;
-+			dst[0] = src_byte;
-+			dst++;
-+			src_byte >>= 8;
-+		}
-+	}
-+
-+	if (!src_bit_off && !dst_bit_off) {
-+		if (nbytes)
-+			memcpy(dst, src, nbytes);
-+	} else {
-+		for (i = 0; i < nbytes; i++) {
-+			src_byte |= src[i] << (8 - src_bit_off);
-+			dst[i] = src_byte;
-+			src_byte >>= 8;
-+		}
-+	}
-+
-+	dst += nbytes;
-+	src += nbytes;
-+	nbits %= 8;
-+
-+	if (!nbits && !src_bit_off)
-+		return;
-+
-+	if (nbits)
-+		src_byte |= (*src & GENMASK(nbits - 1, 0)) <<
-+			    ((8 - src_bit_off) % 8);
-+	nbits += (8 - src_bit_off) % 8;
-+
-+	if (dst_bit_off)
-+		src_byte = (src_byte << dst_bit_off) |
-+			   (*dst & GENMASK(dst_bit_off - 1, 0));
-+	nbits += dst_bit_off;
-+
-+	if (nbits % 8)
-+		src_byte |= (dst[nbits / 8] & GENMASK(7, nbits % 8)) <<
-+			    (nbits / 8);
-+
-+	nbytes = DIV_ROUND_UP(nbits, 8);
-+	for (i = 0; i < nbytes; i++) {
-+		dst[i] = src_byte;
-+		src_byte >>= 8;
-+	}
-+}
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 32c6ba4..17d0736 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -290,6 +290,10 @@ extern int gpmi_send_page(struct gpmi_nand_data *,
- extern int gpmi_read_page(struct gpmi_nand_data *,
- 			dma_addr_t payload, dma_addr_t auxiliary);
- 
-+void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-+		    const u8 *src, size_t src_bit_off,
-+		    size_t nbits);
-+
- /* BCH : Status Block Completion Codes */
- #define STATUS_GOOD		0x00
- #define STATUS_ERASED		0xff
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
