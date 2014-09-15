@@ -1,61 +1,67 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 15 Sep 2014 12:07:12 +0530
-Subject: [Patch v9 3/3] phy: Add Qualcomm DWC3 HS/SS PHY driver
-In-Reply-To: <20140914022452.GA16652@saruman.home>
-References: <1410550088-8754-1-git-send-email-agross@codeaurora.org>
- <1410550088-8754-4-git-send-email-agross@codeaurora.org>
- <5413E829.8020804@ti.com> <20140914022452.GA16652@saruman.home>
-Message-ID: <54168918.1080408@ti.com>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Mon, 15 Sep 2014 09:00:22 +0200
+Subject: [PATCH v3 0/9] Tegra xHCI support
+In-Reply-To: <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
+References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
+ <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
+ <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
+ <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+ <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
+Message-ID: <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sunday 14 September 2014 07:54 AM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Sat, Sep 13, 2014 at 12:16:01PM +0530, Kishon Vijay Abraham I wrote:
->> On Saturday 13 September 2014 12:58 AM, Andy Gross wrote:
->>> This patch adds a new driver for the Qualcomm USB 3.0 PHY that exists on some
->>> Qualcomm platforms.  This driver uses the generic PHY framework and will
->>> interact with the DWC3 controller.
+On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org> wrote:
+> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
+>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
+>>>>>
+>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
+>>>>> recently posted by Andrew Chew [2].
+>>>>
+>>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
+>>>> USB devices I tested with, about half where probed correctly, but the
+>>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
+>>>> right after the reset, the C_PORT_CONNECTION bit is set.
+>>>>
+>>>> I don't see any correlation between the failure and the kind of usb
+>>>> device, but I don't have much experience with USB implementations
+>>>> either.
+>>>
+>>> Hmm... I haven't seen that before.  Which particular devices were you using?
 >>
->> Do you have dt documentation for this driver?
-> 
-> see patch 1
-
-hmm.. missed that.
-> 
->>> +static inline void qcom_dwc3_phy_write_readback(
->>> +	struct qcom_dwc3_usb_phy *phy_dwc3, u32 offset,
->>> +	const u32 mask, u32 val)
->>> +{
->>> +	u32 write_val, tmp = readl(phy_dwc3->base + offset);
->>> +
->>> +	tmp &= ~mask;		/* retain other bits */
->>> +	write_val = tmp | val;
->>> +
->>> +	writel(write_val, phy_dwc3->base + offset);
->>> +
->>> +	/* Read back to see if val was written */
+>> Here they are:
 >>
->> Does it fail sometime? I'm not sure if this should be present in the
->> driver since this looks more of a debug code.
-> 
-> this was mentioned before. Silicon bug.
-
-okay.
-> 
->>> +	writel_relaxed(data | SSUSB_CTRL_SS_PHY_RESET,
->>> +		phy_dwc3->base + SSUSB_PHY_CTRL_REG);
->>> +	usleep_range(2000, 2200);
+>> work:
 >>
->> use msleep here..
-> 
-> why ? usleep_range() gives the scheduler oportunity to group timers.
+>> Genius keyboard: 05d5:6782
+>> Logitech mouse: 046d:c06a
+>> Denver MP3 player: 10d6:1100
+>> Atheros Bluetooth dongle: 0cf3:3005
+>>
+>> don't work:
+>>
+>> MCS7830 ethernet dongle: 9710:7830
+>> Genesys Logic hub: 05e3:0608
+>
+> I tried the hub and it works just fine for me... Have you tried this
+> on any other boards like Big or Blaze?
 
-Was of the opinion that for larger delays msleep should be used. But looks like
-it is only for 10+ ms (Documentation/timers/timers-howto.txt).
+I have a Blaze here, but haven't been able to get the external ports
+to power up. I don't have schematics nor a strong interest to get that
+fixed myself, as I can test my code just fine with the Blaze's
+internal camera and the devices that do work on the Jetson.
 
-Thanks
-Kishon
+I'm using the firmware file that was posted recently:
+
+xhci-tegra 70090000.usb: Firmware timestamp: 2014-05-02 02:22:50 UTC,
+Falcon state 0x20
+
+If things work for you with the same sources, .config and firmware, I
+can only think of the hw being different (other hw revision?).
+
+Regards,
+
+Tomeu
