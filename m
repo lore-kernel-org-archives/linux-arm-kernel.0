@@ -1,12 +1,12 @@
 From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 15 Sep 2014 08:21:28 -0500
+Date: Mon, 15 Sep 2014 08:24:42 -0500
 Subject: [Patch v4 net-next 04/12] net: fec: parser max queue number from
  dt file
 In-Reply-To: <20140915093926.11bdbc32@ipc1.ka-ro>
 References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
  <1410555657-10744-5-git-send-email-Frank.Li@freescale.com>
  <20140915093926.11bdbc32@ipc1.ka-ro>
-Message-ID: <CAHrpEqS3aVoWxi_E_dvCkfZJaFwC_HUvjn5u1x=zLSd-vcYyuA@mail.gmail.com>
+Message-ID: <CAHrpEqTCBMn-P2O7VZOOLUN=Zbc8h_Ow9MKrv5cV5gZPENRqUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -72,6 +72,14 @@ On Mon, Sep 15, 2014 at 2:39 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
 > Shouldn't these be handled seperately? So that if only one of those
 > properties is given in DT the specified value for that property should
 > be used?
+
+I worry about asymmetric design in future.
+And use two property is the easy debug two directory.
+
+best regards
+Frank Li
+
+
 >
 >> +             return;
 >> +     }
@@ -112,14 +120,6 @@ On Mon, Sep 15, 2014 at 2:39 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
 >>
 > useless initialization. These variables are initialized in
 > fec_enet_get_queue_num() anyway.
-
-
-David have applied the whole patch serials.
-How to handle it? use new patch?
-
-best regards
-Frank Li
-
 >
 >>       of_id = of_match_device(fec_dt_ids, &pdev->dev);
 >>       if (of_id)
