@@ -1,31 +1,33 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 15 Sep 2014 17:22:57 +0200
-Subject: [PATCH 2/7] iommu/arm-smmu: add support for multi-master iommu
- groups
-In-Reply-To: <1409849405-17347-3-git-send-email-will.deacon@arm.com>
-References: <1409849405-17347-1-git-send-email-will.deacon@arm.com>
- <1409849405-17347-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20140915152257.GX28786@8bytes.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 15 Sep 2014 08:31:46 -0700
+Subject: [PATCH 00/35] arm: omap: move intc to drivers/irqchip/
+In-Reply-To: <20140914051858.GF21986@titan.lakedaemon.net>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+ <20140914051858.GF21986@titan.lakedaemon.net>
+Message-ID: <20140915153145.GC2762@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 05:50:00PM +0100, Will Deacon wrote:
->  static struct arm_smmu_master_cfg *
-> -find_smmu_master_cfg(struct arm_smmu_device *smmu, struct device *dev)
-> +find_smmu_master_cfg(struct device *dev)
->  {
-> -	struct arm_smmu_master *master;
-> -
-> -	if (dev_is_pci(dev))
-> -		return dev->archdata.iommu;
-> -
-> -	master = find_smmu_master(smmu, dev->of_node);
-> -	return master ? &master->cfg : NULL;
-> +	struct iommu_group *group = iommu_group_get(dev);
-> +	return group ? iommu_group_get_iommudata(group) : NULL;
+* Jason Cooper <jason@lakedaemon.net> [140913 22:19]:
+> On Mon, Jul 28, 2014 at 04:15:48PM -0500, Felipe Balbi wrote:
+> 
+> For patches 32-35, please fix the subject line to:
+> 
+>   irqchip: omap-intc: C...
+> 
+> With that changed, patches 30-35 are:
+> 
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Using iommu_group_get requires the call-sites to do an iommu_group_put
-in the end, but I don't see the call-sites updated.
+Great, thanks Jason for looking through them.
 
+Felipe, can you please repost the missing patches with Jason's
+changes and leaving out patch 30/35 to avoid board-*.c file
+churn?
 
-	Joerg
+The branch to use for rebasing is omap-for-v3.18/intc-v2
+that already contains the arch/arm/mach-omap2 related changes.
+
+Regards,
+
+Tony
