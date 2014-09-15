@@ -1,28 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Sep 2014 14:15:06 +0100
-Subject: [RFC Resend] arm:extend __init_end to a page align address
-In-Reply-To: <20140915105525.GC12361@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103CDBFBFB028@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103D6DB4915FB@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103D6DB491607@CNBJMBX05.corpusers.net>
- <20140915105525.GC12361@n2100.arm.linux.org.uk>
-Message-ID: <20140915131505.GB5415@arm.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 15 Sep 2014 15:11:29 +0200
+Subject: [PATCH 0/2] ARM: meson: add clocksource support
+Message-ID: <1410786691-30302-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 11:55:25AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 15, 2014 at 06:26:43PM +0800, Wang, Yalin wrote:
-> > this patch change the __init_end address to a page align address, so that free_initmem()
-> > can free the whole .init section, because if the end address is not page aligned,
-> > it will round down to a page align address, then the tail unligned page will not be freed.
-> 
-> Please wrap commit messages at or before column 72 - this makes "git log"
-> much easier to read once the change has been committed.
-> 
-> I have no objection to the arch/arm part of this patch.  However, since
-> different people deal with arch/arm and arch/arm64, this patch needs to
-> be split.
+Two patches taken from patchset http://www.spinics.net/lists/devicetree/msg48979.html
+adding support for clocksource and clockevents driver.
 
-I don't mind how it goes in. If Russell is ok to take the whole patch:
+Daniel and Thomas,
+if it's fine with you, could you please take these patches in the clocksource
+tree?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Thanks,
+
+Carlo Caione (2):
+  ARM: meson: documentation: add timer documentation
+  ARM: meson6: clocksource: add Meson6 timer support
+
+ .../bindings/timer/amlogic,meson6-timer.txt        |  16 ++
+ drivers/clocksource/Kconfig                        |   3 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/meson6_timer.c                 | 167 +++++++++++++++++++++
+ 4 files changed, 187 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+ create mode 100644 drivers/clocksource/meson6_timer.c
+
+-- 
+1.9.1
