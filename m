@@ -1,59 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Sep 2014 09:58:45 +0100
-Subject: [PATCH v4 5/7] ARM: EXYNOS: Add .write_sec outer cache
- callback for L2C-310
-In-Reply-To: <1409062680-15906-6-git-send-email-t.figa@samsung.com>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-6-git-send-email-t.figa@samsung.com>
-Message-ID: <20140915085845.GC12379@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 15 Sep 2014 11:02:09 +0200
+Subject: [PATCHv2 8/8] ARM: at91: document Atmel SMART compatibles
+In-Reply-To: <1410536587-24607-9-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410536587-24607-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1410536587-24607-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5416AB11.4060600@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 04:17:58PM +0200, Tomasz Figa wrote:
-> Exynos4 SoCs equipped with an L2C-310 cache controller and running under
-> secure firmware require certain registers of aforementioned IP to be
-> accessed only from secure mode. This means that SMC calls are required
-> for certain register writes. To handle this, an implementation of
-> .write_sec and .configure callbacks is provided by this patch.
+On 12/09/2014 17:43, Alexandre Belloni :
+> Document all the available compatibles for Atmel "SMART" SoCs.
 > 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  arch/arm/mach-exynos/firmware.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+>  .../devicetree/bindings/arm/atmel-at91.txt         | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 > 
-> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-> index f5e626d..554b350 100644
-> --- a/arch/arm/mach-exynos/firmware.c
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -17,6 +17,7 @@
->  #include <asm/cacheflush.h>
->  #include <asm/cputype.h>
->  #include <asm/firmware.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  #include <asm/suspend.h>
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 6e3e3e5c611f..2ef92e04ed10 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -1,6 +1,46 @@
+>  Atmel AT91 device tree bindings.
+>  ================================
 >  
->  #include <mach/map.h>
-> @@ -120,6 +121,31 @@ static const struct firmware_ops exynos_firmware_ops = {
->  	.resume			= exynos_resume,
->  };
->  
-> +static void exynos_l2_write_sec(unsigned long val, unsigned reg)
-> +{
-> +	switch (reg) {
-> +	case L2X0_CTRL:
-> +		if (val & L2X0_CTRL_EN)
-> +			exynos_smc(SMC_CMD_L2X0INVALL, 0, 0, 0);
+> +Boards with a SoC of the Atmel AT91 or SMART family shall have the following
+> +properties:
+> +
+> +Required root node properties:
+> +compatible: must be one of:
+> + * "atmel,rm9200"
 
-If we're calling this with the cache already enabled, presumably you're
-doing this to cover the case where we're disabling the cache.
+No, this one doesn't exists. Does it? It must be "atmel,at91rm9200".
 
-1. Do you really want to *invalidate* the L2 cache, discarding its
-   contents?
-2. Don't you think that... if you needed something like this here, then
-   it could be a defficiency in the common code?
+> + * "atmel,at91sam9260"
+> + * "atmel,at91sam9261"
+> + * "atmel,at91sam9263"
+> + * "atmel,at91sam9x5" for the x5 family, shall be extended with the specific SoC
+> +   compatible:
 
-If (2) doesn't apply, then should be a comment here why this is needed.
+We call it the "5 series" or at91sam9x5 family, not the x5 family.
+
+> +    o "atmel,at91sam9g15"
+> +    o "atmel,at91sam9g25"
+> +    o "atmel,at91sam9g35"
+> +    o "atmel,at91sam9x25"
+> +    o "atmel,at91sam9x35"
+> + * "atmel,at91sam9g20"
+> + * "atmel,at91sam9g45"
+> + * "atmel,at91sam9n12"
+> + * "atmel,at91sam9rl"
+> + * "atmel,sama5" for the cortexA5 family, shall be extended with the specific
+
+for SoC using a Cortex-A5.
+
+> +   SoC family:
+> +    o "atmel,sama5d3" shal be exteneded with the specific SoC compatible:
+
+s/shal/shall/
+
+> +       - "atmel,samad31"
+
+samad31 => sama5d31
+
+> +       - "atmel,samad33"
+> +       - "atmel,samad34"
+> +       - "atmel,samad35"
+> +       - "atmel,samad36"
+
+Ditto for all 4 above.
+
+> +    o "atmel,sama5d4"
+
+Same here, you can also talk about a family:
+
+o "atmel,sama5d41"
+o "atmel,sama5d42"
+o "atmel,sama5d43"
+o "atmel,sama5d44"
+
+
+> +
+> +
+> +In addition, the above compatible shall be extended with the specific
+> +SoC and board used. Currently known SoC compatibles are:
+> +    "marvell,berlin2"      for Marvell Armada 1500 (BG2, 88DE3100),
+> +    "marvell,berlin2cd"    for Marvell Armada 1500-mini (BG2CD, 88DE3005)
+> +    "marvell,berlin2ct"    for Marvell Armada ? (BG2CT, 88DE????)
+> +    "marvell,berlin2q"     for Marvell Armada 1500-pro (BG2Q, 88DE3114)
+> +    "marvell,berlin3"      for Marvell Armada ? (BG3, 88DE????)
+> +
+> +
+
+;-)
+
+>  PIT Timer required properties:
+>  - compatible: Should be "atmel,at91sam9260-pit"
+>  - reg: Should contain registers location and length
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
