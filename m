@@ -1,74 +1,44 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 15 Sep 2014 16:50:22 +0200
-Subject: [PATCH v4 2/2] ARM: dts: at_xdmac: add bindings documentation
-In-Reply-To: <1410792622-22621-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1410792622-22621-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1410792622-22621-3-git-send-email-ludovic.desroches@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Sep 2014 15:51:07 +0100
+Subject: [PATCH v4 06/18] ARM64 / ACPI: Introduce early_param for "acpi"
+In-Reply-To: <20140915062824.GB26649@localhost>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-7-git-send-email-hanjun.guo@linaro.org>
+ <20140915062824.GB26649@localhost>
+Message-ID: <20140915145106.GC5415@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings documentation for the new Atmel DMA controller (XDMAC)
-introduced with SAMA5D4.
+On Mon, Sep 15, 2014 at 07:28:24AM +0100, Olof Johansson wrote:
+> On Fri, Sep 12, 2014 at 10:00:04PM +0800, Hanjun Guo wrote:
+> >  			See also Documentation/power/runtime_pm.txt, pci=noacpi
+> >  
+> > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> > index 9252f72..693da7f 100644
+> > --- a/arch/arm64/kernel/acpi.c
+> > +++ b/arch/arm64/kernel/acpi.c
+> > @@ -67,3 +67,18 @@ void __init acpi_boot_table_init(void)
+> >  	if (acpi_table_init())
+> >  		disable_acpi();
+> >  }
+> > +
+> > +static int __init parse_acpi(char *arg)
+> > +{
+> > +	if (!arg)
+> > +		return -EINVAL;
+> > +
+> > +	/* "acpi=off" disables both ACPI table parsing and interpreter */
+> > +	if (strcmp(arg, "off") == 0)
+> > +		disable_acpi();
+> > +	else
+> > +		return -EINVAL;	/* Core will print when we return error */
+> 
+> For symmetry, you should handle acpi=force here too (i.e. if someone
+> disables by default, which I expect we'll ask for when this code is
+> first merged).
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- .../devicetree/bindings/dma/atmel-xdma.txt         | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+Does this mean you want another Kconfig option - ACPI_DEFAULT_OFF (which
+would be set by default)?
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-new file mode 100644
-index 0000000..647f099
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
-@@ -0,0 +1,48 @@
-+* Atmel Extensible Direct Memory Access Controller (XDMAC)
-+
-+* XDMA Controller
-+Required properties:
-+- compatible: Should be "atmel,<chip>-dma".
-+- reg: Should contain DMA registers location and length.
-+- interrupts: Should contain DMA interrupt.
-+- #dma-cells: Must be <2>, used to represent the number of integer cells in
-+the dmas property of client devices.
-+  - The 1st cell specifies the memory interface (16 most significant bits) and
-+  the peripheral interface (16 less significant bits) to use.
-+  - The 2nd cell specifies the channel configuration register:
-+    - bit 30-24: PERID, peripheral identifier.
-+
-+Example:
-+
-+dma1: dma-controller at f0004000 {
-+	compatible = "atmel,sama5d4-dma";
-+	reg = <0xf0004000 0x200>;
-+	interrupts = <50 4 0>;
-+	#dma-cells = <2>;
-+};
-+
-+
-+* DMA clients
-+DMA clients connected to the Atmel XDMA controller must use the format
-+described in the dma.txt file, using a two-cell specifier for each channel.
-+The three cells in order are:
-+1. A phandle pointing to the DMA controller.
-+2. The memory interface (16 most significant bits), the peripheral interface
-+(16 less significant bits).
-+3. Channel configuration register. Configurable fields are:
-+  - bit 30-24: PERID, peripheral identifier.
-+
-+Example:
-+
-+i2c2: i2c at f8024000 {
-+	compatible = "atmel,at91sam9x5-i2c";
-+	reg = <0xf8024000 0x4000>;
-+	interrupts = <34 4 6>;
-+	dmas = <&dma1
-+		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-+		AT91_XDMAC_DT_PERID(6)>,
-+	       <&dma1
-+		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-+		AT91_XDMAC_DT_PERID(7)>;
-+	dma-names = "tx", "rx";
-+};
 -- 
-2.0.3
+Catalin
