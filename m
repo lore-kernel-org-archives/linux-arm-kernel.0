@@ -1,83 +1,132 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 15 Sep 2014 00:13:04 -0700
-Subject: [PATCH v4 15/18] ARM64 / ACPI: Parse GTDT to initialize arch timer
-In-Reply-To: <1410530416-30200-16-git-send-email-hanjun.guo@linaro.org>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-16-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140915071304.GG26649@localhost>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 15 Sep 2014 09:39:26 +0200
+Subject: [Patch v4 net-next 04/12] net: fec: parser max queue number
+ from dt file
+In-Reply-To: <1410555657-10744-5-git-send-email-Frank.Li@freescale.com>
+References: <1410555657-10744-1-git-send-email-Frank.Li@freescale.com>
+ <1410555657-10744-5-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20140915093926.11bdbc32@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 10:00:13PM +0800, Hanjun Guo wrote:
-> Using the information presented by GTDT to initialize the arch
-> timer (not memory-mapped).
+Hi,
+
+Frank.Li at freescale.com wrote:
+> From: Fugang Duan <B38611@freescale.com>
 > 
-> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> By default, the tx/rx queue number is 1, user can config the queue number
+> at DTS file like this:
+> 	fsl,num-tx-queues=<3>;
+> 	fsl,num-rx-queues=<3>
+> 
+> Since i.MX6SX enet-AVB IP support multi queues, so use multi queues
+> interface to allocate and set up an Ethernet device.
+> 
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 > ---
->  arch/arm64/kernel/time.c             |    7 ++
->  drivers/clocksource/arm_arch_timer.c |  117 ++++++++++++++++++++++++++++------
->  include/linux/clocksource.h          |    6 ++
->  3 files changed, 111 insertions(+), 19 deletions(-)
+>  drivers/net/ethernet/freescale/fec.h      |  2 ++
+>  drivers/net/ethernet/freescale/fec_main.c | 46 ++++++++++++++++++++++++++++++-
+>  2 files changed, 47 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index 1a7125c..42f9195 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -35,6 +35,7 @@
->  #include <linux/delay.h>
->  #include <linux/clocksource.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/acpi.h>
+> diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+> index b2b91f8..72fb90f 100644
+> --- a/drivers/net/ethernet/freescale/fec.h
+> +++ b/drivers/net/ethernet/freescale/fec.h
+> @@ -356,6 +356,8 @@ struct fec_enet_private {
 >  
->  #include <clocksource/arm_arch_timer.h>
+>  	bool ptp_clk_on;
+>  	struct mutex ptp_clk_mutex;
+> +	unsigned int num_tx_queues;
+> +	unsigned int num_rx_queues;
 >  
-> @@ -72,6 +73,12 @@ void __init time_init(void)
+>  	/* The saved address of a sent-in-place packet/buffer, for skfree(). */
+>  	struct fec_enet_priv_tx_q *tx_queue[FEC_ENET_MAX_TX_QS];
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+> index 4c0d2ee..2240df0 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -2709,6 +2709,42 @@ static void fec_reset_phy(struct platform_device *pdev)
+>  }
+>  #endif /* CONFIG_OF */
 >  
->  	tick_setup_hrtimer_broadcast();
->  
-> +	/*
-> +	 * Since ACPI or FDT will only one be available in the system,
-> +	 * we can use acpi_generic_timer_init() here safely
-> +	 */
-> +	acpi_generic_timer_init();
+> +static void
+> +fec_enet_get_queue_num(struct platform_device *pdev, int *num_tx, int *num_rx)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int err;
 > +
->  	arch_timer_rate = arch_timer_get_rate();
->  	if (!arch_timer_rate)
->  		panic("Unable to initialise architected timer.\n");
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..397783f 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -21,6 +21,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/sched_clock.h>
-> +#include <linux/acpi.h>
+> +	*num_tx = *num_rx = 1;
+> +
+> +	if (!np || !of_device_is_available(np))
+> +		return;
+> +
+> +	/* parse the num of tx and rx queues */
+> +	err = of_property_read_u32(np, "fsl,num-tx-queues", num_tx);
+> +	err |= of_property_read_u32(np, "fsl,num-rx-queues", num_rx);
+> +	if (err) {
+> +		*num_tx = 1;
+> +		*num_rx = 1;
+Shouldn't these be handled seperately? So that if only one of those
+properties is given in DT the specified value for that property should
+be used?
+
+> +		return;
+> +	}
+> +
+> +	if (*num_tx < 1 || *num_tx > FEC_ENET_MAX_TX_QS) {
+> +		dev_err(&pdev->dev, "Invalidate num_tx(=%d), fail back to 1\n",
+>
+s/Invalidate/Invalid/
+s/fail/fall/
+If the problem is fixed up by the driver rather than leading to an
+error exit it should be dev_warn() rather than dev_err().
+
+> +			*num_tx);
+> +		*num_tx = 1;
+> +		return;
+> +	}
+> +
+> +	if (*num_rx < 1 || *num_rx > FEC_ENET_MAX_RX_QS) {
+> +		dev_err(&pdev->dev, "Invalidate num_rx(=%d), fail back to 1\n",
+dto.
+
+> +			*num_rx);
+> +		*num_rx = 1;
+> +		return;
+> +	}
+> +
+> +}
+> +
+>  static int
+>  fec_probe(struct platform_device *pdev)
+>  {
+> @@ -2720,13 +2756,18 @@ fec_probe(struct platform_device *pdev)
+>  	const struct of_device_id *of_id;
+>  	static int dev_id;
+>  	struct device_node *np = pdev->dev.of_node, *phy_node;
+> +	int num_tx_qs = 1;
+> +	int num_rx_qs = 1;
 >  
->  #include <asm/arch_timer.h>
->  #include <asm/virt.h>
-> @@ -338,8 +339,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->  	if (arch_timer_rate)
->  		return;
+useless initialization. These variables are initialized in
+fec_enet_get_queue_num() anyway.
+
+>  	of_id = of_match_device(fec_dt_ids, &pdev->dev);
+>  	if (of_id)
+>  		pdev->id_entry = of_id->data;
 >  
-> -	/* Try to determine the frequency from the device tree or CNTFRQ */
-> -	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> +	/*
-> +	 * Try to determine the frequency from the device tree or CNTFRQ,
-> +	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-> +	 */
-
-If ACPI is enabled, the tree won't have been unflattened and there wouldn't be
-a property to match. So I don't think the extra check is needed here.
-
-If anything, add a check to make sure "np" is non-null instead.
-
-> +	if (!acpi_disabled ||
-> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
->  		if (cntbase)
->  			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
->  		else
+> +	fec_enet_get_queue_num(pdev, &num_tx_qs, &num_rx_qs);
+> +
 
 
--Olof
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
