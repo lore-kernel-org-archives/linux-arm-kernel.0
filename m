@@ -1,57 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Sep 2014 17:10:15 +0100
-Subject: [PATCH 01/13] arm64: Add ESR_EL2_EC macros to hyp-stub
-In-Reply-To: <5e1b1892eb3ecc3bccff47766675c24c650a1a14.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
- <5e1b1892eb3ecc3bccff47766675c24c650a1a14.1410302383.git.geoff@infradead.org>
-Message-ID: <20140915161014.GB13789@leverpostej>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 15 Sep 2014 18:12:43 +0200
+Subject: [GIT PULL] at91: drivers for 3.18 #2 (bis)
+In-Reply-To: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1410797563-13378-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> To improve the readability of the el1_sync routine in hyp-stub.S replace the
-> numeric immediate values with preprocessor macros ESR_EL2_EC_SHIFT and
-> ESR_EL2_EC_HVC64.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/kernel/hyp-stub.S | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> index a272f33..2d960a9 100644
-> --- a/arch/arm64/kernel/hyp-stub.S
-> +++ b/arch/arm64/kernel/hyp-stub.S
-> @@ -52,10 +52,13 @@ ENDPROC(__hyp_stub_vectors)
->  
->  	.align 11
->  
-> +#define ESR_EL2_EC_SHIFT	26
-> +#define ESR_EL2_EC_HVC64	0x16
+Arnd, Olof, Kevin,
 
-These exist in arch/arm64/include/asm/kvm_arm.h, no?
+I re-send this pull-request with the work done by Maxime to take Arnd's
+comments into annount: removal of the early_platform devices, and by keeping
+the old mechanism with a function exported by the PIT timer and called by the
+board files.
 
-If anything that should be folded into arch/arm64/include/asm/esr.h...
+Here is the old message that I sent you: just as a reference.
+"
+This pull-request is focused on the work that Maxime did for migrating our
+timer (PIT) to the clocksource sub-system. A big cleanup happened which allows
+us to be even closer to the point when we have only the bare minimum in our
+formerly crowded mach-at91 directory.
+"
 
-Mark.
+This pull-request goes on top of what is already in your at91/drivers branch.
 
-> +
->  el1_sync:
->  	mrs	x1, esr_el2
-> -	lsr	x1, x1, #26
-> -	cmp	x1, #0x16
-> +	lsr	x1, x1, #ESR_EL2_EC_SHIFT
-> +	cmp	x1, #ESR_EL2_EC_HVC64
->  	b.ne	2f				// Not an HVC trap
->  	cbz	x0, 1f
->  	msr	vbar_el2, x0			// Set vbar_el2
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks, best regards,
+
+The following changes since commit 405a72c5e78b5c560c8b2711d4000fa5eb063e1b:
+
+  power: reset: at91-poweroff: fix wakeup status register index (2014-09-01 18:40:44 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-drivers2
+
+for you to fetch changes up to b052ff30cd450c91a32e8e928979bca021462996:
+
+  ARM: at91: PIT: Move the driver to drivers/clocksource (2014-09-15 17:55:48 +0200)
+
+----------------------------------------------------------------
+Second drivers series for AT91/3.18:
+- move of the PIT (basic timer) from mach-at91 to its proper location:
+  drivers/clocksource
+- big cleanup of this driver along the way
+
+----------------------------------------------------------------
+Maxime Ripard (14):
+      ARM: at91: PIT: Follow the general coding rules
+      ARM: at91: generic.h: Add include safe guards
+      ARM: at91: PIT: Use DIV_ROUND_CLOSEST to compute the cycles
+      ARM: at91: PIT: Use of_have_populated_dt instead of CONFIG_OF
+      ARM: at91: PIT: Rework probe functions
+      ARM: at91: dt: Remove init_time definitions
+      ARM: at91: PIT: Use consistent exit path in probe
+      ARM: at91: PIT: Use pr_fmt
+      ARM: at91: PIT: use request_irq instead of setup_irq
+      ARM: at91: PIT: (Almost) remove the global variables
+      ARM: at91: soc: Add init_time callback
+      ARM: at91: Convert the boards to the init_time callback
+      ARM: at91: Give the PIT irq as an argument of at91sam926x_pit_init
+      ARM: at91: PIT: Move the driver to drivers/clocksource
+
+ arch/arm/mach-at91/Kconfig              |   5 -
+ arch/arm/mach-at91/Makefile             |   1 -
+ arch/arm/mach-at91/at91sam9260.c        |   6 +
+ arch/arm/mach-at91/at91sam9261.c        |   6 +
+ arch/arm/mach-at91/at91sam9263.c        |   6 +
+ arch/arm/mach-at91/at91sam926x_time.c   | 294 -------------------------------
+ arch/arm/mach-at91/at91sam9g45.c        |   6 +
+ arch/arm/mach-at91/at91sam9rl.c         |   6 +
+ arch/arm/mach-at91/board-afeb-9260v1.c  |   2 +-
+ arch/arm/mach-at91/board-cam60.c        |   2 +-
+ arch/arm/mach-at91/board-cpu9krea.c     |   2 +-
+ arch/arm/mach-at91/board-dt-sam9.c      |  10 --
+ arch/arm/mach-at91/board-dt-sama5.c     |   9 -
+ arch/arm/mach-at91/board-flexibity.c    |   2 +-
+ arch/arm/mach-at91/board-foxg20.c       |   2 +-
+ arch/arm/mach-at91/board-gsia18s.c      |   2 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c |   2 +-
+ arch/arm/mach-at91/board-sam9-l9260.c   |   2 +-
+ arch/arm/mach-at91/board-sam9260ek.c    |   2 +-
+ arch/arm/mach-at91/board-sam9261ek.c    |   4 +-
+ arch/arm/mach-at91/board-sam9263ek.c    |   2 +-
+ arch/arm/mach-at91/board-sam9g20ek.c    |   4 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c |   2 +-
+ arch/arm/mach-at91/board-sam9rlek.c     |   2 +-
+ arch/arm/mach-at91/board-snapper9260.c  |   2 +-
+ arch/arm/mach-at91/board-stamp9g20.c    |   4 +-
+ arch/arm/mach-at91/generic.h            |   8 +-
+ arch/arm/mach-at91/setup.c              |   5 +
+ arch/arm/mach-at91/soc.h                |   1 +
+ drivers/clocksource/Kconfig             |   4 +
+ drivers/clocksource/Makefile            |   1 +
+ drivers/clocksource/timer-atmel-pit.c   | 296 ++++++++++++++++++++++++++++++++
+ 32 files changed, 363 insertions(+), 339 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/at91sam926x_time.c
+ create mode 100644 drivers/clocksource/timer-atmel-pit.c
+
+-- 
+Nicolas Ferre
