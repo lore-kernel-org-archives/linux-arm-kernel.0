@@ -1,38 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Sep 2014 17:26:25 +0100
-Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
- clang
-In-Reply-To: <20140915160240.GC29744@arm.com>
-References: <20140909101515.GB1754@arm.com>
- <1410759015-15642-1-git-send-email-behanw@converseincode.com>
- <20140915160240.GC29744@arm.com>
-Message-ID: <20140915162624.GH5415@arm.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 15 Sep 2014 12:31:16 -0400
+Subject: [PATCH v4 06/18] ARM64 / ACPI: Introduce early_param for "acpi"
+In-Reply-To: <20140915145106.GC5415@arm.com>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-7-git-send-email-hanjun.guo@linaro.org>
+ <20140915062824.GB26649@localhost> <20140915145106.GC5415@arm.com>
+Message-ID: <54171454.6090906@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 05:02:41PM +0100, Will Deacon wrote:
-> On Mon, Sep 15, 2014 at 06:30:15AM +0100, behanw at converseincode.com wrote:
-> > From: Mark Charlebois <charlebm@gmail.com>
-> > 
-> > Remove '#' from immediate parameter in AARCH64 inline assembly in mmu.
-> > 
-> > This code now works with both gcc and clang.
-> > 
-> > Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-> > Signed-off-by: Behan Webster <behanw@converseincode.com>
-> > ---
-> >  arch/arm64/mm/mmu.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+On 09/15/2014 10:51 AM, Catalin Marinas wrote:
+> On Mon, Sep 15, 2014 at 07:28:24AM +0100, Olof Johansson wrote:
+>> On Fri, Sep 12, 2014 at 10:00:04PM +0800, Hanjun Guo wrote:
+>>>  			See also Documentation/power/runtime_pm.txt, pci=noacpi
+>>>  
+>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>> index 9252f72..693da7f 100644
+>>> --- a/arch/arm64/kernel/acpi.c
+>>> +++ b/arch/arm64/kernel/acpi.c
+>>> @@ -67,3 +67,18 @@ void __init acpi_boot_table_init(void)
+>>>  	if (acpi_table_init())
+>>>  		disable_acpi();
+>>>  }
+>>> +
+>>> +static int __init parse_acpi(char *arg)
+>>> +{
+>>> +	if (!arg)
+>>> +		return -EINVAL;
+>>> +
+>>> +	/* "acpi=off" disables both ACPI table parsing and interpreter */
+>>> +	if (strcmp(arg, "off") == 0)
+>>> +		disable_acpi();
+>>> +	else
+>>> +		return -EINVAL;	/* Core will print when we return error */
+>>
+>> For symmetry, you should handle acpi=force here too (i.e. if someone
+>> disables by default, which I expect we'll ask for when this code is
+>> first merged).
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Thanks, Behan!
-> 
-> Catalin: please can you pick this up for 3.18? It's probably not worth me
-> merging it as a fix, since there are other patches needed to get us building
-> under clang anyway.
+> Does this mean you want another Kconfig option - ACPI_DEFAULT_OFF (which
+> would be set by default)?
 
-I agree, it will go in for 3.18 rather than 3.17.
+This would make sense. I mentioned this before since it gives distros an
+opportunity to set this differently for their shipping preference
+without the upstream having to default to being on.
 
--- 
-Catalin
+Jon.
