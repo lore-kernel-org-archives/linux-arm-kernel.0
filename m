@@ -1,66 +1,62 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 15 Sep 2014 16:36:27 +0200
-Subject: [PATCH] ARM: dts: Add Maxim 77693 PMIC to the Trats2 board
-In-Reply-To: <1410523386-10581-1-git-send-email-k.kozlowski@samsung.com>
-References: <1410523386-10581-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CABxcv=mYWDVwOWbvV4xy+xS5tQUrCexCT_LD7hgUO2d3FPe56w@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 15 Sep 2014 16:42:34 +0200
+Subject: [PATCH v1 05/21] PCI/MSI: Introduce weak arch_find_msi_chip()
+ to find MSI chip
+In-Reply-To: <1409911806-10519-6-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+ <1409911806-10519-6-git-send-email-wangyijing@huawei.com>
+Message-ID: <1410792154.3314.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Am Freitag, den 05.09.2014, 18:09 +0800 schrieb Yijing Wang:
+> Introduce weak arch_find_msi_chip() to find the match msi_chip.
+> Currently, MSI chip associates pci bus to msi_chip. Because in
+> ARM platform, there may be more than one MSI controller in system.
+> Associate pci bus to msi_chip help pci device to find the match
+> msi_chip and setup MSI/MSI-X irq correctly. But in other platform,
+> like in x86. we only need one MSI chip, because all device use
+> the same MSI address/data and irq etc. So it's no need to associate
+> pci bus to MSI chip, just use a arch function, arch_find_msi_chip()
+> to return the MSI chip for simplicity. The default weak
+> arch_find_msi_chip() used in ARM platform, find the MSI chip
+> by pci bus.
+> 
+Hm, while one weak function sounds much better than the plethora we have
+now, I wonder how much work it would be to associate the msi_chip with
+the pci bus on other arches the same way as done on ARM. This way we
+could kill this calling into arch specific functions which would make
+things a bit clearer to follow I think.
 
-On Fri, Sep 12, 2014 at 2:03 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> +       i2c_max77693: i2c-gpio-1 {
-> +               compatible = "i2c-gpio";
-> +               gpios = <&gpm2 0 0>, <&gpm2 1 0 >;
+Regards,
+Lucas
 
-Can you please include <dt-bindings/gpio/gpio.h> and use
-GPIO_ACTIVE_HIGH instead of 0 here for the type/level flags?
-
-> +               i2c-gpio,delay-us = <2>;
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               status = "okay";
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  drivers/pci/msi.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index a77e7f7..539c11d 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -29,9 +29,14 @@ static int pci_msi_enable = 1;
+>  
+>  /* Arch hooks */
+>  
+> +struct msi_chip * __weak arch_find_msi_chip(struct pci_dev *dev)
+> +{
+> +	return dev->bus->msi;
+> +}
 > +
-> +               max77693 at 66 {
-> +                       compatible = "maxim,max77693";
-> +                       interrupt-parent = <&gpx1>;
-> +                       interrupts = <5 2>;
-> +                       reg = <0x66>;
-> +
-> +                       regulators {
-> +                               esafeout1_reg: esafeout at 1 {
-> +                                       regulator-compatible = "ESAFEOUT1";
+>  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>  {
+> -	struct msi_chip *chip = dev->bus->msi;
+> +	struct msi_chip *chip = arch_find_msi_chip(dev);
+>  	int err;
+>  
+>  	if (!chip || !chip->setup_irq)
 
-According to Documentation/devicetree/bindings/regulator/regulator.txt,
-the "regulator-compatible" DT property has been deprecated in favor of
-just using the regulator node's name.
-
-> +                                       regulator-name = "ESAFEOUT1";
-> +                               };
-> +                               esafeout2_reg: esafeout at 2 {
-> +                                       regulator-compatible = "ESAFEOUT2";
-> +                                       regulator-name = "ESAFEOUT2";
-> +                               };
-> +                               charger_reg: charger at 0 {
-> +                                       regulator-compatible = "CHARGER";
-> +                                       regulator-name = "CHARGER";
-> +                                       regulator-min-microamp = <60000>;
-> +                                       regulator-max-microamp = <2580000>;
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
->         mmc at 12550000 {
->                 num-slots = <1>;
->                 supports-highspeed;
->
-
-Once those two issues are addressed, feel free to add my
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
