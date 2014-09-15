@@ -1,40 +1,38 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 15 Sep 2014 15:11:30 +0200
-Subject: [PATCH 1/2] ARM: meson: documentation: add timer documentation
-In-Reply-To: <1410786691-30302-1-git-send-email-carlo@caione.org>
-References: <1410786691-30302-1-git-send-email-carlo@caione.org>
-Message-ID: <1410786691-30302-2-git-send-email-carlo@caione.org>
+From: Catalin.Marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Sep 2014 14:11:49 +0100
+Subject: [PATCH 3/3] ARM64: make of_device_ids const
+In-Reply-To: <1410337579-23466-4-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1410337579-23466-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20140915131149.GA5415@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- .../devicetree/bindings/timer/amlogic,meson6-timer.txt   | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
+On Wed, Sep 10, 2014 at 09:26:19AM +0100, Uwe Kleine-K?nig wrote:
+> of_device_ids (i.e. compatible strings and the respective data) are not
+> supposed to change at runtime. All functions working with of_device_ids
+> provided by <linux/of.h> work with const of_device_ids. So mark the
+> only non-const struct in arch/arm64 as const, too.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm64/kernel/perf_event.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index baf5afb7e6a0..aa29ecb4f800 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -1276,7 +1276,7 @@ arch_initcall(cpu_pmu_reset);
+>  /*
+>   * PMU platform driver and devicetree bindings.
+>   */
+> -static struct of_device_id armpmu_of_device_ids[] = {
+> +static const struct of_device_id armpmu_of_device_ids[] = {
+>  	{.compatible = "arm,armv8-pmuv3"},
+>  	{},
+>  };
 
-diff --git a/Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt b/Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
-new file mode 100644
-index 0000000..d79be27
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
-@@ -0,0 +1,16 @@
-+Amlogic Meson6 SoCs Timer Controller
-+
-+Required properties:
-+
-+- compatible : should be "amlogic,meson6-timer"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupts : The interrupt of the first timer
-+
-+Example:
-+
-+timer at c1109940 {
-+	compatible = "amlogic,meson6-timer";
-+	reg = <0xc1109940 0x14>;
-+	interrupts = <0 10 1>;
-+};
-+
--- 
-1.9.1
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+(I guess you could upstream the patches via the arm-soc tree)
