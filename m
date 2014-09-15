@@ -1,39 +1,63 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 15 Sep 2014 13:50:56 +0200
-Subject: [PATCH 00/16 v9] omap 8250 based uart + DMA
-In-Reply-To: <20140912224324.GK18849@atomide.com>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <20140912224324.GK18849@atomide.com>
-Message-ID: <5416D2A0.5020407@linutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 15 Sep 2014 13:57:38 +0200
+Subject: [RFC PATCH v3 3/7] iommu: add new iommu_ops callback for adding an
+ OF device
+In-Reply-To: <1410539695-29128-4-git-send-email-will.deacon@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-4-git-send-email-will.deacon@arm.com>
+Message-ID: <5416D432.8020107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2014 12:43 AM, Tony Lindgren wrote:
-> * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140910 12:30]:
->> the diff of v8?v9 is small:
->> - rebased on top's of Greg's tty-next branch
->> - fixed #10 where we might have THRE interrupt enabled for longer than
->>   needed
->> - re-did register setup in #10. Before this "less file" could freeze the
->>   am335x-evm.
-> 
-> FYI, looks like merging in your uart_v9 branch for testing
-> with my hwmod changes now fails to produce RX characters on omap3.
-> 
-> The device wakes up just fine to the wake-up interrupt, and then
-> serial8250_handle_irq() gets called, but I'm not seeing anything
-> in the console getting printed out. It's like all the RX characters
-> are getting lost instead of just the first one. The RX characters
-> work fine when the system is running.
-> 
-> So it seems there's been some kind of regression since v8?
+Hello,
 
-I changed the restore function the fix the am335x-evm + less "freeze".
-And now we have this. So let me search?
+On 2014-09-12 18:34, Will Deacon wrote:
+> This patch adds a new function to the iommu_ops structure to allow an
+> OF device to be added to a specific IOMMU instance using the recently
+> merged generic devicetree binding for IOMMUs. The callback (of_xlate)
+> takes a struct device representing the master and an of_phandle_args
+> representing the IOMMU and the correspondong IDs for the new master.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>   include/linux/iommu.h | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 4256f3ce1673..821eb0bd9f6c 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -21,6 +21,7 @@
+>   
+>   #include <linux/errno.h>
+>   #include <linux/err.h>
+> +#include <linux/of.h>
+>   #include <linux/types.h>
+>   #include <trace/events/iommu.h>
+>   
+> @@ -140,6 +141,10 @@ struct iommu_ops {
+>   	/* Get the numer of window per domain */
+>   	u32 (*domain_get_windows)(struct iommu_domain *domain);
+>   
+> +#ifdef CONFIG_OF_IOMMU
+> +	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+> +#endif
 
-> Regards,
-> 
-> Tony
-> 
 
-Sebastian
+If I understand correctly, this callback is intended to do per-master 
+initialization
+of the iommu structures required by the given iommu driver (I stored them in
+dev->archdata.iommu). However I really don't get what is the meaning of 
+the return
+value. Is it a boolean value? It is used only by of_iommu_configure to 
+check if
+the parse loop should be terminated...
+
+> +
+>   	unsigned long pgsize_bitmap;
+>   };
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
