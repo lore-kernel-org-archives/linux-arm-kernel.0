@@ -1,72 +1,91 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Sun, 14 Sep 2014 23:12:12 -0500
-Subject: [PATCH] clk: qcom: Add IPQ8064 PLL required for USB
-Message-ID: <1410754332-26699-1-git-send-email-agross@codeaurora.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sun, 14 Sep 2014 21:14:04 -0700
+Subject: [RFC PATCH for Juno 1/2] net: smsc911x add support for probing
+ from ACPI
+In-Reply-To: <21764799.KDNDm9XRax@wuerfel>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
+ <20140901170447.GF608@arm.com> <21764799.KDNDm9XRax@wuerfel>
+Message-ID: <20140915041404.A72CCC40A02@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PLL0 that is required for the USB clocks to work properly.
+On Mon, 01 Sep 2014 19:11:44 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 01 September 2014 18:04:47 Catalin Marinas wrote:
+> > On Mon, Sep 01, 2014 at 04:06:00PM +0100, Hanjun Guo wrote:
+> > > +#ifdef CONFIG_ACPI
+> > > +/* Configure some sensible defaults for ACPI mode */
+> > > +static int smsc911x_probe_config_acpi(struct smsc911x_platform_config *config,
+> > > +                                 acpi_handle *ahandle)
+> > > +{
+> > > +     if (!ahandle)
+> > > +             return -ENOSYS;
+> > > +
+> > > +     config->phy_interface = PHY_INTERFACE_MODE_MII;
+> > > +
+> > > +     config->flags |= SMSC911X_USE_32BIT;
+> > > +
+> > > +     config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+> > > +
+> > > +     config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
+> > > +
+> > > +     return 0;
+> > > +}
+> > > +#else
+> > 
+> > I don't like this and it shows issues we have with ACPI on certain ARM
+> > platforms. You hard-code these values to match the Juno platform. What
+> > if we get another SoC which has different configuration here? For DT, we
+> > have the smsc911x_probe_config_dt() which reads the relevant information
+> > from DT. I think this kind of configuration would be more suitable as
+> > _DSD properties and sharing the similar names with DT (but we go back to
+> > the question about who's in charge of the _DSD properties).
+> 
+> Good point, I totally missed that.
+> 
+> There is of course the possibility to set those values based on the
+> acpi_device_id, but that is exactly the part that _DSD is trying to
+> avoid.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/clk/qcom/gcc-ipq806x.c |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+These are merely defaults. DSD parsing, when implemented, would be
+override these default values.
 
-diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
-index 4032e51..21f9187 100644
---- a/drivers/clk/qcom/gcc-ipq806x.c
-+++ b/drivers/clk/qcom/gcc-ipq806x.c
-@@ -32,6 +32,33 @@
- #include "clk-branch.h"
- #include "reset.h"
- 
-+static struct clk_pll pll0 = {
-+	.l_reg = 0x30c4,
-+	.m_reg = 0x30c8,
-+	.n_reg = 0x30cc,
-+	.config_reg = 0x30d4,
-+	.mode_reg = 0x30c0,
-+	.status_reg = 0x30d8,
-+	.status_bit = 16,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.name = "pll0",
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_ops,
-+	},
-+};
-+
-+static struct clk_regmap pll0_vote = {
-+	.enable_reg = 0x34c0,
-+	.enable_mask = BIT(0),
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pll0_vote",
-+		.parent_names = (const char *[]){ "pll0" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_vote_ops,
-+	},
-+};
-+
- static struct clk_pll pll3 = {
- 	.l_reg = 0x3164,
- 	.m_reg = 0x3168,
-@@ -155,6 +182,7 @@ static const char *gcc_pxo_pll8_pll0_map[] = {
- 	"pxo",
- 	"pll8_vote",
- 	"pll0",
-+	"pll0_vote",
- };
- 
- static struct freq_tbl clk_tbl_gsbi_uart[] = {
-@@ -2133,6 +2161,8 @@ static struct clk_branch usb_fs1_h_clk = {
- };
- 
- static struct clk_regmap *gcc_ipq806x_clks[] = {
-+	[PLL0] = &pll0.clkr,
-+	[PLL0_VOTE] = &pll0_vote,
- 	[PLL3] = &pll3.clkr,
- 	[PLL8] = &pll8.clkr,
- 	[PLL8_VOTE] = &pll8_vote,
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> > >  static int smsc911x_drv_probe(struct platform_device *pdev)
+> > >  {
+> > >       struct device_node *np = pdev->dev.of_node;
+> > > +     acpi_handle *ahandle = ACPI_HANDLE(&pdev->dev);
+> > >       struct net_device *dev;
+> > >       struct smsc911x_data *pdata;
+> > >       struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
+> > > @@ -2436,6 +2464,9 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
+> > >       }
+> > >  
+> > >       retval = smsc911x_probe_config_dt(&pdata->config, np);
+> > > +     if (retval)
+> > > +             retval = smsc911x_probe_config_acpi(&pdata->config, ahandle);
+> > > +
+> > 
+> > In most of the ACPI patches so far we check for ACPI first with DT as a
+> > fall-back if ACPI is not enabled. This changes here.
+> 
+> Does this really make a difference?
+
+Nope. Only one of DT or ACPI will be matched.
+
+> 
+> > I would prefer
+> > something which probes only ACPI if the ACPI is enabled (run-time, not
+> > config) otherwise DT only. E.g.
+> 
+> (example missing?)
+> 
+> I think we should have the equivalent of of_have_populated_dt(), to
+> check whether acpi is being used to boot, and have that new function
+> be hardcoded to zero in case of !IS_ENABLED(CONFIG_ACPI).
+
+The code already accounts for it. If ACPI isn't enabled, or isn't
+populated, then the ACPI_HANDLE macro will return NULL and the
+smsc911x_probe_config_acpi() function will fail.
+
+g.
