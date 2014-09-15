@@ -1,39 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Sep 2014 15:54:11 +0100
-Subject: [PATCH v4 09/18] ARM64 / ACPI: Parse FADT table to get PSCI
- flags for PSCI init
-In-Reply-To: <20140915063808.GC26649@localhost>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-10-git-send-email-hanjun.guo@linaro.org>
- <20140915063808.GC26649@localhost>
-Message-ID: <20140915145410.GD5415@arm.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 15 Sep 2014 22:55:24 +0800
+Subject: [PATCH 2/5] spi-nor: Remove spi_nor::read_id operation
+In-Reply-To: <1410714676.3040.40.camel@decadent.org.uk>
+References: <1410714624.3040.38.camel@decadent.org.uk>
+ <1410714676.3040.40.camel@decadent.org.uk>
+Message-ID: <20140915145523.GA1963@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 07:38:08AM +0100, Olof Johansson wrote:
-> On Fri, Sep 12, 2014 at 10:00:07PM +0800, Hanjun Guo wrote:
-> > +static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> > +{
-> > +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> > +
-> > +	/*
-> > +	 * Revision in table header is the FADT Major revision,
-> > +	 * and there is a minor revision of FADT which was introduced
-> > +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher revision
-> > +	 * to get arm boot flags, or we will disable ACPI.
-> > +	 */
-> > +	if (table->revision > 5 ||
-> > +	    (table->revision == 5 && fadt->minor_revision >= 1))
-> > +		return 0;
+On Sun, Sep 14, 2014 at 06:11:16PM +0100, Ben Hutchings wrote:
+> There is currently no useful way to override the default
+> implementation of this operation.  The returned struct spi_device_id
+> must have a pointer to struct flash_info in its private data, but this
+> structure is defined inside spi-nor.
 > 
-> The commend and code disagree. The code says 5.1 or newer, while the comment say
-> _only_ 5.1. One or the other needs to change.
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> ---
+>  drivers/mtd/spi-nor/spi-nor.c | 4 +---
+>  include/linux/mtd/spi-nor.h   | 3 ---
+>  2 files changed, 1 insertion(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index 6b1bda2..6f699c5 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -902,8 +902,6 @@ static int spi_nor_check(struct spi_nor *nor)
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (!nor->read_id)
+> -		nor->read_id = spi_nor_read_id;
+>  	if (!nor->wait_till_ready)
+>  		nor->wait_till_ready = spi_nor_wait_till_ready;
+>  
+> @@ -952,7 +950,7 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+>  	if (info->jedec_id) {
+>  		const struct spi_device_id *jid;
+>  
+> -		jid = nor->read_id(nor);
+> +		jid = spi_nor_read_id(nor);
+>  		if (IS_ERR(jid)) {
+>  			return PTR_ERR(jid);
+>  		} else if (jid != id) {
+> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+> index 5ec84cc..66af67a 100644
+> --- a/include/linux/mtd/spi-nor.h
+> +++ b/include/linux/mtd/spi-nor.h
+> @@ -139,8 +139,6 @@ enum spi_nor_ops {
+>   * @write_xfer:		[OPTIONAL] the writefundamental primitive
+>   * @read_reg:		[DRIVER-SPECIFIC] read out the register
+>   * @write_reg:		[DRIVER-SPECIFIC] write data to the register
+> - * @read_id:		[REPLACEABLE] read out the ID data, and find
+> - *			the proper spi_device_id
+If we remove this hook, i guess we will add it back in the later.
+Other new drivers will use this hook.
 
-I don't think the comment and code disagree, it says "we only deal with
-ACPI 5.1 _or_ higher revision".
+so i suggest to keep it as it is.
 
-But since you mention it and following my other thread with Grant, I
-think at least for now we should make this check 5.1 only.
-
--- 
-Catalin
+thanks
+Huang Shijie
