@@ -1,79 +1,79 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 16 Sep 2014 00:18:48 +0200
-Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
-In-Reply-To: <CAKfTPtDHSWs8xumOSfWkyucAtkBvvbJkOVTQkoYXYCBpmHrMZg@mail.gmail.com>
+Date: Mon, 15 Sep 2014 15:33:09 -0700
+Subject: [PATCH v5 09/12] sched: add usage_load_avg
+In-Reply-To: <20140915191541.GA28083@e103687>
 References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
- <20140911161517.GA3190@worktop.ger.corp.intel.com>
- <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
- <20140914194156.GC2832@worktop.localdomain>
- <20140915114229.GB3037@worktop.localdomain>
- <CAKfTPtDHSWs8xumOSfWkyucAtkBvvbJkOVTQkoYXYCBpmHrMZg@mail.gmail.com>
-Message-ID: <CAKfTPtDe388d7iYzCgoO4VfMerYOEGb1GuJ1RdMiyqTJ35c+=A@mail.gmail.com>
+ <1409051215-16788-10-git-send-email-vincent.guittot@linaro.org>
+ <20140915191541.GA28083@e103687>
+Message-ID: <CAKfTPtCj-PzeKb2yMWT64oYe-EoR8rdeAyyJerYOuSgVgzJS5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 September 2014 00:14, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> On 15 September 2014 13:42, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Sun, Sep 14, 2014 at 09:41:56PM +0200, Peter Zijlstra wrote:
->>> On Thu, Sep 11, 2014 at 07:26:48PM +0200, Vincent Guittot wrote:
->>> > On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
+On 15 September 2014 21:15, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> On Tue, Aug 26, 2014 at 12:06:52PM +0100, Vincent Guittot wrote:
+>> Add new statistics which reflect the average time a task is running on the
+>> CPU and the sum of the tasks' running on a runqueue. The latter is named
+>> usage_avg_contrib.
 >>
->>> > > I'm confused about the utilization vs capacity_orig. I see how we should
->>> >
->>> > 1st point is that I should compare utilization vs capacity and not
->>> > capacity_orig.
->>> > I should have replaced capacity_orig by capacity in the functions
->>> > above when i move the utilization statistic from
->>> > rq->avg.runnable_avg_sum to cfs.usage_load_avg.
->>> > rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
->>> > cfs.usage_load_avg integrates only cfs tasks
->>> >
->>> > With this change, we don't need sgs->group_capacity_orig anymore but
->>> > only sgs->group_capacity. So sgs->group_capacity_orig can be removed
->>> > as it's no more used in the code as sg_capacity_factor has been
->>> > removed
->>>
->>> Yes, but.. so I suppose we need to add DVFS accounting and remove
->>> cpufreq from the capacity thing. Otherwise I don't see it make sense.
+>> This patch is based on the usage metric that was proposed in the 1st
+>> versions of the per-entity load tracking patchset but that has be removed
+>> afterward. This version differs from the original one in the sense that it's
+>> not linked to task_group.
 >>
->> OK, I've reconsidered _again_, I still don't get it.
+>> The rq's usage_avg_contrib will be used to check if a rq is overloaded or not
+>> instead of trying to compute how many task a group of CPUs can handle
 >>
->> So fundamentally I think its wrong to scale with the capacity; it just
->> doesn't make any sense. Consider big.little stuff, their CPUs are
->> inherently asymmetric in capacity, but that doesn't matter one whit for
->> utilization numbers. If a core is fully consumed its fully consumed, no
->> matter how much work it can or can not do.
->>
->>
->> So the only thing that needs correcting is the fact that these
->> statistics are based on clock_task and some of that time can end up in
->> other scheduling classes, at which point we'll never get 100% even
->> though we're 'saturated'. But correcting for that using capacity doesn't
->> 'work'.
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 >
-> I'm not sure to catch your last point because the capacity is the only
-> figures that take into account the "time" consumed by other classes.
-> Have you got in mind another way to take into account the other
-> classes ?
+> I should have read this patch before I did almost the same patch for as
+> part a series to introduce scale-invariance which I am about to post :(
 >
-> So we have cpu_capacity that is the capacity that can be currently
-> used by cfs class
-> We have cfs.usage_load_avg that is the sum of running time of cfs
-> tasks on the CPU and reflect the % of usage of this CPU by CFS tasks
-> We have to use the same metrics to compare available capacity for CFS
-> and current cfs usage
+> The only difference I see is slightly different naming and that, AFAICT,
+> task group usage is not accounted for in this patch. Can we add the
+> support for task groups as well? I can provide a patch based on this one
+> if you want.
 >
-> Now we have to use the same unit so we can either weight the
-> cpu_capacity_orig with the cfs.usage_load_avg and compare it with
-> cpu_capacity
-> or with divide cpu_capacity by cpu_capacity_orig and scale it into the
-> SCHED_LOAD_SCALE range. Is It what you are proposing ?
+> Also, since more than half this patch comes directly from PJT's original
+> patch I would add "by Paul Turner <pjt@google.com>" somewhere in the
+> text above.
 
-For the latter, we need to keep the  sgs->group_capacity_orig in order
-to check if a group is overloaded whereas the 1st solution don't need
-it anymore (once the correction i mentioned previously)
+Sorry, It was obvious for me that per-entity load tracking patchset
+were done by pjt but i can surely replace
+"the per-entity load tracking patchset" by "the per-entity load
+tracking patchset by Paul Turner <pjt@google.com>"
+
+>
+> [...]
+>
+>> +static inline void __update_task_entity_usage(struct sched_entity *se)
+>> +{
+>> +     u32 contrib;
+>> +
+>> +     /* avoid overflowing a 32-bit type w/ SCHED_LOAD_SCALE */
+>> +     contrib = se->avg.running_avg_sum * scale_load_down(SCHED_LOAD_SCALE);
+>> +     contrib /= (se->avg.runnable_avg_period + 1);
+>> +     se->avg.usage_avg_contrib = scale_load(contrib);
+>> +}
+>> +
+>> +static long __update_entity_usage_avg_contrib(struct sched_entity *se)
+>> +{
+>> +     long old_contrib = se->avg.usage_avg_contrib;
+>> +
+>> +     if (entity_is_task(se))
+>> +             __update_task_entity_usage(se);
+>
+> Groups are never updated?
+>
+> As said above. I have code that does it.
+
+Yes, feel free to send a patch above this one that add group
 
 Vincent
 >
-> Vincent
+> Morten
+>
+>> +
+>> +     return se->avg.usage_avg_contrib - old_contrib;
+>> +}
+>> +
+>
