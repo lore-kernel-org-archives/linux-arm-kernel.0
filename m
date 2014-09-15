@@ -1,224 +1,137 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Sep 2014 20:41:22 +0100
-Subject: [PATCH 2/2 V6] irqchip: gicv2m: Add support for multiple MSI for
- ARM64 GICv2m
-In-Reply-To: <1410676216-27953-3-git-send-email-suravee.suthikulpanit@amd.com>
- (suravee's message of "Sun, 14 Sep 2014 07:30:16 +0100")
-References: <1410676216-27953-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1410676216-27953-3-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <86egvcn02l.fsf@arm.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 15 Sep 2014 12:41:51 -0700
+Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
+ default
+In-Reply-To: <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
+References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
+ <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
+ <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
+ <20140913170638.GA3348@lvm>
+ <CAKv+Gu93FkRWXd96gKdN+OCrUgjF0sXWL4ohishVWAO-XeR9Ww@mail.gmail.com>
+ <fdc415c79e617d4e9102acc12a4c0d65@www.loen.fr>
+ <CAKv+Gu-kce_1cg2fgj5Qj_kRMtzzHctofZ108531-UrcFLZAog@mail.gmail.com>
+ <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
+Message-ID: <541740FF.2080105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 14 2014 at 07:30:16 AM, "suravee.suthikulpanit at amd.com" <suravee.suthikulpanit@amd.com> wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> This patch extend GICv2m MSI to support multiple MSI in ARM64.
->
-> This requires the common arch_setup_msi_irqs() to be overwriten
-> with ARM64 version which does not return 1 for PCI_CAP_ID_MSI and
-> nvec > 1.
->
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->  arch/arm64/kernel/Makefile    |  1 +
->  arch/arm64/kernel/msi.c       | 41 ++++++++++++++++++++
->  drivers/irqchip/irq-gic-v2m.c | 87 ++++++++++++++++++++++++++++++++++++++-----
->  3 files changed, 119 insertions(+), 10 deletions(-)
->  create mode 100644 arch/arm64/kernel/msi.c
->
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index df7ef87..a921c42 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
->  arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
->  arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
->  arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
-> +arm64-obj-$(CONFIG_PCI_MSI)		+= msi.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/msi.c b/arch/arm64/kernel/msi.c
-> new file mode 100644
-> index 0000000..a295862
-> --- /dev/null
-> +++ b/arch/arm64/kernel/msi.c
-> @@ -0,0 +1,41 @@
-> +/*
-> + * ARM64 architectural MSI implemention
-> + *
-> + * Support for Message Signalelled Interrupts for systems that
-> + * implement ARM Generic Interrupt Controller: GICv2m.
-> + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + * Authors: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/irq.h>
-> +#include <linux/msi.h>
-> +#include <linux/pci.h>
-> +
-> +/*
-> + * ARM64 function for seting up MSI irqs.
-> + * Based on driver/pci/msi.c: arch_setup_msi_irqs().
-> + *
-> + * Note:
-> + * Current implementation assumes that all interrupt controller used in
-> + * ARM64 architecture _MUST_ supports multi-MSI.
-> + */
-> +int arm64_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-> +{
-> +	struct msi_desc *entry;
-> +	int ret;
-> +
-> +	list_for_each_entry(entry, &dev->msi_list, list) {
-> +		ret = arch_setup_msi_irq(dev, entry);
-> +		if (ret < 0)
-> +			return ret;
-> +		if (ret > 0)
-> +			return -ENOSPC;
-> +	}
-> +
-> +	return 0;
-> +}
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-> index 499bfb9..4ddb47d 100644
-> --- a/drivers/irqchip/irq-gic-v2m.c
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -99,13 +99,26 @@ static void gicv2m_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
->  	spin_unlock(&data->msi_cnt_lock);
->  }
->  
-> +static int gicv2m_msi_get_vec_count(struct pci_dev *pdev, struct msi_desc *desc)
-> +{
-> +	int ret = -EINVAL;
-> +#ifdef CONFIG_PCI_MSI
-> +	if (desc->msi_attrib.is_msix)
-> +		ret = pci_msix_vec_count(pdev);
-> +	else
-> +		ret = pci_msi_vec_count(pdev);
-> +#endif
-> +	return ret;
-> +}
-> +
+I've been working around the edges of this discussion, and
+maybe be little unclear on this.
 
-Since I also have:
-https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=gicv3/its-split#n1107
+But the manuals say intersection of Stage1/Stage2 permissions are
+used. If guest sets stage1 to read-only then setting stage 2
+to read-only or read-write should have no impact. So why
+should stage 2 RW be changed?
 
-Maybe it would be a good thing to make this a core thing (not something
-we have to do now though).
+- Mario
 
->  static int gicv2m_setup_msi_irq(struct msi_chip *chip,
->  				struct pci_dev *pdev,
->  				struct msi_desc *desc)
->  {
-> -	int irq, avail;
-> +	int i, irq, nvec, avail;
->  	struct msi_msg msg;
->  	phys_addr_t addr;
-> +	struct msi_desc *entry;
->  	struct v2m_data *data = container_of(chip, struct v2m_data, msi_chip);
->  
->  	if (!desc) {
-> @@ -114,16 +127,70 @@ static int gicv2m_setup_msi_irq(struct msi_chip *chip,
->  		return -EINVAL;
->  	}
->  
-> -	avail = alloc_msi_irq(data, 1, &irq);
-> -	if (avail != 0) {
-> -		dev_err(&pdev->dev,
-> -			"GICv2m: MSI setup failed. Cannnot allocate IRQ\n");
-> -		return -ENOSPC;
-> -	}
-> +	if (desc->msi_attrib.is_msix) {
-> +		/**
-> +		 * For MSIx:
-> +		 * We allocate one irq at a time
-> +		 */
-> +		avail = alloc_msi_irq(data, 1, &irq);
-> +		if (avail != 0) {
-> +			dev_err(&pdev->dev,
-> +				"GICv2m: MSI setup failed. Cannnot allocate IRQ\n");
-> +			return -ENOSPC;
-> +		}
->  
-> -	irq_set_chip_data(irq, chip);
-> -	irq_set_msi_desc(irq, desc);
-> -	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-> +		irq_set_chip_data(irq, chip);
-> +		irq_set_msi_desc(irq, desc);
-> +		irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-> +	} else {
-> +		/**
-> +		 * For MSI and Multi-MSI:
-> +		 * All requested irqs are allocated and setup at
-> +		 * once. Subsequent calls to this function would simply return
-> +		 * success. This is to avoid having to implement a separate
-> +		 * function for setting up multiple irqs.
-> +		 */
-> +		BUG_ON(list_empty(&pdev->msi_list));
-> +		WARN_ON(!list_is_singular(&pdev->msi_list));
-> +
-> +		nvec = gicv2m_msi_get_vec_count(pdev, desc);
-> +		if (WARN_ON(nvec <= 0))
-> +			return nvec;
-> +
-> +		entry = list_first_entry(&pdev->msi_list,
-> +					 struct msi_desc, list);
-> +
-> +		if ((nvec > 1) && (entry->msi_attrib.multiple))
-> +			return 0;
-> +
-> +		avail = alloc_msi_irq(data, nvec, &irq);
-> +		if (avail != 0) {
-> +			dev_err(&pdev->dev,
-> +				"GICv2m: Failed to allocate %d irqs.\n", nvec);
-> +			return avail;
-> +		}
-> +
-> +		if (nvec > 1) {
-> +			/* Set lowest of the new interrupts assigned
-> +			 * to the PCI device
-> +			 */
-> +			entry->nvec_used = nvec;
-> +			entry->msi_attrib.multiple = ilog2(
-> +						__roundup_pow_of_two(nvec));
-> +		}
-> +
-> +		for (i = 0; i < nvec; i++) {
-> +			irq_set_chip_data(irq+i, chip);
-> +			if (irq_set_msi_desc_off(irq, i, entry)) {
-> +				dev_err(&pdev->dev,
-> +					"GICv2m: Failed to set up MSI irq %d\n",
-> +					(irq+i));
-> +				return -EINVAL;
-> +			}
-> +
-> +			irq_set_irq_type((irq+i), IRQ_TYPE_EDGE_RISING);
-> +		}
-> +	}
->  
->  	addr = data->res.start + V2M_MSI_SETSPI_NS;
->  	msg.address_hi = (u32)(addr >> 32);
-
-Overall, I think you should move this "msi > 1" code directly into the
-first patch (not sure the intermediate implementation adds much to the
-understanding of the whole driver).
-
-You can then have the arm64-specific code as your second patch.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+On 09/14/2014 03:57 PM, Ard Biesheuvel wrote:
+> On 14 September 2014 11:43, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 14 September 2014 11:09, Marc Zyngier <maz@misterjones.org> wrote:
+>>> On 2014-09-14 05:49, Ard Biesheuvel wrote:
+>>>>
+>>>> On 13 September 2014 19:06, Christoffer Dall
+>>>> <christoffer.dall@linaro.org> wrote:
+>>>>>
+>>>>> On Sat, Sep 13, 2014 at 01:15:45PM +0200, Ard Biesheuvel wrote:
+>>>>>>
+>>>>>> On 13 September 2014 12:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>>>> Hi Ard,
+>>>>>>>
+>>>>>>> On 2014-09-13 11:17, Ard Biesheuvel wrote:
+>>>>>>>>
+>>>>>>>> Now that we support read-only memslots, we need to make sure that
+>>>>>>>> pass-through device mappings are not mapped writable if the guest
+>>>>>>>> has requested them to be read-only. The existing implementation
+>>>>>>>> already honours this by calling kvm_set_s2pte_writable() on the new
+>>>>>>>> pte in case of writable mappings, so all we need to do is define
+>>>>>>>> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>>
+>>>>>>>
+>>>>>>> I feel very uncomfortable with this change. Why would we map a device
+>>>>>>> RO? Is
+>>>>>>> that only for completeness sake?
+>>>>>>>
+>>>>>>
+>>>>>> We would map a device RO so that QEMU (or whatever is managing KVM)
+>>>>>> can emulate the writes. I don't have a clear cut use case, to be
+>>>>>> honest, but setting up a writable mapping for a memslot that was
+>>>>>> explicitly set up as read-only seems wrong in any case.
+>>>>>
+>>>>>
+>>>>> Agreed, if it doesn't ever make sense to do so, then we should return an
+>>>>> error to user space if userspace attempts such a configuration.  The
+>>>>> current code is just weird.
+>>>>>
+>>>>>>
+>>>>>> Note that the particular problem I was seeing was primarily caused by
+>>>>>> kvm_is_mmio_pfn()'s false positive on the zero page, but it unveiled
+>>>>>> this particular issue as well.
+>>>>>>
+>>>>>>> Note that we also use PAGE_S2_DEVICE for things that are not mapped
+>>>>>>> through
+>>>>>>> a memslot, such as the GIC.
+>>>>>>>
+>>>>>>
+>>>>>> Yes, and I realize now that this breaks it.
+>>>>>> My apologies: I have an additional patch locally that sets up MMIO
+>>>>>> ranges in one go instead of faulting them in one page at a time as we
+>>>>>> do now, and there the read-write case is handled correctly in
+>>>>>> kvm_phys_addr_ioremap(). However, I thought it was better to send
+>>>>>> these out separately first, but apparently not.
+>>>>>
+>>>>>
+>>>>> I think it is better to change this separately, and then add the ioremap
+>>>>> stuff.  However, you need to change all places that call PAGE_S2_DEVICE
+>>>>> and expect a RDWR memory region, this happens to be only
+>>>>> kvm_phys_addr_ioremap() for now.
+>>>>>
+>>>>>>
+>>>>>> So if we can agree on whether or not MMIO backed mappings should be
+>>>>>> read-write even if the memslot says no, I will follow up with a proper
+>>>>>> series if there are still changes required.
+>>>>>>
+>>>>>
+>>>>> I guess it could be theoretically useful to have read-only device memory
+>>>>> regions, and I can't think of why it would violate the architecture.
+>>>>>
+>>>>
+>>>> We have to handle it either way. But after reading D4.5.3 (Table
+>>>> D4-40) of the ARM ARM, I am wondering why we needed patch b88657674d39
+>>>> "ARM: KVM: user_mem_abort: support stage 2 MMIO page mapping" in the
+>>>> first place, and we could just revert that patch and everything would
+>>>> work as expected. (In short, D4.5.3 says that MT_DEVICE trumps
+>>>> MT_NORMAL, so if the stage 1 translation is MT_DEVICE, it doesn't
+>>>> matter what memtype the S2 translation specifies)
+>>>
+>>>
+>>> We've been there before:
+>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/004420.html
+>>>
+>>
+>> Ah right. So why did those patches not make it in?
+>>
+> 
+> Never mind. I read the whole thread this time.
+> 
+> So, in summary, there is a concern that a malicious guest may request
+> a cachable mapping for a device range, in an attempt to manipulate the
+> VGIC or other device memory of another VM.
+> I think that concern only applies to writable mappings, so perhaps we
+> should just change
+> 
+> if (kvm_is_mmio_pfn(pfn))
+> 
+> to
+> 
+> if (kvm_is_mmio_pfn(pfn) && writable)
+> 
+> and be done with it (which is coincidentally the very first naive fix
+> I suggested for the issue i was seeing)
+> That way, we never map read-only MMIO regions writable, and rely on
+> the MT_DEVICE trumps MT_NORMAL rule to ensure the guest reads to those
+> regions are uncached.
+> (Wouldn't hurt to add a comment to explain it, I suppose)
+> 
