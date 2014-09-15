@@ -1,73 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Sep 2014 20:06:17 +0100
-Subject: [PATCH 08/13] arm64: Use cpu_ops for smp_stop
-In-Reply-To: <36ad9302497338a34cc7174a72a2ac99ceb16fdb.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
- <36ad9302497338a34cc7174a72a2ac99ceb16fdb.1410302383.git.geoff@infradead.org>
-Message-ID: <20140915190616.GC14191@leverpostej>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 15 Sep 2014 15:07:44 -0400 (EDT)
+Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
+In-Reply-To: <20140915114229.GB3037@worktop.localdomain>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
+ <20140911161517.GA3190@worktop.ger.corp.intel.com>
+ <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+ <20140914194156.GC2832@worktop.localdomain>
+ <20140915114229.GB3037@worktop.localdomain>
+Message-ID: <alpine.LFD.2.11.1409151451540.8647@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+On Mon, 15 Sep 2014, Peter Zijlstra wrote:
 
-On Tue, Sep 09, 2014 at 11:49:05PM +0100, Geoff Levand wrote:
-> The current implementation of ipi_cpu_stop() is just a tight infinite loop
-> around cpu_relax().  This infinite loop implementation is OK if the machine
-> will soon do a poweroff, but it doesn't have any mechanism to allow a CPU
-> to be brought back on-line, nor is it compatible with kexec re-boot.
-
-I don't see why we should use this when we have disable_nonboot_cpus.
-
-If the kernel is alive and well, disable_nonboot_cpus will correctly
-shut down all but one CPU, returning an error if that fails, whereupon
-we can respect the error code and halt the kexec.
-
-If the kernel is not alive and well, we have no idea what CPUs are
-executing anyway, so all we can expect to do is to boot a (UP) crash
-kernel in some previously reserved memory. Trying to actually kill the
-CPUs is nice, but possibly not necessary.
-
-> Add a check for a valid cpu_die method of the appropriate cpu_ops structure,
-> and if a valid method is found, transfer control to that method.  It is
-> expected that the cpu_die method puts the CPU into a state such that they can
-> be brought back on-line or progress through a kexec re-boot.
+> On Sun, Sep 14, 2014 at 09:41:56PM +0200, Peter Zijlstra wrote:
+> > On Thu, Sep 11, 2014 at 07:26:48PM +0200, Vincent Guittot wrote:
+> > > On 11 September 2014 18:15, Peter Zijlstra <peterz@infradead.org> wrote:
 > 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/kernel/smp.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> > > > I'm confused about the utilization vs capacity_orig. I see how we should
+> > > 
+> > > 1st point is that I should compare utilization vs capacity and not
+> > > capacity_orig.
+> > > I should have replaced capacity_orig by capacity in the functions
+> > > above when i move the utilization statistic from
+> > > rq->avg.runnable_avg_sum to cfs.usage_load_avg.
+> > > rq->avg.runnable_avg_sum was measuring all activity on the cpu whereas
+> > > cfs.usage_load_avg integrates only cfs tasks
+> > > 
+> > > With this change, we don't need sgs->group_capacity_orig anymore but
+> > > only sgs->group_capacity. So sgs->group_capacity_orig can be removed
+> > > as it's no more used in the code as sg_capacity_factor has been
+> > > removed
+> > 
+> > Yes, but.. so I suppose we need to add DVFS accounting and remove
+> > cpufreq from the capacity thing. Otherwise I don't see it make sense.
 > 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 4743397..002aa8a 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -555,6 +555,15 @@ static void ipi_cpu_stop(unsigned int cpu)
->  
->  	local_irq_disable();
->  
-> +	/* If we have the cpu ops use them. */
-> +
-> +	if (cpu_ops[cpu]->cpu_disable &&
-> +	    cpu_ops[cpu]->cpu_die &&
-> +	    !cpu_ops[cpu]->cpu_disable(cpu))
-> +		cpu_ops[cpu]->cpu_die(cpu);
+> OK, I've reconsidered _again_, I still don't get it.
+> 
+> So fundamentally I think its wrong to scale with the capacity; it just
+> doesn't make any sense. Consider big.little stuff, their CPUs are
+> inherently asymmetric in capacity, but that doesn't matter one whit for
+> utilization numbers. If a core is fully consumed its fully consumed, no
+> matter how much work it can or can not do.
 
-I don't think kexec should handle this. The hotplug code already does
-this, better (calling cpu_kill and returning an error code), and having
-two callers of these functions is only going to lead to hard-to-debug
-drift between the two.
+Let's suppose a task running on a 1GHz CPU producing a load of 100.
 
->  	while (1)
->  		cpu_relax();
+The same task on a 100MHz CPU would produce a load of 1000 because that 
+CPU is 10x slower.  So to properly evaluate the load of a task when 
+moving it around, we want to normalize its load based on the CPU 
+performance.  In this case the correction factor would be 0.1.
 
-Any CPUs left here are a major problem.
+Given those normalized loads, we need to scale CPU capacity as well.  If 
+the 1GHz CPU can handle 50 of those tasks it has a capacity of 5000.
 
-We absolutely must fail kexec if a CPU is still in the kernel (in the
-pen or in the kernel proper), or they can do arbitrarily bad things when
-the kernel image gets clobbered. SO this is insufficient.
+In theory the 100MHz CPU could handle only 5 of those tasks, meaning it 
+has a normalized capacity of 500, but only if the load metric is already 
+normalized as well.
 
-As I mention above, a crash kernel might be an exception to that rule,
-but we shouldn't treat that as the usual case.
+Or am I completely missing the point here?
 
-Thanks,
-Mark.
+
+Nicolas
+
+
+
+
+
+> 
+> 
+> So the only thing that needs correcting is the fact that these
+> statistics are based on clock_task and some of that time can end up in
+> other scheduling classes, at which point we'll never get 100% even
+> though we're 'saturated'. But correcting for that using capacity doesn't
+> 'work'.
+> 
+> 
