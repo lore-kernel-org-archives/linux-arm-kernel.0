@@ -1,62 +1,50 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 15 Sep 2014 16:42:34 +0200
-Subject: [PATCH v1 05/21] PCI/MSI: Introduce weak arch_find_msi_chip()
- to find MSI chip
-In-Reply-To: <1409911806-10519-6-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-6-git-send-email-wangyijing@huawei.com>
-Message-ID: <1410792154.3314.7.camel@pengutronix.de>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 15 Sep 2014 22:43:02 +0800
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140913173841.GA18093@brian-ubuntu>
+References: <1410339339-25561-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140911120928.GA1585@localhost.localdomain>
+ <20140911143616.3ebb025a@bbrezillon>
+ <20140911142511.GA2543@localhost.localdomain>
+ <20140911163847.5e2f85c7@bbrezillon>
+ <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
+ <20140912143050.014ad4c3@bbrezillon>
+ <20140913153622.GA10132@localhost.localdomain>
+ <20140913173841.GA18093@brian-ubuntu>
+Message-ID: <20140915144259.GA1947@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 05.09.2014, 18:09 +0800 schrieb Yijing Wang:
-> Introduce weak arch_find_msi_chip() to find the match msi_chip.
-> Currently, MSI chip associates pci bus to msi_chip. Because in
-> ARM platform, there may be more than one MSI controller in system.
-> Associate pci bus to msi_chip help pci device to find the match
-> msi_chip and setup MSI/MSI-X irq correctly. But in other platform,
-> like in x86. we only need one MSI chip, because all device use
-> the same MSI address/data and irq etc. So it's no need to associate
-> pci bus to MSI chip, just use a arch function, arch_find_msi_chip()
-> to return the MSI chip for simplicity. The default weak
-> arch_find_msi_chip() used in ARM platform, find the MSI chip
-> by pci bus.
+On Sat, Sep 13, 2014 at 10:38:41AM -0700, Brian Norris wrote:
+> On Sat, Sep 13, 2014 at 11:36:24PM +0800, Huang Shijie wrote:
+> > On Fri, Sep 12, 2014 at 02:30:50PM +0200, Boris BREZILLON wrote:
+> > > This test validates what's returned by ecc_strength file in sysfs
+> > > (which in turn is specified by the NAND controller when initializing
+> > > the NAND chip).
+> > > 
+> > > Doing this should not imply knowing the ECC algorithm in use in the
+> > > NAND controller or the layout used to store data on NAND.
+> > the difficulty is that the ECC parity area can be not byte aligned.
 > 
-Hm, while one weak function sounds much better than the plethora we have
-now, I wonder how much work it would be to associate the msi_chip with
-the pci bus on other arches the same way as done on ARM. This way we
-could kill this calling into arch specific functions which would make
-things a bit clearer to follow I think.
+> Is there a problem with just rounding up to the nearest byte alignment
+> and ignoring the few bits that are wasted?
 
-Regards,
-Lucas
+I feel a little confused with the two hooks.
 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  drivers/pci/msi.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index a77e7f7..539c11d 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -29,9 +29,14 @@ static int pci_msi_enable = 1;
->  
->  /* Arch hooks */
->  
-> +struct msi_chip * __weak arch_find_msi_chip(struct pci_dev *dev)
-> +{
-> +	return dev->bus->msi;
-> +}
-> +
->  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->  {
-> -	struct msi_chip *chip = dev->bus->msi;
-> +	struct msi_chip *chip = arch_find_msi_chip(dev);
->  	int err;
->  
->  	if (!chip || !chip->setup_irq)
+does the ecc->write_page_raw need to write the ECC parity data?
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+The page's layout after an ecc->write_page  will look like this:
+                                              (Block Mark)
+                                                    |      |
+                                                    |  D   |
+                                                    |<---->|
+                                                    V      V
+     +---+----------+-+----------+-+----------+-+----------+-+
+     | M |   data   |E|   data   |E|   data   |E|   data   |E|
+     +---+----------+-+----------+-+----------+-+----------+-+
+
+What will the page's layout look like after the ecc->write_page_raw?
+
+
+thanks
+Huang Shijie
