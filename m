@@ -1,53 +1,57 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 15 Sep 2014 18:06:31 +0200
-Subject: [PATCH 3/7 v6] power: reset: driver for the Versatile syscon
- reboot
-In-Reply-To: <CACRpkdbE8z3N_7FQzooVsd=UvUeoRhPqO5=foTGn7U=ag0ML9g@mail.gmail.com>
-References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
- <1410176286-32533-4-git-send-email-linus.walleij@linaro.org>
- <CACRpkdbE8z3N_7FQzooVsd=UvUeoRhPqO5=foTGn7U=ag0ML9g@mail.gmail.com>
-Message-ID: <20140915160630.GA19960@earth.universe>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Sep 2014 17:10:15 +0100
+Subject: [PATCH 01/13] arm64: Add ESR_EL2_EC macros to hyp-stub
+In-Reply-To: <5e1b1892eb3ecc3bccff47766675c24c650a1a14.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <5e1b1892eb3ecc3bccff47766675c24c650a1a14.1410302383.git.geoff@infradead.org>
+Message-ID: <20140915161014.GB13789@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 10:55:19AM +0200, Linus Walleij wrote:
-> On Mon, Sep 8, 2014 at 1:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > This driver enabled us to drive the reboot of the Versatile family
-> > of ARM reference boards. Even though only the RealView boards are
-> > supported initially, these boards all have the same procedure for
-> > reboot:
-> >
-> > - Write a magic value into an unlocking register
-> > - Write another magic value into a reset control register
-> >
-> > The driver will be reusable for Versatile and possibly also the
-> > Integrator family of reference boards.
-> >
-> > Cc: Sebastian Reichel <sre@kernel.org>
-> > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > Cc: David Woodhouse <dwmw2@infradead.org>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> > ChangeLog v1->v2:
-> > - Do not probe from a platform device, instead use a device_initcall()
-> >   and look up the syscon device from its node. If that device is
-> >   not yet registered, the call will be deferred. This is done so that
-> >   the Linux driver model is not reflected into the device tree, as
-> >   the reboot property of the syscon is not a separate device.
+On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
+> To improve the readability of the el1_sync routine in hyp-stub.S replace the
+> numeric immediate values with preprocessor macros ESR_EL2_EC_SHIFT and
+> ESR_EL2_EC_HVC64.
 > 
-> Can any of the power maintainers please ACK this patch if it
-> looks OK, so it can be pulled in through ARM SoC?
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/hyp-stub.S | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> index a272f33..2d960a9 100644
+> --- a/arch/arm64/kernel/hyp-stub.S
+> +++ b/arch/arm64/kernel/hyp-stub.S
+> @@ -52,10 +52,13 @@ ENDPROC(__hyp_stub_vectors)
+>  
+>  	.align 11
+>  
+> +#define ESR_EL2_EC_SHIFT	26
+> +#define ESR_EL2_EC_HVC64	0x16
 
-Sorry for the delay:
+These exist in arch/arm64/include/asm/kvm_arm.h, no?
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
+If anything that should be folded into arch/arm64/include/asm/esr.h...
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/decd54cf/attachment.sig>
+Mark.
+
+> +
+>  el1_sync:
+>  	mrs	x1, esr_el2
+> -	lsr	x1, x1, #26
+> -	cmp	x1, #0x16
+> +	lsr	x1, x1, #ESR_EL2_EC_SHIFT
+> +	cmp	x1, #ESR_EL2_EC_HVC64
+>  	b.ne	2f				// Not an HVC trap
+>  	cbz	x0, 1f
+>  	msr	vbar_el2, x0			// Set vbar_el2
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
