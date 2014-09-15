@@ -1,79 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 15 Sep 2014 20:10:17 +0100
-Subject: [PATCH 09/13] arm64/kexec: Kexec expects cpu_die
-In-Reply-To: <8760d3e11621065a78236e91724875f0e1cfadf4.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
- <8760d3e11621065a78236e91724875f0e1cfadf4.1410302383.git.geoff@infradead.org>
-Message-ID: <20140915191017.GD14191@leverpostej>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 15 Sep 2014 21:13:54 +0200
+Subject: [PATCHv6 0/2] Add Allwinner SoCs PWM support
+Message-ID: <1410808436-21460-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 11:49:05PM +0100, Geoff Levand wrote:
-> The arm64 implementation of kexec expects an operational cpu_die method of
-> struct cpu_operations, so add defined(CONFIG_KEXEC) to the preprocessor
-> conditional that enables cpu_die.
+Hi,
 
-I very much do not like this, as I explained in previous postings and my
-comments on other patches in this series.
+This patch seseries adds support for the PWM controller found on the Allwinner
+SoCs.
 
-Please use the hotplug infrastructure, and have kexec depend on
-CPU_HOTPLUG || !SMP.
+The first patch adds the driver itself.
+The second patch adds the DT binding documentation
 
-There is no reason for these files to have any knowledge of kexec
-whatsoever.
+Changes in v6:
+ - Took into account comments from Thierry
+ - Removed the prescaler bypass from sun4i (reported by Jon Smirl)
+ - Rounding period half up when not using the prescaler (reported by Jon Smirl)
+ - Corrected issues reported by Simon (PWM_PRD_MASK, channel 1 and off-by-one
+   error)
 
-Thanks,
-Mark
 
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/include/asm/cpu_ops.h | 2 +-
->  arch/arm64/kernel/psci.c         | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-> index d7b4b38..9fd7281 100644
-> --- a/arch/arm64/include/asm/cpu_ops.h
-> +++ b/arch/arm64/include/asm/cpu_ops.h
-> @@ -50,7 +50,7 @@ struct cpu_operations {
->  	int		(*cpu_prepare)(unsigned int);
->  	int		(*cpu_boot)(unsigned int);
->  	void		(*cpu_postboot)(void);
-> -#ifdef CONFIG_HOTPLUG_CPU
-> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
->  	int		(*cpu_disable)(unsigned int cpu);
->  	void		(*cpu_die)(unsigned int cpu);
->  	int		(*cpu_kill)(unsigned int cpu);
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 5539547..81dbbc9 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -380,7 +380,7 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
->  	return err;
->  }
->  
-> -#ifdef CONFIG_HOTPLUG_CPU
-> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
->  static int cpu_psci_cpu_disable(unsigned int cpu)
->  {
->  	/* Fail early if we don't have CPU_OFF support */
-> @@ -442,7 +442,7 @@ const struct cpu_operations cpu_psci_ops = {
->  	.cpu_init	= cpu_psci_cpu_init,
->  	.cpu_prepare	= cpu_psci_cpu_prepare,
->  	.cpu_boot	= cpu_psci_cpu_boot,
-> -#ifdef CONFIG_HOTPLUG_CPU
-> +#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
->  	.cpu_disable	= cpu_psci_cpu_disable,
->  	.cpu_die	= cpu_psci_cpu_die,
->  	.cpu_kill	= cpu_psci_cpu_kill,
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Alexandre Belloni (2):
+  pwm: Add Allwinner SoC support
+  pwm: sunxi: document OF bindings
+
+ .../devicetree/bindings/pwm/pwm-sunxi.txt          |  20 ++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-sunxi.c                            | 371 +++++++++++++++++++++
+ 4 files changed, 401 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sunxi.txt
+ create mode 100644 drivers/pwm/pwm-sunxi.c
+
+-- 
+1.9.1
