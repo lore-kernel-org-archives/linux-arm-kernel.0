@@ -1,448 +1,1270 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 15 Sep 2014 18:15:55 +0200
-Subject: [PATCHv3 3/7] ARM: at91: SAMA5D4 SoC detection code and low level
- routines
+Date: Mon, 15 Sep 2014 18:15:56 +0200
+Subject: [PATCHv3 4/7] ARM: at91: dt: add device tree file for SAMA5D4 SoC
 In-Reply-To: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1410797759-18675-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1410797759-18675-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-SoC identification code, kernel uncompress and low level
-debugging routines update.
-On SAMA5D4, DBGU is at another address AT91_BASE_DBGU2 so another
-round of detection is needed. We also had to differentiate with
-SAMA5D3 SoC family and rename some variables.
+Add SAMA5D4 SoC DT file.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/board-dt-sama5.c           | 17 ++++-
- arch/arm/mach-at91/generic.h                  |  1 +
- arch/arm/mach-at91/include/mach/cpu.h         | 13 +++-
- arch/arm/mach-at91/include/mach/debug-macro.S |  5 +-
- arch/arm/mach-at91/include/mach/hardware.h    | 19 +++++-
- arch/arm/mach-at91/include/mach/uncompress.h  | 21 ++++--
- arch/arm/mach-at91/sama5d4.c                  | 28 ++++++++
- arch/arm/mach-at91/setup.c                    | 97 +++++++++++++++++++++++++--
- 8 files changed, 189 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/sama5d4.dtsi | 1239 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 1239 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sama5d4.dtsi
 
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index 8c5814fa5325..548de4ad6937 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -40,7 +40,7 @@ static void __init sama5_dt_device_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const char *sama5_dt_board_compat[] __initdata = {
-+static const char *sama5_dt_board_compat[] __initconst = {
- 	"atmel,sama5",
- 	NULL
- };
-@@ -53,3 +53,18 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
- 	.init_machine	= sama5_dt_device_init,
- 	.dt_compat	= sama5_dt_board_compat,
- MACHINE_END
-+
-+static const char *sama5_alt_dt_board_compat[] __initconst = {
-+	"atmel,sama5d4",
-+	NULL
-+};
-+
-+DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5 (Device Tree)")
-+	/* Maintainer: Atmel */
-+	.init_time	= sama5_dt_timer_init,
-+	.map_io		= at91_alt_map_io,
-+	.init_early	= at91_dt_initialize,
-+	.init_machine	= sama5_dt_device_init,
-+	.dt_compat	= sama5_alt_dt_board_compat,
-+	.l2c_aux_mask	= ~0UL,
-+MACHINE_END
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index f42b0490ad98..4e0a965cf7c0 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -14,6 +14,7 @@
- 
-  /* Map io */
- extern void __init at91_map_io(void);
-+extern void __init at91_alt_map_io(void);
- extern void __init at91_init_sram(int bank, unsigned long base,
- 				  unsigned int length);
- 
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index d77572e8cb15..b27e9ca65653 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -36,7 +36,7 @@
- #define ARCH_ID_AT91M40807	0x14080745
- #define ARCH_ID_AT91R40008	0x44000840
- 
--#define ARCH_ID_SAMA5D3		0x8A5C07C0
-+#define ARCH_ID_SAMA5		0x8A5C07C0
- 
- #define ARCH_EXID_AT91SAM9M11	0x00000001
- #define ARCH_EXID_AT91SAM9M10	0x00000002
-@@ -49,12 +49,19 @@
- #define ARCH_EXID_AT91SAM9G25	0x00000003
- #define ARCH_EXID_AT91SAM9X25	0x00000004
- 
-+#define ARCH_EXID_SAMA5D3	0x00004300
- #define ARCH_EXID_SAMA5D31	0x00444300
- #define ARCH_EXID_SAMA5D33	0x00414300
- #define ARCH_EXID_SAMA5D34	0x00414301
- #define ARCH_EXID_SAMA5D35	0x00584300
- #define ARCH_EXID_SAMA5D36	0x00004301
- 
-+#define ARCH_EXID_SAMA5D4	0x00000007
-+#define ARCH_EXID_SAMA5D41	0x00000001
-+#define ARCH_EXID_SAMA5D42	0x00000002
-+#define ARCH_EXID_SAMA5D43	0x00000003
-+#define ARCH_EXID_SAMA5D44	0x00000004
-+
- #define ARCH_FAMILY_AT91X92	0x09200000
- #define ARCH_FAMILY_AT91SAM9	0x01900000
- #define ARCH_FAMILY_AT91SAM9XE	0x02900000
-@@ -111,6 +118,10 @@ enum at91_soc_subtype {
- 	AT91_SOC_SAMA5D31, AT91_SOC_SAMA5D33, AT91_SOC_SAMA5D34,
- 	AT91_SOC_SAMA5D35, AT91_SOC_SAMA5D36,
- 
-+	/* SAMA5D4 */
-+	AT91_SOC_SAMA5D41, AT91_SOC_SAMA5D42, AT91_SOC_SAMA5D43,
-+	AT91_SOC_SAMA5D44,
-+
- 	/* No subtype for this SoC */
- 	AT91_SOC_SUBTYPE_NONE,
- 
-diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
-index c6bb9e2d9baa..2103a90f2261 100644
---- a/arch/arm/mach-at91/include/mach/debug-macro.S
-+++ b/arch/arm/mach-at91/include/mach/debug-macro.S
-@@ -16,8 +16,11 @@
- 
- #if defined(CONFIG_AT91_DEBUG_LL_DBGU0)
- #define AT91_DBGU AT91_BASE_DBGU0
--#else
-+#elif defined(CONFIG_AT91_DEBUG_LL_DBGU1)
- #define AT91_DBGU AT91_BASE_DBGU1
-+#else
-+/* On sama5d4, use USART3 as low level serial console */
-+#define AT91_DBGU SAMA5D4_BASE_USART3
- #endif
- 
- 	.macro	addruart, rp, rv, tmp
-diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-index 56338245653a..d84776f6b8ac 100644
---- a/arch/arm/mach-at91/include/mach/hardware.h
-+++ b/arch/arm/mach-at91/include/mach/hardware.h
-@@ -19,8 +19,10 @@
- /* DBGU base */
- /* rm9200, 9260/9g20, 9261/9g10, 9rl */
- #define AT91_BASE_DBGU0	0xfffff200
--/* 9263, 9g45 */
-+/* 9263, 9g45, sama5d3 */
- #define AT91_BASE_DBGU1	0xffffee00
-+/* sama5d4 */
-+#define AT91_BASE_DBGU2	0xfc069000
- 
- #if defined(CONFIG_ARCH_AT91X40)
- #include <mach/at91x40.h>
-@@ -34,6 +36,7 @@
- #include <mach/at91sam9x5.h>
- #include <mach/at91sam9n12.h>
- #include <mach/sama5d3.h>
-+#include <mach/sama5d4.h>
- 
- /*
-  * On all at91 except rm9200 and x40 have the System Controller starts
-@@ -47,6 +50,11 @@
-  * and map the same memory space
-  */
- #define AT91_BASE_SYS	0xffffc000
-+
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+new file mode 100644
+index 000000000000..1f6a19d41ad4
+--- /dev/null
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -0,0 +1,1239 @@
 +/*
-+ * On sama5d4 there is no system controller, we map some needed peripherals
++ * sama5d4.dtsi - Device Tree Include file for SAMA5D4 family SoC
++ *
++ *  Copyright (C) 2014 Atmel,
++ *                2014 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+#define AT91_ALT_BASE_SYS	0xfc069000
- #endif
- 
- /*
-@@ -69,6 +77,13 @@
-  */
- #define AT91_IO_PHYS_BASE	0xFFF78000
- #define AT91_IO_VIRT_BASE	IOMEM(0xFF000000 - AT91_IO_SIZE)
 +
-+/*
-+ * On sama5d4, remap the peripherals from address 0xFC069000 .. 0xFC06F000
-+ * to 0xFB069000 .. 0xFB06F000.  (24Kb)
-+ */
-+#define AT91_ALT_IO_PHYS_BASE	AT91_ALT_BASE_SYS
-+#define AT91_ALT_IO_VIRT_BASE	IOMEM(0xFB069000)
- #else
- /*
-  * Identity mapping for the non MMU case.
-@@ -81,11 +96,13 @@
- 
-  /* Convert a physical IO address to virtual IO address */
- #define AT91_IO_P2V(x)		((x) - AT91_IO_PHYS_BASE + AT91_IO_VIRT_BASE)
-+#define AT91_ALT_IO_P2V(x)	((x) - AT91_ALT_IO_PHYS_BASE + AT91_ALT_IO_VIRT_BASE)
- 
- /*
-  * Virtual to Physical Address mapping for IO devices.
-  */
- #define AT91_VA_BASE_SYS	AT91_IO_P2V(AT91_BASE_SYS)
-+#define AT91_ALT_VA_BASE_SYS	AT91_ALT_IO_P2V(AT91_ALT_BASE_SYS)
- 
-  /* Internal SRAM is mapped below the IO devices */
- #define AT91_SRAM_MAX		SZ_1M
-diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
-index 4bb644f8e87c..acb2d890ad7e 100644
---- a/arch/arm/mach-at91/include/mach/uncompress.h
-+++ b/arch/arm/mach-at91/include/mach/uncompress.h
-@@ -94,7 +94,7 @@ static const u32 uarts_sam9x5[] = {
- 	0,
- };
- 
--static const u32 uarts_sama5[] = {
-+static const u32 uarts_sama5d3[] = {
- 	AT91_BASE_DBGU1,
- 	SAMA5D3_BASE_USART0,
- 	SAMA5D3_BASE_USART1,
-@@ -103,6 +103,12 @@ static const u32 uarts_sama5[] = {
- 	0,
- };
- 
-+static const u32 uarts_sama5d4[] = {
-+	AT91_BASE_DBGU2,
-+	SAMA5D4_BASE_USART3,
-+	0,
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/at91.h>
++#include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Atmel SAMA5D4 family SoC";
++	compatible = "atmel,sama5d4";
++	interrupt-parent = <&aic>;
++
++	aliases {
++		serial0 = &usart3;
++		serial1 = &usart4;
++		serial2 = &usart2;
++		gpio0 = &pioA;
++		gpio1 = &pioB;
++		gpio2 = &pioC;
++		gpio4 = &pioE;
++		tcb0 = &tcb0;
++		tcb1 = &tcb1;
++		i2c2 = &i2c2;
++	};
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++	};
++
++	memory {
++		reg = <0x20000000 0x20000000>;
++	};
++
++	clocks {
++		slow_xtal: slow_xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
++
++		main_xtal: main_xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
++
++		adc_op_clk: adc_op_clk{
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++		};
++	};
++
++	ahb {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		usb0: gadget at 00400000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "atmel,at91sam9rl-udc";
++			reg = <0x00400000 0x100000
++			       0xfc02c000 0x4000>;
++			interrupts = <47 IRQ_TYPE_LEVEL_HIGH 2>;
++			clocks = <&udphs_clk>, <&utmi>;
++			clock-names = "pclk", "hclk";
++			status = "disabled";
++
++			ep0 {
++				reg = <0>;
++				atmel,fifo-size = <64>;
++				atmel,nb-banks = <1>;
++			};
++
++			ep1 {
++				reg = <1>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <3>;
++				atmel,can-dma;
++				atmel,can-isoc;
++			};
++
++			ep2 {
++				reg = <2>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <3>;
++				atmel,can-dma;
++				atmel,can-isoc;
++			};
++
++			ep3 {
++				reg = <3>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-dma;
++				atmel,can-isoc;
++			};
++
++			ep4 {
++				reg = <4>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-dma;
++				atmel,can-isoc;
++			};
++
++			ep5 {
++				reg = <5>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-dma;
++				atmel,can-isoc;
++			};
++
++			ep6 {
++				reg = <6>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-dma;
++				atmel,can-isoc;
++			};
++
++			ep7 {
++				reg = <7>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep8 {
++				reg = <8>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep9 {
++				reg = <9>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep10 {
++				reg = <10>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep11 {
++				reg = <11>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep12 {
++				reg = <12>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep13 {
++				reg = <13>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep14 {
++				reg = <14>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++
++			ep15 {
++				reg = <15>;
++				atmel,fifo-size = <1024>;
++				atmel,nb-banks = <2>;
++				atmel,can-isoc;
++			};
++		};
++
++		usb1: ohci at 00500000 {
++			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
++			reg = <0x00500000 0x100000>;
++			interrupts = <46 IRQ_TYPE_LEVEL_HIGH 2>;
++			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
++				 <&uhpck>;
++			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			status = "disabled";
++		};
++
++		usb2: ehci at 00600000 {
++			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
++			reg = <0x00600000 0x100000>;
++			interrupts = <46 IRQ_TYPE_LEVEL_HIGH 2>;
++			clocks = <&usb>, <&uhphs_clk>, <&uhpck>;
++			clock-names = "usb_clk", "ehci_clk", "uhpck";
++			status = "disabled";
++		};
++
++		L2: cache-controller at 00a00000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x00a00000 0x1000>;
++			interrupts = <0 67 4>;
++			cache-unified;
++			cache-level = <2>;
++		};
++
++		nand0: nand at 80000000 {
++			compatible = "atmel,at91rm9200-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			reg = <	0x80000000 0x08000000	/* EBI CS3 */
++				0xfc05c070 0x00000490	/* SMC PMECC regs */
++				0xfc05c500 0x00000100	/* SMC PMECC Error Location regs */
++				>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 6>;
++			atmel,nand-addr-offset = <21>;
++			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
++			status = "disabled";
++
++			nfc at 90000000 {
++				compatible = "atmel,sama5d3-nfc";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <
++					0x90000000 0x10000000	/* NFC Command Registers */
++					0xfc05c000 0x00000070	/* NFC HSMC regs */
++					0x00100000 0x00100000	/* NFC SRAM banks */
++                                         >;
++				clocks = <&hsmc_clk>;
++				atmel,write-by-sram;
++			};
++		};
++
++		apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			ramc0: ramc at f0010000 {
++				compatible = "atmel,sama5d3-ddramc";
++				reg = <0xf0010000 0x200>;
++				clocks = <&ddrck>, <&mpddr_clk>;
++				clock-names = "ddrck", "mpddr";
++			};
++
++			pmc: pmc at f0018000 {
++				compatible = "atmel,sama5d3-pmc";
++				reg = <0xf0018000 0x120>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				interrupt-controller;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++
++				main_rc_osc: main_rc_osc {
++					compatible = "atmel,at91sam9x5-clk-main-rc-osc";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MOSCRCS>;
++					clock-frequency = <12000000>;
++					clock-accuracy = <100000000>;
++				};
++
++				main_osc: main_osc {
++					compatible = "atmel,at91rm9200-clk-main-osc";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MOSCS>;
++					clocks = <&main_xtal>;
++				};
++
++				main: mainck {
++					compatible = "atmel,at91sam9x5-clk-main";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MOSCSELS>;
++					clocks = <&main_rc_osc &main_osc>;
++				};
++
++				plla: pllack {
++					compatible = "atmel,sama5d3-clk-pll";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_LOCKA>;
++					clocks = <&main>;
++					reg = <0>;
++					atmel,clk-input-range = <12000000 12000000>;
++					#atmel,pll-clk-output-range-cells = <4>;
++					atmel,pll-clk-output-ranges = <600000000 1200000000 0 0>;
++				};
++
++				plladiv: plladivck {
++					compatible = "atmel,at91sam9x5-clk-plldiv";
++					#clock-cells = <0>;
++					clocks = <&plla>;
++				};
++
++				utmi: utmick {
++					compatible = "atmel,at91sam9x5-clk-utmi";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_LOCKU>;
++					clocks = <&main>;
++				};
++
++				mck: masterck {
++					compatible = "atmel,at91sam9x5-clk-master";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MCKRDY>;
++					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
++					atmel,clk-output-range = <125000000 177000000>;
++					atmel,clk-divisors = <1 2 4 3>;
++				};
++
++				h32ck: h32mxck {
++					#clock-cells = <0>;
++					compatible = "atmel,sama5d4-clk-h32mx";
++					clocks = <&mck>;
++				};
++
++				usb: usbck {
++					compatible = "atmel,at91sam9x5-clk-usb";
++					#clock-cells = <0>;
++					clocks = <&plladiv>, <&utmi>;
++				};
++
++				prog: progck {
++					compatible = "atmel,at91sam9x5-clk-programmable";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					interrupt-parent = <&pmc>;
++					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
++
++					prog0: prog0 {
++						#clock-cells = <0>;
++						reg = <0>;
++						interrupts = <AT91_PMC_PCKRDY(0)>;
++					};
++
++					prog1: prog1 {
++						#clock-cells = <0>;
++						reg = <1>;
++						interrupts = <AT91_PMC_PCKRDY(1)>;
++					};
++
++					prog2: prog2 {
++						#clock-cells = <0>;
++						reg = <2>;
++						interrupts = <AT91_PMC_PCKRDY(2)>;
++					};
++				};
++
++				smd: smdclk {
++					compatible = "atmel,at91sam9x5-clk-smd";
++					#clock-cells = <0>;
++					clocks = <&plladiv>, <&utmi>;
++				};
++
++				systemck {
++					compatible = "atmel,at91rm9200-clk-system";
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					ddrck: ddrck {
++						#clock-cells = <0>;
++						reg = <2>;
++						clocks = <&mck>;
++					};
++
++					lcdck: lcdck {
++						#clock-cells = <0>;
++						reg = <4>;
++						clocks = <&smd>;
++					};
++
++					smdck: smdck {
++						#clock-cells = <0>;
++						reg = <4>;
++						clocks = <&smd>;
++					};
++
++					uhpck: uhpck {
++						#clock-cells = <0>;
++						reg = <6>;
++						clocks = <&usb>;
++					};
++
++					udpck: udpck {
++						#clock-cells = <0>;
++						reg = <7>;
++						clocks = <&usb>;
++					};
++
++					pck0: pck0 {
++						#clock-cells = <0>;
++						reg = <8>;
++						clocks = <&prog0>;
++					};
++
++					pck1: pck1 {
++						#clock-cells = <0>;
++						reg = <9>;
++						clocks = <&prog1>;
++					};
++
++					pck2: pck2 {
++						#clock-cells = <0>;
++						reg = <10>;
++						clocks = <&prog2>;
++					};
++				};
++
++				periph32ck {
++					compatible = "atmel,at91sam9x5-clk-peripheral";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					clocks = <&h32ck>;
++
++					pioD_clk: pioD_clk {
++						#clock-cells = <0>;
++						reg = <5>;
++					};
++
++					usart0_clk: usart0_clk {
++						#clock-cells = <0>;
++						reg = <6>;
++					};
++
++					usart1_clk: usart1_clk {
++						#clock-cells = <0>;
++						reg = <7>;
++					};
++
++					icm_clk: icm_clk {
++						#clock-cells = <0>;
++						reg = <9>;
++					};
++
++					aes_clk: aes_clk {
++						#clock-cells = <0>;
++						reg = <12>;
++					};
++
++					tdes_clk: tdes_clk {
++						#clock-cells = <0>;
++						reg = <14>;
++					};
++
++					sha_clk: sha_clk {
++						#clock-cells = <0>;
++						reg = <15>;
++					};
++
++					matrix1_clk: matrix1_clk {
++						#clock-cells = <0>;
++						reg = <17>;
++					};
++
++					hsmc_clk: hsmc_clk {
++						#clock-cells = <0>;
++						reg = <22>;
++					};
++
++					pioA_clk: pioA_clk {
++						#clock-cells = <0>;
++						reg = <23>;
++					};
++
++					pioB_clk: pioB_clk {
++						#clock-cells = <0>;
++						reg = <24>;
++					};
++
++					pioC_clk: pioC_clk {
++						#clock-cells = <0>;
++						reg = <25>;
++					};
++
++					pioE_clk: pioE_clk {
++						#clock-cells = <0>;
++						reg = <26>;
++					};
++
++					uart0_clk: uart0_clk {
++						#clock-cells = <0>;
++						reg = <27>;
++					};
++
++					uart1_clk: uart1_clk {
++						#clock-cells = <0>;
++						reg = <28>;
++					};
++
++					usart2_clk: usart2_clk {
++						#clock-cells = <0>;
++						reg = <29>;
++					};
++
++					usart3_clk: usart3_clk {
++						#clock-cells = <0>;
++						reg = <30>;
++					};
++
++					usart4_clk: usart4_clk {
++						#clock-cells = <0>;
++						reg = <31>;
++					};
++
++					twi0_clk: twi0_clk {
++						reg = <32>;
++						#clock-cells = <0>;
++					};
++
++					twi1_clk: twi1_clk {
++						#clock-cells = <0>;
++						reg = <33>;
++					};
++
++					twi2_clk: twi2_clk {
++						#clock-cells = <0>;
++						reg = <34>;
++					};
++
++					mci0_clk: mci0_clk {
++						#clock-cells = <0>;
++						reg = <35>;
++					};
++
++					mci1_clk: mci1_clk {
++						#clock-cells = <0>;
++						reg = <36>;
++					};
++
++					spi0_clk: spi0_clk {
++						#clock-cells = <0>;
++						reg = <37>;
++					};
++
++					spi1_clk: spi1_clk {
++						#clock-cells = <0>;
++						reg = <38>;
++					};
++
++					spi2_clk: spi2_clk {
++						#clock-cells = <0>;
++						reg = <39>;
++					};
++
++					tcb0_clk: tcb0_clk {
++						#clock-cells = <0>;
++						reg = <40>;
++					};
++
++					tcb1_clk: tcb1_clk {
++						#clock-cells = <0>;
++						reg = <41>;
++					};
++
++					tcb2_clk: tcb2_clk {
++						#clock-cells = <0>;
++						reg = <42>;
++					};
++
++					pwm_clk: pwm_clk {
++						#clock-cells = <0>;
++						reg = <43>;
++					};
++
++					adc_clk: adc_clk {
++						#clock-cells = <0>;
++						reg = <44>;
++					};
++
++					dbgu_clk: dbgu_clk {
++						#clock-cells = <0>;
++						reg = <45>;
++					};
++
++					uhphs_clk: uhphs_clk {
++						#clock-cells = <0>;
++						reg = <46>;
++					};
++
++					udphs_clk: udphs_clk {
++						#clock-cells = <0>;
++						reg = <47>;
++					};
++
++					ssc0_clk: ssc0_clk {
++						#clock-cells = <0>;
++						reg = <48>;
++					};
++
++					ssc1_clk: ssc1_clk {
++						#clock-cells = <0>;
++						reg = <49>;
++					};
++
++					trng_clk: trng_clk {
++						#clock-cells = <0>;
++						reg = <53>;
++					};
++
++					macb0_clk: macb0_clk {
++						#clock-cells = <0>;
++						reg = <54>;
++					};
++
++					macb1_clk: macb1_clk {
++						#clock-cells = <0>;
++						reg = <55>;
++					};
++
++					fuse_clk: fuse_clk {
++						#clock-cells = <0>;
++						reg = <57>;
++					};
++
++					securam_clk: securam_clk {
++						#clock-cells = <0>;
++						reg = <59>;
++					};
++
++					smd_clk: smd_clk {
++						#clock-cells = <0>;
++						reg = <61>;
++					};
++
++					twi3_clk: twi3_clk {
++						#clock-cells = <0>;
++						reg = <62>;
++					};
++
++					catb_clk: catb_clk {
++						#clock-cells = <0>;
++						reg = <63>;
++					};
++				};
++
++				periph64ck {
++					compatible = "atmel,at91sam9x5-clk-peripheral";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					clocks = <&mck>;
++
++					dma0_clk: dma0_clk {
++						#clock-cells = <0>;
++						reg = <8>;
++					};
++
++					cpkcc_clk: cpkcc_clk {
++						#clock-cells = <0>;
++						reg = <10>;
++					};
++
++					aesb_clk: aesb_clk {
++						#clock-cells = <0>;
++						reg = <13>;
++					};
++
++					mpddr_clk: mpddr_clk {
++						#clock-cells = <0>;
++						reg = <16>;
++					};
++
++					matrix0_clk: matrix0_clk {
++						#clock-cells = <0>;
++						reg = <18>;
++					};
++
++					vdec_clk: vdec_clk {
++						#clock-cells = <0>;
++						reg = <19>;
++					};
++
++					dma1_clk: dma1_clk {
++						#clock-cells = <0>;
++						reg = <50>;
++					};
++
++					lcd_clk: lcd_clk {
++						#clock-cells = <0>;
++						reg = <51>;
++					};
++
++					isi_clk: isi_clk {
++						#clock-cells = <0>;
++						reg = <52>;
++					};
++				};
++			};
++
++			mmc0: mmc at f8000000 {
++				compatible = "atmel,hsmci";
++				reg = <0xf8000000 0x600>;
++				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&mci0_clk>;
++				clock-names = "mci_clk";
++			};
++
++			spi0: spi at f8010000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91rm9200-spi";
++				reg = <0xf8010000 0x100>;
++				interrupts = <37 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
++				clocks = <&spi0_clk>;
++				clock-names = "spi_clk";
++				status = "disabled";
++			};
++
++			i2c0: i2c at f8014000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8014000 0x4000>;
++				interrupts = <32 IRQ_TYPE_LEVEL_HIGH 6>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&twi0_clk>;
++				status = "disabled";
++			};
++
++			tcb0: timer at f801c000 {
++				compatible = "atmel,at91sam9x5-tcb";
++				reg = <0xf801c000 0x100>;
++				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&tcb0_clk>;
++				clock-names = "t0_clk";
++			};
++
++			macb0: ethernet at f8020000 {
++				compatible = "atmel,sama5d4-gem";
++				reg = <0xf8020000 0x100>;
++				interrupts = <54 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_macb0_rmii>;
++				clocks = <&macb0_clk>, <&macb0_clk>;
++				clock-names = "hclk", "pclk";
++				status = "disabled";
++			};
++
++			i2c2: i2c at f8024000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8024000 0x4000>;
++				interrupts = <34 4 6>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c2>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&twi2_clk>;
++				status = "disabled";
++			};
++
++			mmc1: mmc at fc000000 {
++				compatible = "atmel,hsmci";
++				reg = <0xfc000000 0x600>;
++				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3>;
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&mci1_clk>;
++				clock-names = "mci_clk";
++			};
++
++			usart2: serial at fc008000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfc008000 0x100>;
++				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rts &pinctrl_usart2_cts>;
++				clocks = <&usart2_clk>;
++				clock-names = "usart";
++				status = "disabled";
++			};
++
++			usart3: serial at fc00c000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfc00c000 0x100>;
++				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usart3>;
++				clocks = <&usart3_clk>;
++				clock-names = "usart";
++				status = "disabled";
++			};
++
++			usart4: serial at fc010000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfc010000 0x100>;
++				interrupts = <31 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_usart4>;
++				clocks = <&usart4_clk>;
++				clock-names = "usart";
++				status = "disabled";
++			};
++
++			tcb1: timer at fc020000 {
++				compatible = "atmel,at91sam9x5-tcb";
++				reg = <0xfc020000 0x100>;
++				interrupts = <41 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&tcb1_clk>;
++				clock-names = "t0_clk";
++			};
++
++			adc0: adc at fc034000 {
++				compatible = "atmel,at91sam9x5-adc";
++				reg = <0xfc034000 0x100>;
++				interrupts = <44 IRQ_TYPE_LEVEL_HIGH 5>;
++				pinctrl-names = "default";
++				pinctrl-0 = <
++					/* external trigger is conflict with USBA_VBUS */
++					&pinctrl_adc0_ad0
++					&pinctrl_adc0_ad1
++					&pinctrl_adc0_ad2
++					&pinctrl_adc0_ad3
++					&pinctrl_adc0_ad4
++					>;
++				clocks = <&adc_clk>,
++					 <&adc_op_clk>;
++				clock-names = "adc_clk", "adc_op_clk";
++				atmel,adc-channels-used = <0x01f>;
++				atmel,adc-startup-time = <40>;
++				atmel,adc-use-external;
++				atmel,adc-vref = <3000>;
++				atmel,adc-res = <8 10>;
++				atmel,adc-sample-hold-time = <11>;
++				atmel,adc-res-names = "lowres", "highres";
++				atmel,adc-ts-pressure-threshold = <10000>;
++				status = "disabled";
++
++				trigger at 0 {
++					trigger-name = "external-rising";
++					trigger-value = <0x1>;
++					trigger-external;
++				};
++				trigger at 1 {
++					trigger-name = "external-falling";
++					trigger-value = <0x2>;
++					trigger-external;
++				};
++				trigger at 2 {
++					trigger-name = "external-any";
++					trigger-value = <0x3>;
++					trigger-external;
++				};
++				trigger at 3 {
++					trigger-name = "continuous";
++					trigger-value = <0x6>;
++				};
++			};
++
++			rstc at fc068600 {
++				compatible = "atmel,at91sam9g45-rstc";
++				reg = <0xfc068600 0x10>;
++			};
++
++			shdwc at fc068610 {
++				compatible = "atmel,at91sam9x5-shdwc";
++				reg = <0xfc068610 0x10>;
++			};
++
++			pit: timer at fc068630 {
++				compatible = "atmel,at91sam9260-pit";
++				reg = <0xfc068630 0xf>;
++				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
++				clocks = <&h32ck>;
++			};
++
++			watchdog at fc068640 {
++				compatible = "atmel,at91sam9260-wdt";
++				reg = <0xfc068640 0x10>;
++				status = "disabled";
++			};
++
++			sckc at fc068650 {
++				compatible = "atmel,at91sam9x5-sckc";
++				reg = <0xfc068650 0x4>;
++
++				slow_rc_osc: slow_rc_osc {
++					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
++					#clock-cells = <0>;
++					clock-frequency = <32768>;
++					clock-accuracy = <250000000>;
++					atmel,startup-time-usec = <75>;
++				};
++
++				slow_osc: slow_osc {
++					compatible = "atmel,at91sam9x5-clk-slow-osc";
++					#clock-cells = <0>;
++					clocks = <&slow_xtal>;
++					atmel,startup-time-usec = <1200000>;
++				};
++
++				clk32k: slowck {
++					compatible = "atmel,at91sam9x5-clk-slow";
++					#clock-cells = <0>;
++					clocks = <&slow_rc_osc &slow_osc>;
++				};
++			};
++
++			rtc at fc0686b0 {
++				compatible = "atmel,at91rm9200-rtc";
++				reg = <0xfc0686b0 0x30>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++			};
++
++			dbgu: serial at fc069000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfc069000 0x200>;
++				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
++				clocks = <&dbgu_clk>;
++				clock-names = "usart";
++				status = "disabled";
++			};
++
++
++			pinctrl at fc06a000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
++				ranges = <0xfc06a000 0xfc06a000 0x4000>;
++				/* WARNING: revisit as pin spec has changed */
++				atmel,mux-mask = <
++					/*   A          B          C  */
++					0xffffffff 0x3ffcfe7c 0x1c010101	/* pioA */
++					0x7fffffff 0xfffccc3a 0x3f00cc3a	/* pioB */
++					0xffffffff 0x3ff83fff 0xff00ffff	/* pioC */
++					0x00000000 0x00000000 0x00000000	/* pioD */
++					0xffffffff 0x7fffffff 0x76fff1bf	/* pioE */
++					>;
++
++				pioA: gpio at fc06a000 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfc06a000 0x100>;
++					interrupts = <23 IRQ_TYPE_LEVEL_HIGH 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					clocks = <&pioA_clk>;
++				};
++
++				pioB: gpio at fc06b000 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfc06b000 0x100>;
++					interrupts = <24 IRQ_TYPE_LEVEL_HIGH 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					clocks = <&pioB_clk>;
++				};
++
++				pioC: gpio at fc06c000 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfc06c000 0x100>;
++					interrupts = <25 IRQ_TYPE_LEVEL_HIGH 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					clocks = <&pioC_clk>;
++				};
++
++				pioE: gpio at fc06d000 {
++					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++					reg = <0xfc06d000 0x100>;
++					interrupts = <26 IRQ_TYPE_LEVEL_HIGH 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++					clocks = <&pioE_clk>;
++				};
++
++				/* pinctrl pin settings */
++				adc0 {
++					pinctrl_adc0_adtrg: adc0_adtrg {
++						atmel,pins =
++							<AT91_PIOE 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* conflicts with USBA_VBUS */
++					};
++					pinctrl_adc0_ad0: adc0_ad0 {
++						atmel,pins =
++							<AT91_PIOC 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++					pinctrl_adc0_ad1: adc0_ad1 {
++						atmel,pins =
++							<AT91_PIOC 28 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++					pinctrl_adc0_ad2: adc0_ad2 {
++						atmel,pins =
++							<AT91_PIOC 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++					pinctrl_adc0_ad3: adc0_ad3 {
++						atmel,pins =
++							<AT91_PIOC 30 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++					pinctrl_adc0_ad4: adc0_ad4 {
++						atmel,pins =
++							<AT91_PIOC 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++				};
++
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<AT91_PIOB 24 AT91_PERIPH_A AT91_PINCTRL_NONE>,     /* conflicts with D14 and TDI */
++							<AT91_PIOB 25 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;  /* conflicts with D15 and TDO */
++					};
++				};
++
++				i2c0 {
++					pinctrl_i2c0: i2c0-0 {
++						atmel,pins =
++							<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_NONE
++							 AT91_PIOA 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++				};
++
++				i2c2 {
++					pinctrl_i2c2: i2c2-0 {
++						atmel,pins =
++							<AT91_PIOB 29 AT91_PERIPH_A AT91_PINCTRL_NONE	/* TWD2, conflicts with RD0 and PWML1 */
++							 AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE>; /* TWCK2, conflicts with RF0 */
++					};
++				};
++
++				macb0 {
++					pinctrl_macb0_rmii: macb0_rmii-0 {
++						atmel,pins =
++							<AT91_PIOB 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_TX0 */
++							 AT91_PIOB 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_TX1 */
++							 AT91_PIOB  8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_RX0 */
++							 AT91_PIOB  9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_RX1 */
++							 AT91_PIOB  6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_RXDV */
++							 AT91_PIOB  7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_RXER */
++							 AT91_PIOB  2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_TXEN */
++							 AT91_PIOB  0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_TXCK */
++							 AT91_PIOB 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_MDC */
++							 AT91_PIOB 17 AT91_PERIPH_A AT91_PINCTRL_NONE	/* G0_MDIO */
++							>;
++					};
++				};
++
++				mmc0 {
++					pinctrl_mmc0_clk_cmd_dat0: mmc0_clk_cmd_dat0 {
++						atmel,pins =
++							<AT91_PIOC 4 AT91_PERIPH_B AT91_PINCTRL_NONE	/* MCI0_CK */
++							 AT91_PIOE 0 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_CDB */
++							 AT91_PIOE 1 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB0 */
++							>;
++					};
++					pinctrl_mmc0_dat1_3: mmc0_dat1_3 {
++						atmel,pins =
++							<AT91_PIOE 2 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB1 */
++							 AT91_PIOE 3 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB2 */
++							 AT91_PIOE 4 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3 */
++							>;
++					};
++				};
++
++				mmc1 {
++					pinctrl_mmc1_clk_cmd_dat0: mmc1_clk_cmd_dat0 {
++						atmel,pins =
++							<AT91_PIOE 18 AT91_PERIPH_C AT91_PINCTRL_NONE		/* MCI0_CK */
++							 AT91_PIOE 19 AT91_PERIPH_C AT91_PINCTRL_PULL_UP	/* MCI0_CDA */
++							 AT91_PIOE 20 AT91_PERIPH_C AT91_PINCTRL_PULL_UP		/* MCI0_DA0 */
++							>;
++					};
++					pinctrl_mmc1_dat1_3: mmc1_dat1_3 {
++						atmel,pins =
++							<AT91_PIOE 21 AT91_PERIPH_C AT91_PINCTRL_PULL_UP	/* MCI0_DA1 */
++							 AT91_PIOE 22 AT91_PERIPH_C AT91_PINCTRL_PULL_UP	/* MCI0_DA2 */
++							 AT91_PIOE 23 AT91_PERIPH_C AT91_PINCTRL_PULL_UP	/* MCI0_DA3 */
++							>;
++					};
++				};
++
++				nand0 {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC13 periph A Read Enable */
++							 AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC14 periph A Write Enable */
++
++							 AT91_PIOC 17 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC17 ALE */
++							 AT91_PIOC 18 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC18 CLE */
++
++							 AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC15 NCS3/Chip Enable */
++							 AT91_PIOC 16 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PC16 NANDRDY */
++							 AT91_PIOC 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC5 Data bit 0 */
++							 AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC6 Data bit 1 */
++							 AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC7 Data bit 2 */
++							 AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC8 Data bit 3 */
++							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC9 Data bit 4 */
++							 AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC10 Data bit 5 */
++							 AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PC11 periph A Data bit 6 */
++							 AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PC12 periph A Data bit 7 */
++					};
++				};
++
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* SPI0_MISO */
++							 AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* SPI0_MOSI */
++							 AT91_PIOC 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* SPI0_SPCK */
++							>;
++					};
++				};
++
++				usart2 {
++					pinctrl_usart2: usart2-0 {
++						atmel,pins =
++							<AT91_PIOB 4 AT91_PERIPH_B AT91_PINCTRL_NONE		/* RXD - conflicts with G0_CRS, ISI_HSYNC */
++							 AT91_PIOB 5 AT91_PERIPH_B AT91_PINCTRL_PULL_UP		/* TXD - conflicts with G0_COL, PCK2 */
++							>;
++					};
++					pinctrl_usart2_rts: usart2_rts-0 {
++						atmel,pins = <AT91_PIOB 11 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* conflicts with G0_RX3, PWMH1 */
++					};
++					pinctrl_usart2_cts: usart2_cts-0 {
++						atmel,pins = <AT91_PIOB 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* conflicts with G0_TXER, ISI_VSYNC */
++					};
++				};
++
++				usart3 {
++					pinctrl_usart3: usart3-0 {
++						atmel,pins =
++							<AT91_PIOE 16 AT91_PERIPH_B AT91_PINCTRL_NONE		/* RXD */
++							 AT91_PIOE 17 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* TXD */
++							>;
++					};
++				};
++
++				usart4 {
++					pinctrl_usart4: usart4-0 {
++						atmel,pins =
++							<AT91_PIOE 26 AT91_PERIPH_B AT91_PINCTRL_NONE		/* RXD */
++							 AT91_PIOE 27 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* TXD */
++							>;
++					};
++					pinctrl_usart4_rts: usart4_rts-0 {
++						atmel,pins = <AT91_PIOE 28 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* conflicts with NWAIT, A19 */
++					};
++					pinctrl_usart4_cts: usart4_cts-0 {
++						atmel,pins = <AT91_PIOE 0 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* conflicts with A0/NBS0, MCI0_CDB */
++					};
++				};
++			};
++
++			aic: interrupt-controller at fc06e000 {
++				#interrupt-cells = <3>;
++				compatible = "atmel,sama5d4-aic";
++				interrupt-controller;
++				reg = <0xfc06e000 0x200>;
++				atmel,external-irqs = <56>;
++			};
++		};
++	};
 +};
-+
- static inline const u32* decomp_soc_detect(void __iomem *dbgu_base)
- {
- 	u32 cidr, socid;
-@@ -134,8 +140,14 @@ static inline const u32* decomp_soc_detect(void __iomem *dbgu_base)
- 	case ARCH_ID_AT91SAM9X5:
- 		return uarts_sam9x5;
- 
--	case ARCH_ID_SAMA5D3:
--		return uarts_sama5;
-+	case ARCH_ID_SAMA5:
-+		cidr = __raw_readl(dbgu_base + AT91_DBGU_EXID);
-+		if (cidr & ARCH_EXID_SAMA5D3)
-+			return uarts_sama5d3;
-+		else if (cidr & ARCH_EXID_SAMA5D4)
-+			return uarts_sama5d4;
-+
-+		break;
- 	}
- 
- 	/* at91sam9g10 */
-@@ -156,9 +168,10 @@ static inline void arch_decomp_setup(void)
- 	const u32* usarts;
- 
- 	usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU0);
--
- 	if (!usarts)
- 		usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU1);
-+	if (!usarts)
-+		usarts = decomp_soc_detect((void __iomem *)AT91_BASE_DBGU2);
- 	if (!usarts) {
- 		at91_uart = NULL;
- 		return;
-diff --git a/arch/arm/mach-at91/sama5d4.c b/arch/arm/mach-at91/sama5d4.c
-index f81f11ed8deb..7638509639f4 100644
---- a/arch/arm/mach-at91/sama5d4.c
-+++ b/arch/arm/mach-at91/sama5d4.c
-@@ -25,9 +25,37 @@
- /* --------------------------------------------------------------------
-  *  Processor initialization
-  * -------------------------------------------------------------------- */
-+static struct map_desc at91_io_desc[] __initdata = {
-+	{
-+	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_MPDDRC),
-+	.pfn            = __phys_to_pfn(SAMA5D4_BASE_MPDDRC),
-+	.length         = SZ_512,
-+	.type           = MT_DEVICE,
-+	},
-+	{
-+	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_PMC),
-+	.pfn            = __phys_to_pfn(SAMA5D4_BASE_PMC),
-+	.length         = SZ_512,
-+	.type           = MT_DEVICE,
-+	},
-+	{ /* On sama5d4, we use USART3 as serial console */
-+	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_USART3),
-+	.pfn            = __phys_to_pfn(SAMA5D4_BASE_USART3),
-+	.length         = SZ_256,
-+	.type           = MT_DEVICE,
-+	},
-+	{ /* A bunch of peripheral with fine grained IO space */
-+	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_SYS2),
-+	.pfn            = __phys_to_pfn(SAMA5D4_BASE_SYS2),
-+	.length         = SZ_2K,
-+	.type           = MT_DEVICE,
-+	},
-+};
-+
- 
- static void __init sama5d4_map_io(void)
- {
-+	iotable_init(at91_io_desc, ARRAY_SIZE(at91_io_desc));
- 	at91_init_sram(0, SAMA5D4_NS_SRAM_BASE, SAMA5D4_NS_SRAM_SIZE);
- }
- 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index d2cade21ebd7..25e583b513bf 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -98,6 +98,13 @@ static struct map_desc at91_io_desc __initdata __maybe_unused = {
- 	.type		= MT_DEVICE,
- };
- 
-+static struct map_desc at91_alt_io_desc __initdata __maybe_unused = {
-+	.virtual	= (unsigned long)AT91_ALT_VA_BASE_SYS,
-+	.pfn		= __phys_to_pfn(AT91_ALT_BASE_SYS),
-+	.length		= 24 * SZ_1K,
-+	.type		= MT_DEVICE,
-+};
-+
- static void __init soc_detect(u32 dbgu_base)
- {
- 	u32 cidr, socid;
-@@ -160,9 +167,12 @@ static void __init soc_detect(u32 dbgu_base)
- 		at91_boot_soc = at91sam9n12_soc;
- 		break;
- 
--	case ARCH_ID_SAMA5D3:
--		at91_soc_initdata.type = AT91_SOC_SAMA5D3;
--		at91_boot_soc = sama5d3_soc;
-+	case ARCH_ID_SAMA5:
-+		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
-+		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
-+			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
-+			at91_boot_soc = sama5d3_soc;
-+		}
- 		break;
- 	}
- 
-@@ -185,7 +195,8 @@ static void __init soc_detect(u32 dbgu_base)
- 	at91_soc_initdata.cidr = cidr;
- 
- 	/* sub version of soc */
--	at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
-+	if (!at91_soc_initdata.exid)
-+		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
- 
- 	if (at91_soc_initdata.type == AT91_SOC_SAM9G45) {
- 		switch (at91_soc_initdata.exid) {
-@@ -242,6 +253,54 @@ static void __init soc_detect(u32 dbgu_base)
- 	}
- }
- 
-+static void __init alt_soc_detect(u32 dbgu_base)
-+{
-+	u32 cidr, socid;
-+
-+	/* SoC ID */
-+	cidr = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
-+	socid = cidr & ~AT91_CIDR_VERSION;
-+
-+	switch (socid) {
-+	case ARCH_ID_SAMA5:
-+		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
-+		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
-+			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
-+			at91_boot_soc = sama5d3_soc;
-+		} else if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D4) {
-+			at91_soc_initdata.type = AT91_SOC_SAMA5D4;
-+			at91_boot_soc = sama5d4_soc;
-+		}
-+		break;
-+	}
-+
-+	if (!at91_soc_is_detected())
-+		return;
-+
-+	at91_soc_initdata.cidr = cidr;
-+
-+	/* sub version of soc */
-+	if (!at91_soc_initdata.exid)
-+		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
-+
-+	if (at91_soc_initdata.type == AT91_SOC_SAMA5D4) {
-+		switch (at91_soc_initdata.exid) {
-+		case ARCH_EXID_SAMA5D41:
-+			at91_soc_initdata.subtype = AT91_SOC_SAMA5D41;
-+			break;
-+		case ARCH_EXID_SAMA5D42:
-+			at91_soc_initdata.subtype = AT91_SOC_SAMA5D42;
-+			break;
-+		case ARCH_EXID_SAMA5D43:
-+			at91_soc_initdata.subtype = AT91_SOC_SAMA5D43;
-+			break;
-+		case ARCH_EXID_SAMA5D44:
-+			at91_soc_initdata.subtype = AT91_SOC_SAMA5D44;
-+			break;
-+		}
-+	}
-+}
-+
- static const char *soc_name[] = {
- 	[AT91_SOC_RM9200]	= "at91rm9200",
- 	[AT91_SOC_SAM9260]	= "at91sam9260",
-@@ -254,6 +313,7 @@ static const char *soc_name[] = {
- 	[AT91_SOC_SAM9X5]	= "at91sam9x5",
- 	[AT91_SOC_SAM9N12]	= "at91sam9n12",
- 	[AT91_SOC_SAMA5D3]	= "sama5d3",
-+	[AT91_SOC_SAMA5D4]	= "sama5d4",
- 	[AT91_SOC_UNKNOWN]	= "Unknown",
- };
- 
-@@ -281,6 +341,10 @@ static const char *soc_subtype_name[] = {
- 	[AT91_SOC_SAMA5D34]	= "sama5d34",
- 	[AT91_SOC_SAMA5D35]	= "sama5d35",
- 	[AT91_SOC_SAMA5D36]	= "sama5d36",
-+	[AT91_SOC_SAMA5D41]	= "sama5d41",
-+	[AT91_SOC_SAMA5D42]	= "sama5d42",
-+	[AT91_SOC_SAMA5D43]	= "sama5d43",
-+	[AT91_SOC_SAMA5D44]	= "sama5d44",
- 	[AT91_SOC_SUBTYPE_NONE]	= "None",
- 	[AT91_SOC_SUBTYPE_UNKNOWN] = "Unknown",
- };
-@@ -319,6 +383,31 @@ void __init at91_map_io(void)
- 		at91_boot_soc.map_io();
- }
- 
-+void __init at91_alt_map_io(void)
-+{
-+	/* Map peripherals */
-+	iotable_init(&at91_alt_io_desc, 1);
-+
-+	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
-+	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
-+
-+	alt_soc_detect(AT91_BASE_DBGU2);
-+	if (!at91_soc_is_detected())
-+		panic("AT91: Impossible to detect the SOC type");
-+
-+	pr_info("AT91: Detected soc type: %s\n",
-+		at91_get_soc_type(&at91_soc_initdata));
-+	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
-+		pr_info("AT91: Detected soc subtype: %s\n",
-+			at91_get_soc_subtype(&at91_soc_initdata));
-+
-+	if (!at91_soc_is_enabled())
-+		panic("AT91: Soc not enabled");
-+
-+	if (at91_boot_soc.map_io)
-+		at91_boot_soc.map_io();
-+}
-+
- void __iomem *at91_matrix_base;
- EXPORT_SYMBOL_GPL(at91_matrix_base);
- 
 -- 
 1.9.1
