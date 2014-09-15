@@ -1,74 +1,59 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 15 Sep 2014 10:06:34 -0700
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
- <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
- <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
- <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
-Message-ID: <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 15 Sep 2014 09:09:02 -0700
+Subject: [PATCH v4 06/18] ARM64 / ACPI: Introduce early_param for "acpi"
+In-Reply-To: <20140915145106.GC5415@arm.com>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-7-git-send-email-hanjun.guo@linaro.org>
+ <20140915062824.GB26649@localhost> <20140915145106.GC5415@arm.com>
+Message-ID: <20140915160902.GA6504@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
-> On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org> wrote:
->> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>>
->>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>>> recently posted by Andrew Chew [2].
->>>>>
->>>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->>>>> USB devices I tested with, about half where probed correctly, but the
->>>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>>>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>>>
->>>>> I don't see any correlation between the failure and the kind of usb
->>>>> device, but I don't have much experience with USB implementations
->>>>> either.
->>>>
->>>> Hmm... I haven't seen that before.  Which particular devices were you using?
->>>
->>> Here they are:
->>>
->>> work:
->>>
->>> Genius keyboard: 05d5:6782
->>> Logitech mouse: 046d:c06a
->>> Denver MP3 player: 10d6:1100
->>> Atheros Bluetooth dongle: 0cf3:3005
->>>
->>> don't work:
->>>
->>> MCS7830 ethernet dongle: 9710:7830
->>> Genesys Logic hub: 05e3:0608
->>
->> I tried the hub and it works just fine for me... Have you tried this
->> on any other boards like Big or Blaze?
->
-> I have a Blaze here, but haven't been able to get the external ports
-> to power up. I don't have schematics nor a strong interest to get that
-> fixed myself, as I can test my code just fine with the Blaze's
-> internal camera and the devices that do work on the Jetson.
+On Mon, Sep 15, 2014 at 03:51:07PM +0100, Catalin Marinas wrote:
+> On Mon, Sep 15, 2014 at 07:28:24AM +0100, Olof Johansson wrote:
+> > On Fri, Sep 12, 2014 at 10:00:04PM +0800, Hanjun Guo wrote:
+> > >  			See also Documentation/power/runtime_pm.txt, pci=noacpi
+> > >  
+> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> > > index 9252f72..693da7f 100644
+> > > --- a/arch/arm64/kernel/acpi.c
+> > > +++ b/arch/arm64/kernel/acpi.c
+> > > @@ -67,3 +67,18 @@ void __init acpi_boot_table_init(void)
+> > >  	if (acpi_table_init())
+> > >  		disable_acpi();
+> > >  }
+> > > +
+> > > +static int __init parse_acpi(char *arg)
+> > > +{
+> > > +	if (!arg)
+> > > +		return -EINVAL;
+> > > +
+> > > +	/* "acpi=off" disables both ACPI table parsing and interpreter */
+> > > +	if (strcmp(arg, "off") == 0)
+> > > +		disable_acpi();
+> > > +	else
+> > > +		return -EINVAL;	/* Core will print when we return error */
+> > 
+> > For symmetry, you should handle acpi=force here too (i.e. if someone
+> > disables by default, which I expect we'll ask for when this code is
+> > first merged).
+> 
+> Does this mean you want another Kconfig option - ACPI_DEFAULT_OFF (which
+> would be set by default)?
 
-Ok, since Blaze has been announced, hopefully we can post a
-device-tree for it soon.
+No, adding another config option isn't going to help anyone. Instead,
+this gives us the full symmetry and option to just always by default
+keep ACPI off, even if it is merged.
 
-> I'm using the firmware file that was posted recently:
->
-> xhci-tegra 70090000.usb: Firmware timestamp: 2014-05-02 02:22:50 UTC,
-> Falcon state 0x20
+My argument on when ACPI should be merged is not new (i.e. once we've
+seen more than just the simple system parts solved with it and solved
+successfully), then we're still likely to have a transition period when
+it's in tree but not enabled by default. That's what acpi=force is for,
+for those who want to test with it during that time.
 
-Yup, I'm using the same firmware.
+So, my suggestion is just there now to make sure that whichever way
+we go, things will just work as expected (and the same way as on x86,
+which is a goal for some).
 
-> If things work for you with the same sources, .config and firmware, I
-> can only think of the hw being different (other hw revision?).
 
-That, or perhaps bootloader differences?  I'm using mainline U-Boot.
-
-Stephen, Thierry, have either of you had a chance to test this series?
+-Olof
