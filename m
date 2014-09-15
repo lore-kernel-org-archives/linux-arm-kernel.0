@@ -1,111 +1,50 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 15 Sep 2014 11:41:13 +0200
-Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <1410327012-31185-1-git-send-email-b38343@freescale.com>
-References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
-Message-ID: <1410774073.3314.1.camel@pengutronix.de>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 15 Sep 2014 17:59:27 +0800
+Subject: [RFC] arm:extend the reserved mrmory for initrd to be page aligned
+In-Reply-To: <20140915093014.GZ12361@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103D6DB4915FC@CNBJMBX05.corpusers.net>
+ <20140915084616.GX12361@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103D6DB491604@CNBJMBX05.corpusers.net>
+ <20140915093014.GZ12361@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491605@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 10.09.2014, 13:30 +0800 schrieb Robin Gong:
-> There is one weird data in rxfifo after one full rx/tx transfer
-> done sometimes. It looks a design issue and hard to workaround
-> totally, so disable dma functhion here. And will re-enable it
-> once the root cause found.
+Hi
+
+Add more log:
+<4>[    0.000000] INITRD unalign phys address:0x02000000+0x0022fb0e
+<4>[    0.000000] INITRD aligned phys address:0x02000000+0x00230000
+<4>[    0.574868] free_initrd: free initrd 0xc2000000+0xc222fb0e
+<4>[    0.579398] free_initrd_mem: free pfn:8192---8752
+
+The inird used memory is still the same as the one passed by bootloads,
+I don't change it. It should be safe.
+
+
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Monday, September 15, 2014 5:30 PM
+To: Wang, Yalin
+Cc: 'Will Deacon'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-mm at kvack.org'; linux-arm-msm at vger.kernel.org
+Subject: Re: [RFC] arm:extend the reserved mrmory for initrd to be page aligned
+
+On Mon, Sep 15, 2014 at 05:07:53PM +0800, Wang, Yalin wrote:
+> Hi
 > 
-Sorry, I'm late to this as Shawn seems to already have picked up this
-patch, but this isn't the right way to fix the problem.
-
-We made it clear at kernel summit last year that we try to not break
-existing DTs as booting a new kernel with an old DT is a valid use case.
-While you don't strictly violate this rule what you do here is only
-fixing systems booting with a new DT while leaving others broken.
-
-If you are working around a hardware problem please disable DMA support
-in the driver. This will also allow you to enable it again, if you find
-another workaround without touching the DT again.
-
-So this patch gets a NAK from me.
-
-> Signed-off-by: Robin Gong <b38343@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q.dtsi   | 20 ++++++++++++++++++++
->  arch/arm/boot/dts/imx6qdl.dtsi |  8 --------
->  2 files changed, 20 insertions(+), 8 deletions(-)
+> I tested it on my phone,
+> >From log:
+> <4>[    0.000000] INITRD unalign phys address:0x02000000+0x0022fb0e
+> <4>[    0.000000] INITRD aligned phys address:0x02000000+0x00230000
 > 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index e9f3646..8d5d33b 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -291,6 +291,26 @@
->  	};
->  };
->  
-> +&ecspi1 {
-> +	dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
-> +	dma-names = "rx", "tx";
-> +};
-> +
-> +&ecspi2 {
-> +	dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
-> +	dma-names = "rx", "tx";
-> +};
-> +
-> +&ecspi3 {
-> +	dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
-> +	dma-names = "rx", "tx";
-> +};
-> +
-> +&ecspi4 {
-> +	dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
-> +	dma-names = "rx", "tx";
-> +};
-> +
->  &mipi_dsi {
->  	port at 2 {
->  		reg = <2>;
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 70d7207..f696546 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -210,8 +210,6 @@
->  					clocks = <&clks IMX6QDL_CLK_ECSPI1>,
->  						 <&clks IMX6QDL_CLK_ECSPI1>;
->  					clock-names = "ipg", "per";
-> -					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
-> -					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> @@ -224,8 +222,6 @@
->  					clocks = <&clks IMX6QDL_CLK_ECSPI2>,
->  						 <&clks IMX6QDL_CLK_ECSPI2>;
->  					clock-names = "ipg", "per";
-> -					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
-> -					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> @@ -238,8 +234,6 @@
->  					clocks = <&clks IMX6QDL_CLK_ECSPI3>,
->  						 <&clks IMX6QDL_CLK_ECSPI3>;
->  					clock-names = "ipg", "per";
-> -					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
-> -					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
-> @@ -252,8 +246,6 @@
->  					clocks = <&clks IMX6QDL_CLK_ECSPI4>,
->  						 <&clks IMX6QDL_CLK_ECSPI4>;
->  					clock-names = "ipg", "per";
-> -					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
-> -					dma-names = "rx", "tx";
->  					status = "disabled";
->  				};
->  
+> <4>[    0.579474] free_initrd_mem: free pfn:8192---8752
+> 
+> The tail address is not aligned for most initrd image, This page will 
+> not be freed and lost .
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Right, so from this I can assume that you only tested it by seeing what the addresses were, and the values used in free_initrd_mem().
+
+What you haven't tested is whether the initrd actually gets used with your changes, which is more what I was interested in given what I found when reading your patch.
+
+--
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up according to speedtest.net.
