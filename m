@@ -1,61 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Sep 2014 09:12:12 -0700
-Subject: [RFC PATCH for Juno 1/2] net: smsc911x add support for probing
- from ACPI
-In-Reply-To: <20140915041404.A72CCC40A02@trevor.secretlab.ca>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
- <20140901170447.GF608@arm.com> <21764799.KDNDm9XRax@wuerfel>
- <20140915041404.A72CCC40A02@trevor.secretlab.ca>
-Message-ID: <20140915161212.GQ7960@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 15 Sep 2014 17:14:51 +0100
+Subject: [PATCH 02/13] arm64/kvm: Fix assembler compatibility of macros
+In-Reply-To: <CAKv+Gu_uU3cQZbsa2w=GtXCGd59PhD-conRn3szLkOFKmTngSA@mail.gmail.com>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
+ <CAKv+Gu_hs-Sv=Bg6uyKc41OV9sKS0sfM1YAcCMaTF7aTH9YPwA@mail.gmail.com>
+ <1410366914.11440.16.camel@smoke>
+ <CAKv+Gu_uU3cQZbsa2w=GtXCGd59PhD-conRn3szLkOFKmTngSA@mail.gmail.com>
+Message-ID: <20140915161451.GC13789@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 14, 2014 at 09:14:04PM -0700, Grant Likely wrote:
-> On Mon, 01 Sep 2014 19:11:44 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, Sep 10, 2014 at 06:09:07PM +0100, Ard Biesheuvel wrote:
+> On 10 September 2014 18:35, Geoff Levand <geoff@infradead.org> wrote:
+> > On Wed, 2014-09-10 at 10:40 +0200, Ard Biesheuvel wrote:
+> >> On 10 September 2014 00:49, Geoff Levand <geoff@infradead.org> wrote:
+> >> > Some of the macros defined in kvm_arm.h are useful in the exception vector
+> >> > routines, but they are not compatible with the assembler.  Change the
+> >> > definition of ESR_EL2_ISS to be compatible.
+> >> >
+> >> > Fixes build errors like these when using kvm_arm.h in assembly
+> >> > source files:
+> >> >
+> >> >   Error: unexpected characters following instruction at operand 3 -- `add x0,x1,#((1U<<25)-1)'
+> >> >
+> >> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> >> > ---
+> >> >  arch/arm64/include/asm/kvm_arm.h | 2 +-
+> >> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> >> > index cc83520..e0e7e64 100644
+> >> > --- a/arch/arm64/include/asm/kvm_arm.h
+> >> > +++ b/arch/arm64/include/asm/kvm_arm.h
+> >> > @@ -176,7 +176,7 @@
+> >> >  #define ESR_EL2_EC_SHIFT       (26)
+> >> >  #define ESR_EL2_EC             (0x3fU << ESR_EL2_EC_SHIFT)
+> >> >  #define ESR_EL2_IL             (1U << 25)
+> >> > -#define ESR_EL2_ISS            (ESR_EL2_IL - 1)
+> >> > +#define ESR_EL2_ISS            (0xffff)
+> >>
+> >> Don't you mean 0x1ffffff?
+> >
+> > Hcalls have a 16 bit 'payload', the upper bits of the ISS field
+> > are specified as zero by the architecture so 0xffff is the same
+> > as 0x1ffffff.
+> >
+> 
+> Even if HVC is currently the only exception we are taking in EL2 (is
+> that the case btw?), it seems wrong to define this field in such a way
+> that it
+> (a) deviates from how the architecture specifies ESR_ELx.ISS and
+> (b) may cause surprises once someone unsuspectingly starts and'ing his
+> ESR values produced by another exception class with it, expecting the
+> macro's value to reflect its name
 
-> > > > +     config->phy_interface = PHY_INTERFACE_MODE_MII;
+Agreed. A macro called ESR_EL2_ISS should return the ISS field, and
+nothing less.
 
-> > > > +     config->flags |= SMSC911X_USE_32BIT;
+> >> And, there is a macro UL() for this purpose, so I suppose you could
+> >> redefine ESR_EL2_IL as (UL(1) << 25) as well. I know it is not
+> >> strictly the same thing, but it should be good enough as this is arm64
+> >> only
 
-> > > > +     config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+This sounds good to me.
 
-> > > > +     config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
-
-> > > > +     return 0;
-> > > > +}
-
-...
-
-> > There is of course the possibility to set those values based on the
-> > acpi_device_id, but that is exactly the part that _DSD is trying to
-> > avoid.
-
-> These are merely defaults. DSD parsing, when implemented, would be
-> override these default values.
-
-One note of caution here: I do agree that default settings are good but
-it's worth having clear rules for how we pick the defaults, and advice
-for maintainers on how to pick those rules.  If there's a default people
-often want to pick it to match their particular system and it can
-sometimes be hard for the maintainer to identify if a given tweak
-someone is proposing in the defaults might break some other existing
-system.  Having clear guidelines for picking the defaults avoids
-arguments and breakage.
-
-The two basic rules I've seen are that we either follow the defaults
-the hardware has after reset or we follow the state the hardware is left
-in when the kernel starts.  Neither is perfect and sometimes the
-bootloader option just doesn't make sense at all but they're at least
-clear and simple to understand.
-
-It's not the end of the world to do something else, and sometimes the
-way systems are done just doesn't lend itself to providing clear rules,
-but if we encourage people to set them they can save grief.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/17641002/attachment.sig>
+Mark.
