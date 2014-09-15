@@ -1,42 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 15 Sep 2014 17:35:09 -0400 (EDT)
-Subject: [Patch net-next 4/4] net: fec: Workaround for imx6sx enet tx
- hang when enable three queues
-In-Reply-To: <1410801177-15872-5-git-send-email-Frank.Li@freescale.com>
-References: <1410801177-15872-1-git-send-email-Frank.Li@freescale.com>
- <1410801177-15872-5-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20140915.173509.929057672166230893.davem@davemloft.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 15 Sep 2014 14:35:26 -0700
+Subject: [PATCH] Input: palmas-pwrbutton: Fix typo in License
+In-Reply-To: <5417294C.2010506@ti.com>
+References: <1410803937-27022-1-git-send-email-nm@ti.com>
+ <5417294C.2010506@ti.com>
+Message-ID: <20140915213525.GA13468@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: <Frank.Li@freescale.com>
-Date: Tue, 16 Sep 2014 01:12:57 +0800
+On Mon, Sep 15, 2014 at 01:00:44PM -0500, Nishanth Menon wrote:
+> On 09/15/2014 12:58 PM, Nishanth Menon wrote:
+> > Follow the license string convention indicated in include/linux/module.h
+> > (don't capitalize v).
+> > 
+> > This fixes following randconfig warning:
+> > FATAL: modpost: GPL-incompatible module palmas-pwrbutton.ko uses GPL-only symbol 'platform_driver_unregister'
+> > 
+> Uggh.. forgot to add:
+> 
+> Fixes: adff5962fdd2 ("Input: introduce palmas-pwrbutton")
 
-> @@ -111,6 +111,13 @@ static void fec_enet_itr_coal_init(struct net_device *ndev);
->   *   independent rings
->   */
->  #define FEC_QUIRK_HAS_AVB		(1 << 8)
-> +/*
-> + * There is a TDAR race condition for mutliQ when the software sets TDAR
-> + * and the UDMA clears TDAR simultaneously or in a small window (2-4 cycles).
-> + * This will cause the udma_tx and udma_tx_arbiter state machines to hang.
-> + * The issue exist at i.MX6SX enet IP.
-> + */
-> +#define FEC_QUIRK_TKT210582		(1 << 9)
+Applied both, thank you.
 
-Networking comments should be of the form:
+> 
+> > Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+> > Reported-by: Jim Davis <jim.epost@gmail.com>
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> > Reported thread http://marc.info/?l=linux-input&m=141080223209150&w=2
+> > 
+> >  drivers/input/misc/palmas-pwrbutton.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/input/misc/palmas-pwrbutton.c b/drivers/input/misc/palmas-pwrbutton.c
+> > index 3f90211..4ed6f78 100644
+> > --- a/drivers/input/misc/palmas-pwrbutton.c
+> > +++ b/drivers/input/misc/palmas-pwrbutton.c
+> > @@ -326,5 +326,5 @@ module_platform_driver(palmas_pwron_driver);
+> >  
+> >  MODULE_ALIAS("platform:palmas-pwrbutton");
+> >  MODULE_DESCRIPTION("Palmas Power Button");
+> > -MODULE_LICENSE("GPL V2");
+> > +MODULE_LICENSE("GPL v2");
+> >  MODULE_AUTHOR("Texas Instruments Inc.");
+> > 
+> 
+> -- 
+> Regards,
+> Nishanth Menon
 
-	/* Like
-	 * this.
-	 */
-
->  	/* Trigger transmission start */
-> -	writel(0, fep->hwp + FEC_X_DES_ACTIVE(queue));
-> +	if (!(id_entry->driver_data & FEC_QUIRK_TKT210582) ||
-> +		!readl(fep->hwp + FEC_X_DES_ACTIVE(queue)) ||
-> +		!readl(fep->hwp + FEC_X_DES_ACTIVE(queue)) ||
-> +		!readl(fep->hwp + FEC_X_DES_ACTIVE(queue)) ||
-> +		!readl(fep->hwp + FEC_X_DES_ACTIVE(queue)))
-> +		writel(0, fep->hwp + FEC_X_DES_ACTIVE(queue));
-
-This conditional is not indented properly, see my feedback for patch #2.
+-- 
+Dmitry
