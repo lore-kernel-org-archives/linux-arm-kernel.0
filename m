@@ -1,59 +1,113 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Sep 2014 16:15:07 -0500
-Subject: [PATCH 7/9] irqchip: omap-intc: enable TURBO idle mode
+Date: Mon, 15 Sep 2014 16:15:02 -0500
+Subject: [PATCH 2/9] arm: omap: irq: move irq.c to drivers/irqchip/
 In-Reply-To: <1410815709-462-1-git-send-email-balbi@ti.com>
 References: <1410815709-462-1-git-send-email-balbi@ti.com>
-Message-ID: <1410815709-462-8-git-send-email-balbi@ti.com>
+Message-ID: <1410815709-462-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When TURBO bit is set in the INTC_IDLE register,
-the input synchronizer clock will be autogated
-based on activity on the INTC.
+Just move the code over as it has no dependencies
+on arch/arm/ anymore.
 
-Because this idle mode increases the interrupt
-latency by 2 clock cycles, we're only enabling
-it during suspend.
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
+ arch/arm/mach-omap2/Kconfig                                  | 1 +
+ arch/arm/mach-omap2/Makefile                                 | 3 +--
+ drivers/irqchip/Kconfig                                      | 5 +++++
+ drivers/irqchip/Makefile                                     | 1 +
+ arch/arm/mach-omap2/irq.c => drivers/irqchip/irq-omap-intc.c | 9 +++++----
+ 5 files changed, 13 insertions(+), 6 deletions(-)
+ rename arch/arm/mach-omap2/irq.c => drivers/irqchip/irq-omap-intc.c (98%)
 
-Tony, let me know if you want TURBO to be set unconditionally. That's likely
-going to shave off a few extra microwatts, although I don't have a good way to
-measure it.
-
- drivers/irqchip/irq-omap-intc.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index 7681b13..dfa2d9d 100644
---- a/drivers/irqchip/irq-omap-intc.c
-+++ b/drivers/irqchip/irq-omap-intc.c
-@@ -51,6 +51,9 @@
- #define INTCPS_NR_ILR_REGS	128
- #define INTCPS_NR_MIR_REGS	3
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 11ccf0b..691d62a 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -86,6 +86,7 @@ config ARCH_OMAP2PLUS
+ 	select PINCTRL
+ 	select SOC_BUS
+ 	select TI_PRIV_EDMA
++	select OMAP_IRQCHIP
+ 	help
+ 	  Systems based on OMAP2, OMAP3, OMAP4 or OMAP5
  
-+#define INTC_IDLE_FUNCIDLE	(1 << 0)
-+#define INTC_IDLE_TURBO		(1 << 1)
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 69bbcba..0b6095c 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -10,7 +10,6 @@ obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+ 	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+ 	 omap_device.o sram.o drm.o
+ 
+-omap-2-3-common				= irq.o
+ hwmod-common				= omap_hwmod.o omap_hwmod_reset.o \
+ 					  omap_hwmod_common_data.o
+ clock-common				= clock.o clock_common_data.o \
+@@ -20,7 +19,7 @@ secure-common				= omap-smc.o omap-secure.o
+ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
+ obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
+ obj-$(CONFIG_ARCH_OMAP4) += $(hwmod-common) $(secure-common)
+-obj-$(CONFIG_SOC_AM33XX) += irq.o $(hwmod-common)
++obj-$(CONFIG_SOC_AM33XX) += $(hwmod-common)
+ obj-$(CONFIG_SOC_OMAP5)	 += $(hwmod-common) $(secure-common)
+ obj-$(CONFIG_SOC_AM43XX) += $(hwmod-common) $(secure-common)
+ obj-$(CONFIG_SOC_DRA7XX) += $(hwmod-common) $(secure-common)
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index b8632bf..9d539de 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -75,6 +75,11 @@ config OR1K_PIC
+ 	bool
+ 	select IRQ_DOMAIN
+ 
++config OMAP_IRQCHIP
++	bool
++	select GENERIC_IRQ_CHIP
++	select IRQ_DOMAIN
 +
- #define INTC_PROTECTION_ENABLE	(1 << 0)
+ config ORION_IRQCHIP
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 73052ba..d0a2613 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
+ obj-$(CONFIG_CLPS711X_IRQCHIP)		+= irq-clps711x.o
+ obj-$(CONFIG_OR1K_PIC)			+= irq-or1k-pic.o
+ obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
++obj-$(CONFIG_OMAP_IRQCHIP)		+= irq-omap-intc.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+diff --git a/arch/arm/mach-omap2/irq.c b/drivers/irqchip/irq-omap-intc.c
+similarity index 98%
+rename from arch/arm/mach-omap2/irq.c
+rename to drivers/irqchip/irq-omap-intc.c
+index b2993e4..1478f1a 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/drivers/irqchip/irq-omap-intc.c
+@@ -17,15 +17,16 @@
+ #include <linux/io.h>
  
- /*
-@@ -134,12 +137,14 @@ void omap3_intc_prepare_idle(void)
- 	 * cf. errata ID i540 for 3430 (all revisions up to 3.1.x)
- 	 */
- 	intc_writel(INTC_SYSCONFIG, 0);
-+	intc_writel(INTC_IDLE, INTC_IDLE_TURBO);
- }
+ #include <asm/exception.h>
+-#include <asm/mach/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
  
- void omap3_intc_resume_idle(void)
- {
- 	/* Re-enable autoidle */
- 	intc_writel(INTC_SYSCONFIG, 1);
-+	intc_writel(INTC_IDLE, 0);
- }
+-#include "soc.h"
+-#include "common.h"
+-#include "../../drivers/irqchip/irqchip.h"
++#include "irqchip.h"
++
++/* Define these here for now until we drop all board-files */
++#define OMAP24XX_IC_BASE	0x480fe000
++#define OMAP34XX_IC_BASE	0x48200000
  
- /* XXX: FIQ and additional INTC support (only MPU@the moment) */
+ /* selected INTC register offsets */
+ 
 -- 
 2.0.1.563.g66f467c
