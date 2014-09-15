@@ -1,71 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Sep 2014 11:55:25 +0100
-Subject: [RFC Resend] arm:extend __init_end to a page align address
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB491607@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103CDBFBFB028@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103D6DB4915FB@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103D6DB491607@CNBJMBX05.corpusers.net>
-Message-ID: <20140915105525.GC12361@n2100.arm.linux.org.uk>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 15 Sep 2014 18:58:15 +0800
+Subject: [RFC] arm:extend the reserved mrmory for initrd to be page aligned
+In-Reply-To: <20140915103013.GB12361@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103D6DB4915FC@CNBJMBX05.corpusers.net>
+ <20140915084616.GX12361@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103D6DB491604@CNBJMBX05.corpusers.net>
+ <20140915093014.GZ12361@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103D6DB491605@CNBJMBX05.corpusers.net>
+ <20140915101632.GA12361@n2100.arm.linux.org.uk>
+ <35FD53F367049845BC99AC72306C23D103D6DB491606@CNBJMBX05.corpusers.net>
+ <20140915103013.GB12361@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491608@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 06:26:43PM +0800, Wang, Yalin wrote:
-> this patch change the __init_end address to a page align address, so that free_initmem()
-> can free the whole .init section, because if the end address is not page aligned,
-> it will round down to a page align address, then the tail unligned page will not be freed.
+Oh, I see,
+I don't consider non-of platform kernels,
+I will send V2 patch for this .
 
-Please wrap commit messages at or before column 72 - this makes "git log"
-much easier to read once the change has been committed.
+Thanks
 
-I have no objection to the arch/arm part of this patch.  However, since
-different people deal with arch/arm and arch/arm64, this patch needs to
-be split.
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Monday, September 15, 2014 6:30 PM
+To: Wang, Yalin
+Cc: 'Will Deacon'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'; 'linux-mm at kvack.org'; linux-arm-msm at vger.kernel.org
+Subject: Re: [RFC] arm:extend the reserved mrmory for initrd to be page aligned
 
-Also, it may be worth patching include/asm-generic/vmlinux.lds.h to
-indicate that __initrd_end should be page aligned - this seems to be a
-requirement by the (new-ish) free_reserved_area() function, otherwise
-it does indeed round down.
+On Mon, Sep 15, 2014 at 06:22:12PM +0800, Wang, Yalin wrote:
+> Oh, I see your meaning,
+> Yeah , my initrd is a cpio image,
+> And it can still work after apply this patch.
 
-(Added Jiang Liu as the person responsible for free_reserved_area() for
-any further comments.)
+Okay, that's what I wanted to know.  However, I believe your patch to be incorrect.  You delete the assignments to initrd_start and initrd_end in arm_memblock_init(), which will result in non-OF platforms having no initrd.
 
-> 
-> Signed-off-by: Yalin wang <yalin.wang@sonymobile.com>
-> ---
->  arch/arm/kernel/vmlinux.lds.S   | 2 +-
->  arch/arm64/kernel/vmlinux.lds.S | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S index 6f57cb9..8e95aa4 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -219,8 +219,8 @@ SECTIONS
->  	__data_loc = ALIGN(4);		/* location in binary */
->  	. = PAGE_OFFSET + TEXT_OFFSET;
->  #else
-> -	__init_end = .;
->  	. = ALIGN(THREAD_SIZE);
-> +	__init_end = .;
->  	__data_loc = .;
->  #endif
->  
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S index 97f0c04..edf8715 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -97,9 +97,9 @@ SECTIONS
->  
->  	PERCPU_SECTION(64)
->  
-> +	. = ALIGN(PAGE_SIZE);
->  	__init_end = .;
->  
-> -	. = ALIGN(PAGE_SIZE);
->  	_data = .;
->  	_sdata = .;
->  	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
-> --
-> 1.9.2.msysgit.0
+The reason is that OF platforms set initrd_start and initrd_size from the OF code (drivers/of/fdt.c), but ATAG platforms only set our private
+phys_* versions.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The reason I went with phys_* stuff was to permit better verification of the addresses passed - that the addresses were indeed memory locations before passing them through something like __va().
+
+--
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up according to speedtest.net.
