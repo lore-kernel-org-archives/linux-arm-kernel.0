@@ -1,137 +1,47 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 15 Sep 2014 12:41:51 -0700
-Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
- default
-In-Reply-To: <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
-References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
- <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
- <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
- <20140913170638.GA3348@lvm>
- <CAKv+Gu93FkRWXd96gKdN+OCrUgjF0sXWL4ohishVWAO-XeR9Ww@mail.gmail.com>
- <fdc415c79e617d4e9102acc12a4c0d65@www.loen.fr>
- <CAKv+Gu-kce_1cg2fgj5Qj_kRMtzzHctofZ108531-UrcFLZAog@mail.gmail.com>
- <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
-Message-ID: <541740FF.2080105@samsung.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Mon, 15 Sep 2014 20:45:18 +0100
+Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
+In-Reply-To: <20140911140444.GH4783@worktop.ger.corp.intel.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
+ <20140911123412.GY3190@worktop.ger.corp.intel.com>
+ <CAKfTPtBbjpCFifoyFSh8Hb3nBZFFTjjxdfxnpMk=CHy5aX1qpg@mail.gmail.com>
+ <20140911140444.GH4783@worktop.ger.corp.intel.com>
+Message-ID: <20140915194518.GC28083@e103687>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been working around the edges of this discussion, and
-maybe be little unclear on this.
+On Thu, Sep 11, 2014 at 03:04:44PM +0100, Peter Zijlstra wrote:
+> On Thu, Sep 11, 2014 at 03:07:52PM +0200, Vincent Guittot wrote:
+> > > Also I'm not entirely sure I like the usage, utilization names/metrics.
+> > > I would suggest to reverse them. Call the pure running number
+> > > 'utilization' and this scaled with capacity 'usage' or so.
+> > 
+> > ok. i can invert 'usage' and 'utilization', which will give
+> > 
+> > s/get_cpu_utilization/get_cpu_usage/
+> > s/sgs->group_utilization/sgs->group_usage/
 
-But the manuals say intersection of Stage1/Stage2 permissions are
-used. If guest sets stage1 to read-only then setting stage 2
-to read-only or read-write should have no impact. So why
-should stage 2 RW be changed?
+The confusion will have new dimensions added when we introduce
+scale-invariance too. Then the running number is already scaled by the
+current P-state compute capacity. But I don't have any better
+suggestions. 
 
-- Mario
+> > s/cfs.usage_load_avg/cfs.utilization_load_avg/
 
-On 09/14/2014 03:57 PM, Ard Biesheuvel wrote:
-> On 14 September 2014 11:43, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 14 September 2014 11:09, Marc Zyngier <maz@misterjones.org> wrote:
->>> On 2014-09-14 05:49, Ard Biesheuvel wrote:
->>>>
->>>> On 13 September 2014 19:06, Christoffer Dall
->>>> <christoffer.dall@linaro.org> wrote:
->>>>>
->>>>> On Sat, Sep 13, 2014 at 01:15:45PM +0200, Ard Biesheuvel wrote:
->>>>>>
->>>>>> On 13 September 2014 12:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>>>> Hi Ard,
->>>>>>>
->>>>>>> On 2014-09-13 11:17, Ard Biesheuvel wrote:
->>>>>>>>
->>>>>>>> Now that we support read-only memslots, we need to make sure that
->>>>>>>> pass-through device mappings are not mapped writable if the guest
->>>>>>>> has requested them to be read-only. The existing implementation
->>>>>>>> already honours this by calling kvm_set_s2pte_writable() on the new
->>>>>>>> pte in case of writable mappings, so all we need to do is define
->>>>>>>> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
->>>>>>>>
->>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>>>
->>>>>>>
->>>>>>> I feel very uncomfortable with this change. Why would we map a device
->>>>>>> RO? Is
->>>>>>> that only for completeness sake?
->>>>>>>
->>>>>>
->>>>>> We would map a device RO so that QEMU (or whatever is managing KVM)
->>>>>> can emulate the writes. I don't have a clear cut use case, to be
->>>>>> honest, but setting up a writable mapping for a memslot that was
->>>>>> explicitly set up as read-only seems wrong in any case.
->>>>>
->>>>>
->>>>> Agreed, if it doesn't ever make sense to do so, then we should return an
->>>>> error to user space if userspace attempts such a configuration.  The
->>>>> current code is just weird.
->>>>>
->>>>>>
->>>>>> Note that the particular problem I was seeing was primarily caused by
->>>>>> kvm_is_mmio_pfn()'s false positive on the zero page, but it unveiled
->>>>>> this particular issue as well.
->>>>>>
->>>>>>> Note that we also use PAGE_S2_DEVICE for things that are not mapped
->>>>>>> through
->>>>>>> a memslot, such as the GIC.
->>>>>>>
->>>>>>
->>>>>> Yes, and I realize now that this breaks it.
->>>>>> My apologies: I have an additional patch locally that sets up MMIO
->>>>>> ranges in one go instead of faulting them in one page at a time as we
->>>>>> do now, and there the read-write case is handled correctly in
->>>>>> kvm_phys_addr_ioremap(). However, I thought it was better to send
->>>>>> these out separately first, but apparently not.
->>>>>
->>>>>
->>>>> I think it is better to change this separately, and then add the ioremap
->>>>> stuff.  However, you need to change all places that call PAGE_S2_DEVICE
->>>>> and expect a RDWR memory region, this happens to be only
->>>>> kvm_phys_addr_ioremap() for now.
->>>>>
->>>>>>
->>>>>> So if we can agree on whether or not MMIO backed mappings should be
->>>>>> read-write even if the memslot says no, I will follow up with a proper
->>>>>> series if there are still changes required.
->>>>>>
->>>>>
->>>>> I guess it could be theoretically useful to have read-only device memory
->>>>> regions, and I can't think of why it would violate the architecture.
->>>>>
->>>>
->>>> We have to handle it either way. But after reading D4.5.3 (Table
->>>> D4-40) of the ARM ARM, I am wondering why we needed patch b88657674d39
->>>> "ARM: KVM: user_mem_abort: support stage 2 MMIO page mapping" in the
->>>> first place, and we could just revert that patch and everything would
->>>> work as expected. (In short, D4.5.3 says that MT_DEVICE trumps
->>>> MT_NORMAL, so if the stage 1 translation is MT_DEVICE, it doesn't
->>>> matter what memtype the S2 translation specifies)
->>>
->>>
->>> We've been there before:
->>> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/004420.html
->>>
->>
->> Ah right. So why did those patches not make it in?
->>
-> 
-> Never mind. I read the whole thread this time.
-> 
-> So, in summary, there is a concern that a malicious guest may request
-> a cachable mapping for a device range, in an attempt to manipulate the
-> VGIC or other device memory of another VM.
-> I think that concern only applies to writable mappings, so perhaps we
-> should just change
-> 
-> if (kvm_is_mmio_pfn(pfn))
-> 
-> to
-> 
-> if (kvm_is_mmio_pfn(pfn) && writable)
-> 
-> and be done with it (which is coincidentally the very first naive fix
-> I suggested for the issue i was seeing)
-> That way, we never map read-only MMIO regions writable, and rely on
-> the MT_DEVICE trumps MT_NORMAL rule to ensure the guest reads to those
-> regions are uncached.
-> (Wouldn't hurt to add a comment to explain it, I suppose)
-> 
+I don't like using "load" for unweighted metrics. I associate load with
+something that may be weighted by priority like load_avg_contrib, and
+utilization with pure cpu utilization as in how many cycles is spend on
+a particular task. I called it "usage_util_avg" in my own patches, but
+"util_avg" might be better if we agree that utilization == usage.
+
+> > s/se->avg.usage_avg_contrib/se->avg.utilization_avg_contrib
+
+util_avg_contrib maybe to keep it shorter.
+
+> > s/__update_task_entity_usage/__update_task_entity_utilization
+> > s/__update_entity_usage_avg_contrib/__update_entity_utilization_avg_contrib
+
+Maybe use "util" here as well?
+
+Morten
