@@ -1,63 +1,64 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 15 Sep 2014 13:57:38 +0200
-Subject: [RFC PATCH v3 3/7] iommu: add new iommu_ops callback for adding an
- OF device
-In-Reply-To: <1410539695-29128-4-git-send-email-will.deacon@arm.com>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <1410539695-29128-4-git-send-email-will.deacon@arm.com>
-Message-ID: <5416D432.8020107@samsung.com>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Mon, 15 Sep 2014 19:58:56 +0800
+Subject: [PATCH V1 1/3] ARM: clk-imx6sl: refine clock tree for SSI
+In-Reply-To: <CAOMZO5DJZHKAV4Y9aUwMNWZqhoLrKrsZdYnKqPem2ZSy=-oAYw@mail.gmail.com>
+References: <cover.1410253534.git.shengjiu.wang@freescale.com>
+ <7ed21195ebff8b3ccbecaeb492504edd28deea2d.1410253534.git.shengjiu.wang@freescale.com>
+ <CAOMZO5A4FLbA_+u4oMTqgAY69DaF93V=oLiy+op=tEHbagF1pg@mail.gmail.com>
+ <CAOMZO5DJZHKAV4Y9aUwMNWZqhoLrKrsZdYnKqPem2ZSy=-oAYw@mail.gmail.com>
+Message-ID: <20140915115855.GC23877@audiosh1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi fabio, shawn.
 
-On 2014-09-12 18:34, Will Deacon wrote:
-> This patch adds a new function to the iommu_ops structure to allow an
-> OF device to be added to a specific IOMMU instance using the recently
-> merged generic devicetree binding for IOMMUs. The callback (of_xlate)
-> takes a struct device representing the master and an of_phandle_args
-> representing the IOMMU and the correspondong IDs for the new master.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   include/linux/iommu.h | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 4256f3ce1673..821eb0bd9f6c 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -21,6 +21,7 @@
->   
->   #include <linux/errno.h>
->   #include <linux/err.h>
-> +#include <linux/of.h>
->   #include <linux/types.h>
->   #include <trace/events/iommu.h>
->   
-> @@ -140,6 +141,10 @@ struct iommu_ops {
->   	/* Get the numer of window per domain */
->   	u32 (*domain_get_windows)(struct iommu_domain *domain);
->   
-> +#ifdef CONFIG_OF_IOMMU
-> +	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
-> +#endif
+On Fri, Sep 12, 2014 at 01:43:39PM -0300, Fabio Estevam wrote:
+> On Fri, Sep 12, 2014 at 1:35 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Tue, Sep 9, 2014 at 6:13 AM, Shengjiu Wang
+> > <shengjiu.wang@freescale.com> wrote:
+> >> Each SSI has "ssi", "ssi_ipg" clocks, and they share same gate bits.
+> >>
+> >> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> >
+> > This patch breaks audio playback on imx6q-sabresd:
+> >
+> > root at freescale /$ aplay /home/clarinet.wav
+> > Playing WAVE '/home/clarinet.wav' : Signed 16 bit Little Endian, Rate 44100 Hz,
+> > Mono
+> > underrun!!! (at least -1585992.581 ms long)
+> > underrun!!! (at least -1585992.585 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> > underrun!!! (at least -1585992.586 ms long)
+> >
+> > If I revert this commit, then I am able to play it well again.
+> 
+> Ops, I replied in the wrong patch.
+> 
+> The one that breaks imx6q-sabresd is:
+> 
+>    commit 48e1c2255 "ARM: clk-imx6q: refine clock tree for SSI"
+
+I add IMX6QDL_CLK_SSIx in this patch, which use share count with 
+IMX6QDL_CLK_SSIx_IPG. The SSI driver sound/soc/fsl/fsl_ssi.c will enable
+IMX6QDL_CLK_SSIx_IPG clock in probe, but don't disable it. In the end of kernel
+boot up, some one(it is not ssi driver, maybe is the clock tree) will disable
+the IMX6QDL_CLK_SSIx clock, which is not enabled. IMX6QDL_CLK_SSIx_IPG share
+the enable/disable bit with IMX6QDL_CLK_SSIx, So IMX6QDL_CLK_SSIx_IPG is 
+disabled, the aplay will fail.
+
+Is this the issue of imx_clk_gate2_shared()? When we want to disable IMX6QDL_CLK_SSIx,
+but IMX6QDL_CLK_SSIx_IPG is enabled, can IMX6QDL_CLK_SSIx be disabled?
 
 
-If I understand correctly, this callback is intended to do per-master 
-initialization
-of the iommu structures required by the given iommu driver (I stored them in
-dev->archdata.iommu). However I really don't get what is the meaning of 
-the return
-value. Is it a boolean value? It is used only by of_iommu_configure to 
-check if
-the parse loop should be terminated...
+Shawn
 
-> +
->   	unsigned long pgsize_bitmap;
->   };
+   How do you think about this?
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+best regards
+wang shengjiu
