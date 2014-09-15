@@ -1,153 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 15 Sep 2014 00:57:59 +0200
-Subject: [PATCH 1/2] ARM: kvm: define PAGE_S2_DEVICE as read-only by
- default
-In-Reply-To: <CAKv+Gu-kce_1cg2fgj5Qj_kRMtzzHctofZ108531-UrcFLZAog@mail.gmail.com>
-References: <1410603462-28900-1-git-send-email-ard.biesheuvel@linaro.org>
- <bcbc1c52f9e1eeb24f0bd1956236f0a3@www.loen.fr>
- <CAKv+Gu8J8o2=CS9tGVbkavHep6gNwSSegZ0fxqsVE2AVDVzdpA@mail.gmail.com>
- <20140913170638.GA3348@lvm>
- <CAKv+Gu93FkRWXd96gKdN+OCrUgjF0sXWL4ohishVWAO-XeR9Ww@mail.gmail.com>
- <fdc415c79e617d4e9102acc12a4c0d65@www.loen.fr>
- <CAKv+Gu-kce_1cg2fgj5Qj_kRMtzzHctofZ108531-UrcFLZAog@mail.gmail.com>
-Message-ID: <CAKv+Gu-MAkzFtrFk19mYB=jQyLsFLY+k3Ly=eZQ=3hWSALLRPw@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Mon, 15 Sep 2014 09:21:55 +0900
+Subject: [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+In-Reply-To: <5415D4A8.4010304@gmail.com>
+References: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
+ <5415D4A8.4010304@gmail.com>
+Message-ID: <0d2401cfd07b$0e21e190$2a65a4b0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 September 2014 11:43, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 14 September 2014 11:09, Marc Zyngier <maz@misterjones.org> wrote:
->> On 2014-09-14 05:49, Ard Biesheuvel wrote:
->>>
->>> On 13 September 2014 19:06, Christoffer Dall
->>> <christoffer.dall@linaro.org> wrote:
->>>>
->>>> On Sat, Sep 13, 2014 at 01:15:45PM +0200, Ard Biesheuvel wrote:
->>>>>
->>>>> On 13 September 2014 12:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>> > Hi Ard,
->>>>> >
->>>>> > On 2014-09-13 11:17, Ard Biesheuvel wrote:
->>>>> >>
->>>>> >> Now that we support read-only memslots, we need to make sure that
->>>>> >> pass-through device mappings are not mapped writable if the guest
->>>>> >> has requested them to be read-only. The existing implementation
->>>>> >> already honours this by calling kvm_set_s2pte_writable() on the new
->>>>> >> pte in case of writable mappings, so all we need to do is define
->>>>> >> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
->>>>> >>
->>>>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>> >
->>>>> >
->>>>> > I feel very uncomfortable with this change. Why would we map a device
->>>>> > RO? Is
->>>>> > that only for completeness sake?
->>>>> >
->>>>>
->>>>> We would map a device RO so that QEMU (or whatever is managing KVM)
->>>>> can emulate the writes. I don't have a clear cut use case, to be
->>>>> honest, but setting up a writable mapping for a memslot that was
->>>>> explicitly set up as read-only seems wrong in any case.
->>>>
->>>>
->>>> Agreed, if it doesn't ever make sense to do so, then we should return an
->>>> error to user space if userspace attempts such a configuration.  The
->>>> current code is just weird.
->>>>
->>>>>
->>>>> Note that the particular problem I was seeing was primarily caused by
->>>>> kvm_is_mmio_pfn()'s false positive on the zero page, but it unveiled
->>>>> this particular issue as well.
->>>>>
->>>>> > Note that we also use PAGE_S2_DEVICE for things that are not mapped
->>>>> > through
->>>>> > a memslot, such as the GIC.
->>>>> >
->>>>>
->>>>> Yes, and I realize now that this breaks it.
->>>>> My apologies: I have an additional patch locally that sets up MMIO
->>>>> ranges in one go instead of faulting them in one page at a time as we
->>>>> do now, and there the read-write case is handled correctly in
->>>>> kvm_phys_addr_ioremap(). However, I thought it was better to send
->>>>> these out separately first, but apparently not.
->>>>
->>>>
->>>> I think it is better to change this separately, and then add the ioremap
->>>> stuff.  However, you need to change all places that call PAGE_S2_DEVICE
->>>> and expect a RDWR memory region, this happens to be only
->>>> kvm_phys_addr_ioremap() for now.
->>>>
->>>>>
->>>>> So if we can agree on whether or not MMIO backed mappings should be
->>>>> read-write even if the memslot says no, I will follow up with a proper
->>>>> series if there are still changes required.
->>>>>
->>>>
->>>> I guess it could be theoretically useful to have read-only device memory
->>>> regions, and I can't think of why it would violate the architecture.
->>>>
->>>
->>> We have to handle it either way. But after reading D4.5.3 (Table
->>> D4-40) of the ARM ARM, I am wondering why we needed patch b88657674d39
->>> "ARM: KVM: user_mem_abort: support stage 2 MMIO page mapping" in the
->>> first place, and we could just revert that patch and everything would
->>> work as expected. (In short, D4.5.3 says that MT_DEVICE trumps
->>> MT_NORMAL, so if the stage 1 translation is MT_DEVICE, it doesn't
->>> matter what memtype the S2 translation specifies)
->>
->>
->> We've been there before:
->> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/004420.html
->>
->
-> Ah right. So why did those patches not make it in?
->
+Tomasz Figa wrote:
+> 
+> Hi Kukjin,
+> 
+Hi,
 
-Never mind. I read the whole thread this time.
+> On 26.08.2014 16:10, Tomasz Figa wrote:
+> > On Exynos-based boards running secure firmware the sequence of low level
+> > operations to enter and leave system-wide sleep mode is different than
+> > on those without the firmware. Namely:
+> >  - CP15 power control and diagnostic registers cannot be written directly,
+> >  - the way of setting boot address and boot flag is different,
+> >  - different resume handler needs to be used,
+> >  - dedicated SMC call needs to be performed instead of letting the CPU enter
+> >    WFI.
+> >
+> > This series introduces .suspend() and .resume() firmware operations to
+> > perform low level firmware-specific suspend and resume and then leverages
+> > them to provide suspend-resume path meeting the above requirements. Three
+> > additional patches extend device tree sources of Trats2 board with necessary
+> > setup to enable suspend/resume support.
+> >
+> > This series has been tested on Exynos4412-based Trats2 board, without any
+> > additional patches. Unfortunately v3.17-rc1 regressed ODROID support and
+> > suspend stopped working on those boards, due to unknown reasons still being
+> > investigated. It does not seem to be related to anything in this series,
+> > though, so I would not consider this as a stopper.
+> >
+> > Changes since v2:
+> > (https://lkml.org/lkml/2014/7/17/431)
+> >  - added board-specific fixes for device tree sources of Trats2 board,
+> >  - rebased on next-20140826 of linux-next tree.
+> >
+> > Changes since v1:
+> >  - dropped outer_resume() - will be handled in assembly in further patches,
+> >    as support for L2C in non-secure mode gets added,
+> >  - moved CP15 resume to assembly as it needs to be done before MMU is enabled,
+> >  - surrounded CP15 save with a check for cpuid part, because it is valid only
+> >    on Cortex A9,
+> >  - rebased on next-20140717 tag of linux-next tree.
+> >
+> > Tomasz Figa (5):
+> >   ARM: firmware: Introduce suspend and resume operations
+> >   ARM: EXYNOS: Add support for firmware-assisted suspend/resume
+> >   ARM: dts: exynos4412-trats2: Keep eMMC regulators soft-disabled
+> >   ARM: dts: exynos4x12: Add utility macro to define pin sleep states
+> >   ARM: dts: exynos4412-trats2: Add sleep mode pin configuration
+> >
+> >  Documentation/arm/firmware.txt            |  28 +--
+> >  arch/arm/boot/dts/exynos4412-trats2.dts   | 320 +++++++++++++++++++++++++++++-
+> >  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |  16 ++
+> >  arch/arm/include/asm/firmware.h           |   8 +
+> >  arch/arm/mach-exynos/Makefile             |   1 +
+> >  arch/arm/mach-exynos/common.h             |   4 +
+> >  arch/arm/mach-exynos/firmware.c           |  45 +++++
+> >  arch/arm/mach-exynos/pm.c                 |  16 +-
+> >  arch/arm/mach-exynos/sleep.S              |  28 +++
+> >  arch/arm/mach-exynos/smc.h                |   4 +
+> >  10 files changed, 438 insertions(+), 32 deletions(-)
+> >
+> 
+> Would you consider applying this series? It has been waiting on the ML
+> long enough (note no changes in core patches since last revision, just
+> few more board specific patches). Thanks in advance.
+> 
+Sure, I will. Thanks for your gentle reminder.
 
-So, in summary, there is a concern that a malicious guest may request
-a cachable mapping for a device range, in an attempt to manipulate the
-VGIC or other device memory of another VM.
-I think that concern only applies to writable mappings, so perhaps we
-should just change
-
-if (kvm_is_mmio_pfn(pfn))
-
-to
-
-if (kvm_is_mmio_pfn(pfn) && writable)
-
-and be done with it (which is coincidentally the very first naive fix
-I suggested for the issue i was seeing)
-That way, we never map read-only MMIO regions writable, and rely on
-the MT_DEVICE trumps MT_NORMAL rule to ensure the guest reads to those
-regions are uncached.
-(Wouldn't hurt to add a comment to explain it, I suppose)
-
--- 
-Ard.
-
-
->>>> That said, I don't have any more clear use cases in mind, and we
->>>> definitely shouldn't just silently ignore the read-only flag from user
->>>> space and make the region writeable.  If we don't want to allow this
->>>> behavior, we can return an error in kvm_arch_create_memslot(), which
->>>> will cause the KVM_CREATE_USER_MEMORY_REGION ioctl to return -ENOMEM.
->>>>
->>>
->>> Well, I am not sure how easy it is to find out beforehand (i.e., at
->>> ioctl time) what the nature of the backing is, and you have to deal
->>> with hva_to_pfn() potentially returning a VM_PFNMAP pfn or
->>> PageReserved pages anyway.
->>> So just mapping everything as MT_NORMAL actually seems like the sanest
->>> thing to do, so imo we should revert the patch. The only other
->>> question I had is whether it would be better to map a MMIO region in
->>> one go, but we can discuss that separately.
->>
->>
->> Aside from the MT_NORMAL thing, the only saving we'd get by dynamically
->> maping MMIO regions would be the page tables. Not very useful in my opinion.
->>
->
-> OK, so you agree faulting it in entirely upon the first abort is a
-> sane thing to do then.
-> So 1 patch to change that and 1 to revert the PAGE_S2_DEVICE thing then?
+- Kukjin
