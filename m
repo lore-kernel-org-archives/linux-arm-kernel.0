@@ -1,56 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Sep 2014 10:03:53 +0100
-Subject: [PATCH v4 6/7] ARM: EXYNOS: Add support for non-secure L2X0 resume
-In-Reply-To: <1409062680-15906-7-git-send-email-t.figa@samsung.com>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-7-git-send-email-t.figa@samsung.com>
-Message-ID: <20140915090353.GD12379@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 15 Sep 2014 12:05:28 +0300
+Subject: [PATCH] clk: ti: dra7-atl-clock: fix a memory leak
+In-Reply-To: <1410529147-19950-1-git-send-email-t-kristo@ti.com>
+References: <1410529147-19950-1-git-send-email-t-kristo@ti.com>
+Message-ID: <5416ABD8.4040906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 04:17:59PM +0200, Tomasz Figa wrote:
-> On Exynos SoCs it is necessary to resume operation of L2C early in
-> assembly code, because otherwise certain systems will crash. This patch
-> adds necessary code to non-secure resume handler.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h   |  1 +
->  arch/arm/mach-exynos/firmware.c |  4 +++-
->  arch/arm/mach-exynos/sleep.S    | 41 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 45 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index c218200..e88c0f9 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -113,6 +113,7 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
->  
->  extern u32 cp15_save_diag;
->  extern u32 cp15_save_power;
-> +extern unsigned long l2x0_regs_phys;
->  
->  extern void __iomem *sysram_ns_base_addr;
->  extern void __iomem *sysram_base_addr;
-> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-> index 554b350..71bcfbd 100644
-> --- a/arch/arm/mach-exynos/firmware.c
-> +++ b/arch/arm/mach-exynos/firmware.c
-> @@ -102,7 +102,9 @@ static int exynos_suspend(void)
->  	writel(EXYNOS_SLEEP_MAGIC, sysram_ns_base_addr + EXYNOS_BOOT_FLAG);
->  	writel(virt_to_phys(exynos_cpu_resume_ns),
->  		sysram_ns_base_addr + EXYNOS_BOOT_ADDR);
-> -
-> +#ifdef CONFIG_CACHE_L2X0
-> +	l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
-> +#endif
+On 09/12/2014 04:39 PM, Tero Kristo wrote:
+> of_clk_add_provider makes an internal copy of the parent_names property
+> while its called, thus it is no longer needed after this call and can
+> be freed.
 
-NAK.  Please look at how arch/arm/mm/l2c-l2x0-resume.S gets the address
-of this structure in assembly code.  The name of this variable is crap
-in any case.  It's not the registers, it's the saved registers.  So even
-more reason to kill this abomination, which incidentally, I've already
-killed off once before in the exynos code.
+Thanks Tero, indeed this was overlooked in the original driver.
+
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/clk/ti/clk-dra7-atl.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
+> index 4a65b41..3f9308a 100644
+> --- a/drivers/clk/ti/clk-dra7-atl.c
+> +++ b/drivers/clk/ti/clk-dra7-atl.c
+> @@ -199,6 +199,7 @@ static void __init of_dra7_atl_clock_setup(struct device_node *node)
+>  
+>  	if (!IS_ERR(clk)) {
+>  		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +		kfree(parent_names);
+>  		return;
+>  	}
+>  cleanup:
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+P?ter
