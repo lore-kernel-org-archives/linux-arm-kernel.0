@@ -1,129 +1,42 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 15 Sep 2014 13:11:14 +0800
-Subject: [RFC] arm:extend the reserved mrmory for initrd to be page aligned
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB4915FC@CNBJMBX05.corpusers.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 14 Sep 2014 22:16:04 -0700
+Subject: [GIT PULL 3.18] ARM: BCM: Broadcom BCM63138 support
+In-Reply-To: <CAEPRUYpS=yqR8SvUb34eSMfOPMM4HErf4jKZK_Z9jbWvBH9vEg@mail.gmail.com>
+References: <1409953475-23130-1-git-send-email-f.fainelli@gmail.com>	<8641708.a9SSBxeRCZ@wuerfel>
+ <CAEPRUYpS=yqR8SvUb34eSMfOPMM4HErf4jKZK_Z9jbWvBH9vEg@mail.gmail.com>
+Message-ID: <54167614.7030806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch extend the start and end address of initrd to be page aligned,
-so that we can free all memory including the un-page aligned head or tail
-page of initrd, if the start or end address of initrd are not page
-aligned, the page can't be freed by free_initrd_mem() function.
+On 09/14/14 21:56, Christian Daudt wrote:
+> On Sat, Sep 6, 2014 at 7:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Friday 05 September 2014 14:44:35 Florian Fainelli wrote:
+>>> Arnd, Olof,
+>>>
+>>> This pull request contains the basic Broadcom BCM63138 DSL SoC support
+>>> that has been posted a few weeks ago. Arnd has reviewed those changes, and
+>>> I was expecting Matt to carry these changes for me, but I did not get an
+>>> answer so far and I don't want these patches to be held much longer.
+>>
+> Hi Florian,
+>   Apologies for the untimeliness of replies, I've been leaning heavily
+> on Matt to lead mach-bcm maintainership but given recent changes at
+> Broadcom he's found himself pressed for time to do this also.
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/mm/init.c   | 20 ++++++++++++++------
- arch/arm64/mm/init.c | 37 +++++++++++++++++++++++++++++++++----
- 2 files changed, 47 insertions(+), 10 deletions(-)
+Based on our earlier conversations on IRC this week, I was expecting you 
+to send an update to the MAINTAINERS file reflecting the fact that we 
+(Brian, Gregory, Marc and myself) should be listed as mach-bcm 
+maintainers as well.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..6c1db07 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -288,7 +288,12 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- 		phys_initrd_start = __virt_to_phys(initrd_start);
- 		phys_initrd_size = initrd_end - initrd_start;
- 	}
--	initrd_start = initrd_end = 0;
-+
-+	/* make sure the start and end address are page aligned */
-+	phys_initrd_size = round_up(phys_initrd_start + phys_initrd_size, PAGE_SIZE);
-+	phys_initrd_start = round_down(phys_initrd_start, PAGE_SIZE);
-+	phys_initrd_size -= phys_initrd_start;
-+
- 	if (phys_initrd_size &&
- 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
- 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-@@ -301,13 +306,11 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- 		       (u64)phys_initrd_start, phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
--	if (phys_initrd_size) {
-+	if (phys_initrd_size)
- 		memblock_reserve(phys_initrd_start, phys_initrd_size);
-+	else
-+		initrd_start = initrd_end = 0;
- 
--		/* Now convert initrd to virtual addresses */
--		initrd_start = __phys_to_virt(phys_initrd_start);
--		initrd_end = initrd_start + phys_initrd_size;
--	}
- #endif
- 
- 	arm_mm_memblock_reserve();
-@@ -636,6 +639,11 @@ static int keep_initrd;
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
- 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
- 	}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..9dfd9a6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -138,15 +138,38 @@ static void arm64_memory_present(void)
- void __init arm64_memblock_init(void)
- {
- 	phys_addr_t dma_phys_limit = 0;
--
-+	phys_addr_t phys_initrd_start;
-+	phys_addr_t phys_initrd_size;
- 	/*
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
- 	 */
- 	memblock_reserve(__pa(_text), _end - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
--	if (initrd_start)
--		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
-+	if (initrd_start) {
-+		phys_initrd_start = __virt_to_phys(initrd_start);
-+		phys_initrd_size = initrd_end - initrd_start;
-+		/* make sure the start and end address are page aligned */
-+		phys_initrd_size = round_up(phys_initrd_start + phys_initrd_size, PAGE_SIZE);
-+		phys_initrd_start = round_down(phys_initrd_start, PAGE_SIZE);
-+		phys_initrd_size -= phys_initrd_start;
-+		if (phys_initrd_size &&
-+				!memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
-+			pr_err("INITRD: %pa+%pa is not a memory region - disabling initrd\n",
-+					&phys_initrd_start, &phys_initrd_size);
-+			phys_initrd_start = phys_initrd_size = 0;
-+		}
-+		if (phys_initrd_size &&
-+				memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
-+			pr_err("INITRD: %pa+%pa overlaps in-use memory region - disabling initrd\n",
-+					&phys_initrd_start, &phys_initrd_size);
-+			phys_initrd_start = phys_initrd_size = 0;
-+		}
-+		if (phys_initrd_size)
-+			memblock_reserve(phys_initrd_start, phys_initrd_size);
-+		else
-+			initrd_start = initrd_end = 0;
-+	}
- #endif
- 
- 	if (!efi_enabled(EFI_MEMMAP))
-@@ -334,8 +357,14 @@ static int keep_initrd;
- 
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
--	if (!keep_initrd)
-+	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-+	}
- }
- 
- static int __init keepinitrd_setup(char *__unused)
--- 
-2.1.0
+>   I'm looking at this patchset to pull it, but I don't see any acks on
+> the patches (the git commits in your repo do not have them, and
+> searching through linux-arm-kernel doesn't seem to indicate
+> acks/sign-offs for them). Have they been reviewed ? If not, I'll have
+> to review them prior to pulling.
+
+Arnd has reviewed v2, and v3 addresses his former comments, he has not 
+replied with an Ack though I do not mind waiting for this.
+
+Thank you
+--
+Florian
