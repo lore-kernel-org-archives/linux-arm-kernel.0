@@ -1,51 +1,48 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 15 Sep 2014 19:00:43 -0400
-Subject: [RFC PATCH for Juno 0/2] Drivers for Juno to boot from ACPI
-In-Reply-To: <20140915225735.1C5A9C40B84@trevor.secretlab.ca>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>	<353732273.2TKdyNJ83M@wuerfel>
- <540EA446.7010200@redhat.com>	<3840839.IPB3Ru8Evk@wuerfel>
- <20140915225735.1C5A9C40B84@trevor.secretlab.ca>
-Message-ID: <54176F9B.2000709@redhat.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 16 Sep 2014 01:36:15 +0200
+Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
+In-Reply-To: <20140915165359.GA13080@core.coreip.homeip.net>
+References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
+ <6318611.DnX9cEgMjk@vostro.rjw.lan>
+ <20140915165359.GA13080@core.coreip.homeip.net>
+Message-ID: <4451285.EDb1j6ttbA@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 06:57 PM, Grant Likely wrote:
-> On Tue, 09 Sep 2014 12:55:09 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 09 September 2014 02:55:02 Jon Masters wrote:
->>> On 09/01/2014 11:29 AM, Arnd Bergmann wrote:
->>>> On Monday 01 September 2014 23:05:59 Hanjun Guo wrote:
->>>>> This patch set is example of the sort of driver changes needed to boot
->>>>> Juno using ACPI tables, which using the ACPI tables devloped for MS
->>>>> Windows and published by ARM [1].
->>>>
->>>> What about platform support?
->>>
->>> I think Juno is just serving as an example here since it's from ARM and
->>> thus various people have access to it already, etc. It's not the best
->>> example of a server platform out there, since that wasn't its original
->>> design purpose (but it's a wonderful platform nonetheless). There is
->>> work currently in flight to offer other reference ACPI examples.
->>
->> Ok, I see. This is a bit disappointing because it's actually the third
->> attempt to come up with a reference platform (after Exynos and X-Gene),
->> and it always seems to come down to deciding that this particular
->> platform doesn't really work with ACPI beyond basic booting.
->>
->> Which platform(s) are you talking about? Are you sure it will be better
->> suited than the first three?
+On Monday, September 15, 2014 09:53:59 AM Dmitry Torokhov wrote:
+> On Sun, Sep 14, 2014 at 06:38:58PM +0200, Rafael J. Wysocki wrote:
+> > On Friday, September 12, 2014 02:05:53 PM Dmitry Torokhov wrote:
+> > > Hi Ulf,
+> > > 
+> > > On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
+> > > > To give callers the option of acting on a errors while removing the
+> > > > pm_domain ops for the device in the ACPI PM domain, let
+> > > > acpi_dev_pm_detach() return an int to provide the error code.
+> > > 
+> > > So how would callers handle the errors? As far as I can see
+> > > acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
+> > > there is no meaningful strategy to handle errors as you are past the point of
+> > > no return and you keep on tearing down the device.
+> > 
+> > This is specifically for what patch [3/9] is doing AFAICS.  
+> > 
+> > The existing callers don't need to worry about this.
 > 
-> Juno is actually working out as a good reference platform. It works and
-> there aren't horrible things that need to be done to get the system into
-> a working state. AMD Seattle is a second system that will boot with
-> Hanjun's ACPI series with a couple of device driver patches (the SBSA
-> driver which is common with Juno and an Ethernet driver IIRC).
+> OK, so I have the very same comment about patch 3 then: we have
+> dev_pm_domain_detach() returning error. How would the callers handle errors?
 
-...and further there are also patches for Mustang that (this time) are
-"done right" as another reference (relies upon updated UEFI firmware
-that contains ACPI tables that don't have the kinds of hacks seen last
-time - no clocks being exposed and handled through hacks or the kinds of
-things that made Arnd uncomfortable). But perhaps let's take Seattle as
-the second example and see what people think. There is a plan here at
-Connect to have a Seattle example posted out within a day or so.
+Ulf?
 
-Jon.
+> WRT this patch: I'd rater we did not just return generic "error code" just
+> because we do not know who manages PD for the device. Can we add API to check
+> if we are using ACPI to manage power domains? Then patch #3 could check if it
+> needs to use ACPI or generic power domain API.
+
+The rule is that if there is an ACPI companion object for the given device, then
+ACPI is used.  So the API is ACPI_COMPANION(dev) and we have that check around
+until someone realized that acpi_dev_pm_attach/detach() made it too.  We can
+restore it, I suppose, but I'm not sure how much better it is going to be.
+
+Either way, I have no strong preferences here.
+
+Rafael
