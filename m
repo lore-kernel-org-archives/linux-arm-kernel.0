@@ -1,69 +1,119 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 15 Sep 2014 10:10:12 +0200
-Subject: SPI and module auto-loading
-In-Reply-To: <20140912101442.GR7960@sirena.org.uk>
-References: <54119DB6.8020807@collabora.co.uk>
- <20140911193325.GT4015@sirena.org.uk> <5412C1DF.3040707@collabora.co.uk>
- <20140912101442.GR7960@sirena.org.uk>
-Message-ID: <1410768612.22941.1.camel@collabora.co.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 15 Sep 2014 10:20:44 +0200
+Subject: [PATCH 1/2] clk: sunxi: Add sun8i MBUS clock support
+In-Reply-To: <1410540486-22243-2-git-send-email-wens@csie.org>
+References: <1410540486-22243-1-git-send-email-wens@csie.org>
+ <1410540486-22243-2-git-send-email-wens@csie.org>
+Message-ID: <20140915082044.GC31276@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-12 at 11:14 +0100, Mark Brown wrote:
-> On Fri, Sep 12, 2014 at 11:50:23AM +0200, Javier Martinez Canillas wrote:
-> > On 09/11/2014 09:33 PM, Mark Brown wrote:
+Hi Chen-Yu,
+
+On Sat, Sep 13, 2014 at 12:48:05AM +0800, Chen-Yu Tsai wrote:
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+A commit log would be nice here. Is it different from A31? do you know
+wether later SoCs reuses it?
+
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+>  drivers/clk/sunxi/clk-mod0.c                      | 55 +++++++++++++++++++++++
+>  2 files changed, 56 insertions(+)
 > 
-> > > I'm not sure I see that as an interesting use case, it seems better to
-> > > have drivers usable without DT and it's trivial to do so.
-> 
-> > Yes, it's trivial but seems like an unnecessary duplication for me. AFAICT the
-> > OF tables are only used to match the devices in spi_match_device() but if both
-> > the OF and SPI tables must be kept in sync to properly report the module
-> > aliases to user-space then I wonder if the OF tables shouldn't just be removed
-> > from the SPI drivers since spi_match_device() will succeed anyways when
-> > calling spi_match_id().
-> 
-> The vendor identifier is an important part of the OF device ID, vendors
-> can and do end up with different devices of the same name.
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 425b109..fb3b7aa 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -50,6 +50,7 @@ Required properties:
+>  	"allwinner,sun4i-a10-mmc-output-clk" - for the MMC output clock on A10
+>  	"allwinner,sun4i-a10-mmc-sample-clk" - for the MMC sample clock on A10
+>  	"allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+> +	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
+>  	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+>  	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+>  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
+> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+> index 4a56385..9850887 100644
+> --- a/drivers/clk/sunxi/clk-mod0.c
+> +++ b/drivers/clk/sunxi/clk-mod0.c
+> @@ -94,6 +94,61 @@ static void __init sun5i_a13_mbus_setup(struct device_node *node)
+>  }
+>  CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
+>  
+> +/**
+> + * sun8i_a23_get_mbus_factors() - calculates m factor for MBUS clocks
+> + * MBUS rate is calculated as follows
+> + * rate = parent_rate / (m + 1);
+> + */
+> +
+> +static void sun8i_a23_get_mbus_factors(u32 *freq, u32 parent_rate,
+> +				       u8 *n, u8 *k, u8 *m, u8 *p)
+> +{
+> +	u8 div;
+> +
+> +	/* These clocks can only divide, so we will never be able to achieve
+> +	 * frequencies higher than the parent frequency */
 
-Indeed, which actually points at a problem with module loading for SPI
-as the vendor prefix gets dropped when generating the modalias for the
-uevent. So if there is a case where we have two SPI devices with the
-same device name (but a different vendor identifier), module loading
-can't work as the generated modalias for both will be spi:devicename
-even if OF can properly distinguish between both.
+This doesn't follow the multi-line comment style.
 
-The core of the "issue" here really is that the way userspace matches an
-SPI device to a kernel module and how the kernel matches an SPI to a
-driver don't match up (same issue as there is with I2C). While the
-kernel can take advantage of the OF table, userspace needs to resolve
-the simpler spi: alias, thus essentially using the SPI table. Where as
-for the ACPI case, both userspace and kernel will use the ACPI table.
+> +	if (*freq > parent_rate)
+> +		*freq = parent_rate;
+> +
+> +	div = DIV_ROUND_UP(parent_rate, *freq);
+> +
+> +	if (div > 8)
+> +		div = 8;
+> +
+> +	*freq = parent_rate / div;
+> +
+> +	/* we were called to round the frequency, we can now return */
+> +	if (m == NULL)
+> +		return;
+> +
+> +	*m = div - 1;
+> +}
+> +
+> +static struct clk_factors_config sun8i_a23_mbus_config = {
+> +	.mshift = 0,
+> +	.mwidth = 3,
+> +};
+> +
+> +static const struct factors_data sun8i_a23_mbus_data __initconst = {
+> +	.enable = 31,
+> +	.mux = 24,
+> +	.table = &sun8i_a23_mbus_config,
+> +	.getter = sun8i_a23_get_mbus_factors,
+> +};
+> +
+> +static DEFINE_SPINLOCK(sun8i_a23_mbus_lock);
+> +
+> +static void __init sun8i_a23_mbus_setup(struct device_node *node)
+> +{
+> +	struct clk *mbus = sunxi_factors_register(node, &sun8i_a23_mbus_data,
+> +						  &sun8i_a23_mbus_lock);
+> +
+> +	/* The MBUS clocks needs to be always enabled */
+> +	__clk_get(mbus);
+> +	clk_prepare_enable(mbus);
+> +}
+> +CLK_OF_DECLARE(sun8i_a23_mbus, "allwinner,sun8i-a23-mbus-clk", sun8i_a23_mbus_setup);
+> +
 
-So for things to be consistent for both cases the options are to either:
-a) the generated MODALIAS uevent variable should be an OF based alias
-  + Upside is that both kernel and userspace can use the full OF
-    information for matching
-  + Downside is that that would mean adding OF match tables to all
-    drivers that can possible used on a DT based system otherwise module
-    auto-loading for those will be broken.
+It looks like it's pretty much stand alone. Would you mind putting it
+into a file of its own? something like clk-sun8i-mbus.c?
 
-b) Stop using OF style matching and rely solely on the SPI id table
-  + Downside here is that the vendor prefix isn't used anymore for
-    matching. Otoh that's the current status quo for drivers without an
-    OF match table and for how userspace matches modules currently.
-  + Upside is that no extra work is required for drivers that currently
-    work with DT even if they don't have any direct OF support.
-
-
+Thanks,
+Maxime
 
 -- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/921c96b0/attachment.bin>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/c201ae43/attachment.sig>
