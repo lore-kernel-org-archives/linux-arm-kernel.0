@@ -1,65 +1,45 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 15 Sep 2014 16:00:07 +0200
-Subject: [PATCH 1/4] tty: omap-serial: pull out calculation from baud_is_mode16
-In-Reply-To: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
-References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
-Message-ID: <1410789610-23059-2-git-send-email-frans.klaver@xsens.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 15 Sep 2014 16:03:09 +0200
+Subject: [PATCH RESEND v9 1/5] rtc: max77686: Allow the max77686 rtc to
+ wakeup the system
+In-Reply-To: <20140912150537.56419981804c68f9108a22b6@linux-foundation.org>
+References: <1410509864-10019-1-git-send-email-javier.martinez@collabora.co.uk>	<1410509864-10019-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20140912150537.56419981804c68f9108a22b6@linux-foundation.org>
+Message-ID: <5416F19D.4030105@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To determine the correct divisor, we need to know the difference between
-the desired baud rate and the actual baud rate. The calculation for this
-difference is implemented twice within omap_serial_baud_is_mode16().
-Pull out the calculation for easier maintenance.
+Hello Andrew,
 
-Signed-off-by: Frans Klaver <frans.klaver@xsens.com>
----
- drivers/tty/serial/omap-serial.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+Thanks a lot for taking a look to these patches!
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index d017cec..ae935ce 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -239,6 +239,22 @@ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
- }
- 
- /*
-+ * Calculate the absolute difference between the desired and actual baud
-+ * rate for the given mode.
-+ */
-+static inline int calculate_baud_abs_diff(struct uart_port *port,
-+				unsigned int baud, unsigned int mode)
-+{
-+	unsigned int n = port->uartclk / (mode * baud);
-+	int abs_diff = baud - (port->uartclk / (mode * n));
-+
-+	if (abs_diff < 0)
-+		abs_diff = -abs_diff;
-+
-+	return abs_diff;
-+}
-+
-+/*
-  * serial_omap_baud_is_mode16 - check if baud rate is MODE16X
-  * @port: uart port info
-  * @baud: baudrate for which mode needs to be determined
-@@ -252,14 +268,8 @@ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
- static bool
- serial_omap_baud_is_mode16(struct uart_port *port, unsigned int baud)
- {
--	unsigned int n13 = port->uartclk / (13 * baud);
--	unsigned int n16 = port->uartclk / (16 * baud);
--	int baudAbsDiff13 = baud - (port->uartclk / (13 * n13));
--	int baudAbsDiff16 = baud - (port->uartclk / (16 * n16));
--	if (baudAbsDiff13 < 0)
--		baudAbsDiff13 = -baudAbsDiff13;
--	if (baudAbsDiff16 < 0)
--		baudAbsDiff16 = -baudAbsDiff16;
-+	int baudAbsDiff13 = calculate_baud_abs_diff(port, baud, 13);
-+	int baudAbsDiff16 = calculate_baud_abs_diff(port, baud, 16);
- 
- 	return (baudAbsDiff13 >= baudAbsDiff16);
- }
--- 
-2.1.0
+On 09/13/2014 12:05 AM, Andrew Morton wrote:
+> On Fri, 12 Sep 2014 10:17:39 +0200 Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
+> 
+>> From: Doug Anderson <dianders@chromium.org>
+>> 
+>> The max77686 includes an RTC that keeps power during suspend.  It's
+>> convenient to be able to use it as a wakeup source.
+>> 
+>> NOTE: due to wakeup ordering problems this patch alone doesn't work so
+>> well on exynos5250-snow.  You also need something that brings the i2c
+>> bus up before the max77686 wakeup runs.
+> 
+> I removed this paragraph.
+> 
+
+Great.
+
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+> And I rewrote this to Signed-off-by:, as you were on the patch delivery
+> path. Documentation/SubmittingPatches section 12 has the gory details.
+> 
+
+Yes, originally Doug posted this patch separately but was never picked so I
+included on my series but forgot to add my s-o-b and also to remove the note
+paragraph.
+
+Best regards,
+Javier
