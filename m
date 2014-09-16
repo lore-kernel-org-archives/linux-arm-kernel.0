@@ -1,27 +1,37 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 16 Sep 2014 18:56:52 -0400
-Subject: [RFC PATCH for AMD Seattle 0/4] Drivers for AMD-Seatlle to boot
- from ACPI
-In-Reply-To: <5417BC57.4030504@amd.com>
-References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
- <5417BC57.4030504@amd.com>
-Message-ID: <5418C034.8020305@redhat.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Wed, 17 Sep 2014 01:58:10 +0300
+Subject: [PATCH v10 5/9] arm: omap1: Migrate debug_ll macros to use 8250.S
+In-Reply-To: <1410907588-19957-6-git-send-email-daniel.thompson@linaro.org>
+References: <1410907588-19957-1-git-send-email-daniel.thompson@linaro.org>
+ <1410907588-19957-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140916225810.GA1273@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 12:28 AM, Suravee Suthikulpanit wrote:
-> Note: Correcting the typo for linux-acpi mailing list in this reply.
-> 
-> Also, I would like to add the link to the "AMD Opteron? A1100 Series 
-> Processor ACPI Porting Guide", which describes the current ACPI table 
-> for AMD Seattle platform here:
-> 
-> http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf
+Hi,
 
-Thanks again for posting the patch series, and this document, which is
-very useful. We have test systems running these patches right now, and
-they work quite well. If anyone at Linaro Connect this week would like
-to see hardware and get their own kernel built running these bits, let
-myself, Suravee, or Al know and we'll help you make that happen.
+On Tue, Sep 16, 2014 at 11:46:24PM +0100, Daniel Thompson wrote:
+> +	config DEBUG_OMAP1UART1
+> +		bool "Kernel low-level debugging via OMAP1 UART1"
+> +		depends on ARCH_OMAP1
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on OMAP1 based platforms (expect OMAP730) on the UART1.
+                                            ^^^^^^
 
-Jon.
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on OMAP1 based platforms (expect OMAP730) on the UART2.
+                                            ^^^^^^
+
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on OMAP1 based platforms (expect OMAP730) on the UART3.
+                                            ^^^^^^
+
+I already commented earlier, that "expect" here is probably a typo?
+
+A.
