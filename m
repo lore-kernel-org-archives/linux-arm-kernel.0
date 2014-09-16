@@ -1,101 +1,144 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Tue, 16 Sep 2014 23:56:22 +0200
-Subject: [PATCH v2 2/2] bcma: get IRQ numbers from dt
-In-Reply-To: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
-References: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1410904582-6519-2-git-send-email-hauke@hauke-m.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Sep 2014 15:07:54 -0700
+Subject: [PATCH] pinctrl: remove remaining users of gpiochip_remove() retval
+Message-ID: <1410905274-22339-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not possible to auto detect the irq numbers used by the cores on
-an arm SoC. If bcma was registered with device tree it will search for
-some device tree nodes with the irq number and add it to the core
-configuration.
+Some drivers accidentally still use the return value from
+gpiochip_remove(). Get rid of them so we can simplify this function
+and get rid of the return value.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+Abdoulaye Berthe <berthe.ab@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/bcma/main.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+), 1 deletion(-)
+This patch will be merged through the GPIO tree.
+---
+ drivers/pinctrl/nomadik/pinctrl-abx500.c     | 14 ++------------
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c    |  2 +-
+ drivers/pinctrl/qcom/pinctrl-msm.c           |  9 +--------
+ drivers/pinctrl/samsung/pinctrl-exynos5440.c |  6 +-----
+ drivers/pinctrl/samsung/pinctrl-samsung.c    | 13 +++----------
+ 5 files changed, 8 insertions(+), 36 deletions(-)
 
-This is based on wireless-testing and should go into that tree.
-
-changes since:
-RFC:
- - add #ifdef CONFIG_OF
-
-diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-index e5d578c..b8731ee 100644
---- a/drivers/bcma/main.c
-+++ b/drivers/bcma/main.c
-@@ -10,6 +10,8 @@
- #include <linux/platform_device.h>
- #include <linux/bcma/bcma.h>
- #include <linux/slab.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index a53a689a2bfa..7df34b70e8b6 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -1298,10 +1298,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 	return 0;
  
- MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
- MODULE_LICENSE("GPL");
-@@ -131,6 +133,45 @@ static bool bcma_is_core_needed_early(u16 core_id)
- 	return false;
+ out_rem_chip:
+-	err = gpiochip_remove(&pct->chip);
+-	if (err)
+-		dev_info(&pdev->dev, "failed to remove gpiochip\n");
+-
++	gpiochip_remove(&pct->chip);
+ 	return ret;
  }
  
-+#ifdef CONFIG_OF
-+static struct device_node *bcma_of_find_child_device(struct platform_device *parent,
-+						     struct bcma_device *core)
-+{
-+	struct device_node *node;
-+	u64 size;
-+	const __be32 *reg;
-+
-+	if (!parent || !parent->dev.of_node)
-+		return NULL;
-+
-+	for_each_child_of_node(parent->dev.of_node, node) {
-+		reg = of_get_address(node, 0, &size, NULL);
-+		if (!reg)
-+			continue;
-+		if (be32_to_cpup(reg) == core->addr)
-+			return node;
-+	}
-+	return NULL;
-+}
-+
-+static void bcma_of_fill_device(struct platform_device *parent,
-+				struct bcma_device *core)
-+{
-+	struct device_node *node;
-+
-+	node = bcma_of_find_child_device(parent, core);
-+	if (!node)
-+		return;
-+	core->dev.of_node = node;
-+	core->irq = irq_of_parse_and_map(node, 0);
-+}
-+#else
-+static void bcma_of_fill_device(struct platform_device *parent,
-+				struct bcma_device *core)
-+{
-+}
-+#endif /* CONFIG_OF */
-+
- static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
+@@ -1312,15 +1309,8 @@ out_rem_chip:
+ static int abx500_gpio_remove(struct platform_device *pdev)
  {
- 	int err;
-@@ -147,7 +188,13 @@ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
- 		break;
- 	case BCMA_HOSTTYPE_SOC:
- 		core->dev.dma_mask = &core->dev.coherent_dma_mask;
--		core->dma_dev = &core->dev;
-+		if (bus->host_pdev) {
-+			core->dma_dev = &bus->host_pdev->dev;
-+			core->dev.parent = &bus->host_pdev->dev;
-+			bcma_of_fill_device(bus->host_pdev, core);
-+		} else {
-+			core->dma_dev = &core->dev;
-+		}
- 		break;
- 	case BCMA_HOSTTYPE_SDIO:
- 		break;
+ 	struct abx500_pinctrl *pct = platform_get_drvdata(pdev);
+-	int ret;
+-
+-	ret = gpiochip_remove(&pct->chip);
+-	if (ret < 0) {
+-		dev_err(pct->dev, "unable to remove gpiochip: %d\n",
+-			ret);
+-		return ret;
+-	}
+ 
++	gpiochip_remove(&pct->chip);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index e7cab07eef47..4332b38c52ab 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -1261,7 +1261,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 				   IRQ_TYPE_EDGE_FALLING);
+ 	if (ret) {
+ 		dev_err(&dev->dev, "could not add irqchip\n");
+-		ret = gpiochip_remove(&nmk_chip->chip);
++		gpiochip_remove(&nmk_chip->chip);
+ 		return -ENODEV;
+ 	}
+ 	/* Then register the chain on the parent IRQ */
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index 2738108caff2..041677113a48 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -903,16 +903,9 @@ EXPORT_SYMBOL(msm_pinctrl_probe);
+ int msm_pinctrl_remove(struct platform_device *pdev)
+ {
+ 	struct msm_pinctrl *pctrl = platform_get_drvdata(pdev);
+-	int ret;
+-
+-	ret = gpiochip_remove(&pctrl->chip);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Failed to remove gpiochip\n");
+-		return ret;
+-	}
+ 
++	gpiochip_remove(&pctrl->chip);
+ 	pinctrl_unregister(pctrl->pctrl);
+-
+ 	return 0;
+ }
+ EXPORT_SYMBOL(msm_pinctrl_remove);
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+index 603da2f9dd95..8ef370244aee 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+@@ -873,11 +873,7 @@ static int exynos5440_gpiolib_register(struct platform_device *pdev,
+ static int exynos5440_gpiolib_unregister(struct platform_device *pdev,
+ 				struct exynos5440_pinctrl_priv_data *priv)
+ {
+-	int ret = gpiochip_remove(priv->gc);
+-	if (ret) {
+-		dev_err(&pdev->dev, "gpio chip remove failed\n");
+-		return ret;
+-	}
++	gpiochip_remove(priv->gc);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index b07406da333c..0d137c56a6a5 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -945,9 +945,7 @@ static int samsung_gpiolib_register(struct platform_device *pdev,
+ 
+ fail:
+ 	for (--i, --bank; i >= 0; --i, --bank)
+-		if (gpiochip_remove(&bank->gpio_chip))
+-			dev_err(&pdev->dev, "gpio chip %s remove failed\n",
+-							bank->gpio_chip.label);
++		gpiochip_remove(&bank->gpio_chip);
+ 	return ret;
+ }
+ 
+@@ -957,16 +955,11 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+ {
+ 	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+ 	struct samsung_pin_bank *bank = ctrl->pin_banks;
+-	int ret = 0;
+ 	int i;
+ 
+ 	for (i = 0; !ret && i < ctrl->nr_banks; ++i, ++bank)
+-		ret = gpiochip_remove(&bank->gpio_chip);
+-
+-	if (ret)
+-		dev_err(&pdev->dev, "gpio chip remove failed\n");
+-
+-	return ret;
++		gpiochip_remove(&bank->gpio_chip);
++	return 0;
+ }
+ 
+ static const struct of_device_id samsung_pinctrl_dt_match[];
 -- 
-1.9.1
+1.9.3
