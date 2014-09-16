@@ -1,44 +1,89 @@
-From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Tue, 16 Sep 2014 13:44:44 +0200
-Subject: Exynos build failure in -next allmodconfig
-In-Reply-To: <20140915175709.GE12361@n2100.arm.linux.org.uk>
-References: <E1XTTy1-0000vT-NC@cassiel.sirena.org.uk>
- <20140915163458.GS7960@sirena.org.uk>
- <20140915175709.GE12361@n2100.arm.linux.org.uk>
-Message-ID: <541822AC.8040805@samsung.com>
+From: kiran.padwal@smartplayin.com (Kiran Padwal)
+Date: Tue, 16 Sep 2014 17:15:38 +0530
+Subject: [PATCH] ARM: dts: qcom: Add I2C dt node for MSM8974 and DB8074 board
+Message-ID: <1410867938-6254-1-git-send-email-kiran.padwal@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.09.2014 19:57, Russell King - ARM Linux wrote:
-> On Mon, Sep 15, 2014 at 09:34:58AM -0700, Mark Brown wrote:
->> On Mon, Sep 15, 2014 at 11:57:09AM +0100, Build bot for Mark Brown wrote:
->>
->> Today's -next got a build failure in ARM allmodconfig due to platsmp.c:
->>
->> | arch/arm/mach-exynos/platsmp.c:198:31: warning: incorrect type in return expression (different address spaces)
->> | arch/arm/mach-exynos/platsmp.c:198:31:    expected void [noderef] <asn:2>*
->> | arch/arm/mach-exynos/platsmp.c:198:31:    got void *
->> | arch/arm/mach-exynos/platsmp.c:198:31: warning: incorrect type in return expression (different address spaces)
->> | arch/arm/mach-exynos/platsmp.c:198:31:    expected void [noderef] <asn:2>*
->> | arch/arm/mach-exynos/platsmp.c:198:31:    got void *
->> |   CC      arch/arm/mach-exynos/platsmp.o
->> | /tmp/ccC9fkwF.s: Assembler messages:
->> | /tmp/ccC9fkwF.s:423: Error: selected processor does not support ARM mode `isb '
->> | /tmp/ccC9fkwF.s:428: Error: selected processor does not support ARM mode `isb '
->> | /tmp/ccC9fkwF.s:429: Error: selected processor does not support ARM mode `dsb '
->> | scripts/Makefile.build:257: recipe for target 'arch/arm/mach-exynos/platsmp.o' failed
->>
->> Looks like we need a compiler flags override for that file.
->
-> Or.. the question is why a .c file is not using the proper macros.
+Add support for i2c controller on the DB8074 board.
+It also adds necessary DT support for i2c eeprom which is present on
+DB8074 board.
 
-Actually I am the one to blame for build failure (commit: "ARM: EXYNOS: 
-Move code from hotplug.c to platsmp.c"). The problem is 
-v7_exit_coherency_flush() which I think does not make sense on ARMv6.
+Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
+---
+ arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi            |   15 +++++++++++++--
+ 2 files changed, 34 insertions(+), 2 deletions(-)
 
-I'll replace the ISB and DSB commands with macros but the real question 
-is whether the mach-exynos/platsmp.c file and mach-exynos directory 
-should be compiled when CONFIG_ARCH_EXYNOS is not defined?
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+index b4dfb01..4737049 100644
+--- a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+@@ -22,6 +22,13 @@
+ 
+ 
+ 		pinctrl at fd510000 {
++			i2c11_pins: i2c11 {
++				mux {
++					pins = "gpio83", "gpio84";
++					function = "blsp_i2c11";
++				};
++			};
++
+ 			spi8_default: spi8_default {
+ 				mosi {
+ 					pins = "gpio45";
+@@ -41,5 +48,19 @@
+ 				};
+ 			};
+ 		};
++
++		i2c at f9967000 {
++			status = "okay";
++			clock-frequency = <200000>;
++			pinctrl-0 = <&i2c11_pins>;
++			pinctrl-names = "default";
++
++			eeprom: eeprom at 52 {
++				compatible = "atmel,24c128";
++				reg = <0x52>;
++				pagesize = <32>;
++				read-only;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 69dca2a..e265ec1 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -1,8 +1,8 @@
+ /dts-v1/;
+ 
+-#include "skeleton.dtsi"
+-
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/qcom,gcc-msm8974.h>
++#include "skeleton.dtsi"
+ 
+ / {
+ 	model = "Qualcomm MSM8974";
+@@ -236,5 +236,16 @@
+ 			#interrupt-cells = <2>;
+ 			interrupts = <0 208 0>;
+ 		};
++
++		blsp_i2c11: i2c at f9967000 {
++			status = "disable";
++			compatible = "qcom,i2c-qup-v2.1.1";
++			reg = <0xf9967000 0x1000>;
++			interrupts = <0 105 IRQ_TYPE_NONE>;
++			clocks = <&gcc GCC_BLSP2_QUP5_I2C_APPS_CLK>, <&gcc GCC_BLSP2_AHB_CLK>;
++			clock-names = "core", "iface";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
+ 	};
+ };
+-- 
+1.7.9.5
