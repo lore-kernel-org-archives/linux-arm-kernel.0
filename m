@@ -1,102 +1,83 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Sep 2014 16:40:28 -0600
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaGf6JSuq=ekZY7Pp2zSAB0+0S9fZ70xWpct2MJ=pTSmug@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>	<CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>	<CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>	<CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>	<CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>	<CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>	<CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>	<54172B3F.9030901@wwwdotorg.org>	<CAL1qeaEK=C4j+G5CA_91xJNe25d=-y47EyZAYnaMh46fNYVDAw@mail.gmail.com>	<54185698.7020600@wwwdotorg.org>
- <CAL1qeaGf6JSuq=ekZY7Pp2zSAB0+0S9fZ70xWpct2MJ=pTSmug@mail.gmail.com>
-Message-ID: <5418BC5C.5020108@wwwdotorg.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 17 Sep 2014 07:41:11 +0900
+Subject: [GIT PULL 1/2] Samsung cleanup for 3.18
+Message-ID: <5418BC87.8000306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 10:57 AM, Andrew Bresticker wrote:
-> On Tue, Sep 16, 2014 at 8:26 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 09/15/2014 01:30 PM, Andrew Bresticker wrote:
->>>
->>> On Mon, Sep 15, 2014 at 11:09 AM, Stephen Warren <swarren@wwwdotorg.org>
->>> wrote:
->>>>
->>>> On 09/15/2014 11:06 AM, Andrew Bresticker wrote:
->>>>>
->>>>> On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net>
->>>>> wrote:
->>>>>>
->>>>>> On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org>
->>>>>> wrote:
->>>>>>>
->>>>>>> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net>
->>>>>>> wrote:
->>>>>>>>
->>>>>>>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org>
->>>>>>>> wrote:
->>>>>>>>>
->>>>>>>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net>
->>>>>>>>> wrote:
->>>>>>>>>>
->>>>>>>>>> On 2 September 2014 23:34, Andrew Bresticker
->>>>>>>>>> <abrestic@chromium.org> wrote:
->>>>>>>>>>>
->>>>>>>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0
->>>>>>>>>>> and
->>>>>>>>>>> USB3.0 memory sticks and ethernet dongles using controller
->>>>>>>>>>> firmware
->>>>>>>>>>> recently posted by Andrew Chew [2].
->>
->> ...
->>>>>
->>>>> Stephen, Thierry, have either of you had a chance to test this series?
->>>>
->>>>
->>>> I haven't had a chance to yet. I just went to try it out, and found that it
->>>> depends on a whole slew of other patches that I don't have. Is there a git
->>>> branch somewhere to save me having to track down all the dependencies?
->>>
->>> Yes, Tomeu has the branch he used for testing here:
->>> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=3.17rc4-xhci
->>
->> Hmm. That git server was quite reluctant to cough up its bits, but it did
->> eventually.
->>
->>> You'll also need the firmware Andrew Chew posted:
->>> https://patchwork.ozlabs.org/patch/384013/
->>
->> The XHCI driver can't load its firmware unless it's a module; if I make it
->> built-in, it fails immediately with error -2 during "Direct firmware
->> loading". The driver needs to work with either immediate or deferred
->> firmware loading.
->
-> If you want the driver to be built-in, you'll either need to build the
-> firmware in as well (i.e. EXTRA_FIRMWARE) or enable
-> FW_LOADER_USER_HELPER_FALLBACK to load with userspace/uevent (though
-> apparently this is deprecated).
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-Hmm. I didn't have to do that for the Atmel touchpad driver to work, but 
-perhaps it's just ignoring a firmware loading error, and continuing with 
-whatever is in the device's flash already.
+   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-It seems odd that such a fundamental feature would require a deprecated 
-Kconfig option. Is there some replacement that does the same thing that 
-isn't deprecated? The Kconfig help for the option doesn't say anything 
-useful...
+are available in the git repository at:
 
-Oh, this option doesn't actually seem to work. I see the following in dmesg:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-cleanup
 
-> [root at swarren-dt ~]# dmesg|grep -i -e xhci -e firmware
-> [    1.461773] xhci-tegra 70090000.usb: Failed to get supply 'avddio-pex': -517
-> [    1.468930] platform 70090000.usb: Driver xhci-tegra requests probe deferral
-> [    2.567966] xhci-tegra 70090000.usb: Direct firmware load for nvidia/tegra124/xusb.bin failed with error -2
-> [    2.577786] xhci-tegra 70090000.usb: Falling back to user helper
+for you to fetch changes up to f6361c6b3880063c2248d4e453331e3dc1efbf83:
 
-... but:
+   ARM: S3C24XX: remove separate restart code (2014-09-14 02:43:09 +0900)
 
-[root at swarren-dt ~]# lsusb
-unable to initialize libusb: -99
+----------------------------------------------------------------
+Samsung cleanup for 3.18
+- remove unused <mach/memory.h> in exynos
+- local <mach/regs-clock.h> for s5pv210
+- cleanup boot address calculate for exynos
+- remove separate restart code for s3c24xx
 
-Perhaps systemd-udevd doesn't implement firmware loading; is it 
-user-space udev that's deprecated implementing user-space firmware 
-loading, rather than the kernel deprecating support for calling out to 
-user space?
+----------------------------------------------------------------
+Heiko Stuebner (1):
+       ARM: S3C24XX: remove separate restart code
 
-This sucks, because now I can't just TFTP boot kernels but somehow have 
-to get updated kernel modules onto my device every time before testing a 
-new kernel build. That's a huge time-sink, unless I work out NFS root, 
-which probably isn't properly or easily supported by any distro.
+Krzysztof Kozlowski (1):
+       ARM: EXYNOS: Do not calculate boot address twice
+
+Kukjin Kim (1):
+       ARM: S5PV210: move <mach/regs-clock.h> into mach-s5pv210/
+
+Uwe Kleine-Koenig (1):
+       ARM: EXYNOS: remove unused <mach/memory.h>
+
+  arch/arm/mach-exynos/include/mach/memory.h         | 26 
+----------------------
+  arch/arm/mach-exynos/platsmp.c                     |  4 ++--
+  arch/arm/mach-s3c24xx/Kconfig                      |  2 --
+  arch/arm/mach-s3c24xx/common.c                     |  4 ----
+  arch/arm/mach-s3c24xx/common.h                     |  5 -----
+  .../mach-s3c24xx/include/mach/regs-s3c2443-clock.h |  2 --
+  arch/arm/mach-s3c24xx/mach-amlm5900.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-anubis.c                |  1 -
+  arch/arm/mach-s3c24xx/mach-at2440evb.c             |  1 -
+  arch/arm/mach-s3c24xx/mach-bast.c                  |  1 -
+  arch/arm/mach-s3c24xx/mach-gta02.c                 |  1 -
+  arch/arm/mach-s3c24xx/mach-h1940.c                 |  1 -
+  arch/arm/mach-s3c24xx/mach-jive.c                  |  1 -
+  arch/arm/mach-s3c24xx/mach-mini2440.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-n30.c                   |  2 --
+  arch/arm/mach-s3c24xx/mach-nexcoder.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-osiris.c                |  1 -
+  arch/arm/mach-s3c24xx/mach-otom.c                  |  1 -
+  arch/arm/mach-s3c24xx/mach-qt2410.c                |  1 -
+  arch/arm/mach-s3c24xx/mach-rx1950.c                |  1 -
+  arch/arm/mach-s3c24xx/mach-rx3715.c                |  1 -
+  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c            |  1 -
+  arch/arm/mach-s3c24xx/mach-smdk2410.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-smdk2413.c              |  3 ---
+  arch/arm/mach-s3c24xx/mach-smdk2416.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-smdk2440.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-smdk2443.c              |  1 -
+  arch/arm/mach-s3c24xx/mach-tct_hammer.c            |  1 -
+  arch/arm/mach-s3c24xx/mach-vr1000.c                |  1 -
+  arch/arm/mach-s3c24xx/mach-vstms.c                 |  1 -
+  arch/arm/mach-s3c24xx/s3c2410.c                    | 13 -----------
+  arch/arm/mach-s3c24xx/s3c2412.c                    | 23 
+-------------------
+  arch/arm/mach-s3c24xx/s3c2416.c                    |  8 -------
+  arch/arm/mach-s3c24xx/s3c2443.c                    |  8 -------
+  arch/arm/mach-s3c24xx/s3c244x.c                    | 12 ----------
+  arch/arm/mach-s5pv210/pm.c                         |  3 +--
+  .../mach-s5pv210/{include/mach => }/regs-clock.h   |  3 +--
+  arch/arm/mach-s5pv210/s5pv210.c                    |  2 +-
+  38 files changed, 5 insertions(+), 137 deletions(-)
+  delete mode 100644 arch/arm/mach-exynos/include/mach/memory.h
+  rename arch/arm/mach-s5pv210/{include/mach => }/regs-clock.h (99%)
