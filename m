@@ -1,213 +1,48 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue, 16 Sep 2014 19:35:19 +0300
-Subject: [PATCH 1/4] ARM: dts: cm-t54: add HDMI/DVI display data
-In-Reply-To: <1410885322-5928-1-git-send-email-lifshitz@compulab.co.il>
-References: <1410885322-5928-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1410885322-5928-2-git-send-email-lifshitz@compulab.co.il>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Tue, 16 Sep 2014 09:34:34 -0700
+Subject: [PATCH arm64-next v4] net: bpf: arm64: address randomize and
+ write protect JIT code
+In-Reply-To: <1410853730-16470-1-git-send-email-dborkman@redhat.com>
+References: <1410853730-16470-1-git-send-email-dborkman@redhat.com>
+Message-ID: <CABg9mcvgq+8jKYZYgO2+n68hNsFbz5=22XUpOJWgmsdcuZeMzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DSS related pinmux and display data nodes required to support HDMI
-and DVI video out on CM-T54.
+Hi Catalin, Will,
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
----
- arch/arm/boot/dts/omap5-cm-t54.dts |  158 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 158 insertions(+), 0 deletions(-)
+On Tue, Sep 16, 2014 at 12:48 AM, Daniel Borkmann <dborkman@redhat.com> wrote:
+[...]
+> +static void jit_fill_hole(void *area, unsigned int size)
+> +{
+> +       u32 *ptr;
+> +       /* We are guaranteed to have aligned memory. */
+> +       for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
+> +               *ptr++ = cpu_to_le32(AARCH64_BREAK_FAULT);
+> +}
+[...]
 
-diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
-index 429471a..9cb40d6 100644
---- a/arch/arm/boot/dts/omap5-cm-t54.dts
-+++ b/arch/arm/boot/dts/omap5-cm-t54.dts
-@@ -66,6 +66,69 @@
- 			default-state = "off";
- 		};
- 	};
-+
-+	aliases {
-+		display0 = &hdmi0;
-+		display1 = &dvi0;
-+	};
-+
-+	hdmi0: connector at 0 {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "a";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_conn_pins>;
-+
-+		hpd-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>; /* GPIO 193, HPD */
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_out>;
-+			};
-+		};
-+	};
-+
-+	tfp410: encoder at 0 {
-+		compatible = "ti,tfp410";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tfp410_in: endpoint at 0 {
-+					remote-endpoint = <&dpi_dvi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tfp410_out: endpoint at 0 {
-+					remote-endpoint = <&dvi_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dvi0: connector at 1 {
-+		compatible = "dvi-connector";
-+		label = "dvi";
-+
-+		digital;
-+
-+		ddc-i2c-bus = <&i2c2>;
-+
-+		port {
-+			dvi_connector_in: endpoint {
-+				remote-endpoint = <&tfp410_out>;
-+			};
-+		};
-+	};
- };
- 
- &omap5_pmx_core {
-@@ -88,6 +151,13 @@
- 		>;
- 	};
- 
-+	i2c2_pins: pinmux_i2c2_pins {
-+		pinctrl-single,pins = <
-+			OMAP5_IOPAD(0x01b8, PIN_INPUT | MUX_MODE0) /* i2c2_scl */
-+			OMAP5_IOPAD(0x01ba, PIN_INPUT | MUX_MODE0) /* i2c2_sda */
-+		>;
-+	};
-+
- 	mmc1_pins: pinmux_mmc1_pins {
- 		pinctrl-single,pins = <
- 			OMAP5_IOPAD(0x01e2, PIN_INPUT_PULLUP | MUX_MODE0) /* sdcard_clk */
-@@ -144,6 +214,53 @@
- 			OMAP5_IOPAD(0x00b6, PIN_OUTPUT | MUX_MODE6) /* hsi2_acdata.gpio3_83 */
- 		>;
- 	};
-+
-+	dss_hdmi_pins: pinmux_dss_hdmi_pins {
-+		pinctrl-single,pins = <
-+			OMAP5_IOPAD(0x013c, PIN_INPUT_PULLUP | MUX_MODE0) /* hdmi_cec.hdmi_cec */
-+			OMAP5_IOPAD(0x0140, PIN_INPUT | MUX_MODE0) /* hdmi_ddc_scl.hdmi_ddc_scl */
-+			OMAP5_IOPAD(0x0142, PIN_INPUT | MUX_MODE0) /* hdmi_ddc_sda.hdmi_ddc_sda */
-+		>;
-+	};
-+
-+	hdmi_conn_pins: pinmux_hdmi_conn_pins {
-+		pinctrl-single,pins = <
-+			OMAP5_IOPAD(0x013e, PIN_INPUT | MUX_MODE6) /* hdmi_hpd.gpio7_193 */
-+		>;
-+	};
-+
-+	dss_dpi_pins: pinmux_dss_dpi_pins {
-+		pinctrl-single,pins = <
-+			OMAP5_IOPAD(0x0104, PIN_OUTPUT | MUX_MODE3) /* dispc_data15 */
-+			OMAP5_IOPAD(0x0106, PIN_OUTPUT | MUX_MODE3) /* dispc_data14 */
-+			OMAP5_IOPAD(0x0108, PIN_OUTPUT | MUX_MODE3) /* dispc_data13 */
-+			OMAP5_IOPAD(0x010a, PIN_OUTPUT | MUX_MODE3) /* dispc_data12 */
-+			OMAP5_IOPAD(0x010c, PIN_OUTPUT | MUX_MODE3) /* dispc_data11 */
-+			OMAP5_IOPAD(0x010e, PIN_OUTPUT | MUX_MODE3) /* dispc_data10 */
-+			OMAP5_IOPAD(0x0110, PIN_OUTPUT | MUX_MODE3) /* dispc_data9 */
-+			OMAP5_IOPAD(0x0112, PIN_OUTPUT | MUX_MODE3) /* dispc_data8 */
-+			OMAP5_IOPAD(0x0114, PIN_OUTPUT | MUX_MODE3) /* dispc_data7 */
-+			OMAP5_IOPAD(0x0116, PIN_OUTPUT | MUX_MODE3) /* dispc_data6 */
-+			OMAP5_IOPAD(0x0118, PIN_OUTPUT | MUX_MODE3) /* dispc_data5 */
-+			OMAP5_IOPAD(0x011a, PIN_OUTPUT | MUX_MODE3) /* dispc_data4 */
-+			OMAP5_IOPAD(0x011c, PIN_OUTPUT | MUX_MODE3) /* dispc_data3 */
-+			OMAP5_IOPAD(0x011e, PIN_OUTPUT | MUX_MODE3) /* dispc_data2 */
-+			OMAP5_IOPAD(0x0120, PIN_OUTPUT | MUX_MODE3) /* dispc_data1 */
-+			OMAP5_IOPAD(0x0122, PIN_OUTPUT | MUX_MODE3) /* dispc_data0 */
-+			OMAP5_IOPAD(0x0124, PIN_OUTPUT | MUX_MODE3) /* dispc_vsync */
-+			OMAP5_IOPAD(0x0126, PIN_OUTPUT | MUX_MODE3) /* dispc_hsync */
-+			OMAP5_IOPAD(0x0128, PIN_OUTPUT | MUX_MODE3) /* dispc_de */
-+			OMAP5_IOPAD(0x012a, PIN_OUTPUT | MUX_MODE3) /* dispc_pclk */
-+			OMAP5_IOPAD(0x012c, PIN_OUTPUT | MUX_MODE3) /* dispc_data17 */
-+			OMAP5_IOPAD(0x012e, PIN_OUTPUT | MUX_MODE3) /* dispc_data16 */
-+			OMAP5_IOPAD(0x0130, PIN_OUTPUT | MUX_MODE3) /* dispc_data18 */
-+			OMAP5_IOPAD(0x0132, PIN_OUTPUT | MUX_MODE3) /* dispc_data19 */
-+			OMAP5_IOPAD(0x0134, PIN_OUTPUT | MUX_MODE3) /* dispc_data20 */
-+			OMAP5_IOPAD(0x0136, PIN_OUTPUT | MUX_MODE3) /* dispc_data21 */
-+			OMAP5_IOPAD(0x0138, PIN_OUTPUT | MUX_MODE3) /* dispc_data22 */
-+			OMAP5_IOPAD(0x013a, PIN_OUTPUT | MUX_MODE3) /* dispc_data23 */
-+		>;
-+	};
- };
- 
- &mmc1 {
-@@ -398,6 +515,13 @@
- 	};
- };
- 
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
-+	clock-frequency = <100000>;
-+};
-+
- &usbhshost {
- 	port2-mode = "ehci-hsic";
- 	port3-mode = "ehci-hsic";
-@@ -410,3 +534,37 @@
- &cpu0 {
- 	cpu0-supply = <&smps123_reg>;
- };
-+
-+&dss {
-+	status = "ok";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_dpi_pins>;
-+
-+	port {
-+		dpi_dvi_out: endpoint at 0 {
-+			remote-endpoint = <&tfp410_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
-+
-+&dsi2 {
-+ 	status = "ok";
-+ 	vdd-supply = <&ldo4_reg>;
-+};
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&ldo4_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dss_hdmi_pins>;
-+
-+	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&hdmi_connector_in>;
-+			lanes = <1 0 3 2 5 4 7 6>;
-+		};
-+	};
-+};
--- 
-1.7.5.4
+Out of curiosity, I looked at objdump of the above code.
+
+0000000000000088 <jit_fill_hole>:
+      88:       71000c3f        cmp     w1, #0x3
+      8c:       54000149        b.ls    b4 <jit_fill_hole+0x2c>
+      90:       51001022        sub     w2, w1, #0x4
+      94:       927e7442        and     x2, x2, #0xfffffffc
+      98:       91001042        add     x2, x2, #0x4
+      9c:       8b020002        add     x2, x0, x2
+      a0:       52840001        mov     w1, #0x2000
+ // #8192  <-- loops here
+      a4:       72ba8401        movk    w1, #0xd420, lsl #16
+      a8:       b8004401        str     w1, [x0],#4  <-- is there an
+optimization such that we loop here?
+      ac:       eb02001f        cmp     x0, x2
+      b0:       54ffff81        b.ne    a0 <jit_fill_hole+0x18>
+      b4:       d65f03c0        ret
+
+I'm wondering if there's any optimizations that'll generate code that
+loops at 0xa8 instead of 0xa0. w1 only needs to loaded with the
+constant once, but here we're reloading it on every iteration of the
+loop.
+
+Thanks,
+z
