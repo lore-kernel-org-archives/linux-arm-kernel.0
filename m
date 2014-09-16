@@ -1,162 +1,179 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 15 Sep 2014 17:17:47 -0700
-Subject: [PATCH v2] arm: prevent BUG_ON in audit_syscall_entry()
-In-Reply-To: <20140911163736.GV6158@arm.com>
-References: <1410238199-956-1-git-send-email-takahiro.akashi@linaro.org>
- <20140911163736.GV6158@arm.com>
-Message-ID: <541781AB.1050903@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 15 Sep 2014 17:22:51 -0700
+Subject: [PATCH v2] tty: serial: msm: Add earlycon support
+Message-ID: <1410826971-2943-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Add support for DT based and command line based early console on platforms
+with the msm serial hardware.
 
-Sorry for not responding quickly.
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-On 09/11/2014 09:37 AM, Will Deacon wrote:
-> Hi Akashi,
->
-> On Tue, Sep 09, 2014 at 05:49:59AM +0100, AKASHI Takahiro wrote:
->> BUG_ON() in audit_syscall_entry() will be hit if user issues syscall(-1)
->> while syscall auditing is enabled (that is, by starting auditd).
->
-> [...]
->
->> diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
->> index f555bb3..de01145 100644
->> --- a/arch/arm/include/asm/traps.h
->> +++ b/arch/arm/include/asm/traps.h
->> @@ -49,6 +49,7 @@ static inline int in_exception_text(unsigned long ptr)
->>   extern void __init early_trap_init(void *);
->>   extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
->>   extern void ptrace_break(struct task_struct *tsk, struct pt_regs *regs);
->> +extern int arm_syscall(int no, struct pt_regs *regs);
->>
->>   extern void *vectors_page;
->>
->> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->> index e52fe5a..28d3931 100644
->> --- a/arch/arm/kernel/entry-common.S
->> +++ b/arch/arm/kernel/entry-common.S
->> @@ -426,7 +426,6 @@ ENTRY(vector_swi)
->>   local_restart:
->>   	ldr	r10, [tsk, #TI_FLAGS]		@ check for syscall tracing
->>   	stmdb	sp!, {r4, r5}			@ push fifth and sixth args
->> -
->
-> You don't need this cosmetic change.
+Changes since v1:
+ * Add kernel commandline support
 
-Typo. I will fix it.
+ Documentation/kernel-parameters.txt | 12 ++++++
+ drivers/tty/serial/Kconfig          |  1 +
+ drivers/tty/serial/msm_serial.c     | 74 +++++++++++++++++++++++++++++++------
+ 3 files changed, 75 insertions(+), 12 deletions(-)
 
->>   	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
->>   	bne	__sys_trace
->>
->> @@ -476,10 +475,11 @@ __sys_trace:
->>   	cmp	scno, #-1			@ skip the syscall?
->>   	bne	2b
->>   	add	sp, sp, #S_OFF			@ restore stack
->> -	b	ret_slow_syscall
->> +	b	__sys_trace_return_skipped
->
-> Can't you just remove the add as well, them fall-through here?
-
-I'm afraid that we can't remove this branch because we don't want to override
-a value of r0 in regs which a tracer may have already changed while skipping
-a syscall.
-
->>
->>   __sys_trace_return:
->>   	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
->> +__sys_trace_return_skipped:
->>   	mov	r0, sp
->>   	bl	syscall_trace_exit
->>   	b	ret_slow_syscall
->> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
->> index 0c27ed6..68b42cd 100644
->> --- a/arch/arm/kernel/ptrace.c
->> +++ b/arch/arm/kernel/ptrace.c
->> @@ -930,7 +930,9 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->>
->>   asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->>   {
->> -	current_thread_info()->syscall = scno;
->> +	int orig_scno;
->> +
->> +	current_thread_info()->syscall = orig_scno = scno;
->>
->>   	/* Do the secure computing check first; failures should be fast. */
->>   	if (secure_computing(scno) == -1)
->> @@ -941,31 +943,40 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->>
->>   	scno = current_thread_info()->syscall;
->>
->> -	if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->> -		trace_sys_enter(regs, scno);
->> +	if (scno >= 0 && scno < NR_syscalls) {
->
-> Is this supposed to work for OABI? If so, better use __NR_SYSCALL_BASE.
-
-Good point. I'm not quite sure how it works for OABI, but looking into entry-comon.S,
-there is some code:
- > #if defined(CONFIG_OABI_COMPAT)
- >         bics    r10, r10, #0xff000000
- >         eorne   scno, r10, #__NR_OABI_SYSCALL_BASE
- >         ldrne   tbl, =sys_oabi_call_table
- > #elif !defined(CONFIG_AEABI)
- >         bic     scno, scno, #0xff000000         @ mask off SWI op-code
- >         eor     scno, scno, #__NR_SYSCALL_BASE  @ check OS number
- > #endif
- >
- > local_restart:
-
-It seems to me that scno, actually r7 in regs, is already offset.
-
->> +		if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->> +			trace_sys_enter(regs, scno);
->> +
->> +		audit_syscall_entry(AUDIT_ARCH_ARM, scno,
->> +				    regs->ARM_r0, regs->ARM_r1,
->> +				    regs->ARM_r2, regs->ARM_r3);
->> +	}
->>
->> -	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
->> -			    regs->ARM_r2, regs->ARM_r3);
->> +	/* user-issued syscall of -1 */
->> +	if (scno == -1 && orig_scno == -1)
->
-> Make this an else if, for clarity?
-
-Sure. I will fix it.
-
->> +		arm_syscall(scno, regs);
->
-> Doesn't this always result in bad_syscall being called, which sends a SIGILL
-> to the task? Shouldn't we simply return -ENOSYS instead? You could do that
-> in the assembly code.
-
-I meant so (that is, resulting in bad_syscall).
-As I mentioned earlier, a task calling syscall(-1, or whatever native value) is always
-signaled on arm. Meanwhile, whether it is intended or not, this behavior is not simulated
-in the current arm64 compat syscalls.
-
->>   	return scno;
->>   }
->>
->>   asmlinkage void syscall_trace_exit(struct pt_regs *regs)
->>   {
->> -	/*
->> -	 * Audit the syscall before anything else, as a debugger may
->> -	 * come in and change the current registers.
->> -	 */
->> -	audit_syscall_exit(regs);
->> +	if (current_thread_info()->syscall < NR_syscalls) {
->
-> Again, not going to work for OABI.
-
-The same comment above.
-
-Thanks,
--Takahiro AKASHI
-
-
-> Will
->
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 5ae8608ca9f5..22302931e9d4 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -936,6 +936,18 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			must already be setup and configured. Options are not
+ 			yet supported.
+ 
++		msm_serial,<addr>
++			Start an early, polled-mode console on an msm serial
++			port at the specified address. The serial port
++			must already be setup and configured. Options are not
++			yet supported.
++
++		msm_serial_dm,<addr>
++			Start an early, polled-mode console on an msm serial
++			dm port at the specified address. The serial port
++			must already be setup and configured. Options are not
++			yet supported.
++
+ 		smh	Use ARM semihosting calls for early console.
+ 
+ 	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 81f6ee7d4223..d609d605f712 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1070,6 +1070,7 @@ config SERIAL_MSM_CONSOLE
+ 	bool "MSM serial console support"
+ 	depends on SERIAL_MSM=y
+ 	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
+ 
+ config SERIAL_MSM_HS
+ 	tristate "MSM UART High Speed: Serial Driver"
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index 4f9640d0b1bb..4b6c78331a64 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -845,22 +845,15 @@ static inline struct uart_port *get_port_from_line(unsigned int line)
+ }
+ 
+ #ifdef CONFIG_SERIAL_MSM_CONSOLE
+-static void msm_console_write(struct console *co, const char *s,
+-			      unsigned int count)
++static void __msm_console_write(struct uart_port *port, const char *s,
++				unsigned int count, bool is_uartdm)
+ {
+ 	int i;
+-	struct uart_port *port;
+-	struct msm_port *msm_port;
+ 	int num_newlines = 0;
+ 	bool replaced = false;
+ 	void __iomem *tf;
+ 
+-	BUG_ON(co->index < 0 || co->index >= UART_NR);
+-
+-	port = get_port_from_line(co->index);
+-	msm_port = UART_TO_MSM(port);
+-
+-	if (msm_port->is_uartdm)
++	if (is_uartdm)
+ 		tf = port->membase + UARTDM_TF;
+ 	else
+ 		tf = port->membase + UART_TF;
+@@ -872,7 +865,7 @@ static void msm_console_write(struct console *co, const char *s,
+ 	count += num_newlines;
+ 
+ 	spin_lock(&port->lock);
+-	if (msm_port->is_uartdm)
++	if (is_uartdm)
+ 		reset_dm_count(port, count);
+ 
+ 	i = 0;
+@@ -881,7 +874,7 @@ static void msm_console_write(struct console *co, const char *s,
+ 		unsigned int num_chars;
+ 		char buf[4] = { 0 };
+ 
+-		if (msm_port->is_uartdm)
++		if (is_uartdm)
+ 			num_chars = min(count - i, (unsigned int)sizeof(buf));
+ 		else
+ 			num_chars = 1;
+@@ -910,6 +903,20 @@ static void msm_console_write(struct console *co, const char *s,
+ 	spin_unlock(&port->lock);
+ }
+ 
++static void msm_console_write(struct console *co, const char *s,
++			      unsigned int count)
++{
++	struct uart_port *port;
++	struct msm_port *msm_port;
++
++	BUG_ON(co->index < 0 || co->index >= UART_NR);
++
++	port = get_port_from_line(co->index);
++	msm_port = UART_TO_MSM(port);
++
++	__msm_console_write(port, s, count, msm_port->is_uartdm);
++}
++
+ static int __init msm_console_setup(struct console *co, char *options)
+ {
+ 	struct uart_port *port;
+@@ -952,6 +959,49 @@ static int __init msm_console_setup(struct console *co, char *options)
+ 	return uart_set_options(port, co, baud, parity, bits, flow);
+ }
+ 
++static void
++msm_serial_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	__msm_console_write(&dev->port, s, n, false);
++}
++
++static int __init
++msm_serial_early_console_setup(struct earlycon_device *device, const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = msm_serial_early_write;
++	return 0;
++}
++EARLYCON_DECLARE(msm_serial, msm_serial_early_console_setup);
++OF_EARLYCON_DECLARE(msm_serial, "qcom,msm-uart",
++		    msm_serial_early_console_setup);
++
++static void
++msm_serial_early_write_dm(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	__msm_console_write(&dev->port, s, n, true);
++}
++
++static int __init
++msm_serial_early_console_setup_dm(struct earlycon_device *device,
++				  const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = msm_serial_early_write_dm;
++	return 0;
++}
++EARLYCON_DECLARE(msm_serial_dm, msm_serial_early_console_setup_dm);
++OF_EARLYCON_DECLARE(msm_serial_dm, "qcom,msm-uartdm",
++		    msm_serial_early_console_setup_dm);
++
+ static struct uart_driver msm_uart_driver;
+ 
+ static struct console msm_console = {
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
