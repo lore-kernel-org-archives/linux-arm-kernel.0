@@ -1,71 +1,47 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 16 Sep 2014 11:50:06 +0200
-Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <20140916034123.GA20800@Robin-OptiPlex-780>
-References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
- <1410774073.3314.1.camel@pengutronix.de>
- <20140916034123.GA20800@Robin-OptiPlex-780>
-Message-ID: <1410861006.2746.1.camel@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 Sep 2014 18:04:00 +0800
+Subject: [PATCH v3 0/2] clk: sun8i: Add MBUS support
+Message-ID: <1410861842-2743-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi,
 
-Am Dienstag, den 16.09.2014, 11:41 +0800 schrieb Robin Gong:
-> Hi Lucas,
->   I understood your concern,but looks we have to break old DT.
+This is v3 of my sun8i MBUS clock series.
 
-Sorry, but this isn't going to happen. And honestly I don't even see the
-need to do so.
+This series depends on Maxime's "clk: sunxi: Improve MMC clocks support"
+series, specifically the patches that change the factor clocks and move
+out mod0 and mbus. Ideally this series should also be merged after my
+"clk: sun6i: Unify AHB1 clock and fix rate calculation" for the PLL6
+corrections, but I don't think it would cause any issues if it didn't.
 
-> Our old DT
-> support SPI DMA on i.mx6q/dl(v2,b3810c3dc1bcbc6a), but the DMA support patch
-> for SPI driver is still in reviewing(v6).
+Patch 1 adds the sun8i specific MBUS clock driver.
 
-So this means now is the time to fix this driver patch to not enable DMA
-on imx6dl. Nobody will experience any breakage in this case.
+Patch 2 adds proper PLL6 and MBUS clock nodes to the DT, with a dummy
+PLL5 clock node as a parent to MBUS.
 
-> So the violation you mentioned comes
-> if someone use the DT during the time(from v2 to spi driver patch upstreamed).
->   The different behaviors on different chips(only i.mxdl can't pass strength
-> test) are just found from last month, this is why I sent the patch for disable
-> SPI DMA support on i.mx6dl during I sent v6 patch for spi driver. I think that's
-> make sense, because DTs are also in development, new difference between different
-> chips maybe found in the future although they share the same IP....
->   Yes, I can check cpu type by looking at DT in spi driver, but it's not nice.
+Changes since v2:
+  - Fixed multi-line comment style
 
-Yeah it would have been nicer if we had an explicit DT compatible for
-the imx6dl ecspi version, but it's not there, so we have to cope with
-this.
+Changes since v1:
+  - Added commit message to patch 1
+  - Moved sun8i-mbus clk to separate file
 
-> So I'm afraid that we have to break the old DTs in the gap between the two
-> levels patch accepted cycle.
-> 
-> On Mon, Sep 15, 2014 at 11:41:13AM +0200, Lucas Stach wrote:
-> > Am Mittwoch, den 10.09.2014, 13:30 +0800 schrieb Robin Gong:
-> > > There is one weird data in rxfifo after one full rx/tx transfer
-> > > done sometimes. It looks a design issue and hard to workaround
-> > > totally, so disable dma functhion here. And will re-enable it
-> > > once the root cause found.
-> > > 
-> > Sorry, I'm late to this as Shawn seems to already have picked up this
-> > patch, but this isn't the right way to fix the problem.
-> > 
-> > We made it clear at kernel summit last year that we try to not break
-> > existing DTs as booting a new kernel with an old DT is a valid use case.
-> > While you don't strictly violate this rule what you do here is only
-> > fixing systems booting with a new DT while leaving others broken.
-> > 
-> > If you are working around a hardware problem please disable DMA support
-> > in the driver. This will also allow you to enable it again, if you find
-> > another workaround without touching the DT again.
-> > 
-> > So this patch gets a NAK from me.
-> > 
 
-Regards,
-Lucas
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  clk: sunxi: Add sun8i MBUS clock support
+  ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ arch/arm/boot/dts/sun8i-a23.dtsi                  | 29 ++++++++-
+ drivers/clk/sunxi/Makefile                        |  1 +
+ drivers/clk/sunxi/clk-sun8i-mbus.c                | 78 +++++++++++++++++++++++
+ 4 files changed, 107 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-sun8i-mbus.c
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+2.1.0
