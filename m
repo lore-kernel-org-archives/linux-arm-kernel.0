@@ -1,96 +1,146 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Tue, 16 Sep 2014 13:29:23 -0700
-Subject: [PATCH] arm64: bpf: add 'load 64-bit immediate' instruction
-In-Reply-To: <1410892655-17818-1-git-send-email-zlim.lnx@gmail.com>
-References: <1410892655-17818-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <1410899363-27635-1-git-send-email-zlim.lnx@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 16 Sep 2014 15:31:40 -0500
+Subject: [PATCH] arm: omap2: n8x0: move i2c devices to DT
+Message-ID: <1410899500-21323-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, Will,
+By moving i2c devices to DT we can clean up
+i2c_board_info and fix a problem with moving
+INTC to irq domain where IRQs can be renumbered
+on each boot.
 
-Please consider applying this after -rc1 as well. [1]
-
-Let me know how you prefer to handle these patches and I can repost
-as necessary.
-
-Thanks,
-z
-
-[1] https://lkml.org/lkml/2014/9/16/418
->8------------------------------------------------------8<
-
-Commit 02ab695bb37e (net: filter: add "load 64-bit immediate" eBPF
-instruction) introduced a new eBPF instruction. Let's add support
-for this for arm64 as well.
-
-Our arm64 eBPF JIT compiler now passes the new "load 64-bit
-immediate" test case introduced in the same commit 02ab695bb37e.
-
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Alexei Starovoitov <ast@plumgrid.com>
+Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm64/net/bpf_jit_comp.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/omap2420-n810.dts         |  7 +++++++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi |  6 ++++++
+ arch/arm/mach-omap2/board-n8x0.c            | 26 +++-----------------------
+ arch/arm/mach-omap2/common-board-devices.h  |  5 +++++
+ arch/arm/mach-omap2/pdata-quirks.c          |  2 ++
+ 5 files changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 80cc769..618d2cd 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -205,6 +205,12 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	emit(A64_RET(A64_LR), ctx);
+diff --git a/arch/arm/boot/dts/omap2420-n810.dts b/arch/arm/boot/dts/omap2420-n810.dts
+index 21baec1..b604d26 100644
+--- a/arch/arm/boot/dts/omap2420-n810.dts
++++ b/arch/arm/boot/dts/omap2420-n810.dts
+@@ -6,3 +6,10 @@
+ 	model = "Nokia N810";
+ 	compatible = "nokia,n810", "nokia,n8x0", "ti,omap2420", "ti,omap2";
+ };
++
++&i2c2 {
++	aic3x at 18 {
++		compatible = "tlv320aic3x";
++		reg = <0x18>;
++	};
++};
+diff --git a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+index 89608b2..24c50db 100644
+--- a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
++++ b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+@@ -27,6 +27,12 @@
+ 
+ &i2c1 {
+ 	clock-frequency = <400000>;
++
++	pmic at 72 {
++		compatible = "menelaus";
++		reg = <0x72>;
++		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
++	};
+ };
+ 
+ &i2c2 {
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index aead77a..97767a2 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -33,6 +33,7 @@
+ #include "mmc.h"
+ #include "soc.h"
+ #include "gpmc-onenand.h"
++#include "common-board-devices.h"
+ 
+ #define TUSB6010_ASYNC_CS	1
+ #define TUSB6010_SYNC_CS	4
+@@ -568,29 +569,14 @@ static int n8x0_menelaus_late_init(struct device *dev)
  }
+ #endif
  
-+/* JITs an eBPF instruction.
-+ * Returns:
-+ * 0  - successfully JITed an 8-byte eBPF instruction.
-+ * >0 - successfully JITed a 16-byte eBPF instruction.
-+ * <0 - failed to JIT.
-+ */
- static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+-static struct menelaus_platform_data n8x0_menelaus_platform_data __initdata = {
++struct menelaus_platform_data n8x0_menelaus_platform_data __initdata = {
+ 	.late_init = n8x0_menelaus_late_init,
+ };
+ 
+-static struct i2c_board_info __initdata n8x0_i2c_board_info_1[] __initdata = {
+-	{
+-		I2C_BOARD_INFO("menelaus", 0x72),
+-		.irq = 7 + OMAP_INTC_START,
+-		.platform_data = &n8x0_menelaus_platform_data,
+-	},
+-};
+-
+-static struct aic3x_pdata n810_aic33_data __initdata = {
++struct aic3x_pdata n810_aic33_data __initdata = {
+ 	.gpio_reset = 118,
+ };
+ 
+-static struct i2c_board_info n810_i2c_board_info_2[] __initdata = {
+-	{
+-		I2C_BOARD_INFO("tlv320aic3x", 0x18),
+-		.platform_data = &n810_aic33_data,
+-	},
+-};
+-
+ static int __init n8x0_late_initcall(void)
  {
- 	const u8 code = insn->code;
-@@ -464,6 +470,27 @@ emit_cond_jmp:
- 		emit(A64_B(jmp_offset), ctx);
- 		break;
+ 	if (!board_caps)
+@@ -612,11 +598,5 @@ void * __init n8x0_legacy_init(void)
+ 	board_check_revision();
+ 	spi_register_board_info(n800_spi_board_info,
+ 				ARRAY_SIZE(n800_spi_board_info));
+-	i2c_register_board_info(0, n8x0_i2c_board_info_1,
+-				ARRAY_SIZE(n8x0_i2c_board_info_1));
+-	if (board_is_n810())
+-		i2c_register_board_info(1, n810_i2c_board_info_2,
+-					ARRAY_SIZE(n810_i2c_board_info_2));
+-
+ 	return &mmc1_data;
+ }
+diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
+index f338177..07c88ae 100644
+--- a/arch/arm/mach-omap2/common-board-devices.h
++++ b/arch/arm/mach-omap2/common-board-devices.h
+@@ -1,6 +1,8 @@
+ #ifndef __OMAP_COMMON_BOARD_DEVICES__
+ #define __OMAP_COMMON_BOARD_DEVICES__
  
-+	/* dst = imm64 */
-+	case BPF_LD | BPF_IMM | BPF_DW:
-+	{
-+		const struct bpf_insn insn1 = insn[1];
-+		u64 imm64;
-+
-+		if (insn1.code != 0 || insn1.src_reg != 0 ||
-+		    insn1.dst_reg != 0 || insn1.off != 0) {
-+			/* Note: verifier in BPF core must catch invalid
-+			 * instructions.
-+			 */
-+			pr_err_once("Invalid BPF_LD_IMM64 instruction\n");
-+			return -EINVAL;
-+		}
-+
-+		imm64 = (u64)insn1.imm << 32 | imm;
-+		emit_a64_mov_i64(dst, imm64, ctx);
-+
-+		return 1;
-+	}
-+
- 	/* LDX: dst = *(size *)(src + off) */
- 	case BPF_LDX | BPF_MEM | BPF_W:
- 	case BPF_LDX | BPF_MEM | BPF_H:
-@@ -615,6 +642,10 @@ static int build_body(struct jit_ctx *ctx)
- 			ctx->offset[i] = ctx->idx;
++#include <sound/tlv320aic3x.h>
++#include <linux/mfd/menelaus.h>
+ #include "twl-common.h"
  
- 		ret = build_insn(insn, ctx);
-+		if (ret > 0) {
-+			i++;
-+			continue;
-+		}
- 		if (ret)
- 			return ret;
- 	}
+ #define NAND_BLOCK_SIZE	SZ_128K
+@@ -12,4 +14,7 @@ void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+ 		       struct ads7846_platform_data *board_pdata);
+ void *n8x0_legacy_init(void);
+ 
++extern struct menelaus_platform_data n8x0_menelaus_platform_data;
++extern struct aic3x_pdata n810_aic33_data;
++
+ #endif /* __OMAP_COMMON_BOARD_DEVICES__ */
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 8695fd4..06a0ccf 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -336,6 +336,8 @@ static struct pdata_init auxdata_quirks[] __initdata = {
+ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_MACH_NOKIA_N8X0
+ 	OF_DEV_AUXDATA("ti,omap2420-mmc", 0x4809c000, "mmci-omap.0", NULL),
++	OF_DEV_AUXDATA("menelaus", 0x72, "1-0072", &n8x0_menelaus_platform_data),
++	OF_DEV_AUXDATA("tlv320aic3x", 0x18, "2-0018", &n810_aic33_data),
+ #endif
+ #ifdef CONFIG_ARCH_OMAP3
+ 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002030, "48002030.pinmux", &pcs_pdata),
 -- 
-1.9.1
+2.0.1.563.g66f467c
