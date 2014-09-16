@@ -1,65 +1,87 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Mon, 15 Sep 2014 19:47:22 -0500
-Subject: [RFC PATCH for AMD Seattle 0/4] Drivers for AMD-Seatlle to boot from
- ACPI
-Message-ID: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
+Date: Mon, 15 Sep 2014 19:47:23 -0500
+Subject: [PATCH 1/4] ata: ahci_platform: Add ACPI support for AMD Seattle SATA
+ controller
+In-Reply-To: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1410828446-28502-2-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-As a follow up of the email thread:
+This patch adds ACPI match table in ahci_platform. The table includes
+the acpi_device_id to match AMD Seattle SATA controller with following
+asl structure in DSDT:
 
-    [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
-    https://lkml.org/lkml/2014/9/1/446
+    Device (SATA0)
+    {
+      Name(_HID, "AMDI0600")	// Seattle AHSATA
+      Name (_CCA, 1)		// Cache-coherent controller
+      Name (_CRS, ResourceTemplate ()
+      {
+        Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
+        Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
+      })
+    }
 
-Besides Hanjun Guo's patches above, these are the additional patches required
-to boot AMD Seattle platform with full ACPI support:
+Also, since ATA driver should not require PCI support for ATA_ACPI,
+this patch removes dependency in the driver/ata/Kconfig.
+---
+ drivers/ata/Kconfig         |  2 +-
+ drivers/ata/ahci_platform.c | 13 +++++++++++++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-    [PATCH] efi/arm64: efistub: don't abort if base of DRAM is occupied
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272274.html
-
-    [PATCH v2] efi/arm64: fix fdt-related memory reservation
-    https://lkml.org/lkml/2014/9/8/483
-
-    [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle SATA controller
-    https://lkml.org/lkml/2014/9/9/834
-
-    [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
-    https://lkml.org/lkml/2014/9/1/448
-    (NOTE: This is not meant to be submitted upstream, but required to enable
-     ACPI support for UART SBSA driver.)
-
-These patches are rebased from the linux-3.17-rc4 upstream kernel, and 
-compatible with the AMD Seattle Firmware version ROD0070C.
-The full kernel boot log can be found here:
-
-    http://people.linaro.org/~al.stone/seattle-boot-acpi-dmesg.txt
-
-Suravee / Al
-
-Ard Biesheuvel (1):
-  arm64/efi: efistub: don't abort if base of DRAM is occupied
-
-Grame Gregory (1):
-  [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
-
-Mark Salter (1):
-  efi/arm64: fix fdt-related memory reservation
-
-Suravee Suthikulpanit (1):
-  ata: ahci_platform: Add ACPI support for AMD Seattle SATA controller
-
- arch/arm64/kernel/efi-stub.c       |  16 +-
- arch/arm64/mm/init.c               |   3 +-
- drivers/ata/Kconfig                |   2 +-
- drivers/ata/ahci_platform.c        |  13 ++
- drivers/firmware/efi/libstub/fdt.c |  10 +-
- drivers/tty/Kconfig                |   6 +
- drivers/tty/Makefile               |   1 +
- drivers/tty/sbsauart.c             | 328 +++++++++++++++++++++++++++++++++++++
- 8 files changed, 365 insertions(+), 14 deletions(-)
- create mode 100644 drivers/tty/sbsauart.c
-
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index e1b9278..f2e6c9e 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
+ 
+ config ATA_ACPI
+ 	bool "ATA ACPI Support"
+-	depends on ACPI && PCI
++	depends on ACPI
+ 	default y
+ 	help
+ 	  This option adds support for ATA-related ACPI objects.
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index f61ddb9..3499bab 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -20,6 +20,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/libata.h>
+ #include <linux/ahci_platform.h>
++#ifdef CONFIG_ATA_ACPI
++#include <linux/acpi.h>
++#endif
+ #include "ahci.h"
+ 
+ static const struct ata_port_info ahci_port_info = {
+@@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, ahci_of_match);
+ 
++#ifdef CONFIG_ATA_ACPI
++static const struct acpi_device_id ahci_acpi_match[] = {
++	{ "AMDI0600", 0 }, /* AMD Seattle AHCI */
++	{ },
++};
++#endif
++
+ static struct platform_driver ahci_driver = {
+ 	.probe = ahci_probe,
+ 	.remove = ata_platform_remove_one,
+@@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
+ 		.name = "ahci",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = ahci_of_match,
++#ifdef CONFIG_ATA_ACPI
++		.acpi_match_table = ACPI_PTR(ahci_acpi_match),
++#endif
+ 		.pm = &ahci_pm_ops,
+ 	},
+ };
 -- 
 1.9.3
