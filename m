@@ -1,75 +1,26 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Sep 2014 14:52:59 +0200
-Subject: [PATCH] ARM: cacheflush: Fix exynos build breakage on ARMv6 by using
- macros for ISB/DSB
-Message-ID: <1410871979-12470-1-git-send-email-k.kozlowski@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 16 Sep 2014 14:57:36 +0200
+Subject: [PATCH 00/16 v9] omap 8250 based uart + DMA
+In-Reply-To: <5416D2A0.5020407@linutronix.de>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <20140912224324.GK18849@atomide.com> <5416D2A0.5020407@linutronix.de>
+Message-ID: <541833C0.5020106@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
-time options (e.g. by building allmodconfig):
+On 09/15/2014 01:50 PM, Sebastian Andrzej Siewior wrote:
+> I changed the restore function the fix the am335x-evm + less "freeze".
+> And now we have this. So let me search?
 
-$ make allmodconfig
-$ make
-  CC      arch/arm/mach-exynos/platsmp.o
-/tmp/ccdQM0Eg.s: Assembler messages:
-/tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode `isb '
-/tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode `isb '
-/tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode `dsb '
-make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
+IER was 0 by accident. It fixed in TX path.
+I pushed uart_v10_pre1 which should have it fixed aport from other
+things?
+I am going to address the review comments, to split the DMA callbacks
+as requested and if nobody comes up with something fancy we will have a
+v10 :)
 
-The error was introduced in commit "ARM: EXYNOS: Move code from
-hotplug.c to platsmp.c".  Previously code using
-v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
-this flag dissapeared during the movement.
+>> Regards,
+>>
+>> Tony
 
-Use isb() and dsb() macros in v7_exit_coherency_flush() so the proper
-code will be generated for ARMv6.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reported-by: Mark Brown <broonie@kernel.org>
-Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
----
- arch/arm/include/asm/cacheflush.h | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index 79ecb4f34ffb..b74eeec971c0 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -464,22 +464,27 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
-  *   CONFIG_FRAME_POINTER=y.  ip is saved as well if ever r12-clobbering
-  *   trampoline are inserted by the linker and to keep sp 64-bit aligned.
-  */
--#define v7_exit_coherency_flush(level) \
-+#define v7_exit_coherency_flush(level) do { \
- 	asm volatile( \
- 	"stmfd	sp!, {fp, ip} \n\t" \
- 	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
- 	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
- 	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR \n\t" \
--	"isb	\n\t" \
-+	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
-+	      "r9","r10","lr","memory" ); \
-+	isb(); \
-+	asm volatile( \
- 	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
- 	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR \n\t" \
- 	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
- 	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR \n\t" \
--	"isb	\n\t" \
--	"dsb	\n\t" \
--	"ldmfd	sp!, {fp, ip}" \
- 	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
--	      "r9","r10","lr","memory" )
-+	      "r9","r10","lr","memory" ); \
-+	isb(); \
-+	dsb(); \
-+	asm volatile( \
-+	"ldmfd	sp!, {fp, ip}" ); \
-+	} while (0)
- 
- int set_memory_ro(unsigned long addr, int numpages);
- int set_memory_rw(unsigned long addr, int numpages);
--- 
-1.9.1
+Sebastian
