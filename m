@@ -1,392 +1,400 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 16 Sep 2014 20:48:57 +0200
-Subject: [PATCH/RFC v2 10/12] ARM: shmobile: r8a7740 dtsi: Add PM domain
- support
+Date: Tue, 16 Sep 2014 20:48:58 +0200
+Subject: [PATCH/RFC v2 11/12] ARM: shmobile: r8a7740 dtsi: Add PM QoS device
+ latencies
 In-Reply-To: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
 References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1410893339-6361-11-git-send-email-geert+renesas@glider.be>
+Message-ID: <1410893339-6361-12-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the System Controller, with subnodes that
-represent the hardware power area hierarchy.
-Hook up all devices to their respective PM domains.
+For now use 250 ?s, just like the legacy platform code does.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
-  - Insert power-domains property after clock-names property in the cmt1
-    node.
+  - New
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 121 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 121 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 136 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 136 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 502483f4dccb2f45..ed0adeb61a1ad8ec 100644
+index ed0adeb61a1ad8ec..713170442b7bd4b2 100644
 --- a/arch/arm/boot/dts/r8a7740.dtsi
 +++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -25,6 +25,7 @@
- 			device_type = "cpu";
+@@ -26,6 +26,10 @@
  			reg = <0x0>;
  			clock-frequency = <800000000>;
-+			power-domains = <&pd_a3sm>;
+ 			power-domains = <&pd_a3sm>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  		};
  	};
  
-@@ -47,6 +48,7 @@
- 		interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
+@@ -49,6 +53,10 @@
  		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
  		clock-names = "fck";
-+		power-domains = <&pd_c5>;
+ 		power-domains = <&pd_c5>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  
  		renesas,channels-mask = <0x3f>;
  
-@@ -72,6 +74,7 @@
- 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -75,6 +83,10 @@
  			      0 149 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
-+		power-domains = <&pd_a4s>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  	};
  
  	/* irqpin1: IRQ8 - IRQ15 */
-@@ -93,6 +96,7 @@
- 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -97,6 +109,10 @@
  			      0 149 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
-+		power-domains = <&pd_a4s>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  	};
  
  	/* irqpin2: IRQ16 - IRQ23 */
-@@ -114,6 +118,7 @@
- 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -119,6 +135,10 @@
  			      0 149 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
-+		power-domains = <&pd_a4s>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  	};
  
  	/* irqpin3: IRQ24 - IRQ31 */
-@@ -135,6 +140,7 @@
- 			      0 149 IRQ_TYPE_LEVEL_HIGH
+@@ -141,6 +161,10 @@
  			      0 149 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
-+		power-domains = <&pd_a4s>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  	};
  
  	ether: ethernet at e9a00000 {
-@@ -143,6 +149,7 @@
- 		      <0xe9a01800 0x800>;
+@@ -150,6 +174,10 @@
  		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp3_clks R8A7740_CLK_GETHER>;
-+		power-domains = <&pd_a4s>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		phy-mode = "mii";
  		#address-cells = <1>;
  		#size-cells = <0>;
-@@ -159,6 +166,7 @@
- 			      0 203 IRQ_TYPE_LEVEL_HIGH
+@@ -167,6 +195,10 @@
  			      0 204 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp1_clks R8A7740_CLK_IIC0>;
-+		power-domains = <&pd_a4r>;
+ 		power-domains = <&pd_a4r>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -172,6 +180,7 @@
- 			      0 72 IRQ_TYPE_LEVEL_HIGH
+@@ -181,6 +213,10 @@
  			      0 73 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp3_clks R8A7740_CLK_IIC1>;
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -181,6 +190,7 @@
- 		interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
+@@ -191,6 +227,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA0>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -190,6 +200,7 @@
- 		interrupts = <0 101 IRQ_TYPE_LEVEL_HIGH>;
+@@ -201,6 +241,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA1>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -199,6 +210,7 @@
- 		interrupts = <0 102 IRQ_TYPE_LEVEL_HIGH>;
+@@ -211,6 +255,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA0>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -208,6 +220,7 @@
- 		interrupts = <0 103 IRQ_TYPE_LEVEL_HIGH>;
+@@ -221,6 +269,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA3>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -217,6 +230,7 @@
- 		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
+@@ -231,6 +283,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA4>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -226,6 +240,7 @@
- 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
+@@ -241,6 +297,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA5>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -235,6 +250,7 @@
- 		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
+@@ -251,6 +311,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA6>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -244,6 +260,7 @@
- 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+@@ -261,6 +325,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFA7>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -253,6 +270,7 @@
- 		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
+@@ -271,6 +339,10 @@
  		clocks = <&mstp2_clks R8A7740_CLK_SCIFB>;
  		clock-names = "sci_ick";
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -271,12 +289,14 @@
- 			<&irqpin2 4 0>, <&irqpin2 5 0>, <&irqpin2 6 0>, <&irqpin2 7 0>,
+@@ -290,6 +362,10 @@
  			<&irqpin3 0 0>, <&irqpin3 1 0>, <&irqpin3 2 0>, <&irqpin3 3 0>,
  			<&irqpin3 4 0>, <&irqpin3 5 0>, <&irqpin3 6 0>, <&irqpin3 7 0>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  	};
  
  	tpu: pwm at e6600000 {
- 		compatible = "renesas,tpu-r8a7740", "renesas,tpu";
+@@ -297,6 +373,10 @@
  		reg = <0xe6600000 0x100>;
  		clocks = <&mstp3_clks R8A7740_CLK_TPU0>;
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  		#pwm-cells = <3>;
  	};
-@@ -287,6 +307,7 @@
- 		interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH
+@@ -308,6 +388,10 @@
  			      0 57 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp3_clks R8A7740_CLK_MMC>;
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -297,6 +318,7 @@
- 			      0 118 IRQ_TYPE_LEVEL_HIGH
+@@ -319,6 +403,10 @@
  			      0 119 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp3_clks R8A7740_CLK_SDHI0>;
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		cap-sd-highspeed;
  		cap-sdio-irq;
  		status = "disabled";
-@@ -309,6 +331,7 @@
- 			      0 122 IRQ_TYPE_LEVEL_HIGH
+@@ -332,6 +420,10 @@
  			      0 123 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp3_clks R8A7740_CLK_SDHI1>;
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		cap-sd-highspeed;
  		cap-sdio-irq;
  		status = "disabled";
-@@ -321,6 +344,7 @@
- 			      0 126 IRQ_TYPE_LEVEL_HIGH
+@@ -345,6 +437,10 @@
  			      0 127 IRQ_TYPE_LEVEL_HIGH>;
  		clocks = <&mstp4_clks R8A7740_CLK_SDHI2>;
-+		power-domains = <&pd_a3sp>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		cap-sd-highspeed;
  		cap-sdio-irq;
  		status = "disabled";
-@@ -332,6 +356,7 @@
- 		reg = <0xfe1f0000 0x400>;
+@@ -357,6 +453,10 @@
  		interrupts = <0 9 0x4>;
  		clocks = <&mstp3_clks R8A7740_CLK_FSI>;
-+		power-domains = <&pd_a4mp>;
+ 		power-domains = <&pd_a4mp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  		status = "disabled";
  	};
  
-@@ -383,6 +408,7 @@
- 			compatible = "renesas,r8a7740-cpg-clocks";
+@@ -409,6 +509,10 @@
  			reg = <0xe6150000 0x10000>;
  			clocks = <&extal1_clk>, <&extalr_clk>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <1>;
  			clock-output-names = "system", "pllc0", "pllc1",
  					     "pllc2", "r",
-@@ -397,6 +423,7 @@
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
+@@ -424,6 +528,10 @@
  			reg = <0xe6150080 4>;
  			clocks = <&pllc1_div2_clk>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <0>;
  			clock-output-names = "sub";
  		};
-@@ -405,6 +432,7 @@
- 		pllc1_div2_clk: pllc1_div2_clk {
+@@ -433,6 +541,10 @@
  			compatible = "fixed-factor-clock";
  			clocks = <&cpg_clocks R8A7740_CLK_PLLC1>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <0>;
  			clock-div = <2>;
  			clock-mult = <1>;
-@@ -413,6 +441,7 @@
- 		extal1_div2_clk: extal1_div2_clk {
+@@ -442,6 +554,10 @@
  			compatible = "fixed-factor-clock";
  			clocks = <&extal1_clk>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <0>;
  			clock-div = <2>;
  			clock-mult = <1>;
-@@ -424,6 +453,7 @@
- 			compatible = "renesas,r8a7740-mstp-clocks", "renesas,cpg-mstp-clocks";
+@@ -454,6 +570,10 @@
  			reg = <0xe6150080 4>;
  			clocks = <&sub_clk>, <&sub_clk>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <1>;
  			renesas,clock-indices = <
  				R8A7740_CLK_SUBCK R8A7740_CLK_SUBCK2
-@@ -439,6 +469,7 @@
- 				 <&cpg_clocks R8A7740_CLK_B>,
+@@ -470,6 +590,10 @@
  				 <&sub_clk>, <&sub_clk>,
  				 <&cpg_clocks R8A7740_CLK_B>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <1>;
  			renesas,clock-indices = <
  				R8A7740_CLK_CEU21 R8A7740_CLK_CEU20 R8A7740_CLK_TMU0
-@@ -460,6 +491,7 @@
- 				 <&sub_clk>, <&sub_clk>, <&sub_clk>,
+@@ -492,6 +616,10 @@
  				 <&sub_clk>, <&sub_clk>, <&sub_clk>,
  				 <&sub_clk>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <1>;
  			renesas,clock-indices = <
  				R8A7740_CLK_SCIFA6 R8A7740_CLK_INTCA
-@@ -489,6 +521,7 @@
- 				 <&cpg_clocks R8A7740_CLK_HP>,
+@@ -522,6 +650,10 @@
  				 <&cpg_clocks R8A7740_CLK_HP>,
  				 <&cpg_clocks R8A7740_CLK_HP>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <1>;
  			renesas,clock-indices = <
  				R8A7740_CLK_CMT1 R8A7740_CLK_FSI R8A7740_CLK_IIC1
-@@ -506,6 +539,7 @@
- 				 <&cpg_clocks R8A7740_CLK_HP>,
+@@ -540,6 +672,10 @@
  				 <&cpg_clocks R8A7740_CLK_HP>,
  				 <&cpg_clocks R8A7740_CLK_HP>;
-+			power-domains = <&pd_c5>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
  			#clock-cells = <1>;
  			renesas,clock-indices = <
  				R8A7740_CLK_USBH R8A7740_CLK_SDHI2
-@@ -515,4 +549,91 @@
- 				"usbhost", "sdhi2", "usbfunc", "usphy";
- 		};
- 	};
-+
-+	sysc: system-controller@e6180000 {
-+		compatible = "renesas,sysc-r8a7740", "renesas,sysc-rmobile";
-+		reg = <0xe6180000 8000>, <0xe6188000 8000>;
-+
-+		pm-domains {
-+			pd_c5: c5 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#power-domain-cells = <0>;
-+
-+				pd_a4lc: a4lc at 1 {
-+					reg = <1>;
-+					#power-domain-cells = <0>;
-+					power-on-latency = <250000>;
-+					power-off-latency = <250000>;
-+				};
-+
-+				pd_a4mp: a4mp at 2 {
-+					reg = <2>;
-+					#power-domain-cells = <0>;
-+					power-on-latency = <250000>;
-+					power-off-latency = <250000>;
-+				};
-+
-+				pd_d4: d4 at 3 {
-+					reg = <3>;
-+					#power-domain-cells = <0>;
-+					power-on-latency = <250000>;
-+					power-off-latency = <250000>;
-+				};
-+
-+				pd_a4r: a4r at 5 {
-+					reg = <5>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+					power-on-latency = <250000>;
-+					power-off-latency = <250000>;
-+
-+					pd_a3rv: a3rv at 6 {
-+						reg = <6>;
-+						#power-domain-cells = <0>;
-+						power-on-latency = <250000>;
-+						power-off-latency = <250000>;
-+					};
-+				};
-+
-+				pd_a4s: a4s at 10 {
-+					reg = <10>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#power-domain-cells = <0>;
-+					power-on-latency = <250000>;
-+					power-off-latency = <250000>;
-+
-+					pd_a3sp: a3sp at 11 {
-+						reg = <11>;
-+						#power-domain-cells = <0>;
-+						power-on-latency = <250000>;
-+						power-off-latency = <250000>;
-+					};
-+
-+					pd_a3sm: a3sm at 12 {
-+						reg = <12>;
-+						#power-domain-cells = <0>;
-+						power-on-latency = <250000>;
-+						power-off-latency = <250000>;
-+					};
-+
-+					pd_a3sg: a3sg at 13 {
-+						reg = <13>;
-+						#power-domain-cells = <0>;
-+						power-on-latency = <250000>;
-+						power-off-latency = <250000>;
-+					};
-+				};
-+
-+				pd_a4su: a4su at 20 {
-+					reg = <20>;
-+					#power-domain-cells = <0>;
-+					power-on-latency = <250000>;
-+					power-off-latency = <250000>;
-+				};
-+			};
-+		};
-+	};
- };
 -- 
 1.9.1
