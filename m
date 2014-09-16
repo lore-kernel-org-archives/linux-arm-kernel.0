@@ -1,35 +1,56 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 16 Sep 2014 16:50:46 -0400 (EDT)
-Subject: [Patch net-next 1/1] net: fec: fix build error at m68k platform
-In-Reply-To: <1410892458-2113-1-git-send-email-Frank.Li@freescale.com>
-References: <1410892458-2113-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20140916.165046.729135736826887555.davem@davemloft.net>
+From: linux@rasmusvillemoes.dk (Rasmus Villemoes)
+Date: Tue, 16 Sep 2014 22:51:15 +0200
+Subject: [PATCH 01/22] ARM: Replace strnicmp with strncasecmp
+In-Reply-To: <1410900696-6481-1-git-send-email-linux@rasmusvillemoes.dk>
+References: <1410900696-6481-1-git-send-email-linux@rasmusvillemoes.dk>
+Message-ID: <1410900696-6481-2-git-send-email-linux@rasmusvillemoes.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: <Frank.Li@freescale.com>
-Date: Wed, 17 Sep 2014 02:34:18 +0800
+The kernel used to contain two functions for length-delimited,
+case-insensitive string comparison, strnicmp with correct semantics
+and a slightly buggy strncasecmp. The latter is the POSIX name, so
+strnicmp was renamed to strncasecmp, and strnicmp made into a wrapper
+for the new strncasecmp to avoid breaking existing users.
 
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> reproduce:
->   wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->   chmod +x ~/bin/make.cross
->   git checkout 4d494cdc92b3b9a0f5fb9e1560810fa27d5a0489
->   make.cross ARCH=m68k  m5272c3_defconfig
->   make.cross ARCH=m68k
-> 
-> drivers/net/ethernet/freescale/fec.h:262:0: warning: "FEC_R_DES_START" redefined
->  #define FEC_R_DES_START(X) ((X == 1) ? FEC_R_DES_START_1 : \
->  ^
-> drivers/net/ethernet/freescale/fec.h:158:0: note: this is the location of the previous definition
->  #define FEC_R_DES_START  0x3d0 /* Receive descriptor ring */
->  ^
-> drivers/net/ethernet/freescale/fec.h:265:0: warning: "FEC_X_DES_START" redefined
->  #define FEC_X_DES_START(X) ((X == 1) ? FEC_X_DES_START_1 : \
-> 
-> ...
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+To allow the compat wrapper strnicmp to be removed at some point in
+the future, and to avoid the extra indirection cost, do
+s/strnicmp/strncasecmp/g.
 
-Applied.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Rasmus Villemoes <linux@rasmusvillemoes.dk>
+---
+ arch/arm/mach-pxa/lpd270.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
+index 9f6ec16..ad777b3 100644
+--- a/arch/arm/mach-pxa/lpd270.c
++++ b/arch/arm/mach-pxa/lpd270.c
+@@ -416,17 +416,17 @@ static struct pxafb_mach_info *lpd270_lcd_to_use;
+ 
+ static int __init lpd270_set_lcd(char *str)
+ {
+-	if (!strnicmp(str, "lq057q3dc02", 11)) {
++	if (!strncasecmp(str, "lq057q3dc02", 11)) {
+ 		lpd270_lcd_to_use = &sharp_lq057q3dc02;
+-	} else if (!strnicmp(str, "lq121s1dg31", 11)) {
++	} else if (!strncasecmp(str, "lq121s1dg31", 11)) {
+ 		lpd270_lcd_to_use = &sharp_lq121s1dg31;
+-	} else if (!strnicmp(str, "lq036q1da01", 11)) {
++	} else if (!strncasecmp(str, "lq036q1da01", 11)) {
+ 		lpd270_lcd_to_use = &sharp_lq036q1da01;
+-	} else if (!strnicmp(str, "lq64d343", 8)) {
++	} else if (!strncasecmp(str, "lq64d343", 8)) {
+ 		lpd270_lcd_to_use = &sharp_lq64d343;
+-	} else if (!strnicmp(str, "lq10d368", 8)) {
++	} else if (!strncasecmp(str, "lq10d368", 8)) {
+ 		lpd270_lcd_to_use = &sharp_lq10d368;
+-	} else if (!strnicmp(str, "lq035q7db02-20", 14)) {
++	} else if (!strncasecmp(str, "lq035q7db02-20", 14)) {
+ 		lpd270_lcd_to_use = &sharp_lq035q7db02_20;
+ 	} else {
+ 		printk(KERN_INFO "lpd270: unknown lcd panel [%s]\n", str);
+-- 
+2.0.4
