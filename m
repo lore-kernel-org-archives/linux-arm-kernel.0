@@ -1,109 +1,156 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 16 Sep 2014 09:09:17 +0900
-Subject: [PATCH] PM / OPP: Remove ARCH_HAS_OPP completely
-In-Reply-To: <1410511111.31130.4.camel@x220>
-References: <1406551632.5397.17.camel@x220>
- <1410511111.31130.4.camel@x220>
-Message-ID: <20140916000916.GD9847@verge.net.au>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 16 Sep 2014 08:11:56 +0800
+Subject: [PATCH v4 12/18] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <20140915070531.GF26649@localhost>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-13-git-send-email-hanjun.guo@linaro.org>
+ <20140915070531.GF26649@localhost>
+Message-ID: <5417804C.6040402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 10:38:31AM +0200, Paul Bolle wrote:
-> The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
-> 049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
-> removed the only dependency that used it. Setting it had no effect
-> anymore.
-> 
-> So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
-> some reason that commit did not remove all select statements for that
-> symbol. These statements are useless. Remove them too.
-> 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Done on top of next-20140912. Tested with git grep only!
+On 2014?09?15? 15:05, Olof Johansson wrote:
+> On Fri, Sep 12, 2014 at 10:00:10PM +0800, Hanjun Guo wrote:
+>> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+>> from the GICC Structure introduced by ACPI 5.1.
+>>
+>> MPIDR is the CPU hardware ID as local APIC ID on x86 platform, so we use
+>> MPIDR not the GIC CPU interface ID to identify CPUs.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/acpi.h |   32 ++++++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/acpi.c      |    1 -
+>>  drivers/acpi/processor_core.c |   37 +++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 69 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index da8f74a..2c48f70e 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -12,6 +12,8 @@
+>>  #ifndef _ASM_ACPI_H
+>>  #define _ASM_ACPI_H
+>>  
+>> +#include <asm/smp_plat.h>
+>> +
+>>  /* Basic configuration for ACPI */
+>>  #ifdef	CONFIG_ACPI
+>>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+>> @@ -38,6 +40,36 @@ static inline void disable_acpi(void)
+>>  	acpi_noirq = 1;
+>>  }
+>>  
+>> +/* MPIDR value provided in GICC structure is 64 bits, but
+>> + * the acpi processor driver use the 32 bits cpu hardware
+>> + * ID (apic_id on intel platform) everywhere, it is pretty
+>> + * hard to modify the acpi processor driver to accept the
+>> + * 64 bits MPIDR value, at the same time, only 32 bits of
+>> + * the MPIDR is used in the 64 bits MPIDR, just pack the
+>> + * Affx fields into a single 32 bit identifier to accommodate
+>> + * the acpi processor drivers.
+>> + */
+> This is a pretty run-on comment.
+>
+> I'd much rather value something like:
+>
+> Existing apic_id is 32-bit, to conform to the same datatype we need to repack the GICC
+> structure MPIDR.
+>
+> The two formats are:
+>
+> <show how the 64-bit format is laid out>
+> <show how the 32-bit format is laid out>
+>
+>
+>> +static inline u32 pack_mpidr_into_32_bits(u64 mpidr)
+> That's a pretty long name for an exported function.
+>
+>> +{
+>> +	/*
+>> +	 * Bits [0:7] Aff0;
+>> +	 * Bits [8:15] Aff1;
+>> +	 * Bits [16:23] Aff2;
+>> +	 * Bits [32:39] Aff3;
+>> +	 */
+> With the format description above added, then this comment can be removed.
 
-Hi Paul,
+ok, I will update it.
 
-could you break the shmobile portion out into a separate patch
-for me to take through my renesas tree?
+>
+>> +	return (u32) ((mpidr & 0xff00000000) >> 8) | mpidr;
+>> +}
+>> +
+>> +/*
+>> + * The ACPI processor driver for ACPI core code needs this macro
+>> + * to find out this cpu was already mapped (mapping from CPU hardware
+>> + * ID to CPU logical ID) or not.
+>> + *
+>> + * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
+>> + * and MPIDR is the cpu hardware ID we needed to pack.
+>> + */
+>> +#define cpu_physical_id(cpu) pack_mpidr_into_32_bits(cpu_logical_map(cpu))
+>> +
+>>  /*
+>>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>>   * with this check the ACPI core will not override the CPU index
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 644b8b8..2ef8721 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -24,7 +24,6 @@
+>>  #include <linux/bootmem.h>
+>>  #include <linux/smp.h>
+>>  
+>> -#include <asm/smp_plat.h>
+>>  #include <asm/cputype.h>
+>>  #include <asm/cpu_ops.h>
+>>  
+>> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+>> index e32321c..4007313 100644
+>> --- a/drivers/acpi/processor_core.c
+>> +++ b/drivers/acpi/processor_core.c
+>> @@ -64,6 +64,38 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+>>  	return 0;
+>>  }
+>>  
+>> +/*
+>> + * On ARM platform, MPIDR value is the hardware ID as apic ID
+>> + * on Intel platforms
+>> + */
+>> +static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+>> +		int device_declaration, u32 acpi_id, int *mpidr)
+>> +{
+>> +	struct acpi_madt_generic_interrupt *gicc =
+>> +	    container_of(entry, struct acpi_madt_generic_interrupt, header);
+>> +
+>> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+>> +		return -ENODEV;
+>> +
+>> +	/* In the GIC interrupt model, logical processors are
+>> +	 * required to have a Processor Device object in the DSDT,
+>> +	 * so we should check device_declaration here
+>> +	 */
+>> +	if (device_declaration && (gicc->uid == acpi_id)) {
+>> +		/*
+>> +		 * Only bits [0:7] Aff0, bits [8:15] Aff1, bits [16:23] Aff2
+>> +		 * and bits [32:39] Aff3 are meaningful, so pack the Affx
+>> +		 * fields into a single 32 bit identifier to accommodate the
+>> +		 * acpi processor drivers.
+>> +		 */
+> Here's duplicated information again. Reusing the same macro as in the header file
+> would help overall readability, I think.
 
-I am concerned that taking those changes via a different
-route will result in conflicts as arch/arm/mach-shmobile/Kconfig
-is often updated.
+The problem is that it will cause compile error on x86 and ia64 platform,
+it is ARM64 specific only.
 
->  arch/arm/mach-omap2/Kconfig    | 5 -----
->  arch/arm/mach-shmobile/Kconfig | 1 -
->  drivers/devfreq/Kconfig        | 1 -
->  3 files changed, 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 5b103099626d..f138bd33a463 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -22,7 +22,6 @@ config ARCH_OMAP4
->  	bool "TI OMAP4"
->  	depends on ARCH_MULTI_V7
->  	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->  	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
->  	select ARM_CPU_SUSPEND if PM
->  	select ARM_ERRATA_720789
-> @@ -41,7 +40,6 @@ config SOC_OMAP5
->  	bool "TI OMAP5"
->  	depends on ARCH_MULTI_V7
->  	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->  	select ARM_CPU_SUSPEND if PM
->  	select ARM_GIC
->  	select HAVE_ARM_SCU if SMP
-> @@ -53,14 +51,12 @@ config SOC_AM33XX
->  	bool "TI AM33XX"
->  	depends on ARCH_MULTI_V7
->  	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->  	select ARM_CPU_SUSPEND if PM
->  
->  config SOC_AM43XX
->  	bool "TI AM43x"
->  	depends on ARCH_MULTI_V7
->  	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->  	select ARM_GIC
->  	select MACH_OMAP_GENERIC
->  	select MIGHT_HAVE_CACHE_L2X0
-> @@ -69,7 +65,6 @@ config SOC_DRA7XX
->  	bool "TI DRA7XX"
->  	depends on ARCH_MULTI_V7
->  	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->  	select ARM_CPU_SUSPEND if PM
->  	select ARM_GIC
->  	select HAVE_ARM_ARCH_TIMER
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 21f457b56c01..f59019dd986e 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
->  	select NO_IOPORT_MAP
->  	select PINCTRL
->  	select ARCH_REQUIRE_GPIOLIB
-> -	select ARCH_HAS_OPP
->  
->  if ARCH_SHMOBILE_MULTI
->  
-> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-> index 3dced0a9eae3..2227e9bf3884 100644
-> --- a/drivers/devfreq/Kconfig
-> +++ b/drivers/devfreq/Kconfig
-> @@ -80,7 +80,6 @@ config ARM_EXYNOS4_BUS_DEVFREQ
->  config ARM_EXYNOS5_BUS_DEVFREQ
->  	bool "ARM Exynos5250 Bus DEVFREQ Driver"
->  	depends on SOC_EXYNOS5250
-> -	select ARCH_HAS_OPP
->  	select DEVFREQ_GOV_SIMPLE_ONDEMAND
->  	select PM_OPP
->  	help
-> -- 
-> 1.9.3
-> 
-> 
+>
+>> +		*mpidr = ((gicc->arm_mpidr & 0xff00000000) >> 8)
+>> +			 | gicc->arm_mpidr;
+>> +		return 0;
+>> +	}
+>> +
+>> +	return -EINVAL;
+>> +}
+>> +
