@@ -1,27 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 16 Sep 2014 08:54:49 -0700
-Subject: Exynos build failure in -next allmodconfig
-In-Reply-To: <5418267E.8070501@gmail.com>
-References: <E1XTTy1-0000vT-NC@cassiel.sirena.org.uk>
- <20140915163458.GS7960@sirena.org.uk>
- <20140915175709.GE12361@n2100.arm.linux.org.uk>
- <541822AC.8040805@samsung.com> <5418267E.8070501@gmail.com>
-Message-ID: <20140916155449.GK7960@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Sep 2014 16:57:38 +0100
+Subject: [PATCH 3.17-rc4 v6 2/6] arm: fiq: Replace default FIQ handler
+In-Reply-To: <54176F7C.6030908@linaro.org>
+References: <1410695835-10496-1-git-send-email-daniel.thompson@linaro.org>
+ <1410695835-10496-3-git-send-email-daniel.thompson@linaro.org>
+ <54176F7C.6030908@linaro.org>
+Message-ID: <20140916155738.GI12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 02:01:02PM +0200, Tomasz Figa wrote:
+On Tue, Sep 16, 2014 at 12:00:12AM +0100, Daniel Thompson wrote:
+> On 14/09/14 12:57, Daniel Thompson wrote:
+> > This patch introduces a new default FIQ handler that is structured in a
+> > similar way to the existing ARM exception handler and result in the FIQ
+> > being handled by C code running on the SVC stack (despite this code run
+> > in the FIQ handler is subject to severe limitations with respect to
+> > locking making normal interaction with the kernel impossible).
+> > 
+> > This default handler allows concepts that on x86 would be handled using
+> > NMIs to be realized on ARM.
+> > 
+> > Credit:
+> > 
+> >     This patch is a near complete re-write of a patch originally
+> >     provided by Anton Vorontsov. Today only a couple of small fragments
+> >     survive, however without Anton's work to build from this patch would
+> >     not exist. Thanks also to Russell King for spoonfeeding me a variety
+> >     of fixes during the review cycle.
+> 
+> I've send this patch to the your patch tracker as complete respin (#8150/2).
+> 
+> If you'd rather handle it as a follow on patch please let me know and I
+> will prepare it as one.
 
-> I think the problematic case here is v6+v7 multiplatform, where even
-> though CONFIG_ARCH_EXYNOS is defined, compiler flags for lowest common
-> denominator (v6) must be used. Using appropriate macros should fix the
-> problem indeed.
+Thanks, as you will see, I've merged this patch, along with my two
+patches, one removing do_unexp_fiq() and the newline removal in
+show_regs().  They should be appearing in a linux-next rsn.
 
-Right, multiplatform ends up generating such a configuration.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/004087a2/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
