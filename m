@@ -1,38 +1,47 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 16 Sep 2014 08:08:38 -0700
-Subject: [PATCH] ARM: zynq: DT: Fix GEM register area size
-Message-ID: <1410880118-3494-1-git-send-email-soren.brinkmann@xilinx.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 16 Sep 2014 18:08:47 +0300
+Subject: [PATCH v4 10/11] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <7hr3zk7b5z.fsf@deeprootsystems.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <1405047349-15101-11-git-send-email-d-gerlach@ti.com>
+ <7h7g1dlp8b.fsf@linaro.org>
+ <CAK=WgbYwGcSCxHfa880up1qKTroS=mi8UAf_Qh6Wz9n5x4D9rw@mail.gmail.com>
+ <540F5C39.7040201@ti.com> <540F62E3.6080804@ti.com>
+ <7hr3zk7b5z.fsf@deeprootsystems.com>
+Message-ID: <CAK=Wgbas+CqgYJ35Sao8eCkMPujpVNbWW-aikUQExScaqYfETw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The size of the GEM's register area is only 0x1000 bytes.
+On Wed, Sep 10, 2014 at 12:10 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> What I think you need to do (and what I've recommended at least once in
+> earlier reviews) put all the (non-rproc) wkup_m3 IPC into into one
+> driver and create a well-described, well-documented API that the
+> platform PM code will use.
+>
+> IMO, the current "split" is very difficult to read/understand, which
+> means it will even more difficult to maintain.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I strongly agree.
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 6cc83d4c6c76..3eb12f25e669 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -190,7 +190,7 @@
- 
- 		gem0: ethernet at e000b000 {
- 			compatible = "cdns,gem";
--			reg = <0xe000b000 0x4000>;
-+			reg = <0xe000b000 0x1000>;
- 			status = "disabled";
- 			interrupts = <0 22 4>;
- 			clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
-@@ -199,7 +199,7 @@
- 
- 		gem1: ethernet at e000c000 {
- 			compatible = "cdns,gem";
--			reg = <0xe000c000 0x4000>;
-+			reg = <0xe000c000 0x1000>;
- 			status = "disabled";
- 			interrupts = <0 45 4>;
- 			clocks = <&clkc 31>, <&clkc 31>, <&clkc 14>;
--- 
-2.1.0.1.g27b9230
+A remoteproc driver should generally only register its
+hardware-specific implementation of the rproc_ops via the remoteproc
+framework. It is not expected to expose public API of its own - that's
+why we have the generic remoteproc layer for. It makes perfect sense
+not to use rpmsg for communications if it's not lightweight enough,
+but exposing a new set of IPC API should take place in a separate
+well-documented driver.
+
+In addition, the suggested remoteproc driver seems to act both as a
+low-level hardware-specific driver that plugs into remoteproc (by
+registering rproc_ops via the remoteproc framework), and also as a
+high-level driver that utilizes the remoteproc public API (by calling
+rproc_boot). This alone calls for scrutinizing the design as this is
+not very intuitive.
+
+At least for the remoteproc part: if you could provide a simple and
+straight-forward remoteproc driver that just implements the rproc_ops,
+this could be merged very quickly. The rest of the code most probably
+belongs in a different entity, just like Kevin suggested.
+
+Thanks,
+Ohad.
