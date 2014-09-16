@@ -1,70 +1,54 @@
-From: smfrench@gmail.com (Steve French)
-Date: Tue, 16 Sep 2014 13:45:45 -0500
-Subject: [PATCH] cifs: remove dead code
-In-Reply-To: <3319326.1eJrmz0Vgc@wuerfel>
-References: <3319326.1eJrmz0Vgc@wuerfel>
-Message-ID: <CAH2r5mtvXinOSP7MujqLjdOggTnO4SrcO4WaA-iB7h=982XmSA@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 16 Sep 2014 20:48:49 +0200
+Subject: [PATCH/RFC v2 02/12] PM / Domains: Add DT bindings for PM QoS device
+ latencies
+In-Reply-To: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
+References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1410893339-6361-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merged into cifs-2.6.git for-next
+PM QoS device start/stop and save/restore state latencies are more or
+less properties of the hardware.
+In legacy code, they're specified from platform code.
+On DT platforms, their values should come from DT.
 
-Added Yalin Wang <yalin.wang@sonymobile.com> who reported the same problem/fix
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Should these properties be called "linux,*-latency"?
 
-On Mon, Sep 8, 2014 at 10:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> cifs provides two dummy functions 'sess_auth_lanman' and
-> 'sess_auth_kerberos' for the case in which the respective
-> features are not defined. However, the caller is also under
-> an #ifdef, so we just get warnings about unused code:
->
-> fs/cifs/sess.c:1109:1: warning: 'sess_auth_kerberos' defined but not used [-Wunused-function]
->  sess_auth_kerberos(struct sess_data *sess_data)
->
-> Removing the dead functions gets rid of the warnings without
-> any downsides that I can see.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/fs/cifs/sess.c b/fs/cifs/sess.c
-> index 07fe97ac6b0c..ab0fda6e8e58 100644
-> --- a/fs/cifs/sess.c
-> +++ b/fs/cifs/sess.c
-> @@ -745,14 +745,6 @@ out:
->         sess_free_buffer(sess_data);
->  }
->
-> -#else
-> -
-> -static void
-> -sess_auth_lanman(struct sess_data *sess_data)
-> -{
-> -       sess_data->result = -EOPNOTSUPP;
-> -       sess_data->func = NULL;
-> -}
->  #endif
->
->  static void
-> @@ -1103,15 +1095,6 @@ out:
->         ses->auth_key.response = NULL;
->  }
->
-> -#else
-> -
-> -static void
-> -sess_auth_kerberos(struct sess_data *sess_data)
-> -{
-> -       cifs_dbg(VFS, "Kerberos negotiated but upcall support disabled!\n");
-> -       sess_data->result = -ENOSYS;
-> -       sess_data->func = NULL;
-> -}
->  #endif /* ! CONFIG_CIFS_UPCALL */
->
->  /*
->
+v2:
+  - New
+---
+ Documentation/devicetree/bindings/power/power_domain.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-
-
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 7bc421d84367d636..024815bc257723b1 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -42,12 +42,22 @@ Required properties:
+  - power-domains : A phandle and PM domain specifier as defined by bindings of
+                    the power controller specified by phandle.
+ 
++Optional properties:
++ - stop-latency: Stop latency of the device, in ns,
++ - start-latency: Start latency of the device, in ns,
++ - save-state-latency: Save-state latency of the device, in ns,
++ - restore-state-latency: Restore-state latency of the device, in ns.
++
+ Example:
+ 
+ 	leaky-device at 12350000 {
+ 		compatible = "foo,i-leak-current";
+ 		reg = <0x12350000 0x1000>;
+ 		power-domains = <&power 0>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 	};
+ 
+ The node above defines a typical PM domain consumer device, which is located
 -- 
-Thanks,
-
-Steve
+1.9.1
