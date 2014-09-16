@@ -1,177 +1,57 @@
-From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
-Date: Tue, 16 Sep 2014 08:36:41 -0400 (EDT)
-Subject: [PATCH v3] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-In-Reply-To: <20140916023922.GB2386@qualcomm.com>
-References: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
- <20140916023922.GB2386@qualcomm.com>
-Message-ID: <1410871001.891126377@apps.rackspace.com>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Tue, 16 Sep 2014 14:42:01 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140916090540.GJ28458@ci00147.xsens-tech.local>
+References: <54119AAA.9080907@linutronix.de>
+ <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140916090540.GJ28458@ci00147.xsens-tech.local>
+Message-ID: <20140916124200.GK28458@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 16, 2014 at 11:05:40AM +0200, Frans Klaver wrote:
+> On Mon, Sep 15, 2014 at 06:42:04PM +0200, Sebastian Andrzej Siewior wrote:
+> > On 09/12/2014 12:28 PM, Frans Klaver wrote:
+> > > port config is 115200 8N1. I don't recall doing anything special. I
+> > > boot, login, less file and get a lock.
+> > 
+> > So I booted my mini Debian 7.6 (basic system + openssh) on my beagle
+> > bone black which is:
+> > 
+> > [    0.000000] AM335X ES2.0 (neon )
+> > 
+> > configured a console, login, invoked "less file". The file was shown, I
+> > hit on the space key so less shows me more of the file. No lock-up.
+> > I tried booting via NFS and MMC. I tried various files with less.
+> > 
+> > My dot config is here
+> > 	https://breakpoint.cc/config-am335x-bb.txt.xz
+> > 
+> > If there is nothing specific to the file you do less on I have no idea
+> > what else it could if it is not the config.
+> 
+> I'll test your config and go through the differences.
 
+So far it looks like it isn't in the config. I've tested both your and
+my config on debian wheezy on a boneblack. No lock ups.
 
-On Monday, September 15, 2014 10:39pm, "Andy Gross" <agross@codeaurora.org> said:
+Less doesn't fill my entire screen, so it looks a bit funky when
+scrolling, but I'm not sure if that's related to the driver.
 
-> On Tue, Aug 26, 2014 at 05:00:45PM +0530, Kiran Padwal wrote:
->> This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
->> It also adds necessary DT support for i2c eeprom which is present on
->> IFC6410.
->>
->> Tested on IFC6410 board.
-> 
-> Looks fine
+I'll have to look further for things we did that may have impact here.
 
-Thanks for review.
-
+> Thanks,
+> Frans
 > 
->>
->> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
->> ---
->> Changes since v2:
->>  - Renamed pinmux i2c subnode "i2c1_pinmux" to "i2c1".
->>  - Removed labes of node.
->>  - Used canonical value as "okay" instead of "ok".
->>  - Used macros.
->>
->> Changes since v1:
->>  - Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
->>  - Updated pinmux interrupt.
->>
->>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   27 ++++++++++++++
->>  arch/arm/boot/dts/qcom-apq8064.dtsi        |   53 ++++++++++++++++++++++++++++
->>  2 files changed, 80 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> index 7c2441d..ef0857e 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> @@ -5,6 +5,24 @@
->>  	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
->>
->>  	soc {
->> +		gsbi at 12440000 {
->> +			status = "okay";
->> +			qcom,mode = <GSBI_PROT_I2C>;
->> +
->> +			i2c at 12460000 {
->> +				status = "okay";
->> +				clock-frequency = <200000>;
->> +				pinctrl-0 = <&i2c1_pins>;
->> +				pinctrl-names = "default";
->> +
->> +				eeprom: eeprom at 52 {
->> +					compatible = "atmel,24c128";
->> +					reg = <0x52>;
->> +					pagesize = <32>;
->> +				};
-> 
-> don't need read only here.  the eeprom is not being used by anything....
-> thankfully.
-> 
->> +			};
->> +		};
->> +
->>  		gsbi at 16600000 {
->>  			status = "ok";
->>  			qcom,mode = <GSBI_PROT_I2C_UART>;
->> @@ -12,5 +30,14 @@
->>  				status = "ok";
->>  			};
->>  		};
->> +
->> +		pinmux at 800000 {
->> +			i2c1_pins: i2c1 {
->> +				mux {
->> +					pins = "gpio20", "gpio21";
->> +					function = "gsbi1";
->> +				};
->> +			};
->> +		};
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi
->> b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> index 92bf793..5dddbf3 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
->> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> @@ -89,6 +89,17 @@
->>  			cpu-offset = <0x80000>;
->>  		};
->>
->> +		tlmm_pinmux: pinmux at 800000 {
->> +			compatible = "qcom,apq8064-pinctrl";
->> +			reg = <0x800000 0x4000>;
->> +
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			interrupts = <0 16 IRQ_TYPE_LEVEL_HIGH>;
->> +		};
->> +
->>  		acc0: clock-controller at 2088000 {
->>  			compatible = "qcom,kpss-acc-v1";
->>  			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
->> @@ -133,6 +144,48 @@
->>  			regulator;
->>  		};
->>
->> +		gsbi1: gsbi at 12440000 {
->> +			status = "disabled";
->> +			compatible = "qcom,gsbi-v1.0.0";
->> +			reg = <0x12440000 0x100>;
->> +			clocks = <&gcc GSBI1_H_CLK>;
->> +			clock-names = "iface";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +
->> +			i2c1: i2c at 12460000 {
->> +				compatible = "qcom,i2c-qup-v1.1.1";
->> +				reg = <0x12460000 0x1000>;
->> +				interrupts = <0 194 IRQ_TYPE_NONE>;
->> +				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
->> +				clock-names = "core", "iface";
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +			};
->> +		};
->> +
->> +		gsbi2: gsbi at 12480000 {
->> +			status = "disabled";
->> +			compatible = "qcom,gsbi-v1.0.0";
->> +			reg = <0x12480000 0x100>;
->> +			clocks = <&gcc GSBI2_H_CLK>;
->> +			clock-names = "iface";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +
->> +			i2c2: i2c at 124a0000 {
->> +				compatible = "qcom,i2c-qup-v1.1.1";
->> +				reg = <0x124a0000 0x1000>;
->> +				interrupts = <0 196 IRQ_TYPE_NONE>;
->> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
->> +				clock-names = "core", "iface";
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +			};
->> +		};
->> +
->>  		gsbi7: gsbi at 16600000 {
->>  			status = "disabled";
->>  			compatible = "qcom,gsbi-v1.0.0";
->> --
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> --
-> sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
