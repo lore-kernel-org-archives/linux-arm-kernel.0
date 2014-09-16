@@ -1,87 +1,60 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Mon, 15 Sep 2014 19:47:23 -0500
-Subject: [PATCH 1/4] ata: ahci_platform: Add ACPI support for AMD Seattle SATA
- controller
+Date: Mon, 15 Sep 2014 19:47:24 -0500
+Subject: [PATCH 2/4] arm64/efi: efistub: don't abort if base of DRAM is
+ occupied
 In-Reply-To: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
 References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1410828446-28502-2-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1410828446-28502-3-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This patch adds ACPI match table in ahci_platform. The table includes
-the acpi_device_id to match AMD Seattle SATA controller with following
-asl structure in DSDT:
+If we cannot relocate the kernel Image to its preferred offset of base of DRAM
+plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
+TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
+proceed normally otherwise.
 
-    Device (SATA0)
-    {
-      Name(_HID, "AMDI0600")	// Seattle AHSATA
-      Name (_CCA, 1)		// Cache-coherent controller
-      Name (_CRS, ResourceTemplate ()
-      {
-        Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
-        Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
-      })
-    }
-
-Also, since ATA driver should not require PCI support for ATA_ACPI,
-this patch removes dependency in the driver/ata/Kconfig.
+Acked-by: Mark Salter <msalter@redhat.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/ata/Kconfig         |  2 +-
- drivers/ata/ahci_platform.c | 13 +++++++++++++
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/efi-stub.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index e1b9278..f2e6c9e 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index 1317fef..d27dd98 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -28,20 +28,16 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
+ 	kernel_size = _edata - _text;
+ 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+ 		kernel_memsize = kernel_size + (_end - _edata);
+-		status = efi_relocate_kernel(sys_table, image_addr,
+-					     kernel_size, kernel_memsize,
+-					     dram_base + TEXT_OFFSET,
+-					     PAGE_SIZE);
++		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
++				       SZ_2M, reserve_addr);
+ 		if (status != EFI_SUCCESS) {
+ 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
+ 			return status;
+ 		}
+-		if (*image_addr != (dram_base + TEXT_OFFSET)) {
+-			pr_efi_err(sys_table, "Failed to alloc kernel memory\n");
+-			efi_free(sys_table, kernel_memsize, *image_addr);
+-			return EFI_LOAD_ERROR;
+-		}
+-		*image_size = kernel_memsize;
++		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
++		       kernel_size);
++		*image_addr = *reserve_addr + TEXT_OFFSET;
++		*reserve_size = kernel_memsize + TEXT_OFFSET;
+ 	}
  
- config ATA_ACPI
- 	bool "ATA ACPI Support"
--	depends on ACPI && PCI
-+	depends on ACPI
- 	default y
- 	help
- 	  This option adds support for ATA-related ACPI objects.
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index f61ddb9..3499bab 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -20,6 +20,9 @@
- #include <linux/platform_device.h>
- #include <linux/libata.h>
- #include <linux/ahci_platform.h>
-+#ifdef CONFIG_ATA_ACPI
-+#include <linux/acpi.h>
-+#endif
- #include "ahci.h"
  
- static const struct ata_port_info ahci_port_info = {
-@@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, ahci_of_match);
- 
-+#ifdef CONFIG_ATA_ACPI
-+static const struct acpi_device_id ahci_acpi_match[] = {
-+	{ "AMDI0600", 0 }, /* AMD Seattle AHCI */
-+	{ },
-+};
-+#endif
-+
- static struct platform_driver ahci_driver = {
- 	.probe = ahci_probe,
- 	.remove = ata_platform_remove_one,
-@@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
- 		.name = "ahci",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ahci_of_match,
-+#ifdef CONFIG_ATA_ACPI
-+		.acpi_match_table = ACPI_PTR(ahci_acpi_match),
-+#endif
- 		.pm = &ahci_pm_ops,
- 	},
- };
 -- 
 1.9.3
