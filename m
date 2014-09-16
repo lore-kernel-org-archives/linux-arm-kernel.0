@@ -1,40 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 16 Sep 2014 10:57:50 +0900
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Soc Updates for v3.18
-Message-ID: <cover.1410832584.git.horms+renesas@verge.net.au>
+Date: Tue, 16 Sep 2014 10:57:52 +0900
+Subject: [PATCH] ARM: shmobile: r8a7794: Remove unnecessary #ifdef
+ CONFIG_USE_OF
+In-Reply-To: <cover.1410832584.git.horms+renesas@verge.net.au>
+References: <cover.1410832584.git.horms+renesas@verge.net.au>
+Message-ID: <1370078db37de2aa5e906ae2b5dbbb6ba289adb4.1410832584.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+The r8a7794 support is always compiled using ARCH_MULTIPLATFORM which
+selects USE_OF. So #ifdef CONFIG_USE_OF is unnecessary.
 
-Please consider these fourth round of Renesas ARM based SoC soc updates for
-v3.18.
-
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc3-for-v3.18,
-which you have pulled.
-
-
-The following changes since commit 5923abb205e05773e0bb16c7ca4c0b41dbeec40e:
-
-  ARM: shmobile: Initial r8a7794 SoC support (2014-09-05 17:23:49 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc4-for-v3.18
-
-for you to fetch changes up to 1370078db37de2aa5e906ae2b5dbbb6ba289adb4:
-
-  ARM: shmobile: r8a7794: Remove unnecessary #ifdef CONFIG_USE_OF (2014-09-11 09:51:16 +0900)
-
-----------------------------------------------------------------
-Fourth Round of Renesas ARM Based SoC Soc Updates for v3.18
-
-* r8a7794: Remove unnecessary #ifdef CONFIG_USE_OF
-
-----------------------------------------------------------------
-Simon Horman (1):
-      ARM: shmobile: r8a7794: Remove unnecessary #ifdef CONFIG_USE_OF
-
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/setup-r8a7794.c | 3 ---
  1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-r8a7794.c b/arch/arm/mach-shmobile/setup-r8a7794.c
+index 05e970c..c10acd1 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7794.c
++++ b/arch/arm/mach-shmobile/setup-r8a7794.c
+@@ -19,8 +19,6 @@
+ #include "rcar-gen2.h"
+ #include <asm/mach/arch.h>
+ 
+-#ifdef CONFIG_USE_OF
+-
+ static const char * const r8a7794_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7794",
+ 	NULL,
+@@ -32,4 +30,3 @@ DT_MACHINE_START(R8A7794_DT, "Generic R8A7794 (Flattened Device Tree)")
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.dt_compat	= r8a7794_boards_compat_dt,
+ MACHINE_END
+-#endif /* CONFIG_USE_OF */
+-- 
+2.0.1
