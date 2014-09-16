@@ -1,54 +1,65 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Tue, 16 Sep 2014 09:44:52 +0800
-Subject: [PATCH 08/11] ARM: dts: rockchip: add operating points and armclk
- references
-In-Reply-To: <CAFnsNoRdW8icUsuEhMq4YB6wi0njoxu3Vvjv6USKTKec_bJwPg@mail.gmail.com>
-References: <1409958374-30937-1-git-send-email-heiko@sntech.de>	<1409958374-30937-9-git-send-email-heiko@sntech.de>	<CAD=FV=U0h2nDQf6JzErhUn+R7384xSTeTjga03MZtOccf7S0bg@mail.gmail.com>	<5412A1E3.1090707@rock-chips.com>
- <CAFnsNoRdW8icUsuEhMq4YB6wi0njoxu3Vvjv6USKTKec_bJwPg@mail.gmail.com>
-Message-ID: <54179614.7040707@rock-chips.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 16 Sep 2014 09:44:15 +0800
+Subject: [PATCH v2] arm:extend __init_end to a page align address
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160B@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naoki FUKAUMI,
+this patch change the __init_end address to a
+page align address, so that free_initmem() can
+free the whole .init section, because if the end
+address is not page aligned, it will round down to
+a page align address, then the tail unligned page
+will not be freed.
 
-On 09/12/2014 07:37 PM, Naoki FUKAUMI wrote:
-> Hi Kever Yang,
->
-> On Fri, Sep 12, 2014 at 4:33 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
->> Here is the general OPP table for rk3288 we recommend to use in upstream:
->>
->>     operating-points = <
->>                  /* KHz    uV */
->>                  1608000 1350000
->>                  1512000 1300000
->>                  1416000 1200000
->>                  1200000 1100000
->>                  1008000 1050000
->>                  816000 1000000
->>                  696000 950000
->>                  600000 900000
->>                  408000 900000
->>                  312000 900000
->>                  216000 900000
->>                  126000 900000
->>                  >;
->>
->> After this,
->> Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
->>
->> Note that the CPU can't not stay on top frequency for a long time, the cpu
->> might overheat, the cpufreq is better to work with cpu thermal for rk3288.
-> This commit says 1800000 is safe, but actually it's not safe?
->   https://bitbucket.org/T-Firefly/firefly-rk3288/commits/7048675eec554a1aa4a3874c7bb24806e1e1c06b/raw/
-As you have seen, that patch is for a dts file which is board related  
-instead of rk3288.dtsi,
-it should be safe for T-firefly board, but I'm not sure it works for all 
-the boards.
+Signed-off-by: wang <yalin.wang2010@gmail.com>
+---
+ arch/arm/kernel/vmlinux.lds.S     | 2 +-
+ arch/arm64/kernel/vmlinux.lds.S   | 2 +-
+ include/asm-generic/vmlinux.lds.h | 2 ++
+ 3 files changed, 4 insertions(+), 2 deletions(-)
 
-The operation table I provide for rk3288.dtsi with conservative values 
-and available for all boards
-based on rk3288, and maybe need an OPP table with optimized values in 
-dts board file
-for board customized.
-
--Kever
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 6f57cb9..8e95aa4 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -219,8 +219,8 @@ SECTIONS
+ 	__data_loc = ALIGN(4);		/* location in binary */
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+ #else
+-	__init_end = .;
+ 	. = ALIGN(THREAD_SIZE);
++	__init_end = .;
+ 	__data_loc = .;
+ #endif
+ 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 97f0c04..edf8715 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -97,9 +97,9 @@ SECTIONS
+ 
+ 	PERCPU_SECTION(64)
+ 
++	. = ALIGN(PAGE_SIZE);
+ 	__init_end = .;
+ 
+-	. = ALIGN(PAGE_SIZE);
+ 	_data = .;
+ 	_sdata = .;
+ 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 5ba0360..aa70cbd 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -40,6 +40,8 @@
+  * }
+  *
+  * [__init_begin, __init_end] is the init section that may be freed after init
++ * 	// __init_begin and __init_end should be page aligned, so that we can
++ *	// free the whole .init memory
+  * [_stext, _etext] is the text section
+  * [_sdata, _edata] is the data section
+  *
+-- 
+2.1.0
