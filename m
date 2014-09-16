@@ -1,7 +1,8 @@
 From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 16 Sep 2014 13:09:30 +0800
-Subject: [RFC] change keep_initrd and free_initrd_mem into .init section
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160E@CNBJMBX05.corpusers.net>
+Date: Tue, 16 Sep 2014 13:14:05 +0800
+Subject: [RFC resend] arm:change keep_initrd and free_initrd_mem into .init
+ section
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160F@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
