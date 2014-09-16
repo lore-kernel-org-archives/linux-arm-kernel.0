@@ -1,46 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 16 Sep 2014 12:09:23 -0700
-Subject: [GIT PULL 3.18] ARM: BCM: Broadcom BCM63138 support
-In-Reply-To: <201409161827.24548.arnd@arndb.de>
-References: <1409953475-23130-1-git-send-email-f.fainelli@gmail.com>
- <54167614.7030806@gmail.com>
- <CAEPRUYrcpaUmLvr4k5GK11wRbQ8XwFQdxRJPeunH7p-w7jL2-Q@mail.gmail.com>
- <201409161827.24548.arnd@arndb.de>
-Message-ID: <54188AE3.60500@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 16 Sep 2014 21:24:46 +0200
+Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
+In-Reply-To: <1410884281.16519.2.camel@joe-AO725>
+References: <cover.1410632834.git.joe@perches.com>
+ <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
+ <20140915155656.GA29744@arm.com>
+ <20140916160759.GJ12361@n2100.arm.linux.org.uk>
+ <1410884281.16519.2.camel@joe-AO725>
+Message-ID: <20140916192446.GK3755@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 09:27 AM, Arnd Bergmann wrote:
-> On Monday 15 September 2014, Christian Daudt wrote:
->>>
->>>
->>> Arnd has reviewed v2, and v3 addresses his former comments, he has not
->>> replied with an Ack though I do not mind waiting for this.
->>
->> Ok - explicit is better than implicit. Arnd - can you pls confirm your
->> ack to these patches ?
-> 
-> I'm glad you asked, because it triggered me to look at the pull request.
-> The patches are all good, feel free to add
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> to each patch, or to the merge, whichever works for you.
-> 
-> However, the pull request was done wrong, so don't merge this changeset
-> into your branch or we won't pull it from you.
-> 
-> The problem is that it is based on top of out for-next branch, which is
-> not meant to be sent upstream to Linus. Instead as you know we expect
-> all pull requests coming in from platform maintainers to be done as
-> topic branches and normall based on top of the previous -rc1 release,
-> or possibly a later -rcX release if you have a strong dependency on 
-> a bug fix that went into that release.
-> 
-> I'd recommend that Florian rebases from 244a68e90d0775d3e579 to
-> v3.17-rc1 and send a new pull request, but it's also fine if you
-> do the rebase and add your Signed-off-by to the patches in the process.
+Hi Joe,
 
-I will do this and create a tag for Christian to pull from. Thanks!
---
-Florian
+On Tue, Sep 16, 2014 at 09:18:01AM -0700, Joe Perches wrote:
+> On Tue, 2014-09-16 at 17:07 +0100, Russell King - ARM Linux wrote:
+> > any chance you could add a KernelVersion: tag somewhere in the
+> > commit message and throw it at patches at arm.linux.org.uk so it doesn't
+> > get lost?
+> 
+> There are no commit logs with a KernelVersion: tag
+> in all of git history.
+> 
+> What do you think a KernelVersion: tag is and what
+> would it be used for?
+That's used in Russell's patch tracker, but the resulting commit doesn't
+have the KernelVersion tag.
+
+See http://www.arm.linux.org.uk/developer/patches/info.php for the
+details.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
