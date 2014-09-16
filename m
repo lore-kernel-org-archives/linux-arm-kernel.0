@@ -1,63 +1,78 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Sep 2014 13:54:29 +0200
-Subject: [PATCH v2 02/18] arm: exynos: bind power domains earlier,
- on device creation
+Date: Tue, 16 Sep 2014 13:54:39 +0200
+Subject: [PATCH v2 12/18] iommu: exynos: add support for binding more than one
+ sysmmu to master device
 In-Reply-To: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
 References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1410868485-4143-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1410868485-4143-13-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches change initialization time of power domain driver from client
-device driver bind to device creation. This lets other core drivers to
-register power domain notifiers before client driver is bound.
+This patch adds support for assigning more than one SYSMMU controller to
+the master device. This has been achieved simply by chaning the struct
+device pointer in struct exynos_iommu_owner into the list of struct
+sysmmu_drvdata of all controllers assigned to the given master device.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mach-exynos/pm_domains.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ drivers/iommu/exynos-iommu.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index fd76e1b5a471..1d368a26528c 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -159,13 +159,13 @@ static int exynos_pm_notifier_call(struct notifier_block *nb,
- 	struct device *dev = data;
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 1b3f00726cd4..cf36cdecf335 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -186,7 +186,7 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
  
- 	switch (event) {
--	case BUS_NOTIFY_BIND_DRIVER:
-+	case BUS_NOTIFY_ADD_DEVICE:
- 		if (dev->of_node)
- 			exynos_read_domain_from_dt(dev);
- 
- 		break;
- 
--	case BUS_NOTIFY_UNBOUND_DRIVER:
-+	case BUS_NOTIFY_DEL_DEVICE:
- 		exynos_remove_device_from_domain(dev);
- 
- 		break;
-@@ -177,6 +177,13 @@ static struct notifier_block platform_nb = {
- 	.notifier_call = exynos_pm_notifier_call,
+ /* attached to dev.archdata.iommu of the master device */
+ struct exynos_iommu_owner {
+-	struct device *sysmmu;
++	struct list_head clients;
  };
  
-+static int exynos_pm_domain_add(struct device *dev, void *priv)
-+{
-+	if (dev->of_node)
-+		exynos_read_domain_from_dt(dev);
-+	return 0;
-+}
-+
- static __init int exynos4_pm_init_power_domain(void)
+ struct exynos_iommu_domain {
+@@ -207,6 +207,7 @@ struct sysmmu_drvdata {
+ 	spinlock_t lock;
+ 	struct iommu_domain *domain;
+ 	struct list_head domain_node;
++	struct list_head owner_node;
+ 	phys_addr_t pgtable;
+ 	int version;
+ };
+@@ -694,8 +695,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
+ 	if (!has_sysmmu(dev))
+ 		return -ENODEV;
+ 
+-	data = dev_get_drvdata(owner->sysmmu);
+-	if (data) {
++	list_for_each_entry(data, &owner->clients, owner_node) {
+ 		ret = __sysmmu_enable(data, pagetable, domain);
+ 		if (ret >= 0) {
+ 			data->master = dev;
+@@ -723,7 +723,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
  {
- 	struct platform_device *pdev;
-@@ -236,6 +243,7 @@ no_clk:
+ 	struct exynos_iommu_domain *priv = domain->priv;
+ 	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
+-	struct sysmmu_drvdata *data;
++	struct sysmmu_drvdata *data, *next;
+ 	unsigned long flags;
+ 	int found = 0;
+ 
+@@ -731,14 +731,13 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
+ 		return;
+ 
+ 	spin_lock_irqsave(&priv->lock, flags);
+-	list_for_each_entry(data, &priv->clients, domain_node) {
++	list_for_each_entry_safe(data, next, &priv->clients, domain_node) {
+ 		if (data->master == dev) {
+ 			if (__sysmmu_disable(data)) {
+ 				data->master = NULL;
+ 				list_del_init(&data->domain_node);
+ 			}
+ 			found = true;
+-			break;
+ 		}
  	}
- 
- 	bus_register_notifier(&platform_bus_type, &platform_nb);
-+	bus_for_each_dev(&platform_bus_type, NULL, NULL, exynos_pm_domain_add);
- 
- 	return 0;
- }
+ 	spin_unlock_irqrestore(&priv->lock, flags);
 -- 
 1.9.2
