@@ -1,46 +1,80 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 16 Sep 2014 20:48:59 +0200
-Subject: [PATCH/RFC v2 12/12] drivers: sh: Disable PM runtime for
- multi-platform r8a7740 with genpd
+Date: Tue, 16 Sep 2014 20:48:51 +0200
+Subject: [PATCH/RFC v2 04/12] PM / Domains: Add genpd attach/detach callbacks
 In-Reply-To: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
 References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1410893339-6361-13-git-send-email-geert+renesas@glider.be>
+Message-ID: <1410893339-6361-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the default PM domain using PM_CLK is used for PM runtime, the real PM
-domain(s) cannot be registered from DT later.
+While a PM domain can enable PM runtime management of its devices' module
+clocks by setting
 
-Hence do not enable it when running a multi-platform kernel with genpd
-support on an r8a7740. The R-Mobile PM domain driver will take care of
-PM runtime management of the module clocks.
+	genpd->dev_ops.stop = pm_clk_suspend;
+	genpd->dev_ops.start = pm_clk_resume;
 
-The default PM domain is still needed for:
-  - platforms without genpd support,
-  - the legacy (non-DT) case, where real PM domains may take over later,
-    except for the C5 "always on" PM domain.
+this also requires registering the clocks with the pm_clk subsystem.
+In the legacy case, this is handled by the platform code, after
+attaching the device to its PM domain.
+
+When the devices are instantiated from DT, devices are attached to their
+PM domains by generic code, leaving no method for the platform-specific
+PM domain code to register their clocks.
+
+Add two callbacks, allowing a PM domain to perform platform-specific
+tasks when a device is attached to or detached from a PM domain.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
   - New
 ---
- drivers/sh/pm_runtime.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/base/power/domain.c | 12 ++++++++++++
+ include/linux/pm_domain.h   |  2 ++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
-index fe2c2d595f599b2f..85cc89fd3e7d7cb7 100644
---- a/drivers/sh/pm_runtime.c
-+++ b/drivers/sh/pm_runtime.c
-@@ -81,7 +81,9 @@ static int __init sh_pm_runtime_init(void)
- 		if (!of_machine_is_compatible("renesas,emev2") &&
- 		    !of_machine_is_compatible("renesas,r7s72100") &&
- 		    !of_machine_is_compatible("renesas,r8a73a4") &&
-+#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
- 		    !of_machine_is_compatible("renesas,r8a7740") &&
-+#endif
- 		    !of_machine_is_compatible("renesas,r8a7778") &&
- 		    !of_machine_is_compatible("renesas,r8a7779") &&
- 		    !of_machine_is_compatible("renesas,r8a7790") &&
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index f09b615e61515d11..3fa15b6c54f09b36 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1418,6 +1418,12 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ 	if (ret)
+ 		goto out;
+ 
++	if (genpd->attach_dev) {
++		ret = genpd->attach_dev(genpd, dev);
++		if (ret)
++			goto out;
++	}
++
+ 	genpd->device_count++;
+ 	genpd->max_off_time_changed = true;
+ 
+@@ -1541,6 +1547,12 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 
+ 	spin_unlock_irq(&dev->power.lock);
+ 
++	if (genpd->detach_dev) {
++		ret = genpd->detach_dev(genpd, dev);
++		if (ret)
++			goto out;
++	}
++
+ 	mutex_lock(&gpd_data->lock);
+ 	pdd->dev = NULL;
+ 	mutex_unlock(&gpd_data->lock);
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index ff128c1ec0de231c..ac07918f907b7495 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -73,6 +73,8 @@ struct generic_pm_domain {
+ 	bool cached_power_down_ok;
+ 	struct device_node *of_node; /* Node in device tree */
+ 	struct gpd_cpu_data *cpu_data;
++	int (*attach_dev)(struct generic_pm_domain *domain, struct device *dev);
++	int (*detach_dev)(struct generic_pm_domain *domain, struct device *dev);
+ };
+ 
+ static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
 -- 
 1.9.1
