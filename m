@@ -1,172 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 17 Sep 2014 00:04:46 +0800
-Subject: [PATCH v4 2/2] ARM: dts: sun5i: Add DT for HSG H702 tablet board
-In-Reply-To: <1410883486-22888-1-git-send-email-wens@csie.org>
-References: <1410883486-22888-1-git-send-email-wens@csie.org>
-Message-ID: <1410883486-22888-3-git-send-email-wens@csie.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Sep 2014 17:07:59 +0100
+Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
+In-Reply-To: <20140915155656.GA29744@arm.com>
+References: <cover.1410632834.git.joe@perches.com>
+ <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
+ <20140915155656.GA29744@arm.com>
+Message-ID: <20140916160759.GJ12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a Q8 format 7 inch tablet with an Allwinner A13 SoC.
-It has 512MB DRAM, 4GB NAND flash, an accelerometer, camera,
-RTL8188-based WiFi, and micro SD slot for external storage.
+On Mon, Sep 15, 2014 at 04:56:56PM +0100, Will Deacon wrote:
+> On Sat, Sep 13, 2014 at 07:31:12PM +0100, Joe Perches wrote:
+> > Use the more common pr_warn.
+> > 
+> > Other miscellanea:
+> > 
+> > o Coalesce formats
+> > o Realign arguments
+> > 
+> > Signed-off-by: Joe Perches <joe@perches.com>
+> > ---
+> >  arch/arm/include/asm/syscall.h   |  8 ++++----
+> >  arch/arm/kernel/atags_parse.c    |  2 +-
+> >  arch/arm/kernel/hw_breakpoint.c  | 18 +++++++++---------
+> >  arch/arm/kernel/irq.c            |  4 ++--
+> >  arch/arm/kernel/perf_event_cpu.c |  4 ++--
+> >  arch/arm/kernel/smp.c            |  2 +-
+> >  arch/arm/kernel/unwind.c         | 24 ++++++++++++------------
+> >  arch/arm/mm/idmap.c              |  2 +-
+> >  arch/arm/mm/mmu.c                |  4 ++--
+> >  9 files changed, 34 insertions(+), 34 deletions(-)
+> 
+> It's Russell's call on this, but it really looks like more trouble than it's
+> worth imo. Having git blame identify the person who wrote the original code
+> is considerably more useful than being pointed at somebody making cosmetic
+> changes.
 
-It is likely made by a subsidiary of Hanns.G (Hannstar).
+I have no objection to this patch set, but I'll echo Will's comment
+that having git blame identify who wrote the code is useful.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 130 +++++++++++++++++++++++++++++++
- 2 files changed, 131 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+However, removing old cruft is also a useful exercise, as it keeps
+things simpler (because we're not carrying around lots of excess
+baggage.)  So, I think on balance it's worth the churn.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ecb55a3..2f42b18 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -406,6 +406,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a10s-olinuxino-micro.dtb \
- 	sun5i-a10s-r7-tv-dongle.dtb \
-+	sun5i-a13-hsg-h702.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb
- dtb-$(CONFIG_MACH_SUN6I) += \
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-new file mode 100644
-index 0000000..8b3cd090
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -0,0 +1,130 @@
-+/*
-+ * Copyright 2014 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun5i-a13.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "HSG H702";
-+	compatible = "hsg,h702", "allwinner,sun5i-a13";
-+
-+	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
-+			vmmc-supply = <&reg_vcc3v3>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			/*
-+			 * There doesn't seem to be a GPIO for controlling
-+			 * usb1 vbus, despite the fex file saying otherwise.
-+			 */
-+			usb1_vbus-supply = <&reg_vcc5v0>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		pinctrl at 01c20800 {
-+			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_pins_b>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+
-+			pcf8563: rtc at 51 {
-+				compatible = "nxp,pcf8563";
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+};
+Joe, any chance you could add a KernelVersion: tag somewhere in the
+commit message and throw it at patches at arm.linux.org.uk so it doesn't
+get lost?
+
+Thanks.
+
 -- 
-2.1.0
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
