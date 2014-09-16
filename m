@@ -1,222 +1,90 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 16 Sep 2014 14:25:05 +0300
-Subject: [RESEND PATCH v3] spi: davinci: add support for adding delay between
- word's transmissions
-Message-ID: <1410866705-13520-1-git-send-email-grygorii.strashko@ti.com>
+From: sebott@linux.vnet.ibm.com (Sebastian Ott)
+Date: Tue, 16 Sep 2014 13:35:53 +0200 (CEST)
+Subject: [PATCH v1 16/21] s390/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+ <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
+Message-ID: <alpine.LFD.2.11.1409161325280.1618@denkbrett>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Murali Karicheri <m-karicheri2@ti.com>
+Hello,
 
-This patch adds ability to configure delay between transmission of
-words over SPI bus if it's required by SPI slave devices.
+On Fri, 5 Sep 2014, Yijing Wang wrote:
+> Use MSI chip framework instead of arch MSI functions to configure
+> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+> 
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  arch/s390/pci/pci.c |   18 ++++++++++++++----
+>  1 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+> index 2fa7b14..da5316e 100644
+> --- a/arch/s390/pci/pci.c
+> +++ b/arch/s390/pci/pci.c
+> @@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
+>  	}
+>  }
+> 
+> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+> +int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+>  {
+>  	struct zpci_dev *zdev = get_zdev(pdev);
+>  	unsigned int hwirq, msi_vecs;
+> @@ -434,7 +434,7 @@ out:
+>  	return rc;
+>  }
+> 
+> -void arch_teardown_msi_irqs(struct pci_dev *pdev)
+> +static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
+>  {
+>  	struct zpci_dev *zdev = get_zdev(pdev);
+>  	struct msi_desc *msi;
+> @@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>  	/* Release MSI interrupts */
+>  	list_for_each_entry(msi, &pdev->msi_list, list) {
+>  		if (msi->msi_attrib.is_msix)
+> -			default_msix_mask_irq(msi, 1);
+> +			__msix_mask_irq(msi, 1);
+>  		else
+> -			default_msi_mask_irq(msi, 1, 1);
+> +			__msi_mask_irq(msi, 1, 1);
 
-New optional SPI slave property:
-- ti,spi-word-delay : delay between transmission of words
-	(SPIFMTn.WDELAY, SPIDAT1.WDEL)
+The default_msi_mask_irq to __msi_mask_irq renaming is hidden in your
+patch "x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()"
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Rebased on top of:
-  spi.git/for-next + 
-  "[PATCH] spi: davinci: remove empty function davinci_spi_cleanup"
-  http://www.spinics.net/lists/arm-kernel/msg362811.html
+This means that between that patch and this one s390 will not compile.
+Could you please move this hunk to the other patch or even make an extra
+patch with the renaming. Other than that:
 
-v3:
-http://www.spinics.net/lists/devicetree/msg49141.html
-v2:
-http://www.spinics.net/lists/devicetree/msg48514.html
-v1:
-http://www.spinics.net/lists/linux-spi/msg01609.html
+Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
 
- .../devicetree/bindings/spi/spi-davinci.txt        | 30 ++++++++++++
- drivers/spi/spi-davinci.c                          | 55 +++++++++++++++++++---
- 2 files changed, 78 insertions(+), 7 deletions(-)
+Regards,
+Sebastian
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-davinci.txt b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-index f80887b..12ecfe9 100644
---- a/Documentation/devicetree/bindings/spi/spi-davinci.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-davinci.txt
-@@ -1,5 +1,10 @@
- Davinci SPI controller device bindings
- 
-+Links on DM:
-+Keystone 2 - http://www.ti.com/lit/ug/sprugp2a/sprugp2a.pdf
-+dm644x - http://www.ti.com/lit/ug/sprue32a/sprue32a.pdf
-+OMAP-L138/da830 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-+
- Required properties:
- - #address-cells: number of cells required to define a chip select
- 	address on the SPI bus. Should be set to 1.
-@@ -24,6 +29,30 @@ Optional:
- 	cs-gpios = <0>, <0>, <0>, <&gpio1 30 0>, <&gpio1 31 0>;
- 	where first three are internal CS and last two are GPIO CS.
- 
-+Optional properties for slave devices:
-+SPI slave nodes can contain the following properties.
-+Not all SPI Peripherals from Texas Instruments support this.
-+Please check SPI peripheral documentation for a device before using these.
-+
-+- ti,spi-wdelay : delay between transmission of words
-+	(SPIFMTn.WDELAY, SPIDAT1.WDEL) must be specified in number of SPI module
-+	clock periods.
-+
-+	delay = WDELAY * SPI_module_clock_period + 2 * SPI_module_clock_period
-+
-+Below is timing diagram which shows functional meaning of
-+"ti,spi-wdelay" parameter.
-+
-+             +-+ +-+ +-+ +-+ +-+                           +-+ +-+ +-+
-+SPI_CLK      | | | | | | | | | |                           | | | | | |
-+  +----------+ +-+ +-+ +-+ +-+ +---------------------------+ +-+ +-+ +-
-+
-+SPI_SOMI/SIMO+-----------------+                           +-----------
-+  +----------+ word1           +---------------------------+word2
-+             +-----------------+                           +-----------
-+                                          WDELAY
-+                                <-------------------------->
-+
- Example of a NOR flash slave device (n25q032) connected to DaVinci
- SPI controller device over the SPI bus.
- 
-@@ -43,6 +72,7 @@ spi0:spi at 20BF0000 {
- 		compatible = "st,m25p32";
- 		spi-max-frequency = <25000000>;
- 		reg = <0>;
-+		ti,spi-wdelay = <8>;
- 
- 		partition at 0 {
- 			label = "u-boot-spl";
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 134fb6e..ada3891 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -65,6 +65,7 @@
- 
- /* SPIDAT1 (upper 16 bit defines) */
- #define SPIDAT1_CSHOLD_MASK	BIT(12)
-+#define SPIDAT1_WDEL		BIT(10)
- 
- /* SPIGCR1 */
- #define SPIGCR1_CLKMOD_MASK	BIT(1)
-@@ -209,6 +210,7 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
- {
- 	struct davinci_spi *dspi;
- 	struct davinci_spi_platform_data *pdata;
-+	struct davinci_spi_config *spicfg = spi->controller_data;
- 	u8 chip_sel = spi->chip_select;
- 	u16 spidat1 = CS_DEFAULT;
- 	bool gpio_chipsel = false;
-@@ -223,6 +225,10 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
- 		gpio = spi->cs_gpio;
- 	}
- 
-+	/* program delay transfers if tx_delay is non zero */
-+	if (spicfg->wdelay)
-+		spidat1 |= SPIDAT1_WDEL;
-+
- 	/*
- 	 * Board specific chip select logic decides the polarity and cs
- 	 * line for the controller
-@@ -237,9 +243,9 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
- 			spidat1 |= SPIDAT1_CSHOLD_MASK;
- 			spidat1 &= ~(0x1 << chip_sel);
- 		}
--
--		iowrite16(spidat1, dspi->base + SPIDAT1 + 2);
- 	}
-+
-+	iowrite16(spidat1, dspi->base + SPIDAT1 + 2);
- }
- 
- /**
-@@ -285,7 +291,7 @@ static int davinci_spi_setup_transfer(struct spi_device *spi,
- 	int prescale;
- 
- 	dspi = spi_master_get_devdata(spi->master);
--	spicfg = (struct davinci_spi_config *)spi->controller_data;
-+	spicfg = spi->controller_data;
- 	if (!spicfg)
- 		spicfg = &davinci_spi_default_cfg;
- 
-@@ -333,6 +339,14 @@ static int davinci_spi_setup_transfer(struct spi_device *spi,
- 		spifmt |= SPIFMT_PHASE_MASK;
- 
- 	/*
-+	* Assume wdelay is used only on SPI peripherals that has this field
-+	* in SPIFMTn register and when it's configured from board file or DT.
-+	*/
-+	if (spicfg->wdelay)
-+		spifmt |= ((spicfg->wdelay << SPIFMT_WDELAY_SHIFT)
-+				& SPIFMT_WDELAY_MASK);
-+
-+	/*
- 	 * Version 1 hardware supports two basic SPI modes:
- 	 *  - Standard SPI mode uses 4 pins, with chipselect
- 	 *  - 3 pin SPI is a 4 pin variant without CS (SPI_NO_CS)
-@@ -349,9 +363,6 @@ static int davinci_spi_setup_transfer(struct spi_device *spi,
- 
- 		u32 delay = 0;
- 
--		spifmt |= ((spicfg->wdelay << SPIFMT_WDELAY_SHIFT)
--							& SPIFMT_WDELAY_MASK);
--
- 		if (spicfg->odd_parity)
- 			spifmt |= SPIFMT_ODD_PARITY_MASK;
- 
-@@ -383,6 +394,26 @@ static int davinci_spi_setup_transfer(struct spi_device *spi,
- 	return 0;
- }
- 
-+static int davinci_spi_of_setup(struct spi_device *spi)
-+{
-+	struct davinci_spi_config *spicfg = spi->controller_data;
-+	struct device_node *np = spi->dev.of_node;
-+	u32 prop;
-+
-+	if (spicfg == NULL && np) {
-+		spicfg = kzalloc(sizeof(*spicfg), GFP_KERNEL);
-+		if (!spicfg)
-+			return -ENOMEM;
-+		*spicfg = davinci_spi_default_cfg;
-+		/* override with dt configured values */
-+		if (!of_property_read_u32(np, "ti,spi-wdelay", &prop))
-+			spicfg->wdelay = (u8)prop;
-+		spi->controller_data = spicfg;
-+	}
-+
-+	return 0;
-+}
-+
- /**
-  * davinci_spi_setup - This functions will set default transfer method
-  * @spi: spi device on which data transfer to be done
-@@ -433,7 +464,16 @@ static int davinci_spi_setup(struct spi_device *spi)
- 	else
- 		clear_io_bits(dspi->base + SPIGCR1, SPIGCR1_LOOPBACK_MASK);
- 
--	return retval;
-+	return davinci_spi_of_setup(spi);
-+}
-+
-+static void davinci_spi_cleanup(struct spi_device *spi)
-+{
-+	struct davinci_spi_config *spicfg = spi->controller_data;
-+
-+	spi->controller_data = NULL;
-+	if (spi->dev.of_node)
-+		kfree(spicfg);
- }
- 
- static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
-@@ -947,6 +987,7 @@ static int davinci_spi_probe(struct platform_device *pdev)
- 	master->num_chipselect = pdata->num_chipselect;
- 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(2, 16);
- 	master->setup = davinci_spi_setup;
-+	master->cleanup = davinci_spi_cleanup;
- 
- 	dspi->bitbang.chipselect = davinci_spi_chipselect;
- 	dspi->bitbang.setup_transfer = davinci_spi_setup_transfer;
--- 
-1.9.1
+>  		irq_set_msi_desc(msi->irq, NULL);
+>  		irq_free_desc(msi->irq);
+>  		msi->msg.address_lo = 0;
+> @@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>  	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+>  }
+> 
+> +static struct msi_chip zpci_msi_chip = {
+> +	.setup_irqs = zpci_setup_msi_irqs,
+> +	.teardown_irqs = zpci_teardown_msi_irqs,
+> +};
+> +
+> +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
+> +{
+> +	return &zpci_msi_chip;
+> +}
+> +
+>  static void zpci_map_resources(struct zpci_dev *zdev)
+>  {
+>  	struct pci_dev *pdev = zdev->pdev;
+> -- 
+> 1.7.1
+> 
+> 
