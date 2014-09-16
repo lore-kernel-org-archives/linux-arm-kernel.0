@@ -1,54 +1,39 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Sep 2014 20:11:59 -0700
-Subject: [PATCH 05/12] ARM: dts: Do not set pulls for I2C lines
+Date: Mon, 15 Sep 2014 20:12:01 -0700
+Subject: [PATCH 07/12] ARM: dts: Enable PMIC idle configuration for LDP
 In-Reply-To: <1410837126-31553-1-git-send-email-tony@atomide.com>
 References: <1410837126-31553-1-git-send-email-tony@atomide.com>
-Message-ID: <1410837126-31553-5-git-send-email-tony@atomide.com>
+Message-ID: <1410837126-31553-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are external pulls on these lines and enabling the
-internal pulls can cause issue. This is because the internal
-pulls are parallel with the external pulls. So let's clear
-the internal I2C pulls.
+With the IO chain reconfigure fixed, we can now enable the PMIC
+scripts for LDP.
+
+Note that at least on my es3.0 based LDP, the UART seems to be
+flakey after wake-up events from off-idle and hangs but eventually
+continues.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap3-n900.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/omap3-ldp.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 1fe45d1..f0d8236 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -136,22 +136,22 @@
- 
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
--			0x18a (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
--			0x18c (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda */
-+			0x18a (PIN_INPUT | MUX_MODE0)		/* i2c1_scl */
-+			0x18c (PIN_INPUT | MUX_MODE0)		/* i2c1_sda */
- 		>;
+diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+index af272c1..72dca0b 100644
+--- a/arch/arm/boot/dts/omap3-ldp.dts
++++ b/arch/arm/boot/dts/omap3-ldp.dts
+@@ -159,6 +159,11 @@
+ 		reg = <0x48>;
+ 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+ 		interrupt-parent = <&intc>;
++
++		twl_power: power {
++			compatible = "ti,twl4030-power-idle";
++			ti,use_poweroff;
++		};
  	};
- 
- 	i2c2_pins: pinmux_i2c2_pins {
- 		pinctrl-single,pins = <
--			0x18e (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c2_scl */
--			0x190 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c2_sda */
-+			0x18e (PIN_INPUT | MUX_MODE0)		/* i2c2_scl */
-+			0x190 (PIN_INPUT | MUX_MODE0)		/* i2c2_sda */
- 		>;
- 	};
- 
- 	i2c3_pins: pinmux_i2c3_pins {
- 		pinctrl-single,pins = <
--			0x192 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_scl */
--			0x194 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_sda */
-+			0x192 (PIN_INPUT | MUX_MODE0)		/* i2c3_scl */
-+			0x194 (PIN_INPUT | MUX_MODE0)		/* i2c3_sda */
- 		>;
- 	};
+ };
  
 -- 
 2.1.0
