@@ -1,45 +1,84 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 16 Sep 2014 16:57:51 -0700
-Subject: [PATCH v11 3/9] arm: Remove DEBUG_LL_UART_NONE
+Date: Tue, 16 Sep 2014 16:57:52 -0700
+Subject: [PATCH v11 4/9] arm: ks8695: Migrate debug_ll macros to shared
+ directory
 In-Reply-To: <1410911877-24903-1-git-send-email-daniel.thompson@linaro.org>
 References: <1410911877-24903-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1410911877-24903-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1410911877-24903-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only a very small handful of platforms support DEBUG_LL_UART_NONE but it
-lurks in the menus of every single platform config ready to break the
-build. This is an especial problem for defconfig/oldconfig since it is
-often selected by default.
+As part of the migration a couple of uart definitions have been copied
+from of the platform specific header files.
 
-This patch solves the problem by removing this option. Any platforms
-still depending upon this option must be migrated.
+Note that, in order to keep oldconfig working nicely we must defer the
+removal of arch/arm/mach-ks8695/include/mach/debug-macro.S until
+DEBUG_LL_UART_NONE has been removed.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
 ---
- arch/arm/Kconfig.debug | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/Kconfig.debug                                         |  8 ++++++++
+ .../include/mach/debug-macro.S => include/debug/ks8695.S}      | 10 +++++++---
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+ rename arch/arm/{mach-ks8695/include/mach/debug-macro.S => include/debug/ks8695.S} (80%)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..9c46729 100644
+index 9c46729..97c3058 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -877,15 +877,6 @@ choice
- 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
- 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+@@ -348,6 +348,13 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to UART1 serial port on KEYSTONE2 devices.
  
--	config DEBUG_LL_UART_NONE
--		bool "No low-level debugging UART"
--		depends on !ARCH_MULTIPLATFORM
--		help
--		  Say Y here if your platform doesn't provide a UART option
--		  above. This relies on your platform choosing the right UART
--		  definition internally in order for low-level debugging to
--		  work.
--
- 	config DEBUG_ICEDCC
- 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
- 		help
++	config DEBUG_KS8695_UART
++		bool "KS8695 Debug UART"
++		depends on ARCH_KS8695
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on KS8695.
++
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+ 		depends on ARCH_MMP
+@@ -1017,6 +1024,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX6Q_UART || \
+ 				 DEBUG_IMX6SL_UART || \
+ 				 DEBUG_IMX6SX_UART
++	default "debug/ks8695.S" if DEBUG_KS8695_UART
+ 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/include/debug/ks8695.S
+similarity index 80%
+rename from arch/arm/mach-ks8695/include/mach/debug-macro.S
+rename to arch/arm/include/debug/ks8695.S
+index a79e489..961da1f 100644
+--- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
++++ b/arch/arm/include/debug/ks8695.S
+@@ -1,5 +1,5 @@
+ /*
+- * arch/arm/mach-ks8695/include/mach/debug-macro.S
++ * arch/arm/include/debug/ks8695.S
+  *
+  * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
+  * Copyright (C) 2006 Simtec Electronics
+@@ -11,8 +11,12 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#include <mach/hardware.h>
+-#include <mach/regs-uart.h>
++#define KS8695_UART_PA	0x03ffe000
++#define KS8695_UART_VA	0xf00fe000
++#define KS8695_URTH	(0x04)
++#define KS8695_URLS	(0x14)
++#define URLS_URTE	(1 << 6)
++#define URLS_URTHRE	(1 << 5)
+ 
+ 	.macro	addruart, rp, rv, tmp
+ 		ldr	\rp, =KS8695_UART_PA		@ physical base address
 -- 
 1.9.3
