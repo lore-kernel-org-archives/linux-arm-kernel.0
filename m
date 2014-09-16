@@ -1,101 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 17 Sep 2014 07:41:23 +0900
-Subject: [GIT PULL 2/2] Samsung DT changes for 3.18
-Message-ID: <5418BC93.5070008@samsung.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 16 Sep 2014 15:43:18 -0700
+Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
+In-Reply-To: <20140915194518.GC28083@e103687>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
+ <20140911123412.GY3190@worktop.ger.corp.intel.com>
+ <CAKfTPtBbjpCFifoyFSh8Hb3nBZFFTjjxdfxnpMk=CHy5aX1qpg@mail.gmail.com>
+ <20140911140444.GH4783@worktop.ger.corp.intel.com>
+ <20140915194518.GC28083@e103687>
+Message-ID: <CAKfTPtCTxQNQfusJuQhGy7ahDFWjwitQOZHU89O0wyy5ZcNO9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+On 15 September 2014 12:45, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
+> On Thu, Sep 11, 2014 at 03:04:44PM +0100, Peter Zijlstra wrote:
+>> On Thu, Sep 11, 2014 at 03:07:52PM +0200, Vincent Guittot wrote:
+>> > > Also I'm not entirely sure I like the usage, utilization names/metrics.
+>> > > I would suggest to reverse them. Call the pure running number
+>> > > 'utilization' and this scaled with capacity 'usage' or so.
+>> >
+>> > ok. i can invert 'usage' and 'utilization', which will give
+>> >
+>> > s/get_cpu_utilization/get_cpu_usage/
+>> > s/sgs->group_utilization/sgs->group_usage/
+>
+> The confusion will have new dimensions added when we introduce
+> scale-invariance too. Then the running number is already scaled by the
+> current P-state compute capacity. But I don't have any better
+> suggestions.
+>
+>> > s/cfs.usage_load_avg/cfs.utilization_load_avg/
+>
+> I don't like using "load" for unweighted metrics. I associate load with
+> something that may be weighted by priority like load_avg_contrib, and
+> utilization with pure cpu utilization as in how many cycles is spend on
+> a particular task. I called it "usage_util_avg" in my own patches, but
+> "util_avg" might be better if we agree that utilization == usage.
 
-   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+ok. so i don't have the same definition than you. IMHO, load should be
+used for figures that have used the average of the geometric series
+used in the per entity load tracking more than the fact that we weight
+the figures with priority
 
-are available in the git repository at:
+>
+>> > s/se->avg.usage_avg_contrib/se->avg.utilization_avg_contrib
+>
+> util_avg_contrib maybe to keep it shorter.
+>
+>> > s/__update_task_entity_usage/__update_task_entity_utilization
+>> > s/__update_entity_usage_avg_contrib/__update_entity_utilization_avg_contrib
+>
+> Maybe use "util" here as well?
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/samsung-dt
+I agree that utilization can be a bit too long but util sounds a bit
+too short ans we loose the utilization meaning. so we could use
+activity instead of utilization
 
-for you to fetch changes up to 9b02732643d9f4b92b14f5ec041c166bd36033fc:
+Nevertheless, the most important is that we find a common definition convention
 
-   ARM: dts: remove old USB2 PHY node for exynos5250 (2014-09-14 
-10:11:20 +0900)
+Would the following proposal be ok ?
 
-----------------------------------------------------------------
-Samsung DT update for 3.18
+s/get_cpu_utilization/get_cpu_usage/
+s/sgs->group_utilization/sgs->group_usage/
+s/cfs.usage_load_avg/cfs.activity_load_avg/
+s/se->avg.usage_avg_contrib/se->avg.activity_avg_contrib
+s/__update_task_entity_usage/__update_task_entity_activity
+s/__update_entity_usage_avg_contrib/__update_entity_activity_avg_contrib
 
-- un-use slot-node and deprecate the supports-highspped
-   for dw-mmc
-- remove old USB2 PHY node for exynos5250
-
-- exynos4412-odroid-common
-   enable PMIC interrupt and i2c improvements
-
-- exynos5250-snow
-   fold exynos5250-cros-common
-   update display related nodes
-
-- Peach Pit and Pi
-   improve power scheme, add support max77802 PMIC,
-   add hdmi regulators add thermistor, ISL29018 sensor,
-   set i2c clock at 400kHz, add support Atmel touchpad,
-   update display related nodes
-
-----------------------------------------------------------------
-Ajay Kumar (3):
-       ARM: dts: update display related nodes for exynos5250-snow
-       ARM: dts: update display related nodes for exynos5420-peach-pit
-       ARM: dts: update display related nodes for exynos5800-peach-pi
-
-Andreas Faerber (2):
-       ARM: dts: Fix MMC pinctrl for exynos5250-snow
-       ARM: dts: Fold exynos5250-cros-common into exynos5250-snow
-
-Bartlomiej Zolnierkiewicz (2):
-       ARM: dts: remove old USB2 PHY node hook for exynos5250-arndale
-       ARM: dts: remove old USB2 PHY node for exynos5250
-
-Daniel Drake (2):
-       ARM: dts: Enable PMIC interrupts for exynos4412-odroid-common
-       ARM: dts: ODROID i2c improvements for exynos4412-odroid-common
-
-Jaehoon Chung (1):
-       ARM: dts: unuse the slot-node and deprecate the 
-supports-highspeed for dw-mmc in exynos
-
-Javier Martinez Canillas (5):
-       ARM: dts: Improve Peach Pit and Pi power scheme
-       ARM: dts: Add support max77802 PMIC for exynos based Peach boards
-       ARM: dts: Add ISL29018 sensor for exynos based Peach boards
-       ARM: dts: Set i2c7 clock at 400kHz for exynos based Peach boards
-       ARM: dts: Add support Atmel touchpad for exynos5800-peach-pi
-
-Naveen Krishna Chatradhi (1):
-       ARM: dts: Add thermistor dts fragment used by exynos based Peach 
-boards
-
-Rahul Sharma (2):
-       ARM: dts: add hdmi regulators for exynos5800-peach-pi
-       ARM: dts: add hdmi regulators for exynos5420-peach-pit
-
-Sjoerd Simons (1):
-       ARM: dts: Add support Atmel touchpad for exynos5420-peach-pit
-
-  arch/arm/boot/dts/cros-adc-thermistors.dtsi     |  44 +++
-  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  21 +-
-  arch/arm/boot/dts/exynos4412-origen.dts         |   8 +-
-  arch/arm/boot/dts/exynos4412-trats2.dts         |   8 +-
-  arch/arm/boot/dts/exynos5250-arndale.dts        |  22 +-
-  arch/arm/boot/dts/exynos5250-cros-common.dtsi   | 164 --------
-  arch/arm/boot/dts/exynos5250-smdk5250.dts       |  18 +-
-  arch/arm/boot/dts/exynos5250-snow.dts           | 195 ++++++++--
-  arch/arm/boot/dts/exynos5250.dtsi               |  15 -
-  arch/arm/boot/dts/exynos5260-xyref5260.dts      |  18 +-
-  arch/arm/boot/dts/exynos5410-smdk5410.dts       |  18 +-
-  arch/arm/boot/dts/exynos5420-arndale-octa.dts   |  16 +-
-  arch/arm/boot/dts/exynos5420-peach-pit.dts      | 482 
-++++++++++++++++++++++--
-  arch/arm/boot/dts/exynos5420-smdk5420.dts       |  16 +-
-  arch/arm/boot/dts/exynos5800-peach-pi.dts       | 472 
-+++++++++++++++++++++--
-  15 files changed, 1130 insertions(+), 387 deletions(-)
-  create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
-  delete mode 100644 arch/arm/boot/dts/exynos5250-cros-common.dtsi
+Vincent
+>
+> Morten
+>
