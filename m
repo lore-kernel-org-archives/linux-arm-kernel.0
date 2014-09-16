@@ -1,33 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Sep 2014 17:52:56 -0300
-Subject: [Patch net-next v2 4/4] net: fec: Workaround for imx6sx enet tx
- hang when enable three queues
-In-Reply-To: <1410890290-11248-5-git-send-email-Frank.Li@freescale.com>
-References: <1410890290-11248-1-git-send-email-Frank.Li@freescale.com>
- <1410890290-11248-5-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAOMZO5DnmHBaDr7RzozJoBsuEY=bzmusKcfJQ4NjCyD4+13=Tg@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 16 Sep 2014 16:04:12 -0500
+Subject: [Patch v2] clk: qcom: Add IPQ8064 PLL required for USB
+Message-ID: <1410901452-13519-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 2:58 PM,  <Frank.Li@freescale.com> wrote:
-> From: Fugang Duan <B38611@freescale.com>
->
-> When enable three queues on imx6sx enet, and then do tx performance
-> test with iperf tool, after some time running, tx hang.
->
-> Found that:
->         If uDMA is running, software set TDAR may cause tx hang.
->         If uDMA is in idle, software set TDAR don't cause tx hang.
->
-> There is a TDAR race condition for mutliQ when the software sets TDAR
-> and the UDMA clears TDAR simultaneously or in a small window (2-4 cycles).
-> This will cause the udma_tx and udma_tx_arbiter state machines to hang.
-> The issue exist at i.MX6SX enet IP.
->
-> So, the Workaround is checking TDAR status four time, if TDAR cleared by
-> hardware and then write TDAR, otherwise don't set TDAR.
->
-> The patch is only one Workaround for the issue TKT210582.
+This patch adds the PLL0 that is required for the USB clocks to work properly.
 
-As Shawn pointed out, it is better to use the ERR007885 instead of an
-internal bug numbering.
+Changes in v2: Correct table to only use pll0_vote
+
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ drivers/clk/qcom/gcc-ipq806x.c |   31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
+index 4032e51..193b7c4 100644
+--- a/drivers/clk/qcom/gcc-ipq806x.c
++++ b/drivers/clk/qcom/gcc-ipq806x.c
+@@ -32,6 +32,33 @@
+ #include "clk-branch.h"
+ #include "reset.h"
+ 
++static struct clk_pll pll0 = {
++	.l_reg = 0x30c4,
++	.m_reg = 0x30c8,
++	.n_reg = 0x30cc,
++	.config_reg = 0x30d4,
++	.mode_reg = 0x30c0,
++	.status_reg = 0x30d8,
++	.status_bit = 16,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "pll0",
++		.parent_names = (const char *[]){ "pxo" },
++		.num_parents = 1,
++		.ops = &clk_pll_ops,
++	},
++};
++
++static struct clk_regmap pll0_vote = {
++	.enable_reg = 0x34c0,
++	.enable_mask = BIT(0),
++	.hw.init = &(struct clk_init_data){
++		.name = "pll0_vote",
++		.parent_names = (const char *[]){ "pll0" },
++		.num_parents = 1,
++		.ops = &clk_pll_vote_ops,
++	},
++};
++
+ static struct clk_pll pll3 = {
+ 	.l_reg = 0x3164,
+ 	.m_reg = 0x3168,
+@@ -154,7 +181,7 @@ static const u8 gcc_pxo_pll8_pll0[] = {
+ static const char *gcc_pxo_pll8_pll0_map[] = {
+ 	"pxo",
+ 	"pll8_vote",
+-	"pll0",
++	"pll0_vote",
+ };
+ 
+ static struct freq_tbl clk_tbl_gsbi_uart[] = {
+@@ -2133,6 +2160,8 @@ static struct clk_branch usb_fs1_h_clk = {
+ };
+ 
+ static struct clk_regmap *gcc_ipq806x_clks[] = {
++	[PLL0] = &pll0.clkr,
++	[PLL0_VOTE] = &pll0_vote,
+ 	[PLL3] = &pll3.clkr,
+ 	[PLL8] = &pll8.clkr,
+ 	[PLL8_VOTE] = &pll8_vote,
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
