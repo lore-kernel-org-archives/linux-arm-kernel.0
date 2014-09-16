@@ -1,14 +1,15 @@
 From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 16 Sep 2014 15:23:53 +0800
+Date: Tue, 16 Sep 2014 15:45:22 +0800
 Subject: [PATCH v4 2/4] dt-bindings: document Rockchip thermal
 In-Reply-To: <20140911155324.GA27076@developer>
 References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
  <1410403012.25559.69.camel@rzhang1-toshiba>
  <20140911121842.GB26715@developer> <40514790.Xc34lyFLGa@wuerfel>
  <20140911155324.GA27076@developer>
-Message-ID: <1410852233.25559.173.camel@rzhang1-toshiba>
+Message-ID: <1410853522.1280.0.camel@rzhang1-toshiba>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 On Thu, 2014-09-11 at 11:53 -0400, Eduardo Valentin wrote:
 > Arnd,
@@ -50,7 +51,8 @@ On Thu, 2014-09-11 at 11:53 -0400, Eduardo Valentin wrote:
 > 
 Agreed.
 And I think we can have such feature in thermal core.
-But again I don't think we should represent it as an trip point. 
+But again I don't think we should represent it as an trip point.
+Instead, we can have a separate parameter for
 
 thanks,
 rui
