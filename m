@@ -1,22 +1,30 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 16 Sep 2014 09:18:01 -0700
-Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
-In-Reply-To: <20140916160759.GJ12361@n2100.arm.linux.org.uk>
-References: <cover.1410632834.git.joe@perches.com>
- <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
- <20140915155656.GA29744@arm.com>
- <20140916160759.GJ12361@n2100.arm.linux.org.uk>
-Message-ID: <1410884281.16519.2.camel@joe-AO725>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Sep 2014 18:18:02 +0200
+Subject: [PATCH] ARM: dts: mmp2: Fix typo in max8925 compatible property
+Message-ID: <1410884282-18041-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-09-16 at 17:07 +0100, Russell King - ARM Linux wrote:
-> any chance you could add a KernelVersion: tag somewhere in the
-> commit message and throw it at patches at arm.linux.org.uk so it doesn't
-> get lost?
+Fix typo in the compatible property for max8925 MFD driver. The proper
+compatible as in Documentation and driver is 'maxim,max8925'.
 
-There are no commit logs with a KernelVersion: tag
-in all of git history.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/mmp2-brownstone.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-What do you think a KernelVersion: tag is and what
-would it be used for?
+diff --git a/arch/arm/boot/dts/mmp2-brownstone.dts b/arch/arm/boot/dts/mmp2-brownstone.dts
+index 7f70a39459f6..29eeb465f99c 100644
+--- a/arch/arm/boot/dts/mmp2-brownstone.dts
++++ b/arch/arm/boot/dts/mmp2-brownstone.dts
+@@ -30,7 +30,7 @@
+ 			twsi1: i2c at d4011000 {
+ 				status = "okay";
+ 				pmic: max8925 at 3c {
+-					compatible = "maxium,max8925";
++					compatible = "maxim,max8925";
+ 					reg = <0x3c>;
+ 					interrupts = <1>;
+ 					interrupt-parent = <&intcmux4>;
+-- 
+1.9.1
