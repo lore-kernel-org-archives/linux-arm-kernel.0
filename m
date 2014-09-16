@@ -1,48 +1,63 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Sep 2014 13:54:28 +0200
-Subject: [PATCH v2 01/18] arm: dma-mapping: arm_iommu_attach_device:
- automatically set max_seg_size
+Date: Tue, 16 Sep 2014 13:54:29 +0200
+Subject: [PATCH v2 02/18] arm: exynos: bind power domains earlier,
+ on device creation
 In-Reply-To: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
 References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1410868485-4143-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If device has no max_seg_size set, we assume that there is no limit and
-force it to DMA_BIT_MASK(32) to always use contiguous mappings in DMA
-address space.
+This patches change initialization time of power domain driver from client
+device driver bind to device creation. This lets other core drivers to
+register power domain notifiers before client driver is bound.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/mm/dma-mapping.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-exynos/pm_domains.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index bcd5f836f27e..84705e24571b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2050,6 +2050,22 @@ int arm_iommu_attach_device(struct device *dev,
- {
- 	int err;
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fd76e1b5a471..1d368a26528c 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -159,13 +159,13 @@ static int exynos_pm_notifier_call(struct notifier_block *nb,
+ 	struct device *dev = data;
  
-+	/*
-+	 * if device has no max_seg_size set, we assume that there is no limit
-+	 * and force it to DMA_BIT_MASK(32) to always use contiguous mappings
-+	 * in DMA address space
-+	 */
-+	if (!dev->dma_parms) {
-+		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
-+		if (!dev->dma_parms)
-+			return -ENOMEM;
-+	}
-+	if (!dev->dma_parms->max_segment_size) {
-+		err = dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
-+		if (err)
-+			return err;
-+	}
+ 	switch (event) {
+-	case BUS_NOTIFY_BIND_DRIVER:
++	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (dev->of_node)
+ 			exynos_read_domain_from_dt(dev);
+ 
+ 		break;
+ 
+-	case BUS_NOTIFY_UNBOUND_DRIVER:
++	case BUS_NOTIFY_DEL_DEVICE:
+ 		exynos_remove_device_from_domain(dev);
+ 
+ 		break;
+@@ -177,6 +177,13 @@ static struct notifier_block platform_nb = {
+ 	.notifier_call = exynos_pm_notifier_call,
+ };
+ 
++static int exynos_pm_domain_add(struct device *dev, void *priv)
++{
++	if (dev->of_node)
++		exynos_read_domain_from_dt(dev);
++	return 0;
++}
 +
- 	err = iommu_attach_device(mapping->domain, dev);
- 	if (err)
- 		return err;
+ static __init int exynos4_pm_init_power_domain(void)
+ {
+ 	struct platform_device *pdev;
+@@ -236,6 +243,7 @@ no_clk:
+ 	}
+ 
+ 	bus_register_notifier(&platform_bus_type, &platform_nb);
++	bus_for_each_dev(&platform_bus_type, NULL, NULL, exynos_pm_domain_add);
+ 
+ 	return 0;
+ }
 -- 
 1.9.2
