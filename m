@@ -1,57 +1,75 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Tue, 16 Sep 2014 14:42:01 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140916090540.GJ28458@ci00147.xsens-tech.local>
-References: <54119AAA.9080907@linutronix.de>
- <20140911151114.GD28458@ci00147.xsens-tech.local>
- <5411C810.7070906@linutronix.de>
- <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
- <54129F6C.7040508@linutronix.de>
- <20140912094010.GE28458@ci00147.xsens-tech.local>
- <5412C21A.8020203@linutronix.de>
- <20140912102816.GF28458@ci00147.xsens-tech.local>
- <541716DC.9020904@linutronix.de>
- <20140916090540.GJ28458@ci00147.xsens-tech.local>
-Message-ID: <20140916124200.GK28458@ci00147.xsens-tech.local>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 16 Sep 2014 14:52:59 +0200
+Subject: [PATCH] ARM: cacheflush: Fix exynos build breakage on ARMv6 by using
+ macros for ISB/DSB
+Message-ID: <1410871979-12470-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 11:05:40AM +0200, Frans Klaver wrote:
-> On Mon, Sep 15, 2014 at 06:42:04PM +0200, Sebastian Andrzej Siewior wrote:
-> > On 09/12/2014 12:28 PM, Frans Klaver wrote:
-> > > port config is 115200 8N1. I don't recall doing anything special. I
-> > > boot, login, less file and get a lock.
-> > 
-> > So I booted my mini Debian 7.6 (basic system + openssh) on my beagle
-> > bone black which is:
-> > 
-> > [    0.000000] AM335X ES2.0 (neon )
-> > 
-> > configured a console, login, invoked "less file". The file was shown, I
-> > hit on the space key so less shows me more of the file. No lock-up.
-> > I tried booting via NFS and MMC. I tried various files with less.
-> > 
-> > My dot config is here
-> > 	https://breakpoint.cc/config-am335x-bb.txt.xz
-> > 
-> > If there is nothing specific to the file you do less on I have no idea
-> > what else it could if it is not the config.
-> 
-> I'll test your config and go through the differences.
+This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
+time options (e.g. by building allmodconfig):
 
-So far it looks like it isn't in the config. I've tested both your and
-my config on debian wheezy on a boneblack. No lock ups.
+$ make allmodconfig
+$ make
+  CC      arch/arm/mach-exynos/platsmp.o
+/tmp/ccdQM0Eg.s: Assembler messages:
+/tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode `isb '
+/tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode `isb '
+/tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode `dsb '
+make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
 
-Less doesn't fill my entire screen, so it looks a bit funky when
-scrolling, but I'm not sure if that's related to the driver.
+The error was introduced in commit "ARM: EXYNOS: Move code from
+hotplug.c to platsmp.c".  Previously code using
+v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
+this flag dissapeared during the movement.
 
-I'll have to look further for things we did that may have impact here.
+Use isb() and dsb() macros in v7_exit_coherency_flush() so the proper
+code will be generated for ARMv6.
 
-> Thanks,
-> Frans
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reported-by: Mark Brown <broonie@kernel.org>
+Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
+---
+ arch/arm/include/asm/cacheflush.h | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 79ecb4f34ffb..b74eeec971c0 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -464,22 +464,27 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
+  *   CONFIG_FRAME_POINTER=y.  ip is saved as well if ever r12-clobbering
+  *   trampoline are inserted by the linker and to keep sp 64-bit aligned.
+  */
+-#define v7_exit_coherency_flush(level) \
++#define v7_exit_coherency_flush(level) do { \
+ 	asm volatile( \
+ 	"stmfd	sp!, {fp, ip} \n\t" \
+ 	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
+ 	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
+ 	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR \n\t" \
+-	"isb	\n\t" \
++	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
++	      "r9","r10","lr","memory" ); \
++	isb(); \
++	asm volatile( \
+ 	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
+ 	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR \n\t" \
+ 	"bic	r0, r0, #(1 << 6)	@ disable local coherency \n\t" \
+ 	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR \n\t" \
+-	"isb	\n\t" \
+-	"dsb	\n\t" \
+-	"ldmfd	sp!, {fp, ip}" \
+ 	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
+-	      "r9","r10","lr","memory" )
++	      "r9","r10","lr","memory" ); \
++	isb(); \
++	dsb(); \
++	asm volatile( \
++	"ldmfd	sp!, {fp, ip}" ); \
++	} while (0)
+ 
+ int set_memory_ro(unsigned long addr, int numpages);
+ int set_memory_rw(unsigned long addr, int numpages);
+-- 
+1.9.1
