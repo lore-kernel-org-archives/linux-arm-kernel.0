@@ -1,56 +1,33 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 16 Sep 2014 09:34:49 +0800
-Subject: [RFC v3] arm:extend the reserved mrmory for initrd to be page aligned
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160A@CNBJMBX05.corpusers.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 16 Sep 2014 09:43:06 +0800
+Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
+ i.mx6dl
+In-Reply-To: <1410774073.3314.1.camel@pengutronix.de>
+References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
+ <1410774073.3314.1.camel@pengutronix.de>
+Message-ID: <20140916014304.GA23450@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch extend the start and end address of initrd to be page aligned,
-so that we can free all memory including the un-page aligned head or tail
-page of initrd, if the start or end address of initrd are not page
-aligned, the page can't be freed by free_initrd_mem() function.
+On Mon, Sep 15, 2014 at 11:41:13AM +0200, Lucas Stach wrote:
+> Am Mittwoch, den 10.09.2014, 13:30 +0800 schrieb Robin Gong:
+> > There is one weird data in rxfifo after one full rx/tx transfer
+> > done sometimes. It looks a design issue and hard to workaround
+> > totally, so disable dma functhion here. And will re-enable it
+> > once the root cause found.
+> > 
+> Sorry, I'm late to this as Shawn seems to already have picked up this
+> patch, but this isn't the right way to fix the problem.
+> 
+> We made it clear at kernel summit last year that we try to not break
+> existing DTs as booting a new kernel with an old DT is a valid use case.
+> While you don't strictly violate this rule what you do here is only
+> fixing systems booting with a new DT while leaving others broken.
+> 
+> If you are working around a hardware problem please disable DMA support
+> in the driver. This will also allow you to enable it again, if you find
+> another workaround without touching the DT again.
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/mm/init.c   | 5 +++++
- arch/arm64/mm/init.c | 8 +++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+Okay, it's a valid point.  Patch dropped.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..9221645 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -636,6 +636,11 @@ static int keep_initrd;
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
- 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
- 	}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..c5512f6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -334,8 +334,14 @@ static int keep_initrd;
- 
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
--	if (!keep_initrd)
-+	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-+	}
- }
- 
- static int __init keepinitrd_setup(char *__unused)
--- 
-2.1.0
+Shawn
