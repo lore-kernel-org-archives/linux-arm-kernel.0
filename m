@@ -1,98 +1,70 @@
-From: david@protonic.nl (David Jander)
-Date: Tue, 16 Sep 2014 13:42:09 +0200
-Subject: gcc 4.8.3 miscompiles drivers/net/ethernet/freescale/fec_main.c ?!
-In-Reply-To: <20140910164920.3c448b40@archvile>
-References: <20140910110943.3673dbb4@archvile>
- <21520.17620.519242.597681@gargle.gargle.HOWL>
- <20140910164920.3c448b40@archvile>
-Message-ID: <20140916134209.7cc21f86@archvile>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 16 Sep 2014 12:40:27 +0100
+Subject: [RFC PATCH v3 0/7] Introduce automatic DMA configuration for
+ IOMMU masters
+In-Reply-To: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+Message-ID: <541821AB.8040403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
-Hi Mikael,
+On 12/09/14 17:34, Will Deacon wrote:
+> Hi all,
+>
+> Here is version three of the RFC I've previously posted here:
+>
+>    RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
+>    RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
+>
+> Changes since RFCv2 include:
+>
+>    - Put the iommu_ops in iommu_data so of_iommu_configure can avoid using
+>      the bus_type
+>    - Initialise the offset and DMA masks on the dev in of_dma_configure
+>      instead of in the arch callback (as this would cause a regression on
+>      some architectures)
+>    - Added deconfigure/teardown code based on ref counting the iommu_dma_mapping
+>    - A bunch of small fixes (_OF_DECLARE,  some code shuffling, fix multiple
+>      IOMMU parsing)
+>
+> All feedback welcome. Hopefully this is now at a point where people can
+> start looking to port dma-mapping and/or IOMMU drivers to it.
+>
 
-On Wed, 10 Sep 2014 16:49:20 +0200
-David Jander <david@protonic.nl> wrote:
+What about AMBA devices? Playing with this on Juno and wondering why my 
+PL330 doesn't get any of_xlate callbacks, I see that 
+of_amba_device_create doesn't call of_dma_configure or anything from 
+that path. It's easy to work around by removing the arm,primecell 
+compatible, but that feels pretty dirty.
 
-> On Wed, 10 Sep 2014 14:32:20 +0200
-> Mikael Pettersson <mikpelinux@gmail.com> wrote:
-> 
-> > David Jander writes:
-> >  > 
-> >  > Hi,
-> >  > 
-> >  > I am seeing a strange problem when building a recent kernel with
-> >  > gcc-4.8.3 for armv7-a that contains the following patch:
-> >  > 
-> >  > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bfd4ecdd87d350e19457fe0d02fa1e046774c44e
-> >  > 
-> >  > Unfortunately I am not good enough at reading ARM assembly output from
-> >  > GCC to understand whats going wrong, so I am asking for help.
-> >  > 
-> >  > I started noticing ethernet packet loss on a i.MX6 board after upgrading
-> >  > the kernel from 3.16-rc-something to latest mainline. The problem is
-> >  > very easy to reproduce so I started git-bisecting. Git bisect gave me
-> >  > the above patch as the culprit, and indeed: Without the patch a
-> >  > flood-ping goes fine (just one dot on screen, no lost packets). I apply
-> >  > the patch and the dots start filling the screen instantly.
-> >  > 
-> >  > I am compiling the kernel using Pengutronix's OSELAS toolchain version
-> >  > 2013.12.1, which is based on linaro gcc-4.8.3 without any relevant
-> >  > patches AFAIK.
-> > 
-> > Linaro's toolchain is itself heavily modified compared to FSF gcc-4.8.3,
-> > so first please try a pure vanilla FSF gcc-4.8.3, and then a likewise
-> > vanilla gcc-4.9.1.  If those also cause the malfunction, then you have
-> > proof for a bug in upstream gcc (or possibly undefined code in the kernel),
-> > otherwise the bug is likely Linaro's.
-> 
-> Thanks. I will try to build gcc-4.8.3 from vanilla FSF sources and try to
-> reproduce the problem there. Do you think there is a chance this is still a
-> kernel bug?
-> I have assembly output of both working and broken cases (inlined and
-> non-inlined function). I can post them here or send to anyone who wants to
-> try to make sense of it....
+Robin.
 
-This is getting weird:
-
-I have build both vanilla FSF toolchains: binutils-2.24 with gcc-4.8.3 and
-gcc-4.9.1
-
-I can't quite make sense of the results, other than that there is a
-race-condition in the Linux kernel fec_main.c:
-
-gcc-4.8.3 with -O2: fails the same as with OSELAS.Toolchain/linaro gcc-4.8.3
-
-gcc-4.8.3 with -Os: Seems to work correctly
-
-gcc-4.9.1 with -O2: Loses packets, but much less often than with gcc-4.8.3 -O2
-
-gcc-4.9.1 with -Os: Fails even worse than with gcc-4.8.3 -O2
-
-Any suggestion on how to make sense of this?
-For me this looks slightly more like a kernel bug than a compiler bug...
-
-> >  > Compiling with -O2 breaks the code, while -Os seems to produce a
-> >  > correctly working kernel.
-> >  > 
-> >  > I decided to make changes to the code and see if I could find other ways
-> >  > to "fix" the problem, and I got the following result:
-> >  > 
-> >  > The above mentioned patch introduces the static function
-> >  > fec_enet_hwtstamp() near line 1068 of fec_main.c. If I make an exact
-> >  > copy of this function, where I only change the name (e.g.
-> >  > fec_enet_hwtstamp2), and change one of the two places this function is
-> >  > called to instead use the other name, GCC inlines both copies and the
-> >  > problem disappears!
-> >  > 
-> >  > Since I am not very good at GCC internals nor do I know this piece of
-> >  > code in fec_main.c very well, I am asking here for help in hunting down
-> >  > the real bug, which I suspect is in GCC... but I want to know for sure.
-> >  > 
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+> Will Deacon (7):
+>    iommu: provide early initialisation hook for IOMMU drivers
+>    dma-mapping: replace set_arch_dma_coherent_ops with arch_setup_dma_ops
+>    iommu: add new iommu_ops callback for adding an OF device
+>    iommu: provide helper function to configure an IOMMU for an of master
+>    dma-mapping: detect and configure IOMMU in of_dma_configure
+>    arm: call iommu_init before of_platform_populate
+>    arm: dma-mapping: plumb our iommu mapping ops into arch_setup_dma_ops
+>
+>   arch/arm/include/asm/dma-mapping.h |  9 ++--
+>   arch/arm/kernel/setup.c            |  2 +
+>   arch/arm/mm/dma-mapping.c          | 68 ++++++++++++++++++++++++++----
+>   drivers/iommu/Kconfig              |  2 +-
+>   drivers/iommu/of_iommu.c           | 84 ++++++++++++++++++++++++++++++++++++++
+>   drivers/of/platform.c              | 53 +++++++++++++-----------
+>   include/asm-generic/vmlinux.lds.h  |  2 +
+>   include/linux/dma-mapping.h        | 21 +++++++---
+>   include/linux/iommu.h              | 15 +++++++
+>   include/linux/of_iommu.h           | 35 ++++++++++++++++
+>   10 files changed, 247 insertions(+), 44 deletions(-)
+>
