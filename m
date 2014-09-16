@@ -1,86 +1,33 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Tue, 16 Sep 2014 12:43:16 +0200
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
- <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
- <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
- <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
- <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
-Message-ID: <CAAObsKC=_pnr+LD6MBe0iAmf2f6suHgb=ZshkxuLfHhBFM7P3A@mail.gmail.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Tue, 16 Sep 2014 18:44:27 +0800
+Subject: [PATCH v2 0/3] add basic rk3288 smp support
+Message-ID: <1410864271-9277-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2014 19:06, Andrew Bresticker <abrestic@chromium.org> wrote:
-> On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->> On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org> wrote:
->>> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>>>
->>>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>>>> recently posted by Andrew Chew [2].
->>>>>>
->>>>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->>>>>> USB devices I tested with, about half where probed correctly, but the
->>>>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>>>>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>>>>
->>>>>> I don't see any correlation between the failure and the kind of usb
->>>>>> device, but I don't have much experience with USB implementations
->>>>>> either.
->>>>>
->>>>> Hmm... I haven't seen that before.  Which particular devices were you using?
->>>>
->>>> Here they are:
->>>>
->>>> work:
->>>>
->>>> Genius keyboard: 05d5:6782
->>>> Logitech mouse: 046d:c06a
->>>> Denver MP3 player: 10d6:1100
->>>> Atheros Bluetooth dongle: 0cf3:3005
->>>>
->>>> don't work:
->>>>
->>>> MCS7830 ethernet dongle: 9710:7830
->>>> Genesys Logic hub: 05e3:0608
->>>
->>> I tried the hub and it works just fine for me... Have you tried this
->>> on any other boards like Big or Blaze?
->>
->> I have a Blaze here, but haven't been able to get the external ports
->> to power up. I don't have schematics nor a strong interest to get that
->> fixed myself, as I can test my code just fine with the Blaze's
->> internal camera and the devices that do work on the Jetson.
->
-> Ok, since Blaze has been announced, hopefully we can post a
-> device-tree for it soon.
->
->> I'm using the firmware file that was posted recently:
->>
->> xhci-tegra 70090000.usb: Firmware timestamp: 2014-05-02 02:22:50 UTC,
->> Falcon state 0x20
->
-> Yup, I'm using the same firmware.
->
->> If things work for you with the same sources, .config and firmware, I
->> can only think of the hw being different (other hw revision?).
->
-> That, or perhaps bootloader differences?  I'm using mainline U-Boot.
+rk3288 is qual-core CPU Soc, we need to enable the smp.
+This patchset works with either arch-timer use the phisical counter
+in kernel or the firmware initialize the arch-timer virtual counter
+offset and use virtual counter in kernel.
 
-Also mainline here:
+Changes in v2:
+- add documentation
+- use rk3288_boot_secondary instead ofsmp_boot_secondary
+- discards the power domain operation
+- handle the per cpu starup when actived by 'sev'
+- adjust the alignment
 
-U-Boot 2014.10-rc1-00136-g7bee1c9 (Aug 28 2014 - 15:22:05)
+Kever Yang (3):
+  Documentation: dt-bindings: add dt binding info for rk3288-smp
+  ARM: rockchip: add basic smp support for rk3288
+  ARM: dts: add intmem node for rk3288 smp support
 
-Don't know how to check what revision of the hw I have, though.
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/rk3288.dtsi                  | 18 ++++++++
+ arch/arm/mach-rockchip/core.h                  |  1 +
+ arch/arm/mach-rockchip/headsmp.S               | 14 ++++++
+ arch/arm/mach-rockchip/platsmp.c               | 63 +++++++++++++++++++++++---
+ 5 files changed, 91 insertions(+), 6 deletions(-)
 
-Regards,
-
-Tomeu
-
-> Stephen, Thierry, have either of you had a chance to test this series?
+-- 
+1.9.1
