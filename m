@@ -1,186 +1,100 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 15 Sep 2014 23:19:19 -0500
-Subject: [PATCH v2 3/3] PCI: Layerscape: Add Layerscape PCIe driver
-In-Reply-To: <5412D4BC.10704@freescale.com>
-References: <1410469741-11634-1-git-send-email-Minghuan.Lian@freescale.com>
- <1410469741-11634-3-git-send-email-Minghuan.Lian@freescale.com>
- <1410470694.24184.390.camel@snotra.buserror.net>
- <5412D4BC.10704@freescale.com>
-Message-ID: <1410841159.24184.491.camel@snotra.buserror.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 15 Sep 2014 21:37:44 -0700
+Subject: [PATCH v2 5/7] clk: rockchip: add new clock-type for the cpuclk
+In-Reply-To: <54178BBF.70402@rock-chips.com>
+References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+ <1410561030-19127-6-git-send-email-heiko@sntech.de>
+ <CAD=FV=XJEL1QDRHUGL=g5BKEhLWve0uUko7ZH=dM7btWkU4+1w@mail.gmail.com>
+ <54178BBF.70402@rock-chips.com>
+Message-ID: <CAD=FV=VwmALrUznNtX_=89nxWK8A0koM2f2zs4L3DLbuu3Nyhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-12 at 11:10 +0000, Lian Minghuan-B31939 wrote:
-> Hi Scott,
-> 
-> Please see my comments inline.
-> 
-> On 2014?09?11? 21:24, Scott Wood wrote:
-> > On Thu, 2014-09-11 at 21:09 +0000, Minghuan Lian wrote:
-> >> Add support for Freescale Layerscape PCIe controller. This driver
-> >> re-uses the designware core code.
-> >>
-> >> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> >> ---
-> >> Change log:
-> >> v2:
-> >> 1. Add pcie-scfg to link scfg device node and remove "fsl, ls-pcie" compatible
-> >> 2. Use regmap API to access scfg.
-> >> 3. remove ls1021 PCI device ID.
-> >> 4. remove unused irq pme_irq and ls_pcie_list.
-> >> 5. Do not set scfg bit reverse mode
-> >>
-> >>   .../devicetree/bindings/pci/layerscape-pci.txt     |  45 ++++
-> >>   drivers/pci/host/Kconfig                           |   8 +
-> >>   drivers/pci/host/Makefile                          |   1 +
-> >>   drivers/pci/host/pci-layerscape.c                  | 278 +++++++++++++++++++++
-> >>   4 files changed, 332 insertions(+)
-> >>   create mode 100644 Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> >>   create mode 100644 drivers/pci/host/pci-layerscape.c
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> >> new file mode 100644
-> >> index 0000000..1a5dbd8
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> >> @@ -0,0 +1,45 @@
-> >> +Freescale Layerscape PCIe controller
-> >> +
-> >> +This PCIe host controller is based on the Synopsis Designware PCIe IP
-> >> +and thus inherits all the common properties defined in designware-pcie.txt.
-> >> +
-> >> +Required properties:
-> >> +- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
-> >> +- reg: base addresses and lengths of the PCIe controller
-> >> +- interrupts: A list of interrupt outputs of the controller. Must contain an
-> >> +  entry for each entry in the interrupt-names property.
-> >> +- interrupt-names: Must include the following entries:
-> >> +  "intr": The interrupt that is asserted for controller interrupts
-> >> +  "msi": The interrupt that is asserted when an MSI is received
-> >> +  "pme": The interrupt that is asserted when PME state changes
-> >> +- pcie-scfg: Must include two entries.
-> > fsl,pcie-scfg
-> [Minghuan] Ok. I will rename the property.
-> >> +  The first entry must be a link to the SCFG device node
-> >> +  The second entry must be '0' or '1' based on physical PCIe controller index.
-> >> +  used to get SCFG PEXN registers
-> >> +
-> >> +Example:
-> >> +
-> >> +	pcie at 3400000 {
-> >> +		compatible = "fsl,ls1021a-pcie", "snps,dw-pcie";
-> > Can we rely on the config space vendor/device ID instead of hardcoding
-> > the SoC here?
-> [Minghuan] No, for a SoC may have several device ID.
-> For example:
-> LS1021A RM says :
-> 0x0E0A LS1021A with security
-> 0x0E0B LS1021A without security
-> But I read device ID 0x0e00  from some LS1021A boards.
-> 0x0e06 from some LS1021A boards. this may be caused by different CPLD.
+Kever and Heiko
 
-:-(
+On Mon, Sep 15, 2014 at 6:00 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>>> +       /* select alternate parent */
+>>> +       writel(HIWORD_UPDATE(1, 1, reg_data->mux_core_shift),
+>>> +              cpuclk->reg_base + reg_data->core_reg);
+>>
+>> In the "alt_prate > ndata->old_rate" case there's a period of time
+>> where you can be running super slow.
+>>
+>> If we start as 126000 and we're going to switch to 594000, we decide
+>> we need a divide by 5.  We apply the divide by 5 in one statement and
+>> switch to 594MHz in a second statement.  That means there's a very
+>> short period of time where we're at 126000 / 5 = 25200.  That's 25MHz.
+>>
+>> I've found that when I stress out CPUfreq and have a lot of interrupts
+>> coming in (like from USB) the my system hangs here.
+>>
+>> Since the "alt div" and reparenting touch the same register, I think
+>> we can do them in a single operation.  That works for me.
+>
+> Agree, this should be work, the operation for div and parent select for
+> arm clk is in the same register in rk3066, rk3188 and rk3288.
+>>
+>>
+>> ...but something isn't adding up for me, so I'm hesitant to suggest
+>> this.  Somehow I only end up with the hang here and not down in the
+>> post_rate_change().  I'll keep debugging...  It strangely enough seems
+>> related to the rockchip_pll_notifier_cb()???
+>
+> Did you test this on Gerrit 3.14? I think we have a know problem that make
+> POST_RATE_CHANGE notifier is not send which has been fixed by Derek.
 
-> >> +		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
-> >> +		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
-> >> +		reg-names = "regs", "config";
-> >> +		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>, /* controller interrupt */
-> >> +			     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>, /* MSI interrupt */
-> >> +			     <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>; /* PME interrupt */
-> >> +		interrupt-names = "intr", "msi", "pme";
-> >> +		pcie-scfg = <&scfg 0>;
-> >> +		#address-cells = <3>;
-> >> +		#size-cells = <2>;
-> >> +		device_type = "pci";
-> >> +		num-lanes = <4>;
-> >> +		bus-range = <0x00 0xff>;
-> >> +		ranges = <0x81000000 0x0 0x00000000 0x40 0x10000000 0x0 0x00010000   /* downstream I/O */
-> >> +			  0x82000000 0x0 0x00000000 0x41 0x00000000 0x1 0x00000000>; /* non-prefetchable memory */
-> > Are these ranges hardcoded in the SoC, or are they the result of iATU
-> > settings?  If the latter, who configures it and why no prefetchable
-> > region?
-> [Minghuan] 400000_0000 - 480000_0000 is hardcode assigned to PEX1.
-> I separates from this 32 region  1M for IO, 4G for non-prefetchable memory.
-> 4G is the max size iATU supported.
-> IO and memory region will be set to iATU by pci-designware.c
-> Because both powerpc and imx do not set prefechable memory,
-> so  I do not assign prefetchable memory either.
+I accounted for that.  Thanks for the reminder though.
 
-If there's spare room in the addres space for a prefetchable region, why
-not make one, regardless of what PPC and IMX do?
+I think I've solved the two separate bugs.  Hopefully Heiko (and you!)
+can take a look at my fixes.  The overall summary of what I think was
+happening:
 
-FWIW, I believe that ARMv8 can make better use of a prefetchable region
-due to the "gathering" storage attribute, so even if you don't use one
-on LS1021A consider using one on ARMv8-based LS chips.
+1. We were at 126MHz
 
-> >> +		#interrupt-cells = <1>;
-> >> +		interrupt-map-mask = <0 0 0 7>;
-> >> +		interrupt-map = <0000 0 0 1 &gic GIC_SPI 91  IRQ_TYPE_LEVEL_HIGH>,
-> >> +				<0000 0 0 2 &gic GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>,
-> >> +				<0000 0 0 3 &gic GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
-> >> +				<0000 0 0 4 &gic GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
-> >> +	};
-> >> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> >> index 34134d6..c826949 100644
-> >> --- a/drivers/pci/host/Kconfig
-> >> +++ b/drivers/pci/host/Kconfig
-> >> @@ -82,4 +82,12 @@ config PCIE_XILINX
-> >>   	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
-> >>   	  Host Bridge driver.
-> >>   
-> >> +config PCI_LAYERSCAPE
-> >> +	bool "Freescale Layerscape PCIe controller"
-> >> +	depends on SOC_LS1021A
-> >> +	select PCIE_DW
-> >> +	select MFD_SYSCON
-> >> +	help
-> >> +	  Say Y here if you want PCIe controller support on Layerscape SoCs.
-> > Why does it depend on this particular SoC?  Is the same PCIe controller
-> > going to be used on other Layerscape chips?
-> [Minghuan] LS1021A platform patch only contains SOC name no ARCH name.
-> Both LS1042 and LS2085 RM do not contain PCI chapter. I am not sure they
-> will use the same IP.
-> I can remove 'depends on' and wait for the Layerscape ARCH name then add it.
-> The other Layerscape will use ARM v8. I am not even sure LS1021 will be 
-> belong
-> to LS1.
+2. We decided that we wanted to go to 216MHz
 
-Why do you need any dependency here other than what is required to make
-the driver build?
+3. In prep for changing the ARM PLL, we switched to "slow mode".  AKA:
+24MHz.  This happens in a callback.
 
-> >> +static irqreturn_t ls_pcie_msi_irq_handler(int irq, void *data)
-> >> +{
-> >> +	struct pcie_port *pp = data;
-> >> +	struct ls_pcie *pcie = to_ls_pcie(pp);
-> >> +	unsigned int msi_irq;
-> >> +
-> >> +	/* clear the interrupt */
-> >> +	regmap_write(pcie->scfg, SCFG_SPIMSICLRCR,
-> >> +		     MSI_LS1021A_DATA(pcie->index));
-> >> +
-> >> +	msi_irq = irq_find_mapping(pp->irq_domain, 0);
-> >> +	if (msi_irq)
-> >> +		generic_handle_irq(msi_irq);
-> >> +	else
-> >> +		/*
-> >> +		 * that's weird who triggered this?
-> >> +		 * just clear it
-> >> +		 */
-> >> +		dev_info(pcie->dev, "unexpected MSI\n");
-> >> +
-> >> +	return IRQ_HANDLED;
-> >> +}
-> >> +
-> > Why are you returning IRQ_HANDLED in the "unexpected MSI" case?
-> [Minghuan] The interrupt located in top layer chip is dedicated to 32 
-> MSI interrupts.
-> This handler has cleaned the interrupt, so I think it can return IRQ_HANDLED
-> although  the special MSI interrupt belong second layer chip has not 
-> been registered.
+4. In prep for swtiching to GPLL, we decided that the divider should be "/ 5"
 
-If it's wrong enough to print "unexpected MSI" (BTW, please use either
-dev_dbg or a ratelimited dev_err for that, and include the IRQ number),
-then it's wrong enough to return IRQ_NONE so that the upper layers know
-the interrupt was not handled.
+5. We applied "/ 5" to the current PLL (24MHz), giving 4.8MHz
 
--Scott
+
+BUG: If we happen to get a USB interrupt here (we get lots and lots
+and lots if we have a USB Ethernet adapter in), we're hosed.  We'll
+keep getting interrupts faster than we handle them.
+
+
+6. We quickly switch to GPLL, giving us 594MHz / 5 = 118.8MHz.
+
+7. We switch the PLL to 216MHz
+
+8. We switch out of slow mode.
+
+9. We switch off GPLL, giving us 216MHz / 5 = 43MHz.
+
+10. We remove the divider, giving us 216MHz.
+
+---
+
+With my patches we never run on 24MHz and only ever divide GPLL.  I've
+put them on gerrit since I expect Heiko will just fold them in his
+patches.
+
+* https://chromium-review.googlesource.com/218432 - FIXUP: clk:
+rockchip: add new clock-type for the cpuclk (slow mode fix)
+
+* https://chromium-review.googlesource.com/218433 - FIXUP: clk:
+rockchip: add new clock-type for the cpuclk (atomic change, plus ...
+
+
+...I've also fixed the problem with the common clock framework caching things...
+
+
+Comments are certainly welcome.  ...or if I'm doing something stupid /
+wrong, please tell me.  It's late (for me) and I'm writing this after
+drinking a sangria.  ;)
+
+
+-Doug
