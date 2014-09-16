@@ -1,40 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 16 Sep 2014 10:57:43 +0900
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Defconfig Updates
- for v3.18
-Message-ID: <cover.1410832469.git.horms+renesas@verge.net.au>
+Date: Tue, 16 Sep 2014 10:57:45 +0900
+Subject: [PATCH] ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig
+In-Reply-To: <cover.1410832469.git.horms+renesas@verge.net.au>
+References: <cover.1410832469.git.horms+renesas@verge.net.au>
+Message-ID: <7d984c95723725d26f3961c1655c20256f0affdf.1410832469.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+Support for the r8a7794 was recently added.
+Enable it in the shmobile_defconfig to increase build coverage.
 
-Please consider these fourth round of Renesas ARM based SoC defconfig updates for v3.18.
-
-This pull request is based on the previous round of
-such requests, tagged as renesas-defconfig3-for-v3.18,
-which you have pulled.
-
-
-The following changes since commit de46e95cdb8671e2b0728923b8113654779c3ba8:
-
-  ARM: shmobile: Enable Armadillo 800 EVA board in multiplatform defconfig (2014-09-01 10:46:57 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig4-for-v3.18
-
-for you to fetch changes up to 7d984c95723725d26f3961c1655c20256f0affdf:
-
-  ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig (2014-09-11 09:49:40 +0900)
-
-----------------------------------------------------------------
-Fourth Round of Renesas ARM Based SoC Defconfig Updates for v3.18
-
-* Enable r8a7794 SoC in shmobile_defconfig
-
-----------------------------------------------------------------
-Simon Horman (1):
-      ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig
-
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/shmobile_defconfig | 1 +
  1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 522275a..d7346ad 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -16,6 +16,7 @@ CONFIG_ARCH_R8A7740=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
++CONFIG_ARCH_R8A7794=y
+ CONFIG_MACH_KOELSCH=y
+ CONFIG_MACH_LAGER=y
+ CONFIG_MACH_MARZEN=y
+-- 
+2.0.1
