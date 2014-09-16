@@ -1,73 +1,48 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 16 Sep 2014 20:48:52 +0200
-Subject: [PATCH/RFC v2 05/12] PM / Domains: Add helper variable np =
- dev->of_node
+Date: Tue, 16 Sep 2014 20:48:48 +0200
+Subject: [PATCH/RFC v2 01/12] PM / Domains: Add DT bindings for power-on/off
+ latencies
 In-Reply-To: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
 References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1410893339-6361-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1410893339-6361-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PM domain power on/off-latencies are properties of the hardware.
+In legacy code, they're specified from platform code.
+On DT platforms, their values should come from DT.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Kevin Hilman <khilman@linaro.org>
 ---
 v2:
-  - New
+  - Add Acked-by
 ---
- drivers/base/power/domain.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/power/power_domain.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 3fa15b6c54f09b36..e1cbde985d4de606 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2130,17 +2130,18 @@ static struct generic_pm_domain *of_genpd_get_from_provider(
-  */
- int genpd_dev_pm_attach(struct device *dev)
- {
-+	struct device_node *np = dev->of_node;
- 	struct of_phandle_args pd_args;
- 	struct generic_pm_domain *pd;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 98c16672ab5f49e0..7bc421d84367d636 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -19,12 +19,18 @@ Required properties:
+    providing multiple PM domains (e.g. power controllers), but can be any value
+    as specified by device tree binding documentation of particular provider.
  
--	if (!dev->of_node)
-+	if (!np)
- 		return -ENODEV;
++Optional properties:
++ - power-on-latency: Power-on latency of the PM domain, in ns,
++ - power-off-latency: Power-off latency of the PM domain, in ns.
++
+ Example:
  
- 	if (dev->pm_domain)
- 		return -EEXIST;
+ 	power: power-controller at 12340000 {
+ 		compatible = "foo,power-controller";
+ 		reg = <0x12340000 0x1000>;
+ 		#power-domain-cells = <1>;
++		power-on-latency = <250000>;
++		power-off-latency = <250000>;
+ 	};
  
--	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
-+	ret = of_parse_phandle_with_args(np, "power-domains",
- 					"#power-domain-cells", 0, &pd_args);
- 	if (ret < 0) {
- 		if (ret != -ENOENT)
-@@ -2151,8 +2152,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 		 * (for backwards compatibility of DT ABI)
- 		 */
- 		pd_args.args_count = 0;
--		pd_args.np = of_parse_phandle(dev->of_node,
--						"samsung,power-domain", 0);
-+		pd_args.np = of_parse_phandle(np, "samsung,power-domain", 0);
- 		if (!pd_args.np)
- 			return -ENOENT;
- 	}
-@@ -2161,7 +2161,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 	if (IS_ERR(pd)) {
- 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
- 			__func__, PTR_ERR(pd));
--		of_node_put(dev->of_node);
-+		of_node_put(np);
- 		return PTR_ERR(pd);
- 	}
- 
-@@ -2177,7 +2177,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 	if (ret < 0) {
- 		dev_err(dev, "failed to add to PM domain %s: %d",
- 			pd->name, ret);
--		of_node_put(dev->of_node);
-+		of_node_put(np);
- 		return ret;
- 	}
- 
+ The node above defines a power controller that is a PM domain provider and
 -- 
 1.9.1
