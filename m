@@ -1,49 +1,74 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Tue, 16 Sep 2014 11:41:55 +0200
-Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <20140916035204.GB20800@Robin-OptiPlex-780>
-References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
- <5416D26A.4080707@ahsoftware.de> <20140916035204.GB20800@Robin-OptiPlex-780>
-Message-ID: <541805E3.6080003@ahsoftware.de>
+From: karlp@tweak.net.au (Karl Palsson)
+Date: Tue, 16 Sep 2014 09:49:45 +0000
+Subject: [PATCH v2 5/7] clk: rockchip: add new clock-type for the cpuclk
+In-Reply-To: <CAD=FV=XiPd7AFj1YCb4WdR5FU2YQ4tDbZ2FYMz3MFDu8wyKawQ@mail.gmail.com>
+References: <1410561030-19127-1-git-send-email-heiko@sntech.de>
+ <1410561030-19127-6-git-send-email-heiko@sntech.de>
+ <CAD=FV=XJEL1QDRHUGL=g5BKEhLWve0uUko7ZH=dM7btWkU4+1w@mail.gmail.com>
+ <CAD=FV=XiPd7AFj1YCb4WdR5FU2YQ4tDbZ2FYMz3MFDu8wyKawQ@mail.gmail.com>
+Message-ID: <20140916094945.GA5165@palmtree.beeroclock.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.09.2014 05:52, schrieb Robin Gong:
-> On Mon, Sep 15, 2014 at 01:50:02PM +0200, Alexander Holler wrote:
->> Am 10.09.2014 07:30, schrieb Robin Gong:
->>> There is one weird data in rxfifo after one full rx/tx transfer
->>> done sometimes. It looks a design issue and hard to workaround
->>> totally, so disable dma functhion here. And will re-enable it
->>> once the root cause found.
->>
->> Hmm, I experience problems with DMA too but on uart3. I'm using the same
->> workaround for the uart (I've just commented out the dma entries in the DT).
->> The problem manifests itself here such, that brcm_patchram_plus
->> hangs while uploading the firmware to a BCM4330 connected at uart3
->> (reproducible).
->>
->> So maybe there is a bug in the DMA-engine which not only effects
->> SPI. Or both drivers contain the same error in handling DMA (maybe
->> through c&p).
->> But that's just specualtion from me, I haven't looked further into
->> that problem.
->>
->> Regards,
->>
->> Alexander Holler
-> Thanks for your information share. But my issue should be caused by hardware,
-> since everything is ok if it runs on other i.mx6 chip. Is your board also based
-> on i.mx6 chip? If yes, hope you can raise your issue in freescale community or
-> contact with Andy whose mail address added in CC list fugang.duan at freescale.cm.
-> We have fix some bugs in UART DMA case.
+On Mon, Sep 15, 2014 at 05:49:01PM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Mon, Sep 15, 2014 at 4:58 PM, Doug Anderson <dianders@chromium.org> wrote:
+> > Heiko,
+> >
+> > On Fri, Sep 12, 2014 at 3:30 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> >> When changing the armclk on Rockchip SoCs it is supposed to be reparented
+> >> to an alternate parent before changing the underlying pll and back after
+> >> the change. Additionally there exist clocks that are very tightly bound to
+> >> the armclk whose divider values are set according to the armclk rate.
+> >>
+> >> Add a special clock-type to handle all that. The rate table and divider
+> >> values will be supplied from the soc-specific clock controllers.
+> >>
+> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >> ---
+> >>  drivers/clk/rockchip/Makefile  |   1 +
+> >>  drivers/clk/rockchip/clk-cpu.c | 316 +++++++++++++++++++++++++++++++++++++++++
+> >>  drivers/clk/rockchip/clk.c     |  20 +++
+> >>  drivers/clk/rockchip/clk.h     |  36 +++++
+> >>  4 files changed, 373 insertions(+)
+> >>  create mode 100644 drivers/clk/rockchip/clk-cpu.c
+> >>
+> >> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
+> >> index ee6b077..bd8514d 100644
+> >> --- a/drivers/clk/rockchip/Makefile
+> >> +++ b/drivers/clk/rockchip/Makefile
+> >> @@ -5,6 +5,7 @@
+> >>  obj-y  += clk-rockchip.o
+> >>  obj-y  += clk.o
+> >>  obj-y  += clk-pll.o
+> >> +obj-y  += clk-cpu.o
+> >>  obj-$(CONFIG_RESET_CONTROLLER) += softrst.o
+> >>
+> >>  obj-y  += clk-rk3188.o
+> >> diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
+> >> new file mode 100644
+> >> index 0000000..b8382b1
+> >> --- /dev/null
+> >> +++ b/drivers/clk/rockchip/clk-cpu.c
+> >> @@ -0,0 +1,316 @@
+> >> +/*
+> >> + * Copyright (c) 2014 MundoReader S.L.
+> >> + * Author: Heiko Stuebner <heiko@sntech.de>
+> >> + *
+> >> + * based on clk/samsung/clk-cpu.c
+> >> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> >> + * Author: Thomas Abraham <thomas.ab@samsung.com>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + * This file contains the utility function to register CPU clock for Samsung
+> >> + * Exynos platforms. A CPU clock is defined as a clock supplied to a CPU or a
 
-It's an i.mx6q (Wandboard quad c1) where I have this problem with 
-mainline and much older (but heavily patched freescale 3.10.x based) 
-kernels. A quick web-search suggests that this problem exists since a 
-long time (noticed mainly by people which try to use BT as this seems to 
-be the major use case for high speed serial communication).
+It might be based on the clk/samsung/clk-cpu.c, as you mentioned above, but
+_this_  file doesn't contain samsung exynos code...
 
-Regards,
-
-Alexander Holler
+Cheers,
+Karl P
