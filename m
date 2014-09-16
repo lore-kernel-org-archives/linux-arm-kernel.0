@@ -1,14 +1,15 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Sep 2014 20:12:03 -0700
-Subject: [PATCH 09/12] ARM: omap2plus_defconfig: Add cpufreq to defconfig
+Date: Mon, 15 Sep 2014 20:12:05 -0700
+Subject: [PATCH 11/12] ARM: omap2plus_defconfig: Enable battery and reset
+ drivers
 In-Reply-To: <1410837126-31553-1-git-send-email-tony@atomide.com>
 References: <1410837126-31553-1-git-send-email-tony@atomide.com>
-Message-ID: <1410837126-31553-9-git-send-email-tony@atomide.com>
+Message-ID: <1410837126-31553-11-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note that we can now use the CONFIG_GENERIC_CPUFREQ_CPU0,
-so let's only enable that.
+Since many omaps run on battery, we should have the battery
+drivers enabled. Let's also enable the reset driver.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
@@ -16,22 +17,22 @@ Signed-off-by: Tony Lindgren <tony@atomide.com>
  1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index fc63855..9d232a5 100644
+index 8e6c363..113f104 100644
 --- a/arch/arm/configs/omap2plus_defconfig
 +++ b/arch/arm/configs/omap2plus_defconfig
-@@ -43,6 +43,13 @@ CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
- CONFIG_KEXEC=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_GOV_POWERSAVE=y
-+CONFIG_CPU_FREQ_GOV_USERSPACE=y
-+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-+CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
-+CONFIG_GENERIC_CPUFREQ_CPU0=y
-+# CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
- CONFIG_CPU_IDLE=y
- CONFIG_BINFMT_MISC=y
- CONFIG_PM_DEBUG=y
+@@ -181,6 +181,13 @@ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_W1=y
++CONFIG_BATTERY_BQ27x00=m
++CONFIG_CHARGER_ISP1704=m
++CONFIG_CHARGER_TWL4030=m
++CONFIG_CHARGER_BQ2415X=m
++CONFIG_CHARGER_BQ24190=m
++CONFIG_CHARGER_BQ24735=m
++CONFIG_POWER_RESET=y
+ CONFIG_POWER_AVS=y
+ CONFIG_SENSORS_LM75=m
+ CONFIG_THERMAL=y
 -- 
 2.1.0
