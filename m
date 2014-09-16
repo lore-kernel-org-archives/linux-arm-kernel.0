@@ -1,45 +1,38 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 15 Sep 2014 20:40:50 -0700
-Subject: Request to include Mailbox tree in linux-next
-In-Reply-To: <20140809015857.17af92e7@canb.auug.org.au>
-References: <CAJe_ZhdZTSs+Ns4u7bMXwbLHYTnE-5XEE8uev4zXbXrCP52bSg@mail.gmail.com>
- <20140808142912.7bf68229@canb.auug.org.au>
- <CAJe_ZhceR1j_b-_efJoq9Dv6X6C=UuMgyp8AofjcCvc+bQVkfw@mail.gmail.com>
- <20140808144137.GE30282@n2100.arm.linux.org.uk>
- <CAJe_Zhc+_zCB+7196rsHb=KxG4JyuvyODXCpEX-y4XhwRjoBrw@mail.gmail.com>
- <20140809015857.17af92e7@canb.auug.org.au>
-Message-ID: <CAJe_ZhcRs45Rmzpjb-O+A=+HCUt9SspdgPofMkqd5+xL=TYwDA@mail.gmail.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Tue, 16 Sep 2014 11:52:05 +0800
+Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
+ i.mx6dl
+In-Reply-To: <5416D26A.4080707@ahsoftware.de>
+References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
+ <5416D26A.4080707@ahsoftware.de>
+Message-ID: <20140916035204.GB20800@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2014 08:58, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Jassi,
->
-> On Fri, 8 Aug 2014 20:40:47 +0530 Jassi Brar <jaswinder.singh@linaro.org> wrote:
->>
->> On 8 August 2014 20:11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> >> Upon Mark's suggestion (and the right thing to do) I wanted the patchset
->> >> to live the cycle in linux-next.
->> >
->> > Yes, that's the right thing to do, but you sent the request at an
->> > inappropriate time.  The correct time to send your request would be
->> > after 3.17-rc1 has been released, IOW after the current merge window
->> > is over.
->> >
->> > In general, kernel developers don't "remember" requests from one week
->> > to the next; instead, we much prefer people send their requests at the
->> > appropriate times in the development cycle.
->> >
->> OK, thanks for explaining.
->
-> As Russell has said, if you remind me after -rc1 is out, I will add
-> your tree then.  I will try to remember, but don't depend on it.
->
-Hi Stephen, Could you please add now ?
-
-Tree:       git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-Branch:   mailbox-for-next
-Contact:  Jassi Brar <jaswinder.singh@linaro.org>
-
-Thanks,
-Jassi
+On Mon, Sep 15, 2014 at 01:50:02PM +0200, Alexander Holler wrote:
+> Am 10.09.2014 07:30, schrieb Robin Gong:
+> >There is one weird data in rxfifo after one full rx/tx transfer
+> >done sometimes. It looks a design issue and hard to workaround
+> >totally, so disable dma functhion here. And will re-enable it
+> >once the root cause found.
+> 
+> Hmm, I experience problems with DMA too but on uart3. I'm using the same
+> workaround for the uart (I've just commented out the dma entries in the DT).
+> The problem manifests itself here such, that brcm_patchram_plus
+> hangs while uploading the firmware to a BCM4330 connected at uart3
+> (reproducible).
+> 
+> So maybe there is a bug in the DMA-engine which not only effects
+> SPI. Or both drivers contain the same error in handling DMA (maybe
+> through c&p).
+> But that's just specualtion from me, I haven't looked further into
+> that problem.
+> 
+> Regards,
+> 
+> Alexander Holler
+Thanks for your information share. But my issue should be caused by hardware,
+since everything is ok if it runs on other i.mx6 chip. Is your board also based
+on i.mx6 chip? If yes, hope you can raise your issue in freescale community or
+contact with Andy whose mail address added in CC list fugang.duan at freescale.cm.
+We have fix some bugs in UART DMA case.
