@@ -1,64 +1,61 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 16 Sep 2014 09:30:40 +0800
-Subject: [PATCH v1 03/21] MSI: Remove the redundant irq_set_chip_data()
-In-Reply-To: <1410789648.3314.5.camel@pengutronix.de>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>	
- <1409911806-10519-4-git-send-email-wangyijing@huawei.com>
- <1410789648.3314.5.camel@pengutronix.de>
-Message-ID: <541792C0.9090303@huawei.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 16 Sep 2014 09:35:33 +0800
+Subject: [PATCH] ARM: imx: fix .is_enabled() of shared gate clock
+Message-ID: <1410831334-7859-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/15 22:00, Lucas Stach wrote:
-> Am Freitag, den 05.09.2014, 18:09 +0800 schrieb Yijing Wang:
->> Currently, pcie-designware, pcie-rcar, pci-tegra drivers
->> use irq chip_data to save the msi_chip pointer. They
->> already call irq_set_chip_data() in their own MSI irq map
->> functions. So irq_set_chip_data() in arch_setup_msi_irq()
->> is useless.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  drivers/pci/msi.c |    2 --
->>  1 files changed, 0 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
->> index f6cb317..d547f7f 100644
->> --- a/drivers/pci/msi.c
->> +++ b/drivers/pci/msi.c
->> @@ -41,8 +41,6 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->>  	if (err < 0)
->>  		return err;
->>  
->> -	irq_set_chip_data(desc->irq, chip);
->> -
->>  	return 0;
->>  }
->>  
-> 
-> arch_teardown_msi_irq() expects to find the msi_chip in the irq
-> chip_data field. As this means drivers don't have any reasonable other
-> possibility to stuff things into this field, I think it would make sense
-> to do the cleanup the other way around: keep the irq_set_chip_data
-> arch_setup_msi_irq() and rip it out of the individual drivers.
+Commit 63288b721a80 ("ARM: imx: fix shared gate clock") attempted to fix
+an issue with particular enable/disable sequence from two shared gate
+clocks.  But unfortunately, while it partially fixed the issue, it also
+did something wrong in .is_enabled() function hook.  In case of shared
+gate, the function shouldn't really query the hardware state via
+share_count, because the function is trying to query the enabling state
+of the clock in question, not the hardware state which is shared by
+multiple clocks.
 
-Hi Lucas, thanks for your review and comments!
-irq_set_chip_data() should not be placed in MSI core functions, because other arch like x86,
-use irq_data->chip_data to stores irq_cfg. So how to set the chip_data is arch dependent.
-And this series is mainly to use MSI chip framework in all platforms.
-Currently, only ARM platform MSI drivers use the chip_data to store msi_chip, and the drivers call
-irq_set_chip_data() in their driver already. So I thought we should clean up it in MSI core code.
+Fix the issue by returning the enable_count of the clock itself which is
+maintained by clock core, in case it's a clock sharing hardware gate
+with others.  As the result, the initialization of share_count per
+hardware state is not needed now.  So remove it.
 
-Thanks!
-Yijing.
+Reported-by: Fabio Estevam <fabio.estevam@freescale.com>
+Fixes: 63288b721a80 ("ARM: imx: fix shared gate clock")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Hi arm-soc folks,
 
+Please apply it for 3.17.  Thanks.
 
-> 
-> Regards,
-> Lucas
-> 
+Shawn
 
+ arch/arm/mach-imx/clk-gate2.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
+diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
+index 84acdfd1d715..5a75cdc81891 100644
+--- a/arch/arm/mach-imx/clk-gate2.c
++++ b/arch/arm/mach-imx/clk-gate2.c
+@@ -97,7 +97,7 @@ static int clk_gate2_is_enabled(struct clk_hw *hw)
+ 	struct clk_gate2 *gate = to_clk_gate2(hw);
+ 
+ 	if (gate->share_count)
+-		return !!(*gate->share_count);
++		return !!__clk_get_enable_count(hw->clk);
+ 	else
+ 		return clk_gate2_reg_is_enabled(gate->reg, gate->bit_idx);
+ }
+@@ -127,10 +127,6 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ 	gate->bit_idx = bit_idx;
+ 	gate->flags = clk_gate2_flags;
+ 	gate->lock = lock;
+-
+-	/* Initialize share_count per hardware state */
+-	if (share_count)
+-		*share_count = clk_gate2_reg_is_enabled(reg, bit_idx) ? 1 : 0;
+ 	gate->share_count = share_count;
+ 
+ 	init.name = name;
 -- 
-Thanks!
-Yijing
+1.9.1
