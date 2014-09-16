@@ -1,39 +1,86 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Sep 2014 21:37:57 +0200
-Subject: [PATCH] Documentation: arm: add hardware datasheet reference for
- Marvell Armada XP
-Message-ID: <1410896277-32476-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Wed, 17 Sep 2014 02:34:18 +0800
+Subject: [Patch net-next 1/1] net: fec: fix build error at m68k platform
+Message-ID: <1410892458-2113-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some time ago, the "Function Specifications" for the Marvell Armada XP
-processor has been released. However, the "Hardware Specifications"
-were not released at the same time. They have now been released
-publicly, so this commit updates the Marvell documentation file with
-the references to this new documentation.
+From: Frank Li <Frank.Li@freescale.com>
 
-Three documents are available, one for each of the three variants of
-Armada XP: 78230, 78260 and 78460.
+reproduce:
+  wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+  chmod +x ~/bin/make.cross
+  git checkout 4d494cdc92b3b9a0f5fb9e1560810fa27d5a0489
+  make.cross ARCH=m68k  m5272c3_defconfig
+  make.cross ARCH=m68k
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+drivers/net/ethernet/freescale/fec.h:262:0: warning: "FEC_R_DES_START" redefined
+ #define FEC_R_DES_START(X) ((X == 1) ? FEC_R_DES_START_1 : \
+ ^
+drivers/net/ethernet/freescale/fec.h:158:0: note: this is the location of the previous definition
+ #define FEC_R_DES_START  0x3d0 /* Receive descriptor ring */
+ ^
+drivers/net/ethernet/freescale/fec.h:265:0: warning: "FEC_X_DES_START" redefined
+ #define FEC_X_DES_START(X) ((X == 1) ? FEC_X_DES_START_1 : \
+
+...
+
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- Documentation/arm/Marvell/README | 4 ++++
- 1 file changed, 4 insertions(+)
+ This patch based on previous interrupt coalescence patches
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 4dc66c1..1745379 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -103,6 +103,10 @@ EBU Armada family
-     NOTE: not to be confused with the non-SMP 78xx0 SoCs
-     Product Brief: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
-     Functional Spec: http://www.marvell.com/embedded-processors/armada-xp/assets/ARMADA-XP-Functional-SpecDatasheet.pdf
-+    Hardware Specs:
-+      http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78230_OS.PDF
-+      http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78260_OS.PDF
-+      http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78460_OS.PDF
+ drivers/net/ethernet/freescale/fec.h | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
+index 2814610..de86d61 100644
+--- a/drivers/net/ethernet/freescale/fec.h
++++ b/drivers/net/ethernet/freescale/fec.h
+@@ -140,8 +140,12 @@
+ #define FEC_IEVENT		0x004 /* Interrupt even reg */
+ #define FEC_IMASK		0x008 /* Interrupt mask reg */
+ #define FEC_IVEC		0x00c /* Interrupt vec status reg */
+-#define FEC_R_DES_ACTIVE	0x010 /* Receive descriptor reg */
+-#define FEC_X_DES_ACTIVE	0x014 /* Transmit descriptor reg */
++#define FEC_R_DES_ACTIVE_0	0x010 /* Receive descriptor reg */
++#define FEC_R_DES_ACTIVE_1	FEC_R_DES_ACTIVE_0
++#define FEC_R_DES_ACTIVE_2	FEC_R_DES_ACTIVE_0
++#define FEC_X_DES_ACTIVE_0	0x014 /* Transmit descriptor reg */
++#define FEC_X_DES_ACTIVE_1	FEC_X_DES_ACTIVE_0
++#define FEC_X_DES_ACTIVE_2	FEC_X_DES_ACTIVE_0
+ #define FEC_MII_DATA		0x040 /* MII manage frame reg */
+ #define FEC_MII_SPEED		0x044 /* MII speed control reg */
+ #define FEC_R_BOUND		0x08c /* FIFO receive bound reg */
+@@ -155,11 +159,27 @@
+ #define FEC_ADDR_HIGH		0x3c4 /* High 16bits MAC address */
+ #define FEC_GRP_HASH_TABLE_HIGH	0x3c8 /* High 32bits hash table */
+ #define FEC_GRP_HASH_TABLE_LOW	0x3cc /* Low 32bits hash table */
+-#define FEC_R_DES_START		0x3d0 /* Receive descriptor ring */
+-#define FEC_X_DES_START		0x3d4 /* Transmit descriptor ring */
++#define FEC_R_DES_START_0	0x3d0 /* Receive descriptor ring */
++#define FEC_R_DES_START_1	FEC_R_DES_START_0
++#define FEC_R_DES_START_2	FEC_R_DES_START_0
++#define FEC_X_DES_START_0	0x3d4 /* Transmit descriptor ring */
++#define FEC_X_DES_START_1	FEC_X_DES_START_0
++#define FEC_X_DES_START_2	FEC_X_DES_START_0
+ #define FEC_R_BUFF_SIZE		0x3d8 /* Maximum receive buff size */
+ #define FEC_FIFO_RAM		0x400 /* FIFO RAM buffer */
+-
++/* Not existed in real chip
++ * Just for pass build.
++ */
++#define FEC_RCMR_1		0xFFF
++#define FEC_RCMR_2		0xFFF
++#define FEC_DMA_CFG_1		0xFFF
++#define FEC_DMA_CFG_2		0xFFF
++#define FEC_TXIC0		0xFFF
++#define FEC_TXIC1		0xFFF
++#define FEC_TXIC2		0xFFF
++#define FEC_RXIC0		0xFFF
++#define FEC_RXIC1		0xFFF
++#define FEC_RXIC2		0xFFF
+ #endif /* CONFIG_M5272 */
  
-   Core: Sheeva ARMv7 compatible
  
 -- 
-2.0.0
+1.9.1
