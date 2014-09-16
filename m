@@ -1,75 +1,21 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 16 Sep 2014 16:04:12 -0500
-Subject: [Patch v2] clk: qcom: Add IPQ8064 PLL required for USB
-Message-ID: <1410901452-13519-1-git-send-email-agross@codeaurora.org>
+From: ast@plumgrid.com (Alexei Starovoitov)
+Date: Tue, 16 Sep 2014 14:08:07 -0700
+Subject: [PATCH] arm64: bpf: add 'load 64-bit immediate' instruction
+In-Reply-To: <1410899363-27635-1-git-send-email-zlim.lnx@gmail.com>
+References: <1410892655-17818-1-git-send-email-zlim.lnx@gmail.com>
+ <1410899363-27635-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <CAMEtUuzXquYHBOE3Rftag=u7Duct=yT5KYJ3_2Jhg2K0sfS4EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PLL0 that is required for the USB clocks to work properly.
+On Tue, Sep 16, 2014 at 1:29 PM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
+> Hi Catalin, Will,
+>
+> Please consider applying this after -rc1 as well. [1]
 
-Changes in v2: Correct table to only use pll0_vote
+Thank you for adding support of these instructions.
+I don't have any new ones in pipeline, so we should be done
+for foreseeable future :)
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/clk/qcom/gcc-ipq806x.c |   31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
-index 4032e51..193b7c4 100644
---- a/drivers/clk/qcom/gcc-ipq806x.c
-+++ b/drivers/clk/qcom/gcc-ipq806x.c
-@@ -32,6 +32,33 @@
- #include "clk-branch.h"
- #include "reset.h"
- 
-+static struct clk_pll pll0 = {
-+	.l_reg = 0x30c4,
-+	.m_reg = 0x30c8,
-+	.n_reg = 0x30cc,
-+	.config_reg = 0x30d4,
-+	.mode_reg = 0x30c0,
-+	.status_reg = 0x30d8,
-+	.status_bit = 16,
-+	.clkr.hw.init = &(struct clk_init_data){
-+		.name = "pll0",
-+		.parent_names = (const char *[]){ "pxo" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_ops,
-+	},
-+};
-+
-+static struct clk_regmap pll0_vote = {
-+	.enable_reg = 0x34c0,
-+	.enable_mask = BIT(0),
-+	.hw.init = &(struct clk_init_data){
-+		.name = "pll0_vote",
-+		.parent_names = (const char *[]){ "pll0" },
-+		.num_parents = 1,
-+		.ops = &clk_pll_vote_ops,
-+	},
-+};
-+
- static struct clk_pll pll3 = {
- 	.l_reg = 0x3164,
- 	.m_reg = 0x3168,
-@@ -154,7 +181,7 @@ static const u8 gcc_pxo_pll8_pll0[] = {
- static const char *gcc_pxo_pll8_pll0_map[] = {
- 	"pxo",
- 	"pll8_vote",
--	"pll0",
-+	"pll0_vote",
- };
- 
- static struct freq_tbl clk_tbl_gsbi_uart[] = {
-@@ -2133,6 +2160,8 @@ static struct clk_branch usb_fs1_h_clk = {
- };
- 
- static struct clk_regmap *gcc_ipq806x_clks[] = {
-+	[PLL0] = &pll0.clkr,
-+	[PLL0_VOTE] = &pll0_vote,
- 	[PLL3] = &pll3.clkr,
- 	[PLL8] = &pll8.clkr,
- 	[PLL8_VOTE] = &pll8_vote,
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Both patches look good to me and I don't see anything
+scary in them, so should be ok as soon as both trees merge.
