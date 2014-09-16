@@ -1,52 +1,41 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Tue, 16 Sep 2014 12:58:17 -0700
-Subject: [PATCH 6/6] MAINTAINERS: Entry for Cygnus/iproc arm architecture and
- clock drivers
-In-Reply-To: <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
-Message-ID: <1410897497-27527-7-git-send-email-jonathar@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Sep 2014 20:57:38 +0100
+Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
+In-Reply-To: <1410884281.16519.2.camel@joe-AO725>
+References: <cover.1410632834.git.joe@perches.com>
+ <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
+ <20140915155656.GA29744@arm.com>
+ <20140916160759.GJ12361@n2100.arm.linux.org.uk>
+ <1410884281.16519.2.camel@joe-AO725>
+Message-ID: <20140916195737.GO12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Jonathan Richardson <jonathar@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Jonathan Richardson <jonathar@broadcom.com>
----
- MAINTAINERS |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+On Tue, Sep 16, 2014 at 09:18:01AM -0700, Joe Perches wrote:
+> On Tue, 2014-09-16 at 17:07 +0100, Russell King - ARM Linux wrote:
+> > any chance you could add a KernelVersion: tag somewhere in the
+> > commit message and throw it at patches at arm.linux.org.uk so it doesn't
+> > get lost?
+> 
+> There are no commit logs with a KernelVersion: tag
+> in all of git history.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 809ecd6..2152ee0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2070,6 +2070,27 @@ L:	linux-scsi at vger.kernel.org
- S:	Supported
- F:	drivers/scsi/bnx2i/
- 
-+BROADCOM CYGNUS/IPROC ARM ARCHITECTURE
-+M:	Jonathan Richardson <jonathar@broadcom.com>
-+M:	Scott Branden <sbranden@broadcom.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/arm/cygnus.txt
-+F:	arch/arm/boot/dts/bcm-cygnus.dtsi
-+F:	arch/arm/boot/dts/bcm911360_entphn.dts
-+F:	arch/arm/configs/bcm_cygnus_defconfig
-+F:	arch/arm/mach-bcm/board_bcm_cygnus.c
-+
-+BROADCOM CYGNUS/IPROC CLOCK DRIVERS
-+M:	Jonathan Richardson <jonathar@broadcom.com>
-+M:	Scott Branden <sbranden@broadcom.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/clock/clk-cygnus.txt
-+F:	Documentation/devicetree/bindings/clock/clk-iproc.txt
-+F:	drivers/clk/bcm/clk-cygnus.c
-+F:	drivers/clk/bcm/clk-iproc.c
-+
- BROADCOM KONA GPIO DRIVER
- M:	Ray Jui <rjui@broadcom.com>
- L:	bcm-kernel-feedback-list at broadcom.com
+Right, that's not it's purpose.
+
+> What do you think a KernelVersion: tag is and what
+> would it be used for?
+
+It's for that email address to know which kernel version the patch
+was generated against, which is useful information when I come to
+apply it.  It gets filtered out from the commit message.  It can go
+anywhere, even below the -- line.
+
+If you don't want to cooperate, you will have to rely on my notoriously
+bad email skills to scan the mailing list for random patches to apply
+some time (maybe days or even weeks) later after you send your message.
+Which just won't happen.  It's why I wrote scripts which are some 20
+years old to solve my bad email patch handling skills.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
