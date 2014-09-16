@@ -1,136 +1,82 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 16 Sep 2014 17:23:55 +0530
-Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <20140905101409.68b14cc3@bbrezillon>
-References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
- <6034841.GFrG3XCMdb@wuerfel> <20140903151611.260a7218@bbrezillon>
- <4224773.hl3QDeILqz@wuerfel> <20140903161528.05f566e1@bbrezillon>
- <002701cfc7fb$110a7350$331f59f0$@samsung.com>
- <20140905101409.68b14cc3@bbrezillon>
-Message-ID: <000b01cfd1a4$f5ae0d20$e10a2760$@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 16 Sep 2014 13:54:27 +0200
+Subject: [PATCH v2 00/18] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+Message-ID: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,  Lee Jones,
+Hello Everyone,
+
+This is yet another attempt to finally make Exynos SYSMMU driver fully
+integrated with DMA-mapping subsystem.
+
+Previous approach is available here: https://lkml.org/lkml/2014/8/5/183
+
+I meantime, there have been a discussion about the way the iommu driver
+should be integrated with dma-mapping subsystem, which resulted in "[RFC
+PATCH v3 0/7] Introduce automatic DMA configuration for IOMMU masters"
+patches prepared by Will Deacon:
+http://www.spinics.net/lists/arm-kernel/msg362076.html 
+Those patches removed the need to use bus-specific notifiers for
+initialization.
+
+Main changes since previous version of my patches:
+
+1. rebased onto "[RFC PATCH v3 0/7] Introduce automatic DMA
+configuration for IOMMU masters" patches, changed initialization from
+bus notifiers to DT related callbacks
+
+2. removed support for separate IO address spaces - this will be
+discussed separately after the basic support gets merged
+
+3. removed support for power domain notifier-based runtime power
+management - this also will be discussed separately later
+
+I hope that the driver with above changes will be easier to be merged to
+v3.18.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
 
-[snip]
-> 
-> On Thu, 04 Sep 2014 10:15:27 +0530
-> Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> 
-> > Hi Boris,
-> >
-> > On Wednesday, September 03, 2014 Boris BREZILLON wrote,
-> > > To: Arnd Bergmann
-> > > Cc: Pankaj Dubey; kgene.kim at samsung.com; linux at arm.linux.org.uk;
-> > > Alexander Shiyan; naushad at samsung.com; Tomasz Figa;
-> > > linux-kernel at vger.kernel.org; joshi at samsung.com;
-> > > linux-samsung-soc at vger.kernel.org;
-> > thomas.ab at samsung.com;
-> > > tomasz.figa at gmail.com; vikas.sajjan at samsung.com;
-> > > chow.kim at samsung.com; lee.jones at linaro.org; Michal Simek;
-> > > linux-arm-kernel at lists.infradead.org;
-> > Mark
-> > > Brown
-> > > Subject: Re: [PATCH v2] mfd: syscon: Decouple syscon interface from
-> > platform
-> > > devices
-> > >
-> > > On Wed, 03 Sep 2014 15:49:04 +0200
-> > > Arnd Bergmann <arnd@arndb.de> wrote:
-> > >
-> > > > On Wednesday 03 September 2014 15:16:11 Boris BREZILLON wrote:
-> > > > > I checked that part, and it appears most of the code is already
-> > > > > there (see usage of regmap_attach_dev function here [1]).
-> > > > >
-> > > > > The only problem I see is that errors are still printed with
-> > > > > dev_err, which, AFAIK, will trigger a kernel panic if dev is NULL.
-> > > >
-> > > > Actually not:
-> > > >
-> > > > static int __dev_printk(const char *level, const struct device *dev,
-> > > >                         struct va_format *vaf) {
-> > > >         if (!dev)
-> > > >                 return printk("%s(NULL device *): %pV", level,
-> > > > vaf);
-> > > >
-> > > >         return dev_printk_emit(level[1] - '0', dev,
-> > > >                                "%s %s: %pV",
-> > > >                                dev_driver_string(dev),
-> > > > dev_name(dev), vaf); }
-> > > >
-> > >
-> > > My bad then (I don't know where I looked at to think NULL dev was
-> > > not
-> > gracefully
-> > > handled :-)). Thanks for pointing this out.
-> > > Given that, I think it should work fine even with a NULL dev.
-> > > I'll give it a try on at91 ;-).
-> > >
-> >
-> > We have tested this patch, on Exynos board and found working well.
-> > In our use case DT based drivers such as USB Phy, SATA Phy, Watchdog
-> > are calling syscon_regmap_lookup_by APIs to get regmap handle to
-> > Exynos PMU and it worked well for these drivers.
-> >
-> > It would be great if after testing you share result here or give a
-> > Tested-By.
-> >
-> 
-> I eventually tested it (just required minor modifications to my PMC
-> code: see below).
-> Still, this patch is not achieving my final goal which is to remove the
-global
-> at91_pmc_base variable and make use of the syscon regmap to implement at91
-cpu
-> idle and platform suspend.
-> Moreover, I'd like to remove the lock in at91_pmc struct as regmap is
-already taking
-> care of locking the resources when accessing a register, but this requires
-a lot more
-> changes.
-> 
-> Anyway, here is my
-> 
-> Tested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
 
-Any update on this patch. As already it has been tested on two DT based
-platforms.
+Patch summary:
 
-If you think that we can go ahead and break clps711x till it gets migrated
-over DT,
-then please ack this patch, or else if you have opinion to keep support for
-non-DT
-based drivers (clps711x) then I can post another patch keeping platform
-driver support
-for non-DT based platform. 
+Marek Szyprowski (18):
+  arm: dma-mapping: arm_iommu_attach_device: automatically set
+    max_seg_size
+  arm: exynos: bind power domains earlier, on device creation
+  drm: exynos: detach from default dma-mapping domain on init
+  clk: exynos: add missing smmu_g2d clock and update comments
+  ARM: DTS: Exynos4: add System MMU nodes
+  iommu: exynos: don't read version register on every tlb operation
+  iommu: exynos: remove unused functions
+  iommu: exynos: remove useless spinlock
+  iommu: exynos: refactor function parameters to simplify code
+  iommu: exynos: remove unused functions, part 2
+  iommu: exynos: remove useless device_add/remove callbacks
+  iommu: exynos: add support for binding more than one sysmmu to master
+    device
+  iommu: exynos: add support for runtime_pm
+  iommu: exynos: rename variables to reflect their purpose
+  iommu: exynos: document internal structures
+  iommu: exynos: remove excessive includes and sort others
+    alphabetically
+  iommu: exynos: init from dt-specific callback instead of initcall
+  iommu: exynos: add callback for initializing devices from device tree
 
-I would prefer is to keep platform driver support for non-DT based platform
-so that this patch set can go in this merge window, as lot of Exynos PMU
-patches
-(PMU patches of many Exynos SoCs [2,3,4] ) are critically dependent on this
-change. 
+ arch/arm/boot/dts/exynos4.dtsi            | 117 +++++++
+ arch/arm/boot/dts/exynos4210.dtsi         |  23 ++
+ arch/arm/boot/dts/exynos4x12.dtsi         |  82 +++++
+ arch/arm/mach-exynos/pm_domains.c         |  12 +-
+ arch/arm/mm/dma-mapping.c                 |  16 +
+ drivers/clk/samsung/clk-exynos4.c         |   1 +
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c |   3 +
+ drivers/iommu/exynos-iommu.c              | 494 ++++++++++++++----------------
+ include/dt-bindings/clock/exynos4.h       |  10 +-
+ 9 files changed, 483 insertions(+), 275 deletions(-)
 
-As per discussion here [1], clps711x SPI and TTY driver patches still has to
-be posted
-which may take one more merge window, and eventually will drag this patch
-also.
-
-[1]:
-https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36291.html
-[2]:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275675.html
-[3]:
-https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35701.html
-[4]: http://www.spinics.net/lists/arm-kernel/msg358230.html
-
-
-> 
-> 
-[snip]
-
-Thanks,
-Pankaj Dubey
+-- 
+1.9.2
