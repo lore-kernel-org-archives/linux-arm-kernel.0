@@ -1,73 +1,42 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 16 Sep 2014 15:43:18 -0700
-Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
-In-Reply-To: <20140915194518.GC28083@e103687>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
- <20140911123412.GY3190@worktop.ger.corp.intel.com>
- <CAKfTPtBbjpCFifoyFSh8Hb3nBZFFTjjxdfxnpMk=CHy5aX1qpg@mail.gmail.com>
- <20140911140444.GH4783@worktop.ger.corp.intel.com>
- <20140915194518.GC28083@e103687>
-Message-ID: <CAKfTPtCTxQNQfusJuQhGy7ahDFWjwitQOZHU89O0wyy5ZcNO9A@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 17 Sep 2014 00:48:16 +0200
+Subject: [PATCH 1/2] ARM: dts: rockchip: fix swapped Radxa Rock pinctrl
+ references
+Message-ID: <6217952.a0HdpFGHLC@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2014 12:45, Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> On Thu, Sep 11, 2014 at 03:04:44PM +0100, Peter Zijlstra wrote:
->> On Thu, Sep 11, 2014 at 03:07:52PM +0200, Vincent Guittot wrote:
->> > > Also I'm not entirely sure I like the usage, utilization names/metrics.
->> > > I would suggest to reverse them. Call the pure running number
->> > > 'utilization' and this scaled with capacity 'usage' or so.
->> >
->> > ok. i can invert 'usage' and 'utilization', which will give
->> >
->> > s/get_cpu_utilization/get_cpu_usage/
->> > s/sgs->group_utilization/sgs->group_usage/
->
-> The confusion will have new dimensions added when we introduce
-> scale-invariance too. Then the running number is already scaled by the
-> current P-state compute capacity. But I don't have any better
-> suggestions.
->
->> > s/cfs.usage_load_avg/cfs.utilization_load_avg/
->
-> I don't like using "load" for unweighted metrics. I associate load with
-> something that may be weighted by priority like load_avg_contrib, and
-> utilization with pure cpu utilization as in how many cycles is spend on
-> a particular task. I called it "usage_util_avg" in my own patches, but
-> "util_avg" might be better if we agree that utilization == usage.
+The host and otg regulator pinctrl settings got swapped, making the host
+reference the otg pinctrl and the other way round. The actual pins are
+correct (gpio0-3 for host and gpio2-31 for otg).
 
-ok. so i don't have the same definition than you. IMHO, load should be
-used for figures that have used the average of the geometric series
-used in the per entity load tracking more than the fact that we weight
-the figures with priority
+Reported-by: Naoki FUKAUMI <naobsd@gmail.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3188-radxarock.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->
->> > s/se->avg.usage_avg_contrib/se->avg.utilization_avg_contrib
->
-> util_avg_contrib maybe to keep it shorter.
->
->> > s/__update_task_entity_usage/__update_task_entity_utilization
->> > s/__update_entity_usage_avg_contrib/__update_entity_utilization_avg_contrib
->
-> Maybe use "util" here as well?
-
-I agree that utilization can be a bit too long but util sounds a bit
-too short ans we loose the utilization meaning. so we could use
-activity instead of utilization
-
-Nevertheless, the most important is that we find a common definition convention
-
-Would the following proposal be ok ?
-
-s/get_cpu_utilization/get_cpu_usage/
-s/sgs->group_utilization/sgs->group_usage/
-s/cfs.usage_load_avg/cfs.activity_load_avg/
-s/se->avg.usage_avg_contrib/se->avg.activity_avg_contrib
-s/__update_task_entity_usage/__update_task_entity_activity
-s/__update_entity_usage_avg_contrib/__update_entity_activity_avg_contrib
-
-Vincent
->
-> Morten
->
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 1be0c34..c08744d 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -70,7 +70,7 @@
+ 		enable-active-high;
+ 		gpio = <&gpio2 31 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&host_vbus_drv>;
++		pinctrl-0 = <&otg_vbus_drv>;
+ 		regulator-name = "otg-vbus";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+@@ -93,7 +93,7 @@
+ 		enable-active-high;
+ 		gpio = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&otg_vbus_drv>;
++		pinctrl-0 = <&host_vbus_drv>;
+ 		regulator-name = "host-pwr";
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+-- 
+2.0.1
