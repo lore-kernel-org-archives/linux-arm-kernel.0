@@ -1,90 +1,98 @@
-From: sebott@linux.vnet.ibm.com (Sebastian Ott)
-Date: Tue, 16 Sep 2014 13:35:53 +0200 (CEST)
-Subject: [PATCH v1 16/21] s390/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
-Message-ID: <alpine.LFD.2.11.1409161325280.1618@denkbrett>
+From: david@protonic.nl (David Jander)
+Date: Tue, 16 Sep 2014 13:42:09 +0200
+Subject: gcc 4.8.3 miscompiles drivers/net/ethernet/freescale/fec_main.c ?!
+In-Reply-To: <20140910164920.3c448b40@archvile>
+References: <20140910110943.3673dbb4@archvile>
+ <21520.17620.519242.597681@gargle.gargle.HOWL>
+ <20140910164920.3c448b40@archvile>
+Message-ID: <20140916134209.7cc21f86@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Fri, 5 Sep 2014, Yijing Wang wrote:
-> Use MSI chip framework instead of arch MSI functions to configure
-> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  arch/s390/pci/pci.c |   18 ++++++++++++++----
->  1 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
-> index 2fa7b14..da5316e 100644
-> --- a/arch/s390/pci/pci.c
-> +++ b/arch/s390/pci/pci.c
-> @@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
->  	}
->  }
-> 
-> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
-> +int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
->  {
->  	struct zpci_dev *zdev = get_zdev(pdev);
->  	unsigned int hwirq, msi_vecs;
-> @@ -434,7 +434,7 @@ out:
->  	return rc;
->  }
-> 
-> -void arch_teardown_msi_irqs(struct pci_dev *pdev)
-> +static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
->  {
->  	struct zpci_dev *zdev = get_zdev(pdev);
->  	struct msi_desc *msi;
-> @@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
->  	/* Release MSI interrupts */
->  	list_for_each_entry(msi, &pdev->msi_list, list) {
->  		if (msi->msi_attrib.is_msix)
-> -			default_msix_mask_irq(msi, 1);
-> +			__msix_mask_irq(msi, 1);
->  		else
-> -			default_msi_mask_irq(msi, 1, 1);
-> +			__msi_mask_irq(msi, 1, 1);
+Hi Mikael,
 
-The default_msi_mask_irq to __msi_mask_irq renaming is hidden in your
-patch "x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()"
+On Wed, 10 Sep 2014 16:49:20 +0200
+David Jander <david@protonic.nl> wrote:
 
-This means that between that patch and this one s390 will not compile.
-Could you please move this hunk to the other patch or even make an extra
-patch with the renaming. Other than that:
-
-Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
-
-Regards,
-Sebastian
-
->  		irq_set_msi_desc(msi->irq, NULL);
->  		irq_free_desc(msi->irq);
->  		msi->msg.address_lo = 0;
-> @@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
->  	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
->  }
+> On Wed, 10 Sep 2014 14:32:20 +0200
+> Mikael Pettersson <mikpelinux@gmail.com> wrote:
 > 
-> +static struct msi_chip zpci_msi_chip = {
-> +	.setup_irqs = zpci_setup_msi_irqs,
-> +	.teardown_irqs = zpci_teardown_msi_irqs,
-> +};
-> +
-> +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-> +{
-> +	return &zpci_msi_chip;
-> +}
-> +
->  static void zpci_map_resources(struct zpci_dev *zdev)
->  {
->  	struct pci_dev *pdev = zdev->pdev;
-> -- 
-> 1.7.1
+> > David Jander writes:
+> >  > 
+> >  > Hi,
+> >  > 
+> >  > I am seeing a strange problem when building a recent kernel with
+> >  > gcc-4.8.3 for armv7-a that contains the following patch:
+> >  > 
+> >  > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bfd4ecdd87d350e19457fe0d02fa1e046774c44e
+> >  > 
+> >  > Unfortunately I am not good enough at reading ARM assembly output from
+> >  > GCC to understand whats going wrong, so I am asking for help.
+> >  > 
+> >  > I started noticing ethernet packet loss on a i.MX6 board after upgrading
+> >  > the kernel from 3.16-rc-something to latest mainline. The problem is
+> >  > very easy to reproduce so I started git-bisecting. Git bisect gave me
+> >  > the above patch as the culprit, and indeed: Without the patch a
+> >  > flood-ping goes fine (just one dot on screen, no lost packets). I apply
+> >  > the patch and the dots start filling the screen instantly.
+> >  > 
+> >  > I am compiling the kernel using Pengutronix's OSELAS toolchain version
+> >  > 2013.12.1, which is based on linaro gcc-4.8.3 without any relevant
+> >  > patches AFAIK.
+> > 
+> > Linaro's toolchain is itself heavily modified compared to FSF gcc-4.8.3,
+> > so first please try a pure vanilla FSF gcc-4.8.3, and then a likewise
+> > vanilla gcc-4.9.1.  If those also cause the malfunction, then you have
+> > proof for a bug in upstream gcc (or possibly undefined code in the kernel),
+> > otherwise the bug is likely Linaro's.
 > 
-> 
+> Thanks. I will try to build gcc-4.8.3 from vanilla FSF sources and try to
+> reproduce the problem there. Do you think there is a chance this is still a
+> kernel bug?
+> I have assembly output of both working and broken cases (inlined and
+> non-inlined function). I can post them here or send to anyone who wants to
+> try to make sense of it....
+
+This is getting weird:
+
+I have build both vanilla FSF toolchains: binutils-2.24 with gcc-4.8.3 and
+gcc-4.9.1
+
+I can't quite make sense of the results, other than that there is a
+race-condition in the Linux kernel fec_main.c:
+
+gcc-4.8.3 with -O2: fails the same as with OSELAS.Toolchain/linaro gcc-4.8.3
+
+gcc-4.8.3 with -Os: Seems to work correctly
+
+gcc-4.9.1 with -O2: Loses packets, but much less often than with gcc-4.8.3 -O2
+
+gcc-4.9.1 with -Os: Fails even worse than with gcc-4.8.3 -O2
+
+Any suggestion on how to make sense of this?
+For me this looks slightly more like a kernel bug than a compiler bug...
+
+> >  > Compiling with -O2 breaks the code, while -Os seems to produce a
+> >  > correctly working kernel.
+> >  > 
+> >  > I decided to make changes to the code and see if I could find other ways
+> >  > to "fix" the problem, and I got the following result:
+> >  > 
+> >  > The above mentioned patch introduces the static function
+> >  > fec_enet_hwtstamp() near line 1068 of fec_main.c. If I make an exact
+> >  > copy of this function, where I only change the name (e.g.
+> >  > fec_enet_hwtstamp2), and change one of the two places this function is
+> >  > called to instead use the other name, GCC inlines both copies and the
+> >  > problem disappears!
+> >  > 
+> >  > Since I am not very good at GCC internals nor do I know this piece of
+> >  > code in fec_main.c very well, I am asking here for help in hunting down
+> >  > the real bug, which I suspect is in GCC... but I want to know for sure.
+> >  > 
+
+Best regards,
+
+-- 
+David Jander
+Protonic Holland.
