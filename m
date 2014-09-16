@@ -1,53 +1,35 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 16 Sep 2014 13:14:05 +0800
-Subject: [RFC resend] arm:change keep_initrd and free_initrd_mem into .init
- section
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160F@CNBJMBX05.corpusers.net>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Tue, 16 Sep 2014 14:23:44 +0900
+Subject: [PATCH 08/11] ARM: dts: rockchip: add operating points and armclk
+ references
+In-Reply-To: <54179614.7040707@rock-chips.com>
+References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+ <1409958374-30937-9-git-send-email-heiko@sntech.de>
+ <CAD=FV=U0h2nDQf6JzErhUn+R7384xSTeTjga03MZtOccf7S0bg@mail.gmail.com>
+ <5412A1E3.1090707@rock-chips.com>
+ <CAFnsNoRdW8icUsuEhMq4YB6wi0njoxu3Vvjv6USKTKec_bJwPg@mail.gmail.com>
+ <54179614.7040707@rock-chips.com>
+Message-ID: <CAFnsNoQJhvse5pY2GNR7gXCrHsQeat5bN0gtRfTL0myMfABXDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch change keep_initrd to __initdata section,
-and free_initrd_mem to __init section so that they can be freed by
-free_initmem, free_initrd_mem is only called by free_initrd function,
-so it's safe to free it after use.
+Hi,
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/mm/init.c   | 4 ++--
- arch/arm64/mm/init.c | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+On Tue, Sep 16, 2014 at 10:44 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>> This commit says 1800000 is safe, but actually it's not safe?
+>>
+>> https://bitbucket.org/T-Firefly/firefly-rk3288/commits/7048675eec554a1aa4a3874c7bb24806e1e1c06b/raw/
+>
+> As you have seen, that patch is for a dts file which is board related
+> instead of rk3288.dtsi,
+> it should be safe for T-firefly board, but I'm not sure it works for all the
+> boards.
+>
+> The operation table I provide for rk3288.dtsi with conservative values and
+> available for all boards
+> based on rk3288, and maybe need an OPP table with optimized values in dts
+> board file
+> for board customized.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..907dee1 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -631,9 +631,9 @@ void free_initmem(void)
- 
- #ifdef CONFIG_BLK_DEV_INITRD
- 
--static int keep_initrd;
-+static int __initdata keep_initrd;
- 
--void free_initrd_mem(unsigned long start, unsigned long end)
-+void __init free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..7268d57 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -330,9 +330,9 @@ void free_initmem(void)
- 
- #ifdef CONFIG_BLK_DEV_INITRD
- 
--static int keep_initrd;
-+static int __initdata keep_initrd;
- 
--void free_initrd_mem(unsigned long start, unsigned long end)
-+void __init free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd)
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
--- 
-2.1.0
+I see, thank you so much.
+sorry for the noise.
