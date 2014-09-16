@@ -1,23 +1,93 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Sep 2014 14:53:09 -0700
-Subject: [Patch v2] clk: qcom: Add IPQ8064 PLL required for USB
-In-Reply-To: <1410901452-13519-1-git-send-email-agross@codeaurora.org>
-References: <1410901452-13519-1-git-send-email-agross@codeaurora.org>
-Message-ID: <20140916215309.GC22593@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 16 Sep 2014 15:54:48 -0600
+Subject: [PATCH - v4] PCI: keystone: add a pci quirk to limit mrrs
+In-Reply-To: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
+References: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20140916215448.GB5050@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16, Andy Gross wrote:
-> This patch adds the PLL0 that is required for the USB clocks to work properly.
+On Mon, Sep 08, 2014 at 01:03:34PM -0400, Murali Karicheri wrote:
+> Keystone PCI controller has a limitation that memory read request
+> size must not exceed 256 bytes. This is a hardware limitation and
+> add a quirk to force this limit on all downstream devices by
+> updating mrrs.
 > 
-> Changes in v2: Correct table to only use pll0_vote
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+
+Applied to pci/host-keystone for v3.18, thanks.
+
+I moved the pci-keystone.txt update regarding pci=pcie_bus_perf into this
+patch.  This is where it belongs, isn't it?  I'm pretty sure it wasn't
+related to setting the PCI device ID dynamically.
+
 > ---
-
-Thanks, looks good.
-
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>   -v4: re-send removing extra lines
+>   -v3: added check for vendor id and use pci_matc_id() to do matching
+>   -v2: made the quirk happens after tuning
+>   -v1: changed printk to indicate PCI bdf
+> 
+>  drivers/pci/host/pci-keystone.c |   45 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index c1cfaef..ff8ed25 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -42,8 +42,53 @@
+>  /* DEV_STAT_CTRL */
+>  #define PCIE_CAP_BASE		0x70
+>  
+> +/* PCIE controller device IDs */
+> +#define PCIE_RC_K2HK		0xb008
+> +#define PCIE_RC_K2E		0xb009
+> +#define PCIE_RC_K2L		0xb00a
+> +
+>  #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+>  
+> +static void quirk_limit_mrrs(struct pci_dev *dev)
+> +{
+> +	struct pci_bus *bus = dev->bus;
+> +	struct pci_dev *bridge = bus->self;
+> +	static const struct pci_device_id rc_pci_devids[] = {
+> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2HK),
+> +		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2E),
+> +		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2L),
+> +		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
+> +		{ 0, },
+> +	};
+> +
+> +	if (pci_is_root_bus(bus))
+> +		return;
+> +
+> +	/* look for the host bridge */
+> +	while (!pci_is_root_bus(bus)) {
+> +		bridge = bus->self;
+> +		bus = bus->parent;
+> +	}
+> +
+> +	if (bridge) {
+> +		/*
+> +		 * Keystone PCI controller has a h/w limitation of
+> +		 * 256 bytes maximum read request size. It can't handle
+> +		 * anything higher than this. So force this limit on
+> +		 * all downstream devices
+> +		 */
+> +		if (pci_match_id(rc_pci_devids, bridge)) {
+> +			if (pcie_get_readrq(dev) > 256) {
+> +				dev_info(&dev->dev, "limiting mrrs to 256\n");
+> +				pcie_set_readrq(dev, 256);
+> +			}
+> +		}
+> +	}
+> +}
+> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
+> +
+>  static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+>  {
+>  	struct pcie_port *pp = &ks_pcie->pp;
+> -- 
+> 1.7.9.5
+> 
