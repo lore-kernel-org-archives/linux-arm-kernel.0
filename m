@@ -1,21 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Sep 2014 14:43:17 -0700
-Subject: [PATCH v3 0/4] gpio: syscon: reuse for keystone 2 socs
-In-Reply-To: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
-References: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CACRpkdaB7YpYjuND+Dic2eM=0OB0Sk=gGRRd7QrQj1Ze1MYXaQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Sep 2014 14:53:09 -0700
+Subject: [Patch v2] clk: qcom: Add IPQ8064 PLL required for USB
+In-Reply-To: <1410901452-13519-1-git-send-email-agross@codeaurora.org>
+References: <1410901452-13519-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20140916215309.GC22593@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 3, 2014 at 10:05 AM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+On 09/16, Andy Gross wrote:
+> This patch adds the PLL0 that is required for the USB clocks to work properly.
+> 
+> Changes in v2: Correct table to only use pll0_vote
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
 
-> This series intended to integrate Keystone 2 DSP GPIO controller functionality
-> into gpio-syscon driver (drivers/gpio/gpio-syscon.c) as requested
-> by Linus Walleij in [1].
+Thanks, looks good.
 
-OK no comments on DT stuff etc for two weeks, so merged patches
-1-3, the 4th you can take through the keystone git.
-
-Yours,
-Linus Walleij
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
