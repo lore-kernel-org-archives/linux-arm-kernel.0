@@ -1,88 +1,119 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Sep 2014 09:26:16 -0600
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaEK=C4j+G5CA_91xJNe25d=-y47EyZAYnaMh46fNYVDAw@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>	<CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>	<CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>	<CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>	<CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>	<CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>	<CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>	<54172B3F.9030901@wwwdotorg.org>
- <CAL1qeaEK=C4j+G5CA_91xJNe25d=-y47EyZAYnaMh46fNYVDAw@mail.gmail.com>
-Message-ID: <54185698.7020600@wwwdotorg.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 16 Sep 2014 17:31:29 +0200
+Subject: [PATCH] clk: mvebu: fix sscg node lookup
+In-Reply-To: <1410880503-2322-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1410880503-2322-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <541857D1.3020505@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 01:30 PM, Andrew Bresticker wrote:
-> On Mon, Sep 15, 2014 at 11:09 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 09/15/2014 11:06 AM, Andrew Bresticker wrote:
->>> On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>> On 12 September 2014 18:37, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>>>> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>>>>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>>>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>>>>>> recently posted by Andrew Chew [2].
-...
->>> Stephen, Thierry, have either of you had a chance to test this series?
->>
->> I haven't had a chance to yet. I just went to try it out, and found that it
->> depends on a whole slew of other patches that I don't have. Is there a git
->> branch somewhere to save me having to track down all the dependencies?
->
-> Yes, Tomeu has the branch he used for testing here:
-> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=3.17rc4-xhci
+Hi Thomas,
 
-Hmm. That git server was quite reluctant to cough up its bits, but it 
-did eventually.
+On 16/09/2014 17:15, Thomas Petazzoni wrote:
+> Commit 15917b16022427c53755abff4dc7051f3076dd7a ("clk: mvebu: Fix clk
+> frequency value if SSCG is enabled") introduced some logic in the
+> common mvebu clock code to adjust the clock frequency according to the
+> configuration of the SSCG.
+> 
+> In order to do this, it looks up for a DT node called "sscg" and maps
+> it before accessing the SSCG configuration register.
+> 
+> However, the lookup is currently done using:
+> 
+> 	 sscg_np = of_find_node_by_name(np, "sscg");
+> 
+> where "np" is a pointer to the DT node of the clock for which we are
+> calculating the adjusted frequency. This means that if the "sscg" node
+> is *after* the clock node in the Device Tree, it works fine (and
+> that's the case for Armada 370).
+> 
+> However, if it turns out that the "sscg" node is *before* the clock
+> node in the Device Tree, it won't work because the sscg node will not
+> be found.
+> 
+> What we really want here is a search of the entire Device Tree, not
+> only starting from the clock node, so instead of passing "np" as first
+> argument of of_find_node_by_name(), we simply need to pass
+> NULL. Passing a non-NULL argument is typically used in a loop, so that
+> the search for the next matching node starts right after the node that
+> was matched.
+> 
+> This makes the "np" argument to the kirkwood_fix_sscg_deviation()
+> function unnecessary, which leads to further cleanups.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Fixes: 15917b1602242 ("clk: mvebu: Fix clk frequency value if SSCG is enabled")
 
-> You'll also need the firmware Andrew Chew posted:
-> https://patchwork.ozlabs.org/patch/384013/
+Thanks for this fix.
 
-The XHCI driver can't load its firmware unless it's a module; if I make 
-it built-in, it fails immediately with error -2 during "Direct firmware 
-loading". The driver needs to work with either immediate or deferred 
-firmware loading.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I tried three USB3 mass storage devices, and they all appeared to work 
-without issue.
 
-0781:5581 SanDisk Corp.
-154b:fa0a PNY
-0781:5580 SanDisk Corp.
 
-I tried the following USB2 devices without issue:
 
-0781:5575 SanDisk Corp.
-0b95:7720 ASIX Electronics Corp. AX88772
-045e:0095 Microsoft Corp. IntelliMouse Explorer 4.0 (IntelliPoint)
-046d:c313 Logitech, Inc. Internet 350 Keyboard
+> ---
+> Jason, this is a fix that applies on your mvebu/drivers-clk branch.
+> 
+>  drivers/clk/mvebu/common.c | 6 +++---
+>  drivers/clk/mvebu/common.h | 4 ++--
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+> index 354bbad..f902c18 100644
+> --- a/drivers/clk/mvebu/common.c
+> +++ b/drivers/clk/mvebu/common.c
+> @@ -41,7 +41,7 @@ static struct clk_onecell_data clk_data;
+>   * chosen following the dt convention: using the first known SoC
+>   * compatible with it.
+>   */
+> -u32 kirkwood_fix_sscg_deviation(struct device_node *np, u32 system_clk)
+> +u32 kirkwood_fix_sscg_deviation(u32 system_clk)
+>  {
+>  	struct device_node *sscg_np = NULL;
+>  	void __iomem *sscg_map;
+> @@ -49,7 +49,7 @@ u32 kirkwood_fix_sscg_deviation(struct device_node *np, u32 system_clk)
+>  	s32 low_bound, high_bound;
+>  	u64 freq_swing_half;
+>  
+> -	sscg_np = of_find_node_by_name(np, "sscg");
+> +	sscg_np = of_find_node_by_name(NULL, "sscg");
+>  	if (sscg_np == NULL) {
+>  		pr_err("cannot get SSCG register node\n");
+>  		return system_clk;
+> @@ -142,7 +142,7 @@ void __init mvebu_coreclk_setup(struct device_node *np,
+>  
+>  	if (desc->is_sscg_enabled && desc->fix_sscg_deviation
+>  		&& desc->is_sscg_enabled(base))
+> -		rate = desc->fix_sscg_deviation(np, rate);
+> +		rate = desc->fix_sscg_deviation(rate);
+>  
+>  	clk_data.clks[1] = clk_register_fixed_rate(NULL, cpuclk_name, NULL,
+>  						   CLK_IS_ROOT, rate);
+> diff --git a/drivers/clk/mvebu/common.h b/drivers/clk/mvebu/common.h
+> index 59efaa8..989ab14 100644
+> --- a/drivers/clk/mvebu/common.h
+> +++ b/drivers/clk/mvebu/common.h
+> @@ -29,7 +29,7 @@ struct coreclk_soc_desc {
+>  	u32 (*get_cpu_freq)(void __iomem *sar);
+>  	void (*get_clk_ratio)(void __iomem *sar, int id, int *mult, int *div);
+>  	bool (*is_sscg_enabled)(void __iomem *sar);
+> -	u32 (*fix_sscg_deviation)(struct device_node *np, u32 system_clk);
+> +	u32 (*fix_sscg_deviation)(u32 system_clk);
+>  	const struct coreclk_ratio *ratios;
+>  	int num_ratios;
+>  };
+> @@ -51,5 +51,5 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
+>   * This function is shared among the Kirkwood, Armada 370, Armada XP
+>   * and Armada 375 SoC
+>   */
+> -u32 kirkwood_fix_sscg_deviation(struct device_node *np, u32 system_clk);
+> +u32 kirkwood_fix_sscg_deviation(u32 system_clk);
+>  #endif
+> 
 
-The following USB2 devices had problems:
 
-0b95:7720 ASIX Electronics Corp. AX88772
-
-> [  489.140536] usb 1-3: new high-speed USB device number 81 using xhci-tegra
-> [  489.260860] usb 1-3: device descriptor read/64, error -71
-> [  489.370804] xhci-tegra 70090000.usb: Setup ERROR: setup context command for slot 1.
-> [  489.378463] usb 1-3: hub failed to enable device, error -22
-> [  489.500531] usb 1-3: new high-speed USB device number 82 using xhci-tegra
-> [  489.655708] usb 1-3: can't set config #1, error -71
-> [  489.661231] usb 1-3: USB disconnect, device number 82
-> [  489.940531] usb 1-3: new high-speed USB device number 83 using xhci-tegra
-> [  490.060860] usb 1-3: device descriptor read/64, error -71
-> [  490.170805] xhci-tegra 70090000.usb: Setup ERROR: setup context command for slot 1.
-> [  490.178462] usb 1-3: hub failed to enable device, error -22
-(repeats over and over)
-
-15a4:1336 Afatech Technologies, Inc. SDHC/MicroSD/MMC/MS/M2/CF/XD Flash 
-Card Reader
-
-The power light comes on, and the activity light just keeps flashing 
-fast. Usually the activity light flashes a couple times and then turns 
-off. There is nothing in dmesg at all for this device.
-
-05e3:0608 Genesys Logic, Inc. USB-2.0 4-Port HUB
-
-Not detected. There is nothing in dmesg at all for this device.
-
-1bcf:0c31 Sunplus Innovation Technology Inc. SPIF30x Serial-ATA bridge
-
-Not detected. There is nothing in dmesg at all for this device.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
