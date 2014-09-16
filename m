@@ -1,26 +1,48 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 16 Sep 2014 14:57:36 +0200
-Subject: [PATCH 00/16 v9] omap 8250 based uart + DMA
-In-Reply-To: <5416D2A0.5020407@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <20140912224324.GK18849@atomide.com> <5416D2A0.5020407@linutronix.de>
-Message-ID: <541833C0.5020106@linutronix.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 16 Sep 2014 15:38:41 +0200
+Subject: [PATCH v5 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <20140916005129.GC3379@peterchendt>
+References: <1410777378-12726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1410777378-12726-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140916005129.GC3379@peterchendt>
+Message-ID: <20140916133841.GA4869@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 01:50 PM, Sebastian Andrzej Siewior wrote:
-> I changed the restore function the fix the am335x-evm + less "freeze".
-> And now we have this. So let me search?
+On Tue, Sep 16, 2014 at 08:51:30AM +0800, Peter Chen wrote:
+> On Mon, Sep 15, 2014 at 12:36:13PM +0200, Antoine Tenart wrote:
+> > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> > and DMA mask, to support USB2 ChipIdea controllers that don't need
+> > specific functions.
+> > 
+> > Tested on the Marvell Berlin SoCs USB controllers.
+> > 
+> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > ---
+> >  drivers/usb/chipidea/Makefile       |   1 +
+> >  drivers/usb/chipidea/ci_hdrc_usb2.c | 137 ++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 138 insertions(+)
+> >  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
+> > 
+> 
+> compile error:
+> 
+> /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c: In function 'ci_hdrc_usb2_dt_probe':
+> /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c:30:2: error: implicit declaration of function 'of_phy_get' [-Werror=implicit-function-declaration]
+> /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c:30:16: warning: assignment makes pointer from integer without a cast [enabled by default]
 
-IER was 0 by accident. It fixed in TX path.
-I pushed uart_v10_pre1 which should have it fixed aport from other
-things?
-I am going to address the review comments, to split the DMA callbacks
-as requested and if nobody comes up with something fancy we will have a
-v10 :)
+Did you apply the series introducing the support for the generic PHY
+framework in the USB subsystem first? One of the patches includes
+'linux/phy/phy.h' in 'linux/usb/otg.h'. That's why I did not encounter
+this error.
 
->> Regards,
->>
->> Tony
+Anyway, you're right and 'linux/phy/phy.h' should be explicitly included
+here.
 
-Sebastian
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
