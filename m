@@ -1,82 +1,68 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Sep 2014 13:54:27 +0200
-Subject: [PATCH v2 00/18] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-Message-ID: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 16 Sep 2014 13:54:38 +0200
+Subject: [PATCH v2 11/18] iommu: exynos: remove useless device_add/remove
+ callbacks
+In-Reply-To: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1410868485-4143-12-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Everyone,
+The driver doesn't need to do anything important in device add/remove
+callbacks, because initialization will be done from device-tree specific
+callbacks added later. IOMMU groups created by current code were never
+used.
 
-This is yet another attempt to finally make Exynos SYSMMU driver fully
-integrated with DMA-mapping subsystem.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/iommu/exynos-iommu.c | 28 ----------------------------
+ 1 file changed, 28 deletions(-)
 
-Previous approach is available here: https://lkml.org/lkml/2014/8/5/183
-
-I meantime, there have been a discussion about the way the iommu driver
-should be integrated with dma-mapping subsystem, which resulted in "[RFC
-PATCH v3 0/7] Introduce automatic DMA configuration for IOMMU masters"
-patches prepared by Will Deacon:
-http://www.spinics.net/lists/arm-kernel/msg362076.html 
-Those patches removed the need to use bus-specific notifiers for
-initialization.
-
-Main changes since previous version of my patches:
-
-1. rebased onto "[RFC PATCH v3 0/7] Introduce automatic DMA
-configuration for IOMMU masters" patches, changed initialization from
-bus notifiers to DT related callbacks
-
-2. removed support for separate IO address spaces - this will be
-discussed separately after the basic support gets merged
-
-3. removed support for power domain notifier-based runtime power
-management - this also will be discussed separately later
-
-I hope that the driver with above changes will be easier to be merged to
-v3.18.
-
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-
-
-Patch summary:
-
-Marek Szyprowski (18):
-  arm: dma-mapping: arm_iommu_attach_device: automatically set
-    max_seg_size
-  arm: exynos: bind power domains earlier, on device creation
-  drm: exynos: detach from default dma-mapping domain on init
-  clk: exynos: add missing smmu_g2d clock and update comments
-  ARM: DTS: Exynos4: add System MMU nodes
-  iommu: exynos: don't read version register on every tlb operation
-  iommu: exynos: remove unused functions
-  iommu: exynos: remove useless spinlock
-  iommu: exynos: refactor function parameters to simplify code
-  iommu: exynos: remove unused functions, part 2
-  iommu: exynos: remove useless device_add/remove callbacks
-  iommu: exynos: add support for binding more than one sysmmu to master
-    device
-  iommu: exynos: add support for runtime_pm
-  iommu: exynos: rename variables to reflect their purpose
-  iommu: exynos: document internal structures
-  iommu: exynos: remove excessive includes and sort others
-    alphabetically
-  iommu: exynos: init from dt-specific callback instead of initcall
-  iommu: exynos: add callback for initializing devices from device tree
-
- arch/arm/boot/dts/exynos4.dtsi            | 117 +++++++
- arch/arm/boot/dts/exynos4210.dtsi         |  23 ++
- arch/arm/boot/dts/exynos4x12.dtsi         |  82 +++++
- arch/arm/mach-exynos/pm_domains.c         |  12 +-
- arch/arm/mm/dma-mapping.c                 |  16 +
- drivers/clk/samsung/clk-exynos4.c         |   1 +
- drivers/gpu/drm/exynos/exynos_drm_iommu.c |   3 +
- drivers/iommu/exynos-iommu.c              | 494 ++++++++++++++----------------
- include/dt-bindings/clock/exynos4.h       |  10 +-
- 9 files changed, 483 insertions(+), 275 deletions(-)
-
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index b271348a4ec1..1b3f00726cd4 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -1055,32 +1055,6 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
+ 	return phys;
+ }
+ 
+-static int exynos_iommu_add_device(struct device *dev)
+-{
+-	struct iommu_group *group;
+-	int ret;
+-
+-	group = iommu_group_get(dev);
+-
+-	if (!group) {
+-		group = iommu_group_alloc();
+-		if (IS_ERR(group)) {
+-			dev_err(dev, "Failed to allocate IOMMU group\n");
+-			return PTR_ERR(group);
+-		}
+-	}
+-
+-	ret = iommu_group_add_device(group, dev);
+-	iommu_group_put(group);
+-
+-	return ret;
+-}
+-
+-static void exynos_iommu_remove_device(struct device *dev)
+-{
+-	iommu_group_remove_device(dev);
+-}
+-
+ static const struct iommu_ops exynos_iommu_ops = {
+ 	.domain_init = exynos_iommu_domain_init,
+ 	.domain_destroy = exynos_iommu_domain_destroy,
+@@ -1089,8 +1063,6 @@ static const struct iommu_ops exynos_iommu_ops = {
+ 	.map = exynos_iommu_map,
+ 	.unmap = exynos_iommu_unmap,
+ 	.iova_to_phys = exynos_iommu_iova_to_phys,
+-	.add_device = exynos_iommu_add_device,
+-	.remove_device = exynos_iommu_remove_device,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+ };
+ 
 -- 
 1.9.2
