@@ -1,121 +1,98 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 16 Sep 2014 12:35:40 +0200
-Subject: [PATCH 2/3] dmaengine: sun6i: Add support for Allwinner A23
- (sun8i) variant
-In-Reply-To: <1410616381-30226-3-git-send-email-wens@csie.org>
-References: <1410616381-30226-1-git-send-email-wens@csie.org>
- <1410616381-30226-3-git-send-email-wens@csie.org>
-Message-ID: <20140916103540.GF9948@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Sep 2014 11:42:42 +0100
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <54176D62.9010600@codeaurora.org>
+References: <5412DC48.7030708@codeaurora.org> <5412E3BB.9030800@arm.com>
+ <54134291.3040700@codeaurora.org> <20140915111055.GD1577@arm.com>
+ <54174CFF.7050504@codeaurora.org>
+ <CAPz6YkU8hEL6yocPf7UL8-tz9Onuu-9bevAToK3CDWsShN92YQ@mail.gmail.com>
+ <54175EFE.6010509@codeaurora.org>
+ <CAPz6YkWbxiGHO8RK==HbQ3P22amZ9sDKpGew=a2U8gO7soQCDg@mail.gmail.com>
+ <CAPz6YkWwzpd4oxarEH4Vu-Z_eH+ysw0TNubpPsv_eC6QJPcw7g@mail.gmail.com>
+ <54176D62.9010600@codeaurora.org>
+Message-ID: <20140916104242.GC27273@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 13, 2014 at 09:53:00PM +0800, Chen-Yu Tsai wrote:
-> The A23 SoC has the same dma engine as the A31 (sun6i), with a
-> reduced amount of endpoints and physical channels. Add the proper
-> config data and compatible string to support it.
+On Mon, Sep 15, 2014 at 11:51:14PM +0100, Christopher Covington wrote:
+> Hi Sonny,
 > 
-> A slight difference in sun8i is an undocumented register needs
-> to be toggled for dma to function.
+> On 09/15/2014 06:04 PM, Sonny Rao wrote:
+> > On Mon, Sep 15, 2014 at 2:52 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> >> On Mon, Sep 15, 2014 at 2:49 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>> On 09/15/14 14:47, Sonny Rao wrote:
+> >>>> On Mon, Sep 15, 2014 at 1:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>>>> On 09/15/14 04:10, Catalin Marinas wrote:
+> >>>>>> On Fri, Sep 12, 2014 at 07:59:29PM +0100, Stephen Boyd wrote:
+> >>>>>>> On 09/12/14 05:14, Marc Zyngier wrote:
+> >>>>>>>> We surely can handle the UNDEF and do something there. We just can't do
+> >>>>>>>> it the way Doug described it above.
+> >>>>>>> I suggested doing that for something else a while ago and Will and Dave
+> >>>>>>> we're not thrilled[1]. The suggestion back then was to use DT to
+> >>>>>>> indicate what mode the kernel is running in.
+> >>>>>>>
+> >>>>>>> [1]
+> >>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
+> >>>>>> I think the context was slightly different. As I re-read the thread, it
+> >>>>>> seems that the discussion was around whether to use some SMC interface
+> >>>>>> or not based on whether the kernel is running secure or non-secure. The
+> >>>>>> argument made by Will was to actually specify the type of the firmware
+> >>>>>> SMC interface in the DT and use it in the kernel (and probably assume
+> >>>>>> the kernel is running in secure mode if no smc interface is specified in
+> >>>>>> the DT; you could have both though, running in secure mode and also
+> >>>>>> having firmware).
+> >>>>>>
+> >>>>>> In this arch timer case, we need to work around a firmware bug (or
+> >>>>>> feature as 32-bit ARM kernels never required CNTVOFF initialisation by
+> >>>>>> firmware, no matter how small such firmware is). We don't expect a
+> >>>>>> specific SMC call to initialise CNTVOFF, so we can't describe it in the
+> >>>>>> DT.
+> >>>>> Agreed, we can't described SMC calls that don't exist. From my
+> >>>>> perspective it's just another part of the cpu boot sequence that needs
+> >>>>> to be handled in the kernel, so describing the requirement via the
+> >>>>> cpu-boot method seems appropriate. It seems like we're making it harder
+> >>>>> than it should be by handling the undef when we could have slightly
+> >>>>> different SMP boot code (and suspend/resume code) depending on the boot
+> >>>>> method property.
+> >>>>
+> >>>> +heiko
+> >>>>
+> >>>> So, for the case of rk3288, based on this discussion what I'm going to
+> >>>> propose is to add code to rockchip.c which looks for a particular SMP
+> >>>> enable method -- say something like "rockchip,rk3288-smp-secure-svc"
+> >>>> which will then assume we have been booted in secure SVC mode and do
+> >>>> the CNTVOFF fixup.  I believe, it will need to do this on the boot CPU
+> >>>> as well, so I think it will need to scan the DT fairly early on the
+> >>>> boot CPU and also perform the function there.
+> >>>>
+> >>>> I'll look into implementing this and post code.  Comments and
+> >>>> suggestions appreciated, thanks.
+> >>>
+> >>> What goes wrong if we read the cntvoff from the boot CPU during
+> >>> smp_prepare_cpus() phase and use that to set the cntvoff on the other
+> >>> CPUs? That avoids needing to do anything very early by making the value
+> >>> the same. It does mean that cntvoff is some random out of reset value
+> >>> for CPU0, but at least it's consistent.
+> >>
+> >> I think we cannot read the value if we're not in hyp mode.
+> > 
+> > Well, thinking about it a little more, I think you still have a good point.
+> > 
+> > We don't need to do this early on, as long as we haven't started using
+> > the arch timers yet.  If we are still able to do this at the point
+> > where we're executing the code in arch/arm/mach-rockchip/platsmp.c
+> > that finds the enable method then we can just handle it there.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/dma/sun6i-dma.txt |  2 +-
->  drivers/dma/Kconfig                                 |  4 ++--
->  drivers/dma/sun6i-dma.c                             | 20 ++++++++++++++++++++
->  3 files changed, 23 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> index 3e145c1..9cdcba24d 100644
-> --- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> @@ -4,7 +4,7 @@ This driver follows the generic DMA bindings defined in dma.txt.
->  
->  Required properties:
->  
-> -- compatible:	Must be "allwinner,sun6i-a31-dma"
-> +- compatible:	Must be "allwinner,sun6i-a31-dma" or "allwinner,sun8i-a23-dma"
->  - reg:		Should contain the registers base address and length
->  - interrupts:	Should contain a reference to the interrupt used by this device
->  - clocks:	Should contain a reference to the parent AHB clock
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 9b1ea0e..5361aa7 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -395,12 +395,12 @@ config XILINX_VDMA
->  
->  config DMA_SUN6I
->  	tristate "Allwinner A31 SoCs DMA support"
-> -	depends on MACH_SUN6I || COMPILE_TEST
-> +	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
->  	depends on RESET_CONTROLLER
->  	select DMA_ENGINE
->  	select DMA_VIRTUAL_CHANNELS
->  	help
-> -	  Support for the DMA engine for Allwinner A31 SoCs.
-> +	  Support for the DMA engine first found in Allwinner A31 SoCs.
->  
->  config NBPFAXI_DMA
->  	tristate "Renesas Type-AXI NBPF DMA support"
-> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index 89ca0c4..29667dd 100644
-> --- a/drivers/dma/sun6i-dma.c
-> +++ b/drivers/dma/sun6i-dma.c
-> @@ -878,8 +878,20 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
->  	.nr_max_vchans   = 53,
->  };
->  
-> +/*
-> + * The A23 only has 8 physical channels, a maximum DRQ port id of 24,
-> + * and a total of 37 usable source and destination endpoints.
-> + */
-> +
-> +static struct sun6i_dma_config sun8i_a23_dma_cfg = {
-> +	.nr_max_channels = 8,
-> +	.nr_max_requests = 24,
-> +	.nr_max_vchans   = 37,
-> +};
-> +
->  static struct of_device_id sun6i_dma_match[] = {
->  	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
-> +	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
->  	{ /* sentinel */ }
->  };
->  
-> @@ -1008,6 +1020,14 @@ static int sun6i_dma_probe(struct platform_device *pdev)
->  		goto err_dma_unregister;
->  	}
->  
-> +	/*
-> +	 * sun8i variant requires us to toggle an undocumented register,
-> +	 * as seen in Allwinner's SDK.
+> I've been playing around with the probe-based approach and while I need to do
+> a lot more testing, it seems to be working for the first tens of instructions.
+> I hope to be able to share a draft of that soon. Basically, I just read the
+> current NSACR value and write it back (although maybe in the long term we
+> would want to make sure a few of those bits are set or cleared). If that
+> succeeds, we know we're in secure SVC and can proceed to set up MON and HYP.
 
-The BSP I have has this:
-
-static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
-{
-        struct sunxi_dmadev *sunxi_dev = dev;
-
-        clk_prepare_enable(sunxi_dev->ahb_clk);
-#ifdef CONFIG_ARCH_SUN8IW3
-        writel(0x04, sunxi_dev->base + DMA_GATE);
-#endif
-}
-
-/* All is ok, and open the clock */
-sunxi_dma_hw_init(sunxi_dev);
-
-So I guess we can say that it's not that undocumented :)
-
-Maxime
+But when it doesn't succeed, you get an undefined instruction fault
+(since NSACR is only writable in secure mode).
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/c7ec9596/attachment.sig>
+Catalin
