@@ -1,43 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Sep 2014 18:57:05 +0200
-Subject: [RFC][PATCH] devicetree: Add master-id-bits property to the iommu
- device
-In-Reply-To: <bfdff6494d7f46ab9a9f00f94159e9e1@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1410718646-9710-1-git-send-email-Varun.Sethi@freescale.com>
- <201409150438.29649.arnd@arndb.de>
- <bfdff6494d7f46ab9a9f00f94159e9e1@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <201409151857.05463.arnd@arndb.de>
+Date: Tue, 16 Sep 2014 16:52:15 +0200
+Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <000b01cfd1a4$f5ae0d20$e10a2760$@samsung.com>
+References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140905101409.68b14cc3@bbrezillon>
+ <000b01cfd1a4$f5ae0d20$e10a2760$@samsung.com>
+Message-ID: <201409161652.15333.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 September 2014, Varun Sethi wrote:
-> > 
-> > This seems rather specific to MMU-500. I don't think that most IOMMUs would
-> > use the term 'master ID', 'stream ID' or even the general concept, and you
-> > don't expand the acronym 'TBU'. I've seen many IOMMUs and I don't even
-> > know what that means.
+On Tuesday 16 September 2014, Pankaj Dubey wrote:
+> Hi Arnd,  Lee Jones,
+> > On Thu, 04 Sep 2014 10:15:27 +0530
+> > Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
 > 
-> TBU refers to the translation buffer unit, which is responsible for caching page translations. In case of translation miss in the cache, translation request is forwarded to the TCU (Translation control unit). The master id forwarded to TCU would also contain the TBU ID.  Using the master-id-bits property we can mask out the additional TBU bits at the TCU. This is a cause of concern when we want to share master id for devices which are connected to different TBUs. We have a hot pluggable bus architecture, where a device group can have multiple devices connected to different TBUs. So, we need a mechanism to mask out additional TBIU bits.
-
-Ok, I think I understand now
-
-> > Why do you think this is something that is needed to be known at the global
-> > level, rather than a property for some individual drivers?
-> > 
-> In case of Freescale Layerscape SOCs, number of bits used for defining a stream id are specific to a given platform. 
+> Any update on this patch. As already it has been tested on two DT based
+> platforms.
 > 
-> Are you suggesting that this property should be added to the master device node, rather than the iommu node?
+> If you think that we can go ahead and break clps711x till it gets migrated
+> over DT,
+> then please ack this patch, or else if you have opinion to keep support for
+> non-DT
+> based drivers (clps711x) then I can post another patch keeping platform
+> driver support
+> for non-DT based platform. 
 
-Most importantly, I think this needs to be part of the (iommu) device specific binding, not the
-generic binding that is used for all iommus that may or may not have this concept.
+The rule is that we don't intentionally break things, so please post a
+patch that keeps the existing platform driver there. Ideally we get a DT-only
+clps711x for the merge window as well, and if that happens we can add another
+patch on top to remove that syscon-pdev support again but then we will
+have a bisectable kernel that works for every point inbetween.
 
-I believe in case of the ARM SMMU, it should actually go into the master node as part of
-the 'iommus' property, because the mask can be different for each master. If your IOMMU
-has a fixed mask that is used for all devices, that's fine and you can put it into
-the iommu node itself but document it in the binding for your IOMMU.
-
-For hot-pluggable buses, you probably need to have the 'iommus' property in the node
-that corresponds to the bus controller, and that will have a mask that is used for
-all devices plugged into it.
 
 	Arnd
