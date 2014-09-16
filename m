@@ -1,42 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Sep 2014 16:57:38 +0100
-Subject: [PATCH 3.17-rc4 v6 2/6] arm: fiq: Replace default FIQ handler
-In-Reply-To: <54176F7C.6030908@linaro.org>
-References: <1410695835-10496-1-git-send-email-daniel.thompson@linaro.org>
- <1410695835-10496-3-git-send-email-daniel.thompson@linaro.org>
- <54176F7C.6030908@linaro.org>
-Message-ID: <20140916155738.GI12361@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 Sep 2014 17:57:11 +0200
+Subject: [PATCH 1/7] clk: sunxi: Add post clk divider for factor clocks
+In-Reply-To: <54145822.4020607@elopez.com.ar>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-2-git-send-email-wens@csie.org>
+ <54145822.4020607@elopez.com.ar>
+Message-ID: <20140916155711.GF2166@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 12:00:12AM +0100, Daniel Thompson wrote:
-> On 14/09/14 12:57, Daniel Thompson wrote:
-> > This patch introduces a new default FIQ handler that is structured in a
-> > similar way to the existing ARM exception handler and result in the FIQ
-> > being handled by C code running on the SVC stack (despite this code run
-> > in the FIQ handler is subject to severe limitations with respect to
-> > locking making normal interaction with the kernel impossible).
-> > 
-> > This default handler allows concepts that on x86 would be handled using
-> > NMIs to be realized on ARM.
-> > 
-> > Credit:
-> > 
-> >     This patch is a near complete re-write of a patch originally
-> >     provided by Anton Vorontsov. Today only a couple of small fragments
-> >     survive, however without Anton's work to build from this patch would
-> >     not exist. Thanks also to Russell King for spoonfeeding me a variety
-> >     of fixes during the review cycle.
-> 
-> I've send this patch to the your patch tracker as complete respin (#8150/2).
-> 
-> If you'd rather handle it as a follow on patch please let me know and I
-> will prepare it as one.
+Hi Emilio,
 
-Thanks, as you will see, I've merged this patch, along with my two
-patches, one removing do_unexp_fiq() and the newline removal in
-show_regs().  They should be appearing in a linux-next rsn.
+On Sat, Sep 13, 2014 at 11:43:46AM -0300, Emilio L?pez wrote:
+> Hi,
+> 
+> El 06/09/14 a las 07:47, Chen-Yu Tsai escibi?:
+> >Some factor clocks, mostly PLLs, have an extra fixed divider just before
+> >the clock output. Add an option to the factor clk driver config data to
+> >specify this divider.
+> >
+> >Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >---
+> >  drivers/clk/sunxi/clk-factors.c | 3 +++
+> >  drivers/clk/sunxi/clk-factors.h | 1 +
+> >  2 files changed, 4 insertions(+)
+> >
+> >diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> >index 2057c8a..435111d 100644
+> >--- a/drivers/clk/sunxi/clk-factors.c
+> >+++ b/drivers/clk/sunxi/clk-factors.c
+> >@@ -64,6 +64,9 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+> >  	/* Calculate the rate */
+> >  	rate = (parent_rate * (n + config->n_start) * (k + 1) >> p) / (m + 1);
+> >
+> >+	if (config->post_div)
+> >+		rate /= config->post_div;
+> >+
+> >  	return rate;
+> >  }
+> >
+> >diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+> >index d2d0efa..ce70c65 100644
+> >--- a/drivers/clk/sunxi/clk-factors.h
+> >+++ b/drivers/clk/sunxi/clk-factors.h
+> >@@ -16,6 +16,7 @@ struct clk_factors_config {
+> >  	u8 pshift;
+> >  	u8 pwidth;
+> >  	u8 n_start;
+> >+	u8 post_div;
+> >  };
+> >
+> >  struct clk_factors {
+> >
+> 
+> For the record, I liked your solution on[1] more, as it's in line
+> with what we're doing on the other sunxi platforms, instead of
+> adding features in factors to cover for some cases. But it's your
+> and Maxime's call, as I haven't written any of the sun6i code so
+> far.
+
+No, you still wrote most of the clock support, so your opinion is
+always valuable (and valued).
+
+Thing is, unlike what was done in the sun4i driver where there was a
+"real" technical issue that was preventing us from using only
+fixed-factor, we're not in such a case in sun6i (and later,
+apparently).
+
+PLL6 has only one output, which is then directly multiplied by
+fixed-factors, without any (pre|post)-dividers for any of them.
+
+That means that following what you did for the sun4i would just
+register 3 "dumbs" fixed-factors, that we couldn't reference from DT,
+or through a cryptic index (which is not even documented in our
+bindings).
+
+I'd be fine either way, I just prefer the solution that has less code
+and is more explicit.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/202624f8/attachment.sig>
