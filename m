@@ -1,82 +1,32 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 16 Sep 2014 10:00:18 +0200
-Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
-In-Reply-To: <20140915224621.GG25162@lee--X1>
-References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
- <20140912134632.GE1930@katana>
- <CABxcv==OXd+uePcB8zDzB-DDmr9ci6zscHX5TCauWoTO6E4fpg@mail.gmail.com>
- <20140915224621.GG25162@lee--X1>
-Message-ID: <CABxcv=nZhBFRTTmafLxopTiX+wrOKtMD5tKf-00ysrWcZ5N5rg@mail.gmail.com>
+From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
+Date: Tue, 16 Sep 2014 11:08:22 +0300
+Subject: [PATCH v3 3/4] ARM: imx_v6_v7_defconfig: enable tlv320aic3x audio
+ codec by default
+In-Reply-To: <1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <1410854903-26419-4-git-send-email-d.lavnikevich@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+Used on Phytec PBAB01 board.
 
-On Tue, Sep 16, 2014 at 12:46 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 12 Sep 2014, Javier Martinez Canillas wrote:
->> So what I propose is to do it incrementally:
->>
->> 1) Merge Lee's series since that is definitely a step in the right
->> direction to not make an I2C table mandatory (still will be needed for
->> module auto loading though).
->>
->> 2) On a follow-up series, make sure that all I2C drivers have a proper
->> OF table and that are using the MODULE_DEVICE_TABLE(of,...) macro to
->> fill the of:<foo> module aliases. That way the modules will have the
->> proper aliases of the form "of:<foo>" besides the "i2c:<foo>" one.
->> (even when always i2c:<foo> is reported to user-space currently).
->>
->> 3) Apply the patch I posted [0] that changes the behavior of
->> i2c_device_uevent() to report the OF uevent env vars to user-space in
->> case of DT probing which after 2) should not regress any driver module
->> auto-loading since all drivers should fill the of:<foo> aliases.
->
-> This sounds resonable.
->
+Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Ok, sounds like a plan then.
-
->> After this, DT-only drivers will only need an OF table and legacy
->> drivers will only need an I2C table. Drivers that support both will
->> still need the two tables though which is a drawback of this approach
->> since unnecessary duplication will exist on these drivers and can
->> cause issues when both tables are not in sync as we saw on the issue
->> reported by Sjoerd on [1].
->>
->> So an alternate approach could be to do the opposite, just remove the
->> OF tables entirely from the I2C drivers and only use the I2C table
->> even for DT-only drivers. This is possible since i2c_device_match()
->> will succeed even without an OF table because i2c_match_id() matches
->> for compatible strings and what is reported as uevent is what is in
->> the I2C table anyways. I believe that is what Sjoerd suggested but
->> I'll let him comment on that in case I misunderstood.
->
-> This would be really bad.  It would go completely against what I have
-> working to achieve and OF conventions.
->
-
-Yes, I was just mentioning the two possible approaches but Sjoerd did
-a much better work on the SPI thread [0].
-
-Another drawback of only using the I2C table is that the vendor prefix
-of the compatible strings are not reported to user-space. So if there
-are two devices with the same name (driven by two different drivers)
-but different vendor, these are going to be probed correctly if
-built-in but module auto-loading will fail since doesn't take into
-account the vendor prefix. This is the current status btw and I guess
-it was never noticed because there isn't two devices with the same
-name today.
-
-The drawback of using the OF based aliases is that many I2C drivers
-probably rely on the current behavior and don't have a proper OF table
-but IMHO that is a bug and has to be fixed anyways.
-
-Of course that doesn't mean that we shouldn't make sure that all
-drivers have a proper OF table (and using MODULE_DEVICE_TABLE) before
-changing i2c_device_uevent(). Hence my proposal to do it in 3 steps as
-explained before.
-
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2014/9/15/70
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 8fca6e276b69..cac07d67b933 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -210,6 +210,7 @@ CONFIG_SND_SOC_IMX_WM8962=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+ CONFIG_SND_SOC_IMX_MC13783=y
++CONFIG_SND_SOC_TLV320AIC3X=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
+-- 
+2.1.0
