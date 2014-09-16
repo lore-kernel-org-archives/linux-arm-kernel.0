@@ -1,31 +1,96 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 16 Sep 2014 22:25:02 +0200
-Subject: Cortex-M and zImage
-Message-ID: <CAGhQ9VzzSq4P5BKM3UBBCPT61g3T1RHFhttfA-KkWGCcrjaW6A@mail.gmail.com>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Tue, 16 Sep 2014 13:29:23 -0700
+Subject: [PATCH] arm64: bpf: add 'load 64-bit immediate' instruction
+In-Reply-To: <1410892655-17818-1-git-send-email-zlim.lnx@gmail.com>
+References: <1410892655-17818-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <1410899363-27635-1-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Catalin, Will,
 
-I am working on Linux support for the NXP LPC18xx/43xx family of
-Cortex-M3/M4 microcontrollers. Building zImage for Cortex-M fails
-with the following two errors:
-error: arch/arm/boot/compressed/piggy.gzip.o: Conflicting architecture
-profiles M/A
-linux/arch/arm/boot/compressed/head.S:794: undefined reference to
-`CONFIG_PROCESSOR_ID'
+Please consider applying this after -rc1 as well. [1]
 
-The last error is easy to fix. But the first about conflicting arch is
-harder.
+Let me know how you prefer to handle these patches and I can repost
+as necessary.
 
-As far as I know zImage on Cortex-M is not supported or not tested.
+Thanks,
+z
 
-Are there any plans to support zImage on Cortex-M?
-If so does anyone have an idea how the conflicting arch issue could
-be solved?
+[1] https://lkml.org/lkml/2014/9/16/418
+>8------------------------------------------------------8<
 
-btw, building with 'make Image' works fine and I have been running
-Linux for a while on the NXP LPC4357.
+Commit 02ab695bb37e (net: filter: add "load 64-bit immediate" eBPF
+instruction) introduced a new eBPF instruction. Let's add support
+for this for arm64 as well.
 
-regards
-Joachim Eastwood
+Our arm64 eBPF JIT compiler now passes the new "load 64-bit
+immediate" test case introduced in the same commit 02ab695bb37e.
+
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Alexei Starovoitov <ast@plumgrid.com>
+---
+ arch/arm64/net/bpf_jit_comp.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index 80cc769..618d2cd 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -205,6 +205,12 @@ static void build_epilogue(struct jit_ctx *ctx)
+ 	emit(A64_RET(A64_LR), ctx);
+ }
+ 
++/* JITs an eBPF instruction.
++ * Returns:
++ * 0  - successfully JITed an 8-byte eBPF instruction.
++ * >0 - successfully JITed a 16-byte eBPF instruction.
++ * <0 - failed to JIT.
++ */
+ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ {
+ 	const u8 code = insn->code;
+@@ -464,6 +470,27 @@ emit_cond_jmp:
+ 		emit(A64_B(jmp_offset), ctx);
+ 		break;
+ 
++	/* dst = imm64 */
++	case BPF_LD | BPF_IMM | BPF_DW:
++	{
++		const struct bpf_insn insn1 = insn[1];
++		u64 imm64;
++
++		if (insn1.code != 0 || insn1.src_reg != 0 ||
++		    insn1.dst_reg != 0 || insn1.off != 0) {
++			/* Note: verifier in BPF core must catch invalid
++			 * instructions.
++			 */
++			pr_err_once("Invalid BPF_LD_IMM64 instruction\n");
++			return -EINVAL;
++		}
++
++		imm64 = (u64)insn1.imm << 32 | imm;
++		emit_a64_mov_i64(dst, imm64, ctx);
++
++		return 1;
++	}
++
+ 	/* LDX: dst = *(size *)(src + off) */
+ 	case BPF_LDX | BPF_MEM | BPF_W:
+ 	case BPF_LDX | BPF_MEM | BPF_H:
+@@ -615,6 +642,10 @@ static int build_body(struct jit_ctx *ctx)
+ 			ctx->offset[i] = ctx->idx;
+ 
+ 		ret = build_insn(insn, ctx);
++		if (ret > 0) {
++			i++;
++			continue;
++		}
+ 		if (ret)
+ 			return ret;
+ 	}
+-- 
+1.9.1
