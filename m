@@ -1,48 +1,106 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Sep 2014 18:18:03 +0100
-Subject: [PATCH] arm64:mm: initialize max_mapnr using function
- set_max_mapnr
-In-Reply-To: <CAFpQJXVf_6P-kFv+qq-NiAuna_Y-wNsKFOkbE929F8chRFcujg@mail.gmail.com>
-References: <1410442661-3383-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <20140915171134.GK5415@arm.com>
- <CAFpQJXVf_6P-kFv+qq-NiAuna_Y-wNsKFOkbE929F8chRFcujg@mail.gmail.com>
-Message-ID: <20140916171803.GB5508@e104818-lin.cambridge.arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 16 Sep 2014 10:22:54 -0700
+Subject: [PATCH] regulator: rk808: Add function for ramp delay for buck1/buck2
+Message-ID: <1410888174-8279-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 07:37:36PM +0100, Ganapatrao Kulkarni wrote:
-> On Mon, Sep 15, 2014 at 10:41 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Thu, Sep 11, 2014 at 02:37:41PM +0100, Ganapatrao Kulkarni wrote:
-> >> In some config cases, max_mapnr is not defined and direct reference
-> >> results in to compilation error.
-> >> This is fixed by using set_max_mapnr() helper.
-> >>
-> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
-> >> ---
-> >>  arch/arm64/mm/init.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> >> index 5472c24..271e654 100644
-> >> --- a/arch/arm64/mm/init.c
-> >> +++ b/arch/arm64/mm/init.c
-> >> @@ -256,7 +256,7 @@ static void __init free_unused_memmap(void)
-> >>   */
-> >>  void __init mem_init(void)
-> >>  {
-> >> -     max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
-> >> +     set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
-> >
-> > These are not equivalent as PHYS_PFN_OFFSET is dropped (which looks like
-> > the correct thing to do but the commit log should reflect this as well).
-> is below comment ok for the change? if so i can resend the patch.
-> 
-> Initializing max_mapnr using set_max_mapnr() helper function instead
-> of direct reference.
-> Also not adding PHYS_PFN_OFFSET to max_pfn, since it already contains it.
+On rk808 buck1 and buck2 have programmable ramp delays.  Let's add a
+function to allow a client of rk808 to set them.
 
-Yes.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/regulator/rk808-regulator.c | 57 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 55 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/regulator/rk808-regulator.c b/drivers/regulator/rk808-regulator.c
+index 07b0eb4..e305416 100644
+--- a/drivers/regulator/rk808-regulator.c
++++ b/drivers/regulator/rk808-regulator.c
+@@ -28,6 +28,21 @@
+ #define RK808_BUCK4_VSEL_MASK	0xf
+ #define RK808_LDO_VSEL_MASK	0x1f
+ 
++/* Ramp rate definitions for buck1 / buck2 only */
++#define RK808_RAMP_RATE_OFFSET		3
++#define RK808_RAMP_RATE_MASK		(3 << RK808_RAMP_RATE_OFFSET)
++#define RK808_RAMP_RATE_2MV_PER_US	(0 << RK808_RAMP_RATE_OFFSET)
++#define RK808_RAMP_RATE_4MV_PER_US	(1 << RK808_RAMP_RATE_OFFSET)
++#define RK808_RAMP_RATE_6MV_PER_US	(2 << RK808_RAMP_RATE_OFFSET)
++#define RK808_RAMP_RATE_10MV_PER_US	(3 << RK808_RAMP_RATE_OFFSET)
++
++static const int rk808_buck_config_regs[] = {
++	RK808_BUCK1_CONFIG_REG,
++	RK808_BUCK2_CONFIG_REG,
++	RK808_BUCK3_CONFIG_REG,
++	RK808_BUCK4_CONFIG_REG,
++};
++
+ static const struct regulator_linear_range rk808_buck_voltage_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(700000, 0, 63, 12500),
+ };
+@@ -49,6 +64,44 @@ static const struct regulator_linear_range rk808_ldo6_voltage_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(800000, 0, 17, 100000),
+ };
+ 
++static int rk808_set_ramp_delay(struct regulator_dev *rdev, int ramp_delay)
++{
++	unsigned int ramp_value = RK808_RAMP_RATE_10MV_PER_US;
++	unsigned int reg = rk808_buck_config_regs[rdev->desc->id -
++						  RK808_ID_DCDC1];
++
++	switch (ramp_delay) {
++	case 1 ... 2000:
++		ramp_value = RK808_RAMP_RATE_2MV_PER_US;
++		break;
++	case 2001 ... 4000:
++		ramp_value = RK808_RAMP_RATE_4MV_PER_US;
++		break;
++	case 4001 ... 6000:
++		ramp_value = RK808_RAMP_RATE_6MV_PER_US;
++		break;
++	case 6001 ... 10000:
++		break;
++	default:
++		pr_warn("%s ramp_delay: %d not supported, setting 10000\n",
++			rdev->desc->name, ramp_delay);
++	}
++
++	return regmap_update_bits(rdev->regmap, reg,
++				  RK808_RAMP_RATE_MASK, ramp_value);
++}
++
++static struct regulator_ops rk808_buck1_2_ops = {
++	.list_voltage		= regulator_list_voltage_linear_range,
++	.map_voltage		= regulator_map_voltage_linear_range,
++	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
++	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
++	.enable			= regulator_enable_regmap,
++	.disable		= regulator_disable_regmap,
++	.is_enabled		= regulator_is_enabled_regmap,
++	.set_ramp_delay		= rk808_set_ramp_delay,
++};
++
+ static struct regulator_ops rk808_reg_ops = {
+ 	.list_voltage		= regulator_list_voltage_linear_range,
+ 	.map_voltage		= regulator_map_voltage_linear_range,
+@@ -70,7 +123,7 @@ static const struct regulator_desc rk808_reg[] = {
+ 		.name = "DCDC_REG1",
+ 		.supply_name = "vcc1",
+ 		.id = RK808_ID_DCDC1,
+-		.ops = &rk808_reg_ops,
++		.ops = &rk808_buck1_2_ops,
+ 		.type = REGULATOR_VOLTAGE,
+ 		.n_voltages = 64,
+ 		.linear_ranges = rk808_buck_voltage_ranges,
+@@ -84,7 +137,7 @@ static const struct regulator_desc rk808_reg[] = {
+ 		.name = "DCDC_REG2",
+ 		.supply_name = "vcc2",
+ 		.id = RK808_ID_DCDC2,
+-		.ops = &rk808_reg_ops,
++		.ops = &rk808_buck1_2_ops,
+ 		.type = REGULATOR_VOLTAGE,
+ 		.n_voltages = 64,
+ 		.linear_ranges = rk808_buck_voltage_ranges,
 -- 
-Catalin
+2.1.0.rc2.206.gedb03e5
