@@ -1,30 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 16 Sep 2014 16:04:35 +0000 (UTC)
-Subject: [PATCH 01/12] ARM: OMAP2+: Add hwmod flag for
- HWMOD_RECONFIG_IO_CHAIN
-In-Reply-To: <1410837126-31553-1-git-send-email-tony@atomide.com>
-References: <1410837126-31553-1-git-send-email-tony@atomide.com>
-Message-ID: <alpine.DEB.2.02.1409161604160.23518@utopia.booyaka.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 17 Sep 2014 00:04:44 +0800
+Subject: [PATCH v4 0/2] ARM: sun5i: Add DT for HSG H702 tablet board
+Message-ID: <1410883486-22888-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Sep 2014, Tony Lindgren wrote:
+Hi,
 
-> Commit cc824534d4fe ("ARM: OMAP2+: hwmod: Rearm wake-up interrupts
-> for DT when MUSB is idled") fixed issues with hung UART wake-up
-> events by calling _reconfigure_io_chain() when MUSB is connected
-> or disconnected.
-> 
-> As pointed out by Paul Walmsley, we may need to also call
-> _reconfigure_io_chain() in other cases, so it should be a separate
-> flag. Let's add HWMOD_RECONFIG_IO_CHAIN as suggested by Paul.
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
-
-Thanks for taking care of this.
+This is v4 of the HSG H702 tablet support patch. I've split the original
+patch into 2, one for the common 5V regulator, and the other for the
+tablet.
 
 
-- Paul
+Changes since v3
+  - Move fixed regulator to common regulators in separate patch.
+  - Use said common regulator for usb1-vbus. 
+  - Slightly changed commit title
+
+Changes since v2:
+  - Dual license under GPL/X11.
+  - Use extra fixed regulator for usb1-vbus.
+
+
+Chen-Yu Tsai (2):
+  ARM: dts: sunxi: Add fixed 5V regulator
+  ARM: dts: sun5i: Add DT for HSG H702 tablet board
+
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts       | 130 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi |   7 ++
+ 3 files changed, 138 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+
+-- 
+2.1.0
