@@ -1,189 +1,82 @@
-From: dborkman@redhat.com (Daniel Borkmann)
-Date: Tue, 16 Sep 2014 09:48:50 +0200
-Subject: [PATCH arm64-next v4] net: bpf: arm64: address randomize and write
- protect JIT code
-Message-ID: <1410853730-16470-1-git-send-email-dborkman@redhat.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 16 Sep 2014 10:00:18 +0200
+Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
+In-Reply-To: <20140915224621.GG25162@lee--X1>
+References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
+ <20140912134632.GE1930@katana>
+ <CABxcv==OXd+uePcB8zDzB-DDmr9ci6zscHX5TCauWoTO6E4fpg@mail.gmail.com>
+ <20140915224621.GG25162@lee--X1>
+Message-ID: <CABxcv=nZhBFRTTmafLxopTiX+wrOKtMD5tKf-00ysrWcZ5N5rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
-jit against spraying attacks").
+Hello Lee,
 
-Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
-support") which added necessary infrastructure, we can now implement
-RO marking of eBPF generated JIT image pages and randomize start offset
-for the JIT code, so that it does not reside directly on a page boundary
-anymore. Likewise, the holes are filled with illegal instructions: here
-we use BRK #0x100 (opcode 0xd4202000) to trigger a fault in the kernel
-(unallocated BRKs would trigger a fault through do_debug_exception). This
-seems more reliable as we don't have a guaranteed undefined instruction
-space on ARM64.
+On Tue, Sep 16, 2014 at 12:46 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 12 Sep 2014, Javier Martinez Canillas wrote:
+>> So what I propose is to do it incrementally:
+>>
+>> 1) Merge Lee's series since that is definitely a step in the right
+>> direction to not make an I2C table mandatory (still will be needed for
+>> module auto loading though).
+>>
+>> 2) On a follow-up series, make sure that all I2C drivers have a proper
+>> OF table and that are using the MODULE_DEVICE_TABLE(of,...) macro to
+>> fill the of:<foo> module aliases. That way the modules will have the
+>> proper aliases of the form "of:<foo>" besides the "i2c:<foo>" one.
+>> (even when always i2c:<foo> is reported to user-space currently).
+>>
+>> 3) Apply the patch I posted [0] that changes the behavior of
+>> i2c_device_uevent() to report the OF uevent env vars to user-space in
+>> case of DT probing which after 2) should not regress any driver module
+>> auto-loading since all drivers should fill the of:<foo> aliases.
+>
+> This sounds resonable.
+>
 
-This is basically the ARM64 variant of what we already have in ARM via
-commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
-JIT code"). Moreover, this commit also presents a merge resolution due to
-conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
-read-only") as we don't use kfree() in bpf_jit_free() anymore to release
-the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
-a different allocator.
+Ok, sounds like a plan then.
 
-JIT tested on aarch64 with BPF test suite.
+>> After this, DT-only drivers will only need an OF table and legacy
+>> drivers will only need an I2C table. Drivers that support both will
+>> still need the two tables though which is a drawback of this approach
+>> since unnecessary duplication will exist on these drivers and can
+>> cause issues when both tables are not in sync as we saw on the issue
+>> reported by Sjoerd on [1].
+>>
+>> So an alternate approach could be to do the opposite, just remove the
+>> OF tables entirely from the I2C drivers and only use the I2C table
+>> even for DT-only drivers. This is possible since i2c_device_match()
+>> will succeed even without an OF table because i2c_match_id() matches
+>> for compatible strings and what is reported as uevent is what is in
+>> the I2C table anyways. I believe that is what Sjoerd suggested but
+>> I'll let him comment on that in case I misunderstood.
+>
+> This would be really bad.  It would go completely against what I have
+> working to achieve and OF conventions.
+>
 
-Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
-Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
-Cc: Zi Shen Lim <zlim.lnx@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Alexei Starovoitov <ast@plumgrid.com>
----
- v3->v4:
-  - Inclusion into debug-monitors.h as suggested by Will
- v2->v3:
-  - Use cpu_to_le32() as suggested by Zi/Will
- v1->v2:
-  - Use brk insn as suggested by Catalin
- Note:
-  - This patch depends on net-next being merged to mainline due
-    to the mentioned merge conflict.
+Yes, I was just mentioning the two possible approaches but Sjoerd did
+a much better work on the SPI thread [0].
 
- arch/arm64/include/asm/debug-monitors.h |  8 +++++++
- arch/arm64/net/bpf_jit_comp.c           | 39 +++++++++++++++++++++++++--------
- 2 files changed, 38 insertions(+), 9 deletions(-)
+Another drawback of only using the I2C table is that the vendor prefix
+of the compatible strings are not reported to user-space. So if there
+are two devices with the same name (driven by two different drivers)
+but different vendor, these are going to be probed correctly if
+built-in but module auto-loading will fail since doesn't take into
+account the vendor prefix. This is the current status btw and I guess
+it was never noticed because there isn't two devices with the same
+name today.
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 7fb3437..230132f 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -48,9 +48,11 @@
- /*
-  * #imm16 values used for BRK instruction generation
-  * Allowed values for kgbd are 0x400 - 0x7ff
-+ * 0x100: for triggering a fault on purpose (reserved)
-  * 0x400: for dynamic BRK instruction
-  * 0x401: for compile time BRK instruction
-  */
-+#define FAULT_BRK_IMM			0x100
- #define KGDB_DYN_DGB_BRK_IMM		0x400
- #define KDBG_COMPILED_DBG_BRK_IMM	0x401
- 
-@@ -61,6 +63,12 @@
- #define AARCH64_BREAK_MON	0xd4200000
- 
- /*
-+ * BRK instruction for provoking a fault on purpose
-+ * Unlike kgdb, #imm16 value with unallocated handler is used for faulting.
-+ */
-+#define AARCH64_BREAK_FAULT	(AARCH64_BREAK_MON | (FAULT_BRK_IMM << 5))
-+
-+/*
-  * Extract byte from BRK instruction
-  */
- #define KGDB_DYN_DGB_BRK_INS_BYTE(x) \
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 7ae3354..7108895 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -19,12 +19,13 @@
- #define pr_fmt(fmt) "bpf_jit: " fmt
- 
- #include <linux/filter.h>
--#include <linux/moduleloader.h>
- #include <linux/printk.h>
- #include <linux/skbuff.h>
- #include <linux/slab.h>
-+
- #include <asm/byteorder.h>
- #include <asm/cacheflush.h>
-+#include <asm/debug-monitors.h>
- 
- #include "bpf_jit.h"
- 
-@@ -119,6 +120,14 @@ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
- 	return to - from;
- }
- 
-+static void jit_fill_hole(void *area, unsigned int size)
-+{
-+	u32 *ptr;
-+	/* We are guaranteed to have aligned memory. */
-+	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
-+		*ptr++ = cpu_to_le32(AARCH64_BREAK_FAULT);
-+}
-+
- static inline int epilogue_offset(const struct jit_ctx *ctx)
- {
- 	int to = ctx->offset[ctx->prog->len - 1];
-@@ -613,8 +622,10 @@ void bpf_jit_compile(struct bpf_prog *prog)
- 
- void bpf_int_jit_compile(struct bpf_prog *prog)
- {
-+	struct bpf_binary_header *header;
- 	struct jit_ctx ctx;
- 	int image_size;
-+	u8 *image_ptr;
- 
- 	if (!bpf_jit_enable)
- 		return;
-@@ -636,23 +647,25 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 		goto out;
- 
- 	build_prologue(&ctx);
--
- 	build_epilogue(&ctx);
- 
- 	/* Now we know the actual image size. */
- 	image_size = sizeof(u32) * ctx.idx;
--	ctx.image = module_alloc(image_size);
--	if (unlikely(ctx.image == NULL))
-+	header = bpf_jit_binary_alloc(image_size, &image_ptr,
-+				      sizeof(u32), jit_fill_hole);
-+	if (header == NULL)
- 		goto out;
- 
- 	/* 2. Now, the actual pass. */
- 
-+	ctx.image = (u32 *)image_ptr;
- 	ctx.idx = 0;
-+
- 	build_prologue(&ctx);
- 
- 	ctx.body_offset = ctx.idx;
- 	if (build_body(&ctx)) {
--		module_free(NULL, ctx.image);
-+		bpf_jit_binary_free(header);
- 		goto out;
- 	}
- 
-@@ -663,17 +676,25 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
- 		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
- 
- 	bpf_flush_icache(ctx.image, ctx.image + ctx.idx);
-+
-+	set_memory_ro((unsigned long)header, header->pages);
- 	prog->bpf_func = (void *)ctx.image;
- 	prog->jited = 1;
--
- out:
- 	kfree(ctx.offset);
- }
- 
- void bpf_jit_free(struct bpf_prog *prog)
- {
--	if (prog->jited)
--		module_free(NULL, prog->bpf_func);
-+	unsigned long addr = (unsigned long)prog->bpf_func & PAGE_MASK;
-+	struct bpf_binary_header *header = (void *)addr;
-+
-+	if (!prog->jited)
-+		goto free_filter;
-+
-+	set_memory_rw(addr, header->pages);
-+	bpf_jit_binary_free(header);
- 
--	kfree(prog);
-+free_filter:
-+	bpf_prog_unlock_free(prog);
- }
--- 
-1.9.3
+The drawback of using the OF based aliases is that many I2C drivers
+probably rely on the current behavior and don't have a proper OF table
+but IMHO that is a bug and has to be fixed anyways.
+
+Of course that doesn't mean that we shouldn't make sure that all
+drivers have a proper OF table (and using MODULE_DEVICE_TABLE) before
+changing i2c_device_uevent(). Hence my proposal to do it in 3 steps as
+explained before.
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/9/15/70
