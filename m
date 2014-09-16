@@ -1,84 +1,128 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Sep 2014 20:12:06 -0700
-Subject: [PATCH 12/12] ARM: omap2plus_defconfig: Enable some display features
-In-Reply-To: <1410837126-31553-1-git-send-email-tony@atomide.com>
-References: <1410837126-31553-1-git-send-email-tony@atomide.com>
-Message-ID: <1410837126-31553-12-git-send-email-tony@atomide.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Tue, 16 Sep 2014 11:41:24 +0800
+Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
+ i.mx6dl
+In-Reply-To: <1410774073.3314.1.camel@pengutronix.de>
+References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
+ <1410774073.3314.1.camel@pengutronix.de>
+Message-ID: <20140916034123.GA20800@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have panel support for DT based booting,
-let's make it usable and enable most things as modules.
+Hi Lucas,
+  I understood your concern,but looks we have to break old DT. Our old DT
+support SPI DMA on i.mx6q/dl(v2,b3810c3dc1bcbc6a), but the DMA support patch
+for SPI driver is still in reviewing(v6). So the violation you mentioned comes
+if someone use the DT during the time(from v2 to spi driver patch upstreamed).
+  The different behaviors on different chips(only i.mxdl can't pass strength
+test) are just found from last month, this is why I sent the patch for disable
+SPI DMA support on i.mx6dl during I sent v6 patch for spi driver. I think that's
+make sense, because DTs are also in development, new difference between different
+chips maybe found in the future although they share the same IP....
+  Yes, I can check cpu type by looking at DT in spi driver, but it's not nice.
+So I'm afraid that we have to break the old DTs in the gap between the two
+levels patch accepted cycle.
 
-Note that omap3 boards need also the ads7847 module for
-the panel that we're now changing to a loadable module.
-And n900 seems to require setting the brightness via
-sysfs for acx565akm/brightness after modprobe of
-panel_sony_acx565akm and omapfb.
-
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 113f104..c029e5e 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -157,7 +157,9 @@ CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_MATRIX=m
- CONFIG_KEYBOARD_TWL4030=y
- CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ADS7846=y
-+CONFIG_TOUCHSCREEN_ADS7846=m
-+CONFIG_TOUCHSCREEN_TSC2005=m
-+CONFIG_TOUCHSCREEN_TSC2007=m
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_TWL4030_PWRBUTTON=y
- # CONFIG_LEGACY_PTYS is not set
-@@ -220,6 +222,7 @@ CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
- CONFIG_FB_TILEBLITTING=y
- CONFIG_OMAP2_DSS=m
-+CONFIG_OMAP5_DSS_HDMI=y
- CONFIG_OMAP2_DSS_SDI=y
- CONFIG_OMAP2_DSS_DSI=y
- CONFIG_FB_OMAP2=m
-@@ -227,11 +230,25 @@ CONFIG_DISPLAY_ENCODER_TFP410=m
- CONFIG_DISPLAY_ENCODER_TPD12S015=m
- CONFIG_DISPLAY_CONNECTOR_DVI=m
- CONFIG_DISPLAY_CONNECTOR_HDMI=m
-+CONFIG_DISPLAY_CONNECTOR_ANALOG_TV=m
- CONFIG_DISPLAY_PANEL_DPI=m
-+CONFIG_DISPLAY_PANEL_DSI_CM=m
-+CONFIG_DISPLAY_PANEL_SONY_ACX565AKM=m
-+CONFIG_DISPLAY_PANEL_LGPHILIPS_LB035Q02=m
-+CONFIG_DISPLAY_PANEL_SHARP_LS037V7DW01=m
-+CONFIG_DISPLAY_PANEL_TPO_TD028TTEC1=m
-+CONFIG_DISPLAY_PANEL_TPO_TD043MTEA1=m
-+CONFIG_DISPLAY_PANEL_NEC_NL8048HL11=m
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_GENERIC=m
-+CONFIG_BACKLIGHT_PWM=m
-+CONFIG_BACKLIGHT_PANDORA=m
-+CONFIG_BACKLIGHT_GPIO=m
- CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_LOGO=y
- CONFIG_SOUND=m
-@@ -283,6 +300,9 @@ CONFIG_TI_EDMA=y
- CONFIG_DMA_OMAP=y
- CONFIG_EXTCON=y
- CONFIG_EXTCON_PALMAS=y
-+CONFIG_PWM=y
-+CONFIG_PWM_TWL=y
-+CONFIG_PWM_TWL_LED=y
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_EXT2_FS=y
--- 
-2.1.0
+On Mon, Sep 15, 2014 at 11:41:13AM +0200, Lucas Stach wrote:
+> Am Mittwoch, den 10.09.2014, 13:30 +0800 schrieb Robin Gong:
+> > There is one weird data in rxfifo after one full rx/tx transfer
+> > done sometimes. It looks a design issue and hard to workaround
+> > totally, so disable dma functhion here. And will re-enable it
+> > once the root cause found.
+> > 
+> Sorry, I'm late to this as Shawn seems to already have picked up this
+> patch, but this isn't the right way to fix the problem.
+> 
+> We made it clear at kernel summit last year that we try to not break
+> existing DTs as booting a new kernel with an old DT is a valid use case.
+> While you don't strictly violate this rule what you do here is only
+> fixing systems booting with a new DT while leaving others broken.
+> 
+> If you are working around a hardware problem please disable DMA support
+> in the driver. This will also allow you to enable it again, if you find
+> another workaround without touching the DT again.
+> 
+> So this patch gets a NAK from me.
+> 
+> > Signed-off-by: Robin Gong <b38343@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6q.dtsi   | 20 ++++++++++++++++++++
+> >  arch/arm/boot/dts/imx6qdl.dtsi |  8 --------
+> >  2 files changed, 20 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> > index e9f3646..8d5d33b 100644
+> > --- a/arch/arm/boot/dts/imx6q.dtsi
+> > +++ b/arch/arm/boot/dts/imx6q.dtsi
+> > @@ -291,6 +291,26 @@
+> >  	};
+> >  };
+> >  
+> > +&ecspi1 {
+> > +	dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
+> > +	dma-names = "rx", "tx";
+> > +};
+> > +
+> > +&ecspi2 {
+> > +	dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
+> > +	dma-names = "rx", "tx";
+> > +};
+> > +
+> > +&ecspi3 {
+> > +	dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
+> > +	dma-names = "rx", "tx";
+> > +};
+> > +
+> > +&ecspi4 {
+> > +	dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
+> > +	dma-names = "rx", "tx";
+> > +};
+> > +
+> >  &mipi_dsi {
+> >  	port at 2 {
+> >  		reg = <2>;
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> > index 70d7207..f696546 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -210,8 +210,6 @@
+> >  					clocks = <&clks IMX6QDL_CLK_ECSPI1>,
+> >  						 <&clks IMX6QDL_CLK_ECSPI1>;
+> >  					clock-names = "ipg", "per";
+> > -					dmas = <&sdma 3 7 1>, <&sdma 4 7 2>;
+> > -					dma-names = "rx", "tx";
+> >  					status = "disabled";
+> >  				};
+> >  
+> > @@ -224,8 +222,6 @@
+> >  					clocks = <&clks IMX6QDL_CLK_ECSPI2>,
+> >  						 <&clks IMX6QDL_CLK_ECSPI2>;
+> >  					clock-names = "ipg", "per";
+> > -					dmas = <&sdma 5 7 1>, <&sdma 6 7 2>;
+> > -					dma-names = "rx", "tx";
+> >  					status = "disabled";
+> >  				};
+> >  
+> > @@ -238,8 +234,6 @@
+> >  					clocks = <&clks IMX6QDL_CLK_ECSPI3>,
+> >  						 <&clks IMX6QDL_CLK_ECSPI3>;
+> >  					clock-names = "ipg", "per";
+> > -					dmas = <&sdma 7 7 1>, <&sdma 8 7 2>;
+> > -					dma-names = "rx", "tx";
+> >  					status = "disabled";
+> >  				};
+> >  
+> > @@ -252,8 +246,6 @@
+> >  					clocks = <&clks IMX6QDL_CLK_ECSPI4>,
+> >  						 <&clks IMX6QDL_CLK_ECSPI4>;
+> >  					clock-names = "ipg", "per";
+> > -					dmas = <&sdma 9 7 1>, <&sdma 10 7 2>;
+> > -					dma-names = "rx", "tx";
+> >  					status = "disabled";
+> >  				};
+> >  
+> 
+> -- 
+> Pengutronix e.K.             | Lucas Stach                 |
+> Industrial Linux Solutions   | http://www.pengutronix.de/  |
+> 
