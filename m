@@ -1,54 +1,21 @@
-From: kyle@redhat.com (Kyle McMartin)
-Date: Tue, 16 Sep 2014 17:37:18 -0400
-Subject: [PATCH] aarch64: filter $x from kallsyms
-Message-ID: <20140916213718.GR22012@redacted.bos.redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Sep 2014 14:43:17 -0700
+Subject: [PATCH v3 0/4] gpio: syscon: reuse for keystone 2 socs
+In-Reply-To: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
+References: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <CACRpkdaB7YpYjuND+Dic2eM=0OB0Sk=gGRRd7QrQj1Ze1MYXaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to ARM, AArch64 is generating $x and $d syms... which isn't
-terribly helpful when looking at %pF output and the like. Filter those
-out in kallsyms, modpost and when looking at module symbols.
+On Wed, Sep 3, 2014 at 10:05 AM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
 
-Seems simplest since none of these check EM_ARM anyway, to just add it
-to the strchr used, rather than trying to make things overly
-complicated.
+> This series intended to integrate Keystone 2 DSP GPIO controller functionality
+> into gpio-syscon driver (drivers/gpio/gpio-syscon.c) as requested
+> by Linus Walleij in [1].
 
-initcall_debug improves:
-dmesg_before.txt: initcall $x+0x0/0x154 [sg] returned 0 after 26331 usecs
-dmesg_after.txt: initcall init_sg+0x0/0x154 [sg] returned 0 after 15461 usecs
+OK no comments on DT stuff etc for two weeks, so merged patches
+1-3, the 4th you can take through the keystone git.
 
-Signed-off-by: Kyle McMartin <kyle@redhat.com>
-
---- a/kernel/module.c
-+++ b/kernel/module.c
-@@ -3388,7 +3388,7 @@ static inline int is_arm_mapping_symbol(const char *str)
- {
- 	if (str[0] == '.' && str[1] == 'L')
- 		return true;
--	return str[0] == '$' && strchr("atd", str[1])
-+	return str[0] == '$' && strchr("axtd", str[1])
- 	       && (str[2] == '\0' || str[2] == '.');
- }
- 
---- a/scripts/kallsyms.c
-+++ b/scripts/kallsyms.c
-@@ -84,7 +84,7 @@ static void usage(void)
-  */
- static inline int is_arm_mapping_symbol(const char *str)
- {
--	return str[0] == '$' && strchr("atd", str[1])
-+	return str[0] == '$' && strchr("axtd", str[1])
- 	       && (str[2] == '\0' || str[2] == '.');
- }
- 
---- a/scripts/mod/modpost.c
-+++ b/scripts/mod/modpost.c
-@@ -1146,7 +1146,7 @@ static Elf_Sym *find_elf_symbol(struct elf_info *elf, Elf64_Sword addr,
- 
- static inline int is_arm_mapping_symbol(const char *str)
- {
--	return str[0] == '$' && strchr("atd", str[1])
-+	return str[0] == '$' && strchr("axtd", str[1])
- 	       && (str[2] == '\0' || str[2] == '.');
- }
- 
+Yours,
+Linus Walleij
