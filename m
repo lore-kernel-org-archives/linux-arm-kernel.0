@@ -1,70 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 16 Sep 2014 12:40:27 +0100
-Subject: [RFC PATCH v3 0/7] Introduce automatic DMA configuration for
- IOMMU masters
-In-Reply-To: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
-Message-ID: <541821AB.8040403@arm.com>
+From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
+Date: Tue, 16 Sep 2014 13:44:44 +0200
+Subject: Exynos build failure in -next allmodconfig
+In-Reply-To: <20140915175709.GE12361@n2100.arm.linux.org.uk>
+References: <E1XTTy1-0000vT-NC@cassiel.sirena.org.uk>
+ <20140915163458.GS7960@sirena.org.uk>
+ <20140915175709.GE12361@n2100.arm.linux.org.uk>
+Message-ID: <541822AC.8040805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 15.09.2014 19:57, Russell King - ARM Linux wrote:
+> On Mon, Sep 15, 2014 at 09:34:58AM -0700, Mark Brown wrote:
+>> On Mon, Sep 15, 2014 at 11:57:09AM +0100, Build bot for Mark Brown wrote:
+>>
+>> Today's -next got a build failure in ARM allmodconfig due to platsmp.c:
+>>
+>> | arch/arm/mach-exynos/platsmp.c:198:31: warning: incorrect type in return expression (different address spaces)
+>> | arch/arm/mach-exynos/platsmp.c:198:31:    expected void [noderef] <asn:2>*
+>> | arch/arm/mach-exynos/platsmp.c:198:31:    got void *
+>> | arch/arm/mach-exynos/platsmp.c:198:31: warning: incorrect type in return expression (different address spaces)
+>> | arch/arm/mach-exynos/platsmp.c:198:31:    expected void [noderef] <asn:2>*
+>> | arch/arm/mach-exynos/platsmp.c:198:31:    got void *
+>> |   CC      arch/arm/mach-exynos/platsmp.o
+>> | /tmp/ccC9fkwF.s: Assembler messages:
+>> | /tmp/ccC9fkwF.s:423: Error: selected processor does not support ARM mode `isb '
+>> | /tmp/ccC9fkwF.s:428: Error: selected processor does not support ARM mode `isb '
+>> | /tmp/ccC9fkwF.s:429: Error: selected processor does not support ARM mode `dsb '
+>> | scripts/Makefile.build:257: recipe for target 'arch/arm/mach-exynos/platsmp.o' failed
+>>
+>> Looks like we need a compiler flags override for that file.
+>
+> Or.. the question is why a .c file is not using the proper macros.
 
-On 12/09/14 17:34, Will Deacon wrote:
-> Hi all,
->
-> Here is version three of the RFC I've previously posted here:
->
->    RFCv1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/283023.html
->    RFCv2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283752.html
->
-> Changes since RFCv2 include:
->
->    - Put the iommu_ops in iommu_data so of_iommu_configure can avoid using
->      the bus_type
->    - Initialise the offset and DMA masks on the dev in of_dma_configure
->      instead of in the arch callback (as this would cause a regression on
->      some architectures)
->    - Added deconfigure/teardown code based on ref counting the iommu_dma_mapping
->    - A bunch of small fixes (_OF_DECLARE,  some code shuffling, fix multiple
->      IOMMU parsing)
->
-> All feedback welcome. Hopefully this is now at a point where people can
-> start looking to port dma-mapping and/or IOMMU drivers to it.
->
+Actually I am the one to blame for build failure (commit: "ARM: EXYNOS: 
+Move code from hotplug.c to platsmp.c"). The problem is 
+v7_exit_coherency_flush() which I think does not make sense on ARMv6.
 
-What about AMBA devices? Playing with this on Juno and wondering why my 
-PL330 doesn't get any of_xlate callbacks, I see that 
-of_amba_device_create doesn't call of_dma_configure or anything from 
-that path. It's easy to work around by removing the arm,primecell 
-compatible, but that feels pretty dirty.
+I'll replace the ISB and DSB commands with macros but the real question 
+is whether the mach-exynos/platsmp.c file and mach-exynos directory 
+should be compiled when CONFIG_ARCH_EXYNOS is not defined?
 
-Robin.
-
-> Cheers,
->
-> Will
->
-> --->8
->
-> Will Deacon (7):
->    iommu: provide early initialisation hook for IOMMU drivers
->    dma-mapping: replace set_arch_dma_coherent_ops with arch_setup_dma_ops
->    iommu: add new iommu_ops callback for adding an OF device
->    iommu: provide helper function to configure an IOMMU for an of master
->    dma-mapping: detect and configure IOMMU in of_dma_configure
->    arm: call iommu_init before of_platform_populate
->    arm: dma-mapping: plumb our iommu mapping ops into arch_setup_dma_ops
->
->   arch/arm/include/asm/dma-mapping.h |  9 ++--
->   arch/arm/kernel/setup.c            |  2 +
->   arch/arm/mm/dma-mapping.c          | 68 ++++++++++++++++++++++++++----
->   drivers/iommu/Kconfig              |  2 +-
->   drivers/iommu/of_iommu.c           | 84 ++++++++++++++++++++++++++++++++++++++
->   drivers/of/platform.c              | 53 +++++++++++++-----------
->   include/asm-generic/vmlinux.lds.h  |  2 +
->   include/linux/dma-mapping.h        | 21 +++++++---
->   include/linux/iommu.h              | 15 +++++++
->   include/linux/of_iommu.h           | 35 ++++++++++++++++
->   10 files changed, 247 insertions(+), 44 deletions(-)
->
+Best regards,
+Krzysztof
