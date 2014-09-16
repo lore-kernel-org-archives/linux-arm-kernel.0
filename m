@@ -1,68 +1,93 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 16 Sep 2014 13:54:38 +0200
-Subject: [PATCH v2 11/18] iommu: exynos: remove useless device_add/remove
- callbacks
+Date: Tue, 16 Sep 2014 13:54:44 +0200
+Subject: [PATCH v2 17/18] iommu: exynos: init from dt-specific callback instead
+ of initcall
 In-Reply-To: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
 References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1410868485-4143-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1410868485-4143-18-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver doesn't need to do anything important in device add/remove
-callbacks, because initialization will be done from device-tree specific
-callbacks added later. IOMMU groups created by current code were never
-used.
+This patch introduces IOMMU_OF_DECLARE-based initialization to the
+driver, which replaces subsys_initcall-based procedure.
+exynos_iommu_of_setup ensures that each sysmmu controller is probed
+before its master device. 
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 28 ----------------------------
- 1 file changed, 28 deletions(-)
+ drivers/iommu/exynos-iommu.c | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index b271348a4ec1..1b3f00726cd4 100644
+index 5eb999d7653a..0d304c62956e 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -1055,32 +1055,6 @@ static phys_addr_t exynos_iommu_iova_to_phys(struct iommu_domain *domain,
- 	return phys;
- }
+@@ -13,16 +13,21 @@
+ #endif
  
--static int exynos_iommu_add_device(struct device *dev)
--{
--	struct iommu_group *group;
--	int ret;
--
--	group = iommu_group_get(dev);
--
--	if (!group) {
--		group = iommu_group_alloc();
--		if (IS_ERR(group)) {
--			dev_err(dev, "Failed to allocate IOMMU group\n");
--			return PTR_ERR(group);
--		}
--	}
--
--	ret = iommu_group_add_device(group, dev);
--	iommu_group_put(group);
--
--	return ret;
--}
--
--static void exynos_iommu_remove_device(struct device *dev)
--{
--	iommu_group_remove_device(dev);
--}
--
- static const struct iommu_ops exynos_iommu_ops = {
- 	.domain_init = exynos_iommu_domain_init,
- 	.domain_destroy = exynos_iommu_domain_destroy,
-@@ -1089,8 +1063,6 @@ static const struct iommu_ops exynos_iommu_ops = {
- 	.map = exynos_iommu_map,
- 	.unmap = exynos_iommu_unmap,
- 	.iova_to_phys = exynos_iommu_iova_to_phys,
--	.add_device = exynos_iommu_add_device,
--	.remove_device = exynos_iommu_remove_device,
+ #include <linux/clk.h>
++#include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
++#include <linux/of.h>
++#include <linux/of_iommu.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/dma-iommu.h>
+ #include <asm/pgtable.h>
+ 
+ typedef u32 sysmmu_iova_t;
+@@ -1083,6 +1088,8 @@ static const struct iommu_ops exynos_iommu_ops = {
  	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
  };
  
++static int init_done;
++
+ static int __init exynos_iommu_init(void)
+ {
+ 	int ret;
+@@ -1115,6 +1122,8 @@ static int __init exynos_iommu_init(void)
+ 		goto err_set_iommu;
+ 	}
+ 
++	init_done = true;
++
+ 	return 0;
+ err_set_iommu:
+ 	kmem_cache_free(lv2table_kmem_cache, zero_lv2_table);
+@@ -1124,4 +1133,25 @@ err_reg_driver:
+ 	kmem_cache_destroy(lv2table_kmem_cache);
+ 	return ret;
+ }
+-subsys_initcall(exynos_iommu_init);
++
++static struct iommu_data exynos_of_data = {
++	.ops = &exynos_iommu_ops,
++};
++
++static int __init exynos_iommu_of_setup(struct device_node *np)
++{
++	struct platform_device *pdev;
++
++	if (!init_done)
++		exynos_iommu_init();
++
++	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
++	if (IS_ERR(pdev))
++		return PTR_ERR(pdev);
++
++	of_iommu_set_data(np, &exynos_of_data);
++	return 0;
++}
++
++IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu",
++		 exynos_iommu_of_setup);
 -- 
 1.9.2
