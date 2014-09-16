@@ -1,46 +1,39 @@
-From: xuwei5@hisilicon.com (xuwei)
-Date: Tue, 16 Sep 2014 14:22:54 +0800
-Subject: [GIT PULL][for 3.18]pull request for hisilicon hix5hd2 soc dt updates
-Message-ID: <5417D73E.8080309@hisilicon.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 16 Sep 2014 08:40:40 +0200
+Subject: [PATCH v4 1/3] ahci-platform: Bump max number of clocks to 5
+In-Reply-To: <FDA51DE0-3F2C-48E3-81B7-5F2ABCEE6F61@codeaurora.org>
+References: <1410277008-20242-1-git-send-email-galak@codeaurora.org>
+ <FDA51DE0-3F2C-48E3-81B7-5F2ABCEE6F61@codeaurora.org>
+Message-ID: <5417DB68.8050108@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+Hi,
 
-Please help to merge pull request for hisilicon hix5hd2 soc dt updates for 3.18. 
-Thanks!
+On 09/16/2014 04:09 AM, Kumar Gala wrote:
+> 
+> On Sep 9, 2014, at 8:36 AM, Kumar Gala <galak@codeaurora.org> wrote:
+> 
+>> Qualcomm IPQ806x SoCs with SATA controllers need 5 clocks to be enabled.
+>>
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>> ---
+>> (reposted with Hans on list)
+>>
+>> v4:
+>> * Updated to upstream changes
+>>
+>> drivers/ata/ahci.h | 2 +-
+>> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Any updates on these patches?
 
-Best Regards,
-Wei
+I send you a detailed review of this on 9 September, titled:
 
+"Re: [PATCH v4 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host controller driver"
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+I'll forward you that mail again right now.
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+Regards,
 
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-dt-for-3.18
-
-for you to fetch changes up to 610bd8722ef40b649b51f01045c5d1903f41b583:
-
-  ARM: dts: hix5hd2: add wdg node (2014-09-16 11:00:43 +0800)
-
-----------------------------------------------------------------
-ARM: DT:  Hisilicon terminal SoC HiX5HD2 DT updates for 3.18
-
-- Add watchdog, gpio, sata, usb, mmc and gmac nodes in HiX5HD2 SoC DT
-- Enable sata and gmac in HiX5HD2 dkb board DT
-
-----------------------------------------------------------------
-Zhangfei Gao (6):
-      ARM: dts: hix5hd2: add gmac node
-      ARM: dts: hix5hd2: add mmc node
-      ARM: dts: hix5hd2: add usb node
-      ARM: dts: hix5hd2: add sata node
-      ARM: dts: hix5hd2: add gpio node
-      ARM: dts: hix5hd2: add wdg node
-
- arch/arm/boot/dts/hisi-x5hd2-dkb.dts |  33 +++++++++++++++
- arch/arm/boot/dts/hisi-x5hd2.dtsi    | 310 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 343 insertions(+)
+Hans
