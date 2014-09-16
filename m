@@ -1,29 +1,40 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 16 Sep 2014 17:24:16 -0400
-Subject: [RFC] arm: Handle starting up in secure mode
-In-Reply-To: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
-References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
-Message-ID: <5418AA80.4090102@codeaurora.org>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 16 Sep 2014 16:24:20 -0500
+Subject: [Patch net-next v2 4/4] net: fec: Workaround for imx6sx enet tx
+ hang when enable three queues
+In-Reply-To: <CAOMZO5DnmHBaDr7RzozJoBsuEY=bzmusKcfJQ4NjCyD4+13=Tg@mail.gmail.com>
+References: <1410890290-11248-1-git-send-email-Frank.Li@freescale.com>
+ <1410890290-11248-5-git-send-email-Frank.Li@freescale.com>
+ <CAOMZO5DnmHBaDr7RzozJoBsuEY=bzmusKcfJQ4NjCyD4+13=Tg@mail.gmail.com>
+Message-ID: <CAHrpEqRnFLUSyKk+1-0Os0XgJ0X0aSOsL-mEYpxBPqBem3Zt9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 05:09 PM, Christopher Covington wrote:
-> ARM Linux currently has the most features available to it in hypervisor
-> (HYP) mode, so switch to it when possible. This can also ensure proper
-> reset of newer registers such as CNTVOFF.
-> 
-> The permissions on the Non-Secure Access Control Register (NSACR) are
-> used to probe what the security setting currently is when in supervisor
-> (SVC) mode.
+On Tue, Sep 16, 2014 at 3:52 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Tue, Sep 16, 2014 at 2:58 PM,  <Frank.Li@freescale.com> wrote:
+>> From: Fugang Duan <B38611@freescale.com>
+>>
+>> When enable three queues on imx6sx enet, and then do tx performance
+>> test with iperf tool, after some time running, tx hang.
+>>
+>> Found that:
+>>         If uDMA is running, software set TDAR may cause tx hang.
+>>         If uDMA is in idle, software set TDAR don't cause tx hang.
+>>
+>> There is a TDAR race condition for mutliQ when the software sets TDAR
+>> and the UDMA clears TDAR simultaneously or in a small window (2-4 cycles).
+>> This will cause the udma_tx and udma_tx_arbiter state machines to hang.
+>> The issue exist at i.MX6SX enet IP.
+>>
+>> So, the Workaround is checking TDAR status four time, if TDAR cleared by
+>> hardware and then write TDAR, otherwise don't set TDAR.
+>>
+>> The patch is only one Workaround for the issue TKT210582.
+>
+> As Shawn pointed out, it is better to use the ERR007885 instead of an
+> internal bug numbering.
 
-Sorry, this doesn't work yet. I was misinterpreting my test results. For what
-it's worth, my testing and development methodology is to run it after hacked
-up versions of the semihosting bootwrapper on the simulator that corresponds
-to rtsm_ve-aemv8a.dtb (AEM VE FVP these days?) and examine the instruction traces.
+Sorry, I forget change commit message.
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+best regards
+Frank Li
