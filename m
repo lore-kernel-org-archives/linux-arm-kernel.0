@@ -1,29 +1,52 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Sep 2014 23:56:03 -0500
-Subject: [PATCH 08/12] ARM: omap2plus_defconfig: Shrink with savedefconfig
-In-Reply-To: <1410837126-31553-8-git-send-email-tony@atomide.com>
-References: <1410837126-31553-1-git-send-email-tony@atomide.com>
- <1410837126-31553-8-git-send-email-tony@atomide.com>
-Message-ID: <20140916045603.GA10498@saruman.home>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 16 Sep 2014 13:09:30 +0800
+Subject: [RFC] change keep_initrd and free_initrd_mem into .init section
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160E@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+this patch change keep_initrd to __initdata section,
+and free_initrd_mem to __init section so that they can be freed by
+free_initmem, free_initrd_mem is only called by free_initrd function,
+so it's safe to free it after use.
 
-On Mon, Sep 15, 2014 at 08:12:02PM -0700, Tony Lindgren wrote:
-> This saves few lines and makes it easier to make patches
-> against omap2plus_defconfig.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+---
+ arch/arm/mm/init.c   | 4 ++--
+ arch/arm64/mm/init.c | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-while at that, can you enable voluntary preemption ?
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 659c75d..907dee1 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -631,9 +631,9 @@ void free_initmem(void)
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 
+-static int keep_initrd;
++static int __initdata keep_initrd;
+ 
+-void free_initrd_mem(unsigned long start, unsigned long end)
++void __init free_initrd_mem(unsigned long start, unsigned long end)
+ {
+ 	if (!keep_initrd) {
+ 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 5472c24..7268d57 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -330,9 +330,9 @@ void free_initmem(void)
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 
+-static int keep_initrd;
++static int __initdata keep_initrd;
+ 
+-void free_initrd_mem(unsigned long start, unsigned long end)
++void __init free_initrd_mem(unsigned long start, unsigned long end)
+ {
+ 	if (!keep_initrd)
+ 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140915/8da29687/attachment.sig>
+2.1.0
