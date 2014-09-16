@@ -1,64 +1,44 @@
-From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Tue, 16 Sep 2014 11:09:24 +0300
-Subject: [PATCH v3 4/4] ASoC: tlv320aic3x: fix PLL D configuration
-In-Reply-To: <1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1410854964-26573-1-git-send-email-d.lavnikevich@sam-solutions.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 Sep 2014 16:12:45 +0800
+Subject: [PATCH v2 0/2] clk: sun8i: Add MBUS support
+Message-ID: <1410855167-1121-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current caching implementation during regcache_sync() call bypasses
-all register writes of values that are already known as default
-(regmap reg_defaults). Same time in TLV320AIC3x codecs register 5
-(AIC3X_PLL_PROGC_REG) write should be immediately followed by register
-6 write (AIC3X_PLL_PROGD_REG) even if it was not changed. Otherwise
-both registers will not be written.
+Hi,
 
-This brings to issue that appears particulary in case of 44.1kHz
-playback with 19.2MHz master clock. In this case AIC3X_PLL_PROGC_REG
-is 0x6e while AIC3X_PLL_PROGD_REG is 0x0 (same as register
-default). Thus AIC3X_PLL_PROGC_REG also remains not written and we get
-wrong playback speed.
+This is v2 of my sun8i MBUS clock series.
 
-In this patch snd_soc_read() is used to get cached pll values and
-snd_soc_write() (unlike regcache_sync() this function doesn't bypasses
-hardware default values) to write them to registers.
+This series depends on Maxime's "clk: sunxi: Improve MMC clocks support"
+series, specifically the patches that change the factor clocks and move
+out mod0 and mbus. Ideally this series should also be merged after my
+"clk: sun6i: Unify AHB1 clock and fix rate calculation" for the PLL6
+corrections, but I don't think it would cause any issues if it didn't.
 
-Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
----
- sound/soc/codecs/tlv320aic3x.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Patch 1 adds the sun8i specific MBUS clock driver.
 
-diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
-index 64f179ee9834..5e8626ae612b 100644
---- a/sound/soc/codecs/tlv320aic3x.c
-+++ b/sound/soc/codecs/tlv320aic3x.c
-@@ -1121,6 +1121,7 @@ static int aic3x_regulator_event(struct notifier_block *nb,
- static int aic3x_set_power(struct snd_soc_codec *codec, int power)
- {
- 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
-+	unsigned int pll_c, pll_d;
- 	int ret;
- 
- 	if (power) {
-@@ -1138,6 +1139,18 @@ static int aic3x_set_power(struct snd_soc_codec *codec, int power)
- 		/* Sync reg_cache with the hardware */
- 		regcache_cache_only(aic3x->regmap, false);
- 		regcache_sync(aic3x->regmap);
-+
-+		/* Rewrite paired PLL D registers in case cached sync skipped
-+		 * writing one of them and thus caused other one also not
-+		 * being written
-+		 */
-+		pll_c = snd_soc_read(codec, AIC3X_PLL_PROGC_REG);
-+		pll_d = snd_soc_read(codec, AIC3X_PLL_PROGD_REG);
-+		if (pll_c == aic3x_reg[AIC3X_PLL_PROGC_REG].def ||
-+			pll_d == aic3x_reg[AIC3X_PLL_PROGD_REG].def) {
-+			snd_soc_write(codec, AIC3X_PLL_PROGC_REG, pll_c);
-+			snd_soc_write(codec, AIC3X_PLL_PROGD_REG, pll_d);
-+		}
- 	} else {
- 		/*
- 		 * Do soft reset to this codec instance in order to clear
+Patch 2 adds proper PLL6 and MBUS clock nodes to the DT, with a dummy
+PLL5 clock node as a parent to MBUS.
+
+Changes since v1:
+  - Added commit message to patch 1
+  - Moved sun8i-mbus clk to separate file
+
+
+Cheers
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  clk: sunxi: Add sun8i MBUS clock support
+  ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
+ arch/arm/boot/dts/sun8i-a23.dtsi                  | 29 ++++++++-
+ drivers/clk/sunxi/Makefile                        |  1 +
+ drivers/clk/sunxi/clk-sun8i-mbus.c                | 76 +++++++++++++++++++++++
+ 4 files changed, 105 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-sun8i-mbus.c
+
 -- 
 2.1.0
