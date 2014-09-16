@@ -1,44 +1,71 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 16 Sep 2014 16:12:45 +0800
-Subject: [PATCH v2 0/2] clk: sun8i: Add MBUS support
-Message-ID: <1410855167-1121-1-git-send-email-wens@csie.org>
+Date: Tue, 16 Sep 2014 16:12:47 +0800
+Subject: [PATCH v2 2/2] ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
+In-Reply-To: <1410855167-1121-1-git-send-email-wens@csie.org>
+References: <1410855167-1121-1-git-send-email-wens@csie.org>
+Message-ID: <1410855167-1121-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now that the clock driver supports PLL6 and MBUS on sun8i correctly,
+add the corresponding clock nodes to the dtsi.
 
-This is v2 of my sun8i MBUS clock series.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23.dtsi | 29 +++++++++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
 
-This series depends on Maxime's "clk: sunxi: Improve MMC clocks support"
-series, specifically the patches that change the factor clocks and move
-out mod0 and mbus. Ideally this series should also be merged after my
-"clk: sun6i: Unify AHB1 clock and fix rate calculation" for the PLL6
-corrections, but I don't think it would cause any issues if it didn't.
-
-Patch 1 adds the sun8i specific MBUS clock driver.
-
-Patch 2 adds proper PLL6 and MBUS clock nodes to the DT, with a dummy
-PLL5 clock node as a parent to MBUS.
-
-Changes since v1:
-  - Added commit message to patch 1
-  - Moved sun8i-mbus clk to separate file
-
-
-Cheers
-ChenYu
-
-
-Chen-Yu Tsai (2):
-  clk: sunxi: Add sun8i MBUS clock support
-  ARM: dts: sun8i: Add PLL6 and MBUS clock nodes
-
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- arch/arm/boot/dts/sun8i-a23.dtsi                  | 29 ++++++++-
- drivers/clk/sunxi/Makefile                        |  1 +
- drivers/clk/sunxi/clk-sun8i-mbus.c                | 76 +++++++++++++++++++++++
- 4 files changed, 105 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-sun8i-mbus.c
-
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index fc0d023..c32091e 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -74,13 +74,30 @@
+ 		};
+ 
+ 		/* dummy clock until actually implemented */
+-		pll6: pll6_clk {
++		pll5: pll5_clk {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+-			clock-frequency = <600000000>;
++			clock-frequency = <0>;
++			clock-output-names = "pll5";
++		};
++
++		pll6: clk at 01c20028 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun6i-a31-pll6-clk";
++			reg = <0x01c20028 0x4>;
++			clocks = <&osc24M>;
+ 			clock-output-names = "pll6";
+ 		};
+ 
++		pll6x2: pll6x2_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clock-div = <1>;
++			clock-mult = <2>;
++			clocks = <&pll6>;
++			clock-output-names = "pll6x2";
++		};
++
+ 		cpu: cpu_clk at 01c20050 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-cpu-clk";
+@@ -243,6 +260,14 @@
+ 			clocks = <&mmc2_clk>;
+ 			clock-output-names = "mmc2_sample";
+ 		};
++
++		mbus_clk: clk at 01c2015c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun8i-a23-mbus-clk";
++			reg = <0x01c2015c 0x4>;
++			clocks = <&osc24M>, <&pll6x2>, <&pll5>;
++			clock-output-names = "mbus";
++		};
+ 	};
+ 
+ 	soc at 01c00000 {
 -- 
 2.1.0
