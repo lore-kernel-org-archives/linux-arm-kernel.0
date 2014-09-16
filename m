@@ -1,85 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 16 Sep 2014 20:17:06 +0200
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <1410360473732.53953@freescale.com>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <201409051240.44469.marex@denx.de> <1410360473732.53953@freescale.com>
-Message-ID: <201409162017.06439.marex@denx.de>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 16 Sep 2014 13:08:55 -0700
+Subject: [PATCH 1/8] arm: Convert pr_warning to pr_warn
+In-Reply-To: <20140916195737.GO12361@n2100.arm.linux.org.uk>
+References: <cover.1410632834.git.joe@perches.com>
+ <7995478e8c658478cd37dabb996f7269405251ac.1410632835.git.joe@perches.com>
+ <20140915155656.GA29744@arm.com>
+ <20140916160759.GJ12361@n2100.arm.linux.org.uk>
+ <1410884281.16519.2.camel@joe-AO725>
+ <20140916195737.GO12361@n2100.arm.linux.org.uk>
+Message-ID: <1410898135.16519.14.camel@joe-AO725>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 10, 2014 at 04:48:01 PM, Yao Yuan wrote:
-> On Friday, September 05, 2014 6:41 PM, Marek Vasut wrote:
-> > On Friday, September 05, 2014 at 12:32:40 PM, Yao Yuan wrote:
-> > [...]
+On Tue, 2014-09-16 at 20:57 +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 16, 2014 at 09:18:01AM -0700, Joe Perches wrote:
+> > On Tue, 2014-09-16 at 17:07 +0100, Russell King - ARM Linux wrote:
+> > > any chance you could add a KernelVersion: tag somewhere in the
+> > > commit message and throw it at patches at arm.linux.org.uk so it doesn't
+> > > get lost?
 > > 
-> > > > > +static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
-> > > > > +					struct i2c_msg *msgs)
-> > > > > +{
-> > > > > +	int result;
-> > > > > +	unsigned int temp = 0;
-> > > > > +	unsigned long orig_jiffies = jiffies;
-> > > > > +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> > > > > +	struct device *dev = &i2c_imx->adapter.dev;
-> > > > > +
-> > > > > +	dev_dbg(dev, "<%s> write slave address: addr=0x%x\n",
-> > > > > +		__func__, msgs->addr << 1);
-> > > > > +
-> > > > > +	reinit_completion(&i2c_imx->dma->cmd_complete);
-> > > > > +	dma->chan_using = dma->chan_tx;
-> > > > > +	dma->dma_transfer_dir = DMA_MEM_TO_DEV;
-> > > > > +	dma->dma_data_dir = DMA_TO_DEVICE;
-> > > > > +	dma->dma_len = msgs->len - 1;
-> > > > > +	result = i2c_imx_dma_xfer(i2c_imx, msgs);
-> > > > > +	if (result)
-> > > > > +		return result;
-> > > > > +
-> > > > > +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> > > > > +	temp |= I2CR_DMAEN;
-> > > > > +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> > > > > +
-> > > > > +	/*
-> > > > > +	 * Write slave address.
-> > > > > +	 * The first byte muse be transmitted by the CPU.
-> > > > > +	 */
-> > > > > +	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> > > > > +	result = wait_for_completion_interruptible_timeout(
-> > > > > +				&i2c_imx->dma->cmd_complete,
-> > > > > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> > > > > +	if (result <= 0) {
-> > > > > +		dmaengine_terminate_all(dma->chan_using);
-> > > > > +		if (result)
-> > > > > +			return result;
-> > > > > +		else
-> > > > > +			return -ETIMEDOUT;
-> > > > 
-> > > > Shouldn't you force-disable the DMA here somehow (like unsetting
-> > > > I2CR_DMAEN bit), if it failed or timed out?
-> > > 
-> > > [Yuan Yao] Yes, I put the code for force-disable DMA in
-> > > i2c_imx_start(). In order to make sure any DMA error will not effect
-> > > the I2C.
-> > > It seems almost the same as put the code here, how about your think?
-> > 
-> > Would that mean that the "crashed" DMA would be running until the next
-> > transmission is scheduled ?
+> > There are no commit logs with a KernelVersion: tag
+> > in all of git history.
 > 
-> [Yuan Yao] No, In fact any DMA timeout will result the failure of I2C
-> transmission and then it will turn to report the exception and wait for
-> next transmission.
+> Right, that's not it's purpose.
+> 
+> > What do you think a KernelVersion: tag is and what
+> > would it be used for?
+> 
+> It's for that email address to know which kernel version the patch
+> was generated against, which is useful information when I come to
+> apply it.  It gets filtered out from the commit message.  It can go
+> anywhere, even below the -- line.
 
-Can you tell when the next transmission will happen? What if I issue a single 
-transmission and that one fails ? Will the DMA run until who knows when ?
+> If you don't want to cooperate, you will have to rely on my notoriously
+> bad email skills to scan the mailing list for random patches to apply
+> some time (maybe days or even weeks) later after you send your message.
+> Which just won't happen.  It's why I wrote scripts which are some 20
+> years old to solve my bad email patch handling skills.
 
-> The only thing I worried about is I2C may still receive
-> some feedbacks after DMA timeout. In this case the feedbacks may lead to
-> abnormal state in PIO mode.But it will be ignored in DMA model.
-> That's why I tend to delay force-disable DMA until the next transmission
-> begin. Could you please give me some suggestion?
+I received your patchbot's reply about 15 minutes
+before you sent this.
 
-No, this design just seems flawed to me. You should stop the DMA immediatelly if 
-there is an error to avoid wasting resources and prevent possible other adverse 
-effects.
+I suggest you might move one year to patchwork
+(ie: https://patchwork.kernel.org/project/linux-arm-kernel/list/)
+and adapt that as necessary, but whatever works
+for you.
 
-Best regards,
-Marek Vasut
+btw:
+
+patches at arm.linux.org.uk is not documented at all
+in the kernel sources.  You could fix that if you
+want other people to know what you do.
