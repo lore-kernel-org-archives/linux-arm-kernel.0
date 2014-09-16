@@ -1,95 +1,84 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Sep 2014 20:12:04 -0700
-Subject: [PATCH 10/12] ARM: omap2plus_defconfig: Add support for distros with
- systemd
+Date: Mon, 15 Sep 2014 20:12:06 -0700
+Subject: [PATCH 12/12] ARM: omap2plus_defconfig: Enable some display features
 In-Reply-To: <1410837126-31553-1-git-send-email-tony@atomide.com>
 References: <1410837126-31553-1-git-send-email-tony@atomide.com>
-Message-ID: <1410837126-31553-10-git-send-email-tony@atomide.com>
+Message-ID: <1410837126-31553-12-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some distros are now using systemd, so let's enable most of
-what's recommended at:
+Now that we have panel support for DT based booting,
+let's make it usable and enable most things as modules.
 
-http://cgit.freedesktop.org/systemd/systemd/tree/README
+Note that omap3 boards need also the ads7847 module for
+the panel that we're now changing to a loadable module.
+And n900 seems to require setting the brightness via
+sysfs for acx565akm/brightness after modprobe of
+panel_sony_acx565akm and omapfb.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/configs/omap2plus_defconfig | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ arch/arm/configs/omap2plus_defconfig | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 9d232a5..8e6c363 100644
+index 113f104..c029e5e 100644
 --- a/arch/arm/configs/omap2plus_defconfig
 +++ b/arch/arm/configs/omap2plus_defconfig
-@@ -1,11 +1,28 @@
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
-+CONFIG_FHANDLE=y
-+CONFIG_AUDIT=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BSD_PROCESS_ACCT=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_CGROUPS=y
-+CONFIG_CGROUP_FREEZER=y
-+CONFIG_CGROUP_DEVICE=y
-+CONFIG_CPUSETS=y
-+CONFIG_CGROUP_CPUACCT=y
-+CONFIG_RESOURCE_COUNTERS=y
-+CONFIG_MEMCG=y
-+CONFIG_MEMCG_SWAP=y
-+CONFIG_MEMCG_KMEM=y
-+CONFIG_CGROUP_PERF=y
-+CONFIG_CGROUP_SCHED=y
-+CONFIG_CFS_BANDWIDTH=y
-+CONFIG_RT_GROUP_SCHED=y
-+CONFIG_BLK_CGROUP=y
-+CONFIG_NAMESPACES=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_EXPERT=y
- CONFIG_SLAB=y
-@@ -37,6 +54,7 @@ CONFIG_ARM_ERRATA_411920=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_CMA=y
-+CONFIG_SECCOMP=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-@@ -66,7 +84,7 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
- # CONFIG_INET_LRO is not set
--# CONFIG_IPV6 is not set
-+CONFIG_IPV6=y
- CONFIG_NETFILTER=y
- CONFIG_CAN=m
- CONFIG_CAN_C_CAN=m
-@@ -80,7 +98,6 @@ CONFIG_BT_HCIBCM203X=m
- CONFIG_BT_HCIBPA10X=m
- CONFIG_CFG80211=m
- CONFIG_MAC80211=m
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
-@@ -265,11 +282,14 @@ CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
- CONFIG_EXT4_FS=y
-+CONFIG_FANOTIFY=y
- CONFIG_QUOTA=y
- CONFIG_QFMT_V2=y
-+CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
- CONFIG_JFFS2_FS_XATTR=y
+@@ -157,7 +157,9 @@ CONFIG_KEYBOARD_GPIO=y
+ CONFIG_KEYBOARD_MATRIX=m
+ CONFIG_KEYBOARD_TWL4030=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_ADS7846=y
++CONFIG_TOUCHSCREEN_ADS7846=m
++CONFIG_TOUCHSCREEN_TSC2005=m
++CONFIG_TOUCHSCREEN_TSC2007=m
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_TWL4030_PWRBUTTON=y
+ # CONFIG_LEGACY_PTYS is not set
+@@ -220,6 +222,7 @@ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_FB_TILEBLITTING=y
+ CONFIG_OMAP2_DSS=m
++CONFIG_OMAP5_DSS_HDMI=y
+ CONFIG_OMAP2_DSS_SDI=y
+ CONFIG_OMAP2_DSS_DSI=y
+ CONFIG_FB_OMAP2=m
+@@ -227,11 +230,25 @@ CONFIG_DISPLAY_ENCODER_TFP410=m
+ CONFIG_DISPLAY_ENCODER_TPD12S015=m
+ CONFIG_DISPLAY_CONNECTOR_DVI=m
+ CONFIG_DISPLAY_CONNECTOR_HDMI=m
++CONFIG_DISPLAY_CONNECTOR_ANALOG_TV=m
+ CONFIG_DISPLAY_PANEL_DPI=m
++CONFIG_DISPLAY_PANEL_DSI_CM=m
++CONFIG_DISPLAY_PANEL_SONY_ACX565AKM=m
++CONFIG_DISPLAY_PANEL_LGPHILIPS_LB035Q02=m
++CONFIG_DISPLAY_PANEL_SHARP_LS037V7DW01=m
++CONFIG_DISPLAY_PANEL_TPO_TD028TTEC1=m
++CONFIG_DISPLAY_PANEL_TPO_TD043MTEA1=m
++CONFIG_DISPLAY_PANEL_NEC_NL8048HL11=m
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_PLATFORM=y
++CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_GENERIC=m
++CONFIG_BACKLIGHT_PWM=m
++CONFIG_BACKLIGHT_PANDORA=m
++CONFIG_BACKLIGHT_GPIO=m
+ CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=m
+@@ -283,6 +300,9 @@ CONFIG_TI_EDMA=y
+ CONFIG_DMA_OMAP=y
+ CONFIG_EXTCON=y
+ CONFIG_EXTCON_PALMAS=y
++CONFIG_PWM=y
++CONFIG_PWM_TWL=y
++CONFIG_PWM_TWL_LED=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_EXT2_FS=y
 -- 
 2.1.0
