@@ -1,69 +1,55 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 16 Sep 2014 20:48:54 +0200
-Subject: [PATCH/RFC v2 07/12] ARM: shmobile: R-Mobile: Use
- generic_pm_domain.attach_dev() for pm_clk setup
+Date: Tue, 16 Sep 2014 20:48:53 +0200
+Subject: [PATCH/RFC v2 06/12] PM / Domains: Retrieve PM QoS device latencies
+ from DT
 In-Reply-To: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
 References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1410893339-6361-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <1410893339-6361-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Use the just introduced genpd attach/detach callbacks to register the
-devices' module clocks, instead of doing it directly, to make it
-DT-proof.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
   - New
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ drivers/base/power/domain.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 717e6413d29cb998..4c8e47179fdd333b 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -101,6 +101,22 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
- 	return true;
- }
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e1cbde985d4de606..7b166911be541229 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2133,6 +2133,8 @@ int genpd_dev_pm_attach(struct device *dev)
+ 	struct device_node *np = dev->of_node;
+ 	struct of_phandle_args pd_args;
+ 	struct generic_pm_domain *pd;
++	struct gpd_timing_data td;
++	u32 latency;
+ 	int ret;
  
-+static int rmobile_pd_attach_dev(struct generic_pm_domain *genpd,
-+				 struct device *dev)
-+{
-+	if (pm_clk_no_clocks(dev))
-+		pm_clk_add(dev, NULL);
+ 	if (!np)
+@@ -2165,10 +2167,20 @@ int genpd_dev_pm_attach(struct device *dev)
+ 		return PTR_ERR(pd);
+ 	}
+ 
++	memset(&td, 0, sizeof(td));
++	if (!of_property_read_u32(np, "stop-latency", &latency))
++		td.stop_latency_ns = latency;
++	if (!of_property_read_u32(np, "start-latency", &latency))
++		td.start_latency_ns = latency;
++	if (!of_property_read_u32(np, "save-state-latency", &latency))
++		td.save_state_latency_ns = latency;
++	if (!of_property_read_u32(np, "restore-state-latency", &latency))
++		td.restore_state_latency_ns = latency;
 +
-+	return 0;
-+}
-+
-+static int rmobile_pd_detach_dev(struct generic_pm_domain *genpd,
-+				 struct device *dev)
-+{
-+	pm_clk_remove(dev, NULL);
-+	return 0;
-+}
-+
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- {
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
-@@ -112,6 +128,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
-+	genpd->attach_dev		= rmobile_pd_attach_dev;
-+	genpd->detach_dev		= rmobile_pd_detach_dev;
- 	__rmobile_pd_power_up(rmobile_pd, false);
- }
+ 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
  
-@@ -130,8 +148,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
- 	struct device *dev = &pdev->dev;
- 
- 	__pm_genpd_name_add_device(domain_name, dev, td);
--	if (pm_clk_no_clocks(dev))
--		pm_clk_add(dev, NULL);
- }
- 
- void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+ 	while (1) {
+-		ret = pm_genpd_add_device(pd, dev);
++		ret = __pm_genpd_add_device(pd, dev, &td);
+ 		if (ret != -EAGAIN)
+ 			break;
+ 		cond_resched();
 -- 
 1.9.1
