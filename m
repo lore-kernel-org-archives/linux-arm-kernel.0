@@ -1,228 +1,98 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Tue, 16 Sep 2014 16:51:11 -0700
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <5418C498.8030208@wwwdotorg.org>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
- <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
- <CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>
- <CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>
- <CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>
- <54172B3F.9030901@wwwdotorg.org>
- <CAL1qeaEK=C4j+G5CA_91xJNe25d=-y47EyZAYnaMh46fNYVDAw@mail.gmail.com>
- <54185698.7020600@wwwdotorg.org>
- <CAL1qeaGf6JSuq=ekZY7Pp2zSAB0+0S9fZ70xWpct2MJ=pTSmug@mail.gmail.com>
- <CAL1qeaHms021HBTBCnSkcBCHnCVYC0CnSD=JbBWFo_ZN4AKpOw@mail.gmail.com>
- <5418C498.8030208@wwwdotorg.org>
-Message-ID: <CAL1qeaHhabYHN6B5xCUf-y+ZuEWEBpURDPfmjY=KMpmUbuTg5w@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 16 Sep 2014 16:57:48 -0700
+Subject: [PATCH v11 0/9] arm: Fix DEBUG_LL for multi-platform kernels (without
+ PL01X)
+Message-ID: <1410911877-24903-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 4:15 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/16/2014 04:46 PM, Andrew Bresticker wrote:
->>
->> On Tue, Sep 16, 2014 at 9:57 AM, Andrew Bresticker
->> <abrestic@chromium.org> wrote:
->>>
->>> On Tue, Sep 16, 2014 at 8:26 AM, Stephen Warren <swarren@wwwdotorg.org>
->>> wrote:
->>>>
->>>> On 09/15/2014 01:30 PM, Andrew Bresticker wrote:
->>>>>
->>>>>
->>>>> On Mon, Sep 15, 2014 at 11:09 AM, Stephen Warren
->>>>> <swarren@wwwdotorg.org>
->>>>> wrote:
->>>>>>
->>>>>>
->>>>>> On 09/15/2014 11:06 AM, Andrew Bresticker wrote:
->>>>>>>
->>>>>>>
->>>>>>> On Mon, Sep 15, 2014 at 12:00 AM, Tomeu Vizoso
->>>>>>> <tomeu@tomeuvizoso.net>
->>>>>>> wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> On 12 September 2014 18:37, Andrew Bresticker
->>>>>>>> <abrestic@chromium.org>
->>>>>>>> wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso
->>>>>>>>> <tomeu@tomeuvizoso.net>
->>>>>>>>> wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> On 8 September 2014 18:22, Andrew Bresticker
->>>>>>>>>> <abrestic@chromium.org>
->>>>>>>>>> wrote:
->>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso
->>>>>>>>>>> <tomeu@tomeuvizoso.net>
->>>>>>>>>>> wrote:
->>>>>>>>>>>>
->>>>>>>>>>>>
->>>>>>>>>>>> On 2 September 2014 23:34, Andrew Bresticker
->>>>>>>>>>>> <abrestic@chromium.org> wrote:
->>>>>>>>>>>>>
->>>>>>>>>>>>>
->>>>>>>>>>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0
->>>>>>>>>>>>> and
->>>>>>>>>>>>> USB3.0 memory sticks and ethernet dongles using controller
->>>>>>>>>>>>> firmware
->>>>>>>>>>>>> recently posted by Andrew Chew [2].
->>>>
->>>>
->>>> ...
->>>>>>>
->>>>>>>
->>>>>>> Stephen, Thierry, have either of you had a chance to test this
->>>>>>> series?
->>>>>>
->>>>>>
->>>>>>
->>>>>> I haven't had a chance to yet. I just went to try it out, and found
->>>>>> that
->>>>>> it
->>>>>> depends on a whole slew of other patches that I don't have. Is there a
->>>>>> git
->>>>>> branch somewhere to save me having to track down all the dependencies?
->>>>>
->>>>>
->>>>>
->>>>> Yes, Tomeu has the branch he used for testing here:
->>>>> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=3.17rc4-xhci
->>>>
->>>>
->>>>
->>>> Hmm. That git server was quite reluctant to cough up its bits, but it
->>>> did
->>>> eventually.
->>>>
->>>>> You'll also need the firmware Andrew Chew posted:
->>>>> https://patchwork.ozlabs.org/patch/384013/
->>>>
->>>>
->>>>
->>>> The XHCI driver can't load its firmware unless it's a module; if I make
->>>> it
->>>> built-in, it fails immediately with error -2 during "Direct firmware
->>>> loading". The driver needs to work with either immediate or deferred
->>>> firmware loading.
->>>
->>>
->>> If you want the driver to be built-in, you'll either need to build the
->>> firmware in as well (i.e. EXTRA_FIRMWARE) or enable
->>> FW_LOADER_USER_HELPER_FALLBACK to load with userspace/uevent (though
->>> apparently this is deprecated).
->>>
->>>> The following USB2 devices had problems:
->>>>
->>>> 0b95:7720 ASIX Electronics Corp. AX88772
->>>>
->>>>> [  489.140536] usb 1-3: new high-speed USB device number 81 using
->>>>> xhci-tegra
->>>>> [  489.260860] usb 1-3: device descriptor read/64, error -71
->>>>> [  489.370804] xhci-tegra 70090000.usb: Setup ERROR: setup context
->>>>> command
->>>>> for slot 1.
->>>>> [  489.378463] usb 1-3: hub failed to enable device, error -22
->>>>> [  489.500531] usb 1-3: new high-speed USB device number 82 using
->>>>> xhci-tegra
->>>>> [  489.655708] usb 1-3: can't set config #1, error -71
->>>>> [  489.661231] usb 1-3: USB disconnect, device number 82
->>>>> [  489.940531] usb 1-3: new high-speed USB device number 83 using
->>>>> xhci-tegra
->>>>> [  490.060860] usb 1-3: device descriptor read/64, error -71
->>>>> [  490.170805] xhci-tegra 70090000.usb: Setup ERROR: setup context
->>>>> command
->>>>> for slot 1.
->>>>> [  490.178462] usb 1-3: hub failed to enable device, error -22
->>>>
->>>>
->>>> (repeats over and over)
->>>>
->>>> 15a4:1336 Afatech Technologies, Inc. SDHC/MicroSD/MMC/MS/M2/CF/XD Flash
->>>> Card
->>>> Reader
->>>>
->>>> The power light comes on, and the activity light just keeps flashing
->>>> fast.
->>>> Usually the activity light flashes a couple times and then turns off.
->>>> There
->>>> is nothing in dmesg at all for this device.
->>>>
->>>> 05e3:0608 Genesys Logic, Inc. USB-2.0 4-Port HUB
->>>>
->>>> Not detected. There is nothing in dmesg at all for this device.
->>>>
->>>> 1bcf:0c31 Sunplus Innovation Technology Inc. SPIF30x Serial-ATA bridge
->>>>
->>>> Not detected. There is nothing in dmesg at all for this device.
->>>
->>>
->>> Thanks, I'll try to figure out what's going on here.
->>
->>
->> Grr... this is due to the unfortunate UTMI pad controller design on Tegra.
->>
->> Here's the issue:  When UTMI pad 0 is assigned to the EHCI controller
->> (as is currently the case on Jetson-TK1), the UTMI parameters from
->> UTMIP_BIAS_CFG0 in the global UTMI pad register space are used
->> regardless of the owner of the UTMI pads.  If pad 0 is assigned to the
->> XUSB controller, then parameters in USB2_BIAS_PAD_CTL0 in the XUSB
->> register space are used for all UTMI pads (again, regardless of
->> ownership).
->>
->> I wasn't able to reproduce before because I always TFTP booted and
->> U-Boot programs the UTMI parameters correctly when starting the EHCI
->> controllers.  I suspect you and Tomeu were booting without starting
->> the EHCI controllers and thus were stuck with the POR values.
->
->
-> I am loading the kernel over the PCIe Ethernet on Jetson TK1. However, the
-> U-Boot boot scripts do "usb start" first, so I would assume all the USB set
-> is already done either way, before U-Boot attempts to probe USB devices.
+This patchset removes some single-platform compatibility tricks related
+to DEBUG_LL and, as a result, allows multi_v7_defconfig derived builds
+to enable DEBUG_LL. Currently the user selected kbuild setting is
+ignored and the PL01X's DEBUG_LL stub is silently selected instead. This
+is a pain if your hardware doesn't have this cell, not least because it
+takes a little time to figure out that kbuild built the wrong code.
 
-Interesting - just doing "usb start" made the difference for me.
+Warning:
 
->> The easiest way to fix this is to just assign UTMI port 0 (i.e. the
->> OTG port) to the XUSB controller.  AFAIK, device mode on Tegra isn't
->> supported yet in the kernel, so this shouldn't break any existing use
->> cases.  If we wanted to support device mode in the future, it would
->> just have to be done with the XUSB controller instead.  The
->> alternative is some ugly driver that programs the correct register set
->> depending on which controller UTMI port 0 is assigned to.
->>
->> BTW, here's a patch to assign UTMI port 0 to XUSB:
->>
->> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->> b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->> index a473750..dacb0d0 100644
->> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->> @@ -1644,7 +1644,7 @@
->>
->>                  padctl_default: pinmux {
->>                          otg {
->> -                               nvidia,lanes = "otg-1", "otg-2";
->> +                               nvidia,lanes = "otg-0", "otg-1", "otg-2";
->>                                  nvidia,function = "xusb";
->>                          };
->
->
-> That's a bit better; I now see dmesg entries when I plug in my hub where
-> before I got none. However, I still get some descriptor read errors etc.,
+    silentoldconfig on PL011 single platforms will result in DEBUG_LL
+    being directed at ICEDCC rather than PL011. This should only
+    affect silentoldconfig since oldconfig prompts and the defconfigs have
+    been updated to avoid this problem.
 
-I see those sometimes with my ethernet dongle too, but it still seems
-to work ok.
+Changes since v10:
+- Fixed typos in the omap1 config help texts (review of Aaro Koskinen).
 
-> and the USB HDD I have behind the hub isn't fully detected.
+Changes since v9:
+- Removed a spuriously introduced (and unused) config variable from
+  the netx patch (review of Paul Bolle).
+- Fix netx macro to ensure \rv is correctly initialized.
+- Rebased on v3.17rc4.
 
-Can you post the dmesg output?  Does it work when not behind the hub?
-So far I haven't seen any failures with my pile of USB devices after
-the above change.
+Changes since v8:
+- Regenerated patch series with --find-renames to properly track code
+  movement.
 
-Thanks for testing this out!
+Changes since v7:
+- Killed DEBUG_LL_UART_NONE completely and migrated over the four remaining
+  platforms that relied on this (Arnd Bergmann, Russell King). This
+  fixes some problems with oldconfig builds.
+- Rebased on latest mainline (v3.17rc1).
+
+Changes since v6:
+- Removed a patch to limit DEBUG_LL_UART_NONE to platforms that support
+  it because it almost time to drop DEBUG_LL_UART_NONE anyway (only
+  four platforms still use it).
+- Rebased on latest mainline (v3.16rc3).
+
+Changes since v5:
+
+- Shortened the list of platforms that can select DEBUG_LL_UART_NONE
+  (changes Arnd Bergmann)
+- Rebased on latest mainline (v3.15rc7).
+
+Changes since v4:
+
+- Rebased to latest mainline (and tested again). No functional changes.
+
+Changes since v3:
+
+- Converted from a single patch to a series.
+- Tested defconfig builds of all impacted platforms.
+
+Changes since v2:
+
+- Switch from def_bool to bool (thanks Russell King)
+
+Changes since v1:
+
+- Remove pointless single platform support (thanks Arnd Bergmann)
+
+Daniel Thompson (9):
+  arm: versatile: Enable DEBUG_LL_UART_PL01X
+  arm: ep93xx: Enable DEBUG_LL_UART_PL01X
+  arm: Remove DEBUG_LL_UART_NONE
+  arm: ks8695: Migrate debug_ll macros to shared directory
+  arm: omap1: Migrate debug_ll macros to use 8250.S
+  arm: netx: Migrate DEBUG_LL macros to shared directory
+  arm: sa1100: Migrate DEBUG_LL macros to shared directory
+  arm: Seperate DEBUG_UART_PHYS from DEBUG_LL on EP93XX
+  arm: Fix DEBUG_LL for multi-platform kernels (without PL01X)
+
+ arch/arm/Kconfig.debug                             | 137 ++++++++++++++++++---
+ arch/arm/configs/ep93xx_defconfig                  |   1 +
+ arch/arm/configs/versatile_defconfig               |   1 +
+ .../mach/debug-macro.S => include/debug/ks8695.S}  |  10 +-
+ .../mach/debug-macro.S => include/debug/netx.S}    |  22 ++--
+ arch/arm/include/debug/sa1100.S                    |  37 ++++++
+ arch/arm/mach-omap1/include/mach/debug-macro.S     | 101 ---------------
+ arch/arm/mach-sa1100/include/mach/debug-macro.S    |  62 ----------
+ 8 files changed, 174 insertions(+), 197 deletions(-)
+ rename arch/arm/{mach-ks8695/include/mach/debug-macro.S => include/debug/ks8695.S} (80%)
+ rename arch/arm/{mach-netx/include/mach/debug-macro.S => include/debug/netx.S} (62%)
+ create mode 100644 arch/arm/include/debug/sa1100.S
+ delete mode 100644 arch/arm/mach-omap1/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/debug-macro.S
+
+--
+1.9.3
