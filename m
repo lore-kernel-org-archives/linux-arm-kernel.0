@@ -1,56 +1,50 @@
-From: sandeep_n@ti.com (Sandeep Nair)
-Date: Tue, 16 Sep 2014 09:44:59 -0400
-Subject: [PATCH v3 2/3] net: Add Keystone NetCP ethernet driver
-In-Reply-To: <20140915.123755.1868053059646672094.davem@davemloft.net>
-References: <1410638839-14792-1-git-send-email-santosh.shilimkar@ti.com>	<1410638839-14792-3-git-send-email-santosh.shilimkar@ti.com>
- <20140915.123755.1868053059646672094.davem@davemloft.net>
-Message-ID: <54183EDB.20801@ti.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue, 16 Sep 2014 16:05:51 +0200
+Subject: [PATCH v5 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <20140916133841.GA4869@kwain>
+References: <1410777378-12726-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1410777378-12726-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140916005129.GC3379@peterchendt> <20140916133841.GA4869@kwain>
+Message-ID: <20140916140551.GE4869@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/15/2014 12:37 PM, David Miller wrote:
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Sat, 13 Sep 2014 16:07:18 -0400
->
->> +	/* Find this module in the sub-tree for this device */
->> +	devices = of_get_child_by_name(node, "netcp-devices");
->> +	if (!devices) {
->> +		dev_err(dev, "could not find netcp-devices node\n");
->> +		return NETCP_MOD_PROBE_SKIPPED;
->> +	}
->> +
->> +	for_each_available_child_of_node(devices, child) {
->> +		const char *name = netcp_node_name(child);
->> +
->> +		if (!strcasecmp(module->name, name))
->> +			break;
->> +	}
->> +
->> +	/* If module not used for this device, skip it */
->> +	if (child == NULL) {
->> +		dev_warn(dev, "module(%s) not used for device\n", module->name);
->> +		return NETCP_MOD_PROBE_SKIPPED;
->> +	}
->
-> of_get_child_by_name() takes a reference to an OF node, you must release
-> it in the error path.
->
-Will fix this.
->> +	inst_modpriv = devm_kzalloc(dev, sizeof(*inst_modpriv), GFP_KERNEL);
->> +	if (!inst_modpriv) {
->> +		dev_err(dev, "Failed to allocate instance for %s\n",
->> +			module->name);
->> +		return -ENOMEM;
->> +	}
->
-> Likewise, but here you have to release both "devices" and "child".
->
-> You're going to have to fix this OF node refcount problem for this
-> entire probe routine.
->
-Will do.
+On Tue, Sep 16, 2014 at 03:38:41PM +0200, Antoine Tenart wrote:
+> On Tue, Sep 16, 2014 at 08:51:30AM +0800, Peter Chen wrote:
+> > On Mon, Sep 15, 2014 at 12:36:13PM +0200, Antoine Tenart wrote:
+> > > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> > > and DMA mask, to support USB2 ChipIdea controllers that don't need
+> > > specific functions.
+> > > 
+> > > Tested on the Marvell Berlin SoCs USB controllers.
+> > > 
+> > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> > > ---
+> > >  drivers/usb/chipidea/Makefile       |   1 +
+> > >  drivers/usb/chipidea/ci_hdrc_usb2.c | 137 ++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 138 insertions(+)
+> > >  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
+> > > 
+> > 
+> > compile error:
+> > 
+> > /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c: In function 'ci_hdrc_usb2_dt_probe':
+> > /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c:30:2: error: implicit declaration of function 'of_phy_get' [-Werror=implicit-function-declaration]
+> > /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c:30:16: warning: assignment makes pointer from integer without a cast [enabled by default]
+> 
+> Did you apply the series introducing the support for the generic PHY
+> framework in the USB subsystem first? One of the patches includes
+> 'linux/phy/phy.h' in 'linux/usb/otg.h'. That's why I did not encounter
+> this error.
+> 
+> Anyway, you're right and 'linux/phy/phy.h' should be explicitly included
+> here.
 
-Thanks for the review David!
+Let me know if you want me to quickly cook up a new version fixing this.
 
-Regards
-Sandeep
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
