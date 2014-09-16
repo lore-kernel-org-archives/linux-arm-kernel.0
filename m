@@ -1,60 +1,58 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Tue, 16 Sep 2014 18:44:30 +0800
-Subject: [PATCH v2 3/3] ARM: dts: add intmem node for rk3288 smp support
-In-Reply-To: <1410864271-9277-1-git-send-email-kever.yang@rock-chips.com>
-References: <1410864271-9277-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1410864271-9277-4-git-send-email-kever.yang@rock-chips.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Sep 2014 12:03:21 +0100
+Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <54174CFF.7050504@codeaurora.org>
+References: <5411D528.4050605@arm.com>
+ <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
+ <5411DA67.2040402@arm.com>
+ <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
+ <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
+ <5412E3BB.9030800@arm.com> <54134291.3040700@codeaurora.org>
+ <20140915111055.GD1577@arm.com> <54174CFF.7050504@codeaurora.org>
+Message-ID: <20140916110321.GD27273@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add intmem node des which is needed by platsmp.c
-and enable the smp.
+On Mon, Sep 15, 2014 at 09:33:03PM +0100, Stephen Boyd wrote:
+> On 09/15/14 04:10, Catalin Marinas wrote:
+> > On Fri, Sep 12, 2014 at 07:59:29PM +0100, Stephen Boyd wrote:
+> >> On 09/12/14 05:14, Marc Zyngier wrote:
+> >>> We surely can handle the UNDEF and do something there. We just can't do
+> >>> it the way Doug described it above.
+> >> I suggested doing that for something else a while ago and Will and Dave
+> >> we're not thrilled[1]. The suggestion back then was to use DT to
+> >> indicate what mode the kernel is running in.
+> >>
+> >> [1]
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
+> > I think the context was slightly different. As I re-read the thread, it
+> > seems that the discussion was around whether to use some SMC interface
+> > or not based on whether the kernel is running secure or non-secure. The
+> > argument made by Will was to actually specify the type of the firmware
+> > SMC interface in the DT and use it in the kernel (and probably assume
+> > the kernel is running in secure mode if no smc interface is specified in
+> > the DT; you could have both though, running in secure mode and also
+> > having firmware).
+> >
+> > In this arch timer case, we need to work around a firmware bug (or
+> > feature as 32-bit ARM kernels never required CNTVOFF initialisation by
+> > firmware, no matter how small such firmware is). We don't expect a
+> > specific SMC call to initialise CNTVOFF, so we can't describe it in the
+> > DT.
+> 
+> Agreed, we can't described SMC calls that don't exist. From my
+> perspective it's just another part of the cpu boot sequence that needs
+> to be handled in the kernel, so describing the requirement via the
+> cpu-boot method seems appropriate. It seems like we're making it harder
+> than it should be by handling the undef when we could have slightly
+> different SMP boot code (and suspend/resume code) depending on the boot
+> method property.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+For 32-bit ARM SoCs, I think you can describe this via some specific
+enable-method property. What I don't like though is the multitude of
+enable methods (trying to reduce them on arm64) and the fact that
+registers like CNTVOFF are rather architecture than SoC specific.
 
-Changes in v2:
-- adjust the alignment
-
- arch/arm/boot/dts/rk3288.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index dca586e..bcc4dad 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -40,6 +40,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
-+		enable-method = "rockchip,rk3288-smp";
- 		cpu at 500 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a12";
-@@ -353,6 +354,23 @@
- 		status = "disabled";
- 	};
- 
-+	bus_intmem at ff700000 {
-+		compatible = "mmio-sram";
-+		reg = <0xff700000 0x18000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xff700000 0x18000>;
-+		smp-sram at 0 {
-+			compatible = "rockchip,rk3066-smp-sram";
-+			reg = <0x00 0x10>;
-+		};
-+	};
-+
-+	pmu_intmem at ff720000 {
-+		compatible = "mmio-sram";
-+		reg = <0xff720000 0x4000>;
-+	};
-+
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
 -- 
-1.9.1
+Catalin
