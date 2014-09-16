@@ -1,104 +1,251 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 16 Sep 2014 15:55:54 -0600
-Subject: [PATCH v3 1/2] PCI: keystone: remove handle of PCI mode
- configuration
-In-Reply-To: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
-References: <1410369159-11564-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20140916215554.GC5050@google.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Tue, 16 Sep 2014 23:56:21 +0200
+Subject: [PATCH v2 1/2] bcma: register bcma as device tree driver
+Message-ID: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 01:12:38PM -0400, Murali Karicheri wrote:
-> Keystone PCI hardware supports both RC and EP modes and devcfg
-> register has bits to boot strap the device to either of these modes.
-> It seems proper to add this functionality to the boot loader rather
-> than in the driver as device will be operating in either mode, not
-> both any time. Currently the driver supports only RC mode and hence
-> register configuration in the driver is not needed and driver can
-> assume this is a RC hardware.
-> 
-> Also update the DT documentation accordingly.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+This driver is used by the bcm53xx ARM SoC code. Now it is possible to
+give the address of the chipcommon core in device tree and bcma will
+search for all the other cores.
 
-Both applied to pci/host-keystone for v3.18, thanks!
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ Documentation/devicetree/bindings/bus/bcma.txt | 40 +++++++++++++
+ drivers/bcma/bcma_private.h                    | 16 +++++
+ drivers/bcma/host_soc.c                        | 82 ++++++++++++++++++++++++++
+ drivers/bcma/main.c                            | 10 ++++
+ include/linux/bcma/bcma.h                      |  2 +
+ 5 files changed, 150 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
 
-> ---
-> 	v3 - No change
-> 	v2 - Added this separate patch to remove pci mode handling
->  .../devicetree/bindings/pci/pci-keystone.txt       |    4 +---
->  drivers/pci/host/pci-keystone.c                    |   21 ++------------------
->  2 files changed, 3 insertions(+), 22 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> index ceb3e24..bedacf0 100644
-> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> @@ -13,9 +13,7 @@ Required Properties:-
->  
->  compatibility: "ti,keystone-pcie"
->  reg:	index 1 is the base address and length of DW application registers.
-> -	index 2 is the base address and length of PCI mode configuration
-> -	register.
-> -	index 3 is the base address and length of PCI device ID register.
-> +	index 2 is the base address and length of PCI device ID register.
->  
->  pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
->  	interrupt-cells: should be set to 1
-> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index ff8ed25..f1119eb 100644
-> --- a/drivers/pci/host/pci-keystone.c
-> +++ b/drivers/pci/host/pci-keystone.c
-> @@ -35,10 +35,6 @@
->  #define MAX_MSI_HOST_IRQS		8
->  #define MAX_LEGACY_HOST_IRQS		4
->  
-> -/* RC mode settings masks */
-> -#define PCIE_RC_MODE		BIT(2)
-> -#define PCIE_MODE_MASK		(BIT(1) | BIT(2))
-> -
->  /* DEV_STAT_CTRL */
->  #define PCIE_CAP_BASE		0x70
->  
-> @@ -355,7 +351,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->  	void __iomem *reg_p;
->  	struct phy *phy;
->  	int ret = 0;
-> -	u32 val;
->  
->  	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
->  				GFP_KERNEL);
-> @@ -365,18 +360,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->  	}
->  	pp = &ks_pcie->pp;
->  
-> -	/* index 2 is the devcfg register for RC mode settings */
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-> -	reg_p = devm_ioremap_resource(dev, res);
-> -	if (IS_ERR(reg_p))
-> -		return PTR_ERR(reg_p);
-> -
-> -	/* enable RC mode in devcfg */
-> -	val = readl(reg_p);
-> -	val &= ~PCIE_MODE_MASK;
-> -	val |= PCIE_RC_MODE;
-> -	writel(val, reg_p);
-> -
->  	/* initialize SerDes Phy if present */
->  	phy = devm_phy_get(dev, "pcie-phy");
->  	if (!IS_ERR_OR_NULL(phy)) {
-> @@ -385,8 +368,8 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->  			return ret;
->  	}
->  
-> -	/* index 3 is to read PCI DEVICE_ID */
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
-> +	/* index 2 is to read PCI DEVICE_ID */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
->  	reg_p = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(reg_p))
->  		return PTR_ERR(reg_p);
-> -- 
-> 1.7.9.5
-> 
+This is based on wireless-testing and should go into that tree.
+
+changes since:
+v1:
+ - renamed aix to axi
+RFC:
+ - reworded the irq description
+ - improved the example
+ - hocked into bcma_modeinit() and bcma_modexit()
+
+diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+new file mode 100644
+index 0000000..f06f5c3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/bcma.txt
+@@ -0,0 +1,40 @@
++Driver for ARM AXI Bus with Broadcom Plugins (bcma)
++
++Required properties:
++
++- compatible : brcm,bus-axi
++
++- reg : iomem address range of chipcommon core
++
++The cores on the AXI bus are auto detected by bcma. bcma automatically 
++detects the cores and the memory ranges they are using and they get 
++registered afterwards. Automatic detection of the IRQ number is not 
++possible on BCM47xx/BCM53xx ARM and MIPS SoCs. To assign IRQ number to 
++the cores, provide them manually through device tree. The IRQ number 
++and the device tree child entry will get assigned to the core with the 
++matching reg address.
++
++Example:
++
++	axi at 18000000 {
++		compatible = "brcm,bus-axi";
++		reg = <0x18000000 0x1000>;
++		ranges = <0x00000000 0x18000000 0x00100000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		ethernet at 18024000 {
++			reg = <0x18024000 0x1000>;
++			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		ethernet at 18025000 {
++			reg = <0x18025000 0x1000>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		pcie at 18012000 {
++			reg = <0x18012000 0x1000>;
++			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
++		};
++	};
+diff --git a/drivers/bcma/bcma_private.h b/drivers/bcma/bcma_private.h
+index b40be43..b8728f0 100644
+--- a/drivers/bcma/bcma_private.h
++++ b/drivers/bcma/bcma_private.h
+@@ -88,6 +88,22 @@ extern int __init bcma_host_pci_init(void);
+ extern void __exit bcma_host_pci_exit(void);
+ #endif /* CONFIG_BCMA_HOST_PCI */
+ 
++#ifdef CONFIG_BCMA_HOST_SOC
++/* host_pci.c */
++#ifdef CONFIG_OF
++extern int __init bcma_host_soc_register_driver(void);
++extern void __exit bcma_host_soc_unregister_driver(void);
++#else
++static inline int __init bcma_host_soc_register_driver(void)
++{
++	return 0;
++}
++static inline void __exit bcma_host_soc_unregister_driver(void)
++{
++}
++#endif /* CONFIG_OF */
++#endif /* CONFIG_BCMA_HOST_SOC */
++
+ /* driver_pci.c */
+ u32 bcma_pcie_read(struct bcma_drv_pci *pc, u32 address);
+ 
+diff --git a/drivers/bcma/host_soc.c b/drivers/bcma/host_soc.c
+index 718e054..cfbf3b3 100644
+--- a/drivers/bcma/host_soc.c
++++ b/drivers/bcma/host_soc.c
+@@ -7,6 +7,9 @@
+ 
+ #include "bcma_private.h"
+ #include "scan.h"
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
+ #include <linux/bcma/bcma.h>
+ #include <linux/bcma/bcma_soc.h>
+ 
+@@ -176,6 +179,7 @@ int __init bcma_host_soc_register(struct bcma_soc *soc)
+ 	/* Host specific */
+ 	bus->hosttype = BCMA_HOSTTYPE_SOC;
+ 	bus->ops = &bcma_host_soc_ops;
++	bus->host_pdev = NULL;
+ 
+ 	/* Initialize struct, detect chip */
+ 	bcma_init_bus(bus);
+@@ -195,3 +199,81 @@ int __init bcma_host_soc_init(struct bcma_soc *soc)
+ 
+ 	return err;
+ }
++
++#ifdef CONFIG_OF
++static int bcma_host_soc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct bcma_bus *bus;
++	int err;
++
++	/* Alloc */
++	bus = devm_kzalloc(dev, sizeof(*bus), GFP_KERNEL);
++	if (!bus)
++		return -ENOMEM;
++
++	/* Map MMIO */
++	bus->mmio = of_iomap(np, 0);
++	if (!bus->mmio)
++		return -ENOMEM;
++
++	/* Host specific */
++	bus->hosttype = BCMA_HOSTTYPE_SOC;
++	bus->ops = &bcma_host_soc_ops;
++	bus->host_pdev = pdev;
++
++	/* Initialize struct, detect chip */
++	bcma_init_bus(bus);
++
++	/* Register */
++	err = bcma_bus_register(bus);
++	if (err)
++		goto err_unmap_mmio;
++
++	platform_set_drvdata(pdev, bus);
++
++	return err;
++
++err_unmap_mmio:
++	iounmap(bus->mmio);
++	return err;
++}
++
++static int bcma_host_soc_remove(struct platform_device *pdev)
++{
++	struct bcma_bus *bus = platform_get_drvdata(pdev);
++
++	bcma_bus_unregister(bus);
++	iounmap(bus->mmio);
++	platform_set_drvdata(pdev, NULL);
++
++	return 0;
++}
++
++static const struct of_device_id bcma_host_soc_of_match[] = {
++	{ .compatible = "brcm,bus-axi", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, bcma_host_soc_of_match);
++
++static struct platform_driver bcma_host_soc_driver = {
++	.driver = {
++		.name = "bcma-host-soc",
++		.owner = THIS_MODULE,
++		.of_match_table = bcma_host_soc_of_match,
++	},
++	.probe		= bcma_host_soc_probe,
++	.remove		= bcma_host_soc_remove,
++};
++
++int __init bcma_host_soc_register_driver(void)
++{
++	return platform_driver_register(&bcma_host_soc_driver);
++}
++
++void __exit bcma_host_soc_unregister_driver(void)
++{
++	platform_driver_unregister(&bcma_host_soc_driver);
++}
++#endif /* CONFIG_OF */
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index c421403..e5d578c 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -528,6 +528,13 @@ static int __init bcma_modinit(void)
+ 	if (err)
+ 		return err;
+ 
++#ifdef CONFIG_BCMA_HOST_SOC
++	err = bcma_host_soc_register_driver();
++	if (err) {
++		pr_err("SoC host initialization failed\n");
++		err = 0;
++	}
++#endif
+ #ifdef CONFIG_BCMA_HOST_PCI
+ 	err = bcma_host_pci_init();
+ 	if (err) {
+@@ -545,6 +552,9 @@ static void __exit bcma_modexit(void)
+ #ifdef CONFIG_BCMA_HOST_PCI
+ 	bcma_host_pci_exit();
+ #endif
++#ifdef CONFIG_BCMA_HOST_SOC
++	bcma_host_soc_unregister_driver();
++#endif
+ 	bus_unregister(&bcma_bus_type);
+ }
+ module_exit(bcma_modexit)
+diff --git a/include/linux/bcma/bcma.h b/include/linux/bcma/bcma.h
+index 6345979..729f48e 100644
+--- a/include/linux/bcma/bcma.h
++++ b/include/linux/bcma/bcma.h
+@@ -323,6 +323,8 @@ struct bcma_bus {
+ 		struct pci_dev *host_pci;
+ 		/* Pointer to the SDIO device (only for BCMA_HOSTTYPE_SDIO) */
+ 		struct sdio_func *host_sdio;
++		/* Pointer to platform device (only for BCMA_HOSTTYPE_SOC) */
++		struct platform_device *host_pdev;
+ 	};
+ 
+ 	struct bcma_chipinfo chipinfo;
+-- 
+1.9.1
