@@ -1,65 +1,40 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 16 Sep 2014 09:44:15 +0800
-Subject: [PATCH v2] arm:extend __init_end to a page align address
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49160B@CNBJMBX05.corpusers.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 16 Sep 2014 09:46:58 +0800
+Subject: [alsa-devel] [PATCH v2 2/4] ARM: dts: pbab01: enable I2S audio
+ on phyFLEX-i.MX6 boards
+In-Reply-To: <5416D666.2050302@sam-solutions.net>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410537872-17274-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410539161.314611261@f174.i.mail.ru>
+ <CAOMZO5C9_XwgcLvVWvxB1A306_Ehm17ZE111j6d+7MhudAhT0g@mail.gmail.com>
+ <5416D666.2050302@sam-solutions.net>
+Message-ID: <20140916014657.GB23450@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch change the __init_end address to a
-page align address, so that free_initmem() can
-free the whole .init section, because if the end
-address is not page aligned, it will round down to
-a page align address, then the tail unligned page
-will not be freed.
+On Mon, Sep 15, 2014 at 03:07:02PM +0300, Dmitry Lavnikevich wrote:
+> On 12/09/14 19:40, Fabio Estevam wrote:
+> >On Fri, Sep 12, 2014 at 1:26 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> >>Fri, 12 Sep 2014 19:04:30 +0300 ?? Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>:
+> >>>Audio on phyFLEX boards is presented by tlv320aic3007 codec connected
+> >>>over SSI interface.
+> >>>
+> >>>Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> >>>---
+> >>...
+> >>>+&ssi2 {
+> >>>+     fsl,mode = "i2s-slave";
+> >>>+     status = "okay";
+> >>>+     #sound-dai-cells = <0>;
+> >>>+};
+> >>I have already sent patch to add "#sound-dai-cells" into all i.MX DT-files.
+> >>Shawn, can you point us to this tree/commit?
+> >https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=for-next&id=36c7e8826cf32dd4dd34c71b526653b800414355
+> So should I base my next patchset on for-next branch of
+> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> ?
 
-Signed-off-by: wang <yalin.wang2010@gmail.com>
----
- arch/arm/kernel/vmlinux.lds.S     | 2 +-
- arch/arm64/kernel/vmlinux.lds.S   | 2 +-
- include/asm-generic/vmlinux.lds.h | 2 ++
- 3 files changed, 4 insertions(+), 2 deletions(-)
+Yes, please.
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 6f57cb9..8e95aa4 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -219,8 +219,8 @@ SECTIONS
- 	__data_loc = ALIGN(4);		/* location in binary */
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #else
--	__init_end = .;
- 	. = ALIGN(THREAD_SIZE);
-+	__init_end = .;
- 	__data_loc = .;
- #endif
- 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 97f0c04..edf8715 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -97,9 +97,9 @@ SECTIONS
- 
- 	PERCPU_SECTION(64)
- 
-+	. = ALIGN(PAGE_SIZE);
- 	__init_end = .;
- 
--	. = ALIGN(PAGE_SIZE);
- 	_data = .;
- 	_sdata = .;
- 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 5ba0360..aa70cbd 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -40,6 +40,8 @@
-  * }
-  *
-  * [__init_begin, __init_end] is the init section that may be freed after init
-+ * 	// __init_begin and __init_end should be page aligned, so that we can
-+ *	// free the whole .init memory
-  * [_stext, _etext] is the text section
-  * [_sdata, _edata] is the data section
-  *
--- 
-2.1.0
+Shawn
