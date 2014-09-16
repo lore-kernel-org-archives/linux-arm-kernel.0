@@ -1,46 +1,177 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 16 Sep 2014 14:27:24 +0200
-Subject: [PATCH] ARM: zynq: Add ISL9305 regulator on Parallella board
-In-Reply-To: <20140915161613.GR7960@sirena.org.uk>
-References: <1410003616-32077-1-git-send-email-broonie@kernel.org>
- <5999bc23-b615-4b76-acec-ba2ee5675a03@BN1AFFO11FD035.protection.gbl>
- <5416EA84.5070905@suse.de> <20140915161613.GR7960@sirena.org.uk>
-Message-ID: <54182CAC.1030707@monstr.eu>
+From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
+Date: Tue, 16 Sep 2014 08:36:41 -0400 (EDT)
+Subject: [PATCH v3] ARM: apq8064: Add pinmux and i2c pinctrl nodes
+In-Reply-To: <20140916023922.GB2386@qualcomm.com>
+References: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
+ <20140916023922.GB2386@qualcomm.com>
+Message-ID: <1410871001.891126377@apps.rackspace.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 06:16 PM, Mark Brown wrote:
-> On Mon, Sep 15, 2014 at 03:32:52PM +0200, Andreas F?rber wrote:
->> Am 15.09.2014 um 15:26 schrieb Michal Simek:
+
+
+On Monday, September 15, 2014 10:39pm, "Andy Gross" <agross@codeaurora.org> said:
+
+> On Tue, Aug 26, 2014 at 05:00:45PM +0530, Kiran Padwal wrote:
+>> This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
+>> It also adds necessary DT support for i2c eeprom which is present on
+>> IFC6410.
+>>
+>> Tested on IFC6410 board.
 > 
->>> Applied.
+> Looks fine
+
+Thanks for review.
+
 > 
->> Where exactly on the board did you spot that regulator? I did not spot
->> it on my pre-ordered board and wonder whether it might be a difference
->> of the revised RS-distributed board with the large heat sink?
+>>
+>> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
+>> ---
+>> Changes since v2:
+>>  - Renamed pinmux i2c subnode "i2c1_pinmux" to "i2c1".
+>>  - Removed labes of node.
+>>  - Used canonical value as "okay" instead of "ok".
+>>  - Used macros.
+>>
+>> Changes since v1:
+>>  - Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
+>>  - Updated pinmux interrupt.
+>>
+>>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   27 ++++++++++++++
+>>  arch/arm/boot/dts/qcom-apq8064.dtsi        |   53 ++++++++++++++++++++++++++++
+>>  2 files changed, 80 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> index 7c2441d..ef0857e 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> @@ -5,6 +5,24 @@
+>>  	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
+>>
+>>  	soc {
+>> +		gsbi at 12440000 {
+>> +			status = "okay";
+>> +			qcom,mode = <GSBI_PROT_I2C>;
+>> +
+>> +			i2c at 12460000 {
+>> +				status = "okay";
+>> +				clock-frequency = <200000>;
+>> +				pinctrl-0 = <&i2c1_pins>;
+>> +				pinctrl-names = "default";
+>> +
+>> +				eeprom: eeprom at 52 {
+>> +					compatible = "atmel,24c128";
+>> +					reg = <0x52>;
+>> +					pagesize = <32>;
+>> +				};
 > 
-> I didn't actually identify the physical device on the board, it's on
-> sheet 16 of the schematic.  The device is responsive to I2C and I'm
-> reading back the settings I'm expecting from the hardware.
+> don't need read only here.  the eeprom is not being used by anything....
+> thankfully.
 > 
-
-good that you have parallella hardware.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/0f3659c6/attachment.sig>
+>> +			};
+>> +		};
+>> +
+>>  		gsbi at 16600000 {
+>>  			status = "ok";
+>>  			qcom,mode = <GSBI_PROT_I2C_UART>;
+>> @@ -12,5 +30,14 @@
+>>  				status = "ok";
+>>  			};
+>>  		};
+>> +
+>> +		pinmux at 800000 {
+>> +			i2c1_pins: i2c1 {
+>> +				mux {
+>> +					pins = "gpio20", "gpio21";
+>> +					function = "gsbi1";
+>> +				};
+>> +			};
+>> +		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> index 92bf793..5dddbf3 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> @@ -89,6 +89,17 @@
+>>  			cpu-offset = <0x80000>;
+>>  		};
+>>
+>> +		tlmm_pinmux: pinmux at 800000 {
+>> +			compatible = "qcom,apq8064-pinctrl";
+>> +			reg = <0x800000 0x4000>;
+>> +
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			interrupts = <0 16 IRQ_TYPE_LEVEL_HIGH>;
+>> +		};
+>> +
+>>  		acc0: clock-controller at 2088000 {
+>>  			compatible = "qcom,kpss-acc-v1";
+>>  			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
+>> @@ -133,6 +144,48 @@
+>>  			regulator;
+>>  		};
+>>
+>> +		gsbi1: gsbi at 12440000 {
+>> +			status = "disabled";
+>> +			compatible = "qcom,gsbi-v1.0.0";
+>> +			reg = <0x12440000 0x100>;
+>> +			clocks = <&gcc GSBI1_H_CLK>;
+>> +			clock-names = "iface";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +
+>> +			i2c1: i2c at 12460000 {
+>> +				compatible = "qcom,i2c-qup-v1.1.1";
+>> +				reg = <0x12460000 0x1000>;
+>> +				interrupts = <0 194 IRQ_TYPE_NONE>;
+>> +				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
+>> +				clock-names = "core", "iface";
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +			};
+>> +		};
+>> +
+>> +		gsbi2: gsbi at 12480000 {
+>> +			status = "disabled";
+>> +			compatible = "qcom,gsbi-v1.0.0";
+>> +			reg = <0x12480000 0x100>;
+>> +			clocks = <&gcc GSBI2_H_CLK>;
+>> +			clock-names = "iface";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +
+>> +			i2c2: i2c at 124a0000 {
+>> +				compatible = "qcom,i2c-qup-v1.1.1";
+>> +				reg = <0x124a0000 0x1000>;
+>> +				interrupts = <0 196 IRQ_TYPE_NONE>;
+>> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
+>> +				clock-names = "core", "iface";
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +			};
+>> +		};
+>> +
+>>  		gsbi7: gsbi at 16600000 {
+>>  			status = "disabled";
+>>  			compatible = "qcom,gsbi-v1.0.0";
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> --
+> sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
