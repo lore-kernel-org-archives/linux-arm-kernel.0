@@ -1,58 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Sep 2014 12:03:21 +0100
-Subject: [PATCH v2] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <54174CFF.7050504@codeaurora.org>
-References: <5411D528.4050605@arm.com>
- <CAD=FV=XMmizxJFPj0FEhJ7Gk4ZcQaUJDxf_Qq5kGKSvxDFVmzg@mail.gmail.com>
- <5411DA67.2040402@arm.com>
- <CAD=FV=UQfo4J3P4wGjOhQZQ5KXKgYAdjPsi1ykKZxQw-FwJz8w@mail.gmail.com>
- <5411DF5D.8060906@arm.com> <5412DC48.7030708@codeaurora.org>
- <5412E3BB.9030800@arm.com> <54134291.3040700@codeaurora.org>
- <20140915111055.GD1577@arm.com> <54174CFF.7050504@codeaurora.org>
-Message-ID: <20140916110321.GD27273@arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 16 Sep 2014 13:07:41 +0200
+Subject: [GIT PULL] Xilinx Zynq changes for v3.18
+Message-ID: <541819FD.5000301@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 09:33:03PM +0100, Stephen Boyd wrote:
-> On 09/15/14 04:10, Catalin Marinas wrote:
-> > On Fri, Sep 12, 2014 at 07:59:29PM +0100, Stephen Boyd wrote:
-> >> On 09/12/14 05:14, Marc Zyngier wrote:
-> >>> We surely can handle the UNDEF and do something there. We just can't do
-> >>> it the way Doug described it above.
-> >> I suggested doing that for something else a while ago and Will and Dave
-> >> we're not thrilled[1]. The suggestion back then was to use DT to
-> >> indicate what mode the kernel is running in.
-> >>
-> >> [1]
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-June/105321.html
-> > I think the context was slightly different. As I re-read the thread, it
-> > seems that the discussion was around whether to use some SMC interface
-> > or not based on whether the kernel is running secure or non-secure. The
-> > argument made by Will was to actually specify the type of the firmware
-> > SMC interface in the DT and use it in the kernel (and probably assume
-> > the kernel is running in secure mode if no smc interface is specified in
-> > the DT; you could have both though, running in secure mode and also
-> > having firmware).
-> >
-> > In this arch timer case, we need to work around a firmware bug (or
-> > feature as 32-bit ARM kernels never required CNTVOFF initialisation by
-> > firmware, no matter how small such firmware is). We don't expect a
-> > specific SMC call to initialise CNTVOFF, so we can't describe it in the
-> > DT.
-> 
-> Agreed, we can't described SMC calls that don't exist. From my
-> perspective it's just another part of the cpu boot sequence that needs
-> to be handled in the kernel, so describing the requirement via the
-> cpu-boot method seems appropriate. It seems like we're making it harder
-> than it should be by handling the undef when we could have slightly
-> different SMP boot code (and suspend/resume code) depending on the boot
-> method property.
+Hi,
 
-For 32-bit ARM SoCs, I think you can describe this via some specific
-enable-method property. What I don't like though is the multitude of
-enable methods (trying to reduce them on arm64) and the fact that
-registers like CNTVOFF are rather architecture than SoC specific.
+please pull these patches to your arm-soc tree.
+
+Thanks,
+Michal
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.18
+
+for you to fetch changes up to 8097171e19bb69f3e2226827440b71ececa5d74f:
+
+  ARM: zynq: Remove useless L2C AUX setting (2014-09-16 12:55:12 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq cleanup patches for v3.18
+
+- PM support
+- Fix L2 useless setting
+
+----------------------------------------------------------------
+Daniel Lezcano (2):
+      ARM: zynq: Remove invalidate cache for cpu die
+      ARM: zynq: cpuidle: Remove pointless code
+
+Michal Simek (1):
+      ARM: zynq: Remove useless L2C AUX setting
+
+Soren Brinkmann (7):
+      ARM: zynq: PM: Enable A9 internal clock gating feature
+      Documentation: devicetree: Add binding for Synopsys DDR controller
+      ARM: zynq: DT: Add DDRC node
+      ARM: zynq: PM: Enable DDR clock stop
+      ARM: zynq: Synchronise zynq_cpu_die/kill
+      ARM: zynq: Remove hotplug.c
+      ARM: zynq: Rename 'zynq_platform_cpu_die'
+
+ Documentation/devicetree/bindings/memory-controllers/synopsys.txt | 11 +++++++++
+ arch/arm/boot/dts/zynq-7000.dtsi                                  |  5 ++++
+ arch/arm/mach-zynq/Makefile                                       |  3 +--
+ arch/arm/mach-zynq/common.c                                       | 11 +++++++--
+ arch/arm/mach-zynq/common.h                                       | 16 ++++++++++--
+ arch/arm/mach-zynq/hotplug.c                                      | 47 +-----------------------------------
+ arch/arm/mach-zynq/platsmp.c                                      | 41 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-zynq/pm.c                                           | 83 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-zynq/slcr.c                                         | 43 ++++++++++++++++++++++++++++++++-
+ drivers/cpuidle/cpuidle-zynq.c                                    | 10 +-------
+ 10 files changed, 207 insertions(+), 63 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/synopsys.txt
+ create mode 100644 arch/arm/mach-zynq/pm.c
 
 -- 
-Catalin
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/bed3d296/attachment.sig>
