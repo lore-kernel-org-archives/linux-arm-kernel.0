@@ -1,68 +1,38 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Tue, 16 Sep 2014 09:29:30 -0700
-Subject: [PATCH arm64-next v4] net: bpf: arm64: address randomize and
- write protect JIT code
-In-Reply-To: <20140916162531.GC32073@arm.com>
-References: <1410853730-16470-1-git-send-email-dborkman@redhat.com>
- <20140916162531.GC32073@arm.com>
-Message-ID: <CABg9mcvV-+VxW6Ew-xqD=GP7Dmn=WJ5_8r4VqQPE64e3Qb-6bQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Sep 2014 18:33:52 +0200
+Subject: [PATCH v2 3/3] PCI: Layerscape: Add Layerscape PCIe driver
+In-Reply-To: <54187590.4070101@freescale.com>
+References: <1410469741-11634-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1410841159.24184.491.camel@snotra.buserror.net>
+ <54187590.4070101@freescale.com>
+Message-ID: <201409161833.53176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 9:25 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Sep 16, 2014 at 08:48:50AM +0100, Daniel Borkmann wrote:
->> This is the ARM64 variant for 314beb9bcab ("x86: bpf_jit_comp: secure bpf
->> jit against spraying attacks").
->>
->> Thanks to commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
->> support") which added necessary infrastructure, we can now implement
->> RO marking of eBPF generated JIT image pages and randomize start offset
->> for the JIT code, so that it does not reside directly on a page boundary
->> anymore. Likewise, the holes are filled with illegal instructions: here
->> we use BRK #0x100 (opcode 0xd4202000) to trigger a fault in the kernel
->> (unallocated BRKs would trigger a fault through do_debug_exception). This
->> seems more reliable as we don't have a guaranteed undefined instruction
->> space on ARM64.
->>
->> This is basically the ARM64 variant of what we already have in ARM via
->> commit 55309dd3d4cd ("net: bpf: arm: address randomize and write protect
->> JIT code"). Moreover, this commit also presents a merge resolution due to
->> conflicts with commit 60a3b2253c41 ("net: bpf: make eBPF interpreter images
->> read-only") as we don't use kfree() in bpf_jit_free() anymore to release
->> the locked bpf_prog structure, but instead bpf_prog_unlock_free() through
->> a different allocator.
->>
->> JIT tested on aarch64 with BPF test suite.
->>
->> Reference: http://mainisusuallyafunction.blogspot.com/2012/11/attacking-hardened-linux-systems-with.html
->> Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
->> Cc: Zi Shen Lim <zlim.lnx@gmail.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: David S. Miller <davem@davemloft.net>
->> Cc: Alexei Starovoitov <ast@plumgrid.com>
->> ---
->>  v3->v4:
->>   - Inclusion into debug-monitors.h as suggested by Will
->>  v2->v3:
->>   - Use cpu_to_le32() as suggested by Zi/Will
->>  v1->v2:
->>   - Use brk insn as suggested by Catalin
->>  Note:
->>   - This patch depends on net-next being merged to mainline due
->>     to the mentioned merge conflict.
->>
->>  arch/arm64/include/asm/debug-monitors.h |  8 +++++++
->>  arch/arm64/net/bpf_jit_comp.c           | 39 +++++++++++++++++++++++++--------
->>  2 files changed, 38 insertions(+), 9 deletions(-)
->
-> Thanks, Daniel, this looks great:
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
+On Tuesday 16 September 2014, Lian Minghuan-B31939 wrote:
+> >>>> +          ranges = <0x81000000 0x0 0x00000000 0x40 0x10000000 0x0 0x00010000   /* downstream I/O */
+> >>>> +                    0x82000000 0x0 0x00000000 0x41 0x00000000 0x1 0x00000000>; /* non-prefetchable memory */
+> >>> Are these ranges hardcoded in the SoC, or are they the result of iATU
+> >>> settings?  If the latter, who configures it and why no prefetchable
+> >>> region?
+> >> [Minghuan] 400000_0000 - 480000_0000 is hardcode assigned to PEX1.
+> >> I separates from this 32 region  1M for IO, 4G for non-prefetchable memory.
+> >> 4G is the max size iATU supported.
+> >> IO and memory region will be set to iATU by pci-designware.c
+> >> Because both powerpc and imx do not set prefechable memory,
+> >> so  I do not assign prefetchable memory either.
+> > If there's spare room in the addres space for a prefetchable region, why
+> > not make one, regardless of what PPC and IMX do?
+> >
+> > FWIW, I believe that ARMv8 can make better use of a prefetchable region
+> > due to the "gathering" storage attribute, so even if you don't use one
+> > on LS1021A consider using one on ARMv8-based LS chips.
+> [Minghuan] Ok, I will add 4G prefetchable memory region.
 
-Reviewed-by: Zi Shen Lim <zlim.lnx@gmail.com>
+I guess that means you still can't support devices that require 64-bit
+BARs, right? 4GB may be too small for some devices.
 
-> We can merge this at -rc1.
->
-> Will
+Do I read this right that you could have multiple adjacent 4GB areas
+but are limited on registers to set up these areas?
+
+	Arnd
