@@ -1,38 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Sep 2014 18:33:52 +0200
-Subject: [PATCH v2 3/3] PCI: Layerscape: Add Layerscape PCIe driver
-In-Reply-To: <54187590.4070101@freescale.com>
-References: <1410469741-11634-1-git-send-email-Minghuan.Lian@freescale.com>
- <1410841159.24184.491.camel@snotra.buserror.net>
- <54187590.4070101@freescale.com>
-Message-ID: <201409161833.53176.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 16 Sep 2014 11:34:42 -0500
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <20140905211847.GB31011@kahuna>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com> <7hvbpdbvb1.fsf@paris.lan>
+ <CAGo_u6o7vAf=syzDTyxh0-kOhmzAmtdG_ardgFgoPQofrGdxUQ@mail.gmail.com>
+ <53FE3477.2020207@ti.com> <7hegw1bs30.fsf@paris.lan>
+ <20140905211847.GB31011@kahuna>
+Message-ID: <541866A2.70007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 September 2014, Lian Minghuan-B31939 wrote:
-> >>>> +          ranges = <0x81000000 0x0 0x00000000 0x40 0x10000000 0x0 0x00010000   /* downstream I/O */
-> >>>> +                    0x82000000 0x0 0x00000000 0x41 0x00000000 0x1 0x00000000>; /* non-prefetchable memory */
-> >>> Are these ranges hardcoded in the SoC, or are they the result of iATU
-> >>> settings?  If the latter, who configures it and why no prefetchable
-> >>> region?
-> >> [Minghuan] 400000_0000 - 480000_0000 is hardcode assigned to PEX1.
-> >> I separates from this 32 region  1M for IO, 4G for non-prefetchable memory.
-> >> 4G is the max size iATU supported.
-> >> IO and memory region will be set to iATU by pci-designware.c
-> >> Because both powerpc and imx do not set prefechable memory,
-> >> so  I do not assign prefetchable memory either.
-> > If there's spare room in the addres space for a prefetchable region, why
-> > not make one, regardless of what PPC and IMX do?
-> >
-> > FWIW, I believe that ARMv8 can make better use of a prefetchable region
-> > due to the "gathering" storage attribute, so even if you don't use one
-> > on LS1021A consider using one on ARMv8-based LS chips.
-> [Minghuan] Ok, I will add 4G prefetchable memory region.
 
-I guess that means you still can't support devices that require 64-bit
-BARs, right? 4GB may be too small for some devices.
+Daniel,
 
-Do I read this right that you could have multiple adjacent 4GB areas
-but are limited on registers to set up these areas?
+On 09/05/2014 04:18 PM, Nishanth Menon wrote:
+> Daniel,
+> 
+> On 13:22-20140827, Kevin Hilman wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+>>> On Wednesday 27 August 2014 03:35 PM, Nishanth Menon wrote:
+>>>> On Wed, Aug 27, 2014 at 2:13 PM, Kevin Hilman
+>>>> <khilman@deeprootsystems.com> wrote:
+>>>>> + Daniel (cpuidle maintainer)
+>>>> [...]
+>>>>>> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
+>>>>>> +                            struct cpuidle_driver *drv,
+>>>>>> +                            int index)
+>>>>>> +{
+>>>>>> +     struct idle_statedata *cx = state_ptr + index;
+>>>>>> +     unsigned long flag;
+>>>>>> +
+>>>>>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>>>>>> +     cx->mpu_state_vote++;
+>>>>>> +     if (cx->mpu_state_vote == num_online_cpus()) {
+>>>>>> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+>>>>>> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+>>>>>> +     }
+>>>>>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>>>>>> +
+>>>>>> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+>>>>>> +
+>>>>>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>>>>>> +     if (cx->mpu_state_vote == num_online_cpus())
+>>>>>> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+>>>>>> +     cx->mpu_state_vote--;
+>>>>>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>>>>>> +
+>>>>>> +     return index;
+>>>>>> +}
+>>>>>
+>>>>> Hmm, maybe OMAP5/DRA7 CPUidle driver should be a new one based on MCPM?
+>>>>
+>>>> Trying to understand benefit of MCPM here - at least without a deeper
+>>>> understanding of mcpm infrastructure benefits (first look seemed a
+>>>> little heavy for OMAP5/DRA7 needs).
+>>>>
+>>>> Neither DRA7/OMAP5 are multi-cluster, the SoCs are not targetted for
+>>>> "OFF" of CPU1/0, we have mercury hardware to help with context and
+>>>> sync issues.
+>>>>
+>>>> Being able to reuse most of existing OMAP4 infrastructure code is
+>>>> useful as well to leave the existing omap4 framework as being lighter
+>>>> in complexity -esp in a cpuidle like hot path?
+>>>>
+>>>> The spin_lock is only for the programming of MPU power domain in a
+>>>> consistent manner - I suppose might have been the trigger for
+>>>> proposing mcpm?
+>>>>
+>>> Mostly not....
+>>>
+>>> I think this is coming because last time Nicolas Pitre tried to convert
+>>> the OMAP CPUIdle into MCPM but because of various ordering requirements,
+>>> OMAP wasn't suitable and then the plan was dropped later.
+>>>
+>>> Just to make clear, OMAP OMAP5/DRA7 as well the ordering requirement
+>>> remains the same for deeper states. Its just the mercury retention state
+>>> which we are able to enter without ordering requirements and hence
+>>> the voting scheme.
+>>
+>> Ah, OK.  This is the part that I'm missing.  So for deeper states you'll
+>> need to be using omap_enter_idle_coupled()
+>>
+>>> Hope this clarifies to you as well as Kevin just in case he missed the
+>>> part of the deeper C-states requirements.
+>>
+>> Yes, thanks for clarifying.
+>>
+>> That being said, I think MCPM can now do essentially what the coupled
+>> states code is doing. Even so, that's probably not a reason to hold up
+>> this patch, but Daniel gets to make that call.
+> 
+> 
+> Gentle ping.. You can find the discussion and the patch here:
+> https://patchwork.kernel.org/patch/4764661/
+> 
 
-	Arnd
+Ping on this again.. we are pretty close to approaching v3.18 merge
+window and this discussion has'nt gotten further.
+
+-- 
+Regards,
+Nishanth Menon
