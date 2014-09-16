@@ -1,76 +1,46 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 15 Sep 2014 23:28:07 -0500
-Subject: [RFC PATCH for AMD Seattle 0/4] Drivers for AMD-Seatlle to boot
- from ACPI
-In-Reply-To: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <5417BC57.4030504@amd.com>
+From: xuwei5@hisilicon.com (xuwei)
+Date: Tue, 16 Sep 2014 14:22:54 +0800
+Subject: [GIT PULL][for 3.18]pull request for hisilicon hix5hd2 soc dt updates
+Message-ID: <5417D73E.8080309@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note: Correcting the typo for linux-acpi mailing list in this reply.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Also, I would like to add the link to the "AMD Opteron? A1100 Series 
-Processor ACPI Porting Guide", which describes the current ACPI table 
-for AMD Seattle platform here:
+Please help to merge pull request for hisilicon hix5hd2 soc dt updates for 3.18. 
+Thanks!
 
-http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf
+Best Regards,
+Wei
 
-Suravee
 
-On 09/15/2014 07:47 PM, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->
-> As a follow up of the email thread:
->
->      [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
->      https://lkml.org/lkml/2014/9/1/446
->
-> Besides Hanjun Guo's patches above, these are the additional patches required
-> to boot AMD Seattle platform with full ACPI support:
->
->      [PATCH] efi/arm64: efistub: don't abort if base of DRAM is occupied
->      http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272274.html
->
->      [PATCH v2] efi/arm64: fix fdt-related memory reservation
->      https://lkml.org/lkml/2014/9/8/483
->
->      [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle SATA controller
->      https://lkml.org/lkml/2014/9/9/834
->
->      [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
->      https://lkml.org/lkml/2014/9/1/448
->      (NOTE: This is not meant to be submitted upstream, but required to enable
->       ACPI support for UART SBSA driver.)
->
-> These patches are rebased from the linux-3.17-rc4 upstream kernel, and
-> compatible with the AMD Seattle Firmware version ROD0070C.
-> The full kernel boot log can be found here:
->
->      http://people.linaro.org/~al.stone/seattle-boot-acpi-dmesg.txt
->
-> Suravee / Al
->
-> Ard Biesheuvel (1):
->    arm64/efi: efistub: don't abort if base of DRAM is occupied
->
-> Grame Gregory (1):
->    [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
->
-> Mark Salter (1):
->    efi/arm64: fix fdt-related memory reservation
->
-> Suravee Suthikulpanit (1):
->    ata: ahci_platform: Add ACPI support for AMD Seattle SATA controller
->
->   arch/arm64/kernel/efi-stub.c       |  16 +-
->   arch/arm64/mm/init.c               |   3 +-
->   drivers/ata/Kconfig                |   2 +-
->   drivers/ata/ahci_platform.c        |  13 ++
->   drivers/firmware/efi/libstub/fdt.c |  10 +-
->   drivers/tty/Kconfig                |   6 +
->   drivers/tty/Makefile               |   1 +
->   drivers/tty/sbsauart.c             | 328 +++++++++++++++++++++++++++++++++++++
->   8 files changed, 365 insertions(+), 14 deletions(-)
->   create mode 100644 drivers/tty/sbsauart.c
->
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-dt-for-3.18
+
+for you to fetch changes up to 610bd8722ef40b649b51f01045c5d1903f41b583:
+
+  ARM: dts: hix5hd2: add wdg node (2014-09-16 11:00:43 +0800)
+
+----------------------------------------------------------------
+ARM: DT:  Hisilicon terminal SoC HiX5HD2 DT updates for 3.18
+
+- Add watchdog, gpio, sata, usb, mmc and gmac nodes in HiX5HD2 SoC DT
+- Enable sata and gmac in HiX5HD2 dkb board DT
+
+----------------------------------------------------------------
+Zhangfei Gao (6):
+      ARM: dts: hix5hd2: add gmac node
+      ARM: dts: hix5hd2: add mmc node
+      ARM: dts: hix5hd2: add usb node
+      ARM: dts: hix5hd2: add sata node
+      ARM: dts: hix5hd2: add gpio node
+      ARM: dts: hix5hd2: add wdg node
+
+ arch/arm/boot/dts/hisi-x5hd2-dkb.dts |  33 +++++++++++++++
+ arch/arm/boot/dts/hisi-x5hd2.dtsi    | 310 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 343 insertions(+)
