@@ -1,55 +1,80 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Sep 2014 13:29:21 -0500
-Subject: [Patch v9 1/3] usb: dwc3: qcom: Add device tree binding
-In-Reply-To: <20140916181543.GA19101@usblab-sd-06.qualcomm.com>
-References: <1410550088-8754-1-git-send-email-agross@codeaurora.org>
- <1410550088-8754-2-git-send-email-agross@codeaurora.org>
- <20140916181543.GA19101@usblab-sd-06.qualcomm.com>
-Message-ID: <20140916182920.GF19010@saruman.home>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 16 Sep 2014 11:31:45 -0700 (PDT)
+Subject: [RFC Part2 v1 14/21] x86, hpet: Enhance HPET IRQ to support
+ hierarchy irqdomain
+In-Reply-To: <1410444228-3134-15-git-send-email-jiang.liu@linux.intel.com>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+ <1410444228-3134-15-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <alpine.DEB.2.10.1409161104120.4247@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 11 Sep 2014, Jiang Liu wrote:
+>  #ifdef CONFIG_HPET_TIMER
+> +#define	HPET_DOMAIN_REMAPPED		0x80000000
+> +
+> +static inline int hpet_dev_id(struct irq_domain *domain)
+> +{
+> +	return (int)((long)domain->host_data & ~HPET_DOMAIN_REMAPPED);
+> +}
+> +
+> +static inline bool hpet_remapped(struct irq_domain *domain)
+> +{
+> +	return (bool)((long)domain->host_data & HPET_DOMAIN_REMAPPED);
+> +}
 
-On Tue, Sep 16, 2014 at 11:15:43AM -0700, Jack Pham wrote:
-> Hi Andy,
-> 
-> On Fri, Sep 12, 2014 at 02:28:06PM -0500, Andy Gross wrote:
-> > +Example device nodes:
-> > +
-> > +		hs_phy: phy at 100f8800 {
-> > +			compatible = "qcom,dwc3-hs-usb-phy";
-> > +			reg = <0x100f8800 0x30>;
-> 
-> Just wanted to point out that in our downstream code, the glue
-> device/driver, i.e. "qcom,dwc3", does claim an entire register region
-> that encompasses the same registers used by these PHYs. I noticed you're
-> not adding a reg resource to the glue node below in this patchset. In
-> order to allow multiple devices to use the overlapping regions, we avoid
-> calling devm_ioremap_resource() and instead call devm_ioremap_nocache()
-> directly which bypasses the request_mem_region() call, which I don't
-> think is an entirely correct thing to do.
-> 
-> On the other hand I'm trying to think of use cases on our other SOCs
-> (MSM8974, APQ8084) where the glue actually would need access to the same
-> or adjacent IO registers that couldn't just be handled directly by these
-> PHY drivers. Should we accommodate for the potential of overlapping
-> regions or should we just hold the line here and maybe only expose with
-> finer granularity the registers that will actually be needed by the PHYs
-> & glue respectively?
+It's kinda odd to have this encoded in domain->host_data.
 
-I prefer to keep things separated. Glue only needs to access whatever
-belongs to glue. If a register related to PHY settings, it should be in
-the PHY address space.
+>  static int hpet_msi_set_affinity(struct irq_data *data,
+>  				 const struct cpumask *mask, bool force)
+>  {
+> +	struct irq_data *parent = data->parent_data;
+>  	struct irq_cfg *cfg = irqd_cfg(data);
+>  	struct msi_msg msg;
+> -	unsigned int dest;
+>  	int ret;
+>  
+> -	ret = apic_set_affinity(data, mask, &dest);
+> -	if (ret)
+> -		return ret;
+> -
+> -	hpet_msi_read(data->handler_data, &msg);
+> -
+> -	msg.data &= ~MSI_DATA_VECTOR_MASK;
+> -	msg.data |= MSI_DATA_VECTOR(cfg->vector);
+> -	msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
+> -	msg.address_lo |= MSI_ADDR_DEST_ID(dest);
+> -
+> -	hpet_msi_write(data->handler_data, &msg);
+> +	ret = parent->chip->irq_set_affinity(parent, mask, force);
+> +	/* No need to rewrite HPET registers if interrupt is remapped */
+> +	if (ret >= 0 && !hpet_remapped(data->domain)) {
 
-cheers
+So we really should use irq_data->chip_data for this, i.e. storing
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/b45ffe5a/attachment.sig>
+struct hpet_msi {
+       struct msi_msg msg;
+       bool remapped;
+       /* whatever you need here */
+};
+
+> +		hpet_msi_read(data->handler_data, &msg);
+> +		msg.data &= ~MSI_DATA_VECTOR_MASK;
+> +		msg.data |= MSI_DATA_VECTOR(cfg->vector);
+> +		msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
+> +		msg.address_lo |= MSI_ADDR_DEST_ID(cfg->dest_apicid);
+
+We need the same thing for MSI so this should be a helper function
+
+   msi_update_msg(struct msi_msg *msg, struct irq_cfg *cfg)
+
+> +		hpet_msi_write(data->handler_data, &msg);
+> +	}
+>  
+> -	return IRQ_SET_MASK_OK_NOCOPY;
+> +	return ret;
+>  }
+ 
+Thanks,
+
+	tglx
