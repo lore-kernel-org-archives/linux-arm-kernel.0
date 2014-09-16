@@ -1,60 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Sep 2014 16:30:20 -0700
-Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
-References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
- <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140916233020.GC30918@lee--X1>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 16 Sep 2014 16:50:33 -0700
+Subject: [PATCH] ARM: dts: Add initial DTS file for Sony Xperia Z1 phone
+In-Reply-To: <5418C471.9000807@sonymobile.com>
+References: <5418C1D2.4000303@sonymobile.com>
+ <27E278AA-EBC0-4368-B75C-DCB2DD906612@codeaurora.org>
+ <5418C471.9000807@sonymobile.com>
+Message-ID: <8F13381C-BBEF-4602-B5C4-A885B946BDBB@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Sep 2014, Pawel Moll wrote:
 
-> Now, with the CLCD DT support available, there is no
-> more reason to keep the non-DT support for V2P-CA9.
-> 
-> Removed, together with "some" supporting code. It was
-> necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
-> and selected by the machines still interested in it.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  arch/arm/Kconfig                                  |   2 +
->  arch/arm/mach-vexpress/Kconfig                    |   3 -
->  arch/arm/mach-vexpress/Makefile                   |   3 +-
->  arch/arm/mach-vexpress/core.h                     |   7 -
->  arch/arm/mach-vexpress/ct-ca9x4.c                 | 212 ------------
->  arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |  47 ---
->  arch/arm/mach-vexpress/include/mach/hardware.h    |   1 -
->  arch/arm/mach-vexpress/include/mach/irqs.h        |   6 -
->  arch/arm/mach-vexpress/include/mach/motherboard.h |  88 -----
->  arch/arm/mach-vexpress/platsmp.c                  |  42 ---
->  arch/arm/mach-vexpress/v2m.c                      | 374 ----------------------
->  arch/arm/plat-versatile/Kconfig                   |   2 +-
->  drivers/clk/versatile/Makefile                    |   1 -
->  drivers/clk/versatile/clk-vexpress-osc.c          |   7 -
->  drivers/clk/versatile/clk-vexpress.c              |  86 -----
->  drivers/mfd/vexpress-sysreg.c                     |  71 +---
->  drivers/misc/vexpress-syscfg.c                    |  60 +---
->  drivers/power/reset/vexpress-poweroff.c           |  17 +-
->  include/linux/vexpress.h                          |  19 --
->  19 files changed, 35 insertions(+), 1013 deletions(-)
->  delete mode 100644 arch/arm/mach-vexpress/ct-ca9x4.c
->  delete mode 100644 arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
->  delete mode 100644 arch/arm/mach-vexpress/include/mach/hardware.h
->  delete mode 100644 arch/arm/mach-vexpress/include/mach/irqs.h
->  delete mode 100644 arch/arm/mach-vexpress/include/mach/motherboard.h
->  delete mode 100644 drivers/clk/versatile/clk-vexpress.c
+On Sep 16, 2014, at 4:14 PM, Tim Bird <tim.bird@sonymobile.com> wrote:
 
-Is it really necessary to take the one-big-patch approach?  I'm sure
-you can find a nicer way than to burden all these maintainers.
-Naturally I can't speak for everyone concerned, but I don't really
-want to be carrying all this if I don't have to.  Granted I'm not
-carrying any patches touching drivers/mfd/vexpress-sysreg.c at the
-moment, but equally I don't want to rule that out.
+> 
+> 
+> On 09/16/2014 04:08 PM, Kumar Gala wrote:
+>> 
+>> On Sep 16, 2014, at 4:03 PM, Tim Bird <tim.bird@sonymobile.com> wrote:
+>> 
+>>> This DTS has initial support for just a serial console, for the
+>>> Sony Xperia Z1 phone.  This phone uses a QualComm 8074 processor.
+>>> 
+>> 
+>> Qualcomm, the C isn?t caps.
+> 
+> Will fix.
+>> 
+>>> Signed-off-by: Tim Bird <tim.bird@sonymobile.com>
+>>> ---
+>>> arch/arm/boot/dts/Makefile                   |    1 +
+>>> arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts |   18 ++++++++++++++++++
+>>> 2 files changed, 19 insertions(+)
+>>> create mode 100644 arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
+>>> 
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index b8c5cd3..680ce7e 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -341,6 +341,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+>>> dtb-$(CONFIG_ARCH_QCOM) += \
+>>> 	qcom-apq8064-ifc6410.dtb \
+>>> 	qcom-apq8074-dragonboard.dtb \
+>>> +	qcom-apq8074-xperia-z1.dtb \
+>>> 	qcom-apq8084-mtp.dtb \
+>>> 	qcom-msm8660-surf.dtb \
+>>> 	qcom-msm8960-cdp.dtb
+>>> diff --git a/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts b/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
+>>> new file mode 100644
+>>> index 0000000..59b3fa1
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
+>>> @@ -0,0 +1,18 @@
+>>> +#include "qcom-msm8974.dtsi"
+>>> +
+>>> +/ {
+>>> +	model = "Sony Xperia Z1 phone";
+>>> +	compatible = "qcom,msm8974?;
+>> 
+>> Should have a board compat as well
+> I'll ask Bjorn what we want to do here.  There was a compat that I stripped,
+> but I'm not sure we settled on the official name we want.  In any event,
+> will fix.
+>> 
+>>> +	qcom,msm-id = <126 8 0>, <185 8 0>, <186 8 0>;
+>> 
+>> We don?t have qcom,msm-id upstream at this time.
+> Do I just leave this out, then?
+
+yes, lets drop it for now, unless you guys need it to boot the upstream kernel on your hw.
+
+> 
+> Thanks.
+> -- Tim
+> 
+> P.S. By now you probably noticed I mis-typed device-tree at vger.kernel.org.  I'll fix that also.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
