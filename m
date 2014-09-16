@@ -1,28 +1,48 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Tue, 16 Sep 2014 16:40:35 +0200
-Subject: [PATCH] ARM: bcm2835: Enable USB_DWC2_HOST in bcm2835_defconfig
-Message-ID: <1410878435-12499-1-git-send-email-lkundrak@v3.sk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 16 Sep 2014 22:42:03 +0800
+Subject: [PATCH 2/2] watchdog: sunxi: Add A31 watchdog support
+In-Reply-To: <1410878523-4924-1-git-send-email-wens@csie.org>
+References: <1410878523-4924-1-git-send-email-wens@csie.org>
+Message-ID: <1410878523-4924-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It broke when host was moved into a separate module, in [47a1685f1].
+This patch adds support for the watchdog hardware found in A31 and
+newer SoCs. This new hardware has registers at different offsets, and
+the system reset control has been split out of the "mode" register
+into a new "configuration" register.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Differences not supported by this driver include separate interrupt
+lines for each watchdog, instead of sharing an interrupt line and
+registers with the timer block.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/configs/bcm2835_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/watchdog/sunxi_wdt.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 0302d29..31cb073 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -98,6 +98,7 @@ CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
- CONFIG_STAGING=y
- CONFIG_USB_DWC2=y
-+CONFIG_USB_DWC2_HOST=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index a1f7113..b62301e 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -219,8 +219,18 @@ static const struct sunxi_wdt_reg sun4i_wdt_reg = {
+ 	.wdt_reset_val = 0x02,
+ };
+ 
++static const struct sunxi_wdt_reg sun6i_wdt_reg = {
++	.wdt_ctrl = 0x10,
++	.wdt_cfg = 0x14,
++	.wdt_mode = 0x18,
++	.wdt_timeout_shift = 4,
++	.wdt_reset_mask = 0x03,
++	.wdt_reset_val = 0x01,
++};
++
+ static const struct of_device_id sunxi_wdt_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-wdt", .data = &sun4i_wdt_reg },
++	{ .compatible = "allwinner,sun6i-a31-wdt", .data = &sun6i_wdt_reg },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
 -- 
-1.9.3
+2.1.0
