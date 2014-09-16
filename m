@@ -1,80 +1,23 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 16 Sep 2014 11:31:45 -0700 (PDT)
-Subject: [RFC Part2 v1 14/21] x86, hpet: Enhance HPET IRQ to support
- hierarchy irqdomain
-In-Reply-To: <1410444228-3134-15-git-send-email-jiang.liu@linux.intel.com>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
- <1410444228-3134-15-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <alpine.DEB.2.10.1409161104120.4247@nanos>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Sep 2014 11:34:31 -0700
+Subject: [PATCH v2] spi: pl022: Add support for chip select extension
+In-Reply-To: <1410781132-16223-1-git-send-email-anders.berg@avagotech.com>
+References: <1410781132-16223-1-git-send-email-anders.berg@avagotech.com>
+Message-ID: <20140916183431.GX7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014, Jiang Liu wrote:
->  #ifdef CONFIG_HPET_TIMER
-> +#define	HPET_DOMAIN_REMAPPED		0x80000000
-> +
-> +static inline int hpet_dev_id(struct irq_domain *domain)
-> +{
-> +	return (int)((long)domain->host_data & ~HPET_DOMAIN_REMAPPED);
-> +}
-> +
-> +static inline bool hpet_remapped(struct irq_domain *domain)
-> +{
-> +	return (bool)((long)domain->host_data & HPET_DOMAIN_REMAPPED);
-> +}
+On Mon, Sep 15, 2014 at 01:38:52PM +0200, Anders Berg wrote:
 
-It's kinda odd to have this encoded in domain->host_data.
+> v2:
+>     - added constant to <linux/amba/bus.h>
 
->  static int hpet_msi_set_affinity(struct irq_data *data,
->  				 const struct cpumask *mask, bool force)
->  {
-> +	struct irq_data *parent = data->parent_data;
->  	struct irq_cfg *cfg = irqd_cfg(data);
->  	struct msi_msg msg;
-> -	unsigned int dest;
->  	int ret;
->  
-> -	ret = apic_set_affinity(data, mask, &dest);
-> -	if (ret)
-> -		return ret;
-> -
-> -	hpet_msi_read(data->handler_data, &msg);
-> -
-> -	msg.data &= ~MSI_DATA_VECTOR_MASK;
-> -	msg.data |= MSI_DATA_VECTOR(cfg->vector);
-> -	msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-> -	msg.address_lo |= MSI_ADDR_DEST_ID(dest);
-> -
-> -	hpet_msi_write(data->handler_data, &msg);
-> +	ret = parent->chip->irq_set_affinity(parent, mask, force);
-> +	/* No need to rewrite HPET registers if interrupt is remapped */
-> +	if (ret >= 0 && !hpet_remapped(data->domain)) {
-
-So we really should use irq_data->chip_data for this, i.e. storing
-
-struct hpet_msi {
-       struct msi_msg msg;
-       bool remapped;
-       /* whatever you need here */
-};
-
-> +		hpet_msi_read(data->handler_data, &msg);
-> +		msg.data &= ~MSI_DATA_VECTOR_MASK;
-> +		msg.data |= MSI_DATA_VECTOR(cfg->vector);
-> +		msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-> +		msg.address_lo |= MSI_ADDR_DEST_ID(cfg->dest_apicid);
-
-We need the same thing for MSI so this should be a helper function
-
-   msi_update_msg(struct msi_msg *msg, struct irq_cfg *cfg)
-
-> +		hpet_msi_write(data->handler_data, &msg);
-> +	}
->  
-> -	return IRQ_SET_MASK_OK_NOCOPY;
-> +	return ret;
->  }
- 
-Thanks,
-
-	tglx
+Since you're editing the AMBA code you should also CC Russell so he can
+review the AMBA part of the change.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140916/8c829fa0/attachment.sig>
