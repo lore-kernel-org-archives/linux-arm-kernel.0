@@ -1,110 +1,126 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Sep 2014 20:12:00 -0700
-Subject: [PATCH 06/12] ARM: dts: Add support for Ethernet on some N900 macro
- boards
+Date: Mon, 15 Sep 2014 20:12:02 -0700
+Subject: [PATCH 08/12] ARM: omap2plus_defconfig: Shrink with savedefconfig
 In-Reply-To: <1410837126-31553-1-git-send-email-tony@atomide.com>
 References: <1410837126-31553-1-git-send-email-tony@atomide.com>
-Message-ID: <1410837126-31553-6-git-send-email-tony@atomide.com>
+Message-ID: <1410837126-31553-8-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have support for this in board-rx51-peripherals.c, let's
-add it to the .dts files too.
-
-Note that the reset GPIO will eventually go to the driver.
-For now let's just pull it down and skip any further reset
-in case the bootloader has configured the MAC address so
-NFSroot works.
-
-Also note that after 3430-sdp are using proper GPMC timings
-we can remove the tests for smsc,lan91c94 in gpmc.c.
+This saves few lines and makes it easier to make patches
+against omap2plus_defconfig.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap3-n900.dts   | 42 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/pdata-quirks.c |  3 +++
- 2 files changed, 45 insertions(+)
+ arch/arm/configs/omap2plus_defconfig | 19 +++----------------
+ 1 file changed, 3 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index f0d8236..19a5857 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -134,6 +134,14 @@
- 		>;
- 	};
- 
-+	ethernet_pins: pinmux_ethernet_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x20b4, PIN_INPUT_PULLDOWN | MUX_MODE4)	/* gpmc_ncs3.gpio_54 */
-+			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE4)		/* dss_data16.gpio_86 */
-+			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
-+		>;
-+	};
-+
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
- 			0x18a (PIN_INPUT | MUX_MODE0)		/* i2c1_scl */
-@@ -578,6 +586,8 @@
- 
- &gpmc {
- 	ranges = <0 0 0x04000000 0x10000000>; /* 256MB */
-+	ranges = <0 0 0x01000000 0x01000000>,	/* 16 MB for OneNAND */
-+		 <1 0 0x02000000 0x01000000>;	/* 16 MB for smc91c96 */
- 
- 	/* gpio-irq for dma: 65 */
- 
-@@ -646,6 +656,38 @@
- 			reg = <0x004c0000 0x0fb40000>;
- 		};
- 	};
-+
-+	ethernet at gpmc {
-+		compatible = "smsc,lan91c94";
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;	/* gpio54 */
-+		reg = <1 0x300 0xf>;		/* 16 byte IO range at offset 0x300 */
-+		bank-width = <2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ethernet_pins>;
-+		gpmc,device-width = <2>;
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <48>;
-+		gpmc,cs-wr-off-ns = <24>;
-+		gpmc,adv-on-ns = <0>;
-+		gpmc,adv-rd-off-ns = <0>;
-+		gpmc,adv-wr-off-ns = <0>;
-+		gpmc,we-on-ns = <12>;
-+		gpmc,we-off-ns = <18>;
-+		gpmc,oe-on-ns = <12>;
-+		gpmc,oe-off-ns = <48>;
-+		gpmc,page-burst-access-ns = <0>;
-+		gpmc,access-ns = <42>;
-+		gpmc,rd-cycle-ns = <180>;
-+		gpmc,wr-cycle-ns = <180>;
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <0>;
-+		gpmc,wait-monitoring-ns = <0>;
-+		gpmc,clk-activation-ns = <0>;
-+		gpmc,wr-access-ns = <0>;
-+		gpmc,wr-data-mux-bus-ns = <12>;
-+	};
- };
- 
- &mcspi1 {
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index ead7736..540f3f8 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -252,6 +252,9 @@ static void __init nokia_n900_legacy_init(void)
- 		platform_device_register(&omap3_rom_rng_device);
- 
- 	}
-+
-+	/* Only on some development boards */
-+	gpio_request_one(164, GPIOF_OUT_INIT_LOW, "smc91x reset");
- }
- 
- static void __init omap3_tao3530_legacy_init(void)
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index f650f00..fc63855 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -32,7 +32,6 @@ CONFIG_SOC_OMAP5=y
+ CONFIG_SOC_AM33XX=y
+ CONFIG_SOC_AM43XX=y
+ CONFIG_SOC_DRA7XX=y
+-CONFIG_CACHE_L2X0=y
+ CONFIG_ARM_THUMBEE=y
+ CONFIG_ARM_ERRATA_411920=y
+ CONFIG_SMP=y
+@@ -44,7 +43,6 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
+ CONFIG_KEXEC=y
+-CONFIG_FPE_NWFPE=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_PM_DEBUG=y
+@@ -75,8 +73,6 @@ CONFIG_BT_HCIBCM203X=m
+ CONFIG_BT_HCIBPA10X=m
+ CONFIG_CFG80211=m
+ CONFIG_MAC80211=m
+-CONFIG_MAC80211_RC_PID=y
+-CONFIG_MAC80211_RC_DEFAULT_PID=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+@@ -103,7 +99,6 @@ CONFIG_BMP085_I2C=m
+ CONFIG_SENSORS_LIS3_I2C=m
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+ CONFIG_MD=y
+ CONFIG_NETDEVICES=y
+@@ -162,15 +157,12 @@ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_W1=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_AVS=y
+ CONFIG_SENSORS_LM75=m
+ CONFIG_THERMAL=y
+ CONFIG_THERMAL_GOV_FAIR_SHARE=y
+ CONFIG_THERMAL_GOV_USER_SPACE=y
+-CONFIG_CPU_THERMAL=y
+ CONFIG_TI_SOC_THERMAL=y
+-CONFIG_TI_THERMAL=y
+ CONFIG_OMAP4_THERMAL=y
+ CONFIG_OMAP5_THERMAL=y
+ CONFIG_DRA752_THERMAL=y
+@@ -183,8 +175,8 @@ CONFIG_MFD_TPS65217=y
+ CONFIG_MFD_TPS65218=y
+ CONFIG_MFD_TPS65910=y
+ CONFIG_TWL6040_CORE=y
+-CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_PALMAS=y
++CONFIG_REGULATOR_PBIAS=y
+ CONFIG_REGULATOR_TI_ABB=y
+ CONFIG_REGULATOR_TPS65023=y
+ CONFIG_REGULATOR_TPS6507X=y
+@@ -192,7 +184,6 @@ CONFIG_REGULATOR_TPS65217=y
+ CONFIG_REGULATOR_TPS65218=y
+ CONFIG_REGULATOR_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+-CONFIG_REGULATOR_PBIAS=y
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_MODE_HELPERS=y
+@@ -221,8 +212,6 @@ CONFIG_SND_DEBUG=y
+ CONFIG_SND_USB_AUDIO=m
+ CONFIG_SND_SOC=m
+ CONFIG_SND_OMAP_SOC=m
+-CONFIG_SND_AM33XX_SOC_EVM=m
+-CONFIG_SND_DAVINCI_SOC=m
+ CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
+ CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
+ CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
+@@ -233,9 +222,6 @@ CONFIG_USB_WDM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC3=m
+ CONFIG_USB_TEST=y
+-CONFIG_NOP_USB_XCEIV=y
+-CONFIG_OMAP_USB2=y
+-CONFIG_TI_PIPE3=y
+ CONFIG_AM335X_PHY_USB=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_DEBUG=y
+@@ -243,7 +229,6 @@ CONFIG_USB_GADGET_DEBUG_FILES=y
+ CONFIG_USB_GADGET_DEBUG_FS=y
+ CONFIG_USB_ZERO=m
+ CONFIG_MMC=y
+-CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_SDIO_UART=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+@@ -267,6 +252,8 @@ CONFIG_TI_EDMA=y
+ CONFIG_DMA_OMAP=y
+ CONFIG_EXTCON=y
+ CONFIG_EXTCON_PALMAS=y
++CONFIG_OMAP_USB2=y
++CONFIG_TI_PIPE3=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
 -- 
 2.1.0
