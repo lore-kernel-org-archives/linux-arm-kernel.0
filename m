@@ -1,83 +1,43 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 17 Sep 2014 09:10:18 -0700
-Subject: [PATCH 3.17-rc4 v7 6/6] arm: smp: Handle ipi_cpu_backtrace() using
- FIQ (if available)
-In-Reply-To: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1410970218-28847-7-git-send-email-daniel.thompson@linaro.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 17 Sep 2014 17:11:01 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <20140917152735.GU12361@n2100.arm.linux.org.uk>
+References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
+ <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
+ <20140910145818.GG12361@n2100.arm.linux.org.uk>
+ <1410363657.23973.48.camel@hornet>
+ <20140917152735.GU12361@n2100.arm.linux.org.uk>
+Message-ID: <1410970261.30394.15.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced a replacement default FIQ handler and
-an implementation of arch_trigger_all_cpu_backtrace for ARM but these
-are currently independant.
+On Wed, 2014-09-17 at 16:27 +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 10, 2014 at 04:40:57PM +0100, Pawel Moll wrote:
+> > On Wed, 2014-09-10 at 15:58 +0100, Russell King - ARM Linux wrote:
+> > > So, I'll then be asking ARM to provide updated instructions on how to
+> > > boot the CT9x4 with DT... 
+> 
+> Let me repeat: a boot loader with network booting capability is an
+> absolute necessity for me.  This is *required* for unattended boots of
+> kernels which have just been built.  If a platform doesn't have this
+> capability, I'm just not interested in it, and I _will_ not use it.  It
+> really is that simple.
+> 
+> My position on the boot loader issue is not going to change; it's a
+> fundamental requirement for automatic build and boot testing, and for
+> efficient workflow at other times.
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+I understand.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 4 +++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 9 insertions(+), 1 deletion(-)
+As Boot Monitor is not going to do TFTP in foreseeable future, the
+"compat" approach of glueing zImage with dtb is a potential solution.
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 2ec765c..0580270 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -85,6 +87,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 94959f9..7a79d11 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -543,7 +543,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -584,6 +584,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 92c4ea1..40b1de7 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-1.9.3
+I've just tested a build with CONFIG_ARM_ATAG_DTB_COMPAT=y and
+CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y - after cat-ing
+arch/arm/boot/zImage with arch/arm/boot/dts/vexpress-v2p-ca9.dtb
+everything worked fine, booting with a root filesystem on a MMC card.
+
+Of course I tried this with Boot Monitor, but I would hope that it will
+work with uboot without any problem as well.
+
+Pawel
