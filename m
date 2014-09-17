@@ -1,101 +1,256 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 17 Sep 2014 09:48:15 +0900
-Subject: [PATCH v2 4/5] ARM: shmobile: kzm9d: sort dts file by address
+Date: Wed, 17 Sep 2014 09:48:14 +0900
+Subject: [PATCH v2 3/5] ARM: shmobile: r7s72100: sort dtsi file by address
 In-Reply-To: <1410914896-14395-1-git-send-email-horms+renesas@verge.net.au>
 References: <1410914896-14395-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1410914896-14395-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1410914896-14395-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-[horms+renesas at verge.net.au: updated for removal of regulator base addresses]
+[horms+renesas at verge.net.au: resolved conflict by updating
+  to use SoC-specific compat string for mtu2]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 v2 [Simon Horman]
 * Rebase
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 62 +++++++++++++++++++--------------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi | 202 ++++++++++++++++++++--------------------
+ 1 file changed, 101 insertions(+), 101 deletions(-)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index f27fcf0..922da27 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -27,37 +27,6 @@
- 		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp";
- 	};
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index 801a556..277e73c 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -52,16 +52,6 @@
+ 			clock-output-names = "usb_x1";
+ 		};
  
--	reg_1p8v: regulator {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-1.8V";
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <1800000>;
--		regulator-always-on;
--		regulator-boot-on;
--	};
+-		/* Special CPG clocks */
+-		cpg_clocks: cpg_clocks at fcfe0000 {
+-			#clock-cells = <1>;
+-			compatible = "renesas,r7s72100-cpg-clocks",
+-				     "renesas,rz-cpg-clocks";
+-			reg = <0xfcfe0000 0x18>;
+-			clocks = <&extal_clk>, <&usb_x1_clk>;
+-			clock-output-names = "pll", "i", "g";
+-		};
 -
--	reg_3p3v: regulator {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-always-on;
--		regulator-boot-on;
--	};
--
--	lan9220 at 20000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x20000000 0x10000>;
--		phy-mode = "mii";
--		interrupt-parent = <&gpio0>;
--		interrupts = <1 IRQ_TYPE_EDGE_RISING>;
--		reg-io-width = <4>;
--		smsc,irq-active-high;
--		smsc,irq-push-pull;
--		vddvario-supply = <&reg_1p8v>;
--		vdd33a-supply = <&reg_3p3v>;
--	};
--
- 	gpio_keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-@@ -92,4 +61,35 @@
- 			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+ 		/* Fixed factor clocks */
+ 		b_clk: b_clk {
+ 			#clock-cells = <0>;
+@@ -88,6 +78,16 @@
+ 			clock-output-names = "p0";
+ 		};
+ 
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at fcfe0000 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-cpg-clocks",
++				     "renesas,rz-cpg-clocks";
++			reg = <0xfcfe0000 0x18>;
++			clocks = <&extal_clk>, <&usb_x1_clk>;
++			clock-output-names = "pll", "i", "g";
++		};
++
+ 		/* MSTP clocks */
+ 		mstp3_clks: mstp3_clks at fcfe0420 {
+ 			#clock-cells = <1>;
+@@ -148,97 +148,6 @@
  		};
  	};
+ 
+-	gic: interrupt-controller at e8201000 {
+-		compatible = "arm,cortex-a9-gic";
+-		#interrupt-cells = <3>;
+-		#address-cells = <0>;
+-		interrupt-controller;
+-		reg = <0xe8201000 0x1000>,
+-			<0xe8202000 0x1000>;
+-	};
+-
+-	i2c0: i2c at fcfee000 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
+-		reg = <0xfcfee000 0x44>;
+-		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 158 IRQ_TYPE_EDGE_RISING>,
+-			     <0 159 IRQ_TYPE_EDGE_RISING>,
+-			     <0 160 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 161 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
+-		clock-frequency = <100000>;
+-		status = "disabled";
+-	};
+-
+-	i2c1: i2c at fcfee400 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
+-		reg = <0xfcfee400 0x44>;
+-		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 166 IRQ_TYPE_EDGE_RISING>,
+-			     <0 167 IRQ_TYPE_EDGE_RISING>,
+-			     <0 168 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 169 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
+-		clock-frequency = <100000>;
+-		status = "disabled";
+-	};
+-
+-	i2c2: i2c at fcfee800 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
+-		reg = <0xfcfee800 0x44>;
+-		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 174 IRQ_TYPE_EDGE_RISING>,
+-			     <0 175 IRQ_TYPE_EDGE_RISING>,
+-			     <0 176 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 177 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
+-		clock-frequency = <100000>;
+-		status = "disabled";
+-	};
+-
+-	i2c3: i2c at fcfeec00 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
+-		reg = <0xfcfeec00 0x44>;
+-		interrupts = <0 181 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 182 IRQ_TYPE_EDGE_RISING>,
+-			     <0 183 IRQ_TYPE_EDGE_RISING>,
+-			     <0 184 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 185 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
+-			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
+-		clock-frequency = <100000>;
+-		status = "disabled";
+-	};
+-
+-	mtu2: timer at fcff0000 {
+-		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
+-		reg = <0xfcff0000 0x400>;
+-		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-names = "tgi0a";
+-		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
+-		clock-names = "fck";
+-		status = "disabled";
+-	};
+-
+ 	scif0: serial at e8007000 {
+ 		compatible = "renesas,scif-r7s72100", "renesas,scif";
+ 		reg = <0xe8007000 64>;
+@@ -404,4 +313,95 @@
+ 		#size-cells = <0>;
+ 		status = "disabled";
+ 	};
 +
-+	reg_1p8v: regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
++	gic: interrupt-controller at e8201000 {
++		compatible = "arm,cortex-a9-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0xe8201000 0x1000>,
++			<0xe8202000 0x1000>;
 +	};
 +
-+	reg_3p3v: regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
++	i2c0: i2c at fcfee000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfee000 0x44>;
++		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 158 IRQ_TYPE_EDGE_RISING>,
++			     <0 159 IRQ_TYPE_EDGE_RISING>,
++			     <0 160 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 161 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
++		clock-frequency = <100000>;
++		status = "disabled";
 +	};
 +
-+	lan9220 at 20000000 {
-+		compatible = "smsc,lan9220", "smsc,lan9115";
-+		reg = <0x20000000 0x10000>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <1 IRQ_TYPE_EDGE_RISING>;
-+		reg-io-width = <4>;
-+		smsc,irq-active-high;
-+		smsc,irq-push-pull;
-+		vddvario-supply = <&reg_1p8v>;
-+		vdd33a-supply = <&reg_3p3v>;
++	i2c1: i2c at fcfee400 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfee400 0x44>;
++		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 166 IRQ_TYPE_EDGE_RISING>,
++			     <0 167 IRQ_TYPE_EDGE_RISING>,
++			     <0 168 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 169 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at fcfee800 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfee800 0x44>;
++		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 174 IRQ_TYPE_EDGE_RISING>,
++			     <0 175 IRQ_TYPE_EDGE_RISING>,
++			     <0 176 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 177 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
++	i2c3: i2c at fcfeec00 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfeec00 0x44>;
++		interrupts = <0 181 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 182 IRQ_TYPE_EDGE_RISING>,
++			     <0 183 IRQ_TYPE_EDGE_RISING>,
++			     <0 184 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 185 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
++	mtu2: timer at fcff0000 {
++		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
++		reg = <0xfcff0000 0x400>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tgi0a";
++		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
++		clock-names = "fck";
++		status = "disabled";
 +	};
  };
 -- 
