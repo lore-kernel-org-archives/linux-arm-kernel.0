@@ -1,67 +1,22 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 17 Sep 2014 16:37:53 +0300
-Subject: [PATCH v4 10/11] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <541861DB.5000706@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-11-git-send-email-d-gerlach@ti.com>
- <7h7g1dlp8b.fsf@linaro.org>
- <CAK=WgbYwGcSCxHfa880up1qKTroS=mi8UAf_Qh6Wz9n5x4D9rw@mail.gmail.com>
- <540F5C39.7040201@ti.com> <540F62E3.6080804@ti.com>
- <7hr3zk7b5z.fsf@deeprootsystems.com>
- <CAK=Wgbas+CqgYJ35Sao8eCkMPujpVNbWW-aikUQExScaqYfETw@mail.gmail.com>
- <541861DB.5000706@ti.com>
-Message-ID: <CAK=WgbYqv=Fu3fm7SK9_u_gu2Ac13Rgi+3Kyo6Bhu-+1WGFwow@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 17 Sep 2014 16:41:55 +0300
+Subject: [PATCH 3/8] ARM: tegra: Add PLL_M_UD and PLL_C_UD to
+ tegra124-car binding header
+In-Reply-To: <53FB7564.7020304@wwwdotorg.org>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <1405088313-20048-4-git-send-email-mperttunen@nvidia.com>
+ <53FB7564.7020304@wwwdotorg.org>
+Message-ID: <20140917134155.GJ26779@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+On Mon, Aug 25, 2014 at 07:41:56PM +0200, Stephen Warren wrote:
+> On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
+> > Add these clocks to the binding header so that EMC timings that have
+> > them as parent can refer to the clocks.
+> 
+> Peter, I assume this patch (and patch 4/8 too) will be needed by any EMC 
+> driver, whether it's part of this series or Tomeu Vizoso's work. Can you 
+> please review/ack those two patches for later reference. Thanks.
 
-On Tue, Sep 16, 2014 at 7:14 PM, Suman Anna <s-anna@ti.com> wrote:
-> The current remoteproc infrastructure automatically calls rproc_boot
-> only as part of the rpmsg/virtio stack (in remoteproc_virtio.c), but
-> since the WkupM3 does not use rpmsg, there is no automatic booting of
-> the WkupM3 processor.  This is the reason why rproc_boot is called as
-> part of the WkupM3 driver probe sequence. What are your concerns here,
-> and if you think this is not the right place do invoke rproc_boot, where
-> do you expect it to be called?
-
-The remoteproc layer is meant to hide hardware-specific details, and
-allow high-level hardware-agnostic code to boot a remote processor, in
-order to achieve some task, without even caring what kind of hardware
-it is booting.
-
-So generally we have some consumer driver asking remoteproc to boot a
-remote processor, and in turn, remoteproc asking a hardware-specific
-vendor driver to take care of the hardware details like actually
-taking the remote processor out of reset.
-
-The consumer driver is some code that deals with some hardware
-agnostic task. Today the only consumer we have is rpmsg, so it's
-perfectly reasonable if remoteproc needs to be adapted a bit to
-accommodate other consumers as they show up.
-
-Can you think of any component in your code that is not necessarily
-hardware specific, and that one day might be useful for other vendors?
-Can you describe the task you're trying to achieve, the entities
-involved and the flow between them?
-
-> Also do note that, there is no way
-> at present to retrieve the struct rproc for a given remote processor, to
-> be able to invoke the rproc_boot from a different layer.
-
-It's perfectly ok to make struct rproc public if we have a consumer
-that requires it.
-
-> Splitting this would still require some kind of notifier from remoteproc
-> for the other layers for them to know that the WkupM3 remote processor
-> has been loaded and booted successfully. This is also done as part of
-> the WkupM3 driver at the moment.
-
-Are there entities, other than the one that calls rproc_boot, that
-needs to know that the WkupM3 is up? if so, let's discuss who should
-notify them - remoteproc or the actual invoker of rproc_boot. It
-probably depends on who those entities are and what's their relation,
-if any, to the WkupM3 driver.
-
-Thanks,
-Ohad.
+Looks ok to me. I will take them in tegra-clk-next
