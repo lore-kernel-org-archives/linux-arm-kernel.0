@@ -1,172 +1,131 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Sep 2014 00:12:47 +0200
-Subject: [PATCH v3 1/8] clk: rockchip: change pll rate without a clk-notifier
+Date: Thu, 18 Sep 2014 00:12:51 +0200
+Subject: [PATCH v3 5/8] clk: rockchip: make tightly bound armclk child-clocks
+ read-only
 In-Reply-To: <1410991974-12235-1-git-send-email-heiko@sntech.de>
 References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410991974-12235-2-git-send-email-heiko@sntech.de>
+Message-ID: <1410991974-12235-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+Rockchip SoCs contain clocks tightly bound to the armclk, where the best
+rate / divider is supplied by the vendor after careful measuring.
+Often this ideal rate may be greater than the current rate.
 
-The Rockchip PLL code switches into slow mode (AKA bypass more AKA
-24MHz mode) before actually changing the PLL.  This keeps anyone from
-using the PLL while it's changing.  However, in all known Rockchip
-SoCs nobody should ever see the 24MHz when changing the PLL supplying
-the armclk because we should reparent children to an alternate
-(faster than 24MHz) PLL.
+Therefore prevent the ccf from trying to set these dividers itself by
+setting them to read-only.
 
-One problem is that the code to switch to an alternate parent was
-running in PRE_RATE_CHANGE.  ...and the code to switch to slow mode
-was _also_ running in PRE_RATE_CHANGE.  That meant there was no real
-guarantee that we would switch to an alternate parent before switching
-to 24MHz mode.
+In the case of the rk3066, this also includes the aclk_cpu, which makes it
+necessary to also split its direct child-clocks (pclk_cpu, hclk_cpu, ...)
+into individual definitions for rk3066 and rk3188.
 
-Let's move the switch to "slow mode" straight into
-rockchip_rk3066_pll_set_rate().  That means we're guaranteed that the
-24MHz is really a last-resort.
-
-Note that without this change on real systems we were the code to
-switch to an alternate parent at 24MHz.  In some older versions of
-that code we'd appy a (temporary) / 5 to the 24MHz causing us to run
-at 4.8MHz.  That wasn't enough to service USB interrupts in some cases
-and could lead to a system hang.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
 ---
- drivers/clk/rockchip/clk-pll.c | 63 +++++++++---------------------------------
- 1 file changed, 13 insertions(+), 50 deletions(-)
+ drivers/clk/rockchip/clk-rk3188.c | 26 ++++++++++++++++++--------
+ drivers/clk/rockchip/clk-rk3288.c | 18 +++++++++---------
+ 2 files changed, 27 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-index f2a1c7a..a3e886a 100644
---- a/drivers/clk/rockchip/clk-pll.c
-+++ b/drivers/clk/rockchip/clk-pll.c
-@@ -34,7 +34,6 @@ struct rockchip_clk_pll {
- 	const struct clk_ops	*pll_mux_ops;
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index 6a81bc9..adfbfef 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -174,17 +174,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+ 	GATE(0, "aclk_cpu", "aclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 3, GFLAGS),
  
- 	struct notifier_block	clk_nb;
--	bool			rate_change_remuxed;
+-	DIV(0, "pclk_cpu_pre", "aclk_cpu_pre", 0,
+-			RK2928_CLKSEL_CON(1), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
+ 	GATE(0, "atclk_cpu", "pclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 6, GFLAGS),
+ 	GATE(0, "pclk_cpu", "pclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 5, GFLAGS),
+-	DIV(0, "hclk_cpu_pre", "aclk_cpu_pre", 0,
+-			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
+-	COMPOSITE_NOMUX(0, "hclk_ahb2apb", "hclk_cpu_pre", 0,
+-			RK2928_CLKSEL_CON(1), 14, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
+-			RK2928_CLKGATE_CON(4), 9, GFLAGS),
+ 	GATE(0, "hclk_cpu", "hclk_cpu_pre", 0,
+ 			RK2928_CLKGATE_CON(0), 4, GFLAGS),
  
- 	void __iomem		*reg_base;
- 	int			lock_offset;
-@@ -109,38 +108,6 @@ static int rockchip_pll_wait_lock(struct rockchip_clk_pll *pll)
- }
+@@ -416,7 +409,17 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
+ 	COMPOSITE_NOGATE(0, "armclk", mux_armclk_p, 0,
+ 			RK2928_CLKSEL_CON(0), 8, 1, MFLAGS, 0, 5, DFLAGS),
+ 	DIVTBL(0, "aclk_cpu_pre", "armclk", 0,
+-			RK2928_CLKSEL_CON(1), 0, 3, DFLAGS, div_aclk_cpu_t),
++			RK2928_CLKSEL_CON(1), 0, 3, DFLAGS | CLK_DIVIDER_READ_ONLY, div_aclk_cpu_t),
++	DIV(0, "pclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO
++							    | CLK_DIVIDER_READ_ONLY),
++	DIV(0, "hclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO
++							   | CLK_DIVIDER_READ_ONLY),
++	COMPOSITE_NOMUX(0, "hclk_ahb2apb", "hclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 14, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO
++							    | CLK_DIVIDER_READ_ONLY,
++			RK2928_CLKGATE_CON(4), 9, GFLAGS),
  
- /**
-- * Set pll mux when changing the pll rate.
-- * This makes sure to move the pll mux away from the actual pll before
-- * changing its rate and back to the original parent after the change.
-- */
--static int rockchip_pll_notifier_cb(struct notifier_block *nb,
--					unsigned long event, void *data)
--{
--	struct rockchip_clk_pll *pll = to_rockchip_clk_pll_nb(nb);
--	struct clk_mux *pll_mux = &pll->pll_mux;
--	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
--	int cur_parent;
--
--	switch (event) {
--	case PRE_RATE_CHANGE:
--		cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
--		if (cur_parent == PLL_MODE_NORM) {
--			pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
--			pll->rate_change_remuxed = 1;
--		}
--		break;
--	case POST_RATE_CHANGE:
--		if (pll->rate_change_remuxed) {
--			pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_NORM);
--			pll->rate_change_remuxed = 0;
--		}
--		break;
--	}
--
--	return NOTIFY_OK;
--}
--
--/**
-  * PLL used in RK3066, RK3188 and RK3288
-  */
+ 	GATE(CORE_L2C, "core_l2c", "aclk_cpu", 0,
+ 			RK2928_CLKGATE_CON(9), 4, GFLAGS),
+@@ -534,6 +537,13 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
+ 	/* do not source aclk_cpu_pre from the apll, to keep complexity down */
+ 	COMPOSITE_NOGATE(0, "aclk_cpu_pre", mux_aclk_cpu_p, CLK_SET_RATE_NO_REPARENT,
+ 			RK2928_CLKSEL_CON(0), 5, 1, MFLAGS, 0, 5, DFLAGS),
++	DIV(0, "pclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
++	DIV(0, "hclk_cpu_pre", "aclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
++	COMPOSITE_NOMUX(0, "hclk_ahb2apb", "hclk_cpu_pre", 0,
++			RK2928_CLKSEL_CON(1), 14, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
++			RK2928_CLKGATE_CON(4), 9, GFLAGS),
  
-@@ -194,6 +161,10 @@ static int rockchip_rk3066_pll_set_rate(struct clk_hw *hw, unsigned long drate,
- 	const struct rockchip_pll_rate_table *rate;
- 	unsigned long old_rate = rockchip_rk3066_pll_recalc_rate(hw, prate);
- 	struct regmap *grf = rockchip_clk_get_grf();
-+	struct clk_mux *pll_mux = &pll->pll_mux;
-+	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
-+	int rate_change_remuxed = 0;
-+	int cur_parent;
- 	int ret;
+ 	GATE(CORE_L2C, "core_l2c", "armclk", 0,
+ 			RK2928_CLKGATE_CON(9), 4, GFLAGS),
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index b30e147..1d3036d 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -170,31 +170,31 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKSEL_CON(0), 15, 1, MFLAGS, 8, 5, DFLAGS),
  
- 	if (IS_ERR(grf)) {
-@@ -216,6 +187,12 @@ static int rockchip_rk3066_pll_set_rate(struct clk_hw *hw, unsigned long drate,
- 	pr_debug("%s: rate settings for %lu (nr, no, nf): (%d, %d, %d)\n",
- 		 __func__, rate->rate, rate->nr, rate->no, rate->nf);
- 
-+	cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
-+	if (cur_parent == PLL_MODE_NORM) {
-+		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
-+		rate_change_remuxed = 1;
-+	}
-+
- 	/* enter reset mode */
- 	writel(HIWORD_UPDATE(RK3066_PLLCON3_RESET, RK3066_PLLCON3_RESET, 0),
- 	       pll->reg_base + RK3066_PLLCON(3));
-@@ -247,6 +224,9 @@ static int rockchip_rk3066_pll_set_rate(struct clk_hw *hw, unsigned long drate,
- 		rockchip_rk3066_pll_set_rate(hw, old_rate, prate);
- 	}
- 
-+	if (rate_change_remuxed)
-+		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_NORM);
-+
- 	return ret;
- }
- 
-@@ -310,7 +290,6 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
- 	struct clk_mux *pll_mux;
- 	struct clk *pll_clk, *mux_clk;
- 	char pll_name[20];
--	int ret;
- 
- 	if (num_parents != 2) {
- 		pr_err("%s: needs two parent clocks\n", __func__);
-@@ -367,7 +346,6 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
- 	pll->lock_offset = grf_lock_offset;
- 	pll->lock_shift = lock_shift;
- 	pll->lock = lock;
--	pll->clk_nb.notifier_call = rockchip_pll_notifier_cb;
- 
- 	pll_clk = clk_register(NULL, &pll->hw);
- 	if (IS_ERR(pll_clk)) {
-@@ -377,14 +355,6 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
- 		goto err_pll;
- 	}
- 
--	ret = clk_notifier_register(pll_clk, &pll->clk_nb);
--	if (ret) {
--		pr_err("%s: failed to register clock notifier for %s : %d\n",
--				__func__, name, ret);
--		mux_clk = ERR_PTR(ret);
--		goto err_pll_notifier;
--	}
--
- 	/* create the mux on top of the real pll */
- 	pll->pll_mux_ops = &clk_mux_ops;
- 	pll_mux = &pll->pll_mux;
-@@ -417,13 +387,6 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
- 	return mux_clk;
- 
- err_mux:
--	ret = clk_notifier_unregister(pll_clk, &pll->clk_nb);
--	if (ret) {
--		pr_err("%s: could not unregister clock notifier in error path : %d\n",
--		       __func__, ret);
--		return mux_clk;
--	}
--err_pll_notifier:
- 	clk_unregister(pll_clk);
- err_pll:
- 	kfree(pll);
+ 	COMPOSITE_NOMUX(0, "armcore0", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 0, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 0, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 0, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "armcore1", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 4, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 4, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 1, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "armcore2", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 8, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 8, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 2, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "armcore3", "armclk", 0,
+-			RK3288_CLKSEL_CON(36), 12, 3, DFLAGS,
++			RK3288_CLKSEL_CON(36), 12, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 3, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "l2ram", "armclk", 0,
+-			RK3288_CLKSEL_CON(37), 0, 3, DFLAGS,
++			RK3288_CLKSEL_CON(37), 0, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 4, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "aclk_core_m0", "armclk", 0,
+-			RK3288_CLKSEL_CON(0), 0, 4, DFLAGS,
++			RK3288_CLKSEL_CON(0), 0, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 5, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "aclk_core_mp", "armclk", 0,
+-			RK3288_CLKSEL_CON(0), 4, 4, DFLAGS,
++			RK3288_CLKSEL_CON(0), 4, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 6, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "atclk", "armclk", 0,
+-			RK3288_CLKSEL_CON(37), 4, 5, DFLAGS,
++			RK3288_CLKSEL_CON(37), 4, 5, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 7, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "pclk_dbg_pre", "armclk", 0,
+-			RK3288_CLKSEL_CON(37), 9, 5, DFLAGS,
++			RK3288_CLKSEL_CON(37), 9, 5, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK3288_CLKGATE_CON(12), 8, GFLAGS),
+ 	GATE(0, "pclk_dbg", "pclk_dbg_pre", 0,
+ 			RK3288_CLKGATE_CON(12), 9, GFLAGS),
 -- 
 2.0.1
