@@ -1,187 +1,137 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Wed, 17 Sep 2014 08:46:58 +0200
-Subject: [PATCH v2] spi: pl022: Add support for chip select extension
-In-Reply-To: <20140916183431.GX7960@sirena.org.uk>
-References: <20140916183431.GX7960@sirena.org.uk>
-Message-ID: <1410936418-26443-1-git-send-email-anders.berg@avagotech.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 17 Sep 2014 08:55:05 +0200
+Subject: Cortex-M and zImage
+In-Reply-To: <20140917061110.GM3755@pengutronix.de>
+References: <CAGhQ9VzzSq4P5BKM3UBBCPT61g3T1RHFhttfA-KkWGCcrjaW6A@mail.gmail.com>
+ <20140917061110.GM3755@pengutronix.de>
+Message-ID: <CAGhQ9VyhXywQ2kBKK9K5McQf153qXzgsPzt3GoCCL=QjWR2ogw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for a extended PL022 which has an extra register for controlling up
-to five chip select signals. This controller is found on the AXM5516 SoC.
-Unfortunately the PrimeCell identification registers are identical to a
-standard ARM PL022. To work around this, the peripheral ID must be overridden
-in the device tree using the "arm,primecell-periphid" property with the value
-0x000b6022.
+On 17 September 2014 08:11, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello Joachim,
+>
+> On Tue, Sep 16, 2014 at 10:25:02PM +0200, Joachim Eastwood wrote:
+>> I am working on Linux support for the NXP LPC18xx/43xx family of
+>> Cortex-M3/M4 microcontrollers. Building zImage for Cortex-M fails
+>> with the following two errors:
+>> error: arch/arm/boot/compressed/piggy.gzip.o: Conflicting architecture
+>> profiles M/A
+>> linux/arch/arm/boot/compressed/head.S:794: undefined reference to
+>> `CONFIG_PROCESSOR_ID'
+>>
+>> The last error is easy to fix. But the first about conflicting arch is
+>> harder.
+> Do you send a patch?
 
-Signed-off-by: Anders Berg <anders.berg@avagotech.com>
----
+No, I haven't sent a patch to the fix undefined reference since the
+conflicting arch stuff prevented zImage from compiling anyways.
 
-Adding Russell to Cc.
+> I was able to compile a zImage with the patch below. For the
+> "Conflicting architecture profiles" error the most relevant hunk is the
+> first. And of course this needs some #ifdefs.
 
-Changelog:
+Thanks, I'll give it a try later today.
 
-v2:
-    - added constant to <linux/amba/bus.h>
+But is this the way to go?
+Adding lots of 'ifdefs CONFIG_CPU_V7M' to compressed/head.S ?
 
- drivers/spi/spi-pl022.c  | 59 +++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/amba/bus.h |  5 ++++
- 2 files changed, 63 insertions(+), 1 deletion(-)
+I'll guess Russell have to answer that one.
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 1189cfd..b395489 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -82,6 +82,7 @@
- #define SSP_MIS(r)	(r + 0x01C)
- #define SSP_ICR(r)	(r + 0x020)
- #define SSP_DMACR(r)	(r + 0x024)
-+#define SSP_CSR(r)	(r + 0x030) /* vendor extension */
- #define SSP_ITCR(r)	(r + 0x080)
- #define SSP_ITIP(r)	(r + 0x084)
- #define SSP_ITOP(r)	(r + 0x088)
-@@ -198,6 +199,12 @@
- #define SSP_DMACR_MASK_TXDMAE		(0x1UL << 1)
- 
- /*
-+ * SSP Chip Select Control Register - SSP_CSR
-+ * (vendor extension)
-+ */
-+#define SSP_CSR_CSVALUE_MASK		(0x1FUL << 0)
-+
-+/*
-  * SSP Integration Test control Register - SSP_ITCR
-  */
- #define SSP_ITCR_MASK_ITEN		(0x1UL << 0)
-@@ -313,6 +320,7 @@ enum ssp_writing {
-  * @extended_cr: 32 bit wide control register 0 with extra
-  * features and extra features in CR1 as found in the ST variants
-  * @pl023: supports a subset of the ST extensions called "PL023"
-+ * @internal_cs_ctrl: supports chip select control register
-  */
- struct vendor_data {
- 	int fifodepth;
-@@ -321,6 +329,7 @@ struct vendor_data {
- 	bool extended_cr;
- 	bool pl023;
- 	bool loopback;
-+	bool internal_cs_ctrl;
- };
- 
- /**
-@@ -440,9 +449,32 @@ static void null_cs_control(u32 command)
- 	pr_debug("pl022: dummy chip select control, CS=0x%x\n", command);
- }
- 
-+/**
-+ * internal_cs_control - Control chip select signals via SSP_CSR.
-+ * @pl022: SSP driver private data structure
-+ * @command: select/delect the chip
-+ *
-+ * Used on controller with internal chip select control via SSP_CSR register
-+ * (vendor extension). Each of the 5 LSB in the register controls one chip
-+ * select signal.
-+ */
-+static void internal_cs_control(struct pl022 *pl022, u32 command)
-+{
-+	u32 tmp;
-+
-+	tmp = readw(SSP_CSR(pl022->virtbase));
-+	if (command == SSP_CHIP_SELECT)
-+		tmp &= ~BIT(pl022->cur_cs);
-+	else
-+		tmp |= BIT(pl022->cur_cs);
-+	writew(tmp, SSP_CSR(pl022->virtbase));
-+}
-+
- static void pl022_cs_control(struct pl022 *pl022, u32 command)
- {
--	if (gpio_is_valid(pl022->cur_cs))
-+	if (pl022->vendor->internal_cs_ctrl)
-+		internal_cs_control(pl022, command);
-+	else if (gpio_is_valid(pl022->cur_cs))
- 		gpio_set_value(pl022->cur_cs, command);
- 	else
- 		pl022->cur_chip->cs_control(command);
-@@ -2118,6 +2150,9 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (platform_info->num_chipselect && platform_info->chipselects) {
- 		for (i = 0; i < num_cs; i++)
- 			pl022->chipselects[i] = platform_info->chipselects[i];
-+	} else if (pl022->vendor->internal_cs_ctrl) {
-+		for (i = 0; i < num_cs; i++)
-+			pl022->chipselects[i] = i;
- 	} else if (IS_ENABLED(CONFIG_OF)) {
- 		for (i = 0; i < num_cs; i++) {
- 			int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
-@@ -2347,6 +2382,7 @@ static struct vendor_data vendor_arm = {
- 	.extended_cr = false,
- 	.pl023 = false,
- 	.loopback = true,
-+	.internal_cs_ctrl = false,
- };
- 
- static struct vendor_data vendor_st = {
-@@ -2356,6 +2392,7 @@ static struct vendor_data vendor_st = {
- 	.extended_cr = true,
- 	.pl023 = false,
- 	.loopback = true,
-+	.internal_cs_ctrl = false,
- };
- 
- static struct vendor_data vendor_st_pl023 = {
-@@ -2365,6 +2402,17 @@ static struct vendor_data vendor_st_pl023 = {
- 	.extended_cr = true,
- 	.pl023 = true,
- 	.loopback = false,
-+	.internal_cs_ctrl = false,
-+};
-+
-+static struct vendor_data vendor_lsi = {
-+	.fifodepth = 8,
-+	.max_bpw = 16,
-+	.unidir = false,
-+	.extended_cr = false,
-+	.pl023 = false,
-+	.loopback = true,
-+	.internal_cs_ctrl = true,
- };
- 
- static struct amba_id pl022_ids[] = {
-@@ -2398,6 +2446,15 @@ static struct amba_id pl022_ids[] = {
- 		.mask	= 0xffffffff,
- 		.data	= &vendor_st_pl023,
- 	},
-+	{
-+		/*
-+		 * PL022 variant that has a chip select control register whih
-+		 * allows control of 5 output signals nCS[0:4].
-+		 */
-+		.id	= 0x000b6022,
-+		.mask	= 0x000fffff,
-+		.data	= &vendor_lsi,
-+	},
- 	{ 0, 0 },
- };
- 
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index fdd7e1b..c324f57 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -44,10 +44,15 @@ struct amba_driver {
- 	const struct amba_id	*id_table;
- };
- 
-+/*
-+ * Constants for the designer field of the Peripheral ID register. When bit 7
-+ * is set to '1', bits [6:0] should be the JEP106 manufacturer identity code.
-+ */
- enum amba_vendor {
- 	AMBA_VENDOR_ARM = 0x41,
- 	AMBA_VENDOR_ST = 0x80,
- 	AMBA_VENDOR_QCOM = 0x51,
-+	AMBA_VENDOR_LSI = 0xb6,
- };
- 
- extern struct bus_type amba_bustype;
--- 
-1.9.1
+
+regards
+Joachim Eastwood
+
+> Best regards
+> Uwe
+>
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index 413fd94b5301..abad996484f1 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -11,7 +11,7 @@
+>  #include <linux/linkage.h>
+>  #include <asm/assembler.h>
+>
+> -       .arch   armv7-a
+> +       .arch   armv7-m
+>  /*
+>   * Debugging stuff
+>   *
+> @@ -114,7 +114,7 @@
+>   * sort out different calling conventions
+>   */
+>                 .align
+> -               .arm                            @ Always enter in ARM state
+> +               @.arm                           @ Always enter in ARM state
+>  start:
+>                 .type   start,#function
+>                 .rept   7
+> @@ -133,7 +133,7 @@ start:
+>   THUMB(                .thumb                  )
+>  1:
+>   ARM_BE8(      setend  be )                    @ go BE8 if compiled for BE8
+> -               mrs     r9, cpsr
+> +               @mrs    r9, cpsr
+>  #ifdef CONFIG_ARM_VIRT_EXT
+>                 bl      __hyp_stub_install      @ get into SVC mode, reversibly
+>  #endif
+> @@ -145,7 +145,7 @@ start:
+>                  * FIQs/IRQs (numeric definitions from angel arm.h source).
+>                  * We only do this if we were in user mode on entry.
+>                  */
+> -               mrs     r2, cpsr                @ get current mode
+> +               @mrs    r2, cpsr                @ get current mode
+>                 tst     r2, #3                  @ not user?
+>                 bne     not_angel
+>                 mov     r0, #0x17               @ angel_SWIreason_EnterSVC
+> @@ -153,7 +153,7 @@ start:
+>   THUMB(                svc     0xab            )       @ angel_SWI_THUMB
+>  not_angel:
+>                 safe_svcmode_maskall r0
+> -               msr     spsr_cxsf, r9           @ Save the CPU boot mode in
+> +               @msr    spsr_cxsf, r9           @ Save the CPU boot mode in
+>                                                 @ SPSR
+>                 /*
+>                  * Note that some cache flushing and other stuff may
+> @@ -366,7 +366,7 @@ dtb_check_done:
+>
+>  /* Relocate the hyp vector base if necessary */
+>  #ifdef CONFIG_ARM_VIRT_EXT
+> -               mrs     r0, spsr
+> +               @mrs    r0, spsr
+>                 and     r0, r0, #MODE_MASK
+>                 cmp     r0, #HYP_MODE
+>                 bne     1f
+> @@ -500,7 +500,7 @@ not_relocated:      mov     r0, #0
+>                 mov     r2, r8                  @ restore atags pointer
+>
+>  #ifdef CONFIG_ARM_VIRT_EXT
+> -               mrs     r0, spsr                @ Get saved CPU boot mode
+> +               @mrs    r0, spsr                @ Get saved CPU boot mode
+>                 and     r0, r0, #MODE_MASK
+>                 cmp     r0, #HYP_MODE           @ if not booted in HYP mode...
+>                 bne     __enter_kernel          @ boot kernel directly
+> @@ -791,7 +791,7 @@ call_cache_fn:      adr     r12, proc_types
+>  #ifdef CONFIG_CPU_CP15
+>                 mrc     p15, 0, r9, c0, c0      @ get processor ID
+>  #else
+> -               ldr     r9, =CONFIG_PROCESSOR_ID
+> +               @ldr    r9, =CONFIG_PROCESSOR_ID
+>  #endif
+>  1:             ldr     r1, [r12, #0]           @ get value
+>                 ldr     r2, [r12, #4]           @ get mask
+>
+>> As far as I know zImage on Cortex-M is not supported or not tested.
+>>
+>> Are there any plans to support zImage on Cortex-M?
+>> If so does anyone have an idea how the conflicting arch issue could
+>> be solved?
+>>
+>> btw, building with 'make Image' works fine and I have been running
+>> Linux for a while on the NXP LPC4357.
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
