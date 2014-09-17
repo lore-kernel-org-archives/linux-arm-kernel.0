@@ -1,78 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Sep 2014 08:42:12 -0700
-Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <1410965992.30394.6.camel@hornet>
-References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
- <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
- <20140916233020.GC30918@lee--X1> <1410965992.30394.6.camel@hornet>
-Message-ID: <20140917154212.GD30918@lee--X1>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 17 Sep 2014 10:45:14 -0500
+Subject: [PATCH] arm: omap2: n8x0: move i2c devices to DT
+In-Reply-To: <20140917150818.GB14505@atomide.com>
+References: <1410899500-21323-1-git-send-email-balbi@ti.com>
+ <20140916203337.GI19010@saruman.home>
+ <20140917145131.GB7987@atomide.com>
+ <20140917150205.GB6903@saruman.home>
+ <20140917150818.GB14505@atomide.com>
+Message-ID: <20140917154514.GB8140@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Sep 2014, Pawel Moll wrote:
-> On Wed, 2014-09-17 at 00:30 +0100, Lee Jones wrote:
-> > On Wed, 10 Sep 2014, Pawel Moll wrote:
-> > 
-> > > Now, with the CLCD DT support available, there is no
-> > > more reason to keep the non-DT support for V2P-CA9.
+On Wed, Sep 17, 2014 at 08:08:18AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [140917 08:03]:
+> > On Wed, Sep 17, 2014 at 07:51:32AM -0700, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [140916 13:34]:
+> > > > On Tue, Sep 16, 2014 at 03:31:40PM -0500, Felipe Balbi wrote:
+> > > > > By moving i2c devices to DT we can clean up
+> > > > > i2c_board_info and fix a problem with moving
+> > > > > INTC to irq domain where IRQs can be renumbered
+> > > > > on each boot.
+> > > > > 
+> > > > > Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> > > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > 
+> > > > note that this only causes problem for N8x0 because it boots in kinda of
+> > > > a hybrid way, where it uses DT but not all peripherals are created
+> > > > through DT.
 > > > 
-> > > Removed, together with "some" supporting code. It was
-> > > necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
-> > > and selected by the machines still interested in it.
-> > > 
-> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > > ---
-> > >  arch/arm/Kconfig                                  |   2 +
-> > >  arch/arm/mach-vexpress/Kconfig                    |   3 -
-> > >  arch/arm/mach-vexpress/Makefile                   |   3 +-
-> > >  arch/arm/mach-vexpress/core.h                     |   7 -
-> > >  arch/arm/mach-vexpress/ct-ca9x4.c                 | 212 ------------
-> > >  arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |  47 ---
-> > >  arch/arm/mach-vexpress/include/mach/hardware.h    |   1 -
-> > >  arch/arm/mach-vexpress/include/mach/irqs.h        |   6 -
-> > >  arch/arm/mach-vexpress/include/mach/motherboard.h |  88 -----
-> > >  arch/arm/mach-vexpress/platsmp.c                  |  42 ---
-> > >  arch/arm/mach-vexpress/v2m.c                      | 374 ----------------------
-> > >  arch/arm/plat-versatile/Kconfig                   |   2 +-
-> > >  drivers/clk/versatile/Makefile                    |   1 -
-> > >  drivers/clk/versatile/clk-vexpress-osc.c          |   7 -
-> > >  drivers/clk/versatile/clk-vexpress.c              |  86 -----
-> > >  drivers/mfd/vexpress-sysreg.c                     |  71 +---
-> > >  drivers/misc/vexpress-syscfg.c                    |  60 +---
-> > >  drivers/power/reset/vexpress-poweroff.c           |  17 +-
-> > >  include/linux/vexpress.h                          |  19 --
-> > >  19 files changed, 35 insertions(+), 1013 deletions(-)
-> > >  delete mode 100644 arch/arm/mach-vexpress/ct-ca9x4.c
-> > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-> > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/hardware.h
-> > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/irqs.h
-> > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/motherboard.h
-> > >  delete mode 100644 drivers/clk/versatile/clk-vexpress.c
+> > > Thanks applying this into omap-for-v3.18/intc-v2.
 > > 
-> > Is it really necessary to take the one-big-patch approach?  I'm sure
-> > you can find a nicer way than to burden all these maintainers.
-> > Naturally I can't speak for everyone concerned, but I don't really
-> > want to be carrying all this if I don't have to.  Granted I'm not
-> > carrying any patches touching drivers/mfd/vexpress-sysreg.c at the
-> > moment, but equally I don't want to rule that out.
+> > it might be better to apply this on your DT branch and merge DT before
+> > intc-v2, that might avoid a bisection problem.
 > 
-> I feel that getting all this stuff done (notice: no new features, just
-> removing existing stuff) was the simplest approach, without having to
-> rely on patches being merged in particular order.
+> Yes it would have been nice to have this as a patch before preparing
+> for intc-v2, but I did not have my n8x0 booting reliably because of
+> xhci vs ehci issues on my PC and did not notice it early enough.
 > 
-> Besides, there are three things there that are not directly maintained
-> by the arm-soc folk: clk (already acked by Mike), mfd (you) and
-> power/reset. So I thought that gathering acks for those and getting it
-> merged via arm-soc would be the simplest approach...
+> I've already sent a pull request for the first part of intc-v2, so
+> best to keep the related changes together in this case.
 
-It's certainly the easiest approach for you, but it makes things
-difficult for the maintainers as it would entail all 4 entities
-carrying the patch.  The alternative is to hope there won't be any
-subsequent changes to the files in our respective subsystems which
-might cause conflicts.  I'm not keen on the latter idea.
+alright, no problems then.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/ab4f8573/attachment-0001.sig>
