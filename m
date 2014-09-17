@@ -1,75 +1,64 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 17 Sep 2014 17:51:21 +0200
-Subject: [PATCH 2/2] ARM: dts: Add rtc_src clk for s3c-rtc on
- exynos5250-snow
-In-Reply-To: <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
-References: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>	<1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
-Message-ID: <5419ADF9.3010509@suse.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Sep 2014 17:58:27 +0200
+Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in mvebu_get_tgt_attr()
+Message-ID: <1410969507-13692-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.09.2014 um 17:47 schrieb Doug Anderson:
-> Hi,
-> 
-> On Wed, Sep 17, 2014 at 4:50 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> commit 546b117fdf17 ("rtc: s3c: add support for RTC of Exynos3250 SoC")
->> added an "rtc_src" DT property for the Samsung's S3C Real Time Clock
->> controller that specifies the 32.768 kHz clock that uses the RTC as its
->> source clock. In the case of the Exynos5250 based Snow board, the Maxim
->> 77686 32kHz AP clock is used as the source clock.
->>
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>  arch/arm/boot/dts/exynos5250-snow.dts | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->> index e51fcef..56eec56 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->> @@ -10,6 +10,7 @@
->>
->>  /dts-v1/;
->>  #include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/clock/maxim,max77686.h>
->>  #include "exynos5250.dtsi"
->>
->>  / {
->> @@ -29,6 +30,8 @@
->>
->>         rtc at 101E0000 {
->>                 status = "okay";
->> +               clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
->> +               clock-names = "rtc", "rtc_src";
-> 
-> Wait, seriously?  Snow is still using the "rtc at 101E0000" syntax?
-> Whatever happened to the series that Andreas worked so hard on,
-> including <https://patchwork.kernel.org/patch/4664801/>?
-> 
-> Kukjin: Andreas's patch series was Reviewed long ago I think and by
-> now I'd imagine it's got some conflicts due to it not having been
-> applied in a timely fashion.  Perhaps you could fix it up for Andreas
-> (since he's already rebased it several times) and land it?
-> 
-> If I had to guess, outstanding from Andreas's series (patchwork IDs listed):
-> 
-> 4751131 New          [v7] ARM: dts: Prepare node labels for exynos5250
-> 4664801 New          [v6,04/10] ARM: dts: Clean up exynos5250-snow
-> 4664771 New          [v6,05/10] ARM: dts: Fill in bootargs for exynos5250-snow
-> 4664731 New          [v6,06/10] ARM: dts: Clean up exynos5250-smdk5250
-> 4664751 New          [v6,07/10] ARM: dts: Clean up exynos5250-arndale
-> 4664711 New          [v6,08/10] ARM: dts: Fix apparent GPIO typo in
-> exynos5250-arndale
-> 4664681 New          [v6,09/10] ARM: dts: Simplify USB3503 on exynos5250-arndale
-> 4664691 New          [v6,10/10] ARM: dts: Add exynos5250-spring device tree
+Geert Uytterhoeven reported a warning when building pci-mvebu:
 
-Yes, Kukjin told me not to resend anything, and I haven't heard back
-from him since his Kernel Summit trip.
+drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
+drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
+   if (slot == PCI_SLOT(devfn) && type == rtype) {
+                                       ^
 
-Andreas
+And indeed, the code of mvebu_get_tgt_attr() may lead to the usage of
+rtype when being uninitialized, even though it would only happen if we
+had entries other than I/O space and 32 bits memory space.
 
+This commit fixes that by simply skipping the current DT range being
+considered, if it doesn't match the resource type we're looking for.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+This patch is a different solution than the one proposed by Geert. It
+(hopefully) matches the discussion we had with Bjorn and Arnd.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-mvebu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index a8c6f1a..b1315e1 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -873,7 +873,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 	rangesz = pna + na + ns;
+ 	nranges = rlen / sizeof(__be32) / rangesz;
+ 
+-	for (i = 0; i < nranges; i++) {
++	for (i = 0; i < nranges; i++, range += rangesz) {
+ 		u32 flags = of_read_number(range, 1);
+ 		u32 slot = of_read_number(range + 1, 1);
+ 		u64 cpuaddr = of_read_number(range + na, pna);
+@@ -883,14 +883,14 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 			rtype = IORESOURCE_IO;
+ 		else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
+ 			rtype = IORESOURCE_MEM;
++		else
++			continue;
+ 
+ 		if (slot == PCI_SLOT(devfn) && type == rtype) {
+ 			*tgt = DT_CPUADDR_TO_TARGET(cpuaddr);
+ 			*attr = DT_CPUADDR_TO_ATTR(cpuaddr);
+ 			return 0;
+ 		}
+-
+-		range += rangesz;
+ 	}
+ 
+ 	return -ENOENT;
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+2.0.0
