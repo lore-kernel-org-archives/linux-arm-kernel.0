@@ -1,43 +1,51 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 17 Sep 2014 23:06:42 +0200
-Subject: Cortex-M and zImage
-In-Reply-To: <20140917070509.GN3755@pengutronix.de>
-References: <CAGhQ9VzzSq4P5BKM3UBBCPT61g3T1RHFhttfA-KkWGCcrjaW6A@mail.gmail.com>
- <20140917061110.GM3755@pengutronix.de>
- <CAGhQ9VyhXywQ2kBKK9K5McQf153qXzgsPzt3GoCCL=QjWR2ogw@mail.gmail.com>
- <20140917070509.GN3755@pengutronix.de>
-Message-ID: <CAGhQ9VwR+UWsRDgR9c=aPxuZRQkG==bCRZcis6WXKBpc5j=NwA@mail.gmail.com>
+From: julien.grall@linaro.org (Julien Grall)
+Date: Wed, 17 Sep 2014 14:07:06 -0700
+Subject: [PATCH] arm{,
+ 64}/xen: Remove "EXPERIMENTAL" in the description of the Xen options
+Message-ID: <1410988026-19949-1-git-send-email-julien.grall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2014 09:05, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Joachim,
->
-> On Wed, Sep 17, 2014 at 08:55:05AM +0200, Joachim Eastwood wrote:
->> On 17 September 2014 08:11, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> > I was able to compile a zImage with the patch below. For the
->> > "Conflicting architecture profiles" error the most relevant hunk is the
->> > first. And of course this needs some #ifdefs.
->>
->> Thanks, I'll give it a try later today.
->>
->> But is this the way to go?
->> Adding lots of 'ifdefs CONFIG_CPU_V7M' to compressed/head.S ?
-> Probably not lots. I would expect (and hope) that you won't need more
-> than a handful. I don't see an alternative.
+The Xen ARM API is stable since Xen 4.4 and everything has been
+upstreamed in Linux for ARM and ARM64. Therefore we can drop "EXPERIMENTAL"
+from the Xen option in the both Kconfig.
 
-Okey, I got it working.
+Signed-off-by: Julien Grall <julien.grall@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/Kconfig   | 2 +-
+ arch/arm64/Kconfig | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Had to add a total of 6 ifdefs to compressed/head.S so I guess it is
-not too bad.
-
-Here is the diffstat:
-arch/arm/boot/compressed/head.S | 17 +++++++++++++++++
-1 file changed, 17 insertions(+)
-
-I'll send out a patch for comments tomorrow.
-
-regards
-Joachim Eastwood
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 32cbbd5..aa97108 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1758,7 +1758,7 @@ config XEN_DOM0
+ 	depends on XEN
+ 
+ config XEN
+-	bool "Xen guest support on ARM (EXPERIMENTAL)"
++	bool "Xen guest support on ARM"
+ 	depends on ARM && AEABI && OF
+ 	depends on CPU_V7 && !CPU_V6
+ 	depends on !GENERIC_ATOMIC64
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..82bd86c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -317,7 +317,7 @@ config XEN_DOM0
+ 	depends on XEN
+ 
+ config XEN
+-	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
++	bool "Xen guest support on ARM64"
+ 	depends on ARM64 && OF
+ 	select SWIOTLB_XEN
+ 	help
+-- 
+1.9.3
