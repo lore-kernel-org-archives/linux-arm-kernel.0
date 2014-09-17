@@ -1,53 +1,98 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 17 Sep 2014 08:01:08 -0400
-Subject: [PATCH 3/4] tty: omap-serial: use threaded interrupt handler
-In-Reply-To: <20140916085037.GI28458@ci00147.xsens-tech.local>
-References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
- <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
- <54170823.7040801@hurleysoftware.com> <5417228C.5070503@hurleysoftware.com>
- <20140916085037.GI28458@ci00147.xsens-tech.local>
-Message-ID: <54197804.3020302@hurleysoftware.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Wed, 17 Sep 2014 15:10:06 +0300
+Subject: [PATCH v2 4/6] ARM: dts: cm-t54: add Startek LCD support
+In-Reply-To: <1410955808-2174-1-git-send-email-lifshitz@compulab.co.il>
+References: <1410885322-5928-1-git-send-email-lifshitz@compulab.co.il>
+ <1410955808-2174-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1410955808-2174-5-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 04:50 AM, Frans Klaver wrote:
-> On Mon, Sep 15, 2014 at 01:31:56PM -0400, Peter Hurley wrote:
->> On 09/15/2014 11:39 AM, Peter Hurley wrote:
->>> On 09/15/2014 10:00 AM, Frans Klaver wrote:
->>>> At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
->>>> rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
->>>> this to about 170 overflows in 10 minutes.
->>>
->>> Why is the threadirqs kernel boot option not sufficient?
->>> Or conversely, shouldn't this be selectable?
->>
-> 
-> I wasn't aware of the threadirqs boot option. I also wouldn't know if
-> this should be selectable. What would be a reason to favor the
-> non-threaded irq over the threaded irq?
+Add DT support for Startek KD050C LCD 800x480 panel.
 
-Not everyone cares enough about serial to dedicate kthreads to it :)
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+---
+ 
+ v2: Rebased on top of the previous patch changes
 
->> Also, do you see the same performance differential when you implement this
->> in the 8250 driver (that is, on top of Sebastian's omap->8250 conversion)?
->>
-> 
-> I haven't gotten Sebastian's driver to work properly yet on the console.
-> There was no reason for me yet to throw my omap changes on top of
-> Sebastian's queue.
-> 
->>> PS - To overflow the 64 byte RX FIFO at those data rates means interrupt
->>> latency in excess of 250us?
-> 
-> At 3686400 baud it should take about 174 us to fill a 64 byte buffer. I
-> haven't done any measurements on the interrupt latency though. If you
-> consider that we're sending about 1kB of data, 240 times a second, we're
-> spending a lot of time reading data from the uart. I can imagine the
-> system has other work to do as well.
+ arch/arm/boot/dts/omap5-cm-t54.dts |   44 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
 
-System work should not keep irqs from being serviced. Even 174us is a long
-time not to service an interrupt. Maybe console writes are keeping the isr
-from running?
-
-Regards,
-Peter Hurley
+diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
+index d2f241d..e7afeb4 100644
+--- a/arch/arm/boot/dts/omap5-cm-t54.dts
++++ b/arch/arm/boot/dts/omap5-cm-t54.dts
+@@ -19,6 +19,7 @@
+ 	aliases {
+ 		display0 = &hdmi0;
+ 		display1 = &dvi0;
++		display2 = &lcd0;
+ 	};
+ 
+ 	vmmcsd_fixed: fixed-regulator-mmcsd {
+@@ -72,6 +73,38 @@
+ 		};
+ 	};
+ 
++	lcd0: display {
++                compatible = "startek,startek-kd050c", "panel-dpi";
++                label = "lcd";
++
++                pinctrl-names = "default";
++                pinctrl-0 = <&lcd_pins>;
++
++                enable-gpios = <&gpio8 3 GPIO_ACTIVE_HIGH>;
++
++                panel-timing {
++                        clock-frequency = <33000000>;
++                        hactive = <800>;
++                        vactive = <480>;
++                        hfront-porch = <40>;
++                        hback-porch = <40>;
++                        hsync-len = <43>;
++                        vback-porch = <29>;
++                        vfront-porch = <13>;
++                        vsync-len = <3>;
++                        hsync-active = <0>;
++                        vsync-active = <0>;
++                        de-active = <1>;
++                        pixelclk-active = <1>;
++                };
++
++                port {
++                        lcd_in: endpoint {
++                                remote-endpoint = <&dpi_lcd_out>;
++                        };
++                };
++        };
++
+ 	hdmi0: connector at 0 {
+ 		compatible = "hdmi-connector";
+ 		label = "hdmi";
+@@ -223,6 +256,12 @@
+ 		>;
+ 	};
+ 
++	lcd_pins: pinmux_lcd_pins {
++		pinctrl-single,pins = <
++			OMAP5_IOPAD(0x0172, PIN_OUTPUT_PULLDOWN | MUX_MODE6) /* timer11_pwm_evt.gpio8_227 */
++		>;
++	};
++
+ 	hdmi_conn_pins: pinmux_hdmi_conn_pins {
+ 		pinctrl-single,pins = <
+ 			OMAP5_IOPAD(0x013e, PIN_INPUT | MUX_MODE6) /* hdmi_hpd.gpio7_193 */
+@@ -546,6 +585,11 @@
+ 			remote-endpoint = <&tfp410_in>;
+ 			data-lines = <24>;
+ 		};
++
++		dpi_lcd_out: endpoint at 1 {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
++		};
+ 	};
+ };
+ 
+-- 
+1.7.5.4
