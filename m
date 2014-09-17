@@ -1,55 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 Sep 2014 17:55:40 +0200
-Subject: [PATCH 2/3] dmaengine: sun6i: Add support for Allwinner A23
- (sun8i) variant
-In-Reply-To: <CAGb2v67jokpXHxR26YoCEB2Y_v07oQZXZfPuGJC_wO=r-SRZhg@mail.gmail.com>
-References: <1410616381-30226-1-git-send-email-wens@csie.org>
- <1410616381-30226-3-git-send-email-wens@csie.org>
- <20140916103540.GF9948@lukather>
- <CAGb2v67jokpXHxR26YoCEB2Y_v07oQZXZfPuGJC_wO=r-SRZhg@mail.gmail.com>
-Message-ID: <20140917155540.GJ2166@lukather>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Sep 2014 10:02:45 -0600
+Subject: [PATCH 2/2] ARM: tegra: jetson-tk1: Enable PCIe support
+In-Reply-To: <1410969765-18070-1-git-send-email-swarren@wwwdotorg.org>
+References: <1410969765-18070-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1410969765-18070-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 10:13:27PM +0800, Chen-Yu Tsai wrote:
-> >> +     /*
-> >> +      * sun8i variant requires us to toggle an undocumented register,
-> >> +      * as seen in Allwinner's SDK.
-> >
-> > The BSP I have has this:
-> >
-> > static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
-> > {
-> >         struct sunxi_dmadev *sunxi_dev = dev;
-> >
-> >         clk_prepare_enable(sunxi_dev->ahb_clk);
-> > #ifdef CONFIG_ARCH_SUN8IW3
-> >         writel(0x04, sunxi_dev->base + DMA_GATE);
-> > #endif
-> > }
-> >
-> > /* All is ok, and open the clock */
-> > sunxi_dma_hw_init(sunxi_dev);
-> >
-> > So I guess we can say that it's not that undocumented :)
-> 
-> That's right. I meant undocumented in the user manual.
-> I did reference the SDK in the comment, didn't I? :)
+From: Thierry Reding <treding@nvidia.com>
 
-So something like
+Enable both PCIe ports, one of which is connected to an onboard ethernet
+chip, whereas the other goes to a miniPCIe slot.
 
-writel(DMA_GATE_ENABLE, base->DMA_GATE_REG) wouldn't be too far off :)
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+[swarren, fixed PCIe supply property names in DT]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 64828c265414..029c9a021541 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -16,6 +16,26 @@
+ 		reg = <0x0 0x80000000 0x0 0x80000000>;
+ 	};
+ 
++	pcie-controller at 0,01003000 {
++		status = "okay";
++
++		avddio-pex-supply = <&vdd_1v05_run>;
++		dvddio-pex-supply = <&vdd_1v05_run>;
++		avdd-pex-pll-supply = <&vdd_1v05_run>;
++		hvdd-pex-supply = <&vdd_3v3_lp0>;
++		hvdd-pex-pll-e-supply = <&vdd_3v3_lp0>;
++		vddio-pex-ctl-supply = <&vdd_3v3_lp0>;
++		avdd-pll-erefe-supply = <&avdd_1v05_run>;
++
++		pci at 1,0 {
++			status = "okay";
++		};
++
++		pci at 2,0 {
++			status = "okay";
++		};
++	};
++
+ 	host1x at 0,50000000 {
+ 		hdmi at 0,54280000 {
+ 			status = "okay";
+@@ -1550,7 +1570,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				ldo0 {
++				avdd_1v05_run: ldo0 {
+ 					regulator-name = "+1.05V_RUN_AVDD";
+ 					regulator-min-microvolt = <1050000>;
+ 					regulator-max-microvolt = <1050000>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/8d1ad173/attachment.sig>
+1.9.1
