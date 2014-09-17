@@ -1,31 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Sep 2014 17:28:23 +0100
-Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
- <20140915183334.GA30737@arm.com>
- <20140915184023.GF12361@n2100.arm.linux.org.uk>
- <20140915185027.GC30737@arm.com>
- <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
-Message-ID: <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 17 Sep 2014 09:34:05 -0700
+Subject: [PATCH v4 9/9] mfd: syscon: add Atmel GPBR DT bindings documention
+In-Reply-To: <1410441525-25258-10-git-send-email-boris.brezillon@free-electrons.com>
+References: <1410441525-25258-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1410441525-25258-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140917163405.GM30918@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 02:53:55AM +0100, Wang, Yalin wrote:
-> The reason that a want merge this patch is that
-> It confuse me when I debug memory issue by 
-> /sys/kernel/debug/memblock/reserved  debug file,
-> It show lots of un-correct reserved memory.
-> In fact, I also send a patch to cma driver part
-> For this issue too:
-> http://ozlabs.org/~akpm/mmots/broken-out/free-the-reserved-memblock-when-free-cma-pages.patch
-> 
-> I want to remove these un-correct memblock parts as much as possible,
-> so that I can see more correct info from /sys/kernel/debug/memblock/reserved
-> debug file .
+On Thu, 11 Sep 2014, Boris BREZILLON wrote:
 
-Could we not always call memblock_free() from free_reserved_area() (with
-a dummy definition when !CONFIG_HAVE_MEMBLOCK)?
+> The GPBR block provides a set of battery-backed registers that can be used
+> to save data which need to be kept when the system is powered down and
+> VDD-core is maintained by an external battery.
+> 
+> A typical usage is the RTT block (when used as an RTC) which needs one of
+> those registers to save the current time.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/atmel,gpbr.txt | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+> new file mode 100644
+> index 0000000..a285695
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+> @@ -0,0 +1,15 @@
+> +* Device tree bindings for Atmel GPBR (General Purpose Backup Registers)
+> +
+> +The GPBR are a set of battery-backed registers.
+> +
+> +Required properties:
+> +- compatible:		"atmel,at91sam9260-gpbr", "syscon"
+> +- reg:			contains offset/length value of the GPBR memory
+> +			region.
+> +
+> +Example:
+> +
+> +gpbr: gpbr at fffffd50 {
+
+Is something referencing this node via phandle?  If not, please remove
+the label.
+
+> +	compatible = "atmel,at91sam9260-gpbr", "syscon";
+> +	reg = <0xfffffd50 0x10>;
+> +};
 
 -- 
-Catalin
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
