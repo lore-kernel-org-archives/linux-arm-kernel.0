@@ -1,87 +1,162 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Sep 2014 09:54:05 -0700
-Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <1410968760.30394.7.camel@hornet>
-References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
- <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
- <20140916233020.GC30918@lee--X1> <1410965992.30394.6.camel@hornet>
- <20140917154212.GD30918@lee--X1> <1410968760.30394.7.camel@hornet>
-Message-ID: <20140917165405.GP30918@lee--X1>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Wed, 17 Sep 2014 10:01:50 -0700
+Subject: [PATCH 4/4] [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
+In-Reply-To: <20140917114029.190eb8f9@alan.etchedpixels.co.uk>
+References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1410828446-28502-5-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140917114029.190eb8f9@alan.etchedpixels.co.uk>
+Message-ID: <20140917170150.GB2464@xora-yoga-13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Sep 2014, Pawel Moll wrote:
-
-> On Wed, 2014-09-17 at 16:42 +0100, Lee Jones wrote:
-> > On Wed, 17 Sep 2014, Pawel Moll wrote:
-> > > On Wed, 2014-09-17 at 00:30 +0100, Lee Jones wrote:
-> > > > On Wed, 10 Sep 2014, Pawel Moll wrote:
-> > > > 
-> > > > > Now, with the CLCD DT support available, there is no
-> > > > > more reason to keep the non-DT support for V2P-CA9.
-> > > > > 
-> > > > > Removed, together with "some" supporting code. It was
-> > > > > necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
-> > > > > and selected by the machines still interested in it.
-> > > > > 
-> > > > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > > > > ---
-> > > > >  arch/arm/Kconfig                                  |   2 +
-> > > > >  arch/arm/mach-vexpress/Kconfig                    |   3 -
-> > > > >  arch/arm/mach-vexpress/Makefile                   |   3 +-
-> > > > >  arch/arm/mach-vexpress/core.h                     |   7 -
-> > > > >  arch/arm/mach-vexpress/ct-ca9x4.c                 | 212 ------------
-> > > > >  arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |  47 ---
-> > > > >  arch/arm/mach-vexpress/include/mach/hardware.h    |   1 -
-> > > > >  arch/arm/mach-vexpress/include/mach/irqs.h        |   6 -
-> > > > >  arch/arm/mach-vexpress/include/mach/motherboard.h |  88 -----
-> > > > >  arch/arm/mach-vexpress/platsmp.c                  |  42 ---
-> > > > >  arch/arm/mach-vexpress/v2m.c                      | 374 ----------------------
-> > > > >  arch/arm/plat-versatile/Kconfig                   |   2 +-
-> > > > >  drivers/clk/versatile/Makefile                    |   1 -
-> > > > >  drivers/clk/versatile/clk-vexpress-osc.c          |   7 -
-> > > > >  drivers/clk/versatile/clk-vexpress.c              |  86 -----
-> > > > >  drivers/mfd/vexpress-sysreg.c                     |  71 +---
-> > > > >  drivers/misc/vexpress-syscfg.c                    |  60 +---
-> > > > >  drivers/power/reset/vexpress-poweroff.c           |  17 +-
-> > > > >  include/linux/vexpress.h                          |  19 --
-> > > > >  19 files changed, 35 insertions(+), 1013 deletions(-)
-> > > > >  delete mode 100644 arch/arm/mach-vexpress/ct-ca9x4.c
-> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/hardware.h
-> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/irqs.h
-> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/motherboard.h
-> > > > >  delete mode 100644 drivers/clk/versatile/clk-vexpress.c
-> > > > 
-> > > > Is it really necessary to take the one-big-patch approach?  I'm sure
-> > > > you can find a nicer way than to burden all these maintainers.
-> > > > Naturally I can't speak for everyone concerned, but I don't really
-> > > > want to be carrying all this if I don't have to.  Granted I'm not
-> > > > carrying any patches touching drivers/mfd/vexpress-sysreg.c at the
-> > > > moment, but equally I don't want to rule that out.
-> > > 
-> > > I feel that getting all this stuff done (notice: no new features, just
-> > > removing existing stuff) was the simplest approach, without having to
-> > > rely on patches being merged in particular order.
-> > > 
-> > > Besides, there are three things there that are not directly maintained
-> > > by the arm-soc folk: clk (already acked by Mike), mfd (you) and
-> > > power/reset. So I thought that gathering acks for those and getting it
-> > > merged via arm-soc would be the simplest approach...
-> > 
-> > It's certainly the easiest approach for you, but it makes things
-> > difficult for the maintainers as it would entail all 4 entities
-> > carrying the patch.  The alternative is to hope there won't be any
-> > subsequent changes to the files in our respective subsystems which
-> > might cause conflicts.  I'm not keen on the latter idea.
+On Wed, Sep 17, 2014 at 11:40:29AM +0100, One Thousand Gnomes wrote:
 > 
-> No problem, I will factor out the mfd and reset stuff and post it
-> separately after the main changes are merged.
+> Firstly provide some useful information about the hardware. It's no good
+> wavng your arms at a document that requires agreeing to a giant ARM T&C
+> to get access to. Most of don't work for ARM and we'd have to get our own
+> corporate legal to approve the legal garbage involved.
+> 
+> Secondly explain why you can't use PL011 given that it already supports
+> non DMA accesses. What would it take to tweak it further for this ?
+> 
+> 
 
-Thanks Pawel.
+As the original author of this driver it is only meant for internal use
+inside Linaro. It only ever reached the level of "good enough" for
+internal testing.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+There is a discussion on a more complete driver in this thread.
+
+http://www.spinics.net/lists/arm-kernel/msg358083.html
+
+Graeme
+
+> > +static void sbsa_tty_do_write(const char *buf, unsigned count)
+> > +{
+> > +	unsigned long irq_flags;
+> > +	struct sbsa_tty *qtty = sbsa_tty;
+> > +	void __iomem *base = qtty->base;
+> > +	unsigned n;
+> > +
+> > +	spin_lock_irqsave(&qtty->lock, irq_flags);
+> > +	for (n = 0; n < count; n++) {
+> > +		while (readw(base + UART01x_FR) & UART01x_FR_TXFF)
+> > +			mdelay(10);
+> > +		writew(buf[n], base + UART01x_DR);
+> 
+> serious - you are going to sit and spin in kernel space with interrupts
+> off for an indefinite period ?
+> 
+> No. Even if your hardware is so completely brain dead and broken that it
+> hasn't got an interrupt for 'write room' that's not acceptable. You need
+> error handling and some kind of sensible timer based solution.
+> 
+> To put it simply. You have a queue (or you should - your driver is broken
+> in that respect too), you have a baud rate, you have a bit time. From
+> that you can compute sensible wakeup points to try and refill the
+> hardware FIFO. Assuming the hardware fifo is not tiny you don't even have
+> to be that good an aim.
+> 
+> It's acceptable for the printk console code to spin, if you think getting
+> the message out on a failure or error outweighs the pain. It's not
+> acceptable for the tty layer.
+> 
+> > +static void sbsauart_fifo_to_tty(struct sbsa_tty *qtty)
+> > +{
+> > +	void __iomem *base = qtty->base;
+> > +	unsigned int flag, max_count = 32;
+> > +	u16 status, ch;
+> > +
+> > +	while (max_count--) {
+> > +		status = readw(base + UART01x_FR);
+> > +		if (status & UART01x_FR_RXFE)
+> > +			break;
+> > +
+> > +		/* Take chars from the FIFO and update status */
+> > +		ch = readw(base + UART01x_DR);
+> > +		flag = TTY_NORMAL;
+> > +
+> > +		if (ch & UART011_DR_BE)
+> > +			flag = TTY_BREAK;
+> > +		else if (ch & UART011_DR_PE)
+> > +			flag = TTY_PARITY;
+> > +		else if (ch & UART011_DR_FE)
+> > +			flag = TTY_FRAME;
+> > +		else if (ch & UART011_DR_OE)
+> > +			flag = TTY_OVERRUN;
+> > +
+> > +		ch &= SBSAUART_CHAR_MASK;
+> > +
+> > +		tty_insert_flip_char(&qtty->port, ch, flag);
+> 
+> If its a console you ought to support the sysrq interfaces.
+> 
+> > +static int sbsa_tty_write_room(struct tty_struct *tty)
+> > +{
+> > +	return 32;
+> > +}
+> 
+> You can't do this. You need a proper queue and queueing mechanism or
+> you'll break in some situations (aside from sitting spinning in your
+> write code trashing your system performance entirely). We have a kfifo
+> object in the kernel which is really trivial to use and should do what
+> you need without any effort.
+> 
+> > +
+> > +static void sbsa_tty_console_write(struct console *co, const char *b,
+> > +								unsigned count)
+> > +{
+> > +	sbsa_tty_do_write(b, count);
+> > +
+> > +	if(b[count - 1] == '\n');
+> > +		sbsa_tty_do_write("\r", 1);
+> 
+> I would expect \r\n to be the order ?
+> 
+> > +static struct tty_port_operations sbsa_port_ops = {
+> > +};
+> 
+> No power management ?
+> 
+> > +
+> > +static const struct tty_operations sbsa_tty_ops = {
+> > +	.open = sbsa_tty_open,
+> > +	.close = sbsa_tty_close,
+> > +	.hangup = sbsa_tty_hangup,
+> > +	.write = sbsa_tty_write,
+> > +	.write_room = sbsa_tty_write_room,
+> 
+> No termios handling ?
+> 
+> > +static int sbsa_tty_probe(struct platform_device *pdev)
+> > +{
+> > +	struct sbsa_tty *qtty;
+> > +	int ret = -EINVAL;
+> > +	int i;
+> > +	struct resource *r;
+> > +	struct device *ttydev;
+> > +	void __iomem *base;
+> > +	u32 irq;
+> > +
+> > +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (r == NULL)
+> > +		return -EINVAL;
+> > +
+> > +	base = ioremap(r->start, r->end - r->start);
+> > +	if (base == NULL)
+> > +		pr_err("sbsa_tty: unable to remap base\n");
+> 
+> So you are then going to continue and randomly crash  ???
+> 
+> Also you've got a device so use dev_err() and friends on it
+> 
+> > +	if (pdev->id > 0)
+> > +		goto err_unmap;
+> 
+> Why not test this before you do all the mapping ??
+> 
+> 
+> It's clean code, it's easy to understand it just doesn't seem to be very
+> complete ?
+> 
+> Alan
