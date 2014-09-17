@@ -1,56 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Sep 2014 09:34:05 -0700
-Subject: [PATCH v4 9/9] mfd: syscon: add Atmel GPBR DT bindings documention
-In-Reply-To: <1410441525-25258-10-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410441525-25258-1-git-send-email-boris.brezillon@free-electrons.com>
- <1410441525-25258-10-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140917163405.GM30918@lee--X1>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 17 Sep 2014 18:34:45 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <54118AAB.2010205@linutronix.de>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+Message-ID: <5419B825.5000201@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014, Boris BREZILLON wrote:
-
-> The GPBR block provides a set of battery-backed registers that can be used
-> to save data which need to be kept when the system is powered down and
-> VDD-core is maintained by an external battery.
+On 09/11/2014 01:42 PM, Sebastian Andrzej Siewior wrote:
+>> We should add hooks like tx_dma and rx_dma to struct uart_8250_dma so
+>> that the probe drivers can replace serial8250_tx_dma and
+>> seria8250_rx_dma, like I think Alan already suggested.
 > 
-> A typical usage is the RTT block (when used as an RTC) which needs one of
-> those registers to save the current time.
+> Okay. Wasn't aware that Alan already suggested that.
+> I also need a watchdog timer for TX since it seems that on omap3 the
+> DMA engine suddenly forgets to continue with DMA?
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/mfd/atmel,gpbr.txt | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+> If this is really what we want, I would need to refactor a few things?
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> new file mode 100644
-> index 0000000..a285695
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> @@ -0,0 +1,15 @@
-> +* Device tree bindings for Atmel GPBR (General Purpose Backup Registers)
-> +
-> +The GPBR are a set of battery-backed registers.
-> +
-> +Required properties:
-> +- compatible:		"atmel,at91sam9260-gpbr", "syscon"
-> +- reg:			contains offset/length value of the GPBR memory
-> +			region.
-> +
-> +Example:
-> +
-> +gpbr: gpbr at fffffd50 {
+>> Let's keep serial8250_tx_dma/rx_dma as the default, and not add any
+>> quirks to them. Only if there is a very common case should it be
+>> handled in those. The case of RX req needing to be sent before data in
+>> FIFO maybe one of those, but I'm no sure.
+> 
+> keep in mind that both (RX & TX bugs/hacks) need also a bit of handling
+> in the 8250-core so it works together (like the tx_err member so we
+> fall back to manual xmit)
 
-Is something referencing this node via phandle?  If not, please remove
-the label.
+Done. I've kept the RX workarounds in the 8250_dma and moved the TX
+part into the omap driver.
+I needed to add the 8250_core pieces of patch #10 [0]. Now If you say,
+couldn't this done in an other way then I could move the RX workarounds
+pieces to the omap driver as well as the interrupt routine. Any
+preferences?
 
-> +	compatible = "atmel,at91sam9260-gpbr", "syscon";
-> +	reg = <0xfffffd50 0x10>;
-> +};
+[0] [PATCH 10/16] tty: serial: 8250_dma: optimize the xmit path due to
+    UART_BUG_DMA_TX
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sebastian
