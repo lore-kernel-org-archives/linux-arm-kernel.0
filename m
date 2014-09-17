@@ -1,22 +1,53 @@
-From: davidcdueck@googlemail.com (D. Dueck)
-Date: Wed, 17 Sep 2014 12:11:38 +0200
-Subject: [PATCH] can: at91_can: prepare and unprepare the clock
-In-Reply-To: <54195097.1000106@pengutronix.de>
-References: <1410944721-32325-1-git-send-email-davidcdueck@googlemail.com>
- <54195097.1000106@pengutronix.de>
-Message-ID: <CANfhG651svVhhLch9ekjSESTgoS3-0rB1C9RJLkX_=Y=GKOxbA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 17 Sep 2014 12:24:20 +0200
+Subject: [PATCH v3 1/3] ARM: dts: imx6: add pm_power_off support for
+ i.mx6 chips
+In-Reply-To: <1410947881-7345-2-git-send-email-b38343@freescale.com>
+References: <1410947881-7345-1-git-send-email-b38343@freescale.com>
+ <1410947881-7345-2-git-send-email-b38343@freescale.com>
+Message-ID: <20140917102420.GW4992@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-09-17 11:12 GMT+02:00 Marc Kleine-Budde <mkl@pengutronix.de>:
+On Wed, Sep 17, 2014 at 05:57:58PM +0800, Robin Gong wrote:
+> All chips of i.mx6 can be powered off by programming SNVS.
+> For example :
+> On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+> pmic ON/OFF pin, that will cause the whole PMIC powered off
+> except VSNVS. And system can restart once PMIC_ON_REQ goes
+> high by push POWRER key.
+> 
+> Signed-off-by: Robin Gong <b38343@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi |    5 +++++
+>  arch/arm/boot/dts/imx6sl.dtsi  |    5 +++++
+>  arch/arm/boot/dts/imx6sx.dtsi  |    5 +++++
+>  3 files changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index c701af9..fffa1c6 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -645,6 +645,11 @@
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+>  						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+> +
+> +				snvs-poweroff at 38 {
+> +					compatible = "fsl,sec-v4.0-poweroff";
+> +					reg = <0x38 0x4>;
+> +				};
 
-> Which warning?
+As said: This makes board specific assumptions on SoC level. Whether or
+not this function is available is *BOARD* specific, so at SoC level this
+needs a status = "disabled";
 
-I will rephrase this. When using COMMON_CLK, for example on sama5d3, we
-have to prepare the clock first. I will send v2.
+So: NACK.
 
-> Can you please check the return value of clock_prepare_enbale().
+Sascha
 
-Yes, sorry I missed that.
-
-David
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
