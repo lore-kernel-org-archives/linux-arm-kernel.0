@@ -1,125 +1,149 @@
-From: kiran.padwal@smartplayin.com (Kiran Padwal)
-Date: Wed, 17 Sep 2014 16:00:25 +0530
-Subject: [PATCH v4] ARM: DT: apq8064: Add i2c device nodes
-Message-ID: <1410949825-7631-1-git-send-email-kiran.padwal@smartplayin.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Wed, 17 Sep 2014 11:40:29 +0100
+Subject: [PATCH 4/4] [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
+In-Reply-To: <1410828446-28502-5-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1410828446-28502-5-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <20140917114029.190eb8f9@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds i2c pinctrl DT node for IFC6410 board.
-It also adds necessary DT support for i2c eeprom which is present on
-IFC6410.
 
-Tested on IFC6410 board.
+Firstly provide some useful information about the hardware. It's no good
+wavng your arms at a document that requires agreeing to a giant ARM T&C
+to get access to. Most of don't work for ARM and we'd have to get our own
+corporate legal to approve the legal garbage involved.
 
-Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
----
-Changes since v3:
- - Removed pinctrl DT node.
+Secondly explain why you can't use PL011 given that it already supports
+non DMA accesses. What would it take to tweak it further for this ?
 
-Changes since v2:
- - Renamed pinmux i2c subnode "i2c1_pinmux" to "i2c1".
- - Removed labes of node.
- - Used canonical value as "okay" instead of "ok".
- - Used macros.
 
-Changes since v1:
- - Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
- - Updated pinmux interrupt.
+> +static void sbsa_tty_do_write(const char *buf, unsigned count)
+> +{
+> +	unsigned long irq_flags;
+> +	struct sbsa_tty *qtty = sbsa_tty;
+> +	void __iomem *base = qtty->base;
+> +	unsigned n;
+> +
+> +	spin_lock_irqsave(&qtty->lock, irq_flags);
+> +	for (n = 0; n < count; n++) {
+> +		while (readw(base + UART01x_FR) & UART01x_FR_TXFF)
+> +			mdelay(10);
+> +		writew(buf[n], base + UART01x_DR);
 
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   27 ++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        |   42 ++++++++++++++++++++++++++++
- 2 files changed, 69 insertions(+)
+serious - you are going to sit and spin in kernel space with interrupts
+off for an indefinite period ?
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 90db8af..3573cd7 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -5,6 +5,33 @@
- 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
- 
- 	soc {
-+		pinctrl at 800000 {
-+			i2c1_pins: i2c1 {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "gsbi1";
-+				};
-+			};
-+		};
-+
-+		gsbi at 12440000 {
-+			status = "okay";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+
-+			i2c at 12460000 {
-+				status = "okay";
-+				clock-frequency = <200000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+
-+				eeprom: eeprom at 52 {
-+					compatible = "atmel,24c128";
-+					reg = <0x52>;
-+					pagesize = <32>;
-+				};
-+			};
-+		};
-+
- 		gsbi at 16600000 {
- 			status = "ok";
- 			qcom,mode = <GSBI_PROT_I2C_UART>;
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index b1e476a..fddaeb7 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -156,6 +156,48 @@
- 			regulator;
- 		};
- 
-+		gsbi1: gsbi at 12440000 {
-+			status = "disabled";
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x12440000 0x100>;
-+			clocks = <&gcc GSBI1_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			i2c1: i2c at 12460000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x12460000 0x1000>;
-+				interrupts = <0 194 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
-+		gsbi2: gsbi at 12480000 {
-+			status = "disabled";
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x12480000 0x100>;
-+			clocks = <&gcc GSBI2_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			i2c2: i2c at 124a0000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x124a0000 0x1000>;
-+				interrupts = <0 196 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
- 		gsbi7: gsbi at 16600000 {
- 			status = "disabled";
- 			compatible = "qcom,gsbi-v1.0.0";
--- 
-1.7.9.5
+No. Even if your hardware is so completely brain dead and broken that it
+hasn't got an interrupt for 'write room' that's not acceptable. You need
+error handling and some kind of sensible timer based solution.
+
+To put it simply. You have a queue (or you should - your driver is broken
+in that respect too), you have a baud rate, you have a bit time. From
+that you can compute sensible wakeup points to try and refill the
+hardware FIFO. Assuming the hardware fifo is not tiny you don't even have
+to be that good an aim.
+
+It's acceptable for the printk console code to spin, if you think getting
+the message out on a failure or error outweighs the pain. It's not
+acceptable for the tty layer.
+
+> +static void sbsauart_fifo_to_tty(struct sbsa_tty *qtty)
+> +{
+> +	void __iomem *base = qtty->base;
+> +	unsigned int flag, max_count = 32;
+> +	u16 status, ch;
+> +
+> +	while (max_count--) {
+> +		status = readw(base + UART01x_FR);
+> +		if (status & UART01x_FR_RXFE)
+> +			break;
+> +
+> +		/* Take chars from the FIFO and update status */
+> +		ch = readw(base + UART01x_DR);
+> +		flag = TTY_NORMAL;
+> +
+> +		if (ch & UART011_DR_BE)
+> +			flag = TTY_BREAK;
+> +		else if (ch & UART011_DR_PE)
+> +			flag = TTY_PARITY;
+> +		else if (ch & UART011_DR_FE)
+> +			flag = TTY_FRAME;
+> +		else if (ch & UART011_DR_OE)
+> +			flag = TTY_OVERRUN;
+> +
+> +		ch &= SBSAUART_CHAR_MASK;
+> +
+> +		tty_insert_flip_char(&qtty->port, ch, flag);
+
+If its a console you ought to support the sysrq interfaces.
+
+> +static int sbsa_tty_write_room(struct tty_struct *tty)
+> +{
+> +	return 32;
+> +}
+
+You can't do this. You need a proper queue and queueing mechanism or
+you'll break in some situations (aside from sitting spinning in your
+write code trashing your system performance entirely). We have a kfifo
+object in the kernel which is really trivial to use and should do what
+you need without any effort.
+
+> +
+> +static void sbsa_tty_console_write(struct console *co, const char *b,
+> +								unsigned count)
+> +{
+> +	sbsa_tty_do_write(b, count);
+> +
+> +	if(b[count - 1] == '\n');
+> +		sbsa_tty_do_write("\r", 1);
+
+I would expect \r\n to be the order ?
+
+> +static struct tty_port_operations sbsa_port_ops = {
+> +};
+
+No power management ?
+
+> +
+> +static const struct tty_operations sbsa_tty_ops = {
+> +	.open = sbsa_tty_open,
+> +	.close = sbsa_tty_close,
+> +	.hangup = sbsa_tty_hangup,
+> +	.write = sbsa_tty_write,
+> +	.write_room = sbsa_tty_write_room,
+
+No termios handling ?
+
+> +static int sbsa_tty_probe(struct platform_device *pdev)
+> +{
+> +	struct sbsa_tty *qtty;
+> +	int ret = -EINVAL;
+> +	int i;
+> +	struct resource *r;
+> +	struct device *ttydev;
+> +	void __iomem *base;
+> +	u32 irq;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (r == NULL)
+> +		return -EINVAL;
+> +
+> +	base = ioremap(r->start, r->end - r->start);
+> +	if (base == NULL)
+> +		pr_err("sbsa_tty: unable to remap base\n");
+
+So you are then going to continue and randomly crash  ???
+
+Also you've got a device so use dev_err() and friends on it
+
+> +	if (pdev->id > 0)
+> +		goto err_unmap;
+
+Why not test this before you do all the mapping ??
+
+
+It's clean code, it's easy to understand it just doesn't seem to be very
+complete ?
+
+Alan
