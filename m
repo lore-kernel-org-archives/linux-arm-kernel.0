@@ -1,63 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Sep 2014 12:57:58 +0100
-Subject: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared at
- sp804_of_init
-In-Reply-To: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
-References: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
-Message-ID: <20140917115758.GQ12361@n2100.arm.linux.org.uk>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 17 Sep 2014 08:01:08 -0400
+Subject: [PATCH 3/4] tty: omap-serial: use threaded interrupt handler
+In-Reply-To: <20140916085037.GI28458@ci00147.xsens-tech.local>
+References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
+ <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
+ <54170823.7040801@hurleysoftware.com> <5417228C.5070503@hurleysoftware.com>
+ <20140916085037.GI28458@ci00147.xsens-tech.local>
+Message-ID: <54197804.3020302@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 08:34:46PM +0900, Chanho Min wrote:
-> sp804 may not be added to the tick device if the higher device is
-> already registered. In this case, If pending interrupt is existed
-> (usually It will be passed from the boot loader), inetrrupt is occured
-> without event_handler then it cause kernel panic. So Interrupts
-> should be cleared before clockevent is registered.
+On 09/16/2014 04:50 AM, Frans Klaver wrote:
+> On Mon, Sep 15, 2014 at 01:31:56PM -0400, Peter Hurley wrote:
+>> On 09/15/2014 11:39 AM, Peter Hurley wrote:
+>>> On 09/15/2014 10:00 AM, Frans Klaver wrote:
+>>>> At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
+>>>> rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
+>>>> this to about 170 overflows in 10 minutes.
+>>>
+>>> Why is the threadirqs kernel boot option not sufficient?
+>>> Or conversely, shouldn't this be selectable?
+>>
 > 
-> Changes since v1:
->  - Move to sp804_of_init
->  - Clear TIMER2 interrupt
->  - Update commit log
+> I wasn't aware of the threadirqs boot option. I also wouldn't know if
+> this should be selectable. What would be a reason to favor the
+> non-threaded irq over the threaded irq?
+
+Not everyone cares enough about serial to dedicate kthreads to it :)
+
+>> Also, do you see the same performance differential when you implement this
+>> in the 8250 driver (that is, on top of Sebastian's omap->8250 conversion)?
+>>
 > 
-> Signed-off-by: Chanho Min <chanho.min@lge.com>
-> ---
->  arch/arm/common/timer-sp.c |    4 ++++
->  1 file changed, 4 insertions(+)
+> I haven't gotten Sebastian's driver to work properly yet on the console.
+> There was no reason for me yet to throw my omap changes on top of
+> Sebastian's queue.
 > 
-> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-> index fd6bff0..e3cc08e 100644
-> --- a/arch/arm/common/timer-sp.c
-> +++ b/arch/arm/common/timer-sp.c
-> @@ -226,6 +226,10 @@ static void __init sp804_of_init(struct device_node *np)
->  	writel(0, base + TIMER_CTRL);
->  	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
->  
-> +	/* Ensure interrupt is cleared */
-> +	writel(1, base + TIMER_INTCLR);
-> +	writel(1, base + TIMER_2_BASE + TIMER_INTCLR);
+>>> PS - To overflow the 64 byte RX FIFO at those data rates means interrupt
+>>> latency in excess of 250us?
+> 
+> At 3686400 baud it should take about 174 us to fill a 64 byte buffer. I
+> haven't done any measurements on the interrupt latency though. If you
+> consider that we're sending about 1kB of data, 240 times a second, we're
+> spending a lot of time reading data from the uart. I can imagine the
+> system has other work to do as well.
 
-NAK.
+System work should not keep irqs from being serviced. Even 174us is a long
+time not to service an interrupt. Maybe console writes are keeping the isr
+from running?
 
-This is really not necessary for two reasons, and incorrect for a third
-reason:
-
-1. If the control register is cleared, interrupts are disabled.  When
-   interrupts are disabled, the IRQ line from the timer module is
-   deasserted irrespective of the internal interrupt state of the timer.
-
-2. We only enable the interrupt when we set the timer up to run in either
-   periodic or one-shot modes.  If the timer is not used, the interrupt
-   remains masked.
-
-3. Even if this was necessary (which it isn't), only doing this in the
-   sp804_of_init() path is wrong - there are other initialisation paths
-   in this code, and there's no reason why one should have a different
-   behaviour to the others.
-
-If you've found this by running the kernel with QEMU, then it's probably
-a QEMU bug if it raises an interrupt during the above code.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Peter Hurley
