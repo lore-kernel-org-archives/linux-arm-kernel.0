@@ -1,68 +1,48 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Wed, 17 Sep 2014 23:26:11 +0800
-Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <20140915221210.5d9871fb@bbrezillon>
-References: <20140911120928.GA1585@localhost.localdomain>
- <20140911143616.3ebb025a@bbrezillon>
- <20140911142511.GA2543@localhost.localdomain>
- <20140911163847.5e2f85c7@bbrezillon>
- <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
- <20140912143050.014ad4c3@bbrezillon>
- <20140913153622.GA10132@localhost.localdomain>
- <20140913173841.GA18093@brian-ubuntu>
- <20140915144259.GA1947@localhost.localdomain>
- <20140915221210.5d9871fb@bbrezillon>
-Message-ID: <20140917152609.GA2111@localhost.localdomain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Sep 2014 16:27:35 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <1410363657.23973.48.camel@hornet>
+References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
+ <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
+ <20140910145818.GG12361@n2100.arm.linux.org.uk>
+ <1410363657.23973.48.camel@hornet>
+Message-ID: <20140917152735.GU12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 10:12:10PM +0200, Boris BREZILLON wrote:
-> On Mon, 15 Sep 2014 22:43:02 +0800
-> Huang Shijie <shijie8@gmail.com> wrote:
+On Wed, Sep 10, 2014 at 04:40:57PM +0100, Pawel Moll wrote:
+> On Wed, 2014-09-10 at 15:58 +0100, Russell King - ARM Linux wrote:
+> > So, I'll then be asking ARM to provide updated instructions on how to
+> > boot the CT9x4 with DT... 
 > 
-> > On Sat, Sep 13, 2014 at 10:38:41AM -0700, Brian Norris wrote:
-> > > On Sat, Sep 13, 2014 at 11:36:24PM +0800, Huang Shijie wrote:
-> > > > On Fri, Sep 12, 2014 at 02:30:50PM +0200, Boris BREZILLON wrote:
-> > > > > This test validates what's returned by ecc_strength file in sysfs
-> > > > > (which in turn is specified by the NAND controller when initializing
-> > > > > the NAND chip).
-> > > > > 
-> > > > > Doing this should not imply knowing the ECC algorithm in use in the
-> > > > > NAND controller or the layout used to store data on NAND.
-> > > > the difficulty is that the ECC parity area can be not byte aligned.
-> > > 
-> > > Is there a problem with just rounding up to the nearest byte alignment
-> > > and ignoring the few bits that are wasted?
-> > 
-> > I feel a little confused with the two hooks.
-> > 
-> > does the ecc->write_page_raw need to write the ECC parity data?
-> 
-> Depending on the oob_required argument, it might be allowed to
-> overwrite the ECC bytes even if this implies breaking page reliability
-> (which is exactly what's expected).
-> 
-> When using raw write with with oob write option the writer should take
-> care of regenerating ECC bytes (which you said was impossible in GPMI
-> case) or copying them from a previous raw read.
-Thanks for the explanation.
+> The same version (although different build) of the Boot Monitor you have
+> got for CA15_A7 (a.k.a. TC2) is able to boot CA9x4 with DT. It has got
+> the same limitations though, namely no TFTP support, if this is your
+> main concern (there is no ARM-provided uboot for TC2 either).
 
-If we do not write the OOB, should we write the ECC bytes?
-The hooks should comment clearly about how to implement them :(
+I don't use Boot Monitor.  I use uboot.  I use uboot because uboot supports
+network booting.  I *require* networking booting.  Boot Monitor is a piece
+of crap that no sane kernel developer would ever use as a boot environment.
+I also boot a root filesystem off the MMC slot.
 
-> 
-> Here is a real example of what one could test with raw write + oob:
-> 1) read a page in raw mode
-> 2) flip some bits in the generated ECC bytes (or what you references as
->    parity data) (this case can actually happen in real life)
-> 3) write the modified page in raw mode
-> 4) read back the same page in normal and check that ECC correction still
->    works as expected
-the nandbiterr test mode does the test as above.
-But i think the multi-writes to the same page should occur only for the
-SLC nand. 
+As for TC2, I just don't bother with that.  It's really not worth the
+hastle.  I asked for help with that and got almost nothing.  Yes, there's
+Nicolas' uboot, which solves some problems, but getting the kernel to
+boot on TC2 turned out to be a dead loss - and no help with it was
+forthcoming.  So I've permanently shelved the TC2 tile.  ARM Ltd can
+have the TC2 tile back for all I care, it's more useful to me as a door
+stop than something for running Linux.
 
-I will read your new patch set carefully in this weekend.
+Let me repeat: a boot loader with network booting capability is an
+absolute necessity for me.  This is *required* for unattended boots of
+kernels which have just been built.  If a platform doesn't have this
+capability, I'm just not interested in it, and I _will_ not use it.  It
+really is that simple.
 
-thanks
-Huang Shijie
+My position on the boot loader issue is not going to change; it's a
+fundamental requirement for automatic build and boot testing, and for
+efficient workflow at other times.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
