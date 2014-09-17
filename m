@@ -1,73 +1,43 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 17 Sep 2014 12:18:57 -0400 (EDT)
-Subject: [PATCH v8 1/4] pci:host: APM X-Gene PCIe host controller driver
-In-Reply-To: <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
-References: <1410476266-29426-1-git-send-email-tinamdar@apm.com>
- <1410476266-29426-2-git-send-email-tinamdar@apm.com>
- <20140912091816.GU27864@e106497-lin.cambridge.arm.com>
- <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
- <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
-Message-ID: <582775710.16963612.1410970737167.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 17 Sep 2014 21:49:17 +0530
+Subject: [PATCH 7/9] phy: remove .owner field for drivers using
+ module_platform_driver
+In-Reply-To: <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
+References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
+ <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <5419B485.8010002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for top posting...in a keynote. I have a patch that does this I have sent to APM separately for testing something else. Assuming that works, they can send on or I will today.
+Hi,
 
--- 
-Computer Architect | Sent from my #ARM Powered Mobile device
-
-On Sep 17, 2014 9:04 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->
-> On Tue, Sep 16, 2014 at 09:02:11PM +0100, Tanmay Inamdar wrote: 
-> > On Fri, SeOn Tue, Sep 16, 2014 at 09:02:11PM +0100, Tanmay Inamdar wrote:
-> On Fri, Sep 12, 2014 at 2:18 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Thu, Sep 11, 2014 at 11:57:43PM +0100, Tanmay Inamdar wrote:
-> >> This patch adds the AppliedMicro X-Gene SOC PCIe host controller driver.
-> >> X-Gene PCIe controller supports maximum up to 8 lanes and GEN3 speed.
-> >> X-Gene SOC supports maximum 5 PCIe ports.
-> >>
-> >> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> >
-> > It looks good to me now. You can add if you care:
-> >
-> > Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver or platform_driver_register api,
+> as this is overriden in __platform_driver_register.
 > 
-> I will have to send another version of patch as I forgot to add
-> 'dma-coherent' in device tree entry.
-> 
-> Secondly I see that setting 'dma-coherent' in device tree node sets
-> coherent_dma_ops for the root bus but for the endpoint another 'dev'
-> gets assigned. This causes endpoint to use non-coherent dma apis
-> causing failure in dma operations.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/phy/phy-bcm-kona-usb2.c     | 1 -
+>  drivers/phy/phy-berlin-sata.c       | 1 -
+>  drivers/phy/phy-exynos-dp-video.c   | 1 -
+>  drivers/phy/phy-exynos-mipi-video.c | 1 -
+>  drivers/phy/phy-exynos5-usbdrd.c    | 1 -
+>  drivers/phy/phy-exynos5250-sata.c   | 1 -
+>  drivers/phy/phy-hix5hd2-sata.c      | 1 -
+>  drivers/phy/phy-miphy365x.c         | 1 -
+>  drivers/phy/phy-mvebu-sata.c        | 1 -
+>  drivers/phy/phy-omap-control.c      | 1 -
+>  drivers/phy/phy-omap-usb2.c         | 1 -
+>  drivers/phy/phy-qcom-apq8064-sata.c | 1 -
+>  drivers/phy/phy-qcom-ipq806x-sata.c | 1 -
+>  drivers/phy/phy-samsung-usb2.c      | 1 -
+>  drivers/phy/phy-sun4i-usb.c         | 1 -
+>  drivers/phy/phy-ti-pipe3.c          | 1 -
+>  drivers/phy/phy-twl4030-usb.c       | 1 -
 
-For PCIe, setting dma-coherent in the DT nodes wouldn't have any effect
-yet. We have of_dma_configure() being called for platform devices but it
-won't work for PCIe which are probed at run-time (nor for AMBA which
-require an additional patch).
+twl4030-usb doesn't use module_platform_driver. Care to resend this patch
+along? I've merged all other patches in this series.
 
-So for arm64 currently we have some hooks in dma-mapping.c to intercept
-when a device is added to a bus. What I need to do though is check
-recursively whether the parent (bus) had the 'dma-coherent' property
-(pointed out by Jon). I think something like this would do (not tested):
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 4164c5ace9f8..638475378f94 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -316,7 +316,7 @@ static int dma_bus_notifier(struct notifier_block *nb,
- 	if (event != BUS_NOTIFY_ADD_DEVICE)
- 		return NOTIFY_DONE;
- 
--	if (of_property_read_bool(dev->of_node, "dma-coherent"))
-+	if (of_dma_is_coherent(dev->of_node))
- 		set_dma_ops(dev, &coherent_swiotlb_dma_ops);
- 
- 	return NOTIFY_OK;
-
-After this, we need to a bus notifier for PCIe as well. Since I don't
-think we have an of_node for a PCI device, we would need to check
-recursively on the parent device rather than the parent node until we
-find an OF node with the 'dma-coherent' property.
-
--- 
-Catalin
+Cheers
+Kishon
