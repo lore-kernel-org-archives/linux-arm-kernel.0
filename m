@@ -1,47 +1,37 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Sep 2014 14:56:15 -0700
-Subject: [PATCH 0/6] KVM: handling of MMIO pass-through regions
-Message-ID: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 17 Sep 2014 14:56:16 -0700
+Subject: [PATCH 1/6] arm/arm64: KVM: use __GFP_ZERO not memset() to get zeroed
+ pages
+In-Reply-To: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1410990981-665-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a followup to the patches 'kvm: define PAGE_S2_DEVICE as
-read-only by default' I sent out last week. Essentially build tested
-only: while QEMU on KVM still works correctly for my use case with
-these patches applied, it does not in fact use passthrough mappings
-of device memory.
+Pass __GFP_ZERO to __get_free_pages() instead of calling memset()
+explicitly.
 
-Patch #1 is a trivial fix for an issue identified by sparse where we
-are calling memset(0) on 2 MB worth of pages.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kvm/mmu.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Patch #2 fixes a potential NULL dereference in user_mem_abort()
-
-Patch #3 adds a 'writable' parameter to kmv_phys_addr_ioremap() so that
-read-only device regions can be mapped using this function. The existing
-callers are updated to pass 'true' for this parameter.
-
-Patch #4 and #5 were sent out before, and change the value of
-PAGE_S2_DEVICE to read-only, so that read-only regions can be
-ioremap()'ed
-
-Patch #6 ensures that VM_PFNMAP linear mappings of non-system RAM host
-memory are mapped eagerly rather than faulted in page by page.
-
-
-Ard Biesheuvel (6):
-  arm/arm64: KVM: use __GFP_ZERO not memset() to get zeroed pages
-  arm/arm64: KVM: fix potential NULL dereference in user_mem_abort()
-  arm/arm64: KVM: add 'writable' parameter to kvm_phys_addr_ioremap
-  ARM: kvm: define PAGE_S2_DEVICE as read-only by default
-  arm64: kvm: define PAGE_S2_DEVICE as read-only by default
-  arm/arm64: KVM: map MMIO regions at creation time
-
- arch/arm/include/asm/pgtable.h   |  2 +-
- arch/arm/kvm/mmu.c               | 64 ++++++++++++++++++++++++++++++++++++----
- arch/arm64/include/asm/kvm_mmu.h |  2 +-
- arch/arm64/include/asm/pgtable.h |  2 +-
- virt/kvm/arm/vgic.c              |  3 +-
- 5 files changed, 64 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index c68ec28f17c3..152e0f896e63 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -528,11 +528,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ 		return -EINVAL;
+ 	}
+ 
+-	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
++	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
+ 	if (!pgd)
+ 		return -ENOMEM;
+ 
+-	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
+ 	kvm_clean_pgd(pgd);
+ 	kvm->arch.pgd = pgd;
+ 
 -- 
 1.8.3.2
