@@ -1,41 +1,54 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 17 Sep 2014 08:20:41 -0400
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <54186B89.8050505@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
- <5411B33F.10405@hurleysoftware.com> <54171B85.5060209@linutronix.de>
- <54186B89.8050505@linutronix.de>
-Message-ID: <54197C99.8030601@hurleysoftware.com>
+From: davidcdueck@googlemail.com (David Dueck)
+Date: Wed, 17 Sep 2014 14:26:48 +0200
+Subject: [PATCHv2] can: at91_can: prepare and unprepare the clock
+Message-ID: <1410956808-1964-1-git-send-email-davidcdueck@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 12:55 PM, Sebastian Andrzej Siewior wrote:
-> On 09/15/2014 07:01 PM, Sebastian Andrzej Siewior wrote:
->> On 09/11/2014 04:35 PM, Peter Hurley wrote:
->>> I do need to find out if omap hardware sets UART_MSR_DCTS when auto CTS
->>> is on. Would you mind running the debug patch below with HW flow control on?
->>
->> I didn't forget about this. However I told minicom to use hardware flow
->> control (and I see the driver set the HW bit) but I haven't seen that
->> uart_handle_cts_change() has been invoked at all. I'm going to check
->> two other boards and report then.
-> 
-> No, I don't get into this at all function.
+Make the driver work with the common clock framework.
 
-Ok, good to know. Thanks for testing that.
+Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
+---
+Changes since v1:
+- improve commit message
+- check return value of clk_prepare_enable
 
-> So I connected my am335x-evm
-> with beagle board xm because both of them have an old fashion UART
-> connector (instead those uart-to-usb). Both configured with HW-Flow and
-> I haven't seen the function invoked but I saw "port->icount.overrun"
-> being incremented. This shouldn't happen. So I am a little puzzled here?
+ drivers/net/can/at91_can.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Yeah, that's weird. Do you have a break-out box to confirm that RTS/CTS are
-being driven?
-
-Regards,
-Peter Hurley
+diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+index f07fa89..05e1aa0 100644
+--- a/drivers/net/can/at91_can.c
++++ b/drivers/net/can/at91_can.c
+@@ -1123,7 +1123,9 @@ static int at91_open(struct net_device *dev)
+ 	struct at91_priv *priv = netdev_priv(dev);
+ 	int err;
+ 
+-	clk_enable(priv->clk);
++	err = clk_prepare_enable(priv->clk);
++	if (err)
++		return err;
+ 
+ 	/* check or determine and set bittime */
+ 	err = open_candev(dev);
+@@ -1149,7 +1151,7 @@ static int at91_open(struct net_device *dev)
+  out_close:
+ 	close_candev(dev);
+  out:
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	return err;
+ }
+@@ -1166,7 +1168,7 @@ static int at91_close(struct net_device *dev)
+ 	at91_chip_stop(dev, CAN_STATE_STOPPED);
+ 
+ 	free_irq(dev->irq, dev);
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	close_candev(dev);
+ 
+-- 
+2.1.0
