@@ -1,64 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 17 Sep 2014 19:57:27 +0200
-Subject: [PATCH v4 9/9] mfd: syscon: add Atmel GPBR DT bindings documention
-In-Reply-To: <20140917163405.GM30918@lee--X1>
-References: <1410441525-25258-1-git-send-email-boris.brezillon@free-electrons.com>
- <1410441525-25258-10-git-send-email-boris.brezillon@free-electrons.com>
- <20140917163405.GM30918@lee--X1>
-Message-ID: <20140917195727.1c75a062@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Sep 2014 19:05:25 +0100
+Subject: [PATCH] of: amba: use of_dma_configure for AMBA devices
+In-Reply-To: <CAL_JsqKTZyPgbxy=pPmFPKRxa97oaWqC6u6pBvqvja_URLno4Q@mail.gmail.com>
+References: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
+ <20140917170338.GC18532@arm.com>
+ <CAL_JsqKTZyPgbxy=pPmFPKRxa97oaWqC6u6pBvqvja_URLno4Q@mail.gmail.com>
+Message-ID: <20140917180524.GG18532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 17 Sep 2014 09:34:05 -0700
-Lee Jones <lee.jones@linaro.org> wrote:
-
-> On Thu, 11 Sep 2014, Boris BREZILLON wrote:
+On Wed, Sep 17, 2014 at 06:47:19PM +0100, Rob Herring wrote:
+> On Wed, Sep 17, 2014 at 12:03 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Sep 17, 2014 at 12:56:07PM +0100, Robin Murphy wrote:
+> >> Commit 591c1e ("of: configure the platform device dma parameters)
+> >> introduced a common mechanism to configure DMA from DT properties.
+> >> AMBA devices created from DT can take advantage of this, too.
+> >>
+> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > It would be great if the arm-soc guys can pick this up.
 > 
-> > The GPBR block provides a set of battery-backed registers that can be used
-> > to save data which need to be kept when the system is powered down and
-> > VDD-core is maintained by an external battery.
-> > 
-> > A typical usage is the RTT block (when used as an RTC) which needs one of
-> > those registers to save the current time.
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/atmel,gpbr.txt | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> > new file mode 100644
-> > index 0000000..a285695
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> > @@ -0,0 +1,15 @@
-> > +* Device tree bindings for Atmel GPBR (General Purpose Backup Registers)
-> > +
-> > +The GPBR are a set of battery-backed registers.
-> > +
-> > +Required properties:
-> > +- compatible:		"atmel,at91sam9260-gpbr", "syscon"
-> > +- reg:			contains offset/length value of the GPBR memory
-> > +			region.
-> > +
-> > +Example:
-> > +
-> > +gpbr: gpbr at fffffd50 {
+> Is this a dependency for something else? If so,
 > 
-> Is something referencing this node via phandle?  If not, please remove
-> the label.
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Yes, the rtt device is referencing it in its atmel,rtt-rtc-time-reg
-property (see patch 8 of this series).
+Yeah, it's going to be needed by my IOMMU init rework so that AMBA devices
+get registered with their IOMMUs.
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Will
