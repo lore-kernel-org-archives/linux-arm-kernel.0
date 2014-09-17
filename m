@@ -1,47 +1,110 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 17 Sep 2014 01:24:50 +0000 (UTC)
-Subject: Tegra baseline test results for v3.17-rc2
-Message-ID: <alpine.DEB.2.02.1409170123190.5860@utopia.booyaka.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 17 Sep 2014 09:24:10 +0800
+Subject: [PATCH v1 16/21] s390/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <alpine.LFD.2.11.1409161325280.1618@denkbrett>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+ <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
+ <alpine.LFD.2.11.1409161325280.1618@denkbrett>
+Message-ID: <5418E2BA.4030304@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2014/9/16 19:35, Sebastian Ott wrote:
+> Hello,
+> 
+> On Fri, 5 Sep 2014, Yijing Wang wrote:
+>> Use MSI chip framework instead of arch MSI functions to configure
+>> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> ---
+>>  arch/s390/pci/pci.c |   18 ++++++++++++++----
+>>  1 files changed, 14 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+>> index 2fa7b14..da5316e 100644
+>> --- a/arch/s390/pci/pci.c
+>> +++ b/arch/s390/pci/pci.c
+>> @@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
+>>  	}
+>>  }
+>>
+>> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+>> +int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+>>  {
+>>  	struct zpci_dev *zdev = get_zdev(pdev);
+>>  	unsigned int hwirq, msi_vecs;
+>> @@ -434,7 +434,7 @@ out:
+>>  	return rc;
+>>  }
+>>
+>> -void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>> +static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
+>>  {
+>>  	struct zpci_dev *zdev = get_zdev(pdev);
+>>  	struct msi_desc *msi;
+>> @@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>>  	/* Release MSI interrupts */
+>>  	list_for_each_entry(msi, &pdev->msi_list, list) {
+>>  		if (msi->msi_attrib.is_msix)
+>> -			default_msix_mask_irq(msi, 1);
+>> +			__msix_mask_irq(msi, 1);
+>>  		else
+>> -			default_msi_mask_irq(msi, 1, 1);
+>> +			__msi_mask_irq(msi, 1, 1);
+> 
+> The default_msi_mask_irq to __msi_mask_irq renaming is hidden in your
+> patch "x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()"
+> 
+> This means that between that patch and this one s390 will not compile.
+> Could you please move this hunk to the other patch or even make an extra
+> patch with the renaming. Other than that:
 
-Here are some basic Tegra test results for Linux v3.17-rc2.
-Logs and other details at:
+Good catch. I will move this hunk into the patch "x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()".
 
-    http://nvt.pwsan.com/pub/linux/testlogs/test_v3.17-rc2/20140916145434/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
+> 
+> Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
 
 
-vmlinux object size
-(delta in bytes from test_v3.17-rc1 
-(7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9)):
-   text     data      bss    total  kernel
-  +1592       +8        0    +1600  multi_v7_defconfig
-  +1124       +8        0    +1132  tegra_defconfig
+Thanks!
+Yijing.
 
 
-Boot-time memory difference
-(delta in bytes from test_v3.17-rc1 
-(7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-      -8k       8k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-      -8k       8k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-      -8k       8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+> 
+> Regards,
+> Sebastian
+> 
+>>  		irq_set_msi_desc(msi->irq, NULL);
+>>  		irq_free_desc(msi->irq);
+>>  		msi->msg.address_lo = 0;
+>> @@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+>>  	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+>>  }
+>>
+>> +static struct msi_chip zpci_msi_chip = {
+>> +	.setup_irqs = zpci_setup_msi_irqs,
+>> +	.teardown_irqs = zpci_teardown_msi_irqs,
+>> +};
+>> +
+>> +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
+>> +{
+>> +	return &zpci_msi_chip;
+>> +}
+>> +
+>>  static void zpci_map_resources(struct zpci_dev *zdev)
+>>  {
+>>  	struct pci_dev *pdev = zdev->pdev;
+>> -- 
+>> 1.7.1
+>>
+>>
+> 
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
