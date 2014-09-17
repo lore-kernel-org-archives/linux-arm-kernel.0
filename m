@@ -1,37 +1,58 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 17 Sep 2014 13:50:31 +0200
-Subject: [PATCH 0/2] s3c RTC fix for Exynos Chromebooks
-Message-ID: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 17 Sep 2014 13:57:16 +0200
+Subject: [PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on
+ wake-up
+Message-ID: <1410955036-1956-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+If power area D4, which contains the Coresight-ETM hardware block, is
+powered down on R-Mobile A1 (r8a7740), the kernel crashes when
+suspending from s2ram with:
 
-commit 546b117fdf17 ("rtc: s3c: add support for RTC of Exynos3250 SoC")
-added an "rtc_src" DT property for the Samsung's S3C Real Time Clock
-controller that specifies the 32.768 kHz clock that uses the RTC as
-its source clock but this breaks the s3c RTC on Exynos Chromebooks
-because the rtc device node does not define the "rtc_src" clock.
+    Internal error: Oops - undefined instruction: 0 [#1] ARM
 
-It was working before only because the source clock was not disabled
-by the kernel since the CCF didn't know about it. But once the clock
-is known, the CCF disables the clock and does not work so define the
-"rtc_src" clock to make the s3c-rtc driver obtain it and kept enabled.
+This happens because dbg_cpu_pm_notify() calls reset_ctrl_regs(), which
+can't access the debug registers as the debug module is powered down.
 
-This series makes the s3c RTC to claim its source clock on the Snow
-and Peach boards but other Samsung boards will have the same issue.
+Protect the call to reset_ctrl_regs() by an undefined instruction hook,
+like was done in commit 0d352e3d006c9589 ("ARM: hw_breakpoint: trap
+undef instruction exceptions in reset_ctrl_regs") for another caller.
 
-The following patches are meant to be for the 3.18 rc cycle once
-3.18-rc1 is released.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Question: Do we need the same protection in dbg_reset_notify()?
+          I can't trigger that case, as r8a7740 has only one CPU core.
+---
+ arch/arm/kernel/hw_breakpoint.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Javier Martinez Canillas (2):
-  ARM: dts: Add rtc_src clk for s3c-rtc on exynos Peach boards
-  ARM: dts: Add rtc_src clk for s3c-rtc on exynos5250-snow
-
- arch/arm/boot/dts/exynos5250-snow.dts      | 5 ++++-
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 ++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 ++++-
- 3 files changed, 12 insertions(+), 3 deletions(-)
-
-Best regards,
-Javier
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 4d963fb66e3f0bce..f55f25d4e4de7674 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -1038,8 +1038,21 @@ static struct notifier_block dbg_reset_nb = {
+ static int dbg_cpu_pm_notify(struct notifier_block *self, unsigned long action,
+ 			     void *v)
+ {
+-	if (action == CPU_PM_EXIT)
++	if (action == CPU_PM_EXIT) {
++		/*
++		 * We need to tread carefully here because DBGSWENABLE may be
++		 * driven low on this core and there isn't an architected way to
++		 * determine that.
++		 */
++		register_undef_hook(&debug_reg_hook);
++
++		/*
++		 * Reset the breakpoint resources. We assume that a halting
++		 * debugger will leave the world in a nice state for us.
++		 */
+ 		reset_ctrl_regs(NULL);
++		unregister_undef_hook(&debug_reg_hook);
++	}
+ 
+ 	return NOTIFY_OK;
+ }
+-- 
+1.9.1
