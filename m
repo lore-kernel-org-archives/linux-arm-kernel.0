@@ -1,92 +1,40 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 17 Sep 2014 16:50:50 +0530
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <20140917085818.GA10285@shlinux1.ap.freescale.net>
-References: <1410935510-1567-1-git-send-email-pankaj.dubey@samsung.com>
- <20140917085818.GA10285@shlinux1.ap.freescale.net>
-Message-ID: <000401cfd269$922dfc40$b689f4c0$@samsung.com>
+From: chanho.min@lge.com (Chanho Min)
+Date: Wed, 17 Sep 2014 20:34:46 +0900
+Subject: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared at sp804_of_init
+Message-ID: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+sp804 may not be added to the tick device if the higher device is
+already registered. In this case, If pending interrupt is existed
+(usually It will be passed from the boot loader), inetrrupt is occured
+without event_handler then it cause kernel panic. So Interrupts
+should be cleared before clockevent is registered.
 
-On Wednesday, September 17, 2014, Dong Aisheng Wrote,
-> >
-> > +static struct syscon *of_syscon_register(struct device_node *np) {
-> > +	struct syscon *syscon;
-> > +	struct regmap *regmap;
-> > +	void __iomem *base;
-> > +
-> > +	if (!of_device_is_compatible(np, "syscon"))
-> > +		return ERR_PTR(-EINVAL);
-> > +
-> > +	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
-> > +	if (!syscon)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	base = of_iomap(np, 0);
-> > +	if (!base)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	regmap = regmap_init_mmio(NULL, base, &syscon_regmap_config);
-> 
-> Does a NULL device pointer work?
+Changes since v1:
+ - Move to sp804_of_init
+ - Clear TIMER2 interrupt
+ - Update commit log
 
-Yes, it is safe, at least we are able to test on Exynos based SoC. 
-I have tested it with kgene/for-next kernel on Exynos3250.
-Also it has been tested on Exynos5250 based Snow board with 3.17-rc5 based
-kernel
-by Vivek Gautam. 
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm/common/timer-sp.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Patch V2 also has been tested by "Borris Brezillon" on AT91 platform.
-
-
-> I just tested on MX6SX SDB board and it seemed crashed at here in
-regmap_init
-> function.
-> 
-
-Can you please provide crash log which can give more information about the
-crash?
-
-
-Thanks,
-Pankaj Dubey
-
-> Regards
-> Dong Aisheng
-> 
-> > +	if (IS_ERR(regmap)) {
-> > +		pr_err("regmap init failed\n");
-> > +		return ERR_CAST(regmap);
-> > +	}
-> > +
-> > +	syscon->regmap = regmap;
-> > +	syscon->np = np;
-> > +
-> > +	spin_lock(&syscon_list_slock);
-> > +	list_add_tail(&syscon->list, &syscon_list);
-> > +	spin_unlock(&syscon_list_slock);
-> > +
-> > +	return syscon;
-> > +}
-> > +
-> >  static int syscon_probe(struct platform_device *pdev)  {
-> >  	struct device *dev = &pdev->dev;
-> > @@ -167,7 +204,6 @@ static struct platform_driver syscon_driver = {
-> >  	.driver = {
-> >  		.name = "syscon",
-> >  		.owner = THIS_MODULE,
-> > -		.of_match_table = of_syscon_match,
-> >  	},
-> >  	.probe		= syscon_probe,
-> >  	.id_table	= syscon_ids,
-> > --
-> > 1.7.9.5
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index fd6bff0..e3cc08e 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -226,6 +226,10 @@ static void __init sp804_of_init(struct device_node *np)
+ 	writel(0, base + TIMER_CTRL);
+ 	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
+ 
++	/* Ensure interrupt is cleared */
++	writel(1, base + TIMER_INTCLR);
++	writel(1, base + TIMER_2_BASE + TIMER_INTCLR);
++
+ 	if (initialized || !of_device_is_available(np))
+ 		goto err;
+ 
+-- 
+1.7.9.5
