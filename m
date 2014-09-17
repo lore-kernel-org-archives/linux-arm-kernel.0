@@ -1,50 +1,67 @@
-From: alex@lindusembedded.com (Alex Gonzalez)
-Date: Wed, 17 Sep 2014 15:31:20 +0200
-Subject: Timer expiring past its expiration time
-Message-ID: <CANsDNf1ssAd-zSyRuokqBAGGmsatFyykfPYgSPN6L_riCpZbUA@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 17 Sep 2014 16:37:53 +0300
+Subject: [PATCH v4 10/11] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <541861DB.5000706@ti.com>
+References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
+ <1405047349-15101-11-git-send-email-d-gerlach@ti.com>
+ <7h7g1dlp8b.fsf@linaro.org>
+ <CAK=WgbYwGcSCxHfa880up1qKTroS=mi8UAf_Qh6Wz9n5x4D9rw@mail.gmail.com>
+ <540F5C39.7040201@ti.com> <540F62E3.6080804@ti.com>
+ <7hr3zk7b5z.fsf@deeprootsystems.com>
+ <CAK=Wgbas+CqgYJ35Sao8eCkMPujpVNbWW-aikUQExScaqYfETw@mail.gmail.com>
+ <541861DB.5000706@ti.com>
+Message-ID: <CAK=WgbYqv=Fu3fm7SK9_u_gu2Ac13Rgi+3Kyo6Bhu-+1WGFwow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Suman,
 
-I am looking for hints into a problem I am seeing on a Freescale i.MX6
-SoC based board running a 3.10.54 linux kernel. We realized that
-sometimes the reboot process would take too long, sometimes minutes,
-and we traced it down to a 2 secs sleep call from one of the rc.d
-scripts.
+On Tue, Sep 16, 2014 at 7:14 PM, Suman Anna <s-anna@ti.com> wrote:
+> The current remoteproc infrastructure automatically calls rproc_boot
+> only as part of the rpmsg/virtio stack (in remoteproc_virtio.c), but
+> since the WkupM3 does not use rpmsg, there is no automatic booting of
+> the WkupM3 processor.  This is the reason why rproc_boot is called as
+> part of the WkupM3 driver probe sequence. What are your concerns here,
+> and if you think this is not the right place do invoke rproc_boot, where
+> do you expect it to be called?
 
-I have captured the problem in the serial console output below. The
-number in brackets is the {CPU id}.
+The remoteproc layer is meant to hide hardware-specific details, and
+allow high-level hardware-agnostic code to boot a remote processor, in
+order to achieve some task, without even caring what kind of hardware
+it is booting.
 
-[   21.788864] {0}[SYSC_nanosleep]2 secs 0 nsecs
-[   21.793933] {0}[do_nanosleep]About to schedule timer a86eff00
-[  127.217630] {0}[__run_hrtimer]timer a86eff00 EXPIRED
-[  127.227133] {0}[do_nanosleep]AFTER schedule
-[  127.232079] {0}[do_nanosleep]
-[  127.239428] Restarting system.
-[  127.242511] {0}[machine_restart]
+So generally we have some consumer driver asking remoteproc to boot a
+remote processor, and in turn, remoteproc asking a hardware-specific
+vendor driver to take care of the hardware details like actually
+taking the remote processor out of reset.
 
-This shows the do_nanosleep() function calling schedule(), but the
-timer not expiring until 106 seconds later, when it was programmed to
-2 secs.
+The consumer driver is some code that deals with some hardware
+agnostic task. Today the only consumer we have is rpmsg, so it's
+perfectly reasonable if remoteproc needs to be adapted a bit to
+accommodate other consumers as they show up.
 
-The system is using high resolution timers, but I have also build
-without HR timers support and still hit the problem.  I have also
-cherry-picked patches from mainline v3.17-rc5 into hrtimers.c, but
-they did not help.
+Can you think of any component in your code that is not necessarily
+hardware specific, and that one day might be useful for other vendors?
+Can you describe the task you're trying to achieve, the entities
+involved and the flow between them?
 
-The problem occurs randomly, around 1% of the reboots, and only
-happens on SMP systems. That is, if I boot with maxcpus=1 we won't hit
-it. Also, it seems to be only reproducible on reboot. We have done
-some runtime testing trying to catch the error and are not able to see
-it happening. This is expected, as the platform is working normally
-otherwise.
+> Also do note that, there is no way
+> at present to retrieve the struct rproc for a given remote processor, to
+> be able to invoke the rproc_boot from a different layer.
 
-I was hoping for some clues or maybe reports of anyone with similar issues.
+It's perfectly ok to make struct rproc public if we have a consumer
+that requires it.
 
-BTW, even though the serial output does not seem to mask the problem,
-having a persistent storage for a custom ftrace would be nice. Is that
-possible?
+> Splitting this would still require some kind of notifier from remoteproc
+> for the other layers for them to know that the WkupM3 remote processor
+> has been loaded and booted successfully. This is also done as part of
+> the WkupM3 driver at the moment.
+
+Are there entities, other than the one that calls rproc_boot, that
+needs to know that the WkupM3 is up? if so, let's discuss who should
+notify them - remoteproc or the actual invoker of rproc_boot. It
+probably depends on who those entities are and what's their relation,
+if any, to the WkupM3 driver.
 
 Thanks,
-Alex
+Ohad.
