@@ -1,40 +1,63 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 18 Sep 2014 07:06:11 +0800
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <1628662.T2ReQ4irMm@vostro.rjw.lan>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <4416582.iOjLNrLDZE@vostro.rjw.lan> <20140917192259.GA18980@srcf.ucam.org>
- <1628662.T2ReQ4irMm@vostro.rjw.lan>
-Message-ID: <541A13E3.4010800@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 18 Sep 2014 01:13:42 +0200
+Subject: [PATCH v3 1/8] clk: rockchip: change pll rate without a
+ clk-notifier
+In-Reply-To: <CAD=FV=VjU7E4TpPHv5Md=zLEig=zCTG8twx8L9+5hdLuERDUAw@mail.gmail.com>
+References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
+ <1410991974-12235-2-git-send-email-heiko@sntech.de>
+ <CAD=FV=VjU7E4TpPHv5Md=zLEig=zCTG8twx8L9+5hdLuERDUAw@mail.gmail.com>
+Message-ID: <1802092.5yu3PTGUzO@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?09?18? 04:11, Rafael J. Wysocki wrote:
-> On Wednesday, September 17, 2014 08:22:59 PM Matthew Garrett wrote:
->> On Wed, Sep 17, 2014 at 09:37:42PM +0200, Rafael J. Wysocki wrote:
->>
->>> There are no implied IP issues with using the information there I know of and
->>> if there's any fine print anywhere that may suggest so, please let me know.
->> Using the information should be fine, but my understanding of the UEFI 
->> forum rules is that any submissions to UEFI specs must be from UEFI 
->> forum members - there are concerns around accidentally including 
->> patented material.
-> The documents in question are not regarded as UEFI specs, however.  They
-> are just hosted by UEFI.
->
->> The easy way around this is just for the bindings to 
->> be managed outside UEFI.
-> Again, there's a difference between UEFI material and the UEFI hosting
-> something (but not maintaining it).
->
-> In principle, the bindings could be hosted by UEFI, but maintained by
-> community members.
+Am Mittwoch, 17. September 2014, 15:46:08 schrieb Doug Anderson:
+> Heiko,
+> 
+> On Wed, Sep 17, 2014 at 3:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > From: Doug Anderson <dianders@chromium.org>
+> > 
+> > The Rockchip PLL code switches into slow mode (AKA bypass more AKA
+> > 24MHz mode) before actually changing the PLL.  This keeps anyone from
+> > using the PLL while it's changing.  However, in all known Rockchip
+> > SoCs nobody should ever see the 24MHz when changing the PLL supplying
+> > the armclk because we should reparent children to an alternate
+> > (faster than 24MHz) PLL.
+> > 
+> > One problem is that the code to switch to an alternate parent was
+> > running in PRE_RATE_CHANGE.  ...and the code to switch to slow mode
+> > was _also_ running in PRE_RATE_CHANGE.  That meant there was no real
+> > guarantee that we would switch to an alternate parent before switching
+> > to 24MHz mode.
+> > 
+> > Let's move the switch to "slow mode" straight into
+> > rockchip_rk3066_pll_set_rate().  That means we're guaranteed that the
+> > 24MHz is really a last-resort.
+> > 
+> > Note that without this change on real systems we were the code to
+> > switch to an alternate parent at 24MHz.  In some older versions of
+> > that code we'd appy a (temporary) / 5 to the 24MHz causing us to run
+> > at 4.8MHz.  That wasn't enough to service USB interrupts in some cases
+> > and could lead to a system hang.
+> > 
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/clk/rockchip/clk-pll.c | 63
+> >  +++++++++--------------------------------- 1 file changed, 13
+> >  insertions(+), 50 deletions(-)
+> 
+> Thanks for adding my patch to your series (with the proper commit
+> message)!  I think you need your SoB on the patch too.  Andrew Morton
+> pointed to the docs in another patch I was involved in.  Specifically,
+> you were "on the patch delivery".  See Documentation/SubmittingPatches
+> section 12 (and 13).
 
-Thanks for the clarify, I totally agree with you, that's how things work now for such doc hosted
-by UEFI.
+ok ... Mike can you add the
 
-For now,  _DSD will use the same binding as DT, is there any chance that _DSD will introduce
-new bindings? if yes, how can we handle it?
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Thanks
-Hanjun
+to the patch, or do you want a respin [if no other issue appears]
+
+
+Heiko
