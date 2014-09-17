@@ -1,51 +1,104 @@
-From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
-Date: Wed, 17 Sep 2014 06:26:44 -0400 (EDT)
-Subject: [PATCH v3] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-In-Reply-To: <96034F94-3C6D-43FC-95EF-7FA705724F99@codeaurora.org>
-References: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
- <20140916023922.GB2386@qualcomm.com>
- <1410871001.891126377@apps.rackspace.com>
- <96034F94-3C6D-43FC-95EF-7FA705724F99@codeaurora.org>
-Message-ID: <1410949604.906729871@apps.rackspace.com>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Wed, 17 Sep 2014 12:28:12 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <541716DC.9020904@linutronix.de>
+References: <5411967A.6090406@hurleysoftware.com>
+ <54119AAA.9080907@linutronix.de>
+ <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+Message-ID: <20140917102812.GA20438@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Yesterday's testing was a bit messy. So here goes again.
 
-On Tuesday, September 16, 2014 3:00pm, "Kumar Gala" <galak@codeaurora.org> said:
+On Mon, Sep 15, 2014 at 06:42:04PM +0200, Sebastian Andrzej Siewior wrote:
+> On 09/12/2014 12:28 PM, Frans Klaver wrote:
+> > port config is 115200 8N1. I don't recall doing anything special. I
+> > boot, login, less file and get a lock.
+> 
+> So I booted my mini Debian 7.6 (basic system + openssh) on my beagle
+> bone black which is:
+> 
+> [    0.000000] AM335X ES2.0 (neon )
 
-> 
-> On Sep 16, 2014, at 5:36 AM, kiran.padwal at smartplayin.com wrote:
-> 
->>
->>
->> On Monday, September 15, 2014 10:39pm, "Andy Gross" <agross@codeaurora.org>
->> said:
->>
->>> On Tue, Aug 26, 2014 at 05:00:45PM +0530, Kiran Padwal wrote:
->>>> This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
->>>> It also adds necessary DT support for i2c eeprom which is present on
->>>> IFC6410.
->>>>
->>>> Tested on IFC6410 board.
->>>
->>> Looks fine
->>
->> Thanks for review.
-> 
-> Can you rebase this on:
-> 
->  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git
-> tags/qcom-dt-for-3.18
+Mine's the same.
 
-Sure, I will resend this patch gain.
+> configured a console, login, invoked "less file". The file was shown, I
+> hit on the space key so less shows me more of the file. No lock-up.
+> I tried booting via NFS and MMC. I tried various files with less.
+> 
+> My dot config is here
+> 	https://breakpoint.cc/config-am335x-bb.txt.xz
+> 
+> If there is nothing specific to the file you do less on I have no idea
+> what else it could if it is not the config.
 
-> 
-> - k
-> 
-> --
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The
-> Linux Foundation
-> 
-> 
+It could be environmental. I have three test cases right now. Two of
+them on the beagle bone black, the third on our custom am335x based
+platform.
+
+- All test cases run the same kernel built from uart_v10-pre1.
+- For the black, the board, dtb, and u-boot environment are equal for
+  the test cases.
+
+- Bone Black: Debian 7.5
+  Login, "less file" doesn't lock up. Scrolling down looks sensible.
+  Scrolling up leaves me with a crooked display, provided the minicom
+  window is more than 24 lines high. Condensed example:
+
+  Normal less looks like:
+  
+	Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+	eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
+	minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+	aliquip ex ea commodo consequat. Duis aute irure dolor in
+	:
+
+  While after scrolling up it looks like
+
+	minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+	aliquip ex ea commodo consequat. Duis aute irure dolor in
+	:
+
+	Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+	eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad
+
+  vi works sensibly, but only occupies part of the total screen estate
+  in minicom. After quitting, minicom doesn't use the rest of the screen
+  estate anymore.
+
+  After running vi, less doesn't show the weird scrolling behavior
+  anymore, since the console has just been limited to 24x80.
+
+- Bone Black: Yocto poky, core-image-minimal
+  Login, "less file" locks up, doesn't show anything. I can exit using
+  Ctrl-C.
+
+  vi runs normally, only occupies part of the total screen estate in
+  minicom. After quitting, a weird character shows up (typically I see
+  ? there), but minicom can use the rest of the screen estate again.
+  If we disregard the odd character, this is much like the behavior we
+  have on the omap-serial driver.
+
+- Custom board: Yocto poky, custom image
+  Login, "less file" locks up, showing only "?" in the top left corner
+  of the screen. Can get out of there by having something dumped through
+  /dev/kmsg.
+
+  vi: see "Bone Black: Yocto poky, core-image-minimal"
+
+Having it summed up like this, I think we're back at ncurses and its
+interaction with the serial driver.
+
+Hope this helps. Thanks for your effort so far,
+Frans
