@@ -1,27 +1,97 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Wed, 17 Sep 2014 21:00:13 +0200
-Subject: [PATCH 0/6] video: fbdev: use container_of where possible
-Message-ID: <1410980419-5326-1-git-send-email-fabf@skynet.be>
+Date: Wed, 17 Sep 2014 21:00:17 +0200
+Subject: [PATCH 4/6] video: fbdev: cyber2000fb.c: use container_of to resolve
+ cfb_info from fb_info
+In-Reply-To: <1410980419-5326-1-git-send-email-fabf@skynet.be>
+References: <1410980419-5326-1-git-send-email-fabf@skynet.be>
+Message-ID: <1410980419-5326-5-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Small patchset using container_of instead of casting on first structure member address.
+Use container_of instead of casting first structure member.
 
-Fabian Frederick (6):
-  video: fbdev: stifb.c: use container_of to resolve stifb_info from fb_info
-  video: fbdev: sa1100fb.c: use container_of to resolve sa1100fb_info from fb_info
-  video: fbdev: controlfb.c: use container_of to resolve fb_info_control from fb_info
-  video: fbdev: cyber2000fb.c: use container_of to resolve cfb_info from fb_info
-  video: fbdev: pxafb.c: use container_of to resolve pxafb_info/layer from fb_info
-  video: fbdev: valkyriefb.c: use container_of to resolve fb_info_valkyrie from fb_info
+Signed-off-by: Fabian Frederick <fabf@skynet.be>
+---
+Compiled but untested.
 
- drivers/video/fbdev/controlfb.c   | 15 ++++++++++-----
  drivers/video/fbdev/cyber2000fb.c | 16 ++++++++--------
- drivers/video/fbdev/pxafb.c       | 20 ++++++++++----------
- drivers/video/fbdev/sa1100fb.c    | 18 ++++++++++++------
- drivers/video/fbdev/stifb.c       |  4 ++--
- drivers/video/fbdev/valkyriefb.c  | 12 ++++++++----
- 6 files changed, 50 insertions(+), 35 deletions(-)
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/video/fbdev/cyber2000fb.c b/drivers/video/fbdev/cyber2000fb.c
+index b0a950f..99acf53 100644
+--- a/drivers/video/fbdev/cyber2000fb.c
++++ b/drivers/video/fbdev/cyber2000fb.c
+@@ -159,7 +159,7 @@ cyber2000_seqw(unsigned int reg, unsigned int val, struct cfb_info *cfb)
+ static void
+ cyber2000fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	unsigned long dst, col;
+ 
+ 	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT)) {
+@@ -191,7 +191,7 @@ cyber2000fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
+ static void
+ cyber2000fb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	unsigned int cmd = CO_CMD_L_PATTERN_FGCOL;
+ 	unsigned long src, dst;
+ 
+@@ -241,7 +241,7 @@ cyber2000fb_imageblit(struct fb_info *info, const struct fb_image *image)
+ 
+ static int cyber2000fb_sync(struct fb_info *info)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	int count = 100000;
+ 
+ 	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT))
+@@ -276,7 +276,7 @@ static int
+ cyber2000fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+ 		      u_int transp, struct fb_info *info)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	struct fb_var_screeninfo *var = &cfb->fb.var;
+ 	u32 pseudo_val;
+ 	int ret = 1;
+@@ -758,7 +758,7 @@ cyber2000fb_decode_clock(struct par_info *hw, struct cfb_info *cfb,
+ static int
+ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	struct par_info hw;
+ 	unsigned int mem;
+ 	int err;
+@@ -861,7 +861,7 @@ cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+ 
+ static int cyber2000fb_set_par(struct fb_info *info)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	struct fb_var_screeninfo *var = &cfb->fb.var;
+ 	struct par_info hw;
+ 	unsigned int mem;
+@@ -971,7 +971,7 @@ static int cyber2000fb_set_par(struct fb_info *info)
+ static int
+ cyber2000fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 
+ 	if (cyber2000fb_update_start(cfb, var))
+ 		return -EINVAL;
+@@ -1007,7 +1007,7 @@ cyber2000fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+  */
+ static int cyber2000fb_blank(int blank, struct fb_info *info)
+ {
+-	struct cfb_info *cfb = (struct cfb_info *)info;
++	struct cfb_info *cfb = container_of(info, struct cfb_info, fb);
+ 	unsigned int sync = 0;
+ 	int i;
+ 
 -- 
 2.1.0
