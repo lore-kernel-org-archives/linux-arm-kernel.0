@@ -1,66 +1,48 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Wed, 17 Sep 2014 14:38:44 +0545
-Subject: [RESEND PATCH] arm: exynos: Allow rtc alarm and tick wakeup irq
- for exynos3250.
-In-Reply-To: <1410923262-4771-1-git-send-email-jonghwa3.lee@samsung.com>
-References: <1410923262-4771-1-git-send-email-jonghwa3.lee@samsung.com>
-Message-ID: <CAGm_ybjMaLHPALp519fe=UdMy1DeJbcxUxJN+hcPecttY7A_tQ@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 17 Sep 2014 10:55:56 +0200
+Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
+ i.mx6dl
+In-Reply-To: <20140917084120.GA6369@Robin-OptiPlex-780>
+References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
+ <1410774073.3314.1.camel@pengutronix.de>
+ <20140916034123.GA20800@Robin-OptiPlex-780>
+ <1410861006.2746.1.camel@pengutronix.de>
+ <20140917084120.GA6369@Robin-OptiPlex-780>
+Message-ID: <1410944156.2731.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Mittwoch, den 17.09.2014, 16:41 +0800 schrieb Robin Gong:
+> On Tue, Sep 16, 2014 at 11:50:06AM +0200, Lucas Stach wrote:
+> > Hi Robin,
+> > 
+> > Am Dienstag, den 16.09.2014, 11:41 +0800 schrieb Robin Gong:
+> > > Hi Lucas,
+> > >   I understood your concern,but looks we have to break old DT.
+> > 
+> > Sorry, but this isn't going to happen. And honestly I don't even see the
+> > need to do so.
+> > 
+> > > Our old DT
+> > > support SPI DMA on i.mx6q/dl(v2,b3810c3dc1bcbc6a), but the DMA support patch
+> > > for SPI driver is still in reviewing(v6).
+> > 
+> > So this means now is the time to fix this driver patch to not enable DMA
+> > on imx6dl. Nobody will experience any breakage in this case.
+> >
+> Sorry, i.mx6q and i.mx6dl are totally same, not only IP but also clock. So we
+> can't distinguish them except for different compatible name....
 
-On Wed, Sep 17, 2014 at 8:52 AM, Jonghwa Lee <jonghwa3.lee@samsung.com> wrote:
-> Add rtc alarm and tick irq to wakeup sources in exynos3250.
->
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Acked-by : Chanwoo choi <cw00.choi@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c |    9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index fa7218a..d78dcf9 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -66,6 +66,12 @@ static struct sleep_save exynos_core_save[] = {
->
->  static u32 exynos_irqwake_intmask = 0xffffffff;
->
-> +static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
-> +       { 105, BIT(1) }, /* RTC alarm */
-> +       { 106, BIT(2) }, /* RTC tick */
-> +       { /* sentinel */ },
-> +};
-> +
->  static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
->         { 76, BIT(1) }, /* RTC alarm */
->         { 77, BIT(2) }, /* RTC tick */
-> @@ -81,9 +87,10 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
->  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
->  {
->         const struct exynos_wkup_irq *wkup_irq;
-> -
->         if (soc_is_exynos5250())
->                 wkup_irq = exynos5250_wkup_irq;
-> +       else if (soc_is_exynos3250())
-> +               wkup_irq = exynos3250_wkup_irq;
+I know that, but I still don't see the problem.
 
+If this issue is specific to the ECSPI IP integrated into a imx6dl SoC
+you need to check for the machine compatible in the driver and disable
+DMA support based on this. We generally avoid checking for the machine
+compatible in drivers and prefer to have a specific IP block compatible
+instead, but in that case it's the only reasonable thing to do.
 
-Don't add anymore soc_is_exynosxxx() checks, please rebase on [1],
-which refactors the pm.c to use DT based lookup.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg355266.html
-
-
-
->         else
->                 wkup_irq = exynos4_wkup_irq;
->
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
