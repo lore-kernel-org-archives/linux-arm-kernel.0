@@ -1,42 +1,33 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 17 Sep 2014 13:16:09 -0700
-Subject: [PATCH 2/2] iommu/arm-smmu: add support for access-protected mappings
-In-Reply-To: <1410984969-2340-1-git-send-email-mitchelh@codeaurora.org>
-References: <1410984969-2340-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <1410984969-2340-3-git-send-email-mitchelh@codeaurora.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 17 Sep 2014 22:16:51 +0200
+Subject: [PATCHv2] can: at91_can: prepare and unprepare the clock
+In-Reply-To: <1410956808-1964-1-git-send-email-davidcdueck@googlemail.com>
+References: <1410956808-1964-1-git-send-email-davidcdueck@googlemail.com>
+Message-ID: <5419EC33.7050802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM SMMUs support memory access control via some bits in the translation
-table descriptor memory attributes. Currently we assume all translations
-are "unprivileged". Add support for privileged mappings, controlled by
-the IOMMU_PRIV prot flag.
+On 09/17/2014 02:26 PM, David Dueck wrote:
+> Make the driver work with the common clock framework.
+> 
+> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+> Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
 
-Also sneak in a whitespace change for consistency with nearby code.
+Added with a some more prose commit message to the linux-can tree.
 
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/iommu/arm-smmu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Thanks,
+Marc
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ca18d6d42a..93999ec22c 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1256,10 +1256,11 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
- 	}
- 
- 	if (stage == 1) {
--		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
-+		pteval |= ARM_SMMU_PTE_nG;
-+		if (!(prot & IOMMU_PRIV))
-+			pteval |= ARM_SMMU_PTE_AP_UNPRIV;
- 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
- 			pteval |= ARM_SMMU_PTE_AP_RDONLY;
--
- 		if (prot & IOMMU_CACHE)
- 			pteval |= (MAIR_ATTR_IDX_CACHE <<
- 				   ARM_SMMU_PTE_ATTRINDX_SHIFT);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/3fc1801a/attachment.sig>
