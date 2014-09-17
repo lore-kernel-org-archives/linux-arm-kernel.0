@@ -1,33 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 17 Sep 2014 09:05:09 +0200
-Subject: Cortex-M and zImage
-In-Reply-To: <CAGhQ9VyhXywQ2kBKK9K5McQf153qXzgsPzt3GoCCL=QjWR2ogw@mail.gmail.com>
-References: <CAGhQ9VzzSq4P5BKM3UBBCPT61g3T1RHFhttfA-KkWGCcrjaW6A@mail.gmail.com>
- <20140917061110.GM3755@pengutronix.de>
- <CAGhQ9VyhXywQ2kBKK9K5McQf153qXzgsPzt3GoCCL=QjWR2ogw@mail.gmail.com>
-Message-ID: <20140917070509.GN3755@pengutronix.de>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 17 Sep 2014 15:17:38 +0800
+Subject: [PATCH v2 1/3] ARM: dts: imx6: add pm_power_off support for
+ i.mx6 chips
+In-Reply-To: <20140917060649.GJ4992@pengutronix.de>
+References: <1410511739-31122-1-git-send-email-b38343@freescale.com>
+ <1410511739-31122-2-git-send-email-b38343@freescale.com>
+ <20140917021044.GD4796@dragon> <20140917034514.GF27452@Robin-OptiPlex-780>
+ <20140917060649.GJ4992@pengutronix.de>
+Message-ID: <20140917071736.GA5545@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joachim,
-
-On Wed, Sep 17, 2014 at 08:55:05AM +0200, Joachim Eastwood wrote:
-> On 17 September 2014 08:11, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > I was able to compile a zImage with the patch below. For the
-> > "Conflicting architecture profiles" error the most relevant hunk is the
-> > first. And of course this needs some #ifdefs.
+On Wed, Sep 17, 2014 at 08:06:49AM +0200, Sascha Hauer wrote:
+> On Wed, Sep 17, 2014 at 11:45:15AM +0800, Robin Gong wrote:
+> > On Wed, Sep 17, 2014 at 10:10:45AM +0800, Shawn Guo wrote:
+> > > On Fri, Sep 12, 2014 at 04:48:57PM +0800, Robin Gong wrote:
+> > > > All chips of i.mx6 can be powered off by programming SNVS.
+> > > > For example :
+> > > > On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+> > > > pmic ON/OFF pin, that will cause the whole PMIC powered off
+> > > > except VSNVS. And system can restart once PMIC_ON_REQ goes
+> > > > high by push POWRER key.
+> > > 
+> > > What's the behavior for those boards on which PMIC_ON_REQ isn't
+> > > connected to anywhere?
+> > >
+> > System can't be powered off if not connect PMIC_ON_REQ. Although all of our
+> > reference design for i.mx6 chips are connecting  PMIC_ON_REQ with external
+> > PMIC, we need consider others may not use external PMIC. I'll add the info
+> > into commit log or Kconfig.
 > 
-> Thanks, I'll give it a try later today.
+> You should add the information to the dtsi file in form of a
+> status = "disabled" property so that boards that actually have the
+> feature can enable it.
 > 
-> But is this the way to go?
-> Adding lots of 'ifdefs CONFIG_CPU_V7M' to compressed/head.S ?
-Probably not lots. I would expect (and hope) that you won't need more
-than a handful. I don't see an alternative.
- 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Sascha
+Hi Sacha, but that's  SOC level feature and it's harmless even if others don't
+want to use this pin to control external PMIC.
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
