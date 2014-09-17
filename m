@@ -1,48 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Sep 2014 16:27:35 +0100
-Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <1410363657.23973.48.camel@hornet>
-References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
- <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
- <20140910145818.GG12361@n2100.arm.linux.org.uk>
- <1410363657.23973.48.camel@hornet>
-Message-ID: <20140917152735.GU12361@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 17 Sep 2014 08:37:30 -0700
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+In-Reply-To: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <A4205FCA-D4DE-48A4-B19F-58400A3FBF5C@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 04:40:57PM +0100, Pawel Moll wrote:
-> On Wed, 2014-09-10 at 15:58 +0100, Russell King - ARM Linux wrote:
-> > So, I'll then be asking ARM to provide updated instructions on how to
-> > boot the CT9x4 with DT... 
+
+On Sep 17, 2014, at 1:56 AM, Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com> wrote:
+
+> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 > 
-> The same version (although different build) of the Boot Monitor you have
-> got for CA15_A7 (a.k.a. TC2) is able to boot CA9x4 with DT. It has got
-> the same limitations though, namely no TFTP support, if this is your
-> main concern (there is no ARM-provided uboot for TC2 either).
+> This patch adds property "nid" to memory node to provide the memory range to
+> numa node id mapping.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> 
+> ?
 
-I don't use Boot Monitor.  I use uboot.  I use uboot because uboot supports
-network booting.  I *require* networking booting.  Boot Monitor is a piece
-of crap that no sane kernel developer would ever use as a boot environment.
-I also boot a root filesystem off the MMC slot.
+Adding the PPC guys as they?ve been doing NUMA on IBM Power Servers for years with OF/DT.  So we should really try and follow what they?ve done.
 
-As for TC2, I just don't bother with that.  It's really not worth the
-hastle.  I asked for help with that and got almost nothing.  Yes, there's
-Nicolas' uboot, which solves some problems, but getting the kernel to
-boot on TC2 turned out to be a dead loss - and no help with it was
-forthcoming.  So I've permanently shelved the TC2 tile.  ARM Ltd can
-have the TC2 tile back for all I care, it's more useful to me as a door
-stop than something for running Linux.
-
-Let me repeat: a boot loader with network booting capability is an
-absolute necessity for me.  This is *required* for unattended boots of
-kernels which have just been built.  If a platform doesn't have this
-capability, I'm just not interested in it, and I _will_ not use it.  It
-really is that simple.
-
-My position on the boot loader issue is not going to change; it's a
-fundamental requirement for automatic build and boot testing, and for
-efficient workflow at other times.
+> Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+> 1 file changed, 58 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/numa.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+> new file mode 100644
+> index 0000000..c4a94f2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/numa.txt
+> @@ -0,0 +1,58 @@
+> +======================================================
+> +numa id binding description
+> +======================================================
+> +
+> +======================================================
+> +1 - Introduction
+> +======================================================
+> +The device node  property "nid(numa node id)" can be added to memory
+> +device node to map the range of memory addresses as defined in property "reg".
+> +The property "nid" maps the memory range to the numa node id, which is used to
+> +find the local and remory pages on numa aware systems.
+> +
+> +======================================================
+> +2 - nid property
+> +======================================================
+> +Numa node id, "nid" is required property of memory device node for 
+> +numa enabled platforms.
+> +
+> +|------------------------------------------------------|
+> +|Property Type  | Usage | Value Type | Definition      |
+> +|------------------------------------------------------|
+> +|  nid          |  R    |    <u32>   | Numa Node id    |
+> +|               |       |            | for this memory |
+> +|------------------------------------------------------|
+> +
+> +========================================================
+> +4 - Example memory nodes with numa node id mapping
+> +========================================================
+> +
+> +Example 1 (2 memory nodes, each mapped to a numa node.):
+> +
+> +	memory at 00000000 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x00000000 0x0 0x80000000>;
+> +		nid = <0x0>;
+> +	};
+> +
+> +	memory at 10000000000 {
+> +		device_type = "memory";
+> +		reg = <0x100 0x00000000 0x0 0x80000000>;
+> +		nid = <0x1>;
+> +	};
+> +
+> +Example 2 (multiple memory ranges in each memory node and mapped to numa node):
+> +
+> +	memory at 00000000 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x00000000 0x0 0x80000000>,
+> +		      <0x0 0x80000000 0x0 0x80000000>;
+> +		nid = <0x0>;
+> +	};
+> +
+> +	memory at 10000000000 {
+> +		device_type = "memory";
+> +		reg = <0x100 0x00000000 0x0 0x80000000>,
+> +		      <0x100 0x80000000 0x0 0x80000000>;
+> +		nid = <0x1>;
+> +	};
+> -- 
+> 1.8.1.4
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
