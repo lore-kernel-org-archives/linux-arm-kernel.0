@@ -1,21 +1,37 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Wed, 17 Sep 2014 11:58:04 +0900
-Subject: [PATCH] ARM: timer-sp: ensure interrupt is cleared at
- sp804_clockevents_init
-In-Reply-To: <20140917010923.GB10233@codeaurora.org>
-References: <1410914571-8388-1-git-send-email-chanho.min@lge.com>
- <20140917010923.GB10233@codeaurora.org>
-Message-ID: <021401cfd223$337d9430$9a78bc90$@min@lge.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 17 Sep 2014 11:07:13 +0800
+Subject: [RFC Part2 v1 02/21] genirq: Introduce helper functions to support
+ stacked irq_chip
+In-Reply-To: <alpine.DEB.2.10.1409161044330.4247@nanos>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+ <1410444228-3134-3-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.10.1409161044330.4247@nanos>
+Message-ID: <5418FAE1.4030008@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +	/* Ensure interrupt is cleared */
-> > +	writel(1, clkevt_base + TIMER_INTCLR);
-> >  	setup_irq(irq, &sp804_timer_irq);
-> >  	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
+
+
+On 2014/9/17 1:45, Thomas Gleixner wrote:
+> On Thu, 11 Sep 2014, Jiang Liu wrote:
+>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +void irq_chip_ack_parent(struct irq_data *data)
+>> +{
+>> +	data = data->parent_data;
+>> +	if (data && data->chip && data->chip->irq_ack)
+>> +		data->chip->irq_ack(data);
 > 
-> Or just flip the order of clockevents_config_and_register() and
-> setup_irq()? We've done this in other clockevents drivers.
-It won't fix this issue. clockevents_config_and_register will do nothing
-if the higher rated device is registered. if pending interrupt is existed,
-interrupt will be triggered as soon as setup_irq is done.
+> Why is this restricted to a single parent level and does not go down
+> the whole stack?
+Hi Thomas,
+	It happens to work on x86, and we want to achieve a bit
+performance advantage by not walking down the whole stack.
+If preferred, I will change it to walk the whole stack.
+Regards!
+Gerry
+
+> 
+> Thanks,
+> 
+> 	tglx
+> 
