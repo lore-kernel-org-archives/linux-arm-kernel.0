@@ -1,81 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Sep 2014 14:56:21 -0700
-Subject: [PATCH 6/6] arm/arm64: KVM: map MMIO regions at creation time
-In-Reply-To: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1410990981-665-7-git-send-email-ard.biesheuvel@linaro.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 17 Sep 2014 15:08:39 -0700
+Subject: [PATCH 0/8] qcom SCM updates
+In-Reply-To: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
+References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <B5197E58-92B9-4DA5-8202-966FAE5A3B6A@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is really no point in faulting in memory regions page by page
-if they are not backed by demand paged system RAM but by a linear
-passthrough mapping of a host MMIO region.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kvm/mmu.c | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+On Aug 4, 2014, at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index fe53c3a30383..b153ef0c6d9f 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1162,7 +1162,55 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
- int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
- 			    unsigned long npages)
- {
--	return 0;
-+	hva_t hva = slot->userspace_addr;
-+	phys_addr_t gpa = slot->base_gfn << PAGE_SHIFT;
-+	phys_addr_t size = slot->npages << PAGE_SHIFT;
-+	int ret = 0;
-+
-+	/*
-+	 * A memslot could potentially cover multiple VMAs, so iterate
-+	 * over all of them to find out if we can map any of them right now.
-+	 *
-+	 *     +--------------------------------------------+
-+	 * +---+---------+-------------------+--------------+----+
-+	 * |   : VMA 1   |       VMA 2       |       VMA 3  :    |
-+	 * +---+---------+-------------------+--------------+----+
-+	 *     |                   memslot                  |
-+	 *     +--------------------------------------------+
-+	 */
-+	do {
-+		struct vm_area_struct *vma = find_vma(current->mm, hva);
-+		hva_t start, end;
-+
-+		if (!vma || vma->vm_start > hva) {
-+			ret = -EFAULT;
-+			break;
-+		}
-+
-+		start = max(slot->userspace_addr, vma->vm_start);
-+		end = min((hva_t)(slot->userspace_addr + size), vma->vm_end);
-+
-+		if (vma->vm_flags & VM_PFNMAP) {
-+			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) + start -
-+					 vma->vm_start;
-+			bool writable = vma->vm_flags & VM_WRITE &&
-+					!(slot->flags & KVM_MEM_READONLY);
-+
-+			ret = kvm_phys_addr_ioremap(kvm, gpa, pa, end - start,
-+						    writable);
-+			if (ret)
-+				break;
-+		}
-+		hva += end - start;
-+		gpa += end - start;
-+	} while (hva < slot->userspace_addr + size);
-+
-+	if (ret) {
-+		spin_lock(&kvm->mmu_lock);
-+		unmap_stage2_range(kvm, slot->base_gfn << PAGE_SHIFT, size);
-+		spin_unlock(&kvm->mmu_lock);
-+	}
-+	return ret;
- }
- 
- void kvm_arch_memslots_updated(struct kvm *kvm)
+> The SCM code in the mainline kernel is woefully out of data from what
+> is in the downstream msm kernels. Update the code to be at least 
+> functionally correct and useful for features like cpuidle and
+> suspend.
+> 
+> Olav Haugan (1):
+>  msm: scm: Add logging of actual return code from scm call
+> 
+> Saravana Kannan (1):
+>  msm: scm: Add API to query for service/command availability.
+> 
+> Stephen Boyd (5):
+>  msm: scm: Fix incorrect cache invalidation
+>  msm: scm: Get cacheline size from CTR
+>  msm: scm: Add atomic SCM APIs
+>  msm: scm: Add a feat version query API
+>  msm: scm: Move the scm driver to drivers/soc/qcom
+> 
+> Vikram Mulukutla (1):
+>  msm: scm: Flush the command buffer only instead of the entire cache
+> 
+> arch/arm/mach-qcom/Kconfig                     |   3 -
+> arch/arm/mach-qcom/Makefile                    |   4 +-
+> arch/arm/mach-qcom/scm-boot.c                  |   2 +-
+> drivers/soc/qcom/Kconfig                       |   2 +
+> drivers/soc/qcom/Makefile                      |   2 +
+> {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c | 162 ++++++++++++++++++++++---
+> {arch/arm/mach-qcom => include/soc/qcom}/scm.h |   8 +-
+> 7 files changed, 158 insertions(+), 25 deletions(-)
+> rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c (62%)
+> rename {arch/arm/mach-qcom => include/soc/qcom}/scm.h (69%)
+
+I took patches 1-4,7-8.  There are no immediate users for 5-6 at this time.
+
+- k
+
 -- 
-1.8.3.2
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
