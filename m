@@ -1,133 +1,47 @@
 From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Wed, 17 Sep 2014 22:24:08 +0800
-Subject: [PATCH v2 1/7] arm: MTK: Add basic support for mt8127
-In-Reply-To: <1410963854-17154-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1410963854-17154-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1410963854-17154-2-git-send-email-srv_yingjoe.chen@mediatek.com>
+Date: Wed, 17 Sep 2014 22:24:07 +0800
+Subject: [PATCH v2 0/7] arm: Add basic support for MediaTek MT8127 & MT8135
+ SoCs
+Message-ID: <1410963854-17154-1-git-send-email-srv_yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Joe.C" <yingjoe.chen@mediatek.com>
+This is v2 of adding basic device tree support MT8127 & MT8135.
+This series is based on Matthias' pull request for mediatek support [1]
+Comparing to v1, this version changes:
+ - Change timer compatible string.
+ - Build dtb for mt8127 & mt8135
+ - Adding earlyprintk support for mt8127 & mt8135
 
-This adds a basic dtsi for MT8127 SoC.
+We are planning to upstream drivers for MT8127 & MT8135 SoCs.
+MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
+tablet soc with 4 CA7. They share many similar IP components
+with MT65xx series.
 
-Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
----
- arch/arm/boot/dts/mt8127.dtsi     | 93 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mediatek/mediatek.c |  1 +
- 2 files changed, 94 insertions(+)
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287506.html
+
+Joe.C (7):
+  arm: MTK: Add basic support for mt8127
+  arm: mediatek: add dts for 8127 Moose board
+  arm: MTK: Add basic support for mt8135
+  arm: mediatek: add dts for MT8135 evaluation board.
+  dt-bindings: add more chips in documentation for Mediatek SoC
+  arm: dts: Build dtb for mt8127 & mt8135
+  arm: mediatek: Add earlyprintk support for mt8127 & mt8135
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   9 +-
+ arch/arm/Kconfig.debug                             |  20 ++++
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ arch/arm/boot/dts/mt8127-moose.dts                 |  24 +++++
+ arch/arm/boot/dts/mt8127.dtsi                      |  93 +++++++++++++++++
+ arch/arm/boot/dts/mt8135-evbp1.dts                 |  24 +++++
+ arch/arm/boot/dts/mt8135.dtsi                      | 115 +++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c                  |   2 +
+ 8 files changed, 287 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
  create mode 100644 arch/arm/boot/dts/mt8127.dtsi
+ create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
+ create mode 100644 arch/arm/boot/dts/mt8135.dtsi
 
-diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
-new file mode 100644
-index 0000000..25c9f69
---- /dev/null
-+++ b/arch/arm/boot/dts/mt8127.dtsi
-@@ -0,0 +1,93 @@
-+/*
-+ * Copyright (c) 2014 MediaTek Inc.
-+ * Author: Joe.C <yingjoe.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton64.dtsi"
-+
-+/ {
-+	compatible = "mediatek,mt8127";
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+
-+	};
-+
-+	clocks {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		system_clk: dummy13m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <13000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		rtc_clk: dummy32k {
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+			#clock-cells = <0>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		timer: timer at 10008000 {
-+			compatible = "mediatek,mt8127-timer", "mediatek,mt6577-timer";
-+			reg = <0 0x10008000 0 0x80>;
-+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&system_clk>, <&rtc_clk>;
-+			clock-names = "system-clk", "rtc-clk";
-+		};
-+
-+		gic: interrupt-controller at 10211000 {
-+			compatible = "arm,cortex-a7-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0 0x10211000 0 0x1000>,
-+			      <0 0x10212000 0 0x1000>,
-+			      <0 0x10214000 0 0x2000>,
-+			      <0 0x10216000 0 0x2000>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index f2acf07..7f478ce 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -19,6 +19,7 @@
- 
- static const char * const mediatek_board_dt_compat[] = {
- 	"mediatek,mt6589",
-+	"mediatek,mt8127",
- 	NULL,
- };
- 
 -- 
 1.8.1.1.dirty
