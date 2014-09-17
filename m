@@ -1,53 +1,75 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 17 Sep 2014 17:19:24 +0800
-Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <1410944156.2731.1.camel@pengutronix.de>
-References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
- <1410774073.3314.1.camel@pengutronix.de>
- <20140916034123.GA20800@Robin-OptiPlex-780>
- <1410861006.2746.1.camel@pengutronix.de>
- <20140917084120.GA6369@Robin-OptiPlex-780>
- <1410944156.2731.1.camel@pengutronix.de>
-Message-ID: <20140917091922.GA6551@Robin-OptiPlex-780>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 17 Sep 2014 11:12:55 +0200
+Subject: [PATCH] can: at91_can: prepare and unprepare the clock
+In-Reply-To: <1410944721-32325-1-git-send-email-davidcdueck@googlemail.com>
+References: <1410944721-32325-1-git-send-email-davidcdueck@googlemail.com>
+Message-ID: <54195097.1000106@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 10:55:56AM +0200, Lucas Stach wrote:
-> Am Mittwoch, den 17.09.2014, 16:41 +0800 schrieb Robin Gong:
-> > On Tue, Sep 16, 2014 at 11:50:06AM +0200, Lucas Stach wrote:
-> > > Hi Robin,
-> > > 
-> > > Am Dienstag, den 16.09.2014, 11:41 +0800 schrieb Robin Gong:
-> > > > Hi Lucas,
-> > > >   I understood your concern,but looks we have to break old DT.
-> > > 
-> > > Sorry, but this isn't going to happen. And honestly I don't even see the
-> > > need to do so.
-> > > 
-> > > > Our old DT
-> > > > support SPI DMA on i.mx6q/dl(v2,b3810c3dc1bcbc6a), but the DMA support patch
-> > > > for SPI driver is still in reviewing(v6).
-> > > 
-> > > So this means now is the time to fix this driver patch to not enable DMA
-> > > on imx6dl. Nobody will experience any breakage in this case.
-> > >
-> > Sorry, i.mx6q and i.mx6dl are totally same, not only IP but also clock. So we
-> > can't distinguish them except for different compatible name....
+On 09/17/2014 11:05 AM, David Dueck wrote:
+> This prevents a warning.
+
+Which warning?
+
+Can you please check the return value of clock_prepare_enbale().
+
+Marc
+
+BTW: Please add linux-can at vger.kernel.org on Cc for CAN related patches.
+
+> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+> Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
+> ---
+>  drivers/net/can/at91_can.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> I know that, but I still don't see the problem.
+> diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+> index f07fa89..7dcb790 100644
+> --- a/drivers/net/can/at91_can.c
+> +++ b/drivers/net/can/at91_can.c
+> @@ -1123,7 +1123,7 @@ static int at91_open(struct net_device *dev)
+>  	struct at91_priv *priv = netdev_priv(dev);
+>  	int err;
+>  
+> -	clk_enable(priv->clk);
+> +	clk_prepare_enable(priv->clk);
+>  
+>  	/* check or determine and set bittime */
+>  	err = open_candev(dev);
+> @@ -1149,7 +1149,7 @@ static int at91_open(struct net_device *dev)
+>   out_close:
+>  	close_candev(dev);
+>   out:
+> -	clk_disable(priv->clk);
+> +	clk_disable_unprepare(priv->clk);
+>  
+>  	return err;
+>  }
+> @@ -1166,7 +1166,7 @@ static int at91_close(struct net_device *dev)
+>  	at91_chip_stop(dev, CAN_STATE_STOPPED);
+>  
+>  	free_irq(dev->irq, dev);
+> -	clk_disable(priv->clk);
+> +	clk_disable_unprepare(priv->clk);
+>  
+>  	close_candev(dev);
+>  
 > 
-> If this issue is specific to the ECSPI IP integrated into a imx6dl SoC
-> you need to check for the machine compatible in the driver and disable
-> DMA support based on this. We generally avoid checking for the machine
-> compatible in drivers and prefer to have a specific IP block compatible
-> instead, but in that case it's the only reasonable thing to do.
-> 
-> Regards,
-> Lucas
-Sounds we make a agreement on use different compatible name, right? I will
-make patch for reviewing, thanks.
-> -- 
-> Pengutronix e.K.             | Lucas Stach                 |
-> Industrial Linux Solutions   | http://www.pengutronix.de/  |
-> 
+
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/e395fcfd/attachment-0001.sig>
