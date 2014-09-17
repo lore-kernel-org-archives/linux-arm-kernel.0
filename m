@@ -1,37 +1,58 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 17 Sep 2014 20:04:01 +0100
-Subject: [PATCH 7/9] phy: remove .owner field for drivers using
- module_platform_driver
-In-Reply-To: <5419B485.8010002@ti.com>
-References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
- <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
- <5419B485.8010002@ti.com>
-Message-ID: <20140917190401.GA31237@griffinp-ThinkPad-X1-Carbon-2nd>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 17 Sep 2014 21:14:36 +0200
+Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <1410965416759.91038@freescale.com>
+References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
+ <201409162017.06439.marex@denx.de> <1410965416759.91038@freescale.com>
+Message-ID: <201409172114.36617.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On Wed, 17 Sep 2014, Kishon Vijay Abraham I wrote:
-
-> Hi,
-> 
-> On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
-> > This patch removes the superflous .owner field for drivers which
-> > use the module_platform_driver or platform_driver_register api,
-> > as this is overriden in __platform_driver_register.
+On Wednesday, September 17, 2014 at 04:50:34 PM, Yao Yuan wrote:
+[...]
+> > > > Would that mean that the "crashed" DMA would be running until the
+> > > > next transmission is scheduled ?
+> > > 
+> > > [Yuan Yao] No, In fact any DMA timeout will result the failure of I2C
+> > > transmission and then it will turn to report the exception and wait
+> > > for next transmission.
 > > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-
-<snip>
-> >  drivers/phy/phy-twl4030-usb.c       | 1 -
+> > Can you tell when the next transmission will happen? What if I issue a
+> > single transmission and that one fails ? Will the DMA run until who knows
+> > when ?
 > 
-> twl4030-usb doesn't use module_platform_driver. Care to resend this patch
-> along? I've merged all other patches in this series.
+> [Yuan Yao]
+> Sorry for my unclear description. In fact, During the DMA transmission  if
+> an error happened or time out, DMA will stop at once and be disabled.
+> I just continue to route the TX and RX request to signal the DMA
+> controller. Because the DMA is disabled, it will ignore those signals.
+> 
+> In a word, I just want to block the I2C TX, RX and interrupt signal when
+> DMA mode failed until the next I2C transmission start.
 
-That is true, but it does use platform_driver_register  whih overrides .owner.
-So the patch is stil good I think (fyi see include/linux/platform_device.h).
+So the I2C block is in error state until you clean it up upon next transmission?
 
-regards,
+> In fact, the bit "I2CR_DMAEN" is a switch which decide whether I2C route
+> the TX, RX and interrupt signal to DMA controller.
+> 
+> > > The only thing I worried about is I2C may still receive some feedbacks
+> > > after DMA timeout. In this case the feedbacks may lead to abnormal
+> > > state in PIO mode.But it will be ignored in DMA model.
+> > > That's why I tend to delay force-disable DMA until the next
+> > > transmission begin. Could you please give me some suggestion?
+> > 
+> > No, this design just seems flawed to me. You should stop the DMA
+> > immediatelly if there is an error to avoid wasting resources and prevent
+> > possible other adverse effects.
+> 
+> [Yuan Yao]
+> Yes, I have stopped the DMA immediately. However I keep the I2C DMA
+> single route.
+> 
+> I don't have the exact evidence to prove that my design is acceptable.
+> So if you are sure it's flawed, I will change it in the next version(V8).
 
-Peter.
+I'm just trying to understand it.
+
+Best regards,
+Marek Vasut
