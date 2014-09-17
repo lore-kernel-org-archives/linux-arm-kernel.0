@@ -1,52 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 17 Sep 2014 12:48:16 -0700
-Subject: [PATCH v5 2/4] dt-bindings: document Rockchip thermal
-In-Reply-To: <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
-References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
- <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <CAD=FV=Vq4zSBv-=OxHD4sGbAgLh_ebe29PR6RU_sQe4XspsPsw@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 17 Sep 2014 22:11:13 +0200
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140917192259.GA18980@srcf.ucam.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <4416582.iOjLNrLDZE@vostro.rjw.lan> <20140917192259.GA18980@srcf.ucam.org>
+Message-ID: <1628662.T2ReQ4irMm@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+On Wednesday, September 17, 2014 08:22:59 PM Matthew Garrett wrote:
+> On Wed, Sep 17, 2014 at 09:37:42PM +0200, Rafael J. Wysocki wrote:
+> 
+> > There are no implied IP issues with using the information there I know of and
+> > if there's any fine print anywhere that may suggest so, please let me know.
+> 
+> Using the information should be fine, but my understanding of the UEFI 
+> forum rules is that any submissions to UEFI specs must be from UEFI 
+> forum members - there are concerns around accidentally including 
+> patented material.
 
-On Tue, Sep 16, 2014 at 8:59 PM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
-> This add the necessary binding documentation for the thermal
-> found on Rockchip SoCs
->
-> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> ---
->  .../bindings/thermal/rockchip-thermal.txt          | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->
-> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> new file mode 100644
-> index 0000000..6fc8bc3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> @@ -0,0 +1,41 @@
-> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
-> +
-> +Required properties:
-> +- compatible: "rockchip,rk3288-tsadc"
-> +- reg: physical base address of the controller and length of memory mapped
-> +       region.
-> +- interrupts: The interrupt number to the cpu. The interrupt specifier format
-> +             depends on the interrupt controller.
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk" for
-> +              the peripheral clock.
-> +- num-trips:  number of total trip points, this is required, set it 0 if none,
-> +             if greater than 0, the following properties must be defined;
+The documents in question are not regarded as UEFI specs, however.  They
+are just hosted by UEFI.
 
-nit: there is whitespace damage (space before tab) on the line before
-this one.  It's more obvious in the patch you uploaded to gerrit which
-highlights this in red:
+> The easy way around this is just for the bindings to 
+> be managed outside UEFI.
 
-https://chromium-review.googlesource.com/#/c/213967/5/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+Again, there's a difference between UEFI material and the UEFI hosting
+something (but not maintaining it).
 
-Did you run your patches through checkpatch before submitting?
+In principle, the bindings could be hosted by UEFI, but maintained by
+community members.
 
--Doug
+Rafael
