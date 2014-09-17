@@ -1,39 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 17 Sep 2014 09:48:11 +0900
-Subject: [PATCH v2 0/5] ARM: shmobile: various DT files sorted by address
-Message-ID: <1410914896-14395-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 17 Sep 2014 09:48:12 +0900
+Subject: [PATCH v2 1/5] ARM: shmobile: kzm9d: Remove spurious regulator base
+ addresses
+In-Reply-To: <1410914896-14395-1-git-send-email-horms+renesas@verge.net.au>
+References: <1410914896-14395-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1410914896-14395-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As there is no reg property the regulator nodes should
+not include @...
 
-this is an update of a series posted by Ulrich,
-"ARM: shmobile: various DT files sorted by address",
-the purpose of which is to sort DT nodes by their address.
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Changes since v1.
-* Some patches from the v1 series have been queued up and thus are not
-  present in v2.
-* Two new patches have been added to remove spurious regulator base
-  addresses, as suggested by Geert Uytterhoeven. These correct incorrect
-  lines before subsequent patches, rebased since v1, move them.
+---
+v2
+* First post
+---
+ arch/arm/boot/dts/emev2-kzm9d.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Based on renesas-next-20140916v2-v3.17-rc2.
-Targeted for inclusion in v3.19.
-
-Simon Horman (2):
-  ARM: shmobile: kzm9d: Remove spurious regulator base addresses
-  ARM: shmobile: r8a73a4: Remove spurious dma-multiplexer base addresses
-
-Ulrich Hecht (3):
-  ARM: shmobile: r7s72100: sort dtsi file by address
-  ARM: shmobile: kzm9d: sort dts file by address
-  ARM: shmobile: r8a73a4: sort dtsi file by address
-
- arch/arm/boot/dts/emev2-kzm9d.dts |  62 +++++-----
- arch/arm/boot/dts/r7s72100.dtsi   | 202 ++++++++++++++++-----------------
- arch/arm/boot/dts/r8a73a4.dtsi    | 232 +++++++++++++++++++-------------------
- 3 files changed, 248 insertions(+), 248 deletions(-)
-
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 50ccd15..f27fcf0 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -27,7 +27,7 @@
+ 		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp";
+ 	};
+ 
+-	reg_1p8v: regulator at 0 {
++	reg_1p8v: regulator {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-1.8V";
+ 		regulator-min-microvolt = <1800000>;
+@@ -36,7 +36,7 @@
+ 		regulator-boot-on;
+ 	};
+ 
+-	reg_3p3v: regulator at 1 {
++	reg_3p3v: regulator {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-3.3V";
+ 		regulator-min-microvolt = <3300000>;
 -- 
 2.0.1
