@@ -1,38 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Sep 2014 09:44:36 -0700
-Subject: [PATCH] BCM2835: Add I2S driver to device tree
-In-Reply-To: <5418E985.5090708@wwwdotorg.org>
-References: <1404895825-25668-1-git-send-email-broonie@kernel.org>
- <5418E985.5090708@wwwdotorg.org>
-Message-ID: <20140917164436.GJ7960@sirena.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 17 Sep 2014 16:46:43 +0000 (UTC)
+Subject: [PATCH 02/12] ARM: OMAP3: Use force-idle for UARTs because of
+ DMA errata
+In-Reply-To: <20140916174434.GB1580@atomide.com>
+References: <1410837126-31553-1-git-send-email-tony@atomide.com>
+ <1410837126-31553-2-git-send-email-tony@atomide.com>
+ <alpine.DEB.2.02.1409161605200.23518@utopia.booyaka.com>
+ <20140916174434.GB1580@atomide.com>
+Message-ID: <alpine.DEB.2.02.1409171559470.20823@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 07:53:09PM -0600, Stephen Warren wrote:
-> On 07/09/2014 02:50 AM, Mark Brown wrote:
-> > From: Mark Brown <broonie@linaro.org>
+On Tue, 16 Sep 2014, Tony Lindgren wrote:
 
-> > +		bcm2835_i2s: i2s at 7e203000 {
-> > +			compatible = "brcm,bcm2835-i2s";
-> > +			reg = <0x7e203000 0x20>,
-> > +			      <0x7e101098 0x02>;
-> > +
-> > +			dmas = <&dma 2>,
-> > +			       <&dma 3>;
-> > +			dma-names = "tx", "rx";
-> > +		};
+> For toggling the DMA vs PIO mode, that should be done with some Linux
+> generic API from the driver. But since we don't have that, I don't think
+> there's much overhead for always configuring for DMA mode. Or do you
+> see some issues with that?
 
-> This node is already there (and even edited in this patch), so I dropped
-> that hunk.
+I think it should be OK.  Probably it would not be a case of additional 
+overhead.  The impact would be on UART wakeup handling.  We'll just want 
+to keep an eye on wakeups from characters received on the UART, and if 
+those start flaking out occasionally, we might take a closer look at this 
+patch.  
 
-Right, not sure what went on with applying it upstream originally but it
-looks like git rebase didn't figure out what was going on well - the
-bcm2835_i2s is needed so we can reference the node.  I'll probably get
-round to resending an incremental patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/f718a915/attachment.sig>
+The race window, if it even exists, would be pretty narrow.  And the 
+erratum usage note doesn't mention any impact on wakeups...  
+
+> Yes great. I've verified that's enough to make it work properly with off-idle
+> and dma when tested against Sebastian's uart_v10_pre1 branch.
+> 
+> Updated patch below, thanks for catching the bogus configuration.
+
+Cool, thanks for looking into those flags.
+
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
+
+
+- Paul
