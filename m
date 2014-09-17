@@ -1,79 +1,128 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 17 Sep 2014 09:40:08 +0200
-Subject: [PATCH v4 14/18] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <20140915164253.GI5415@arm.com>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-15-git-send-email-hanjun.guo@linaro.org>
- <20140915150136.GF5415@arm.com> <541710D5.3030001@redhat.com>
- <20140915164253.GI5415@arm.com>
-Message-ID: <54193AD8.3090301@linaro.org>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Wed, 17 Sep 2014 07:40:01 +0000
+Subject: [PATCHv2] watchdog: imx2_wdt: add restart handler support
+In-Reply-To: <1410506676-24205-1-git-send-email-jingchang.lu@freescale.com>
+References: <1410506676-24205-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <4d89bf404e934cbd8e27c5adf4d29420@BLUPR03MB472.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.09.2014 18:42, Catalin Marinas wrote:
-> On Mon, Sep 15, 2014 at 05:16:21PM +0100, Jon Masters wrote:
->> On 09/15/2014 11:01 AM, Catalin Marinas wrote:
->>> On Fri, Sep 12, 2014 at 03:00:12PM +0100, Hanjun Guo wrote:
->>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->>>> index 5b3546b..9869377 100644
->>>> --- a/arch/arm64/kernel/acpi.c
->>>> +++ b/arch/arm64/kernel/acpi.c
->>>> @@ -23,6 +23,7 @@
->>>>   #include <linux/irqdomain.h>
->>>>   #include <linux/bootmem.h>
->>>>   #include <linux/smp.h>
->>>> +#include <linux/irqchip/arm-gic-acpi.h>
->>>>
->>>>   #include <asm/cputype.h>
->>>>   #include <asm/cpu_ops.h>
->>>> @@ -312,6 +313,28 @@ void __init acpi_boot_table_init(void)
->>>>   		pr_err("Can't find FADT or error happened during parsing FADT\n");
->>>>   }
->>>>
->>>> +void __init acpi_gic_init(void)
->>>> +{
->>>> +	struct acpi_table_header *table;
->>>> +	acpi_status status;
->>>> +	acpi_size tbl_size;
->>>> +	int err;
->>>> +
->>>> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
->>>> +	if (ACPI_FAILURE(status)) {
->>>> +		const char *msg = acpi_format_exception(status);
->>>> +
->>>> +		pr_err("Failed to get MADT table, %s\n", msg);
->>>> +		return;
->>>> +	}
->>>> +
->>>> +	err = gic_v2_acpi_init(table);
->>>> +	if (err)
->>>> +		pr_err("Failed to initialize GIC IRQ controller");
->>>> +
->>>> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
->>>> +}
->>>
->>> Maybe this was discussed already but why does this function need to live
->>> under arch/arm64? Isn't the driver code more appropriate?
+Hi, Guenter,
 
-There will be another call here for GICv3 so this function will merge 
-common logic for them. As Jon pointed out, we are planning to add ACPI 
-flag which indicates GICv3 or GICv2(m) IRQ controller in advance.
+  Could you please help review this v2 patch, Thanks.
 
->>
->> Well there's two halves to this, right? There's the MADT parsing/setup,
->> which is architecture specific, and then there's the GIC irqchip
->> initialization which lives under drivers.
+Best Regards,
+Jingchang
+
+>-----Original Message-----
+>From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
+>Sent: Friday, September 12, 2014 3:25 PM
+>To: wim at iguana.be
+>Cc: Guo Shawn-R65073; arnd at arndb.de; linux at roeck-us.net; linux-
+>watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Lu
+>Jingchang-B35083
+>Subject: [PATCHv2] watchdog: imx2_wdt: add restart handler support
 >
-> I think it gets worse, this function is called from irqchip_init(). I
-> would have been slightly happier if it was called from the arm64
-> init_IRQ(). But putting an ARM specific GIC initialisation call in a
-> generic irqchip_init() just looks weird. Can we do anything better here?
-
-Yes this was discussed, please have a look at: 
-https://lkml.org/lkml/2014/9/1/555
-We had this in init_IRQ() in previous patch set, then we got feedback 
-irqchip_init() is more appropriate. We can move it back to init_IRQ() 
-and I am sold on this.
-
-Tomasz
+>  Register the watchdog as the system restart function
+>to the new introducing kernel restart call chain in the
+>driver instead of providing the restart in machine desc.
+>  This restart handler function is from the mxc_restart()
+>in arch/arm/mach-imx/system.c
+>
+>Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+>---
+> drivers/watchdog/imx2_wdt.c | 37 +++++++++++++++++++++++++++++++++++++
+> 1 file changed, 37 insertions(+)
+>
+>diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+>index 68c3d37..d32470e 100644
+>--- a/drivers/watchdog/imx2_wdt.c
+>+++ b/drivers/watchdog/imx2_wdt.c
+>@@ -22,14 +22,17 @@
+>  */
+>
+> #include <linux/clk.h>
+>+#include <linux/delay.h>
+> #include <linux/init.h>
+> #include <linux/io.h>
+> #include <linux/jiffies.h>
+> #include <linux/kernel.h>
+> #include <linux/module.h>
+> #include <linux/moduleparam.h>
+>+#include <linux/notifier.h>
+> #include <linux/of_address.h>
+> #include <linux/platform_device.h>
+>+#include <linux/reboot.h>
+> #include <linux/regmap.h>
+> #include <linux/timer.h>
+> #include <linux/watchdog.h>
+>@@ -59,6 +62,7 @@ struct imx2_wdt_device {
+> 	struct regmap *regmap;
+> 	struct timer_list timer;	/* Pings the watchdog when closed */
+> 	struct watchdog_device wdog;
+>+	struct notifier_block restart_handler;
+> };
+>
+> static bool nowayout = WATCHDOG_NOWAYOUT;
+>@@ -77,6 +81,31 @@ static const struct watchdog_info imx2_wdt_info = {
+> 	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+> };
+>
+>+static int imx2_restart_handler(struct notifier_block *this, unsigned
+>long mode,
+>+				void *cmd)
+>+{
+>+	unsigned int wcr_enable = IMX2_WDT_WCR_WDE;
+>+	struct imx2_wdt_device *wdev = container_of(this,
+>+						    struct imx2_wdt_device,
+>+						    restart_handler);
+>+	/* Assert SRS signal */
+>+	regmap_write(wdev->regmap, 0, wcr_enable);
+>+	/*
+>+	 * Due to imx6q errata ERR004346 (WDOG: WDOG SRS bit requires to be
+>+	 * written twice), we add another two writes to ensure there must be
+>at
+>+	 * least two writes happen in the same one 32kHz clock period.  We
+>save
+>+	 * the target check here, since the writes shouldn't be a huge
+>burden
+>+	 * for other platforms.
+>+	 */
+>+	regmap_write(wdev->regmap, 0, wcr_enable);
+>+	regmap_write(wdev->regmap, 0, wcr_enable);
+>+
+>+	/* wait for reset to assert... */
+>+	mdelay(500);
+>+
+>+	return NOTIFY_DONE;
+>+}
+>+
+> static inline void imx2_wdt_setup(struct watchdog_device *wdog)
+> {
+> 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+>@@ -257,6 +286,12 @@ static int __init imx2_wdt_probe(struct
+>platform_device *pdev)
+> 		return ret;
+> 	}
+>
+>+	wdev->restart_handler.notifier_call = imx2_restart_handler;
+>+	wdev->restart_handler.priority = 128;
+>+	ret = register_restart_handler(&wdev->restart_handler);
+>+	if (ret)
+>+		dev_err(&pdev->dev, "cannot register restart handler\n");
+>+
+> 	dev_info(&pdev->dev, "timeout %d sec (nowayout=%d)\n",
+> 		 wdog->timeout, nowayout);
+>
+>@@ -268,6 +303,8 @@ static int __exit imx2_wdt_remove(struct
+>platform_device *pdev)
+> 	struct watchdog_device *wdog = platform_get_drvdata(pdev);
+> 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+>
+>+	unregister_restart_handler(&wdev->restart_handler);
+>+
+> 	watchdog_unregister_device(wdog);
+>
+> 	if (imx2_wdt_is_running(wdev)) {
+>--
+>1.8.0
