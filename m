@@ -1,32 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Sep 2014 17:48:50 +0100
-Subject: [PATCH v4 01/18] ARM64: Move the init of cpu_logical_map(0)
- before unflatten_device_tree()
-In-Reply-To: <20140915061632.GA26649@localhost>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-2-git-send-email-hanjun.guo@linaro.org>
- <20140915061632.GA26649@localhost>
-Message-ID: <20140917164850.GB7983@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 17 Sep 2014 09:54:05 -0700
+Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <1410968760.30394.7.camel@hornet>
+References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
+ <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
+ <20140916233020.GC30918@lee--X1> <1410965992.30394.6.camel@hornet>
+ <20140917154212.GD30918@lee--X1> <1410968760.30394.7.camel@hornet>
+Message-ID: <20140917165405.GP30918@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 07:16:32AM +0100, Olof Johansson wrote:
-> On Fri, Sep 12, 2014 at 09:59:59PM +0800, Hanjun Guo wrote:
-> > It always make sense to initialize CPU0's logical map entry from the
-> > hardware values, so move the initialization of cpu_logical_map(0)
-> > before unflatten_device_tree() which is needed by ACPI code later.
+On Wed, 17 Sep 2014, Pawel Moll wrote:
+
+> On Wed, 2014-09-17 at 16:42 +0100, Lee Jones wrote:
+> > On Wed, 17 Sep 2014, Pawel Moll wrote:
+> > > On Wed, 2014-09-17 at 00:30 +0100, Lee Jones wrote:
+> > > > On Wed, 10 Sep 2014, Pawel Moll wrote:
+> > > > 
+> > > > > Now, with the CLCD DT support available, there is no
+> > > > > more reason to keep the non-DT support for V2P-CA9.
+> > > > > 
+> > > > > Removed, together with "some" supporting code. It was
+> > > > > necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
+> > > > > and selected by the machines still interested in it.
+> > > > > 
+> > > > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > > > > ---
+> > > > >  arch/arm/Kconfig                                  |   2 +
+> > > > >  arch/arm/mach-vexpress/Kconfig                    |   3 -
+> > > > >  arch/arm/mach-vexpress/Makefile                   |   3 +-
+> > > > >  arch/arm/mach-vexpress/core.h                     |   7 -
+> > > > >  arch/arm/mach-vexpress/ct-ca9x4.c                 | 212 ------------
+> > > > >  arch/arm/mach-vexpress/include/mach/ct-ca9x4.h    |  47 ---
+> > > > >  arch/arm/mach-vexpress/include/mach/hardware.h    |   1 -
+> > > > >  arch/arm/mach-vexpress/include/mach/irqs.h        |   6 -
+> > > > >  arch/arm/mach-vexpress/include/mach/motherboard.h |  88 -----
+> > > > >  arch/arm/mach-vexpress/platsmp.c                  |  42 ---
+> > > > >  arch/arm/mach-vexpress/v2m.c                      | 374 ----------------------
+> > > > >  arch/arm/plat-versatile/Kconfig                   |   2 +-
+> > > > >  drivers/clk/versatile/Makefile                    |   1 -
+> > > > >  drivers/clk/versatile/clk-vexpress-osc.c          |   7 -
+> > > > >  drivers/clk/versatile/clk-vexpress.c              |  86 -----
+> > > > >  drivers/mfd/vexpress-sysreg.c                     |  71 +---
+> > > > >  drivers/misc/vexpress-syscfg.c                    |  60 +---
+> > > > >  drivers/power/reset/vexpress-poweroff.c           |  17 +-
+> > > > >  include/linux/vexpress.h                          |  19 --
+> > > > >  19 files changed, 35 insertions(+), 1013 deletions(-)
+> > > > >  delete mode 100644 arch/arm/mach-vexpress/ct-ca9x4.c
+> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/hardware.h
+> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/irqs.h
+> > > > >  delete mode 100644 arch/arm/mach-vexpress/include/mach/motherboard.h
+> > > > >  delete mode 100644 drivers/clk/versatile/clk-vexpress.c
+> > > > 
+> > > > Is it really necessary to take the one-big-patch approach?  I'm sure
+> > > > you can find a nicer way than to burden all these maintainers.
+> > > > Naturally I can't speak for everyone concerned, but I don't really
+> > > > want to be carrying all this if I don't have to.  Granted I'm not
+> > > > carrying any patches touching drivers/mfd/vexpress-sysreg.c at the
+> > > > moment, but equally I don't want to rule that out.
+> > > 
+> > > I feel that getting all this stuff done (notice: no new features, just
+> > > removing existing stuff) was the simplest approach, without having to
+> > > rely on patches being merged in particular order.
+> > > 
+> > > Besides, there are three things there that are not directly maintained
+> > > by the arm-soc folk: clk (already acked by Mike), mfd (you) and
+> > > power/reset. So I thought that gathering acks for those and getting it
+> > > merged via arm-soc would be the simplest approach...
 > > 
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > It's certainly the easiest approach for you, but it makes things
+> > difficult for the maintainers as it would entail all 4 entities
+> > carrying the patch.  The alternative is to hope there won't be any
+> > subsequent changes to the files in our respective subsystems which
+> > might cause conflicts.  I'm not keen on the latter idea.
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> With or without needs for ACPI, I don't think there's any reason for
-> this code to not go in now.
+> No problem, I will factor out the mfd and reset stuff and post it
+> separately after the main changes are merged.
 
-I can see this being of use to psci_init() where I'd like to check
-MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU early on for systems with PSCI
-0.2+. So moving it at least that early sounds good to me.
+Thanks Pawel.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
