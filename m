@@ -1,15 +1,15 @@
 From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 17 Sep 2014 01:22:44 +0000 (UTC)
-Subject: Tegra baseline test results for v3.17-rc1
-Message-ID: <alpine.DEB.2.02.1409170119520.5860@utopia.booyaka.com>
+Date: Wed, 17 Sep 2014 01:24:50 +0000 (UTC)
+Subject: Tegra baseline test results for v3.17-rc2
+Message-ID: <alpine.DEB.2.02.1409170123190.5860@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Here are some basic Tegra test results for Linux v3.17-rc1.
+Here are some basic Tegra test results for Linux v3.17-rc2.
 Logs and other details at:
 
-    http://nvt.pwsan.com/pub/linux/testlogs/test_v3.17-rc1/20140916142710/
+    http://nvt.pwsan.com/pub/linux/testlogs/test_v3.17-rc2/20140916145434/
 
 
 Test summary
@@ -28,20 +28,20 @@ Boot to userspace: tegra_defconfig:
 
 
 vmlinux object size
-(delta in bytes from test_v3.16 
-(19583ca584d6f574384e17fe7613dfaeadcdc4a6)):
+(delta in bytes from test_v3.17-rc1 
+(7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9)):
    text     data      bss    total  kernel
-+447188   +63224    +1216  +511628  multi_v7_defconfig
-+287957   +10172     +452  +298581  tegra_defconfig
+  +1592       +8        0    +1600  multi_v7_defconfig
+  +1124       +8        0    +1132  tegra_defconfig
 
 
 Boot-time memory difference
-(delta in bytes from test_v3.16 
-(19583ca584d6f574384e17fe7613dfaeadcdc4a6))
+(delta in bytes from test_v3.17-rc1 
+(7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9))
     avail    rsrvd     high    freed                board              kconfig                  dtb
-    -504k     504k        .      44k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-    -292k     292k        .       8k tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-    -508k     508k        .      44k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-    -296k     296k        .       8k  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-    -512k     512k        .      44k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-    -300k     300k        .       8k       tegra30-beaver      tegra_defconfig       tegra30-beaver
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+      -8k       8k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+      -8k       8k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+      -8k       8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
