@@ -1,53 +1,37 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 17 Sep 2014 12:03:37 -0700
-Subject: [PATCH] ARM: DT: ifc6410: Add board memory range.
-In-Reply-To: <54192B64.6070604@smartplayin.com>
-References: <1410932179-4652-1-git-send-email-srinivas.kandagatla@linaro.org>
- <54192B64.6070604@smartplayin.com>
-Message-ID: <FA9D8682-DB0E-48CF-A519-86A0465300E1@codeaurora.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 17 Sep 2014 20:04:01 +0100
+Subject: [PATCH 7/9] phy: remove .owner field for drivers using
+ module_platform_driver
+In-Reply-To: <5419B485.8010002@ti.com>
+References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
+ <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
+ <5419B485.8010002@ti.com>
+Message-ID: <20140917190401.GA31237@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kishon,
 
-On Sep 16, 2014, at 11:34 PM, Pramod Gurav <pramod.gurav@smartplayin.com> wrote:
+On Wed, 17 Sep 2014, Kishon Vijay Abraham I wrote:
 
-> Hi Srini,
+> Hi,
 > 
-> Thanks for the patch.
-> Tested-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+> On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
+> > This patch removes the superflous .owner field for drivers which
+> > use the module_platform_driver or platform_driver_register api,
+> > as this is overriden in __platform_driver_register.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+
+<snip>
+> >  drivers/phy/phy-twl4030-usb.c       | 1 -
 > 
-> A minor nit.
-> On Wednesday 17 September 2014 11:06 AM, Srinivas Kandagatla wrote:
->> This patch adds memory details of IFC6410 as this is necessary to
->> fix the in-correct memory start comming from ATAGs.
->> 
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 5 +++++
->> 1 file changed, 5 insertions(+)
->> 
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> index 90db8af..3287f12 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> @@ -4,6 +4,11 @@
->> 	model = "Qualcomm APQ8064/IFC6410";
->> 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
->> 
->> +	memory{
-> Space before {?
->> +		device_type = "memory";
->> +		reg = <0x80000000 0x80000000>;
->> +	};
->> +
->> 	soc {
->> 		gsbi at 16600000 {
->> 			status = "ok?;
+> twl4030-usb doesn't use module_platform_driver. Care to resend this patch
+> along? I've merged all other patches in this series.
 
-Hmm, this doesn?t seem to work for me.
+That is true, but it does use platform_driver_register  whih overrides .owner.
+So the patch is stil good I think (fyi see include/linux/platform_device.h).
 
-- k
+regards,
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Peter.
