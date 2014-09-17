@@ -1,66 +1,35 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 17 Sep 2014 16:29:03 -0700
-Subject: [PATCH] arm: arm: fiq: fix build breakage with CONFIG_FIQ
-In-Reply-To: <1410984101-16762-1-git-send-email-balbi@ti.com>
-References: <1410984101-16762-1-git-send-email-balbi@ti.com>
-Message-ID: <541A193F.2060503@linaro.org>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Wed, 17 Sep 2014 16:40:36 -0700
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <201409180122.10631.arnd@arndb.de>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <20140917014410.GC31214@srcf.ucam.org>
+ <20140917160508.GA2464@xora-yoga-13>
+ <201409180122.10631.arnd@arndb.de>
+Message-ID: <20140917234036.GC2464@xora-yoga-13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/14 13:01, Felipe Balbi wrote:
-> commit e1add97 (ARM: 8150/2: fiq: Replace default FIQ handler)
-> has a typo which causes build breakage whenever CONFIG_FIQ is
-> set.
+On Thu, Sep 18, 2014 at 01:22:10AM +0200, Arnd Bergmann wrote:
+> On Wednesday 17 September 2014, Graeme Gregory wrote:
+> > It sounds like from the discussions in other threads that ARM64 should
+> > be following x86 and re-using DT bindings here. In which case there is
+> > not need to submit things to UEFI organisation.
+> > 
+> > What I got a little lost in has there been a formal decision about DT
+> > bindings in _DSD?
 > 
-> The bug is very clear as can be noted that a new struct pt_regs
-> def_fiq_regs was defined but code uses dfl_fiq_regs.
-
-Quite so. My fault.
-
-This error was picked up by Olof's autobuilder and I have offered
-a fix as 8150/3 (posted to mailing list in this thread
-http://thread.gmane.org/gmane.linux.kernel/1789554 ).
-
-Your fix and mine are slightly different (I standardised on
-dfl_fiq_regs) but both approaches should be functionally identical.
-
-
-Daniel.
-
-
-> Cc: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Fixes: e1add97 (ARM: 8150/2: fiq: Replace default FIQ handler)
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
+> I think this is a discussion that still needs to happen: either we should
+> recommend everyone to use _DSD in favor of the alternatives, or we
+> should prohibit the use of _DSD. I have heard arguments both ways, but
+> hopefully we can find an easy answer.
 > 
-> KernelVersion: next-20140917
-> 
-> Russell, let me know if this is the correct KernelVersion tag you want/need
-> 
->  arch/arm/kernel/fiq.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-> index 1743049..b6ab4c7 100644
-> --- a/arch/arm/kernel/fiq.c
-> +++ b/arch/arm/kernel/fiq.c
-> @@ -64,7 +64,7 @@ static int fiq_def_op(void *ref, int relinquish)
->  	if (!relinquish) {
->  		/* Restore default handler and registers */
->  		local_fiq_disable();
-> -		set_fiq_regs(&dfl_fiq_regs);
-> +		set_fiq_regs(&def_fiq_regs);
->  		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
->  		local_fiq_enable();
->  
-> @@ -159,6 +159,6 @@ void __init init_FIQ(int start)
->  {
->  	unsigned offset = FIQ_OFFSET;
->  	no_fiq_insn = *(unsigned long *)(0xffff0000 + offset);
-> -	get_fiq_regs(&dfl_fiq_regs);
-> +	get_fiq_regs(&def_fiq_regs);
->  	fiq_start = start;
->  }
-> 
+
+This discussion is just not going to happen until people at @redhat.com
+and people who have currently announced/released hardware are actually
+willing to start talking about it.
+
+Id love to be able to put my foot down and ban the use of _DSD for
+servers but I suspect that will not happen.
+
+Graeme
