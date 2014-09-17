@@ -1,42 +1,75 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 17 Sep 2014 17:48:12 +0200
-Subject: [PATCH v3 0/2] clk: sun8i: Add MBUS support
-In-Reply-To: <1410861842-2743-1-git-send-email-wens@csie.org>
-References: <1410861842-2743-1-git-send-email-wens@csie.org>
-Message-ID: <20140917154812.GH2166@lukather>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Wed, 17 Sep 2014 17:51:21 +0200
+Subject: [PATCH 2/2] ARM: dts: Add rtc_src clk for s3c-rtc on
+ exynos5250-snow
+In-Reply-To: <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
+References: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>	<1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
+Message-ID: <5419ADF9.3010509@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 06:04:00PM +0800, Chen-Yu Tsai wrote:
+Am 17.09.2014 um 17:47 schrieb Doug Anderson:
 > Hi,
 > 
-> This is v3 of my sun8i MBUS clock series.
+> On Wed, Sep 17, 2014 at 4:50 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> commit 546b117fdf17 ("rtc: s3c: add support for RTC of Exynos3250 SoC")
+>> added an "rtc_src" DT property for the Samsung's S3C Real Time Clock
+>> controller that specifies the 32.768 kHz clock that uses the RTC as its
+>> source clock. In the case of the Exynos5250 based Snow board, the Maxim
+>> 77686 32kHz AP clock is used as the source clock.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>  arch/arm/boot/dts/exynos5250-snow.dts | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>> index e51fcef..56eec56 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>> @@ -10,6 +10,7 @@
+>>
+>>  /dts-v1/;
+>>  #include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/clock/maxim,max77686.h>
+>>  #include "exynos5250.dtsi"
+>>
+>>  / {
+>> @@ -29,6 +30,8 @@
+>>
+>>         rtc at 101E0000 {
+>>                 status = "okay";
+>> +               clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
+>> +               clock-names = "rtc", "rtc_src";
 > 
-> This series depends on Maxime's "clk: sunxi: Improve MMC clocks support"
-> series, specifically the patches that change the factor clocks and move
-> out mod0 and mbus. Ideally this series should also be merged after my
-> "clk: sun6i: Unify AHB1 clock and fix rate calculation" for the PLL6
-> corrections, but I don't think it would cause any issues if it didn't.
+> Wait, seriously?  Snow is still using the "rtc at 101E0000" syntax?
+> Whatever happened to the series that Andreas worked so hard on,
+> including <https://patchwork.kernel.org/patch/4664801/>?
 > 
-> Patch 1 adds the sun8i specific MBUS clock driver.
+> Kukjin: Andreas's patch series was Reviewed long ago I think and by
+> now I'd imagine it's got some conflicts due to it not having been
+> applied in a timely fashion.  Perhaps you could fix it up for Andreas
+> (since he's already rebased it several times) and land it?
 > 
-> Patch 2 adds proper PLL6 and MBUS clock nodes to the DT, with a dummy
-> PLL5 clock node as a parent to MBUS.
+> If I had to guess, outstanding from Andreas's series (patchwork IDs listed):
+> 
+> 4751131 New          [v7] ARM: dts: Prepare node labels for exynos5250
+> 4664801 New          [v6,04/10] ARM: dts: Clean up exynos5250-snow
+> 4664771 New          [v6,05/10] ARM: dts: Fill in bootargs for exynos5250-snow
+> 4664731 New          [v6,06/10] ARM: dts: Clean up exynos5250-smdk5250
+> 4664751 New          [v6,07/10] ARM: dts: Clean up exynos5250-arndale
+> 4664711 New          [v6,08/10] ARM: dts: Fix apparent GPIO typo in
+> exynos5250-arndale
+> 4664681 New          [v6,09/10] ARM: dts: Simplify USB3503 on exynos5250-arndale
+> 4664691 New          [v6,10/10] ARM: dts: Add exynos5250-spring device tree
 
-Both patches look fine to me. It can't be merged without the MMC
-clocks series though, and we're waiting for Mike there.
+Yes, Kukjin told me not to resend anything, and I haven't heard back
+from him since his Kernel Summit trip.
 
-Thanks!
-Maxime
+Andreas
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/99540451/attachment-0001.sig>
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
