@@ -1,51 +1,62 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 17 Sep 2014 15:08:39 -0700
-Subject: [PATCH 0/8] qcom SCM updates
-In-Reply-To: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
-References: <1407202310-3359-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <B5197E58-92B9-4DA5-8202-966FAE5A3B6A@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 18 Sep 2014 00:12:48 +0200
+Subject: [PATCH v3 2/8] clk: rockchip: fix rk3066 pll status register location
+In-Reply-To: <1410991974-12235-1-git-send-email-heiko@sntech.de>
+References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
+Message-ID: <1410991974-12235-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The register providing the pll lock status is at a different address on the
+rk3066. The error became apparent while working on cpufreq support for
+the rockchip SoCs.
 
-On Aug 4, 2014, at 6:31 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/rockchip/clk-rk3188.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-> The SCM code in the mainline kernel is woefully out of data from what
-> is in the downstream msm kernels. Update the code to be at least 
-> functionally correct and useful for features like cpuidle and
-> suspend.
-> 
-> Olav Haugan (1):
->  msm: scm: Add logging of actual return code from scm call
-> 
-> Saravana Kannan (1):
->  msm: scm: Add API to query for service/command availability.
-> 
-> Stephen Boyd (5):
->  msm: scm: Fix incorrect cache invalidation
->  msm: scm: Get cacheline size from CTR
->  msm: scm: Add atomic SCM APIs
->  msm: scm: Add a feat version query API
->  msm: scm: Move the scm driver to drivers/soc/qcom
-> 
-> Vikram Mulukutla (1):
->  msm: scm: Flush the command buffer only instead of the entire cache
-> 
-> arch/arm/mach-qcom/Kconfig                     |   3 -
-> arch/arm/mach-qcom/Makefile                    |   4 +-
-> arch/arm/mach-qcom/scm-boot.c                  |   2 +-
-> drivers/soc/qcom/Kconfig                       |   2 +
-> drivers/soc/qcom/Makefile                      |   2 +
-> {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c | 162 ++++++++++++++++++++++---
-> {arch/arm/mach-qcom => include/soc/qcom}/scm.h |   8 +-
-> 7 files changed, 158 insertions(+), 25 deletions(-)
-> rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c (62%)
-> rename {arch/arm/mach-qcom => include/soc/qcom}/scm.h (69%)
-
-I took patches 1-4,7-8.  There are no immediate users for 5-6 at this time.
-
-- k
-
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index 0147614..1c5e644 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -19,6 +19,7 @@
+ #include <dt-bindings/clock/rk3188-cru-common.h>
+ #include "clk.h"
+ 
++#define RK3066_GRF_SOC_STATUS	0x15c
+ #define RK3188_GRF_SOC_STATUS	0xac
+ 
+ enum rk3188_plls {
+@@ -629,9 +630,6 @@ static void __init rk3188_common_clk_init(struct device_node *np)
+ 		pr_warn("%s: could not register clock usb480m: %ld\n",
+ 			__func__, PTR_ERR(clk));
+ 
+-	rockchip_clk_register_plls(rk3188_pll_clks,
+-				   ARRAY_SIZE(rk3188_pll_clks),
+-				   RK3188_GRF_SOC_STATUS);
+ 	rockchip_clk_register_branches(common_clk_branches,
+ 				  ARRAY_SIZE(common_clk_branches));
+ 	rockchip_clk_protect_critical(rk3188_critical_clocks,
+@@ -644,6 +642,9 @@ static void __init rk3188_common_clk_init(struct device_node *np)
+ static void __init rk3066a_clk_init(struct device_node *np)
+ {
+ 	rk3188_common_clk_init(np);
++	rockchip_clk_register_plls(rk3188_pll_clks,
++				   ARRAY_SIZE(rk3188_pll_clks),
++				   RK3066_GRF_SOC_STATUS);
+ 	rockchip_clk_register_branches(rk3066a_clk_branches,
+ 				  ARRAY_SIZE(rk3066a_clk_branches));
+ }
+@@ -652,6 +653,9 @@ CLK_OF_DECLARE(rk3066a_cru, "rockchip,rk3066a-cru", rk3066a_clk_init);
+ static void __init rk3188a_clk_init(struct device_node *np)
+ {
+ 	rk3188_common_clk_init(np);
++	rockchip_clk_register_plls(rk3188_pll_clks,
++				   ARRAY_SIZE(rk3188_pll_clks),
++				   RK3188_GRF_SOC_STATUS);
+ 	rockchip_clk_register_branches(rk3188_clk_branches,
+ 				  ARRAY_SIZE(rk3188_clk_branches));
+ }
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.0.1
