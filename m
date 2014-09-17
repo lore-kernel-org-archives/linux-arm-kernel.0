@@ -1,64 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 17 Sep 2014 17:03:39 +0100
-Subject: [PATCH v8 1/4] pci:host: APM X-Gene PCIe host controller driver
-In-Reply-To: <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
-References: <1410476266-29426-1-git-send-email-tinamdar@apm.com>
- <1410476266-29426-2-git-send-email-tinamdar@apm.com>
- <20140912091816.GU27864@e106497-lin.cambridge.arm.com>
- <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
-Message-ID: <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
+From: graeme.gregory@linaro.org (Graeme Gregory)
+Date: Wed, 17 Sep 2014 09:05:08 -0700
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140917014410.GC31214@srcf.ucam.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
+ <20140917014410.GC31214@srcf.ucam.org>
+Message-ID: <20140917160508.GA2464@xora-yoga-13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 09:02:11PM +0100, Tanmay Inamdar wrote:
-> On Fri, Sep 12, 2014 at 2:18 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Thu, Sep 11, 2014 at 11:57:43PM +0100, Tanmay Inamdar wrote:
-> >> This patch adds the AppliedMicro X-Gene SOC PCIe host controller driver.
-> >> X-Gene PCIe controller supports maximum up to 8 lanes and GEN3 speed.
-> >> X-Gene SOC supports maximum 5 PCIe ports.
-> >>
-> >> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
-> >
-> > It looks good to me now. You can add if you care:
-> >
-> > Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Wed, Sep 17, 2014 at 02:44:10AM +0100, Matthew Garrett wrote:
+> On Fri, Sep 12, 2014 at 10:00:16PM +0800, Hanjun Guo wrote:
 > 
-> I will have to send another version of patch as I forgot to add
-> 'dma-coherent' in device tree entry.
+> > +Common _DSD bindings should be submitted to ASWG to be included in the
+> > +document :-
+> > +
+> > +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
 > 
-> Secondly I see that setting 'dma-coherent' in device tree node sets
-> coherent_dma_ops for the root bus but for the endpoint another 'dev'
-> gets assigned. This causes endpoint to use non-coherent dma apis
-> causing failure in dma operations.
+> How are individuals/companies who aren't UEFI members supposed to do 
+> this? Aren't there IP issues involved in taking submissions from 
+> non-members?
+> 
 
-For PCIe, setting dma-coherent in the DT nodes wouldn't have any effect
-yet. We have of_dma_configure() being called for platform devices but it
-won't work for PCIe which are probed at run-time (nor for AMBA which
-require an additional patch).
+This section needs to be changed anyway, it comes out of a
+misunderstanding I had of the _DSD spec.
 
-So for arm64 currently we have some hooks in dma-mapping.c to intercept
-when a device is added to a bus. What I need to do though is check
-recursively whether the parent (bus) had the 'dma-coherent' property
-(pointed out by Jon). I think something like this would do (not tested):
+It sounds like from the discussions in other threads that ARM64 should
+be following x86 and re-using DT bindings here. In which case there is
+not need to submit things to UEFI organisation.
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 4164c5ace9f8..638475378f94 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -316,7 +316,7 @@ static int dma_bus_notifier(struct notifier_block *nb,
- 	if (event != BUS_NOTIFY_ADD_DEVICE)
- 		return NOTIFY_DONE;
- 
--	if (of_property_read_bool(dev->of_node, "dma-coherent"))
-+	if (of_dma_is_coherent(dev->of_node))
- 		set_dma_ops(dev, &coherent_swiotlb_dma_ops);
- 
- 	return NOTIFY_OK;
+What I got a little lost in has there been a formal decision about DT
+bindings in _DSD?
 
-After this, we need to a bus notifier for PCIe as well. Since I don't
-think we have an of_node for a PCI device, we would need to check
-recursively on the parent device rather than the parent node until we
-find an OF node with the 'dma-coherent' property.
-
--- 
-Catalin
+Graeme
