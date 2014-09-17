@@ -1,51 +1,86 @@
-From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Wed, 17 Sep 2014 22:24:11 +0800
-Subject: [PATCH v2 4/7] arm: mediatek: add dts for MT8135 evaluation board.
-In-Reply-To: <1410963854-17154-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1410963854-17154-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1410963854-17154-5-git-send-email-srv_yingjoe.chen@mediatek.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 17 Sep 2014 09:25:03 -0500
+Subject: [PATCH] ARM: dts: DRA7: Add PMU nodes
+In-Reply-To: <540719FC.5070803@ti.com>
+References: <1408456440-30171-1-git-send-email-nm@ti.com>
+ <540719FC.5070803@ti.com>
+Message-ID: <20140917142503.GA11856@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Joe.C" <yingjoe.chen@mediatek.com>
+On 08:39-20140903, Nishanth Menon wrote:
+> On 08/19/2014 08:54 AM, Nishanth Menon wrote:
+> > From: Lucas Weaver <l-weaver@ti.com>
+> > 
+> > DRA74x and DRA72x family of processors vary slightly in the number
+> > of CPUs. So, add different instances of PMU for each of these processor
+> > groups. Further, since the interrupts bypass crossbar and are directly
+> > connected to GIC, mark the dts nodes with relevant information.
+> > 
+> > Tested with perf utility.
+> > 
+> > Reviewed-by: Felipe Balbi <balbi@ti.com>
+> > Signed-off-by: Lucas Weaver <l-weaver@ti.com>
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> Hi,
+> Gentle ping..
 
-Evbp1 is a tablet evaluation board based on MT8135 SoC.
+Tony,
+I dont see this patch in omap-for-v3.18/dt
 
-Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
----
- arch/arm/boot/dts/mt8135-evbp1.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
+Is there anyway you might consider pulling this for 3.18?
 
-diff --git a/arch/arm/boot/dts/mt8135-evbp1.dts b/arch/arm/boot/dts/mt8135-evbp1.dts
-new file mode 100644
-index 0000000..d7c5ef0
---- /dev/null
-+++ b/arch/arm/boot/dts/mt8135-evbp1.dts
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (c) 2014 MediaTek Inc.
-+ * Author: Joe.C <yingjoe.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+#include "mt8135.dtsi"
-+
-+/ {
-+	model = "mt8135-evbp1";
-+
-+	memory {
-+		reg = <0 0x80000000 0 0x40000000>;
-+	};
-+};
+Patchworks link:
+https://patchwork.kernel.org/patch/4743121/
+
+> 
+> Regards,
+> Nishanth Menon
+> >  arch/arm/boot/dts/dra72x.dtsi |    5 +++++
+> >  arch/arm/boot/dts/dra74x.dtsi |    6 ++++++
+> >  2 files changed, 11 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+> > index f1ec22f..e5a3d23 100644
+> > --- a/arch/arm/boot/dts/dra72x.dtsi
+> > +++ b/arch/arm/boot/dts/dra72x.dtsi
+> > @@ -22,4 +22,9 @@
+> >  			reg = <0>;
+> >  		};
+> >  	};
+> > +
+> > +	pmu {
+> > +		compatible = "arm,cortex-a15-pmu";
+> > +		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>;
+> > +	};
+> >  };
+> > diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+> > index a4e8bb9..3be544c 100644
+> > --- a/arch/arm/boot/dts/dra74x.dtsi
+> > +++ b/arch/arm/boot/dts/dra74x.dtsi
+> > @@ -38,4 +38,10 @@
+> >  			reg = <1>;
+> >  		};
+> >  	};
+> > +
+> > +	pmu {
+> > +		compatible = "arm,cortex-a15-pmu";
+> > +		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <GIC_SPI DIRECT_IRQ(132) IRQ_TYPE_LEVEL_HIGH>;
+> > +	};
+> >  };
+> > 
+> 
+> 
+> -- 
+> Regards,
+> Nishanth Menon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.8.1.1.dirty
+Regards,
+Nishanth Menon
