@@ -1,47 +1,88 @@
-From: jonghwa3.lee@samsung.com (Jonghwa Lee)
-Date: Wed, 17 Sep 2014 12:07:42 +0900
-Subject: [RESEND PATCH] arm: exynos: Allow rtc alarm and tick wakeup irq for
- exynos3250.
-Message-ID: <1410923262-4771-1-git-send-email-jonghwa3.lee@samsung.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 17 Sep 2014 11:11:46 +0800
+Subject: [PATCH V2 2/2] ARM: imx: add anatop settings for LPDDR2 when enter
+ DSM mode
+In-Reply-To: <1410923506-21439-1-git-send-email-b20788@freescale.com>
+References: <1410923506-21439-1-git-send-email-b20788@freescale.com>
+Message-ID: <1410923506-21439-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add rtc alarm and tick irq to wakeup sources in exynos3250.
+For LPDDR2 platform, no need to enable weak2P5 in DSM mode,
+it can be pulled down to save power(~0.65mW).
 
-Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-Acked-by : Chanwoo choi <cw00.choi@samsung.com>
+And per design team's recommendation, we should disconnect
+VDDHIGH and SNVS in DSM mode on i.MX6SL.
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-exynos/pm.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+changes from v1 -> v2
+	remove DDR_TYPE definition, it is in mxc.h already.
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index fa7218a..d78dcf9 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -66,6 +66,12 @@ static struct sleep_save exynos_core_save[] = {
+ arch/arm/mach-imx/anatop.c |   34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 8259a62..4fa97c9 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -30,8 +30,11 @@
+ #define ANADIG_DIGPROG_IMX6SL	0x280
  
- static u32 exynos_irqwake_intmask = 0xffffffff;
+ #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
++#define BM_ANADIG_REG_2P5_ENABLE_PULLDOWN	0x8
+ #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
+ #define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	0x1000
++/* Below MISC0_DISCON_HIGH_SNVS is only for i.MX6SL */
++#define BM_ANADIG_ANA_MISC0_DISCON_HIGH_SNVS	0x2000
+ #define BM_ANADIG_USB_CHRG_DETECT_CHK_CHRG_B	0x80000
+ #define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x100000
  
-+static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
-+	{ 105, BIT(1) }, /* RTC alarm */
-+	{ 106, BIT(2) }, /* RTC tick */
-+	{ /* sentinel */ },
-+};
+@@ -56,16 +59,43 @@ static void imx_anatop_enable_fet_odrive(bool enable)
+ 		BM_ANADIG_REG_CORE_FET_ODRIVE);
+ }
+ 
++static inline void imx_anatop_enable_2p5_pulldown(bool enable)
++{
++	regmap_write(anatop, ANADIG_REG_2P5 + (enable ? REG_SET : REG_CLR),
++		BM_ANADIG_REG_2P5_ENABLE_PULLDOWN);
++}
 +
- static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
- 	{ 76, BIT(1) }, /* RTC alarm */
- 	{ 77, BIT(2) }, /* RTC tick */
-@@ -81,9 +87,10 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
- static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
++static inline void imx_anatop_disconnect_high_snvs(bool enable)
++{
++	regmap_write(anatop, ANADIG_ANA_MISC0 + (enable ? REG_SET : REG_CLR),
++		BM_ANADIG_ANA_MISC0_DISCON_HIGH_SNVS);
++}
++
+ void imx_anatop_pre_suspend(void)
  {
- 	const struct exynos_wkup_irq *wkup_irq;
--
- 	if (soc_is_exynos5250())
- 		wkup_irq = exynos5250_wkup_irq;
-+	else if (soc_is_exynos3250())
-+		wkup_irq = exynos3250_wkup_irq;
- 	else
- 		wkup_irq = exynos4_wkup_irq;
+-	imx_anatop_enable_weak2p5(true);
++	if (imx_mmdc_get_ddr_type() == DDR_TYPE_LPDDR2)
++		imx_anatop_enable_2p5_pulldown(true);
++	else
++		imx_anatop_enable_weak2p5(true);
++
+ 	imx_anatop_enable_fet_odrive(true);
++
++	if (cpu_is_imx6sl())
++		imx_anatop_disconnect_high_snvs(true);
+ }
  
+ void imx_anatop_post_resume(void)
+ {
++	if (imx_mmdc_get_ddr_type() == DDR_TYPE_LPDDR2)
++		imx_anatop_enable_2p5_pulldown(false);
++	else
++		imx_anatop_enable_weak2p5(false);
++
+ 	imx_anatop_enable_fet_odrive(false);
+-	imx_anatop_enable_weak2p5(false);
++
++	if (cpu_is_imx6sl())
++		imx_anatop_disconnect_high_snvs(false);
++
+ }
+ 
+ static void imx_anatop_usb_chrg_detect_disable(void)
 -- 
 1.7.9.5
