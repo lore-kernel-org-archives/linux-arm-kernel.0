@@ -1,43 +1,34 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 17 Sep 2014 21:49:17 +0530
-Subject: [PATCH 7/9] phy: remove .owner field for drivers using
- module_platform_driver
-In-Reply-To: <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
-References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
- <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
-Message-ID: <5419B485.8010002@ti.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 17 Sep 2014 18:25:07 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <54197C99.8030601@hurleysoftware.com>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
+ <5411B33F.10405@hurleysoftware.com> <54171B85.5060209@linutronix.de>
+ <54186B89.8050505@linutronix.de> <54197C99.8030601@hurleysoftware.com>
+Message-ID: <5419B5E3.10307@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
-> This patch removes the superflous .owner field for drivers which
-> use the module_platform_driver or platform_driver_register api,
-> as this is overriden in __platform_driver_register.
+On 09/17/2014 02:20 PM, Peter Hurley wrote:
+>> So I connected my am335x-evm
+>> with beagle board xm because both of them have an old fashion UART
+>> connector (instead those uart-to-usb). Both configured with HW-Flow and
+>> I haven't seen the function invoked but I saw "port->icount.overrun"
+>> being incremented. This shouldn't happen. So I am a little puzzled here?
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  drivers/phy/phy-bcm-kona-usb2.c     | 1 -
->  drivers/phy/phy-berlin-sata.c       | 1 -
->  drivers/phy/phy-exynos-dp-video.c   | 1 -
->  drivers/phy/phy-exynos-mipi-video.c | 1 -
->  drivers/phy/phy-exynos5-usbdrd.c    | 1 -
->  drivers/phy/phy-exynos5250-sata.c   | 1 -
->  drivers/phy/phy-hix5hd2-sata.c      | 1 -
->  drivers/phy/phy-miphy365x.c         | 1 -
->  drivers/phy/phy-mvebu-sata.c        | 1 -
->  drivers/phy/phy-omap-control.c      | 1 -
->  drivers/phy/phy-omap-usb2.c         | 1 -
->  drivers/phy/phy-qcom-apq8064-sata.c | 1 -
->  drivers/phy/phy-qcom-ipq806x-sata.c | 1 -
->  drivers/phy/phy-samsung-usb2.c      | 1 -
->  drivers/phy/phy-sun4i-usb.c         | 1 -
->  drivers/phy/phy-ti-pipe3.c          | 1 -
->  drivers/phy/phy-twl4030-usb.c       | 1 -
+> Yeah, that's weird. Do you have a break-out box to confirm that RTS/CTS are
+> being driven?
 
-twl4030-usb doesn't use module_platform_driver. Care to resend this patch
-along? I've merged all other patches in this series.
+Yeah, I've been thinking about that, too. I will be gone next week and
+hopefully when I get back I will something around to test this.
 
-Cheers
-Kishon
+> 
+> Regards,
+> Peter Hurley
+> 
+
+Sebastian
