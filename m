@@ -1,58 +1,37 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 17 Sep 2014 21:14:36 +0200
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <1410965416759.91038@freescale.com>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <201409162017.06439.marex@denx.de> <1410965416759.91038@freescale.com>
-Message-ID: <201409172114.36617.marex@denx.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 17 Sep 2014 21:37:42 +0200
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140917014410.GC31214@srcf.ucam.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
+ <20140917014410.GC31214@srcf.ucam.org>
+Message-ID: <4416582.iOjLNrLDZE@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 17, 2014 at 04:50:34 PM, Yao Yuan wrote:
-[...]
-> > > > Would that mean that the "crashed" DMA would be running until the
-> > > > next transmission is scheduled ?
-> > > 
-> > > [Yuan Yao] No, In fact any DMA timeout will result the failure of I2C
-> > > transmission and then it will turn to report the exception and wait
-> > > for next transmission.
-> > 
-> > Can you tell when the next transmission will happen? What if I issue a
-> > single transmission and that one fails ? Will the DMA run until who knows
-> > when ?
+On Wednesday, September 17, 2014 02:44:10 AM Matthew Garrett wrote:
+> On Fri, Sep 12, 2014 at 10:00:16PM +0800, Hanjun Guo wrote:
 > 
-> [Yuan Yao]
-> Sorry for my unclear description. In fact, During the DMA transmission  if
-> an error happened or time out, DMA will stop at once and be disabled.
-> I just continue to route the TX and RX request to signal the DMA
-> controller. Because the DMA is disabled, it will ignore those signals.
-> 
-> In a word, I just want to block the I2C TX, RX and interrupt signal when
-> DMA mode failed until the next I2C transmission start.
+> > +Common _DSD bindings should be submitted to ASWG to be included in the
+> > +document :-
+> > +
+> > +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
 
-So the I2C block is in error state until you clean it up upon next transmission?
+Well, the intention here is different.
 
-> In fact, the bit "I2CR_DMAEN" is a switch which decide whether I2C route
-> the TX, RX and interrupt signal to DMA controller.
-> 
-> > > The only thing I worried about is I2C may still receive some feedbacks
-> > > after DMA timeout. In this case the feedbacks may lead to abnormal
-> > > state in PIO mode.But it will be ignored in DMA model.
-> > > That's why I tend to delay force-disable DMA until the next
-> > > transmission begin. Could you please give me some suggestion?
-> > 
-> > No, this design just seems flawed to me. You should stop the DMA
-> > immediatelly if there is an error to avoid wasting resources and prevent
-> > possible other adverse effects.
-> 
-> [Yuan Yao]
-> Yes, I have stopped the DMA immediately. However I keep the I2C DMA
-> single route.
-> 
-> I don't have the exact evidence to prove that my design is acceptable.
-> So if you are sure it's flawed, I will change it in the next version(V8).
+The linked document is supposed to define the format of data to be returned
+by _DSD and the one at:
 
-I'm just trying to understand it.
+http://www.uefi.org/sites/default/files/resources/_DSD-device-properties-UUID.pdf
 
-Best regards,
-Marek Vasut
+does it specifically for the UUID associated with the DT bindings format.
+
+There are no implied IP issues with using the information there I know of and
+if there's any fine print anywhere that may suggest so, please let me know.
+
+That said, those documents are not intended to be libraries of actual bindings.
+
+A common place for the binding and a process for submitting/accepting them is
+needed, but we are yet to agree on how to do that.
+
+Rafael
