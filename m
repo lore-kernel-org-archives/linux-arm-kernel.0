@@ -1,58 +1,60 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Sep 2014 13:57:16 +0200
-Subject: [PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on
- wake-up
-Message-ID: <1410955036-1956-1-git-send-email-geert+renesas@glider.be>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 17 Sep 2014 12:56:07 +0100
+Subject: [PATCH] of: amba: use of_dma_configure for AMBA devices
+Message-ID: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If power area D4, which contains the Coresight-ETM hardware block, is
-powered down on R-Mobile A1 (r8a7740), the kernel crashes when
-suspending from s2ram with:
+Commit 591c1e ("of: configure the platform device dma parameters)
+introduced a common mechanism to configure DMA from DT properties.
+AMBA devices created from DT can take advantage of this, too.
 
-    Internal error: Oops - undefined instruction: 0 [#1] ARM
-
-This happens because dbg_cpu_pm_notify() calls reset_ctrl_regs(), which
-can't access the debug registers as the debug module is powered down.
-
-Protect the call to reset_ctrl_regs() by an undefined instruction hook,
-like was done in commit 0d352e3d006c9589 ("ARM: hw_breakpoint: trap
-undef instruction exceptions in reset_ctrl_regs") for another caller.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
-Question: Do we need the same protection in dbg_reset_notify()?
-          I can't trigger that case, as r8a7740 has only one CPU core.
----
- arch/arm/kernel/hw_breakpoint.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ drivers/of/platform.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 4d963fb66e3f0bce..f55f25d4e4de7674 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -1038,8 +1038,21 @@ static struct notifier_block dbg_reset_nb = {
- static int dbg_cpu_pm_notify(struct notifier_block *self, unsigned long action,
- 			     void *v)
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 0197725..3b64d0b 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -160,11 +160,10 @@ EXPORT_SYMBOL(of_device_alloc);
+  * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
+  * to fix up DMA configuration.
+  */
+-static void of_dma_configure(struct platform_device *pdev)
++static void of_dma_configure(struct device *dev)
  {
--	if (action == CPU_PM_EXIT)
-+	if (action == CPU_PM_EXIT) {
-+		/*
-+		 * We need to tread carefully here because DBGSWENABLE may be
-+		 * driven low on this core and there isn't an architected way to
-+		 * determine that.
-+		 */
-+		register_undef_hook(&debug_reg_hook);
-+
-+		/*
-+		 * Reset the breakpoint resources. We assume that a halting
-+		 * debugger will leave the world in a nice state for us.
-+		 */
- 		reset_ctrl_regs(NULL);
-+		unregister_undef_hook(&debug_reg_hook);
-+	}
+ 	u64 dma_addr, paddr, size;
+ 	int ret;
+-	struct device *dev = &pdev->dev;
  
- 	return NOTIFY_OK;
- }
+ 	/*
+ 	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+@@ -229,7 +228,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ 	if (!dev)
+ 		goto err_clear_flag;
+ 
+-	of_dma_configure(dev);
++	of_dma_configure(&dev->dev);
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
+@@ -291,7 +290,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 	}
+ 
+ 	/* setup generic device info */
+-	dev->dev.coherent_dma_mask = ~0;
+ 	dev->dev.of_node = of_node_get(node);
+ 	dev->dev.parent = parent;
+ 	dev->dev.platform_data = platform_data;
+@@ -299,6 +297,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 		dev_set_name(&dev->dev, "%s", bus_id);
+ 	else
+ 		of_device_make_bus_id(&dev->dev);
++	of_dma_configure(&dev->dev);
+ 
+ 	/* Allow the HW Peripheral ID to be overridden */
+ 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
 -- 
 1.9.1
