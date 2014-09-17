@@ -1,71 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Sep 2014 18:03:38 +0100
-Subject: [PATCH] of: amba: use of_dma_configure for AMBA devices
-In-Reply-To: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
-References: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
-Message-ID: <20140917170338.GC18532@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Sep 2014 18:16:10 +0100
+Subject: [PATCH RESEND] arm64:mm: initialize max_mapnr using function
+ set_max_mapnr
+In-Reply-To: <1410890034-27228-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1410890034-27228-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <20140917171607.GA17701@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 12:56:07PM +0100, Robin Murphy wrote:
-> Commit 591c1e ("of: configure the platform device dma parameters)
-> introduced a common mechanism to configure DMA from DT properties.
-> AMBA devices created from DT can take advantage of this, too.
+On Tue, Sep 16, 2014 at 06:53:54PM +0100, Ganapatrao Kulkarni wrote:
+> Initializing max_mapnr using set_max_mapnr() helper function instead
+> of direct reference. Also not adding PHYS_PFN_OFFSET to max_pfn,
+> since it already contains it.
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Applied, thanks.
 
-It would be great if the arm-soc guys can pick this up.
-
-Will
-
-> ---
->  drivers/of/platform.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 0197725..3b64d0b 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -160,11 +160,10 @@ EXPORT_SYMBOL(of_device_alloc);
->   * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
->   * to fix up DMA configuration.
->   */
-> -static void of_dma_configure(struct platform_device *pdev)
-> +static void of_dma_configure(struct device *dev)
->  {
->  	u64 dma_addr, paddr, size;
->  	int ret;
-> -	struct device *dev = &pdev->dev;
->  
->  	/*
->  	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-> @@ -229,7 +228,7 @@ static struct platform_device *of_platform_device_create_pdata(
->  	if (!dev)
->  		goto err_clear_flag;
->  
-> -	of_dma_configure(dev);
-> +	of_dma_configure(&dev->dev);
->  	dev->dev.bus = &platform_bus_type;
->  	dev->dev.platform_data = platform_data;
->  
-> @@ -291,7 +290,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  	}
->  
->  	/* setup generic device info */
-> -	dev->dev.coherent_dma_mask = ~0;
->  	dev->dev.of_node = of_node_get(node);
->  	dev->dev.parent = parent;
->  	dev->dev.platform_data = platform_data;
-> @@ -299,6 +297,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  		dev_set_name(&dev->dev, "%s", bus_id);
->  	else
->  		of_device_make_bus_id(&dev->dev);
-> +	of_dma_configure(&dev->dev);
->  
->  	/* Allow the HW Peripheral ID to be overridden */
->  	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-> -- 
-> 1.9.1
-> 
+-- 
+Catalin
