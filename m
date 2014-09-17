@@ -1,102 +1,88 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 17 Sep 2014 13:53:17 +0530
-Subject: =?UTF-8?q?=5BPATCH=202/2=5D=20ARM=3A=20imx=3A=20vf610-adc=3A=20Add=20temperature=20sensor=20support?=
-In-Reply-To: <cover.1410873422.git.maitysanchayan@gmail.com>
-References: <cover.1410873422.git.maitysanchayan@gmail.com>
-Message-ID: <0cd6b1bdf146a0c9024a804742078ce77a38e184.1410873422.git.maitysanchayan@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Sep 2014 10:30:34 +0200
+Subject: [PATCH v4 2/2] ARM: dts: at_xdmac: add bindings documentation
+In-Reply-To: <1410792622-22621-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1410792622-22621-1-git-send-email-ludovic.desroches@atmel.com>
+ <1410792622-22621-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <541946AA.6070407@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vybrid ADC module includes a temperature sensor which
-is connected to channel number 26. This patch adds
-support for the sensor. The raw value is read and the
-temperature calculated in degree Celsius which is
-returned using the IIO_CHAN_INFO_PROCESSED option.
+On 15/09/2014 16:50, Ludovic Desroches :
+> Add bindings documentation for the new Atmel DMA controller (XDMAC)
+> introduced with SAMA5D4.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  .../devicetree/bindings/dma/atmel-xdma.txt         | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/atmel-xdma.txt b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> new file mode 100644
+> index 0000000..647f099
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/atmel-xdma.txt
+> @@ -0,0 +1,48 @@
+> +* Atmel Extensible Direct Memory Access Controller (XDMAC)
+> +
+> +* XDMA Controller
+> +Required properties:
+> +- compatible: Should be "atmel,<chip>-dma".
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- drivers/iio/adc/vf610_adc.c |   34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+You must add the "chip" used here: like:
+<chip> compatible description:
+- sama5d4: first SoC adding the XDMAC
 
-diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-index 44799eb5..aa682aa 100644
---- a/drivers/iio/adc/vf610_adc.c
-+++ b/drivers/iio/adc/vf610_adc.c
-@@ -91,7 +91,7 @@
- #define VF610_ADC_CAL			0x80
- 
- /* Other field define */
--#define VF610_ADC_ADCHC(x)		((x) & 0xF)
-+#define VF610_ADC_ADCHC(x)		((x) & 0x1F)
- #define VF610_ADC_AIEN			(0x1 << 7)
- #define VF610_ADC_CONV_DISABLE		0x1F
- #define VF610_ADC_HS_COCO0		0x1
-@@ -137,7 +137,7 @@ struct vf610_adc {
- 	struct clk *clk;
- 
- 	u32 vref_uv;
--	u32 value;
-+	int value;
- 	struct regulator *vref;
- 	struct vf610_adc_feature adc_feature;
- 
-@@ -153,6 +153,15 @@ struct vf610_adc {
- 				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
- }
- 
-+#define VF610_ADC_TEMPERATURE_CHAN(_idx, _chan_type) {		\
-+	.type = (_chan_type),					\
-+	.indexed = 1,							\
-+	.channel = (_idx),						\
-+	.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),		\
-+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
-+				BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
-+}
-+
- static const struct iio_chan_spec vf610_adc_iio_channels[] = {
- 	VF610_ADC_CHAN(0, IIO_VOLTAGE),
- 	VF610_ADC_CHAN(1, IIO_VOLTAGE),
-@@ -170,6 +179,7 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
- 	VF610_ADC_CHAN(13, IIO_VOLTAGE),
- 	VF610_ADC_CHAN(14, IIO_VOLTAGE),
- 	VF610_ADC_CHAN(15, IIO_VOLTAGE),
-+	VF610_ADC_TEMPERATURE_CHAN(26, IIO_TEMP),
- 	/* sentinel */
- };
- 
-@@ -451,6 +461,7 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
- 
- 	switch (mask) {
- 	case IIO_CHAN_INFO_RAW:
-+	case IIO_CHAN_INFO_PROCESSED:
- 		mutex_lock(&indio_dev->mlock);
- 		reinit_completion(&info->completion);
- 
-@@ -468,7 +479,24 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
- 			return ret;
- 		}
- 
--		*val = info->value;
-+		switch (chan->type)	{
-+		case IIO_VOLTAGE:
-+			*val = info->value;
-+			break;
-+		case IIO_TEMP:
-+			/*
-+			* Calculate in degree celsius times 1000
-+			* Using sensor slope of 1.84 mV/?C and
-+			* V at 25?C of 696mv
-+			*/
-+			info->value -= 864;
-+			info->value = 25000 - info->value * 1000000 / 1840;
-+			*val = info->value;
-+			break;
-+		default:
-+			break;
-+		}
-+
- 		mutex_unlock(&indio_dev->mlock);
- 		return IIO_VAL_INT;
- 
+> +- reg: Should contain DMA registers location and length.
+> +- interrupts: Should contain DMA interrupt.
+> +- #dma-cells: Must be <2>, used to represent the number of integer cells in
+> +the dmas property of client devices.
+> +  - The 1st cell specifies the memory interface (16 most significant bits) and
+> +  the peripheral interface (16 less significant bits) to use.
+> +  - The 2nd cell specifies the channel configuration register:
+> +    - bit 30-24: PERID, peripheral identifier.
+> +
+> +Example:
+> +
+> +dma1: dma-controller at f0004000 {
+> +	compatible = "atmel,sama5d4-dma";
+> +	reg = <0xf0004000 0x200>;
+> +	interrupts = <50 4 0>;
+> +	#dma-cells = <2>;
+> +};
+> +
+> +
+> +* DMA clients
+> +DMA clients connected to the Atmel XDMA controller must use the format
+> +described in the dma.txt file, using a two-cell specifier for each channel.
+> +The three cells in order are:
+> +1. A phandle pointing to the DMA controller.
+> +2. The memory interface (16 most significant bits), the peripheral interface
+> +(16 less significant bits).
+> +3. Channel configuration register. Configurable fields are:
+> +  - bit 30-24: PERID, peripheral identifier.
+> +
+> +Example:
+> +
+> +i2c2: i2c at f8024000 {
+> +	compatible = "atmel,at91sam9x5-i2c";
+> +	reg = <0xf8024000 0x4000>;
+> +	interrupts = <34 4 6>;
+> +	dmas = <&dma1
+> +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
+> +		AT91_XDMAC_DT_PERID(6)>,
+> +	       <&dma1
+> +		(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
+> +		AT91_XDMAC_DT_PERID(7)>;
+> +	dma-names = "tx", "rx";
+> +};
+> 
+
+Otherwise, you can add my:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, bye,
 -- 
-1.7.9.5
+Nicolas Ferre
