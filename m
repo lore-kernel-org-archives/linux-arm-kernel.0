@@ -1,188 +1,49 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 17 Sep 2014 09:03:37 +0800
-Subject: [PATCH v2 2/3] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <CAPz6YkVqhO6kJtySB7MrCYzVLgjViKLO3c_HgS_NVxt3-=SJew@mail.gmail.com>
-References: <1410864271-9277-1-git-send-email-kever.yang@rock-chips.com>
- <1410864271-9277-3-git-send-email-kever.yang@rock-chips.com>
- <CAPz6YkVqhO6kJtySB7MrCYzVLgjViKLO3c_HgS_NVxt3-=SJew@mail.gmail.com>
-Message-ID: <5418DDE9.1000603@rock-chips.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Sep 2014 18:09:23 -0700
+Subject: [PATCH] ARM: timer-sp: ensure interrupt is cleared at
+ sp804_clockevents_init
+In-Reply-To: <1410914571-8388-1-git-send-email-chanho.min@lge.com>
+References: <1410914571-8388-1-git-send-email-chanho.min@lge.com>
+Message-ID: <20140917010923.GB10233@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sonny,
+On 09/17, Chanho Min wrote:
+> When sp804 is registerd as clock event device, it may not be added to
 
-On 09/17/2014 04:17 AM, Sonny Rao wrote:
-> On Tue, Sep 16, 2014 at 3:44 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
->> This patch add basic rk3288 smp support, cpu 1~3 are in wfe state
->> when get into kernel.
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->> ---
->>
->> Changes in v2:
->> - use rk3288_boot_secondary instead ofsmp_boot_secondary
->> - discards the power domain operation
->> - handle the per cpu starup when actived by 'sev'
->>
->>   arch/arm/mach-rockchip/core.h    |  1 +
->>   arch/arm/mach-rockchip/headsmp.S | 14 +++++++++
->>   arch/arm/mach-rockchip/platsmp.c | 63 ++++++++++++++++++++++++++++++++++++----
->>   3 files changed, 72 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
->> index 39bca96..13de05a 100644
->> --- a/arch/arm/mach-rockchip/core.h
->> +++ b/arch/arm/mach-rockchip/core.h
->> @@ -18,3 +18,4 @@ extern char rockchip_secondary_trampoline_end;
->>
->>   extern unsigned long rockchip_boot_fn;
->>   extern void rockchip_secondary_startup(void);
->> +extern void rk3288_secondary_startup(void);
->> diff --git a/arch/arm/mach-rockchip/headsmp.S b/arch/arm/mach-rockchip/headsmp.S
->> index 73206e3..bacdb56 100644
->> --- a/arch/arm/mach-rockchip/headsmp.S
->> +++ b/arch/arm/mach-rockchip/headsmp.S
->> @@ -20,6 +20,20 @@ ENTRY(rockchip_secondary_startup)
->>          b       secondary_startup
->>   ENDPROC(rockchip_secondary_startup)
->>
->> +ENTRY(rk3288_secondary_startup)
->> +       mrc p15, 0, r0, c0, c0, 5
->> +       mov r2, #3
->> +       and r0, r0, r2
->> +       ldr r1, =0xff700000
->> +       ldr r1, [r1]
->> +       cmp r0, r1
->> +       beq 2f
->> +       ldr r2, =0xfffd0000
->> +       mov pc, r2
->> +2:
->> +       b       secondary_startup
->> +ENDPROC(rk3288_secondary_startup)
-> Comments on what's going on here would be nice.
-I will do that in next version.
-> It looks like what you're doing is checking to see whether this CPU is
-> the one that is supposed to wake up or not, but looking at sram
-> (written by the C code below), and this isn't the correct CPU then go
-> back to boot rom?  Since we read in int-mem from the device-tree it
-> would also probably be good to make that ldr r1, 0xff700000 reference
-> the sram_base_addr variable rather than hard coding here.
-I don't like the hard coding either, but I don't know how to get the
-physical base of sram and bootrom address in the assemble code.
->
->> +
->>   ENTRY(rockchip_secondary_trampoline)
->>          ldr     pc, 1f
->>   ENDPROC(rockchip_secondary_trampoline)
->> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
->> index 189684f..022a01d 100644
->> --- a/arch/arm/mach-rockchip/platsmp.c
->> +++ b/arch/arm/mach-rockchip/platsmp.c
->> @@ -60,7 +60,7 @@ static void pmu_set_power_domain(int pd, bool on)
->>    * Handling of CPU cores
->>    */
->>
->> -static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->> +static int __cpuinit rk3066_boot_secondary(unsigned int cpu,
->>                                               struct task_struct *idle)
->>   {
->>          if (!sram_base_addr || !pmu_base_addr) {
->> @@ -80,6 +80,28 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->>          return 0;
->>   }
->>
->> +static int __cpuinit rk3288_boot_secondary(unsigned int cpu,
->> +                                            struct task_struct *idle)
->> +{
->> +       if (!sram_base_addr) {
->> +               pr_err("%s: sram missing for cpu boot\n", __func__);
->> +               return -ENXIO;
->> +       }
->> +
->> +       if (cpu >= ncores) {
->> +               pr_err("%s: cpu %d outside maximum number of cpus %d\n",
->> +                                                       __func__, cpu, ncores);
->> +               return -ENXIO;
->> +       }
->> +       /* start the core */
->> +       writel(virt_to_phys(rk3288_secondary_startup), sram_base_addr + 8);
->> +       writel(0xDEADBEAF, sram_base_addr + 4);
->> +       writel(cpu, sram_base_addr + 0);
-> I guess the boot rom is looking for 0xDEADBEEF here at sram_base_addr
-> + 4, but the cpu itself will be looking at sram_base_addr + 0.
-> Again, might be good to somehow document what the protocol is.
->
->> +       dsb_sev();
->> +
->> +       return 0;
->> +}
->> +
->>   /**
->>    * rockchip_smp_prepare_sram - populate necessary sram block
->>    * Starting cores execute the code residing at the start of the on-chip sram
->> @@ -125,7 +147,7 @@ static int __init rockchip_smp_prepare_sram(struct device_node *node)
->>          return 0;
->>   }
->>
->> -static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->> +static void __init rk3066_smp_prepare_cpus(unsigned int max_cpus)
->>   {
->>          struct device_node *node;
->>          unsigned int i;
->> @@ -194,12 +216,41 @@ static void rockchip_cpu_die(unsigned int cpu)
->>   }
->>   #endif
->>
->> -static struct smp_operations rockchip_smp_ops __initdata = {
->> -       .smp_prepare_cpus       = rockchip_smp_prepare_cpus,
->> -       .smp_boot_secondary     = rockchip_boot_secondary,
->> +static void __init rk3288_smp_prepare_cpus(unsigned int max_cpus)
->> +{
->> +       struct device_node *node;
->> +
->> +       node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-smp-sram");
->> +       if (!node) {
->> +               pr_err("%s: could not find sram dt node\n", __func__);
->> +               return;
->> +       }
->> +
->> +       sram_base_addr = of_iomap(node, 0);
->> +       if (!sram_base_addr) {
->> +               pr_err("%s: could not map pmu registers\n", __func__);
->> +               return;
->> +       }
->> +
->> +       ncores = 4;
->> +}
->> +
->> +static struct smp_operations rockchip3066_smp_ops __initdata = {
->> +       .smp_prepare_cpus       = rk3066_smp_prepare_cpus,
->> +       .smp_boot_secondary     = rk3066_boot_secondary,
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +       .cpu_kill               = rockchip_cpu_kill,
->> +       .cpu_die                = rockchip_cpu_die,
->> +#endif
->> +};
->> +CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip3066_smp_ops);
->> +
->> +static struct smp_operations rockchip3288_smp_ops __initdata = {
->> +       .smp_prepare_cpus       = rk3288_smp_prepare_cpus,
->> +       .smp_boot_secondary     = rk3288_boot_secondary,
->>   #ifdef CONFIG_HOTPLUG_CPU
->>          .cpu_kill               = rockchip_cpu_kill,
->>          .cpu_die                = rockchip_cpu_die,
->>   #endif
->>   };
->> -CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
->> +CPU_METHOD_OF_DECLARE(rk3288_smp, "rockchip,rk3288-smp", &rockchip3288_smp_ops);
->> --
->> 1.9.1
->>
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
->
->
+s/registerd/registered/
+
+> tick device if the higher rated device is already registerd. In this case,
+
+s/registerd/registered/
+
+> for uncertan reason, inetrrupt is occured without event_handler it cause
+
+s/inetrrupt/interrupt/
+
+> kernel panic. So Interrupt should be cleared before clockevent is registered.
+> 
+> Signed-off-by: Chanho Min <chanho.min@lge.com>
+> ---
+>  arch/arm/common/timer-sp.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> index fd6bff0..b658873 100644
+> --- a/arch/arm/common/timer-sp.c
+> +++ b/arch/arm/common/timer-sp.c
+> @@ -205,6 +205,8 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
+>  
+>  	writel(0, base + TIMER_CTRL);
+>  
+> +	/* Ensure interrupt is cleared */
+> +	writel(1, clkevt_base + TIMER_INTCLR);
+>  	setup_irq(irq, &sp804_timer_irq);
+>  	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
+
+Or just flip the order of clockevents_config_and_register() and
+setup_irq()? We've done this in other clockevents drivers.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
