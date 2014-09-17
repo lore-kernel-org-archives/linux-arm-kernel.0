@@ -1,60 +1,63 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 17 Sep 2014 12:56:07 +0100
-Subject: [PATCH] of: amba: use of_dma_configure for AMBA devices
-Message-ID: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Sep 2014 12:57:58 +0100
+Subject: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared at
+ sp804_of_init
+In-Reply-To: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
+References: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
+Message-ID: <20140917115758.GQ12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 591c1e ("of: configure the platform device dma parameters)
-introduced a common mechanism to configure DMA from DT properties.
-AMBA devices created from DT can take advantage of this, too.
+On Wed, Sep 17, 2014 at 08:34:46PM +0900, Chanho Min wrote:
+> sp804 may not be added to the tick device if the higher device is
+> already registered. In this case, If pending interrupt is existed
+> (usually It will be passed from the boot loader), inetrrupt is occured
+> without event_handler then it cause kernel panic. So Interrupts
+> should be cleared before clockevent is registered.
+> 
+> Changes since v1:
+>  - Move to sp804_of_init
+>  - Clear TIMER2 interrupt
+>  - Update commit log
+> 
+> Signed-off-by: Chanho Min <chanho.min@lge.com>
+> ---
+>  arch/arm/common/timer-sp.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> index fd6bff0..e3cc08e 100644
+> --- a/arch/arm/common/timer-sp.c
+> +++ b/arch/arm/common/timer-sp.c
+> @@ -226,6 +226,10 @@ static void __init sp804_of_init(struct device_node *np)
+>  	writel(0, base + TIMER_CTRL);
+>  	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
+>  
+> +	/* Ensure interrupt is cleared */
+> +	writel(1, base + TIMER_INTCLR);
+> +	writel(1, base + TIMER_2_BASE + TIMER_INTCLR);
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/of/platform.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+NAK.
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 0197725..3b64d0b 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -160,11 +160,10 @@ EXPORT_SYMBOL(of_device_alloc);
-  * can use Platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE event
-  * to fix up DMA configuration.
-  */
--static void of_dma_configure(struct platform_device *pdev)
-+static void of_dma_configure(struct device *dev)
- {
- 	u64 dma_addr, paddr, size;
- 	int ret;
--	struct device *dev = &pdev->dev;
- 
- 	/*
- 	 * Set default dma-mask to 32 bit. Drivers are expected to setup
-@@ -229,7 +228,7 @@ static struct platform_device *of_platform_device_create_pdata(
- 	if (!dev)
- 		goto err_clear_flag;
- 
--	of_dma_configure(dev);
-+	of_dma_configure(&dev->dev);
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 
-@@ -291,7 +290,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 	}
- 
- 	/* setup generic device info */
--	dev->dev.coherent_dma_mask = ~0;
- 	dev->dev.of_node = of_node_get(node);
- 	dev->dev.parent = parent;
- 	dev->dev.platform_data = platform_data;
-@@ -299,6 +297,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 		dev_set_name(&dev->dev, "%s", bus_id);
- 	else
- 		of_device_make_bus_id(&dev->dev);
-+	of_dma_configure(&dev->dev);
- 
- 	/* Allow the HW Peripheral ID to be overridden */
- 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
+This is really not necessary for two reasons, and incorrect for a third
+reason:
+
+1. If the control register is cleared, interrupts are disabled.  When
+   interrupts are disabled, the IRQ line from the timer module is
+   deasserted irrespective of the internal interrupt state of the timer.
+
+2. We only enable the interrupt when we set the timer up to run in either
+   periodic or one-shot modes.  If the timer is not used, the interrupt
+   remains masked.
+
+3. Even if this was necessary (which it isn't), only doing this in the
+   sp804_of_init() path is wrong - there are other initialisation paths
+   in this code, and there's no reason why one should have a different
+   behaviour to the others.
+
+If you've found this by running the kernel with QEMU, then it's probably
+a QEMU bug if it raises an interrupt during the above code.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
