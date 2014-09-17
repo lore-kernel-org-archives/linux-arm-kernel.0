@@ -1,63 +1,91 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 18 Sep 2014 01:13:42 +0200
-Subject: [PATCH v3 1/8] clk: rockchip: change pll rate without a
- clk-notifier
-In-Reply-To: <CAD=FV=VjU7E4TpPHv5Md=zLEig=zCTG8twx8L9+5hdLuERDUAw@mail.gmail.com>
-References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
- <1410991974-12235-2-git-send-email-heiko@sntech.de>
- <CAD=FV=VjU7E4TpPHv5Md=zLEig=zCTG8twx8L9+5hdLuERDUAw@mail.gmail.com>
-Message-ID: <1802092.5yu3PTGUzO@diego>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Wed, 17 Sep 2014 16:12:41 -0700
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+In-Reply-To: <541A01B7.8030601@mentor.com>
+References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <541A01B7.8030601@mentor.com>
+Message-ID: <CAMDttNfSr5BrnEwLXqgy676jOZbFHhXcMtC0n7gBSniwhWCDRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 17. September 2014, 15:46:08 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Wed, Sep 17, 2014 at 3:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > From: Doug Anderson <dianders@chromium.org>
-> > 
-> > The Rockchip PLL code switches into slow mode (AKA bypass more AKA
-> > 24MHz mode) before actually changing the PLL.  This keeps anyone from
-> > using the PLL while it's changing.  However, in all known Rockchip
-> > SoCs nobody should ever see the 24MHz when changing the PLL supplying
-> > the armclk because we should reparent children to an alternate
-> > (faster than 24MHz) PLL.
-> > 
-> > One problem is that the code to switch to an alternate parent was
-> > running in PRE_RATE_CHANGE.  ...and the code to switch to slow mode
-> > was _also_ running in PRE_RATE_CHANGE.  That meant there was no real
-> > guarantee that we would switch to an alternate parent before switching
-> > to 24MHz mode.
-> > 
-> > Let's move the switch to "slow mode" straight into
-> > rockchip_rk3066_pll_set_rate().  That means we're guaranteed that the
-> > 24MHz is really a last-resort.
-> > 
-> > Note that without this change on real systems we were the code to
-> > switch to an alternate parent at 24MHz.  In some older versions of
-> > that code we'd appy a (temporary) / 5 to the 24MHz causing us to run
-> > at 4.8MHz.  That wasn't enough to service USB interrupts in some cases
-> > and could lead to a system hang.
-> > 
-> > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  drivers/clk/rockchip/clk-pll.c | 63
-> >  +++++++++--------------------------------- 1 file changed, 13
-> >  insertions(+), 50 deletions(-)
-> 
-> Thanks for adding my patch to your series (with the proper commit
-> message)!  I think you need your SoB on the patch too.  Andrew Morton
-> pointed to the docs in another patch I was involved in.  Specifically,
-> you were "on the patch delivery".  See Documentation/SubmittingPatches
-> section 12 (and 13).
+On Wed, Sep 17, 2014 at 2:48 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+> On 09/17/2014 03:56 AM, Ganapatrao Kulkarni wrote:
+>> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>
+>> This patch adds property "nid" to memory node to provide the memory range to
+>> numa node id mapping.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>
+>> ---
+>>  Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+>>  1 file changed, 58 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/numa.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+>> new file mode 100644
+>> index 0000000..c4a94f2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/numa.txt
+>> @@ -0,0 +1,58 @@
+>> +======================================================
+>> +numa id binding description
+>> +======================================================
+>> +
+>> +======================================================
+>> +1 - Introduction
+>> +======================================================
+>> +The device node  property "nid(numa node id)" can be added to memory
+>> +device node to map the range of memory addresses as defined in property "reg".
+>> +The property "nid" maps the memory range to the numa node id, which is used to
+>> +find the local and remory pages on numa aware systems.
+>
+> "Local" and "remote" memory are notions that relate to some other
+> resource -- typically a CPU, but also I/O resources on some systems.  It
+> seems to me that a useful NUMA binding would at least specify a "nid"
+> property, or something like it, for both cpu and memory nodes.  But this
+> document speaks only of memory nodes.
+>
+> As Kumar said, the device tree on powerpc server systems already has
+> properties that express NUMA information.  If you can get hold of a copy
+> of the PAPR (not ePAPR) from power.org, refer to the description of
+> "ibm,associativity" and related properties.  I recall that it's a bit
+> more complex than this proposal, though.
 
-ok ... Mike can you add the
+I'm not able to find a link to the actual PAPR (not ePAPR)
+specification. Anyone has a linky?
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+I did find some code in tree, but couldn't find the bindings in
+Documentation/devicetree/.
 
-to the patch, or do you want a respin [if no other issue appears]
+Seems like we'd care about form1?
+-----8<-----
+commit 41eab6f88f24124df89e38067b3766b7bef06ddb
+Author: Anton Blanchard <anton@samba.org>
+Date:   Sun May 16 20:22:31 2010 +0000
+
+    powerpc/numa: Use form 1 affinity to setup node distance
+
+    Form 1 affinity allows multiple entries in
+ibm,associativity-reference-points
+    which represent affinity domains in decreasing order of importance. The
+    Linux concept of a node is always the first entry, but using the other
+    values as an input to node_distance() allows the memory allocator to make
+    better decisions on which node to go first when local memory has been
+    exhausted.
+
+    We keep things simple and create an array indexed by NUMA node, capped at
+    4 entries. Each time we lookup an associativity property we initialise
+    the array which is overkill, but since we should only hit this path during
+    boot it didn't seem worth adding a per node valid bit.
+
+    Signed-off-by: Anton Blanchard <anton@samba.org>
+    Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+----->8-----
 
 
-Heiko
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
