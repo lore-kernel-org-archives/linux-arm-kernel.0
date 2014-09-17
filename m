@@ -1,110 +1,36 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 17 Sep 2014 09:24:10 +0800
-Subject: [PATCH v1 16/21] s390/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <alpine.LFD.2.11.1409161325280.1618@denkbrett>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
- <alpine.LFD.2.11.1409161325280.1618@denkbrett>
-Message-ID: <5418E2BA.4030304@huawei.com>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Wed, 17 Sep 2014 02:26:14 +0100
+Subject: [PATCH 1/4] ata: ahci_platform: Add ACPI support for AMD Seattle
+ SATA controller
+In-Reply-To: <1410828446-28502-2-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1410828446-28502-2-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <20140917012614.GA31214@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/16 19:35, Sebastian Ott wrote:
-> Hello,
+On Mon, Sep 15, 2014 at 07:47:23PM -0500, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > 
-> On Fri, 5 Sep 2014, Yijing Wang wrote:
->> Use MSI chip framework instead of arch MSI functions to configure
->> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  arch/s390/pci/pci.c |   18 ++++++++++++++----
->>  1 files changed, 14 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
->> index 2fa7b14..da5316e 100644
->> --- a/arch/s390/pci/pci.c
->> +++ b/arch/s390/pci/pci.c
->> @@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
->>  	}
->>  }
->>
->> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
->> +int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
->>  {
->>  	struct zpci_dev *zdev = get_zdev(pdev);
->>  	unsigned int hwirq, msi_vecs;
->> @@ -434,7 +434,7 @@ out:
->>  	return rc;
->>  }
->>
->> -void arch_teardown_msi_irqs(struct pci_dev *pdev)
->> +static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
->>  {
->>  	struct zpci_dev *zdev = get_zdev(pdev);
->>  	struct msi_desc *msi;
->> @@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
->>  	/* Release MSI interrupts */
->>  	list_for_each_entry(msi, &pdev->msi_list, list) {
->>  		if (msi->msi_attrib.is_msix)
->> -			default_msix_mask_irq(msi, 1);
->> +			__msix_mask_irq(msi, 1);
->>  		else
->> -			default_msi_mask_irq(msi, 1, 1);
->> +			__msi_mask_irq(msi, 1, 1);
+> This patch adds ACPI match table in ahci_platform. The table includes
+> the acpi_device_id to match AMD Seattle SATA controller with following
+> asl structure in DSDT:
 > 
-> The default_msi_mask_irq to __msi_mask_irq renaming is hidden in your
-> patch "x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()"
-> 
-> This means that between that patch and this one s390 will not compile.
-> Could you please move this hunk to the other patch or even make an extra
-> patch with the renaming. Other than that:
+>     Device (SATA0)
+>     {
+>       Name(_HID, "AMDI0600")	// Seattle AHSATA
 
-Good catch. I will move this hunk into the patch "x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()".
+There really ought to be a well-defined PNPID for AHCI, so you can _HID 
+to AMD and _CID to something generic. That way we won't have:
 
-> 
-> Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
+> +#ifdef CONFIG_ATA_ACPI
+> +static const struct acpi_device_id ahci_acpi_match[] = {
+> +	{ "AMDI0600", 0 }, /* AMD Seattle AHCI */
+> +	{ },
+> +};
 
-
-Thanks!
-Yijing.
-
-
-> 
-> Regards,
-> Sebastian
-> 
->>  		irq_set_msi_desc(msi->irq, NULL);
->>  		irq_free_desc(msi->irq);
->>  		msi->msg.address_lo = 0;
->> @@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
->>  	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
->>  }
->>
->> +static struct msi_chip zpci_msi_chip = {
->> +	.setup_irqs = zpci_setup_msi_irqs,
->> +	.teardown_irqs = zpci_teardown_msi_irqs,
->> +};
->> +
->> +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
->> +{
->> +	return &zpci_msi_chip;
->> +}
->> +
->>  static void zpci_map_resources(struct zpci_dev *zdev)
->>  {
->>  	struct pci_dev *pdev = zdev->pdev;
->> -- 
->> 1.7.1
->>
->>
-> 
-> 
-> .
-> 
-
+utter sadness here. Really, please don't end up in a situation where we 
+need to add device-specific IDs to a generic driver.
 
 -- 
-Thanks!
-Yijing
+Matthew Garrett | mjg59 at srcf.ucam.org
