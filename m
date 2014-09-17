@@ -1,50 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Sep 2014 15:45:39 +0200
-Subject: [PATCH] ARM: mvebu: switch the Armada 370 RD board to internal
- registers at 0xf1000000
-Message-ID: <1410961539-10388-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 17 Sep 2014 15:46:46 +0200
+Subject: [PATCH 1/7] ARM: add mach-asm9260
+In-Reply-To: <20140914090545.GA21986@titan.lakedaemon.net>
+References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
+ <1410646408-28901-2-git-send-email-linux@rempel-privat.de>
+ <20140914071206.GP21986@titan.lakedaemon.net>
+ <54154780.80203@rempel-privat.de>
+ <20140914090545.GA21986@titan.lakedaemon.net>
+Message-ID: <20140917134646.GF27054@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent bootloader versions from Marvell that have DT support and
-various other new features remap the internal registers at
-0xf1000000. We have already done this change for most of the
-development boards from Marvell, and this commit does this change for
-the Marvell Armada 370 RD board.
+Hi,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-rd.dts | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+On 14/09/2014 at 05:05:45 -0400, Jason Cooper wrote :
+> On Sun, Sep 14, 2014 at 09:45:04AM +0200, Oleksij Rempel wrote:
+> > Am 14.09.2014 um 09:12 schrieb Jason Cooper:
+> > > On Sun, Sep 14, 2014 at 12:13:22AM +0200, Oleksij Rempel wrote:
+> > > 
+> > > Could you please add a description of the SoC?  Perhaps a link to
+> > > documentation, or at least a slick sheet?  Also, are there any products
+> > > on the market with this SoC, which ones?
+> > > 
+> > > thx,
+> > 
+> > Hi,
+> > 
+> > it is low cost (?) SoC targeted for market in China and India which
+> > trying to "replace" AT91SAM9G25.
+> > 
+> > Here is some info:
+> > http://www.alphascale.com/index.asp?ics/615.html
+> > 
+> > One of products:
+> > http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
+> 
+> Ok, please include this information is the commit log of the next
+> version of this patch.
+> 
 
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index 4169f40..7054611 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -9,6 +9,15 @@
-  * This file is licensed under the terms of the GNU General Public
-  * License version 2.  This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-  */
- 
- /dts-v1/;
-@@ -30,7 +39,7 @@
- 	};
- 
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
- 
- 		pcie-controller {
+I would also suggest to call it AlphaScale instead of Alpscale as it
+allows to get more useful information when searching the web.
+
 -- 
-2.0.0
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
