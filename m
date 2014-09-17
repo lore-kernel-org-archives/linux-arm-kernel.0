@@ -1,36 +1,33 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Sep 2014 19:52:04 -0600
-Subject: [PATCH] ARM: bcm2835: enable USB_DWC2_HOST in defconfig
-Message-ID: <1410918724-22752-1-git-send-email-swarren@wwwdotorg.org>
+Date: Tue, 16 Sep 2014 19:53:09 -0600
+Subject: [PATCH] BCM2835: Add I2S driver to device tree
+In-Reply-To: <1404895825-25668-1-git-send-email-broonie@kernel.org>
+References: <1404895825-25668-1-git-send-email-broonie@kernel.org>
+Message-ID: <5418E985.5090708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lubomir Rintel <lkundrak@v3.sk>
+On 07/09/2014 02:50 AM, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> [Tweaked slightly to disable by default -- broonie]
+> 
+> Signed-off-by: Florian Meier <florian.meier@koalo.de>
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 
-It broke when host was moved into a separate module, in 47a1685 ("usb:
-dwc2/s3c-hsotg: move s3c-hsotg into dwc2 directory"),
+I've belatedly forwarded this to arm-soc for application, except:
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
----
-These two patches are all I expect to have for RPi for 3.18, so I figure
-it's easiest to just forward them on to you rather than sending tiny pull
-requests.
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
 
- arch/arm/configs/bcm2835_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> +		bcm2835_i2s: i2s at 7e203000 {
+> +			compatible = "brcm,bcm2835-i2s";
+> +			reg = <0x7e203000 0x20>,
+> +			      <0x7e101098 0x02>;
+> +
+> +			dmas = <&dma 2>,
+> +			       <&dma 3>;
+> +			dma-names = "tx", "rx";
+> +		};
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 0302d29..31cb073 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -98,6 +98,7 @@ CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
- CONFIG_STAGING=y
- CONFIG_USB_DWC2=y
-+CONFIG_USB_DWC2_HOST=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
--- 
-1.9.1
+This node is already there (and even edited in this patch), so I dropped
+that hunk.
