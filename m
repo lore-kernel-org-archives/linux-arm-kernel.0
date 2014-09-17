@@ -1,53 +1,80 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 17 Sep 2014 16:51:08 +0800
-Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <541805E3.6080003@ahsoftware.de>
-References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
- <5416D26A.4080707@ahsoftware.de> <20140916035204.GB20800@Robin-OptiPlex-780>
- <541805E3.6080003@ahsoftware.de>
-Message-ID: <20140917085106.GB6369@Robin-OptiPlex-780>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Sep 2014 09:47:19 +0100
+Subject: Cortex-M and zImage
+In-Reply-To: <20140917061110.GM3755@pengutronix.de>
+References: <CAGhQ9VzzSq4P5BKM3UBBCPT61g3T1RHFhttfA-KkWGCcrjaW6A@mail.gmail.com>
+ <20140917061110.GM3755@pengutronix.de>
+Message-ID: <20140917084719.GP12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 11:41:55AM +0200, Alexander Holler wrote:
-> Am 16.09.2014 05:52, schrieb Robin Gong:
-> >On Mon, Sep 15, 2014 at 01:50:02PM +0200, Alexander Holler wrote:
-> >>Am 10.09.2014 07:30, schrieb Robin Gong:
-> >>>There is one weird data in rxfifo after one full rx/tx transfer
-> >>>done sometimes. It looks a design issue and hard to workaround
-> >>>totally, so disable dma functhion here. And will re-enable it
-> >>>once the root cause found.
-> >>
-> >>Hmm, I experience problems with DMA too but on uart3. I'm using the same
-> >>workaround for the uart (I've just commented out the dma entries in the DT).
-> >>The problem manifests itself here such, that brcm_patchram_plus
-> >>hangs while uploading the firmware to a BCM4330 connected at uart3
-> >>(reproducible).
-> >>
-> >>So maybe there is a bug in the DMA-engine which not only effects
-> >>SPI. Or both drivers contain the same error in handling DMA (maybe
-> >>through c&p).
-> >>But that's just specualtion from me, I haven't looked further into
-> >>that problem.
-> >>
-> >>Regards,
-> >>
-> >>Alexander Holler
-> >Thanks for your information share. But my issue should be caused by hardware,
-> >since everything is ok if it runs on other i.mx6 chip. Is your board also based
-> >on i.mx6 chip? If yes, hope you can raise your issue in freescale community or
-> >contact with Andy whose mail address added in CC list fugang.duan at freescale.cm.
-> >We have fix some bugs in UART DMA case.
-> 
-> It's an i.mx6q (Wandboard quad c1) where I have this problem with
-> mainline and much older (but heavily patched freescale 3.10.x based)
-> kernels. A quick web-search suggests that this problem exists since
-> a long time (noticed mainly by people which try to use BT as this
-> seems to be the major use case for high speed serial communication).
-> 
-> Regards,
-> 
-> Alexander Holler
-Yes, we just have fixed the BT issue over high speed UART last month. Suggest
-you trying our patches based on v3.10.
+On Wed, Sep 17, 2014 at 08:11:10AM +0200, Uwe Kleine-K?nig wrote:
+> I was able to compile a zImage with the patch below. For the
+> "Conflicting architecture profiles" error the most relevant hunk is the
+> first. And of course this needs some #ifdefs.
+
+However, when I see crap like this, I really have to say something.
+
+> @@ -145,7 +145,7 @@ start:
+>  		 * FIQs/IRQs (numeric definitions from angel arm.h source).
+>  		 * We only do this if we were in user mode on entry.
+>  		 */
+> -		mrs	r2, cpsr		@ get current mode
+> +		@mrs	r2, cpsr		@ get current mode
+>  		tst	r2, #3			@ not user?
+>  		bne	not_angel
+
+This *reads* into r2, which is then tested, and the path through the code
+changes according to the value read.  You've commented out the read, so
+now r2 is effective uninitialised.  How do you know which path will be
+used?
+
+>  		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
+> @@ -153,7 +153,7 @@ start:
+>   THUMB(		svc	0xab		)	@ angel_SWI_THUMB
+>  not_angel:
+>  		safe_svcmode_maskall r0
+> -		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
+> +		@msr	spsr_cxsf, r9		@ Save the CPU boot mode in
+>  						@ SPSR
+>  		/*
+>  		 * Note that some cache flushing and other stuff may
+> @@ -366,7 +366,7 @@ dtb_check_done:
+>  
+>  /* Relocate the hyp vector base if necessary */
+>  #ifdef CONFIG_ARM_VIRT_EXT
+> -		mrs	r0, spsr
+> +		@mrs	r0, spsr
+>  		and	r0, r0, #MODE_MASK
+>  		cmp	r0, #HYP_MODE
+>  		bne	1f
+
+Same here.
+
+> @@ -500,7 +500,7 @@ not_relocated:	mov	r0, #0
+>  		mov	r2, r8			@ restore atags pointer
+>  
+>  #ifdef CONFIG_ARM_VIRT_EXT
+> -		mrs	r0, spsr		@ Get saved CPU boot mode
+> +		@mrs	r0, spsr		@ Get saved CPU boot mode
+>  		and	r0, r0, #MODE_MASK
+>  		cmp	r0, #HYP_MODE		@ if not booted in HYP mode...
+>  		bne	__enter_kernel		@ boot kernel directly
+
+And here.
+
+> @@ -791,7 +791,7 @@ call_cache_fn:	adr	r12, proc_types
+>  #ifdef CONFIG_CPU_CP15
+>  		mrc	p15, 0, r9, c0, c0	@ get processor ID
+>  #else
+> -		ldr	r9, =CONFIG_PROCESSOR_ID
+> +		@ldr	r9, =CONFIG_PROCESSOR_ID
+
+And here.
+
+Please, don't post such utter trash, and don't post such utter trash for
+others to possibly use either.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
