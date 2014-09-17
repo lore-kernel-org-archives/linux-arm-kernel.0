@@ -1,195 +1,187 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 17 Sep 2014 12:01:50 +0530
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from platform
- devices
-Message-ID: <1410935510-1567-1-git-send-email-pankaj.dubey@samsung.com>
+From: anders.berg@avagotech.com (Anders Berg)
+Date: Wed, 17 Sep 2014 08:46:58 +0200
+Subject: [PATCH v2] spi: pl022: Add support for chip select extension
+In-Reply-To: <20140916183431.GX7960@sirena.org.uk>
+References: <20140916183431.GX7960@sirena.org.uk>
+Message-ID: <1410936418-26443-1-git-send-email-anders.berg@avagotech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently a syscon entity can be only registered directly through a
-platform device that binds to a dedicated syscon driver. However in
-certain use cases it is desirable to make a device used with another
-driver a syscon interface provider.
+Add support for a extended PL022 which has an extra register for controlling up
+to five chip select signals. This controller is found on the AXM5516 SoC.
+Unfortunately the PrimeCell identification registers are identical to a
+standard ARM PL022. To work around this, the peripheral ID must be overridden
+in the device tree using the "arm,primecell-periphid" property with the value
+0x000b6022.
 
-For example, certain SoCs (e.g. Exynos) contain system controller
-blocks which perform various functions such as power domain control,
-CPU power management, low power mode control, but in addition contain
-certain IP integration glue, such as various signal masks,
-coprocessor power control, etc. In such case, there is a need to have
-a dedicated driver for such system controller but also share registers
-with other drivers. The latter is where the syscon interface is helpful.
-
-In case of DT based platforms, this patch decouples syscon object from
-syscon platform driver, and allows to create syscon objects first time
-when it is required by calling of syscon_regmap_lookup_by APIs and keep
-a list of such syscon objects along with syscon provider device_nodes
-and regmap handles.
-
-For non-DT based platforms, this patch keeps syscon platform driver
-structure where is can be probed and such non-DT based drivers can use
-syscon_regmap_lookup_by_pdev API and get access to regmap handles.
-Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-we can completly remove platform driver of syscon, and keep only helper
-functions to get regmap handles.
-
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Anders Berg <anders.berg@avagotech.com>
 ---
-V2 of this patchset and related discussion can be found here [1].
 
-Changes since v2:
- - Added back platform device support from syscon, with one change that
-   syscon will not be probed for DT based platform.
- - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
-   users of syscon will not be broken.
- - Removed unwanted change in syscon.h.
- - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
-   Arnd Bergmann.
- - Added Tested-by of Vivek Gautam for testing on Exynos platform.
+Adding Russell to Cc.
 
-Changes since v1:
- - Removed of_syscon_unregister function.
- - Modified of_syscon_register function and it will be used by syscon.c 
-   to create syscon objects whenever required. 
- - Removed platform device support from syscon.
- - Removed syscon_regmap_lookup_by_pdevname API support.
- - As there are significant changes w.r.t patchset v1, I am taking over
-   author for this patchset from Tomasz Figa.
+Changelog:
 
-[1]: https://lkml.org/lkml/2014/9/2/299
+v2:
+    - added constant to <linux/amba/bus.h>
 
- drivers/mfd/syscon.c |   78 ++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 57 insertions(+), 21 deletions(-)
+ drivers/spi/spi-pl022.c  | 59 +++++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/amba/bus.h |  5 ++++
+ 2 files changed, 63 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index ca15878..4a4bad9 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -15,40 +15,49 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/list.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
--#include <linux/of_platform.h>
- #include <linux/platform_data/syscon.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/slab.h>
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 1189cfd..b395489 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -82,6 +82,7 @@
+ #define SSP_MIS(r)	(r + 0x01C)
+ #define SSP_ICR(r)	(r + 0x020)
+ #define SSP_DMACR(r)	(r + 0x024)
++#define SSP_CSR(r)	(r + 0x030) /* vendor extension */
+ #define SSP_ITCR(r)	(r + 0x080)
+ #define SSP_ITIP(r)	(r + 0x084)
+ #define SSP_ITOP(r)	(r + 0x088)
+@@ -198,6 +199,12 @@
+ #define SSP_DMACR_MASK_TXDMAE		(0x1UL << 1)
  
- static struct platform_driver syscon_driver;
- 
-+static DEFINE_SPINLOCK(syscon_list_slock);
-+static LIST_HEAD(syscon_list);
+ /*
++ * SSP Chip Select Control Register - SSP_CSR
++ * (vendor extension)
++ */
++#define SSP_CSR_CSVALUE_MASK		(0x1FUL << 0)
 +
- struct syscon {
-+	struct device_node *np;
- 	struct regmap *regmap;
-+	struct list_head list;
++/*
+  * SSP Integration Test control Register - SSP_ITCR
+  */
+ #define SSP_ITCR_MASK_ITEN		(0x1UL << 0)
+@@ -313,6 +320,7 @@ enum ssp_writing {
+  * @extended_cr: 32 bit wide control register 0 with extra
+  * features and extra features in CR1 as found in the ST variants
+  * @pl023: supports a subset of the ST extensions called "PL023"
++ * @internal_cs_ctrl: supports chip select control register
+  */
+ struct vendor_data {
+ 	int fifodepth;
+@@ -321,6 +329,7 @@ struct vendor_data {
+ 	bool extended_cr;
+ 	bool pl023;
+ 	bool loopback;
++	bool internal_cs_ctrl;
  };
  
--static int syscon_match_node(struct device *dev, void *data)
--{
--	struct device_node *dn = data;
--
--	return (dev->of_node == dn) ? 1 : 0;
--}
-+static struct syscon *of_syscon_register(struct device_node *np);
- 
- struct regmap *syscon_node_to_regmap(struct device_node *np)
- {
--	struct syscon *syscon;
--	struct device *dev;
-+	struct syscon *entry, *syscon = NULL;
- 
--	dev = driver_find_device(&syscon_driver.driver, NULL, np,
--				 syscon_match_node);
--	if (!dev)
--		return ERR_PTR(-EPROBE_DEFER);
-+	spin_lock(&syscon_list_slock);
- 
--	syscon = dev_get_drvdata(dev);
-+	list_for_each_entry(entry, &syscon_list, list)
-+		if (entry->np == np) {
-+			syscon = entry;
-+			break;
-+		}
- 
--	return syscon->regmap;
-+	spin_unlock(&syscon_list_slock);
-+
-+	if (!syscon)
-+		syscon = of_syscon_register(np);
-+
-+	if (!IS_ERR(syscon))
-+		return syscon->regmap;
-+
-+	return ERR_CAST(syscon);
+ /**
+@@ -440,9 +449,32 @@ static void null_cs_control(u32 command)
+ 	pr_debug("pl022: dummy chip select control, CS=0x%x\n", command);
  }
- EXPORT_SYMBOL_GPL(syscon_node_to_regmap);
  
-@@ -110,17 +119,45 @@ struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
- }
- EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
- 
--static const struct of_device_id of_syscon_match[] = {
--	{ .compatible = "syscon", },
--	{ },
--};
--
- static struct regmap_config syscon_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
- };
- 
-+static struct syscon *of_syscon_register(struct device_node *np)
++/**
++ * internal_cs_control - Control chip select signals via SSP_CSR.
++ * @pl022: SSP driver private data structure
++ * @command: select/delect the chip
++ *
++ * Used on controller with internal chip select control via SSP_CSR register
++ * (vendor extension). Each of the 5 LSB in the register controls one chip
++ * select signal.
++ */
++static void internal_cs_control(struct pl022 *pl022, u32 command)
 +{
-+	struct syscon *syscon;
-+	struct regmap *regmap;
-+	void __iomem *base;
++	u32 tmp;
 +
-+	if (!of_device_is_compatible(np, "syscon"))
-+		return ERR_PTR(-EINVAL);
-+
-+	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
-+	if (!syscon)
-+		return ERR_PTR(-ENOMEM);
-+
-+	base = of_iomap(np, 0);
-+	if (!base)
-+		return ERR_PTR(-ENOMEM);
-+
-+	regmap = regmap_init_mmio(NULL, base, &syscon_regmap_config);
-+	if (IS_ERR(regmap)) {
-+		pr_err("regmap init failed\n");
-+		return ERR_CAST(regmap);
-+	}
-+
-+	syscon->regmap = regmap;
-+	syscon->np = np;
-+
-+	spin_lock(&syscon_list_slock);
-+	list_add_tail(&syscon->list, &syscon_list);
-+	spin_unlock(&syscon_list_slock);
-+
-+	return syscon;
++	tmp = readw(SSP_CSR(pl022->virtbase));
++	if (command == SSP_CHIP_SELECT)
++		tmp &= ~BIT(pl022->cur_cs);
++	else
++		tmp |= BIT(pl022->cur_cs);
++	writew(tmp, SSP_CSR(pl022->virtbase));
 +}
 +
- static int syscon_probe(struct platform_device *pdev)
+ static void pl022_cs_control(struct pl022 *pl022, u32 command)
  {
- 	struct device *dev = &pdev->dev;
-@@ -167,7 +204,6 @@ static struct platform_driver syscon_driver = {
- 	.driver = {
- 		.name = "syscon",
- 		.owner = THIS_MODULE,
--		.of_match_table = of_syscon_match,
+-	if (gpio_is_valid(pl022->cur_cs))
++	if (pl022->vendor->internal_cs_ctrl)
++		internal_cs_control(pl022, command);
++	else if (gpio_is_valid(pl022->cur_cs))
+ 		gpio_set_value(pl022->cur_cs, command);
+ 	else
+ 		pl022->cur_chip->cs_control(command);
+@@ -2118,6 +2150,9 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (platform_info->num_chipselect && platform_info->chipselects) {
+ 		for (i = 0; i < num_cs; i++)
+ 			pl022->chipselects[i] = platform_info->chipselects[i];
++	} else if (pl022->vendor->internal_cs_ctrl) {
++		for (i = 0; i < num_cs; i++)
++			pl022->chipselects[i] = i;
+ 	} else if (IS_ENABLED(CONFIG_OF)) {
+ 		for (i = 0; i < num_cs; i++) {
+ 			int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+@@ -2347,6 +2382,7 @@ static struct vendor_data vendor_arm = {
+ 	.extended_cr = false,
+ 	.pl023 = false,
+ 	.loopback = true,
++	.internal_cs_ctrl = false,
+ };
+ 
+ static struct vendor_data vendor_st = {
+@@ -2356,6 +2392,7 @@ static struct vendor_data vendor_st = {
+ 	.extended_cr = true,
+ 	.pl023 = false,
+ 	.loopback = true,
++	.internal_cs_ctrl = false,
+ };
+ 
+ static struct vendor_data vendor_st_pl023 = {
+@@ -2365,6 +2402,17 @@ static struct vendor_data vendor_st_pl023 = {
+ 	.extended_cr = true,
+ 	.pl023 = true,
+ 	.loopback = false,
++	.internal_cs_ctrl = false,
++};
++
++static struct vendor_data vendor_lsi = {
++	.fifodepth = 8,
++	.max_bpw = 16,
++	.unidir = false,
++	.extended_cr = false,
++	.pl023 = false,
++	.loopback = true,
++	.internal_cs_ctrl = true,
+ };
+ 
+ static struct amba_id pl022_ids[] = {
+@@ -2398,6 +2446,15 @@ static struct amba_id pl022_ids[] = {
+ 		.mask	= 0xffffffff,
+ 		.data	= &vendor_st_pl023,
  	},
- 	.probe		= syscon_probe,
- 	.id_table	= syscon_ids,
++	{
++		/*
++		 * PL022 variant that has a chip select control register whih
++		 * allows control of 5 output signals nCS[0:4].
++		 */
++		.id	= 0x000b6022,
++		.mask	= 0x000fffff,
++		.data	= &vendor_lsi,
++	},
+ 	{ 0, 0 },
+ };
+ 
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index fdd7e1b..c324f57 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -44,10 +44,15 @@ struct amba_driver {
+ 	const struct amba_id	*id_table;
+ };
+ 
++/*
++ * Constants for the designer field of the Peripheral ID register. When bit 7
++ * is set to '1', bits [6:0] should be the JEP106 manufacturer identity code.
++ */
+ enum amba_vendor {
+ 	AMBA_VENDOR_ARM = 0x41,
+ 	AMBA_VENDOR_ST = 0x80,
+ 	AMBA_VENDOR_QCOM = 0x51,
++	AMBA_VENDOR_LSI = 0xb6,
+ };
+ 
+ extern struct bus_type amba_bustype;
 -- 
-1.7.9.5
+1.9.1
