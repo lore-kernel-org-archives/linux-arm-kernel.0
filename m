@@ -1,37 +1,47 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 17 Sep 2014 14:56:17 -0700
-Subject: [PATCH 2/6] arm/arm64: KVM: fix potential NULL dereference in
- user_mem_abort()
-In-Reply-To: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1410990981-665-3-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 17 Sep 2014 14:56:15 -0700
+Subject: [PATCH 0/6] KVM: handling of MMIO pass-through regions
+Message-ID: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle the potential NULL return value of find_vma_intersection()
-before dereferencing it.
+This is a followup to the patches 'kvm: define PAGE_S2_DEVICE as
+read-only by default' I sent out last week. Essentially build tested
+only: while QEMU on KVM still works correctly for my use case with
+these patches applied, it does not in fact use passthrough mappings
+of device memory.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kvm/mmu.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Patch #1 is a trivial fix for an issue identified by sparse where we
+are calling memset(0) on 2 MB worth of pages.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 152e0f896e63..c093e95ff7ef 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -776,7 +776,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	/* Let's check if we will get back a huge page backed by hugetlbfs */
- 	down_read(&current->mm->mmap_sem);
- 	vma = find_vma_intersection(current->mm, hva, hva + 1);
--	if (is_vm_hugetlb_page(vma)) {
-+	if (unlikely(!vma)) {
-+		kvm_err("Failed to find VMA for hva 0x%lx\n", hva);
-+		up_read(&current->mm->mmap_sem);
-+		return -EFAULT;
-+	} else if (is_vm_hugetlb_page(vma)) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
+Patch #2 fixes a potential NULL dereference in user_mem_abort()
+
+Patch #3 adds a 'writable' parameter to kmv_phys_addr_ioremap() so that
+read-only device regions can be mapped using this function. The existing
+callers are updated to pass 'true' for this parameter.
+
+Patch #4 and #5 were sent out before, and change the value of
+PAGE_S2_DEVICE to read-only, so that read-only regions can be
+ioremap()'ed
+
+Patch #6 ensures that VM_PFNMAP linear mappings of non-system RAM host
+memory are mapped eagerly rather than faulted in page by page.
+
+
+Ard Biesheuvel (6):
+  arm/arm64: KVM: use __GFP_ZERO not memset() to get zeroed pages
+  arm/arm64: KVM: fix potential NULL dereference in user_mem_abort()
+  arm/arm64: KVM: add 'writable' parameter to kvm_phys_addr_ioremap
+  ARM: kvm: define PAGE_S2_DEVICE as read-only by default
+  arm64: kvm: define PAGE_S2_DEVICE as read-only by default
+  arm/arm64: KVM: map MMIO regions at creation time
+
+ arch/arm/include/asm/pgtable.h   |  2 +-
+ arch/arm/kvm/mmu.c               | 64 ++++++++++++++++++++++++++++++++++++----
+ arch/arm64/include/asm/kvm_mmu.h |  2 +-
+ arch/arm64/include/asm/pgtable.h |  2 +-
+ virt/kvm/arm/vgic.c              |  3 +-
+ 5 files changed, 64 insertions(+), 9 deletions(-)
+
 -- 
 1.8.3.2
