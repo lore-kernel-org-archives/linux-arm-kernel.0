@@ -1,136 +1,84 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 17 Sep 2014 08:46:42 -0700
-Subject: [PATCHv2] watchdog: imx2_wdt: add restart handler support
-In-Reply-To: <4d89bf404e934cbd8e27c5adf4d29420@BLUPR03MB472.namprd03.prod.outlook.com>
-References: <1410506676-24205-1-git-send-email-jingchang.lu@freescale.com>
- <4d89bf404e934cbd8e27c5adf4d29420@BLUPR03MB472.namprd03.prod.outlook.com>
-Message-ID: <20140917154642.GB29184@roeck-us.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 17 Sep 2014 08:47:54 -0700
+Subject: [PATCH 2/2] ARM: dts: Add rtc_src clk for s3c-rtc on
+ exynos5250-snow
+In-Reply-To: <1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
+References: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 07:40:01AM +0000, Jingchang Lu wrote:
-> Hi, Guenter,
-> 
->   Could you please help review this v2 patch, Thanks.
-> 
-Sure, but please give me some time. I _do_ have a daytime job.
+Hi,
 
-Thanks,
-Guenter
+On Wed, Sep 17, 2014 at 4:50 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> commit 546b117fdf17 ("rtc: s3c: add support for RTC of Exynos3250 SoC")
+> added an "rtc_src" DT property for the Samsung's S3C Real Time Clock
+> controller that specifies the 32.768 kHz clock that uses the RTC as its
+> source clock. In the case of the Exynos5250 based Snow board, the Maxim
+> 77686 32kHz AP clock is used as the source clock.
+>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/boot/dts/exynos5250-snow.dts | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index e51fcef..56eec56 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -10,6 +10,7 @@
+>
+>  /dts-v1/;
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/clock/maxim,max77686.h>
+>  #include "exynos5250.dtsi"
+>
+>  / {
+> @@ -29,6 +30,8 @@
+>
+>         rtc at 101E0000 {
+>                 status = "okay";
+> +               clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
+> +               clock-names = "rtc", "rtc_src";
 
-> Best Regards,
-> Jingchang
-> 
-> >-----Original Message-----
-> >From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
-> >Sent: Friday, September 12, 2014 3:25 PM
-> >To: wim at iguana.be
-> >Cc: Guo Shawn-R65073; arnd at arndb.de; linux at roeck-us.net; linux-
-> >watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Lu
-> >Jingchang-B35083
-> >Subject: [PATCHv2] watchdog: imx2_wdt: add restart handler support
-> >
-> >  Register the watchdog as the system restart function
-> >to the new introducing kernel restart call chain in the
-> >driver instead of providing the restart in machine desc.
-> >  This restart handler function is from the mxc_restart()
-> >in arch/arm/mach-imx/system.c
-> >
-> >Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> >---
-> > drivers/watchdog/imx2_wdt.c | 37 +++++++++++++++++++++++++++++++++++++
-> > 1 file changed, 37 insertions(+)
-> >
-> >diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> >index 68c3d37..d32470e 100644
-> >--- a/drivers/watchdog/imx2_wdt.c
-> >+++ b/drivers/watchdog/imx2_wdt.c
-> >@@ -22,14 +22,17 @@
-> >  */
-> >
-> > #include <linux/clk.h>
-> >+#include <linux/delay.h>
-> > #include <linux/init.h>
-> > #include <linux/io.h>
-> > #include <linux/jiffies.h>
-> > #include <linux/kernel.h>
-> > #include <linux/module.h>
-> > #include <linux/moduleparam.h>
-> >+#include <linux/notifier.h>
-> > #include <linux/of_address.h>
-> > #include <linux/platform_device.h>
-> >+#include <linux/reboot.h>
-> > #include <linux/regmap.h>
-> > #include <linux/timer.h>
-> > #include <linux/watchdog.h>
-> >@@ -59,6 +62,7 @@ struct imx2_wdt_device {
-> > 	struct regmap *regmap;
-> > 	struct timer_list timer;	/* Pings the watchdog when closed */
-> > 	struct watchdog_device wdog;
-> >+	struct notifier_block restart_handler;
-> > };
-> >
-> > static bool nowayout = WATCHDOG_NOWAYOUT;
-> >@@ -77,6 +81,31 @@ static const struct watchdog_info imx2_wdt_info = {
-> > 	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
-> > };
-> >
-> >+static int imx2_restart_handler(struct notifier_block *this, unsigned
-> >long mode,
-> >+				void *cmd)
-> >+{
-> >+	unsigned int wcr_enable = IMX2_WDT_WCR_WDE;
-> >+	struct imx2_wdt_device *wdev = container_of(this,
-> >+						    struct imx2_wdt_device,
-> >+						    restart_handler);
-> >+	/* Assert SRS signal */
-> >+	regmap_write(wdev->regmap, 0, wcr_enable);
-> >+	/*
-> >+	 * Due to imx6q errata ERR004346 (WDOG: WDOG SRS bit requires to be
-> >+	 * written twice), we add another two writes to ensure there must be
-> >at
-> >+	 * least two writes happen in the same one 32kHz clock period.  We
-> >save
-> >+	 * the target check here, since the writes shouldn't be a huge
-> >burden
-> >+	 * for other platforms.
-> >+	 */
-> >+	regmap_write(wdev->regmap, 0, wcr_enable);
-> >+	regmap_write(wdev->regmap, 0, wcr_enable);
-> >+
-> >+	/* wait for reset to assert... */
-> >+	mdelay(500);
-> >+
-> >+	return NOTIFY_DONE;
-> >+}
-> >+
-> > static inline void imx2_wdt_setup(struct watchdog_device *wdog)
-> > {
-> > 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> >@@ -257,6 +286,12 @@ static int __init imx2_wdt_probe(struct
-> >platform_device *pdev)
-> > 		return ret;
-> > 	}
-> >
-> >+	wdev->restart_handler.notifier_call = imx2_restart_handler;
-> >+	wdev->restart_handler.priority = 128;
-> >+	ret = register_restart_handler(&wdev->restart_handler);
-> >+	if (ret)
-> >+		dev_err(&pdev->dev, "cannot register restart handler\n");
-> >+
-> > 	dev_info(&pdev->dev, "timeout %d sec (nowayout=%d)\n",
-> > 		 wdog->timeout, nowayout);
-> >
-> >@@ -268,6 +303,8 @@ static int __exit imx2_wdt_remove(struct
-> >platform_device *pdev)
-> > 	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-> > 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> >
-> >+	unregister_restart_handler(&wdev->restart_handler);
-> >+
-> > 	watchdog_unregister_device(wdog);
-> >
-> > 	if (imx2_wdt_is_running(wdev)) {
-> >--
-> >1.8.0
-> 
+Wait, seriously?  Snow is still using the "rtc at 101E0000" syntax?
+Whatever happened to the series that Andreas worked so hard on,
+including <https://patchwork.kernel.org/patch/4664801/>?
+
+Kukjin: Andreas's patch series was Reviewed long ago I think and by
+now I'd imagine it's got some conflicts due to it not having been
+applied in a timely fashion.  Perhaps you could fix it up for Andreas
+(since he's already rebased it several times) and land it?
+
+If I had to guess, outstanding from Andreas's series (patchwork IDs listed):
+
+4751131 New          [v7] ARM: dts: Prepare node labels for exynos5250
+4664801 New          [v6,04/10] ARM: dts: Clean up exynos5250-snow
+4664771 New          [v6,05/10] ARM: dts: Fill in bootargs for exynos5250-snow
+4664731 New          [v6,06/10] ARM: dts: Clean up exynos5250-smdk5250
+4664751 New          [v6,07/10] ARM: dts: Clean up exynos5250-arndale
+4664711 New          [v6,08/10] ARM: dts: Fix apparent GPIO typo in
+exynos5250-arndale
+4664681 New          [v6,09/10] ARM: dts: Simplify USB3503 on exynos5250-arndale
+4664691 New          [v6,10/10] ARM: dts: Add exynos5250-spring device tree
+
+
+>         };
+>
+>         pinctrl at 11400000 {
+> @@ -350,7 +353,7 @@
+>         samsung,i2c-sda-delay = <100>;
+>         samsung,i2c-max-bus-freq = <378000>;
+>
+> -       max77686 at 09 {
+> +       max77686: max77686 at 09 {
+>                 compatible = "maxim,max77686";
+>                 interrupt-parent = <&gpx3>;
+>                 interrupts = <2 0>;
+
+In any case, there's nothing wrong with Javier's patch other than the
+fact that it will eventually need to get merged with Andreas's, so:
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
