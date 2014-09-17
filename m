@@ -1,35 +1,74 @@
 From: b38343@freescale.com (Robin Gong)
-Date: Wed, 17 Sep 2014 17:57:57 +0800
-Subject: [PATCH v3 0/3] add power off driver for i.mx6
-Message-ID: <1410947881-7345-1-git-send-email-b38343@freescale.com>
+Date: Wed, 17 Sep 2014 17:57:58 +0800
+Subject: [PATCH v3 1/3] ARM: dts: imx6: add pm_power_off support for i.mx6
+ chips
+In-Reply-To: <1410947881-7345-1-git-send-email-b38343@freescale.com>
+References: <1410947881-7345-1-git-send-email-b38343@freescale.com>
+Message-ID: <1410947881-7345-2-git-send-email-b38343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple power off driver for i.mx6, including:
-- add basic imx-snvs-poweroff driver in drivers/power/reset
-- add device node in all dts files of i.mx6.
-- enable in config file
+All chips of i.mx6 can be powered off by programming SNVS.
+For example :
+On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+pmic ON/OFF pin, that will cause the whole PMIC powered off
+except VSNVS. And system can restart once PMIC_ON_REQ goes
+high by push POWRER key.
 
-Change from v2:
-- remove useless included head files
-- split device binding doc from dts patch
-- add description for the case that PMIC_ON_REQ not used as external power
-  control
+Signed-off-by: Robin Gong <b38343@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi |    5 +++++
+ arch/arm/boot/dts/imx6sl.dtsi  |    5 +++++
+ arch/arm/boot/dts/imx6sx.dtsi  |    5 +++++
+ 3 files changed, 15 insertions(+)
 
-Robin Gong (3):
-  ARM: dts: imx6: add pm_power_off support for i.mx6 chips
-  power: reset: imx-snvs-poweroff: add power off driver for i.mx6
-  ARM: configs: imx_v6_v7_defconfig: add power off driver
-
- arch/arm/boot/dts/imx6qdl.dtsi          |  5 +++
- arch/arm/boot/dts/imx6sl.dtsi           |  5 +++
- arch/arm/boot/dts/imx6sx.dtsi           |  5 +++
- arch/arm/configs/imx_v6_v7_defconfig    |  3 ++
- drivers/power/reset/Kconfig             |  5 +++
- drivers/power/reset/Makefile            |  1 +
- drivers/power/reset/imx-snvs-poweroff.c | 69 +++++++++++++++++++++++++++++++++
- 7 files changed, 93 insertions(+)
- create mode 100644 drivers/power/reset/imx-snvs-poweroff.c
-
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index c701af9..fffa1c6 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -645,6 +645,11 @@
+ 					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
++
++				snvs-poweroff at 38 {
++					compatible = "fsl,sec-v4.0-poweroff";
++					reg = <0x38 0x4>;
++				};
+ 			};
+ 
+ 			epit1: epit at 020d0000 { /* EPIT1 */
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 505da9e..3256318 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -565,6 +565,11 @@
+ 					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
++
++				snvs-poweroff at 38 {
++					compatible = "fsl,sec-v4.0-poweroff";
++					reg = <0x38 0x4>;
++				};
+ 			};
+ 
+ 			epit1: epit at 020d0000 {
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index f4b9da6..74a0131 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -668,6 +668,11 @@
+ 					reg = <0x34 0x58>;
+ 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
++
++				snvs-poweroff at 38 {
++					compatible = "fsl,sec-v4.0-poweroff";
++					reg = <0x38 0x4>;
++				};
+ 			};
+ 
+ 			epit1: epit at 020d0000 {
 -- 
-1.9.1
+1.7.9.5
