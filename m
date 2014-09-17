@@ -1,102 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Sep 2014 10:02:44 -0600
-Subject: [PATCH 1/2] ARM: tegra: tegra124: Add PCIe support
-Message-ID: <1410969765-18070-1-git-send-email-swarren@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Sep 2014 17:03:39 +0100
+Subject: [PATCH v8 1/4] pci:host: APM X-Gene PCIe host controller driver
+In-Reply-To: <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
+References: <1410476266-29426-1-git-send-email-tinamdar@apm.com>
+ <1410476266-29426-2-git-send-email-tinamdar@apm.com>
+ <20140912091816.GU27864@e106497-lin.cambridge.arm.com>
+ <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
+Message-ID: <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Tue, Sep 16, 2014 at 09:02:11PM +0100, Tanmay Inamdar wrote:
+> On Fri, Sep 12, 2014 at 2:18 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Thu, Sep 11, 2014 at 11:57:43PM +0100, Tanmay Inamdar wrote:
+> >> This patch adds the AppliedMicro X-Gene SOC PCIe host controller driver.
+> >> X-Gene PCIe controller supports maximum up to 8 lanes and GEN3 speed.
+> >> X-Gene SOC supports maximum 5 PCIe ports.
+> >>
+> >> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> >
+> > It looks good to me now. You can add if you care:
+> >
+> > Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> I will have to send another version of patch as I forgot to add
+> 'dma-coherent' in device tree entry.
+> 
+> Secondly I see that setting 'dma-coherent' in device tree node sets
+> coherent_dma_ops for the root bus but for the endpoint another 'dev'
+> gets assigned. This causes endpoint to use non-coherent dma apis
+> causing failure in dma operations.
 
-Add the PCIe controller device tree node and hook up the PCIe PHY from
-the XUSB pad controller.
+For PCIe, setting dma-coherent in the DT nodes wouldn't have any effect
+yet. We have of_dma_configure() being called for platform devices but it
+won't work for PCIe which are probed at run-time (nor for AMBA which
+require an additional patch).
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I intend to apply these immediately, since they simply implement the DT
-bindings that were posted a while ago and recently merged into the PCIe
-tree, follow the same layout as PCIe support for earlier chips, and the
-patches have had plenty of local testing by myself.
+So for arm64 currently we have some hooks in dma-mapping.c to intercept
+when a device is added to a bus. What I need to do though is check
+recursively whether the parent (bus) had the 'dma-coherent' property
+(pointed out by Jon). I think something like this would do (not tested):
 
- arch/arm/boot/dts/tegra124.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 0ba3a0b6685f..478c555ebd96 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -12,6 +12,72 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 4164c5ace9f8..638475378f94 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -316,7 +316,7 @@ static int dma_bus_notifier(struct notifier_block *nb,
+ 	if (event != BUS_NOTIFY_ADD_DEVICE)
+ 		return NOTIFY_DONE;
  
-+	pcie-controller at 0,01003000 {
-+		compatible = "nvidia,tegra124-pcie";
-+		device_type = "pci";
-+		reg = <0x0 0x01003000 0x0 0x00000800   /* PADS registers */
-+		       0x0 0x01003800 0x0 0x00000800   /* AFI registers */
-+		       0x0 0x02000000 0x0 0x10000000>; /* configuration space */
-+		reg-names = "pads", "afi", "cs";
-+		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>, /* controller interrupt */
-+			     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>; /* MSI interrupt */
-+		interrupt-names = "intr", "msi";
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		bus-range = <0x00 0xff>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+
-+		ranges = <0x82000000 0 0x01000000 0x0 0x01000000 0 0x00001000   /* port 0 configuration space */
-+			  0x82000000 0 0x01001000 0x0 0x01001000 0 0x00001000   /* port 1 configuration space */
-+			  0x81000000 0 0x0        0x0 0x12000000 0 0x00010000   /* downstream I/O (64 KiB) */
-+			  0x82000000 0 0x13000000 0x0 0x13000000 0 0x0d000000   /* non-prefetchable memory (208 MiB) */
-+			  0xc2000000 0 0x20000000 0x0 0x20000000 0 0x20000000>; /* prefetchable memory (512 MiB) */
-+
-+		clocks = <&tegra_car TEGRA124_CLK_PCIE>,
-+			 <&tegra_car TEGRA124_CLK_AFI>,
-+			 <&tegra_car TEGRA124_CLK_PLL_E>,
-+			 <&tegra_car TEGRA124_CLK_CML0>;
-+		clock-names = "pex", "afi", "pll_e", "cml";
-+		resets = <&tegra_car 70>,
-+			 <&tegra_car 72>,
-+			 <&tegra_car 74>;
-+		reset-names = "pex", "afi", "pcie_x";
-+		status = "disabled";
-+
-+		phys = <&padctl TEGRA_XUSB_PADCTL_PCIE>;
-+		phy-names = "pcie";
-+
-+		pci at 1,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82000800 0 0x01000000 0 0x1000>;
-+			reg = <0x000800 0 0 0 0>;
-+			status = "disabled";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			nvidia,num-lanes = <2>;
-+		};
-+
-+		pci at 2,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82001000 0 0x01001000 0 0x1000>;
-+			reg = <0x001000 0 0 0 0>;
-+			status = "disabled";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			nvidia,num-lanes = <1>;
-+		};
-+	};
-+
- 	host1x at 0,50000000 {
- 		compatible = "nvidia,tegra124-host1x", "simple-bus";
- 		reg = <0x0 0x50000000 0x0 0x00034000>;
+-	if (of_property_read_bool(dev->of_node, "dma-coherent"))
++	if (of_dma_is_coherent(dev->of_node))
+ 		set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+ 
+ 	return NOTIFY_OK;
+
+After this, we need to a bus notifier for PCIe as well. Since I don't
+think we have an of_node for a PCI device, we would need to check
+recursively on the parent device rather than the parent node until we
+find an OF node with the 'dma-coherent' property.
+
 -- 
-1.9.1
+Catalin
