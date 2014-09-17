@@ -1,30 +1,48 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 17 Sep 2014 10:00:36 +0100
-Subject: [GIT PULL] vexpress: updates for 3.18
-In-Reply-To: <1410886963.12376.27.camel@hornet>
-References: <1410886963.12376.27.camel@hornet>
-Message-ID: <1410944436.12376.28.camel@hornet>
+From: davidcdueck@googlemail.com (David Dueck)
+Date: Wed, 17 Sep 2014 11:05:21 +0200
+Subject: [PATCH] can: at91_can: prepare and unprepare the clock
+Message-ID: <1410944721-32325-1-git-send-email-davidcdueck@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-09-16 at 18:02 +0100, Pawel Moll wrote:
-> Hello Arnd, Kevin, Olof,
-> 
-> The following changes since commit 9e82bf014195d6f0054982c463575cdce24292be:
-> 
->   Linux 3.17-rc5 (2014-09-14 17:50:12 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/pawel.moll/linux.git tags/vexpress/updates-for-3.18
-> 
-> for you to fetch changes up to f0a325ccfab9814e3f7ebd9c75d3f6a752cac6c3:
-> 
->   ARM: vexpress: Remove non-DT code (2014-09-16 17:44:06 +0100)
+This prevents a warning.
 
-Ignore this for the moment - some new comments started flowing in. I'll
-re-send the pull request once they are taken care of.
+Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
+---
+ drivers/net/can/at91_can.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks!
-
-Pawel
+diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
+index f07fa89..7dcb790 100644
+--- a/drivers/net/can/at91_can.c
++++ b/drivers/net/can/at91_can.c
+@@ -1123,7 +1123,7 @@ static int at91_open(struct net_device *dev)
+ 	struct at91_priv *priv = netdev_priv(dev);
+ 	int err;
+ 
+-	clk_enable(priv->clk);
++	clk_prepare_enable(priv->clk);
+ 
+ 	/* check or determine and set bittime */
+ 	err = open_candev(dev);
+@@ -1149,7 +1149,7 @@ static int at91_open(struct net_device *dev)
+  out_close:
+ 	close_candev(dev);
+  out:
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	return err;
+ }
+@@ -1166,7 +1166,7 @@ static int at91_close(struct net_device *dev)
+ 	at91_chip_stop(dev, CAN_STATE_STOPPED);
+ 
+ 	free_irq(dev->irq, dev);
+-	clk_disable(priv->clk);
++	clk_disable_unprepare(priv->clk);
+ 
+ 	close_candev(dev);
+ 
+-- 
+2.1.0
