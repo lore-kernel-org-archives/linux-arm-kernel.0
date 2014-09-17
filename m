@@ -1,54 +1,59 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 17 Sep 2014 00:00:57 +0000
-Subject: [PATCH v5 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140916140551.GE4869@kwain>
-References: <1410777378-12726-1-git-send-email-antoine.tenart@free-electrons.com>
- <1410777378-12726-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140916005129.GC3379@peterchendt> <20140916133841.GA4869@kwain>
- <20140916140551.GE4869@kwain>
-Message-ID: <9aaef3c1f0944174b725371fff9813ab@BN1PR0301MB0772.namprd03.prod.outlook.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Sep 2014 17:01:04 -0700
+Subject: [PATCH] clocksource: arm_arch_timer: discard unavailable timers
+ correctly
+In-Reply-To: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
+References: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20140917000104.GA10233@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> > > > Tested on the Marvell Berlin SoCs USB controllers.
-> > > >
-> > > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > > > ---
-> > > >  drivers/usb/chipidea/Makefile       |   1 +
-> > > >  drivers/usb/chipidea/ci_hdrc_usb2.c | 137
-> > > > ++++++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 138 insertions(+)  create mode 100644
-> > > > drivers/usb/chipidea/ci_hdrc_usb2.c
-> > > >
-> > >
-> > > compile error:
-> > >
-> > > /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c: In
-> function 'ci_hdrc_usb2_dt_probe':
-> > > /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c:30
-> > > :2: error: implicit declaration of function 'of_phy_get'
-> > > [-Werror=implicit-function-declaration]
-> > > /home/peter/work/projects/usb/drivers/usb/chipidea/ci_hdrc_usb2.c:30
-> > > :16: warning: assignment makes pointer from integer without a cast
-> > > [enabled by default]
-> >
-> > Did you apply the series introducing the support for the generic PHY
-> > framework in the USB subsystem first? One of the patches includes
-> > 'linux/phy/phy.h' in 'linux/usb/otg.h'. That's why I did not encounter
-> > this error.
-> >
-> > Anyway, you're right and 'linux/phy/phy.h' should be explicitly
-> > included here.
+On 09/17, Sudeep Holla wrote:
+> Currently we wait until both nodes are probed if we have two timers
+> without checking if the device is actually available. This might
+
+device node is actually available?
+
+> result in non-functional system as no timer gets registered.
 > 
-> Let me know if you want me to quickly cook up a new version fixing this.
+> This patch adds the check for the availablity of the timer device
+> so that unavailable timers are discarded correctly.
 > 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
 
-You can send this fix if you don't want to get comments for other parts in this
-series.
+Looks mostly ok. Comment below could be a follow up I guess.
 
-I also see other dependencies like generic phy support for chipidea with this one.
-I think the 7th and 8th in this series are ok after adding 'linux/phy/phy.h', but
-you generic phy support series should be queued before this one.
+>  drivers/clocksource/arm_arch_timer.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec1..4d025ad 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -622,11 +622,15 @@ static void __init arch_timer_common_init(void)
+>  
+>  	/* Wait until both nodes are probed if we have two timers */
+>  	if ((arch_timers_present & mask) != mask) {
+> -		if (of_find_matching_node(NULL, arch_timer_mem_of_match) &&
+> -				!(arch_timers_present & ARCH_MEM_TIMER))
+> +		struct device_node *dn;
+> +
+> +		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
+> +		if (dn && of_device_is_available(dn) &&
+> +		    !(arch_timers_present & ARCH_MEM_TIMER))
+>  			return;
+> -		if (of_find_matching_node(NULL, arch_timer_of_match) &&
+> -				!(arch_timers_present & ARCH_CP15_TIMER))
+> +		dn = of_find_matching_node(NULL, arch_timer_of_match);
+> +		if (dn && of_device_is_available(dn) &&
+> +		    !(arch_timers_present & ARCH_CP15_TIMER))
+>  			return;
 
-Peter
+Where's the of_node_put()?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
