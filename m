@@ -1,62 +1,49 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Sep 2014 00:12:48 +0200
-Subject: [PATCH v3 2/8] clk: rockchip: fix rk3066 pll status register location
+Date: Thu, 18 Sep 2014 00:12:49 +0200
+Subject: [PATCH v3 3/8] clk: rockchip: fix rk3288 pll status register location
 In-Reply-To: <1410991974-12235-1-git-send-email-heiko@sntech.de>
 References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410991974-12235-3-git-send-email-heiko@sntech.de>
+Message-ID: <1410991974-12235-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register providing the pll lock status is at a different address on the
-rk3066. The error became apparent while working on cpufreq support for
-the rockchip SoCs.
+From: Jianqun <jay.xu@rock-chips.com>
 
+In RK3288, APLL lock status bit is in GRF_SOC_STATUS1,
+but in RK3188, is GRFSOC_STATUS0.
+
+Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+
+Also name the constant accordingly as GRF_SOC_STATUS1
+to prevent confusion.
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
 ---
- drivers/clk/rockchip/clk-rk3188.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/clk/rockchip/clk-rk3288.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 0147614..1c5e644 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -19,6 +19,7 @@
- #include <dt-bindings/clock/rk3188-cru-common.h>
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index aa4f4b7..b30e147 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -20,7 +20,7 @@
  #include "clk.h"
  
-+#define RK3066_GRF_SOC_STATUS	0x15c
- #define RK3188_GRF_SOC_STATUS	0xac
+ #define RK3288_GRF_SOC_CON(x)	(0x244 + x * 4)
+-#define RK3288_GRF_SOC_STATUS	0x280
++#define RK3288_GRF_SOC_STATUS1	0x284
  
- enum rk3188_plls {
-@@ -629,9 +630,6 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- 		pr_warn("%s: could not register clock usb480m: %ld\n",
- 			__func__, PTR_ERR(clk));
+ enum rk3288_plls {
+ 	apll, dpll, cpll, gpll, npll,
+@@ -713,7 +713,7 @@ static void __init rk3288_clk_init(struct device_node *np)
  
--	rockchip_clk_register_plls(rk3188_pll_clks,
--				   ARRAY_SIZE(rk3188_pll_clks),
--				   RK3188_GRF_SOC_STATUS);
- 	rockchip_clk_register_branches(common_clk_branches,
- 				  ARRAY_SIZE(common_clk_branches));
- 	rockchip_clk_protect_critical(rk3188_critical_clocks,
-@@ -644,6 +642,9 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- static void __init rk3066a_clk_init(struct device_node *np)
- {
- 	rk3188_common_clk_init(np);
-+	rockchip_clk_register_plls(rk3188_pll_clks,
-+				   ARRAY_SIZE(rk3188_pll_clks),
-+				   RK3066_GRF_SOC_STATUS);
- 	rockchip_clk_register_branches(rk3066a_clk_branches,
- 				  ARRAY_SIZE(rk3066a_clk_branches));
- }
-@@ -652,6 +653,9 @@ CLK_OF_DECLARE(rk3066a_cru, "rockchip,rk3066a-cru", rk3066a_clk_init);
- static void __init rk3188a_clk_init(struct device_node *np)
- {
- 	rk3188_common_clk_init(np);
-+	rockchip_clk_register_plls(rk3188_pll_clks,
-+				   ARRAY_SIZE(rk3188_pll_clks),
-+				   RK3188_GRF_SOC_STATUS);
- 	rockchip_clk_register_branches(rk3188_clk_branches,
- 				  ARRAY_SIZE(rk3188_clk_branches));
- }
+ 	rockchip_clk_register_plls(rk3288_pll_clks,
+ 				   ARRAY_SIZE(rk3288_pll_clks),
+-				   RK3288_GRF_SOC_STATUS);
++				   RK3288_GRF_SOC_STATUS1);
+ 	rockchip_clk_register_branches(rk3288_clk_branches,
+ 				  ARRAY_SIZE(rk3288_clk_branches));
+ 	rockchip_clk_protect_critical(rk3288_critical_clocks,
 -- 
 2.0.1
