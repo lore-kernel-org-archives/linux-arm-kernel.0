@@ -1,41 +1,61 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Sep 2014 00:12:53 +0200
-Subject: [PATCH v3 7/8] clk: rockchip: add binding id for ARMCLK
+Date: Thu, 18 Sep 2014 00:12:50 +0200
+Subject: [PATCH v3 4/8] clk: rockchip: reparent aclk_cpu_pre to the gpll
 In-Reply-To: <1410991974-12235-1-git-send-email-heiko@sntech.de>
 References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410991974-12235-8-git-send-email-heiko@sntech.de>
+Message-ID: <1410991974-12235-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+aclk_cpu_pre on the rk3188 can either be sourced from the armclk or the gpll.
+To reduce complexity on apll changes caused by cpufreq, reparent it always
+to the gpll source.
+
+If really necessary it could be reparented back on a per board level using
+the assigned-clocks mechanism.
+
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- include/dt-bindings/clock/rk3188-cru-common.h | 1 +
- include/dt-bindings/clock/rk3288-cru.h        | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/clk/rockchip/clk-rk3188.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/include/dt-bindings/clock/rk3188-cru-common.h b/include/dt-bindings/clock/rk3188-cru-common.h
-index 750ee60..6a37050 100644
---- a/include/dt-bindings/clock/rk3188-cru-common.h
-+++ b/include/dt-bindings/clock/rk3188-cru-common.h
-@@ -20,6 +20,7 @@
- #define PLL_GPLL		4
- #define CORE_PERI		5
- #define CORE_L2C		6
-+#define ARMCLK			7
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index 1c5e644..6a81bc9 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -652,12 +652,33 @@ CLK_OF_DECLARE(rk3066a_cru, "rockchip,rk3066a-cru", rk3066a_clk_init);
  
- /* sclk gates (special clocks) */
- #define SCLK_UART0		64
-diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
-index ebcb460..8f75bf0 100644
---- a/include/dt-bindings/clock/rk3288-cru.h
-+++ b/include/dt-bindings/clock/rk3288-cru.h
-@@ -19,6 +19,7 @@
- #define PLL_CPLL		3
- #define PLL_GPLL		4
- #define PLL_NPLL		5
-+#define ARMCLK			6
+ static void __init rk3188a_clk_init(struct device_node *np)
+ {
++	struct clk *clk1, *clk2;
++	unsigned long rate;
++	int ret;
++
+ 	rk3188_common_clk_init(np);
+ 	rockchip_clk_register_plls(rk3188_pll_clks,
+ 				   ARRAY_SIZE(rk3188_pll_clks),
+ 				   RK3188_GRF_SOC_STATUS);
+ 	rockchip_clk_register_branches(rk3188_clk_branches,
+ 				  ARRAY_SIZE(rk3188_clk_branches));
++
++	/* reparent aclk_cpu_pre from apll */
++	clk1 = __clk_lookup("aclk_cpu_pre");
++	clk2 = __clk_lookup("gpll");
++	if (clk1 && clk2) {
++		rate = clk_get_rate(clk1);
++
++		ret = clk_set_parent(clk1, clk2);
++		if (ret < 0)
++			pr_warn("%s: could not reparent aclk_cpu_pre to gpll\n",
++				__func__);
++
++		clk_set_rate(clk1, rate);
++	} else {
++		pr_warn("%s: missing clocks to reparent aclk_cpu_pre to gpll\n",
++			__func__);
++	}
+ }
+ CLK_OF_DECLARE(rk3188a_cru, "rockchip,rk3188a-cru", rk3188a_clk_init);
  
- /* sclk gates (special clocks) */
- #define SCLK_GPU		64
 -- 
 2.0.1
