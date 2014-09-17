@@ -1,48 +1,28 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 17 Sep 2014 14:18:30 -0500
-Subject: [PATCH] ARM: DT: ifc6410: Add board memory range.
-In-Reply-To: <FA9D8682-DB0E-48CF-A519-86A0465300E1@codeaurora.org>
-References: <1410932179-4652-1-git-send-email-srinivas.kandagatla@linaro.org>
- <54192B64.6070604@smartplayin.com>
- <FA9D8682-DB0E-48CF-A519-86A0465300E1@codeaurora.org>
-Message-ID: <20140917191829.GC3749@joshc.qualcomm.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 17 Sep 2014 15:29:38 -0400
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140917192259.GA18980@srcf.ucam.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
+ <20140917014410.GC31214@srcf.ucam.org> <4416582.iOjLNrLDZE@vostro.rjw.lan>
+ <20140917192259.GA18980@srcf.ucam.org>
+Message-ID: <5419E122.9060404@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 12:03:37PM -0700, Kumar Gala wrote:
-> On Sep 16, 2014, at 11:34 PM, Pramod Gurav <pramod.gurav@smartplayin.com> wrote:
-> > On Wednesday 17 September 2014 11:06 AM, Srinivas Kandagatla wrote:
-> >> This patch adds memory details of IFC6410 as this is necessary to
-> >> fix the in-correct memory start comming from ATAGs.
-> >> 
-> >> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> >> ---
-> >> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 5 +++++
-> >> 1 file changed, 5 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> >> index 90db8af..3287f12 100644
-> >> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> >> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> >> @@ -4,6 +4,11 @@
-> >> 	model = "Qualcomm APQ8064/IFC6410";
-> >> 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
-> >> 
-> >> +	memory{
-> > Space before {?
-> >> +		device_type = "memory";
-> >> +		reg = <0x80000000 0x80000000>;
-> >> +	};
-> >> +
-> >> 	soc {
-> >> 		gsbi at 16600000 {
-> >> 			status = "ok?;
+On 09/17/2014 03:22 PM, Matthew Garrett wrote:
+> On Wed, Sep 17, 2014 at 09:37:42PM +0200, Rafael J. Wysocki wrote:
 > 
-> Hmm, this doesn?t seem to work for me.
+>> There are no implied IP issues with using the information there I know of and
+>> if there's any fine print anywhere that may suggest so, please let me know.
+> 
+> Using the information should be fine, but my understanding of the UEFI 
+> forum rules is that any submissions to UEFI specs must be from UEFI 
+> forum members - there are concerns around accidentally including 
+> patented material. The easy way around this is just for the bindings to 
+> be managed outside UEFI.
 
-I don't see how it could with qcom_defconfig, as we set
-CONFIG_ARM_ATAG_DTB_COMPAT.  Is this patch fixing a real issue?
+I've raised this with Dong in person this morning and I'll ask him to
+followup on UEFI policy.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Jon.
