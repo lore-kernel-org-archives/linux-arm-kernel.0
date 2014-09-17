@@ -1,74 +1,33 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 17 Sep 2014 10:57:45 -0400
-Subject: [PATCH] Revert "init: make rootdelay=N consistent with rootwait
- behaviour"
-In-Reply-To: <20140917142542.GA5225@windriver.com>
-References: <20140917142542.GA5225@windriver.com>
-Message-ID: <1410965865-5547-1-git-send-email-paul.gortmaker@windriver.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Sep 2014 07:59:06 -0700
+Subject: [GIT PULL] omap wake-up regression fix for v3.17
+Message-ID: <20140917145906.GA14505@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 4dfe694f616e00e6fd83e5bbcd7a3c4d7113493d.
+The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
 
-In that, we did:
+  Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
 
-  Here we move the rootdelay code to be right beside the rootwait code, so
-  that their behaviour is consistent.
+are available in the git repository at:
 
-...which is fine, but in hindsight, perhaps moving the rootwait to be
-beside the rootdelay would have been better.  We also indicated:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fix-v3.17-io-chain-v3
 
-  It should be noted that in doing so, the actions based on the
-  saved_root_name[0] and initrd_load() were previously put on hold by
-  rootdelay=N and now currently will not be delayed.  However, I think
-  consistent behaviour is more important than matching historical behaviour
-  of delaying the above two operations.
+for you to fetch changes up to 7db143b89137de06ed289cf8b302f3bbbc5baa1f:
 
-But Pavel reported an instance where an ARM target with root on MMC
-was failing to mount root, and Russell diagnosed it to the fact that
-the call to set ROOT_DEV within the saved_root_name[0] processing
-block mentioned above was no longer being delayed.
+  ARM: OMAP3: Fix I/O chain clock line assertion timed out error (2014-09-16 15:09:44 -0700)
 
-Rather than moving both wait clauses to the original position of
-rootdelay and risking unearthing other possible corner case breakage
-at this point in time, we simply revert now and we can revisit
-trying the alternate/earlier location in another development cycle.
+----------------------------------------------------------------
+Regression fix for early omap3 revisions for wake-up events that
+too some time to narrow down. Although a bit intrusive, this would
+be good to get into the -rc cycle as there are quite a few boards
+out there with omap3 es2.1 and es3.0, and we have those in at least
+three boot test systems too that show errors without this patch.
 
-Cc: Pavel Machek <pavel@denx.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+----------------------------------------------------------------
+Tony Lindgren (1):
+      ARM: OMAP3: Fix I/O chain clock line assertion timed out error
 
-diff --git a/init/do_mounts.c b/init/do_mounts.c
-index b6237c31b0e2..82f22885c87e 100644
---- a/init/do_mounts.c
-+++ b/init/do_mounts.c
-@@ -539,6 +539,12 @@ void __init prepare_namespace(void)
- {
- 	int is_floppy;
- 
-+	if (root_delay) {
-+		printk(KERN_INFO "Waiting %d sec before mounting root device...\n",
-+		       root_delay);
-+		ssleep(root_delay);
-+	}
-+
- 	/*
- 	 * wait for the known devices to complete their probing
- 	 *
-@@ -565,12 +571,6 @@ void __init prepare_namespace(void)
- 	if (initrd_load())
- 		goto out;
- 
--	if (root_delay) {
--		pr_info("Waiting %d sec before mounting root device...\n",
--			root_delay);
--		ssleep(root_delay);
--	}
--
- 	/* wait for any asynchronous scanning to complete */
- 	if ((ROOT_DEV == 0) && root_wait) {
- 		printk(KERN_INFO "Waiting for root device %s...\n",
--- 
-1.9.2
+ arch/arm/mach-omap2/omap_hwmod.c |  2 +-
+ arch/arm/mach-omap2/prm3xxx.c    | 39 +++++++++++++++++++++++++++++++++++----
+ 2 files changed, 36 insertions(+), 5 deletions(-)
