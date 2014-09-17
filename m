@@ -1,47 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 17 Sep 2014 13:58:55 -0700 (PDT)
-Subject: [RFC Part2 v1 02/21] genirq: Introduce helper functions to
- support stacked irq_chip
-In-Reply-To: <5418FAE1.4030008@linux.intel.com>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
- <1410444228-3134-3-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.10.1409161044330.4247@nanos> <5418FAE1.4030008@linux.intel.com>
-Message-ID: <alpine.DEB.2.10.1409171244090.21313@nanos>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 17 Sep 2014 23:06:42 +0200
+Subject: Cortex-M and zImage
+In-Reply-To: <20140917070509.GN3755@pengutronix.de>
+References: <CAGhQ9VzzSq4P5BKM3UBBCPT61g3T1RHFhttfA-KkWGCcrjaW6A@mail.gmail.com>
+ <20140917061110.GM3755@pengutronix.de>
+ <CAGhQ9VyhXywQ2kBKK9K5McQf153qXzgsPzt3GoCCL=QjWR2ogw@mail.gmail.com>
+ <20140917070509.GN3755@pengutronix.de>
+Message-ID: <CAGhQ9VwR+UWsRDgR9c=aPxuZRQkG==bCRZcis6WXKBpc5j=NwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Sep 2014, Jiang Liu wrote:
-> On 2014/9/17 1:45, Thomas Gleixner wrote:
-> > On Thu, 11 Sep 2014, Jiang Liu wrote:
-> >> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-> >> +void irq_chip_ack_parent(struct irq_data *data)
-> >> +{
-> >> +	data = data->parent_data;
-> >> +	if (data && data->chip && data->chip->irq_ack)
-> >> +		data->chip->irq_ack(data);
-> > 
-> > Why is this restricted to a single parent level and does not go down
-> > the whole stack?
-> Hi Thomas,
-> 	It happens to work on x86, and we want to achieve a bit
-> performance advantage by not walking down the whole stack.
-> If preferred, I will change it to walk the whole stack.
+On 17 September 2014 09:05, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello Joachim,
+>
+> On Wed, Sep 17, 2014 at 08:55:05AM +0200, Joachim Eastwood wrote:
+>> On 17 September 2014 08:11, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>> > I was able to compile a zImage with the patch below. For the
+>> > "Conflicting architecture profiles" error the most relevant hunk is the
+>> > first. And of course this needs some #ifdefs.
+>>
+>> Thanks, I'll give it a try later today.
+>>
+>> But is this the way to go?
+>> Adding lots of 'ifdefs CONFIG_CPU_V7M' to compressed/head.S ?
+> Probably not lots. I would expect (and hope) that you won't need more
+> than a handful. I don't see an alternative.
 
-Happens to work on my machine is always a bad argument :)
+Okey, I got it working.
 
-Now, I can see why you want to do that, but if we do an optimization
-like that then we should really get rid of the conditional.
+Had to add a total of 6 ifdefs to compressed/head.S so I guess it is
+not too bad.
 
-You surely need a conditional on data->chip and data->chip->callback
-for a full stackq walk, but for an explicit request to use the parents
-ack the parent better has a chip with an ack function, right?
+Here is the diffstat:
+arch/arm/boot/compressed/head.S | 17 +++++++++++++++++
+1 file changed, 17 insertions(+)
 
-void irq_chip_ack_parent(struct irq_data *data)
-{
-	data = data->parent_data;
-	data->chip->irq_ack(data);
-}
+I'll send out a patch for comments tomorrow.
 
-Thanks,
-
-	tglx
+regards
+Joachim Eastwood
