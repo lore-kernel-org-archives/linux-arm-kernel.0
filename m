@@ -1,45 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 17 Sep 2014 11:23:26 -0600
-Subject: [PATCH] BCM2835: Add I2S driver to device tree
-In-Reply-To: <20140917164436.GJ7960@sirena.org.uk>
-References: <1404895825-25668-1-git-send-email-broonie@kernel.org>
- <5418E985.5090708@wwwdotorg.org> <20140917164436.GJ7960@sirena.org.uk>
-Message-ID: <5419C38E.4010709@wwwdotorg.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 17 Sep 2014 18:25:10 +0100
+Subject: [PATCH v4 04/11] drivers: base: support cpu cache information
+ interface to userspace via sysfs
+In-Reply-To: <1409763617-17074-5-git-send-email-sudeep.holla@arm.com>
+References: <1409763617-17074-1-git-send-email-sudeep.holla@arm.com>
+ <1409763617-17074-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5419C3F6.4050607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 10:44 AM, Mark Brown wrote:
-> On Tue, Sep 16, 2014 at 07:53:09PM -0600, Stephen Warren wrote:
->> On 07/09/2014 02:50 AM, Mark Brown wrote:
->>> From: Mark Brown <broonie@linaro.org>
+Hi Greg,
+
+On 03/09/14 18:00, Sudeep Holla wrote:
+> From: Sudeep Holla <sudeep.holla@arm.com>
 >
->>> +		bcm2835_i2s: i2s at 7e203000 {
->>> +			compatible = "brcm,bcm2835-i2s";
->>> +			reg = <0x7e203000 0x20>,
->>> +			      <0x7e101098 0x02>;
->>> +
->>> +			dmas = <&dma 2>,
->>> +			       <&dma 3>;
->>> +			dma-names = "tx", "rx";
->>> +		};
+> This patch adds initial support for providing processor cache information
+> to userspace through sysfs interface. This is based on already existing
+> implementations(x86, ia64, s390 and powerpc) and hence the interface is
+> intended to be fully compatible.
 >
->> This node is already there (and even edited in this patch), so I dropped
->> that hunk.
+> The main purpose of this generic support is to avoid further code
+> duplication to support new architectures and also to unify all the existing
+> different implementations.
 >
-> Right, not sure what went on with applying it upstream originally but it
-> looks like git rebase didn't figure out what was going on well - the
-> bcm2835_i2s is needed so we can reference the node.  I'll probably get
-> round to resending an incremental patch.
+> This implementation maintains the hierarchy of cache objects which reflects
+> the system's cache topology. Cache devices are instantiated as needed as
+> CPUs come online. The cache information is replicated per-cpu even if they are
+> shared. A per-cpu array of cache information maintained is used mainly for
+> sysfs-related book keeping.
+>
+> It also implements the shared_cpu_map attribute, which is essential for
+> enabling both kernel and user-space to discover the system's overall cache
+> topology.
+>
+> This patch also add the missing ABI documentation for the cacheinfo sysfs
+> interface already, which is well defined and widely used.
+>
 
-Oh right, I guess I did drop the addition of that label when I dropped 
-that node.
+Can you review the first 4 patches in this series please ?
 
-The board DT could doesn't necessarily require a label though; it could 
-just repeat the node name:
-
-/ {
-     i2s at 7e203000 {
-         ... extra properties
-
-Still, it looks like we typically use labels to reference nodes in 
-bcm2835-*.dts, so adding the label would indeed be a good idea.
+Regards,
+Sudeep
