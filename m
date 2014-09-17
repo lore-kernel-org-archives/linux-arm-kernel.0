@@ -1,91 +1,143 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed, 17 Sep 2014 16:12:41 -0700
-Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
-In-Reply-To: <541A01B7.8030601@mentor.com>
-References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <541A01B7.8030601@mentor.com>
-Message-ID: <CAMDttNfSr5BrnEwLXqgy676jOZbFHhXcMtC0n7gBSniwhWCDRQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Wed, 17 Sep 2014 23:20:09 +0000
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <5419D7BD.30003@linaro.org>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com>,<5419D7BD.30003@linaro.org>
+Message-ID: <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 2:48 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
-> On 09/17/2014 03:56 AM, Ganapatrao Kulkarni wrote:
->> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>
->> This patch adds property "nid" to memory node to provide the memory range to
->> numa node id mapping.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->>
->> ---
->>  Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
->>  1 file changed, 58 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/numa.txt
->>
->> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
->> new file mode 100644
->> index 0000000..c4a94f2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/numa.txt
->> @@ -0,0 +1,58 @@
->> +======================================================
->> +numa id binding description
->> +======================================================
->> +
->> +======================================================
->> +1 - Introduction
->> +======================================================
->> +The device node  property "nid(numa node id)" can be added to memory
->> +device node to map the range of memory addresses as defined in property "reg".
->> +The property "nid" maps the memory range to the numa node id, which is used to
->> +find the local and remory pages on numa aware systems.
+Sorry for the format. Emailing from webmail.
+________________________________________
+From: Daniel Lezcano [daniel.lezcano at linaro.org]
+Sent: Wednesday, September 17, 2014 2:49 PM
+To: Menon, Nishanth; Shilimkar, Santosh; Tony Lindgren; Kristo, Tero; Paul Walmsley
+Cc: Kevin Hilman; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; J, KEERTHY; Beno?t Cousson
+Subject: Re: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+
+On 08/22/2014 07:02 AM, Nishanth Menon wrote:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >
-> "Local" and "remote" memory are notions that relate to some other
-> resource -- typically a CPU, but also I/O resources on some systems.  It
-> seems to me that a useful NUMA binding would at least specify a "nid"
-> property, or something like it, for both cpu and memory nodes.  But this
-> document speaks only of memory nodes.
+> Add OMAP5/DRA74/72 CPUIDLE support.
 >
-> As Kumar said, the device tree on powerpc server systems already has
-> properties that express NUMA information.  If you can get hold of a copy
-> of the PAPR (not ePAPR) from power.org, refer to the description of
-> "ibm,associativity" and related properties.  I recall that it's a bit
-> more complex than this proposal, though.
-
-I'm not able to find a link to the actual PAPR (not ePAPR)
-specification. Anyone has a linky?
-
-I did find some code in tree, but couldn't find the bindings in
-Documentation/devicetree/.
-
-Seems like we'd care about form1?
------8<-----
-commit 41eab6f88f24124df89e38067b3766b7bef06ddb
-Author: Anton Blanchard <anton@samba.org>
-Date:   Sun May 16 20:22:31 2010 +0000
-
-    powerpc/numa: Use form 1 affinity to setup node distance
-
-    Form 1 affinity allows multiple entries in
-ibm,associativity-reference-points
-    which represent affinity domains in decreasing order of importance. The
-    Linux concept of a node is always the first entry, but using the other
-    values as an input to node_distance() allows the memory allocator to make
-    better decisions on which node to go first when local memory has been
-    exhausted.
-
-    We keep things simple and create an array indexed by NUMA node, capped at
-    4 entries. Each time we lookup an associativity property we initialise
-    the array which is overkill, but since we should only hit this path during
-    boot it didn't seem worth adding a per node valid bit.
-
-    Signed-off-by: Anton Blanchard <anton@samba.org>
-    Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
------>8-----
-
-
+> This patch adds MPUSS low power states in cpuidle.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>          C1 - CPU0 WFI + CPU1 WFI + MPU ON
+>          C2 - CPU0 RET + CPU1 RET + MPU CSWR
+>
+> Tested on DRA74/72-EVM for C1 and C2 states.
+>
+> NOTE: DRA7 does not do voltage scaling as part of retention transition
+> and has Mercury which speeds up transition paths - Latency numbers are
+> based on measurements done by toggling GPIOs.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> [ j-keerthy at ti.com rework on 3.14]
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> [nm at ti.com: updates based on profiling, OMAP5 squashed]
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>   arch/arm/mach-omap2/cpuidle44xx.c |   82 ++++++++++++++++++++++++++++++++++++-
+>   arch/arm/mach-omap2/pm44xx.c      |    2 +-
+>   2 files changed, 82 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+> index 2498ab0..8ad4f44 100644
+> --- a/arch/arm/mach-omap2/cpuidle44xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
+> @@ -22,6 +22,7 @@
+>   #include "common.h"
+>   #include "pm.h"
+>   #include "prm.h"
+> +#include "soc.h"
+>   #include "clockdomain.h"
+>
+>   #define MAX_CPUS    2
+> @@ -31,6 +32,7 @@ struct idle_statedata {
+>       u32 cpu_state;
+>       u32 mpu_logic_state;
+>       u32 mpu_state;
+> +     u32 mpu_state_vote;
+>   };
+>
+>   static struct idle_statedata omap4_idle_data[] = {
+> @@ -51,12 +53,26 @@ static struct idle_statedata omap4_idle_data[] = {
+>       },
+>   };
+>
+> +static struct idle_statedata dra7_idle_data[] = {
+> +     {
+> +             .cpu_state = PWRDM_POWER_ON,
+> +             .mpu_state = PWRDM_POWER_ON,
+> +             .mpu_logic_state = PWRDM_POWER_ON,
+> +     },
+> +     {
+> +             .cpu_state = PWRDM_POWER_RET,
+> +             .mpu_state = PWRDM_POWER_RET,
+> +             .mpu_logic_state = PWRDM_POWER_RET,
+> +     },
+> +};
+> +
+>   static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
+>   static struct clockdomain *cpu_clkdm[MAX_CPUS];
+>
+>   static atomic_t abort_barrier;
+>   static bool cpu_done[MAX_CPUS];
+>   static struct idle_statedata *state_ptr = &omap4_idle_data[0];
+> +static DEFINE_RAW_SPINLOCK(mpu_lock);
+>
+>   /* Private functions */
+>
+> @@ -78,6 +94,32 @@ static int omap_enter_idle_simple(struct cpuidle_device *dev,
+>       return index;
+>   }
+>
+> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
+> +                            struct cpuidle_driver *drv,
+> +                            int index)
+> +{
+> +     struct idle_statedata *cx = state_ptr + index;
+> +     unsigned long flag;
+> +
+> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+
+Why do you need this spin_lock_irqsave ? Aren't the local irqs already
+disabled ?
+
+[Santosh] Actually at one point of time before the idle consolidation the local
+irq disable was inside the idle drivers. Now with that moved to core layer,
+I think plain spin_lock/unlock() should work.
+
+> +     cx->mpu_state_vote++;
+> +     if (cx->mpu_state_vote == num_online_cpus()) {
+> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+> +     }
+> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+> +
+> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+> +
+> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+> +     if (cx->mpu_state_vote == num_online_cpus())
+> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+> +     cx->mpu_state_vote--;
+> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+
+I am not sure that will work. What happens if a cpu exits idle and then
+re-enter idle immediately ?
+
+[Santosh] It works and that case is already taken care. CPU exist the idle and then votes
+out for cluster state and if it reenters with the right targeted state, the cluster state would
+be picked.
+
+
+Could you try a long run of this little program:
+
+https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
+
+[Santosh] I am sure there will not be any issue with the long run test case here.
+Lets see if Nishant sees anything otherwise
+
+Regards,
+Santosh
