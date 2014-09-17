@@ -1,67 +1,28 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 17 Sep 2014 20:34:44 +0200
-Subject: [PATCHv2] can: at91_can: prepare and unprepare the clock
-In-Reply-To: <1410956808-1964-1-git-send-email-davidcdueck@googlemail.com>
-References: <1410956808-1964-1-git-send-email-davidcdueck@googlemail.com>
-Message-ID: <20140917203444.126dadcd@bbrezillon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 17 Sep 2014 11:36:00 -0700
+Subject: [PATCH v6 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <20140917181939.GG10179@sonymobile.com>
+References: <1409029109-28769-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1409029109-28769-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140826072727.GB9574@lee--X1> <20140917161554.GJ30918@lee--X1>
+ <20140917181939.GG10179@sonymobile.com>
+Message-ID: <20140917183600.GT7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Sep 2014 14:26:48 +0200
-David Dueck <davidcdueck@googlemail.com> wrote:
+On Wed, Sep 17, 2014 at 11:19:40AM -0700, Bjorn Andersson wrote:
 
-> Make the driver work with the common clock framework.
-> 
-> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
-> Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
+> The regulator driver have a strong dependency on the mfd driver, but Kconfig
+> will make sure it's not selectable until the two parts merges again, so it
+> should be fine. But I guess it's up to Mark?
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
-> Changes since v1:
-> - improve commit message
-> - check return value of clk_prepare_enable
-> 
->  drivers/net/can/at91_can.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-> index f07fa89..05e1aa0 100644
-> --- a/drivers/net/can/at91_can.c
-> +++ b/drivers/net/can/at91_can.c
-> @@ -1123,7 +1123,9 @@ static int at91_open(struct net_device *dev)
->  	struct at91_priv *priv = netdev_priv(dev);
->  	int err;
->  
-> -	clk_enable(priv->clk);
-> +	err = clk_prepare_enable(priv->clk);
-> +	if (err)
-> +		return err;
->  
->  	/* check or determine and set bittime */
->  	err = open_candev(dev);
-> @@ -1149,7 +1151,7 @@ static int at91_open(struct net_device *dev)
->   out_close:
->  	close_candev(dev);
->   out:
-> -	clk_disable(priv->clk);
-> +	clk_disable_unprepare(priv->clk);
->  
->  	return err;
->  }
-> @@ -1166,7 +1168,7 @@ static int at91_close(struct net_device *dev)
->  	at91_chip_stop(dev, CAN_STATE_STOPPED);
->  
->  	free_irq(dev->irq, dev);
-> -	clk_disable(priv->clk);
-> +	clk_disable_unprepare(priv->clk);
->  
->  	close_candev(dev);
->  
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yes, that's the normal approach.  I'd have applied it but a lot of the
+early discussion seemed to be about the register I/O interface.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/05508a4a/attachment.sig>
