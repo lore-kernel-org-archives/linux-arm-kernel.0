@@ -1,65 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Sep 2014 14:32:16 -0700
-Subject: [PATCH v4 9/9] mfd: syscon: add Atmel GPBR DT bindings documention
-In-Reply-To: <20140917195727.1c75a062@bbrezillon>
-References: <1410441525-25258-1-git-send-email-boris.brezillon@free-electrons.com>
- <1410441525-25258-10-git-send-email-boris.brezillon@free-electrons.com>
- <20140917163405.GM30918@lee--X1>
- <20140917195727.1c75a062@bbrezillon>
-Message-ID: <20140917213216.GS30918@lee--X1>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 17 Sep 2014 16:48:39 -0500
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+In-Reply-To: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <541A01B7.8030601@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Sep 2014, Boris BREZILLON wrote:
-> On Wed, 17 Sep 2014 09:34:05 -0700
-> Lee Jones <lee.jones@linaro.org> wrote:
+On 09/17/2014 03:56 AM, Ganapatrao Kulkarni wrote:
+> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 > 
-> > On Thu, 11 Sep 2014, Boris BREZILLON wrote:
-> > 
-> > > The GPBR block provides a set of battery-backed registers that can be used
-> > > to save data which need to be kept when the system is powered down and
-> > > VDD-core is maintained by an external battery.
-> > > 
-> > > A typical usage is the RTT block (when used as an RTC) which needs one of
-> > > those registers to save the current time.
-> > > 
-> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/mfd/atmel,gpbr.txt | 15 +++++++++++++++
-> > >  1 file changed, 15 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> > > new file mode 100644
-> > > index 0000000..a285695
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-> > > @@ -0,0 +1,15 @@
-> > > +* Device tree bindings for Atmel GPBR (General Purpose Backup Registers)
-> > > +
-> > > +The GPBR are a set of battery-backed registers.
-> > > +
-> > > +Required properties:
-> > > +- compatible:		"atmel,at91sam9260-gpbr", "syscon"
-> > > +- reg:			contains offset/length value of the GPBR memory
-> > > +			region.
-> > > +
-> > > +Example:
-> > > +
-> > > +gpbr: gpbr at fffffd50 {
-> > 
-> > Is something referencing this node via phandle?  If not, please remove
-> > the label.
+> This patch adds property "nid" to memory node to provide the memory range to
+> numa node id mapping.
 > 
-> Yes, the rtt device is referencing it in its atmel,rtt-rtc-time-reg
-> property (see patch 8 of this series).
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> 
+> ---
+>  Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/numa.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+> new file mode 100644
+> index 0000000..c4a94f2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/numa.txt
+> @@ -0,0 +1,58 @@
+> +======================================================
+> +numa id binding description
+> +======================================================
+> +
+> +======================================================
+> +1 - Introduction
+> +======================================================
+> +The device node  property "nid(numa node id)" can be added to memory
+> +device node to map the range of memory addresses as defined in property "reg".
+> +The property "nid" maps the memory range to the numa node id, which is used to
+> +find the local and remory pages on numa aware systems.
 
-How can I?  You only sent me patch 9.
+"Local" and "remote" memory are notions that relate to some other
+resource -- typically a CPU, but also I/O resources on some systems.  It
+seems to me that a useful NUMA binding would at least specify a "nid"
+property, or something like it, for both cpu and memory nodes.  But this
+document speaks only of memory nodes.
 
-Patch looks good, I'm going to apply it.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+As Kumar said, the device tree on powerpc server systems already has
+properties that express NUMA information.  If you can get hold of a copy
+of the PAPR (not ePAPR) from power.org, refer to the description of
+"ibm,associativity" and related properties.  I recall that it's a bit
+more complex than this proposal, though.
