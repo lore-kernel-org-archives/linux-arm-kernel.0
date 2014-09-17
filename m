@@ -1,48 +1,85 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 17 Sep 2014 10:55:56 +0200
-Subject: [PATCH v2] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <20140917084120.GA6369@Robin-OptiPlex-780>
-References: <1410327012-31185-1-git-send-email-b38343@freescale.com>
- <1410774073.3314.1.camel@pengutronix.de>
- <20140916034123.GA20800@Robin-OptiPlex-780>
- <1410861006.2746.1.camel@pengutronix.de>
- <20140917084120.GA6369@Robin-OptiPlex-780>
-Message-ID: <1410944156.2731.1.camel@pengutronix.de>
+From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Wed, 17 Sep 2014 14:26:29 +0530
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+Message-ID: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 17.09.2014, 16:41 +0800 schrieb Robin Gong:
-> On Tue, Sep 16, 2014 at 11:50:06AM +0200, Lucas Stach wrote:
-> > Hi Robin,
-> > 
-> > Am Dienstag, den 16.09.2014, 11:41 +0800 schrieb Robin Gong:
-> > > Hi Lucas,
-> > >   I understood your concern,but looks we have to break old DT.
-> > 
-> > Sorry, but this isn't going to happen. And honestly I don't even see the
-> > need to do so.
-> > 
-> > > Our old DT
-> > > support SPI DMA on i.mx6q/dl(v2,b3810c3dc1bcbc6a), but the DMA support patch
-> > > for SPI driver is still in reviewing(v6).
-> > 
-> > So this means now is the time to fix this driver patch to not enable DMA
-> > on imx6dl. Nobody will experience any breakage in this case.
-> >
-> Sorry, i.mx6q and i.mx6dl are totally same, not only IP but also clock. So we
-> can't distinguish them except for different compatible name....
+From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-I know that, but I still don't see the problem.
+This patch adds property "nid" to memory node to provide the memory range to
+numa node id mapping.
 
-If this issue is specific to the ECSPI IP integrated into a imx6dl SoC
-you need to check for the machine compatible in the driver and disable
-DMA support based on this. We generally avoid checking for the machine
-compatible in drivers and prefer to have a specific IP block compatible
-instead, but in that case it's the only reasonable thing to do.
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-Regards,
-Lucas
+---
+ Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/numa.txt
+
+diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+new file mode 100644
+index 0000000..c4a94f2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/numa.txt
+@@ -0,0 +1,58 @@
++======================================================
++numa id binding description
++======================================================
++
++======================================================
++1 - Introduction
++======================================================
++The device node  property "nid(numa node id)" can be added to memory
++device node to map the range of memory addresses as defined in property "reg".
++The property "nid" maps the memory range to the numa node id, which is used to
++find the local and remory pages on numa aware systems.
++
++======================================================
++2 - nid property
++======================================================
++Numa node id, "nid" is required property of memory device node for 
++numa enabled platforms.
++
++|------------------------------------------------------|
++|Property Type  | Usage | Value Type | Definition      |
++|------------------------------------------------------|
++|  nid          |  R    |    <u32>   | Numa Node id    |
++|               |       |            | for this memory |
++|------------------------------------------------------|
++
++========================================================
++4 - Example memory nodes with numa node id mapping
++========================================================
++
++Example 1 (2 memory nodes, each mapped to a numa node.):
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x00000000 0x0 0x80000000>;
++		nid = <0x0>;
++	};
++
++	memory at 10000000000 {
++		device_type = "memory";
++		reg = <0x100 0x00000000 0x0 0x80000000>;
++		nid = <0x1>;
++	};
++
++Example 2 (multiple memory ranges in each memory node and mapped to numa node):
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x00000000 0x0 0x80000000>,
++		      <0x0 0x80000000 0x0 0x80000000>;
++		nid = <0x0>;
++	};
++
++	memory at 10000000000 {
++		device_type = "memory";
++		reg = <0x100 0x00000000 0x0 0x80000000>,
++		      <0x100 0x80000000 0x0 0x80000000>;
++		nid = <0x1>;
++	};
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+1.8.1.4
