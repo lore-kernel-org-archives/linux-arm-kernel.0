@@ -1,94 +1,65 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 17 Sep 2014 10:03:39 +0200
-Subject: [PATCH v2 2/3] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <5418DDE9.1000603@rock-chips.com>
-References: <1410864271-9277-1-git-send-email-kever.yang@rock-chips.com>
- <CAPz6YkVqhO6kJtySB7MrCYzVLgjViKLO3c_HgS_NVxt3-=SJew@mail.gmail.com>
- <5418DDE9.1000603@rock-chips.com>
-Message-ID: <1818235.yqePbxBFzD@diego>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 17 Sep 2014 16:16:22 +0800
+Subject: [PATCH v2 1/3] ARM: dts: imx6: add pm_power_off support for
+ i.mx6 chips
+In-Reply-To: <20140917072437.GP4992@pengutronix.de>
+References: <1410511739-31122-1-git-send-email-b38343@freescale.com>
+ <1410511739-31122-2-git-send-email-b38343@freescale.com>
+ <20140917021044.GD4796@dragon> <20140917034514.GF27452@Robin-OptiPlex-780>
+ <20140917060649.GJ4992@pengutronix.de>
+ <20140917071736.GA5545@Robin-OptiPlex-780>
+ <20140917072437.GP4992@pengutronix.de>
+Message-ID: <20140917081609.GA6274@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kever,
-
-Am Mittwoch, 17. September 2014, 09:03:37 schrieb Kever Yang:
-> Sonny,
+On Wed, Sep 17, 2014 at 09:24:37AM +0200, Sascha Hauer wrote:
+> On Wed, Sep 17, 2014 at 03:17:38PM +0800, Robin Gong wrote:
+> > On Wed, Sep 17, 2014 at 08:06:49AM +0200, Sascha Hauer wrote:
+> > > On Wed, Sep 17, 2014 at 11:45:15AM +0800, Robin Gong wrote:
+> > > > On Wed, Sep 17, 2014 at 10:10:45AM +0800, Shawn Guo wrote:
+> > > > > On Fri, Sep 12, 2014 at 04:48:57PM +0800, Robin Gong wrote:
+> > > > > > All chips of i.mx6 can be powered off by programming SNVS.
+> > > > > > For example :
+> > > > > > On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+> > > > > > pmic ON/OFF pin, that will cause the whole PMIC powered off
+> > > > > > except VSNVS. And system can restart once PMIC_ON_REQ goes
+> > > > > > high by push POWRER key.
+> > > > > 
+> > > > > What's the behavior for those boards on which PMIC_ON_REQ isn't
+> > > > > connected to anywhere?
+> > > > >
+> > > > System can't be powered off if not connect PMIC_ON_REQ. Although all of our
+> > > > reference design for i.mx6 chips are connecting  PMIC_ON_REQ with external
+> > > > PMIC, we need consider others may not use external PMIC. I'll add the info
+> > > > into commit log or Kconfig.
+> > > 
+> > > You should add the information to the dtsi file in form of a
+> > > status = "disabled" property so that boards that actually have the
+> > > feature can enable it.
+> > > 
+> > > Sascha
+> > Hi Sacha, but that's  SOC level feature and it's harmless even if others don't
+> > want to use this pin to control external PMIC.
 > 
-> On 09/17/2014 04:17 AM, Sonny Rao wrote:
-> > On Tue, Sep 16, 2014 at 3:44 AM, Kever Yang <kever.yang@rock-chips.com> 
-wrote:
-> >> This patch add basic rk3288 smp support, cpu 1~3 are in wfe state
-> >> when get into kernel.
-> >> 
-> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> >> ---
-> >> 
-> >> Changes in v2:
-> >> - use rk3288_boot_secondary instead ofsmp_boot_secondary
-> >> - discards the power domain operation
-> >> - handle the per cpu starup when actived by 'sev'
-> >> 
-> >>   arch/arm/mach-rockchip/core.h    |  1 +
-> >>   arch/arm/mach-rockchip/headsmp.S | 14 +++++++++
-> >>   arch/arm/mach-rockchip/platsmp.c | 63
-> >>   ++++++++++++++++++++++++++++++++++++---- 3 files changed, 72
-> >>   insertions(+), 6 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-rockchip/core.h
-> >> b/arch/arm/mach-rockchip/core.h
-> >> index 39bca96..13de05a 100644
-> >> --- a/arch/arm/mach-rockchip/core.h
-> >> +++ b/arch/arm/mach-rockchip/core.h
-> >> @@ -18,3 +18,4 @@ extern char rockchip_secondary_trampoline_end;
-> >> 
-> >>   extern unsigned long rockchip_boot_fn;
-> >>   extern void rockchip_secondary_startup(void);
-> >> 
-> >> +extern void rk3288_secondary_startup(void);
-> >> diff --git a/arch/arm/mach-rockchip/headsmp.S
-> >> b/arch/arm/mach-rockchip/headsmp.S index 73206e3..bacdb56 100644
-> >> --- a/arch/arm/mach-rockchip/headsmp.S
-> >> +++ b/arch/arm/mach-rockchip/headsmp.S
-> >> @@ -20,6 +20,20 @@ ENTRY(rockchip_secondary_startup)
-> >> 
-> >>          b       secondary_startup
-> >>   
-> >>   ENDPROC(rockchip_secondary_startup)
-> >> 
-> >> +ENTRY(rk3288_secondary_startup)
-> >> +       mrc p15, 0, r0, c0, c0, 5
-> >> +       mov r2, #3
-> >> +       and r0, r0, r2
-> >> +       ldr r1, =0xff700000
-> >> +       ldr r1, [r1]
-> >> +       cmp r0, r1
-> >> +       beq 2f
-> >> +       ldr r2, =0xfffd0000
-> >> +       mov pc, r2
-> >> +2:
-> >> +       b       secondary_startup
-> >> +ENDPROC(rk3288_secondary_startup)
-> > 
-> > Comments on what's going on here would be nice.
+> Harmless? If a pm_power_off hook is registered I expect it to work, but
+> it doesn't work when my board does not have the connection between the
+> PMIC and the SoC. Even worse, if my board has some custom power of
+> method you overwrite my method in the snvs poweroff driver with a method
+> that does not work on my board.
 > 
-> I will do that in next version.
+> Sascha
+Sorry, I suppose PMIC_ON_REQ is the only way to control external power ON/OFF.
+If they don't use PMIC_ON_REQ, I assume they drop poweroff feature.
+Yes, I agree with you that set status as 'disable' in DTS make things clear if
+they want to use other pins to control external power. But I'm not sure whether
+we need consider this special case to 'disable' the soc level feature and
+re-enable on many boards level DTS? Also, I don't understand why they give up
+PMIC_ON_REQ and consume another pin to do the same thing....But I'm ok if both
+you and Shawn agree with it.
 > 
-> > It looks like what you're doing is checking to see whether this CPU is
-> > the one that is supposed to wake up or not, but looking at sram
-> > (written by the C code below), and this isn't the correct CPU then go
-> > back to boot rom?  Since we read in int-mem from the device-tree it
-> > would also probably be good to make that ldr r1, 0xff700000 reference
-> > the sram_base_addr variable rather than hard coding here.
-> 
-> I don't like the hard coding either, but I don't know how to get the
-> physical base of sram and bootrom address in the assemble code.
-
-Take a look at how the rk3066 smp code handles the address: defining 
-rockchip_boot_fn in headsmp.S, having it in core.h and filling it with the 
-address in platsmp.c
-
-I would think transfering the address read from dt could work similarly.
-
-
-Heiko
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
