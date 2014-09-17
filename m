@@ -1,71 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 17 Sep 2014 20:39:34 +0100
-Subject: [PATCH v2] clocksource: arm_arch_timer: discard unavailable timers
- correctly
-In-Reply-To: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
-References: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 17 Sep 2014 12:48:16 -0700
+Subject: [PATCH v5 2/4] dt-bindings: document Rockchip thermal
+In-Reply-To: <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
+ <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <CAD=FV=Vq4zSBv-=OxHD4sGbAgLh_ebe29PR6RU_sQe4XspsPsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we wait until both cp15 and mem timers are probed if we
-have both timer device nodes present in the device tree without
-checking if the device is actually available. If one of the timer
-device node present is disabled, the system locks up on the boot
-as no timer gets registered.
+Caesar,
 
-This patch adds the check for the availablity of the timer device
-so that we unavailable timers are discarded correctly. It also adds
-the missing of_node_put.
+On Tue, Sep 16, 2014 at 8:59 PM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+> This add the necessary binding documentation for the thermal
+> found on Rockchip SoCs
+>
+> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  .../bindings/thermal/rockchip-thermal.txt          | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> new file mode 100644
+> index 0000000..6fc8bc3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -0,0 +1,41 @@
+> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+> +
+> +Required properties:
+> +- compatible: "rockchip,rk3288-tsadc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +       region.
+> +- interrupts: The interrupt number to the cpu. The interrupt specifier format
+> +             depends on the interrupt controller.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk" for
+> +              the peripheral clock.
+> +- num-trips:  number of total trip points, this is required, set it 0 if none,
+> +             if greater than 0, the following properties must be defined;
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+nit: there is whitespace damage (space before tab) on the line before
+this one.  It's more obvious in the patch you uploaded to gerrit which
+highlights this in red:
 
-Changes v1->v2:
-	- Added missing of_node_put in the original code
-	- Updated the commit log as suggested
+https://chromium-review.googlesource.com/#/c/213967/5/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5163ec13429d..7e267e3990ab 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -616,17 +616,29 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
- 	{},
- };
- 
-+static bool __init
-+arch_timer_probed(int type, const struct of_device_id *matches)
-+{
-+	struct device_node *dn;
-+	bool probed = false;
-+
-+	dn = of_find_matching_node(NULL, matches);
-+	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-+		probed = true;
-+	of_node_put(dn);
-+
-+	return probed;
-+}
-+
- static void __init arch_timer_common_init(void)
- {
- 	unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
- 
- 	/* Wait until both nodes are probed if we have two timers */
- 	if ((arch_timers_present & mask) != mask) {
--		if (of_find_matching_node(NULL, arch_timer_mem_of_match) &&
--				!(arch_timers_present & ARCH_MEM_TIMER))
-+		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
- 			return;
--		if (of_find_matching_node(NULL, arch_timer_of_match) &&
--				!(arch_timers_present & ARCH_CP15_TIMER))
-+		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
- 			return;
- 	}
- 
--- 
-1.9.1
+Did you run your patches through checkpatch before submitting?
+
+-Doug
