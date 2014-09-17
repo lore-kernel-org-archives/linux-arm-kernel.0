@@ -1,64 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Sep 2014 17:58:27 +0200
-Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in mvebu_get_tgt_attr()
-Message-ID: <1410969507-13692-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 17 Sep 2014 17:55:40 +0200
+Subject: [PATCH 2/3] dmaengine: sun6i: Add support for Allwinner A23
+ (sun8i) variant
+In-Reply-To: <CAGb2v67jokpXHxR26YoCEB2Y_v07oQZXZfPuGJC_wO=r-SRZhg@mail.gmail.com>
+References: <1410616381-30226-1-git-send-email-wens@csie.org>
+ <1410616381-30226-3-git-send-email-wens@csie.org>
+ <20140916103540.GF9948@lukather>
+ <CAGb2v67jokpXHxR26YoCEB2Y_v07oQZXZfPuGJC_wO=r-SRZhg@mail.gmail.com>
+Message-ID: <20140917155540.GJ2166@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven reported a warning when building pci-mvebu:
+On Tue, Sep 16, 2014 at 10:13:27PM +0800, Chen-Yu Tsai wrote:
+> >> +     /*
+> >> +      * sun8i variant requires us to toggle an undocumented register,
+> >> +      * as seen in Allwinner's SDK.
+> >
+> > The BSP I have has this:
+> >
+> > static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
+> > {
+> >         struct sunxi_dmadev *sunxi_dev = dev;
+> >
+> >         clk_prepare_enable(sunxi_dev->ahb_clk);
+> > #ifdef CONFIG_ARCH_SUN8IW3
+> >         writel(0x04, sunxi_dev->base + DMA_GATE);
+> > #endif
+> > }
+> >
+> > /* All is ok, and open the clock */
+> > sunxi_dma_hw_init(sunxi_dev);
+> >
+> > So I guess we can say that it's not that undocumented :)
+> 
+> That's right. I meant undocumented in the user manual.
+> I did reference the SDK in the comment, didn't I? :)
 
-drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
-drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   if (slot == PCI_SLOT(devfn) && type == rtype) {
-                                       ^
+So something like
 
-And indeed, the code of mvebu_get_tgt_attr() may lead to the usage of
-rtype when being uninitialized, even though it would only happen if we
-had entries other than I/O space and 32 bits memory space.
+writel(DMA_GATE_ENABLE, base->DMA_GATE_REG) wouldn't be too far off :)
 
-This commit fixes that by simply skipping the current DT range being
-considered, if it doesn't match the resource type we're looking for.
+Maxime
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-This patch is a different solution than the one proposed by Geert. It
-(hopefully) matches the discussion we had with Bjorn and Arnd.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-mvebu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index a8c6f1a..b1315e1 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -873,7 +873,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
- 	rangesz = pna + na + ns;
- 	nranges = rlen / sizeof(__be32) / rangesz;
- 
--	for (i = 0; i < nranges; i++) {
-+	for (i = 0; i < nranges; i++, range += rangesz) {
- 		u32 flags = of_read_number(range, 1);
- 		u32 slot = of_read_number(range + 1, 1);
- 		u64 cpuaddr = of_read_number(range + na, pna);
-@@ -883,14 +883,14 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
- 			rtype = IORESOURCE_IO;
- 		else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
- 			rtype = IORESOURCE_MEM;
-+		else
-+			continue;
- 
- 		if (slot == PCI_SLOT(devfn) && type == rtype) {
- 			*tgt = DT_CPUADDR_TO_TARGET(cpuaddr);
- 			*attr = DT_CPUADDR_TO_ATTR(cpuaddr);
- 			return 0;
- 		}
--
--		range += rangesz;
- 	}
- 
- 	return -ENOENT;
 -- 
-2.0.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/8d1ad173/attachment.sig>
