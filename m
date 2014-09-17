@@ -1,38 +1,41 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Sep 2014 09:15:54 -0700
-Subject: [PATCH v6 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <20140826072727.GB9574@lee--X1>
-References: <1409029109-28769-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1409029109-28769-2-git-send-email-bjorn.andersson@sonymobile.com>
- <20140826072727.GB9574@lee--X1>
-Message-ID: <20140917161554.GJ30918@lee--X1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 17 Sep 2014 17:17:38 +0100
+Subject: [PATCH 1/2] devicetree: cadence_ttc: Document binding for timer
+ width
+In-Reply-To: <3537996136ec435ea660da869102d0a019214979.1410964243.git.michal.simek@xilinx.com>
+References: <3537996136ec435ea660da869102d0a019214979.1410964243.git.michal.simek@xilinx.com>
+Message-ID: <20140917161737.GA7983@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Aug 2014, Lee Jones wrote:
-
-> On Mon, 25 Aug 2014, Bjorn Andersson wrote:
+On Wed, Sep 17, 2014 at 03:30:49PM +0100, Michal Simek wrote:
+> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
 > 
-> > Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
-> > 8960 and 8064 based devices. The binding currently describes the rpm
-> > itself and the regulator subnodes.
-> > 
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/qcom,rpm.txt |  246 ++++++++++++++++++++
-> >  include/dt-bindings/mfd/qcom,rpm.h                 |  154 ++++++++++++
-> >  2 files changed, 400 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,rpm.txt
-> >  create mode 100644 include/dt-bindings/mfd/qcom,rpm.h
+> Modern TTC implementations can extend the timer width to 32 bit. This
+> feature is not self identifying so the driver needs to be made aware
+> via device tree.
 > 
-> Please use the same filename formatting as the existing files.
+> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+> index 993695c659e1..5439976eca6b 100644
+> --- a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+> @@ -6,6 +6,9 @@ Required properties:
+>  - interrupts : A list of 3 interrupts; one per timer channel.
+>  - clocks: phandle to the source clock
+> 
+> +Optional properties:
+> +- timer-width: Bit width of the timer. Either 16 or 32 (default 16).
 
-Are you going to resubmit this (and answer my question on the
-regulator patch)?
+Are we expecting TTC implementations with widths other than 16 or 32?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+This looks sane to me, but we might be able to just have a 32-bit-timer
+property if we don't expect arbitrary widths.
+
+Mark.
