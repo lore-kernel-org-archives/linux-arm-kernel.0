@@ -1,49 +1,41 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Sep 2014 00:12:49 +0200
-Subject: [PATCH v3 3/8] clk: rockchip: fix rk3288 pll status register location
+Date: Thu, 18 Sep 2014 00:12:53 +0200
+Subject: [PATCH v3 7/8] clk: rockchip: add binding id for ARMCLK
 In-Reply-To: <1410991974-12235-1-git-send-email-heiko@sntech.de>
 References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410991974-12235-4-git-send-email-heiko@sntech.de>
+Message-ID: <1410991974-12235-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jianqun <jay.xu@rock-chips.com>
-
-In RK3288, APLL lock status bit is in GRF_SOC_STATUS1,
-but in RK3188, is GRFSOC_STATUS0.
-
-Signed-off-by: Jianqun <jay.xu@rock-chips.com>
-
-Also name the constant accordingly as GRF_SOC_STATUS1
-to prevent confusion.
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
 ---
- drivers/clk/rockchip/clk-rk3288.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/dt-bindings/clock/rk3188-cru-common.h | 1 +
+ include/dt-bindings/clock/rk3288-cru.h        | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index aa4f4b7..b30e147 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -20,7 +20,7 @@
- #include "clk.h"
+diff --git a/include/dt-bindings/clock/rk3188-cru-common.h b/include/dt-bindings/clock/rk3188-cru-common.h
+index 750ee60..6a37050 100644
+--- a/include/dt-bindings/clock/rk3188-cru-common.h
++++ b/include/dt-bindings/clock/rk3188-cru-common.h
+@@ -20,6 +20,7 @@
+ #define PLL_GPLL		4
+ #define CORE_PERI		5
+ #define CORE_L2C		6
++#define ARMCLK			7
  
- #define RK3288_GRF_SOC_CON(x)	(0x244 + x * 4)
--#define RK3288_GRF_SOC_STATUS	0x280
-+#define RK3288_GRF_SOC_STATUS1	0x284
+ /* sclk gates (special clocks) */
+ #define SCLK_UART0		64
+diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
+index ebcb460..8f75bf0 100644
+--- a/include/dt-bindings/clock/rk3288-cru.h
++++ b/include/dt-bindings/clock/rk3288-cru.h
+@@ -19,6 +19,7 @@
+ #define PLL_CPLL		3
+ #define PLL_GPLL		4
+ #define PLL_NPLL		5
++#define ARMCLK			6
  
- enum rk3288_plls {
- 	apll, dpll, cpll, gpll, npll,
-@@ -713,7 +713,7 @@ static void __init rk3288_clk_init(struct device_node *np)
- 
- 	rockchip_clk_register_plls(rk3288_pll_clks,
- 				   ARRAY_SIZE(rk3288_pll_clks),
--				   RK3288_GRF_SOC_STATUS);
-+				   RK3288_GRF_SOC_STATUS1);
- 	rockchip_clk_register_branches(rk3288_clk_branches,
- 				  ARRAY_SIZE(rk3288_clk_branches));
- 	rockchip_clk_protect_critical(rk3288_critical_clocks,
+ /* sclk gates (special clocks) */
+ #define SCLK_GPU		64
 -- 
 2.0.1
