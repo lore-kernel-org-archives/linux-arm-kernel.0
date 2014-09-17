@@ -1,77 +1,143 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 17 Sep 2014 09:09:58 -0700
-Subject: [PATCH] mfd: RK808: Add register caching
-In-Reply-To: <1410303964-6943-1-git-send-email-dianders@chromium.org>
-References: <1410303964-6943-1-git-send-email-dianders@chromium.org>
-Message-ID: <20140917160958.GI30918@lee--X1>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 17 Sep 2014 09:10:12 -0700
+Subject: [PATCH 3.17-rc4 v7 0/6] arm: Implement arch_trigger_all_cpu_backtrace
+Message-ID: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Sep 2014, Doug Anderson wrote:
+This patchset implements arch_trigger_all_cpu_backtrace for arm.
 
-> Let's define the voltatile registers (those that can't be cached) and
-> enable caching.  The rk808 is accessed almost constantly with cpufreq
-> so this is really nice.
-> 
-> As measured by ftrace:
->   before this change: cpu0_set_target() => ~2200us
->   after this change:  cpu0_set_target() =>  ~500us
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/mfd/rk808.c | 30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
+Non-maskable signalling relies on the kernel being able to access FIQ
+and therefore, for devices that implement TrustZone, it will work only on
+systems that boot the kernel in secure mode.
 
-Applied with Chris' Reviewed-by.
+Tested on Freescale iMX.6 (both via SysRq-l and by deliberately locking
+up the kernel with CONFIG_DEBUG_SPINLOCK=y).
 
-> diff --git a/drivers/mfd/rk808.c b/drivers/mfd/rk808.c
-> index 0324422..bd02150 100644
-> --- a/drivers/mfd/rk808.c
-> +++ b/drivers/mfd/rk808.c
-> @@ -29,10 +29,40 @@ struct rk808_reg_data {
->  	int value;
->  };
->  
-> +static bool rk808_is_volatile_reg(struct device *dev, unsigned int reg)
-> +{
-> +	/*
-> +	 * Notes:
-> +	 * - Technically the ROUND_30s bit makes RTC_CTRL_REG volatile, but
-> +	 *   we don't use that feature.  It's better to cache.
-> +	 * - It's unlikely we care that RK808_DEVCTRL_REG is volatile since
-> +	 *   bits are cleared in case when we shutoff anyway, but better safe.
-> +	 */
-> +
-> +	switch (reg) {
-> +	case RK808_SECONDS_REG ... RK808_WEEKS_REG:
-> +	case RK808_RTC_STATUS_REG:
-> +	case RK808_VB_MON_REG:
-> +	case RK808_THERMAL_REG:
-> +	case RK808_DCDC_UV_STS_REG:
-> +	case RK808_LDO_UV_STS_REG:
-> +	case RK808_DCDC_PG_REG:
-> +	case RK808_LDO_PG_REG:
-> +	case RK808_DEVCTRL_REG:
-> +	case RK808_INT_STS_REG1:
-> +	case RK808_INT_STS_REG2:
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  static const struct regmap_config rk808_regmap_config = {
->  	.reg_bits = 8,
->  	.val_bits = 8,
->  	.max_register = RK808_IO_POL_REG,
-> +	.cache_type = REGCACHE_RBTREE,
-> +	.volatile_reg = rk808_is_volatile_reg,
->  };
->  
->  static struct resource rtc_resources[] = {
+Changes since v6:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+* Re-arranged code within the patch series to fix a regression introduced midway
+  through the series and corrected by a later patch (testing by Olof's
+  autobuilder). Tested offending patch in isolation using defconfig
+  identified by the autobuilder.
+
+Changes since v5:
+
+* Renamed svc_entry's call_trace argument to just trace (example code
+  from Russell King).
+
+* Fixed mismatched ENDPROC() in __fiq_abt (example code from Russell
+  King).
+
+* Modified usr_entry to optionall avoid calling into the trace code and
+  used this in FIQ entry from usr path. Modified corresponding exit code to
+  avoid calling into trace code and the scheduler (example code from
+  Russell King).
+
+* Ensured the default FIQ register state is restored when the default
+  FIQ handler is reinstalled (example code from Russell King).
+
+* Renamed no_fiq_insn to dfl_fiq_insn to reflect the effect of adopting
+  a default FIQ handler.
+
+* Re-instated fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq(). gic_raise_softirq() is called by wake_up_klogd()
+  in the console unlock logic.
+
+Changes since v4:
+
+* Rebased on 3.17-rc4.
+
+* Removed a spurious line from the final "glue it together" patch
+  that broke the build.
+
+Changes since v3:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+Changes since v2:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+Changes since v1:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
+
+
+Daniel Thompson (5):
+  arm: fiq: Replace default FIQ handler
+  arm64: Introduce dummy version of asm/fiq.h
+  irqchip: gic: Add support for IPI FIQ
+  ARM: add basic support for on-demand backtrace of other CPUs
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
+
+Russell King (1):
+  ARM: remove unused do_unexp_fiq() function
+
+ arch/arm/include/asm/irq.h      |   5 ++
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/entry-armv.S    |  98 +++++++++++++++++++++---
+ arch/arm/kernel/entry-header.S  |  47 ++++++++++++
+ arch/arm/kernel/fiq.c           |  17 ++++-
+ arch/arm/kernel/setup.c         |   8 +-
+ arch/arm/kernel/smp.c           |  64 ++++++++++++++++
+ arch/arm/kernel/traps.c         |  32 +++++++-
+ arch/arm64/include/asm/fiq.h    |   8 ++
+ drivers/irqchip/irq-gic.c       | 162 ++++++++++++++++++++++++++++++++++++++--
+ include/linux/irqchip/arm-gic.h |   3 +
+ 11 files changed, 421 insertions(+), 26 deletions(-)
+ create mode 100644 arch/arm64/include/asm/fiq.h
+
+--
+1.9.3
