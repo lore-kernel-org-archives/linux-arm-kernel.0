@@ -1,48 +1,53 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 17 Sep 2014 12:00:48 -0700
-Subject: [PATCH v4 04/11] drivers: base: support cpu cache information
- interface to userspace via sysfs
-In-Reply-To: <5419C3F6.4050607@arm.com>
-References: <1409763617-17074-1-git-send-email-sudeep.holla@arm.com>
- <1409763617-17074-5-git-send-email-sudeep.holla@arm.com>
- <5419C3F6.4050607@arm.com>
-Message-ID: <20140917190048.GA4063@kroah.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 17 Sep 2014 12:03:37 -0700
+Subject: [PATCH] ARM: DT: ifc6410: Add board memory range.
+In-Reply-To: <54192B64.6070604@smartplayin.com>
+References: <1410932179-4652-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <54192B64.6070604@smartplayin.com>
+Message-ID: <FA9D8682-DB0E-48CF-A519-86A0465300E1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 06:25:10PM +0100, Sudeep Holla wrote:
-> Hi Greg,
-> 
-> On 03/09/14 18:00, Sudeep Holla wrote:
-> >From: Sudeep Holla <sudeep.holla@arm.com>
-> >
-> >This patch adds initial support for providing processor cache information
-> >to userspace through sysfs interface. This is based on already existing
-> >implementations(x86, ia64, s390 and powerpc) and hence the interface is
-> >intended to be fully compatible.
-> >
-> >The main purpose of this generic support is to avoid further code
-> >duplication to support new architectures and also to unify all the existing
-> >different implementations.
-> >
-> >This implementation maintains the hierarchy of cache objects which reflects
-> >the system's cache topology. Cache devices are instantiated as needed as
-> >CPUs come online. The cache information is replicated per-cpu even if they are
-> >shared. A per-cpu array of cache information maintained is used mainly for
-> >sysfs-related book keeping.
-> >
-> >It also implements the shared_cpu_map attribute, which is essential for
-> >enabling both kernel and user-space to discover the system's overall cache
-> >topology.
-> >
-> >This patch also add the missing ABI documentation for the cacheinfo sysfs
-> >interface already, which is well defined and widely used.
-> >
-> 
-> Can you review the first 4 patches in this series please ?
 
-It's in my todo queue, which is really long at the moment due to me
-going to conferences (at one right now...)  Will be working on this
-soon, thanks for your patience.
+On Sep 16, 2014, at 11:34 PM, Pramod Gurav <pramod.gurav@smartplayin.com> wrote:
 
-greg k-h
+> Hi Srini,
+> 
+> Thanks for the patch.
+> Tested-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+> 
+> A minor nit.
+> On Wednesday 17 September 2014 11:06 AM, Srinivas Kandagatla wrote:
+>> This patch adds memory details of IFC6410 as this is necessary to
+>> fix the in-correct memory start comming from ATAGs.
+>> 
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>> arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 5 +++++
+>> 1 file changed, 5 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> index 90db8af..3287f12 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> @@ -4,6 +4,11 @@
+>> 	model = "Qualcomm APQ8064/IFC6410";
+>> 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
+>> 
+>> +	memory{
+> Space before {?
+>> +		device_type = "memory";
+>> +		reg = <0x80000000 0x80000000>;
+>> +	};
+>> +
+>> 	soc {
+>> 		gsbi at 16600000 {
+>> 			status = "ok?;
+
+Hmm, this doesn?t seem to work for me.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
