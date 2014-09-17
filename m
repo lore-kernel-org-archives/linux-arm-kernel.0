@@ -1,120 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 17 Sep 2014 20:34:52 +0100
-Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
-In-Reply-To: <A4205FCA-D4DE-48A4-B19F-58400A3FBF5C@codeaurora.org>
-References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
- <A4205FCA-D4DE-48A4-B19F-58400A3FBF5C@codeaurora.org>
-Message-ID: <20140917193452.GD7983@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 17 Sep 2014 20:39:34 +0100
+Subject: [PATCH v2] clocksource: arm_arch_timer: discard unavailable timers
+ correctly
+In-Reply-To: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
+References: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 04:37:30PM +0100, Kumar Gala wrote:
-> 
-> On Sep 17, 2014, at 1:56 AM, Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com> wrote:
-> 
-> > From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > 
-> > This patch adds property "nid" to memory node to provide the memory range to
-> > numa node id mapping.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > 
-> > ?
-> 
-> Adding the PPC guys as they?ve been doing NUMA on IBM Power Servers
-> for years with OF/DT.  So we should really try and follow what they?ve
-> done.
+Currently we wait until both cp15 and mem timers are probed if we
+have both timer device nodes present in the device tree without
+checking if the device is actually available. If one of the timer
+device node present is disabled, the system locks up on the boot
+as no timer gets registered.
 
-Agreed.
+This patch adds the check for the availablity of the timer device
+so that we unavailable timers are discarded correctly. It also adds
+the missing of_node_put.
 
-> > Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
-> > 1 file changed, 58 insertions(+)
-> > create mode 100644 Documentation/devicetree/bindings/numa.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
-> > new file mode 100644
-> > index 0000000..c4a94f2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/numa.txt
-> > @@ -0,0 +1,58 @@
-> > +======================================================
-> > +numa id binding description
-> > +======================================================
-> > +
-> > +======================================================
-> > +1 - Introduction
-> > +======================================================
-> > +The device node  property "nid(numa node id)" can be added to memory
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-Why the quotes?
+Changes v1->v2:
+	- Added missing of_node_put in the original code
+	- Updated the commit log as suggested
 
-> > +device node to map the range of memory addresses as defined in property "reg".
-> > +The property "nid" maps the memory range to the numa node id, which is used to
-> > +find the local and remory pages on numa aware systems.
-
-What is a "numa node id", exactly, and how is the OS intended to use it?
-
-I don't see how this can be of any use as-is.
-
-Mark.
-
-> > +
-> > +======================================================
-> > +2 - nid property
-> > +======================================================
-> > +Numa node id, "nid" is required property of memory device node for 
-> > +numa enabled platforms.
-> > +
-> > +|------------------------------------------------------|
-> > +|Property Type  | Usage | Value Type | Definition      |
-> > +|------------------------------------------------------|
-> > +|  nid          |  R    |    <u32>   | Numa Node id    |
-> > +|               |       |            | for this memory |
-> > +|------------------------------------------------------|
-> > +
-> > +========================================================
-> > +4 - Example memory nodes with numa node id mapping
-> > +========================================================
-> > +
-> > +Example 1 (2 memory nodes, each mapped to a numa node.):
-> > +
-> > +	memory at 00000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x00000000 0x0 0x80000000>;
-> > +		nid = <0x0>;
-> > +	};
-> > +
-> > +	memory at 10000000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x100 0x00000000 0x0 0x80000000>;
-> > +		nid = <0x1>;
-> > +	};
-> > +
-> > +Example 2 (multiple memory ranges in each memory node and mapped to numa node):
-> > +
-> > +	memory at 00000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x00000000 0x0 0x80000000>,
-> > +		      <0x0 0x80000000 0x0 0x80000000>;
-> > +		nid = <0x0>;
-> > +	};
-> > +
-> > +	memory at 10000000000 {
-> > +		device_type = "memory";
-> > +		reg = <0x100 0x00000000 0x0 0x80000000>,
-> > +		      <0x100 0x80000000 0x0 0x80000000>;
-> > +		nid = <0x1>;
-> > +	};
-> > -- 
-> > 1.8.1.4
-> > 
-> 
-> -- 
-> Employee of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5163ec13429d..7e267e3990ab 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -616,17 +616,29 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ 	{},
+ };
+ 
++static bool __init
++arch_timer_probed(int type, const struct of_device_id *matches)
++{
++	struct device_node *dn;
++	bool probed = false;
++
++	dn = of_find_matching_node(NULL, matches);
++	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
++		probed = true;
++	of_node_put(dn);
++
++	return probed;
++}
++
+ static void __init arch_timer_common_init(void)
+ {
+ 	unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
+ 
+ 	/* Wait until both nodes are probed if we have two timers */
+ 	if ((arch_timers_present & mask) != mask) {
+-		if (of_find_matching_node(NULL, arch_timer_mem_of_match) &&
+-				!(arch_timers_present & ARCH_MEM_TIMER))
++		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
+ 			return;
+-		if (of_find_matching_node(NULL, arch_timer_of_match) &&
+-				!(arch_timers_present & ARCH_CP15_TIMER))
++		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
+ 			return;
+ 	}
+ 
+-- 
+1.9.1
