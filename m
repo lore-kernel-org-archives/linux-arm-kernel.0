@@ -1,115 +1,44 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 17 Sep 2014 13:10:05 +0200
-Subject: [PATCH v3 2/3] power: reset: imx-snvs-poweroff: add power off
- driver for i.mx6
-In-Reply-To: <1410947881-7345-3-git-send-email-b38343@freescale.com>
-References: <1410947881-7345-1-git-send-email-b38343@freescale.com>
- <1410947881-7345-3-git-send-email-b38343@freescale.com>
-Message-ID: <20140917131005.7d8ab95c@ipc1.ka-ro>
+From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
+Date: Wed, 17 Sep 2014 07:18:19 -0400 (EDT)
+Subject: [PATCH] ARM: dts: qcom: Add I2C dt node for MSM8974 and DB8074
+ board
+In-Reply-To: <306266B7-29AB-474E-855E-F0BE55C9BA11@codeaurora.org>
+References: <1410867938-6254-1-git-send-email-kiran.padwal@smartplayin.com>
+ <306266B7-29AB-474E-855E-F0BE55C9BA11@codeaurora.org>
+Message-ID: <1410952699.0923113@apps.rackspace.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kumar,
 
-Robin Gong wrote:
-> This driver register pm_power_off with snvs power off function. If
-> your boards NOT use PMIC_ON_REQ to turn on/off external pmic, or use
-> other pin to do, please disable the driver in dts, otherwise, your
-> pm_power_off maybe overwrote by this driver.
+On Tuesday, September 16, 2014 2:59pm, "Kumar Gala" <galak@codeaurora.org> said:
+
 > 
-> Signed-off-by: Robin Gong <b38343@freescale.com>
-> ---
->  .../bindings/power_supply/imx-snvs-poweroff.txt    |   23 +++++++
->  drivers/power/reset/Kconfig                        |    9 +++
->  drivers/power/reset/Makefile                       |    1 +
->  drivers/power/reset/imx-snvs-poweroff.c            |   66 ++++++++++++++++++++
->  4 files changed, 99 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
->  create mode 100644 drivers/power/reset/imx-snvs-poweroff.c
+> On Sep 16, 2014, at 4:45 AM, Kiran Padwal <kiran.padwal@smartplayin.com> wrote:
 > 
-[...]
-> diff --git a/drivers/power/reset/imx-snvs-poweroff.c b/drivers/power/reset/imx-snvs-poweroff.c
-> new file mode 100644
-> index 0000000..d726ac4
-> --- /dev/null
-> +++ b/drivers/power/reset/imx-snvs-poweroff.c
-> @@ -0,0 +1,66 @@
-> +/* Power off driver for i.mx6
-> + * Copyright (c) 2014, FREESCALE CORPORATION.  All rights reserved.
-> + *
-> + * based on msm-poweroff.c
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +
-> +static void __iomem *snvs_base;
-> +
-> +static void do_imx_poweroff(void)
-> +{
-> +	u32 value = readl(snvs_base);
-> +
-> +	/* set TOP and DP_EN bit */
-> +	writel(value | 0x60, snvs_base);
-> +}
-> +
-> +static int imx_poweroff_probe(struct platform_device *pdev)
-> +{
-> +	snvs_base = of_iomap(pdev->dev.of_node, 0);
-> +	if (!snvs_base) {
-> +		dev_err(&pdev->dev, "failed to get memory\n");
-> +		return -EIO;
->
-I don't think EIO is an appropriate return code here. There was no I/O
-in progress that had an error. IMO ENODEV would be more appropriate
-here.
+>> Add support for i2c controller on the DB8074 board.
+>> It also adds necessary DT support for i2c eeprom which is present on
+>> DB8074 board.
+>>
+>> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
+>> ---
+>> arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |   21 +++++++++++++++++++++
+>> arch/arm/boot/dts/qcom-msm8974.dtsi            |   15 +++++++++++++--
+>> 2 files changed, 34 insertions(+), 2 deletions(-)
+> 
+> Can you rebase this on:
+> 
+>  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git
+> tags/qcom-dt-for-3.18
 
-> +static const struct of_device_id of_imx_poweroff_match[] = {
-> +	{ .compatible = "fsl,sec-v4.0-poweroff", },
-> +	{},
->
-useless comma after terminating NULL element of array.
-You never want any patch to add an entry after this one.
-Without the comma doing so (e.g. because of a badly resolved merge
-conflict) would lead to a compile error.
+This patches apply on this tree with no warnings/errors.
 
-
-> +};
-> +MODULE_DEVICE_TABLE(of, of_imx_poweroff_match);
-> +
-> +static struct platform_driver imx_poweroff_driver = {
-> +	.probe = imx_poweroff_probe,
-> +	.driver = {
-> +		.name = "imx-snvs-poweroff",
-> +		.of_match_table = of_match_ptr(of_imx_poweroff_match),
->
-useless use of of_match_ptr()
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> 
+> - k
+> 
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The
+> Linux Foundation
+> 
+> 
