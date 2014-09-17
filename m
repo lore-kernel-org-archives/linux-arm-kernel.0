@@ -1,34 +1,31 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 17 Sep 2014 18:25:07 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <54197C99.8030601@hurleysoftware.com>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5411967A.6090406@hurleysoftware.com> <54119AAA.9080907@linutronix.de>
- <5411B33F.10405@hurleysoftware.com> <54171B85.5060209@linutronix.de>
- <54186B89.8050505@linutronix.de> <54197C99.8030601@hurleysoftware.com>
-Message-ID: <5419B5E3.10307@linutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 17 Sep 2014 17:28:23 +0100
+Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
+ <20140915183334.GA30737@arm.com>
+ <20140915184023.GF12361@n2100.arm.linux.org.uk>
+ <20140915185027.GC30737@arm.com>
+ <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
+Message-ID: <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 02:20 PM, Peter Hurley wrote:
->> So I connected my am335x-evm
->> with beagle board xm because both of them have an old fashion UART
->> connector (instead those uart-to-usb). Both configured with HW-Flow and
->> I haven't seen the function invoked but I saw "port->icount.overrun"
->> being incremented. This shouldn't happen. So I am a little puzzled here?
+On Tue, Sep 16, 2014 at 02:53:55AM +0100, Wang, Yalin wrote:
+> The reason that a want merge this patch is that
+> It confuse me when I debug memory issue by 
+> /sys/kernel/debug/memblock/reserved  debug file,
+> It show lots of un-correct reserved memory.
+> In fact, I also send a patch to cma driver part
+> For this issue too:
+> http://ozlabs.org/~akpm/mmots/broken-out/free-the-reserved-memblock-when-free-cma-pages.patch
 > 
-> Yeah, that's weird. Do you have a break-out box to confirm that RTS/CTS are
-> being driven?
+> I want to remove these un-correct memblock parts as much as possible,
+> so that I can see more correct info from /sys/kernel/debug/memblock/reserved
+> debug file .
 
-Yeah, I've been thinking about that, too. I will be gone next week and
-hopefully when I get back I will something around to test this.
+Could we not always call memblock_free() from free_reserved_area() (with
+a dummy definition when !CONFIG_HAVE_MEMBLOCK)?
 
-> 
-> Regards,
-> Peter Hurley
-> 
-
-Sebastian
+-- 
+Catalin
