@@ -1,44 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Sep 2014 13:27:37 -0500
-Subject: [PATCH] clk: prevent erronous parsing of children during rate
- change
-In-Reply-To: <20140903192203.11368.5520@quantum>
-References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
- <20140903192203.11368.5520@quantum>
-Message-ID: <20140917182737.GF8140@saruman.home>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 17 Sep 2014 20:32:29 +0200
+Subject: [PATCH] ARM: at91/dt: Fix typo regarding can0_clk
+In-Reply-To: <1410942812-31682-1-git-send-email-davidcdueck@googlemail.com>
+References: <1410942812-31682-1-git-send-email-davidcdueck@googlemail.com>
+Message-ID: <20140917203229.01600058@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi David, Anthony,
 
-On Wed, Sep 03, 2014 at 12:22:03PM -0700, Mike Turquette wrote:
-> Quoting Tero Kristo (2014-08-21 06:47:45)
-> > In some cases, clocks can switch their parent with clk_set_rate, for
-> > example clk_mux can do this in some cases. Current implementation of
-> > clk_change_rate uses un-safe list iteration on the clock children, which
-> > will cause wrong clocks to be parsed in case any of the clock children
-> > change their parents during the change rate operation. Fixed by using
-> > the safe list iterator instead.
-> > 
-> > The problem was detected due to some divide by zero errors generated
-> > by clock init on dra7-evm board, see discussion under
-> > http://article.gmane.org/gmane.linux.ports.arm.kernel/349180 for details.
-> > 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > To: Mike Turquette <mturquette@linaro.org>
-> > Reported-by: Nishanth Menon <nm@ti.com>
+On Wed, 17 Sep 2014 10:33:32 +0200
+David Dueck <davidcdueck@googlemail.com> wrote:
+
+> Otherwise the clock for can0 will never get enabled.
 > 
-> Applied to clk-fixes.
+> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+> Signed-off-by: Anthony Harivel <anthony.harivel@emtrion.de>
 
-v3.17-rc5 and today's next still exhibit the same bug. Any chance we can
-this fix into v3.17-final ?
+Thanks for fixing that.
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  arch/arm/boot/dts/sama5d3_can.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3_can.dtsi b/arch/arm/boot/dts/sama5d3_can.dtsi
+> index a077585..eaf4145 100644
+> --- a/arch/arm/boot/dts/sama5d3_can.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3_can.dtsi
+> @@ -40,7 +40,7 @@
+>  						atmel,clk-output-range = <0 66000000>;
+>  					};
+>  
+> -					can1_clk: can0_clk {
+> +					can1_clk: can1_clk {
+>  						#clock-cells = <0>;
+>  						reg = <41>;
+>  						atmel,clk-output-range = <0 66000000>;
+
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/01cf6821/attachment.sig>
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
