@@ -1,32 +1,30 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 17 Sep 2014 04:58:10 -0400
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20140917014410.GC31214@srcf.ucam.org>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
- <20140917014410.GC31214@srcf.ucam.org>
-Message-ID: <54194D22.7060706@redhat.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 17 Sep 2014 10:00:36 +0100
+Subject: [GIT PULL] vexpress: updates for 3.18
+In-Reply-To: <1410886963.12376.27.camel@hornet>
+References: <1410886963.12376.27.camel@hornet>
+Message-ID: <1410944436.12376.28.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 09:44 PM, Matthew Garrett wrote:
-> On Fri, Sep 12, 2014 at 10:00:16PM +0800, Hanjun Guo wrote:
+On Tue, 2014-09-16 at 18:02 +0100, Pawel Moll wrote:
+> Hello Arnd, Kevin, Olof,
 > 
->> +Common _DSD bindings should be submitted to ASWG to be included in the
->> +document :-
->> +
->> +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
+> The following changes since commit 9e82bf014195d6f0054982c463575cdce24292be:
 > 
-> How are individuals/companies who aren't UEFI members supposed to do 
-> this? Aren't there IP issues involved in taking submissions from 
-> non-members?
+>   Linux 3.17-rc5 (2014-09-14 17:50:12 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/pawel.moll/linux.git tags/vexpress/updates-for-3.18
+> 
+> for you to fetch changes up to f0a325ccfab9814e3f7ebd9c75d3f6a752cac6c3:
+> 
+>   ARM: vexpress: Remove non-DT code (2014-09-16 17:44:06 +0100)
 
-Obviously, I'm not a lawyer, but I would note that the _DSD bindings
-aren't going into the core ACPI document. I think the specifics for non
-members of the UEFI to potentially contribute bindings need to be
-addressed. That said, at this point, the population of the UEFI forum is
-very well aligned with initial players (that this is the case is not
-entirely an accident, I went around to a few folks a year or so ago and
-made sure that they had become members in anticipation of this issue).
+Ignore this for the moment - some new comments started flowing in. I'll
+re-send the pull request once they are taken care of.
 
-Jon.
+Thanks!
+
+Pawel
