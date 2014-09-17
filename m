@@ -1,50 +1,48 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 17 Sep 2014 11:09:54 -0700
-Subject: [GIT PULL #2] ARM: BCM: Broadcom BCM63138 support
-Message-ID: <1410977394-27987-1-git-send-email-f.fainelli@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Sep 2014 19:12:54 +0100
+Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
+In-Reply-To: <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
+ <20140915183334.GA30737@arm.com>
+ <20140915184023.GF12361@n2100.arm.linux.org.uk>
+ <20140915185027.GC30737@arm.com>
+ <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
+ <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
+Message-ID: <20140917181254.GW12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-- rebased against v3.17-rc1
-- added Arnd's Acked-by
-- added a proper tag to pull from
+On Wed, Sep 17, 2014 at 05:28:23PM +0100, Catalin Marinas wrote:
+> On Tue, Sep 16, 2014 at 02:53:55AM +0100, Wang, Yalin wrote:
+> > The reason that a want merge this patch is that
+> > It confuse me when I debug memory issue by 
+> > /sys/kernel/debug/memblock/reserved  debug file,
+> > It show lots of un-correct reserved memory.
+> > In fact, I also send a patch to cma driver part
+> > For this issue too:
+> > http://ozlabs.org/~akpm/mmots/broken-out/free-the-reserved-memblock-when-free-cma-pages.patch
+> > 
+> > I want to remove these un-correct memblock parts as much as possible,
+> > so that I can see more correct info from /sys/kernel/debug/memblock/reserved
+> > debug file .
+> 
+> Could we not always call memblock_free() from free_reserved_area() (with
+> a dummy definition when !CONFIG_HAVE_MEMBLOCK)?
 
-Thank you!
+Why bother?
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+The next thing is that people will want to have memblock's reserved areas
+track whether the kernel allocates a page so that the memblock debugging
+follows the kernel's allocation state.
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+This is utterly rediculous.  Memblock is purely a method to get the system
+up and running.  Once it hands memory over to the normal kernel allocators,
+the reservation information in memblock is no longer valid.
 
-are available in the git repository at:
+The /useful/ information that it provides is the state of memory passed
+over to the kernel allocators, which in itself is valuable information.
+Destroying it by freeing stuff after that point is not useful.
 
-  http://github.com/brcm/linux.git tags/bcm63138-v4
-
-for you to fetch changes up to e076e96227ef6b5b66cfdd79e75401bd2f6d532f:
-
-  MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs (2014-09-17 10:56:08 -0700)
-
-----------------------------------------------------------------
-Florian Fainelli (5):
-      ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
-      ARM: BCM63XX: add low-level UART debug support
-      ARM: BCM63XX: add BCM63138 minimal Device Tree
-      ARM: BCM63XX: add BCM963138DVT Reference platform DTS
-      MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
-
- .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
- MAINTAINERS                                        |   8 ++
- arch/arm/Kconfig.debug                             |  18 ++-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/bcm63138.dtsi                    | 134 +++++++++++++++++++++
- arch/arm/boot/dts/bcm963138dvt.dts                 |  30 +++++
- arch/arm/include/debug/bcm63xx.S                   |  33 +++++
- arch/arm/mach-bcm/Kconfig                          |  17 +++
- arch/arm/mach-bcm/Makefile                         |   3 +
- arch/arm/mach-bcm/bcm63xx.c                        |  27 +++++
- 10 files changed, 278 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
- create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
- create mode 100644 arch/arm/boot/dts/bcm963138dvt.dts
- create mode 100644 arch/arm/include/debug/bcm63xx.S
- create mode 100644 arch/arm/mach-bcm/bcm63xx.c
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
