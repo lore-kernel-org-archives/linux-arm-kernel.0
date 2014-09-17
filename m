@@ -1,35 +1,90 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Wed, 17 Sep 2014 09:05:08 -0700
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20140917014410.GC31214@srcf.ucam.org>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
- <20140917014410.GC31214@srcf.ucam.org>
-Message-ID: <20140917160508.GA2464@xora-yoga-13>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 17 Sep 2014 19:04:50 +0300
+Subject: [RFC PATCH 0/3] PM / clock_ops: allow to specify custom
+ pm_clk_notifier callback
+In-Reply-To: <CAMuHMdUJzXNep14ny24R=FhA4WzsWU9401ZU-nnZ_CkkJqxSsA@mail.gmail.com>
+References: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>	<7hr3zln692.fsf@linaro.org>	<540F0381.7010500@ti.com>
+ <CAMuHMdUJzXNep14ny24R=FhA4WzsWU9401ZU-nnZ_CkkJqxSsA@mail.gmail.com>
+Message-ID: <5419B122.3010509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 02:44:10AM +0100, Matthew Garrett wrote:
-> On Fri, Sep 12, 2014 at 10:00:16PM +0800, Hanjun Guo wrote:
+Hi Geert,
+
+On 09/17/2014 06:03 PM, Geert Uytterhoeven wrote:
 > 
-> > +Common _DSD bindings should be submitted to ASWG to be included in the
-> > +document :-
-> > +
-> > +http://www.uefi.org/sites/default/files/resources/_DSD-implementation-guide-toplevel.htm
+> On Tue, Sep 9, 2014 at 3:41 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>>> Since you're essentially gutting clock_ops, have you considered
+>>> migrating to genpd and having your own pm_domain ops that manage your clocks?
+>>
+>> Yes. I've thought about using genpd. But:
+>> - PM domain is not merged in 3.17 and I don't know if it will be merged in 3.18 :(
+>> http://www.spinics.net/lists/arm-kernel/msg357003.html
 > 
-> How are individuals/companies who aren't UEFI members supposed to do 
-> this? Aren't there IP issues involved in taking submissions from 
-> non-members?
+> Let's wait and see...
 > 
+>> - To switch using PM domains I will need to create PM domain node PER EACH device,
+>> (if I understand PM domain bindings right). For example:
+>>
+>> +power_netcp: power-controller at 0 {
+>> +               compatible = "keystone,power-controller";
+>> +               #power-domain-cells = <0>;
+>> +               clocks = <&clkcpgmac>, <&clkpa>, <&chipclk12>;
+>> +       };
+>>
+>> netcp: netcp at 2090000 {
+>>                  reg = <0x2620110 0x8>;
+>> +               power-domains = <&power_netcp>;
+>> ...
+>> }
+> 
+> I think you can have one power-controller, and add the clocks and
+> power-domains properties to the individual device nodes.
+> 
+> Then the power-controller driver can use the attach callback
+> introduced in "[PATCH/RFC v2 04/12] PM / Domains: Add genpd attach/detach
+> callbacks" (https://lkml.org/lkml/2014/9/16/429) to set up the clocks?
 
-This section needs to be changed anyway, it comes out of a
-misunderstanding I had of the _DSD spec.
+Thanks for the advice. I saw your series :)
+Unfortunately, I think, It can't be used as is, because there still no way
+ to separate "functional" and "optional" clocks for the device in DT.
+So, I'll need to define some sort of "fck-clocks" or "pm-clocks" properties for each device -
+but, it seems to be mostly impossible to obtain the approval of such a decision  :(
+ (taking into account current state of discussion
+  https://lkml.org/lkml/2014/6/12/441).
 
-It sounds like from the discussions in other threads that ARM64 should
-be following x86 and re-using DT bindings here. In which case there is
-not need to submit things to UEFI organisation.
+There no such problems with Gen PD, but, as drawback:
+- I have to define one Gen PD per-device.
+- some CLK data duplication is present if Driver code need
+  to operate with clocks in legacy way (for example to get current
+  CLK  frequency).
 
-What I got a little lost in has there been a formal decision about DT
-bindings in _DSD?
+Actually, I've done RFC implementation already and I hope to post it soon.
+My DT looks like:
++               netcp_domain: netcp_pm_controller {
++                       compatible = "ti,keystone-pm-controller";
++                       clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
++                       #power-domain-cells = <0>;
++               };
++
+                netcp: netcp at 2090000 {
+                        reg = <0x2620110 0x8>;
+                        reg-names = "efuse";
+@@ -229,6 +252,7 @@
+                        #address-cells = <1>;
+                        #size-cells = <1>;
+                        ranges;
++                       power-domains = <&netcp_domain>;
+ 
+                        clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+                        dma-coherent;
 
-Graeme
+
+By the way, looks like you did the same thing as I:
+I've hacked cock_ops, You - Generic PD ;P
+but the goal is the same - add hooks for platform's specific initialization code
+to workaround imperfection of clock_ops framework :)
+
+regards,
+-grygorii
