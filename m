@@ -1,86 +1,50 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 17 Sep 2014 09:25:50 -0400
-Subject: [RFC] arm: Handle starting up in secure mode
-In-Reply-To: <5418AA80.4090102@codeaurora.org>
-References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
- <5418AA80.4090102@codeaurora.org>
-Message-ID: <54198BDE.8000509@codeaurora.org>
+From: alex@lindusembedded.com (Alex Gonzalez)
+Date: Wed, 17 Sep 2014 15:31:20 +0200
+Subject: Timer expiring past its expiration time
+Message-ID: <CANsDNf1ssAd-zSyRuokqBAGGmsatFyykfPYgSPN6L_riCpZbUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 05:24 PM, Christopher Covington wrote:
-> On 09/16/2014 05:09 PM, Christopher Covington wrote:
->> ARM Linux currently has the most features available to it in hypervisor
->> (HYP) mode, so switch to it when possible. This can also ensure proper
->> reset of newer registers such as CNTVOFF.
->>
->> The permissions on the Non-Secure Access Control Register (NSACR) are
->> used to probe what the security setting currently is when in supervisor
->> (SVC) mode.
-> 
-> Sorry, this doesn't work yet. I was misinterpreting my test results. For what
-> it's worth, my testing and development methodology is to run it after hacked
-> up versions of the semihosting bootwrapper on the simulator that corresponds
-> to rtsm_ve-aemv8a.dtb (AEM VE FVP these days?) and examine the instruction traces.
+Hi,
 
-Looks like the real problem was that I was hacking up the bootwrapper
-incorrectly--my start-in-secure-mode bootwrapper variant wasn't setting up the
-GIC for non-secure access. With that changed, I've tested the following
-variations using the Image file in a single core configuration.
+I am looking for hints into a problem I am seeing on a Freescale i.MX6
+SoC based board running a 3.10.54 linux kernel. We realized that
+sometimes the reboot process would take too long, sometimes minutes,
+and we traced it down to a 2 secs sleep call from one of the rc.d
+scripts.
 
-Start in non-secure SVC with non-secure access to GIC configured.
+I have captured the problem in the serial console output below. The
+number in brackets is the {CPU id}.
 
-Start in secure SVC with non-secure access to GIC configured.
+[   21.788864] {0}[SYSC_nanosleep]2 secs 0 nsecs
+[   21.793933] {0}[do_nanosleep]About to schedule timer a86eff00
+[  127.217630] {0}[__run_hrtimer]timer a86eff00 EXPIRED
+[  127.227133] {0}[do_nanosleep]AFTER schedule
+[  127.232079] {0}[do_nanosleep]
+[  127.239428] Restarting system.
+[  127.242511] {0}[machine_restart]
 
-Start in secure SVC with non-secure access to GIC configured and hypervisor
-support disabled in the model (-C cluster.has_el2=0). This required setting
-the VBAR again in non-secure SVC but with that fix it seems to work. I'll
-include this change in v2.
+This shows the do_nanosleep() function calling schedule(), but the
+timer not expiring until 106 seconds later, when it was programmed to
+2 secs.
 
-I have not been able to start up the bootwrapper with secure monitor support
-disabled in the model (-C cluster.has_el3=0) because of faults during GIC
-configuration.
+The system is using high resolution timers, but I have also build
+without HR timers support and still hit the problem.  I have also
+cherry-picked patches from mainline v3.17-rc5 into hrtimers.c, but
+they did not help.
 
-So, any thoughts on the code? I have some questions.
+The problem occurs randomly, around 1% of the reboots, and only
+happens on SMP systems. That is, if I boot with maxcpus=1 we won't hit
+it. Also, it seems to be only reproducible on reboot. We have done
+some runtime testing trying to catch the error and are not able to see
+it happening. This is expected, as the platform is working normally
+otherwise.
 
-What initialization am I missing?
+I was hoping for some clues or maybe reports of anyone with similar issues.
 
-What's the right ifdefery? I'm thinking a CONFIG_ARM_SEC_EXT that is
-independent of CONFIG_ARM_VIRT_EXT.
-
-Are there folks who want to run Linux in secure mode? Would documenting in
-Kconfig that they can do this by leaving CONFIG_ARM_SEC_EXT undefined be
-sufficient support for this?
-
-Is it fine or bad to leave the CPU in undefined mode when one of the extension
-or privileged operations fails? It's only for maybe a dozen instructions until
-safe_svcmode_maskall.
-
-How should CPU mode recording be handled? Should the CONFIG_ARM_SEC_EXT code
-set __boot_cpu_mode with an extra bit specifying the security setting and then
-the CONFIG_ARM_VIRT_EXT code set-if-unset?
-
-What should the secure monitor stub leave behind? Right now it's different
-than the hypervisor stub: put the address of the code you want run in monitor
-mode into r4, make the secure monitor call, and make sure your code makes an
-exception return when finished.
-
-Whatever is left behind, I think it should allow the GIC driver to enable
-non-secure access to the hardware if Linux was booted in secure mode.
-
-If this code can be evolved and tested to the point where it's mergeable, then
-Linux can finally interact intelligently with the features introduced by the
-security extensions and only has to depend on firmware and bootloaders getting
-the implementation defined aspects of a system right, taking care of the
-architectually specified stuff itself when sufficiently privileged. Among
-other things, this should lead towards the bootwrapper no longer being
-required to boot Linux on ARM's virtual platforms, which would make my life
-easier.
+BTW, even though the serial output does not seem to mask the problem,
+having a persistent storage for a custom ftrace would be nice. Is that
+possible?
 
 Thanks,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Alex
