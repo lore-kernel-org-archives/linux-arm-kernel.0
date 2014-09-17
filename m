@@ -1,46 +1,68 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 17 Sep 2014 01:32:20 +0000 (UTC)
-Subject: Tegra baseline test results for v3.17-rc3
-Message-ID: <alpine.DEB.2.02.1409170128010.5860@utopia.booyaka.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Sep 2014 02:39:07 +0100
+Subject: [RFC PATCH v3 3/7] iommu: add new iommu_ops callback for adding
+ an OF device
+In-Reply-To: <5416D432.8020107@samsung.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-4-git-send-email-will.deacon@arm.com>
+ <5416D432.8020107@samsung.com>
+Message-ID: <20140917013907.GA15756@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 15, 2014 at 12:57:38PM +0100, Marek Szyprowski wrote:
+> Hello,
 
-Here are some basic Tegra test results for Linux v3.17-rc3.
-Logs and other details at:
+Hi Marek,
 
-    http://nvt.pwsan.com/pub/linux/testlogs/test_v3.17-rc3/20140916151848/
+Thanks for looking again at this -- I'll take at look at your exynos series
+when I'm back in the UK next week.
 
+> On 2014-09-12 18:34, Will Deacon wrote:
+> > This patch adds a new function to the iommu_ops structure to allow an
+> > OF device to be added to a specific IOMMU instance using the recently
+> > merged generic devicetree binding for IOMMUs. The callback (of_xlate)
+> > takes a struct device representing the master and an of_phandle_args
+> > representing the IOMMU and the correspondong IDs for the new master.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >   include/linux/iommu.h | 5 +++++
+> >   1 file changed, 5 insertions(+)
+> >
+> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > index 4256f3ce1673..821eb0bd9f6c 100644
+> > --- a/include/linux/iommu.h
+> > +++ b/include/linux/iommu.h
+> > @@ -21,6 +21,7 @@
+> >   
+> >   #include <linux/errno.h>
+> >   #include <linux/err.h>
+> > +#include <linux/of.h>
+> >   #include <linux/types.h>
+> >   #include <trace/events/iommu.h>
+> >   
+> > @@ -140,6 +141,10 @@ struct iommu_ops {
+> >   	/* Get the numer of window per domain */
+> >   	u32 (*domain_get_windows)(struct iommu_domain *domain);
+> >   
+> > +#ifdef CONFIG_OF_IOMMU
+> > +	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+> > +#endif
+> 
+> 
+> If I understand correctly, this callback is intended to do per-master 
+> initialization
+> of the iommu structures required by the given iommu driver (I stored them in
+> dev->archdata.iommu). However I really don't get what is the meaning of 
+> the return
+> value. Is it a boolean value? It is used only by of_iommu_configure to 
+> check if
+> the parse loop should be terminated...
 
-Test summary
-------------
+It should probably return 0 on success, < 0 otherwise. I'll fix
+of_iommu_configure to check for < 0 and only exit the loop then. The idea is
+that we don't swizzle the DMA ops for a device to IOMMU ops if of_xlate
+failed for any of its IDs.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.17-rc2 
-(52addcf9d6669fa439387610bc65c92fa0980cef)):
-   text     data      bss    total  kernel
- -12101     -528        0   -12629  multi_v7_defconfig
-  -4296      +56        0    -4240  tegra_defconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.17-rc2 
-(52addcf9d6669fa439387610bc65c92fa0980cef))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-       8k      -8k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-       8k      -8k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-       8k      -8k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-       8k      -8k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-       8k      -8k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-       8k      -8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Will
