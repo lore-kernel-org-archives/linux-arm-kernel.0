@@ -1,30 +1,50 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 17 Sep 2014 16:45:19 +0300
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <5418BC5C.5020108@wwwdotorg.org>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>	<CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>	<CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>	<CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>	<CAL1qeaEk_r5XAKvvJfwXN9+Wi9EjC_2MgBfoP92TK=F+Ou9QTA@mail.gmail.com>	<CAAObsKAwgfx1g2p7PQP+=HudvAHHpcPi47gEH6BrxEgLu6w2VQ@mail.gmail.com>	<CAL1qeaEC9O8-jgjGC44cFctoZPpp4dRVfQ=mhSb_2on7GgiU0w@mail.gmail.com>	<54172B3F.9030901@wwwdotorg.org>	<CAL1qeaEK=C4j+G5CA_91xJNe25d=-y47EyZAYnaMh46fNYVDAw@mail.gmail.com>	<54185698.7020600@wwwdotorg.org>
- <CAL1qeaGf6JSuq=ekZY7Pp2zSAB0+0S9fZ70xWpct2MJ=pTSmug@mail.gmail.com>
- <5418BC5C.5020108@wwwdotorg.org>
-Message-ID: <5419906F.1060605@kapsi.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Sep 2014 15:45:39 +0200
+Subject: [PATCH] ARM: mvebu: switch the Armada 370 RD board to internal
+ registers at 0xf1000000
+Message-ID: <1410961539-10388-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 01:40 AM, Stephen Warren wrote:
-> That's a huge time-sink, unless I work out NFS root,
-> which probably isn't properly or easily supported by any distro.
+Recent bootloader versions from Marvell that have DT support and
+various other new features remap the internal registers at
+0xf1000000. We have already done this change for most of the
+development boards from Marvell, and this commit does this change for
+the Marvell Armada 370 RD board.
 
-FWIW, this is how I've been working, and it hasn't been /that/ difficult 
-to get working. The Tegra side is trivial, just append something like
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-rd.dts | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-ip=dhcp root=/dev/nfs 
-nfsroot=host_ip:/your/nfsroot,v3,rsize=8192,wsize=8192,timeo=15
-
-(Granted, I had to do a bit of mucking around before finding this 
-working incantation..)
-
-to the kernel boot arguments. I've used Ubuntu 12.04, 13.10 and Arch 
-Linux on my Jetson in this way. The more annoying part is the nfs host 
-machine, but there are guides for that. Anyway, I've had both Ubuntu 
-12.04 and Arch working as hosts without problems.
-
-Mikko
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 4169f40..7054611 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -9,6 +9,15 @@
+  * This file is licensed under the terms of the GNU General Public
+  * License version 2.  This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
++ *
++ * Note: this Device Tree assumes that the bootloader has remapped the
++ * internal registers to 0xf1000000 (instead of the default
++ * 0xd0000000). The 0xf1000000 is the default used by the recent,
++ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
++ * boards were delivered with an older version of the bootloader that
++ * left internal registers mapped at 0xd0000000. If you are in this
++ * situation, you should either update your bootloader (preferred
++ * solution) or the below Device Tree should be adjusted.
+  */
+ 
+ /dts-v1/;
+@@ -30,7 +39,7 @@
+ 	};
+ 
+ 	soc {
+-		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+ 
+ 		pcie-controller {
+-- 
+2.0.0
