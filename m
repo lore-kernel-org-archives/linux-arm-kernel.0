@@ -1,48 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Sep 2014 19:12:54 +0100
-Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
-In-Reply-To: <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
- <20140915183334.GA30737@arm.com>
- <20140915184023.GF12361@n2100.arm.linux.org.uk>
- <20140915185027.GC30737@arm.com>
- <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
- <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
-Message-ID: <20140917181254.GW12361@n2100.arm.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 17 Sep 2014 20:16:44 +0200
+Subject: [PATCH] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140917152609.GA2111@localhost.localdomain>
+References: <20140911120928.GA1585@localhost.localdomain>
+ <20140911143616.3ebb025a@bbrezillon>
+ <20140911142511.GA2543@localhost.localdomain>
+ <20140911163847.5e2f85c7@bbrezillon>
+ <20140912004550.GB26904@shldeISGChi005.sh.intel.com>
+ <20140912143050.014ad4c3@bbrezillon>
+ <20140913153622.GA10132@localhost.localdomain>
+ <20140913173841.GA18093@brian-ubuntu>
+ <20140915144259.GA1947@localhost.localdomain>
+ <20140915221210.5d9871fb@bbrezillon>
+ <20140917152609.GA2111@localhost.localdomain>
+Message-ID: <20140917201644.43df2cd7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 05:28:23PM +0100, Catalin Marinas wrote:
-> On Tue, Sep 16, 2014 at 02:53:55AM +0100, Wang, Yalin wrote:
-> > The reason that a want merge this patch is that
-> > It confuse me when I debug memory issue by 
-> > /sys/kernel/debug/memblock/reserved  debug file,
-> > It show lots of un-correct reserved memory.
-> > In fact, I also send a patch to cma driver part
-> > For this issue too:
-> > http://ozlabs.org/~akpm/mmots/broken-out/free-the-reserved-memblock-when-free-cma-pages.patch
+Hi Huang,
+
+On Wed, 17 Sep 2014 23:26:11 +0800
+Huang Shijie <shijie8@gmail.com> wrote:
+
+> On Mon, Sep 15, 2014 at 10:12:10PM +0200, Boris BREZILLON wrote:
+> > On Mon, 15 Sep 2014 22:43:02 +0800
+> > Huang Shijie <shijie8@gmail.com> wrote:
 > > 
-> > I want to remove these un-correct memblock parts as much as possible,
-> > so that I can see more correct info from /sys/kernel/debug/memblock/reserved
-> > debug file .
+> > > On Sat, Sep 13, 2014 at 10:38:41AM -0700, Brian Norris wrote:
+> > > > On Sat, Sep 13, 2014 at 11:36:24PM +0800, Huang Shijie wrote:
+> > > > > On Fri, Sep 12, 2014 at 02:30:50PM +0200, Boris BREZILLON wrote:
+> > > > > > This test validates what's returned by ecc_strength file in sysfs
+> > > > > > (which in turn is specified by the NAND controller when initializing
+> > > > > > the NAND chip).
+> > > > > > 
+> > > > > > Doing this should not imply knowing the ECC algorithm in use in the
+> > > > > > NAND controller or the layout used to store data on NAND.
+> > > > > the difficulty is that the ECC parity area can be not byte aligned.
+> > > > 
+> > > > Is there a problem with just rounding up to the nearest byte alignment
+> > > > and ignoring the few bits that are wasted?
+> > > 
+> > > I feel a little confused with the two hooks.
+> > > 
+> > > does the ecc->write_page_raw need to write the ECC parity data?
+> > 
+> > Depending on the oob_required argument, it might be allowed to
+> > overwrite the ECC bytes even if this implies breaking page reliability
+> > (which is exactly what's expected).
+> > 
+> > When using raw write with with oob write option the writer should take
+> > care of regenerating ECC bytes (which you said was impossible in GPMI
+> > case) or copying them from a previous raw read.
+> Thanks for the explanation.
 > 
-> Could we not always call memblock_free() from free_reserved_area() (with
-> a dummy definition when !CONFIG_HAVE_MEMBLOCK)?
+> If we do not write the OOB, should we write the ECC bytes?
 
-Why bother?
+No we shouldn't, and if you take a look at my new proposal you'll see
+that I always write ECC bytes even when oob_required is not required,
+but this is not a problem because in this case the nand_base code has
+already set the oob area to 0xff and, if I'm correct, writing 0xff is
+just like leaving the area unwritten.
 
-The next thing is that people will want to have memblock's reserved areas
-track whether the kernel allocates a page so that the memblock debugging
-follows the kernel's allocation state.
+Of course leaving the ECC bytes to 0xff after a page erase will
+certainly trigger ECC errors when reading the page back in normal mode,
+but this is the MTD user responsibility to know what he's doing.
 
-This is utterly rediculous.  Memblock is purely a method to get the system
-up and running.  Once it hands memory over to the normal kernel allocators,
-the reservation information in memblock is no longer valid.
+> The hooks should comment clearly about how to implement them :(
 
-The /useful/ information that it provides is the state of memory passed
-over to the kernel allocators, which in itself is valuable information.
-Destroying it by freeing stuff after that point is not useful.
+Absolutely, and if we all agree on the expected behavior, I'll be happy
+to document it ;-).
+
+> 
+> > 
+> > Here is a real example of what one could test with raw write + oob:
+> > 1) read a page in raw mode
+> > 2) flip some bits in the generated ECC bytes (or what you references as
+> >    parity data) (this case can actually happen in real life)
+> > 3) write the modified page in raw mode
+> > 4) read back the same page in normal and check that ECC correction still
+> >    works as expected
+> the nandbiterr test mode does the test as above.
+> But i think the multi-writes to the same page should occur only for the
+> SLC nand.
+
+I already have a patch for that :-):
+
+http://code.bulix.org/f69wuu-87021
+
+This patch is erasing the NAND block between each bitflip insertion so
+that it can work on MLC nandflashes too.
+Anyway, IMHO this nandbiterrs testsuite should be implemented in a
+user-space tool (which could be part of mtd-utils) because we already
+have all the primitives we need to do it from there (ioctls to access
+NAND chips in raw mode).
+
+> 
+> I will read your new patch set carefully in this weekend.
+
+Thanks.
+
+Boris
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
