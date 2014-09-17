@@ -1,44 +1,70 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 17 Sep 2014 11:19:40 -0700
-Subject: [PATCH v6 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <20140917161554.GJ30918@lee--X1>
-References: <1409029109-28769-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1409029109-28769-2-git-send-email-bjorn.andersson@sonymobile.com>
- <20140826072727.GB9574@lee--X1> <20140917161554.GJ30918@lee--X1>
-Message-ID: <20140917181939.GG10179@sonymobile.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 17 Sep 2014 20:25:44 +0200
+Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
+In-Reply-To: <4451285.EDb1j6ttbA@vostro.rjw.lan>
+References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
+ <6318611.DnX9cEgMjk@vostro.rjw.lan>
+ <20140915165359.GA13080@core.coreip.homeip.net>
+ <4451285.EDb1j6ttbA@vostro.rjw.lan>
+Message-ID: <CAPDyKFq6FZcuU=TCMh0JE0ymbS73_eLtNrTgmgKA4OxEp=_zpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 17 Sep 09:15 PDT 2014, Lee Jones wrote:
+On 16 September 2014 01:36, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, September 15, 2014 09:53:59 AM Dmitry Torokhov wrote:
+>> On Sun, Sep 14, 2014 at 06:38:58PM +0200, Rafael J. Wysocki wrote:
+>> > On Friday, September 12, 2014 02:05:53 PM Dmitry Torokhov wrote:
+>> > > Hi Ulf,
+>> > >
+>> > > On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
+>> > > > To give callers the option of acting on a errors while removing the
+>> > > > pm_domain ops for the device in the ACPI PM domain, let
+>> > > > acpi_dev_pm_detach() return an int to provide the error code.
+>> > >
+>> > > So how would callers handle the errors? As far as I can see
+>> > > acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
+>> > > there is no meaningful strategy to handle errors as you are past the point of
+>> > > no return and you keep on tearing down the device.
 
-> On Tue, 26 Aug 2014, Lee Jones wrote:
-> 
-> > On Mon, 25 Aug 2014, Bjorn Andersson wrote:
-> > 
-> > > Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
-> > > 8960 and 8064 based devices. The binding currently describes the rpm
-> > > itself and the regulator subnodes.
-> > > 
-> > > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/mfd/qcom,rpm.txt |  246 ++++++++++++++++++++
-> > >  include/dt-bindings/mfd/qcom,rpm.h                 |  154 ++++++++++++
-> > >  2 files changed, 400 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,rpm.txt
-> > >  create mode 100644 include/dt-bindings/mfd/qcom,rpm.h
-> > 
-> > Please use the same filename formatting as the existing files.
-> 
-> Are you going to resubmit this (and answer my question on the
-> regulator patch)?
-> 
+The benefit is only relevant when ACPI and genpd PM domains would
+co-exist. In that case we might be able to skip genpd_dev_pm_detach()
+if acpi_dev_pm_detach() succeeds. So, currently there are  no benefit,
+but still it doesn't hurt.
 
-I'll resubmit all three parts after changing the filename of the dt header.
+>> >
+>> > This is specifically for what patch [3/9] is doing AFAICS.
+>> >
+>> > The existing callers don't need to worry about this.
+>>
+>> OK, so I have the very same comment about patch 3 then: we have
+>> dev_pm_domain_detach() returning error. How would the callers handle errors?
+>
+> Ulf?
 
-The regulator driver have a strong dependency on the mfd driver, but Kconfig
-will make sure it's not selectable until the two parts merges again, so it
-should be fine. But I guess it's up to Mark?
+I see your point. How about making dev_pm_domain_detach() to be a void
+function instead?
 
-Regards,
-Bjorn
+>
+>> WRT this patch: I'd rater we did not just return generic "error code" just
+>> because we do not know who manages PD for the device. Can we add API to check
+>> if we are using ACPI to manage power domains? Then patch #3 could check if it
+>> needs to use ACPI or generic power domain API.
+
+The problem is scalability. If we have other PM domains implementation
+in future, each of them need to be checked prior invoking the attach
+functions.
+Also, how would we distinguish between genpd and a new PM domain XYZ?
+
+Kind regards
+Uffe
+
+>
+> The rule is that if there is an ACPI companion object for the given device, then
+> ACPI is used.  So the API is ACPI_COMPANION(dev) and we have that check around
+> until someone realized that acpi_dev_pm_attach/detach() made it too.  We can
+> restore it, I suppose, but I'm not sure how much better it is going to be.
+>
+> Either way, I have no strong preferences here.
+>
+> Rafael
+>
