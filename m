@@ -1,53 +1,105 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Sep 2014 15:53:06 +0200
-Subject: [PATCH 1/7] ARM: add mach-asm9260
-In-Reply-To: <20140917134646.GF27054@piout.net>
-References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
- <1410646408-28901-2-git-send-email-linux@rempel-privat.de>
- <20140914071206.GP21986@titan.lakedaemon.net>
- <54154780.80203@rempel-privat.de>
- <20140914090545.GA21986@titan.lakedaemon.net>
- <20140917134646.GF27054@piout.net>
-Message-ID: <54199242.5020404@atmel.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 17 Sep 2014 10:11:53 -0400
+Subject: [PATCH - v4] PCI: keystone: add a pci quirk to limit mrrs
+In-Reply-To: <20140916215448.GB5050@google.com>
+References: <1410195814-30414-1-git-send-email-m-karicheri2@ti.com>
+ <20140916215448.GB5050@google.com>
+Message-ID: <541996A9.306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/2014 15:46, Alexandre Belloni :
-> Hi,
-> 
-> On 14/09/2014 at 05:05:45 -0400, Jason Cooper wrote :
->> On Sun, Sep 14, 2014 at 09:45:04AM +0200, Oleksij Rempel wrote:
->>> Am 14.09.2014 um 09:12 schrieb Jason Cooper:
->>>> On Sun, Sep 14, 2014 at 12:13:22AM +0200, Oleksij Rempel wrote:
->>>>
->>>> Could you please add a description of the SoC?  Perhaps a link to
->>>> documentation, or at least a slick sheet?  Also, are there any products
->>>> on the market with this SoC, which ones?
->>>>
->>>> thx,
->>>
->>> Hi,
->>>
->>> it is low cost (?) SoC targeted for market in China and India which
->>> trying to "replace" AT91SAM9G25.
-
-Well, I won't say "replace" but "compete with" Atmel AT91SAM9G25.
-AT91SAM9G25 is here to stay ;-)
-
->>> Here is some info:
->>> http://www.alphascale.com/index.asp?ics/615.html
->>>
->>> One of products:
->>> http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
+On 09/16/2014 05:54 PM, Bjorn Helgaas wrote:
+> On Mon, Sep 08, 2014 at 01:03:34PM -0400, Murali Karicheri wrote:
+>> Keystone PCI controller has a limitation that memory read request
+>> size must not exceed 256 bytes. This is a hardware limitation and
+>> add a quirk to force this limit on all downstream devices by
+>> updating mrrs.
 >>
->> Ok, please include this information is the commit log of the next
->> version of this patch.
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>
+> Applied to pci/host-keystone for v3.18, thanks.
+>
+> I moved the pci-keystone.txt update regarding pci=pcie_bus_perf into this
+> patch.  This is where it belongs, isn't it?  I'm pretty sure it wasn't
+> related to setting the PCI device ID dynamically.
+Yes. Thanks for taking care of the documentation part.
+
+Thanks
+Murali
+
+>
+>> ---
+>>    -v4: re-send removing extra lines
+>>    -v3: added check for vendor id and use pci_matc_id() to do matching
+>>    -v2: made the quirk happens after tuning
+>>    -v1: changed printk to indicate PCI bdf
 >>
-> 
-> I would also suggest to call it AlphaScale instead of Alpscale as it
-> allows to get more useful information when searching the web.
-> 
+>>   drivers/pci/host/pci-keystone.c |   45 +++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 45 insertions(+)
+>>
+>> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+>> index c1cfaef..ff8ed25 100644
+>> --- a/drivers/pci/host/pci-keystone.c
+>> +++ b/drivers/pci/host/pci-keystone.c
+>> @@ -42,8 +42,53 @@
+>>   /* DEV_STAT_CTRL */
+>>   #define PCIE_CAP_BASE		0x70
+>>
+>> +/* PCIE controller device IDs */
+>> +#define PCIE_RC_K2HK		0xb008
+>> +#define PCIE_RC_K2E		0xb009
+>> +#define PCIE_RC_K2L		0xb00a
+>> +
+>>   #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+>>
+>> +static void quirk_limit_mrrs(struct pci_dev *dev)
+>> +{
+>> +	struct pci_bus *bus = dev->bus;
+>> +	struct pci_dev *bridge = bus->self;
+>> +	static const struct pci_device_id rc_pci_devids[] = {
+>> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2HK),
+>> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
+>> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2E),
+>> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
+>> +		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2L),
+>> +		 .class = PCI_CLASS_BRIDGE_PCI<<  8, .class_mask = ~0, },
+>> +		{ 0, },
+>> +	};
+>> +
+>> +	if (pci_is_root_bus(bus))
+>> +		return;
+>> +
+>> +	/* look for the host bridge */
+>> +	while (!pci_is_root_bus(bus)) {
+>> +		bridge = bus->self;
+>> +		bus = bus->parent;
+>> +	}
+>> +
+>> +	if (bridge) {
+>> +		/*
+>> +		 * Keystone PCI controller has a h/w limitation of
+>> +		 * 256 bytes maximum read request size. It can't handle
+>> +		 * anything higher than this. So force this limit on
+>> +		 * all downstream devices
+>> +		 */
+>> +		if (pci_match_id(rc_pci_devids, bridge)) {
+>> +			if (pcie_get_readrq(dev)>  256) {
+>> +				dev_info(&dev->dev, "limiting mrrs to 256\n");
+>> +				pcie_set_readrq(dev, 256);
+>> +			}
+>> +		}
+>> +	}
+>> +}
+>> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
+>> +
+>>   static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+>>   {
+>>   	struct pcie_port *pp =&ks_pcie->pp;
+>> --
+>> 1.7.9.5
+>>
 
 
 -- 
-Nicolas Ferre
+Murali Karicheri
+Linux Kernel, Texas Instruments
