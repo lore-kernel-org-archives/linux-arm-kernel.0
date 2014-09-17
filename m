@@ -1,95 +1,42 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 17 Sep 2014 06:39:35 +0100
-Subject: [PATCH] ARM: DT: apq8064: add support to sdcc4 for wlan.
-Message-ID: <1410932375-4858-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 17 Sep 2014 08:06:49 +0200
+Subject: [PATCH v2 1/3] ARM: dts: imx6: add pm_power_off support for
+ i.mx6 chips
+In-Reply-To: <20140917034514.GF27452@Robin-OptiPlex-780>
+References: <1410511739-31122-1-git-send-email-b38343@freescale.com>
+ <1410511739-31122-2-git-send-email-b38343@freescale.com>
+ <20140917021044.GD4796@dragon>
+ <20140917034514.GF27452@Robin-OptiPlex-780>
+Message-ID: <20140917060649.GJ4992@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds sdcc4 node to enable wlan support on IFC6410
+On Wed, Sep 17, 2014 at 11:45:15AM +0800, Robin Gong wrote:
+> On Wed, Sep 17, 2014 at 10:10:45AM +0800, Shawn Guo wrote:
+> > On Fri, Sep 12, 2014 at 04:48:57PM +0800, Robin Gong wrote:
+> > > All chips of i.mx6 can be powered off by programming SNVS.
+> > > For example :
+> > > On i.mx6q-sabresd board, PMIC_ON_REQ connect with external
+> > > pmic ON/OFF pin, that will cause the whole PMIC powered off
+> > > except VSNVS. And system can restart once PMIC_ON_REQ goes
+> > > high by push POWRER key.
+> > 
+> > What's the behavior for those boards on which PMIC_ON_REQ isn't
+> > connected to anywhere?
+> >
+> System can't be powered off if not connect PMIC_ON_REQ. Although all of our
+> reference design for i.mx6 chips are connecting  PMIC_ON_REQ with external
+> PMIC, we need consider others may not use external PMIC. I'll add the info
+> into commit log or Kconfig.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |  4 ++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 38 ++++++++++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+You should add the information to the dtsi file in form of a
+status = "disabled" property so that boards that actually have the
+feature can enable it.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 3287f12..a69a059 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -28,6 +28,10 @@
- 			sdcc3: sdcc at 12180000 {
- 				status = "okay";
- 			};
-+			/* WLAN */
-+			sdcc4: sdcc at 121c0000 {
-+				status = "okay";
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index b1e476a..f31d20b 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -85,6 +85,13 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&ps_hold>;
- 
-+			sdc4_gpios: sdc4-gpios {
-+				pios {
-+					pins = "gpio63", "gpio64", "gpio65", "gpio66", "gpio67", "gpio68";
-+					function = "sdc4";
-+				};
-+			};
-+
- 			ps_hold: ps_hold {
- 				mux {
- 					pins = "gpio78";
-@@ -226,6 +233,16 @@
- 			qcom,ee = <0>;
- 		};
- 
-+		sdcc4bam:dma at 121c2000{
-+			compatible = "qcom,bam-v1.3.0";
-+			reg = <0x121c2000 0x8000>;
-+			interrupts = <0 95 0>;
-+			clocks = <&gcc SDC4_H_CLK>;
-+			clock-names = "bam_clk";
-+			#dma-cells = <1>;
-+			qcom,ee = <0>;
-+		};
-+
- 		amba {
- 			compatible = "arm,amba-bus";
- 			#address-cells = <1>;
-@@ -268,6 +285,27 @@
- 				dmas = <&sdcc3bam 2>, <&sdcc3bam 1>;
- 				dma-names = "tx", "rx";
- 			};
-+
-+			sdcc4: sdcc at 121c0000 {
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				status		= "disabled";
-+				reg		= <0x121c0000 0x2000>;
-+				interrupts	= <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC4_CLK>, <&gcc SDC4_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <4>;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+				max-frequency	= <48000000>;
-+				vmmc-supply = <&vsdcc_fixed>;
-+				vqmmc-supply = <&vsdcc_fixed>;
-+				dmas = <&sdcc4bam 2>, <&sdcc4bam 1>;
-+				dma-names = "tx", "rx";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&sdc4_gpios>;
-+			};
- 		};
- 	};
- };
+Sascha
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
