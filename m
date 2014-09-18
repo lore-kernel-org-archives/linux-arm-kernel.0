@@ -1,35 +1,113 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 18 Sep 2014 15:47:20 -0700
-Subject: [PATCH] pinctrl: qcom: use restart_notifier mechanism for ps_hold
-In-Reply-To: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
-References: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <11F1E440-6BD4-46F1-A399-4334FBA2C3B6@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 19 Sep 2014 01:13:21 +0200
+Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
+In-Reply-To: <CAPDyKFoPBfAYfP9gwSxWvdUvNSjMxxNeJ_BfRkgvOZLTNpzJXA@mail.gmail.com>
+References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
+ <20140917234331.GA28771@core.coreip.homeip.net>
+ <CAPDyKFoPBfAYfP9gwSxWvdUvNSjMxxNeJ_BfRkgvOZLTNpzJXA@mail.gmail.com>
+Message-ID: <58813810.nrS47mt5xk@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Sep 18, 2014, at 3:32 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
-
-> By converting to the restart_notifier mechanism for restart, we allow
-> for other mechanisms, like the watchdog, to be used for restart in the
-> case where PS_HOLD has failed to reset the chip.
+On Thursday, September 18, 2014 02:35:44 AM Ulf Hansson wrote:
+> On 18 September 2014 01:43, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> > On Thu, Sep 18, 2014 at 01:20:49AM +0200, Ulf Hansson wrote:
+> >> On 17 September 2014 22:10, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> >> > On Wed, Sep 17, 2014 at 08:25:44PM +0200, Ulf Hansson wrote:
+> >> >> On 16 September 2014 01:36, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> >> > On Monday, September 15, 2014 09:53:59 AM Dmitry Torokhov wrote:
+> >> >> >> On Sun, Sep 14, 2014 at 06:38:58PM +0200, Rafael J. Wysocki wrote:
+> >> >> >> > On Friday, September 12, 2014 02:05:53 PM Dmitry Torokhov wrote:
+> >> >> >> > > Hi Ulf,
+> >> >> >> > >
+> >> >> >> > > On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
+> >> >> >> > > > To give callers the option of acting on a errors while removing the
+> >> >> >> > > > pm_domain ops for the device in the ACPI PM domain, let
+> >> >> >> > > > acpi_dev_pm_detach() return an int to provide the error code.
+> >> >> >> > >
+> >> >> >> > > So how would callers handle the errors? As far as I can see
+> >> >> >> > > acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
+> >> >> >> > > there is no meaningful strategy to handle errors as you are past the point of
+> >> >> >> > > no return and you keep on tearing down the device.
+> >> >>
+> >> >> The benefit is only relevant when ACPI and genpd PM domains would
+> >> >> co-exist. In that case we might be able to skip genpd_dev_pm_detach()
+> >> >> if acpi_dev_pm_detach() succeeds. So, currently there are  no benefit,
+> >> >> but still it doesn't hurt.
+> >> >
+> >> > It doe snot have any negative material effect, the drawback is purely
+> >> > from API perspective.
+> >> >
+> >> >>
+> >> >> >> >
+> >> >> >> > This is specifically for what patch [3/9] is doing AFAICS.
+> >> >> >> >
+> >> >> >> > The existing callers don't need to worry about this.
+> >> >> >>
+> >> >> >> OK, so I have the very same comment about patch 3 then: we have
+> >> >> >> dev_pm_domain_detach() returning error. How would the callers handle errors?
+> >> >> >
+> >> >> > Ulf?
+> >> >>
+> >> >> I see your point. How about making dev_pm_domain_detach() to be a void
+> >> >> function instead?
+> >> >
+> >> > Yes, please.
+> >>
+> >> OK!
+> >>
+> >> >
+> >> >>
+> >> >> >
+> >> >> >> WRT this patch: I'd rater we did not just return generic "error code" just
+> >> >> >> because we do not know who manages PD for the device. Can we add API to check
+> >> >> >> if we are using ACPI to manage power domains? Then patch #3 could check if it
+> >> >> >> needs to use ACPI or generic power domain API.
+> >> >>
+> >> >> The problem is scalability. If we have other PM domains implementation
+> >> >> in future, each of them need to be checked prior invoking the attach
+> >> >> functions.
+> >> >> Also, how would we distinguish between genpd and a new PM domain XYZ?
+> >> >
+> >> > I do not think that trying all available methods to detach a pm domain,
+> >> > i.e.
+> >> >
+> >> >         err = acpi_dev_pm_detach();
+> >> >         if (err)
+> >> >                 err = blah_dev_pm_detach();
+> >> >         if (err)
+> >> >                 err = flab_dev_pm_detach();
+> >> >         if (err)
+> >> >                 err = gen_dev_pm_detach();
+> >> >
+> >> > is any better from scalability point of view. If you need to do that you
+> >> > will probably have to store something like "struct pd_ops *pd_ops" in
+> >> > your device and call appropriate implementation via it.
+> >>
+> >> No, that's not needed. Go ahead and have look at both ACPI and genpd,
+> >> the interesting part is the validation of struct dev_pm_domain pointer
+> >> in the struct device. That's all there is to it, no additional data
+> >> are required.
+> >
+> > OK, so can you simply put the needed method into struct dev_pm_domain and then
+> > dev_pm_domain_detach() would become:
+> >
+> > void dev_pm_domain_detach(struct device *dev, bool power_off)
+> > {
+> >         if (dev->pm_domain)
+> >                 dev->pm_domain->detach(dev, power_off);
+> > }
+> >
+> > Thanks.
 > 
-> Choose priority 128, as according to documentation, this mechanism "is
-> sufficient to restart the entire system?.
+> Ohh, didn't quite follow that this is what you meant. That would be a
+> great improvement, I will adopt in the next version.
 
-Will we use a higher priority for watchdog?  or how would we fail over to watchdog?
 
-> 
-> Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
-> drivers/pinctrl/qcom/pinctrl-msm.c | 38 ++++++++++++++++++++++++++------------
-> 1 file changed, 26 insertions(+), 12 deletions(-)
-> 
+         if (dev->pm_domain && dev->pm_domain->detach)
+                 dev->pm_domain->detach(dev, power_off);
 
-- k
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Pretty please.
+
+Rafael
