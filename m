@@ -1,48 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 18 Sep 2014 09:57:42 +0800
-Subject: [PATCH 2/3] dmaengine: sun6i: Add support for Allwinner A23
- (sun8i) variant
-In-Reply-To: <20140917155540.GJ2166@lukather>
-References: <1410616381-30226-1-git-send-email-wens@csie.org>
- <1410616381-30226-3-git-send-email-wens@csie.org>
- <20140916103540.GF9948@lukather>
- <CAGb2v67jokpXHxR26YoCEB2Y_v07oQZXZfPuGJC_wO=r-SRZhg@mail.gmail.com>
- <20140917155540.GJ2166@lukather>
-Message-ID: <CAGb2v65p4QPJY+eiLps6C2kAZjhPd99D5YYauwUjLJnnj54B1A@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Thu, 18 Sep 2014 09:58:10 +0800
+Subject: [PATCH] arm:extend the reserved mrmory for initrd to be page aligned
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491616@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 11:55 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Sep 16, 2014 at 10:13:27PM +0800, Chen-Yu Tsai wrote:
->> >> +     /*
->> >> +      * sun8i variant requires us to toggle an undocumented register,
->> >> +      * as seen in Allwinner's SDK.
->> >
->> > The BSP I have has this:
->> >
->> > static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
->> > {
->> >         struct sunxi_dmadev *sunxi_dev = dev;
->> >
->> >         clk_prepare_enable(sunxi_dev->ahb_clk);
->> > #ifdef CONFIG_ARCH_SUN8IW3
->> >         writel(0x04, sunxi_dev->base + DMA_GATE);
->> > #endif
->> > }
->> >
->> > /* All is ok, and open the clock */
->> > sunxi_dma_hw_init(sunxi_dev);
->> >
->> > So I guess we can say that it's not that undocumented :)
->>
->> That's right. I meant undocumented in the user manual.
->> I did reference the SDK in the comment, didn't I? :)
->
-> So something like
->
-> writel(DMA_GATE_ENABLE, base->DMA_GATE_REG) wouldn't be too far off :)
+this patch extend the start and end address of initrd to be page aligned,
+so that we can free all memory including the un-page aligned head or tail
+page of initrd, if the start or end address of initrd are not page
+aligned, the page can't be freed by free_initrd_mem() function.
 
-Sure. Will also update the comment to reflect the naming.
+Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+---
+ arch/arm/mm/init.c   | 5 +++++
+ arch/arm64/mm/init.c | 8 +++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-ChenYu
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 659c75d..9221645 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -636,6 +636,11 @@ static int keep_initrd;
+ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+ 	if (!keep_initrd) {
++		if (start == initrd_start)
++			start = round_down(start, PAGE_SIZE);
++		if (end == initrd_end)
++			end = round_up(end, PAGE_SIZE);
++
+ 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+ 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
+ 	}
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 5472c24..c5512f6 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -334,8 +334,14 @@ static int keep_initrd;
+ 
+ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+-	if (!keep_initrd)
++	if (!keep_initrd) {
++		if (start == initrd_start)
++			start = round_down(start, PAGE_SIZE);
++		if (end == initrd_end)
++			end = round_up(end, PAGE_SIZE);
++
+ 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
++	}
+ }
+ 
+ static int __init keepinitrd_setup(char *__unused)
+-- 
+2.1.0
