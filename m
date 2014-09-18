@@ -1,82 +1,115 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 17 Sep 2014 17:22:50 -0700
-Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
-In-Reply-To: <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
- <1408716154-26101-9-git-send-email-nm@ti.com>,
- <5419D7BD.30003@linaro.org>
- <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>
-Message-ID: <541A25DA.8030101@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 18 Sep 2014 02:35:44 +0200
+Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
+In-Reply-To: <20140917234331.GA28771@core.coreip.homeip.net>
+References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
+ <6318611.DnX9cEgMjk@vostro.rjw.lan>
+ <20140915165359.GA13080@core.coreip.homeip.net>
+ <4451285.EDb1j6ttbA@vostro.rjw.lan>
+ <CAPDyKFq6FZcuU=TCMh0JE0ymbS73_eLtNrTgmgKA4OxEp=_zpw@mail.gmail.com>
+ <20140917201025.GC25297@core.coreip.homeip.net>
+ <CAPDyKFqM27C9L86fn8wNxJewv9AvxymPgzzVo3CFh+=3Vo04Uw@mail.gmail.com>
+ <20140917234331.GA28771@core.coreip.homeip.net>
+Message-ID: <CAPDyKFoPBfAYfP9gwSxWvdUvNSjMxxNeJ_BfRkgvOZLTNpzJXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 04:20 PM, Shilimkar, Santosh wrote:
-> Sorry for the format. Emailing from webmail.
-> ________________________________________
-
-[ ... ]
-
->> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
->> +                            struct cpuidle_driver *drv,
->> +                            int index)
->> +{
->> +     struct idle_statedata *cx = state_ptr + index;
->> +     unsigned long flag;
->> +
->> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+On 18 September 2014 01:43, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> On Thu, Sep 18, 2014 at 01:20:49AM +0200, Ulf Hansson wrote:
+>> On 17 September 2014 22:10, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+>> > On Wed, Sep 17, 2014 at 08:25:44PM +0200, Ulf Hansson wrote:
+>> >> On 16 September 2014 01:36, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> >> > On Monday, September 15, 2014 09:53:59 AM Dmitry Torokhov wrote:
+>> >> >> On Sun, Sep 14, 2014 at 06:38:58PM +0200, Rafael J. Wysocki wrote:
+>> >> >> > On Friday, September 12, 2014 02:05:53 PM Dmitry Torokhov wrote:
+>> >> >> > > Hi Ulf,
+>> >> >> > >
+>> >> >> > > On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
+>> >> >> > > > To give callers the option of acting on a errors while removing the
+>> >> >> > > > pm_domain ops for the device in the ACPI PM domain, let
+>> >> >> > > > acpi_dev_pm_detach() return an int to provide the error code.
+>> >> >> > >
+>> >> >> > > So how would callers handle the errors? As far as I can see
+>> >> >> > > acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
+>> >> >> > > there is no meaningful strategy to handle errors as you are past the point of
+>> >> >> > > no return and you keep on tearing down the device.
+>> >>
+>> >> The benefit is only relevant when ACPI and genpd PM domains would
+>> >> co-exist. In that case we might be able to skip genpd_dev_pm_detach()
+>> >> if acpi_dev_pm_detach() succeeds. So, currently there are  no benefit,
+>> >> but still it doesn't hurt.
+>> >
+>> > It doe snot have any negative material effect, the drawback is purely
+>> > from API perspective.
+>> >
+>> >>
+>> >> >> >
+>> >> >> > This is specifically for what patch [3/9] is doing AFAICS.
+>> >> >> >
+>> >> >> > The existing callers don't need to worry about this.
+>> >> >>
+>> >> >> OK, so I have the very same comment about patch 3 then: we have
+>> >> >> dev_pm_domain_detach() returning error. How would the callers handle errors?
+>> >> >
+>> >> > Ulf?
+>> >>
+>> >> I see your point. How about making dev_pm_domain_detach() to be a void
+>> >> function instead?
+>> >
+>> > Yes, please.
+>>
+>> OK!
+>>
+>> >
+>> >>
+>> >> >
+>> >> >> WRT this patch: I'd rater we did not just return generic "error code" just
+>> >> >> because we do not know who manages PD for the device. Can we add API to check
+>> >> >> if we are using ACPI to manage power domains? Then patch #3 could check if it
+>> >> >> needs to use ACPI or generic power domain API.
+>> >>
+>> >> The problem is scalability. If we have other PM domains implementation
+>> >> in future, each of them need to be checked prior invoking the attach
+>> >> functions.
+>> >> Also, how would we distinguish between genpd and a new PM domain XYZ?
+>> >
+>> > I do not think that trying all available methods to detach a pm domain,
+>> > i.e.
+>> >
+>> >         err = acpi_dev_pm_detach();
+>> >         if (err)
+>> >                 err = blah_dev_pm_detach();
+>> >         if (err)
+>> >                 err = flab_dev_pm_detach();
+>> >         if (err)
+>> >                 err = gen_dev_pm_detach();
+>> >
+>> > is any better from scalability point of view. If you need to do that you
+>> > will probably have to store something like "struct pd_ops *pd_ops" in
+>> > your device and call appropriate implementation via it.
+>>
+>> No, that's not needed. Go ahead and have look at both ACPI and genpd,
+>> the interesting part is the validation of struct dev_pm_domain pointer
+>> in the struct device. That's all there is to it, no additional data
+>> are required.
 >
-> Why do you need this spin_lock_irqsave ? Aren't the local irqs already
-> disabled ?
+> OK, so can you simply put the needed method into struct dev_pm_domain and then
+> dev_pm_domain_detach() would become:
 >
-> [Santosh] Actually at one point of time before the idle consolidation the local
-> irq disable was inside the idle drivers. Now with that moved to core layer,
-> I think plain spin_lock/unlock() should work.
-
-ok.
-
->> +     cx->mpu_state_vote++;
->> +     if (cx->mpu_state_vote == num_online_cpus()) {
->> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
->> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
->> +     }
->> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
->> +
->> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
->> +
->> +     raw_spin_lock_irqsave(&mpu_lock, flag);
->> +     if (cx->mpu_state_vote == num_online_cpus())
->> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
->> +     cx->mpu_state_vote--;
->> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+> void dev_pm_domain_detach(struct device *dev, bool power_off)
+> {
+>         if (dev->pm_domain)
+>                 dev->pm_domain->detach(dev, power_off);
+> }
 >
-> I am not sure that will work. What happens if a cpu exits idle and then
-> re-enter idle immediately ?
+> Thanks.
+
+Ohh, didn't quite follow that this is what you meant. That would be a
+great improvement, I will adopt in the next version.
+
+Kind regards
+Uffe
+
 >
-> [Santosh] It works and that case is already taken care. CPU exist the idle and then votes
-> out for cluster state and if it reenters with the right targeted state, the cluster state would
-> be picked.
-
-It isn't possible to have one cpu disabling the coherency, while the 
-other one is looking for a lock ? Or eg. cpu0 is on WFI then cpu1 is the 
-last entering idle. While cpu1 is entering 'lowpower', cpu0 exits the 
-wfi check the state vote and set the power domain on. In the meantime 
-cpu1 disables the coherency and cpu0 decrease the vote and release the 
-lock. Could be possible there is a very small racy window here ?
-
-> Could you try a long run of this little program:
->
-> https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
->
-> [Santosh] I am sure there will not be any issue with the long run test case here.
-> Lets see if Nishant sees anything otherwise
-
-Ok. Make sure the cpu is effectively entering your C2 state with the 
-sleep duration in the test program.
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> --
+> Dmitry
