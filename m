@@ -1,140 +1,115 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Thu, 18 Sep 2014 16:19:26 +0200
-Subject: [PATCH v5 2/4] dt-bindings: document Rockchip thermal
-In-Reply-To: <541ADD58.7070901@rock-chips.com>
-References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
- <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
- <CAAObsKA61Ano85P6PehOY7WqR0FgTz_Rfur8UAt56ZXoNyoyqQ@mail.gmail.com>
- <541ADD58.7070901@rock-chips.com>
-Message-ID: <CAAObsKCYGEBNEvDTs=iQD9KT0YomQWHg0W-vwHG4nLZbqogF=g@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 18 Sep 2014 20:00:19 +0530
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+In-Reply-To: <CAFpQJXUs+6Qvj0SqgajA8_D8UdEh_EQVgTQDz0bPSn-VpEty9g@mail.gmail.com>
+References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <541A01B7.8030601@mentor.com>
+ <CAMDttNfSr5BrnEwLXqgy676jOZbFHhXcMtC0n7gBSniwhWCDRQ@mail.gmail.com>
+ <CAFpQJXUs+6Qvj0SqgajA8_D8UdEh_EQVgTQDz0bPSn-VpEty9g@mail.gmail.com>
+Message-ID: <CAFpQJXWjZc8mPFUrG0ec=c7-5bBMnwTjrfFmvopSTjVqO_o5Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 September 2014 15:25, Caesar Wang <caesar.wang@rock-chips.com> wrote:
-> Tomeu,
->
-> ? 2014?09?18? 17:27, Tomeu Vizoso ??:
->>
->> On 17 September 2014 05:59, Caesar Wang <caesar.wang@rock-chips.com>
->> wrote:
+looks like previous email not had the email ids added by kumar gala.
+adding the missing ids and sending again.
+
+On Thu, Sep 18, 2014 at 9:32 AM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> On Thu, Sep 18, 2014 at 4:42 AM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
+>> On Wed, Sep 17, 2014 at 2:48 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+>>> On 09/17/2014 03:56 AM, Ganapatrao Kulkarni wrote:
+>>>> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>>
+>>>> This patch adds property "nid" to memory node to provide the memory range to
+>>>> numa node id mapping.
+>>>>
+>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+>>>>  1 file changed, 58 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/numa.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+>>>> new file mode 100644
+>>>> index 0000000..c4a94f2
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/numa.txt
+>>>> @@ -0,0 +1,58 @@
+>>>> +======================================================
+>>>> +numa id binding description
+>>>> +======================================================
+>>>> +
+>>>> +======================================================
+>>>> +1 - Introduction
+>>>> +======================================================
+>>>> +The device node  property "nid(numa node id)" can be added to memory
+>>>> +device node to map the range of memory addresses as defined in property "reg".
+>>>> +The property "nid" maps the memory range to the numa node id, which is used to
+>>>> +find the local and remory pages on numa aware systems.
 >>>
->>> This add the necessary binding documentation for the thermal
->>> found on Rockchip SoCs
->>
->> Hi Caesar,
->>
->> is there any reason to not use the existing thermal bindings? You can
->> find a description in
->> Documentation/devicetree/bindings/thermal/thermal.txt and example code
->> in omap, or in the patches for Tegra recently posted by Mikko
->> Perttunen.
->>
->> Regards,
->>
->> Tomeu
->
->
-> Why should I use the existing thermal bindings?
-
-Because otherwise, you are asking to merge duplicated code. There's a
-generic way to define thermal zones, trip points, cooling devices,
-etc. And also code to parse and plug them together. Why add
-soc-specific code to do the same?
-
-> I believe omap,tegar and rockchip are  the three seperate thermals driver.
-
-Yes, and OMAP is already using the generic bindings, and the proposed
-patches for Tegra as well, and I think it would make sense for
-Rockchip to also use them (unless I'm missing something).
-
-Regards,
-
-Tomeu
-
-> So far, I submitted the series Patchs for rockchip thermal.
->
->>
->>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
->>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
->>> ---
->>>   .../bindings/thermal/rockchip-thermal.txt          | 41
->>> ++++++++++++++++++++++
->>>   1 file changed, 41 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>> "Local" and "remote" memory are notions that relate to some other
+>>> resource -- typically a CPU, but also I/O resources on some systems.  It
+>>> seems to me that a useful NUMA binding would at least specify a "nid"
+>>> property, or something like it, for both cpu and memory nodes.  But this
+>>> document speaks only of memory nodes.
+> IMO, nid can be extended to cpu node also if the arch dont have any
+> other way to do mapping, in fact this can be scaled to any node.
+> for ARM arch, cpu mapping can be fetched from topology parsing and
+> more over cpu mapping is required much later when secondary cpus comes
+> online.
+> i have added for memory, since this is parsed very early in the boot
+> sequence and there is no support for dt based map at this moment(at
+> least i am not aware off).
+> numa distance matrix can also be defined, if the architecture has
+> variable node distance other than just local/remote.
 >>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->>> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->>> new file mode 100644
->>> index 0000000..6fc8bc3
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->>> @@ -0,0 +1,41 @@
->>> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
->>> +
->>> +Required properties:
->>> +- compatible: "rockchip,rk3288-tsadc"
->>> +- reg: physical base address of the controller and length of memory
->>> mapped
->>> +       region.
->>> +- interrupts: The interrupt number to the cpu. The interrupt specifier
->>> format
->>> +             depends on the interrupt controller.
->>> +- clocks: Must contain an entry for each entry in clock-names.
->>> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk"
->>> for
->>> +              the peripheral clock.
->>> +- num-trips:  number of total trip points, this is required, set it 0 if
->>> none,
->>> +             if greater than 0, the following properties must be
->>> defined;
->>> +- tripN-temp: temperature of trip point N, should be in ascending order;
->>> +- tripN-type: type of trip point N, should be one of "active" "passive"
->>> "hot"
->>> +             "critical";
->>> +- tripN-cdev-num: number of the cooling devices which can be bound to
->>> trip
->>> +                 point N, this is required if trip point N is defined,
->>> set it 0 if none,
->>> +                 otherwise the following cooling device names must be
->>> defined;
->>> +- tripN-cdev-nameM: name of the No. M cooling device of trip point N;
->>> +
->>> +Example:
->>> +tsadc: tsadc at ff280000 {
->>> +       compatible = "rockchip,rk3288-tsadc";
->>> +       reg = <0xff280000 0x100>;
->>> +       interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
->>> +       clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
->>> +       clock-names = "tsadc", "apb_pclk";
->>> +
->>> +       num-trips = <2>;
->>> +
->>> +       trip0-temp = <80>;
->>> +       trip0-type = "passive";
->>> +       trip0-cdev-num = <1>;
->>> +       trip0-cdev-name0 = "thermal-cpufreq-0";
->>> +
->>> +       trip1-temp = <100>;
->>> +       trip1-type = "critical";
->>> +       trip1-cdev-num = <1>;
->>> +       trip1-cdev-name0 = "thermal-cpufreq-0";
->>> +};
->>> --
->>> 1.9.1
+>>> As Kumar said, the device tree on powerpc server systems already has
+>>> properties that express NUMA information.  If you can get hold of a copy
+>>> of the PAPR (not ePAPR) from power.org, refer to the description of
+>>> "ibm,associativity" and related properties.  I recall that it's a bit
+>>> more complex than this proposal, though.
+>>
+>> I'm not able to find a link to the actual PAPR (not ePAPR)
+>> specification. Anyone has a linky?
+>>
+>> I did find some code in tree, but couldn't find the bindings in
+>> Documentation/devicetree/.
+> yes, there is nothing in Documentation, if PPC are using since several
+> years, then i humbly request to publish the documentation for numa
+> bindings.
+> No point in reinventing the wheel. Also i did not find any spec named
+> PAPR, is it open spec, available to all like ePAPR?
+>
+>>
+>> Seems like we'd care about form1?
+>> -----8<-----
+>> commit 41eab6f88f24124df89e38067b3766b7bef06ddb
+>> Author: Anton Blanchard <anton@samba.org>
+>> Date:   Sun May 16 20:22:31 2010 +0000
+>>
+>>     powerpc/numa: Use form 1 affinity to setup node distance
+>>
+>>     Form 1 affinity allows multiple entries in
+>> ibm,associativity-reference-points
+>>     which represent affinity domains in decreasing order of importance. The
+>>     Linux concept of a node is always the first entry, but using the other
+>>     values as an input to node_distance() allows the memory allocator to make
+>>     better decisions on which node to go first when local memory has been
+>>     exhausted.
+>>
+>>     We keep things simple and create an array indexed by NUMA node, capped at
+>>     4 entries. Each time we lookup an associativity property we initialise
+>>     the array which is overkill, but since we should only hit this path during
+>>     boot it didn't seem worth adding a per node valid bit.
+>>
+>>     Signed-off-by: Anton Blanchard <anton@samba.org>
+>>     Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> ----->8-----
+>>
+>>
 >>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->>
->
-> --
-> Best regards,
-> Caesar
->
->
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
