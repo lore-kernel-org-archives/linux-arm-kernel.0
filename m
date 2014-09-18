@@ -1,63 +1,56 @@
-From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
-Date: Thu, 18 Sep 2014 11:04:16 +0900
-Subject: [RESEND PATCH] arm: exynos: Allow rtc alarm and tick wakeup irq
- for exynos3250.
-In-Reply-To: <CAGm_ybjMaLHPALp519fe=UdMy1DeJbcxUxJN+hcPecttY7A_tQ@mail.gmail.com>
-References: <1410923262-4771-1-git-send-email-jonghwa3.lee@samsung.com>
- <CAGm_ybjMaLHPALp519fe=UdMy1DeJbcxUxJN+hcPecttY7A_tQ@mail.gmail.com>
-Message-ID: <541A3DA0.1040805@samsung.com>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Wed, 17 Sep 2014 19:08:24 -0700
+Subject: [PATCH 0/2 V7] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1411006106-17339-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014? 09? 17? 17:53, Vikas Sajjan wrote:
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-> Hi,
-> 
-> On Wed, Sep 17, 2014 at 8:52 AM, Jonghwa Lee <jonghwa3.lee@samsung.com> wrote:
->> Add rtc alarm and tick irq to wakeup sources in exynos3250.
->>
->> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
->> Acked-by : Chanwoo choi <cw00.choi@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pm.c |    9 ++++++++-
->>  1 file changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->> index fa7218a..d78dcf9 100644
->> --- a/arch/arm/mach-exynos/pm.c
->> +++ b/arch/arm/mach-exynos/pm.c
->> @@ -66,6 +66,12 @@ static struct sleep_save exynos_core_save[] = {
->>
->>  static u32 exynos_irqwake_intmask = 0xffffffff;
->>
->> +static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
->> +       { 105, BIT(1) }, /* RTC alarm */
->> +       { 106, BIT(2) }, /* RTC tick */
->> +       { /* sentinel */ },
->> +};
->> +
->>  static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
->>         { 76, BIT(1) }, /* RTC alarm */
->>         { 77, BIT(2) }, /* RTC tick */
->> @@ -81,9 +87,10 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
->>  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
->>  {
->>         const struct exynos_wkup_irq *wkup_irq;
->> -
->>         if (soc_is_exynos5250())
->>                 wkup_irq = exynos5250_wkup_irq;
->> +       else if (soc_is_exynos3250())
->> +               wkup_irq = exynos3250_wkup_irq;
-> 
-> 
-> Don't add anymore soc_is_exynosxxx() checks, please rebase on [1],
-> which refactors the pm.c to use DT based lookup.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg355266.html
->
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
+This depends on and has been tested with the following patch set which
+implements PCI supports for ARM64:
 
-Okay, I'll wait those patches are merged, then I'll rebase and repost it.
+    [PATCH v10 00/10] Support for creating generic PCI host bridges from DT
+    https://lkml.org/lkml/2014/9/8/333
 
-Thanks,
-Jonghwa.
+    [PATCH v10] Add support for PCI in AArch64
+    https://lkml.org/lkml/2014/9/8/325
+ 
+Changes in V7:
+    * Fix error handling logic in gicv2m_of_init() and gicv2m_init_one().
+      per Marc suggestions.
+    * Restructure the patch to integrate the multi-MSI support for V2m
+      into the patch 2/2.
+    * Introduce "arm,gic-v2m-frame" compatible ID for the v2m DT binding.
+    * Introduce "arm,msi-base-spi" and "arm,msi-num-spi" property in the
+      v2m DT binding for overwriting value in MSI_TYPER register.
+    * Add irq-gic-v2m.c: is_msi_spi_valid() to validate the SPI base and
+      number of SPIs.
+    * Fix various comments from Marc (Many thanks).
+    * Add the missing CONFIG_ARM_GICV2M (per Marcin Juszkiewicz comment)
+
+Suravee Suthikulpanit (2):
+  irqchip: gic: Add support for multiple MSI for ARM64
+  irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
+
+ Documentation/devicetree/bindings/arm/gic.txt |  55 ++++
+ arch/arm64/Kconfig                            |   1 +
+ arch/arm64/kernel/Makefile                    |   1 +
+ arch/arm64/kernel/msi.c                       |  41 +++
+ drivers/irqchip/Kconfig                       |   7 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-gic-common.c              |  12 +
+ drivers/irqchip/irq-gic-common.h              |   4 +
+ drivers/irqchip/irq-gic-v2m.c                 | 356 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                     |  82 +++---
+ drivers/irqchip/irq-gic.h                     |  54 ++++
+ 11 files changed, 584 insertions(+), 30 deletions(-)
+ create mode 100644 arch/arm64/kernel/msi.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
+ create mode 100644 drivers/irqchip/irq-gic.h
+
+-- 
+1.9.3
