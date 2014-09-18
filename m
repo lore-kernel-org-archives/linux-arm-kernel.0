@@ -1,97 +1,53 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Thu, 18 Sep 2014 09:59:35 -0500
-Subject: [PATCH v2 3/3] clocksource: arm_arch_timer: consolidate
- arch_timer_evtstrm_enable
-In-Reply-To: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1411052390-27238-4-git-send-email-nathan_lynch@mentor.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 18 Sep 2014 17:07:12 +0200
+Subject: [PATCH] ARM: at91/dt: sama5d3: add the nfc clock
+In-Reply-To: <1410857037-24445-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410857037-24445-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <541AF520.3050705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch_timer_evtstrm_enable hooks in arm and arm64 are substantially
-similar, the only difference being a CONFIG_COMPAT-conditional section
-which is relevant only for arm64.  Copy the arm64 version to the
-driver, removing the arch-specific hooks.
+On 16/09/2014 10:43, Alexandre Belloni :
+> The atmel_nand driver is now able to handle the nfc clock, add it to sama5d3.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
- arch/arm/include/asm/arch_timer.h    | 11 -----------
- arch/arm64/include/asm/arch_timer.h  | 14 --------------
- drivers/clocksource/arm_arch_timer.c | 15 +++++++++++++++
- 3 files changed, 15 insertions(+), 25 deletions(-)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index b7ae44464231..92793ba69c40 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -99,17 +99,6 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
- 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
- }
- 
--static inline void arch_timer_evtstrm_enable(int divider)
--{
--	u32 cntkctl = arch_timer_get_cntkctl();
--	cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
--	/* Set the divider and enable virtual event stream */
--	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
--			| ARCH_TIMER_VIRT_EVT_EN;
--	arch_timer_set_cntkctl(cntkctl);
--	elf_hwcap |= HWCAP_EVTSTRM;
--}
--
- #endif
- 
- #endif
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 49e94c677e7a..f19097134b02 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -104,20 +104,6 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
- 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
- }
- 
--static inline void arch_timer_evtstrm_enable(int divider)
--{
--	u32 cntkctl = arch_timer_get_cntkctl();
--	cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
--	/* Set the divider and enable virtual event stream */
--	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
--			| ARCH_TIMER_VIRT_EVT_EN;
--	arch_timer_set_cntkctl(cntkctl);
--	elf_hwcap |= HWCAP_EVTSTRM;
--#ifdef CONFIG_COMPAT
--	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
--#endif
--}
--
- static inline u64 arch_counter_get_cntvct(void)
- {
- 	u64 cval;
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 31781fdd7c19..ce5f99e957b9 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -299,6 +299,21 @@ static void __arch_timer_setup(unsigned type,
- 	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
- }
- 
-+static void arch_timer_evtstrm_enable(int divider)
-+{
-+	u32 cntkctl = arch_timer_get_cntkctl();
-+
-+	cntkctl &= ~ARCH_TIMER_EVT_TRIGGER_MASK;
-+	/* Set the divider and enable virtual event stream */
-+	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+			| ARCH_TIMER_VIRT_EVT_EN;
-+	arch_timer_set_cntkctl(cntkctl);
-+	elf_hwcap |= HWCAP_EVTSTRM;
-+#ifdef CONFIG_COMPAT
-+	compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
-+#endif
-+}
-+
- static void arch_timer_configure_evtstream(void)
- {
- 	int evt_stream_div, pos;
+Stacked on at91-3.18-dt3 branch.
+
+Thanks,
+
+> ---
+>  arch/arm/boot/dts/sama5d3.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 7702a0d120cb..cd36c76fd4e3 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -1005,6 +1005,11 @@
+>  						reg = <2>;
+>  					};
+>  
+> +					hsmc_clk: hsmc_clk {
+> +						#clock-cells = <0>;
+> +						reg = <5>;
+> +					};
+> +
+>  					pioA_clk: pioA_clk {
+>  						#clock-cells = <0>;
+>  						reg = <6>;
+> @@ -1405,6 +1410,7 @@
+>  					0xffffc000 0x00000070	/* NFC HSMC regs */
+>  					0x00200000 0x00100000	/* NFC SRAM banks */
+>  					>;
+> +				clocks = <&hsmc_clk>;
+>  			};
+>  		};
+>  	};
+> 
+
+
 -- 
-1.9.3
+Nicolas Ferre
