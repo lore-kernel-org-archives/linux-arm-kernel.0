@@ -1,49 +1,86 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 18 Sep 2014 17:27:00 -0500
-Subject: [PATCH 2/3] watchdog: qcom: document device tree bindings
+Date: Thu, 18 Sep 2014 17:27:01 -0500
+Subject: [PATCH 3/3] watchdog: qcom: register a restart notifier
 In-Reply-To: <cover.1411078425.git.joshc@codeaurora.org>
 References: <cover.1411078425.git.joshc@codeaurora.org>
-Message-ID: <2fb34baf36df6c5ca086c2bb496474e4bf28f0ba.1411078426.git.joshc@codeaurora.org>
+Message-ID: <d0f4cd93ad3f6690d637413b1171ac3c71aba861.1411078426.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm Krait Processor Sub-system (KPSS) contains one or more
-instances of the WDT.  Provide documentation on how to describe these in
-the device tree.
+The WDT's BITE_TIME warm-reset behavior can be leveraged as a last
+resort mechanism for triggering chip reset.  Usually, other restart
+methods (such as PS_HOLD) are preferrable for issuing a more complete
+reset of the chip.  As such, keep the priority of the watchdog notifier
+low.
 
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- .../devicetree/bindings/watchdog/qcom-wdt.txt       | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
+ drivers/watchdog/qcom-wdt.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt b/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
-new file mode 100644
-index 0000000..e65cb8e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
-@@ -0,0 +1,21 @@
-+Qualcomm Krait Processor Sub-system (KPSS) Watchdog
-+---------------------------------------------------
+diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+index e9409f5..710ab43 100644
+--- a/drivers/watchdog/qcom-wdt.c
++++ b/drivers/watchdog/qcom-wdt.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/reboot.h>
+ #include <linux/watchdog.h>
+ 
+ #define WDT_RST		0x0
+@@ -24,6 +25,7 @@
+ struct qcom_wdt {
+ 	struct watchdog_device	wdd;
+ 	unsigned long		freq;
++	struct notifier_block	restart_nb;
+ 	void __iomem		*base;
+ };
+ 
+@@ -82,6 +84,24 @@ static const struct watchdog_info qcom_wdt_info = {
+ 	.identity	= KBUILD_MODNAME,
+ };
+ 
++static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
++			    void *data)
++{
++	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
 +
-+Required properties :
-+- compatible : shall contain only one of the following:
++	/*
++	 * Trigger watchdog bite:
++	 *    Setup BITE_TIME to be very low, and enable WDT.
++	 */
++	mutex_lock(&wdt->wdd.lock);
++	writel_relaxed(0, wdt->base + WDT_EN);
++	writel_relaxed(1, wdt->base + WDT_RST);
++	writel_relaxed(0x31F3, wdt->base + WDT_BITE_TIME);
++	writel_relaxed(1, wdt->base + WDT_EN);
++	mutex_unlock(&wdt->wdd.lock);
++	return NOTIFY_DONE;
++}
 +
-+			"qcom,kpss-wdt-msm8960"
-+			"qcom,kpss-wdt-apq8064"
-+			"qcom,kpss-wdt-ipq8064"
+ static int qcom_watchdog_probe(struct platform_device *pdev)
+ {
+ 	struct qcom_wdt *wdt;
+@@ -121,6 +141,17 @@ static int qcom_watchdog_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/*
++	 * WDT restart notifier has priority 0 (use as a last resort)
++	 */
++	wdt->restart_nb.notifier_call = qcom_wdt_restart;
++	ret = register_restart_handler(&wdt->restart_nb);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to setup restart handler\n");
++		watchdog_unregister_device(&wdt->wdd);
++		return ret;
++	}
 +
-+- reg : shall contain base register location and length
-+- clock-frequency : shall contain the frequency at which the watchdog ticks
-+- timeout-sec : shall contain the default watchdog timeout in seconds
-+
-+Example:
-+	watchdog at 208a038 {
-+		compatible = "qcom,kpss-wdt-ipq8064";
-+		reg = <0x0208a038 0x40>;
-+		clock-frequency = <32768>;
-+		timeout-sec = <10>;
-+	};
+ 	return 0;
+ }
+ 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
