@@ -1,25 +1,47 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 18 Sep 2014 21:43:45 +0800
-Subject: [PATCH V2 1/2] ARM: imx: replace cpu type check with ddr type
- check
-In-Reply-To: <1410923506-21439-1-git-send-email-b20788@freescale.com>
-References: <1410923506-21439-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140918134344.GJ4796@dragon>
+Date: Thu, 18 Sep 2014 21:46:15 +0800
+Subject: [PATCH 1/2] ARM: dts: vf610-colibri: Add ADC support
+In-Reply-To: <1015e874d5b13795e38069402a66b4798d79b632.1410873422.git.maitysanchayan@gmail.com>
+References: <cover.1410873422.git.maitysanchayan@gmail.com>
+ <1015e874d5b13795e38069402a66b4798d79b632.1410873422.git.maitysanchayan@gmail.com>
+Message-ID: <20140918134613.GK4796@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 11:11:45AM +0800, Anson Huang wrote:
-> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
-> index 17a41ca..caea07b 100644
-> --- a/arch/arm/mach-imx/mxc.h
-> +++ b/arch/arm/mach-imx/mxc.h
-> @@ -55,6 +55,8 @@
->  #define IMX_CHIP_REVISION_3_3		0x33
->  #define IMX_CHIP_REVISION_UNKNOWN	0xff
+On Wed, Sep 17, 2014 at 01:53:16PM +0530, Sanchayan Maity wrote:
+> Enable ADC support for Colibri VF61 modules
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  arch/arm/boot/dts/vf610-colibri.dtsi |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+> index 0cd8343..275ebec 100644
+> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+> @@ -69,6 +69,16 @@
+>  	status = "okay";
+>  };
 >  
-> +#define DDR_TYPE_LPDDR2		1
+> +&adc0 {
+> +	pinctrl-names = "default";
+> +	status = "okay";
+> +};
+> +
+> +&adc1 {
+> +	pinctrl-names = "default";
+> +	status = "okay";
+> +};
+> +
 
-We should give it a name-space.  I renamed it to IMX_DDR_TYPE_LPDDR2
-and applied both patches.
+Please sort the nodes alphabetically in node name.
 
 Shawn
+
+>  &iomuxc {
+>  	vf610-colibri {
+>  		pinctrl_esdhc1: esdhc1grp {
+> -- 
+> 1.7.9.5
+> 
