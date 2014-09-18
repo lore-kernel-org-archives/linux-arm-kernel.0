@@ -1,64 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Sep 2014 22:46:22 +0100
-Subject: [PATCH 3.17-rc4 v7 4/6] irqchip: gic: Add support for IPI FIQ
-In-Reply-To: <20140917185138.GX12361@n2100.arm.linux.org.uk> (Russell King's
- message of "Wed, 17 Sep 2014 19:51:38 +0100")
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
- <1410970218-28847-5-git-send-email-daniel.thompson@linaro.org>
- <20140917185138.GX12361@n2100.arm.linux.org.uk>
-Message-ID: <867g10vbyp.fsf@arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 18 Sep 2014 23:57:07 +0200
+Subject: [PATCH] ASoC: samsung: Remove goni or aquila with the WM8994
+In-Reply-To: <20140918175752.GC7960@sirena.org.uk>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
+ <201409041802.36466.arnd@arndb.de> <1411033409.2017.15.camel@x220>
+ <20140918175752.GC7960@sirena.org.uk>
+Message-ID: <1411077427.2012.6.camel@x41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17 2014 at 07:51:38 PM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi Mark,
 
-Hi Russell,
+Mark Brown schreef op do 18-09-2014 om 10:57 [-0700]:
+> On Thu, Sep 18, 2014 at 11:43:29AM +0200, Paul Bolle wrote:
+> > On Thu, 2014-09-04 at 18:02 +0200, Arnd Bergmann wrote:
+> 
+> > > I think it would be nice if you could submit a patch to remove the
+> > > drivers from ASoC, then we can see if anybody complains.
+> 
+> > Same thing for v3.17-rc5 and next-20140918. Let's see if we can remove
+> > the goni or aquila with wm8994 driver.
+> > 
+> > Done on top of next-20140918. Untested.
+> > --------->8---------
+> > From: Paul Bolle <pebolle@tiscali.nl>
+> 
+> Please follow the patch submission process in SubmittingPatches.
 
-> On Wed, Sep 17, 2014 at 09:10:16AM -0700, Daniel Thompson wrote:
->> This patch provides support for arm's newly added IPI FIQ. It works
->> by placing all interrupt sources *except* IPI FIQ in group 1 and
->> then flips a configuration bit in the GIC such that group 1
->> interrupts use IRQ and group 0 interrupts use FIQ.
->>
->> All GIC hardware except GICv1-without-TrustZone support provides a means
->> to group exceptions into group 0 and group 1. However the hardware
->> functionality is unavailable to the kernel when a secure monitor is
->> present because access to the grouping registers are prohibited outside
->> "secure world" (a feature that allows grouping to be used to allow
->> hardware peripherals to send interrupts into the secure world). However
->> when grouping is not available we can rely on the GIC's RAZ/WI semantics
->> and avoid conditional code.
->
-> I've been chasing a bug with this on the Versatile Express CT9x4.  It
-> seems that the GIC there is a GICv1, with secure extensions.  It seems
-> to support interrupt grouping.
->
-> However, setting SPIs to group 1, with the control registers enabling
-> both group 0 and group 1 (such that both groups are treated as IRQs)
-> results in no SPIs being delivered to the kernel.  In other words,
-> setting GIC_DIST_IGROUP for SPIs, and setting both GIC_CPU_CTRL and
-> GIC_DIST_CTRL to 3.
->
-> This is rather worrying, because we seem to have a GIC which for all
-> intents and purposes appears to be compatible with what we want to do,
-> appears to conform with the GIC architecture specifications, but doesn't
-> actually work.
->
-> I suspect that running the Versatile Express CT9x4 in non-secure mode
-> wouldn't work (because in non-secure mode, the GIC only allows access
-> to group 1 interrupts.)
->
-> I've added Will and Mark to this to see whether they have any comment.
+Could you please be more specific? What part of SubmittingPatches have I
+skipped?
 
-I'm rather far away from my VE-A9 board (and won't be to get back to it
-for another two weeks), so this is all a shot in the dark...
-
-Can you have a look at the GICC_AIAR register (located at GICC_IAR +
-0x14)? It *shouldn't* exist on this HW, assuming this is a real
-GICv1. But what you describe makes me think of something like this.
+Is it the perhaps the use of scissors? Or the superfluous From: line?
+"git am -c" appears to handle this message (and the very similar message
+I also sent today) just fine.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+
+Paul Bolle
