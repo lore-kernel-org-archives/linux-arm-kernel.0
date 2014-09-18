@@ -1,74 +1,43 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 18 Sep 2014 15:46:04 +0000
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <201409172114.36617.marex@denx.de>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <201409162017.06439.marex@denx.de>
- <1410965416759.91038@freescale.com>,<201409172114.36617.marex@denx.de>
-Message-ID: <1411055145666.72178@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Sep 2014 16:54:42 +0100
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140917234036.GC2464@xora-yoga-13>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <20140917014410.GC31214@srcf.ucam.org>
+ <20140917160508.GA2464@xora-yoga-13>
+ <201409180122.10631.arnd@arndb.de>
+ <20140917234036.GC2464@xora-yoga-13>
+Message-ID: <20140918155439.GA25330@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 18, 2014 at 12:40:36AM +0100, Graeme Gregory wrote:
+> On Thu, Sep 18, 2014 at 01:22:10AM +0200, Arnd Bergmann wrote:
+> > On Wednesday 17 September 2014, Graeme Gregory wrote:
+> > > It sounds like from the discussions in other threads that ARM64 should
+> > > be following x86 and re-using DT bindings here. In which case there is
+> > > not need to submit things to UEFI organisation.
+> > > 
+> > > What I got a little lost in has there been a formal decision about DT
+> > > bindings in _DSD?
+> > 
+> > I think this is a discussion that still needs to happen: either we should
+> > recommend everyone to use _DSD in favor of the alternatives, or we
+> > should prohibit the use of _DSD. I have heard arguments both ways, but
+> > hopefully we can find an easy answer.
+> 
+> This discussion is just not going to happen until people at @redhat.com
+> and people who have currently announced/released hardware are actually
+> willing to start talking about it.
 
-Marek Vasut wrote:
-> On Wednesday, September 17, 2014 at 04:50:34 PM, Yao Yuan wrote:
-> [...]
-> > > > > Would that mean that the "crashed" DMA would be running until the
-> > > > > next transmission is scheduled ?
-> > > >
-> > > > [Yuan Yao] No, In fact any DMA timeout will result the failure of I2C
-> > > > transmission and then it will turn to report the exception and wait
-> > > > for next transmission.
-> > >
-> > > Can you tell when the next transmission will happen? What if I issue a
-> > > single transmission and that one fails ? Will the DMA run until who knows
-> > > when ?
-> >
-> > [Yuan Yao]
-> > Sorry for my unclear description. In fact, During the DMA transmission  if
-> > an error happened or time out, DMA will stop at once and be disabled.
-> > I just continue to route the TX and RX request to signal the DMA
-> > controller. Because the DMA is disabled, it will ignore those signals.
-> >
-> > In a word, I just want to block the I2C TX, RX and interrupt signal when
-> > DMA mode failed until the next I2C transmission start.
+OTOH, there doesn't seem to be any urgency for merging arm64 ACPI
+support, so this discussion can wait ;).
 
-> So the I2C block is in error state until you clean it up upon next transmission?
-[Yuan Yao]
-No, just DMAEN bit.
-Other I2C error state will clean soon.
+> Id love to be able to put my foot down and ban the use of _DSD for
+> servers but I suspect that will not happen.
 
-> > In fact, the bit "I2CR_DMAEN" is a switch which decide whether I2C route
-> > the TX, RX and interrupt signal to DMA controller.
-> >
-> > > The only thing I worried about is I2C may still receive some feedbacks
-> > > after DMA timeout. In this case the feedbacks may lead to abnormal
-> > > state in PIO mode.But it will be ignored in DMA model.
-> > > That's why I tend to delay force-disable DMA until the next
-> > > transmission begin. Could you please give me some suggestion?
-> >
-> > > No, this design just seems flawed to me. You should stop the DMA
-> > > immediatelly if there is an error to avoid wasting resources and prevent
-> > > possible other adverse effects.
-> >
-> > [Yuan Yao]
-> > Yes, I have stopped the DMA immediately. However I keep the I2C DMA
-> > single route.
-> >
-> > I don't have the exact evidence to prove that my design is acceptable.
-> > So if you are sure it's flawed, I will change it in the next version(V8).
+And the alternative would be hard-coded platform specific configuration
+(or we assume that such configuration isn't needed)?
 
-> I'm just trying to understand it.
-
-[Yuan Yao]
-Both of us know that we should stop DMA immediately when issue happened.
-The only argument is that I want to set the DMAEN bit just before the next 
-transmission starts. But you think when I stop the DMA I should set it at the same
-time. The bit is the switch which is used to decide whether Rx and Tx signal can
-be routed to DMA. In fact, I deeply think about what is the difference between
-our arguments for those days. I think the two ways are almost the same.
-Your way is more acceptable because people tend to clear the DMA status
-just after stopping it. So I think your way is better.
-
-Best regards,
-Yuan Yao
+-- 
+Catalin
