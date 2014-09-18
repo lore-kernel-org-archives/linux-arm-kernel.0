@@ -1,47 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Sep 2014 13:55:36 +0100
-Subject: [PATCH] of: amba: use of_dma_configure for AMBA devices
-In-Reply-To: <541AC384.8010806@arm.com>
-References: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
- <20140917170338.GC18532@arm.com>
- <CAL_JsqKTZyPgbxy=pPmFPKRxa97oaWqC6u6pBvqvja_URLno4Q@mail.gmail.com>
- <20140917180524.GG18532@arm.com> <541AC384.8010806@arm.com>
-Message-ID: <20140918125535.GB17701@e104818-lin.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 18 Sep 2014 15:01:22 +0200
+Subject: [PATCH v2 7/7] arm: mediatek: Add earlyprintk support for mt8127
+ & mt8135
+In-Reply-To: <1410963854-17154-8-git-send-email-srv_yingjoe.chen@mediatek.com>
+References: <1410963854-17154-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1410963854-17154-8-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <541AD7A2.9020008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 12:35:32PM +0100, Robin Murphy wrote:
-> On 17/09/14 19:05, Will Deacon wrote:
-> > On Wed, Sep 17, 2014 at 06:47:19PM +0100, Rob Herring wrote:
-> >> On Wed, Sep 17, 2014 at 12:03 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >>> On Wed, Sep 17, 2014 at 12:56:07PM +0100, Robin Murphy wrote:
-> >>>> Commit 591c1e ("of: configure the platform device dma parameters)
-> >>>> introduced a common mechanism to configure DMA from DT properties.
-> >>>> AMBA devices created from DT can take advantage of this, too.
-> >>>>
-> >>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >>>
-> >>>    Acked-by: Will Deacon <will.deacon@arm.com>
-> >>>
-> >>> It would be great if the arm-soc guys can pick this up.
-> >>
-> >> Is this a dependency for something else? If so,
-> >>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >
-> > Yeah, it's going to be needed by my IOMMU init rework so that AMBA devices
-> > get registered with their IOMMUs.
+
+
+On 17/09/14 16:24, Joe.C wrote:
+> From: "Joe.C" <yingjoe.chen@mediatek.com>
 > 
-> Noob question: Does that mean I should resend (with ACKs) to 
-> arm at kernel.org? (I wasn't entirely sure where this should go, hence just 
-> throwing at the list with CCs)
+> Enable low-level debug for Mediatek mt8127 & mt8135 SoC.
+> 
+> Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/Kconfig.debug | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index cfdd1c0..3888d17 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -842,6 +842,22 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  for Mediatek mt6589 based platforms on UART0.
+>  
+> +	config DEBUG_MT8127_UART0
+> +		bool "Mediatek mt8127 UART0"
+> +		depends on ARCH_MEDIATEK
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  for Mediatek mt8127 based platforms on UART0.
+> +
+> +	config DEBUG_MT8135_UART3
+> +		bool "Mediatek mt8135 UART3"
+> +		depends on ARCH_MEDIATEK
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  for Mediatek mt8135 based platforms on UART3.
+> +
+>  	config DEBUG_VEXPRESS_UART0_DETECT
+>  		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+>  		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+> @@ -1084,6 +1100,8 @@ config DEBUG_UART_PHYS
+>  	default 0x101f1000 if ARCH_VERSATILE
+>  	default 0x101fb000 if DEBUG_NOMADIK_UART
+>  	default 0x11006000 if DEBUG_MT6589_UART0
+> +	default 0x11002000 if DEBUG_MT8127_UART0
+> +	default 0x11009000 if DEBUG_MT8135_UART3
 
-If it is not part of a larger series you want to merge, Rob could pick
-it up (he could add the acks as well).
+These lines are ordered by the address.
 
-Alternatively, I can get it via the arm64 tree together with an
-additional patch removing the bus hooks in dma-mapping.c (maybe that's a
-better option if no-one objects).
+>  	default 0x16000000 if ARCH_INTEGRATOR
+>  	default 0x18000300 if DEBUG_BCM_5301X
+>  	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
+> @@ -1147,6 +1165,8 @@ config DEBUG_UART_VIRT
+>  	default 0xf0201000 if DEBUG_BCM2835
+>  	default 0xf1000300 if DEBUG_BCM_5301X
+>  	default 0xf1006000 if DEBUG_MT6589_UART0
+> +	default 0xf1002000 if DEBUG_MT8127_UART0
+> +	default 0xf1009000 if DEBUG_MT8135_UART3
 
--- 
-Catalin
+Same here.
+Apart from that the patches look fine to me.
+
+Cheers,
+Matthias
+
+>  	default 0xf11f1000 if ARCH_VERSATILE
+>  	default 0xf1600000 if ARCH_INTEGRATOR
+>  	default 0xf1c28000 if DEBUG_SUNXI_UART0
+> 
