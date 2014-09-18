@@ -1,49 +1,45 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 18 Sep 2014 10:02:49 -0700
-Subject: [PATCH v5 1/4] thermal: rockchip: add driver for Thermal
-In-Reply-To: <541A985C.6030301@rock-chips.com>
-References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
- <1410926353-15674-2-git-send-email-caesar.wang@rock-chips.com>
- <20140917170223.GB25297@core.coreip.homeip.net>
- <541A985C.6030301@rock-chips.com>
-Message-ID: <20140918170249.GC14809@core.coreip.homeip.net>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 18 Sep 2014 20:15:24 +0300
+Subject: [PATCH 3/3] ARM: dts: keystone: k2l: Fix chip selects for SPI devices
+In-Reply-To: <1411060524-25077-1-git-send-email-grygorii.strashko@ti.com>
+References: <1411060524-25077-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1411060524-25077-4-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+From: Murali Karicheri <m-karicheri2@ti.com>
 
-On Thu, Sep 18, 2014 at 04:31:24PM +0800, Caesar Wang wrote:
-> Dear Dmitry,
-> 
-> 
-> ? 2014?09?18? 01:02, Dmitry Torokhov ??:
-> >Hi Caesar,
-> >
-> >On Wed, Sep 17, 2014 at 11:59:10AM +0800, Caesar Wang wrote:
-> >>+{
-> >>+	int i;
-> >>+
-> >>+	for (i = 0; i < ARRAY_SIZE(v2_code_table) - 1; i++) {
-> >>+		if (code >= v2_code_table[i].code)
-> >>+			return v2_code_table[i].temp;
-> >>+	}
-> >>+
-> >>+	return 0;
-> >I think if we do not find the code we should be returning max
-> >temperature, not 0.
-> Agree.
-> >And also WARN_ON() as this should not be happening.
-> >
-> Maybe,I will fix it as the follows:
-> 
-> pr_warn("Don't find code from v2_code_table\n");
-> return 125;
-> 
-> Do you agree?
+There are 5 chip selects per SPI0 and SPI2 and 3 per SPI1. SPI2 needs
+to be pinned out to use and by default they are disabled. So keep the
+state disabled to reflect default.
 
-Sounds good.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/k2l.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Thanks.
-
+diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
+index e3bb142..291db43 100644
+--- a/arch/arm/boot/dts/k2l.dtsi
++++ b/arch/arm/boot/dts/k2l.dtsi
+@@ -81,3 +81,17 @@
+ 		};
+ 	};
+ };
++
++&spi0 {
++       ti,davinci-spi-num-cs = <5>;
++};
++
++&spi1 {
++       ti,davinci-spi-num-cs = <3>;
++};
++
++&spi2 {
++       ti,davinci-spi-num-cs = <5>;
++       /* Pin muxed. Enabled and configured by Bootloader */
++       status = "disabled";
++};
 -- 
-Dmitry
+1.9.1
