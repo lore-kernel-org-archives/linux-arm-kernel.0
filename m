@@ -1,77 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Sep 2014 12:16:16 -0700
-Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
-In-Reply-To: <20140918171650.GK14505@atomide.com>
-References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
- <20140918171650.GK14505@atomide.com>
-Message-ID: <20140918191615.GN14505@atomide.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 18 Sep 2014 12:19:01 -0700
+Subject: [PATCH v6 0/8] arm: support CONFIG_RODATA
+Message-ID: <1411067949-10913-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140918 10:17]:
-> * Tero Kristo <t-kristo@ti.com> [140901 11:09]:
-> > Hi,
-> > 
-> > This set contains PRCM related cleanups meant for 3.18 merge window.
-> > These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
-> > (http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
-> > set is used as basis to avoid merge issues.
-> > 
-> > Purpose of this work is to eventually convert the PRCM code into a
-> > separate driver, but this is done in incremental parts as the amount
-> > of changes is substantial. Expected conclusion of this work is 3.19
-> > if everything goes fine.
-> > 
-> > This part of the work mostly moves some of the SoC specific PRCM driver
-> > calls under generic version of the same, and adds SoC-ops to support
-> > these on the driver level.
-> > 
-> > Working branch posted here:
-> > 
-> > tree: https://github.com/t-kristo/linux-pm.git
-> > branch: for-v3.18/prcm-cleanup
-> 
-> Paul, any comments on this series?
+This is a series of patches to support CONFIG_RODATA on ARM, so that
+the kernel text is RO, and non-text sections default to NX. To support
+on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
+support has been finalized based on several versions of various patches
+that are floating around on the mailing list. This series attempts to
+include the least intrusive version, so that others can build on it for
+future fixmap work.
 
-Just gave this branch a quick try, it seems to work with off-idle
-for me when merged with current linux-omap master branch. The following
-merge resolution is needed because of the recent pre es3.1 fix though.
+The series has been heavily tested, and appears to be working correctly:
 
-I've pushed out this merged with all the other pending patches into
-omap-for-v3.18/tmp-merge-2014-09-18.
+With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
+/sys/kernel/debug/kernel_page_tables.
 
-Nishant, care to give it a try and check your recent PM related
-changes work with it?
+Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
+for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
+        EXEC_DATA
+        WRITE_RO
+        WRITE_KERN
 
-Regards,
+ftrace works:
+        CONFIG_FTRACE_STARTUP_TEST passes
+        Enabling tracing works:
+                echo function > /sys/kernel/debug/tracing/current_tracer
+kprobes works:
+        CONFIG_ARM_KPROBES_TEST passes
 
-Tony
+kexec works:
+        kexec will load and start a new kernel
 
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@@ -30,6 -30,12 +30,11 @@@
-  #include "cm3xxx.h"
-  #include "cm-regbits-34xx.h"
-  
-+ static void omap3xxx_prm_read_pending_irqs(unsigned long *events);
-+ static void omap3xxx_prm_ocp_barrier(void);
-+ static void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask);
-+ static void omap3xxx_prm_restore_irqen(u32 *saved_mask);
- -static void omap3xxx_prm_reconfigure_io_chain(void);
-+ 
-  static const struct omap_prcm_irq omap3_prcm_irqs[] = {
-  	OMAP_PRCM_IRQ("wkup",	0,	0),
-  	OMAP_PRCM_IRQ("io",	9,	1),
-@@@ -391,9 -382,9 +396,9 @@@ void omap3430_pre_es3_1_reconfigure_io_
-   * I/O wakeup gates are aligned with the current mux settings.  Works
-   * by asserting WUCLKIN, waiting for WUCLKOUT to be asserted, and then
-   * deasserting WUCLKIN and clearing the ST_IO_CHAIN WKST bit.  No
- - * return value.
- + * return value. These registers are only available in 3430 es3.1 and later.
-   */
-- void omap3_prm_reconfigure_io_chain(void)
- -static void omap3xxx_prm_reconfigure_io_chain(void)
-++static void omap3_prm_reconfigure_io_chain(void)
-  {
-  	int i = 0;
-  
+Built with and without CONFIG_HIGHMEM, CONFIG_HIGHMEM_DEBUG, and
+CONFIG_NR_CPUS=32.
+
+Thanks to everyone who has been testing this series and working on its
+various pieces!
+
+Hopefully this should address Will's last concerns. :)
+
+Thanks!
+
+-Kees
+
+v6:
+- always run patch_text under stop_machine (will.deacon)
+- document set_fixmap's TLB flushing situation (will.deacon)
+
+v5:
+- clean up #includes in mmu.c (will.deacon)
+- optimize get_cr() test (will.deacon)
+- created free_tcmmem to avoid excessive #ifdefs (will.deacon)
+- explicitly test irqs_disabled in set_fixmap (will.deacon)
+
+v4:
+- expanded fixmap to 3MB to support 32 CPUs (robh)
+- corrected pmd-finding via vaddr instead of FIXMAP_START (robh)
+- switched structure size test to BUILD_BUG_ON (sboyd)
+- added locking annotations to keep sparse happy (sboyd)
+- adding missing "static" declarations noticed by sparse
+- reorganized fixmap portion of patches
+
+v3:
+- more cleanups in switch to generic fixmap (lauraa, robh)
+- fixed kexec merge hunk glitch (will.deacon)
+- added tested-by tags where appropriate from v2 testing
+
+v2:
+- fix typo in kexec merge (buildbot)
+- flip index order for highmem pte access (lauraa)
+- added kgdb updates (dianders)
