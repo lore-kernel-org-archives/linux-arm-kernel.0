@@ -1,56 +1,63 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Thu, 18 Sep 2014 09:58:10 +0800
-Subject: [PATCH] arm:extend the reserved mrmory for initrd to be page aligned
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491616@CNBJMBX05.corpusers.net>
+From: jonghwa3.lee@samsung.com (jonghwa3.lee at samsung.com)
+Date: Thu, 18 Sep 2014 11:04:16 +0900
+Subject: [RESEND PATCH] arm: exynos: Allow rtc alarm and tick wakeup irq
+ for exynos3250.
+In-Reply-To: <CAGm_ybjMaLHPALp519fe=UdMy1DeJbcxUxJN+hcPecttY7A_tQ@mail.gmail.com>
+References: <1410923262-4771-1-git-send-email-jonghwa3.lee@samsung.com>
+ <CAGm_ybjMaLHPALp519fe=UdMy1DeJbcxUxJN+hcPecttY7A_tQ@mail.gmail.com>
+Message-ID: <541A3DA0.1040805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch extend the start and end address of initrd to be page aligned,
-so that we can free all memory including the un-page aligned head or tail
-page of initrd, if the start or end address of initrd are not page
-aligned, the page can't be freed by free_initrd_mem() function.
+On 2014? 09? 17? 17:53, Vikas Sajjan wrote:
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/mm/init.c   | 5 +++++
- arch/arm64/mm/init.c | 8 +++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+> Hi,
+> 
+> On Wed, Sep 17, 2014 at 8:52 AM, Jonghwa Lee <jonghwa3.lee@samsung.com> wrote:
+>> Add rtc alarm and tick irq to wakeup sources in exynos3250.
+>>
+>> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+>> Acked-by : Chanwoo choi <cw00.choi@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/pm.c |    9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+>> index fa7218a..d78dcf9 100644
+>> --- a/arch/arm/mach-exynos/pm.c
+>> +++ b/arch/arm/mach-exynos/pm.c
+>> @@ -66,6 +66,12 @@ static struct sleep_save exynos_core_save[] = {
+>>
+>>  static u32 exynos_irqwake_intmask = 0xffffffff;
+>>
+>> +static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
+>> +       { 105, BIT(1) }, /* RTC alarm */
+>> +       { 106, BIT(2) }, /* RTC tick */
+>> +       { /* sentinel */ },
+>> +};
+>> +
+>>  static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
+>>         { 76, BIT(1) }, /* RTC alarm */
+>>         { 77, BIT(2) }, /* RTC tick */
+>> @@ -81,9 +87,10 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+>>  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+>>  {
+>>         const struct exynos_wkup_irq *wkup_irq;
+>> -
+>>         if (soc_is_exynos5250())
+>>                 wkup_irq = exynos5250_wkup_irq;
+>> +       else if (soc_is_exynos3250())
+>> +               wkup_irq = exynos3250_wkup_irq;
+> 
+> 
+> Don't add anymore soc_is_exynosxxx() checks, please rebase on [1],
+> which refactors the pm.c to use DT based lookup.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg355266.html
+>
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..9221645 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -636,6 +636,11 @@ static int keep_initrd;
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
- 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
- 	}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..c5512f6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -334,8 +334,14 @@ static int keep_initrd;
- 
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
--	if (!keep_initrd)
-+	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-+	}
- }
- 
- static int __init keepinitrd_setup(char *__unused)
--- 
-2.1.0
+
+Okay, I'll wait those patches are merged, then I'll rebase and repost it.
+
+Thanks,
+Jonghwa.
