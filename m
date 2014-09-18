@@ -1,148 +1,68 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 18 Sep 2014 15:10:43 +0530
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <1c762cb71a5245f19fdcec8266fd45b6@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <1410935510-1567-1-git-send-email-pankaj.dubey@samsung.com>
- <20140917085818.GA10285@shlinux1.ap.freescale.net>
- <000401cfd269$922dfc40$b689f4c0$@samsung.com>
- <20140918030552.GA26661@shlinux1.ap.freescale.net>
- <000701cfd306$4d3e8080$e7bb8180$@samsung.com>
- <20140918075516.GB15363@shlinux1.ap.freescale.net>
- <1c762cb71a5245f19fdcec8266fd45b6@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <000d01cfd324$a2db05e0$e89111a0$@samsung.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Thu, 18 Sep 2014 17:38:54 +0800
+Subject: [PATCH] arm64:free_initrd_mem should also free the memblock
+In-Reply-To: <20140917181254.GW12361@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103CDBFBFB029@CNBJMBX05.corpusers.net>
+ <20140915183334.GA30737@arm.com>
+ <20140915184023.GF12361@n2100.arm.linux.org.uk>
+ <20140915185027.GC30737@arm.com>
+ <35FD53F367049845BC99AC72306C23D103D6DB49160C@CNBJMBX05.corpusers.net>
+ <20140917162822.GB15261@e104818-lin.cambridge.arm.com>
+ <20140917181254.GW12361@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49161B@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
-On September 18, 2014, Li.Xiubo wrote,
-> Subject: RE: [PATCH v3] mfd: syscon: Decouple syscon interface from
-platform
-> devices
-> 
-> [...]
-> > > I think there should have been a check for NULL on "dev" in
-> > > "regmap_get_val_endian", so that if dev pointer exist then only it
-> > > makes sense to get endianness property from DT.
-> > >
-> > > I will suggest following fix in regmap.c for this. With following
-> > > fix I tested it and it works well on linux-next also. So if you can
-> > > confirm following fix is working for you then I can post this patch.
-> > >
-> >
-> > I tested the patch work.
-> > But as Xiubo pointed in another mail, it may still cause other issues.
-> > Looking at regmap.c, there're still some other places using the device
-> > pointer, e.g. dev_xxx debug information and some tracepoints also take
-> > device pointer as parameter(not sure if it will break if dev is NULL).
-> > Another thing is that if dev is NULL, we may not be able to use regmap
-> > debugfs feature which seems also not as our expected.
-> >
-> > Maybe we could consider create device structure for each syscon
-> > compatible device in syscon driver in of_syscon_register in first time
-> > which seems to be reasonable.
-> >
-> > Regards
-> > Dong Aisheng
-> >
-> > > --------------------------------------------
-> > > Subject: [PATCH] regmap: fix NULL pointer dereference in
-> > > regmap_get_val_endian
-> > >
-> > > Recent commits for getting reg endianess causing NULL pointer
-> > > dereference if dev is passed NULL in regmap_init_mmio. This patch
-> > > fixes this issue, and allows to parse reg endianess only if dev and
-> > > dev->of_node exist.
-> > >
-> > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > > ---
-> > >  drivers/base/regmap/regmap.c |   23 ++++++++++++++---------
-> > >  1 file changed, 14 insertions(+), 9 deletions(-)
-> > >
-> > > diff --git a/drivers/base/regmap/regmap.c
-> > > b/drivers/base/regmap/regmap.c index f2281af..455a877 100644
-> > > --- a/drivers/base/regmap/regmap.c
-> > > +++ b/drivers/base/regmap/regmap.c
-> > > @@ -477,7 +477,7 @@ static enum regmap_endian
-> > > regmap_get_val_endian(struct device *dev,
-> > >  					const struct regmap_bus *bus,
-> > >  					const struct regmap_config *config)
-{
-> > > -	struct device_node *np = dev->of_node;
-> > > +	struct device_node *np;
-> 
-> And the 'np' must be NULL as default.
-> 
-> Isn't it ?
-> 
+mm..
+I see your meaning,
+But how to debug reserved memory,
+I mean how to know which physical memory are reserved in kernel if 
+Not use /sys/kernel/debug/memblock/reserved  debug file ?
+
+I think memblock provides a debug interface, so it should keep it 
+Correct for debug .
+
+For Catalin 's suggestion,
+I am not sure if it is always true to call memblock_free() in
+free_reserved_area() , maybe some caller don't want this
+behaviors .
+So maybe we can introduce another function like free_reserved_area_and_memblock() to implement it.
 
 
-Yes. 
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Thursday, September 18, 2014 2:13 AM
+To: Catalin Marinas
+Cc: Wang, Yalin; Will Deacon; 'linux-mm at kvack.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: Re: [PATCH] arm64:free_initrd_mem should also free the memblock
 
-Thanks,
-Pankaj Dubey
+On Wed, Sep 17, 2014 at 05:28:23PM +0100, Catalin Marinas wrote:
+> On Tue, Sep 16, 2014 at 02:53:55AM +0100, Wang, Yalin wrote:
+> > The reason that a want merge this patch is that It confuse me when I 
+> > debug memory issue by /sys/kernel/debug/memblock/reserved  debug 
+> > file, It show lots of un-correct reserved memory.
+> > In fact, I also send a patch to cma driver part For this issue too:
+> > http://ozlabs.org/~akpm/mmots/broken-out/free-the-reserved-memblock-
+> > when-free-cma-pages.patch
+> > 
+> > I want to remove these un-correct memblock parts as much as 
+> > possible, so that I can see more correct info from 
+> > /sys/kernel/debug/memblock/reserved
+> > debug file .
+> 
+> Could we not always call memblock_free() from free_reserved_area() 
+> (with a dummy definition when !CONFIG_HAVE_MEMBLOCK)?
 
-> Thanks,
-> 
-> BRs
-> Xiubo
-> 
-> > >  	enum regmap_endian endian;
-> > >
-> > >  	/* Retrieve the endianness specification from the regmap config */
-> > > @@ -487,15 +487,20 @@ static enum regmap_endian
-> > > regmap_get_val_endian(struct device *dev,
-> > >  	if (endian != REGMAP_ENDIAN_DEFAULT)
-> > >  		return endian;
-> > >
-> > > -	/* Parse the device's DT node for an endianness specification */
-> > > -	if (of_property_read_bool(np, "big-endian"))
-> > > -		endian = REGMAP_ENDIAN_BIG;
-> > > -	else if (of_property_read_bool(np, "little-endian"))
-> > > -		endian = REGMAP_ENDIAN_LITTLE;
-> > > +	/* If the dev and dev->of_node exist try to get endianness from DT
-> > > */
-> > > +	if (dev && dev->of_node) {
-> > > +		np = dev->of_node;
-> > >
-> > > -	/* If the endianness was specified in DT, use that */
-> > > -	if (endian != REGMAP_ENDIAN_DEFAULT)
-> > > -		return endian;
-> > > +		/* Parse the device's DT node for an endianness
-> > > specification */
-> > > +		if (of_property_read_bool(np, "big-endian"))
-> > > +			endian = REGMAP_ENDIAN_BIG;
-> > > +		else if (of_property_read_bool(np, "little-endian"))
-> > > +			endian = REGMAP_ENDIAN_LITTLE;
-> > > +
-> > > +		/* If the endianness was specified in DT, use that */
-> > > +		if (endian != REGMAP_ENDIAN_DEFAULT)
-> > > +			return endian;
-> > > +	}
-> > >
-> > >  	/* Retrieve the endianness specification from the bus config */
-> > >  	if (bus && bus->val_format_endian_default)
-> > > --
-> > >
-> > > Thanks,
-> > > Pankaj Dubey
-> > >
-> > > > Regards
-> > > > Dong Aisheng
-> > > >
-> > > > >
-> > > > > Thanks,
-> > > > > Pankaj Dubey
-> > > > >
-> > > > > > Regards
-> > > > > > Dong Aisheng
-> > > > > >
-> > > > > > >
-> > > > > > >
-> > > > > > > _______________________________________________
-> > > > > > > linux-arm-kernel mailing list
-> > > > > > > linux-arm-kernel at lists.infradead.org
-> > > > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > > >
-> > >
+Why bother?
+
+The next thing is that people will want to have memblock's reserved areas track whether the kernel allocates a page so that the memblock debugging follows the kernel's allocation state.
+
+This is utterly rediculous.  Memblock is purely a method to get the system up and running.  Once it hands memory over to the normal kernel allocators, the reservation information in memblock is no longer valid.
+
+The /useful/ information that it provides is the state of memory passed over to the kernel allocators, which in itself is valuable information.
+Destroying it by freeing stuff after that point is not useful.
+
+--
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up according to speedtest.net.
