@@ -1,52 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Sep 2014 13:11:03 -0700
-Subject: [GIT PULL 4/4] omap clean-up for v3.18 merge window
-In-Reply-To: <pull-1411070912-460910>
-References: <pull-1411070912-460910>
-Message-ID: <pull-1411070912-460910-4>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 18 Sep 2014 13:14:52 -0700
+Subject: [PATCH] arm, kaslr: randomize module base address
+Message-ID: <20140918201452.GA1653@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+While we don't yet have text base address randomization in ARM, we can
+do module base address randomization. This bumps the module base by up
+to 4MiB.
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/Kconfig         |  8 ++++++++
+ arch/arm/kernel/module.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 50 insertions(+), 3 deletions(-)
 
-are available in the git repository at:
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 32cbbd565902..47b03360aa51 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1769,6 +1769,14 @@ config XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 
++config RANDOMIZE_BASE
++	bool "Randomize the base address of loaded modules"
++	depends on MMU
++	default n
++	---help---
++	   Randomizes the base address at which kernel modules are loaded,
++	   with 10 bits of entropy. At most, this will create a 4MiB gap
++	   at the start of the kernel modules virtual address range.
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 6a4dffefd357..f7cf7e84905e 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -19,6 +19,7 @@
+ #include <linux/fs.h>
+ #include <linux/string.h>
+ #include <linux/gfp.h>
++#include <linux/random.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/sections.h>
+@@ -38,11 +39,49 @@
+ #endif
+ 
+ #ifdef CONFIG_MMU
++# ifdef CONFIG_RANDOMIZE_BASE
++static unsigned long module_load_offset;
++static int randomize_modules = 1;
++
++/* Mutex protects the module_load_offset. */
++static DEFINE_MUTEX(module_kaslr_mutex);
++
++static int __init parse_nokaslr(char *p)
++{
++	randomize_modules = 0;
++	return 0;
++}
++early_param("nokaslr", parse_nokaslr);
++
++static unsigned long int get_module_load_offset(void)
++{
++	if (randomize_modules) {
++		mutex_lock(&module_kaslr_mutex);
++		/*
++		 * Calculate the module_load_offset the first time this
++		 * code is called. Once calculated it stays the same until
++		 * reboot.
++		 */
++		if (module_load_offset == 0)
++			module_load_offset =
++				(get_random_int() % 1024 + 1) * PAGE_SIZE;
++		mutex_unlock(&module_kaslr_mutex);
++	}
++	return module_load_offset;
++}
++# else
++static unsigned long int get_module_load_offset(void)
++{
++	return 0;
++}
++# endif
++
+ void *module_alloc(unsigned long size)
+ {
+-	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+-				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
+-				__builtin_return_address(0));
++	return __vmalloc_node_range(size, 1,
++				MODULES_VADDR + get_module_load_offset(),
++				MODULES_END, GFP_KERNEL, PAGE_KERNEL_EXEC,
++				NUMA_NO_NODE, __builtin_return_address(0));
+ }
+ #endif
+ 
+-- 
+1.9.1
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/cleanup-for-v3.18
 
-for you to fetch changes up to 3d0cb73e9c85e60206ea9d5191bc0b9a0c4c8a99:
-
-  arm: mach-omap2: Convert pr_warning to pr_warn (2014-09-18 09:53:57 -0700)
-
-----------------------------------------------------------------
-Clean-up for omaps for v3.18 merge window:
-
-- Remove unused pieces of the legacy DMA API as we're moving to
-  dmaengine API
-
-- Search and replace to standardize on pr_warn instead of pr_warning
-
-----------------------------------------------------------------
-Joe Perches (1):
-      arm: mach-omap2: Convert pr_warning to pr_warn
-
-Tony Lindgren (1):
-      ARM: OMAP: Remove unused pieces of legacy DMA API
-
- arch/arm/mach-omap2/display.c            |   2 +-
- arch/arm/mach-omap2/hdq1w.c              |   4 +-
- arch/arm/mach-omap2/i2c.c                |   2 +-
- arch/arm/mach-omap2/msdi.c               |   4 +-
- arch/arm/mach-omap2/mux.c                |   2 +-
- arch/arm/mach-omap2/omap_hwmod.c         |  26 +-
- arch/arm/mach-omap2/pdata-quirks.c       |   4 +-
- arch/arm/mach-omap2/pm34xx.c             |   2 +-
- arch/arm/mach-omap2/smartreflex-class3.c |   4 +-
- arch/arm/mach-omap2/sr_device.c          |   2 +-
- arch/arm/mach-omap2/vc.c                 |   2 +-
- arch/arm/mach-omap2/voltage.c            |  22 +-
- arch/arm/mach-omap2/wd_timer.c           |   4 +-
- arch/arm/plat-omap/dma.c                 | 737 +------------------------------
- include/linux/omap-dma.h                 |  37 --
- 15 files changed, 46 insertions(+), 808 deletions(-)
+-- 
+Kees Cook
+Chrome OS Security
