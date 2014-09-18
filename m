@@ -1,48 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Sep 2014 08:48:39 +0100
-Subject: [PATCH 3.17-rc4 v7 4/6] irqchip: gic: Add support for IPI FIQ
-In-Reply-To: <20140917210712.GY12361@n2100.arm.linux.org.uk>
-References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
- <1410970218-28847-5-git-send-email-daniel.thompson@linaro.org>
- <20140917185138.GX12361@n2100.arm.linux.org.uk> <5419EB27.2040405@linaro.org>
- <20140917210712.GY12361@n2100.arm.linux.org.uk>
-Message-ID: <20140918074839.GZ12361@n2100.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 18 Sep 2014 09:56:50 +0200
+Subject: [PATCH 4/7] clk: add clk-asm9260 driver
+In-Reply-To: <541A7FE1.8060202@rempel-privat.de>
+References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
+ <1410646408-28901-5-git-send-email-linux@rempel-privat.de>
+ <20140917135440.GG27054@piout.net>
+ <541A7FE1.8060202@rempel-privat.de>
+Message-ID: <20140918075650.GB29620@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 10:07:13PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 17, 2014 at 01:12:23PM -0700, Daniel Thompson wrote:
-> > I may have missed something but this sounds like the expected behaviour
-> > to me.
+Hi,
+
+On 18/09/2014 at 08:46:57 +0200, Oleksij Rempel wrote :
+> Am 17.09.2014 um 15:54 schrieb Alexandre Belloni:
+> > Hi,
 > > 
-> > Without AckCtl set (GIC_CPU_CTRL bit 2) then it is not possible to
-> > acknowledge group 1 interrupts from secure mode. Thus in the
-> > circumstances described above I would expect the system to wedge in the
-> > interrupt handler because IRQ is raised but the software is not able to
-> > acknowledge it.
+> > Please have a look at https://lkml.org/lkml/2014/5/14/598 which describe
+> > the preferred way of implementing clocks in the CCF where you only
+> > declare the clock generator in the DT instead of each separate clocks.
 > 
-> Setting AckCtl (0x07) results in no change in behaviour - still crashes
-> when it tries to calibrate the timer.
+> hm... if i see it correctly. i will need to move almost everything from
+> DT to clk-driver. And i will need to create separate driver for other
+> SoC provided by AlphaScale. On other side with current (generic) driver
+> i will need only to change DT and it will work.
 > 
-> > I think there may also problems with leaving CBPR unset. Leaving CBPR
-> > unset certainly causes a change of behaviour compared to an all group0
-> > setup.
+> May be instead of going qcom way, it will be better to have generic
+> gate, div and mux bindings for DT? Sure it will make DT a bit fuzzy, but
+> it will dramatically reduce kernel code and reduce the time of providing
+> code to upstream.
 > 
-> Also tried setting that (0x17), but still the same.
+> I don't think drivers/clk/qcom/gcc-msm8974.c is less complicated solution.
 
-Another data point: SDP4430 boots fine with 0x17.
+IT is not less complicated but it is more flexible (for exemple when
+setting flags on individual clocks, like CLK_SET_RATE_PARENT or
+CLK_IGNORE_UNUSED). Describing all the individual clocks in DT is a
+mistake we made in at91 and it will definitely bother you in the future,
+for example when you realize that your clock controller is also taking
+care of reset or power management.
 
-The Versatile Express has GIC ID/TYPER register values of:
+Also, this is the kind of driver you write only once per SoC so it is
+about the same doing it in DT or in C with the added advantage that
+doing it in C takes less memory and is probably faster.
 
-GICC IDR: 0x3901043b GICD TYPER: 0x0000fc62
-
-The SDP4430 has:
-
-GICC IDR: 0x3901043b GICD TYPER: 0x0000fc24
-
-so they should in theory be identical GICs, and should behave identically,
-but they don't.
+You can have a look at how it has been done for the berlin SoCs to see
+how you can easily reuse code between drivers.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
