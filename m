@@ -1,274 +1,215 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 18 Sep 2014 12:42:16 +0200
-Subject: [PATCH] ASoC: samsung: Remove PCM support for WM8580 on SMDK
-In-Reply-To: <201409041802.36466.arnd@arndb.de>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
- <201409041802.36466.arnd@arndb.de>
-Message-ID: <1411036935.2017.30.camel@x220>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Sep 2014 14:13:13 +0300
+Subject: [RFC PATCH v3 4/7] iommu: provide helper function to configure an
+ IOMMU for an of master
+In-Reply-To: <1410539695-29128-5-git-send-email-will.deacon@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-5-git-send-email-will.deacon@arm.com>
+Message-ID: <4801495.ovhjCBfpBC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-09-04 at 18:02 +0200, Arnd Bergmann wrote:
-> On Thursday 04 September 2014, Paul Bolle wrote:
-> > Ditto for [...] MACH_SMDKC110, and MACH_SMDKV210. Note that
-> > here SND_SOC_SMDK_WM8580_PCM can not be set anymore.
->>
-> [...]
-> I think it would be nice if you could submit a patch to remove the
-> drivers from ASoC, then we can see if anybody complains.
+Hi Will,
 
-Also the same thing for v3.17-rc5 and next-20140918. So let's see if we
-can remove this driver too.
+Thank you for the patch.
 
-Done on top of next-20140918. Again untested.
--------->8--------
-From: Paul Bolle <pebolle@tiscali.nl>
+On Friday 12 September 2014 17:34:52 Will Deacon wrote:
+> The generic IOMMU device-tree bindings can be used to add arbitrary OF
+> masters to an IOMMU with a compliant binding.
+> 
+> This patch introduces of_iommu_configure, which does exactly that. A
+> list of iommu_dma_mapping structures are created for each device, which
+> represent the set of IOMMU instances through which the device can
+> master. The list is protected by a kref count and freed when no users
+> remain. It is expected that DMA-mapping code will take a reference if it
+> wishes to make use of the IOMMU information.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/Kconfig       |  2 +-
+>  drivers/iommu/of_iommu.c    | 70 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-mapping.h |  8 ++++++
+>  include/linux/of_iommu.h    | 10 +++++++
+>  4 files changed, 89 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index dd5112265cc9..6d13f962f156 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -15,7 +15,7 @@ if IOMMU_SUPPORT
+> 
+>  config OF_IOMMU
+>         def_bool y
+> -       depends on OF
+> +       depends on OF && IOMMU_API
+> 
+>  config FSL_PAMU
+>  	bool "Freescale IOMMU support"
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 13d800c4ce25..8656b63f27ee 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -18,9 +18,11 @@
+>   */
+> 
+>  #include <linux/export.h>
+> +#include <linux/iommu.h>
+>  #include <linux/limits.h>
+>  #include <linux/of.h>
+>  #include <linux/of_iommu.h>
+> +#include <linux/slab.h>
+> 
+>  /**
+>   * of_get_dma_window - Parse *dma-window property and returns 0 if found.
+> @@ -90,6 +92,74 @@ int of_get_dma_window(struct device_node *dn, const char
+> *prefix, int index, }
+>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> 
+> +struct iommu_dma_mapping *of_iommu_configure(struct device *dev)
+> +{
+> +	struct of_phandle_args iommu_spec;
+> +	struct iommu_dma_mapping *mapping;
+> +	struct device_node *np;
+> +	struct iommu_data *iommu = NULL;
+> +	int idx = 0;
+> +
+> +	/*
+> +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> +	 * See the `Notes:' section of
+> +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> +	 */
+> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> +					   "#iommu-cells", idx,
+> +					   &iommu_spec)) {
+> +		struct iommu_data *data;
+> +
+> +		np = iommu_spec.np;
+> +		data = of_iommu_get_data(np);
+> +
+> +		if (!data || !data->ops || !data->ops->of_xlate)
+> +			goto err_put_node;
+> +
+> +		if (!iommu) {
+> +			iommu = data;
+> +		} else if (iommu != data) {
+> +			/* We don't currently support multi-IOMMU masters */
+> +			pr_warn("Rejecting device %s with multiple IOMMU instances\n",
+> +				dev_name(dev));
+> +			goto err_put_node;
+> +		}
+> +
+> +		if (!data->ops->of_xlate(dev, &iommu_spec))
+> +			goto err_put_node;
+> +
+> +		of_node_put(np);
+> +		idx++;
+> +	}
+> +
+> +	if (!iommu)
+> +		return NULL;
+> +
+> +	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+> +	if (!mapping)
+> +		return NULL;
+> +
+> +	kref_init(&mapping->kref);
+> +	INIT_LIST_HEAD(&mapping->node);
 
-Commit 28c8331d386a ("ARM: S5PV210: Remove support for board files")
-removed the Kconfig symbols MACH_SMDKC110 and MACH_SMDKV210. As a result
-the dependencies of SND_SOC_SMDK_WM8580_PCM can never be met. So remove
-the unbuildable "SoC PCM Audio support for WM8580 on SMDK".
+I might be missing something, but that doesn't seem to match the commit 
+message. This creates a single iommu_dma_mapping per device, where is the list 
+supposed to be populated ?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
- sound/soc/samsung/Kconfig          |   9 --
- sound/soc/samsung/Makefile         |   2 -
- sound/soc/samsung/smdk_wm8580pcm.c | 186 -------------------------------------
- 3 files changed, 197 deletions(-)
- delete mode 100644 sound/soc/samsung/smdk_wm8580pcm.c
+> +	mapping->iommu = iommu;
+> +	return mapping;
+> +
+> +err_put_node:
+> +	of_node_put(np);
+> +	return NULL;
+> +}
+> +
+> +void of_iommu_deconfigure(struct kref *kref)
+> +{
+> +	struct iommu_dma_mapping *mapping, *curr, *next;
+> +
+> +	mapping = container_of(kref, struct iommu_dma_mapping, kref);
+> +	list_for_each_entry_safe(curr, next, &mapping->node, node) {
+> +		list_del(&curr->node);
+> +		kfree(curr);
+> +	}
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 9d9b149ad977..52fd0a446bdf 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -153,15 +153,6 @@ config SND_SOC_SAMSUNG_SMDK_SPDIF
- 	help
- 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
- 
--config SND_SOC_SMDK_WM8580_PCM
--	tristate "SoC PCM Audio support for WM8580 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKV210 || MACH_SMDKC110)
--	depends on REGMAP_I2C
--	select SND_SOC_WM8580
--	select SND_SAMSUNG_PCM
--	help
--	  Say Y if you want to add support for SoC audio on the SMDK.
--
- config SND_SOC_SMDK_WM8994_PCM
- 	tristate "SoC PCM Audio support for WM8994 on SMDK"
- 	depends on SND_SOC_SAMSUNG
-diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
-index c30293a67176..51b471ace06f 100644
---- a/sound/soc/samsung/Makefile
-+++ b/sound/soc/samsung/Makefile
-@@ -36,7 +36,6 @@ snd-soc-snow-objs := snow.o
- snd-soc-smdk-wm9713-objs := smdk_wm9713.o
- snd-soc-s3c64xx-smartq-wm8987-objs := smartq_wm8987.o
- snd-soc-smdk-spdif-objs := smdk_spdif.o
--snd-soc-smdk-wm8580pcm-objs := smdk_wm8580pcm.o
- snd-soc-smdk-wm8994pcm-objs := smdk_wm8994pcm.o
- snd-soc-speyside-objs := speyside.o
- snd-soc-tobermory-objs := tobermory.o
-@@ -61,7 +60,6 @@ obj-$(CONFIG_SND_SOC_SNOW) += snd-soc-snow.o
- obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_WM9713) += snd-soc-smdk-wm9713.o
- obj-$(CONFIG_SND_SOC_SMARTQ) += snd-soc-s3c64xx-smartq-wm8987.o
- obj-$(CONFIG_SND_SOC_SAMSUNG_SMDK_SPDIF) += snd-soc-smdk-spdif.o
--obj-$(CONFIG_SND_SOC_SMDK_WM8580_PCM) += snd-soc-smdk-wm8580pcm.o
- obj-$(CONFIG_SND_SOC_SMDK_WM8994_PCM) += snd-soc-smdk-wm8994pcm.o
- obj-$(CONFIG_SND_SOC_SPEYSIDE) += snd-soc-speyside.o
- obj-$(CONFIG_SND_SOC_TOBERMORY) += snd-soc-tobermory.o
-diff --git a/sound/soc/samsung/smdk_wm8580pcm.c b/sound/soc/samsung/smdk_wm8580pcm.c
-deleted file mode 100644
-index 63d079303561..000000000000
---- a/sound/soc/samsung/smdk_wm8580pcm.c
-+++ /dev/null
-@@ -1,186 +0,0 @@
--/*
-- *  sound/soc/samsung/smdk_wm8580pcm.c
-- *
-- *  Copyright (c) 2011 Samsung Electronics Co. Ltd
-- *
-- *  This program is free software; you can redistribute  it and/or  modify it
-- *  under  the terms of  the GNU General  Public License as published by the
-- *  Free Software Foundation;  either version 2 of the  License, or (at your
-- *  option) any later version.
-- */
--#include <linux/module.h>
--#include <sound/soc.h>
--#include <sound/pcm_params.h>
--#include <sound/pcm.h>
--
--#include <asm/mach-types.h>
--
--#include "../codecs/wm8580.h"
--#include "dma.h"
--#include "pcm.h"
--
--/*
-- * Board Settings:
-- *  o '1' means 'ON'
-- *  o '0' means 'OFF'
-- *  o 'X' means 'Don't care'
-- *
-- * SMDK6410 Base B/D: CFG1-0000, CFG2-1111
-- * SMDKC110, SMDKV210: CFGB11-100100, CFGB12-0000
-- */
--
--#define SMDK_WM8580_EXT_OSC 12000000
--#define SMDK_WM8580_EXT_MCLK 4096000
--#define SMDK_WM8580_EXT_VOICE 2048000
--
--static unsigned long mclk_freq;
--static unsigned long xtal_freq;
--
--/*
-- * If MCLK clock directly gets from XTAL, we don't have to use PLL
-- * to make MCLK, but if XTAL clock source connects with other codec
-- * pin (like XTI), we should have to set codec's PLL to make MCLK.
-- * Because Samsung SoC does not support pcmcdclk output like I2S.
-- */
--
--static int smdk_wm8580_pcm_hw_params(struct snd_pcm_substream *substream,
--			      struct snd_pcm_hw_params *params)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_dai *codec_dai = rtd->codec_dai;
--	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
--	int rfs, ret;
--
--	switch (params_rate(params)) {
--	case 8000:
--		break;
--	default:
--		printk(KERN_ERR "%s:%d Sampling Rate %u not supported!\n",
--		__func__, __LINE__, params_rate(params));
--		return -EINVAL;
--	}
--
--	rfs = mclk_freq / params_rate(params) / 2;
--
--	/* Set the codec DAI configuration */
--	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_DSP_B
--				| SND_SOC_DAIFMT_IB_NF
--				| SND_SOC_DAIFMT_CBS_CFS);
--	if (ret < 0)
--		return ret;
--
--	/* Set the cpu DAI configuration */
--	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_DSP_B
--				| SND_SOC_DAIFMT_IB_NF
--				| SND_SOC_DAIFMT_CBS_CFS);
--	if (ret < 0)
--		return ret;
--
--	if (mclk_freq == xtal_freq) {
--		ret = snd_soc_dai_set_sysclk(codec_dai, WM8580_CLKSRC_MCLK,
--						mclk_freq, SND_SOC_CLOCK_IN);
--		if (ret < 0)
--			return ret;
--
--		ret = snd_soc_dai_set_clkdiv(codec_dai, WM8580_MCLK,
--						WM8580_CLKSRC_MCLK);
--		if (ret < 0)
--			return ret;
--	} else {
--		ret = snd_soc_dai_set_sysclk(codec_dai, WM8580_CLKSRC_PLLA,
--						mclk_freq, SND_SOC_CLOCK_IN);
--		if (ret < 0)
--			return ret;
--
--		ret = snd_soc_dai_set_clkdiv(codec_dai, WM8580_MCLK,
--						WM8580_CLKSRC_PLLA);
--		if (ret < 0)
--			return ret;
--
--		ret = snd_soc_dai_set_pll(codec_dai, WM8580_PLLA, 0,
--						xtal_freq, mclk_freq);
--		if (ret < 0)
--			return ret;
--	}
--
--	/* Set PCM source clock on CPU */
--	ret = snd_soc_dai_set_sysclk(cpu_dai, S3C_PCM_CLKSRC_MUX,
--					mclk_freq, SND_SOC_CLOCK_IN);
--	if (ret < 0)
--		return ret;
--
--	/* Set SCLK_DIV for making bclk */
--	ret = snd_soc_dai_set_clkdiv(cpu_dai, S3C_PCM_SCLK_PER_FS, rfs);
--	if (ret < 0)
--		return ret;
--
--	return 0;
--}
--
--static struct snd_soc_ops smdk_wm8580_pcm_ops = {
--	.hw_params = smdk_wm8580_pcm_hw_params,
--};
--
--static struct snd_soc_dai_link smdk_dai[] = {
--	{
--		.name = "WM8580 PAIF PCM RX",
--		.stream_name = "Playback",
--		.cpu_dai_name = "samsung-pcm.0",
--		.codec_dai_name = "wm8580-hifi-playback",
--		.platform_name = "samsung-audio",
--		.codec_name = "wm8580.0-001b",
--		.ops = &smdk_wm8580_pcm_ops,
--	}, {
--		.name = "WM8580 PAIF PCM TX",
--		.stream_name = "Capture",
--		.cpu_dai_name = "samsung-pcm.0",
--		.codec_dai_name = "wm8580-hifi-capture",
--		.platform_name = "samsung-pcm.0",
--		.codec_name = "wm8580.0-001b",
--		.ops = &smdk_wm8580_pcm_ops,
--	},
--};
--
--static struct snd_soc_card smdk_pcm = {
--	.name = "SMDK-PCM",
--	.owner = THIS_MODULE,
--	.dai_link = smdk_dai,
--	.num_links = 2,
--};
--
--/*
-- * After SMDKC110 Base Board's Rev is '0.1', 12MHz External OSC(X1)
-- * is absent (or not connected), so we connect EXT_VOICE_CLK(OSC4),
-- * 2.0484Mhz, directly with MCLK both Codec and SoC.
-- */
--static int snd_smdk_probe(struct platform_device *pdev)
--{
--	int ret = 0;
--
--	xtal_freq = SMDK_WM8580_EXT_OSC;
--	mclk_freq = SMDK_WM8580_EXT_MCLK;
--
--	if (machine_is_smdkc110() || machine_is_smdkv210())
--		xtal_freq = mclk_freq = SMDK_WM8580_EXT_VOICE;
--
--	smdk_pcm.dev = &pdev->dev;
--	ret = devm_snd_soc_register_card(&pdev->dev, &smdk_pcm);
--	if (ret)
--		dev_err(&pdev->dev, "snd_soc_register_card failed %d\n", ret);
--
--	return ret;
--}
--
--static struct platform_driver snd_smdk_driver = {
--	.driver = {
--		.owner = THIS_MODULE,
--		.name = "samsung-smdk-pcm",
--	},
--	.probe = snd_smdk_probe,
--};
--
--module_platform_driver(snd_smdk_driver);
--
--MODULE_AUTHOR("Sangbeom Kim, <sbkim73@samsung.com>");
--MODULE_DESCRIPTION("ALSA SoC SMDK WM8580 for PCM");
--MODULE_LICENSE("GPL");
+Don't you need to also kfree(mapping) here ?
+
+> +}
+> +
+
+Do you expect other users of of_iommu_deconfigure() than kref_put() ? If not, 
+how about exposing an of_iommu_put(struct iommu_dma_mapping *) that would call 
+kref_put() internally, and hiding of_iommu_deconfigure() ?
+
+>  void __init of_iommu_init(void)
+>  {
+>  	struct device_node *np;
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index 1e944e77d38d..e60e52d82db9 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -62,6 +62,14 @@ struct dma_map_ops {
+>  	int is_phys;
+>  };
+> 
+> +struct iommu_data;
+> +
+> +struct iommu_dma_mapping {
+> +	struct iommu_data *iommu;
+> +	struct list_head node;
+> +	struct kref kref;
+> +};
+
+Could you please document the structure with kerneldoc ?
+
+> +
+>  #define DMA_BIT_MASK(n)	(((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
+> 
+>  #define DMA_MASK_NONE	0x0ULL
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 0a685e0ab33e..af6179557005 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -1,9 +1,12 @@
+>  #ifndef __OF_IOMMU_H
+>  #define __OF_IOMMU_H
+> 
+> +#include <linux/device.h>
+>  #include <linux/iommu.h>
+>  #include <linux/of.h>
+> 
+> +struct iommu_dma_mapping;
+> +
+>  #ifdef CONFIG_OF_IOMMU
+> 
+>  extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+> @@ -11,6 +14,8 @@ extern int of_get_dma_window(struct device_node *dn, const
+> char *prefix, size_t *size);
+> 
+>  extern void of_iommu_init(void);
+> +extern struct iommu_dma_mapping *of_iommu_configure(struct device *dev);
+> +extern void of_iommu_deconfigure(struct kref *kref);
+> 
+>  #else
+> 
+> @@ -22,6 +27,11 @@ static inline int of_get_dma_window(struct device_node
+> *dn, const char *prefix, }
+> 
+>  static inline void of_iommu_init(void) { }
+> +static inline struct iommu_dma_mapping *of_iommu_configure(struct device
+> *dev) +{
+> +	return NULL;
+> +}
+> +static inline void of_iommu_deconfigure(struct kref *kref) { }
+> 
+>  #endif	/* CONFIG_OF_IOMMU */
+
 -- 
-1.9.3
+Regards,
+
+Laurent Pinchart
