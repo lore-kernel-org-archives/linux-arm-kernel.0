@@ -1,42 +1,26 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 18 Sep 2014 11:02:46 +0530
-Subject: [PATCH 7/9] phy: remove .owner field for drivers using
- module_platform_driver
-In-Reply-To: <20140917190401.GA31237@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
- <1408106416-19044-8-git-send-email-peter.griffin@linaro.org>
- <5419B485.8010002@ti.com>
- <20140917190401.GA31237@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <541A6E7E.4040903@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 17 Sep 2014 22:49:40 -0700
+Subject: [PATCHv5] mtd: nand: atmel_nand: retrieve NFC clock
+In-Reply-To: <1410564239-8411-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1410564239-8411-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140918054940.GC7362@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 18 September 2014 12:34 AM, Peter Griffin wrote:
-> Hi Kishon,
+On Sat, Sep 13, 2014 at 01:23:59AM +0200, Alexandre Belloni wrote:
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 > 
-> On Wed, 17 Sep 2014, Kishon Vijay Abraham I wrote:
+> Retrieve the NFC clock to make sure it is enabled. Make that optional to ensure
+> compatibility with previous device trees but document it as mandatory so newer
+> device trees will include it.
 > 
->> Hi,
->>
->> On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
->>> This patch removes the superflous .owner field for drivers which
->>> use the module_platform_driver or platform_driver_register api,
->>> as this is overriden in __platform_driver_register.
->>>
->>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> 
-> <snip>
->>>  drivers/phy/phy-twl4030-usb.c       | 1 -
->>
->> twl4030-usb doesn't use module_platform_driver. Care to resend this patch
->> along? I've merged all other patches in this series.
-> 
-> That is true, but it does use platform_driver_register  whih overrides .owner.
-> So the patch is stil good I think (fyi see include/linux/platform_device.h).
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> Changes in v5:
+>  - Added a proper commit log
 
-Indeed. Will merge this one.
+Pushed to l2-mtd.git. Thanks!
 
-Thanks
-Kishon
+Brian
