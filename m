@@ -1,76 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 Sep 2014 14:43:11 -0700
-Subject: [PATCH 2/3] ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp
- implementations
-In-Reply-To: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
-References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1411076592-6157-3-git-send-email-sboyd@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Sep 2014 22:46:22 +0100
+Subject: [PATCH 3.17-rc4 v7 4/6] irqchip: gic: Add support for IPI FIQ
+In-Reply-To: <20140917185138.GX12361@n2100.arm.linux.org.uk> (Russell King's
+ message of "Wed, 17 Sep 2014 19:51:38 +0100")
+References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
+ <1410970218-28847-5-git-send-email-daniel.thompson@linaro.org>
+ <20140917185138.GX12361@n2100.arm.linux.org.uk>
+Message-ID: <867g10vbyp.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The subarchitecture field in the fpsid register is 7 bits wide.
-The topmost bit is used to designate that the subarchitecture
-designer is not ARM. We use this field to determine which VFP
-version is supported by the CPU. Since the topmost bit is ignored
-with the current mask we detect non-ARM subarchitectures as
-supporting only HWCAP_VFP. In Qualcomm's processors (Krait and
-Scorpion) it should see that we have HWCAP_VFPv3 but it doesn't.
+On Wed, Sep 17 2014 at 07:51:38 PM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Use the proper width for the mask and then check to see if the
-implementor is 0x51 (Qualcomm). If so, indicate that the vfp
-architecture is compatible with VFPv3 architecture or later with
-common VFP subarchitecture v3.
+Hi Russell,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/asm/cputype.h | 1 +
- arch/arm/include/asm/vfp.h     | 2 +-
- arch/arm/vfp/vfpmodule.c       | 7 +++++++
- 3 files changed, 9 insertions(+), 1 deletion(-)
+> On Wed, Sep 17, 2014 at 09:10:16AM -0700, Daniel Thompson wrote:
+>> This patch provides support for arm's newly added IPI FIQ. It works
+>> by placing all interrupt sources *except* IPI FIQ in group 1 and
+>> then flips a configuration bit in the GIC such that group 1
+>> interrupts use IRQ and group 0 interrupts use FIQ.
+>>
+>> All GIC hardware except GICv1-without-TrustZone support provides a means
+>> to group exceptions into group 0 and group 1. However the hardware
+>> functionality is unavailable to the kernel when a secure monitor is
+>> present because access to the grouping registers are prohibited outside
+>> "secure world" (a feature that allows grouping to be used to allow
+>> hardware peripherals to send interrupts into the secure world). However
+>> when grouping is not available we can rely on the GIC's RAZ/WI semantics
+>> and avoid conditional code.
+>
+> I've been chasing a bug with this on the Versatile Express CT9x4.  It
+> seems that the GIC there is a GICv1, with secure extensions.  It seems
+> to support interrupt grouping.
+>
+> However, setting SPIs to group 1, with the control registers enabling
+> both group 0 and group 1 (such that both groups are treated as IRQs)
+> results in no SPIs being delivered to the kernel.  In other words,
+> setting GIC_DIST_IGROUP for SPIs, and setting both GIC_CPU_CTRL and
+> GIC_DIST_CTRL to 3.
+>
+> This is rather worrying, because we seem to have a GIC which for all
+> intents and purposes appears to be compatible with what we want to do,
+> appears to conform with the GIC architecture specifications, but doesn't
+> actually work.
+>
+> I suspect that running the Versatile Express CT9x4 in non-secure mode
+> wouldn't work (because in non-secure mode, the GIC only allows access
+> to group 1 interrupts.)
+>
+> I've added Will and Mark to this to see whether they have any comment.
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 8c2b7321a478..a8329a5fd9b1 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -60,6 +60,7 @@
- 	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
- 
- #define ARM_CPU_IMP_ARM			0x41
-+#define ARM_CPU_IMP_QCOM		0x51
- #define ARM_CPU_IMP_INTEL		0x69
- 
- #define ARM_CPU_PART_ARM1136		0xB360
-diff --git a/arch/arm/include/asm/vfp.h b/arch/arm/include/asm/vfp.h
-index f4ab34fd4f72..76d3f6907cce 100644
---- a/arch/arm/include/asm/vfp.h
-+++ b/arch/arm/include/asm/vfp.h
-@@ -21,7 +21,7 @@
- #define FPSID_FORMAT_MASK	(0x3  << FPSID_FORMAT_BIT)
- #define FPSID_NODOUBLE		(1<<20)
- #define FPSID_ARCH_BIT		(16)
--#define FPSID_ARCH_MASK		(0xF  << FPSID_ARCH_BIT)
-+#define FPSID_ARCH_MASK		(0x7F  << FPSID_ARCH_BIT)
- #define FPSID_PART_BIT		(8)
- #define FPSID_PART_MASK		(0xFF << FPSID_PART_BIT)
- #define FPSID_VARIANT_BIT	(4)
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 2f37e1d6cb45..e6bd8d99e916 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -746,6 +746,13 @@ static int __init vfp_init(void)
- 		hotcpu_notifier(vfp_hotplug, 0);
- 
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
-+
-+		/*
-+		 * Qualcomm implementations are VFPv3 architecture or later
-+		 * with common VFP subarchitecture v3
-+		 */
-+		if (ARM_CPU_IMP_QCOM == ((vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT))
-+			VFP_arch = 4;
- 		pr_cont("implementor %02x architecture %d part %02x variant %x rev %x\n",
- 			(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
- 			(vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT,
+I'm rather far away from my VE-A9 board (and won't be to get back to it
+for another two weeks), so this is all a shot in the dark...
+
+Can you have a look at the GICC_AIAR register (located at GICC_IAR +
+0x14)? It *shouldn't* exist on this HW, assuming this is a real
+GICv1. But what you describe makes me think of something like this.
+
+Thanks,
+
+	M.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Jazz is not dead. It just smells funny.
