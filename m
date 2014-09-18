@@ -1,72 +1,121 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 18 Sep 2014 11:07:24 +0800
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from
- platform devices
-In-Reply-To: <000001cfd2f0$c9d0ebd0$5d72c370$@samsung.com>
-References: <1410935510-1567-1-git-send-email-pankaj.dubey@samsung.com>
- <201409171723.04549.arnd@arndb.de>
- <000001cfd2f0$c9d0ebd0$5d72c370$@samsung.com>
-Message-ID: <20140918030722.GB26661@shlinux1.ap.freescale.net>
+From: bamvor.zhangjian@huawei.com (zhangjian)
+Date: Thu, 18 Sep 2014 11:41:16 +0800
+Subject: [PATCH 07/24] ARM64:ILP32: Use the same size and layout of the
+ signal structures for ILP32 as for LP64
+In-Reply-To: <1409779158-30963-8-git-send-email-apinski@cavium.com>
+References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
+ <1409779158-30963-8-git-send-email-apinski@cavium.com>
+Message-ID: <541A545C.3030307@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 08:59:32AM +0530, Pankaj Dubey wrote:
-> +CC: Dong Aisheng 
+On 2014/9/4 5:19, Andrew Pinski wrote:
+> Defines the macros which allow the signal structures to be the same between ILP32 and LP64.
 > 
-> Hi Arnd,
+> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+> ---
+>  arch/arm64/include/uapi/asm/siginfo.h |   33 ++++++++++++++++++++++++++++++++
+>  arch/arm64/include/uapi/asm/signal.h  |   34 +++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+), 0 deletions(-)
 > 
-> On Wednesday, September 17, 2014, Arnd Bergmann wrote,
-> > > V2 of this patchset and related discussion can be found here [1].
-> > >
-> > > Changes since v2:
-> > >  - Added back platform device support from syscon, with one change that
-> > >    syscon will not be probed for DT based platform.
-> > >  - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
-> > >    users of syscon will not be broken.
-> > >  - Removed unwanted change in syscon.h.
-> > >  - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
-> > >    Arnd Bergmann.
-> > >  - Added Tested-by of Vivek Gautam for testing on Exynos platform.
-> > 
-> > Looks fine. Provided you can figure out the problem that Dong Aisheng
-> reported,
-> > please add my
-> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> 
-> Thanks. 
-> After he reported I have again done code walk-through of regmap_init_mmio
-> and 
-> could not see any such fatal error.  At the same time I have replied to Dong
-> Aisheng,
-> asking for more details and waiting for his reply. 
+> diff --git a/arch/arm64/include/uapi/asm/siginfo.h b/arch/arm64/include/uapi/asm/siginfo.h
+> index 5a74a08..c80c612 100644
+> --- a/arch/arm64/include/uapi/asm/siginfo.h
+> +++ b/arch/arm64/include/uapi/asm/siginfo.h
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright (C) 2012 ARM Ltd.
+> + * Copyright (C) 2014 Cavium Inc.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -18,6 +19,38 @@
 >  
-
-I just replied and gave the log.
-
-Regards
-Dong Aisheng
-
-> > > -}
-> > > +static struct syscon *of_syscon_register(struct device_node *np);
-> > >
-> > 
-> > One  minor comment: please avoid doing forward declarations of local
-> functions. It
-> > took me a while to understand what is going on because I expect all
-> functions to be
-> > ordered such that they only get called by functions below, and don't need
-> this.
-> > 
-> > Just move of_syscon_register() here directly.
-> > 
-> 
-> OK, I will remove forward declaration of "of_syscon_register" and respin
-> patch once again.
-> 
-> > 	Arnd
-> 
-> Thanks,
-> Pankaj Dubey
+>  #define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
+>  
+> +#ifdef __ILP32__
+> +
+> +/*
+> + * For ILP32, the siginfo structures should share the same layout and
+> + * alignement requirements as LP64 ABI.
+> + * To do this, use an extra pad field and add aligned attribute
+> + * to the structure.
+> + */
+> +
+> +# ifdef __AARCH64EB__
+> +#  define __SIGINFO_INNER(type, field)		\
+> +		int __pad#field;		\
+> +		type field
+> +# else
+> +#  define __SIGINFO_INNER(type, field)		\
+> +		type field;			\
+> +		int __pad#field
+> +# endif
+> +
+> +# undef __SIGINFO_VOIDPTR
+> +# define __SIGINFO_VOIDPTR(field)		\
+> +		__SIGINFO_INNER(void __user*, field)
+> +# undef __SIGINFO_BAND
+> +
+> +# define __SIGINFO_BAND(field)			\
+> +	__SIGINFO_INNER(long, field)
+> +
+> +/* Make the alignment of siginfo always 8 byte aligned. */
+> +#define __ARCH_SI_ATTRIBUTES __attribute__((aligned(8)))
+> +
+> +#endif
+> +
+>  #include <asm-generic/siginfo.h>
+>  
+>  #endif
+> diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
+> index 8d1e723..d33a5f7 100644
+> --- a/arch/arm64/include/uapi/asm/signal.h
+> +++ b/arch/arm64/include/uapi/asm/signal.h
+> @@ -16,9 +16,43 @@
+>  #ifndef __ASM_SIGNAL_H
+>  #define __ASM_SIGNAL_H
+>  
+> +#include <asm/posix-types.h>
+typos here, it should be
+#include <asm/posix_types.h>
+> +
+>  /* Required for AArch32 compatibility. */
+>  #define SA_RESTORER	0x04000000
+>  
+> +/*
+> + * Since sigset is a bitmask, we need the same size fields for ILP32
+> + * and LP64.  With big-endian, 32bit bitmask does not match up to
+> + * 64bit bitmask (unlike with little-endian).
+> + */
+> +#ifdef __ILP32__
+> +
+> +#define __SIGSET_INNER_TYPE __kernel_ulong_t
+> +#define _NSIG_BPW 64
+> +
+> +# ifdef __AARCH64EB__
+> +#  define __SIGNAL_INNER(type, field)		\
+> +		int __pad_##field;		\
+> +		type field;
+> +# else
+> +#  define __SIGNAL_INNER(type, field)		\
+> +		type field;			\
+> +		int __pad_##field;
+> +# endif
+> +
+> +# define __SIGACTION_HANDLER(field)		\
+> +	__SIGNAL_INNER(__sighandler_t, field)
+> +
+> +
+> +#define __SIGACTION_FLAGS(field)		\
+> +	__kernel_ulong_t field
+> +
+> +#define __SIGACTION_RESTORER(field)		\
+> +	__SIGNAL_INNER(__sigrestore_t, field)
+> +
+> +#endif
+> +
+>  #include <asm-generic/signal.h>
+>  
+>  #endif
 > 
