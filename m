@@ -1,39 +1,56 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 18 Sep 2014 16:58:19 +0800
-Subject: [RFC Part2 v1 01/21] irqdomain: Introduce new interfaces to
- support hierarchy irqdomains
-In-Reply-To: <1411030087.14746.2.camel@mtksdaap41>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>	
- <1410444228-3134-2-git-send-email-jiang.liu@linux.intel.com>
- <1411030087.14746.2.camel@mtksdaap41>
-Message-ID: <541A9EAB.3060000@linux.intel.com>
+From: gvormayr@gmail.com (Gernot Vormayr)
+Date: Thu, 18 Sep 2014 11:03:52 +0200
+Subject: [PATCH 1/1] gpio: Fix ngpio in gpio-xilinx driver
+Message-ID: <1411031032-20649-1-git-send-email-gvormayr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/18 16:48, Joe.C wrote:
-> On Thu, 2014-09-11 at 22:03 +0800, Jiang Liu wrote:
->> +#else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->> +static inline int irq_domain_activate_irq(struct irq_data *data) { return 0; }
->> +static inline int irq_domain_deactivate_irq(struct irq_data *data) { return 0; }
->> +#endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->> +
-> 
-> I get the following build warnings on these lines:
-> 
-> ../include/linux/irqdomain.h:75:47: warning: 'struct irq_data' declared
-> inside parameter list [enabled by default]
-> ../include/linux/irqdomain.h:75:47: warning: its scope is only this
-> definition or declaration, which is probably not what you want [enabled
-> by default]
-> ../include/linux/irqdomain.h:76:49: warning: 'struct irq_data' declared
-> inside parameter list [enabled by default
-Hi Joe,
-	Thanks for testing. We should add a forward declaration of
-struct irq_data to the top of include/linux/irqdomain.h.
-Will fix it in next version.
-Regards!
-Gerry
-> 
-> Joe.C
-> 
-> 
+If one adds 'gpio-controller;' to the chip in the devicetree, then
+initialization fails with 'gpiochip_find_base: cannot find free range',
+because ngpio is 0. This patch fixes the bug.
+
+Tested on ml507 board.
+
+Signed-off-by: Gernot Vormayr <gvormayr@gmail.com>
+---
+ drivers/gpio/gpio-xilinx.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+index 1248186..4606ad2 100644
+--- a/drivers/gpio/gpio-xilinx.c
++++ b/drivers/gpio/gpio-xilinx.c
+@@ -197,6 +197,7 @@ static int xgpio_of_probe(struct device_node *np)
+ 	struct xgpio_instance *chip;
+ 	int status = 0;
+ 	const u32 *tree_info;
++	u32 ngpio;
+ 
+ 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+ 	if (!chip)
+@@ -215,8 +216,9 @@ static int xgpio_of_probe(struct device_node *np)
+ 	chip->mmchip.gc.ngpio = 32;
+ 
+ 	/* Check device node and parent device node for device width */
+-	of_property_read_u32(np, "xlnx,gpio-width",
+-			      (u32 *)&chip->mmchip.gc.ngpio);
++	status = of_property_read_u32(np, "xlnx,gpio-width", &ngpio);
++	if (status == 0)
++		chip->mmchip.gc.ngpio = (u16)ngpio;
+ 
+ 	spin_lock_init(&chip->gpio_lock);
+ 
+@@ -262,8 +264,9 @@ static int xgpio_of_probe(struct device_node *np)
+ 		chip->mmchip.gc.ngpio = 32;
+ 
+ 		/* Check device node and parent device node for device width */
+-		of_property_read_u32(np, "xlnx,gpio2-width",
+-				     (u32 *)&chip->mmchip.gc.ngpio);
++		status = of_property_read_u32(np, "xlnx,gpio2-width", &ngpio);
++		if (status == 0)
++			chip->mmchip.gc.ngpio = (u16)ngpio;
+ 
+ 		spin_lock_init(&chip->gpio_lock);
+ 
+-- 
+2.1.0
