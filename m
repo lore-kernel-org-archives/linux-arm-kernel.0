@@ -1,76 +1,83 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Sep 2014 19:19:39 +0200
-Subject: [GIT PULL] at91: dt for 3.18 #3
-Message-ID: <1411060779-32090-1-git-send-email-nicolas.ferre@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Sep 2014 18:23:18 +0100
+Subject: [RFC] arm: Handle starting up in secure mode
+In-Reply-To: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
+References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
+Message-ID: <20140918172318.GF25330@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Tue, Sep 16, 2014 at 10:09:16PM +0100, Christopher Covington wrote:
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index 2a55373..36d1a9c 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -20,6 +20,7 @@
+>  #include <linux/linkage.h>
+>  #include <asm/assembler.h>
+>  #include <asm/virt.h>
+> +#include <asm/opcodes-sec.h>
+>  
+>  #ifndef ZIMAGE
+>  /*
+> @@ -76,6 +77,64 @@ ENTRY(__boot_cpu_mode)
+>  #endif /* ZIMAGE */
+>  
+>  /*
+> + * Detect whether the system is in secure supervisor mode, and if it is,
+> + * switch to hypervisor mode by way of secure monitor mode.
+> + */
+> +ENTRY(__mon_stub_install)
+> +	mrs	r4, cpsr
+> +	and	r4, r4, #MODE_MASK
+> +	cmp	r4, #SVC_MODE
+> +	movne	pc, lr
+> +
+> +	/*
+> +	 * Set things up so that if an NSACR access causes an undefined
+> +	 * instruction exception, we return. safe_svcmode_maskall called
+> +	 * just after this will get us back into supervisor mode.
+> +	 */
+> +	adr	r4, __mon_stub_vectors
+> +	mcr	p15, 0, r4, c12, c0, 0	@ set vector base address (VBAR)
+> +	mov	r4, lr
+> +
+> +	/*
+> +	 * Writing the NSACR will only succeed if we're in a secure mode.
+> +	 */
+> +	mrc	p15, 0, r5, c1, c1, 2	@ get non-secure access control (NSACR)
+> +	mcr	p15, 0, r5, c1, c1, 2	@ set non-secure access control (NSACR)
 
-A third DT update for AT91 during this 3.18 dev. phase. Interesting updates and
-also new features used: the NFC clock and the changes in pinctrl new the driver
-updates that are already queued in mtd and pinctrl trees. No build dependency
-but the NFC clock need the modification in the driver to be able to actually
-boot: a kind of "runtime" dependency. But I don't know if you want to pull the
-mtd or l2-mtd trees... Tell me if I need to do something for this.
+Since you talk about ARMv8 further down, if you run in AArch32 mode in
+secure EL1 it will trap to EL3 (if it was non-secure EL1/EL2, write
+would undef and read returns 0xc00). Therefore for ARMv8 my
+recommendation is to run Linux (whether AArch64 or AArch32) only on the
+non-secure side.
 
-It is on top of what you already have in at91/dt2.
+> +	/*
+> +	 * If we get here, we know we're in secure supervisor mode, so make the
+> +	 * switch to secure monitor mode.
+> +	 *
+> +	 * TODO: make sure this doesn't trap to A64 EL3.
+> +	 */
+> +	adr	r4, __mon_stub_vectors
+> +	mcr	p15, 0, r4, c12, c0, 1	@ set monitor vector base (MVBAR)
+> +	adr	r4, mon_settings
+> +	__SMC(0)
 
-Thanks, best regards,
+I think from secure EL1 you can switch to monitor simply by setting the
+CPSR mode bits (though IIRC on ARMv8 would also trap to EL3).
 
-The following changes since commit 5f8157309624929e05ece846d3ca8a3a64988378:
+> +
+> +	/*
+> +	 * Now, from non-secure supervisor mode, transition to hypervisor mode
+> +	 * and return via the exception vector.
+> +	 */
+> +	mov	r4, lr
+> +	__HVC(0)
 
-  ARM: at91: remove phy fixup for sama5d3xek boards (2014-09-01 19:30:44 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-dt3
-
-for you to fetch changes up to 4dd7933ad606af457bc85b1afdaaac68aa993abf:
-
-  ARM: at91/dt: at91sam9m10g45ek add rtc node (2014-09-18 18:14:48 +0200)
-
-----------------------------------------------------------------
-More AT91 DT material for 3.18:
-- specify DMA channels for USART on sama5d3 and choose peripherals
-  that will use them on the EK boards
-- SSC update for audio on at91sam9rl and at91sam9g20
-- addition of the NFC clock and new pinctrl compatible string
-  to use enhancements that will land in drivers during this release
-- several new nodes and fixes
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: at91/dt: sama5d3: add the nfc clock
-
-Bo Shen (3):
-      ARM: at91: sama5d3xek: reserve dma channel for audio
-      ARM: at91/dt: at91sam9rl: switch ssc compatible string
-      ARM: at91/dt: at91sam9g20: switch ssc compatible string
-
-Boris BREZILLON (1):
-      ARM: at91/dt: declare sckc node on at91sam9g45
-
-David Dueck (1):
-      ARM: at91/dt: Fix typo regarding can0_clk
-
-Erik van Luijk (1):
-      ARM: at91/dt: at91sam9m10g45ek add rtc node
-
-Ludovic Desroches (1):
-      ARM: at91: sama5d3: add usart dma configurations
-
-Marek Roszko (1):
-      ARM: at91/dt: sama5d3: use new pinctrl compatible string
-
- arch/arm/boot/dts/at91sam9g20.dtsi     |  4 ++++
- arch/arm/boot/dts/at91sam9g45.dtsi     | 37 ++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/at91sam9m10g45ek.dts |  4 ++++
- arch/arm/boot/dts/at91sam9rl.dtsi      |  4 ++--
- arch/arm/boot/dts/sama5d3.dtsi         | 23 ++++++++++++++++++++-
- arch/arm/boot/dts/sama5d3_can.dtsi     |  2 +-
- arch/arm/boot/dts/sama5d3xmb.dtsi      |  4 ++++
- 7 files changed, 72 insertions(+), 6 deletions(-)
+>From monitor mode can you return directly to HVC mode via ERET and avoid
+another HVC?
 
 -- 
-Nicolas Ferre
+Catalin
