@@ -1,52 +1,146 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 18 Sep 2014 13:17:34 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
-In-Reply-To: <20140918075758.GA12361@n2100.arm.linux.org.uk>
-References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
- <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
- <20140910145818.GG12361@n2100.arm.linux.org.uk>
- <1410363657.23973.48.camel@hornet>
- <20140917152735.GU12361@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1409172059050.8647@knanqh.ubzr>
- <20140918075758.GA12361@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1409181314080.8647@knanqh.ubzr>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Sep 2014 10:17:26 -0700
+Subject: [PATCH] clk: ti: change clock init to use generic of_clk_init
+In-Reply-To: <1408628959-32442-1-git-send-email-t-kristo@ti.com>
+References: <1408628959-32442-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20140918171725.GL14505@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Sep 2014, Russell King - ARM Linux wrote:
-
-> On Wed, Sep 17, 2014 at 09:04:54PM -0400, Nicolas Pitre wrote:
-> > On Wed, 17 Sep 2014, Russell King - ARM Linux wrote:
-> > 
-> > > As for TC2, I just don't bother with that.  It's really not worth the
-> > > hastle.  I asked for help with that and got almost nothing.  Yes, there's
-> > > Nicolas' uboot, which solves some problems, but getting the kernel to
-> > > boot on TC2 turned out to be a dead loss - and no help with it was
-> > > forthcoming.
-> > 
-> > TC2 is my main development board at the moment and it boots mainline 
-> > perfectly.  If you want I can provide you with a tarball of everything 
-> > you need to boot it, including my setup script and compiled kernel, to 
-> > get you started.
+* Tero Kristo <t-kristo@ti.com> [140821 06:52]:
+> Previously, the TI clock driver initialized all the clocks hierarchically
+> under each separate clock provider node. Now, each clock that requires
+> IO access will instead check their parent node to find out which IO range
+> to use.
 > 
-> Well, right now I have a slightly different view, because of the work on
-> the FIQ stuff.
+> This patch allows the TI clock driver to use a few new features provided
+> by the generic of_clk_init, and also allows registration of clock nodes
+> outside the clock hierarchy (for example, any external clocks.)
+
+Paul, any comments on this one?
+
+Regards,
+
+Tony
+ 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Jyri Sarha <jsarha@ti.com>
+> Cc: Stefan Assmann <sassmann@kpanic.de>
+> ---
+>  arch/arm/mach-omap2/io.c         |   10 ++++++++--
+>  arch/arm/mach-omap2/prm_common.c |    2 --
+>  drivers/clk/ti/clk.c             |   31 ++++++++++++++++---------------
+>  3 files changed, 24 insertions(+), 19 deletions(-)
 > 
-> We currently have the situation where the GIC on CT9x4 appears to be
-> different from other GICs, in that group 1 interrupts are never
-> delivered.  As the GIC is indistinguishable from working parts, this
-> currently squarely puts the Daniel's KGDB FIQ work, and work to use
-> FIQ for dumping backtraces in the case of a spinlock lockup beyond the
-> reach of the kernel right now, and nothing more than a local hack.
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index 5d0667c..3325df6 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -734,8 +734,14 @@ int __init omap_clk_init(void)
+>  	ti_clk_init_features();
+>  
+>  	ret = of_prcm_init();
+> -	if (!ret)
+> -		ret = omap_clk_soc_init();
+> +	if (ret)
+> +		return ret;
+> +
+> +	of_clk_init(NULL);
+> +
+> +	ti_dt_clockdomains_setup();
+> +
+> +	ret = omap_clk_soc_init();
+>  
+>  	return ret;
+>  }
+> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+> index 76ca320..3b89080 100644
+> --- a/arch/arm/mach-omap2/prm_common.c
+> +++ b/arch/arm/mach-omap2/prm_common.c
+> @@ -525,8 +525,6 @@ int __init of_prcm_init(void)
+>  		memmap_index++;
+>  	}
+>  
+> -	ti_dt_clockdomains_setup();
+> -
+>  	return 0;
+>  }
+>  
+> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+> index b1a6f71..f7201d0 100644
+> --- a/drivers/clk/ti/clk.c
+> +++ b/drivers/clk/ti/clk.c
+> @@ -25,8 +25,8 @@
+>  #undef pr_fmt
+>  #define pr_fmt(fmt) "%s: " fmt, __func__
+>  
+> -static int ti_dt_clk_memmap_index;
+>  struct ti_clk_ll_ops *ti_clk_ll_ops;
+> +static struct device_node *clocks_node_ptr[CLK_MAX_MEMMAPS];
+>  
+>  /**
+>   * ti_dt_clocks_register - register DT alias clocks during boot
+> @@ -108,9 +108,21 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+>  	struct clk_omap_reg *reg;
+>  	u32 val;
+>  	u32 tmp;
+> +	int i;
+>  
+>  	reg = (struct clk_omap_reg *)&tmp;
+> -	reg->index = ti_dt_clk_memmap_index;
+> +
+> +	for (i = 0; i < CLK_MAX_MEMMAPS; i++) {
+> +		if (clocks_node_ptr[i] == node->parent)
+> +			break;
+> +	}
+> +
+> +	if (i == CLK_MAX_MEMMAPS) {
+> +		pr_err("clk-provider not found for %s!\n", node->name);
+> +		return NULL;
+> +	}
+> +
+> +	reg->index = i;
+>  
+>  	if (of_property_read_u32_index(node, "reg", index, &val)) {
+>  		pr_err("%s must have reg[%d]!\n", node->name, index);
+> @@ -133,15 +145,10 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+>   */
+>  void ti_dt_clk_init_provider(struct device_node *parent, int index)
+>  {
+> -	const struct of_device_id *match;
+> -	struct device_node *np;
+>  	struct device_node *clocks;
+> -	of_clk_init_cb_t clk_init_cb;
+>  	struct clk_init_item *retry;
+>  	struct clk_init_item *tmp;
+>  
+> -	ti_dt_clk_memmap_index = index;
+> -
+>  	/* get clocks for this parent */
+>  	clocks = of_get_child_by_name(parent, "clocks");
+>  	if (!clocks) {
+> @@ -149,14 +156,8 @@ void ti_dt_clk_init_provider(struct device_node *parent, int index)
+>  		return;
+>  	}
+>  
+> -	for_each_child_of_node(clocks, np) {
+> -		match = of_match_node(&__clk_of_table, np);
+> -		if (!match)
+> -			continue;
+> -		clk_init_cb = (of_clk_init_cb_t)match->data;
+> -		pr_debug("%s: initializing: %s\n", __func__, np->name);
+> -		clk_init_cb(np);
+> -	}
+> +	/* add clocks node info */
+> +	clocks_node_ptr[index] = clocks;
+>  
+>  	list_for_each_entry_safe(retry, tmp, &retry_list, link) {
+>  		pr_debug("retry-init: %s\n", retry->node->name);
+> -- 
+> 1.7.9.5
 > 
-> So, until we get to the bottom of this, I need Versatile Express support
-> to stay as-is, so there's no extraneous variables in the platform.  That
-> means right now I need the legacy stuff to stay as switching to DT will
-> add a huge variable into what's going on.
-
-
-No problem -- I'm just offering kickstart help whenever you wish to make 
-your TC2 useful beyond a doorstop.
-
-
-Nicolas
