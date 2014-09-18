@@ -1,93 +1,25 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 18 Sep 2014 08:41:22 -0500
-Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
-In-Reply-To: <541A25DA.8030101@linaro.org>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
- <1408716154-26101-9-git-send-email-nm@ti.com>,
- <5419D7BD.30003@linaro.org>
- <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>
- <541A25DA.8030101@linaro.org>
-Message-ID: <541AE102.2070407@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 18 Sep 2014 21:43:45 +0800
+Subject: [PATCH V2 1/2] ARM: imx: replace cpu type check with ddr type
+ check
+In-Reply-To: <1410923506-21439-1-git-send-email-b20788@freescale.com>
+References: <1410923506-21439-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140918134344.GJ4796@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 07:22 PM, Daniel Lezcano wrote:
-> On 09/17/2014 04:20 PM, Shilimkar, Santosh wrote:
-[...]
->> Could you try a long run of this little program:
->>
->> https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
->>
->> [Santosh] I am sure there will not be any issue with the long run test case here.
->> Lets see if Nishant sees anything otherwise
-> 
-> Ok. Make sure the cpu is effectively entering your C2 state with the 
-> sleep duration in the test program.
+On Wed, Sep 17, 2014 at 11:11:45AM +0800, Anson Huang wrote:
+> diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+> index 17a41ca..caea07b 100644
+> --- a/arch/arm/mach-imx/mxc.h
+> +++ b/arch/arm/mach-imx/mxc.h
+> @@ -55,6 +55,8 @@
+>  #define IMX_CHIP_REVISION_3_3		0x33
+>  #define IMX_CHIP_REVISION_UNKNOWN	0xff
+>  
+> +#define DDR_TYPE_LPDDR2		1
 
-Test kernel:
-https://github.com/nmenon/linux-2.6-playground/commits/testing/tmlind-test-suspend-resume
-(I decided to merge in various send for pull branches from maintainers
-and apply cpuidle on top)..
+We should give it a name-space.  I renamed it to IMX_DDR_TYPE_LPDDR2
+and applied both patches.
 
-Controlled test run as follows on 4 different impacted platforms and 1
-platform as legacy reference.
-
-What we are looking for is
-> cpu1_pwrdm (ON),OFF:0,RET:2677,INA:0,ON:2678,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-RET:2677 indicated CPU1 hit C2
-> cpu0_pwrdm (ON),OFF:0,RET:2677,INA:0,ON:2678,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-RET:2677 indicated CPU0 hit C2
-> mpu_pwrdm (ON),OFF:0,RET:2667,INA:0,ON:2668,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:2667,RET-MEMBANK2-OFF:0
-RET:2667 indicates that CPU0 and CPU1 managed to achieve RET together,
-else by hardware constraints in place, MPU power domain will fail to
-transition.
-
-What I see in all cases below is that transitions do take place (C2 is
-successfully hit).
-
-Test #1: 120 seconds:
-CMD: set -x;uname -a;cat /sys/kernel/debug/pm_debug/count;sleep
-1;./cpuidle_killer_120;sleep 1;cat /sys/kernel/debug/pm_debug/count;set +x
-
-OMAP4 Panda-ES: (2 a9) - not impacted as part of this patch - just
-base test vector
-http://fpaste.org/134547/14110454/
-
-OMAP5 uEVM: (2 a15)
-http://fpaste.org/134546/10454181/
-
-DRA74x: (2 a15)
-http://fpaste.org/134543/11045286/
-
-DRA72: (2 a15)
-http://fpaste.org/134544/11045335/
-
-AM572x(DRA74x variant): (2 A15)
-http://fpaste.org/134545/10453761/
-
-
-Test #2: 1200 seconds: (http://fpaste.org/134564/47289141/)
-CMD: set -x;uname -a;cat /sys/kernel/debug/pm_debug/count;sleep
-1;./cpuidle_killer_1200;sleep 1;cat
-/sys/kernel/debug/pm_debug/count;set +x
-
-OMAP4 Panda-ES: (2 a9) - not impacted as part of this patch - just
-base test vector
-http://fpaste.org/134563/41104728/
-
-OMAP5 uEVM: (2 a15)
-http://fpaste.org/134562/47221141/
-
-DRA74x EVM: (2 a15)
-http://fpaste.org/134559/11047098/
-
-DRA72 EVM: (2 a15)
-http://fpaste.org/134560/11047151/
-
-AM572x EVM: (2 A15)
-http://fpaste.org/134561/47189141/
-
-
--- 
-Regards,
-Nishanth Menon
+Shawn
