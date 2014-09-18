@@ -1,60 +1,107 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Thu, 18 Sep 2014 14:53:57 +0800
-Subject: [PATCH Resend] arm:extend the reserved mrmory for initrd to be
- page aligned
-In-Reply-To: <20140918055553.GO3755@pengutronix.de>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491616@CNBJMBX05.corpusers.net>
- <20140918055553.GO3755@pengutronix.de>
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491619@CNBJMBX05.corpusers.net>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 18 Sep 2014 09:01:27 +0200
+Subject: [PATCH 10/12] ARM: omap2plus_defconfig: Add support for distros
+ with systemd
+In-Reply-To: <1410837126-31553-10-git-send-email-tony@atomide.com>
+References: <1410837126-31553-1-git-send-email-tony@atomide.com>
+ <1410837126-31553-10-git-send-email-tony@atomide.com>
+Message-ID: <CABxcv=k9wEf31ojc7b4o19Hk1oU6dKNinqxgLS5qZMrHSVb1FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends the start and end address of initrd to be page aligned,
-so that we can free all memory including the un-page aligned head or tail
-page of initrd, if the start or end address of initrd are not page
-aligned, the page can't be freed by free_initrd_mem() function.
+Hello Tony,
 
-Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
----
- arch/arm/mm/init.c   | 5 +++++
- arch/arm64/mm/init.c | 8 +++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+On Tue, Sep 16, 2014 at 5:12 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Some distros are now using systemd, so let's enable most of
+> what's recommended at:
+>
+> http://cgit.freedesktop.org/systemd/systemd/tree/README
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 24 ++++++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index 9d232a5..8e6c363 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -1,11 +1,28 @@
+>  CONFIG_SYSVIPC=y
+>  CONFIG_POSIX_MQUEUE=y
+> +CONFIG_FHANDLE=y
+> +CONFIG_AUDIT=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+>  CONFIG_BSD_PROCESS_ACCT=y
+>  CONFIG_IKCONFIG=y
+>  CONFIG_IKCONFIG_PROC=y
+>  CONFIG_LOG_BUF_SHIFT=16
+> +CONFIG_CGROUPS=y
+> +CONFIG_CGROUP_FREEZER=y
+> +CONFIG_CGROUP_DEVICE=y
+> +CONFIG_CPUSETS=y
+> +CONFIG_CGROUP_CPUACCT=y
+> +CONFIG_RESOURCE_COUNTERS=y
+> +CONFIG_MEMCG=y
+> +CONFIG_MEMCG_SWAP=y
+> +CONFIG_MEMCG_KMEM=y
+> +CONFIG_CGROUP_PERF=y
+> +CONFIG_CGROUP_SCHED=y
+> +CONFIG_CFS_BANDWIDTH=y
+> +CONFIG_RT_GROUP_SCHED=y
+> +CONFIG_BLK_CGROUP=y
+> +CONFIG_NAMESPACES=y
+>  CONFIG_BLK_DEV_INITRD=y
+>  CONFIG_EXPERT=y
+>  CONFIG_SLAB=y
+> @@ -37,6 +54,7 @@ CONFIG_ARM_ERRATA_411920=y
+>  CONFIG_SMP=y
+>  CONFIG_NR_CPUS=2
+>  CONFIG_CMA=y
+> +CONFIG_SECCOMP=y
+>  CONFIG_ZBOOT_ROM_TEXT=0x0
+>  CONFIG_ZBOOT_ROM_BSS=0x0
+>  CONFIG_ARM_APPENDED_DTB=y
+> @@ -66,7 +84,7 @@ CONFIG_IP_PNP_DHCP=y
+>  CONFIG_IP_PNP_BOOTP=y
+>  CONFIG_IP_PNP_RARP=y
+>  # CONFIG_INET_LRO is not set
+> -# CONFIG_IPV6 is not set
+> +CONFIG_IPV6=y
+>  CONFIG_NETFILTER=y
+>  CONFIG_CAN=m
+>  CONFIG_CAN_C_CAN=m
+> @@ -80,7 +98,6 @@ CONFIG_BT_HCIBCM203X=m
+>  CONFIG_BT_HCIBPA10X=m
+>  CONFIG_CFG80211=m
+>  CONFIG_MAC80211=m
+> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_DEVTMPFS=y
+>  CONFIG_DEVTMPFS_MOUNT=y
+>  CONFIG_DMA_CMA=y
+> @@ -265,11 +282,14 @@ CONFIG_EXT2_FS=y
+>  CONFIG_EXT3_FS=y
+>  # CONFIG_EXT3_FS_XATTR is not set
+>  CONFIG_EXT4_FS=y
+> +CONFIG_FANOTIFY=y
+>  CONFIG_QUOTA=y
+>  CONFIG_QFMT_V2=y
+> +CONFIG_AUTOFS4_FS=y
+>  CONFIG_MSDOS_FS=y
+>  CONFIG_VFAT_FS=y
+>  CONFIG_TMPFS=y
+> +CONFIG_TMPFS_POSIX_ACL=y
+>  CONFIG_JFFS2_FS=y
+>  CONFIG_JFFS2_SUMMARY=y
+>  CONFIG_JFFS2_FS_XATTR=y
+> --
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d..9221645 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -636,6 +636,11 @@ static int keep_initrd;
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
- 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
- 	}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..c5512f6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -334,8 +334,14 @@ static int keep_initrd;
- 
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
--	if (!keep_initrd)
-+	if (!keep_initrd) {
-+		if (start == initrd_start)
-+			start = round_down(start, PAGE_SIZE);
-+		if (end == initrd_end)
-+			end = round_up(end, PAGE_SIZE);
-+
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
-+	}
- }
- 
- static int __init keepinitrd_setup(char *__unused)
--- 
-2.1.0
+Looks good to me, so:
+
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+I think that the same options should be enabled in multi_v7_defconfig BTW.
+
+Best regards,
+Javier
