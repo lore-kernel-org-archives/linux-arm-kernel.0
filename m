@@ -1,139 +1,44 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Sep 2014 14:17:33 +0300
-Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <1410539695-29128-6-git-send-email-will.deacon@arm.com>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <1410539695-29128-6-git-send-email-will.deacon@arm.com>
-Message-ID: <4252161.sBJZLIS2WH@avalon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 18 Sep 2014 12:35:32 +0100
+Subject: [PATCH] of: amba: use of_dma_configure for AMBA devices
+In-Reply-To: <20140917180524.GG18532@arm.com>
+References: <90bd1ff3c93b827c12e1b3dc9ad3f227632d0f6e.1410954967.git.robin.murphy@arm.com>
+ <20140917170338.GC18532@arm.com>
+ <CAL_JsqKTZyPgbxy=pPmFPKRxa97oaWqC6u6pBvqvja_URLno4Q@mail.gmail.com>
+ <20140917180524.GG18532@arm.com>
+Message-ID: <541AC384.8010806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Thanks Catalin/Will/Rob,
 
-Thank you for the patch.
+On 17/09/14 19:05, Will Deacon wrote:
+> On Wed, Sep 17, 2014 at 06:47:19PM +0100, Rob Herring wrote:
+>> On Wed, Sep 17, 2014 at 12:03 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Wed, Sep 17, 2014 at 12:56:07PM +0100, Robin Murphy wrote:
+>>>> Commit 591c1e ("of: configure the platform device dma parameters)
+>>>> introduced a common mechanism to configure DMA from DT properties.
+>>>> AMBA devices created from DT can take advantage of this, too.
+>>>>
+>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>>
+>>>    Acked-by: Will Deacon <will.deacon@arm.com>
+>>>
+>>> It would be great if the arm-soc guys can pick this up.
+>>
+>> Is this a dependency for something else? If so,
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>
+> Yeah, it's going to be needed by my IOMMU init rework so that AMBA devices
+> get registered with their IOMMUs.
+>
 
-On Friday 12 September 2014 17:34:53 Will Deacon wrote:
-> This patch extends of_dma_configure so that it sets up the IOMMU for a
-> device, as well as the coherent/non-coherent DMA mapping ops.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/dma-mapping.h |  4 +++-
->  drivers/of/platform.c              | 24 +++++++++++++++++-------
->  include/linux/dma-mapping.h        |  8 +++++++-
->  3 files changed, 27 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h
-> b/arch/arm/include/asm/dma-mapping.h index 7e9ac4f604c3..a8bb0c494bb3
-> 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -121,7 +121,9 @@ static inline unsigned long dma_max_pfn(struct device
-> *dev) }
->  #define dma_max_pfn(dev) dma_max_pfn(dev)
-> 
-> -static inline void arch_setup_dma_ops(struct device *dev, bool coherent)
-> +static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-> +				      u64 size, struct iommu_dma_mapping *iommu,
-> +				      bool coherent)
->  {
->  	if (coherent)
->  		set_dma_ops(dev, &arm_coherent_dma_ops);
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 946dd7ae0394..95ebd38db545 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -19,6 +19,7 @@
->  #include <linux/slab.h>
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_iommu.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> @@ -166,6 +167,7 @@ static void of_dma_configure(struct platform_device
-> *pdev) int ret;
->  	bool coherent;
->  	unsigned long offset;
-> +	struct iommu_dma_mapping *iommu;
->  	struct device *dev = &pdev->dev;
-> 
->  	/*
-> @@ -195,7 +197,19 @@ static void of_dma_configure(struct platform_device
-> *pdev) dev_dbg(dev, "device is%sdma coherent\n",
->  		coherent ? " " : " not ");
-> 
-> -	arch_setup_dma_ops(dev, coherent);
-> +	iommu = of_iommu_configure(dev);
-> +	dev_dbg(dev, "device is%sbehind an iommu\n",
-> +		iommu ? " " : " not ");
-> +
-> +	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> +
-> +	if (iommu)
-> +		kref_put(&iommu->kref, of_iommu_deconfigure);
+Noob question: Does that mean I should resend (with ACKs) to 
+arm at kernel.org? (I wasn't entirely sure where this should go, hence just 
+throwing at the list with CCs)
 
-What's the expected life cycle of the iommu_dma_mapping structure ? It gets 
-created by of_iommu_configure() and the initial reference gets dropped here. I 
-suppose you expect arch code to need to keep a reference to the structure, but 
-your implementation in patch 7/7 doesn't. As far as I can see, you don't even 
-use the contents of the structure in the ARM arch_setup_dma_ops() 
-implementation. Do you expect that to change later, or other architectures to 
-need it ?
+Robin.
 
-By the way, now that I think about it, I find struct iommu_dma_mapping and 
-struct dma_iommu_mapping very confusing.
-
-> +}
-> +
-> +static void of_dma_deconfigure(struct platform_device *pdev)
-> +{
-> +	arch_teardown_dma_ops(&pdev->dev);
->  }
-> 
->  /**
-> @@ -224,16 +238,12 @@ static struct platform_device
-> *of_platform_device_create_pdata( if (!dev)
->  		goto err_clear_flag;
-> 
-> -	of_dma_configure(dev);
->  	dev->dev.bus = &platform_bus_type;
->  	dev->dev.platform_data = platform_data;
-> -
-> -	/* We do not fill the DMA ops for platform devices by default.
-> -	 * This is currently the responsibility of the platform code
-> -	 * to do such, possibly using a device notifier
-> -	 */
-> +	of_dma_configure(dev);
-> 
->  	if (of_device_add(dev) != 0) {
-> +		of_dma_deconfigure(dev);
->  		platform_device_put(dev);
->  		goto err_clear_flag;
->  	}
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index e60e52d82db9..47e1ac30e300 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -138,7 +138,13 @@ static inline int dma_coerce_mask_and_coherent(struct
-> device *dev, u64 mask) extern u64 dma_get_required_mask(struct device
-> *dev);
-> 
->  #ifndef arch_setup_dma_ops
-> -static inline void arch_setup_dma_ops(struct device *dev, bool coherent) {
-> } +static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-> +				      u64 size, struct iommu_dma_mapping *iommu,
-> +				      bool coherent) { }
-> +#endif
-> +
-> +#ifndef arch_teardown_dma_ops
-> +static inline void arch_teardown_dma_ops(struct device *dev) { }
->  #endif
-> 
->  static inline unsigned int dma_get_max_seg_size(struct device *dev)
-
--- 
-Regards,
-
-Laurent Pinchart
+> Will
+>
