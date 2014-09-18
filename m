@@ -1,48 +1,62 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 18 Sep 2014 15:16:37 +0100
-Subject: [PATCH] ARM: DT: ifc6410: Add board memory range.
-In-Reply-To: <CAJAp7Og5v-ADm6ekMVUs8++CL5NP+OEw-vZ7mKdChOZyBTBZpA@mail.gmail.com>
-References: <1410932179-4652-1-git-send-email-srinivas.kandagatla@linaro.org>	<54192B64.6070604@smartplayin.com>	<FA9D8682-DB0E-48CF-A519-86A0465300E1@codeaurora.org>	<20140917191829.GC3749@joshc.qualcomm.com>	<541A01F3.4020303@linaro.org>
- <CAJAp7Og5v-ADm6ekMVUs8++CL5NP+OEw-vZ7mKdChOZyBTBZpA@mail.gmail.com>
-Message-ID: <541AE945.9030203@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 18 Sep 2014 22:17:06 +0800
+Subject: [PATCH 3/3] ARM: dts: vf610-colibri: Add backlight support
+In-Reply-To: <cea494421deefe0b862e31b08685074715acf8d6.1410930820.git.bhuvanchandra.dv@toradex.com>
+References: <cover.1410930820.git.bhuvanchandra.dv@toradex.com>
+ <cea494421deefe0b862e31b08685074715acf8d6.1410930820.git.bhuvanchandra.dv@toradex.com>
+Message-ID: <20140918141705.GM4796@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 17, 2014 at 01:46:30PM +0530, Bhuvanchandra DV wrote:
+> 
+> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> ---
+>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
+>  arch/arm/boot/dts/vf610-colibri.dtsi        |    7 +++++++
+>  2 files changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> index ba98039..f1988a0 100644
+> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> @@ -52,3 +52,9 @@
+>  &pwm1 {
+>  	status = "okay";
+>  };
+> +
+> +&backlight {
+> +	brightness-levels = <0 4 8 16 32 64 128 255>;
+> +	default-brightness-level = <6>;
+> +	status  = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+> index 9bd1415..e725306 100644
+> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+> @@ -25,6 +25,13 @@
+>  		};
+>  	};
+>  
+> +	backlight: bl {
 
+I would suggest we name the node following the example in
+Documentation/devicetree/bindings/pwm/pwm.txt, i.e. bl: backlight.
 
-On 18/09/14 05:37, Bjorn Andersson wrote:
-> On Wed, Sep 17, 2014 at 2:49 PM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
->>
->>
->> On 17/09/14 20:18, Josh Cartwright wrote:
->>>
->>> On Wed, Sep 17, 2014 at 12:03:37PM -0700, Kumar Gala wrote:
-> [..]
->>>> Hmm, this doesn?t seem to work for me.
->>>
->>>
->>> I don't see how it could with qcom_defconfig, as we set
->>> CONFIG_ARM_ATAG_DTB_COMPAT.  Is this patch fixing a real issue?
->>
->> No, its not fixing any thing by itself.
->>
->> However along with "ARM: zImage: Allow DTB to override broken ATAG_MEM"
->> patch atleast I get to boot my IFC6410 with multi_v7_defconfig.
->
-> But that patch was rejected by various people.
-> Instead have a look at [1], it solves the problem for you (and have
-> reference to the original source).
->
-> [1] https://github.com/andersson/kernel/commit/d4c0061cf7be8a341e6d06a97c85ecb69284e74c
-Looks cool.. I think we can ignore this patch with this fixup.
-On IFC6410 now that we have some way to unbrick the board we could even 
-try to fix this at bootloader level.
+> +		compitable = "pwm-backlight";
+> +		pwms = <&pwm0 0 5000000 0>;
+> +		pwm-names = " backlight";
 
-Thanks to Kumar and You for redirecting me to this link.
+Drop the leading space in the string.
 
---srini
->
-> Regards,
-> Bjorn
->
+Shawn
+
+> +		status = "disabled";
+> +	};
+> +
+>  };
+>  
+>  &esdhc1 {
+> -- 
+> 1.7.9.5
+> 
