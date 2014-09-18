@@ -1,108 +1,64 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 18 Sep 2014 13:14:52 -0700
-Subject: [PATCH] arm, kaslr: randomize module base address
-Message-ID: <20140918201452.GA1653@www.outflux.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Sep 2014 13:15:08 -0700
+Subject: [GIT PULL 5/5] omap dts changes for v3.18 merge window
+In-Reply-To: <pull-1410478051-378788-5>
+References: <pull-1410478051-378788>
+ <pull-1410478051-378788-5>
+Message-ID: <20140918201507.GO14505@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While we don't yet have text base address randomization in ARM, we can
-do module base address randomization. This bumps the module base by up
-to 4MiB.
+* Tony Lindgren <tony@atomide.com> [140911 16:29]:
+> The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
+> 
+>   Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/dt-for-v3.18
+> 
+> for you to fetch changes up to d27704d1ec2f9ba06247b402c58a6f2febecef78:
+> 
+>   ARM: dts: OMAP2+: Add sub mailboxes device node information (2014-09-11 11:46:30 -0700)
+> 
+> ----------------------------------------------------------------
+> Changes for .dts files for omaps for v3.18 merge window:
+> 
+> - Updates for gta04 to add gta04a3 model
+> - Add support for Tehnexion TAO3530 boards
+> - Regulator names for beaglebone
+> - Pinctrl related updates for omap5, dra7 and am437
+> - Model name fix for sbc-t54
+> - Enable mailbox for various omaps
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm/Kconfig         |  8 ++++++++
- arch/arm/kernel/module.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
- 2 files changed, 50 insertions(+), 3 deletions(-)
+This can cause a minor merge conflict, here's the
+merge resolution for reference.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 32cbbd565902..47b03360aa51 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1769,6 +1769,14 @@ config XEN
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
- 
-+config RANDOMIZE_BASE
-+	bool "Randomize the base address of loaded modules"
-+	depends on MMU
-+	default n
-+	---help---
-+	   Randomizes the base address at which kernel modules are loaded,
-+	   with 10 bits of entropy. At most, this will create a 4MiB gap
-+	   at the start of the kernel modules virtual address range.
- endmenu
- 
- menu "Boot options"
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 6a4dffefd357..f7cf7e84905e 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -19,6 +19,7 @@
- #include <linux/fs.h>
- #include <linux/string.h>
- #include <linux/gfp.h>
-+#include <linux/random.h>
- 
- #include <asm/pgtable.h>
- #include <asm/sections.h>
-@@ -38,11 +39,49 @@
- #endif
- 
- #ifdef CONFIG_MMU
-+# ifdef CONFIG_RANDOMIZE_BASE
-+static unsigned long module_load_offset;
-+static int randomize_modules = 1;
-+
-+/* Mutex protects the module_load_offset. */
-+static DEFINE_MUTEX(module_kaslr_mutex);
-+
-+static int __init parse_nokaslr(char *p)
-+{
-+	randomize_modules = 0;
-+	return 0;
-+}
-+early_param("nokaslr", parse_nokaslr);
-+
-+static unsigned long int get_module_load_offset(void)
-+{
-+	if (randomize_modules) {
-+		mutex_lock(&module_kaslr_mutex);
-+		/*
-+		 * Calculate the module_load_offset the first time this
-+		 * code is called. Once calculated it stays the same until
-+		 * reboot.
-+		 */
-+		if (module_load_offset == 0)
-+			module_load_offset =
-+				(get_random_int() % 1024 + 1) * PAGE_SIZE;
-+		mutex_unlock(&module_kaslr_mutex);
-+	}
-+	return module_load_offset;
-+}
-+# else
-+static unsigned long int get_module_load_offset(void)
-+{
-+	return 0;
-+}
-+# endif
-+
- void *module_alloc(unsigned long size)
- {
--	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
--				GFP_KERNEL, PAGE_KERNEL_EXEC, NUMA_NO_NODE,
--				__builtin_return_address(0));
-+	return __vmalloc_node_range(size, 1,
-+				MODULES_VADDR + get_module_load_offset(),
-+				MODULES_END, GFP_KERNEL, PAGE_KERNEL_EXEC,
-+				NUMA_NO_NODE, __builtin_return_address(0));
- }
- #endif
- 
--- 
-1.9.1
+Regards,
 
+Tony
 
--- 
-Kees Cook
-Chrome OS Security
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@@ -226,7 -240,9 +226,9 @@@ MACHINE_EN
+  #endif
+  
+  #ifdef CONFIG_SOC_DRA7XX
+ -static const char *dra74x_boards_compat[] __initconst = {
+ +static const char *const dra74x_boards_compat[] __initconst = {
++ 	"ti,am5728",
++ 	"ti,am5726",
+  	"ti,dra742",
+  	"ti,dra7",
+  	NULL,
+@@@ -245,7 -261,9 +247,9 @@@ DT_MACHINE_START(DRA74X_DT, "Generic DR
+  	.restart	= omap44xx_restart,
+  MACHINE_END
+  
+ -static const char *dra72x_boards_compat[] __initconst = {
+ +static const char *const dra72x_boards_compat[] __initconst = {
++ 	"ti,am5718",
++ 	"ti,am5716",
+  	"ti,dra722",
+  	NULL,
+  };
