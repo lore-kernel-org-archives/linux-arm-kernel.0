@@ -1,72 +1,106 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 18 Sep 2014 22:52:11 +0200
-Subject: [PATCH v2 1/2] bcma: register bcma as device tree driver
-In-Reply-To: <CACna6rw0-g+v6u3Yxhnmy1NT0mhj-s4re5R3z0dbBV-tMvky6Q@mail.gmail.com>
-References: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
- <CACna6rw0-g+v6u3Yxhnmy1NT0mhj-s4re5R3z0dbBV-tMvky6Q@mail.gmail.com>
-Message-ID: <541B45FB.3000503@hauke-m.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Sep 2014 22:02:12 +0100
+Subject: [PATCH] ARM: at91: sama5: configure L2 cache
+In-Reply-To: <1411072716-20769-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1411072716-20769-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140918210212.GD5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 10:03 PM, Rafa? Mi?ecki wrote:
-> On 16 September 2014 23:56, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> +The cores on the AXI bus are auto detected by bcma. bcma automatically
->> +detects the cores
+On Thu, Sep 18, 2014 at 10:38:36PM +0200, Alexandre Belloni wrote:
+> From: Wenyou Yang <wenyou.yang@atmel.com>
 > 
-> I'm far from being an English expert, but above is kind of pleonasm to me ;)
+> Ensure that the L2 cache configuration is optimal to avoid depending on the
+> bootloader to set it correctly.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/mach-at91/board-dt-sama5.c | 47 ++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 46 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 548de4ad6937..7cbe0d9daf2b 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -13,12 +13,14 @@
+>  #include <linux/gpio.h>
+>  #include <linux/micrel_phy.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/phy.h>
+>  #include <linux/clk-provider.h>
+>  
+>  #include <asm/setup.h>
+> +#include <asm/hardware/cache-l2x0.h>
+>  #include <asm/irq.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> @@ -35,8 +37,52 @@ static void __init sama5_dt_timer_init(void)
+>  	at91sam926x_pit_init();
+>  }
+>  
+> +static void __init at91_l2x0_init(void)
+> +{
+> +	struct device_node *np;
+> +	void __iomem *l2cc_base;
+> +	u32 reg;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+> +	if (!np)
+> +		return;
+> +
+> +	l2cc_base = of_iomap(np, 0);
+> +	of_node_put(np);
+> +
+> +	if (!l2cc_base) {
+> +		pr_err("L2C-310 unable to map registers\n");
+> +		return;
+> +	}
+> +
+> +	/* Prefetch Control */
+> +	reg = readl_relaxed(l2cc_base + L310_PREFETCH_CTRL);
+> +	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
+> +	reg |= 0x01 & L310_PREFETCH_CTRL_OFFSET_MASK;
+> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+> +	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
+> +	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
+> +	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
+> +	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
+> +	writel_relaxed(reg, l2cc_base + L310_PREFETCH_CTRL);
+> +
+> +	/* Power Control */
+> +	reg = readl_relaxed(l2cc_base + L310_POWER_CTRL);
+> +	reg |= L310_STNDBY_MODE_EN;
+> +	reg |= L310_DYNAMIC_CLK_GATING_EN;
+> +	writel_relaxed(reg, l2cc_base + L310_POWER_CTRL);
+> +
+> +	/* Disable interrupts */
+> +	writel_relaxed(0x00, l2cc_base + L2X0_INTR_MASK);
+> +	writel_relaxed(0x01ff, l2cc_base + L2X0_INTR_CLEAR);
+> +
+> +	l2x0_of_init(0, ~0UL);
 
-Yes to me too. ;-)
+NAK.  Really, nak.  Stop this mentality of working around shortcomings
+of generic code by adding yet more platform junk.  Such approaches are
+not acceptable.
 
->> and the memory ranges they are using and they get
->> +registered afterwards. Automatic detection of the IRQ number is not
->> +possible on BCM47xx/BCM53xx ARM and MIPS SoCs.
-> 
-> Should we replace "not possible" with something like "not reliable"?
-> After the last info we got from Arend.
+The power control is already done by generic code.  I know that you've
+developed the above code against the exact copy of generic code which
+has this, because you're using the new symbols.
 
-Yes that sounds good.
+You shouldn't need to disable interrupts; the interrupts should already
+be disabled unless your bootloaders are doing something weird with them.
 
-> 
-> 
->> +#ifdef CONFIG_BCMA_HOST_SOC
->> +/* host_pci.c */
-> 
-> s/pci/soc/
-> 
-> 
->> +#ifdef CONFIG_OF
->> +extern int __init bcma_host_soc_register_driver(void);
->> +extern void __exit bcma_host_soc_unregister_driver(void);
->> +#else
->> +static inline int __init bcma_host_soc_register_driver(void)
->> +{
->> +       return 0;
->> +}
->> +static inline void __exit bcma_host_soc_unregister_driver(void)
->> +{
->> +}
->> +#endif /* CONFIG_OF */
->> +#endif /* CONFIG_BCMA_HOST_SOC */
-> 
-> OK, so you just made bcma_host_soc_(un)register_driver calls safe above.
-> 
-> 
->> diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
->> index c421403..e5d578c 100644
->> --- a/drivers/bcma/main.c
->> +++ b/drivers/bcma/main.c
->> @@ -528,6 +528,13 @@ static int __init bcma_modinit(void)
->>         if (err)
->>                 return err;
->>
->> +#ifdef CONFIG_BCMA_HOST_SOC
->> +       err = bcma_host_soc_register_driver();
->> +       if (err) {
->> +               pr_err("SoC host initialization failed\n");
->> +               err = 0;
->> +       }
->> +#endif
-> 
-> And above you check for CONFIG_ anyway.
-> 
-Yes that sounds good.
+There have been DT bindings proposed for prefetch control register.  I
+suggest that you search this mailing list for that patch, and check
+whether it is acceptable for your platform.
+
+Taking all that together, you should need /zero/ code in your platform
+for L2 caches, which is *the way it should be*.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
