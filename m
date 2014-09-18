@@ -1,40 +1,61 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 17 Sep 2014 21:37:59 -0700
-Subject: [PATCH] ARM: DT: ifc6410: Add board memory range.
-In-Reply-To: <541A01F3.4020303@linaro.org>
-References: <1410932179-4652-1-git-send-email-srinivas.kandagatla@linaro.org>
- <54192B64.6070604@smartplayin.com>
- <FA9D8682-DB0E-48CF-A519-86A0465300E1@codeaurora.org>
- <20140917191829.GC3749@joshc.qualcomm.com>
- <541A01F3.4020303@linaro.org>
-Message-ID: <CAJAp7Og5v-ADm6ekMVUs8++CL5NP+OEw-vZ7mKdChOZyBTBZpA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 18 Sep 2014 07:07:40 +0200
+Subject: [PATCH 1/2] devicetree: cadence_ttc: Document binding for timer
+ width
+In-Reply-To: <20140917161737.GA7983@leverpostej>
+References: <3537996136ec435ea660da869102d0a019214979.1410964243.git.michal.simek@xilinx.com>
+ <20140917161737.GA7983@leverpostej>
+Message-ID: <db43281a-06bc-436b-a082-212d1f95d974@BL2FFO11FD034.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 2:49 PM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
->
->
-> On 17/09/14 20:18, Josh Cartwright wrote:
+On 09/17/2014 06:17 PM, Mark Rutland wrote:
+> On Wed, Sep 17, 2014 at 03:30:49PM +0100, Michal Simek wrote:
+>> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
 >>
->> On Wed, Sep 17, 2014 at 12:03:37PM -0700, Kumar Gala wrote:
-[..]
->>> Hmm, this doesn?t seem to work for me.
+>> Modern TTC implementations can extend the timer width to 32 bit. This
+>> feature is not self identifying so the driver needs to be made aware
+>> via device tree.
 >>
+>> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
 >>
->> I don't see how it could with qcom_defconfig, as we set
->> CONFIG_ARM_ATAG_DTB_COMPAT.  Is this patch fixing a real issue?
->
-> No, its not fixing any thing by itself.
->
-> However along with "ARM: zImage: Allow DTB to override broken ATAG_MEM"
-> patch atleast I get to boot my IFC6410 with multi_v7_defconfig.
+>>  Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+>> index 993695c659e1..5439976eca6b 100644
+>> --- a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+>> +++ b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+>> @@ -6,6 +6,9 @@ Required properties:
+>>  - interrupts : A list of 3 interrupts; one per timer channel.
+>>  - clocks: phandle to the source clock
+>>
+>> +Optional properties:
+>> +- timer-width: Bit width of the timer. Either 16 or 32 (default 16).
+> 
+> Are we expecting TTC implementations with widths other than 16 or 32?
 
-But that patch was rejected by various people.
-Instead have a look at [1], it solves the problem for you (and have
-reference to the original source).
+IRC if you use 32bit timer and setup for example 24bit width it should work
+too and you are just ignoring that upper bits.
 
-[1] https://github.com/andersson/kernel/commit/d4c0061cf7be8a341e6d06a97c85ecb69284e74c
+> 
+> This looks sane to me, but we might be able to just have a 32-bit-timer
+> property if we don't expect arbitrary widths.
 
-Regards,
-Bjorn
+Definitely model different timer width is easily possible to do in qemu
+that's why I think having more generic property timer-width is just better than
+having property used just for one case.
+
+Thanks,
+Michal
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140918/3e67cb67/attachment-0001.sig>
