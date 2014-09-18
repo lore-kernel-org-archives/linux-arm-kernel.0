@@ -1,40 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 18 Sep 2014 11:03:16 -0500
-Subject: [PATCH 08/12] ARM: omap2plus_defconfig: Shrink with savedefconfig
-In-Reply-To: <20140918155731.GC14505@atomide.com>
-References: <1410837126-31553-1-git-send-email-tony@atomide.com>
- <1410837126-31553-8-git-send-email-tony@atomide.com>
- <20140916045603.GA10498@saruman.home>
- <20140918155731.GC14505@atomide.com>
-Message-ID: <20140918160316.GD4537@saruman.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Sep 2014 17:04:34 +0100
+Subject: [PATCH Resend] arm:extend the reserved mrmory for initrd to be
+ page aligned
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB491619@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491616@CNBJMBX05.corpusers.net>
+ <20140918055553.GO3755@pengutronix.de>
+ <35FD53F367049845BC99AC72306C23D103D6DB491619@CNBJMBX05.corpusers.net>
+Message-ID: <20140918160434.GC25330@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 18, 2014 at 08:57:32AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [140915 21:57]:
-> > Hi,
-> > 
-> > On Mon, Sep 15, 2014 at 08:12:02PM -0700, Tony Lindgren wrote:
-> > > This saves few lines and makes it easier to make patches
-> > > against omap2plus_defconfig.
-> > > 
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > 
-> > while at that, can you enable voluntary preemption ?
+On Thu, Sep 18, 2014 at 07:53:57AM +0100, Wang, Yalin wrote:
+> This patch extends the start and end address of initrd to be page aligned,
+> so that we can free all memory including the un-page aligned head or tail
+> page of initrd, if the start or end address of initrd are not page
+> aligned, the page can't be freed by free_initrd_mem() function.
 > 
-> OK, can you do a separate patch for that with a brief description
-> why it should be enabled?
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
 
-sure, gimme a day or two (busy with other patches).
+You still have a typo in the subject.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140918/1a220e10/attachment.sig>
+For the arm64 part:
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+so you can merge it via Russell's patch system.
