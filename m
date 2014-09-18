@@ -1,52 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Sep 2014 09:56:50 +0200
-Subject: [PATCH 4/7] clk: add clk-asm9260 driver
-In-Reply-To: <541A7FE1.8060202@rempel-privat.de>
-References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
- <1410646408-28901-5-git-send-email-linux@rempel-privat.de>
- <20140917135440.GG27054@piout.net>
- <541A7FE1.8060202@rempel-privat.de>
-Message-ID: <20140918075650.GB29620@piout.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Sep 2014 08:57:58 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <alpine.LFD.2.11.1409172059050.8647@knanqh.ubzr>
+References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
+ <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
+ <20140910145818.GG12361@n2100.arm.linux.org.uk>
+ <1410363657.23973.48.camel@hornet>
+ <20140917152735.GU12361@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1409172059050.8647@knanqh.ubzr>
+Message-ID: <20140918075758.GA12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 18/09/2014 at 08:46:57 +0200, Oleksij Rempel wrote :
-> Am 17.09.2014 um 15:54 schrieb Alexandre Belloni:
-> > Hi,
-> > 
-> > Please have a look at https://lkml.org/lkml/2014/5/14/598 which describe
-> > the preferred way of implementing clocks in the CCF where you only
-> > declare the clock generator in the DT instead of each separate clocks.
+On Wed, Sep 17, 2014 at 09:04:54PM -0400, Nicolas Pitre wrote:
+> On Wed, 17 Sep 2014, Russell King - ARM Linux wrote:
 > 
-> hm... if i see it correctly. i will need to move almost everything from
-> DT to clk-driver. And i will need to create separate driver for other
-> SoC provided by AlphaScale. On other side with current (generic) driver
-> i will need only to change DT and it will work.
+> > As for TC2, I just don't bother with that.  It's really not worth the
+> > hastle.  I asked for help with that and got almost nothing.  Yes, there's
+> > Nicolas' uboot, which solves some problems, but getting the kernel to
+> > boot on TC2 turned out to be a dead loss - and no help with it was
+> > forthcoming.
 > 
-> May be instead of going qcom way, it will be better to have generic
-> gate, div and mux bindings for DT? Sure it will make DT a bit fuzzy, but
-> it will dramatically reduce kernel code and reduce the time of providing
-> code to upstream.
-> 
-> I don't think drivers/clk/qcom/gcc-msm8974.c is less complicated solution.
+> TC2 is my main development board at the moment and it boots mainline 
+> perfectly.  If you want I can provide you with a tarball of everything 
+> you need to boot it, including my setup script and compiled kernel, to 
+> get you started.
 
-IT is not less complicated but it is more flexible (for exemple when
-setting flags on individual clocks, like CLK_SET_RATE_PARENT or
-CLK_IGNORE_UNUSED). Describing all the individual clocks in DT is a
-mistake we made in at91 and it will definitely bother you in the future,
-for example when you realize that your clock controller is also taking
-care of reset or power management.
+Well, right now I have a slightly different view, because of the work on
+the FIQ stuff.
 
-Also, this is the kind of driver you write only once per SoC so it is
-about the same doing it in DT or in C with the added advantage that
-doing it in C takes less memory and is probably faster.
+We currently have the situation where the GIC on CT9x4 appears to be
+different from other GICs, in that group 1 interrupts are never
+delivered.  As the GIC is indistinguishable from working parts, this
+currently squarely puts the Daniel's KGDB FIQ work, and work to use
+FIQ for dumping backtraces in the case of a spinlock lockup beyond the
+reach of the kernel right now, and nothing more than a local hack.
 
-You can have a look at how it has been done for the berlin SoCs to see
-how you can easily reuse code between drivers.
+So, until we get to the bottom of this, I need Versatile Express support
+to stay as-is, so there's no extraneous variables in the platform.  That
+means right now I need the legacy stuff to stay as switching to DT will
+add a huge variable into what's going on.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
