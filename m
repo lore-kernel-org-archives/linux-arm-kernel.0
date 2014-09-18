@@ -1,62 +1,140 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 18 Sep 2014 22:17:06 +0800
-Subject: [PATCH 3/3] ARM: dts: vf610-colibri: Add backlight support
-In-Reply-To: <cea494421deefe0b862e31b08685074715acf8d6.1410930820.git.bhuvanchandra.dv@toradex.com>
-References: <cover.1410930820.git.bhuvanchandra.dv@toradex.com>
- <cea494421deefe0b862e31b08685074715acf8d6.1410930820.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <20140918141705.GM4796@dragon>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Thu, 18 Sep 2014 16:19:26 +0200
+Subject: [PATCH v5 2/4] dt-bindings: document Rockchip thermal
+In-Reply-To: <541ADD58.7070901@rock-chips.com>
+References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
+ <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
+ <CAAObsKA61Ano85P6PehOY7WqR0FgTz_Rfur8UAt56ZXoNyoyqQ@mail.gmail.com>
+ <541ADD58.7070901@rock-chips.com>
+Message-ID: <CAAObsKCYGEBNEvDTs=iQD9KT0YomQWHg0W-vwHG4nLZbqogF=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 01:46:30PM +0530, Bhuvanchandra DV wrote:
-> 
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> ---
->  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
->  arch/arm/boot/dts/vf610-colibri.dtsi        |    7 +++++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> index ba98039..f1988a0 100644
-> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> @@ -52,3 +52,9 @@
->  &pwm1 {
->  	status = "okay";
->  };
-> +
-> +&backlight {
-> +	brightness-levels = <0 4 8 16 32 64 128 255>;
-> +	default-brightness-level = <6>;
-> +	status  = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-> index 9bd1415..e725306 100644
-> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-> @@ -25,6 +25,13 @@
->  		};
->  	};
->  
-> +	backlight: bl {
+On 18 September 2014 15:25, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+> Tomeu,
+>
+> ? 2014?09?18? 17:27, Tomeu Vizoso ??:
+>>
+>> On 17 September 2014 05:59, Caesar Wang <caesar.wang@rock-chips.com>
+>> wrote:
+>>>
+>>> This add the necessary binding documentation for the thermal
+>>> found on Rockchip SoCs
+>>
+>> Hi Caesar,
+>>
+>> is there any reason to not use the existing thermal bindings? You can
+>> find a description in
+>> Documentation/devicetree/bindings/thermal/thermal.txt and example code
+>> in omap, or in the patches for Tegra recently posted by Mikko
+>> Perttunen.
+>>
+>> Regards,
+>>
+>> Tomeu
+>
+>
+> Why should I use the existing thermal bindings?
 
-I would suggest we name the node following the example in
-Documentation/devicetree/bindings/pwm/pwm.txt, i.e. bl: backlight.
+Because otherwise, you are asking to merge duplicated code. There's a
+generic way to define thermal zones, trip points, cooling devices,
+etc. And also code to parse and plug them together. Why add
+soc-specific code to do the same?
 
-> +		compitable = "pwm-backlight";
-> +		pwms = <&pwm0 0 5000000 0>;
-> +		pwm-names = " backlight";
+> I believe omap,tegar and rockchip are  the three seperate thermals driver.
 
-Drop the leading space in the string.
+Yes, and OMAP is already using the generic bindings, and the proposed
+patches for Tegra as well, and I think it would make sense for
+Rockchip to also use them (unless I'm missing something).
 
-Shawn
+Regards,
 
-> +		status = "disabled";
-> +	};
-> +
->  };
->  
->  &esdhc1 {
-> -- 
-> 1.7.9.5
-> 
+Tomeu
+
+> So far, I submitted the series Patchs for rockchip thermal.
+>
+>>
+>>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+>>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>>> ---
+>>>   .../bindings/thermal/rockchip-thermal.txt          | 41
+>>> ++++++++++++++++++++++
+>>>   1 file changed, 41 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>> new file mode 100644
+>>> index 0000000..6fc8bc3
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>> @@ -0,0 +1,41 @@
+>>> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+>>> +
+>>> +Required properties:
+>>> +- compatible: "rockchip,rk3288-tsadc"
+>>> +- reg: physical base address of the controller and length of memory
+>>> mapped
+>>> +       region.
+>>> +- interrupts: The interrupt number to the cpu. The interrupt specifier
+>>> format
+>>> +             depends on the interrupt controller.
+>>> +- clocks: Must contain an entry for each entry in clock-names.
+>>> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk"
+>>> for
+>>> +              the peripheral clock.
+>>> +- num-trips:  number of total trip points, this is required, set it 0 if
+>>> none,
+>>> +             if greater than 0, the following properties must be
+>>> defined;
+>>> +- tripN-temp: temperature of trip point N, should be in ascending order;
+>>> +- tripN-type: type of trip point N, should be one of "active" "passive"
+>>> "hot"
+>>> +             "critical";
+>>> +- tripN-cdev-num: number of the cooling devices which can be bound to
+>>> trip
+>>> +                 point N, this is required if trip point N is defined,
+>>> set it 0 if none,
+>>> +                 otherwise the following cooling device names must be
+>>> defined;
+>>> +- tripN-cdev-nameM: name of the No. M cooling device of trip point N;
+>>> +
+>>> +Example:
+>>> +tsadc: tsadc at ff280000 {
+>>> +       compatible = "rockchip,rk3288-tsadc";
+>>> +       reg = <0xff280000 0x100>;
+>>> +       interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>>> +       clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+>>> +       clock-names = "tsadc", "apb_pclk";
+>>> +
+>>> +       num-trips = <2>;
+>>> +
+>>> +       trip0-temp = <80>;
+>>> +       trip0-type = "passive";
+>>> +       trip0-cdev-num = <1>;
+>>> +       trip0-cdev-name0 = "thermal-cpufreq-0";
+>>> +
+>>> +       trip1-temp = <100>;
+>>> +       trip1-type = "critical";
+>>> +       trip1-cdev-num = <1>;
+>>> +       trip1-cdev-name0 = "thermal-cpufreq-0";
+>>> +};
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>>
+>
+> --
+> Best regards,
+> Caesar
+>
+>
