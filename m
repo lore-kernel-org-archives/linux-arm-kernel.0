@@ -1,100 +1,104 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Thu, 18 Sep 2014 16:24:15 +0900
-Subject: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared
- at	sp804_of_init
-In-Reply-To: <20140917115758.GQ12361@n2100.arm.linux.org.uk>
-References: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
- <20140917115758.GQ12361@n2100.arm.linux.org.uk>
-Message-ID: <002c01cfd311$8d3e0330$a7ba0990$@min@lge.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 18 Sep 2014 15:28:44 +0800
+Subject: [RFC Part2 v1 01/21] irqdomain: Introduce new interfaces to
+ support hierarchy irqdomains
+In-Reply-To: <alpine.DEB.2.10.1409160859080.4247@nanos>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+ <1410444228-3134-2-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.10.1409160859080.4247@nanos>
+Message-ID: <541A89AC.9000706@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Wednesday, September 17, 2014 8:58 PM
-> To: Chanho Min
-> Cc: Stephen Boyd; Michael Opdenacker; Linus Walleij; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Jongsung Kim
-> Subject: Re: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared at sp804_of_init
+On 2014/9/17 1:43, Thomas Gleixner wrote:
+> Jiang,
 > 
-> On Wed, Sep 17, 2014 at 08:34:46PM +0900, Chanho Min wrote:
-> > sp804 may not be added to the tick device if the higher device is
-> > already registered. In this case, If pending interrupt is existed
-> > (usually It will be passed from the boot loader), inetrrupt is occured
-> > without event_handler then it cause kernel panic. So Interrupts
-> > should be cleared before clockevent is registered.
-> >
-> > Changes since v1:
-> >  - Move to sp804_of_init
-> >  - Clear TIMER2 interrupt
-> >  - Update commit log
-> >
-> > Signed-off-by: Chanho Min <chanho.min@lge.com>
-> > ---
-> >  arch/arm/common/timer-sp.c |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-> > index fd6bff0..e3cc08e 100644
-> > --- a/arch/arm/common/timer-sp.c
-> > +++ b/arch/arm/common/timer-sp.c
-> > @@ -226,6 +226,10 @@ static void __init sp804_of_init(struct device_node *np)
-> >  	writel(0, base + TIMER_CTRL);
-> >  	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
-> >
-> > +	/* Ensure interrupt is cleared */
-> > +	writel(1, base + TIMER_INTCLR);
-> > +	writel(1, base + TIMER_2_BASE + TIMER_INTCLR);
+> On Thu, 11 Sep 2014, Jiang Liu wrote:
+>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>  	/* Create mapping */
+>> -	virq = irq_create_mapping(domain, hwirq);
+>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +	if (domain->ops->alloc)
+>> +		virq = irq_domain_alloc_irqs(domain, -1, 1, NUMA_NO_NODE,
+>> +					     irq_data);
+>> +	else
+>> +#endif
+>> +		virq = irq_create_mapping(domain, hwirq);
 > 
-> NAK.
+> I'd prefer to get rid of the #ifdef CONFIG...s in the code. So this
+> can be written:
 > 
-> This is really not necessary for two reasons, and incorrect for a third
-> reason:
+>         if (irq_domain_has_hierarchy(domain))
+> 		virq = irq_domain_alloc_irqs(domain, -1, 1, NUMA_NO_NODE,
+> 					     irq_data);
+> 	else
+> 		virq = irq_create_mapping(domain, hwirq);
+Sure, will kill the ifdef. 	
+
+> 	   
 > 
-> 1. If the control register is cleared, interrupts are disabled.  When
->    interrupts are disabled, the IRQ line from the timer module is
->    deasserted irrespective of the internal interrupt state of the timer.
+>>  	if (!virq)
+>>  		return virq;
+>>  
+>> @@ -540,7 +542,11 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
+>>  		return 0;
+>>  
+>>  	if (hwirq < domain->revmap_direct_max_irq) {
+>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +		data = irq_domain_get_irq_data(domain, hwirq);
+>> +#else
+>>  		data = irq_get_irq_data(hwirq);
+>> +#endif
 > 
-
-Even if the control register is cleared and interrupts are disabled,
-It is not harmful before timer is enabled but It is rather harmful
-if interrupt is asserted before timer up. My patch just ensure interrupt
-is cleared before timer up
-
-> 2. We only enable the interrupt when we set the timer up to run in either
->    periodic or one-shot modes.  If the timer is not used, the interrupt
->    remains masked.
+> Similar here. Make irq_domain_get_irq_data() map to irq_get_irq_data() for
+> the non hierarchy mode so you end up with a single line:
 > 
-In our test, setup_irq enables the interrupt irrespective of the timer up/down.
+> -  		data = irq_get_irq_data(hwirq);
+> +		data = irq_domain_get_irq_data(domain, hwirq);
+Sure.
 
-> 3. Even if this was necessary (which it isn't), only doing this in the
->    sp804_of_init() path is wrong - there are other initialisation paths
->    in this code, and there's no reason why one should have a different
->    behaviour to the others.
-
-So Can another approach be acceptable as bellows?
-
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index fd6bff0..4aed813 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -121,8 +121,8 @@ static irqreturn_t sp804_timer_interrupt(int irq, void *dev_id)
- 
-        /* clear the interrupt */
-        writel(1, clkevt_base + TIMER_INTCLR);
--
--       evt->event_handler(evt);
-+       if(evt->event_handler)
-+               evt->event_handler(evt);
- 
-        return IRQ_HANDLED;
- }
-
-> If you've found this by running the kernel with QEMU, then it's probably
-> a QEMU bug if it raises an interrupt during the above code.
+>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +/**
+>> + * irq_domain_alloc_irqs - Allocate IRQs from domain
+>> + * @domain: domain to allocate from
+>> + * @irq_base: allocate specified IRQ nubmer if irq_base >= 0
+>> + * @nr_irqs: number of IRQs to allocate
+>> + * @node: NUMA node id for memory allocation
+>> + * @arg: domain specific argument
+>> + * @realloc: IRQ descriptors have already been allocated if true
+>> + *
+>> + * Allocate IRQ numbers and initialized all data structures to support
+>> + * hiearchy IRQ domains.
+>> + * Parameter @realloc is mainly to support legacy IRQs.
 > 
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+> What's the issue with the legacy irqs? So this has the interrupt
+> descriptors allocated already. Are they already wired up for serving
+> interrupts and what's the state of those lines?
+Function arch_early_ioapic_init() will allocate irq descriptors and
+irq_cfg structures for all legacy IRQ for three purposes:
+1) To support ISA IRQs managed by 8259.
+2) To reserve vectors on all CPUs for legacy IRQs
+3) Prepare data structures to support pre_init_apic_IRQ0().
+We will kill pre_init_apic_IRQ0() soon, so item 3 above won't be needed
+anymore.
 
-Chaho
+When __irq_domain_alloc_irqs() is called, only irq descriptor and
+irq_cfg have been allocated, but the interrupt controller hardware
+should be untouched yet.
+
+> 
+>> + * Returns error code or allocated IRQ number
+> 
+> Can you please add some documentation how the hierarchical allocation
+> is supposed to work and how the domains are connected. That should
+> probably go to Documentation/IRQ-domains.txt.
+Sure, I will do my best to add documentations for it.
+> 
+> Other than that this looks pretty good! Nice work!
+Thanks!
+Gerry
+> 
+> Thanks,
+> 
+> 	tglx
+> 
