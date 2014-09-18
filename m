@@ -1,27 +1,45 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 Sep 2014 14:43:09 -0700
-Subject: [PATCH 0/3] Krait VFP fixes
-Message-ID: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 18 Sep 2014 14:43:12 -0700
+Subject: [PATCH 3/3] arm: vfp: Bounce undefined instructions in vectored mode
+In-Reply-To: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1411076592-6157-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These changes allow us to support VFP correctly on Krait processors.
-They also fix short vector emulation for Cortex-A15 and Krait.
+From: Stepan Moskovchenko <stepanm@codeaurora.org>
 
-Stepan Moskovchenko (1):
-  arm: vfp: Bounce undefined instructions in vectored mode
+Certain ARM CPU implementations (e.g. Cortex-A15) may not raise a
+floating- point exception whenever deprecated short-vector VFP
+instructions are executed. Instead these instructions are treated
+as UNALLOCATED. Change the VFP exception handling code to emulate
+short-vector instructions even if FPEXC exception bits are not
+set.
 
-Stephen Boyd (2):
-  ARM: vfp: Workaround bad MVFR1 register on some Kraits
-  ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp implementations
+Tested-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/vfp/vfphw.S | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
- arch/arm/include/asm/cputype.h | 1 +
- arch/arm/include/asm/vfp.h     | 2 +-
- arch/arm/mm/proc-v7.S          | 5 +++--
- arch/arm/vfp/vfphw.S           | 6 ++++++
- arch/arm/vfp/vfpmodule.c       | 7 +++++++
- 5 files changed, 18 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+index be807625ed8c..c041579a8d82 100644
+--- a/arch/arm/vfp/vfphw.S
++++ b/arch/arm/vfp/vfphw.S
+@@ -197,6 +197,12 @@ look_for_VFP_exceptions:
+ 	tst	r5, #FPSCR_IXE
+ 	bne	process_exception
+ 
++	tst	r5, #FPSCR_LENGTH_MASK
++	beq	skip
++	orr	r1, r1, #FPEXC_DEX
++	b process_exception
++skip:
++
+ 	@ Fall into hand on to next handler - appropriate coproc instr
+ 	@ not recognised by VFP
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
