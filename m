@@ -1,32 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Sep 2014 10:59:32 -0700
-Subject: [PATCH] ASoC: samsung: Remove PCM support for WM8580 on SMDK
-In-Reply-To: <1411036935.2017.30.camel@x220>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
- <201409041802.36466.arnd@arndb.de> <1411036935.2017.30.camel@x220>
-Message-ID: <20140918175932.GD7960@sirena.org.uk>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 18 Sep 2014 14:20:48 -0700
+Subject: [PATCH 3.17-rc4 v7 4/6] irqchip: gic: Add support for IPI FIQ
+In-Reply-To: <20140918081739.GA5182@n2100.arm.linux.org.uk>
+References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
+ <1410970218-28847-5-git-send-email-daniel.thompson@linaro.org>
+ <20140918081739.GA5182@n2100.arm.linux.org.uk>
+Message-ID: <541B4CB0.8040705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 12:42:16PM +0200, Paul Bolle wrote:
-> On Thu, 2014-09-04 at 18:02 +0200, Arnd Bergmann wrote:
+On 18/09/14 01:17, Russell King - ARM Linux wrote:
+> On Wed, Sep 17, 2014 at 09:10:16AM -0700, Daniel Thompson wrote:
+>> @@ -604,8 +731,19 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>  {
+>>  	int cpu;
+>>  	unsigned long flags, map = 0;
+>> +	unsigned long softint;
+>>  
+>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>> +	/*
+>> +	 * The locking in this function ensures we don't use stale cpu mappings
+>> +	 * and thus we never route an IPI to the wrong physical core during a
+>> +	 * big.LITTLE switch. The switch code takes both of these locks meaning
+>> +	 * we can choose whichever lock is safe to use from our current calling
+>> +	 * context.
+>> +	 */
+>> +	if (in_nmi())
+>> +		raw_spin_lock(&fiq_safe_migration_lock);
+>> +	else
+>> +		raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> 
+> BTW, I see this code is still here...
 
-> > I think it would be nice if you could submit a patch to remove the
-> > drivers from ASoC, then we can see if anybody complains.
+Quite so.
 
-> Also the same thing for v3.17-rc5 and next-20140918. So let's see if we
-> can remove this driver too.
-
-> Done on top of next-20140918. Again untested.
-> -------->8--------
-> From: Paul Bolle <pebolle@tiscali.nl>
-
-Again, please follow the patch submission process in SubmittingPatches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140918/3f5d4df4/attachment.sig>
+I'm afraid I haven't yet re-written it to use r/w locks (as proposed in
+mails from the weekend) but I had to respin the default FIQ handler
+patch to fix the CONFIG_FIQ build problem I introduced.
