@@ -1,83 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Sep 2014 18:23:18 +0100
-Subject: [RFC] arm: Handle starting up in secure mode
-In-Reply-To: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
-References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20140918172318.GF25330@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 18 Sep 2014 10:21:47 -0700
+Subject: [PATCH] arm64: insn: Add return statements after BUG_ON()
+In-Reply-To: <20140918170205.GE25330@e104818-lin.cambridge.arm.com>
+References: <1410885753-25025-1-git-send-email-broonie@kernel.org>
+ <20140918170205.GE25330@e104818-lin.cambridge.arm.com>
+Message-ID: <20140918172147.GX7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 10:09:16PM +0100, Christopher Covington wrote:
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index 2a55373..36d1a9c 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -20,6 +20,7 @@
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
->  #include <asm/virt.h>
-> +#include <asm/opcodes-sec.h>
->  
->  #ifndef ZIMAGE
->  /*
-> @@ -76,6 +77,64 @@ ENTRY(__boot_cpu_mode)
->  #endif /* ZIMAGE */
->  
->  /*
-> + * Detect whether the system is in secure supervisor mode, and if it is,
-> + * switch to hypervisor mode by way of secure monitor mode.
-> + */
-> +ENTRY(__mon_stub_install)
-> +	mrs	r4, cpsr
-> +	and	r4, r4, #MODE_MASK
-> +	cmp	r4, #SVC_MODE
-> +	movne	pc, lr
-> +
-> +	/*
-> +	 * Set things up so that if an NSACR access causes an undefined
-> +	 * instruction exception, we return. safe_svcmode_maskall called
-> +	 * just after this will get us back into supervisor mode.
-> +	 */
-> +	adr	r4, __mon_stub_vectors
-> +	mcr	p15, 0, r4, c12, c0, 0	@ set vector base address (VBAR)
-> +	mov	r4, lr
-> +
-> +	/*
-> +	 * Writing the NSACR will only succeed if we're in a secure mode.
-> +	 */
-> +	mrc	p15, 0, r5, c1, c1, 2	@ get non-secure access control (NSACR)
-> +	mcr	p15, 0, r5, c1, c1, 2	@ set non-secure access control (NSACR)
+On Thu, Sep 18, 2014 at 06:02:06PM +0100, Catalin Marinas wrote:
+> On Tue, Sep 16, 2014 at 05:42:33PM +0100, Mark Brown wrote:
 
-Since you talk about ARMv8 further down, if you run in AArch32 mode in
-secure EL1 it will trap to EL3 (if it was non-secure EL1/EL2, write
-would undef and read returns 0xc00). Therefore for ARMv8 my
-recommendation is to run Linux (whether AArch64 or AArch32) only on the
-non-secure side.
+> >  	default:
+> >  		BUG_ON(1);
+> > +		return 0;
+> >  	}
 
-> +	/*
-> +	 * If we get here, we know we're in secure supervisor mode, so make the
-> +	 * switch to secure monitor mode.
-> +	 *
-> +	 * TODO: make sure this doesn't trap to A64 EL3.
-> +	 */
-> +	adr	r4, __mon_stub_vectors
-> +	mcr	p15, 0, r4, c12, c0, 1	@ set monitor vector base (MVBAR)
-> +	adr	r4, mon_settings
-> +	__SMC(0)
+> Wouldn't there be less lines if we initialise insn to 0 in these
+> functions?
 
-I think from secure EL1 you can switch to monitor simply by setting the
-CPSR mode bits (though IIRC on ARMv8 would also trap to EL3).
-
-> +
-> +	/*
-> +	 * Now, from non-secure supervisor mode, transition to hypervisor mode
-> +	 * and return via the exception vector.
-> +	 */
-> +	mov	r4, lr
-> +	__HVC(0)
-
->From monitor mode can you return directly to HVC mode via ERET and avoid
-another HVC?
-
--- 
-Catalin
+In general that's bad practice since it means that you loose the benefit
+of flow analysis on that variable throughout the function - it will shut
+the warning up but if someone introduces a bug later on the compiler
+won't be able to tell them about it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140918/b75f0cc9/attachment.sig>
