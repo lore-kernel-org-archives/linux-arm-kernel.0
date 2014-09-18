@@ -1,32 +1,43 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Fri, 19 Sep 2014 00:31:54 +0200
-Subject: [PATCH 0/6] Add initial support for Broadcom Cygnus SoC
-In-Reply-To: <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
-Message-ID: <541B5D5A.10800@hauke-m.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Sep 2014 23:32:41 +0100
+Subject: [PATCH 0/3] Krait VFP fixes
+In-Reply-To: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140918223241.GE5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2014 09:58 PM, Jonathan Richardson wrote:
-> Hi,
+It would be nice to be copied on these patches, as the VFP code is
+entirely my creation...  I'll review these patches shortly.
+
+On Thu, Sep 18, 2014 at 02:43:09PM -0700, Stephen Boyd wrote:
+> These changes allow us to support VFP correctly on Krait processors.
+> They also fix short vector emulation for Cortex-A15 and Krait.
 > 
-> This patchset contains initial support for Broadcom's Cygnus SoC based on our
-> iProc architecture. Initial support is minimal and includes just the mach
-> platform code, clock driver, and a basic device tree configuration. Peripheral
-> drivers will be submitted soon, as will device tree configurations for other
-> Cygnus board variants.
+> Stepan Moskovchenko (1):
+>   arm: vfp: Bounce undefined instructions in vectored mode
+> 
+> Stephen Boyd (2):
+>   ARM: vfp: Workaround bad MVFR1 register on some Kraits
+>   ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp implementations
+> 
+>  arch/arm/include/asm/cputype.h | 1 +
+>  arch/arm/include/asm/vfp.h     | 2 +-
+>  arch/arm/mm/proc-v7.S          | 5 +++--
+>  arch/arm/vfp/vfphw.S           | 6 ++++++
+>  arch/arm/vfp/vfpmodule.c       | 7 +++++++
+>  5 files changed, 18 insertions(+), 3 deletions(-)
+> 
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-This SoC looks similar to the BCM5301X (Northstar) SoCs even some cores
-are at the same memory addresses. Does this SoC use an AXI bus with
-Broadcom Plugins at address 0x18000000 ?
-
-The BCM5301X (Northstar) SoCs also has an iProc Clock Control Unit and I
-will try to use your driver for that SoC.
-
-Is Broadcom Cygnus similar to BCM563XX or is it actually the same SoC?
-
-Do you have some description of the hardware features of this SoC? Does
-it have PCIe, or Ethernet?
-
-Hauke
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
