@@ -1,113 +1,55 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 19 Sep 2014 01:13:21 +0200
-Subject: [v4, 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error code
-In-Reply-To: <CAPDyKFoPBfAYfP9gwSxWvdUvNSjMxxNeJ_BfRkgvOZLTNpzJXA@mail.gmail.com>
-References: <1410262570-22785-2-git-send-email-ulf.hansson@linaro.org>
- <20140917234331.GA28771@core.coreip.homeip.net>
- <CAPDyKFoPBfAYfP9gwSxWvdUvNSjMxxNeJ_BfRkgvOZLTNpzJXA@mail.gmail.com>
-Message-ID: <58813810.nrS47mt5xk@vostro.rjw.lan>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Fri, 19 Sep 2014 00:54:54 +0200
+Subject: [PATCH 0/6] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <541B5F16.6030005@openwrt.org>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
+ <541B5D5A.10800@hauke-m.de> <541B5F16.6030005@openwrt.org>
+Message-ID: <541B62BE.8050909@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 18, 2014 02:35:44 AM Ulf Hansson wrote:
-> On 18 September 2014 01:43, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> > On Thu, Sep 18, 2014 at 01:20:49AM +0200, Ulf Hansson wrote:
-> >> On 17 September 2014 22:10, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> >> > On Wed, Sep 17, 2014 at 08:25:44PM +0200, Ulf Hansson wrote:
-> >> >> On 16 September 2014 01:36, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >> >> > On Monday, September 15, 2014 09:53:59 AM Dmitry Torokhov wrote:
-> >> >> >> On Sun, Sep 14, 2014 at 06:38:58PM +0200, Rafael J. Wysocki wrote:
-> >> >> >> > On Friday, September 12, 2014 02:05:53 PM Dmitry Torokhov wrote:
-> >> >> >> > > Hi Ulf,
-> >> >> >> > >
-> >> >> >> > > On Tue, Sep 09, 2014 at 01:36:02PM +0200, Ulf Hansson wrote:
-> >> >> >> > > > To give callers the option of acting on a errors while removing the
-> >> >> >> > > > pm_domain ops for the device in the ACPI PM domain, let
-> >> >> >> > > > acpi_dev_pm_detach() return an int to provide the error code.
-> >> >> >> > >
-> >> >> >> > > So how would callers handle the errors? As far as I can see
-> >> >> >> > > acpi_dev_pm_detach() is called from ->remove() and ->shutdown() methods, where
-> >> >> >> > > there is no meaningful strategy to handle errors as you are past the point of
-> >> >> >> > > no return and you keep on tearing down the device.
-> >> >>
-> >> >> The benefit is only relevant when ACPI and genpd PM domains would
-> >> >> co-exist. In that case we might be able to skip genpd_dev_pm_detach()
-> >> >> if acpi_dev_pm_detach() succeeds. So, currently there are  no benefit,
-> >> >> but still it doesn't hurt.
-> >> >
-> >> > It doe snot have any negative material effect, the drawback is purely
-> >> > from API perspective.
-> >> >
-> >> >>
-> >> >> >> >
-> >> >> >> > This is specifically for what patch [3/9] is doing AFAICS.
-> >> >> >> >
-> >> >> >> > The existing callers don't need to worry about this.
-> >> >> >>
-> >> >> >> OK, so I have the very same comment about patch 3 then: we have
-> >> >> >> dev_pm_domain_detach() returning error. How would the callers handle errors?
-> >> >> >
-> >> >> > Ulf?
-> >> >>
-> >> >> I see your point. How about making dev_pm_domain_detach() to be a void
-> >> >> function instead?
-> >> >
-> >> > Yes, please.
-> >>
-> >> OK!
-> >>
-> >> >
-> >> >>
-> >> >> >
-> >> >> >> WRT this patch: I'd rater we did not just return generic "error code" just
-> >> >> >> because we do not know who manages PD for the device. Can we add API to check
-> >> >> >> if we are using ACPI to manage power domains? Then patch #3 could check if it
-> >> >> >> needs to use ACPI or generic power domain API.
-> >> >>
-> >> >> The problem is scalability. If we have other PM domains implementation
-> >> >> in future, each of them need to be checked prior invoking the attach
-> >> >> functions.
-> >> >> Also, how would we distinguish between genpd and a new PM domain XYZ?
-> >> >
-> >> > I do not think that trying all available methods to detach a pm domain,
-> >> > i.e.
-> >> >
-> >> >         err = acpi_dev_pm_detach();
-> >> >         if (err)
-> >> >                 err = blah_dev_pm_detach();
-> >> >         if (err)
-> >> >                 err = flab_dev_pm_detach();
-> >> >         if (err)
-> >> >                 err = gen_dev_pm_detach();
-> >> >
-> >> > is any better from scalability point of view. If you need to do that you
-> >> > will probably have to store something like "struct pd_ops *pd_ops" in
-> >> > your device and call appropriate implementation via it.
-> >>
-> >> No, that's not needed. Go ahead and have look at both ACPI and genpd,
-> >> the interesting part is the validation of struct dev_pm_domain pointer
-> >> in the struct device. That's all there is to it, no additional data
-> >> are required.
-> >
-> > OK, so can you simply put the needed method into struct dev_pm_domain and then
-> > dev_pm_domain_detach() would become:
-> >
-> > void dev_pm_domain_detach(struct device *dev, bool power_off)
-> > {
-> >         if (dev->pm_domain)
-> >                 dev->pm_domain->detach(dev, power_off);
-> > }
-> >
-> > Thanks.
+On 09/19/2014 12:39 AM, Florian Fainelli wrote:
+> On 09/18/2014 03:31 PM, Hauke Mehrtens wrote:
+>> On 09/16/2014 09:58 PM, Jonathan Richardson wrote:
+>>> Hi,
+>>>
+>>> This patchset contains initial support for Broadcom's Cygnus SoC based on our
+>>> iProc architecture. Initial support is minimal and includes just the mach
+>>> platform code, clock driver, and a basic device tree configuration. Peripheral
+>>> drivers will be submitted soon, as will device tree configurations for other
+>>> Cygnus board variants.
+>>
+>> This SoC looks similar to the BCM5301X (Northstar) SoCs even some cores
+>> are at the same memory addresses. Does this SoC use an AXI bus with
+>> Broadcom Plugins at address 0x18000000 ?
+>>
+>> The BCM5301X (Northstar) SoCs also has an iProc Clock Control Unit and I
+>> will try to use your driver for that SoC.
+>>
+>> Is Broadcom Cygnus similar to BCM563XX or is it actually the same SoC?
 > 
-> Ohh, didn't quite follow that this is what you meant. That would be a
-> great improvement, I will adopt in the next version.
+> According to this link:
+> http://lists.denx.de/pipermail/u-boot/2014-August/186086.html
+> 
+> these SoCs, in particular BCM58622 would belong to the StrataGX network
+> processors:
+> http://www.broadcom.com/products/Processors/Home-and-Small-Business/BCM5862X-Series.
 
+Broadcom claims that this SoC is pin and software compatible to BCM5301X:
+> Pin compatible and software compatible products with previous
+> generation BCM5301x products enable single design with easy
+> upgradeable path
 
-         if (dev->pm_domain && dev->pm_domain->detach)
-                 dev->pm_domain->detach(dev, power_off);
+>> Do you have some description of the hardware features of this SoC? Does
+>> it have PCIe, or Ethernet?
+> 
+> From the link above, it has Ethernet for sure, and certainly PCIe since
+> the Wi-Fi chips mentioned in the link above are PCIe chips.
+> 
+> It would be really good if all the work you and Rafal did was usable for
+> the Cygnus SoCs.
 
+I also hope you can use much of the code and improve it. ;-)
 
-Pretty please.
-
-Rafael
+Hauke
