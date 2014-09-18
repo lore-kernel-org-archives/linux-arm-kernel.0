@@ -1,116 +1,94 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 17 Sep 2014 18:32:23 -0700
-Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
-In-Reply-To: <20140917222553.GD2848@worktop.localdomain>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
- <20140911161517.GA3190@worktop.ger.corp.intel.com>
- <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
- <20140914194156.GC2832@worktop.localdomain>
- <20140915114229.GB3037@worktop.localdomain>
- <CAKfTPtDHSWs8xumOSfWkyucAtkBvvbJkOVTQkoYXYCBpmHrMZg@mail.gmail.com>
- <20140917222553.GD2848@worktop.localdomain>
-Message-ID: <CAKfTPtA_=MvAVya6JR3M+qs-kLapZgGknBqo=87MVbihCCXF9A@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 18 Sep 2014 02:31:12 +0100
+Subject: [PATCH v11] Add support for PCI in AArch64
+Message-ID: <1411003873-21574-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2014 15:25, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Tue, Sep 16, 2014 at 12:14:54AM +0200, Vincent Guittot wrote:
->> On 15 September 2014 13:42, Peter Zijlstra <peterz@infradead.org> wrote:
->
->> > OK, I've reconsidered _again_, I still don't get it.
->> >
->> > So fundamentally I think its wrong to scale with the capacity; it just
->> > doesn't make any sense. Consider big.little stuff, their CPUs are
->> > inherently asymmetric in capacity, but that doesn't matter one whit for
->> > utilization numbers. If a core is fully consumed its fully consumed, no
->> > matter how much work it can or can not do.
->> >
->> >
->> > So the only thing that needs correcting is the fact that these
->> > statistics are based on clock_task and some of that time can end up in
->> > other scheduling classes, at which point we'll never get 100% even
->> > though we're 'saturated'. But correcting for that using capacity doesn't
->> > 'work'.
->>
->> I'm not sure to catch your last point because the capacity is the only
->> figures that take into account the "time" consumed by other classes.
->> Have you got in mind another way to take into account the other
->> classes ?
->
-> So that was the entire point of stuffing capacity in? Note that that
-> point was not at all clear.
->
-> This is very much like 'all we have is a hammer, and therefore
-> everything is a nail'. The rt fraction is a 'small' part of what the
-> capacity is.
->
->> So we have cpu_capacity that is the capacity that can be currently
->> used by cfs class
->> We have cfs.usage_load_avg that is the sum of running time of cfs
->> tasks on the CPU and reflect the % of usage of this CPU by CFS tasks
->> We have to use the same metrics to compare available capacity for CFS
->> and current cfs usage
->
-> -ENOPARSE
->
->> Now we have to use the same unit so we can either weight the
->> cpu_capacity_orig with the cfs.usage_load_avg and compare it with
->> cpu_capacity
->> or with divide cpu_capacity by cpu_capacity_orig and scale it into the
->> SCHED_LOAD_SCALE range. Is It what you are proposing ?
->
-> I'm so not getting it; orig vs capacity still includes
-> arch_scale_freq_capacity(), so that is not enough to isolate the rt
-> fraction.
+Hi,
 
-This patch does not try to solve any scale invariance issue. This
-patch removes capacity_factor because it rarely works correctly.
-capacity_factor tries to compute how many tasks a group of CPUs can
-handle at the time we are doing the load balance. The capacity_factor
-is hardly working for SMT system: it sometimes works for big cores and
-but fails to do the right thing for little cores.
+This patch adds support for PCIe to AArch64. It depends on my v11 patch
+that adds support for creating generic host bridge resources from device
+trees. With that in place, I was able to boot a platform that
+has PCIe host bridge support and use a PCIe network card.
 
-Below are two examples to illustrate the problem that this patch solves:
+Changes from v10:
+ - Added Catalin's Acked-by
 
-capacity_factor makes the assumption that max capacity of a CPU is
-SCHED_CAPACITY_SCALE and the load of a thread is always is
-SCHED_LOAD_SCALE. It compares the output of these figures with the sum
-of nr_running to decide if a group is overloaded or not.
+Changes from v9:
+ - Moved the pcibios_add_device() patch that parses the IRQ number from DT into here.
+ - Moved the arm64-specific redefine of pgprot_device here from the generic patchset.
+ - Readability fix for definition of IO_SPACE_LIMIT
 
-But if the default capacity of a CPU is less than SCHED_CAPACITY_SCALE
-(640 as an example), a group of 3 CPUS will have a max capacity_factor
-of 2 ( div_round_closest(3x640/1024) = 2) which means that it will be
-seen as overloaded if we have only one task per CPU.
+Changes from v8:
+  - Added support for generic PCI domains
 
-Then, if the default capacity of a CPU is greater than
-SCHED_CAPACITY_SCALE (1512 as an example), a group of 4 CPUs will have
-a capacity_factor of 4 (at max and thanks to the fix[0] for SMT system
-that prevent the apparition of ghost CPUs) but if one CPU is fully
-used by a rt task (and its capacity is reduced to nearly nothing), the
-capacity factor of the group will still be 4
-(div_round_closest(3*1512/1024) = 5).
+Changes from v7:
+  - Rebased to v3.16-rc3
+  - Removed pci_ioremap_io() function as it is provided by my v8 generic
+    PCI host bridge patches under a different name.
 
-So, this patch tries to solve this issue by removing capacity_factor
-and replacing it with the 2 following metrics :
--the available CPU capacity for CFS tasks which is the one currently
-used by load_balance
--the capacity that are effectively used by CFS tasks on the CPU. For
-that, i have re-introduced the usage_avg_contrib which is in the range
-[0..SCHED_CPU_LOAD] whatever the capacity of the CPU on which the task
-is running, is. This usage_avg_contrib doesn't solve the scaling
-in-variance problem, so i have to scale the usage with original
-capacity in get_cpu_utilization (that will become get_cpu_usage in the
-next version) in order to compare it with available capacity.
+Changes from v6:
+  - Guard the pci_domain_nr() inline implementation with #ifdef CONFIG_PCI as
+    to avoid conflict with default empty version present in include/linux/pci.h.
+    Thanks to Jingoo Han for catching this.
 
-Once the scaling invariance will have been added in usage_avg_contrib,
-we can remove the scale by cpu_capacity_orig in get_cpu_utilization.
-But the scaling invariance will come in another patchset.
+Changes from v5:
+  - Removed pcibios_fixup_bridge_ranges() as the week default version is fine.
+  - Removed the ALIGN() call in pcibios_align_resource()
+  - Stopped exporting pcibios_align_resource()
 
-Hope that this explanation makes the goal of this patchset clearer.
-And I can add this explanation in the commit log if you found it clear
-enough
+Changes from v4:
+  - Fixed the pci_domain_nr() implementation for arm64. Now we use
+    find_pci_host_bride() to find the host bridge before we retrieve
+    the domain number.
 
-Vincent
+Changes from v3:
+  - Added Acks accumulated so far ;)
+  - Still carrying Catalin's patch for moving the PCI_IO_BASE until it
+    lands in linux-next or mainline, in order to ease applying the series
 
-[0] https://lkml.org/lkml/2013/8/28/194
+Changes from v2:
+  - Implement an arch specific version of pci_register_io_range() and
+    pci_address_to_pio().
+  - Return 1 from pci_proc_domain().
+
+Changes from v1:
+  - Added Catalin's patch for moving the PCI_IO_BASE location and extend
+    its size to 16MB
+  - Integrated Arnd's version of pci_ioremap_io that uses a bitmap for
+    keeping track of assigned IO space and returns an io_offset. At the
+    moment the code is added in arch/arm64 but it can be moved in drivers/pci.
+  - Added a fix for the generic ioport_map() function when !CONFIG_GENERIC_IOMAP
+    as suggested by Arnd.
+
+v10 thread here: https://lkml.org/lkml/2014/9/8/325
+v9 thread here: https://lkml.org/lkml/2014/8/12/394
+v8 thread here: https://lkml.org/lkml/2014/7/1/705
+v7 thread here: https://lkml.org/lkml/2014/3/14/320
+v6 thread here: https://lkml.org/lkml/2014/3/5/41
+v5 thread here: https://lkml.org/lkml/2014/3/4/307
+v4 thread here: https://lkml.org/lkml/2014/3/3/298
+v3 thread here: https://lkml.org/lkml/2014/2/28/211
+v2 thread here: https://lkml.org/lkml/2014/2/27/255
+v1 thread here: https://lkml.org/lkml/2014/2/3/389
+
+Best regards,
+Liviu
+
+Liviu Dudau (1):
+  arm64: Add architectural support for PCIe
+
+ arch/arm64/Kconfig               | 22 ++++++++++++++-
+ arch/arm64/include/asm/Kbuild    |  1 +
+ arch/arm64/include/asm/io.h      |  3 +-
+ arch/arm64/include/asm/pci.h     | 37 +++++++++++++++++++++++++
+ arch/arm64/include/asm/pgtable.h |  2 ++
+ arch/arm64/kernel/Makefile       |  1 +
+ arch/arm64/kernel/pci.c          | 59 ++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 123 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/pci.c
+
+-- 
+2.1.0
