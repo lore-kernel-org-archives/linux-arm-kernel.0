@@ -1,36 +1,62 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 18 Sep 2014 14:04:44 -0500
-Subject: [PATCH V3 1/3] Documentation: dt-bindings: mfd: palmas: Fix example
- style of i2c peripheral
+Date: Thu, 18 Sep 2014 14:04:45 -0500
+Subject: [PATCH V3 2/3] Documentation: dt-bindings: mfd: palmas: document
+ optional wakeup IRQ
 In-Reply-To: <1411067086-16613-1-git-send-email-nm@ti.com>
 References: <1411067086-16613-1-git-send-email-nm@ti.com>
-Message-ID: <1411067086-16613-2-git-send-email-nm@ti.com>
+Message-ID: <1411067086-16613-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use device at address as name for device nodes.
+With the recent pinctrl-single changes, SoCs such as OMAP family can
+treat wake-up events from deeper low power states as interrupts.
 
-Suggested-by: Lee Jones <lee.jones@linaro.org>
+This is usable when the wakeup from deeper low power states is
+triggered by a different hardware mechanism tied to pinctrl compared
+to the routine interrupt handling generating the reqular interrupt
+events. This is usually done on SoCs where the routine interrupt
+sources such as GPIO need to be disabled to be actually achieve low
+power state and wakeup is triggered from pinctrl interrupt source.
+
+Provide documentation example for the case where the system needs two
+interrupt sources when SoC is in deep sleep(1 to exit from deep sleep,
+and other from the module handling the actual event).
+
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
 V3: no change
-V2: http://marc.info/?l=linux-kernel&m=140995036518562&w=2
+V2: http://marc.info/?l=linux-kernel&m=140995036418561&w=2
 
- Documentation/devicetree/bindings/mfd/palmas.txt |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
-index eda8989..d193859 100644
+index d193859..1c821d6 100644
 --- a/Documentation/devicetree/bindings/mfd/palmas.txt
 +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
-@@ -33,7 +33,7 @@ Optional properties:
- 
- Example:
- 
--palmas {
+@@ -51,3 +51,23 @@ palmas at 48 {
+ 		....
+ 	};
+ }
++
++Example: With interrupts extended
++ See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
++ Use pinmux 0x418 as wakeup interrupt and gpio1_0 as interrupt source
++
 +palmas at 48 {
- 	compatible = "ti,twl6035", "ti,palmas";
- 	reg = <0x48>
- 	interrupt-parent = <&intc>;
++	compatible = "ti,twl6035", "ti,palmas";
++	reg = <0x48>
++	interrupt-parent = <&intc>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	interrupts-extended = <&gpio1 0 IRQ_TYPE_LEVEL_HIGH>,
++			      <&pinmux 0x418>;
++	pmic {
++		compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
++		....
++	};
++}
 -- 
 1.7.9.5
