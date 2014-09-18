@@ -1,26 +1,78 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Thu, 18 Sep 2014 17:53:40 -0600
-Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
-In-Reply-To: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
-References: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAD8Lp44n3xArQ-xvZsFdYn13x80Dqv1oCY=dLm1UPxKr8XbyJQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 18 Sep 2014 19:59:53 -0400
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <6318202.hl003vettj@vostro.rjw.lan>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <201409180122.10631.arnd@arndb.de> <20140917234036.GC2464@xora-yoga-13>
+ <6318202.hl003vettj@vostro.rjw.lan>
+Message-ID: <541B71F9.70008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 10:37 AM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> The default mux and divider clocks are specified in device tree
-> so that the FIMC devices in Exynos4210 and Exynos4x12 SoCs are
-> clocked from recommended clock source and with maximum supported
-> frequency. If needed these settings could be overrode in board
-> specific dts files, however they are in practice optimal in most
-> cases.
+On 09/18/2014 07:20 PM, Rafael J. Wysocki wrote:
+> On Wednesday, September 17, 2014 04:40:36 PM Graeme Gregory wrote:
+>> On Thu, Sep 18, 2014 at 01:22:10AM +0200, Arnd Bergmann wrote:
+>>> On Wednesday 17 September 2014, Graeme Gregory wrote:
+>>>> It sounds like from the discussions in other threads that ARM64 should
+>>>> be following x86 and re-using DT bindings here. In which case there is
+>>>> not need to submit things to UEFI organisation.
+>>>>
+>>>> What I got a little lost in has there been a formal decision about DT
+>>>> bindings in _DSD?
+>>>
+>>> I think this is a discussion that still needs to happen: either we should
+>>> recommend everyone to use _DSD in favor of the alternatives, or we
+>>> should prohibit the use of _DSD. I have heard arguments both ways, but
+>>> hopefully we can find an easy answer.
+>>>
+>>
+>> This discussion is just not going to happen until people at @redhat.com
+>> and people who have currently announced/released hardware are actually
+>> willing to start talking about it.
+>>
+>> Id love to be able to put my foot down and ban the use of _DSD for
+>> servers but I suspect that will not happen.
+> 
+> I'll probably should stay away from this discussion, but I can't resist. :-)
+> 
+> Please imagine the situation in which the same IP block is included in an ARM64
+> SoC and in an x86 SoC that ships with ACPI tables and a _DSD for that device in
+> them.  What benefit would be there from disallowing systems based on the ARM64
+> SoC in question to ship the same _DSD in their ACPI tables?
 
-Another consideration for this patch.
+"Disallowing" is a strong word in any case, because vendors own the
+platform and will ship _DSD properties to describe those devices. So the
+only "disallowing" Linux can do is to ignore entities present in ACPI
+tables that have already been shipped by vendors.
 
-fimc-core.c already has probe-time code that tries to set the clock
-frequency, using a clock-frequency property in the DT, and falling
-back to a hardcoded value in the driver. Maybe it is best to just set
-the clock rate from one place.
+Anyway. I think we all don't want a runaway frenzy with _DSD key/values
+(generally there ought to be as few as possible, and additions should
+only happen carefully). Broadly, there are three levels I see here:
 
-Daniel
+0). Devices that are part of the core ACPI specification. None today
+need key/value pairs, and I want to avoid this from growing.
+1). Devices containing _DSD key/value pairs for a specific device but of
+a common industry type, such as a network device. In this case, the 4-6
+properties that might need to be specified (MAC address, PHY address,
+PHY type, etc.) should be as minimal as possible and then standardized
+into a common binding that vendors agree to support, and which is owned
+and controlled by a neutral group such as ASWG.
+2). Devices containining a specific ACPI ID that is unique to a given
+vendor where that device implements value-add/offload/something non core
+that can be owned entirely within a driver for one device. In that case,
+maybe a vendor would define a minimal set of _DSD key/values and be on
+the hook to maintain compatibility themselves.
+
+I've chatted with a few people, and there will be a nice proposal
+presented to ASWG/UEFI on how to provide an official process for
+defining key/value pairs that are shared between common device types and
+managed by such a forum, as in the cases 0 and 1 above. In the
+meanwhile, there is only one _DSD use case in the early ACPI patches for
+ARM servers (in the network MAC, to pass in the mac address and a couple
+of PHY address/ID bits) and I've connected the vendors together asking
+them to come up with the initial first example covering that.
+
+None of this is core to ACPI enablement. It's specific to a few drivers
+where also on x86 there will be _DSD properties.
+
+Jon.
