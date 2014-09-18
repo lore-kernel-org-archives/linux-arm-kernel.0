@@ -1,67 +1,51 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 18 Sep 2014 22:03:57 +0200
-Subject: [PATCH v2 1/2] bcma: register bcma as device tree driver
-In-Reply-To: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
-References: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <CACna6rw0-g+v6u3Yxhnmy1NT0mhj-s4re5R3z0dbBV-tMvky6Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Sep 2014 13:11:00 -0700
+Subject: [GIT PULL 1/4] part 2 of omap intc changes for v3.18 merge window
+Message-ID: <pull-1411070912-460910>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 September 2014 23:56, Hauke Mehrtens <hauke@hauke-m.de> wrote:
-> +The cores on the AXI bus are auto detected by bcma. bcma automatically
-> +detects the cores
+The following changes since commit 55601c9f24670ba926ebdd4d712ac3b177232330:
 
-I'm far from being an English expert, but above is kind of pleonasm to me ;)
+  arm: omap: intc: switch over to linear irq domain (2014-09-11 13:05:50 -0700)
 
+are available in the git repository at:
 
-> and the memory ranges they are using and they get
-> +registered afterwards. Automatic detection of the IRQ number is not
-> +possible on BCM47xx/BCM53xx ARM and MIPS SoCs.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/intc-part2-for-v3.18
 
-Should we replace "not possible" with something like "not reliable"?
-After the last info we got from Arend.
+for you to fetch changes up to 64d5947b9ee1284b38b8e212e7c94024452b2bb4:
 
+  irqchip: omap-intc: remove unnecessary comments (2014-09-16 14:45:01 -0700)
 
-> +#ifdef CONFIG_BCMA_HOST_SOC
-> +/* host_pci.c */
+----------------------------------------------------------------
+Second part of omap intc interrupt controller changes to
+move it to drivers.
 
-s/pci/soc/
+----------------------------------------------------------------
+Felipe Balbi (10):
+      arm: omap2: n8x0: move i2c devices to DT
+      irqchip: add irq-omap-intc.h header
+      arm: omap: irq: move irq.c to drivers/irqchip/
+      irqchip: omap-intc: minor improvement to omap_irq_pending()
+      irqchip: omap-intc: comment style cleanup
+      irqchip: omap-intc: remove unnecesary of_address_to_resource() call
+      irqchip: omap-intc: enable IP protection
+      irqchip: omap-intc: enable TURBO idle mode
+      irqchip: omap-intc: correct maximum number or MIR registers
+      irqchip: omap-intc: remove unnecessary comments
 
-
-> +#ifdef CONFIG_OF
-> +extern int __init bcma_host_soc_register_driver(void);
-> +extern void __exit bcma_host_soc_unregister_driver(void);
-> +#else
-> +static inline int __init bcma_host_soc_register_driver(void)
-> +{
-> +       return 0;
-> +}
-> +static inline void __exit bcma_host_soc_unregister_driver(void)
-> +{
-> +}
-> +#endif /* CONFIG_OF */
-> +#endif /* CONFIG_BCMA_HOST_SOC */
-
-OK, so you just made bcma_host_soc_(un)register_driver calls safe above.
-
-
-> diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-> index c421403..e5d578c 100644
-> --- a/drivers/bcma/main.c
-> +++ b/drivers/bcma/main.c
-> @@ -528,6 +528,13 @@ static int __init bcma_modinit(void)
->         if (err)
->                 return err;
->
-> +#ifdef CONFIG_BCMA_HOST_SOC
-> +       err = bcma_host_soc_register_driver();
-> +       if (err) {
-> +               pr_err("SoC host initialization failed\n");
-> +               err = 0;
-> +       }
-> +#endif
-
-And above you check for CONFIG_ anyway.
-
--- 
-Rafa?
+ arch/arm/boot/dts/omap2420-n810.dts                |  7 +++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  6 ++
+ arch/arm/mach-omap2/Kconfig                        |  1 +
+ arch/arm/mach-omap2/Makefile                       |  3 +-
+ arch/arm/mach-omap2/board-n8x0.c                   | 26 +--------
+ arch/arm/mach-omap2/common-board-devices.h         |  5 ++
+ arch/arm/mach-omap2/common.h                       | 10 +---
+ arch/arm/mach-omap2/pdata-quirks.c                 |  2 +
+ drivers/irqchip/Kconfig                            |  5 ++
+ drivers/irqchip/Makefile                           |  1 +
+ .../irq.c => drivers/irqchip/irq-omap-intc.c       | 64 +++++++++++++---------
+ include/linux/irqchip/irq-omap-intc.h              | 32 +++++++++++
+ 12 files changed, 101 insertions(+), 61 deletions(-)
+ rename arch/arm/mach-omap2/irq.c => drivers/irqchip/irq-omap-intc.c (89%)
+ create mode 100644 include/linux/irqchip/irq-omap-intc.h
