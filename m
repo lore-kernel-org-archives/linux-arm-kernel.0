@@ -1,51 +1,83 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Sep 2014 17:07:12 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d3: add the nfc clock
-In-Reply-To: <1410857037-24445-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410857037-24445-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <541AF520.3050705@atmel.com>
+Date: Thu, 18 Sep 2014 17:18:42 +0200
+Subject: [PATCH] ARM: at91/dt: declare sckc node on at91sam9g45
+In-Reply-To: <1410257660-8590-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1410257660-8590-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <541AF7D2.7080106@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/2014 10:43, Alexandre Belloni :
-> The atmel_nand driver is now able to handle the nfc clock, add it to sama5d3.
+On 09/09/2014 12:14, Boris BREZILLON :
+> Declare the SCKC (Slow Clock Configuration) block and its clks.
+> Make use of the clk32k clk instead of slow_osc where appropriate.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Stacked on at91-3.18-dt3 branch.
+Stacked on top of at91-3.18-dt3.
 
-Thanks,
+Thanks, best regards,
 
 > ---
->  arch/arm/boot/dts/sama5d3.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 30 ++++++++++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 7702a0d120cb..cd36c76fd4e3 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -1005,6 +1005,11 @@
->  						reg = <2>;
->  					};
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 9d4d0a1..68a457b 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -159,7 +159,7 @@
+>  					compatible = "atmel,at91rm9200-clk-master";
+>  					#clock-cells = <0>;
+>  					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
+> -					clocks = <&slow_xtal>, <&main>, <&plladiv>, <&utmi>;
+> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
+>  					atmel,clk-output-range = <0 133333333>;
+>  					atmel,clk-divisors = <1 2 4 3>;
+>  				};
+> @@ -175,7 +175,7 @@
+>  					#address-cells = <1>;
+>  					#size-cells = <0>;
+>  					interrupt-parent = <&pmc>;
+> -					clocks = <&slow_xtal>, <&main>, <&plladiv>, <&utmi>, <&mck>;
+> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
 >  
-> +					hsmc_clk: hsmc_clk {
-> +						#clock-cells = <0>;
-> +						reg = <5>;
-> +					};
-> +
->  					pioA_clk: pioA_clk {
+>  					prog0: prog0 {
 >  						#clock-cells = <0>;
->  						reg = <6>;
-> @@ -1405,6 +1410,7 @@
->  					0xffffc000 0x00000070	/* NFC HSMC regs */
->  					0x00200000 0x00100000	/* NFC SRAM banks */
->  					>;
-> +				clocks = <&hsmc_clk>;
+> @@ -1160,6 +1160,32 @@
+>  				};
 >  			};
->  		};
->  	};
+>  
+> +			sckc at fffffd50 {
+> +				compatible = "atmel,at91sam9x5-sckc";
+> +				reg = <0xfffffd50 0x4>;
+> +
+> +				slow_osc: slow_osc {
+> +					compatible = "atmel,at91sam9x5-clk-slow-osc";
+> +					#clock-cells = <0>;
+> +					atmel,startup-time-usec = <1200000>;
+> +					clocks = <&slow_xtal>;
+> +				};
+> +
+> +				slow_rc_osc: slow_rc_osc {
+> +					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
+> +					#clock-cells = <0>;
+> +					atmel,startup-time-usec = <75>;
+> +					clock-frequency = <32768>;
+> +					clock-accuracy = <50000000>;
+> +				};
+> +
+> +				clk32k: slck {
+> +					compatible = "atmel,at91sam9x5-clk-slow";
+> +					#clock-cells = <0>;
+> +					clocks = <&slow_rc_osc &slow_osc>;
+> +				};
+> +			};
+> +
+>  			rtc at fffffdb0 {
+>  				compatible = "atmel,at91rm9200-rtc";
+>  				reg = <0xfffffdb0 0x10>;
 > 
 
 
