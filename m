@@ -1,36 +1,72 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 18 Sep 2014 22:50:25 +0200
+Date: Thu, 18 Sep 2014 22:52:11 +0200
 Subject: [PATCH v2 1/2] bcma: register bcma as device tree driver
-In-Reply-To: <541AA904.1070002@broadcom.com>
+In-Reply-To: <CACna6rw0-g+v6u3Yxhnmy1NT0mhj-s4re5R3z0dbBV-tMvky6Q@mail.gmail.com>
 References: <1410904582-6519-1-git-send-email-hauke@hauke-m.de>
- <CACna6rzGa6wiKTrXbtUSGekRNq7gUkC0kyu4RQ_p4fG0Hd+DjQ@mail.gmail.com>
- <541AA904.1070002@broadcom.com>
-Message-ID: <541B4591.3010208@hauke-m.de>
+ <CACna6rw0-g+v6u3Yxhnmy1NT0mhj-s4re5R3z0dbBV-tMvky6Q@mail.gmail.com>
+Message-ID: <541B45FB.3000503@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 11:42 AM, Arend van Spriel wrote:
-> On 09/17/14 17:10, Rafa? Mi?ecki wrote:
->> On 16 September 2014 23:56, Hauke Mehrtens<hauke@hauke-m.de>  wrote:
->>> This driver is used by the bcm53xx ARM SoC code. Now it is possible to
->>> give the address of the chipcommon core in device tree and bcma will
->>> search for all the other cores.
->>
->> Did you get any answer from Arend about detecting IRQs?
->>
->> If not:
->> Arend: how much time it make take you to get an answer?
+On 09/18/2014 10:03 PM, Rafa? Mi?ecki wrote:
+> On 16 September 2014 23:56, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>> +The cores on the AXI bus are auto detected by bcma. bcma automatically
+>> +detects the cores
 > 
-> I already discussed this with our chip architect. There is a chip design
-> rule that core index corresponds to the irq number. This at least is
-> true for the bcm43xx devices, but unsure about others. So that option
-> does not seem to fit. That leaves the OOB_ROUTER core I mentioned
-> earlier, but it is a chip designers nightmare as they told me. Did not
-> sound encouraging enough to start digging in there to obtain the
-> information.
+> I'm far from being an English expert, but above is kind of pleonasm to me ;)
 
-Thanks for asking around.
+Yes to me too. ;-)
 
-I will go with specifying the IRQs in device tree then.
+>> and the memory ranges they are using and they get
+>> +registered afterwards. Automatic detection of the IRQ number is not
+>> +possible on BCM47xx/BCM53xx ARM and MIPS SoCs.
+> 
+> Should we replace "not possible" with something like "not reliable"?
+> After the last info we got from Arend.
 
-Hauke
+Yes that sounds good.
+
+> 
+> 
+>> +#ifdef CONFIG_BCMA_HOST_SOC
+>> +/* host_pci.c */
+> 
+> s/pci/soc/
+> 
+> 
+>> +#ifdef CONFIG_OF
+>> +extern int __init bcma_host_soc_register_driver(void);
+>> +extern void __exit bcma_host_soc_unregister_driver(void);
+>> +#else
+>> +static inline int __init bcma_host_soc_register_driver(void)
+>> +{
+>> +       return 0;
+>> +}
+>> +static inline void __exit bcma_host_soc_unregister_driver(void)
+>> +{
+>> +}
+>> +#endif /* CONFIG_OF */
+>> +#endif /* CONFIG_BCMA_HOST_SOC */
+> 
+> OK, so you just made bcma_host_soc_(un)register_driver calls safe above.
+> 
+> 
+>> diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+>> index c421403..e5d578c 100644
+>> --- a/drivers/bcma/main.c
+>> +++ b/drivers/bcma/main.c
+>> @@ -528,6 +528,13 @@ static int __init bcma_modinit(void)
+>>         if (err)
+>>                 return err;
+>>
+>> +#ifdef CONFIG_BCMA_HOST_SOC
+>> +       err = bcma_host_soc_register_driver();
+>> +       if (err) {
+>> +               pr_err("SoC host initialization failed\n");
+>> +               err = 0;
+>> +       }
+>> +#endif
+> 
+> And above you check for CONFIG_ anyway.
+> 
+Yes that sounds good.
