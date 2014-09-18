@@ -1,51 +1,45 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 18 Sep 2014 16:33:27 +0200
-Subject: [PATCH v3] CLK: TI: consider the fact that of_clk_get() might return
- an error
-In-Reply-To: <20140917163559.GA25790@kahuna>
-References: <1410451272-31068-1-git-send-email-bigeasy@linutronix.de>
- <54198411.1080706@ti.com> <20140917155623.GA28043@linutronix.de>
- <20140917163559.GA25790@kahuna>
-Message-ID: <20140918143327.GA4418@linutronix.de>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Thu, 18 Sep 2014 09:59:32 -0500
+Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code consolidation
+Message-ID: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I "forgot" to update the dtb and the kernel crashed:
-|Unable to handle kernel NULL pointer dereference at virtual address 0000002e
-|PC is at __clk_get_flags+0x4/0xc
-|LR is at ti_dt_clockdomains_setup+0x70/0xe8
+This series contains the necessary changes to allow architected timer
+access from user-space on 32-bit ARM.  This allows the VDSO to support
+high resolution timestamps for clock_gettime and gettimeofday.  This
+also merges substantially similar code from arm and arm64 into the
+core arm_arch_timer driver.
 
-because I did not have the clock nodes. of_clk_get() returns an error
-pointer which is not checked here.
+The functional changes are:
+- When available, CNTVCT is made readable by user space on arm, as it
+  is on arm64.
+- The clocksource name becomes "arch_mem_counter" if CP15 access to
+  the counter is not available.
 
-Acked-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- v2?v3:
-    - added acked by
-    - fixed "CHECK: Alignment should match open parenthesis"
-    
- v1?v2:
-     add "%s __func__" to the added pr_err
+These changes have been carried as part of the ARM VDSO patch set over
+the last several months, but I am splitting them out here as I assume
+they should go through the clocksource maintainers.
 
- drivers/clk/ti/clockdomain.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Changes since v1:
+- Fix minor checkpatch complaints.
+- Rework patches 2-4.  v1 copied arm64's arch_timer_evtstrm_enable
+  and arch_counter_set_user_access to the driver with slightly
+  different names in one patch, then removed the unused functions in
+  subsequent patches for each of arm and arm64.  This seemed kind of
+  awkward to me, so I've reorganized those changes into two patches
+  that should be easier to review.  Patch #1 is unchanged.
 
-diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-index f1e0038d76ac..b4c5faccaece 100644
---- a/drivers/clk/ti/clockdomain.c
-+++ b/drivers/clk/ti/clockdomain.c
-@@ -36,6 +36,11 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
- 
- 	for (i = 0; i < num_clks; i++) {
- 		clk = of_clk_get(node, i);
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: Failed get %s' clock nr %d (%ld)\n",
-+			       __func__, node->full_name, i, PTR_ERR(clk));
-+			continue;
-+		}
- 		if (__clk_get_flags(clk) & CLK_IS_BASIC) {
- 			pr_warn("can't setup clkdm for basic clk %s\n",
- 				__clk_get_name(clk));
+Nathan Lynch (3):
+  clocksource: arm_arch_timer: change clocksource name if CP15
+    unavailable
+  clocksource: arm_arch_timer: enable counter access for 32-bit ARM
+  clocksource: arm_arch_timer: consolidate arch_timer_evtstrm_enable
+
+ arch/arm/include/asm/arch_timer.h    | 25 --------------------
+ arch/arm64/include/asm/arch_timer.h  | 31 -------------------------
+ drivers/clocksource/arm_arch_timer.c | 44 ++++++++++++++++++++++++++++++++++--
+ 3 files changed, 42 insertions(+), 58 deletions(-)
+
 -- 
-2.1.0
+1.9.3
