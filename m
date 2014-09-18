@@ -1,51 +1,102 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Sep 2014 15:23:22 +0200
-Subject: [PATCH] ARM: at91: sama5d3xek: reserve dma channel for audio
-Message-ID: <1411046602-4864-1-git-send-email-nicolas.ferre@atmel.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Thu, 18 Sep 2014 21:25:44 +0800
+Subject: [PATCH v5 2/4] dt-bindings: document Rockchip thermal
+In-Reply-To: <CAAObsKA61Ano85P6PehOY7WqR0FgTz_Rfur8UAt56ZXoNyoyqQ@mail.gmail.com>
+References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
+ <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
+ <CAAObsKA61Ano85P6PehOY7WqR0FgTz_Rfur8UAt56ZXoNyoyqQ@mail.gmail.com>
+Message-ID: <541ADD58.7070901@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bo Shen <voice.shen@atmel.com>
+Tomeu,
 
-We set the DMA configuration on USARTs in the SoC DT in (ARM: at91: sama5d3:
-add usart dma configurations). As the audio must work with DMA channels, we
-reserve some dma channels for audio, or else audio won't work.
+? 2014?09?18? 17:27, Tomeu Vizoso ??:
+> On 17 September 2014 05:59, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+>> This add the necessary binding documentation for the thermal
+>> found on Rockchip SoCs
+> Hi Caesar,
+>
+> is there any reason to not use the existing thermal bindings? You can
+> find a description in
+> Documentation/devicetree/bindings/thermal/thermal.txt and example code
+> in omap, or in the patches for Tegra recently posted by Mikko
+> Perttunen.
+>
+> Regards,
+>
+> Tomeu
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
-[nicolas.ferre at atmel.com: move to the sama5d3xmb.dtsi to cover all board variants]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d3xmb.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Why should I use the existing thermal bindings?
+I believe omap,tegar and rockchip are  the three seperate thermals driver.
 
-diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
-index b8c6f20e780c..49c10d33df30 100644
---- a/arch/arm/boot/dts/sama5d3xmb.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
-@@ -25,6 +25,8 @@
- 			};
- 
- 			spi0: spi at f0004000 {
-+				dmas = <0>, <0>;	/*  Do not use DMA for spi0 */
-+
- 				m25p80 at 0 {
- 					compatible = "atmel,at25df321a";
- 					spi-max-frequency = <50000000>;
-@@ -51,6 +53,7 @@
- 			};
- 
- 			usart1: serial at f0020000 {
-+				dmas = <0>, <0>;	/*  Do not use DMA for usart1 */
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
- 				status = "okay";
-@@ -132,6 +135,7 @@
- 			};
- 
- 			dbgu: serial at ffffee00 {
-+				dmas = <0>, <0>;	/*  Do not use DMA for dbgu */
- 				status = "okay";
- 			};
- 
+So far, I submitted the series Patchs for rockchip thermal.
+>
+>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>> ---
+>>   .../bindings/thermal/rockchip-thermal.txt          | 41 ++++++++++++++++++++++
+>>   1 file changed, 41 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> new file mode 100644
+>> index 0000000..6fc8bc3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> @@ -0,0 +1,41 @@
+>> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+>> +
+>> +Required properties:
+>> +- compatible: "rockchip,rk3288-tsadc"
+>> +- reg: physical base address of the controller and length of memory mapped
+>> +       region.
+>> +- interrupts: The interrupt number to the cpu. The interrupt specifier format
+>> +             depends on the interrupt controller.
+>> +- clocks: Must contain an entry for each entry in clock-names.
+>> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk" for
+>> +              the peripheral clock.
+>> +- num-trips:  number of total trip points, this is required, set it 0 if none,
+>> +             if greater than 0, the following properties must be defined;
+>> +- tripN-temp: temperature of trip point N, should be in ascending order;
+>> +- tripN-type: type of trip point N, should be one of "active" "passive" "hot"
+>> +             "critical";
+>> +- tripN-cdev-num: number of the cooling devices which can be bound to trip
+>> +                 point N, this is required if trip point N is defined, set it 0 if none,
+>> +                 otherwise the following cooling device names must be defined;
+>> +- tripN-cdev-nameM: name of the No. M cooling device of trip point N;
+>> +
+>> +Example:
+>> +tsadc: tsadc at ff280000 {
+>> +       compatible = "rockchip,rk3288-tsadc";
+>> +       reg = <0xff280000 0x100>;
+>> +       interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>> +       clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+>> +       clock-names = "tsadc", "apb_pclk";
+>> +
+>> +       num-trips = <2>;
+>> +
+>> +       trip0-temp = <80>;
+>> +       trip0-type = "passive";
+>> +       trip0-cdev-num = <1>;
+>> +       trip0-cdev-name0 = "thermal-cpufreq-0";
+>> +
+>> +       trip1-temp = <100>;
+>> +       trip1-type = "critical";
+>> +       trip1-cdev-num = <1>;
+>> +       trip1-cdev-name0 = "thermal-cpufreq-0";
+>> +};
+>> --
+>> 1.9.1
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+
 -- 
-1.8.2.2
+Best regards,
+Caesar
