@@ -1,83 +1,60 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Sep 2014 17:18:42 +0200
-Subject: [PATCH] ARM: at91/dt: declare sckc node on at91sam9g45
-In-Reply-To: <1410257660-8590-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410257660-8590-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <541AF7D2.7080106@atmel.com>
+Date: Thu, 18 Sep 2014 17:32:18 +0200
+Subject: [PATCH v2 2/3] ARM: at91/dt: at91: use new pinctrl id for sama5
+In-Reply-To: <540D63DA.5090207@atmel.com>
+References: <1408849926-9603-1-git-send-email-mark.roszko@gmail.com>
+ <1408849926-9603-2-git-send-email-mark.roszko@gmail.com>
+ <540D63DA.5090207@atmel.com>
+Message-ID: <541AFB02.2010900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 12:14, Boris BREZILLON :
-> Declare the SCKC (Slow Clock Configuration) block and its clks.
-> Make use of the clk32k clk instead of slow_osc where appropriate.
+On 08/09/2014 10:07, Nicolas Ferre :
+> On 24/08/2014 05:12, Marek Roszko :
+>> This switches the SAMA5D3 to use the new atmel,sama5d3-pinctrl id that was
+>> added with the drive strength options patch.
+>>
+>> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/sama5d3.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+>> index 45013b8..7db0e85 100644
+>> --- a/arch/arm/boot/dts/sama5d3.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+>> @@ -428,7 +428,7 @@
+>>  			pinctrl at fffff200 {
+>>  				#address-cells = <1>;
+>>  				#size-cells = <1>;
+>> -				compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
+>> +				compatible = "atmel,sama5d3-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus";
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> I'd better keep the compatibility with at91sam9x5, like it
+> was before your patch: that will remove the dependency on
+> the pinctrl series: what about:
+> 
+> +				compatible = "atmel,sama5d3-pinctrl", "atmel,at91sam9x5-pinctrl", "simple-bus";
+
+So, with the modification that I did above:
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Stacked on top of at91-3.18-dt3.
+I also stack it to my at91-3.18-dt3 that will soon reach arm-soc (there
+is no dependency with the other patches of the series anymore).
 
-Thanks, best regards,
+Linus, are the other two of the series ready to land in Mainline for
+next kernel release (3.18)? (I'm just asking because you said you would
+do a "tentative").
 
-> ---
->  arch/arm/boot/dts/at91sam9g45.dtsi | 30 ++++++++++++++++++++++++++++--
->  1 file changed, 28 insertions(+), 2 deletions(-)
+Thanks, bye,
+
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 9d4d0a1..68a457b 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -159,7 +159,7 @@
->  					compatible = "atmel,at91rm9200-clk-master";
->  					#clock-cells = <0>;
->  					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
-> -					clocks = <&slow_xtal>, <&main>, <&plladiv>, <&utmi>;
-> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
->  					atmel,clk-output-range = <0 133333333>;
->  					atmel,clk-divisors = <1 2 4 3>;
->  				};
-> @@ -175,7 +175,7 @@
->  					#address-cells = <1>;
->  					#size-cells = <0>;
->  					interrupt-parent = <&pmc>;
-> -					clocks = <&slow_xtal>, <&main>, <&plladiv>, <&utmi>, <&mck>;
-> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
->  
->  					prog0: prog0 {
->  						#clock-cells = <0>;
-> @@ -1160,6 +1160,32 @@
->  				};
->  			};
->  
-> +			sckc at fffffd50 {
-> +				compatible = "atmel,at91sam9x5-sckc";
-> +				reg = <0xfffffd50 0x4>;
-> +
-> +				slow_osc: slow_osc {
-> +					compatible = "atmel,at91sam9x5-clk-slow-osc";
-> +					#clock-cells = <0>;
-> +					atmel,startup-time-usec = <1200000>;
-> +					clocks = <&slow_xtal>;
-> +				};
-> +
-> +				slow_rc_osc: slow_rc_osc {
-> +					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
-> +					#clock-cells = <0>;
-> +					atmel,startup-time-usec = <75>;
-> +					clock-frequency = <32768>;
-> +					clock-accuracy = <50000000>;
-> +				};
-> +
-> +				clk32k: slck {
-> +					compatible = "atmel,at91sam9x5-clk-slow";
-> +					#clock-cells = <0>;
-> +					clocks = <&slow_rc_osc &slow_osc>;
-> +				};
-> +			};
-> +
->  			rtc at fffffdb0 {
->  				compatible = "atmel,at91rm9200-rtc";
->  				reg = <0xfffffdb0 0x10>;
+>>  				ranges = <0xfffff200 0xfffff200 0xa00>;
+>>  				atmel,mux-mask = <
+>>  					/*   A          B          C  */
+>>
+> 
 > 
 
 
