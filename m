@@ -1,77 +1,68 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 17 Sep 2014 17:39:29 -0700
-Subject: exynos5420/arndale-octa: imprecise external aborts on
- exynos_defconfig
-In-Reply-To: <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
- (Thomas Abraham's message of "Sat, 13 Sep 2014 18:29:58 +0530")
-References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
- <7h7g1bwbyh.fsf@deeprootsystems.com>
- <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
-Message-ID: <7hk351ep8e.fsf@deeprootsystems.com>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Thu, 18 Sep 2014 00:42:48 +0000
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <541A25DA.8030101@linaro.org>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com>,<5419D7BD.30003@linaro.org>
+ <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>,
+ <541A25DA.8030101@linaro.org>
+Message-ID: <448912EABC71F84BBCADFD3C67C4BE52CAC8B9@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham <ta.omasab@gmail.com> writes:
 
-> On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Tyler Baker <tyler.baker@linaro.org> writes:
->>
->>> Exynos5420-based Arndale octa boards have recently started failing boot
->>> tests due to imprecise external aborts.  This only appears to happen
->>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
->>> issue seems to be intermittent, so is not reliably reproducable and
->>> difficult to bisect.  Here are a few boot logs from recent
->>> mainline/linux-next kernels that are failing:
->>
->> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
->> of next-20140910:
->> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
->>
->> However, my userspace is much simpler and doesn't seem to cause a panic,
->> so my boot tests report passing. (I should fixup my scripts so these
->> imprecise aborts are reported as a FAIL.)
->>
->> I'm glad you pointed out that it happens only with exynos_defconfig and
->> not multi_v7_defconfig because I noticed that too.  I haven't had the
->> time to track it any further than that, so maybe the exynos folks can
->> help track it down from here.
->>
->> Thanks for reporting this,
->>
->> Kevin
+________________________________________
+From: Daniel Lezcano [daniel.lezcano at linaro.org]
+Sent: Wednesday, September 17, 2014 8:22 PM
+To: Shilimkar, Santosh; Menon, Nishanth; Tony Lindgren; Kristo, Tero; Paul Walmsley
+Cc: Kevin Hilman; linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; J, KEERTHY; Beno?t Cousson
+Subject: Re: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+
+On 09/17/2014 04:20 PM, Shilimkar, Santosh wrote:
+> Sorry for the format. Emailing from webmail.
+> ________________________________________
+
+[ ... ]
+
+
+>> +     cx->mpu_state_vote++;
+>> +     if (cx->mpu_state_vote == num_online_cpus()) {
+>> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+>> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+>> +     }
+>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>> +
+>> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+>> +
+>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>> +     if (cx->mpu_state_vote == num_online_cpus())
+>> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+>> +     cx->mpu_state_vote--;
+>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
 >
-> Hi Tyler, Kevin,
+> I am not sure that will work. What happens if a cpu exits idle and then
+> re-enter idle immediately ?
 >
-> From the bootlog you have shared,
->
-> [    1.060016] CPU4: failed to come online
-> [    2.070031] CPU5: failed to come online
-> [    3.080049] CPU6: failed to come online
-> [    4.090066] CPU7: failed to come online
-> [    4.090099] Brought up 4 CPUs
-> [    4.090109] SMP: Total of 4 processors activated.
-> [    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
-> modes (primary CPU mode 0x13)
-> [    4.090128] CPU: This may indicate a broken bootloader or firmware.
->
-> Would it be possible to set max cpus to 1, disable switcher and try
-> again. I don't have a arndale octa board but I have tested mainline
-> kernel with smdk5420 board. It boots all eight CPUs, switcher works
-> fine and there are no imprecise aborts seen.
+> [Santosh] It works and that case is already taken care. CPU exist the idle and then votes
+> out for cluster state and if it reenters with the right targeted state, the cluster state would
+> be picked.
 
-Sorry for the delay, I'm travelling this week.
+It isn't possible to have one cpu disabling the coherency, while the
+other one is looking for a lock ? Or eg. cpu0 is on WFI then cpu1 is the
+last entering idle. While cpu1 is entering 'lowpower', cpu0 exits the
+wfi check the state vote and set the power domain on. In the meantime
+cpu1 disables the coherency and cpu0 decrease the vote and release the
+lock. Could be possible there is a very small racy window here ?
 
-FWIW, the same CPU boot failures you hilight above are happening on
-multi_v7_defconfig[1] which is not getting the imprecise abort.  This is
-only happening on exynos_defconfig[2], so I'm curious why you think the
-switcher or NR_CPUS might be the issues.
+[Santosh] The coherency isn't disable by CPU. Thats actually taken care by
+hardware. CPU takes it own power domain down and takes itself out of
+coherency. The Coherency is always ON as long as there is a CPU ON
+and SMP bit on that CPU is enabled.
 
-Anyways, I narrowed this down a bit and discovered it's
-CONFIG_EXYNOS5420_MCPM=y that's the root cause.  If I use
-exynos_defconfig and then disable that option, I don't get any more
-imprecise aborts.
+The scenario, you mentioned can never happen on this hardware thanks
+to the inbuilt smart hardware.
 
-Kevin
+If you have more questions, lets discuss. I am around here at connect. ;-)
 
-[1] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-multi_v7_defconfig/boot-exynos5420-arndale-octa.html
-[2] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+Regards,
+Santosh
