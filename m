@@ -1,39 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Sep 2014 09:08:26 -0700
-Subject: [PATCH v2 0/6] ARM: dts: cm-t54: enable video out, touchscreen
- and USB3.0
-In-Reply-To: <1410955808-2174-1-git-send-email-lifshitz@compulab.co.il>
-References: <1410885322-5928-1-git-send-email-lifshitz@compulab.co.il>
- <1410955808-2174-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <20140918160826.GE14505@atomide.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 18 Sep 2014 11:11:31 -0500
+Subject: [PATCH 09/12] ARM: omap2plus_defconfig: Add cpufreq to defconfig
+In-Reply-To: <1410837126-31553-9-git-send-email-tony@atomide.com>
+References: <1410837126-31553-1-git-send-email-tony@atomide.com>
+ <1410837126-31553-9-git-send-email-tony@atomide.com>
+Message-ID: <20140918161131.GA32319@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dmitry Lifshitz <lifshitz@compulab.co.il> [140917 05:10]:
-> Add CM-T54 DT nodes:
+On 20:12-20140915, Tony Lindgren wrote:
+> Note that we can now use the CONFIG_GENERIC_CPUFREQ_CPU0,
+> so let's only enable that.
 > 
-> * enable HDMI/DVI/LCD video output support
-> * add ADS7846 touchscreen support
-> * enchance DWC3 setup to enable power supply for USB3.0 OTG port
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/configs/omap2plus_defconfig | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> v2: * Fixed comment style issue for mux mode.
->       Follow the convention mode0_name.modeX_name for pins
->       which mux mode differs from MUX_MODE0
-> 
->     * Moved aliases node to the top of dts file
-> 
-> Dmitry Lifshitz (6):
->   ARM: dts: sbc-t54: fix mux mode comment style
->   ARM: dts: cm-t54: fix mux mode comment style
->   ARM: dts: cm-t54: add HDMI/DVI display data
->   ARM: dts: cm-t54: add Startek LCD support
->   ARM: dts: cm-t54: add ADS7846 touchscreen support
->   ARM: dts: cm-t54: setup omap_dwc3
-> 
->  arch/arm/boot/dts/omap5-cm-t54.dts  |  272 ++++++++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/omap5-sbc-t54.dts |    4 +-
->  2 files changed, 272 insertions(+), 4 deletions(-)
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index fc63855..9d232a5 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -43,6 +43,13 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_ARM_ATAG_DTB_COMPAT=y
+>  CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
+>  CONFIG_KEXEC=y
+> +CONFIG_CPU_FREQ=y
+> +CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+> +CONFIG_CPU_FREQ_GOV_USERSPACE=y
+> +CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+> +CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+> +CONFIG_GENERIC_CPUFREQ_CPU0=y
+> +# CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
 
-Applying all into omap-for-v3.18/dt thanks.
+With this
+we get performace as the default governor.
 
-Tony
+could we use CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND as the default
+instead? on Many TI SoCs using Highest frequency is not really too nice
+of an idea for long periods of time. And not everything is upstream to
+support things optimially - example avs class 0, 1.5 ABB consolidation
+with cpufreq etc.. We definitely need thermal enabled as well for device
+safety needs.
+
+I propose the following instead:
+@@ -43,6 +43,14 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
+ CONFIG_KEXEC=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_STAT_DETAILS=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
++CONFIG_GENERIC_CPUFREQ_CPU0=y
++# CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
+ CONFIG_CPU_IDLE=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_PM_DEBUG=y
+@@ -162,7 +170,9 @@ CONFIG_SENSORS_LM75=m
+ CONFIG_THERMAL=y
+ CONFIG_THERMAL_GOV_FAIR_SHARE=y
+ CONFIG_THERMAL_GOV_USER_SPACE=y
++CONFIG_CPU_THERMAL=y
+ CONFIG_TI_SOC_THERMAL=y
++CONFIG_TI_THERMAL=y
+ CONFIG_OMAP4_THERMAL=y
+ CONFIG_OMAP5_THERMAL=y
+ CONFIG_DRA752_THERMAL=y
+
+-- 
+Regards,
+Nishanth Menon
