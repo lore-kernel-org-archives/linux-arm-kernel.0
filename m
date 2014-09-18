@@ -1,43 +1,41 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 19 Sep 2014 01:20:52 +0200
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20140917234036.GC2464@xora-yoga-13>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <201409180122.10631.arnd@arndb.de> <20140917234036.GC2464@xora-yoga-13>
-Message-ID: <6318202.hl003vettj@vostro.rjw.lan>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 18 Sep 2014 16:02:19 -0700
+Subject: [PATCH] pinctrl: qcom: use restart_notifier mechanism for ps_hold
+In-Reply-To: <20140918224904.GD3749@joshc.qualcomm.com>
+References: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
+ <11F1E440-6BD4-46F1-A399-4334FBA2C3B6@codeaurora.org>
+ <20140918224904.GD3749@joshc.qualcomm.com>
+Message-ID: <9CD0FD1C-E8EA-4585-9837-070199BCC26D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 17, 2014 04:40:36 PM Graeme Gregory wrote:
-> On Thu, Sep 18, 2014 at 01:22:10AM +0200, Arnd Bergmann wrote:
-> > On Wednesday 17 September 2014, Graeme Gregory wrote:
-> > > It sounds like from the discussions in other threads that ARM64 should
-> > > be following x86 and re-using DT bindings here. In which case there is
-> > > not need to submit things to UEFI organisation.
-> > > 
-> > > What I got a little lost in has there been a formal decision about DT
-> > > bindings in _DSD?
-> > 
-> > I think this is a discussion that still needs to happen: either we should
-> > recommend everyone to use _DSD in favor of the alternatives, or we
-> > should prohibit the use of _DSD. I have heard arguments both ways, but
-> > hopefully we can find an easy answer.
-> > 
+
+On Sep 18, 2014, at 3:49 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
+
+> On Thu, Sep 18, 2014 at 03:47:20PM -0700, Kumar Gala wrote:
+>> On Sep 18, 2014, at 3:32 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
+>> 
+>>> By converting to the restart_notifier mechanism for restart, we allow
+>>> for other mechanisms, like the watchdog, to be used for restart in the
+>>> case where PS_HOLD has failed to reset the chip.
+>>> 
+>>> Choose priority 128, as according to documentation, this mechanism "is
+>>> sufficient to restart the entire system?.
+>> 
+>> Will we use a higher priority for watchdog?  or how would we fail over to watchdog?
 > 
-> This discussion is just not going to happen until people at @redhat.com
-> and people who have currently announced/released hardware are actually
-> willing to start talking about it.
+> The registered restart handlers are called in (descending) priority
+> order.  This driver registers as 128, but conceivably there could be
+> some super-board-specific restart mechanism that can register itself as
+> higher priority than this and it will be attempted first.
 > 
-> Id love to be able to put my foot down and ban the use of _DSD for
-> servers but I suspect that will not happen.
+> If PS_HOLD doesn't work, the lower priority restart handlers will
+> continue to be called, including the watchdog, which is registering with
+> the lowest priority (0).
 
-I'll probably should stay away from this discussion, but I can't resist. :-)
+Cool, thanks.
 
-Please imagine the situation in which the same IP block is included in an ARM64
-SoC and in an x86 SoC that ships with ACPI tables and a _DSD for that device in
-them.  What benefit would be there from disallowing systems based on the ARM64
-SoC in question to ship the same _DSD in their ACPI tables?
-
+- k
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
