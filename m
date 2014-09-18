@@ -1,115 +1,55 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 18 Sep 2014 13:35:01 +0800
-Subject: [PATCH 6/7] mmc: sdhci-esdhc-imx: add imx6sx support
-In-Reply-To: <CAPDyKFo5TfuQyb-ECDR+uzCfwio3guY+7LPxHzHXLNBacMbW_A@mail.gmail.com>
-References: <1409745903-26550-1-git-send-email-b29396@freescale.com>
- <1409745903-26550-7-git-send-email-b29396@freescale.com>
- <CAPDyKFo5TfuQyb-ECDR+uzCfwio3guY+7LPxHzHXLNBacMbW_A@mail.gmail.com>
-Message-ID: <20140918053457.GA15363@shlinux1.ap.freescale.net>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 18 Sep 2014 14:14:43 +0800
+Subject: [RFC Part2 v1 02/21] genirq: Introduce helper functions to support
+ stacked irq_chip
+In-Reply-To: <alpine.DEB.2.10.1409171244090.21313@nanos>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+ <1410444228-3134-3-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.10.1409161044330.4247@nanos> <5418FAE1.4030008@linux.intel.com>
+ <alpine.DEB.2.10.1409171244090.21313@nanos>
+Message-ID: <541A7853.4020303@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 12:29:52AM +0200, Ulf Hansson wrote:
-> On 3 September 2014 14:05, Dong Aisheng <b29396@freescale.com> wrote:
-> > The imx6sx usdhc is derived from imx6sl, the difference is minor.
-> > imx6sx have the errata ESDHC_FLAG_ERR004536 fixed.
-> > So introduce a new compatible string for imx6sx to distinguish them.
-> >
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+
+
+On 2014/9/18 4:58, Thomas Gleixner wrote:
+> On Wed, 17 Sep 2014, Jiang Liu wrote:
+>> On 2014/9/17 1:45, Thomas Gleixner wrote:
+>>> On Thu, 11 Sep 2014, Jiang Liu wrote:
+>>>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>>>> +void irq_chip_ack_parent(struct irq_data *data)
+>>>> +{
+>>>> +	data = data->parent_data;
+>>>> +	if (data && data->chip && data->chip->irq_ack)
+>>>> +		data->chip->irq_ack(data);
+>>>
+>>> Why is this restricted to a single parent level and does not go down
+>>> the whole stack?
+>> Hi Thomas,
+>> 	It happens to work on x86, and we want to achieve a bit
+>> performance advantage by not walking down the whole stack.
+>> If preferred, I will change it to walk the whole stack.
 > 
-> Hi Dong,
+> Happens to work on my machine is always a bad argument :)
 > 
-> This one has checkpatch errors due to missing DT documentation.
+> Now, I can see why you want to do that, but if we do an optimization
+> like that then we should really get rid of the conditional.
 > 
-
-The original binding doc is writing in the format of:
- Required properties:
--- compatible : Should be "fsl,<chip>-esdhc"
-It just provides a rule and does not provide the specific compatible string.
-So i did not update the doc before.
-
-But i think it's better to fix it to avoid future warning again.
-
-Can you help add below patch before this commit or do you need me
-to resend the patch series again with this patch added?
-
->From 467b84e5ffcba543b9ac88913b1d2dc1159dfa72 Mon Sep 17 00:00:00 2001
-From: Dong Aisheng <b29396@freescale.com>
-Date: Thu, 18 Sep 2014 13:11:03 +0800
-Subject: [PATCH 6/8] mmc: sdhci-esdhc-imx: using specific compatible string
- in binding doc
-
-Using specific compatible string in binding doc to make the binding
-more clear.
-It's also used to avoid checkpatch warning in the future like follows:
-0005-mmc-sdhci-do-not-enable-card-cd-wakeup-for-gpio-case.patch has no obvious style problems and is ready for submission.
-WARNING: DT compatible string "fsl,imx6sx-usdhc" appears un-documented -- check ./Documentation/devicetree/bindings/
-+       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
-
-total: 0 errors, 1 warnings, 18 lines checked
-
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
----
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 9046ba06..c415d34 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -7,7 +7,14 @@ This file documents differences between the core properties described
- by mmc.txt and the properties used by the sdhci-esdhc-imx driver.
-
- Required properties:
--- compatible : Should be "fsl,<chip>-esdhc"
-+- compatible : Should be "fsl,<chip>-esdhc", the supported chips include
-+              "fsl,imx25-esdhc"
-+              "fsl,imx35-esdhc"
-+              "fsl,imx51-esdhc"
-+              "fsl,imx53-esdhc"
-+              "fsl,imx6q-usdhc"
-+              "fsl,imx6sl-usdhc"
-+              "fsl,imx6sx-usdhc"
-
- Optional properties:
- - fsl,cd-controller : Indicate to use controller internal card detection
---
-1.7.8
-
-Regards
-Dong Aisheng
-
-> Kind regards
-> Uffe
+> You surely need a conditional on data->chip and data->chip->callback
+> for a full stackq walk, but for an explicit request to use the parents
+> ack the parent better has a chip with an ack function, right?
 > 
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c |    6 ++++++
-> >  1 files changed, 6 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index dc0e384..87179c4 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -150,6 +150,11 @@ static struct esdhc_soc_data usdhc_imx6sl_data = {
-> >                         | ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536,
-> >  };
-> >
-> > +static struct esdhc_soc_data usdhc_imx6sx_data = {
-> > +       .flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
-> > +                       | ESDHC_FLAG_HAVE_CAP1,
-> > +};
-> > +
-> >  struct pltfm_imx_data {
-> >         u32 scratchpad;
-> >         struct pinctrl *pinctrl;
-> > @@ -190,6 +195,7 @@ static const struct of_device_id imx_esdhc_dt_ids[] = {
-> >         { .compatible = "fsl,imx35-esdhc", .data = &esdhc_imx35_data, },
-> >         { .compatible = "fsl,imx51-esdhc", .data = &esdhc_imx51_data, },
-> >         { .compatible = "fsl,imx53-esdhc", .data = &esdhc_imx53_data, },
-> > +       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
-> >         { .compatible = "fsl,imx6sl-usdhc", .data = &usdhc_imx6sl_data, },
-> >         { .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
-> >         { /* sentinel */ }
-> > --
-> > 1.7.8
-> >
+> void irq_chip_ack_parent(struct irq_data *data)
+> {
+> 	data = data->parent_data;
+> 	data->chip->irq_ack(data);
+> }
+Sure, will optimize it further as above code.
+Regards!
+Gerry
+> 
+> Thanks,
+> 
+> 	tglx
+> 
