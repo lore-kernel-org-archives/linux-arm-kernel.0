@@ -1,40 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Sep 2014 09:58:18 -0700
-Subject: [PATCH] ARM: dts: DRA7: Add PMU nodes
-In-Reply-To: <20140917142503.GA11856@kahuna>
-References: <1408456440-30171-1-git-send-email-nm@ti.com>
- <540719FC.5070803@ti.com> <20140917142503.GA11856@kahuna>
-Message-ID: <20140918165817.GI14505@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 18 Sep 2014 18:02:06 +0100
+Subject: [PATCH] arm64: insn: Add return statements after BUG_ON()
+In-Reply-To: <1410885753-25025-1-git-send-email-broonie@kernel.org>
+References: <1410885753-25025-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140918170205.GE25330@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140917 07:26]:
-> On 08:39-20140903, Nishanth Menon wrote:
-> > On 08/19/2014 08:54 AM, Nishanth Menon wrote:
-> > > From: Lucas Weaver <l-weaver@ti.com>
-> > > 
-> > > DRA74x and DRA72x family of processors vary slightly in the number
-> > > of CPUs. So, add different instances of PMU for each of these processor
-> > > groups. Further, since the interrupts bypass crossbar and are directly
-> > > connected to GIC, mark the dts nodes with relevant information.
-> > > 
-> > > Tested with perf utility.
-> > > 
-> > > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > > Signed-off-by: Lucas Weaver <l-weaver@ti.com>
-> > > Signed-off-by: Nishanth Menon <nm@ti.com>
-> > > ---
-> > Hi,
-> > Gentle ping..
+On Tue, Sep 16, 2014 at 05:42:33PM +0100, Mark Brown wrote:
+> Following a recent series of enhancements to the insn code the ARMv8
+> allnoconfig build has been generating a large number of warnings in the
+> form of:
 > 
-> Tony,
-> I dont see this patch in omap-for-v3.18/dt
+> arch/arm64/kernel/insn.c:689:8: warning: 'insn' may be used uninitialized in this function [-Wmaybe-uninitialized]
 > 
-> Is there anyway you might consider pulling this for 3.18?
+> This is because BUG() and related macros can be compiled out so we get
+> execution paths which normally result in a panic compiling out to noops
+> instead.
 > 
-> Patchworks link:
-> https://patchwork.kernel.org/patch/4743121/
+> I wasn't able to immediately identify a sensible return value to use in
+> these cases so just return 0 - this is all "should never happen" code so
+> hopefully it never has a practical impact.
+> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>  arch/arm64/kernel/insn.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 0668ee5..7af35f3 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -388,6 +388,7 @@ u32 __kprobes aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+>  		break;
+>  	default:
+>  		BUG_ON(1);
+> +		return 0;
+>  	}
 
-Thanks applying into omap-for-v3.18/dt.
+Wouldn't there be less lines if we initialise insn to 0 in these
+functions?
 
-Tony
+-- 
+Catalin
