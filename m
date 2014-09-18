@@ -1,40 +1,60 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 18 Sep 2014 08:48:49 +0200
-Subject: [PATCH 2/2] ARM: dts: Add rtc_src clk for s3c-rtc on
- exynos5250-snow
-In-Reply-To: <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
-References: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>	<1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
-Message-ID: <541A8051.20207@collabora.co.uk>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Thu, 18 Sep 2014 14:53:57 +0800
+Subject: [PATCH Resend] arm:extend the reserved mrmory for initrd to be
+ page aligned
+In-Reply-To: <20140918055553.GO3755@pengutronix.de>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491616@CNBJMBX05.corpusers.net>
+ <20140918055553.GO3755@pengutronix.de>
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491619@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug, Andreas,
+This patch extends the start and end address of initrd to be page aligned,
+so that we can free all memory including the un-page aligned head or tail
+page of initrd, if the start or end address of initrd are not page
+aligned, the page can't be freed by free_initrd_mem() function.
 
-On 09/17/2014 05:47 PM, Doug Anderson wrote:
->>
->>         rtc at 101E0000 {
->>                 status = "okay";
->> +               clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
->> +               clock-names = "rtc", "rtc_src";
-> 
-> Wait, seriously?  Snow is still using the "rtc at 101E0000" syntax?
-> Whatever happened to the series that Andreas worked so hard on,
-> including <https://patchwork.kernel.org/patch/4664801/>?
->
+Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+---
+ arch/arm/mm/init.c   | 5 +++++
+ arch/arm64/mm/init.c | 8 +++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-Andreas, I completely forgot about your series when writing this patch even
-though I've on my TO-DO to sync the downstream and upstream Snow DTS once your
-patches land. Sorry about that.
-
-> 
-> In any case, there's nothing wrong with Javier's patch other than the
-> fact that it will eventually need to get merged with Andreas's, so:
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> 
-
-Thanks, I'll re-spin and post again once Kukjin merges Andreas series.
-
-Best regards,
-Javier
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 659c75d..9221645 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -636,6 +636,11 @@ static int keep_initrd;
+ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+ 	if (!keep_initrd) {
++		if (start == initrd_start)
++			start = round_down(start, PAGE_SIZE);
++		if (end == initrd_end)
++			end = round_up(end, PAGE_SIZE);
++
+ 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
+ 		free_reserved_area((void *)start, (void *)end, -1, "initrd");
+ 	}
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 5472c24..c5512f6 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -334,8 +334,14 @@ static int keep_initrd;
+ 
+ void free_initrd_mem(unsigned long start, unsigned long end)
+ {
+-	if (!keep_initrd)
++	if (!keep_initrd) {
++		if (start == initrd_start)
++			start = round_down(start, PAGE_SIZE);
++		if (end == initrd_end)
++			end = round_up(end, PAGE_SIZE);
++
+ 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
++	}
+ }
+ 
+ static int __init keepinitrd_setup(char *__unused)
+-- 
+2.1.0
