@@ -1,203 +1,88 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 18 Sep 2014 10:23:06 +0100
-Subject: [PATCH RESENT for 3.18] ARM: vexpress: Add CLCD Device Tree properties
-Message-ID: <1411032186-6934-1-git-send-email-pawel.moll@arm.com>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Thu, 18 Sep 2014 11:27:45 +0200
+Subject: [PATCH v5 2/4] dt-bindings: document Rockchip thermal
+In-Reply-To: <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1410926353-15674-1-git-send-email-caesar.wang@rock-chips.com>
+ <1410926353-15674-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <CAAObsKA61Ano85P6PehOY7WqR0FgTz_Rfur8UAt56ZXoNyoyqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
-dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
+On 17 September 2014 05:59, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+> This add the necessary binding documentation for the thermal
+> found on Rockchip SoCs
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
+Hi Caesar,
 
-Hello, Arnd, Kevin, Olof,
+is there any reason to not use the existing thermal bindings? You can
+find a description in
+Documentation/devicetree/bindings/thermal/thermal.txt and example code
+in omap, or in the patches for Tegra recently posted by Mikko
+Perttunen.
 
-As Russell asked to wait with the non-DT removal, the
-VE updates for 3.18 get down to this single patch. Could you
-please queue it?
+Regards,
 
-Thanks!
+Tomeu
 
-Pawel
-
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 36 +++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/vexpress-v2m.dtsi     | 36 +++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 31 ++++++++++++++++++++++++++++
- 3 files changed, 99 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-index 756c986..2efb205 100644
---- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-@@ -41,7 +41,7 @@
- 			bank-width = <4>;
- 		};
- 
--		vram at 2,00000000 {
-+		v2m_video_ram: vram at 2,00000000 {
- 			compatible = "arm,vexpress-vram";
- 			reg = <2 0x00000000 0x00800000>;
- 		};
-@@ -246,9 +246,41 @@
- 			clcd at 1f0000 {
- 				compatible = "arm,pl111", "arm,primecell";
- 				reg = <0x1f0000 0x1000>;
-+				interrupt-names = "combined";
- 				interrupts = <14>;
- 				clocks = <&v2m_oscclk1>, <&smbclk>;
- 				clock-names = "clcdclk", "apb_pclk";
-+				memory-region = <&v2m_video_ram>;
-+				max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
-+
-+				port {
-+					v2m_clcd_pads: endpoint {
-+						remote-endpoint = <&v2m_clcd_panel>;
-+						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+					};
-+				};
-+
-+				panel {
-+					compatible = "panel-dpi";
-+
-+					port {
-+						v2m_clcd_panel: endpoint {
-+							remote-endpoint = <&v2m_clcd_pads>;
-+						};
-+					};
-+
-+					panel-timing {
-+						clock-frequency = <25175000>;
-+						hactive = <640>;
-+						hback-porch = <40>;
-+						hfront-porch = <24>;
-+						hsync-len = <96>;
-+						vactive = <480>;
-+						vback-porch = <32>;
-+						vfront-porch = <11>;
-+						vsync-len = <2>;
-+					};
-+				};
- 			};
- 		};
- 
-@@ -350,7 +382,7 @@
- 				/* CLCD clock */
- 				compatible = "arm,vexpress-osc";
- 				arm,vexpress-sysreg,func = <1 1>;
--				freq-range = <23750000 63500000>;
-+				freq-range = <23750000 65000000>;
- 				#clock-cells = <0>;
- 				clock-output-names = "v2m:oscclk1";
- 			};
-diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
-index ba856d6..cb3090f 100644
---- a/arch/arm/boot/dts/vexpress-v2m.dtsi
-+++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
-@@ -40,7 +40,7 @@
- 			bank-width = <4>;
- 		};
- 
--		vram at 3,00000000 {
-+		v2m_video_ram: vram at 3,00000000 {
- 			compatible = "arm,vexpress-vram";
- 			reg = <3 0x00000000 0x00800000>;
- 		};
-@@ -245,9 +245,41 @@
- 			clcd at 1f000 {
- 				compatible = "arm,pl111", "arm,primecell";
- 				reg = <0x1f000 0x1000>;
-+				interrupt-names = "combined";
- 				interrupts = <14>;
- 				clocks = <&v2m_oscclk1>, <&smbclk>;
- 				clock-names = "clcdclk", "apb_pclk";
-+				memory-region = <&v2m_video_ram>;
-+				max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
-+
-+				port {
-+					v2m_clcd_pads: endpoint {
-+						remote-endpoint = <&v2m_clcd_panel>;
-+						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+					};
-+				};
-+
-+				panel {
-+					compatible = "panel-dpi";
-+
-+					port {
-+						v2m_clcd_panel: endpoint {
-+							remote-endpoint = <&v2m_clcd_pads>;
-+						};
-+					};
-+
-+					panel-timing {
-+						clock-frequency = <25175000>;
-+						hactive = <640>;
-+						hback-porch = <40>;
-+						hfront-porch = <24>;
-+						hsync-len = <96>;
-+						vactive = <480>;
-+						vback-porch = <32>;
-+						vfront-porch = <11>;
-+						vsync-len = <2>;
-+					};
-+				};
- 			};
- 		};
- 
-@@ -349,7 +381,7 @@
- 				/* CLCD clock */
- 				compatible = "arm,vexpress-osc";
- 				arm,vexpress-sysreg,func = <1 1>;
--				freq-range = <23750000 63500000>;
-+				freq-range = <23750000 65000000>;
- 				#clock-cells = <0>;
- 				clock-output-names = "v2m:oscclk1";
- 			};
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index 62d9b22..23662b5 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -70,9 +70,40 @@
- 	clcd at 10020000 {
- 		compatible = "arm,pl111", "arm,primecell";
- 		reg = <0x10020000 0x1000>;
-+		interrupt-names = "combined";
- 		interrupts = <0 44 4>;
- 		clocks = <&oscclk1>, <&oscclk2>;
- 		clock-names = "clcdclk", "apb_pclk";
-+		max-memory-bandwidth = <130000000>; /* 16bpp @ 63.5MHz */
-+
-+		port {
-+			clcd_pads: endpoint {
-+				remote-endpoint = <&clcd_panel>;
-+				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
-+			};
-+		};
-+
-+		panel {
-+			compatible = "panel-dpi";
-+
-+			port {
-+				clcd_panel: endpoint {
-+					remote-endpoint = <&clcd_pads>;
-+				};
-+			};
-+
-+			panel-timing {
-+				clock-frequency = <63500127>;
-+				hactive = <1024>;
-+				hback-porch = <152>;
-+				hfront-porch = <48>;
-+				hsync-len = <104>;
-+				vactive = <768>;
-+				vback-porch = <23>;
-+				vfront-porch = <3>;
-+				vsync-len = <4>;
-+			};
-+		};
- 	};
- 
- 	memory-controller at 100e0000 {
--- 
-1.9.1
+> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  .../bindings/thermal/rockchip-thermal.txt          | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> new file mode 100644
+> index 0000000..6fc8bc3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -0,0 +1,41 @@
+> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+> +
+> +Required properties:
+> +- compatible: "rockchip,rk3288-tsadc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +       region.
+> +- interrupts: The interrupt number to the cpu. The interrupt specifier format
+> +             depends on the interrupt controller.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk" for
+> +              the peripheral clock.
+> +- num-trips:  number of total trip points, this is required, set it 0 if none,
+> +             if greater than 0, the following properties must be defined;
+> +- tripN-temp: temperature of trip point N, should be in ascending order;
+> +- tripN-type: type of trip point N, should be one of "active" "passive" "hot"
+> +             "critical";
+> +- tripN-cdev-num: number of the cooling devices which can be bound to trip
+> +                 point N, this is required if trip point N is defined, set it 0 if none,
+> +                 otherwise the following cooling device names must be defined;
+> +- tripN-cdev-nameM: name of the No. M cooling device of trip point N;
+> +
+> +Example:
+> +tsadc: tsadc at ff280000 {
+> +       compatible = "rockchip,rk3288-tsadc";
+> +       reg = <0xff280000 0x100>;
+> +       interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +       clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+> +       clock-names = "tsadc", "apb_pclk";
+> +
+> +       num-trips = <2>;
+> +
+> +       trip0-temp = <80>;
+> +       trip0-type = "passive";
+> +       trip0-cdev-num = <1>;
+> +       trip0-cdev-name0 = "thermal-cpufreq-0";
+> +
+> +       trip1-temp = <100>;
+> +       trip1-type = "critical";
+> +       trip1-cdev-num = <1>;
+> +       trip1-cdev-name0 = "thermal-cpufreq-0";
+> +};
+> --
+> 1.9.1
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
