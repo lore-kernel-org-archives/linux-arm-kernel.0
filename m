@@ -1,34 +1,27 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 18 Sep 2014 17:49:04 -0500
-Subject: [PATCH] pinctrl: qcom: use restart_notifier mechanism for ps_hold
-In-Reply-To: <11F1E440-6BD4-46F1-A399-4334FBA2C3B6@codeaurora.org>
-References: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
- <11F1E440-6BD4-46F1-A399-4334FBA2C3B6@codeaurora.org>
-Message-ID: <20140918224904.GD3749@joshc.qualcomm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Sep 2014 23:55:31 +0100
+Subject: [PATCH 3/3] arm: vfp: Bounce undefined instructions in
+ vectored mode
+In-Reply-To: <1411076592-6157-4-git-send-email-sboyd@codeaurora.org>
+References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+ <1411076592-6157-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140918225531.GG5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 03:47:20PM -0700, Kumar Gala wrote:
-> On Sep 18, 2014, at 3:32 PM, Josh Cartwright <joshc@codeaurora.org> wrote:
+On Thu, Sep 18, 2014 at 02:43:12PM -0700, Stephen Boyd wrote:
+> From: Stepan Moskovchenko <stepanm@codeaurora.org>
 > 
-> > By converting to the restart_notifier mechanism for restart, we allow
-> > for other mechanisms, like the watchdog, to be used for restart in the
-> > case where PS_HOLD has failed to reset the chip.
-> > 
-> > Choose priority 128, as according to documentation, this mechanism "is
-> > sufficient to restart the entire system?.
-> 
-> Will we use a higher priority for watchdog?  or how would we fail over to watchdog?
+> Certain ARM CPU implementations (e.g. Cortex-A15) may not raise a
+> floating- point exception whenever deprecated short-vector VFP
+> instructions are executed. Instead these instructions are treated
+> as UNALLOCATED. Change the VFP exception handling code to emulate
+> short-vector instructions even if FPEXC exception bits are not
+> set.
 
-The registered restart handlers are called in (descending) priority
-order.  This driver registers as 128, but conceivably there could be
-some super-board-specific restart mechanism that can register itself as
-higher priority than this and it will be attempted first.
-
-If PS_HOLD doesn't work, the lower priority restart handlers will
-continue to be called, including the watchdog, which is registering with
-the lowest priority (0).
+Purely out of interest, how much use do these instructions have in
+real programs?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
