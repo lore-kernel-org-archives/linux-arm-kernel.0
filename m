@@ -1,47 +1,41 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 18 Sep 2014 21:46:15 +0800
-Subject: [PATCH 1/2] ARM: dts: vf610-colibri: Add ADC support
-In-Reply-To: <1015e874d5b13795e38069402a66b4798d79b632.1410873422.git.maitysanchayan@gmail.com>
-References: <cover.1410873422.git.maitysanchayan@gmail.com>
- <1015e874d5b13795e38069402a66b4798d79b632.1410873422.git.maitysanchayan@gmail.com>
-Message-ID: <20140918134613.GK4796@dragon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Sep 2014 14:49:56 +0100
+Subject: [PATCH] arm: arm: fiq: fix build breakage with CONFIG_FIQ
+In-Reply-To: <20140918015127.GA5745@saruman.home>
+References: <1410984101-16762-1-git-send-email-balbi@ti.com>
+ <541A193F.2060503@linaro.org> <20140918015127.GA5745@saruman.home>
+Message-ID: <20140918134956.GG12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 01:53:16PM +0530, Sanchayan Maity wrote:
-> Enable ADC support for Colibri VF61 modules
+On Wed, Sep 17, 2014 at 08:51:28PM -0500, Felipe Balbi wrote:
+> Hi,
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/boot/dts/vf610-colibri.dtsi |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+> On Wed, Sep 17, 2014 at 04:29:03PM -0700, Daniel Thompson wrote:
+> > On 17/09/14 13:01, Felipe Balbi wrote:
+> > > commit e1add97 (ARM: 8150/2: fiq: Replace default FIQ handler)
+> > > has a typo which causes build breakage whenever CONFIG_FIQ is
+> > > set.
+> > > 
+> > > The bug is very clear as can be noted that a new struct pt_regs
+> > > def_fiq_regs was defined but code uses dfl_fiq_regs.
+> > 
+> > Quite so. My fault.
+> > 
+> > This error was picked up by Olof's autobuilder and I have offered
+> > a fix as 8150/3 (posted to mailing list in this thread
+> > http://thread.gmane.org/gmane.linux.kernel/1789554 ).
 > 
-> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-> index 0cd8343..275ebec 100644
-> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-> @@ -69,6 +69,16 @@
->  	status = "okay";
->  };
->  
-> +&adc0 {
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> +
-> +&adc1 {
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> +
-
-Please sort the nodes alphabetically in node name.
-
-Shawn
-
->  &iomuxc {
->  	vf610-colibri {
->  		pinctrl_esdhc1: esdhc1grp {
-> -- 
-> 1.7.9.5
+> aaa, alright. I missed that one :-)
 > 
+> > Your fix and mine are slightly different (I standardised on
+> > dfl_fiq_regs) but both approaches should be functionally identical.
+> 
+> sure thing, no issues. I reckon it should be in next within the next
+> couple days ?
+
+Should be in the next next.  It missed last night's sfr pull.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
