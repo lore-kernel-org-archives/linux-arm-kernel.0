@@ -1,104 +1,48 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 18 Sep 2014 15:28:44 +0800
-Subject: [RFC Part2 v1 01/21] irqdomain: Introduce new interfaces to
- support hierarchy irqdomains
-In-Reply-To: <alpine.DEB.2.10.1409160859080.4247@nanos>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
- <1410444228-3134-2-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.10.1409160859080.4247@nanos>
-Message-ID: <541A89AC.9000706@linux.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Sep 2014 08:48:39 +0100
+Subject: [PATCH 3.17-rc4 v7 4/6] irqchip: gic: Add support for IPI FIQ
+In-Reply-To: <20140917210712.GY12361@n2100.arm.linux.org.uk>
+References: <1410970218-28847-1-git-send-email-daniel.thompson@linaro.org>
+ <1410970218-28847-5-git-send-email-daniel.thompson@linaro.org>
+ <20140917185138.GX12361@n2100.arm.linux.org.uk> <5419EB27.2040405@linaro.org>
+ <20140917210712.GY12361@n2100.arm.linux.org.uk>
+Message-ID: <20140918074839.GZ12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/17 1:43, Thomas Gleixner wrote:
-> Jiang,
+On Wed, Sep 17, 2014 at 10:07:13PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 17, 2014 at 01:12:23PM -0700, Daniel Thompson wrote:
+> > I may have missed something but this sounds like the expected behaviour
+> > to me.
+> > 
+> > Without AckCtl set (GIC_CPU_CTRL bit 2) then it is not possible to
+> > acknowledge group 1 interrupts from secure mode. Thus in the
+> > circumstances described above I would expect the system to wedge in the
+> > interrupt handler because IRQ is raised but the software is not able to
+> > acknowledge it.
 > 
-> On Thu, 11 Sep 2014, Jiang Liu wrote:
->> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>  	/* Create mapping */
->> -	virq = irq_create_mapping(domain, hwirq);
->> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
->> +	if (domain->ops->alloc)
->> +		virq = irq_domain_alloc_irqs(domain, -1, 1, NUMA_NO_NODE,
->> +					     irq_data);
->> +	else
->> +#endif
->> +		virq = irq_create_mapping(domain, hwirq);
+> Setting AckCtl (0x07) results in no change in behaviour - still crashes
+> when it tries to calibrate the timer.
 > 
-> I'd prefer to get rid of the #ifdef CONFIG...s in the code. So this
-> can be written:
+> > I think there may also problems with leaving CBPR unset. Leaving CBPR
+> > unset certainly causes a change of behaviour compared to an all group0
+> > setup.
 > 
->         if (irq_domain_has_hierarchy(domain))
-> 		virq = irq_domain_alloc_irqs(domain, -1, 1, NUMA_NO_NODE,
-> 					     irq_data);
-> 	else
-> 		virq = irq_create_mapping(domain, hwirq);
-Sure, will kill the ifdef. 	
+> Also tried setting that (0x17), but still the same.
 
-> 	   
-> 
->>  	if (!virq)
->>  		return virq;
->>  
->> @@ -540,7 +542,11 @@ unsigned int irq_find_mapping(struct irq_domain *domain,
->>  		return 0;
->>  
->>  	if (hwirq < domain->revmap_direct_max_irq) {
->> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
->> +		data = irq_domain_get_irq_data(domain, hwirq);
->> +#else
->>  		data = irq_get_irq_data(hwirq);
->> +#endif
-> 
-> Similar here. Make irq_domain_get_irq_data() map to irq_get_irq_data() for
-> the non hierarchy mode so you end up with a single line:
-> 
-> -  		data = irq_get_irq_data(hwirq);
-> +		data = irq_domain_get_irq_data(domain, hwirq);
-Sure.
+Another data point: SDP4430 boots fine with 0x17.
 
->> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
->> +/**
->> + * irq_domain_alloc_irqs - Allocate IRQs from domain
->> + * @domain: domain to allocate from
->> + * @irq_base: allocate specified IRQ nubmer if irq_base >= 0
->> + * @nr_irqs: number of IRQs to allocate
->> + * @node: NUMA node id for memory allocation
->> + * @arg: domain specific argument
->> + * @realloc: IRQ descriptors have already been allocated if true
->> + *
->> + * Allocate IRQ numbers and initialized all data structures to support
->> + * hiearchy IRQ domains.
->> + * Parameter @realloc is mainly to support legacy IRQs.
-> 
-> What's the issue with the legacy irqs? So this has the interrupt
-> descriptors allocated already. Are they already wired up for serving
-> interrupts and what's the state of those lines?
-Function arch_early_ioapic_init() will allocate irq descriptors and
-irq_cfg structures for all legacy IRQ for three purposes:
-1) To support ISA IRQs managed by 8259.
-2) To reserve vectors on all CPUs for legacy IRQs
-3) Prepare data structures to support pre_init_apic_IRQ0().
-We will kill pre_init_apic_IRQ0() soon, so item 3 above won't be needed
-anymore.
+The Versatile Express has GIC ID/TYPER register values of:
 
-When __irq_domain_alloc_irqs() is called, only irq descriptor and
-irq_cfg have been allocated, but the interrupt controller hardware
-should be untouched yet.
+GICC IDR: 0x3901043b GICD TYPER: 0x0000fc62
 
-> 
->> + * Returns error code or allocated IRQ number
-> 
-> Can you please add some documentation how the hierarchical allocation
-> is supposed to work and how the domains are connected. That should
-> probably go to Documentation/IRQ-domains.txt.
-Sure, I will do my best to add documentations for it.
-> 
-> Other than that this looks pretty good! Nice work!
-Thanks!
-Gerry
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+The SDP4430 has:
+
+GICC IDR: 0x3901043b GICD TYPER: 0x0000fc24
+
+so they should in theory be identical GICs, and should behave identically,
+but they don't.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
