@@ -1,121 +1,109 @@
-From: bamvor.zhangjian@huawei.com (zhangjian)
-Date: Thu, 18 Sep 2014 11:41:16 +0800
-Subject: [PATCH 07/24] ARM64:ILP32: Use the same size and layout of the
- signal structures for ILP32 as for LP64
-In-Reply-To: <1409779158-30963-8-git-send-email-apinski@cavium.com>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <1409779158-30963-8-git-send-email-apinski@cavium.com>
-Message-ID: <541A545C.3030307@huawei.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Thu, 18 Sep 2014 09:32:16 +0530
+Subject: [RFC PATCH] dt:numa: adding numa node mapping for memory nodes.
+In-Reply-To: <CAMDttNfSr5BrnEwLXqgy676jOZbFHhXcMtC0n7gBSniwhWCDRQ@mail.gmail.com>
+References: <1410944189-3608-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+ <541A01B7.8030601@mentor.com>
+ <CAMDttNfSr5BrnEwLXqgy676jOZbFHhXcMtC0n7gBSniwhWCDRQ@mail.gmail.com>
+Message-ID: <CAFpQJXUs+6Qvj0SqgajA8_D8UdEh_EQVgTQDz0bPSn-VpEty9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/4 5:19, Andrew Pinski wrote:
-> Defines the macros which allow the signal structures to be the same between ILP32 and LP64.
-> 
-> Signed-off-by: Andrew Pinski <apinski@cavium.com>
-> ---
->  arch/arm64/include/uapi/asm/siginfo.h |   33 ++++++++++++++++++++++++++++++++
->  arch/arm64/include/uapi/asm/signal.h  |   34 +++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/siginfo.h b/arch/arm64/include/uapi/asm/siginfo.h
-> index 5a74a08..c80c612 100644
-> --- a/arch/arm64/include/uapi/asm/siginfo.h
-> +++ b/arch/arm64/include/uapi/asm/siginfo.h
-> @@ -1,5 +1,6 @@
->  /*
->   * Copyright (C) 2012 ARM Ltd.
-> + * Copyright (C) 2014 Cavium Inc.
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -18,6 +19,38 @@
->  
->  #define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
->  
-> +#ifdef __ILP32__
-> +
-> +/*
-> + * For ILP32, the siginfo structures should share the same layout and
-> + * alignement requirements as LP64 ABI.
-> + * To do this, use an extra pad field and add aligned attribute
-> + * to the structure.
-> + */
-> +
-> +# ifdef __AARCH64EB__
-> +#  define __SIGINFO_INNER(type, field)		\
-> +		int __pad#field;		\
-> +		type field
-> +# else
-> +#  define __SIGINFO_INNER(type, field)		\
-> +		type field;			\
-> +		int __pad#field
-> +# endif
-> +
-> +# undef __SIGINFO_VOIDPTR
-> +# define __SIGINFO_VOIDPTR(field)		\
-> +		__SIGINFO_INNER(void __user*, field)
-> +# undef __SIGINFO_BAND
-> +
-> +# define __SIGINFO_BAND(field)			\
-> +	__SIGINFO_INNER(long, field)
-> +
-> +/* Make the alignment of siginfo always 8 byte aligned. */
-> +#define __ARCH_SI_ATTRIBUTES __attribute__((aligned(8)))
-> +
-> +#endif
-> +
->  #include <asm-generic/siginfo.h>
->  
->  #endif
-> diff --git a/arch/arm64/include/uapi/asm/signal.h b/arch/arm64/include/uapi/asm/signal.h
-> index 8d1e723..d33a5f7 100644
-> --- a/arch/arm64/include/uapi/asm/signal.h
-> +++ b/arch/arm64/include/uapi/asm/signal.h
-> @@ -16,9 +16,43 @@
->  #ifndef __ASM_SIGNAL_H
->  #define __ASM_SIGNAL_H
->  
-> +#include <asm/posix-types.h>
-typos here, it should be
-#include <asm/posix_types.h>
-> +
->  /* Required for AArch32 compatibility. */
->  #define SA_RESTORER	0x04000000
->  
-> +/*
-> + * Since sigset is a bitmask, we need the same size fields for ILP32
-> + * and LP64.  With big-endian, 32bit bitmask does not match up to
-> + * 64bit bitmask (unlike with little-endian).
-> + */
-> +#ifdef __ILP32__
-> +
-> +#define __SIGSET_INNER_TYPE __kernel_ulong_t
-> +#define _NSIG_BPW 64
-> +
-> +# ifdef __AARCH64EB__
-> +#  define __SIGNAL_INNER(type, field)		\
-> +		int __pad_##field;		\
-> +		type field;
-> +# else
-> +#  define __SIGNAL_INNER(type, field)		\
-> +		type field;			\
-> +		int __pad_##field;
-> +# endif
-> +
-> +# define __SIGACTION_HANDLER(field)		\
-> +	__SIGNAL_INNER(__sighandler_t, field)
-> +
-> +
-> +#define __SIGACTION_FLAGS(field)		\
-> +	__kernel_ulong_t field
-> +
-> +#define __SIGACTION_RESTORER(field)		\
-> +	__SIGNAL_INNER(__sigrestore_t, field)
-> +
-> +#endif
-> +
->  #include <asm-generic/signal.h>
->  
->  #endif
-> 
+On Thu, Sep 18, 2014 at 4:42 AM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
+> On Wed, Sep 17, 2014 at 2:48 PM, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+>> On 09/17/2014 03:56 AM, Ganapatrao Kulkarni wrote:
+>>> From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>
+>>> This patch adds property "nid" to memory node to provide the memory range to
+>>> numa node id mapping.
+>>>
+>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>
+>>> ---
+>>>  Documentation/devicetree/bindings/numa.txt | 58 ++++++++++++++++++++++++++++++
+>>>  1 file changed, 58 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/numa.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+>>> new file mode 100644
+>>> index 0000000..c4a94f2
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/numa.txt
+>>> @@ -0,0 +1,58 @@
+>>> +======================================================
+>>> +numa id binding description
+>>> +======================================================
+>>> +
+>>> +======================================================
+>>> +1 - Introduction
+>>> +======================================================
+>>> +The device node  property "nid(numa node id)" can be added to memory
+>>> +device node to map the range of memory addresses as defined in property "reg".
+>>> +The property "nid" maps the memory range to the numa node id, which is used to
+>>> +find the local and remory pages on numa aware systems.
+>>
+>> "Local" and "remote" memory are notions that relate to some other
+>> resource -- typically a CPU, but also I/O resources on some systems.  It
+>> seems to me that a useful NUMA binding would at least specify a "nid"
+>> property, or something like it, for both cpu and memory nodes.  But this
+>> document speaks only of memory nodes.
+IMO, nid can be extended to cpu node also if the arch dont have any
+other way to do mapping, in fact this can be scaled to any node.
+for ARM arch, cpu mapping can be fetched from topology parsing and
+more over cpu mapping is required much later when secondary cpus comes
+online.
+i have added for memory, since this is parsed very early in the boot
+sequence and there is no support for dt based map at this moment(at
+least i am not aware off).
+numa distance matrix can also be defined, if the architecture has
+variable node distance other than just local/remote.
+>>
+>> As Kumar said, the device tree on powerpc server systems already has
+>> properties that express NUMA information.  If you can get hold of a copy
+>> of the PAPR (not ePAPR) from power.org, refer to the description of
+>> "ibm,associativity" and related properties.  I recall that it's a bit
+>> more complex than this proposal, though.
+>
+> I'm not able to find a link to the actual PAPR (not ePAPR)
+> specification. Anyone has a linky?
+>
+> I did find some code in tree, but couldn't find the bindings in
+> Documentation/devicetree/.
+yes, there is nothing in Documentation, if PPC are using since several
+years, then i humbly request to publish the documentation for numa
+bindings.
+No point in reinventing the wheel. Also i did not find any spec named
+PAPR, is it open spec, available to all like ePAPR?
+
+>
+> Seems like we'd care about form1?
+> -----8<-----
+> commit 41eab6f88f24124df89e38067b3766b7bef06ddb
+> Author: Anton Blanchard <anton@samba.org>
+> Date:   Sun May 16 20:22:31 2010 +0000
+>
+>     powerpc/numa: Use form 1 affinity to setup node distance
+>
+>     Form 1 affinity allows multiple entries in
+> ibm,associativity-reference-points
+>     which represent affinity domains in decreasing order of importance. The
+>     Linux concept of a node is always the first entry, but using the other
+>     values as an input to node_distance() allows the memory allocator to make
+>     better decisions on which node to go first when local memory has been
+>     exhausted.
+>
+>     We keep things simple and create an array indexed by NUMA node, capped at
+>     4 entries. Each time we lookup an associativity property we initialise
+>     the array which is overkill, but since we should only hit this path during
+>     boot it didn't seem worth adding a per node valid bit.
+>
+>     Signed-off-by: Anton Blanchard <anton@samba.org>
+>     Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ----->8-----
+>
+>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
