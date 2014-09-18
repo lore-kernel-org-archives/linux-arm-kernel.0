@@ -1,162 +1,115 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 18 Sep 2014 11:33:26 +0530
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <20140918030552.GA26661@shlinux1.ap.freescale.net>
-References: <1410935510-1567-1-git-send-email-pankaj.dubey@samsung.com>
- <20140917085818.GA10285@shlinux1.ap.freescale.net>
- <000401cfd269$922dfc40$b689f4c0$@samsung.com>
- <20140918030552.GA26661@shlinux1.ap.freescale.net>
-Message-ID: <000701cfd306$4d3e8080$e7bb8180$@samsung.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Thu, 18 Sep 2014 13:35:01 +0800
+Subject: [PATCH 6/7] mmc: sdhci-esdhc-imx: add imx6sx support
+In-Reply-To: <CAPDyKFo5TfuQyb-ECDR+uzCfwio3guY+7LPxHzHXLNBacMbW_A@mail.gmail.com>
+References: <1409745903-26550-1-git-send-email-b29396@freescale.com>
+ <1409745903-26550-7-git-send-email-b29396@freescale.com>
+ <CAPDyKFo5TfuQyb-ECDR+uzCfwio3guY+7LPxHzHXLNBacMbW_A@mail.gmail.com>
+Message-ID: <20140918053457.GA15363@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Adding CC to Xiubo Li, Geert Uytterhoeven and Stephen Warren. 
-
-On Thursday, September 18, 2014, Dong Aisheng wrote,
-> On Wed, Sep 17, 2014 at 04:50:50PM +0530, Pankaj Dubey wrote:
-> > Hi,
+On Thu, Sep 18, 2014 at 12:29:52AM +0200, Ulf Hansson wrote:
+> On 3 September 2014 14:05, Dong Aisheng <b29396@freescale.com> wrote:
+> > The imx6sx usdhc is derived from imx6sl, the difference is minor.
+> > imx6sx have the errata ESDHC_FLAG_ERR004536 fixed.
+> > So introduce a new compatible string for imx6sx to distinguish them.
 > >
-> > On Wednesday, September 17, 2014, Dong Aisheng Wrote,
-> > > >
-> > > > +	regmap = regmap_init_mmio(NULL, base,
-&syscon_regmap_config);
-> > >
-> > > Does a NULL device pointer work?
-> >
-> > Yes, it is safe, at least we are able to test on Exynos based SoC.
-> > I have tested it with kgene/for-next kernel on Exynos3250.
-> > Also it has been tested on Exynos5250 based Snow board with 3.17-rc5
-> > based kernel by Vivek Gautam.
-> >
-> > Patch V2 also has been tested by "Borris Brezillon" on AT91 platform.
-> >
-> >
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
 > 
-> The kernel i tested was next-20140915 of linux-next.
+> Hi Dong,
 > 
-> please see regmap_get_val_endian called in regmap_init function.
-> static enum regmap_endian regmap_get_val_endian(struct device *dev,
->                                         const struct regmap_bus *bus,
->                                         const struct regmap_config
-*config) {
->         struct device_node *np = dev->of_node;
->         enum regmap_endian endian;
-> ...
-> }
-> It will crash at the first line of dev->of_node if dev is NULL.
+> This one has checkpatch errors due to missing DT documentation.
 > 
-> Can you check if you're using the same code as mine?
 
-No, it's not same.
-My bad that I was not using linux-next for testing this patch.
-We tested on kgene/for-next where these changes still have not come.
-Just now I checked linux-next and found that it will crash at first line of 
-"regmap_get_val_endian" as there is no check for NULL on dev.
+The original binding doc is writing in the format of:
+ Required properties:
+-- compatible : Should be "fsl,<chip>-esdhc"
+It just provides a rule and does not provide the specific compatible string.
+So i did not update the doc before.
 
-I checked git history of regmap.c file and found recently this file has been
-modified
-for adding DT endianness binding support. Following are set of patches gone
-for this
+But i think it's better to fix it to avoid future warning again.
 
-cf673fb regmap: Split regmap_get_endian() in two functions
-5844a8b regmap: Fix handling of volatile registers for format_write() chips
-45e1a27 regmap: of_regmap_get_endian() cleanup
-ba1b53f regmap: Fix DT endianess parsing logic
-d647c19 regmap: add DT endianness binding support.
+Can you help add below patch before this commit or do you need me
+to resend the patch series again with this patch added?
 
-I think there should have been a check for NULL on "dev" in
-"regmap_get_val_endian", so that if dev pointer exist then only it makes
-sense to get
-endianness property from DT. 
+>From 467b84e5ffcba543b9ac88913b1d2dc1159dfa72 Mon Sep 17 00:00:00 2001
+From: Dong Aisheng <b29396@freescale.com>
+Date: Thu, 18 Sep 2014 13:11:03 +0800
+Subject: [PATCH 6/8] mmc: sdhci-esdhc-imx: using specific compatible string
+ in binding doc
 
-I will suggest following fix in regmap.c for this. With following fix I
-tested it and it works well
-on linux-next also. So if you can confirm following fix is working for you
-then I can post this
-patch.
+Using specific compatible string in binding doc to make the binding
+more clear.
+It's also used to avoid checkpatch warning in the future like follows:
+0005-mmc-sdhci-do-not-enable-card-cd-wakeup-for-gpio-case.patch has no obvious style problems and is ready for submission.
+WARNING: DT compatible string "fsl,imx6sx-usdhc" appears un-documented -- check ./Documentation/devicetree/bindings/
++       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
 
---------------------------------------------
-Subject: [PATCH] regmap: fix NULL pointer dereference in
- regmap_get_val_endian
+total: 0 errors, 1 warnings, 18 lines checked
 
-Recent commits for getting reg endianess causing NULL pointer
-dereference if dev is passed NULL in regmap_init_mmio. This patch
-fixes this issue, and allows to parse reg endianess only if dev
-and dev->of_node exist.
-
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/base/regmap/regmap.c |   23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index f2281af..455a877 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -477,7 +477,7 @@ static enum regmap_endian regmap_get_val_endian(struct
-device *dev,
- 					const struct regmap_bus *bus,
- 					const struct regmap_config *config)
- {
--	struct device_node *np = dev->of_node;
-+	struct device_node *np;
- 	enum regmap_endian endian;
- 
- 	/* Retrieve the endianness specification from the regmap config */
-@@ -487,15 +487,20 @@ static enum regmap_endian regmap_get_val_endian(struct
-device *dev,
- 	if (endian != REGMAP_ENDIAN_DEFAULT)
- 		return endian;
- 
--	/* Parse the device's DT node for an endianness specification */
--	if (of_property_read_bool(np, "big-endian"))
--		endian = REGMAP_ENDIAN_BIG;
--	else if (of_property_read_bool(np, "little-endian"))
--		endian = REGMAP_ENDIAN_LITTLE;
-+	/* If the dev and dev->of_node exist try to get endianness from DT
-*/
-+	if (dev && dev->of_node) {
-+		np = dev->of_node;
- 
--	/* If the endianness was specified in DT, use that */
--	if (endian != REGMAP_ENDIAN_DEFAULT)
--		return endian;
-+		/* Parse the device's DT node for an endianness
-specification */
-+		if (of_property_read_bool(np, "big-endian"))
-+			endian = REGMAP_ENDIAN_BIG;
-+		else if (of_property_read_bool(np, "little-endian"))
-+			endian = REGMAP_ENDIAN_LITTLE;
-+
-+		/* If the endianness was specified in DT, use that */
-+		if (endian != REGMAP_ENDIAN_DEFAULT)
-+			return endian;
-+	}
- 
- 	/* Retrieve the endianness specification from the bus config */
- 	if (bus && bus->val_format_endian_default)
+diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+index 9046ba06..c415d34 100644
+--- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
++++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+@@ -7,7 +7,14 @@ This file documents differences between the core properties described
+ by mmc.txt and the properties used by the sdhci-esdhc-imx driver.
+
+ Required properties:
+-- compatible : Should be "fsl,<chip>-esdhc"
++- compatible : Should be "fsl,<chip>-esdhc", the supported chips include
++              "fsl,imx25-esdhc"
++              "fsl,imx35-esdhc"
++              "fsl,imx51-esdhc"
++              "fsl,imx53-esdhc"
++              "fsl,imx6q-usdhc"
++              "fsl,imx6sl-usdhc"
++              "fsl,imx6sx-usdhc"
+
+ Optional properties:
+ - fsl,cd-controller : Indicate to use controller internal card detection
 --
+1.7.8
 
-Thanks,
-Pankaj Dubey
+Regards
+Dong Aisheng
 
-> Regards
-> Dong Aisheng
+> Kind regards
+> Uffe
 > 
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc-imx.c |    6 ++++++
+> >  1 files changed, 6 insertions(+), 0 deletions(-)
 > >
-> > Thanks,
-> > Pankaj Dubey
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index dc0e384..87179c4 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -150,6 +150,11 @@ static struct esdhc_soc_data usdhc_imx6sl_data = {
+> >                         | ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536,
+> >  };
 > >
-> > > Regards
-> > > Dong Aisheng
-> > >
-> > > >
-> > > >
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > +static struct esdhc_soc_data usdhc_imx6sx_data = {
+> > +       .flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+> > +                       | ESDHC_FLAG_HAVE_CAP1,
+> > +};
+> > +
+> >  struct pltfm_imx_data {
+> >         u32 scratchpad;
+> >         struct pinctrl *pinctrl;
+> > @@ -190,6 +195,7 @@ static const struct of_device_id imx_esdhc_dt_ids[] = {
+> >         { .compatible = "fsl,imx35-esdhc", .data = &esdhc_imx35_data, },
+> >         { .compatible = "fsl,imx51-esdhc", .data = &esdhc_imx51_data, },
+> >         { .compatible = "fsl,imx53-esdhc", .data = &esdhc_imx53_data, },
+> > +       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
+> >         { .compatible = "fsl,imx6sl-usdhc", .data = &usdhc_imx6sl_data, },
+> >         { .compatible = "fsl,imx6q-usdhc", .data = &usdhc_imx6q_data, },
+> >         { /* sentinel */ }
+> > --
+> > 1.7.8
 > >
