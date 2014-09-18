@@ -1,64 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Sep 2014 13:17:08 -0700
-Subject: [GIT PULL] omap wake-up regression fix for v3.17
-In-Reply-To: <20140917145906.GA14505@atomide.com>
-References: <20140917145906.GA14505@atomide.com>
-Message-ID: <20140918201708.GP14505@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 18 Sep 2014 22:38:36 +0200
+Subject: [PATCH] ARM: at91: sama5: configure L2 cache
+Message-ID: <1411072716-20769-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [140917 08:00]:
-> The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
-> 
->   Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fix-v3.17-io-chain-v3
-> 
-> for you to fetch changes up to 7db143b89137de06ed289cf8b302f3bbbc5baa1f:
-> 
->   ARM: OMAP3: Fix I/O chain clock line assertion timed out error (2014-09-16 15:09:44 -0700)
-> 
-> ----------------------------------------------------------------
-> Regression fix for early omap3 revisions for wake-up events that
-> too some time to narrow down. Although a bit intrusive, this would
-> be good to get into the -rc cycle as there are quite a few boards
-> out there with omap3 es2.1 and es3.0, and we have those in at least
-> three boot test systems too that show errors without this patch.
+From: Wenyou Yang <wenyou.yang@atmel.com>
 
-This can also cause a merge conflict for linux next,
-here's the merge resolution for reference.
+Ensure that the L2 cache configuration is optimal to avoid depending on the
+bootloader to set it correctly.
 
-Regards,
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/board-dt-sama5.c | 47 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
 
-Tony
-
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@@ -662,18 -680,13 +686,25 @@@ static int omap3xxx_prm_late_init(void
-  	if (!(prm_features & PRM_HAS_IO_WAKEUP))
-  		return 0;
-  
- +	if (of_have_populated_dt()) {
- +		struct device_node *np;
- +		int irq_num;
- +
- +		np = of_find_matching_node(NULL, omap3_prm_dt_match_table);
- +		if (np) {
- +			irq_num = of_irq_get(np, 0);
- +			if (irq_num >= 0)
- +				omap3_prcm_irq_setup.irq = irq_num;
- +		}
- +	}
- +
-+ 	if (omap3_has_io_chain_ctrl())
-+ 		omap3_prcm_irq_setup.reconfigure_io_chain =
-+ 			omap3_prm_reconfigure_io_chain;
-+ 	else
-+ 		omap3_prcm_irq_setup.reconfigure_io_chain =
-+ 			omap3430_pre_es3_1_reconfigure_io_chain;
-+ 
-  	omap3xxx_prm_enable_io_wakeup();
-  	ret = omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
-  	if (!ret)
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index 548de4ad6937..7cbe0d9daf2b 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -13,12 +13,14 @@
+ #include <linux/gpio.h>
+ #include <linux/micrel_phy.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+ #include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/irq.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -35,8 +37,52 @@ static void __init sama5_dt_timer_init(void)
+ 	at91sam926x_pit_init();
+ }
+ 
++static void __init at91_l2x0_init(void)
++{
++	struct device_node *np;
++	void __iomem *l2cc_base;
++	u32 reg;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
++	if (!np)
++		return;
++
++	l2cc_base = of_iomap(np, 0);
++	of_node_put(np);
++
++	if (!l2cc_base) {
++		pr_err("L2C-310 unable to map registers\n");
++		return;
++	}
++
++	/* Prefetch Control */
++	reg = readl_relaxed(l2cc_base + L310_PREFETCH_CTRL);
++	reg &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
++	reg |= 0x01 & L310_PREFETCH_CTRL_OFFSET_MASK;
++	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++	reg |= L310_PREFETCH_CTRL_PREFETCH_DROP;
++	reg |= L310_PREFETCH_CTRL_DATA_PREFETCH;
++	reg |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
++	reg |= L310_PREFETCH_CTRL_DBL_LINEFILL;
++	writel_relaxed(reg, l2cc_base + L310_PREFETCH_CTRL);
++
++	/* Power Control */
++	reg = readl_relaxed(l2cc_base + L310_POWER_CTRL);
++	reg |= L310_STNDBY_MODE_EN;
++	reg |= L310_DYNAMIC_CLK_GATING_EN;
++	writel_relaxed(reg, l2cc_base + L310_POWER_CTRL);
++
++	/* Disable interrupts */
++	writel_relaxed(0x00, l2cc_base + L2X0_INTR_MASK);
++	writel_relaxed(0x01ff, l2cc_base + L2X0_INTR_CLEAR);
++
++	l2x0_of_init(0, ~0UL);
++}
++
+ static void __init sama5_dt_device_init(void)
+ {
++	at91_l2x0_init();
++
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+@@ -66,5 +112,4 @@ DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5 (Device Tree)")
+ 	.init_early	= at91_dt_initialize,
+ 	.init_machine	= sama5_dt_device_init,
+ 	.dt_compat	= sama5_alt_dt_board_compat,
+-	.l2c_aux_mask	= ~0UL,
+ MACHINE_END
+-- 
+1.9.1
