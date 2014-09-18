@@ -1,87 +1,79 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 18 Sep 2014 12:19:02 -0700
-Subject: [PATCH v6 1/8] arm: use generic fixmap.h
+Date: Thu, 18 Sep 2014 12:19:04 -0700
+Subject: [PATCH v6 3/8] arm: fixmap: implement __set_fixmap()
 In-Reply-To: <1411067949-10913-1-git-send-email-keescook@chromium.org>
 References: <1411067949-10913-1-git-send-email-keescook@chromium.org>
-Message-ID: <1411067949-10913-2-git-send-email-keescook@chromium.org>
+Message-ID: <1411067949-10913-4-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+This is used from set_fixmap() and clear_fixmap() via asm-generic/fixmap.h.
+Also makes sure that the fixmap allocation fits into the expected range.
 
-ARM is different from other architectures in that fixmap pages are indexed
-with a positive offset from FIXADDR_START.  Other architectures index with
-a negative offset from FIXADDR_TOP.  In order to use the generic fixmap.h
-definitions, this patch redefines FIXADDR_TOP to be inclusive of the
-useable range.  That is, FIXADDR_TOP is the virtual address of the topmost
-fixed page.  The newly defined FIXADDR_END is the first virtual address
-past the fixed mappings.
+Based on patch by Rabin Vincent.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-[kees: update for a05e54c103b0 ("ARM: 8031/2: change fixmap ...")]
 Signed-off-by: Kees Cook <keescook@chromium.org>
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Rob Herring <robh@kernel.org>
+Cc: Rabin Vincent <rabin@rab.in>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/fixmap.h | 27 +++++++++------------------
- arch/arm/mm/init.c            |  2 +-
- 2 files changed, 10 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/fixmap.h |  2 ++
+ arch/arm/mm/mmu.c             | 24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
 diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 74124b0d0d79..a7add6f9315d 100644
+index d984ca69ce19..714606f70425 100644
 --- a/arch/arm/include/asm/fixmap.h
 +++ b/arch/arm/include/asm/fixmap.h
-@@ -2,27 +2,18 @@
- #define _ASM_FIXMAP_H
+@@ -14,6 +14,8 @@ enum fixed_addresses {
+ 	__end_of_fixed_addresses
+ };
  
- #define FIXADDR_START		0xffc00000UL
--#define FIXADDR_TOP		0xffe00000UL
--#define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
-+#define FIXADDR_END		0xffe00000UL
-+#define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
- 
--#define FIX_KMAP_NR_PTES	(FIXADDR_SIZE >> PAGE_SHIFT)
-+#include <asm/kmap_types.h>
- 
--#define __fix_to_virt(x)	(FIXADDR_START + ((x) << PAGE_SHIFT))
--#define __virt_to_fix(x)	(((x) - FIXADDR_START) >> PAGE_SHIFT)
-+enum fixed_addresses {
-+	FIX_KMAP_BEGIN,
-+	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
- 
--extern void __this_fixmap_does_not_exist(void);
-+	__end_of_fixed_addresses
-+};
- 
--static inline unsigned long fix_to_virt(const unsigned int idx)
--{
--	if (idx >= FIX_KMAP_NR_PTES)
--		__this_fixmap_does_not_exist();
--	return __fix_to_virt(idx);
--}
--
--static inline unsigned int virt_to_fix(const unsigned long vaddr)
--{
--	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
--	return __virt_to_fix(vaddr);
--}
-+#include <asm-generic/fixmap.h>
++void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
++
+ #include <asm-generic/fixmap.h>
  
  #endif
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d808dc..ad82c05bfc3a 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -570,7 +570,7 @@ void __init mem_init(void)
- 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
- 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
- #endif
--			MLK(FIXADDR_START, FIXADDR_TOP),
-+			MLK(FIXADDR_START, FIXADDR_END),
- 			MLM(VMALLOC_START, VMALLOC_END),
- 			MLM(PAGE_OFFSET, (unsigned long)high_memory),
- #ifdef CONFIG_HIGHMEM
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 7fa0966cd15f..bdf5c94f7c36 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
++#include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+ #include <asm/smp_plat.h>
+@@ -393,6 +394,29 @@ SET_MEMORY_FN(x, pte_set_x)
+ SET_MEMORY_FN(nx, pte_set_nx)
+ 
+ /*
++ * To avoid TLB flush broadcasts, this uses local_flush_tlb_kernel_range().
++ * As a result, this can only be called with preemption disabled, as under
++ * stop_machine().
++ */
++void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
++{
++	unsigned long vaddr = __fix_to_virt(idx);
++	pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++
++	/* Make sure fixmap region does not exceed available allocation. */
++	BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
++		     FIXADDR_END);
++	BUG_ON(idx >= __end_of_fixed_addresses);
++
++	if (pgprot_val(prot))
++		set_pte_at(NULL, vaddr, pte,
++			pfn_pte(phys >> PAGE_SHIFT, prot));
++	else
++		pte_clear(NULL, vaddr, pte);
++	local_flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
++}
++
++/*
+  * Adjust the PMD section entries according to the CPU in use.
+  */
+ static void __init build_mem_type_table(void)
 -- 
 1.9.1
