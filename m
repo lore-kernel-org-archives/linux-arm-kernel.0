@@ -1,94 +1,46 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 18 Sep 2014 02:31:12 +0100
-Subject: [PATCH v11] Add support for PCI in AArch64
-Message-ID: <1411003873-21574-1-git-send-email-Liviu.Dudau@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 17 Sep 2014 20:51:28 -0500
+Subject: [PATCH] arm: arm: fiq: fix build breakage with CONFIG_FIQ
+In-Reply-To: <541A193F.2060503@linaro.org>
+References: <1410984101-16762-1-git-send-email-balbi@ti.com>
+ <541A193F.2060503@linaro.org>
+Message-ID: <20140918015127.GA5745@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-This patch adds support for PCIe to AArch64. It depends on my v11 patch
-that adds support for creating generic host bridge resources from device
-trees. With that in place, I was able to boot a platform that
-has PCIe host bridge support and use a PCIe network card.
+On Wed, Sep 17, 2014 at 04:29:03PM -0700, Daniel Thompson wrote:
+> On 17/09/14 13:01, Felipe Balbi wrote:
+> > commit e1add97 (ARM: 8150/2: fiq: Replace default FIQ handler)
+> > has a typo which causes build breakage whenever CONFIG_FIQ is
+> > set.
+> > 
+> > The bug is very clear as can be noted that a new struct pt_regs
+> > def_fiq_regs was defined but code uses dfl_fiq_regs.
+> 
+> Quite so. My fault.
+> 
+> This error was picked up by Olof's autobuilder and I have offered
+> a fix as 8150/3 (posted to mailing list in this thread
+> http://thread.gmane.org/gmane.linux.kernel/1789554 ).
 
-Changes from v10:
- - Added Catalin's Acked-by
+aaa, alright. I missed that one :-)
 
-Changes from v9:
- - Moved the pcibios_add_device() patch that parses the IRQ number from DT into here.
- - Moved the arm64-specific redefine of pgprot_device here from the generic patchset.
- - Readability fix for definition of IO_SPACE_LIMIT
+> Your fix and mine are slightly different (I standardised on
+> dfl_fiq_regs) but both approaches should be functionally identical.
 
-Changes from v8:
-  - Added support for generic PCI domains
+sure thing, no issues. I reckon it should be in next within the next
+couple days ?
 
-Changes from v7:
-  - Rebased to v3.16-rc3
-  - Removed pci_ioremap_io() function as it is provided by my v8 generic
-    PCI host bridge patches under a different name.
-
-Changes from v6:
-  - Guard the pci_domain_nr() inline implementation with #ifdef CONFIG_PCI as
-    to avoid conflict with default empty version present in include/linux/pci.h.
-    Thanks to Jingoo Han for catching this.
-
-Changes from v5:
-  - Removed pcibios_fixup_bridge_ranges() as the week default version is fine.
-  - Removed the ALIGN() call in pcibios_align_resource()
-  - Stopped exporting pcibios_align_resource()
-
-Changes from v4:
-  - Fixed the pci_domain_nr() implementation for arm64. Now we use
-    find_pci_host_bride() to find the host bridge before we retrieve
-    the domain number.
-
-Changes from v3:
-  - Added Acks accumulated so far ;)
-  - Still carrying Catalin's patch for moving the PCI_IO_BASE until it
-    lands in linux-next or mainline, in order to ease applying the series
-
-Changes from v2:
-  - Implement an arch specific version of pci_register_io_range() and
-    pci_address_to_pio().
-  - Return 1 from pci_proc_domain().
-
-Changes from v1:
-  - Added Catalin's patch for moving the PCI_IO_BASE location and extend
-    its size to 16MB
-  - Integrated Arnd's version of pci_ioremap_io that uses a bitmap for
-    keeping track of assigned IO space and returns an io_offset. At the
-    moment the code is added in arch/arm64 but it can be moved in drivers/pci.
-  - Added a fix for the generic ioport_map() function when !CONFIG_GENERIC_IOMAP
-    as suggested by Arnd.
-
-v10 thread here: https://lkml.org/lkml/2014/9/8/325
-v9 thread here: https://lkml.org/lkml/2014/8/12/394
-v8 thread here: https://lkml.org/lkml/2014/7/1/705
-v7 thread here: https://lkml.org/lkml/2014/3/14/320
-v6 thread here: https://lkml.org/lkml/2014/3/5/41
-v5 thread here: https://lkml.org/lkml/2014/3/4/307
-v4 thread here: https://lkml.org/lkml/2014/3/3/298
-v3 thread here: https://lkml.org/lkml/2014/2/28/211
-v2 thread here: https://lkml.org/lkml/2014/2/27/255
-v1 thread here: https://lkml.org/lkml/2014/2/3/389
-
-Best regards,
-Liviu
-
-Liviu Dudau (1):
-  arm64: Add architectural support for PCIe
-
- arch/arm64/Kconfig               | 22 ++++++++++++++-
- arch/arm64/include/asm/Kbuild    |  1 +
- arch/arm64/include/asm/io.h      |  3 +-
- arch/arm64/include/asm/pci.h     | 37 +++++++++++++++++++++++++
- arch/arm64/include/asm/pgtable.h |  2 ++
- arch/arm64/kernel/Makefile       |  1 +
- arch/arm64/kernel/pci.c          | 59 ++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 123 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/pci.c
+cheers
 
 -- 
-2.1.0
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/db51f916/attachment.sig>
