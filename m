@@ -1,147 +1,53 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 18 Sep 2014 20:15:23 +0300
-Subject: [PATCH 2/3] ARM: dts: keystone: add dsp gpio controllers nodes
-In-Reply-To: <1411060524-25077-1-git-send-email-grygorii.strashko@ti.com>
-References: <1411060524-25077-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1411060524-25077-3-git-send-email-grygorii.strashko@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Sep 2014 10:16:51 -0700
+Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
+In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20140918171650.GK14505@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Keystone 2 DSP GPIO nodes for SoCs:
-k2hk:
- DSP GPIO banks 0-7 correspond to DSP0-DSP7
-k2l:
- DSP GPIO banks 0-3 correspond to DSP0-DSP3
-k2e:
- DSP GPIO bank 0 corresponds to DSP0
+* Tero Kristo <t-kristo@ti.com> [140901 11:09]:
+> Hi,
+> 
+> This set contains PRCM related cleanups meant for 3.18 merge window.
+> These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
+> (http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
+> set is used as basis to avoid merge issues.
+> 
+> Purpose of this work is to eventually convert the PRCM code into a
+> separate driver, but this is done in incremental parts as the amount
+> of changes is substantial. Expected conclusion of this work is 3.19
+> if everything goes fine.
+> 
+> This part of the work mostly moves some of the SoC specific PRCM driver
+> calls under generic version of the same, and adds SoC-ops to support
+> these on the driver level.
+> 
+> Working branch posted here:
+> 
+> tree: https://github.com/t-kristo/linux-pm.git
+> branch: for-v3.18/prcm-cleanup
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2e.dtsi  |  7 ++++++
- arch/arm/boot/dts/k2hk.dtsi | 56 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/k2l.dtsi  | 28 +++++++++++++++++++++++
- 3 files changed, 91 insertions(+)
+Paul, any comments on this series?
 
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 03d0190..13cf35a 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -76,5 +76,12 @@
- 				usb-phy = <&usb1_phy>, <&usb1_phy>;
- 			};
- 		};
-+
-+		dspgpio0: keystone_dsp_gpio at 02620240 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x240>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
-index c73899c..d721f4b 100644
---- a/arch/arm/boot/dts/k2hk.dtsi
-+++ b/arch/arm/boot/dts/k2hk.dtsi
-@@ -42,5 +42,61 @@
+Regards,
+
+Tony
  
- 	soc {
- 		/include/ "k2hk-clocks.dtsi"
-+
-+		dspgpio0: keystone_dsp_gpio at 02620240 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x240>;
-+		};
-+
-+		dspgpio1: keystone_dsp_gpio at 2620244 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x244>;
-+		};
-+
-+		dspgpio2: keystone_dsp_gpio at 2620248 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x248>;
-+		};
-+
-+		dspgpio3: keystone_dsp_gpio at 262024c {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x24c>;
-+		};
-+
-+		dspgpio4: keystone_dsp_gpio at 2620250 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x250>;
-+		};
-+
-+		dspgpio5: keystone_dsp_gpio at 2620254 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x254>;
-+		};
-+
-+		dspgpio6: keystone_dsp_gpio at 2620258 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x258>;
-+		};
-+
-+		dspgpio7: keystone_dsp_gpio at 262025c {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x25c>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
-index 1f7f479..e3bb142 100644
---- a/arch/arm/boot/dts/k2l.dtsi
-+++ b/arch/arm/boot/dts/k2l.dtsi
-@@ -51,5 +51,33 @@
- 			clocks	= <&clkuart3>;
- 			interrupts = <GIC_SPI 435 IRQ_TYPE_EDGE_RISING>;
- 		};
-+
-+		dspgpio0: keystone_dsp_gpio at 02620240 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x240>;
-+		};
-+
-+		dspgpio1: keystone_dsp_gpio at 2620244 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x244>;
-+		};
-+
-+		dspgpio2: keystone_dsp_gpio at 2620248 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x248>;
-+		};
-+
-+		dspgpio3: keystone_dsp_gpio at 262024c {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x24c>;
-+		};
- 	};
- };
--- 
-1.9.1
+> Testing done:
+> am335x-evm: boot
+> am335x-bone: boot
+> am335x-boneblack: boot
+> am3517-evm: boot
+> am437x-gp-evm: boot
+> omap3-beagle-xm: boot
+> omap3-beagle: boot suspend/resume (ret/off)
+> dra7-evm: boot (with additional clock patches to fix boot issues)
+> omap3-n900: boot
+> omap5-uevm: boot
+> omap4-panda-es: boot suspend/resume (ret)
+> omap2430-sdp: boot
+> 
+> -Tero
+> 
