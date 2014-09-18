@@ -1,46 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Sep 2014 20:51:28 -0500
-Subject: [PATCH] arm: arm: fiq: fix build breakage with CONFIG_FIQ
-In-Reply-To: <541A193F.2060503@linaro.org>
-References: <1410984101-16762-1-git-send-email-balbi@ti.com>
- <541A193F.2060503@linaro.org>
-Message-ID: <20140918015127.GA5745@saruman.home>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 18 Sep 2014 09:57:42 +0800
+Subject: [PATCH 2/3] dmaengine: sun6i: Add support for Allwinner A23
+ (sun8i) variant
+In-Reply-To: <20140917155540.GJ2166@lukather>
+References: <1410616381-30226-1-git-send-email-wens@csie.org>
+ <1410616381-30226-3-git-send-email-wens@csie.org>
+ <20140916103540.GF9948@lukather>
+ <CAGb2v67jokpXHxR26YoCEB2Y_v07oQZXZfPuGJC_wO=r-SRZhg@mail.gmail.com>
+ <20140917155540.GJ2166@lukather>
+Message-ID: <CAGb2v65p4QPJY+eiLps6C2kAZjhPd99D5YYauwUjLJnnj54B1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 17, 2014 at 11:55 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Sep 16, 2014 at 10:13:27PM +0800, Chen-Yu Tsai wrote:
+>> >> +     /*
+>> >> +      * sun8i variant requires us to toggle an undocumented register,
+>> >> +      * as seen in Allwinner's SDK.
+>> >
+>> > The BSP I have has this:
+>> >
+>> > static void sunxi_dma_hw_init(struct sunxi_dmadev *dev)
+>> > {
+>> >         struct sunxi_dmadev *sunxi_dev = dev;
+>> >
+>> >         clk_prepare_enable(sunxi_dev->ahb_clk);
+>> > #ifdef CONFIG_ARCH_SUN8IW3
+>> >         writel(0x04, sunxi_dev->base + DMA_GATE);
+>> > #endif
+>> > }
+>> >
+>> > /* All is ok, and open the clock */
+>> > sunxi_dma_hw_init(sunxi_dev);
+>> >
+>> > So I guess we can say that it's not that undocumented :)
+>>
+>> That's right. I meant undocumented in the user manual.
+>> I did reference the SDK in the comment, didn't I? :)
+>
+> So something like
+>
+> writel(DMA_GATE_ENABLE, base->DMA_GATE_REG) wouldn't be too far off :)
 
-On Wed, Sep 17, 2014 at 04:29:03PM -0700, Daniel Thompson wrote:
-> On 17/09/14 13:01, Felipe Balbi wrote:
-> > commit e1add97 (ARM: 8150/2: fiq: Replace default FIQ handler)
-> > has a typo which causes build breakage whenever CONFIG_FIQ is
-> > set.
-> > 
-> > The bug is very clear as can be noted that a new struct pt_regs
-> > def_fiq_regs was defined but code uses dfl_fiq_regs.
-> 
-> Quite so. My fault.
-> 
-> This error was picked up by Olof's autobuilder and I have offered
-> a fix as 8150/3 (posted to mailing list in this thread
-> http://thread.gmane.org/gmane.linux.kernel/1789554 ).
+Sure. Will also update the comment to reflect the naming.
 
-aaa, alright. I missed that one :-)
-
-> Your fix and mine are slightly different (I standardised on
-> dfl_fiq_regs) but both approaches should be functionally identical.
-
-sure thing, no issues. I reckon it should be in next within the next
-couple days ?
-
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140917/db51f916/attachment.sig>
+ChenYu
