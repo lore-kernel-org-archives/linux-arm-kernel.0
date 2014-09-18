@@ -1,38 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Sep 2014 15:39:13 -0700
-Subject: [PATCH 1/7 v6] leds: add a driver for syscon-based LEDs
-In-Reply-To: <CACRpkdaZhzaA4RxO7fsUSzxquqF4M0g3WXHXPeG5YyF9HttdHg@mail.gmail.com>
-References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
- <1410176286-32533-2-git-send-email-linus.walleij@linaro.org>
- <CACRpkdaZhzaA4RxO7fsUSzxquqF4M0g3WXHXPeG5YyF9HttdHg@mail.gmail.com>
-Message-ID: <CACRpkdZkYx73VPJpdxyyjuo4uQ=+zJ5ALYh86B7DGZe_vdUiOA@mail.gmail.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 18 Sep 2014 15:39:18 -0700
+Subject: [PATCH 0/6] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <541B5D5A.10800@hauke-m.de>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
+ <541B5D5A.10800@hauke-m.de>
+Message-ID: <541B5F16.6030005@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 1:56 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Sep 8, 2014 at 1:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> This makes it possible to create a set of LEDs from a syscon
->> MFD instance, which is lean mean and clean on the ARM
->> reference designs and can replace the Versatile LEDs driver
->> in the long run, as well as other custom syscon LEDs drivers.
+On 09/18/2014 03:31 PM, Hauke Mehrtens wrote:
+> On 09/16/2014 09:58 PM, Jonathan Richardson wrote:
+>> Hi,
 >>
->> Cc: Bryan Wu <cooloney@gmail.com>
->> Cc: Richard Purdie <rpurdie@rpsys.net>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ChangeLog v1->v2:
->> - Augment driver to probe all nodes of a syscon to see if they
->>   are "register-bit-led"s, and then allocate them under the syscon
->>   if that is the case.
->> - Switch compatible string from "syscon-leds" to "register-bit-led"
->
-> Bryan can you please ACK this patch if you're OK with it so
-> it can be pulled in through ARM SoC?
+>> This patchset contains initial support for Broadcom's Cygnus SoC based on our
+>> iProc architecture. Initial support is minimal and includes just the mach
+>> platform code, clock driver, and a basic device tree configuration. Peripheral
+>> drivers will be submitted soon, as will device tree configurations for other
+>> Cygnus board variants.
+> 
+> This SoC looks similar to the BCM5301X (Northstar) SoCs even some cores
+> are at the same memory addresses. Does this SoC use an AXI bus with
+> Broadcom Plugins at address 0x18000000 ?
+> 
+> The BCM5301X (Northstar) SoCs also has an iProc Clock Control Unit and I
+> will try to use your driver for that SoC.
+> 
+> Is Broadcom Cygnus similar to BCM563XX or is it actually the same SoC?
 
-Ping!
+According to this link:
+http://lists.denx.de/pipermail/u-boot/2014-August/186086.html
 
-I will send a pull request for this soon anyway.
+these SoCs, in particular BCM58622 would belong to the StrataGX network
+processors:
+http://www.broadcom.com/products/Processors/Home-and-Small-Business/BCM5862X-Series.
 
-Yours,
-Linus Walleij
+> 
+> Do you have some description of the hardware features of this SoC? Does
+> it have PCIe, or Ethernet?
+
+>From the link above, it has Ethernet for sure, and certainly PCIe since
+the Wi-Fi chips mentioned in the link above are PCIe chips.
+
+It would be really good if all the work you and Rafal did was usable for
+the Cygnus SoCs.
+--
+Florian
