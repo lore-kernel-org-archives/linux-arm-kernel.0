@@ -1,227 +1,116 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 18 Sep 2014 02:31:13 +0100
-Subject: [PATCH v11] arm64: Add architectural support for PCIe
-In-Reply-To: <1411003873-21574-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1411003873-21574-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1411003873-21574-2-git-send-email-Liviu.Dudau@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 17 Sep 2014 18:32:23 -0700
+Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
+In-Reply-To: <20140917222553.GD2848@worktop.localdomain>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
+ <20140911161517.GA3190@worktop.ger.corp.intel.com>
+ <CAKfTPtDFuzxzGBKi_n6v_F8FUkQ84MW+dQBX4WNXo-o54mksGA@mail.gmail.com>
+ <20140914194156.GC2832@worktop.localdomain>
+ <20140915114229.GB3037@worktop.localdomain>
+ <CAKfTPtDHSWs8xumOSfWkyucAtkBvvbJkOVTQkoYXYCBpmHrMZg@mail.gmail.com>
+ <20140917222553.GD2848@worktop.localdomain>
+Message-ID: <CAKfTPtA_=MvAVya6JR3M+qs-kLapZgGknBqo=87MVbihCCXF9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic PCI domain and OF functions
-to provide support for PCI Express on arm64.
+On 17 September 2014 15:25, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Sep 16, 2014 at 12:14:54AM +0200, Vincent Guittot wrote:
+>> On 15 September 2014 13:42, Peter Zijlstra <peterz@infradead.org> wrote:
+>
+>> > OK, I've reconsidered _again_, I still don't get it.
+>> >
+>> > So fundamentally I think its wrong to scale with the capacity; it just
+>> > doesn't make any sense. Consider big.little stuff, their CPUs are
+>> > inherently asymmetric in capacity, but that doesn't matter one whit for
+>> > utilization numbers. If a core is fully consumed its fully consumed, no
+>> > matter how much work it can or can not do.
+>> >
+>> >
+>> > So the only thing that needs correcting is the fact that these
+>> > statistics are based on clock_task and some of that time can end up in
+>> > other scheduling classes, at which point we'll never get 100% even
+>> > though we're 'saturated'. But correcting for that using capacity doesn't
+>> > 'work'.
+>>
+>> I'm not sure to catch your last point because the capacity is the only
+>> figures that take into account the "time" consumed by other classes.
+>> Have you got in mind another way to take into account the other
+>> classes ?
+>
+> So that was the entire point of stuffing capacity in? Note that that
+> point was not at all clear.
+>
+> This is very much like 'all we have is a hammer, and therefore
+> everything is a nail'. The rt fraction is a 'small' part of what the
+> capacity is.
+>
+>> So we have cpu_capacity that is the capacity that can be currently
+>> used by cfs class
+>> We have cfs.usage_load_avg that is the sum of running time of cfs
+>> tasks on the CPU and reflect the % of usage of this CPU by CFS tasks
+>> We have to use the same metrics to compare available capacity for CFS
+>> and current cfs usage
+>
+> -ENOPARSE
+>
+>> Now we have to use the same unit so we can either weight the
+>> cpu_capacity_orig with the cfs.usage_load_avg and compare it with
+>> cpu_capacity
+>> or with divide cpu_capacity by cpu_capacity_orig and scale it into the
+>> SCHED_LOAD_SCALE range. Is It what you are proposing ?
+>
+> I'm so not getting it; orig vs capacity still includes
+> arch_scale_freq_capacity(), so that is not enough to isolate the rt
+> fraction.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- arch/arm64/Kconfig               | 22 ++++++++++++++-
- arch/arm64/include/asm/Kbuild    |  1 +
- arch/arm64/include/asm/io.h      |  3 +-
- arch/arm64/include/asm/pci.h     | 37 +++++++++++++++++++++++++
- arch/arm64/include/asm/pgtable.h |  2 ++
- arch/arm64/kernel/Makefile       |  1 +
- arch/arm64/kernel/pci.c          | 59 ++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 123 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/pci.h
- create mode 100644 arch/arm64/kernel/pci.c
+This patch does not try to solve any scale invariance issue. This
+patch removes capacity_factor because it rarely works correctly.
+capacity_factor tries to compute how many tasks a group of CPUs can
+handle at the time we are doing the load balance. The capacity_factor
+is hardly working for SMT system: it sometimes works for big cores and
+but fails to do the right thing for little cores.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fd4e81a..6b01df9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -81,7 +81,7 @@ config MMU
- 	def_bool y
- 
- config NO_IOPORT_MAP
--	def_bool y
-+	def_bool y if !PCI
- 
- config STACKTRACE_SUPPORT
- 	def_bool y
-@@ -156,6 +156,26 @@ menu "Bus support"
- config ARM_AMBA
- 	bool
- 
-+config PCI
-+	bool "PCI support"
-+	help
-+	  This feature enables support for PCIe bus system. If you say Y
-+	  here, the kernel will include drivers and infrastructure code
-+	  to support PCIe bus devices.
-+
-+config PCI_DOMAINS
-+	def_bool PCI
-+
-+config PCI_DOMAINS_GENERIC
-+	def_bool PCI
-+
-+config PCI_SYSCALL
-+	def_bool PCI
-+
-+source "drivers/pci/Kconfig"
-+source "drivers/pci/pcie/Kconfig"
-+source "drivers/pci/hotplug/Kconfig"
-+
- endmenu
- 
- menu "Kernel Features"
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 0b3fcf8..07cb417 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -29,6 +29,7 @@ generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
- generic-y += pci.h
-+generic-y += pci-bridge.h
- generic-y += poll.h
- generic-y += preempt.h
- generic-y += resource.h
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index e0ecdcf..f998d90 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -121,7 +121,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- /*
-  *  I/O port access primitives.
-  */
--#define IO_SPACE_LIMIT		0xffff
-+#define arch_has_dev_port()	(1)
-+#define IO_SPACE_LIMIT		(SZ_32M - 1)
- #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
- 
- static inline u8 inb(unsigned long addr)
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-new file mode 100644
-index 0000000..872ba93
---- /dev/null
-+++ b/arch/arm64/include/asm/pci.h
-@@ -0,0 +1,37 @@
-+#ifndef __ASM_PCI_H
-+#define __ASM_PCI_H
-+#ifdef __KERNEL__
-+
-+#include <linux/types.h>
-+#include <linux/slab.h>
-+#include <linux/dma-mapping.h>
-+
-+#include <asm/io.h>
-+#include <asm-generic/pci-bridge.h>
-+#include <asm-generic/pci-dma-compat.h>
-+
-+#define PCIBIOS_MIN_IO		0x1000
-+#define PCIBIOS_MIN_MEM		0
-+
-+/*
-+ * Set to 1 if the kernel should re-assign all PCI bus numbers
-+ */
-+#define pcibios_assign_all_busses() \
-+	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
-+
-+/*
-+ * PCI address space differs from physical memory address space
-+ */
-+#define PCI_DMA_BUS_IS_PHYS	(0)
-+
-+extern int isa_dma_bridge_buggy;
-+
-+#ifdef CONFIG_PCI
-+static inline int pci_proc_domain(struct pci_bus *bus)
-+{
-+	return 1;
-+}
-+#endif  /* CONFIG_PCI */
-+
-+#endif  /* __KERNEL__ */
-+#endif  /* __ASM_PCI_H */
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index ffe1ba0..a968523 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -296,6 +296,8 @@ static inline int has_transparent_hugepage(void)
- 	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
- #define pgprot_writecombine(prot) \
- 	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC) | PTE_PXN | PTE_UXN)
-+#define pgprot_device(prot) \
-+	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_PXN | PTE_UXN)
- #define __HAVE_PHYS_MEM_ACCESS_PROT
- struct file;
- extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index df7ef87..1ed5a06 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
-+arm64-obj-$(CONFIG_PCI)			+= pci.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-new file mode 100644
-index 0000000..0d755d6
---- /dev/null
-+++ b/arch/arm64/kernel/pci.c
-@@ -0,0 +1,59 @@
-+/*
-+ * Code borrowed from powerpc/kernel/pci-common.c
-+ *
-+ * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
-+ * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+
-+#include <asm/pci-bridge.h>
-+
-+/*
-+ * Called after each bus is probed, but before its children are examined
-+ */
-+void pcibios_fixup_bus(struct pci_bus *bus)
-+{
-+	/* nothing to do, expected to be removed in the future */
-+}
-+
-+/*
-+ * We don't have to worry about legacy ISA devices, so nothing to do here
-+ */
-+resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-+				resource_size_t size, resource_size_t align)
-+{
-+	return res->start;
-+}
-+
-+/*
-+ * Try to assign the IRQ number from DT when adding a new device
-+ */
-+int pcibios_add_device(struct pci_dev *dev)
-+{
-+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-+
-+	return 0;
-+}
-+
-+
-+#ifdef CONFIG_PCI_DOMAINS_GENERIC
-+void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+{
-+	int domain = of_pci_get_domain_nr(parent->of_node, true);
-+
-+	if (domain >= 0)
-+		bus->domain_nr = domain;
-+}
-+#endif
--- 
-2.1.0
+Below are two examples to illustrate the problem that this patch solves:
+
+capacity_factor makes the assumption that max capacity of a CPU is
+SCHED_CAPACITY_SCALE and the load of a thread is always is
+SCHED_LOAD_SCALE. It compares the output of these figures with the sum
+of nr_running to decide if a group is overloaded or not.
+
+But if the default capacity of a CPU is less than SCHED_CAPACITY_SCALE
+(640 as an example), a group of 3 CPUS will have a max capacity_factor
+of 2 ( div_round_closest(3x640/1024) = 2) which means that it will be
+seen as overloaded if we have only one task per CPU.
+
+Then, if the default capacity of a CPU is greater than
+SCHED_CAPACITY_SCALE (1512 as an example), a group of 4 CPUs will have
+a capacity_factor of 4 (at max and thanks to the fix[0] for SMT system
+that prevent the apparition of ghost CPUs) but if one CPU is fully
+used by a rt task (and its capacity is reduced to nearly nothing), the
+capacity factor of the group will still be 4
+(div_round_closest(3*1512/1024) = 5).
+
+So, this patch tries to solve this issue by removing capacity_factor
+and replacing it with the 2 following metrics :
+-the available CPU capacity for CFS tasks which is the one currently
+used by load_balance
+-the capacity that are effectively used by CFS tasks on the CPU. For
+that, i have re-introduced the usage_avg_contrib which is in the range
+[0..SCHED_CPU_LOAD] whatever the capacity of the CPU on which the task
+is running, is. This usage_avg_contrib doesn't solve the scaling
+in-variance problem, so i have to scale the usage with original
+capacity in get_cpu_utilization (that will become get_cpu_usage in the
+next version) in order to compare it with available capacity.
+
+Once the scaling invariance will have been added in usage_avg_contrib,
+we can remove the scale by cpu_capacity_orig in get_cpu_utilization.
+But the scaling invariance will come in another patchset.
+
+Hope that this explanation makes the goal of this patchset clearer.
+And I can add this explanation in the commit log if you found it clear
+enough
+
+Vincent
+
+[0] https://lkml.org/lkml/2013/8/28/194
