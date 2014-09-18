@@ -1,107 +1,100 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 18 Sep 2014 09:01:27 +0200
-Subject: [PATCH 10/12] ARM: omap2plus_defconfig: Add support for distros
- with systemd
-In-Reply-To: <1410837126-31553-10-git-send-email-tony@atomide.com>
-References: <1410837126-31553-1-git-send-email-tony@atomide.com>
- <1410837126-31553-10-git-send-email-tony@atomide.com>
-Message-ID: <CABxcv=k9wEf31ojc7b4o19Hk1oU6dKNinqxgLS5qZMrHSVb1FQ@mail.gmail.com>
+From: chanho.min@lge.com (Chanho Min)
+Date: Thu, 18 Sep 2014 16:24:15 +0900
+Subject: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared
+ at	sp804_of_init
+In-Reply-To: <20140917115758.GQ12361@n2100.arm.linux.org.uk>
+References: <1410953686-15072-1-git-send-email-chanho.min@lge.com>
+ <20140917115758.GQ12361@n2100.arm.linux.org.uk>
+Message-ID: <002c01cfd311$8d3e0330$a7ba0990$@min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Wednesday, September 17, 2014 8:58 PM
+> To: Chanho Min
+> Cc: Stephen Boyd; Michael Opdenacker; Linus Walleij; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Jongsung Kim
+> Subject: Re: [PATCH v2] ARM: timer-sp: ensure interrupt is cleared at sp804_of_init
+> 
+> On Wed, Sep 17, 2014 at 08:34:46PM +0900, Chanho Min wrote:
+> > sp804 may not be added to the tick device if the higher device is
+> > already registered. In this case, If pending interrupt is existed
+> > (usually It will be passed from the boot loader), inetrrupt is occured
+> > without event_handler then it cause kernel panic. So Interrupts
+> > should be cleared before clockevent is registered.
+> >
+> > Changes since v1:
+> >  - Move to sp804_of_init
+> >  - Clear TIMER2 interrupt
+> >  - Update commit log
+> >
+> > Signed-off-by: Chanho Min <chanho.min@lge.com>
+> > ---
+> >  arch/arm/common/timer-sp.c |    4 ++++
+> >  1 file changed, 4 insertions(+)
+> >
+> > diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> > index fd6bff0..e3cc08e 100644
+> > --- a/arch/arm/common/timer-sp.c
+> > +++ b/arch/arm/common/timer-sp.c
+> > @@ -226,6 +226,10 @@ static void __init sp804_of_init(struct device_node *np)
+> >  	writel(0, base + TIMER_CTRL);
+> >  	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
+> >
+> > +	/* Ensure interrupt is cleared */
+> > +	writel(1, base + TIMER_INTCLR);
+> > +	writel(1, base + TIMER_2_BASE + TIMER_INTCLR);
+> 
+> NAK.
+> 
+> This is really not necessary for two reasons, and incorrect for a third
+> reason:
+> 
+> 1. If the control register is cleared, interrupts are disabled.  When
+>    interrupts are disabled, the IRQ line from the timer module is
+>    deasserted irrespective of the internal interrupt state of the timer.
+> 
 
-On Tue, Sep 16, 2014 at 5:12 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Some distros are now using systemd, so let's enable most of
-> what's recommended at:
->
-> http://cgit.freedesktop.org/systemd/systemd/tree/README
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/configs/omap2plus_defconfig | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index 9d232a5..8e6c363 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -1,11 +1,28 @@
->  CONFIG_SYSVIPC=y
->  CONFIG_POSIX_MQUEUE=y
-> +CONFIG_FHANDLE=y
-> +CONFIG_AUDIT=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_BSD_PROCESS_ACCT=y
->  CONFIG_IKCONFIG=y
->  CONFIG_IKCONFIG_PROC=y
->  CONFIG_LOG_BUF_SHIFT=16
-> +CONFIG_CGROUPS=y
-> +CONFIG_CGROUP_FREEZER=y
-> +CONFIG_CGROUP_DEVICE=y
-> +CONFIG_CPUSETS=y
-> +CONFIG_CGROUP_CPUACCT=y
-> +CONFIG_RESOURCE_COUNTERS=y
-> +CONFIG_MEMCG=y
-> +CONFIG_MEMCG_SWAP=y
-> +CONFIG_MEMCG_KMEM=y
-> +CONFIG_CGROUP_PERF=y
-> +CONFIG_CGROUP_SCHED=y
-> +CONFIG_CFS_BANDWIDTH=y
-> +CONFIG_RT_GROUP_SCHED=y
-> +CONFIG_BLK_CGROUP=y
-> +CONFIG_NAMESPACES=y
->  CONFIG_BLK_DEV_INITRD=y
->  CONFIG_EXPERT=y
->  CONFIG_SLAB=y
-> @@ -37,6 +54,7 @@ CONFIG_ARM_ERRATA_411920=y
->  CONFIG_SMP=y
->  CONFIG_NR_CPUS=2
->  CONFIG_CMA=y
-> +CONFIG_SECCOMP=y
->  CONFIG_ZBOOT_ROM_TEXT=0x0
->  CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_ARM_APPENDED_DTB=y
-> @@ -66,7 +84,7 @@ CONFIG_IP_PNP_DHCP=y
->  CONFIG_IP_PNP_BOOTP=y
->  CONFIG_IP_PNP_RARP=y
->  # CONFIG_INET_LRO is not set
-> -# CONFIG_IPV6 is not set
-> +CONFIG_IPV6=y
->  CONFIG_NETFILTER=y
->  CONFIG_CAN=m
->  CONFIG_CAN_C_CAN=m
-> @@ -80,7 +98,6 @@ CONFIG_BT_HCIBCM203X=m
->  CONFIG_BT_HCIBPA10X=m
->  CONFIG_CFG80211=m
->  CONFIG_MAC80211=m
-> -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_DEVTMPFS=y
->  CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_DMA_CMA=y
-> @@ -265,11 +282,14 @@ CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
->  # CONFIG_EXT3_FS_XATTR is not set
->  CONFIG_EXT4_FS=y
-> +CONFIG_FANOTIFY=y
->  CONFIG_QUOTA=y
->  CONFIG_QFMT_V2=y
-> +CONFIG_AUTOFS4_FS=y
->  CONFIG_MSDOS_FS=y
->  CONFIG_VFAT_FS=y
->  CONFIG_TMPFS=y
-> +CONFIG_TMPFS_POSIX_ACL=y
->  CONFIG_JFFS2_FS=y
->  CONFIG_JFFS2_SUMMARY=y
->  CONFIG_JFFS2_FS_XATTR=y
+Even if the control register is cleared and interrupts are disabled,
+It is not harmful before timer is enabled but It is rather harmful
+if interrupt is asserted before timer up. My patch just ensure interrupt
+is cleared before timer up
+
+> 2. We only enable the interrupt when we set the timer up to run in either
+>    periodic or one-shot modes.  If the timer is not used, the interrupt
+>    remains masked.
+> 
+In our test, setup_irq enables the interrupt irrespective of the timer up/down.
+
+> 3. Even if this was necessary (which it isn't), only doing this in the
+>    sp804_of_init() path is wrong - there are other initialisation paths
+>    in this code, and there's no reason why one should have a different
+>    behaviour to the others.
+
+So Can another approach be acceptable as bellows?
+
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index fd6bff0..4aed813 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -121,8 +121,8 @@ static irqreturn_t sp804_timer_interrupt(int irq, void *dev_id)
+ 
+        /* clear the interrupt */
+        writel(1, clkevt_base + TIMER_INTCLR);
+-
+-       evt->event_handler(evt);
++       if(evt->event_handler)
++               evt->event_handler(evt);
+ 
+        return IRQ_HANDLED;
+ }
+
+> If you've found this by running the kernel with QEMU, then it's probably
+> a QEMU bug if it raises an interrupt during the above code.
+> 
 > --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
 
-Looks good to me, so:
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-I think that the same options should be enabled in multi_v7_defconfig BTW.
-
-Best regards,
-Javier
+Chaho
