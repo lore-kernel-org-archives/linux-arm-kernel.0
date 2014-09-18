@@ -1,199 +1,40 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 18 Sep 2014 06:33:24 +0000
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <000701cfd306$4d3e8080$e7bb8180$@samsung.com>
-References: <1410935510-1567-1-git-send-email-pankaj.dubey@samsung.com>
- <20140917085818.GA10285@shlinux1.ap.freescale.net>
- <000401cfd269$922dfc40$b689f4c0$@samsung.com>
- <20140918030552.GA26661@shlinux1.ap.freescale.net>
- <000701cfd306$4d3e8080$e7bb8180$@samsung.com>
-Message-ID: <c93278a6da2b40649089426026a857f7@BY2PR0301MB0613.namprd03.prod.outlook.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Thu, 18 Sep 2014 08:46:57 +0200
+Subject: [PATCH 4/7] clk: add clk-asm9260 driver
+In-Reply-To: <20140917135440.GG27054@piout.net>
+References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
+ <1410646408-28901-5-git-send-email-linux@rempel-privat.de>
+ <20140917135440.GG27054@piout.net>
+Message-ID: <541A7FE1.8060202@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
-
-One more question:
-For example:
-
-regmap_read()
-    ----> _regmap_read()
-        ----> 2112 #ifdef LOG_DEVICE
-        ----> 2113                 if (strcmp(dev_name(map->dev), LOG_DEVICE) == 0)
-        ----> 2114                         dev_info(map->dev, "%x => %x\n", reg, *val);
-        ----> 2115 #endif 
-
-In dev_name(map->dev) will also encounter the same crash core trace like in
-regmap_get_val_endian(dev, ...).
-
-Could there be another method, such as using 'dummy dev' instead of 'NULL dev' ?
-Just one suggestion.
-
-
-BRs
-Xiubo
-
-
-> -----Original Message-----
-> From: Pankaj Dubey [mailto:pankaj.dubey at samsung.com]
-> Sent: Thursday, September 18, 2014 2:03 PM
-> To: Dong Aisheng-B29396
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
-> linux-kernel at vger.kernel.org; kgene.kim at samsung.com; linux at arm.linux.org.uk;
-> arnd at arndb.de; naushad at samsung.com; tomasz.figa at gmail.com; joshi at samsung.com;
-> thomas.ab at samsung.com; vikas.sajjan at samsung.com; chow.kim at samsung.com;
-> lee.jones at linaro.org; 'Boris BREZILLON'; Xiubo Li-B47053; 'Geert Uytterhoeven';
-> 'Stephen Warren'
-> Subject: RE: [PATCH v3] mfd: syscon: Decouple syscon interface from platform
-> devices
-> 
+Am 17.09.2014 um 15:54 schrieb Alexandre Belloni:
 > Hi,
 > 
-> Adding CC to Xiubo Li, Geert Uytterhoeven and Stephen Warren.
-> 
-> On Thursday, September 18, 2014, Dong Aisheng wrote,
-> > On Wed, Sep 17, 2014 at 04:50:50PM +0530, Pankaj Dubey wrote:
-> > > Hi,
-> > >
-> > > On Wednesday, September 17, 2014, Dong Aisheng Wrote,
-> > > > >
-> > > > > +	regmap = regmap_init_mmio(NULL, base,
-> &syscon_regmap_config);
-> > > >
-> > > > Does a NULL device pointer work?
-> > >
-> > > Yes, it is safe, at least we are able to test on Exynos based SoC.
-> > > I have tested it with kgene/for-next kernel on Exynos3250.
-> > > Also it has been tested on Exynos5250 based Snow board with 3.17-rc5
-> > > based kernel by Vivek Gautam.
-> > >
-> > > Patch V2 also has been tested by "Borris Brezillon" on AT91 platform.
-> > >
-> > >
-> >
-> > The kernel i tested was next-20140915 of linux-next.
-> >
-> > please see regmap_get_val_endian called in regmap_init function.
-> > static enum regmap_endian regmap_get_val_endian(struct device *dev,
-> >                                         const struct regmap_bus *bus,
-> >                                         const struct regmap_config
-> *config) {
-> >         struct device_node *np = dev->of_node;
-> >         enum regmap_endian endian;
-> > ...
-> > }
-> > It will crash at the first line of dev->of_node if dev is NULL.
-> >
-> > Can you check if you're using the same code as mine?
-> 
-> No, it's not same.
-> My bad that I was not using linux-next for testing this patch.
-> We tested on kgene/for-next where these changes still have not come.
-> Just now I checked linux-next and found that it will crash at first line of
-> "regmap_get_val_endian" as there is no check for NULL on dev.
-> 
-> I checked git history of regmap.c file and found recently this file has been
-> modified
-> for adding DT endianness binding support. Following are set of patches gone
-> for this
-> 
-> cf673fb regmap: Split regmap_get_endian() in two functions
-> 5844a8b regmap: Fix handling of volatile registers for format_write() chips
-> 45e1a27 regmap: of_regmap_get_endian() cleanup
-> ba1b53f regmap: Fix DT endianess parsing logic
-> d647c19 regmap: add DT endianness binding support.
-> 
-> I think there should have been a check for NULL on "dev" in
-> "regmap_get_val_endian", so that if dev pointer exist then only it makes
-> sense to get
-> endianness property from DT.
-> 
-> I will suggest following fix in regmap.c for this. With following fix I
-> tested it and it works well
-> on linux-next also. So if you can confirm following fix is working for you
-> then I can post this
-> patch.
-> 
-> --------------------------------------------
-> Subject: [PATCH] regmap: fix NULL pointer dereference in
->  regmap_get_val_endian
-> 
-> Recent commits for getting reg endianess causing NULL pointer
-> dereference if dev is passed NULL in regmap_init_mmio. This patch
-> fixes this issue, and allows to parse reg endianess only if dev
-> and dev->of_node exist.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/base/regmap/regmap.c |   23 ++++++++++++++---------
->  1 file changed, 14 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-> index f2281af..455a877 100644
-> --- a/drivers/base/regmap/regmap.c
-> +++ b/drivers/base/regmap/regmap.c
-> @@ -477,7 +477,7 @@ static enum regmap_endian regmap_get_val_endian(struct
-> device *dev,
->  					const struct regmap_bus *bus,
->  					const struct regmap_config *config)
->  {
-> -	struct device_node *np = dev->of_node;
-> +	struct device_node *np;
->  	enum regmap_endian endian;
-> 
->  	/* Retrieve the endianness specification from the regmap config */
-> @@ -487,15 +487,20 @@ static enum regmap_endian regmap_get_val_endian(struct
-> device *dev,
->  	if (endian != REGMAP_ENDIAN_DEFAULT)
->  		return endian;
-> 
-> -	/* Parse the device's DT node for an endianness specification */
-> -	if (of_property_read_bool(np, "big-endian"))
-> -		endian = REGMAP_ENDIAN_BIG;
-> -	else if (of_property_read_bool(np, "little-endian"))
-> -		endian = REGMAP_ENDIAN_LITTLE;
-> +	/* If the dev and dev->of_node exist try to get endianness from DT
-> */
-> +	if (dev && dev->of_node) {
-> +		np = dev->of_node;
-> 
-> -	/* If the endianness was specified in DT, use that */
-> -	if (endian != REGMAP_ENDIAN_DEFAULT)
-> -		return endian;
-> +		/* Parse the device's DT node for an endianness
-> specification */
-> +		if (of_property_read_bool(np, "big-endian"))
-> +			endian = REGMAP_ENDIAN_BIG;
-> +		else if (of_property_read_bool(np, "little-endian"))
-> +			endian = REGMAP_ENDIAN_LITTLE;
-> +
-> +		/* If the endianness was specified in DT, use that */
-> +		if (endian != REGMAP_ENDIAN_DEFAULT)
-> +			return endian;
-> +	}
-> 
->  	/* Retrieve the endianness specification from the bus config */
->  	if (bus && bus->val_format_endian_default)
-> --
-> 
-> Thanks,
-> Pankaj Dubey
-> 
-> > Regards
-> > Dong Aisheng
-> >
-> > >
-> > > Thanks,
-> > > Pankaj Dubey
-> > >
-> > > > Regards
-> > > > Dong Aisheng
-> > > >
-> > > > >
-> > > > >
-> > > > > _______________________________________________
-> > > > > linux-arm-kernel mailing list
-> > > > > linux-arm-kernel at lists.infradead.org
-> > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > >
+> Please have a look at https://lkml.org/lkml/2014/5/14/598 which describe
+> the preferred way of implementing clocks in the CCF where you only
+> declare the clock generator in the DT instead of each separate clocks.
+
+hm... if i see it correctly. i will need to move almost everything from
+DT to clk-driver. And i will need to create separate driver for other
+SoC provided by AlphaScale. On other side with current (generic) driver
+i will need only to change DT and it will work.
+
+May be instead of going qcom way, it will be better to have generic
+gate, div and mux bindings for DT? Sure it will make DT a bit fuzzy, but
+it will dramatically reduce kernel code and reduce the time of providing
+code to upstream.
+
+I don't think drivers/clk/qcom/gcc-msm8974.c is less complicated solution.
+-- 
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140918/a206d61a/attachment.sig>
