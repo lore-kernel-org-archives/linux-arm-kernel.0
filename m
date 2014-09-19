@@ -1,20 +1,80 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Sep 2014 09:29:30 -0700
-Subject: [PATCH 0/3] Krait VFP fixes
-In-Reply-To: <20140918223241.GE5182@n2100.arm.linux.org.uk>
-References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
- <20140918223241.GE5182@n2100.arm.linux.org.uk>
-Message-ID: <541C59EA.5020404@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 19 Sep 2014 16:30:12 +0000 (UTC)
+Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
+In-Reply-To: <20140918171650.GK14505@atomide.com>
+References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+ <20140918171650.GK14505@atomide.com>
+Message-ID: <alpine.DEB.2.02.1409191606310.22526@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/14 15:32, Russell King - ARM Linux wrote:
-> It would be nice to be copied on these patches, as the VFP code is
-> entirely my creation...  I'll review these patches shortly.
->
+On Thu, 18 Sep 2014, Tony Lindgren wrote:
 
-Ah sorry. I will copy you on v2 and run get_maintainers too.
+> * Tero Kristo <t-kristo@ti.com> [140901 11:09]:
+> > Hi,
+> > 
+> > This set contains PRCM related cleanups meant for 3.18 merge window.
+> > These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
+> > (http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
+> > set is used as basis to avoid merge issues.
+> > 
+> > Purpose of this work is to eventually convert the PRCM code into a
+> > separate driver, but this is done in incremental parts as the amount
+> > of changes is substantial. Expected conclusion of this work is 3.19
+> > if everything goes fine.
+> > 
+> > This part of the work mostly moves some of the SoC specific PRCM driver
+> > calls under generic version of the same, and adds SoC-ops to support
+> > these on the driver level.
+> > 
+> > Working branch posted here:
+> > 
+> > tree: https://github.com/t-kristo/linux-pm.git
+> > branch: for-v3.18/prcm-cleanup
+> 
+> Paul, any comments on this series?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Patches 1, 3, 5, 8, 10, 13, 17, 18, 20, 21, 22, 23, 24 are:
+
+Acked-by: Paul Walmsley <paul@pwsan.com>
+
+Here are some specific comments on a few other patches:
+
+Regarding patch 7:  The kerneldoc-nano function comments are good, but 
+should begin with "/**" rather than "/*".  When that's fixed, it can be 
+considered acked by me.
+
+Regarding patches 14, 15, 16: Non-static prm_* functions really should 
+start with omap*_ to avoid potential naming conflicts with other drivers 
+when these are moved to drivers/.  (Obviously the same would apply for any 
+CM function names in other, future patches.)  When that's fixed, it can be 
+considered acked by me.
+
+Regarding patch 25: What are "I/O wakeup gaes" -- gates?  When that's 
+fixed, an acked-by for me can be added.
+
+Regarding patch 26: It seems wise to ensure that omap_prm_reset_system() 
+ends with a 'while(1) { cpu_relax(); }' or something similar, to ensure 
+that execution flow does not proceed past that point. At that point, it 
+should be possible to remove the "while(1) {}"s from omap44xx_restart(), 
+omap2xxx_restart(), etc.  When that's fixed, an acked-by for me can be 
+added.
+
+...
+
+And some general comments: none of which should probably block this 
+series, but seemed worth noting:
+
+Regarding patches 6 and 19: Tero, could you please share the DT node data 
+that you're planning to submit for the PRM, CM1, and CM2 on the OMAP4* 
+platforms? According to the TRM, these are separate IP blocks, with 
+separate OCP header register areas.  So these should probably have 
+separate DT nodes, regs, etc. if the DTS files are to match the hardware.  
+The planned DTS data may impact the way these patches are written, at 
+least, if more patches are to be avoided later.
+
+As far as patches 2, 4, 9, 11, and 12 go, I'll let those go without 
+comment.
+
+
+- Paul
