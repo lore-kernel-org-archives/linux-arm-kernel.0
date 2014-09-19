@@ -1,48 +1,92 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 19 Sep 2014 12:50:29 -0700
-Subject: [PATCH v2 1/2] bus: brcmstb_gisb: register the fault code hook
+Date: Fri, 19 Sep 2014 12:50:30 -0700
+Subject: [PATCH v2 2/2] bus: brcmstb_gisb: save and restore GISB timeout
 In-Reply-To: <1411156230-24024-1-git-send-email-f.fainelli@gmail.com>
 References: <1411156230-24024-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1411156230-24024-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1411156230-24024-3-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 44127b771d9c31 ("bus: add Broadcom GISB bus arbiter timeout/error
-handler") added everything that is required to register an ARM fault
-handler for imprecise external aborts, except that there is nothing
-calling this currently.
-
-We do not need to export that specific function and have to update
-arch/arm/mach-bcm/brcmstb.c to call it, simply, register the fault
-handler with an arch_initcall.
+When the system enters S3, we will lose the GISB timeout value we have
+configured, make sure that we do save this timeout value, and restore
+this timeout value prior to re-enabling interrupts such that the GISB
+timeout interrupt will fire with the expected timeout.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
 Changes in v2:
-- removed the accidental hunk that added saved_timeout since it does
-  not belong in this patch
+- took the hunk that adds saved_timeout here
 
- drivers/bus/brcmstb_gisb.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/bus/brcmstb_gisb.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index f2cd6a2d40b4..5b608955957a 100644
+index 5b608955957a..c202c97493de 100644
 --- a/drivers/bus/brcmstb_gisb.c
 +++ b/drivers/bus/brcmstb_gisb.c
-@@ -160,11 +160,13 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
- 	return ret;
+@@ -23,6 +23,7 @@
+ #include <linux/list.h>
+ #include <linux/of.h>
+ #include <linux/bitops.h>
++#include <linux/pm.h>
+ 
+ #include <asm/bug.h>
+ #include <asm/signal.h>
+@@ -48,6 +49,7 @@ struct brcmstb_gisb_arb_device {
+ 	struct list_head next;
+ 	u32 valid_mask;
+ 	const char *master_names[sizeof(u32) * BITS_PER_BYTE];
++	u32 saved_timeout;
+ };
+ 
+ static LIST_HEAD(brcmstb_gisb_arb_device_list);
+@@ -269,6 +271,39 @@ static int brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
--void __init brcmstb_hook_fault_code(void)
-+static int __init brcmstb_hook_fault_code(void)
- {
- 	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
- 			"imprecise external abort");
++#ifdef CONFIG_PM_SLEEP
++static int brcmstb_gisb_arb_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
++
++	gdev->saved_timeout = ioread32(gdev->base + ARB_TIMER);
++
 +	return 0;
- }
-+arch_initcall(brcmstb_hook_fault_code)
++}
++
++/* Make sure we provide the same timeout value that was configured before, and
++ * do this before the GISB timeout interrupt handler has any chance to run.
++ */
++static int brcmstb_gisb_arb_resume_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
++
++	iowrite32(gdev->saved_timeout, gdev->base + ARB_TIMER);
++
++	return 0;
++}
++#else
++#define brcmstb_gisb_arb_suspend       NULL
++#define brcmstb_gisb_arb_resume_noirq  NULL
++#endif
++
++static const struct dev_pm_ops brcmstb_gisb_arb_pm_ops = {
++	.suspend	= brcmstb_gisb_arb_suspend,
++	.resume_noirq	= brcmstb_gisb_arb_resume_noirq,
++};
++
+ static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
+ 	{ .compatible = "brcm,gisb-arb" },
+ 	{ },
+@@ -280,6 +315,7 @@ static struct platform_driver brcmstb_gisb_arb_driver = {
+ 		.name	= "brcm-gisb-arb",
+ 		.owner	= THIS_MODULE,
+ 		.of_match_table = brcmstb_gisb_arb_of_match,
++		.pm	= &brcmstb_gisb_arb_pm_ops,
+ 	},
+ };
  
- static irqreturn_t brcmstb_gisb_timeout_handler(int irq, void *dev_id)
- {
 -- 
 1.9.1
