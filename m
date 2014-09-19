@@ -1,46 +1,303 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Sep 2014 11:58:45 +0100
-Subject: [PATCH] arm64: insn: Add return statements after BUG_ON()
-In-Reply-To: <20140916164953.GE32073@arm.com>
-References: <1410885753-25025-1-git-send-email-broonie@kernel.org>
- <20140916164953.GE32073@arm.com>
-Message-ID: <20140919105843.GC2295@e104818-lin.cambridge.arm.com>
+From: holzmayr@rsi-elektrotechnik.de (Josef Holzmayr)
+Date: Fri, 19 Sep 2014 13:02:26 +0200
+Subject: [PATCH] Remove the support for the RSI EWS board
+Message-ID: <1411124546-6972-1-git-send-email-holzmayr@rsi-elektrotechnik.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 05:49:53PM +0100, Will Deacon wrote:
-> On Tue, Sep 16, 2014 at 05:42:33PM +0100, Mark Brown wrote:
-> > Following a recent series of enhancements to the insn code the ARMv8
-> > allnoconfig build has been generating a large number of warnings in the
-> > form of:
-> > 
-> > arch/arm64/kernel/insn.c:689:8: warning: 'insn' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> > 
-> > This is because BUG() and related macros can be compiled out so we get
-> > execution paths which normally result in a panic compiling out to noops
-> > instead.
-> > 
-> > I wasn't able to immediately identify a sensible return value to use in
-> > these cases so just return 0 - this is all "should never happen" code so
-> > hopefully it never has a practical impact.
-> 
-> Hmm, I had a similar complaint when we merged the code. I'd much rather see
-> those BUG statements removed entirely, and have an error return code back to
-> the jit. However, the counter argument was that the jitted code has already
-> been verified at this point, so any errors really are fatal.
+The platform is end of life/support and should not clutter
+the mach-at91 directory with non-DT files. It is therefore
+removed.
 
-It's BPF, ftrace and jump label all using the insn.c code. What's funny,
-ftrace.c passes the type as true/false rather than an enum (not sure
-how/when we missed this).
+Signed-off-by: Josef Holzmayr <holzmayr@rsi-elektrotechnik.de>
+---
+ arch/arm/mach-at91/Kconfig.non_dt  |   6 -
+ arch/arm/mach-at91/Makefile        |   1 -
+ arch/arm/mach-at91/board-rsi-ews.c | 232 -------------------------------------
+ 3 files changed, 239 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/board-rsi-ews.c
 
-> So, I think your patch is probably the best thing we can do without
-> reopening that discussion.
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+index 44ace32..836d275 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -132,12 +132,6 @@ config MACH_ECO920
+ 	bool "eco920"
+ 	help
+ 	  Select this if you are using the eco920 board
+-
+-config MACH_RSI_EWS
+-	bool "RSI Embedded Webserver"
+-	depends on ARCH_AT91RM9200
+-	help
+-	  Select this if you are using RSIs EWS board.
+ endif
+ 
+ # ----------------------------------------------------------
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 78e9cec..b74db03 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -46,7 +46,6 @@ obj-$(CONFIG_MACH_ECBAT91)	+= board-ecbat91.o
+ obj-$(CONFIG_MACH_YL9200)	+= board-yl-9200.o
+ obj-$(CONFIG_MACH_CPUAT91)	+= board-cpuat91.o
+ obj-$(CONFIG_MACH_ECO920)	+= board-eco920.o
+-obj-$(CONFIG_MACH_RSI_EWS)	+= board-rsi-ews.o
+ 
+ # AT91SAM9260 board-specific support
+ obj-$(CONFIG_MACH_AT91SAM9260EK) += board-sam9260ek.o
+diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
+deleted file mode 100644
+index f28e8b7..0000000
+--- a/arch/arm/mach-at91/board-rsi-ews.c
++++ /dev/null
+@@ -1,232 +0,0 @@
+-/*
+- * board-rsi-ews.c
+- *
+- *  Copyright (C)
+- *  2005 SAN People,
+- *  2008-2011 R-S-I Elektrotechnik GmbH & Co. KG
+- *
+- * Licensed under GPLv2 or later.
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/mm.h>
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/spi/spi.h>
+-#include <linux/mtd/physmap.h>
+-
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-#include <asm/irq.h>
+-
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/mach/irq.h>
+-
+-#include <mach/hardware.h>
+-
+-#include <linux/gpio.h>
+-
+-#include "at91_aic.h"
+-#include "board.h"
+-#include "generic.h"
+-#include "gpio.h"
+-
+-static void __init rsi_ews_init_early(void)
+-{
+-	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
+-}
+-
+-/*
+- * Ethernet
+- */
+-static struct macb_platform_data rsi_ews_eth_data __initdata = {
+-	.phy_irq_pin	= AT91_PIN_PC4,
+-	.is_rmii	= 1,
+-};
+-
+-/*
+- * USB Host
+- */
+-static struct at91_usbh_data rsi_ews_usbh_data __initdata = {
+-	.ports		= 1,
+-	.vbus_pin	= {-EINVAL, -EINVAL},
+-	.overcurrent_pin= {-EINVAL, -EINVAL},
+-};
+-
+-/*
+- * SD/MC
+- */
+-static struct mci_platform_data __initdata rsi_ews_mci0_data = {
+-	.slot[0] = {
+-		.bus_width	= 4,
+-		.detect_pin	= AT91_PIN_PB27,
+-		.wp_pin		= AT91_PIN_PB29,
+-	},
+-};
+-
+-/*
+- * I2C
+- */
+-static struct i2c_board_info rsi_ews_i2c_devices[] __initdata = {
+-	{
+-		I2C_BOARD_INFO("ds1337", 0x68),
+-	},
+-	{
+-		I2C_BOARD_INFO("24c01", 0x50),
+-	}
+-};
+-
+-/*
+- * LEDs
+- */
+-static struct gpio_led rsi_ews_leds[] = {
+-	{
+-		.name			= "led0",
+-		.gpio			= AT91_PIN_PB6,
+-		.active_low		= 0,
+-	},
+-	{
+-		.name			= "led1",
+-		.gpio			= AT91_PIN_PB7,
+-		.active_low		= 0,
+-	},
+-	{
+-		.name			= "led2",
+-		.gpio			= AT91_PIN_PB8,
+-		.active_low		= 0,
+-	},
+-	{
+-		.name			= "led3",
+-		.gpio			= AT91_PIN_PB9,
+-		.active_low		= 0,
+-	},
+-};
+-
+-/*
+- * DataFlash
+- */
+-static struct spi_board_info rsi_ews_spi_devices[] = {
+-	{	/* DataFlash chip 1*/
+-		.modalias	= "mtd_dataflash",
+-		.chip_select	= 0,
+-		.max_speed_hz	= 5 * 1000 * 1000,
+-	},
+-	{	/* DataFlash chip 2*/
+-		.modalias	= "mtd_dataflash",
+-		.chip_select	= 1,
+-		.max_speed_hz	= 5 * 1000 * 1000,
+-	},
+-};
+-
+-/*
+- * NOR flash
+- */
+-static struct mtd_partition rsiews_nor_partitions[] = {
+-	{
+-		.name		= "boot",
+-		.offset		= 0,
+-		.size		= 3 * SZ_128K,
+-		.mask_flags	= MTD_WRITEABLE
+-	},
+-	{
+-		.name		= "kernel",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= SZ_2M - (3 * SZ_128K)
+-	},
+-	{
+-		.name		= "root",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= SZ_8M
+-	},
+-	{
+-		.name		= "kernelupd",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 3 * SZ_512K,
+-		.mask_flags	= MTD_WRITEABLE
+-	},
+-	{
+-		.name		= "rootupd",
+-		.offset		= MTDPART_OFS_NXTBLK,
+-		.size		= 9 * SZ_512K,
+-		.mask_flags	= MTD_WRITEABLE
+-	},
+-};
+-
+-static struct physmap_flash_data rsiews_nor_data = {
+-	.width		= 2,
+-	.parts		= rsiews_nor_partitions,
+-	.nr_parts	= ARRAY_SIZE(rsiews_nor_partitions),
+-};
+-
+-#define NOR_BASE	AT91_CHIPSELECT_0
+-#define NOR_SIZE	SZ_16M
+-
+-static struct resource nor_flash_resources[] = {
+-	{
+-		.start	= NOR_BASE,
+-		.end	= NOR_BASE + NOR_SIZE - 1,
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct platform_device rsiews_nor_flash = {
+-	.name		= "physmap-flash",
+-	.id		= 0,
+-	.dev		= {
+-				.platform_data	= &rsiews_nor_data,
+-	},
+-	.resource	= nor_flash_resources,
+-	.num_resources	= ARRAY_SIZE(nor_flash_resources),
+-};
+-
+-/*
+- * Init Func
+- */
+-static void __init rsi_ews_board_init(void)
+-{
+-	/* Serial */
+-	/* DBGU on ttyS0. (Rx & Tx only) */
+-	/* This one is for debugging */
+-	at91_register_uart(0, 0, 0);
+-
+-	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
+-	/* Dialin/-out modem interface */
+-	at91_register_uart(AT91RM9200_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS
+-			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
+-			   | ATMEL_UART_RI);
+-
+-	/* USART3 on ttyS4. (Rx, Tx, RTS) */
+-	/* RS485 communication */
+-	at91_register_uart(AT91RM9200_ID_US3, 4, ATMEL_UART_RTS);
+-	at91_add_device_serial();
+-	at91_set_gpio_output(AT91_PIN_PA21, 0);
+-	/* Ethernet */
+-	at91_add_device_eth(&rsi_ews_eth_data);
+-	/* USB Host */
+-	at91_add_device_usbh(&rsi_ews_usbh_data);
+-	/* I2C */
+-	at91_add_device_i2c(rsi_ews_i2c_devices,
+-			ARRAY_SIZE(rsi_ews_i2c_devices));
+-	/* SPI */
+-	at91_add_device_spi(rsi_ews_spi_devices,
+-			ARRAY_SIZE(rsi_ews_spi_devices));
+-	/* MMC */
+-	at91_add_device_mci(0, &rsi_ews_mci0_data);
+-	/* NOR Flash */
+-	platform_device_register(&rsiews_nor_flash);
+-	/* LEDs */
+-	at91_gpio_leds(rsi_ews_leds, ARRAY_SIZE(rsi_ews_leds));
+-}
+-
+-MACHINE_START(RSI_EWS, "RSI EWS")
+-	/* Maintainer: Josef Holzmayr <holzmayr@rsi-elektrotechnik.de> */
+-	.init_time	= at91rm9200_timer_init,
+-	.map_io		= at91_map_io,
+-	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= rsi_ews_init_early,
+-	.init_irq	= at91_init_irq_default,
+-	.init_machine	= rsi_ews_board_init,
+-MACHINE_END
+-- 
+2.1.0
 
-We can merge this patch for now but I would rather return an error. It
-may be better if we actually return a fault generating instruction (BRK)
-rather than 0 like the AARCH64_BREAK_FAULT defined here:
-
-http://lkml.kernel.org/g/1410853730-16470-1-git-send-email-dborkman at redhat.com
 
 -- 
-Catalin
+_____________________________________________________________
+R-S-I Elektrotechnik GmbH & Co. KG
+Woelkestrasse 11
+D-85301 Schweitenkirchen
+Fon: +49 8444 9204-0
+Fax: +49 8444 9204-50
+www.rsi-elektrotechnik.de
+
+_____________________________________________________________
+Amtsgericht Ingolstadt - GmbH: HRB 191328 - KG: HRA 170363
+Gesch?ftsf?hrer: Dr.-Ing. Michael Sorg, Dipl.-Ing. Franz Sorg
+USt-IdNr.: DE 128592548
