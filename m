@@ -1,43 +1,33 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 19 Sep 2014 10:07:51 +0200
-Subject: [PATCH v2 1/4] ARM: docs: add documentation binding for meson
- watchdog
-In-Reply-To: <20140917205827.GA5269@gmail.com>
-References: <1410984726-18944-1-git-send-email-carlo@caione.org>
- <1410984726-18944-2-git-send-email-carlo@caione.org>
- <20140917205827.GA5269@gmail.com>
-Message-ID: <CAOQ7t2Y4JAvs97UYONd1K3Lchps8w+RqavnT0D1R8gbgrCVd6A@mail.gmail.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri, 19 Sep 2014 10:08:11 +0200
+Subject: [PATCH 0/2 v2]  Add OF match tables for the ChromeOs EC subdevices
+Message-ID: <1411114093-3505-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 10:58 PM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> On Wed, Sep 17, 2014 at 10:12:03PM +0200, Carlo Caione wrote:
->> Signed-off-by: Carlo Caione <carlo@caione.org>
->> ---
->>  Documentation/devicetree/bindings/watchdog/meson-wdt.txt | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/watchdog/meson-wdt.txt
->>
->> diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
->> new file mode 100644
->> index 0000000..e66c0c3
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
->> @@ -0,0 +1,13 @@
->> +Meson SoCs Watchdog timer
->> +
->> +Required properties:
->> +
->> +- compatible : should be "amlogic,meson-wdt"
->
-> Hi Carlo,
->
-> the compatible property should describe a specific version of the
-> device, so maybe "amlogic,meson6-wdt" would be more appropriate.
+[ This is essentially a resend, adding Javiers reviewed-by and fixing some small
+identation issues in the second patch. Also added Wolfgang and Dimitry in the
+to, as i missed them last time ]
 
-Agree. Fix in v3.
+The ChromeOS EC MFD driver registers its sub-devices with both a (platform)
+name and an OF compatibility string. As a result of this the modalias passed on
+to user-space will be based on the OF compatibility string. Thus to be able to
+rely on autoloading in case the subdevices are build as modules they need to
+export the necessary module aliases based to match the of information.
 
-Thanks,
+The two patches in these series add the requird of match information to the EC
+subdevices
+
+I guess the first patch should through the i2c tree while the second one would
+be for the input tree?
+
+Sjoerd Simons (2):
+  i2c: cros-ec-tunnel: Add of match table
+  input: cros_ec_keyb: Add of match table
+
+ drivers/i2c/busses/i2c-cros-ec-tunnel.c | 9 +++++++++
+ drivers/input/keyboard/cros_ec_keyb.c   | 9 +++++++++
+ 2 files changed, 18 insertions(+)
 
 -- 
-Carlo Caione
+2.1.0
