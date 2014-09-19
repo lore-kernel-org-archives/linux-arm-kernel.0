@@ -1,35 +1,73 @@
-From: yingjoe.chen@mediatek.com (Joe.C)
-Date: Fri, 19 Sep 2014 21:47:40 +0800
-Subject: [PATCH 2/4] ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
-In-Reply-To: <1411127306-13677-3-git-send-email-srv_hongzhou.yang@mediatek.com>
-References: <1411127306-13677-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411127306-13677-3-git-send-email-srv_hongzhou.yang@mediatek.com>
-Message-ID: <1411134460.27173.8.camel@mtksdaap41>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 19 Sep 2014 09:58:17 -0400
+Subject: [RFC] arm: Handle starting up in secure mode
+In-Reply-To: <20140919133056.GE2295@e104818-lin.cambridge.arm.com>
+References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
+ <5418AA80.4090102@codeaurora.org> <54198BDE.8000509@codeaurora.org>
+ <CAFEAcA-Z_KqCrBRKLxtEaca3jAH35Xx=CqOr36KgAGfFrE91nw@mail.gmail.com>
+ <541C2E02.5000303@codeaurora.org>
+ <20140919133056.GE2295@e104818-lin.cambridge.arm.com>
+Message-ID: <541C3679.4080001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-19 at 19:48 +0800, srv_hongzhou.yang at mediatek.com wrote:
-> +
-> +static const struct pinmux_ops mt_pmx_ops = {
-> +	.get_functions_count	= mt_pmx_get_funcs_cnt,
-> +	.get_function_name	= mt_pmx_get_func_name,
-> +	.get_function_groups	= mt_pmx_get_func_groups,
-> +	.enable			= mt_pmx_enable,
-> +	.disable		= mt_pmx_disable,
-> +	.gpio_set_direction	= mt_pmx_gpio_set_direction,
-> +};
-> +
+On 09/19/2014 09:30 AM, Catalin Marinas wrote:
+> On Fri, Sep 19, 2014 at 02:22:10PM +0100, Christopher Covington wrote:
+>> On 09/19/2014 01:56 AM, Peter Maydell wrote:
+>>> On 17 September 2014 06:25, Christopher Covington <cov@codeaurora.org> wrote:
+>>>> On 09/16/2014 05:24 PM, Christopher Covington wrote:
+>>>>> On 09/16/2014 05:09 PM, Christopher Covington wrote:
+>>>>>> ARM Linux currently has the most features available to it in hypervisor
+>>>>>> (HYP) mode, so switch to it when possible. This can also ensure proper
+>>>>>> reset of newer registers such as CNTVOFF.
+>>>>>>
+>>>>>> The permissions on the Non-Secure Access Control Register (NSACR) are
+>>>>>> used to probe what the security setting currently is when in supervisor
+>>>>>> (SVC) mode.
+>>>>>
+>>>>> Sorry, this doesn't work yet. I was misinterpreting my test results. For what
+>>>>> it's worth, my testing and development methodology is to run it after hacked
+>>>>> up versions of the semihosting bootwrapper on the simulator that corresponds
+>>>>> to rtsm_ve-aemv8a.dtb (AEM VE FVP these days?) and examine the instruction traces.
+>>>>
+>>>> Looks like the real problem was that I was hacking up the bootwrapper
+>>>> incorrectly--my start-in-secure-mode bootwrapper variant wasn't setting up the
+>>>> GIC for non-secure access. With that changed, I've tested the following
+>>>> variations using the Image file in a single core configuration.
+>>>>
+>>>> Start in non-secure SVC with non-secure access to GIC configured.
+>>>>
+>>>> Start in secure SVC with non-secure access to GIC configured.
+>>>>
+>>>> Start in secure SVC with non-secure access to GIC configured and hypervisor
+>>>> support disabled in the model (-C cluster.has_el2=0). This required setting
+>>>> the VBAR again in non-secure SVC but with that fix it seems to work. I'll
+>>>> include this change in v2.
+>>>
+>>> If you're relying on the boot loader to set up the GIC to support
+>>> non-secure access anyway, why not just have it boot the kernel in Hyp
+>>> like the boot protocol document recommends? (The same thing as the GIC
+>>> is going to apply for any other hardware that needs configuration to
+>>> allow NS access; if we need the firmware to deal with this we might as
+>>> well just have it boot us in the right mode too.)
+>>
+>> I'd like to get rid of as much of the bootwrapper as possible (having gotten
+>> spoiled by using QEMU's built-in bootloader). I'm just taking it one step at a
+>> time. Handling GIC initialization in the kernel is probably the next step.
+> 
+> The problem is that the kernel doesn't know about GIC until much later.
+> So I don't see an easy workaround, other than relying on the boot-loader
+> to do the right thing (and then we go to the point Peter made about
+> changing it to start Linux in Hyp mode directly).
 
-It seems pinmux_ops.disable is removed in commit commit
-2243a87d90b42eb38bc281957df3e57c712b5e56. So this will cause build
-error. This should be fixed in next version.
+My initial thought was to have the later-running GIC driver capable of running
+some initialization code in monitor mode. However in reading through the ID
+registers, keying off of PFR1.GIC might allow for early initialization on
+newer systems.
 
-../drivers/pinctrl/mediatek/pinctrl-mtk-common.c:566:2: error: unknown
-field 'disable' specified in initializer
-../drivers/pinctrl/mediatek/pinctrl-mtk-common.c:566:2: warning:
-initialization from incompatible pointer type [enabled by default]
-../drivers/pinctrl/mediatek/pinctrl-mtk-common.c:566:2: warning: (near
-initialization for 'mt_pmx_ops.gpio_request_enable') [enabled by
-default]
+Christopher
 
-Joe.C
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
