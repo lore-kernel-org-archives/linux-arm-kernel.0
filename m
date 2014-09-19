@@ -1,56 +1,93 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 19 Sep 2014 12:26:11 +0200
-Subject: [PATCH v10 0/6] Add Maxim 77802 RTC support
-Message-ID: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Fri, 19 Sep 2014 12:26:12 +0200
+Subject: [PATCH v10 1/6] rtc: max77686: Allow the max77686 rtc to wakeup the
+ system
+In-Reply-To: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1411122377-10426-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+From: Doug Anderson <dianders@chromium.org>
 
-This series add support for the Real Time clock present in
-the Maxim 77802 Power Managment IC. The version number is
-quite high because it previously was part of a bigger series
-[0] that aimed to add support for all the devices in the
-max77802 PMIC. But now that the max77802 dependencies were
-already merged for 3.17, the series were split but I kept
-the version numbering.
+The max77686 includes an RTC that keeps power during suspend.  It's
+convenient to be able to use it as a wakeup source.
 
-While working on the max77802 rtc support a lot of feedback
-was given and the issues pointed out also apply to a driver
-for a similar PMIC RTC (max77686). So patches 01/06 to 05/06
-in the series are cleanups for the max77686 driver and patch
-06/06 adds the support for the max77802 RTC.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
-This version address the issues pointed out on the previous
-version [1] and changelog are present on each patch when is
-applicable.
+Changes since v9:
+ - Remove note from Doug that is not applicable anymore due changes in the
+   i2c driver.
+ - Add s-o-b since I'm in the patch delivery path. Suggested by Andrew Morton.
 
-The series were tested on an Exynos5250 Snow (max77686) and
-Exynos5420 Peach Pit (max77802) machines and applies cleanly
-to both 3.17-rc1 and today's linux-next (20140919).
+Changes since v8: None
 
-NOTE: The patches from the previous version [1] were already
-present in the -mm tree [2] so I didn't know if I should had
-sent this as a delta or as a new revision. I decided to do
-the later but please let me know if you expected the former.
+Changes since v7: None
 
-Doug Anderson (1):
-  rtc: max77686: Allow the max77686 rtc to wakeup the system
+Changes since v6: None
 
-Javier Martinez Canillas (5):
-  rtc: max77686: Remove dead code for SMPL and WTSR.
-  rtc: max77686: Fail to probe if no RTC regmap irqchip is set
-  rtc: max77686: Remove unneded info log
-  rtc: max77686: Use ffs() to calculate tm_wday
-  rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+Changes since v5:
+ - Fix $SUBJECT since the patch does not actually touch the mfd subsys.
+   Suggested by Lee Jones.
 
- drivers/rtc/Kconfig        |  10 +
- drivers/rtc/Makefile       |   1 +
- drivers/rtc/rtc-max77686.c | 139 +++----------
- drivers/rtc/rtc-max77802.c | 501 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 542 insertions(+), 109 deletions(-)
- create mode 100644 drivers/rtc/rtc-max77802.c
+Changes since v4: None
 
-[0]: http://lwn.net/Articles/605350/
-[1]: https://lkml.org/lkml/2014/9/12/87
-[2]: http://ozlabs.org/~akpm/mmots/series
+Changes since v3:
+ - Keep the note that this patch needs another change due wakeup
+   ordering problems.
+
+ drivers/rtc/rtc-max77686.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+index d20a7f0..c1c6055 100644
+--- a/drivers/rtc/rtc-max77686.c
++++ b/drivers/rtc/rtc-max77686.c
+@@ -583,6 +583,33 @@ static void max77686_rtc_shutdown(struct platform_device *pdev)
+ #endif /* MAX77686_RTC_WTSR_SMPL */
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int max77686_rtc_suspend(struct device *dev)
++{
++	if (device_may_wakeup(dev)) {
++		struct max77686_rtc_info *info = dev_get_drvdata(dev);
++
++		return enable_irq_wake(info->virq);
++	}
++
++	return 0;
++}
++
++static int max77686_rtc_resume(struct device *dev)
++{
++	if (device_may_wakeup(dev)) {
++		struct max77686_rtc_info *info = dev_get_drvdata(dev);
++
++		return disable_irq_wake(info->virq);
++	}
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(max77686_rtc_pm_ops,
++			 max77686_rtc_suspend, max77686_rtc_resume);
++
+ static const struct platform_device_id rtc_id[] = {
+ 	{ "max77686-rtc", 0 },
+ 	{},
+@@ -592,6 +619,7 @@ static struct platform_driver max77686_rtc_driver = {
+ 	.driver		= {
+ 		.name	= "max77686-rtc",
+ 		.owner	= THIS_MODULE,
++		.pm	= &max77686_rtc_pm_ops,
+ 	},
+ 	.probe		= max77686_rtc_probe,
+ 	.shutdown	= max77686_rtc_shutdown,
+-- 
+2.1.0
