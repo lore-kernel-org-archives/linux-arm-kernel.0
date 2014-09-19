@@ -1,208 +1,88 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Fri, 19 Sep 2014 13:46:04 +0800
-Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from
- platform devices
-In-Reply-To: <8e0ba684d5fe4663a8842336385ed7ad@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <20140917085818.GA10285@shlinux1.ap.freescale.net>
- <000401cfd269$922dfc40$b689f4c0$@samsung.com>
- <20140918030552.GA26661@shlinux1.ap.freescale.net>
- <000701cfd306$4d3e8080$e7bb8180$@samsung.com>
- <20140918075516.GB15363@shlinux1.ap.freescale.net>
- <000c01cfd324$1f2cd930$5d868b90$@samsung.com>
- <20140918100505.GA19346@shlinux1.ap.freescale.net>
- <48f9f4067cc44ad49297bb4b62c56c88@BY2PR0301MB0613.namprd03.prod.outlook.com>
- <20140919041933.GB19346@shlinux1.ap.freescale.net>
- <8e0ba684d5fe4663a8842336385ed7ad@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <20140919054602.GC19346@shlinux1.ap.freescale.net>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 19 Sep 2014 08:17:15 +0200
+Subject: [PATCH 1/2] devicetree: cadence_ttc: Document binding for timer
+ width
+In-Reply-To: <20140918183626.GB10911@leverpostej>
+References: <3537996136ec435ea660da869102d0a019214979.1410964243.git.michal.simek@xilinx.com>
+ <20140917161737.GA7983@leverpostej>
+ <db43281a-06bc-436b-a082-212d1f95d974@BL2FFO11FD034.protection.gbl>
+ <20140918183626.GB10911@leverpostej>
+Message-ID: <add05eb7-2998-495a-b9c3-f95333b06c7a@BN1BFFO11FD040.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 01:20:18PM +0800, Xiubo Li-B47053 wrote:
-> [...]
-> > >    create child: /dcsr at 20000000/dcsr-atbrepl at 3a8000
-> > >    create child: /dcsr at 20000000/dcsr-tsgen-ctrl at 3a9000
-> > >    create child: /dcsr at 20000000/dcsr-tsgen-read at 3aa000
-> > >    create child: /regulators/regulator at 0
-> > >    ...
-> > >
-> > > As default the Linux will create all the platform device for each DT node,
-> > which
-> > > Can be found from "drivers/of/platform.c".
-> > >
-> > > So we can get the pdev node using the specified DT node, and feel safe to
-> > use
-> > > it as Pankaj's patch does.
-> > >
-> > 
-> > I mean before the devices are populated from device tree.
-> > For example, we usually call of_platform_populate in .init_machine.
-> > Before it, we may not be able to get it's device, isn't it?
-> > 
+On 09/18/2014 08:36 PM, Mark Rutland wrote:
+> On Thu, Sep 18, 2014 at 06:07:40AM +0100, Michal Simek wrote:
+>> On 09/17/2014 06:17 PM, Mark Rutland wrote:
+>>> On Wed, Sep 17, 2014 at 03:30:49PM +0100, Michal Simek wrote:
+>>>> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+>>>>
+>>>> Modern TTC implementations can extend the timer width to 32 bit. This
+>>>> feature is not self identifying so the driver needs to be made aware
+>>>> via device tree.
+>>>>
+>>>> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+>>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>>>> ---
+>>>>
+>>>>  Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+>>>> index 993695c659e1..5439976eca6b 100644
+>>>> --- a/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+>>>> +++ b/Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt
+>>>> @@ -6,6 +6,9 @@ Required properties:
+>>>>  - interrupts : A list of 3 interrupts; one per timer channel.
+>>>>  - clocks: phandle to the source clock
+>>>>
+>>>> +Optional properties:
+>>>> +- timer-width: Bit width of the timer. Either 16 or 32 (default 16).
+>>>
+>>> Are we expecting TTC implementations with widths other than 16 or 32?
+>>
+>> IRC if you use 32bit timer and setup for example 24bit width it should work
+>> too and you are just ignoring that upper bits.
 > 
-> Yes, right.
-> 
-> For this case, we'd better create the pdev or dev manually for the first time
-> We use it, right ?
+> Sure, but what I'd like to know is whether we expect HW implementations
+> other than 16 or 32 bit rather than whether or not the driver will work
+> in that case. I'm not saying no to this patch; I'm just curious.
 
-Yes, that's my understanding.
+We are trying to find this information.
 
-Regards
-Dong Aisheng
 
+>>> This looks sane to me, but we might be able to just have a 32-bit-timer
+>>> property if we don't expect arbitrary widths.
+>>
+>> Definitely model different timer width is easily possible to do in qemu
+>> that's why I think having more generic property timer-width is just better than
+>> having property used just for one case.
 > 
-> Thanks,
+> Ok, so if you want to support that can we change the documentation
+> wording to be:
 > 
-> BRs
-> Xiubo
+> - timer-width: Bit width of the timer, necessary if not 16.
 > 
-> 
-> > Regards
-> > Dong Aisheng
-> > 
-> > > And also we must make sure that the 'syscon' DT nodes has the compatible
-> > prop.
-> > >
-> > > Thanks,
-> > >
-> > > BRs
-> > > Xiubo
-> > >
-> > >
-> > > > Regards
-> > > > Dong Aisheng
-> > > >
-> > > > > ----
-> > > > > static struct syscon *of_syscon_register(struct device_node *np)
-> > > > >  {
-> > > > > +	struct platform_device *pdev;
-> > > > >  	struct syscon *syscon;
-> > > > >  	struct regmap *regmap;
-> > > > >  	void __iomem *base;
-> > > > > @@ -142,7 +144,11 @@ static struct syscon *of_syscon_register(struct
-> > > > > device_node *np)
-> > > > >  	if (!base)
-> > > > >  		return ERR_PTR(-ENOMEM);
-> > > > >
-> > > > > -	regmap = regmap_init_mmio(NULL, base, &syscon_regmap_config);
-> > > > > +	pdev = of_find_device_by_node(np);
-> > > > > +	if (!(&pdev->dev))
-> > > > > +		return ERR_PTR(-ENODEV);
-> > > > > +
-> > > > > +	regmap = regmap_init_mmio(&pdev->dev, base,
-> > &syscon_regmap_config);
-> > > > >  	if (IS_ERR(regmap)) {
-> > > > >  		pr_err("regmap init failed\n");
-> > > > >  		return ERR_CAST(regmap);
-> > > > > -------
-> > > > >
-> > > > > I have tested this in linux-next and it works well. In this way there
-> > won't
-> > > > > be any issues of
-> > > > > dereferencing NULL pointer in regmap.c and at the same time, if DT has
-> > > > > {big,little}-endian
-> > > > > optional property in syscon device node, it will be taken care.
-> > > > >
-> > > > > So I would wait for Arnd's opinion about above mentioned changes and
-> > then
-> > > > > post a new
-> > > > > change after addressing Arnd's minor comment along with this fix in next
-> > > > > revision.
-> > > > >
-> > > > >
-> > > > > Thanks,
-> > > > > Pankaj Dubey
-> > > > > > Maybe we could consider create device structure for each syscon
-> > compatible
-> > > > > device in
-> > > > > > syscon driver in of_syscon_register in first time which seems to be
-> > > > > reasonable.
-> > > > > >
-> > > > > > Regards
-> > > > > > Dong Aisheng
-> > > > > >
-> > > > > > > --------------------------------------------
-> > > > > > > Subject: [PATCH] regmap: fix NULL pointer dereference in
-> > > > > > > regmap_get_val_endian
-> > > > > > >
-> > > > > > > Recent commits for getting reg endianess causing NULL pointer
-> > > > > > > dereference if dev is passed NULL in regmap_init_mmio. This patch
-> > > > > > > fixes this issue, and allows to parse reg endianess only if dev and
-> > > > > > > dev->of_node exist.
-> > > > > > >
-> > > > > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > > > > > > ---
-> > > > > > >  drivers/base/regmap/regmap.c |   23 ++++++++++++++---------
-> > > > > > >  1 file changed, 14 insertions(+), 9 deletions(-)
-> > > > > > >
-> > > > > > > diff --git a/drivers/base/regmap/regmap.c
-> > > > > > > b/drivers/base/regmap/regmap.c index f2281af..455a877 100644
-> > > > > > > --- a/drivers/base/regmap/regmap.c
-> > > > > > > +++ b/drivers/base/regmap/regmap.c
-> > > > > > > @@ -477,7 +477,7 @@ static enum regmap_endian
-> > > > > > > regmap_get_val_endian(struct device *dev,
-> > > > > > >  					const struct regmap_bus *bus,
-> > > > > > >  					const struct regmap_config *config)
-> > > > > {
-> > > > > > > -	struct device_node *np = dev->of_node;
-> > > > > > > +	struct device_node *np;
-> > > > > > >  	enum regmap_endian endian;
-> > > > > > >
-> > > > > > >  	/* Retrieve the endianness specification from the regmap config
-> > > > */
-> > > > > > > @@ -487,15 +487,20 @@ static enum regmap_endian
-> > > > > > > regmap_get_val_endian(struct device *dev,
-> > > > > > >  	if (endian != REGMAP_ENDIAN_DEFAULT)
-> > > > > > >  		return endian;
-> > > > > > >
-> > > > > > > -	/* Parse the device's DT node for an endianness specification */
-> > > > > > > -	if (of_property_read_bool(np, "big-endian"))
-> > > > > > > -		endian = REGMAP_ENDIAN_BIG;
-> > > > > > > -	else if (of_property_read_bool(np, "little-endian"))
-> > > > > > > -		endian = REGMAP_ENDIAN_LITTLE;
-> > > > > > > +	/* If the dev and dev->of_node exist try to get endianness from
-> > > > DT
-> > > > > > > */
-> > > > > > > +	if (dev && dev->of_node) {
-> > > > > > > +		np = dev->of_node;
-> > > > > > >
-> > > > > > > -	/* If the endianness was specified in DT, use that */
-> > > > > > > -	if (endian != REGMAP_ENDIAN_DEFAULT)
-> > > > > > > -		return endian;
-> > > > > > > +		/* Parse the device's DT node for an endianness
-> > > > > > > specification */
-> > > > > > > +		if (of_property_read_bool(np, "big-endian"))
-> > > > > > > +			endian = REGMAP_ENDIAN_BIG;
-> > > > > > > +		else if (of_property_read_bool(np, "little-endian"))
-> > > > > > > +			endian = REGMAP_ENDIAN_LITTLE;
-> > > > > > > +
-> > > > > > > +		/* If the endianness was specified in DT, use that */
-> > > > > > > +		if (endian != REGMAP_ENDIAN_DEFAULT)
-> > > > > > > +			return endian;
-> > > > > > > +	}
-> > > > > > >
-> > > > > > >  	/* Retrieve the endianness specification from the bus config */
-> > > > > > >  	if (bus && bus->val_format_endian_default)
-> > > > > > > --
-> > > > > > >
-> > > > > > > Thanks,
-> > > > > > > Pankaj Dubey
-> > > > > > >
-> > > > > > > > Regards
-> > > > > > > > Dong Aisheng
-> > > > > > > >
-> > > > > > > > >
-> > > > > > > > > Thanks,
-> > > > > > > > > Pankaj Dubey
-> > > > > > > > >
-> > > > > > > > > > Regards
-> > > > > > > > > > Dong Aisheng
-> > > > > > > > > >
-> > > > > > > > > > >
-> > > > > > > > > > >
-> > > > > > > > > > > _______________________________________________
-> > > > > > > > > > > linux-arm-kernel mailing list
-> > > > > > > > > > > linux-arm-kernel at lists.infradead.org
-> > > > > > > > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > > > > > > >
-> > > > > > >
-> > > > >
+> That implies support for other bit widths, and when the property needs
+> to be set (IMO 'default' sounds too much like a driver description than
+> a contract description).
+
+Default one is just option which is used for origin configuration
+and we should be backward compatible.
+I am OK with this description. Will send v2.
+
+> Does this apply to one timer register, or are multiple registers
+> affected?
+
+It applies for all 3 timers. All of them are 16 or 32.
+
+Thanks,
+Michal
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140919/36a6cb2f/attachment.sig>
