@@ -1,34 +1,41 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Fri, 19 Sep 2014 12:39:59 +0200
-Subject: [PATCH resend v5 0/2] ARM: sunxi: RTC support for A31/A23
-In-Reply-To: <1409025296-6342-1-git-send-email-wens@csie.org>
-References: <1409025296-6342-1-git-send-email-wens@csie.org>
-Message-ID: <20140919103959.GO2166@lukather>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 Sep 2014 12:38:22 +0200
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <20140907154907.GB3804@lukather>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140907154907.GB3804@lukather>
+Message-ID: <20140919103822.GN2166@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:54:54AM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> Resending the sun6i RTC series, rebased onto 3.17-rc1.
-> The DT/defconfig patches have been queued for 3.18, and therefore
-> dropped from this series. Hope we can get the driver parts in as
-> well.
-> 
-> The A31 has a new RTC block that is separate from the timer block.
-> It has separate interrupts for each of the alarms, and a different
-> format for the counter alarm. The driver has been tested on the
-> A31 Hummingbird, and the A23 tablet I'm using to work on sun8i
-> support.
-> 
-> Patch 1 adds the driver for the RTC.
-> 
-> Patch 2 is a minor cleanup. This makes rtc-sunxi depend on sun4i or
-> sun7i, the 2 platforms the driver is actually used on.
+Hi Lorenzo,
 
-Ok, I ended up merging the two patches.
+On Sun, Sep 07, 2014 at 05:49:07PM +0200, Maxime Ripard wrote:
+> On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
+> > The current GPL only licensing on the DTSI makes it very impractical for other
+> > software components licensed under another license.
+> > 
+> > In order to make it easier for them to reuse our device trees, relicense our
+> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Carlo Caione <carlo.caione@gmail.com>
+> > Cc: Chen-Yu Tsai <wens@csie.org>
+> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > Cc: Hans de Goede <hdegoede@redhat.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Oliver Schinagl <oliver@schinagl.nl>
+> > Cc: Roman Byshko <rbyshko@gmail.com>
+> > Cc: Stefan Roese <sr@denx.de>
+> 
+> Ok, so I just merged the patches 3 to 5 since we have everyone's
+> approval, and I'll merge the patches 1-2 once and if Lorenzo give his.
 
-Thanks!
+Any opinion on this?
+
 Maxime
 
 -- 
@@ -41,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140919/f4de4f7d/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140919/7578020a/attachment.sig>
