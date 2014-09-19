@@ -1,33 +1,37 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 18 Sep 2014 20:21:30 -0400
-Subject: [PATCH v8 1/4] pci:host: APM X-Gene PCIe host controller driver
-In-Reply-To: <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
-References: <1410476266-29426-1-git-send-email-tinamdar@apm.com>
- <1410476266-29426-2-git-send-email-tinamdar@apm.com>
- <20140912091816.GU27864@e106497-lin.cambridge.arm.com>
- <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
- <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
-Message-ID: <541B770A.8070502@redhat.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 18 Sep 2014 18:37:40 -0600
+Subject: How to enable ETM/ETB on Qualcom chipset
+In-Reply-To: <loom.20140915T174010-341@post.gmane.org>
+References: <loom.20140915T174010-341@post.gmane.org>
+Message-ID: <CANLsYkyB=c4cyp2v+5+k7TyQdO+U50p1uKRgqtxobACLsk7+Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 12:03 PM, Catalin Marinas wrote:
+HW assisted tracing is currently not supported upstream on a core like
+the 8974.  There is currently a lot of work being done to change that
+but things aren't finished yet.
 
-> So for arm64 currently we have some hooks in dma-mapping.c to intercept
-> when a device is added to a bus. What I need to do though is check
-> recursively whether the parent (bus) had the 'dma-coherent' property
-> (pointed out by Jon). I think something like this would do (not tested):
+Support for the 8974 can be found here [1] and here [2] as work in progress.
 
-We've got a patch now that I posted internally and we've tested. I've
-asked Mark Salter to send it upstream (but hey, you'll probably just
-want to switch the default over to recurse up the tree and then simply
-add a new notifier register for pci_bus_type). For this stuff to work,
-we need v10 of the APM X-Gene patches because (as I noticed earlier when
-going through their code and testing on a board with an actual card -
-and a modified devicetree node for the PCI root) that's the point they
-add a call to setup the root of_nodes correctly via pci_scan_root_bus.
-Prior to that the trivially obvious patch for dma-coherent doesn't work.
-Today, there are two platform PCIe devices that do it right, plus the
-latest APM rev of their driver just posted.
+For a free trace decoding "ptm2human" does a pretty good job.  Tools
+like DS-5 and Trace32 will work flawlessly.
 
-Jon.
+Mathieu
+
+[1]. https://www.codeaurora.org/cgit/quic/la/kernel/msm-3.10/log/?h=LNX.LA.3.7.1_rb3.2
+[2]. https://git.linaro.org/kernel/coresight.git
+
+On 15 September 2014 09:49, Lijun Chen <ljchen999@gmail.com> wrote:
+> Hi,
+>
+> Anybody used ETM/ETB on Qualcomm, e.g. 8974? Which CONFIGs need to be
+> turned on? And how to decode the buffer afterwards?
+>
+> Thanks,
+> Lijun
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
