@@ -1,190 +1,73 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 19 Sep 2014 15:06:10 -0600
-Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140919210610.GI19374@google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 19 Sep 2014 14:11:36 -0700
+Subject: [PATCH v2 1/2] bus: brcmstb_gisb: register the fault code hook
+In-Reply-To: <20140919201722.GL1193@ld-irv-0074>
+References: <1411156230-24024-1-git-send-email-f.fainelli@gmail.com>
+ <1411156230-24024-2-git-send-email-f.fainelli@gmail.com>
+ <20140919201722.GL1193@ld-irv-0074>
+Message-ID: <541C9C08.9070809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 02:30:23AM +0100, Liviu Dudau wrote:
-> Provide a function to parse the PCI DT ranges that can be used to
-> create a pci_host_bridge structure together with its associated
-> bus.
+On 09/19/2014 01:17 PM, Brian Norris wrote:
+> On Fri, Sep 19, 2014 at 12:50:29PM -0700, Florian Fainelli wrote:
+>> Commit 44127b771d9c31 ("bus: add Broadcom GISB bus arbiter timeout/error
+>> handler") added everything that is required to register an ARM fault
+>> handler for imprecise external aborts, except that there is nothing
+>> calling this currently.
+>>
+>> We do not need to export that specific function and have to update
+>> arch/arm/mach-bcm/brcmstb.c to call it, simply, register the fault
+>> handler with an arch_initcall.
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  drivers/of/of_pci.c    | 108 +++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_pci.h |  11 +++++
->  2 files changed, 119 insertions(+)
+> Am I missing something, or does that mean that this error handler will
+> be registered for *all* kernels which include this driver? e.g., anyone
+> using multi_v7_defconfig?
+
+That's a very good point, at first I was relying on the fact that even
+though we register our fault code, this is not much of a problem because
+the list is empty until we get to probe the gisb-arb node, it would be
+empty for non-brcmstb platforms, but that's not a good thing.
+
 > 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 7eaeac2..c18b8da 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -1,7 +1,9 @@
->  #include <linux/kernel.h>
->  #include <linux/export.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_pci.h>
-> +#include <linux/slab.h>
->  
->  #include "of_private.h"
->  
-> @@ -151,6 +153,112 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
->  }
->  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
->  
-> +/**
-> + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-> + * @dev: device node of the host bridge having the range property
-> + * @busno: bus number associated with the bridge root bus
-> + * @bus_max: maximum number of busses for this bridge
-> + * @resources: list where the range of resources will be added after DT parsing
-> + * @io_base: pointer to a variable that will contain on return the physical
-> + * address for the start of the I/O range.
-> + *
-> + * It is the callers job to free the @resources list.
-> + *
-> + * This function will parse the "ranges" property of a PCI host bridge device
-> + * node and setup the resource mapping based on its content. It is expected
-> + * that the property conforms with the Power ePAPR document.
-> + *
-> + * It returns zero if the range parsing has been successful or a standard error
-> + * value if it failed.
-> + */
-> +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> +			unsigned char busno, unsigned char bus_max,
-> +			struct list_head *resources, resource_size_t *io_base)
-> +{
-> +	struct resource *res;
-> +	struct resource *bus_range;
-> +	struct of_pci_range range;
-> +	struct of_pci_range_parser parser;
-> +	char range_type[4];
-> +	int err;
-> +
-> +	if (!io_base)
-> +		return -EINVAL;
-> +	*io_base = OF_BAD_ADDR;
-> +
-> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> +	if (!bus_range)
-> +		return -ENOMEM;
-> +
-> +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> +
-> +	err = of_pci_parse_bus_range(dev, bus_range);
-> +	if (err) {
-> +		bus_range->start = busno;
-> +		bus_range->end = bus_max;
-> +		bus_range->flags = IORESOURCE_BUS;
-> +		pr_info("  No bus range found for %s, using %pR\n",
-> +			dev->full_name, &bus_range);
-> +	} else {
-> +		if (bus_range->end > bus_range->start + bus_max)
-> +			bus_range->end = bus_range->start + bus_max;
-> +	}
-> +	pci_add_resource(resources, bus_range);
-> +
-> +	/* Check for ranges property */
-> +	err = of_pci_range_parser_init(&parser, dev);
-> +	if (err)
-> +		goto parse_failed;
-> +
-> +	pr_debug("Parsing ranges property...\n");
-> +	for_each_of_pci_range(&parser, &range) {
-> +		/* Read next ranges element */
-> +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-> +			snprintf(range_type, 4, " IO");
-> +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
-> +			snprintf(range_type, 4, "MEM");
-> +		else
-> +			snprintf(range_type, 4, "err");
-> +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
-> +			range.cpu_addr, range.cpu_addr + range.size - 1,
-> +			range.pci_addr);
-> +
-> +		/*
-> +		 * If we failed translation or got a zero-sized region
-> +		 * then skip this range
-> +		 */
-> +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> +			continue;
-> +
-> +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> +		if (!res) {
-> +			err = -ENOMEM;
-> +			goto parse_failed;
-> +		}
-> +
-> +		err = of_pci_range_to_resource(&range, dev, res);
-> +		if (err) {
-> +			kfree(res);
-> +			goto parse_failed;
-> +		}
-> +
-> +		if (resource_type(res) == IORESOURCE_IO) {
-> +			if (*io_base != OF_BAD_ADDR)
-> +				pr_warn("More than one I/O resource converted. CPU offset for old range lost!\n");
+> So it seems we need to gate this behind some kind of machine check;
+> either called from mach-bcm/*, or better, from something that is probed
+> via device tree. Is it a problem to register this in the probe()
+> function, like drivers/pci/host/pci-imx6.c?
 
-It'd be nice if the output included a hint about which device this warning
-applies to.
+No, I do not think this is a problem, there might be a small window
+during which we enable external aborts exceptions and we have no handler
+for it yet, but I will check that more thoroughly.
 
-> +			*io_base = range.cpu_addr;
-> +		}
-> +
-> +		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
-> +	}
-> +
-> +	return 0;
-> +
-> +parse_failed:
-> +	pci_free_resource_list(resources);
-> +	return err;
-> +}
-> +EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-> +
->  #ifdef CONFIG_PCI_MSI
->  
->  static LIST_HEAD(of_pci_msi_chip_list);
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index 3a3824c..a4b8a85 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -16,6 +16,10 @@ int of_pci_get_devfn(struct device_node *np);
->  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
->  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
->  int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing);
-> +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> +			unsigned char busno, unsigned char bus_max,
-> +			struct list_head *resources, resource_size_t *io_base);
-> +
->  #else
->  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
->  {
-> @@ -50,6 +54,13 @@ of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
->  {
->  	return -1;
->  }
-> +
-> +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> +			unsigned char busno, unsigned char bus_max,
-> +			struct list_head *resources, resource_size_t *io_base);
-> +{
-> +	return -EINVAL;
-> +}
->  #endif
->  
->  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> -- 
-> 2.1.0
+> 
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>> Changes in v2:
+>> - removed the accidental hunk that added saved_timeout since it does
+>>   not belong in this patch
+>>
+>>  drivers/bus/brcmstb_gisb.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+>> index f2cd6a2d40b4..5b608955957a 100644
+>> --- a/drivers/bus/brcmstb_gisb.c
+>> +++ b/drivers/bus/brcmstb_gisb.c
+>> @@ -160,11 +160,13 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+>>  	return ret;
+>>  }
+>>  
+>> -void __init brcmstb_hook_fault_code(void)
+>> +static int __init brcmstb_hook_fault_code(void)
+>>  {
+>>  	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
+>>  			"imprecise external abort");
+>> +	return 0;
+>>  }
+>> +arch_initcall(brcmstb_hook_fault_code)
+>>  
+>>  static irqreturn_t brcmstb_gisb_timeout_handler(int irq, void *dev_id)
+>>  {
+> 
+> Brian
 > 
