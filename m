@@ -1,31 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Sep 2014 13:40:04 +0100
-Subject: [RFC PATCH 05/10] drivers: PL011: refactor pl011_probe()
-In-Reply-To: <1411129283-17219-6-git-send-email-andre.przywara@arm.com>
-References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
- <1411129283-17219-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <20140919124004.GI5182@n2100.arm.linux.org.uk>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 19 Sep 2014 14:40:41 +0200
+Subject: [PATCH] ARM: zImage: add support for ARMv7-M
+In-Reply-To: <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
+References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
+ <201409181938.46996.arnd@arndb.de>
+ <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
+ <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
+Message-ID: <CAGhQ9Vzm+Tx00-kjX2SODiy9SbUvH+B6oiHcUHM_BqQAX4u9cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 01:21:18PM +0100, Andre Przywara wrote:
-> Currently the pl011_probe() function is relying on some AMBA IDs
-> and a device tree node to initialize the driver and a port.
-> Both features are not necessarily required for the driver:
-> - we lack AMBA IDs in the ARM SBSA generic UART and
-> - we lack a DT node in ACPI systems.
-> So lets refactor the function to ease later reuse.
+On 19 September 2014 12:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Sep 18, 2014 at 07:34:47PM +0100, Joachim Eastwood wrote:
+>> On 18 September 2014 19:38, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Thursday 18 September 2014, Joachim Eastwood wrote:
+>> >>   ARM(          mov     pc, r4  )               @ call kernel
+>> >> - THUMB(                bx      r4      )               @ entry point is always ARM
+>> >> +#ifdef CONFIG_CPU_V7M
+>> >> +               add     r4, r4, #1              @ enter in Thumb mode for ARMv7M
+>> >> +#endif
+>> >> + THUMB(                bx      r4      )               @ entry point is always ARM for non ARMv7M CPUs
+>> >>
+>> >
+>> > I think it would be much nicer to avoid sprinkling #ifdefs here. We already
+>> > have the ARM() and THUMB() macros to deal with the two cases we support, which
+>> > are booting in ARM mode vs ARMv7-A with THUMB2 mode. We can probably add
+>> > another macro like this to deal with the ARMv7-M case that does not have
+>> > ARM mode.
+>>
+>> Well, I guess I could make a THUMBONLY macro or something like that.
+>> But I think that the macro would only be useful in the case you quoted
+>> above. The other ifdefs in the patch are either for large blocks or
+>> removing code. So I don't think it would improve the patch a great
+>> deal.
+>>
+>> btw, do you have better name suggestion than THUMBONLY?
+>
+> It looks like you would need the reverse as well, !THUMBONLY. What about
+> M_CLASS and A_CLASS (with or without underscore and maybe AR_CLASS if we
+> ever need to differentiate between A and R)?
 
-Both features are not "necessary" for any driver, but that doesn't mean
-we work around it by throwing a platform driver at it.  We already have
-this same problem with PL010 UARTs, and the DT support for AMBA has the
-ability to specify the AMBA ID.
+Yes, that would remove more of the ifdefs.
+With M_CLASS/A_CLASS macros I could also wrap ".arch armv7-m" and
+".arm" directives. But A_CLASS might look a bit strange when used for
+ARM CPUs that are not called Cortex.
 
-Moreover, there is nothing which prevents you from declaring an AMBA
-device with an appropriate AMBA ID for the driver to bind to - which is
-presumably something very similar to what you're already doing with a
-platform device.
+I'll cook up a new patch and see how it turns out.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+regards,
+Joachim Eastwood
