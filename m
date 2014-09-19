@@ -1,69 +1,44 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 19 Sep 2014 21:27:07 +0200
-Subject: [PATCH v10 5/6] rtc: max77686: Use ffs() to calculate tm_wday
-In-Reply-To: <1411137561.24444.5.camel@joe-AO725>
-References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>	
- <1411122377-10426-6-git-send-email-javier.martinez@collabora.co.uk>
- <1411137561.24444.5.camel@joe-AO725>
-Message-ID: <541C838B.7070207@collabora.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 19 Sep 2014 20:27:24 +0100
+Subject: [PATCH] ARM: at91: sama5: configure L2 cache
+In-Reply-To: <20140918212836.GD29620@piout.net>
+References: <1411072716-20769-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140918210212.GD5182@n2100.arm.linux.org.uk>
+ <20140918212836.GD29620@piout.net>
+Message-ID: <20140919192724.GH26036@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joe,
+[...]
 
-On 09/19/2014 04:39 PM, Joe Perches wrote:
-> On Fri, 2014-09-19 at 12:26 +0200, Javier Martinez Canillas wrote:
->> The function max77686_rtc_calculate_wday() is used to
->> calculate the day of the week to be filled in struct
->> rtc_time but that function only calculates the number
->> of bits shifted. So the ffs() function can be used to
->> find the first bit set instead of a special function.
+> > There have been DT bindings proposed for prefetch control register.  I
+> > suggest that you search this mailing list for that patch, and check
+> > whether it is acceptable for your platform.
+> > 
 > 
-> This isn't the same logic.  Perhaps you want fls.
->
+> I'm really wondering whether we should really put that in the device
+> tree... We will soon end up with a property for each bit of each
+> registers and the binding will end up being huge. Also, that is
+> configuration, not HW description.
 
-Right, the removed function has the same logic than fls() - 1 but the value
-stored in data[RTC_WEEKDAY] is:
+If it's configuration, why is putting it in a board file any better?
+The optimal values will depend on the workload, which depends on more
+than the just the machine. If anything this kind of tuning might be
+better handled using kernel command line parameters.
 
-data[RTC_WEEKDAY] = 1 << tm->tm_wday;
+> I actually tried multiple things, without any satisfaction:
+>  - using DT, with the main issue that we will definitely end up with one
+>    property per bit of configuration
+> 
+>  - adding an .l2c_prefetch_val to the machine start but that is kind of
+>    ugly.
+> 
+>  - adding a new parameter to l2x0_of_init()
+> 
+> So I ended up choosing to do it in the platform code. But if everybody
+> is fine with adding more properties to DT, I can go that way.
 
-so for this particular case, it doesn't matter since ffs() == fls() always.
+We can add properties as necessary. The fun part is deciding what is
+necessary.
 
->> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
-> []
->> -static inline int max77686_rtc_calculate_wday(u8 shifted)
->> -{
->> -	int counter = -1;
->> -	while (shifted) {
->> -		shifted >>= 1;
->> -		counter++;
->> -	}
->> -	return counter;
->> -}
->> -
->>  static void max77686_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
->>  				   int rtc_24hr_mode)
->>  {
->> @@ -93,7 +83,7 @@ static void max77686_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
->>  			tm->tm_hour += 12;
->>  	}
->>  
->> -	tm->tm_wday = max77686_rtc_calculate_wday(data[RTC_WEEKDAY] & 0x7f);
->> +	tm->tm_wday = ffs(data[RTC_WEEKDAY] & 0x7f) - 1;
-
-I did wonder which function to use and the question is when you want to know
-the number of shifted bits, do you look for the first or the last bit set?
-
-Of course is the same for powers of two but I did a naive search to have an
-usage count:
-
-$ git grep "shift = ffs(" | wc -l
-39
-$ git grep "shift = fls(" | wc -l
-17
-
-so it seems that ffs() is twice more popular than fls() for this case so I
-decided to use ffs() but I don't have a strong opinion tbh.
-
-Best regards,
-Javier
+Mark.
