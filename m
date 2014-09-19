@@ -1,42 +1,103 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Sep 2014 11:33:34 +0100
-Subject: [PATCH] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
- <201409181938.46996.arnd@arndb.de>
- <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
-Message-ID: <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Fri, 19 Sep 2014 15:49:09 +0530
+Subject: [PATCH 2/3] ARM: dts: vf610-colibri: Add PWM support
+In-Reply-To: <20140918141248.GL4796@dragon>
+References: <cover.1410930820.git.bhuvanchandra.dv@toradex.com>
+ <819bd3bc9541ca53f005b7cf95bc890f1a9215e5.1410930820.git.bhuvanchandra.dv@toradex.com>
+ <20140918141248.GL4796@dragon>
+Message-ID: <541C031D.2010208@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 07:34:47PM +0100, Joachim Eastwood wrote:
-> On 18 September 2014 19:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 18 September 2014, Joachim Eastwood wrote:
-> >>   ARM(          mov     pc, r4  )               @ call kernel
-> >> - THUMB(                bx      r4      )               @ entry point is always ARM
-> >> +#ifdef CONFIG_CPU_V7M
-> >> +               add     r4, r4, #1              @ enter in Thumb mode for ARMv7M
-> >> +#endif
-> >> + THUMB(                bx      r4      )               @ entry point is always ARM for non ARMv7M CPUs
-> >>
-> >
-> > I think it would be much nicer to avoid sprinkling #ifdefs here. We already
-> > have the ARM() and THUMB() macros to deal with the two cases we support, which
-> > are booting in ARM mode vs ARMv7-A with THUMB2 mode. We can probably add
-> > another macro like this to deal with the ARMv7-M case that does not have
-> > ARM mode.
-> 
-> Well, I guess I could make a THUMBONLY macro or something like that.
-> But I think that the macro would only be useful in the case you quoted
-> above. The other ifdefs in the patch are either for large blocks or
-> removing code. So I don't think it would improve the patch a great
-> deal.
-> 
-> btw, do you have better name suggestion than THUMBONLY?
 
-It looks like you would need the reverse as well, !THUMBONLY. What about
-M_CLASS and A_CLASS (with or without underscore and maybe AR_CLASS if we
-ever need to differentiate between A and R)?
+On Thursday 18 September 2014 07:42 PM, Shawn Guo wrote:
 
--- 
-Catalin
+> On Wed, Sep 17, 2014 at 01:46:29PM +0530, Bhuvanchandra DV wrote:
+>>  The Colibri standard defines four pins as PWM outputs, two of them (PWM
+>>  A and C) are routed to FTM instance 0 and the other two (PWM B and D)
+>>  are routed to FTM instance 1. Hence enable both FTM instances for the
+>>  Colibri module and mux the four pins accordingly.
+>>
+>> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+>> ---
+>>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    8 ++++++++
+>>  arch/arm/boot/dts/vf610-colibri.dtsi        |   25 +++++++++++++++++++++++++
+>>  2 files changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> index 7fb3066..ba98039 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> @@ -44,3 +44,11 @@
+>>  &uart2 {
+>>  	status = "okay";
+>>  };
+>> +
+>> +&pwm0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pwm1 {
+>> +	status = "okay";
+>> +};
+> Please sort the node alphabetically, so that we can locate them more
+> easily.
+
+Ok, will sort the nodes alphabetically 
+
+>> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> index 0cd8343..9bd1415 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+>> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> @@ -69,6 +69,16 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&pwm0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pwm0>;
+>> +};
+>> +
+>> +&pwm1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pwm1>;
+>> +};
+>> +
+> Ditto
+
+Ok
+
+>>  &iomuxc {
+>>  	vf610-colibri {
+>>  		pinctrl_esdhc1: esdhc1grp {
+>> @@ -119,5 +129,20 @@
+>>  				VF610_PAD_PTD3__UART2_CTS		0x21a1
+>>  			>;
+>>  		};
+>> +
+>> +		pinctrl_pwm0: pwm0grp {
+> We also maintain the alphabetic order of pinctrl_* entries under iomuxc
+> node.
+>
+> Shawn
+
+Ok
+
+>> +			fsl,pins = <
+>> +				VF610_PAD_PTB0__FTM0_CH0		0x1182
+>> +				VF610_PAD_PTB1__FTM0_CH1		0x1182
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pwm1: pwm1grp {
+>> +			fsl,pins = <
+>> +				VF610_PAD_PTB8__FTM1_CH0		0x1182
+>> +				VF610_PAD_PTB9__FTM1_CH1		0x1182
+>> +			>;
+>> +		};
+>> +
+>>  	};
+>>  };
+>> -- 
+>> 1.7.9.5
+>>
