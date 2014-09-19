@@ -1,72 +1,33 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Fri, 19 Sep 2014 05:34:10 +0530
-Subject: [PATCH] arm64: Fix GIC addresses for APM X-Gene
-In-Reply-To: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
-References: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <CALrVBktfX8SkpdzpHp7Y6WgcLYKA9CMrmbTHtH=iqomsnqhTZQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 18 Sep 2014 20:21:30 -0400
+Subject: [PATCH v8 1/4] pci:host: APM X-Gene PCIe host controller driver
+In-Reply-To: <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
+References: <1410476266-29426-1-git-send-email-tinamdar@apm.com>
+ <1410476266-29426-2-git-send-email-tinamdar@apm.com>
+ <20140912091816.GU27864@e106497-lin.cambridge.arm.com>
+ <CACoXjckWYhe=PpWE+xYSC9Q72FyAq__3uUh2gGeGtgpC5SrpzQ@mail.gmail.com>
+ <20140917160337.GA15261@e104818-lin.cambridge.arm.com>
+Message-ID: <541B770A.8070502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2014 11:25, Anup Patel <anup.patel@linaro.org> wrote:
-> The APM X-Gene CPU does not implement security extensions but uses
-> GIC-400 which has security extensions implemented. To take care of
-> this situation APM HW designers provided two sets of GIC addresses
-> for accessing secured and non-secured GIC registers seperately.
->
-> Currently, the APM X-Gene DTS file points to secured GIC registers
-> and uses GIC Group0 for all irqs. This works fine in most cases
-> but does not work when routing host irqs to guest or VM using the
-> GICH_LRn.HW bit. It happens because if Guest or VM EOIs routed irqs
-> using GICV_EOI register then GIC-400 treats that Guest or VM is
-> trying to EOI a Group0 irq (i.e. secured irq) from non-secured mode
-> hence GIC-400 does not deactivate the routed irq.
->
-> To take care of the above issue, we initialize secured GIC registers
-> from bootloader such that all host irqs are treated as Group1 irqs
-> (i.e. non-secured irqs) and we only access non-secured GIC registers
-> from Linux, Xen and other hypervisors. The bootloader GIC initialization
-> part is already taken care and is available to all APM Mustang users
-> in latest APM SW release. This patch updates Linux DTS files to use
-> non-secured GIC registers for Linux and Xen.
->
-> Folks who want to try this patch, please update your APM Mustang
-> u-boot from any APM SW release after 7th July 2014.
->
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm64/boot/dts/apm-storm.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index c0aceef..2b162f1 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -81,10 +81,10 @@
->                 compatible = "arm,cortex-a15-gic";
->                 #interrupt-cells = <3>;
->                 interrupt-controller;
-> -               reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
-> -                     <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
-> -                     <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
-> -                     <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
-> +               reg = <0x0 0x78090000 0x0 0x1000>,      /* GIC Dist */
-> +                     <0x0 0x780A0000 0x0 0x1000>,      /* GIC CPU */
-> +                     <0x0 0x780C0000 0x0 0x2000>,      /* GIC VCPU Control */
-> +                     <0x0 0x780E0000 0x0 0x2000>;      /* GIC VCPU */
->                 interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
->         };
->
-> --
-> 1.7.9.5
->
+On 09/17/2014 12:03 PM, Catalin Marinas wrote:
 
-Hi All,
+> So for arm64 currently we have some hooks in dma-mapping.c to intercept
+> when a device is added to a bus. What I need to do though is check
+> recursively whether the parent (bus) had the 'dma-coherent' property
+> (pointed out by Jon). I think something like this would do (not tested):
 
-Any comments on this one?
+We've got a patch now that I posted internally and we've tested. I've
+asked Mark Salter to send it upstream (but hey, you'll probably just
+want to switch the default over to recurse up the tree and then simply
+add a new notifier register for pci_bus_type). For this stuff to work,
+we need v10 of the APM X-Gene patches because (as I noticed earlier when
+going through their code and testing on a board with an actual card -
+and a modified devicetree node for the PCI root) that's the point they
+add a call to setup the root of_nodes correctly via pci_scan_root_bus.
+Prior to that the trivially obvious patch for dma-coherent doesn't work.
+Today, there are two platform PCIe devices that do it right, plus the
+latest APM rev of their driver just posted.
 
-This patch is required to have GICH_LRn.HW bit working
-on X-Gene with Xen and KVM.
-
-Thanks,
-Anup
+Jon.
