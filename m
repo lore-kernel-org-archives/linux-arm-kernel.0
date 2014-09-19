@@ -1,40 +1,65 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 19 Sep 2014 23:30:17 +0900
-Subject: ASoC: samsung: MACH_SMDKC100
-In-Reply-To: <1411034122.2017.18.camel@x220>
-References: <1404288063.12021.13.camel@x220> <1405673749.2155.5.camel@x220>
- <53C96F67.7010108@samsung.com> <1411034122.2017.18.camel@x220>
-Message-ID: <017301cfd416$3bf90be0$b3eb23a0$@kernel.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 19 Sep 2014 16:32:33 +0200
+Subject: [PATCH 1/2] ARM: dts: vf610: Add ARM Global Timer
+In-Reply-To: <20140912075900.GK18566@dragon>
+References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
+ <20140912075900.GK18566@dragon>
+Message-ID: <42e11ee7107cacb92fa3a477e61dc6d4@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle wrote:
+Am 2014-09-12 09:59, schrieb Shawn Guo:
+> On Thu, Sep 11, 2014 at 02:06:14PM +0200, Stefan Agner wrote:
+>> Add Global Timer support which is part of the Snoop Control Unit
+>> of the Cortex-A5 processor. This Global Timer is compatible with the
+>> Cortex-A9 implementation. It's a 64-bit timer and is clocked by the
+>> peripheral clock, which is typically 133 or 166MHz on Vybrid.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  arch/arm/boot/dts/vf610.dtsi | 8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+>> index 4d2ec32..a03abf6 100644
+>> --- a/arch/arm/boot/dts/vf610.dtsi
+>> +++ b/arch/arm/boot/dts/vf610.dtsi
+>> @@ -11,6 +11,7 @@
+>>  #include "vf610-pinfunc.h"
+>>  #include <dt-bindings/clock/vf610-clock.h>
+>>  #include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>>
+>>  / {
+>>  	aliases {
+>> @@ -83,6 +84,13 @@
+>>  				      <0x40002100 0x100>;
+>>  			};
+>>
+>> +			global_timer: global-timer at 40002200 {
 > 
-> Hi Kukjin,
-> 
-Hi,
+> I think it's more idiomatic to use the generic name 'timer' for the
+> node.
 
-> On Sat, 2014-07-19 at 04:03 +0900, Kukjin Kim wrote:
-> > On 07/18/14 17:55, Paul Bolle wrote:
-> > > On Wed, 2014-07-02 at 10:01 +0200, Paul Bolle wrote:
-> > >> Your commit 52ad6582ceb2 ("ARM: S5PC100: no more support S5PC100 SoC"
-> > >> landed in next-20140702. It removed the Kconfig symbol MACH_SMDKC100
-> > >> (and a lot of other stuff).
-> > >>
-> > >> Is the trivial patch to also remove the last two references to
-> > >> MACH_SMDKC100 from sound/soc/samsung/Kconfig/ queued somewhere? I don't
-> > >> think it was part of the series that included the above commit.
-> > >
-> > > Have you had time to look at this? Those last two references to
-> > > MACH_SMDKC100 can still be seen in next-20140718.
-> > >
-> > Yeah you're right. The MACH_SMDKC100 is no more required...
-> >
-> > I submitted its fixup to Mark and I think he will take it for v3.17.
-> 
-> What ever happened to that fixup? There are still (pointless) references
-> to MACH_SMDKC100 in v3.17-rc5 and in next-20140918.
-> 
-Oh....Mark, what's wrong?
+Agree to that. I guess you can change that when you apply it, in case
+there are no other objections to this patchset..?
 
-- Kukjin
+> 
+> Shawn
+> 
+>> +				compatible = "arm,cortex-a9-global-timer";
+>> +				reg = <0x40002200 0x20>;
+>> +				interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>> +				clocks = <&clks VF610_CLK_PLATFORM_BUS>;
+>> +			};
+>> +
+>>  			L2: l2-cache at 40006000 {
+>>  				compatible = "arm,pl310-cache";
+>>  				reg = <0x40006000 0x1000>;
+>> --
+>> 2.1.0
+>>
+
+
+--
+Stefan
