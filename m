@@ -1,51 +1,48 @@
 From: srv_hongzhou.yang@mediatek.com (srv_hongzhou.yang at mediatek.com)
-Date: Fri, 19 Sep 2014 19:48:23 +0800
-Subject: [PATCH 1/4] arm: mediatek: Add config option for mediatek SoCs.
+Date: Fri, 19 Sep 2014 19:48:25 +0800
+Subject: [PATCH 3/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
 In-Reply-To: <1411127306-13677-1-git-send-email-srv_hongzhou.yang@mediatek.com>
 References: <1411127306-13677-1-git-send-email-srv_hongzhou.yang@mediatek.com>
-Message-ID: <1411127306-13677-2-git-send-email-srv_hongzhou.yang@mediatek.com>
+Message-ID: <1411127306-13677-4-git-send-email-srv_hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Joe.C" <yingjoe.chen@mediatek.com>
+From: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-Add config options for ARCH_MT6589, ARCH_MT8127, ARCH_MT8135. This
-allow drivers to isolate support base on these options.
+Add pinctrl node to mt8135.dtsi.
 
-Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 ---
- arch/arm/mach-mediatek/Kconfig | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/mt8135.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
-index 2c043a2..25fe6cf 100644
---- a/arch/arm/mach-mediatek/Kconfig
-+++ b/arch/arm/mach-mediatek/Kconfig
-@@ -1,6 +1,22 @@
--config ARCH_MEDIATEK
--	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
-+menuconfig ARCH_MEDIATEK
-+	bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
- 	select ARM_GIC
- 	select MTK_TIMER
- 	help
--	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
-+	  Support for Mediatek MT65xx & MT81xx SoCs
+diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+index 90a56ad..1bfd3d0 100644
+--- a/arch/arm/boot/dts/mt8135.dtsi
++++ b/arch/arm/boot/dts/mt8135.dtsi
+@@ -15,6 +15,8 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "skeleton64.dtsi"
++#include "mt8135-pinfunc.h"
++#include <dt-bindings/pinctrl/mt65xx.h>
+ 
+ / {
+ 	compatible = "mediatek,mt8135";
+@@ -111,5 +113,14 @@
+ 			      <0 0x10214000 0 0x2000>,
+ 			      <0 0x10216000 0 0x2000>;
+ 		};
 +
-+if ARCH_MEDIATEK
++		pio: pinctrl at 10005000 {
++			compatible = "mediatek,mt8135-pinctrl";
++			reg = <0 0x10005000 0 0x1000>,
++			      <0 0x1020C000 0 0x1000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
 +
-+config MACH_MT6589
-+	bool "MediaTek MT6589 SoCs support"
-+	default ARCH_MEDIATEK
-+
-+config MACH_MT8127
-+	bool "MediaTek MT8127 SoCs support"
-+	default ARCH_MEDIATEK
-+
-+config MACH_MT8135
-+	bool "MediaTek MT8135 SoCs support"
-+	default ARCH_MEDIATEK
-+
-+endif
+ 	};
+ };
 -- 
 1.8.1.1.dirty
