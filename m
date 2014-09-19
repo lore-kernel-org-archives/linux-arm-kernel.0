@@ -1,112 +1,74 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 18 Sep 2014 17:57:33 -0700 (PDT)
-Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <1411067086-16613-4-git-send-email-nm@ti.com>
-References: <1411067086-16613-1-git-send-email-nm@ti.com>
- <1411067086-16613-4-git-send-email-nm@ti.com>
-Message-ID: <alpine.DEB.2.10.1409181749170.4206@nanos>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 18 Sep 2014 17:58:51 -0700
+Subject: [PATCH 0/6] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <541B62BE.8050909@hauke-m.de>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1410897497-27527-1-git-send-email-jonathar@broadcom.com>
+ <541B5D5A.10800@hauke-m.de> <541B5F16.6030005@openwrt.org>
+ <541B62BE.8050909@hauke-m.de>
+Message-ID: <541B7FCB.1090102@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Sep 2014, Nishanth Menon wrote:
-> +static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
-> +{
-> +	/*
-> +	 * Return Not handled so that interrupt is disabled.
+On 14-09-18 03:54 PM, Hauke Mehrtens wrote:
+> On 09/19/2014 12:39 AM, Florian Fainelli wrote:
+>> On 09/18/2014 03:31 PM, Hauke Mehrtens wrote:
+>>> On 09/16/2014 09:58 PM, Jonathan Richardson wrote:
+>>>> Hi,
+>>>>
+>>>> This patchset contains initial support for Broadcom's Cygnus SoC based on our
+>>>> iProc architecture. Initial support is minimal and includes just the mach
+>>>> platform code, clock driver, and a basic device tree configuration. Peripheral
+>>>> drivers will be submitted soon, as will device tree configurations for other
+>>>> Cygnus board variants.
+>>>
+>>> This SoC looks similar to the BCM5301X (Northstar) SoCs even some cores
+>>> are at the same memory addresses. Does this SoC use an AXI bus with
+>>> Broadcom Plugins at address 0x18000000 ?
+>>>
+>>> The BCM5301X (Northstar) SoCs also has an iProc Clock Control Unit and I
+>>> will try to use your driver for that SoC.
+>>>
+>>> Is Broadcom Cygnus similar to BCM563XX or is it actually the same SoC?
+Cygnus is a next generation product with similarities to other Broadcom 
+SoC's.  It takes technology from other parts for sure.  Our first step 
+is to upstream the core IPROC code and Cygnus code.  From there we will 
+upstream individual drivers which are reusable on some other Broadcom 
+chips (or will need minor additions/quirks added as identified).  There 
+are also other IPROC-based Broadcom chips that can also be upstreamed 
+more easily with this patchset going forward.
 
-And how is that interrupt disabled by returning IRQ_NONE? You mean it
-gets disabled after it got reraised 100000 times and the spurious
-detector kills it?
+I know the BCM5301X iProc Clock Control Unit is an older.  I think you 
+may run into some difficulties running this code as is.  But hopefully 
+we can build up more support for other chips from this initial 
+submission for Cygnus support.
+>>
+>> According to this link:
+>> http://lists.denx.de/pipermail/u-boot/2014-August/186086.html
+>>
+>> these SoCs, in particular BCM58622 would belong to the StrataGX network
+>> processors:
+>> http://www.broadcom.com/products/Processors/Home-and-Small-Business/BCM5862X-Series.
+>
+> Broadcom claims that this SoC is pin and software compatible to BCM5301X:
+>> Pin compatible and software compatible products with previous
+>> generation BCM5301x products enable single design with easy
+>> upgradeable path
+>
+>>> Do you have some description of the hardware features of this SoC? Does
+>>> it have PCIe, or Ethernet?
+Yes, Some variants of Cygnus do have PCIe or Ethernet.  Drivers to be 
+upstreamed once cleaned up fully.  The drivers will be built into our 
+bcm_cygnus_defconfig and then enabled in device tree.
+>>
+>>  From the link above, it has Ethernet for sure, and certainly PCIe since
+>> the Wi-Fi chips mentioned in the link above are PCIe chips.
+>>
+>> It would be really good if all the work you and Rafal did was usable for
+>> the Cygnus SoCs.
+>
+> I also hope you can use much of the code and improve it. ;-)
+>
+> Hauke
 
-> +	 * Level event ensures that the event is eventually handled
-> +	 * by the appropriate chip handler already registered
-
-Eventually handled? So eventually it's not handled?
-
-> +	 */
-> +	return IRQ_NONE;
-> +}
-> +
->  int palmas_ext_control_req_config(struct palmas *palmas,
->  	enum palmas_external_requestor_id id,  int ext_ctrl, bool enable)
->  {
-> @@ -409,6 +420,7 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
->  		pdata->mux_from_pdata = 1;
->  		pdata->pad2 = prop;
->  	}
-> +	pdata->wakeirq = irq_of_parse_and_map(node, 1);
->  
->  	/* The default for this register is all masked */
->  	ret = of_property_read_u32(node, "ti,power-ctrl", &prop);
-> @@ -521,6 +533,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
->  	i2c_set_clientdata(i2c, palmas);
->  	palmas->dev = &i2c->dev;
->  	palmas->irq = i2c->irq;
-> +	palmas->wakeirq = pdata->wakeirq;
->  
->  	match = of_match_device(of_palmas_match_tbl, &i2c->dev);
->  
-> @@ -587,6 +600,25 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
->  	if (ret < 0)
->  		goto err_i2c;
->  
-> +	if (!palmas->wakeirq)
-> +		goto no_wake_irq;
-> +
-> +	ret = devm_request_irq(palmas->dev, palmas->wakeirq,
-> +			       palmas_wake_irq,
-> +			       pdata->irq_flags,
-> +			       dev_name(palmas->dev),
-> +			       &palmas);
-> +	if (ret < 0) {
-> +		dev_err(palmas->dev, "Invalid wakeirq(%d) (res: %d), skiping\n",
-> +			palmas->wakeirq, ret);
-> +		palmas->wakeirq = 0;
-> +	} else {
-> +		/* We use wakeirq only during suspend-resume path */
-> +		device_set_wakeup_capable(palmas->dev, true);
-> +		disable_irq_nosync(palmas->wakeirq);
-
-Urgh. Why nosysnc? And why do you want to do that at all?
-
-	irq_set_status_flags(irq, IRQ_NOAUTOEN);
-
-Is what you want to set before requesting the irq.
-
-
-> +	}
-> +
-> +no_wake_irq:
->  no_irq:
->  	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
->  	addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
-> @@ -706,6 +738,34 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
->  	return 0;
->  }
->  
-> +static int palmas_i2c_suspend(struct i2c_client *i2c,  pm_message_t mesg)
-> +{
-> +	struct palmas *palmas = i2c_get_clientdata(i2c);
-> +	struct device *dev = &i2c->dev;
-> +
-> +	if (!palmas->wakeirq)
-> +		return 0;
-> +
-> +	if (device_may_wakeup(dev))
-> +		enable_irq(palmas->wakeirq);
-> +
-> +	return 0;
-> +}
-> +
-> +static int palmas_i2c_resume(struct i2c_client *i2c)
-> +{
-> +	struct palmas *palmas = i2c_get_clientdata(i2c);
-> +	struct device *dev = &i2c->dev;
-> +
-> +	if (!palmas->wakeirq)
-> +		return 0;
-> +
-> +	if (device_may_wakeup(dev))
-> +		disable_irq_nosync(palmas->wakeirq);
-
-Again, why nosync?
+>
