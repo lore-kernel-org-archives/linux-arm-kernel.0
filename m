@@ -1,53 +1,129 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 19 Sep 2014 23:44:26 +0200
-Subject: [PATCH v10 5/6] rtc: max77686: Use ffs() to calculate tm_wday
-In-Reply-To: <1411156347.24444.31.camel@joe-AO725>
-References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>	
- <1411122377-10426-6-git-send-email-javier.martinez@collabora.co.uk>	
- <1411137561.24444.5.camel@joe-AO725> <541C838B.7070207@collabora.co.uk>
- <1411156347.24444.31.camel@joe-AO725>
-Message-ID: <541CA3BA.6060905@collabora.co.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 19 Sep 2014 15:54:00 -0600
+Subject: [PATCH v11 10/10] PCI: Introduce pci_remap_iospace() for
+ remapping PCI I/O bus resources into CPU space
+In-Reply-To: <1411003825-21521-11-git-send-email-Liviu.Dudau@arm.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411003825-21521-11-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140919215400.GA30239@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joe,
+On Thu, Sep 18, 2014 at 02:30:25AM +0100, Liviu Dudau wrote:
+> Introduce a default implementation for remapping PCI bus I/O resources
+> onto the CPU address space. Architectures with special needs may
+> provide their own version, but most should be able to use this one.
 
-On 09/19/2014 09:52 PM, Joe Perches wrote:
-> On Fri, 2014-09-19 at 21:27 +0200, Javier Martinez Canillas wrote:
->> On 09/19/2014 04:39 PM, Joe Perches wrote:
->> > On Fri, 2014-09-19 at 12:26 +0200, Javier Martinez Canillas wrote:
->> >> The function max77686_rtc_calculate_wday() is used to
->> >> calculate the day of the week to be filled in struct
->> >> rtc_time but that function only calculates the number
->> >> of bits shifted. So the ffs() function can be used to
->> >> find the first bit set instead of a special function.
->> > 
->> > This isn't the same logic.  Perhaps you want fls.
->> >
->> 
->> Right, the removed function has the same logic than fls() - 1 but the value
->> stored in data[RTC_WEEKDAY] is:
->> 
->> data[RTC_WEEKDAY] = 1 << tm->tm_wday;
->> 
->> so for this particular case, it doesn't matter since ffs() == fls() always.
+I see that this is used by Tanmay's APM X-Gene PCIe host controller driver.
+Since it's not used in this series, it'd be nice to mention where it *will*
+be used.
+
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  drivers/pci/pci.c             | 33 +++++++++++++++++++++++++++++++++
+>  include/asm-generic/pgtable.h |  4 ++++
+>  include/linux/pci.h           |  3 +++
+>  3 files changed, 40 insertions(+)
 > 
-> I didn't look that far.
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 2c9ac70..654b44c 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -2704,6 +2704,39 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
+>  }
+>  EXPORT_SYMBOL(pci_request_regions_exclusive);
+>  
+> +/**
+> + *	pci_remap_iospace - Remap the memory mapped I/O space
+> + *	@res: Resource describing the I/O space
+> + *	@phys_addr: physical address where the range will be mapped.
+> + *
+> + *	Remap the memory mapped I/O space described by the @res
+> + *	into the CPU physical address space. 
+
+This comment doesn't seem quite right.  I think the space is already in the
+CPU physical address space.  ioremap() and friends normally map existing
+physical space into the *virtual* address space, i.e., they create mappings
+from a virtual address to a physical address.
+
+> Only architectures
+> + *	that have memory mapped IO defined (and hence PCI_IOBASE)
+> + *	should call this function.
+> + */
+> +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+> +{
+> +	int err = -ENODEV;
+> +
+> +#ifdef PCI_IOBASE
+> +	if (!(res->flags & IORESOURCE_IO))
+> +		return -EINVAL;
+> +
+> +	if (res->end > IO_SPACE_LIMIT)
+> +		return -EINVAL;
+> +
+
+PCI_IOBASE is a virtual address.  So PCI_IOBASE + res->start is also a
+virtual address (only for IORESOURCE_IO).
+
+Since res->start is normally a *physical* address, I think it would be less
+confusing to do something like this:
+
+    vaddr = PCI_IOBASE + res->start;
+    ioremap_page_range(vaddr, vaddr + resource_size(res), ...);
+
+so we have a hint that the first two ioremap_page_range() parameters are
+virtual addresses.  It's also confusing that it uses "unsigned long" for
+the virtual addresses, when we usually use "void *".  But that's out of
+scope for this patch.
+
+> +	err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
+> +				res->end + 1 + (unsigned long)PCI_IOBASE,
+> +				phys_addr, pgprot_device(PAGE_KERNEL));
+> +#else
+> +	/* this architecture does not have memory mapped I/O space,
+> +	   so this function should never be called */
+> +	WARN_ON(1);
+> +#endif
+> +
+> +	return err;
+> +}
+> +
+>  static void __pci_set_master(struct pci_dev *dev, bool enable)
+>  {
+>  	u16 old_cmd, cmd;
+> diff --git a/include/asm-generic/pgtable.h b/include/asm-generic/pgtable.h
+> index 53b2acc..977e545 100644
+> --- a/include/asm-generic/pgtable.h
+> +++ b/include/asm-generic/pgtable.h
+> @@ -249,6 +249,10 @@ static inline int pmd_same(pmd_t pmd_a, pmd_t pmd_b)
+>  #define pgprot_writecombine pgprot_noncached
+>  #endif
+>  
+> +#ifndef pgprot_device
+> +#define pgprot_device pgprot_noncached
+> +#endif
+> +
+>  /*
+>   * When walking page tables, get the address of the next boundary,
+>   * or the end address of the range if that comes earlier.  Although no
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index a494e5d..fc8c529 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1100,6 +1100,9 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
+>  						  resource_size_t),
+>  			void *alignf_data);
+>  
+> +
+> +int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+> +
+>  static inline dma_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+>  {
+>  	struct pci_bus_region region;
+> -- 
+> 2.1.0
 > 
-> I just wanted to show that the logic wasn't the same.
-> 
-
-No worries, thanks a lot for your feedback. Probably it would had been good to
-mention that in the commit message.
-
-> Perhaps you can specify that ffs==fls in the changelog.
-> 
-
-I won't say I'm thrilled to do a whole re-spin of the series just to change
-that ;)
-
-Specially since I already did too many revisions and this series have been
-floating around for months but is up to Andrew to decide if is worth it.
-
-Best regards,
-Javier
