@@ -1,147 +1,120 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 19 Sep 2014 07:54:46 -0500
-Subject: [PATCH] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <541BFBFC.5070505@ti.com>
-References: <1411119994-8234-1-git-send-email-lokeshvutla@ti.com>
- <541BFBFC.5070505@ti.com>
-Message-ID: <541C2796.7030300@ti.com>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Fri, 19 Sep 2014 14:56:57 +0200
+Subject: [PATCH net-next v2] net: bpf: arm: make hole-faulting more robust
+Message-ID: <1411131417-23667-1-git-send-email-dborkman@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2014 04:48 AM, Lokesh Vutla wrote:
-> +linux-omap, linux-arm-kernel, devicetree
-> On Friday 19 September 2014 03:16 PM, Lokesh Vutla wrote:
->> On some Soc's RTC is powered by an external power regulator.
->> e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
->> power regulator.
->> And also making the driver as module_platform_driver to
->> support probe deferal.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->> Tested on DRA7. Logs here: http://fpaste.org/134804/11200041/
+Will Deacon pointed out, that the currently used opcode for filling holes,
+that is 0xe7ffffff, seems not robust enough ...
 
-Is that the only platform using rtc-omap.c?
+  $ echo 0xffffffe7 | xxd -r > test.bin
+  $ arm-linux-gnueabihf-objdump -m arm -D -b binary test.bin
+  ...
+  0: e7ffffff     udf    #65535  ; 0xffff
 
->>
->>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
->>  drivers/rtc/rtc-omap.c                             | 28 ++++++++++++++++++++--
->>  2 files changed, 29 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->> index 5a0f02d..c9f963a 100644
->> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->> @@ -10,6 +10,9 @@ Required properties:
->>  - interrupts: rtc timer, alarm interrupts in order
->>  - interrupt-parent: phandle for the interrupt controller
->>  
->> +Optional Properties:
->> + - rtc-supply : phandle to the regulator device tree node if needed.
->> +
->>  Example:
->>  
->>  rtc at 1c23000 {
->> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
->> index 21142e6..4473d1d 100644
->> --- a/drivers/rtc/rtc-omap.c
->> +++ b/drivers/rtc/rtc-omap.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/of_device.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/io.h>
->> +#include <linux/regulator/consumer.h>
->>  
->>  /* The OMAP1 RTC is a year/month/day/hours/minutes/seconds BCD clock
->>   * with century-range alarm matching, driven by the 32kHz clock.
->> @@ -121,6 +122,7 @@
->>  #define OMAP_RTC_HAS_32KCLK_EN		BIT(2)
->>  
->>  static void __iomem	*rtc_base;
+... while for Thumb, it ends up as ...
 
-^^ this can easily be removed by allocating data in probe.
+  0: ffff e7ff    vqshl.u64  q15, <illegal reg q15.5>, #63
 
->> +static struct regulator	*rtc_reg;
+... which is a bit fragile. The ARM specification defines some *permanently*
+guaranteed undefined instruction (UDF) space, for example for ARM in ARMv7-AR,
+section A5.4 and for Thumb in ARMv7-M, section A5.2.6.
 
-So, two instances cannot have different RTC supplies? we dont need to
-do this.
+Similarly, ptrace, kprobes, kgdb, bug and uprobes make use of such instruction
+as well to trap. Given mentioned section from the specification, we can find
+such a universe as (where 'x' denotes 'don't care'):
 
->>  
->>  #define rtc_read(addr)		readb(rtc_base + (addr))
->>  #define rtc_write(val, addr)	writeb(val, rtc_base + (addr))
->> @@ -372,11 +374,12 @@ static const struct of_device_id omap_rtc_of_match[] = {
->>  };
->>  MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
->>  
->> -static int __init omap_rtc_probe(struct platform_device *pdev)
->> +static int omap_rtc_probe(struct platform_device *pdev)
->>  {
->>  	struct resource		*res;
->>  	struct rtc_device	*rtc;
->>  	u8			reg, new_ctrl;
->> +	int			ret;
->>  	const struct platform_device_id *id_entry;
->>  	const struct of_device_id *of_id;
->>  
->> @@ -402,6 +405,23 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
->>  		return -ENOENT;
->>  	}
->>  
->> +	rtc_reg =  devm_regulator_get_optional(&pdev->dev, "rtc");
->> +	if (IS_ERR(rtc_reg)) {
->> +		if (PTR_ERR(rtc_reg) == -EPROBE_DEFER) {
->> +			dev_err(&pdev->dev, "regulator not ready, retry\n");
->> +			return -EPROBE_DEFER;
->> +		}
->> +		rtc_reg = NULL;
->> +	}
->> +
->> +	if (rtc_reg) {
->> +		ret = regulator_enable(rtc_reg);
->> +		if (ret) {
->> +			dev_dbg(&pdev->dev, "regulator enable failed\n");
->> +			return ret;
->> +		}
->> +	}
->> +
+  ARM:    xxxx 0111 1111 xxxx xxxx xxxx 1111 xxxx
+  Thumb:  1101 1110 xxxx xxxx
 
-Do you have a specific voltage you need for your rtc device?
+We therefore should use a more robust opcode that fits both. Russell King
+suggested that we can even reuse a single 32-bit word, that is, 0xe7fddef1
+which will fault if executed in ARM *or* Thumb mode as done in f928d4f2a86f
+("ARM: poison the vectors page"). That will still hold our requirements:
 
->>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>  	rtc_base = devm_ioremap_resource(&pdev->dev, res);
->>  	if (IS_ERR(rtc_base))
->> @@ -517,6 +537,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
->>  	pm_runtime_put_sync(&pdev->dev);
->>  	pm_runtime_disable(&pdev->dev);
->>  
->> +	if (rtc_reg)
->> +		regulator_disable(rtc_reg);
->> +
->>  	return 0;
->>  }
->>  
->> @@ -565,6 +588,7 @@ static void omap_rtc_shutdown(struct platform_device *pdev)
->>  
->>  MODULE_ALIAS("platform:omap_rtc");
->>  static struct platform_driver omap_rtc_driver = {
->> +	.probe		= omap_rtc_probe,
->>  	.remove		= __exit_p(omap_rtc_remove),
->>  	.shutdown	= omap_rtc_shutdown,
->>  	.driver		= {
->> @@ -576,7 +600,7 @@ static struct platform_driver omap_rtc_driver = {
->>  	.id_table	= omap_rtc_devtype,
->>  };
->>  
->> -module_platform_driver_probe(omap_rtc_driver, omap_rtc_probe);
->> +module_platform_driver(omap_rtc_driver);
+  $ echo 0xf1defde7 | xxd -r > test.bin
+  $ arm-unknown-linux-gnueabi-objdump -m arm -D -b binary test.bin
+  ...
+  0: e7fddef1     udf    #56801 ; 0xdde1
+  $ echo 0xf1defde7f1defde7f1defde7 | xxd -r > test.bin
+  $ arm-unknown-linux-gnueabi-objdump -marm -Mforce-thumb -D -b binary test.bin
+  ...
+  0: def1         udf    #241 ; 0xf1
+  2: e7fd         b.n    0x0
+  4: def1         udf    #241 ; 0xf1
+  6: e7fd         b.n    0x4
+  8: def1         udf    #241 ; 0xf1
+  a: e7fd         b.n    0x8
 
->>  
->>  MODULE_AUTHOR("George G. Davis (and others)");
->>  MODULE_LICENSE("GPL");
->>
-> 
+So on ARM 0xe7fddef1 conforms to the above UDF pattern, and the low 16 bit
+likewise correspond to UDF in Thumb case. The 0xe7fd part is an unconditional
+branch back to the UDF instruction.
 
+Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mircea Gherzan <mgherzan@gmail.com>
+Cc: Alexei Starovoitov <ast@plumgrid.com>
+---
+ v1->v2:
+  - Use single word version instead of separately handling ARM and Thumb
 
+ arch/arm/net/bpf_jit_32.c |  6 +++---
+ arch/arm/net/bpf_jit_32.h | 14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index 6b45f64..e1268f9 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -16,6 +16,7 @@
+ #include <linux/string.h>
+ #include <linux/slab.h>
+ #include <linux/if_vlan.h>
++
+ #include <asm/cacheflush.h>
+ #include <asm/hwcap.h>
+ #include <asm/opcodes.h>
+@@ -175,11 +176,10 @@ static inline bool is_load_to_a(u16 inst)
+ 
+ static void jit_fill_hole(void *area, unsigned int size)
+ {
+-	/* Insert illegal UND instructions. */
+-	u32 *ptr, fill_ins = 0xe7ffffff;
++	u32 *ptr;
+ 	/* We are guaranteed to have aligned memory. */
+ 	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
+-		*ptr++ = fill_ins;
++		*ptr++ = __opcode_to_mem_arm(ARM_INST_UDF);
+ }
+ 
+ static void build_prologue(struct jit_ctx *ctx)
+diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
+index afb8462..b2d7d92 100644
+--- a/arch/arm/net/bpf_jit_32.h
++++ b/arch/arm/net/bpf_jit_32.h
+@@ -114,6 +114,20 @@
+ 
+ #define ARM_INST_UMULL		0x00800090
+ 
++/*
++ * Use a suitable undefined instruction to use for ARM/Thumb2 faulting.
++ * We need to be careful not to conflict with those used by other modules
++ * (BUG, kprobes, etc) and the register_undef_hook() system.
++ *
++ * The ARM architecture reference manual guarantees that the following
++ * instruction space will produce an undefined instruction exception on
++ * all CPUs:
++ *
++ * ARM:   xxxx 0111 1111 xxxx xxxx xxxx 1111 xxxx	ARMv7-AR, section A5.4
++ * Thumb: 1101 1110 xxxx xxxx				ARMv7-M, section A5.2.6
++ */
++#define ARM_INST_UDF		0xe7fddef1
++
+ /* register */
+ #define _AL3_R(op, rd, rn, rm)	((op ## _R) | (rd) << 12 | (rn) << 16 | (rm))
+ /* immediate */
 -- 
-Regards,
-Nishanth Menon
+1.7.11.7
