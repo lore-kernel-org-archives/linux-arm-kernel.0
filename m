@@ -1,83 +1,127 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 19 Sep 2014 19:28:09 +0100
-Subject: [PATCH V3 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <20140908090626.GA14634@linaro.org>
-References: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
- <20140828152320.GN22580@arm.com>
- <CAPvkgC0YVhPEBqbWSDnGyZBUn3+8Kv7-yx1-_n0Jx+giKzOqmw@mail.gmail.com>
- <20140908090626.GA14634@linaro.org>
-Message-ID: <20140919182808.GA22622@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 19 Sep 2014 20:27:44 +0200
+Subject: [PATCH v5 11/11] ACPI / PM: Convert acpi_dev_pm_detach() into a
+ static function
+In-Reply-To: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1411151264-16245-12-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 10:06:27AM +0100, Steve Capper wrote:
-> On Mon, Sep 01, 2014 at 12:43:06PM +0100, Steve Capper wrote:
-> > On 28 August 2014 16:23, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Aug 28, 2014 at 03:45:01PM +0100, Steve Capper wrote:
-> > >> I would like to get this series into 3.18 as it fixes quite a big problem
-> > >> with THP on arm and arm64. This series is split into a core mm part, an
-> > >> arm part and an arm64 part.
-> > >>
-> > >> Could somebody please take patch #1 (if it looks okay)?
-> > >> Russell, would you be happy with patches #2, #3, #4? (if we get #1 merged)
-> > >> Catalin, would you be happy taking patches #5, #6? (if we get #1 merged)
-> > >
-> > > Pretty sure we're happy to take the arm64 bits once you've got the core
-> > > changes sorted out. Failing that, Catalin's acked them so they could go via
-> > > an mm tree if it's easier.
-> > >
-> > 
-> > Hello,
-> > 
-> > Are any mm maintainers willing to take the first patch from this
-> > series into their tree for merging into 3.18?
-> >   mm: Introduce a general RCU get_user_pages_fast.
-> > 
-> > (or please let me know if there are any issues with the patch that
-> > need addressing).
-> > 
-> > As Will has stated, Catalin's already acked the arm64 patches, and
-> > these can also go in via an mm tree if that makes things easier:
-> >   arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-> >   arm64: mm: Enable RCU fast_gup
-> > 
-> > Thanks,
-> > --
-> > Steve
-> 
-> Hi,
-> Just a ping on this.
-> 
-> I was wondering if the first patch in this series:
-> 
-> [PATCH V3 1/6] mm: Introduce a general RCU get_user_pages_fast.
-> http://marc.info/?l=linux-mm&m=140923713202355&w=2
-> 
-> could be merged into 3.18 via an mm tree, or if there are any issues
-> with the patch that I should fix?
-> 
-> Acks or flames from the mm maintainers would be greatly appreciated!
-> 
-> Cheers,
-> -- 
-> Steve
+The ->detach() callback for the PM domain has now been fully adopted,
+thus there no users left of the acpi_dev_pm_detach() API. This allow us
+to convert it into a static function.
 
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/acpi/device_pm.c | 69 ++++++++++++++++++++++++------------------------
+ include/linux/acpi.h     |  2 --
+ 2 files changed, 34 insertions(+), 37 deletions(-)
 
-Hello,
-Apologies for being a pest, but we're really keen to get this into 3.18,
-as it fixes a THP problem with arm/arm64.
-
-I need mm folk to either ack or flame the first patch in the series in
-order to proceed. (All the patches in the series have been
-acked/reviewed, but not by any mm folk.):
- [PATCH V3 1/6] mm: Introduce a general RCU get_user_pages_fast.
-
-If it puts people's minds at rest regarding the testing...
-On top of the ltp tests, and futex tests, we also ran these patches on
-the arm64 Debian buildd's. With THP set to always, just under 8000
-Debian packages have been built (and unit tested) without any kernel
-issues for arm64.
-
-Cheers,
+diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
+index eec5ed5..bea6896 100644
+--- a/drivers/acpi/device_pm.c
++++ b/drivers/acpi/device_pm.c
+@@ -1041,6 +1041,40 @@ static struct dev_pm_domain acpi_general_pm_domain = {
+ };
+ 
+ /**
++ * acpi_dev_pm_detach - Remove ACPI power management from the device.
++ * @dev: Device to take care of.
++ * @power_off: Whether or not to try to remove power from the device.
++ *
++ * Remove the device from the general ACPI PM domain and remove its wakeup
++ * notifier.  If @power_off is set, additionally remove power from the device if
++ * possible.
++ *
++ * Callers must ensure proper synchronization of this function with power
++ * management callbacks.
++ */
++static void acpi_dev_pm_detach(struct device *dev, bool power_off)
++{
++	struct acpi_device *adev = ACPI_COMPANION(dev);
++
++	if (adev && dev->pm_domain == &acpi_general_pm_domain) {
++		dev->pm_domain = NULL;
++		acpi_remove_pm_notifier(adev);
++		if (power_off) {
++			/*
++			 * If the device's PM QoS resume latency limit or flags
++			 * have been exposed to user space, they have to be
++			 * hidden at this point, so that they don't affect the
++			 * choice of the low-power state to put the device into.
++			 */
++			dev_pm_qos_hide_latency_limit(dev);
++			dev_pm_qos_hide_flags(dev);
++			acpi_device_wakeup(adev, ACPI_STATE_S0, false);
++			acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
++		}
++	}
++}
++
++/**
+  * acpi_dev_pm_attach - Prepare device for ACPI power management.
+  * @dev: Device to prepare.
+  * @power_on: Whether or not to power on the device.
+@@ -1077,39 +1111,4 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
+-
+-/**
+- * acpi_dev_pm_detach - Remove ACPI power management from the device.
+- * @dev: Device to take care of.
+- * @power_off: Whether or not to try to remove power from the device.
+- *
+- * Remove the device from the general ACPI PM domain and remove its wakeup
+- * notifier.  If @power_off is set, additionally remove power from the device if
+- * possible.
+- *
+- * Callers must ensure proper synchronization of this function with power
+- * management callbacks.
+- */
+-void acpi_dev_pm_detach(struct device *dev, bool power_off)
+-{
+-	struct acpi_device *adev = ACPI_COMPANION(dev);
+-
+-	if (adev && dev->pm_domain == &acpi_general_pm_domain) {
+-		dev->pm_domain = NULL;
+-		acpi_remove_pm_notifier(adev);
+-		if (power_off) {
+-			/*
+-			 * If the device's PM QoS resume latency limit or flags
+-			 * have been exposed to user space, they have to be
+-			 * hidden at this point, so that they don't affect the
+-			 * choice of the low-power state to put the device into.
+-			 */
+-			dev_pm_qos_hide_latency_limit(dev);
+-			dev_pm_qos_hide_flags(dev);
+-			acpi_device_wakeup(adev, ACPI_STATE_S0, false);
+-			acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
+-		}
+-	}
+-}
+-EXPORT_SYMBOL_GPL(acpi_dev_pm_detach);
+ #endif /* CONFIG_PM */
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 807cbc4..b7926bb 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -587,7 +587,6 @@ static inline int acpi_subsys_freeze(struct device *dev) { return 0; }
+ #if defined(CONFIG_ACPI) && defined(CONFIG_PM)
+ struct acpi_device *acpi_dev_pm_get_node(struct device *dev);
+ int acpi_dev_pm_attach(struct device *dev, bool power_on);
+-void acpi_dev_pm_detach(struct device *dev, bool power_off);
+ #else
+ static inline struct acpi_device *acpi_dev_pm_get_node(struct device *dev)
+ {
+@@ -597,7 +596,6 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ {
+ 	return -ENODEV;
+ }
+-static inline void acpi_dev_pm_detach(struct device *dev, bool power_off) {}
+ #endif
+ 
+ #ifdef CONFIG_ACPI
 -- 
-Steve
+1.9.1
