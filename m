@@ -1,28 +1,34 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 19 Sep 2014 14:29:57 +0800
-Subject: [PATCH 0/2] watchdog: dw_wdt: one bug fix and restart handler support
-Message-ID: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
+Date: Fri, 19 Sep 2014 14:29:58 +0800
+Subject: [PATCH 1/2] watchdog: dw_wdt: restart the counter immediately after
+ enabling WDT
+In-Reply-To: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
+References: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1411108199-1280-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches are intend to improve dw_wdt in the following two aspects:
+The TOP_INIT may be zero, so the timeout period may be very short after
+initialization is done, thus the system may be reset soon after enabling.
+We fix this problem by restarting the counter immediately after enabling
+WDT.
 
-Firstly, the TOP_INIT may be zero at reset on some HW, so the timeout period
-may be very short, thus we will see immediate system reset after openning 
-the watchdog. Fix this problem by restarting the counter immediately after
-WDT enabling.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/watchdog/dw_wdt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Secondly, the WDT can also be used to reboot the system with the help of
-recently introduced restart handler.
-
-Tested on Marvell BG2Q DMP board.
-
-Jisheng Zhang (2):
-  watchdog: dw_wdt: restart the counter immediately after enabling WDT
-  watchdog: dw_wdt: add restart handler support
-
- drivers/watchdog/dw_wdt.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
+diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+index 9f21029..ad0619d 100644
+--- a/drivers/watchdog/dw_wdt.c
++++ b/drivers/watchdog/dw_wdt.c
+@@ -146,6 +146,7 @@ static int dw_wdt_open(struct inode *inode, struct file *filp)
+ 		dw_wdt_set_top(DW_WDT_MAX_TOP);
+ 		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+ 		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
++		dw_wdt_keepalive();
+ 	}
+ 
+ 	dw_wdt_set_next_heartbeat();
 -- 
 2.1.0
