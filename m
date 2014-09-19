@@ -1,63 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Sep 2014 14:35:55 +0100
-Subject: [PATCH] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <CAGhQ9Vzm+Tx00-kjX2SODiy9SbUvH+B6oiHcUHM_BqQAX4u9cQ@mail.gmail.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
- <201409181938.46996.arnd@arndb.de>
- <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
- <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
- <CAGhQ9Vzm+Tx00-kjX2SODiy9SbUvH+B6oiHcUHM_BqQAX4u9cQ@mail.gmail.com>
-Message-ID: <20140919133555.GF2295@e104818-lin.cambridge.arm.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Fri, 19 Sep 2014 19:08:50 +0530
+Subject: [PATCH v2 0/2] Add PWM and backlight support for Colibri VF61 modules
+Message-ID: <cover.1411130205.git.bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 01:40:41PM +0100, Joachim Eastwood wrote:
-> On 19 September 2014 12:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Sep 18, 2014 at 07:34:47PM +0100, Joachim Eastwood wrote:
-> >> On 18 September 2014 19:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Thursday 18 September 2014, Joachim Eastwood wrote:
-> >> >>   ARM(          mov     pc, r4  )               @ call kernel
-> >> >> - THUMB(                bx      r4      )               @ entry point is always ARM
-> >> >> +#ifdef CONFIG_CPU_V7M
-> >> >> +               add     r4, r4, #1              @ enter in Thumb mode for ARMv7M
-> >> >> +#endif
-> >> >> + THUMB(                bx      r4      )               @ entry point is always ARM for non ARMv7M CPUs
-> >> >>
-> >> >
-> >> > I think it would be much nicer to avoid sprinkling #ifdefs here. We already
-> >> > have the ARM() and THUMB() macros to deal with the two cases we support, which
-> >> > are booting in ARM mode vs ARMv7-A with THUMB2 mode. We can probably add
-> >> > another macro like this to deal with the ARMv7-M case that does not have
-> >> > ARM mode.
-> >>
-> >> Well, I guess I could make a THUMBONLY macro or something like that.
-> >> But I think that the macro would only be useful in the case you quoted
-> >> above. The other ifdefs in the patch are either for large blocks or
-> >> removing code. So I don't think it would improve the patch a great
-> >> deal.
-> >>
-> >> btw, do you have better name suggestion than THUMBONLY?
-> >
-> > It looks like you would need the reverse as well, !THUMBONLY. What about
-> > M_CLASS and A_CLASS (with or without underscore and maybe AR_CLASS if we
-> > ever need to differentiate between A and R)?
-> 
-> Yes, that would remove more of the ifdefs.
-> With M_CLASS/A_CLASS macros I could also wrap ".arch armv7-m" and
-> ".arm" directives. But A_CLASS might look a bit strange when used for
-> ARM CPUs that are not called Cortex.
+Changes since v1:
+[1] Sorted the node names alphabetically.
+[2] Updated the node name 'bl: backlight' to 'backlight: bl'.
+[3] Dropped the leading space in 'pwm-names' property of backlight.
 
-'A' in this context does not refer to Cortex CPUs. The ARM Architecture
-Reference Class defines three classes:
+Bhuvanchandra DV (2):
+  ARM: dts: vf610-colibri: Add PWM support
+  ARM: dts: vf610-colibri: Add backlight support
 
-A - Application class (MMU)
-R - Real-time class (no MMU, usually with an MPU, more deterministic)
-M - Microcontroller class (no MMU, simpler exception model aimed at bare
-    metal applications)
-
-The A and R class are covered by the same ARM ARM book while the M class
-has a separate reference manual. That's why for some macros were we
-target both A and R classes I suggested AR_CLASS.
+ arch/arm/boot/dts/vf610-colibri-eval-v3.dts |   14 ++++++++++++
+ arch/arm/boot/dts/vf610-colibri.dtsi        |   33 +++++++++++++++++++++++++--
+ 2 files changed, 45 insertions(+), 2 deletions(-)
 
 -- 
-Catalin
+1.7.9.5
