@@ -1,80 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 19 Sep 2014 16:30:12 +0000 (UTC)
-Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
-In-Reply-To: <20140918171650.GK14505@atomide.com>
-References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
- <20140918171650.GK14505@atomide.com>
-Message-ID: <alpine.DEB.2.02.1409191606310.22526@utopia.booyaka.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 19 Sep 2014 11:25:50 -0500
+Subject: [PATCH 1/3] watchdog: qcom: add support for KPSS WDT
+In-Reply-To: <541BA5F7.1030704@roeck-us.net>
+References: <cover.1411078425.git.joshc@codeaurora.org>
+ <32d17907ad1dfdcafe4e76f33adc2ff22631cd28.1411078425.git.joshc@codeaurora.org>
+ <541B97CD.60400@roeck-us.net>
+ <20140919032416.GE3749@joshc.qualcomm.com>
+ <541BA5F7.1030704@roeck-us.net>
+Message-ID: <20140919162550.GI3749@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Sep 2014, Tony Lindgren wrote:
-
-> * Tero Kristo <t-kristo@ti.com> [140901 11:09]:
-> > Hi,
-> > 
-> > This set contains PRCM related cleanups meant for 3.18 merge window.
-> > These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
-> > (http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
-> > set is used as basis to avoid merge issues.
-> > 
-> > Purpose of this work is to eventually convert the PRCM code into a
-> > separate driver, but this is done in incremental parts as the amount
-> > of changes is substantial. Expected conclusion of this work is 3.19
-> > if everything goes fine.
-> > 
-> > This part of the work mostly moves some of the SoC specific PRCM driver
-> > calls under generic version of the same, and adds SoC-ops to support
-> > these on the driver level.
-> > 
-> > Working branch posted here:
-> > 
-> > tree: https://github.com/t-kristo/linux-pm.git
-> > branch: for-v3.18/prcm-cleanup
+On Thu, Sep 18, 2014 at 08:41:43PM -0700, Guenter Roeck wrote:
+> On 09/18/2014 08:24 PM, Josh Cartwright wrote:
+> >On Thu, Sep 18, 2014 at 07:41:17PM -0700, Guenter Roeck wrote:
+> >>On 09/18/2014 03:26 PM, Josh Cartwright wrote:
+> >>>Add a driver for the watchdog timer block found in the Krait Processor
+> >>>Subsystem (KPSS) on the MSM8960, APQ8064, and IPQ8064.
+> >>>
+> >>>Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> >>
+> >>Hi Josh,
+> >>
+> >>comments inline.
+> >
+> >Thanks for taking a look!
+> >
+[..]
+> >>>+	watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev);
+> >>
+> >>That leaves you with no default timeout if timeout-sec is not set in devicetree,
+> >>which if I understand the code correctly might result in an immediate reset.
+> >>Is this really what you want to happen ?
+> >
+> >I think I'd like to handle timeout-sec being unspecified as an error at
+> >probe.  If someone explicitly sets timeout-sec = <0>, then they get what
+> >they ask for.  I'll take another look to see how to make this happen.
+> >
 > 
-> Paul, any comments on this series?
+> Hmm.. kind of unusual. Usual would be to initialize the timeout together
+> with min_timeout / max_timeout above and only force the user to specify
+> a value if the default timeout is not desirable. You don't really gain
+> anything by making timeout-sec mandatory.
 
-Patches 1, 3, 5, 8, 10, 13, 17, 18, 20, 21, 22, 23, 24 are:
+Making timeout-sec mandatory makes it so I don't have to decide what a
+"sane default" is. :)
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
+It's even less clear about what a sane default is looking at the other
+watchdog drivers.  From the drivers I looked at, it ranges any where
+from 30s to 2mins.  Am I just to choose?  Why do these even differ
+between all of the drivers?
 
-Here are some specific comments on a few other patches:
-
-Regarding patch 7:  The kerneldoc-nano function comments are good, but 
-should begin with "/**" rather than "/*".  When that's fixed, it can be 
-considered acked by me.
-
-Regarding patches 14, 15, 16: Non-static prm_* functions really should 
-start with omap*_ to avoid potential naming conflicts with other drivers 
-when these are moved to drivers/.  (Obviously the same would apply for any 
-CM function names in other, future patches.)  When that's fixed, it can be 
-considered acked by me.
-
-Regarding patch 25: What are "I/O wakeup gaes" -- gates?  When that's 
-fixed, an acked-by for me can be added.
-
-Regarding patch 26: It seems wise to ensure that omap_prm_reset_system() 
-ends with a 'while(1) { cpu_relax(); }' or something similar, to ensure 
-that execution flow does not proceed past that point. At that point, it 
-should be possible to remove the "while(1) {}"s from omap44xx_restart(), 
-omap2xxx_restart(), etc.  When that's fixed, an acked-by for me can be 
-added.
-
-...
-
-And some general comments: none of which should probably block this 
-series, but seemed worth noting:
-
-Regarding patches 6 and 19: Tero, could you please share the DT node data 
-that you're planning to submit for the PRM, CM1, and CM2 on the OMAP4* 
-platforms? According to the TRM, these are separate IP blocks, with 
-separate OCP header register areas.  So these should probably have 
-separate DT nodes, regs, etc. if the DTS files are to match the hardware.  
-The planned DTS data may impact the way these patches are written, at 
-least, if more patches are to be avoided later.
-
-As far as patches 2, 4, 9, 11, and 12 go, I'll let those go without 
-comment.
-
-
-- Paul
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
