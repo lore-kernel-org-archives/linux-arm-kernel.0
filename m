@@ -1,22 +1,209 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 19 Sep 2014 19:18:18 +0200
-Subject: [PATCH v2 1/5] i2c: Don't start transfers when suspended
-In-Reply-To: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-References: <1405608520-5644-1-git-send-email-hechtb@gmail.com>
-Message-ID: <20140919171818.GA2874@katana>
+Date: Fri, 19 Sep 2014 19:18:30 +0200
+Subject: [PATCH resend 2/2] i2c: hix5hd2: add i2c controller driver
+In-Reply-To: <1409030722-30709-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1409030722-30709-1-git-send-email-zhangfei.gao@linaro.org>
+ <1409030722-30709-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140919171829.GB2874@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 17, 2014 at 04:48:36PM +0200, Bastian Hecht wrote:
-> i2c transfer requests come in very uncontrolled, like from interrupt routines.
-> We might be suspended when this happens. To avoid i2c timeouts caused by
-> powered down busses we check for suspension.
-> 
-> Several bus drivers handle this problem on their own. We can clean things up
-> by moving the protection mechanism into the core.
-> 
-> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+Hi,
 
-Dropping this series due to the comments. I am not sure if it is worth
-to add information about the clients being "normally" suspendable or
-not. Thanks Bastian for the effort, though.
+thanks for the submission.
+
+> --- /dev/null
+> +++ b/drivers/i2c/busses/i2c-hix5hd2.c
+> @@ -0,0 +1,573 @@
+> +/*
+> + * Copyright (c) 2014 Linaro Ltd.
+> + * Copyright (c) 2014 Hisilicon Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+
+"publishhed"
+
+> + *
+> + * Now only support 7 bit address.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/i2c.h>
+> +#include <linux/io.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+
+I think there should be at least of.h, too.
+
+> +struct hix5hd2_i2c {
+> +	struct i2c_adapter adap;
+> +	struct i2c_msg	*msg;
+> +	unsigned int msg_ptr;	/* msg index */
+
+Comment seems wrong. It looks to me as the msg buffer index. If so, the
+variable name is also confusing.
+
+> +	unsigned int len;	/* msg length */
+> +	int stop;
+> +	struct completion msg_complete;
+> +
+> +	unsigned int irq;
+
+That can be a local variable.
+
+> +	void __iomem *regs;
+> +	struct clk *clk;
+> +	struct device *dev;
+> +	spinlock_t lock;	/* IRQ synchronization */
+> +
+> +	int err;
+> +	enum hix5hd2_i2c_state state;
+> +	enum hix5hd2_i2c_speed speed_mode;
+
+Where is this needed?
+
+> +
+> +	/* Controller frequency */
+> +	unsigned int s_clock;
+> +};
+> +
+> +static void hix5hd2_i2c_drv_setrate(struct hix5hd2_i2c *i2c)
+> +{
+> +	u32 rate, val;
+> +	u32 sclh, scll, sysclock;
+> +
+> +	/* close all i2c interrupt */
+> +	val = readl_relaxed(i2c->regs + HIX5I2C_CTRL);
+> +	writel_relaxed(val & (~I2C_UNMASK_TOTAL), i2c->regs + HIX5I2C_CTRL);
+> +
+> +	rate = i2c->s_clock;
+> +	sysclock = clk_get_rate(i2c->clk);
+> +	sclh = (sysclock / (rate * 2)) / 2 - 1;
+> +	writel_relaxed(sclh, i2c->regs + HIX5I2C_SCL_H);
+> +	scll = (sysclock / (rate * 2)) / 2 - 1;
+
+scll and sclh use the same formula? Have you measured the setup
+frequency with a scope?
+
+> +	writel_relaxed(scll, i2c->regs + HIX5I2C_SCL_L);
+> +
+> +	/* restore original interrupt*/
+> +	writel_relaxed(val, i2c->regs + HIX5I2C_CTRL);
+> +
+> +	dev_dbg(i2c->dev, "%s: sysclock=%d, rate=%d, sclh=%d, scll=%d\n",
+> +		__func__, sysclock, rate, sclh, scll);
+> +}
+> +
+> +static void hix5hd2_rw_over(struct hix5hd2_i2c *i2c)
+> +{
+> +	if (HIX5I2C_STAT_SND_STOP == i2c->state)
+
+To be honest, I don't like having the constant on the left side. It
+is far easier to read if they are on the right side. Plus, we have gcc
+warnings to prevent the "=" and "==" mistake. Please switch them around
+in this driver.
+
+> +		dev_dbg(i2c->dev, "%s: rw and send stop over\n", __func__);
+> +	else
+> +		dev_dbg(i2c->dev, "%s: have not data to send\n", __func__);
+> +
+> +	i2c->state = HIX5I2C_STAT_RW_SUCCESS;
+> +	i2c->err = 0;
+> +}
+> +
+
+...
+
+> +	/* handle error */
+> +	if (int_status & I2C_ARBITRATE_INTR) {
+> +		/*Bus error */
+
+Space missing in front of "Bus". If this is an arbitration lost error,
+then please use -EAGAIN. Check Documentation/i2c/fault-codes for the
+convention.
+
+> +		dev_dbg(i2c->dev, "ARB bus loss\n");
+> +		i2c->err = -ENXIO;
+> +		i2c->state = HIX5I2C_STAT_RW_ERR;
+> +		goto stop;
+> +	} else if (int_status & I2C_ACK_INTR) {
+> +		/* ack error */
+> +		dev_dbg(i2c->dev, "No ACK from device\n");
+> +		i2c->err = -ENXIO;
+> +		i2c->state = HIX5I2C_STAT_RW_ERR;
+> +		goto stop;
+> +	}
+> +
+> +static void hix5hd2_i2c_message_start(struct hix5hd2_i2c *i2c, int stop)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&i2c->lock, flags);
+> +	hix5hd2_i2c_clr_all_irq(i2c);
+> +	hix5hd2_i2c_enable_irq(i2c);
+> +
+> +	if (i2c->msg->flags & I2C_M_RD)
+> +		writel_relaxed(i2c->msg->addr | HIX5I2C_READ_OPERATION,
+> +			       i2c->regs + HIX5I2C_TXR);
+> +	else
+> +		writel_relaxed(i2c->msg->addr & HIX5I2C_WRITE_OPERATION,
+> +			       i2c->regs + HIX5I2C_TXR);
+
+??? Does this really work? i2c->msg->addr should be left shifted by 1?
+
+> +
+> +	writel_relaxed(I2C_WRITE | I2C_START, i2c->regs + HIX5I2C_COM);
+> +	spin_unlock_irqrestore(&i2c->lock, flags);
+> +}
+> +
+> +static int hix5hd2_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct hix5hd2_i2c *i2c;
+> +	struct resource *mem;
+> +	unsigned int op_clock;
+> +	int ret;
+> +
+> +	i2c = devm_kzalloc(&pdev->dev, sizeof(struct hix5hd2_i2c), GFP_KERNEL);
+> +	if (!i2c)
+> +		return -ENOMEM;
+> +
+> +	if (of_property_read_u32(np, "clock-frequency", &op_clock)) {
+> +		/* use default value */
+> +		i2c->speed_mode = HIX5I2C_HIG_SPD;
+> +		i2c->s_clock = HIX5I2C_HS_TX_CLOCK;
+
+Please use 100kHz as the default. This is the speed devices should
+support. 400kHz is optional. And I think 100000 is easier to read than a
+define.
+
+> +	} else {
+> +		if (op_clock >= HIX5I2C_HS_TX_CLOCK) {
+> +			i2c->speed_mode = HIX5I2C_HIG_SPD;
+> +			i2c->s_clock = HIX5I2C_HS_TX_CLOCK;
+
+So, if the speed is bigger than 400kHz, it will be capped down to
+400kHz? Is that true? Then, the user should be informed about that.
+
+> +		} else {
+> +			i2c->speed_mode = HIX5I2C_NORMAL_SPD;
+> +			i2c->s_clock = op_clock;
+> +		}
+> +	}
+> +
+
+...
+
+> +	i2c->adap.owner   = THIS_MODULE;
+> +	i2c->adap.algo	  = &hix5hd2_i2c_algorithm;
+
+Single space as indentation.
+
+Thanks,
+
+   Wolfram
