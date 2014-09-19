@@ -1,51 +1,97 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 19 Sep 2014 14:40:41 +0200
-Subject: [PATCH] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
- <201409181938.46996.arnd@arndb.de>
- <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
- <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
-Message-ID: <CAGhQ9Vzm+Tx00-kjX2SODiy9SbUvH+B6oiHcUHM_BqQAX4u9cQ@mail.gmail.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Fri, 19 Sep 2014 18:17:33 +0530
+Subject: [PATCH 3/3] watchdog: qcom: register a restart notifier
+In-Reply-To: <d0f4cd93ad3f6690d637413b1171ac3c71aba861.1411078426.git.joshc@codeaurora.org>
+References: <cover.1411078425.git.joshc@codeaurora.org>
+ <d0f4cd93ad3f6690d637413b1171ac3c71aba861.1411078426.git.joshc@codeaurora.org>
+Message-ID: <541C25E5.6080601@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 September 2014 12:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Sep 18, 2014 at 07:34:47PM +0100, Joachim Eastwood wrote:
->> On 18 September 2014 19:38, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 18 September 2014, Joachim Eastwood wrote:
->> >>   ARM(          mov     pc, r4  )               @ call kernel
->> >> - THUMB(                bx      r4      )               @ entry point is always ARM
->> >> +#ifdef CONFIG_CPU_V7M
->> >> +               add     r4, r4, #1              @ enter in Thumb mode for ARMv7M
->> >> +#endif
->> >> + THUMB(                bx      r4      )               @ entry point is always ARM for non ARMv7M CPUs
->> >>
->> >
->> > I think it would be much nicer to avoid sprinkling #ifdefs here. We already
->> > have the ARM() and THUMB() macros to deal with the two cases we support, which
->> > are booting in ARM mode vs ARMv7-A with THUMB2 mode. We can probably add
->> > another macro like this to deal with the ARMv7-M case that does not have
->> > ARM mode.
->>
->> Well, I guess I could make a THUMBONLY macro or something like that.
->> But I think that the macro would only be useful in the case you quoted
->> above. The other ifdefs in the patch are either for large blocks or
->> removing code. So I don't think it would improve the patch a great
->> deal.
->>
->> btw, do you have better name suggestion than THUMBONLY?
->
-> It looks like you would need the reverse as well, !THUMBONLY. What about
-> M_CLASS and A_CLASS (with or without underscore and maybe AR_CLASS if we
-> ever need to differentiate between A and R)?
+Hi Josh,
 
-Yes, that would remove more of the ifdefs.
-With M_CLASS/A_CLASS macros I could also wrap ".arch armv7-m" and
-".arm" directives. But A_CLASS might look a bit strange when used for
-ARM CPUs that are not called Cortex.
+Tested this patch on IFC6410 by disabling pinctrl ps_hold reset
+implementation and on top of Guenter's patchset for restart_notifier.
 
-I'll cook up a new patch and see how it turns out.
+Tested-by: pramod.gurav at smartplayin.com
 
-regards,
-Joachim Eastwood
+I picked up DT changes from bindings as they are from this patchset.
+
+Thanks
+Pramod
+On Friday 19 September 2014 03:57 AM, Josh Cartwright wrote:
+> The WDT's BITE_TIME warm-reset behavior can be leveraged as a last
+> resort mechanism for triggering chip reset.  Usually, other restart
+> methods (such as PS_HOLD) are preferrable for issuing a more complete
+> reset of the chip.  As such, keep the priority of the watchdog notifier
+> low.
+> 
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  drivers/watchdog/qcom-wdt.c | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+> index e9409f5..710ab43 100644
+> --- a/drivers/watchdog/qcom-wdt.c
+> +++ b/drivers/watchdog/qcom-wdt.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+>  #include <linux/watchdog.h>
+>  
+>  #define WDT_RST		0x0
+> @@ -24,6 +25,7 @@
+>  struct qcom_wdt {
+>  	struct watchdog_device	wdd;
+>  	unsigned long		freq;
+> +	struct notifier_block	restart_nb;
+>  	void __iomem		*base;
+>  };
+>  
+> @@ -82,6 +84,24 @@ static const struct watchdog_info qcom_wdt_info = {
+>  	.identity	= KBUILD_MODNAME,
+>  };
+>  
+> +static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
+> +			    void *data)
+> +{
+> +	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
+> +
+> +	/*
+> +	 * Trigger watchdog bite:
+> +	 *    Setup BITE_TIME to be very low, and enable WDT.
+> +	 */
+> +	mutex_lock(&wdt->wdd.lock);
+> +	writel_relaxed(0, wdt->base + WDT_EN);
+> +	writel_relaxed(1, wdt->base + WDT_RST);
+> +	writel_relaxed(0x31F3, wdt->base + WDT_BITE_TIME);
+> +	writel_relaxed(1, wdt->base + WDT_EN);
+> +	mutex_unlock(&wdt->wdd.lock);
+> +	return NOTIFY_DONE;
+> +}
+> +
+>  static int qcom_watchdog_probe(struct platform_device *pdev)
+>  {
+>  	struct qcom_wdt *wdt;
+> @@ -121,6 +141,17 @@ static int qcom_watchdog_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	/*
+> +	 * WDT restart notifier has priority 0 (use as a last resort)
+> +	 */
+> +	wdt->restart_nb.notifier_call = qcom_wdt_restart;
+> +	ret = register_restart_handler(&wdt->restart_nb);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to setup restart handler\n");
+> +		watchdog_unregister_device(&wdt->wdd);
+> +		return ret;
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> 
