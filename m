@@ -1,36 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Sep 2014 13:14:21 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8a7740 legacy: Fix copied bug in comment
+Date: Fri, 19 Sep 2014 13:14:20 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7794: Reserve memory as other R-Car
+ Gen2 SoCs
 In-Reply-To: <cover.1411100007.git.horms+renesas@verge.net.au>
 References: <cover.1411100007.git.horms+renesas@verge.net.au>
-Message-ID: <8237f9e5c38098aeb8570a77bacd0fe0ebc61dfa.1411100007.git.horms+renesas@verge.net.au>
+Message-ID: <299e14734c22994e69c913e66ab1f4bb56423f5d.1411100007.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-The corresponding bug in pm-sh7372.c was fixed in commit
-70fe7b24672a988f ("ARM: shmobile: Do not access sh7372 A4S domain
-internals directly").
+Other R-Car Gen2 SoCs such as r8a7790 and r8a7791 reserve
+the top 256 MiB of memory for use with CMA. Adjust the
+board-less r8a7794 code to do the same.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-r8a7740.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7794.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index a0d44d5..94c8815 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -18,7 +18,7 @@ static int r8a7740_pd_a4s_suspend(void)
- {
- 	/*
- 	 * The A4S domain contains the CPU core and therefore it should
--	 * only be turned off if the CPU is in use.
-+	 * only be turned off if the CPU is not in use.
- 	 */
- 	return -EBUSY;
- }
+diff --git a/arch/arm/mach-shmobile/setup-r8a7794.c b/arch/arm/mach-shmobile/setup-r8a7794.c
+index c10acd1..d2b0930 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7794.c
++++ b/arch/arm/mach-shmobile/setup-r8a7794.c
+@@ -28,5 +28,6 @@ DT_MACHINE_START(R8A7794_DT, "Generic R8A7794 (Flattened Device Tree)")
+ 	.init_early	= shmobile_init_delay,
+ 	.init_late	= shmobile_init_late,
+ 	.init_time	= rcar_gen2_timer_init,
++	.reserve	= rcar_gen2_reserve,
+ 	.dt_compat	= r8a7794_boards_compat_dt,
+ MACHINE_END
 -- 
 2.0.1
