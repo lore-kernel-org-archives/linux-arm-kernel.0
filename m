@@ -1,52 +1,214 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 18 Sep 2014 22:56:23 -0700
-Subject: [RFC] arm: Handle starting up in secure mode
-In-Reply-To: <54198BDE.8000509@codeaurora.org>
-References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
- <5418AA80.4090102@codeaurora.org> <54198BDE.8000509@codeaurora.org>
-Message-ID: <CAFEAcA-Z_KqCrBRKLxtEaca3jAH35Xx=CqOr36KgAGfFrE91nw@mail.gmail.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Fri, 19 Sep 2014 14:05:29 +0800
+Subject: [PATCH v3 2/3] power: reset: imx-snvs-poweroff: add power off
+ driver for i.mx6
+In-Reply-To: <20140918175316.GA10911@leverpostej>
+References: <1410947881-7345-1-git-send-email-b38343@freescale.com>
+ <1410947881-7345-3-git-send-email-b38343@freescale.com>
+ <20140917175244.GC7983@leverpostej>
+ <20140918022125.GA8150@Robin-OptiPlex-780>
+ <20140918175316.GA10911@leverpostej>
+Message-ID: <20140919060512.GA3872@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2014 06:25, Christopher Covington <cov@codeaurora.org> wrote:
-> On 09/16/2014 05:24 PM, Christopher Covington wrote:
->> On 09/16/2014 05:09 PM, Christopher Covington wrote:
->>> ARM Linux currently has the most features available to it in hypervisor
->>> (HYP) mode, so switch to it when possible. This can also ensure proper
->>> reset of newer registers such as CNTVOFF.
->>>
->>> The permissions on the Non-Secure Access Control Register (NSACR) are
->>> used to probe what the security setting currently is when in supervisor
->>> (SVC) mode.
->>
->> Sorry, this doesn't work yet. I was misinterpreting my test results. For what
->> it's worth, my testing and development methodology is to run it after hacked
->> up versions of the semihosting bootwrapper on the simulator that corresponds
->> to rtsm_ve-aemv8a.dtb (AEM VE FVP these days?) and examine the instruction traces.
->
-> Looks like the real problem was that I was hacking up the bootwrapper
-> incorrectly--my start-in-secure-mode bootwrapper variant wasn't setting up the
-> GIC for non-secure access. With that changed, I've tested the following
-> variations using the Image file in a single core configuration.
->
-> Start in non-secure SVC with non-secure access to GIC configured.
->
-> Start in secure SVC with non-secure access to GIC configured.
->
-> Start in secure SVC with non-secure access to GIC configured and hypervisor
-> support disabled in the model (-C cluster.has_el2=0). This required setting
-> the VBAR again in non-secure SVC but with that fix it seems to work. I'll
-> include this change in v2.
+On Thu, Sep 18, 2014 at 06:53:16PM +0100, Mark Rutland wrote:
+> On Thu, Sep 18, 2014 at 03:21:27AM +0100, Robin Gong wrote:
+> > On Wed, Sep 17, 2014 at 06:52:44PM +0100, Mark Rutland wrote:
+> > > On Wed, Sep 17, 2014 at 10:57:59AM +0100, Robin Gong wrote:
+> > > > This driver register pm_power_off with snvs power off function. If
+> > > > your boards NOT use PMIC_ON_REQ to turn on/off external pmic, or use
+> > > > other pin to do, please disable the driver in dts, otherwise, your
+> > > > pm_power_off maybe overwrote by this driver.
+> > > > 
+> > > > Signed-off-by: Robin Gong <b38343@freescale.com>
+> > > > ---
+> > > >  .../bindings/power_supply/imx-snvs-poweroff.txt    |   23 +++++++
+> > > >  drivers/power/reset/Kconfig                        |    9 +++
+> > > >  drivers/power/reset/Makefile                       |    1 +
+> > > >  drivers/power/reset/imx-snvs-poweroff.c            |   66 ++++++++++++++++++++
+> > > >  4 files changed, 99 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
+> > > >  create mode 100644 drivers/power/reset/imx-snvs-poweroff.c
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt b/Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
+> > > > new file mode 100644
+> > > > index 0000000..6caf64e
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
+> > > > @@ -0,0 +1,23 @@
+> > > > +i.mx6 Poweroff Driver
+> > > > +
+> > > > +SNVS_LPCR in SNVS module can power off the whole system by pull
+> > > > +PMIC_ON_REQ low if PMIC_ON_REQ is connected with external PMIC.
+> > > > +If you don't want to use PMIC_ON_REQ as power on/off control,
+> > > > +please set status='disabled' to disable this driver.
+> > > > +
+> > > > +Required Properties:
+> > > > +-compatible: "fsl,sec-v4.0-poweroff"
+> > > > +-reg: Specifies the physical address of the SNVS_LPCR register
+> > > 
+> > > As you describe above, this is part of the SNVS module. So why does this
+> > > need a separate node?
+> > > 
+> > > Surely there should just be a property on the SNVS node that desribers
+> > > whether or not this can be used?
+> > > 
+> > > Mark.
+> > >
+> > Yes, put this function in rtc-snvs make things easier, honestly,this is our way
+> > in internal tree. But looks more and more power off driver put in drivers/power
+> > /reset,so we decided to add new power off driver. If it is ok to register
+> > pm_power_off hook in drivers/rtc/rtc-snvs.c, I can drop this patch.
+> 
+> My view would be that the ability to power off the system is a feature
+> of some SNVS modules, and that the SNVS_LPCR register is not a
+> sufficiently large sub-block to be described separately. I am not a fan
+> of partitioning HW to match Linux implementation details rather than its
+> logical structure.
+No, actually snvs cover the  SNVS_LPCR register. This patch only want to put
+pm_power_off under drivers/power/reset instead of drivers/rtc. I'll create
+another straightfoward snvs-patch to try, thanks.
 
-If you're relying on the boot loader to set up the GIC to support
-non-secure access anyway, why not just have it boot the kernel in Hyp
-like the boot protocol document recommends? (The same thing as the GIC
-is going to apply for any other hardware that needs configuration to
-allow NS access; if we need the firmware to deal with this we might as
-well just have it boot us in the right mode too.)
-
-Incidentally, on a v7 CPU without the Security Extensions the VBAR
-doesn't exist at all, so your code is going to UNDEF at an earlier
-point than you think it is...
-
--- PMM
+> 
+> So, asuming the layout of the SNS block is well-defined I'd just expect
+> a top-level SNVS node, with a driver that can decompose the block
+> appropriately and portion it out to different drivers as necessary.
+> 
+> I am not familiar with the hardware, so perhaps that is not a good idea.
+> How variable is the SNVS block?
+> 
+> Mark.
+> 
+> > > > +
+> > > > +Example:
+> > > > +	snvs at 020cc000 {
+> > > > +		compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> > > > +		#address-cells = <1>;
+> > > > +		#size-cells = <1>;
+> > > > +		ranges = <0 0x020cc000 0x4000>;
+> > > > +		.....
+> > > > +		snvs-poweroff at 38 {
+> > > > +			compatible = "fsl,sec-v4.0-poweroff";
+> > > > +			reg = <0x38 0x4>;
+> > > > +		};
+> > > > +	}
+> > > > diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> > > > index ca41523..b26c547 100644
+> > > > --- a/drivers/power/reset/Kconfig
+> > > > +++ b/drivers/power/reset/Kconfig
+> > > > @@ -45,6 +45,15 @@ config POWER_RESET_HISI
+> > > >  	help
+> > > >  	  Reboot support for Hisilicon boards.
+> > > >  
+> > > > +config POWER_RESET_IMX
+> > > > +	bool "IMX6 power-off driver"
+> > > > +	depends on POWER_RESET && SOC_IMX6
+> > > > +	help
+> > > > +	  This driver support power off external PMIC by PMIC_ON_REQ on i.mx6
+> > > > +	  boards.If you want to use other pin to control external power,please
+> > > > +	  say N here or disable in dts to make sure pm_power_off never be
+> > > > +	  overwrote wrongly by this driver.
+> > > > +
+> > > >  config POWER_RESET_MSM
+> > > >  	bool "Qualcomm MSM power-off driver"
+> > > >  	depends on POWER_RESET && ARCH_QCOM
+> > > > diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> > > > index a42e70e..2524daf 100644
+> > > > --- a/drivers/power/reset/Makefile
+> > > > +++ b/drivers/power/reset/Makefile
+> > > > @@ -3,6 +3,7 @@ obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
+> > > >  obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
+> > > >  obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+> > > >  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+> > > > +obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
+> > > >  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+> > > >  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+> > > >  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+> > > > diff --git a/drivers/power/reset/imx-snvs-poweroff.c b/drivers/power/reset/imx-snvs-poweroff.c
+> > > > new file mode 100644
+> > > > index 0000000..d726ac4
+> > > > --- /dev/null
+> > > > +++ b/drivers/power/reset/imx-snvs-poweroff.c
+> > > > @@ -0,0 +1,66 @@
+> > > > +/* Power off driver for i.mx6
+> > > > + * Copyright (c) 2014, FREESCALE CORPORATION.  All rights reserved.
+> > > > + *
+> > > > + * based on msm-poweroff.c
+> > > > + *
+> > > > + * This program is free software; you can redistribute it and/or modify
+> > > > + * it under the terms of the GNU General Public License version 2 and
+> > > > + * only version 2 as published by the Free Software Foundation.
+> > > > + *
+> > > > + * This program is distributed in the hope that it will be useful,
+> > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > > + * GNU General Public License for more details.
+> > > > + *
+> > > > + */
+> > > > +
+> > > > +#include <linux/err.h>
+> > > > +#include <linux/init.h>
+> > > > +#include <linux/io.h>
+> > > > +#include <linux/kernel.h>
+> > > > +#include <linux/module.h>
+> > > > +#include <linux/of.h>
+> > > > +#include <linux/of_address.h>
+> > > > +#include <linux/platform_device.h>
+> > > > +
+> > > > +static void __iomem *snvs_base;
+> > > > +
+> > > > +static void do_imx_poweroff(void)
+> > > > +{
+> > > > +	u32 value = readl(snvs_base);
+> > > > +
+> > > > +	/* set TOP and DP_EN bit */
+> > > > +	writel(value | 0x60, snvs_base);
+> > > > +}
+> > > > +
+> > > > +static int imx_poweroff_probe(struct platform_device *pdev)
+> > > > +{
+> > > > +	snvs_base = of_iomap(pdev->dev.of_node, 0);
+> > > > +	if (!snvs_base) {
+> > > > +		dev_err(&pdev->dev, "failed to get memory\n");
+> > > > +		return -EIO;
+> > > > +	}
+> > > > +
+> > > > +	pm_power_off = do_imx_poweroff;
+> > > > +	return 0;
+> > > > +}
+> > > > +
+> > > > +static const struct of_device_id of_imx_poweroff_match[] = {
+> > > > +	{ .compatible = "fsl,sec-v4.0-poweroff", },
+> > > > +	{},
+> > > > +};
+> > > > +MODULE_DEVICE_TABLE(of, of_imx_poweroff_match);
+> > > > +
+> > > > +static struct platform_driver imx_poweroff_driver = {
+> > > > +	.probe = imx_poweroff_probe,
+> > > > +	.driver = {
+> > > > +		.name = "imx-snvs-poweroff",
+> > > > +		.of_match_table = of_match_ptr(of_imx_poweroff_match),
+> > > > +	},
+> > > > +};
+> > > > +
+> > > > +static int __init imx_poweroff_init(void)
+> > > > +{
+> > > > +	return platform_driver_register(&imx_poweroff_driver);
+> > > > +}
+> > > > +device_initcall(imx_poweroff_init);
+> > > > -- 
+> > > > 1.7.9.5
+> > > > 
+> > > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
