@@ -1,59 +1,50 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 19 Sep 2014 18:03:42 +0200
-Subject: [PATCH v2 2/2] ARM: dts: vf610-colibri: Add backlight support
-In-Reply-To: <bae435d33cac93fd5f0c763fbe7bb302b52a6f0f.1411130205.git.bhuvanchandra.dv@toradex.com>
-References: <cover.1411130205.git.bhuvanchandra.dv@toradex.com>
- <bae435d33cac93fd5f0c763fbe7bb302b52a6f0f.1411130205.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <6548345144e6eb9f252bfa35e9783079@agner.ch>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 19 Sep 2014 18:16:20 +0200
+Subject: [PATCH 4/5] arm: imx53: clk: add ARM clock
+In-Reply-To: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
+References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1411143381-10516-5-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-19 15:38, schrieb Bhuvanchandra DV:
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> ---
->  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
->  arch/arm/boot/dts/vf610-colibri.dtsi        |    6 ++++++
->  2 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> index 00f63d9..711cf82 100644
-> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-> @@ -19,6 +19,12 @@
->  	};
->  };
->  
-> +&bl {
-> +	brightness-levels = <0 4 8 16 32 64 128 255>;
-> +	default-brightness-level = <6>;
-> +	status  = "okay";
-> +};
-> +
->  &esdhc1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_esdhc1>;
-> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi
-> b/arch/arm/boot/dts/vf610-colibri.dtsi
-> index 560cd69..20b1c15 100644
-> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-> @@ -13,6 +13,12 @@
->  	model = "Toradex Colibri VF61 COM";
->  	compatible = "toradex,vf610-colibri_vf61", "fsl,vf610";
->  
-> +	bl: backlight {
-> +		compitable = "pwm-backlight";
-> +		pwms = <&pwm0 0 5000000 0>;
-> +		status = "disabled";
-> +	};
-> +
+The ARM clock is a virtual clock feeding the ARM partition of
+the SoC. It controls multiple other clocks to ensure the right
+sequencing when cpufreq changes the CPU clock rate.
 
-Typo, "compitable" is not a valid property...
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx51-imx53.c    | 5 +++++
+ include/dt-bindings/clock/imx5-clock.h | 3 ++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-When this is fixed,
-Acked-By: Stefan Agner <stefan@agner.ch>
-
->  	clocks {
->  		enet_ext {
->  			compatible = "fixed-clock";
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index aafccf4b47c2..0f7e536147cb 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -541,6 +541,11 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_CKO2]		= imx_clk_gate2("cko2", "cko2_podf", MXC_CCM_CCOSR, 24);
+ 	clk[IMX5_CLK_SPDIF_XTAL_SEL]	= imx_clk_mux("spdif_xtal_sel", MXC_CCM_CSCMR1, 2, 2,
+ 						mx53_spdif_xtal_sel, ARRAY_SIZE(mx53_spdif_xtal_sel));
++	clk[IMX5_CLK_ARM]		= imx_clk_cpu("arm", "cpu_podf",
++						clk[IMX5_CLK_CPU_PODF],
++						clk[IMX5_CLK_CPU_PODF_SEL],
++						clk[IMX5_CLK_PLL1_SW],
++						clk[IMX5_CLK_STEP_SEL]);
+ 
+ 	imx_check_clocks(clk, ARRAY_SIZE(clk));
+ 
+diff --git a/include/dt-bindings/clock/imx5-clock.h b/include/dt-bindings/clock/imx5-clock.h
+index 1a36ff4ace1e..f4b7478e23c8 100644
+--- a/include/dt-bindings/clock/imx5-clock.h
++++ b/include/dt-bindings/clock/imx5-clock.h
+@@ -200,6 +200,7 @@
+ #define IMX5_CLK_SATA_REF		188
+ #define IMX5_CLK_STEP_SEL		189
+ #define IMX5_CLK_CPU_PODF_SEL		190
+-#define IMX5_CLK_END			191
++#define IMX5_CLK_ARM			191
++#define IMX5_CLK_END			192
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX5_H */
+-- 
+2.1.0
