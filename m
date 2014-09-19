@@ -1,93 +1,42 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 18 Sep 2014 21:03:18 -0700
-Subject: [PATCH 3/3] watchdog: qcom: register a restart notifier
-In-Reply-To: <20140919033202.GF3749@joshc.qualcomm.com>
-References: <cover.1411078425.git.joshc@codeaurora.org>
- <d0f4cd93ad3f6690d637413b1171ac3c71aba861.1411078426.git.joshc@codeaurora.org>
- <541B995A.6000609@roeck-us.net> <20140919033202.GF3749@joshc.qualcomm.com>
-Message-ID: <541BAB06.7040502@roeck-us.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 19 Sep 2014 13:14:13 +0900
+Subject: [GIT PULL] Fifth Round of Renesas ARM Based SoC DT Updates for v3.18
+Message-ID: <cover.1411099817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 08:32 PM, Josh Cartwright wrote:
-> On Thu, Sep 18, 2014 at 07:47:54PM -0700, Guenter Roeck wrote:
->> On 09/18/2014 03:27 PM, Josh Cartwright wrote:
->>> The WDT's BITE_TIME warm-reset behavior can be leveraged as a last
->>> resort mechanism for triggering chip reset.  Usually, other restart
->>> methods (such as PS_HOLD) are preferrable for issuing a more complete
->>> reset of the chip.  As such, keep the priority of the watchdog notifier
->>> low.
->>>
->>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> [..]
->>> +static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
->>> +			    void *data)
->>> +{
->>> +	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
->>> +
->>> +	/*
->>> +	 * Trigger watchdog bite:
->>> +	 *    Setup BITE_TIME to be very low, and enable WDT.
->>> +	 */
->>> +	mutex_lock(&wdt->wdd.lock);
->>
->> At this time you don't need to worry about locks.
->>
->> Actually, this might be dangerous if the lock happens to be taken,
->> as it won't be released (there is no other code running anymore
->> when this function is called).
->
-> Ah, great.  I'll drop the locking.
->
->>> +	writel_relaxed(0, wdt->base + WDT_EN);
->>> +	writel_relaxed(1, wdt->base + WDT_RST);
->>> +	writel_relaxed(0x31F3, wdt->base + WDT_BITE_TIME);
->>
->> What is the magic here, ie what does 0x31F3 stand for ?
->
-> Nothing magic, it's just a reasonably low value to set the bite time
-> counter at.  It also happens to be the value at reset.
->
-Can you add a note explaining that this reflects a reset delay of <n>
-milliseconds or whatever it is ?
+Hi Olof, Hi Kevin, Hi Arnd,
 
->>> +	writel_relaxed(1, wdt->base + WDT_EN);
->>> +	mutex_unlock(&wdt->wdd.lock);
->>> +	return NOTIFY_DONE;
->>> +}
->>> +
->>>   static int qcom_watchdog_probe(struct platform_device *pdev)
->>>   {
->>>   	struct qcom_wdt *wdt;
->>> @@ -121,6 +141,17 @@ static int qcom_watchdog_probe(struct platform_device *pdev)
->>>   		return ret;
->>>   	}
->>>
->>> +	/*
->>> +	 * WDT restart notifier has priority 0 (use as a last resort)
->>> +	 */
->>> +	wdt->restart_nb.notifier_call = qcom_wdt_restart;
->>> +	ret = register_restart_handler(&wdt->restart_nb);
->>> +	if (ret) {
->>> +		dev_err(&pdev->dev, "failed to setup restart handler\n");
->>> +		watchdog_unregister_device(&wdt->wdd);
->>> +		return ret;
->>
->> Sure you want to return an error here ? The watchdog itself is still working,
->> and this is supposed to be a restart method of last resort. Causing the driver
->> to fail loading because it can not register its restart handler seems to be
->> a bit aggressive.
->
-> It is a bit aggressive.  I'll at least drop it to a dev_warn(); even
-> though it is a "last resort", on some boards it's the only available
-> mechanism for reliable restart.
->
-Sure, but the problem is that you don't let people use the watchdog just
-because restart handler registration failed. dev_err or dev_warn is fine,
-my concern was not the message but that you abort watchdog registration
-in this case.
+Please consider these fifth round of Renesas ARM based SoC DT updates for v3.18.
 
-Kind of letting people not use their car just because one of its lights
-failed.
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt4-for-v3.18,
+which I have already sent a pull-request for.
 
-Guenter
+
+The following changes since commit a742795be9ceae2853ca71f216193f29da151da8:
+
+  ARM: shmobile: Initial Alt board device tree (2014-09-09 11:29:27 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt5-for-v3.18
+
+for you to fetch changes up to 08adafd4a1f8c9b6e2c49d955a0e45743c9ffd9a:
+
+  ARM: shmobile: Add manufacturer for KZM boards (2014-09-17 09:23:14 +0900)
+
+----------------------------------------------------------------
+Fifth Round of Renesas ARM Based SoC DT Updates for v3.18
+
+* Document manufacturer for KZM boards
+* Use SoC-specific irqc compatible property
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a73a4 dtsi: Add SoC-specific irqc compatible property
+      ARM: shmobile: Add manufacturer for KZM boards
+
+ Documentation/devicetree/bindings/arm/shmobile.txt | 6 +++---
+ arch/arm/boot/dts/r8a73a4.dtsi                     | 4 ++--
+ 2 files changed, 5 insertions(+), 5 deletions(-)
