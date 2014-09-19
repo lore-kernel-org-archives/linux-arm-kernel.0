@@ -1,37 +1,123 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 19 Sep 2014 11:27:23 -0700
-Subject: [PATCH] MAINTAINERS: add a third maintainer to mach-bcm
-In-Reply-To: <1411150632-25695-2-git-send-email-f.fainelli@gmail.com>
-References: <1411150632-25695-1-git-send-email-f.fainelli@gmail.com>
- <1411150632-25695-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20140919182723.GK1193@ld-irv-0074>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 19 Sep 2014 20:27:33 +0200
+Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
+Message-ID: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 11:17:12AM -0700, Florian Fainelli wrote:
-> Add myself as a third maintainer to the mach-bcm code to increase the
-> chances the redundancy in the merging/reviewing process.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Changes in v5:
+	- Converted dev_pm_domain_detach() to a void function
+	- Added a ->detach() callback to the PM domain struct, invoked from the
+	  dev_pm_domain_detach().
+	- Make ACPI and genpd both assign the ->detach() callback at successfull
+	  attachment.
+	- The above changes made it possible to make acpi_pm_domain_detach() to
+	  be static, added a separate patch for that.
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Changes in v4:
+	- Rebased patch "PM / Domains: Add generic OF-based PM domain look-up" -
+	  and updated the author and the commit message.
+	- Adopted review comments for "PM / Domains: Add APIs to attach/detach
+	  a PM domain for a device".
+	- Updated author and commit message for "ARM: exynos: Move to generic
+	  PM domain DT bindings".
+	- Added some acks and reviewed by tags.
+	- Started to use the "--in-reply-to" option to git-send-email. It should
+	  provide the option to show a better diffstat per patch.
 
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 809ecd680d88..e0762fea2d02 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2004,6 +2004,7 @@ F:	drivers/net/ethernet/broadcom/bnx2x/
->  BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
->  M:	Christian Daudt <bcm@fixthebug.org>
->  M:	Matt Porter <mporter@linaro.org>
-> +M:	Florian Fainelli <f.fainelli@gmail.com>
->  L:	bcm-kernel-feedback-list at broadcom.com
->  T:	git git://github.com/broadcom/mach-bcm
->  S:	Maintained
-> -- 
-> 1.9.1
-> 
+Changes in v3:
+	- Aligned on terminology, now using "PM domain" in comments and commit
+	- messages/headers.
+	- Improved English and grammar in comments and commit messages/headers.
+	- Adopted proposal from Geert, to have compile-time-check wrapper
+	  functions for the API that adds xlate_simple and xlate_onecell
+	  providers.
+ 	- Renamed "domain_num" to "num_domains", in genpd_onecell_data struct.
+	- Handle non-contiguous arrays for onecell PM domain providers.
+	- Rebased the Exynos patch to follow the new genpd API changes.
+
+
+Changes in v2:
+	- Fix the ACPI patch, it didn't even compile for CONFIG_ACPI.
+	- Updated some comments in code and in commit messages.
+	- Fixed the dev_pm_domain_attach API to handle EPROBE_DEFER properly.
+	- Rebased the ARM Exynos patch.
+	- Added some Tested-by tags.
+
+
+This patchset has a bit of a history and some parts of it has been posted
+earlier.
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
+
+In the first revision I intentially didn't increase version number of the
+patches, since I think it would have cause more confusion than clarity.
+
+A summary of changes in V1 and since the last patchset, from the link above:
+	- Instead of letting driver core handling the device to power domain
+	binding/unbinding, follow the behavior of how the ACPI power domain
+	is handled.
+
+
+This is a summary of what these patches are intended to do:
+
+1)
+Add generic power domain OF-based support which also includes APIs to handle
+attach/detach of generic power domains to devices.
+
+2)
+Adding a common API to attach/detach power domains and include support for the
+ACPI and the generic power domain in there.
+
+3)
+>From subsystem level code, at probe/remove, convert from invoking the ACPI
+specific power domain attach/detach functions to the new common attach/detach
+APIs.
+
+4)
+Add support for the AMBA bus to attach/detach power domains, using the new
+common APIs.
+
+5)
+Convert Exynos to use the new generic power domain OF support.
+
+Obviously, there are dependencies througout this patchset, which means if they
+get accepted the all need to go together. It might also be convenient to share
+them through an immutable branch.
+
+
+Tomasz Figa (2):
+  PM / Domains: Add generic OF-based PM domain look-up
+  ARM: exynos: Move to generic PM domain DT bindings
+
+Ulf Hansson (9):
+  PM / Domains: Add a detach callback to the struct dev_pm_domain
+  ACPI / PM: Assign the ->detach() callback when attaching the PM domain
+  PM / Domains: Add APIs to attach/detach a PM domain for a device
+  drivercore / platform: Convert to dev_pm_domain_attach|detach()
+  i2c: core: Convert to dev_pm_domain_attach|detach()
+  mmc: sdio: Convert to dev_pm_domain_attach|detach()
+  spi: core: Convert to dev_pm_domain_attach|detach()
+  amba: Add support for attach/detach of PM domains
+  ACPI / PM: Convert acpi_dev_pm_detach() into a static function
+
+ .../bindings/arm/exynos/power_domain.txt           |  13 +-
+ .../devicetree/bindings/power/power_domain.txt     |  49 ++++
+ arch/arm/mach-exynos/pm_domains.c                  |  78 +-----
+ drivers/acpi/device_pm.c                           |  71 ++---
+ drivers/amba/bus.c                                 |  10 +-
+ drivers/base/platform.c                            |  15 +-
+ drivers/base/power/common.c                        |  52 ++++
+ drivers/base/power/domain.c                        | 289 +++++++++++++++++++++
+ drivers/i2c/i2c-core.c                             |  13 +-
+ drivers/mmc/core/sdio_bus.c                        |   4 +-
+ drivers/spi/spi.c                                  |  12 +-
+ include/linux/acpi.h                               |   2 -
+ include/linux/pm.h                                 |  12 +
+ include/linux/pm_domain.h                          |  52 ++++
+ kernel/power/Kconfig                               |   4 +
+ 15 files changed, 535 insertions(+), 141 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+
+-- 
+1.9.1
