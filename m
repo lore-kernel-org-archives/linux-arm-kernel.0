@@ -1,120 +1,219 @@
-From: dborkman@redhat.com (Daniel Borkmann)
-Date: Fri, 19 Sep 2014 14:56:57 +0200
-Subject: [PATCH net-next v2] net: bpf: arm: make hole-faulting more robust
-Message-ID: <1411131417-23667-1-git-send-email-dborkman@redhat.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 19 Sep 2014 18:36:49 +0530
+Subject: [PATCH v4] mfd: syscon: Decouple syscon interface from platform
+ devices
+Message-ID: <1411132009-11173-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon pointed out, that the currently used opcode for filling holes,
-that is 0xe7ffffff, seems not robust enough ...
+Currently a syscon entity can be only registered directly through a
+platform device that binds to a dedicated syscon driver. However in
+certain use cases it is desirable to make a device used with another
+driver a syscon interface provider.
 
-  $ echo 0xffffffe7 | xxd -r > test.bin
-  $ arm-linux-gnueabihf-objdump -m arm -D -b binary test.bin
-  ...
-  0: e7ffffff     udf    #65535  ; 0xffff
+For example, certain SoCs (e.g. Exynos) contain system controller
+blocks which perform various functions such as power domain control,
+CPU power management, low power mode control, but in addition contain
+certain IP integration glue, such as various signal masks,
+coprocessor power control, etc. In such case, there is a need to have
+a dedicated driver for such system controller but also share registers
+with other drivers. The latter is where the syscon interface is helpful.
 
-... while for Thumb, it ends up as ...
+In case of DT based platforms, this patch decouples syscon object from
+syscon platform driver, and allows to create syscon objects first time
+when it is required by calling of syscon_regmap_lookup_by APIs and keep
+a list of such syscon objects along with syscon provider device_nodes
+and regmap handles.
 
-  0: ffff e7ff    vqshl.u64  q15, <illegal reg q15.5>, #63
+For non-DT based platforms, this patch keeps syscon platform driver
+structure where is can be probed and such non-DT based drivers can use
+syscon_regmap_lookup_by_pdev API and get access to regmap handles.
+Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
+we can completly remove platform driver of syscon, and keep only helper
+functions to get regmap handles.
 
-... which is a bit fragile. The ARM specification defines some *permanently*
-guaranteed undefined instruction (UDF) space, for example for ARM in ARMv7-AR,
-section A5.4 and for Thumb in ARMv7-M, section A5.2.6.
-
-Similarly, ptrace, kprobes, kgdb, bug and uprobes make use of such instruction
-as well to trap. Given mentioned section from the specification, we can find
-such a universe as (where 'x' denotes 'don't care'):
-
-  ARM:    xxxx 0111 1111 xxxx xxxx xxxx 1111 xxxx
-  Thumb:  1101 1110 xxxx xxxx
-
-We therefore should use a more robust opcode that fits both. Russell King
-suggested that we can even reuse a single 32-bit word, that is, 0xe7fddef1
-which will fault if executed in ARM *or* Thumb mode as done in f928d4f2a86f
-("ARM: poison the vectors page"). That will still hold our requirements:
-
-  $ echo 0xf1defde7 | xxd -r > test.bin
-  $ arm-unknown-linux-gnueabi-objdump -m arm -D -b binary test.bin
-  ...
-  0: e7fddef1     udf    #56801 ; 0xdde1
-  $ echo 0xf1defde7f1defde7f1defde7 | xxd -r > test.bin
-  $ arm-unknown-linux-gnueabi-objdump -marm -Mforce-thumb -D -b binary test.bin
-  ...
-  0: def1         udf    #241 ; 0xf1
-  2: e7fd         b.n    0x0
-  4: def1         udf    #241 ; 0xf1
-  6: e7fd         b.n    0x4
-  8: def1         udf    #241 ; 0xf1
-  a: e7fd         b.n    0x8
-
-So on ARM 0xe7fddef1 conforms to the above UDF pattern, and the low 16 bit
-likewise correspond to UDF in Thumb case. The 0xe7fd part is an unconditional
-branch back to the UDF instruction.
-
-Signed-off-by: Daniel Borkmann <dborkman@redhat.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mircea Gherzan <mgherzan@gmail.com>
-Cc: Alexei Starovoitov <ast@plumgrid.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- v1->v2:
-  - Use single word version instead of separately handling ARM and Thumb
+Changes since v3:
+ - Addressed Arnd's comment for v2.
+ - Updated of_syscon_register for adding dev pointer in regmap_init_mmio.
+ - For early users created dummy platform device.
+   
+Changes since v2:
+ - Added back platform device support from syscon, with one change that
+   syscon will not be probed for DT based platform.
+ - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
+   users of syscon will not be broken.
+ - Removed unwanted change in syscon.h.
+ - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
+   Arnd Bergmann.
+ - Added Tested-by of Vivek Gautam for testing on Exynos platform.
 
- arch/arm/net/bpf_jit_32.c |  6 +++---
- arch/arm/net/bpf_jit_32.h | 14 ++++++++++++++
- 2 files changed, 17 insertions(+), 3 deletions(-)
+Changes since v1:
+ - Removed of_syscon_unregister function.
+ - Modified of_syscon_register function and it will be used by syscon.c
+   to create syscon objects whenever required.
+ - Removed platform device support from syscon.
+ - Removed syscon_regmap_lookup_by_pdevname API support.
+ - As there are significant changes w.r.t patchset v1, I am taking over
+   author for this patchset from Tomasz Figa.
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 6b45f64..e1268f9 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -16,6 +16,7 @@
- #include <linux/string.h>
- #include <linux/slab.h>
- #include <linux/if_vlan.h>
-+
- #include <asm/cacheflush.h>
- #include <asm/hwcap.h>
- #include <asm/opcodes.h>
-@@ -175,11 +176,10 @@ static inline bool is_load_to_a(u16 inst)
+[1]: https://lkml.org/lkml/2014/9/2/299
+ drivers/mfd/syscon.c |  102 ++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 79 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+index ca15878..630de0a 100644
+--- a/drivers/mfd/syscon.c
++++ b/drivers/mfd/syscon.c
+@@ -15,6 +15,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/list.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+@@ -22,33 +23,100 @@
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/mfd/syscon.h>
++#include <linux/slab.h>
  
- static void jit_fill_hole(void *area, unsigned int size)
+ static struct platform_driver syscon_driver;
+ 
++static DEFINE_SPINLOCK(syscon_list_slock);
++static LIST_HEAD(syscon_list);
++
+ struct syscon {
++	struct device_node *np;
+ 	struct regmap *regmap;
++	struct list_head list;
++};
++
++static struct regmap_config syscon_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = 4,
+ };
+ 
+-static int syscon_match_node(struct device *dev, void *data)
++static struct syscon *of_syscon_register(struct device_node *np)
  {
--	/* Insert illegal UND instructions. */
--	u32 *ptr, fill_ins = 0xe7ffffff;
-+	u32 *ptr;
- 	/* We are guaranteed to have aligned memory. */
- 	for (ptr = area; size >= sizeof(u32); size -= sizeof(u32))
--		*ptr++ = fill_ins;
-+		*ptr++ = __opcode_to_mem_arm(ARM_INST_UDF);
+-	struct device_node *dn = data;
++	struct platform_device *pdev = NULL;
++	struct syscon *syscon;
++	struct regmap *regmap;
++	void __iomem *base;
++
++
++	if (!of_device_is_compatible(np, "syscon"))
++		return ERR_PTR(-EINVAL);
++
++	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
++	if (!syscon)
++		return ERR_PTR(-ENOMEM);
++
++	base = of_iomap(np, 0);
++	if (!base)
++		return ERR_PTR(-ENOMEM);
++
++	if (!of_device_is_available(np) ||
++			of_node_test_and_set_flag(np, OF_POPULATED)) {
++		/* if device is already populated and avaiable then use it */
++		pdev = of_find_device_by_node(np);
++		if (!(&pdev->dev))
++			return ERR_PTR(-ENODEV);
++
++	} else {
++		/* for early users create dummy syscon device and use it */
++		pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
++		if (!pdev)
++			return ERR_PTR(-ENOMEM);
++
++		pdev->name = "dummy-syscon";
++		pdev->id = -1;
++		device_initialize(&pdev->dev);
++		pdev->dev.of_node = np;
++	}
++
++	regmap = regmap_init_mmio(&pdev->dev, base, &syscon_regmap_config);
++	if (IS_ERR(regmap)) {
++		pr_err("regmap init failed\n");
++		return ERR_CAST(regmap);
++	}
++
++	syscon->regmap = regmap;
++	syscon->np = np;
+ 
+-	return (dev->of_node == dn) ? 1 : 0;
++	spin_lock(&syscon_list_slock);
++	list_add_tail(&syscon->list, &syscon_list);
++	spin_unlock(&syscon_list_slock);
++
++	return syscon;
  }
  
- static void build_prologue(struct jit_ctx *ctx)
-diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
-index afb8462..b2d7d92 100644
---- a/arch/arm/net/bpf_jit_32.h
-+++ b/arch/arm/net/bpf_jit_32.h
-@@ -114,6 +114,20 @@
+ struct regmap *syscon_node_to_regmap(struct device_node *np)
+ {
+-	struct syscon *syscon;
+-	struct device *dev;
++	struct syscon *entry, *syscon = NULL;
  
- #define ARM_INST_UMULL		0x00800090
+-	dev = driver_find_device(&syscon_driver.driver, NULL, np,
+-				 syscon_match_node);
+-	if (!dev)
+-		return ERR_PTR(-EPROBE_DEFER);
++	spin_lock(&syscon_list_slock);
  
-+/*
-+ * Use a suitable undefined instruction to use for ARM/Thumb2 faulting.
-+ * We need to be careful not to conflict with those used by other modules
-+ * (BUG, kprobes, etc) and the register_undef_hook() system.
-+ *
-+ * The ARM architecture reference manual guarantees that the following
-+ * instruction space will produce an undefined instruction exception on
-+ * all CPUs:
-+ *
-+ * ARM:   xxxx 0111 1111 xxxx xxxx xxxx 1111 xxxx	ARMv7-AR, section A5.4
-+ * Thumb: 1101 1110 xxxx xxxx				ARMv7-M, section A5.2.6
-+ */
-+#define ARM_INST_UDF		0xe7fddef1
+-	syscon = dev_get_drvdata(dev);
++	list_for_each_entry(entry, &syscon_list, list)
++		if (entry->np == np) {
++			syscon = entry;
++			break;
++		}
+ 
+-	return syscon->regmap;
++	spin_unlock(&syscon_list_slock);
 +
- /* register */
- #define _AL3_R(op, rd, rn, rm)	((op ## _R) | (rd) << 12 | (rn) << 16 | (rm))
- /* immediate */
++	if (!syscon)
++		syscon = of_syscon_register(np);
++
++	if (!IS_ERR(syscon))
++		return syscon->regmap;
++
++	return ERR_CAST(syscon);
+ }
+ EXPORT_SYMBOL_GPL(syscon_node_to_regmap);
+ 
+@@ -110,17 +178,6 @@ struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
+ }
+ EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
+ 
+-static const struct of_device_id of_syscon_match[] = {
+-	{ .compatible = "syscon", },
+-	{ },
+-};
+-
+-static struct regmap_config syscon_regmap_config = {
+-	.reg_bits = 32,
+-	.val_bits = 32,
+-	.reg_stride = 4,
+-};
+-
+ static int syscon_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -167,7 +224,6 @@ static struct platform_driver syscon_driver = {
+ 	.driver = {
+ 		.name = "syscon",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = of_syscon_match,
+ 	},
+ 	.probe		= syscon_probe,
+ 	.id_table	= syscon_ids,
 -- 
-1.7.11.7
+1.7.9.5
