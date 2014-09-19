@@ -1,146 +1,470 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 19 Sep 2014 15:12:56 -0500
-Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
-In-Reply-To: <20140918191615.GN14505@atomide.com>
-References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
- <20140918171650.GK14505@atomide.com> <20140918191615.GN14505@atomide.com>
-Message-ID: <541C8E48.6090306@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 19 Sep 2014 22:14:39 +0200
+Subject: [PATCH 3/8] ARM: mvebu: armada-xp: Use pinctrl node alias
+In-Reply-To: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1411157684-6991-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 02:16 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140918 10:17]:
->> * Tero Kristo <t-kristo@ti.com> [140901 11:09]:
->>> Hi,
->>>
->>> This set contains PRCM related cleanups meant for 3.18 merge window.
->>> These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
->>> (http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
->>> set is used as basis to avoid merge issues.
->>>
->>> Purpose of this work is to eventually convert the PRCM code into a
->>> separate driver, but this is done in incremental parts as the amount
->>> of changes is substantial. Expected conclusion of this work is 3.19
->>> if everything goes fine.
->>>
->>> This part of the work mostly moves some of the SoC specific PRCM driver
->>> calls under generic version of the same, and adds SoC-ops to support
->>> these on the driver level.
->>>
->>> Working branch posted here:
->>>
->>> tree: https://github.com/t-kristo/linux-pm.git
->>> branch: for-v3.18/prcm-cleanup
->>
->> Paul, any comments on this series?
-> 
-> Just gave this branch a quick try, it seems to work with off-idle
-> for me when merged with current linux-omap master branch. The following
-> merge resolution is needed because of the recent pre es3.1 fix though.
-> 
-> I've pushed out this merged with all the other pending patches into
-> omap-for-v3.18/tmp-merge-2014-09-18.
-> 
-> Nishant, care to give it a try and check your recent PM related
-> changes work with it?
-> 
-Sure. Sorry about the delay..  needed to find some workarounds for
-working with my board farm..
+Armada XP pinctrl node gained an alias, make use of it.
 
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  68 +++++-----
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  62 ++++-----
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi         |   8 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi         |   8 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi         |   8 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 164 +++++++++++------------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  14 +-
+ 7 files changed, 167 insertions(+), 165 deletions(-)
 
-Tested-by: Nishanth Menon <nm@ti.com>
-
-Based on:
-
-omap-for-v3.18/tmp-merge-2014-09-18
-0164b2d Merge branch 'omap-for-v3.18/prcm' into omap-for-v3.18/tmp-merge
-
-Test #1: basic testing
-Added
-69c6133 HACK: Makefile: Build a uImage with dtb already appended
-(for legacy boards)
-
-commit 0164b2dbe83e885a53b0c9a99a508bdbfdf7ee6d BASIC boot
- 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s2zy9OUOMM
- 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2t0JaiHYf
- 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2SRkMMQwp
- 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s20T0sq5dp
- 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s2AVYqDVBf
- 6: am43xx-gpevm:  Boot PASS: http://slexy.org/raw/s213N14B9r
- 7: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s21yyMkFRS
- 8: beagleboard-vanilla:  Boot PASS: http://slexy.org/raw/s2SYJOHRwI
- 9: beaglebone-black:  Boot PASS: http://slexy.org/raw/s214QDgb06
-10: beaglebone:  Boot PASS: http://slexy.org/raw/s21SOLcjMD
-11: craneboard:  Boot PASS: http://slexy.org/raw/s218cXoYSl
-12: dra72x-evm:  Boot FAIL: http://slexy.org/raw/s21BAnAW8N
-13: dra7xx-evm:  Boot PASS: http://slexy.org/raw/s21kf4G5Sh
-14: OMAP3430-Labrador(LDP):  Boot PASS: http://slexy.org/raw/s21QIGwFOM
-15:       n900:  Boot PASS: http://slexy.org/raw/s21T5xECo2
-16:  omap5-evm:  Boot PASS: http://slexy.org/raw/s20qxa3iPw
-17: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2Fh0hMW7n
-18: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s2vqUc528i
-19:    sdp2430:  Boot PASS: http://slexy.org/raw/s21gAsEAeD
-20:    sdp3430:  Boot PASS: http://slexy.org/raw/s2dvThSn5D
-TOTAL = 20 boards, Booted Boards = 19, No Boot boards = 1
-
-
-Test #2: PM test (cpufreq/cpuidle/suspend-resume where applicable)
-
-Testing script: (http://slexy.org/view/s21SRQehwu)
-
-Added the following patches:
-59bf40d ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
-(discussion still going on https://patchwork.kernel.org/patch/4764661/
-- but good to know if it still continues to work with PRM changes).
-
-69c6133 HACK: Makefile: Build a uImage with dtb already appended
-(for legacy boards)
-
-b854ca8 gpio: omap: Fix interrupt names
-(https://patchwork.kernel.org/patch/4854511/)
-
-c50fc8b pinctrl: single: AM437x: Add pinctrl compatibility
-37d17bf pinctrl: single: Add DRA7 pinctrl compatibility
-74121c6 pinctrl: bindings: Add OMAP pinctrl binding
-(all of the above are in linux-next)
-
-efb2486 clk: prevent erronous parsing of children during rate change
-b92ac70 clk: ti: dra7-atl: Provide error check for incoming parameters
-in set_rate
-96e8b6b clk: ti: divider: Provide error check for incoming parameters
-in set_rate
-(all above picked up by mike)
-
-92e5e74 ARM: OMAP2+ / pm_debug: add support for wakeup_timer configuration
-(wakeup timer for testing purposes - remote boards)
-
-with these:
-commit 0164b2dbe83e885a53b0c9a99a508bdbfdf7ee6d + Additional patches
-basic PM test
- 1: am335x-evm:  Boot PASS: http://slexy.org/raw/s2xRMuVHvj
- 2:  am335x-sk:  Boot PASS: http://slexy.org/raw/s2qEHyI9Rs
- 3: am3517-evm:  Boot PASS: http://slexy.org/raw/s2Vptpboop
- 4:  am37x-evm:  Boot PASS: http://slexy.org/raw/s21TKVsyet
- 5: am43xx-epos:  Boot PASS: http://slexy.org/raw/s20KGye4N9
- 6: am43xx-gpevm:  Boot PASS: http://slexy.org/raw/s201uuCOp2
- 7: BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s21ChQP74I
- 8: beagleboard-vanilla:  Boot PASS: http://slexy.org/raw/s20oagBAsl
- 9: beaglebone-black:  Boot PASS: http://slexy.org/raw/s2VT200vL0
-10: beaglebone:  Boot PASS: http://slexy.org/raw/s20raoHSya
-11: craneboard:  Boot PASS: http://slexy.org/raw/s2vq6MYXNZ
-12: dra72x-evm:  Boot FAIL: http://slexy.org/raw/s2EPseu0Jj
-13: dra7xx-evm:  Boot PASS: http://slexy.org/raw/s21JJGLkTU
-14: OMAP3430-Labrador(LDP):  Boot PASS: http://slexy.org/raw/s20Drlvdlp
-15:       n900:  Boot PASS: http://slexy.org/raw/s21aDnJ1Bi
-16:  omap5-evm:  Boot PASS: http://slexy.org/raw/s20ClvPKeK
-17: pandaboard-es:  Boot PASS: http://slexy.org/raw/s2L0dt0syP
-18: pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s2OlA9hfzy
-19:    sdp2430:  Boot PASS: http://slexy.org/raw/s20Kgf04TW
-20:    sdp3430:  Boot PASS: http://slexy.org/raw/s21p71QaVO
-TOTAL = 20 boards, Booted Boards = 19, No Boot boards = 1
-
-
-
+diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+index 546016148283..cdab007fbaf4 100644
+--- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
++++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+@@ -60,40 +60,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl: pin-ctrl at 18000 {
+-				pinctrl-0 = <&pmx_phy_int>;
+-				pinctrl-names = "default";
+-
+-				pmx_ge0: pmx-ge0 {
+-					marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+-						       "mpp4", "mpp5", "mpp6", "mpp7",
+-						       "mpp8", "mpp9", "mpp10", "mpp11";
+-					marvell,function = "ge0";
+-				};
+-
+-				pmx_ge1: pmx-ge1 {
+-					marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
+-						       "mpp16", "mpp17", "mpp18", "mpp19",
+-						       "mpp20", "mpp21", "mpp22", "mpp23";
+-					marvell,function = "ge1";
+-				};
+-
+-				pmx_keys: pmx-keys {
+-					marvell,pins = "mpp33";
+-					marvell,function = "gpio";
+-				};
+-
+-				pmx_spi: pmx-spi {
+-					marvell,pins = "mpp36", "mpp37", "mpp38", "mpp39";
+-					marvell,function = "spi";
+-				};
+-
+-				pmx_phy_int: pmx-phy-int {
+-					marvell,pins = "mpp32";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			serial at 12000 {
+ 				status = "okay";
+ 			};
+@@ -162,3 +128,37 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	pinctrl-0 = <&pmx_phy_int>;
++	pinctrl-names = "default";
++
++	pmx_ge0: pmx-ge0 {
++		marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
++			       "mpp4", "mpp5", "mpp6", "mpp7",
++			       "mpp8", "mpp9", "mpp10", "mpp11";
++		marvell,function = "ge0";
++	};
++
++	pmx_ge1: pmx-ge1 {
++		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
++			       "mpp16", "mpp17", "mpp18", "mpp19",
++			       "mpp20", "mpp21", "mpp22", "mpp23";
++		marvell,function = "ge1";
++	};
++
++	pmx_keys: pmx-keys {
++		marvell,pins = "mpp33";
++		marvell,function = "gpio";
++	};
++
++	pmx_spi: pmx-spi {
++		marvell,pins = "mpp36", "mpp37", "mpp38", "mpp39";
++		marvell,function = "spi";
++	};
++
++	pmx_phy_int: pmx-phy-int {
++		marvell,pins = "mpp32";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index baa43a004299..492cd8e3f424 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -51,37 +51,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl: pin-ctrl at 18000 {
+-				poweroff_pin: poweroff-pin {
+-					marvell,pins = "mpp24";
+-					marvell,function = "gpio";
+-				};
+-
+-				power_button_pin: power-button-pin {
+-					marvell,pins = "mpp44";
+-					marvell,function = "gpio";
+-				};
+-
+-				reset_button_pin: reset-button-pin {
+-					marvell,pins = "mpp45";
+-					marvell,function = "gpio";
+-				};
+-				select_button_pin: select-button-pin {
+-					marvell,pins = "mpp41";
+-					marvell,function = "gpio";
+-				};
+-
+-				scroll_button_pin: scroll-button-pin {
+-					marvell,pins = "mpp42";
+-					marvell,function = "gpio";
+-				};
+-
+-				hdd_led_pin: hdd-led-pin {
+-					marvell,pins = "mpp26";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			serial at 12000 {
+ 				status = "okay";
+ 			};
+@@ -282,3 +251,34 @@
+ 		gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
++
++&pinctrl {
++	poweroff_pin: poweroff-pin {
++		marvell,pins = "mpp24";
++		marvell,function = "gpio";
++	};
++
++	power_button_pin: power-button-pin {
++		marvell,pins = "mpp44";
++		marvell,function = "gpio";
++	};
++
++	reset_button_pin: reset-button-pin {
++		marvell,pins = "mpp45";
++		marvell,function = "gpio";
++	};
++	select_button_pin: select-button-pin {
++		marvell,pins = "mpp41";
++		marvell,function = "gpio";
++	};
++
++	scroll_button_pin: scroll-button-pin {
++		marvell,pins = "mpp42";
++		marvell,function = "gpio";
++	};
++
++	hdd_led_pin: hdd-led-pin {
++		marvell,pins = "mpp26";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index e24ef072b8cb..281ccd24295c 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -167,10 +167,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl: pin-ctrl at 18000 {
+-				compatible = "marvell,mv78230-pinctrl";
+-			};
+-
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+ 				reg = <0x18100 0x40>;
+@@ -195,3 +191,7 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	compatible = "marvell,mv78230-pinctrl";
++};
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 53dfb157b91a..d7a8d0b0f385 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -251,10 +251,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl: pin-ctrl at 18000 {
+-				compatible = "marvell,mv78260-pinctrl";
+-			};
+-
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+ 				reg = <0x18100 0x40>;
+@@ -298,3 +294,7 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	compatible = "marvell,mv78260-pinctrl";
++};
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 8b4ab0a5d620..9c40c130d11a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -289,10 +289,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl: pin-ctrl at 18000 {
+-				compatible = "marvell,mv78460-pinctrl";
+-			};
+-
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+ 				reg = <0x18100 0x40>;
+@@ -336,3 +332,7 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	compatible = "marvell,mv78460-pinctrl";
++};
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index b3951c39c5da..8c241d08f2a3 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -55,88 +55,6 @@
+ 		};
+ 
+ 		internal-regs {
+-			pinctrl: pin-ctrl at 18000 {
+-				poweroff: poweroff {
+-					marvell,pins = "mpp42";
+-					marvell,function = "gpio";
+-				};
+-
+-				power_button_pin: power-button-pin {
+-					marvell,pins = "mpp27";
+-					marvell,function = "gpio";
+-				};
+-
+-				reset_button_pin: reset-button-pin {
+-					marvell,pins = "mpp41";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata1_led_pin: sata1-led-pin {
+-					marvell,pins = "mpp31";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata2_led_pin: sata2-led-pin {
+-					marvell,pins = "mpp40";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata3_led_pin: sata3-led-pin {
+-					marvell,pins = "mpp44";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata4_led_pin: sata4-led-pin {
+-					marvell,pins = "mpp47";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata1_power_pin: sata1-power-pin {
+-					marvell,pins = "mpp24";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata2_power_pin: sata2-power-pin {
+-					marvell,pins = "mpp25";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata3_power_pin: sata3-power-pin {
+-					marvell,pins = "mpp26";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata4_power_pin: sata4-power-pin {
+-					marvell,pins = "mpp28";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata1_pres_pin: sata1-pres-pin {
+-					marvell,pins = "mpp32";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata2_pres_pin: sata2-pres-pin {
+-					marvell,pins = "mpp33";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata3_pres_pin: sata3-pres-pin {
+-					marvell,pins = "mpp34";
+-					marvell,function = "gpio";
+-				};
+-
+-				sata4_pres_pin: sata4-pres-pin {
+-					marvell,pins = "mpp35";
+-					marvell,function = "gpio";
+-				};
+-
+-				err_led_pin: err-led-pin {
+-					marvell,pins = "mpp45";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+ 			serial at 12000 {
+ 				status = "okay";
+ 			};
+@@ -324,3 +242,85 @@
+ 		gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+ 	};
+ };
++
++&pinctrl {
++	poweroff: poweroff {
++		marvell,pins = "mpp42";
++		marvell,function = "gpio";
++	};
++
++	power_button_pin: power-button-pin {
++		marvell,pins = "mpp27";
++		marvell,function = "gpio";
++	};
++
++	reset_button_pin: reset-button-pin {
++		marvell,pins = "mpp41";
++		marvell,function = "gpio";
++	};
++
++	sata1_led_pin: sata1-led-pin {
++		marvell,pins = "mpp31";
++		marvell,function = "gpio";
++	};
++
++	sata2_led_pin: sata2-led-pin {
++		marvell,pins = "mpp40";
++		marvell,function = "gpio";
++	};
++
++	sata3_led_pin: sata3-led-pin {
++		marvell,pins = "mpp44";
++		marvell,function = "gpio";
++	};
++
++	sata4_led_pin: sata4-led-pin {
++		marvell,pins = "mpp47";
++		marvell,function = "gpio";
++	};
++
++	sata1_power_pin: sata1-power-pin {
++		marvell,pins = "mpp24";
++		marvell,function = "gpio";
++	};
++
++	sata2_power_pin: sata2-power-pin {
++		marvell,pins = "mpp25";
++		marvell,function = "gpio";
++	};
++
++	sata3_power_pin: sata3-power-pin {
++		marvell,pins = "mpp26";
++		marvell,function = "gpio";
++	};
++
++	sata4_power_pin: sata4-power-pin {
++		marvell,pins = "mpp28";
++		marvell,function = "gpio";
++	};
++
++	sata1_pres_pin: sata1-pres-pin {
++		marvell,pins = "mpp32";
++		marvell,function = "gpio";
++	};
++
++	sata2_pres_pin: sata2-pres-pin {
++		marvell,pins = "mpp33";
++		marvell,function = "gpio";
++	};
++
++	sata3_pres_pin: sata3-pres-pin {
++		marvell,pins = "mpp34";
++		marvell,function = "gpio";
++	};
++
++	sata4_pres_pin: sata4-pres-pin {
++		marvell,pins = "mpp35";
++		marvell,function = "gpio";
++	};
++
++	err_led_pin: err-led-pin {
++		marvell,pins = "mpp45";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index 394f085751be..6f6b0916df48 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -77,12 +77,7 @@
+ 			serial at 12100 {
+ 				status = "okay";
+ 			};
+-			pinctrl: pin-ctrl at 18000 {
+-				led_pins: led-pins-0 {
+-					marvell,pins = "mpp49", "mpp51", "mpp53";
+-					marvell,function = "gpio";
+-				};
+-			};
++
+ 			leds {
+ 				compatible = "gpio-leds";
+ 				pinctrl-names = "default";
+@@ -187,3 +182,10 @@
+ 		};
+ 	};
+ };
++
++&pinctrl {
++	led_pins: led-pins-0 {
++		marvell,pins = "mpp49", "mpp51", "mpp53";
++		marvell,function = "gpio";
++	};
++};
 -- 
-Regards,
-Nishanth Menon
+2.0.0
