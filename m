@@ -1,127 +1,123 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 19 Sep 2014 19:22:47 +0200
-Subject: [PATCH v2] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <1411057343-20861-1-git-send-email-manabian@gmail.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
-Message-ID: <1411147367-26824-1-git-send-email-manabian@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 19 Sep 2014 10:25:22 -0700
+Subject: [PATCH resend] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <1411146032-5771-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1411146032-5771-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9xDEZ7ujpExBTP5_5VFCyutOzZSyf7XjT6ac5jvc4AWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to enter zImage in Thumb mode for ARMv7M
-(Cortex-M) CPUs that does not support ARM mode. The kernel entry is
-also made in Thumb mode.
+On 19 September 2014 10:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> From: Yi Li <yi.li@linaro.org>
+>
+> SMbios is important for server hardware vendors. It implements a spec for
+> providing descriptive information about the platform. Things like serial
+> numbers, physical layout of the ports, build configuration data, and the like.
+>
+> This has been tested by dmidecode and lshw tools.
+>
+> Signed-off-by: Yi Li <yi.li@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
-Hi,
 
-Updated version of the patch which introduce AR_CLASS/M_CLASS macros
-as suggested by Catalin. This reduces the amount of ifdefs needed in
-compressed/head.S.
+@WIll, Catalin:
 
-Successfully tested on NXP LPC4357 (Cortex-M4).
+Yi just informed me that this is *not* the patch he tested, and that
+it needs to be changed to work correctly.
 
-regards,
-Joachim Eastwood
+Apologies for adding yet more to the confusion around this, but please
+DO NOT merge this.
 
- arch/arm/boot/compressed/head.S | 18 ++++++++++++++----
- arch/arm/include/asm/unified.h  |  8 ++++++++
- 2 files changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 413fd94b5301..75edba37bc04 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -11,7 +11,9 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- 
--	.arch	armv7-a
-+ AR_CLASS(	.arch	armv7-a)
-+ M_CLASS(	.arch	armv7-m)
-+
- /*
-  * Debugging stuff
-  *
-@@ -114,7 +116,7 @@
-  * sort out different calling conventions
-  */
- 		.align
--		.arm				@ Always enter in ARM state
-+ AR_CLASS(	.arm	)		@ Always enter in ARM state for AR class
- start:
- 		.type	start,#function
- 		.rept	7
-@@ -133,6 +135,7 @@ start:
-  THUMB(		.thumb			)
- 1:
-  ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
-+#ifndef CONFIG_CPU_V7M
- 		mrs	r9, cpsr
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
-@@ -155,6 +158,7 @@ not_angel:
- 		safe_svcmode_maskall r0
- 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
- 						@ SPSR
-+#endif
- 		/*
- 		 * Note that some cache flushing and other stuff may
- 		 * be needed here - is there an Angel SWI call for this?
-@@ -790,6 +794,9 @@ __common_mmu_cache_on:
- call_cache_fn:	adr	r12, proc_types
- #ifdef CONFIG_CPU_CP15
- 		mrc	p15, 0, r9, c0, c0	@ get processor ID
-+#elif defined(CONFIG_CPU_V7M)
-+		ldr	r9, =0xe000ed00		@ CPUID register address
-+		ldr	r9, [r9]
- #else
- 		ldr	r9, =CONFIG_PROCESSOR_ID
- #endif
-@@ -945,11 +952,13 @@ proc_types:
- 		W(b)	__armv4_mmu_cache_off
- 		W(b)	__armv6_mmu_cache_flush
- 
-+#ifndef CONFIG_CPU_V7M
- 		.word	0x000f0000		@ new CPU Id
- 		.word	0x000f0000
- 		W(b)	__armv7_mmu_cache_on
- 		W(b)	__armv7_mmu_cache_off
- 		W(b)	__armv7_mmu_cache_flush
-+#endif
- 
- 		.word	0			@ unrecognised type
- 		.word	0
-@@ -1277,8 +1286,9 @@ __hyp_reentry_vectors:
- 
- __enter_kernel:
- 		mov	r0, #0			@ must be 0
-- ARM(		mov	pc, r4	)		@ call kernel
-- THUMB(		bx	r4	)		@ entry point is always ARM
-+ ARM(		mov	pc, r4		)	@ call kernel
-+ M_CLASS(	add	r4, r4, #1	)	@ enter in Thumb mode for M class
-+ THUMB(		bx	r4		)	@ entry point is always ARM for AR class
- 
- reloc_code_end:
- 
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index b88beaba6b4a..200f9a7cd623 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -24,6 +24,14 @@
- 	.syntax unified
- #endif
- 
-+#ifdef CONFIG_CPU_V7M
-+#define AR_CLASS(x...)
-+#define M_CLASS(x...)	x
-+#else
-+#define AR_CLASS(x...)	x
-+#define M_CLASS(x...)
-+#endif
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 
- #if __GNUC__ < 4
 -- 
-1.8.0
+Ard.
+
+
+>  arch/arm64/Kconfig           | 11 +++++++++++
+>  arch/arm64/include/asm/dmi.h | 31 +++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/setup.c    |  2 ++
+>  3 files changed, 44 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/dmi.h
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index fd4e81a4e1ce..c69ab5a3a321 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -368,6 +368,17 @@ config EFI
+>           allow the kernel to be booted as an EFI application. This
+>           is only useful on systems that have UEFI firmware.
+>
+> +config DMI
+> +       bool "Enable support for SMBIOS (DMI) tables"
+> +       depends on EFI
+> +       default y
+> +       help
+> +         This enables SMBIOS/DMI feature for systems.
+> +
+> +         This option is only useful on systems that have UEFI firmware.
+> +         However, even with this option, the resultant kernel should
+> +         continue to boot on existing non-UEFI platforms.
+> +
+>  endmenu
+>
+>  menu "Userspace binary formats"
+> diff --git a/arch/arm64/include/asm/dmi.h b/arch/arm64/include/asm/dmi.h
+> new file mode 100644
+> index 000000000000..69d37d87b159
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/dmi.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * arch/arm64/include/asm/dmi.h
+> + *
+> + * Copyright (C) 2013 Linaro Limited.
+> + * Written by: Yi Li (yi.li at linaro.org)
+> + *
+> + * based on arch/ia64/include/asm/dmi.h
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#ifndef __ASM_DMI_H
+> +#define __ASM_DMI_H
+> +
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +
+> +/*
+> + * According to section 2.3.6 of the UEFI spec, the firmware should not
+> + * request a virtual mapping for configuration tables such as SMBIOS.
+> + * This means we have to map them before use.
+> + */
+> +#define dmi_early_remap(x, l)          ioremap_cache(x, l)
+> +#define dmi_early_unmap(x, l)          iounmap(x)
+> +#define dmi_remap(x, l)                        ioremap_cache(x, l)
+> +#define dmi_unmap(x)                   iounmap(x)
+> +#define dmi_alloc(l)                   kzalloc(l, GFP_KERNEL)
+> +
+> +#endif
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index edb146d01857..87e2e5419a51 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -43,6 +43,7 @@
+>  #include <linux/of_fdt.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/efi.h>
+> +#include <linux/dmi.h>
+>
+>  #include <asm/fixmap.h>
+>  #include <asm/cpu.h>
+> @@ -416,6 +417,7 @@ void __init setup_arch(char **cmdline_p)
+>  static int __init arm64_device_init(void)
+>  {
+>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +       dmi_scan_machine();
+>         return 0;
+>  }
+>  arch_initcall_sync(arm64_device_init);
+> --
+> 1.8.3.2
+>
