@@ -1,53 +1,41 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 19 Sep 2014 15:59:05 -0600
-Subject: [PATCH v11 00/10] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140919215905.GB30239@google.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 19 Sep 2014 14:58:42 -0700
+Subject: [PATCH] iommu/arm-smmu: fix bug in pmd construction
+Message-ID: <1411163922-8833-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 02:30:15AM +0100, Liviu Dudau wrote:
-> This is my version 11 of the attempt at adding support for generic PCI host
-> bridge controllers that make use of device tree information to
-> configure themselves. It contains minor cleanups compared with v10 to address
-> the existing comments.
-> ...
-> Catalin Marinas (1):
->   PCI: Introduce generic domain handling for PCI busses.
-> 
-> Liviu Dudau (9):
->   Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
->   PCI: Introduce helper functions to deal with PCI I/O ranges.
->   ARM: Define PCI_IOBASE as the base of virtual PCI IO space.
->   PCI: OF: Fix the conversion of IO ranges into IO resources.
->   PCI: Create pci_host_bridge before its associated bus in
->     pci_create_root_bus.
->   OF: Introduce helper function for getting PCI domain_nr
->   OF: PCI: Add support for parsing PCI host bridge resources from DT
->   PCI: Assign unassigned bus resources in pci_scan_root_bus()
->   PCI: Introduce pci_remap_iospace() for remapping PCI I/O bus resources
->     into CPU space
-> 
->  arch/arm/include/asm/io.h         |   1 +
->  arch/arm/mach-integrator/pci_v3.c |  23 +++---
->  drivers/of/address.c              | 146 ++++++++++++++++++++++++++++++++
->  drivers/of/of_pci.c               | 170 ++++++++++++++++++++++++++++++++++++++
->  drivers/pci/host/pci-tegra.c      |  10 ++-
->  drivers/pci/host/pcie-rcar.c      |  21 +++--
->  drivers/pci/pci.c                 |  33 ++++++++
->  drivers/pci/probe.c               |  46 +++++++----
->  include/asm-generic/io.h          |   2 +-
->  include/asm-generic/pgtable.h     |   4 +
->  include/linux/of_address.h        |  15 +---
->  include/linux/of_pci.h            |  18 ++++
->  include/linux/pci.h               |  24 ++++++
->  13 files changed, 463 insertions(+), 50 deletions(-)
+We are using the same pfn for every pte we create while constructing the
+pmd. Fix this by actually updating the pfn on each iteration of the pmd
+construction loop.
 
-I put this on a pci/liviu-generic-v11 branch.  I mentioned a couple things
-in response to the individual patches, so I'm hoping you can send me
-incremental patches to address them.  Then I'll update this branch, rename
-it, and get it into linux-next.
+It's not clear if we can actually hit this bug right now since iommu_map
+splits up the calls to .map based on the page size, so we only ever seem to
+iterate this loop once. However, things might change in the future that
+might cause us to hit this.
 
-Bjorn
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+Will, I was unable to come up with a test case to hit this bug based on
+what I said in the commit message above. Not sure if my analysis is
+completely off base, my head is still spinning from all these page tables
+:).
+---
+ drivers/iommu/arm-smmu.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ca18d6d42a..eba4cb390c 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1368,6 +1368,7 @@ static int arm_smmu_alloc_init_pmd(struct arm_smmu_device *smmu, pud_t *pud,
+ 		ret = arm_smmu_alloc_init_pte(smmu, pmd, addr, next, pfn,
+ 					      prot, stage);
+ 		phys += next - addr;
++		pfn = __phys_to_pfn(phys);
+ 	} while (pmd++, addr = next, addr < end);
+ 
+ 	return ret;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
