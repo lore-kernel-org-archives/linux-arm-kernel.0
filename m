@@ -1,127 +1,188 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 19 Sep 2014 20:27:44 +0200
-Subject: [PATCH v5 11/11] ACPI / PM: Convert acpi_dev_pm_detach() into a
- static function
+Date: Fri, 19 Sep 2014 20:27:43 +0200
+Subject: [PATCH v5 10/11] ARM: exynos: Move to generic PM domain DT bindings
 In-Reply-To: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
 References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1411151264-16245-12-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1411151264-16245-11-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ->detach() callback for the PM domain has now been fully adopted,
-thus there no users left of the acpi_dev_pm_detach() API. This allow us
-to convert it into a static function.
+From: Tomasz Figa <tomasz.figa@gmail.com>
 
+This patch moves Exynos PM domain code to use the new generic PM domain
+look-up framework introduced in previous patches, thus also allowing
+the new code to be compiled with CONFIG_ARCH_EXYNOS.
+
+This patch was originally submitted by Tomasz Figa when he was employed
+by Samsung.
+http://marc.info/?l=linux-pm&m=139955336002083&w=2
+
+Cc: linux-samsung-soc at vger.kernel.org
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
 ---
- drivers/acpi/device_pm.c | 69 ++++++++++++++++++++++++------------------------
- include/linux/acpi.h     |  2 --
- 2 files changed, 34 insertions(+), 37 deletions(-)
+ .../bindings/arm/exynos/power_domain.txt           | 13 ++--
+ arch/arm/mach-exynos/pm_domains.c                  | 78 +---------------------
+ kernel/power/Kconfig                               |  2 +-
+ 3 files changed, 8 insertions(+), 85 deletions(-)
 
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index eec5ed5..bea6896 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -1041,6 +1041,40 @@ static struct dev_pm_domain acpi_general_pm_domain = {
- };
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+index 8b4f7b7f..abde1ea 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+@@ -8,6 +8,8 @@ Required Properties:
+     * samsung,exynos4210-pd - for exynos4210 type power domain.
+ - reg: physical base address of the controller and length of memory mapped
+     region.
++- #power-domain-cells: number of cells in power domain specifier;
++    must be 0.
  
- /**
-+ * acpi_dev_pm_detach - Remove ACPI power management from the device.
-+ * @dev: Device to take care of.
-+ * @power_off: Whether or not to try to remove power from the device.
-+ *
-+ * Remove the device from the general ACPI PM domain and remove its wakeup
-+ * notifier.  If @power_off is set, additionally remove power from the device if
-+ * possible.
-+ *
-+ * Callers must ensure proper synchronization of this function with power
-+ * management callbacks.
-+ */
-+static void acpi_dev_pm_detach(struct device *dev, bool power_off)
-+{
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+
-+	if (adev && dev->pm_domain == &acpi_general_pm_domain) {
-+		dev->pm_domain = NULL;
-+		acpi_remove_pm_notifier(adev);
-+		if (power_off) {
-+			/*
-+			 * If the device's PM QoS resume latency limit or flags
-+			 * have been exposed to user space, they have to be
-+			 * hidden at this point, so that they don't affect the
-+			 * choice of the low-power state to put the device into.
-+			 */
-+			dev_pm_qos_hide_latency_limit(dev);
-+			dev_pm_qos_hide_flags(dev);
-+			acpi_device_wakeup(adev, ACPI_STATE_S0, false);
-+			acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
-+		}
-+	}
-+}
-+
-+/**
-  * acpi_dev_pm_attach - Prepare device for ACPI power management.
-  * @dev: Device to prepare.
-  * @power_on: Whether or not to power on the device.
-@@ -1077,39 +1111,4 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
- 	return 0;
+ Optional Properties:
+ - clocks: List of clock handles. The parent clocks of the input clocks to the
+@@ -29,6 +31,7 @@ Example:
+ 	lcd0: power-domain-lcd0 {
+ 		compatible = "samsung,exynos4210-pd";
+ 		reg = <0x10023C00 0x10>;
++		#power-domain-cells = <0>;
+ 	};
+ 
+ 	mfc_pd: power-domain at 10044060 {
+@@ -37,12 +40,8 @@ Example:
+ 		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
+ 			<&clock CLK_MOUT_USER_ACLK333>;
+ 		clock-names = "oscclk", "pclk0", "clk0";
++		#power-domain-cells = <0>;
+ 	};
+ 
+-Example of the node using power domain:
+-
+-	node {
+-		/* ... */
+-		samsung,power-domain = <&lcd0>;
+-		/* ... */
+-	};
++See Documentation/devicetree/bindings/power/power_domain.txt for description
++of consumer-side bindings.
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index fd76e1b..20f2671 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -105,78 +105,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+ 	return exynos_pd_power(domain, false);
  }
- EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
--
--/**
-- * acpi_dev_pm_detach - Remove ACPI power management from the device.
-- * @dev: Device to take care of.
-- * @power_off: Whether or not to try to remove power from the device.
-- *
-- * Remove the device from the general ACPI PM domain and remove its wakeup
-- * notifier.  If @power_off is set, additionally remove power from the device if
-- * possible.
-- *
-- * Callers must ensure proper synchronization of this function with power
-- * management callbacks.
-- */
--void acpi_dev_pm_detach(struct device *dev, bool power_off)
+ 
+-static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+-					 struct device *dev)
 -{
--	struct acpi_device *adev = ACPI_COMPANION(dev);
+-	int ret;
 -
--	if (adev && dev->pm_domain == &acpi_general_pm_domain) {
--		dev->pm_domain = NULL;
--		acpi_remove_pm_notifier(adev);
--		if (power_off) {
--			/*
--			 * If the device's PM QoS resume latency limit or flags
--			 * have been exposed to user space, they have to be
--			 * hidden at this point, so that they don't affect the
--			 * choice of the low-power state to put the device into.
--			 */
--			dev_pm_qos_hide_latency_limit(dev);
--			dev_pm_qos_hide_flags(dev);
--			acpi_device_wakeup(adev, ACPI_STATE_S0, false);
--			acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
--		}
+-	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
+-
+-	while (1) {
+-		ret = pm_genpd_add_device(&pd->pd, dev);
+-		if (ret != -EAGAIN)
+-			break;
+-		cond_resched();
+-	}
+-
+-	pm_genpd_dev_need_restore(dev, true);
+-}
+-
+-static void exynos_remove_device_from_domain(struct device *dev)
+-{
+-	struct generic_pm_domain *genpd = dev_to_genpd(dev);
+-	int ret;
+-
+-	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
+-
+-	while (1) {
+-		ret = pm_genpd_remove_device(genpd, dev);
+-		if (ret != -EAGAIN)
+-			break;
+-		cond_resched();
 -	}
 -}
--EXPORT_SYMBOL_GPL(acpi_dev_pm_detach);
- #endif /* CONFIG_PM */
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 807cbc4..b7926bb 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -587,7 +587,6 @@ static inline int acpi_subsys_freeze(struct device *dev) { return 0; }
- #if defined(CONFIG_ACPI) && defined(CONFIG_PM)
- struct acpi_device *acpi_dev_pm_get_node(struct device *dev);
- int acpi_dev_pm_attach(struct device *dev, bool power_on);
--void acpi_dev_pm_detach(struct device *dev, bool power_off);
- #else
- static inline struct acpi_device *acpi_dev_pm_get_node(struct device *dev)
+-
+-static void exynos_read_domain_from_dt(struct device *dev)
+-{
+-	struct platform_device *pd_pdev;
+-	struct exynos_pm_domain *pd;
+-	struct device_node *node;
+-
+-	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
+-	if (!node)
+-		return;
+-	pd_pdev = of_find_device_by_node(node);
+-	if (!pd_pdev)
+-		return;
+-	pd = platform_get_drvdata(pd_pdev);
+-	exynos_add_device_to_domain(pd, dev);
+-}
+-
+-static int exynos_pm_notifier_call(struct notifier_block *nb,
+-				    unsigned long event, void *data)
+-{
+-	struct device *dev = data;
+-
+-	switch (event) {
+-	case BUS_NOTIFY_BIND_DRIVER:
+-		if (dev->of_node)
+-			exynos_read_domain_from_dt(dev);
+-
+-		break;
+-
+-	case BUS_NOTIFY_UNBOUND_DRIVER:
+-		exynos_remove_device_from_domain(dev);
+-
+-		break;
+-	}
+-	return NOTIFY_DONE;
+-}
+-
+-static struct notifier_block platform_nb = {
+-	.notifier_call = exynos_pm_notifier_call,
+-};
+-
+ static __init int exynos4_pm_init_power_domain(void)
  {
-@@ -597,7 +596,6 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
- {
- 	return -ENODEV;
- }
--static inline void acpi_dev_pm_detach(struct device *dev, bool power_off) {}
- #endif
+ 	struct platform_device *pdev;
+@@ -202,7 +130,6 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		pd->base = of_iomap(np, 0);
+ 		pd->pd.power_off = exynos_pd_power_off;
+ 		pd->pd.power_on = exynos_pd_power_on;
+-		pd->pd.of_node = np;
  
- #ifdef CONFIG_ACPI
+ 		pd->oscclk = clk_get(dev, "oscclk");
+ 		if (IS_ERR(pd->oscclk))
+@@ -228,15 +155,12 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			clk_put(pd->oscclk);
+ 
+ no_clk:
+-		platform_set_drvdata(pdev, pd);
+-
+ 		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
+ 
+ 		pm_genpd_init(&pd->pd, NULL, !on);
++		of_genpd_add_provider_simple(np, &pd->pd);
+ 	}
+ 
+-	bus_register_notifier(&platform_bus_type, &platform_nb);
+-
+ 	return 0;
+ }
+ arch_initcall(exynos4_pm_init_power_domain);
+diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+index 897619b..bbef57f 100644
+--- a/kernel/power/Kconfig
++++ b/kernel/power/Kconfig
+@@ -304,7 +304,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
+ 
+ config PM_GENERIC_DOMAINS_OF
+ 	def_bool y
+-	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
++	depends on PM_GENERIC_DOMAINS && OF
+ 
+ config CPU_PM
+ 	bool
 -- 
 1.9.1
