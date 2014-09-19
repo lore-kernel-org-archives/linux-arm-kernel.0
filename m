@@ -1,68 +1,103 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 19 Sep 2014 22:14:36 +0200
-Subject: [PATCH 0/8] Armada XP pinctrl consolidation and ix4-300d fixes
-Message-ID: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Fri, 19 Sep 2014 22:14:40 +0200
+Subject: [PATCH 4/8] ARM: mvebu: armada-xp: Move GE0/1 pinctrl settings for
+ RGMII
+In-Reply-To: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1411157684-6991-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Pinctrl settings for GE0 and GE1 are not only usable on RD-AXPWiFiAP.
+Moreover, naming the RGMII settings pmx-ge{0,1} is not precise enough
+as there is also a GMII setting for GE0.
 
-this is a patch set preparing barebox support for ix4-300d. As usual,
-I stumbled upon a few nice-to-haves before actually touching ix4-300d
-dts. As it is a mach-mvebu thing, I just added the related mailing
-lists instead of each of the DT maintainers.
+Move the pinctrl sub-nodes to the common pinctrl node and rename them
+to pmx-ge{0,1}-rgmii.
 
-First 5 patches consolidate SoC-specific pinctrl nodes to one common
-node in armada-xp.dtsi, compatible overwrites for each SoC, and node
-alias usage for each board. Also, ge{0,1} pinctrl settings are moved
-to the common node from one board specific node.
-
-Last 3 patches then use that ge{0,1} pinctrl settings on ix4-300d which
-is vital for bootloader init. During exploration of ix4-300d, I also
-found a i2c eeprom that has not been added to the dts, yet. Finally,
-there is only one 74hc595 on ix4 mainboard while dts property is set
-for two.
-
-I cannot recall in detail what is on that eeprom, but IIRC it is nothing
-important. Some reg,addr pairs for some init stuff that should have
-already been done by stock u-boot. Anyway, adding the node will do no
-harm.
-
-Patches are based on v3.17-rc1 and intended for v3.18 but I am not in
-a hurry. I only compile tested this, so a formal Tested-by from Benoit
-for the ix4 and any other Armada XP board would be great.
-
-Sebastian
-
-Sebastian Hesselbarth (8):
-  ARM: mvebu: armada-xp: Consolidate pinctrl node
-  ARM: mvebu: armada-xp: Add node alias to pinctrl and add base address
-  ARM: mvebu: armada-xp: Use pinctrl node alias
-  ARM: mvebu: armada-xp: Move GE0/1 pinctrl settings for RGMII
-  ARM: mvebu: armada-xp: Add GE0 pinctrl settings for GMII
-  ARM: mvebu: armada-xp: Add RGMII pinctrl to Lenovo ix4-300d
-  ARM: mvebu: armada-xp: Add I2C eeprom on Lenovo ix4-300d
-  ARM: mvebu: armada-xp: Fix 74hc595 count for Lenovo ix4-300d
-
- arch/arm/boot/dts/armada-xp-axpwifiap.dts        |  58 +++-----
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  73 +++++-----
- arch/arm/boot/dts/armada-xp-mv78230.dtsi         |  15 +--
- arch/arm/boot/dts/armada-xp-mv78260.dtsi         |  15 +--
- arch/arm/boot/dts/armada-xp-mv78460.dtsi         |  15 +--
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 164 +++++++++++------------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  14 +-
- arch/arm/boot/dts/armada-xp.dtsi                 |  37 +++++
- 8 files changed, 202 insertions(+), 189 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Benoit Masson <yahoo@perenite.com>
 Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts | 18 ++----------------
+ arch/arm/boot/dts/armada-xp.dtsi          | 16 ++++++++++++++++
+ 2 files changed, 18 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+index cdab007fbaf4..0e53fad111de 100644
+--- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
++++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+@@ -84,14 +84,14 @@
+ 			};
+ 
+ 			ethernet at 70000 {
+-				pinctrl-0 = <&pmx_ge0>;
++				pinctrl-0 = <&pmx_ge0_rgmii>;
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy0>;
+ 				phy-mode = "rgmii-id";
+ 			};
+ 			ethernet at 74000 {
+-				pinctrl-0 = <&pmx_ge1>;
++				pinctrl-0 = <&pmx_ge1_rgmii>;
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy = <&phy1>;
+@@ -133,20 +133,6 @@
+ 	pinctrl-0 = <&pmx_phy_int>;
+ 	pinctrl-names = "default";
+ 
+-	pmx_ge0: pmx-ge0 {
+-		marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
+-			       "mpp4", "mpp5", "mpp6", "mpp7",
+-			       "mpp8", "mpp9", "mpp10", "mpp11";
+-		marvell,function = "ge0";
+-	};
+-
+-	pmx_ge1: pmx-ge1 {
+-		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15",
+-			       "mpp16", "mpp17", "mpp18", "mpp19",
+-			       "mpp20", "mpp21", "mpp22", "mpp23";
+-		marvell,function = "ge1";
+-	};
+-
+ 	pmx_keys: pmx-keys {
+ 		marvell,pins = "mpp33";
+ 		marvell,function = "gpio";
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index b5fd8c69dfff..dfbcb10ad0db 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -74,6 +74,22 @@
+ 			pinctrl: pin-ctrl at 18000 {
+ 				reg = <0x18000 0x38>;
+ 
++				pmx_ge0_rgmii: pmx-ge0-rgmii {
++					marvell,pins =
++					     "mpp0", "mpp1", "mpp2", "mpp3",
++					     "mpp4", "mpp5", "mpp6", "mpp7",
++					     "mpp8", "mpp9", "mpp10", "mpp11";
++					marvell,function = "ge0";
++				};
++
++				pmx_ge1_rgmii: pmx-ge1-rgmii {
++					marvell,pins =
++					     "mpp12", "mpp13", "mpp14", "mpp15",
++					     "mpp16", "mpp17", "mpp18", "mpp19",
++					     "mpp20", "mpp21", "mpp22", "mpp23";
++					marvell,function = "ge1";
++				};
++
+ 				sdio_pins: sdio-pins {
+ 					marvell,pins = "mpp30", "mpp31", "mpp32",
+ 						       "mpp33", "mpp34", "mpp35";
 -- 
 2.0.0
