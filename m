@@ -1,51 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 19 Sep 2014 16:33:28 +0200
-Subject: [PATCH 2/4] ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
-In-Reply-To: <1411134460.27173.8.camel@mtksdaap41>
-References: <1411127306-13677-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411127306-13677-3-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411134460.27173.8.camel@mtksdaap41>
-Message-ID: <CABuKBeLF5gA7R5qVWEUdAWTxKA1feY7mSy5g98gpL18HWnvp0A@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 19 Sep 2014 07:39:21 -0700
+Subject: [PATCH v10 5/6] rtc: max77686: Use ffs() to calculate tm_wday
+In-Reply-To: <1411122377-10426-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1411122377-10426-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1411137561.24444.5.camel@joe-AO725>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-09-19 15:47 GMT+02:00 Joe.C <yingjoe.chen@mediatek.com>:
-> On Fri, 2014-09-19 at 19:48 +0800, srv_hongzhou.yang at mediatek.com wrote:
->> +
->> +static const struct pinmux_ops mt_pmx_ops = {
->> +     .get_functions_count    = mt_pmx_get_funcs_cnt,
->> +     .get_function_name      = mt_pmx_get_func_name,
->> +     .get_function_groups    = mt_pmx_get_func_groups,
->> +     .enable                 = mt_pmx_enable,
->> +     .disable                = mt_pmx_disable,
->> +     .gpio_set_direction     = mt_pmx_gpio_set_direction,
->> +};
->> +
->
-> It seems pinmux_ops.disable is removed in commit commit
-> 2243a87d90b42eb38bc281957df3e57c712b5e56. So this will cause build
-> error. This should be fixed in next version.
+On Fri, 2014-09-19 at 12:26 +0200, Javier Martinez Canillas wrote:
+> The function max77686_rtc_calculate_wday() is used to
+> calculate the day of the week to be filled in struct
+> rtc_time but that function only calculates the number
+> of bits shifted. So the ffs() function can be used to
+> find the first bit set instead of a special function.
 
-For this cases and in general it would be good to put in the patch set
-description against which tree/tag the patches are build.
+This isn't the same logic.  Perhaps you want fls.
 
-Thanks,
-Matthias
-
->
-> ../drivers/pinctrl/mediatek/pinctrl-mtk-common.c:566:2: error: unknown
-> field 'disable' specified in initializer
-> ../drivers/pinctrl/mediatek/pinctrl-mtk-common.c:566:2: warning:
-> initialization from incompatible pointer type [enabled by default]
-> ../drivers/pinctrl/mediatek/pinctrl-mtk-common.c:566:2: warning: (near
-> initialization for 'mt_pmx_ops.gpio_request_enable') [enabled by
-> default]
->
-> Joe.C
->
->
-
-
-
--- 
-motzblog.wordpress.com
+> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+[]
+> -static inline int max77686_rtc_calculate_wday(u8 shifted)
+> -{
+> -	int counter = -1;
+> -	while (shifted) {
+> -		shifted >>= 1;
+> -		counter++;
+> -	}
+> -	return counter;
+> -}
+> -
+>  static void max77686_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
+>  				   int rtc_24hr_mode)
+>  {
+> @@ -93,7 +83,7 @@ static void max77686_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
+>  			tm->tm_hour += 12;
+>  	}
+>  
+> -	tm->tm_wday = max77686_rtc_calculate_wday(data[RTC_WEEKDAY] & 0x7f);
+> +	tm->tm_wday = ffs(data[RTC_WEEKDAY] & 0x7f) - 1;
