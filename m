@@ -1,130 +1,70 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 19 Sep 2014 08:37:18 -0700 (PDT)
-Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <20140919030333.GA6088@kahuna>
-References: <1411067086-16613-1-git-send-email-nm@ti.com>
- <1411067086-16613-4-git-send-email-nm@ti.com>
- <alpine.DEB.2.10.1409181749170.4206@nanos> <20140919030333.GA6088@kahuna>
-Message-ID: <alpine.DEB.2.10.1409190710320.5612@nanos>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 19 Sep 2014 08:40:36 -0700
+Subject: [PATCH 1/2] watchdog: sunxi: support parameterized compatible
+ strings
+In-Reply-To: <CAGb2v67vB-mr1-fM7inWq7wntt31mYroEj-Hq7sMUfWDwV878w@mail.gmail.com>
+References: <1410878523-4924-1-git-send-email-wens@csie.org>
+ <1410878523-4924-2-git-send-email-wens@csie.org>
+ <541BB712.6020607@roeck-us.net>
+ <CAGb2v67vB-mr1-fM7inWq7wntt31mYroEj-Hq7sMUfWDwV878w@mail.gmail.com>
+Message-ID: <20140919154036.GA30723@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Sep 2014, Nishanth Menon wrote:
-> On 17:57-20140918, Thomas Gleixner wrote:
+On Fri, Sep 19, 2014 at 10:00:36PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> I suppose I can improve the commit message to elaborate this better?
-> Will that help?
-
-You also want to improve the comment in the empty handler.
-
-> > 
-> > > +	 */
-> > > +	return IRQ_NONE;
-
-And it still does not explain WHY you think that returning IRQ_NONE is
-the right thing to do here. You actually handle the interrupt, right?
-Just because the handler is an NOP does not mean you did not handle
-it.
-
-> > > +static int palmas_i2c_suspend(struct i2c_client *i2c,  pm_message_t mesg)
-> > > +{
-> > > +	struct palmas *palmas = i2c_get_clientdata(i2c);
-> > > +	struct device *dev = &i2c->dev;
-> > > +
-> > > +	if (!palmas->wakeirq)
-> > > +		return 0;
-> > > +
-> > > +	if (device_may_wakeup(dev))
-> > > +		enable_irq(palmas->wakeirq);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static int palmas_i2c_resume(struct i2c_client *i2c)
-> > > +{
-> > > +	struct palmas *palmas = i2c_get_clientdata(i2c);
-> > > +	struct device *dev = &i2c->dev;
-> > > +
-> > > +	if (!palmas->wakeirq)
-> > > +		return 0;
-> > > +
-> > > +	if (device_may_wakeup(dev))
-> > > +		disable_irq_nosync(palmas->wakeirq);
-> > 
-> > Again, why nosync?
-> true - nosync is not necessary at here. disable_irq is however necessary
-> as we are not interested in wakeup events for level changes.
+> On Fri, Sep 19, 2014 at 12:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On 09/16/2014 07:42 AM, Chen-Yu Tsai wrote:
+> >>
+> >> This patch adds support for hardware parameters tied to compatible
+> >> strings, so similar hardware can reuse the driver.
+> >>
+> >> This will be used to support the newer watchdog found in A31 and
+> >> later SoCs. Differences in the new hardware include separate
+> >> interrupt lines for each watchdog, and corresponding interrupt
+> >> control/status registers. Watchdog control registers were also
+> >> slightly rearranged.
+> >>
+> > You might also mention that you replace some iowrite32 with writel.
 > 
-> We just use the enable/disable to control when we'd want to arm the pin
-> for waking up from suspend state.
+> Ah.... Had that in mind, but forgot about it when finishing the series :(
+> 
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> >
+> > Have you considered using regmap ? Seems to be an ideal candidate.
+> 
+> I don't follow. Do you mean using regmap to share the interrupt registers
+> with the timer on sun4i? Otherwise I don't really see a difference.
+> 
+Use regmap instead of direct writel. Nice thing about it is that regmap offers
+bit manipulation functions, so you could replace the read / mask / modify /write
+in a single regmap function call. See imx2_wdt.c for an example how it is used.
 
-And what is issuing the call to enable/disable_irq_wake()? 
+> Am I missing something?
+> 
+Not really. Just a suggestion.
 
-So if that interrupt is not marked proper then you can bring your
-device into a wont resume state easily
+> >>
+> >> -       /* Enable timer and set reset bit in the watchdog */
+> >> -       writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
+> >> +       /* Set lowest timeout and enable watchdog */
+> >> +       val = readl(wdt_base + regs->wdt_mode);
+> >> +       val &= ~(WDT_TIMEOUT_MASK << regs->wdt_timeout_shift);
+> >> +       val |= WDT_MODE_EN;
+> >
+> >
+> > I think it would make sense to also define WDT_MODE_EN and
+> > WDT_TIMEOUT_MASK as configurable, even if not currently needed.
+> > It is odd to have the shift configurable but not the mask,
+> > and to have the mode register configurable but not the mode value.
+> 
+> I think keeping these values constants clearly shows that they are
+> the same and shared among the hardware. Making them configurable
+> shouldn't impose much penalty, but I'd prefer to keep them as is
+> until we need to change them.
+> 
+Ok, guess we have a different philosophy ;-). I'll leave it up to you.
 
-       start suspend
-       enable wakeirq
-       disable_device_irqs()
-	   if (!iswakeup_irq())
-	      disable_irq() // does not mask due to lazy masking
-
-       ....
-       wakeirq fires
-          if (irq_is_disabled())
-	     mask_irq();
-
-       transition into suspend
-
-Now your pinctrl irq is masked at the HW level and wont wake the
-machine up ever again.
-
-So now looking at that pinctrl irq chip thing, which seems to be
-designed to handle these kind of wakeups. That thing looks massivly
-wrong as well, simply because it enforces to use
-enable_irq/disable_irq().
-
-So because the sole purpose of this chip is to handle the separate
-wakeup style interrupt, it should actually NOT enable the interrupt in
-the irq_unmask callback.
-
-Simply because during normal operation nothing is interested in the
-interrupt and any operation which might enable it (including request
-irq) is just making the system handle completely pointless interrupts
-and hoops and loops juggling with enable/disable irq.
-
-So the right thing here is to have an empty unmask function and do the
-actual unmask only in the irq_set_wake() callback. mask of course
-needs to do what it says. The point is, that the following sequence of
-code will just work w/o generating an interrupt on the wakeirq line
-outside of the wake enabled context.
-
-dev_init()
-	request_wakeirq();
-
-suspend()
-	if (may_wake())
-	   enable_irq_wake();
-
-resume()
-	if (may_wake())
-	   disable_irq_wake();
-
-The other omap drivers using this have the same issue ... And of
-course they are subtly different.
-
-The uart one handles the actual device interrupt, which is violating
-the general rule of possible interrupt reentrancy in the pm-runtime
-case if the two interrupts are affine to two different cores. Yes,
-it's protected by a lock and works by chance ....
-
-The mmc one issues a disable_irq_nosync() in the wakeup irq handler
-itself.
-
-WHY does one driver need that and the other does not? You are not even
-able to come up with a common scheme for OMAP. I don't want to see the
-mess others are going to create when this stuff becomes more used.
-
-Thanks,
-
-	tglx
+Guenter
