@@ -1,72 +1,86 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 19 Sep 2014 13:21:13 +0100
-Subject: [RFC PATCH 00/10] drivers: PL011: add SBSA subset support
-Message-ID: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+Date: Fri, 19 Sep 2014 13:21:21 +0100
+Subject: [RFC PATCH 08/10] drivers: PL011: allow avoiding UART
+ enabling/disabling
+In-Reply-To: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1411129283-17219-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(This version has still issues, but I'd like to have feedback on
-the general feasibility of this approach before wasting even more
-time on debugging).
+The SBSA UART should not be enabled or disabled (it is always on),
+and consequently the spec lacks the UART_CR register.
+Add a vendor specific property to skip disabling or enabling of the
+UART. This will be used later by the SBSA UART support.
 
-The ARM Server Base System Architecture[1] document describes a
-generic UART which is a subset of the PL011 UART.
-It lacks DMA support, baud rate control and modem status line
-control, among other things.
-The idea is to move the UART initialization and setup into the
-firmware (which does this job today already) and let the kernel just
-use the UART for sending and receiving characters.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-This patchset is an attempt to integrate support for this UART subset
-into the existing PL011 driver - basically by refactoring some
-functions and providing a new uart_ops structure for it. It also has
-a separate probe function to be not dependent on AMBA/PrimeCell.
-Beside the obvious effect of code sharing it has the advantage of not
-introducing another serial device prefix, so it can go with ttyAMA,
-which seems to be pretty common.
-
-There is still one issue in bringing up the UART. On the PL011 we
-send a dummy character via the loopback facility with the FIFOs
-disabled to get things going, but both FIFO control and loopback are
-outside of the SBSA spec. I consider this loopback approach a kludge
-anyway, but am struggling to find a better way of fixing this due to
-my lack of understanding of the TTY/serial layer.
-If someone with more wisdom could enlighten me, I would be grateful.
-
-
-Patch 1/10 contains a bug fix which applies to the PL011 part also,
-it should be considered regardless of the rest of the series.
-Patch 2-7 refactor some PL011 functions by splitting them up into
-smaller pieces, so that most the code can be reused later by the SBSA
-part.
-Patch 8 and 9 introduce two new properties for the vendor structure,
-this is for SBSA functionality which cannot be controlled by
-separate uart_ops members only.
-Patch 10 then finally drops in the SBSA specific code, by providing
-a new uart_ops, vendor struct and probe function for it.
-
-Please have a look and tell me whether this SBSA driver approach has
-any future.
-
-Regards,
-Andre
-
-Andre Przywara (10):
-  drivers: PL011: avoid potential unregister_driver call
-  drivers: PL011: refactor pl011_startup()
-  drivers: PL011: refactor pl011_shutdown()
-  drivers: PL011: refactor pl011_set_termios()
-  drivers: PL011: refactor pl011_probe()
-  drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
-  drivers: PL011: move cts_event workaround into separate function
-  drivers: PL011: allow avoiding UART enabling/disabling
-  drivers: PL011: allow to supply fixed option string
-  drivers: PL011: add support for the ARM SBSA generic UART
-
- .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
- drivers/tty/serial/amba-pl011.c                    |  509 ++++++++++++++------
- 2 files changed, 380 insertions(+), 138 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 65a0411..70af210 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -78,6 +78,7 @@ struct vendor_data {
+ 	bool			oversampling;
+ 	bool			dma_threshold;
+ 	bool			cts_event_workaround;
++	bool			always_enabled;
+ 
+ 	unsigned int (*get_fifosize)(struct amba_device *dev);
+ };
+@@ -94,6 +95,7 @@ static struct vendor_data vendor_arm = {
+ 	.oversampling		= false,
+ 	.dma_threshold		= false,
+ 	.cts_event_workaround	= false,
++	.always_enabled		= false,
+ 	.get_fifosize		= get_fifosize_arm,
+ };
+ 
+@@ -109,6 +111,7 @@ static struct vendor_data vendor_st = {
+ 	.oversampling		= true,
+ 	.dma_threshold		= true,
+ 	.cts_event_workaround	= true,
++	.always_enabled		= false,
+ 	.get_fifosize		= get_fifosize_st,
+ };
+ 
+@@ -1944,7 +1947,7 @@ static void
+ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ {
+ 	struct uart_amba_port *uap = amba_ports[co->index];
+-	unsigned int status, old_cr, new_cr;
++	unsigned int status, old_cr = 0, new_cr;
+ 	unsigned long flags;
+ 	int locked = 1;
+ 
+@@ -1961,10 +1964,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	/*
+ 	 *	First save the CR then disable the interrupts
+ 	 */
+-	old_cr = readw(uap->port.membase + UART011_CR);
+-	new_cr = old_cr & ~UART011_CR_CTSEN;
+-	new_cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
+-	writew(new_cr, uap->port.membase + UART011_CR);
++	if (!uap->vendor->always_enabled) {
++		old_cr = readw(uap->port.membase + UART011_CR);
++		new_cr = old_cr & ~UART011_CR_CTSEN;
++		new_cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
++		writew(new_cr, uap->port.membase + UART011_CR);
++	}
+ 
+ 	uart_console_write(&uap->port, s, count, pl011_console_putchar);
+ 
+@@ -1975,7 +1980,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	do {
+ 		status = readw(uap->port.membase + UART01x_FR);
+ 	} while (status & UART01x_FR_BUSY);
+-	writew(old_cr, uap->port.membase + UART011_CR);
++	if (!uap->vendor->always_enabled)
++		writew(old_cr, uap->port.membase + UART011_CR);
+ 
+ 	if (locked)
+ 		spin_unlock(&uap->port.lock);
 -- 
 1.7.9.5
