@@ -1,55 +1,51 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 19 Sep 2014 10:09:14 -0500
+Date: Fri, 19 Sep 2014 10:19:20 -0500
 Subject: [PATCH] pinctrl: qcom: use restart_notifier mechanism for ps_hold
-In-Reply-To: <541B9ADA.2070107@roeck-us.net>
+In-Reply-To: <541BA451.9010508@roeck-us.net>
 References: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
- <541B9ADA.2070107@roeck-us.net>
-Message-ID: <20140919150914.GG3749@joshc.qualcomm.com>
+ <541B9ADA.2070107@roeck-us.net> <541BA451.9010508@roeck-us.net>
+Message-ID: <20140919151920.GH3749@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 07:54:18PM -0700, Guenter Roeck wrote:
-> On 09/18/2014 03:32 PM, Josh Cartwright wrote:
-> >By converting to the restart_notifier mechanism for restart, we allow
-> >for other mechanisms, like the watchdog, to be used for restart in the
-> >case where PS_HOLD has failed to reset the chip.
-> >
-> >Choose priority 128, as according to documentation, this mechanism "is
-> >sufficient to restart the entire system".
-> >
-> >Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
-> >Cc: Guenter Roeck <linux@roeck-us.net>
-> >Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> >---
+On Thu, Sep 18, 2014 at 08:34:41PM -0700, Guenter Roeck wrote:
+> On 09/18/2014 07:54 PM, Guenter Roeck wrote:
+> >On 09/18/2014 03:32 PM, Josh Cartwright wrote:
+> >>By converting to the restart_notifier mechanism for restart, we allow
+> >>for other mechanisms, like the watchdog, to be used for restart in the
+> >>case where PS_HOLD has failed to reset the chip.
+> >>
+> >>Choose priority 128, as according to documentation, this mechanism "is
+> >>sufficient to restart the entire system".
+> >>
+> >>Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
+> >>Cc: Guenter Roeck <linux@roeck-us.net>
+> >>Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> >>---
 [..]
-> >
-> >-#ifdef CONFIG_ARM
+> >>  int msm_pinctrl_probe(struct platform_device *pdev,
+> >>                const struct msm_pinctrl_soc_data *soc_data)
+> >>@@ -943,6 +948,15 @@ int msm_pinctrl_remove(struct platform_device *pdev)
+> >>
+> >>      pinctrl_unregister(pctrl->pctrl);
+> >>
+> >>+    if (pctrl->restart_nb.notifier_call) {
+>
+> One more comment: The conditional is really unnecessary. Just let
+> unregister_restart_handler deal with it ...
+>
+> >>+        ret = unregister_restart_handler(&pctrl->restart_nb);
 > 
-> Unrelated to this patch, but is this going to be executed (and potentially used)
-> on any non-arm architectures ?
+> and just ignore the error return. The function will only return an error
+> if the entry was not found, and then it is a don't care.
 
-No.  Not for now.  The only other conceivable platform that could make
-use of this would be hexagon, but I think there would be other hurdles
-to getting this driver working before even tackling the restart handler.
+Awesome, thanks.  I like simplifications :).  I was hijacking
+notifier_call to indicate whether or not the restart notifier was
+registered at all (because it's conditional on the particular chipset
+having a "ps_hold" function).  But, nice to know
+unregister_restart_handler() does the right thing if the handler wasn't
+registered in the first place.
 
-[..]
-> >+static int msm_ps_hold_restart(struct notifier_block *nb, unsigned long action,
-> >+			       void *data)
-> >  {
-> >-	writel(0, msm_ps_hold);
-> >+	struct msm_pinctrl *pctrl = container_of(nb, struct msm_pinctrl, restart_nb);
-> >+
-> >+	writel(0, pctrl->regs + PS_HOLD_OFFSET);
-> >  	mdelay(10000);
-> 
-> Sure you still want to wait for 10 seconds here ?
-> Would it make sense to choose a more reasonable timeout ?
-
-Yeah, 10s is a bit extreme.  I don't quite know what a reasonable
-timeout is, so I'll do some rough measurements, and shorten it down in
-v2.
-
-Thanks again,
   Josh
 
 -- 
