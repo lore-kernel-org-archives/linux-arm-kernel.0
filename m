@@ -1,96 +1,39 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 19 Sep 2014 10:02:08 -0400
-Subject: [RFC] arm: Handle starting up in secure mode
-In-Reply-To: <20140918172318.GF25330@e104818-lin.cambridge.arm.com>
-References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
- <20140918172318.GF25330@e104818-lin.cambridge.arm.com>
-Message-ID: <541C3760.5040300@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Sep 2014 15:08:56 +0100
+Subject: [PATCH 0/6] dts, kbuild: Implement support for dtb vendor subdirs
+In-Reply-To: <20140919123056.GC20170@rric.localhost>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <CAL1qeaGCeRyeKLo70E264bZcamOfBKoN9Y8_NDCjV5j4DoOw1Q@mail.gmail.com>
+ <20140919123056.GC20170@rric.localhost>
+Message-ID: <20140919140856.GG2295@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 09/18/2014 01:23 PM, Catalin Marinas wrote:
-> On Tue, Sep 16, 2014 at 10:09:16PM +0100, Christopher Covington wrote:
->> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
->> index 2a55373..36d1a9c 100644
->> --- a/arch/arm/kernel/hyp-stub.S
->> +++ b/arch/arm/kernel/hyp-stub.S
->> @@ -20,6 +20,7 @@
->>  #include <linux/linkage.h>
->>  #include <asm/assembler.h>
->>  #include <asm/virt.h>
->> +#include <asm/opcodes-sec.h>
->>  
->>  #ifndef ZIMAGE
->>  /*
->> @@ -76,6 +77,64 @@ ENTRY(__boot_cpu_mode)
->>  #endif /* ZIMAGE */
->>  
->>  /*
->> + * Detect whether the system is in secure supervisor mode, and if it is,
->> + * switch to hypervisor mode by way of secure monitor mode.
->> + */
->> +ENTRY(__mon_stub_install)
->> +	mrs	r4, cpsr
->> +	and	r4, r4, #MODE_MASK
->> +	cmp	r4, #SVC_MODE
->> +	movne	pc, lr
->> +
->> +	/*
->> +	 * Set things up so that if an NSACR access causes an undefined
->> +	 * instruction exception, we return. safe_svcmode_maskall called
->> +	 * just after this will get us back into supervisor mode.
->> +	 */
->> +	adr	r4, __mon_stub_vectors
->> +	mcr	p15, 0, r4, c12, c0, 0	@ set vector base address (VBAR)
->> +	mov	r4, lr
->> +
->> +	/*
->> +	 * Writing the NSACR will only succeed if we're in a secure mode.
->> +	 */
->> +	mrc	p15, 0, r5, c1, c1, 2	@ get non-secure access control (NSACR)
->> +	mcr	p15, 0, r5, c1, c1, 2	@ set non-secure access control (NSACR)
+On Fri, Sep 19, 2014 at 01:30:56PM +0100, Robert Richter wrote:
+> On 16.09.14 20:49:18, Andrew Bresticker wrote:
+> > > Robert Richter (6):
+> > >   dts, arm64: Add dtbs_install make target
+> > >   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+> > >   dts, arm/arm64: Remove dtbs build rules in sub-makes
+> > >   dts, kbuild: Implement support for dtb vendor subdirs
+> > >   dts, arm64: Move dts files to vendor subdirs
+> > >   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+> > 
+> > I've tested this for arm64 and by adding a vendor sub-directory
+> > locally for arm.  This series is also the base for my MIPS DT vendor
+> > sub-directory series
+> > (http://www.linux-mips.org/archives/linux-mips/2014-09/msg00217.html).
+> > So, for the entire series,
+> > 
+> > Tested-by: Andrew Bresticker <abrestic@chromium.org>
 > 
-> Since you talk about ARMv8 further down, if you run in AArch32 mode in
-> secure EL1 it will trap to EL3.
-
-If EL3/MON is A64, yes. If EL3/MON is A32 (the case I care most about for A32
-kernels), my simulator experiments and reading of the documentation suggest
-the write succeeds. I'll have to make an A64 EL3 test case and see what I can
-do about that.
-
->> +	/*
->> +	 * If we get here, we know we're in secure supervisor mode, so make the
->> +	 * switch to secure monitor mode.
->> +	 *
->> +	 * TODO: make sure this doesn't trap to A64 EL3.
->> +	 */
->> +	adr	r4, __mon_stub_vectors
->> +	mcr	p15, 0, r4, c12, c0, 1	@ set monitor vector base (MVBAR)
->> +	adr	r4, mon_settings
->> +	__SMC(0)
+> Andrew, thanks for testing and great this also works on mips.
 > 
-> I think from secure EL1 you can switch to monitor simply by setting the
-> CPSR mode bits (though IIRC on ARMv8 would also trap to EL3).
-> 
->> +
->> +	/*
->> +	 * Now, from non-secure supervisor mode, transition to hypervisor mode
->> +	 * and return via the exception vector.
->> +	 */
->> +	mov	r4, lr
->> +	__HVC(0)
-> 
-> From monitor mode can you return directly to HVC mode via ERET and avoid
-> another HVC?
+> Anyone willing to take the patches for 3.18? Are any further acks
+> needed?
 
-I'll experiment with switching modes through [CS]PSR writes.
+For the arm64 bits in this series:
 
-Thanks,
-Christopher
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+I think the patches can be merged via arm-soc.
