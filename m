@@ -1,89 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Sep 2014 12:16:49 -0700
-Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <alpine.DEB.2.10.1409191027330.5612@nanos>
-References: <1411067086-16613-1-git-send-email-nm@ti.com>
- <1411067086-16613-4-git-send-email-nm@ti.com>
- <alpine.DEB.2.10.1409181749170.4206@nanos>
- <20140919030333.GA6088@kahuna>
- <alpine.DEB.2.10.1409190710320.5612@nanos>
- <20140919161927.GA28613@kahuna>
- <alpine.DEB.2.10.1409191027330.5612@nanos>
-Message-ID: <20140919191649.GQ14505@atomide.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 19 Sep 2014 21:27:07 +0200
+Subject: [PATCH v10 5/6] rtc: max77686: Use ffs() to calculate tm_wday
+In-Reply-To: <1411137561.24444.5.camel@joe-AO725>
+References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>	
+ <1411122377-10426-6-git-send-email-javier.martinez@collabora.co.uk>
+ <1411137561.24444.5.camel@joe-AO725>
+Message-ID: <541C838B.7070207@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Gleixner <tglx@linutronix.de> [140919 10:37]:
-> On Fri, 19 Sep 2014, Nishanth Menon wrote:
-> > On 08:37-20140919, Thomas Gleixner wrote:
-> > > The other omap drivers using this have the same issue ... And of
-> > > course they are subtly different.
-> > > 
-> > > The uart one handles the actual device interrupt, which is violating
-> > > the general rule of possible interrupt reentrancy in the pm-runtime
-> > > case if the two interrupts are affine to two different cores. Yes,
-> > > it's protected by a lock and works by chance ....
-> > > 
-> > > The mmc one issues a disable_irq_nosync() in the wakeup irq handler
-> > > itself.
-> > > 
-> > > WHY does one driver need that and the other does not? You are not even
-> > > able to come up with a common scheme for OMAP. I don't want to see the
-> > > mess others are going to create when this stuff becomes more used.
-> > > 
-> > > Thanks,
-> > > 
-> > > 	tglx
-> > 
-> > I think I understand your concern - I request Tony to comment about
-> > this. I mean, I can try and hook things like uart in other drivers
-> > (like https://patchwork.kernel.org/patch/4759171/ ), but w.r.t overall
-> > generic usage guideline wise, I would prefer Tony to comment.
+Hello Joe,
+
+On 09/19/2014 04:39 PM, Joe Perches wrote:
+> On Fri, 2014-09-19 at 12:26 +0200, Javier Martinez Canillas wrote:
+>> The function max77686_rtc_calculate_wday() is used to
+>> calculate the day of the week to be filled in struct
+>> rtc_time but that function only calculates the number
+>> of bits shifted. So the ffs() function can be used to
+>> find the first bit set instead of a special function.
 > 
-> No, the uart and that i2c thing are just wrong. Assume the following
-> 
-> device irq affine to cpu0
-> wakeup irq affine to cpu1
-> 
-> CPU 0				CPU 1
-> 
-> runtime suspend
-> 
->  enable_wake(wakeup irq);
-> 
-> wakeup interrupt is raised	device interrupt is raised
-> 
->   dev_handler(device)		dev_handler(device)
-> 
-> It might work due to locking, but it is nevertheless wrong. Interrupt
-> handlers for devices are guaranteed not to be reentrant. And this
-> brilliant stuff simply violates that guarantee. So, no. It's wrong
-> even if it happens to work by chance.
+> This isn't the same logic.  Perhaps you want fls.
+>
 
-Hmm yeah that's a good point indeed.
+Right, the removed function has the same logic than fls() - 1 but the value
+stored in data[RTC_WEEKDAY] is:
 
->From hardware point of view the wake-up events behave like interrupts
-and could also be used as the only interrupt in some messed up cases.
-That avoids all kinds of custom APIs from driver point.
+data[RTC_WEEKDAY] = 1 << tm->tm_wday;
 
-The re-entrancy problem we've most likely had ever since we enabled
-the PRCM interrupts, and maybe that's why I did not even consider
-that part. I think before that we were calling the driver interrupt
-after waking up from the PM code..
+so for this particular case, it doesn't matter since ffs() == fls() always.
 
-Anyways, how about the following to deal with the re-entrancy problem:
+>> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+> []
+>> -static inline int max77686_rtc_calculate_wday(u8 shifted)
+>> -{
+>> -	int counter = -1;
+>> -	while (shifted) {
+>> -		shifted >>= 1;
+>> -		counter++;
+>> -	}
+>> -	return counter;
+>> -}
+>> -
+>>  static void max77686_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
+>>  				   int rtc_24hr_mode)
+>>  {
+>> @@ -93,7 +83,7 @@ static void max77686_rtc_data_to_tm(u8 *data, struct rtc_time *tm,
+>>  			tm->tm_hour += 12;
+>>  	}
+>>  
+>> -	tm->tm_wday = max77686_rtc_calculate_wday(data[RTC_WEEKDAY] & 0x7f);
+>> +	tm->tm_wday = ffs(data[RTC_WEEKDAY] & 0x7f) - 1;
 
-1. The wake-up interrupt handler must have a separate interrupt
-   handler that just calls tasklet_schedule()
+I did wonder which function to use and the question is when you want to know
+the number of shifted bits, do you look for the first or the last bit set?
 
-2. The device interrupt handler also just calls tasklet_schedule()
+Of course is the same for powers of two but I did a naive search to have an
+usage count:
 
-3. The tasklet then does pm_runtime_get, handles the registers, and
-   so on.
+$ git grep "shift = ffs(" | wc -l
+39
+$ git grep "shift = fls(" | wc -l
+17
 
-Or would we still have a re-entrancy problem somewhere else with
-that?
+so it seems that ffs() is twice more popular than fls() for this case so I
+decided to use ffs() but I don't have a strong opinion tbh.
 
-Regards,
-
-Tony
+Best regards,
+Javier
