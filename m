@@ -1,49 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 19 Sep 2014 11:50:01 +0200
-Subject: [PATCH v4 4/7] ARM: l2c: Add support for overriding prefetch
- settings
-In-Reply-To: <1409062680-15906-5-git-send-email-t.figa@samsung.com>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-5-git-send-email-t.figa@samsung.com>
-Message-ID: <20140919095000.GF29620@piout.net>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Fri, 19 Sep 2014 15:25:51 +0530
+Subject: [PATCH 1/2] ARM: dts: vf610-colibri: Add ADC support
+In-Reply-To: <20140918134613.GK4796@dragon>
+References: <cover.1410873422.git.maitysanchayan@gmail.com>
+ <1015e874d5b13795e38069402a66b4798d79b632.1410873422.git.maitysanchayan@gmail.com>
+ <20140918134613.GK4796@dragon>
+Message-ID: <CANkTNWDXkGSENi0QE2RJ96mWvRpiGdudMP24Wrw=Q_Df=1jKpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/2014 at 16:17:57 +0200, Tomasz Figa wrote :
-> Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
-> settings configured in registers leading to crashes if L2C is enabled
-> without overriding them. This patch introduces bindings to enable
-> prefetch settings to be specified from DT and necessary support in the
-> driver.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> Enable ADC support for Colibri VF61 modules
+>>
+>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/vf610-colibri.dtsi |   10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> index 0cd8343..275ebec 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+>> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> @@ -69,6 +69,16 @@
+>>       status = "okay";
+>>  };
+>>
+>> +&adc0 {
+>> +     pinctrl-names = "default";
+>> +     status = "okay";
+>> +};
+>> +
+>> +&adc1 {
+>> +     pinctrl-names = "default";
+>> +     status = "okay";
+>> +};
+>> +
+>
+> Please sort the nodes alphabetically in node name.
 
-Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Thanks for the input. Will clean and resend.
 
-It is working and useful on Atmel's sama5d4 were the bootloader is not
-configuring the L2C prefetch. However, I'm wondering whether we should
-add support for setting L310_PREFETCH_CTRL_DATA_PREFETCH and
-L310_PREFETCH_CTRL_INSTR_PREFETCH. I'm currently doing it by using
-".l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
-L310_AUX_CTRL_INSTR_PREFETCH" (those are the same bits) but this has the
-disadvantage of displaying the "L2C: platform modifies aux control
-register:" twice.
+Sanchayan
 
-> +	if (!of_property_read_u32(np, "arm,prefetch-offset", &val)) {
-> +		prefetch &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
-> +		prefetch |= val & L310_PREFETCH_CTRL_OFFSET_MASK;
-> +	}
-> +
-
-While you use val directly here, later, while printing the offset, val +
-1 is used. Maybe it would be better to have the same number in both
-places, else you end up with having "arm,prefetch-offset = <1>" in your
-DT and the kernel printing "L2C-310 ID prefetch enabled, offset 2
-lines".
-
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> Shawn
+>
+>>  &iomuxc {
+>>       vf610-colibri {
+>>               pinctrl_esdhc1: esdhc1grp {
+>> --
+>> 1.7.9.5
+>>
