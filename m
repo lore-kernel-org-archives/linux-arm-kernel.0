@@ -1,42 +1,182 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Sep 2014 15:25:44 -0700
-Subject: [PATCH v4 10/11] ARM: kernel: add support for cpu cache
- information
-In-Reply-To: <1409763617-17074-11-git-send-email-sudeep.holla@arm.com>
-References: <1409763617-17074-1-git-send-email-sudeep.holla@arm.com>
- <1409763617-17074-11-git-send-email-sudeep.holla@arm.com>
-Message-ID: <541CAD68.2090009@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 19 Sep 2014 16:32:58 -0600
+Subject: [PATCH v9 1/4] pci:host: APM X-Gene PCIe host controller driver
+In-Reply-To: <1410906824-9321-2-git-send-email-tinamdar@apm.com>
+References: <1410906824-9321-1-git-send-email-tinamdar@apm.com>
+ <1410906824-9321-2-git-send-email-tinamdar@apm.com>
+Message-ID: <20140919223258.GA32208@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/14 10:00, Sudeep Holla wrote:
-> From: Sudeep Holla <sudeep.holla@arm.com>
->
-> This patch adds support for cacheinfo on ARM platforms.
->
-> On ARMv7, the cache hierarchy can be identified through Cache Level ID
-> register(CLIDR) while the cache geometry is provided by Cache Size ID
-> register(CCSIDR).
->
-> On architecture versions before ARMv7, CLIDR and CCSIDR is not
-> implemented. The cache type register(CTR) provides both cache hierarchy
-> and geometry if implemented. For implementations that doesn't support
-> CTR, we need to list the probable value of CTR if it was implemented
-> along with the cpuid for the sake of simplicity to handle them.
->
-> Since the architecture doesn't provide any way of detecting the cpus
-> sharing particular cache, device tree is used fo the same purpose.
-> On non-DT platforms, first level caches are per-cpu while higher level
-> caches are assumed system-wide.
->
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
->
+On Tue, Sep 16, 2014 at 03:33:41PM -0700, Tanmay Inamdar wrote:
+> This patch adds the AppliedMicro X-Gene SOC PCIe host controller driver.
+> X-Gene PCIe controller supports maximum up to 8 lanes and GEN3 speed.
+> X-Gene SOC supports maximum 5 PCIe ports.
+> 
+> Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host/Kconfig     |  10 +
+>  drivers/pci/host/Makefile    |   1 +
+>  drivers/pci/host/pci-xgene.c | 646 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 657 insertions(+)
+>  create mode 100644 drivers/pci/host/pci-xgene.c
+> ...
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> +static inline void
+> +xgene_pcie_cfg_in16(void __iomem *addr, int offset, u32 *val)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Whitespace - can fit on one line.  Also others below.
+
+> +{
+> +	*val = readl(addr + (offset & ~0x3));
+> +
+> +	switch (offset & 0x3) {
+> +	case 2:
+> +		*val >>= 16;
+> +		break;
+> +	}
+> +
+> +	*val &= 0xFFFF;
+> +}
+> +
+> +static inline void
+> +xgene_pcie_cfg_in8(void __iomem *addr, int offset, u32 *val)
+> +{
+> +	*val = readl(addr + (offset & ~0x3));
+> +
+> +	switch (offset & 0x3) {
+> +	case 3:
+> +		*val = *val >> 24;
+> +		break;
+> +	case 2:
+> +		*val = *val >> 16;
+> +		break;
+> +	case 1:
+> +		*val = *val >> 8;
+> +		break;
+> +	}
+> +	*val &= 0xFF;
+> +}
+> +
+> +/* When the address bit [17:16] is 2'b01, the Configuration access will be
+> + * treated as Type 1 and it will be forwarded to external PCIe device.
+> + */
+
+Follow usual block comment style:
+
+    /*
+     * text
+     */
+
+> ...
+> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+> +{
+> +	int i;
+> +
+> +	/* Hide the PCI host BARs from the kernel as their content doesn't
+> +	 * fit well in the resource management
+> +	 */
+
+This needs a better explanation than "doesn't fit well."
+
+I *think* you're probably talking about something similar to the MVEBU
+devices mentioned here:
+http://lkml.kernel.org/r/CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA at mail.gmail.com
+
+where the device can be configured as either an endpoint or a root port,
+and the endpoint BARs are still visible when configured as a root port.
+
+In any event, I'd like a description of exactly what these BARs are and wha
+the problem is.  Presumably the BARs exist and were sized by the PCI core
+in __pci_read_base().  That will generate some log messages and possibly
+some warnings, depending on how the host bridge windows are set up.
+
+We might eventually need a way to skip BARs like that altogether so we
+don't even try to size them.
+
+> +	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+> +		dev->resource[i].start = dev->resource[i].end = 0;
+> +		dev->resource[i].flags = 0;
+> +	}
+> +	dev_info(&dev->dev, "Hiding X-Gene pci host bridge resources %s\n",
+> +		 pci_name(dev));
+> +}
+> +DECLARE_PCI_FIXUP_HEADER(XGENE_PCIE_VENDORID, XGENE_PCIE_DEVICEID,
+> +			 xgene_pcie_fixup_bridge);
+> +
+> ...
+
+> +static void xgene_pcie_setup_ob_reg(struct xgene_pcie_port *port,
+> +				    struct resource *res, u32 offset,
+> +				    u64 cpu_addr, u64 pci_addr)
+> +{
+> +	void __iomem *base = port->csr_base + offset;
+> +	resource_size_t size = resource_size(res);
+> +	u64 restype = resource_type(res);
+> +	u64 mask = 0;
+> +	u32 min_size;
+> +	u32 flag = EN_REG;
+> +
+> +	if (restype == IORESOURCE_MEM) {
+> +		min_size = SZ_128M;
+> +	} else {
+> +		min_size = 128;
+> +		flag |= OB_LO_IO;
+> +	}
+> +
+> +	if (size >= min_size)
+> +		mask = ~(size - 1) | flag;
+> +	else
+> +		dev_warn(port->dev, "res size 0x%llx less than minimum 0x%x\n",
+> +			 (u64)size, min_size);
+
+I'd include a %pR here to help identify the offending resource.
+
+> +static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+> +				 struct list_head *res,
+> +				 resource_size_t io_base)
+> +{
+> +	struct pci_host_bridge_window *window;
+> +	struct device *dev = port->dev;
+> +	int ret;
+> +
+> +	list_for_each_entry(window, res, list) {
+> +		struct resource *res = window->res;
+> +		u64 restype = resource_type(res);
+> +
+> +		dev_dbg(port->dev, "0x%08lx 0x%016llx...0x%016llx\n",
+> +			res->flags, res->start, res->end);
+
+Use %pR here.
+
+> +
+> +		switch (restype) {
+> +		case IORESOURCE_IO:
+> +			xgene_pcie_setup_ob_reg(port, res, OMR3BARL, io_base,
+> +						res->start - window->offset);
+> +			ret = pci_remap_iospace(res, io_base);
+> +			if (ret < 0)
+> +				return ret;
+> +			break;
+> +		case IORESOURCE_MEM:
+> +			xgene_pcie_setup_ob_reg(port, res, OMR1BARL, res->start,
+> +						res->start - window->offset);
+> +			break;
+> +		case IORESOURCE_BUS:
+> +			break;
+> +		default:
+> +			dev_err(dev, "invalid io resource!");
+
+If you're going to print something here, you might as well include the type
+that seems invalid.  If you use %pR, I think it will do that automatically.
+
+> +			return -EINVAL;
+> +		}
+> +	}
+> +	xgene_pcie_setup_cfg_reg(port->csr_base, port->cfg_addr);
+> +
+> +	return 0;
+> +}
+
+Bjorn
