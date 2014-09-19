@@ -1,214 +1,208 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Fri, 19 Sep 2014 14:05:29 +0800
-Subject: [PATCH v3 2/3] power: reset: imx-snvs-poweroff: add power off
- driver for i.mx6
-In-Reply-To: <20140918175316.GA10911@leverpostej>
-References: <1410947881-7345-1-git-send-email-b38343@freescale.com>
- <1410947881-7345-3-git-send-email-b38343@freescale.com>
- <20140917175244.GC7983@leverpostej>
- <20140918022125.GA8150@Robin-OptiPlex-780>
- <20140918175316.GA10911@leverpostej>
-Message-ID: <20140919060512.GA3872@Robin-OptiPlex-780>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Fri, 19 Sep 2014 13:46:04 +0800
+Subject: [PATCH v3] mfd: syscon: Decouple syscon interface from
+ platform devices
+In-Reply-To: <8e0ba684d5fe4663a8842336385ed7ad@BY2PR0301MB0613.namprd03.prod.outlook.com>
+References: <20140917085818.GA10285@shlinux1.ap.freescale.net>
+ <000401cfd269$922dfc40$b689f4c0$@samsung.com>
+ <20140918030552.GA26661@shlinux1.ap.freescale.net>
+ <000701cfd306$4d3e8080$e7bb8180$@samsung.com>
+ <20140918075516.GB15363@shlinux1.ap.freescale.net>
+ <000c01cfd324$1f2cd930$5d868b90$@samsung.com>
+ <20140918100505.GA19346@shlinux1.ap.freescale.net>
+ <48f9f4067cc44ad49297bb4b62c56c88@BY2PR0301MB0613.namprd03.prod.outlook.com>
+ <20140919041933.GB19346@shlinux1.ap.freescale.net>
+ <8e0ba684d5fe4663a8842336385ed7ad@BY2PR0301MB0613.namprd03.prod.outlook.com>
+Message-ID: <20140919054602.GC19346@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 06:53:16PM +0100, Mark Rutland wrote:
-> On Thu, Sep 18, 2014 at 03:21:27AM +0100, Robin Gong wrote:
-> > On Wed, Sep 17, 2014 at 06:52:44PM +0100, Mark Rutland wrote:
-> > > On Wed, Sep 17, 2014 at 10:57:59AM +0100, Robin Gong wrote:
-> > > > This driver register pm_power_off with snvs power off function. If
-> > > > your boards NOT use PMIC_ON_REQ to turn on/off external pmic, or use
-> > > > other pin to do, please disable the driver in dts, otherwise, your
-> > > > pm_power_off maybe overwrote by this driver.
-> > > > 
-> > > > Signed-off-by: Robin Gong <b38343@freescale.com>
-> > > > ---
-> > > >  .../bindings/power_supply/imx-snvs-poweroff.txt    |   23 +++++++
-> > > >  drivers/power/reset/Kconfig                        |    9 +++
-> > > >  drivers/power/reset/Makefile                       |    1 +
-> > > >  drivers/power/reset/imx-snvs-poweroff.c            |   66 ++++++++++++++++++++
-> > > >  4 files changed, 99 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
-> > > >  create mode 100644 drivers/power/reset/imx-snvs-poweroff.c
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt b/Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
-> > > > new file mode 100644
-> > > > index 0000000..6caf64e
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/power_supply/imx-snvs-poweroff.txt
-> > > > @@ -0,0 +1,23 @@
-> > > > +i.mx6 Poweroff Driver
-> > > > +
-> > > > +SNVS_LPCR in SNVS module can power off the whole system by pull
-> > > > +PMIC_ON_REQ low if PMIC_ON_REQ is connected with external PMIC.
-> > > > +If you don't want to use PMIC_ON_REQ as power on/off control,
-> > > > +please set status='disabled' to disable this driver.
-> > > > +
-> > > > +Required Properties:
-> > > > +-compatible: "fsl,sec-v4.0-poweroff"
-> > > > +-reg: Specifies the physical address of the SNVS_LPCR register
-> > > 
-> > > As you describe above, this is part of the SNVS module. So why does this
-> > > need a separate node?
-> > > 
-> > > Surely there should just be a property on the SNVS node that desribers
-> > > whether or not this can be used?
-> > > 
-> > > Mark.
+On Fri, Sep 19, 2014 at 01:20:18PM +0800, Xiubo Li-B47053 wrote:
+> [...]
+> > >    create child: /dcsr at 20000000/dcsr-atbrepl at 3a8000
+> > >    create child: /dcsr at 20000000/dcsr-tsgen-ctrl at 3a9000
+> > >    create child: /dcsr at 20000000/dcsr-tsgen-read at 3aa000
+> > >    create child: /regulators/regulator at 0
+> > >    ...
 > > >
-> > Yes, put this function in rtc-snvs make things easier, honestly,this is our way
-> > in internal tree. But looks more and more power off driver put in drivers/power
-> > /reset,so we decided to add new power off driver. If it is ok to register
-> > pm_power_off hook in drivers/rtc/rtc-snvs.c, I can drop this patch.
-> 
-> My view would be that the ability to power off the system is a feature
-> of some SNVS modules, and that the SNVS_LPCR register is not a
-> sufficiently large sub-block to be described separately. I am not a fan
-> of partitioning HW to match Linux implementation details rather than its
-> logical structure.
-No, actually snvs cover the  SNVS_LPCR register. This patch only want to put
-pm_power_off under drivers/power/reset instead of drivers/rtc. I'll create
-another straightfoward snvs-patch to try, thanks.
-
-> 
-> So, asuming the layout of the SNS block is well-defined I'd just expect
-> a top-level SNVS node, with a driver that can decompose the block
-> appropriately and portion it out to different drivers as necessary.
-> 
-> I am not familiar with the hardware, so perhaps that is not a good idea.
-> How variable is the SNVS block?
-> 
-> Mark.
-> 
-> > > > +
-> > > > +Example:
-> > > > +	snvs at 020cc000 {
-> > > > +		compatible = "fsl,sec-v4.0-mon", "simple-bus";
-> > > > +		#address-cells = <1>;
-> > > > +		#size-cells = <1>;
-> > > > +		ranges = <0 0x020cc000 0x4000>;
-> > > > +		.....
-> > > > +		snvs-poweroff at 38 {
-> > > > +			compatible = "fsl,sec-v4.0-poweroff";
-> > > > +			reg = <0x38 0x4>;
-> > > > +		};
-> > > > +	}
-> > > > diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> > > > index ca41523..b26c547 100644
-> > > > --- a/drivers/power/reset/Kconfig
-> > > > +++ b/drivers/power/reset/Kconfig
-> > > > @@ -45,6 +45,15 @@ config POWER_RESET_HISI
-> > > >  	help
-> > > >  	  Reboot support for Hisilicon boards.
-> > > >  
-> > > > +config POWER_RESET_IMX
-> > > > +	bool "IMX6 power-off driver"
-> > > > +	depends on POWER_RESET && SOC_IMX6
-> > > > +	help
-> > > > +	  This driver support power off external PMIC by PMIC_ON_REQ on i.mx6
-> > > > +	  boards.If you want to use other pin to control external power,please
-> > > > +	  say N here or disable in dts to make sure pm_power_off never be
-> > > > +	  overwrote wrongly by this driver.
-> > > > +
-> > > >  config POWER_RESET_MSM
-> > > >  	bool "Qualcomm MSM power-off driver"
-> > > >  	depends on POWER_RESET && ARCH_QCOM
-> > > > diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> > > > index a42e70e..2524daf 100644
-> > > > --- a/drivers/power/reset/Makefile
-> > > > +++ b/drivers/power/reset/Makefile
-> > > > @@ -3,6 +3,7 @@ obj-$(CONFIG_POWER_RESET_AXXIA) += axxia-reset.o
-> > > >  obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
-> > > >  obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
-> > > >  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
-> > > > +obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
-> > > >  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
-> > > >  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
-> > > >  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
-> > > > diff --git a/drivers/power/reset/imx-snvs-poweroff.c b/drivers/power/reset/imx-snvs-poweroff.c
-> > > > new file mode 100644
-> > > > index 0000000..d726ac4
-> > > > --- /dev/null
-> > > > +++ b/drivers/power/reset/imx-snvs-poweroff.c
-> > > > @@ -0,0 +1,66 @@
-> > > > +/* Power off driver for i.mx6
-> > > > + * Copyright (c) 2014, FREESCALE CORPORATION.  All rights reserved.
-> > > > + *
-> > > > + * based on msm-poweroff.c
-> > > > + *
-> > > > + * This program is free software; you can redistribute it and/or modify
-> > > > + * it under the terms of the GNU General Public License version 2 and
-> > > > + * only version 2 as published by the Free Software Foundation.
-> > > > + *
-> > > > + * This program is distributed in the hope that it will be useful,
-> > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > > + * GNU General Public License for more details.
-> > > > + *
-> > > > + */
-> > > > +
-> > > > +#include <linux/err.h>
-> > > > +#include <linux/init.h>
-> > > > +#include <linux/io.h>
-> > > > +#include <linux/kernel.h>
-> > > > +#include <linux/module.h>
-> > > > +#include <linux/of.h>
-> > > > +#include <linux/of_address.h>
-> > > > +#include <linux/platform_device.h>
-> > > > +
-> > > > +static void __iomem *snvs_base;
-> > > > +
-> > > > +static void do_imx_poweroff(void)
-> > > > +{
-> > > > +	u32 value = readl(snvs_base);
-> > > > +
-> > > > +	/* set TOP and DP_EN bit */
-> > > > +	writel(value | 0x60, snvs_base);
-> > > > +}
-> > > > +
-> > > > +static int imx_poweroff_probe(struct platform_device *pdev)
-> > > > +{
-> > > > +	snvs_base = of_iomap(pdev->dev.of_node, 0);
-> > > > +	if (!snvs_base) {
-> > > > +		dev_err(&pdev->dev, "failed to get memory\n");
-> > > > +		return -EIO;
-> > > > +	}
-> > > > +
-> > > > +	pm_power_off = do_imx_poweroff;
-> > > > +	return 0;
-> > > > +}
-> > > > +
-> > > > +static const struct of_device_id of_imx_poweroff_match[] = {
-> > > > +	{ .compatible = "fsl,sec-v4.0-poweroff", },
-> > > > +	{},
-> > > > +};
-> > > > +MODULE_DEVICE_TABLE(of, of_imx_poweroff_match);
-> > > > +
-> > > > +static struct platform_driver imx_poweroff_driver = {
-> > > > +	.probe = imx_poweroff_probe,
-> > > > +	.driver = {
-> > > > +		.name = "imx-snvs-poweroff",
-> > > > +		.of_match_table = of_match_ptr(of_imx_poweroff_match),
-> > > > +	},
-> > > > +};
-> > > > +
-> > > > +static int __init imx_poweroff_init(void)
-> > > > +{
-> > > > +	return platform_driver_register(&imx_poweroff_driver);
-> > > > +}
-> > > > +device_initcall(imx_poweroff_init);
-> > > > -- 
-> > > > 1.7.9.5
-> > > > 
-> > > > 
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > As default the Linux will create all the platform device for each DT node,
+> > which
+> > > Can be found from "drivers/of/platform.c".
+> > >
+> > > So we can get the pdev node using the specified DT node, and feel safe to
+> > use
+> > > it as Pankaj's patch does.
+> > >
+> > 
+> > I mean before the devices are populated from device tree.
+> > For example, we usually call of_platform_populate in .init_machine.
+> > Before it, we may not be able to get it's device, isn't it?
 > > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Yes, right.
+> 
+> For this case, we'd better create the pdev or dev manually for the first time
+> We use it, right ?
+
+Yes, that's my understanding.
+
+Regards
+Dong Aisheng
+
+> 
+> Thanks,
+> 
+> BRs
+> Xiubo
+> 
+> 
+> > Regards
+> > Dong Aisheng
+> > 
+> > > And also we must make sure that the 'syscon' DT nodes has the compatible
+> > prop.
+> > >
+> > > Thanks,
+> > >
+> > > BRs
+> > > Xiubo
+> > >
+> > >
+> > > > Regards
+> > > > Dong Aisheng
+> > > >
+> > > > > ----
+> > > > > static struct syscon *of_syscon_register(struct device_node *np)
+> > > > >  {
+> > > > > +	struct platform_device *pdev;
+> > > > >  	struct syscon *syscon;
+> > > > >  	struct regmap *regmap;
+> > > > >  	void __iomem *base;
+> > > > > @@ -142,7 +144,11 @@ static struct syscon *of_syscon_register(struct
+> > > > > device_node *np)
+> > > > >  	if (!base)
+> > > > >  		return ERR_PTR(-ENOMEM);
+> > > > >
+> > > > > -	regmap = regmap_init_mmio(NULL, base, &syscon_regmap_config);
+> > > > > +	pdev = of_find_device_by_node(np);
+> > > > > +	if (!(&pdev->dev))
+> > > > > +		return ERR_PTR(-ENODEV);
+> > > > > +
+> > > > > +	regmap = regmap_init_mmio(&pdev->dev, base,
+> > &syscon_regmap_config);
+> > > > >  	if (IS_ERR(regmap)) {
+> > > > >  		pr_err("regmap init failed\n");
+> > > > >  		return ERR_CAST(regmap);
+> > > > > -------
+> > > > >
+> > > > > I have tested this in linux-next and it works well. In this way there
+> > won't
+> > > > > be any issues of
+> > > > > dereferencing NULL pointer in regmap.c and at the same time, if DT has
+> > > > > {big,little}-endian
+> > > > > optional property in syscon device node, it will be taken care.
+> > > > >
+> > > > > So I would wait for Arnd's opinion about above mentioned changes and
+> > then
+> > > > > post a new
+> > > > > change after addressing Arnd's minor comment along with this fix in next
+> > > > > revision.
+> > > > >
+> > > > >
+> > > > > Thanks,
+> > > > > Pankaj Dubey
+> > > > > > Maybe we could consider create device structure for each syscon
+> > compatible
+> > > > > device in
+> > > > > > syscon driver in of_syscon_register in first time which seems to be
+> > > > > reasonable.
+> > > > > >
+> > > > > > Regards
+> > > > > > Dong Aisheng
+> > > > > >
+> > > > > > > --------------------------------------------
+> > > > > > > Subject: [PATCH] regmap: fix NULL pointer dereference in
+> > > > > > > regmap_get_val_endian
+> > > > > > >
+> > > > > > > Recent commits for getting reg endianess causing NULL pointer
+> > > > > > > dereference if dev is passed NULL in regmap_init_mmio. This patch
+> > > > > > > fixes this issue, and allows to parse reg endianess only if dev and
+> > > > > > > dev->of_node exist.
+> > > > > > >
+> > > > > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > > > > > > ---
+> > > > > > >  drivers/base/regmap/regmap.c |   23 ++++++++++++++---------
+> > > > > > >  1 file changed, 14 insertions(+), 9 deletions(-)
+> > > > > > >
+> > > > > > > diff --git a/drivers/base/regmap/regmap.c
+> > > > > > > b/drivers/base/regmap/regmap.c index f2281af..455a877 100644
+> > > > > > > --- a/drivers/base/regmap/regmap.c
+> > > > > > > +++ b/drivers/base/regmap/regmap.c
+> > > > > > > @@ -477,7 +477,7 @@ static enum regmap_endian
+> > > > > > > regmap_get_val_endian(struct device *dev,
+> > > > > > >  					const struct regmap_bus *bus,
+> > > > > > >  					const struct regmap_config *config)
+> > > > > {
+> > > > > > > -	struct device_node *np = dev->of_node;
+> > > > > > > +	struct device_node *np;
+> > > > > > >  	enum regmap_endian endian;
+> > > > > > >
+> > > > > > >  	/* Retrieve the endianness specification from the regmap config
+> > > > */
+> > > > > > > @@ -487,15 +487,20 @@ static enum regmap_endian
+> > > > > > > regmap_get_val_endian(struct device *dev,
+> > > > > > >  	if (endian != REGMAP_ENDIAN_DEFAULT)
+> > > > > > >  		return endian;
+> > > > > > >
+> > > > > > > -	/* Parse the device's DT node for an endianness specification */
+> > > > > > > -	if (of_property_read_bool(np, "big-endian"))
+> > > > > > > -		endian = REGMAP_ENDIAN_BIG;
+> > > > > > > -	else if (of_property_read_bool(np, "little-endian"))
+> > > > > > > -		endian = REGMAP_ENDIAN_LITTLE;
+> > > > > > > +	/* If the dev and dev->of_node exist try to get endianness from
+> > > > DT
+> > > > > > > */
+> > > > > > > +	if (dev && dev->of_node) {
+> > > > > > > +		np = dev->of_node;
+> > > > > > >
+> > > > > > > -	/* If the endianness was specified in DT, use that */
+> > > > > > > -	if (endian != REGMAP_ENDIAN_DEFAULT)
+> > > > > > > -		return endian;
+> > > > > > > +		/* Parse the device's DT node for an endianness
+> > > > > > > specification */
+> > > > > > > +		if (of_property_read_bool(np, "big-endian"))
+> > > > > > > +			endian = REGMAP_ENDIAN_BIG;
+> > > > > > > +		else if (of_property_read_bool(np, "little-endian"))
+> > > > > > > +			endian = REGMAP_ENDIAN_LITTLE;
+> > > > > > > +
+> > > > > > > +		/* If the endianness was specified in DT, use that */
+> > > > > > > +		if (endian != REGMAP_ENDIAN_DEFAULT)
+> > > > > > > +			return endian;
+> > > > > > > +	}
+> > > > > > >
+> > > > > > >  	/* Retrieve the endianness specification from the bus config */
+> > > > > > >  	if (bus && bus->val_format_endian_default)
+> > > > > > > --
+> > > > > > >
+> > > > > > > Thanks,
+> > > > > > > Pankaj Dubey
+> > > > > > >
+> > > > > > > > Regards
+> > > > > > > > Dong Aisheng
+> > > > > > > >
+> > > > > > > > >
+> > > > > > > > > Thanks,
+> > > > > > > > > Pankaj Dubey
+> > > > > > > > >
+> > > > > > > > > > Regards
+> > > > > > > > > > Dong Aisheng
+> > > > > > > > > >
+> > > > > > > > > > >
+> > > > > > > > > > >
+> > > > > > > > > > > _______________________________________________
+> > > > > > > > > > > linux-arm-kernel mailing list
+> > > > > > > > > > > linux-arm-kernel at lists.infradead.org
+> > > > > > > > > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > > > > > > >
+> > > > > > >
+> > > > >
