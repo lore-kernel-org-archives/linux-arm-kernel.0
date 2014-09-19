@@ -1,45 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 19 Sep 2014 13:14:19 +0900
-Subject: [GIT PULL] Fifth Round of Renesas ARM Based SoC Soc Updates for v3.18
-Message-ID: <cover.1411100007.git.horms+renesas@verge.net.au>
+Date: Fri, 19 Sep 2014 13:14:21 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7740 legacy: Fix copied bug in comment
+In-Reply-To: <cover.1411100007.git.horms+renesas@verge.net.au>
+References: <cover.1411100007.git.horms+renesas@verge.net.au>
+Message-ID: <8237f9e5c38098aeb8570a77bacd0fe0ebc61dfa.1411100007.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these fifth round of Renesas ARM based SoC soc updates for v3.18.
+The corresponding bug in pm-sh7372.c was fixed in commit
+70fe7b24672a988f ("ARM: shmobile: Do not access sh7372 A4S domain
+internals directly").
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc4-for-v3.18,
-which I have already sent a pull-request for.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/pm-r8a7740.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-The following changes since commit 1370078db37de2aa5e906ae2b5dbbb6ba289adb4:
-
-  ARM: shmobile: r8a7794: Remove unnecessary #ifdef CONFIG_USE_OF (2014-09-11 09:51:16 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc5-for-v3.18
-
-for you to fetch changes up to 8237f9e5c38098aeb8570a77bacd0fe0ebc61dfa:
-
-  ARM: shmobile: r8a7740 legacy: Fix copied bug in comment (2014-09-17 09:20:53 +0900)
-
-----------------------------------------------------------------
-Fifth Round of Renesas ARM Based SoC Soc Updates for v3.18
-
-* r8a7740: Fix documentation error coppied from elsewhere
-* r8a7794: Reserve memory for CMA in a manner consistent to
-           other R-Car Gen2 SoCs
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: r8a7740 legacy: Fix copied bug in comment
-
-Magnus Damm (1):
-      ARM: shmobile: r8a7794: Reserve memory as other R-Car Gen2 SoCs
-
- arch/arm/mach-shmobile/pm-r8a7740.c    | 2 +-
- arch/arm/mach-shmobile/setup-r8a7794.c | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
+index a0d44d5..94c8815 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7740.c
++++ b/arch/arm/mach-shmobile/pm-r8a7740.c
+@@ -18,7 +18,7 @@ static int r8a7740_pd_a4s_suspend(void)
+ {
+ 	/*
+ 	 * The A4S domain contains the CPU core and therefore it should
+-	 * only be turned off if the CPU is in use.
++	 * only be turned off if the CPU is not in use.
+ 	 */
+ 	return -EBUSY;
+ }
+-- 
+2.0.1
