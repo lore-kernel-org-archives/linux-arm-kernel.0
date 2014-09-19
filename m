@@ -1,67 +1,42 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Fri, 19 Sep 2014 15:57:35 +0530
-Subject: [PATCH 3/3] ARM: dts: vf610-colibri: Add backlight support
-In-Reply-To: <20140918141705.GM4796@dragon>
-References: <cover.1410930820.git.bhuvanchandra.dv@toradex.com>
- <cea494421deefe0b862e31b08685074715acf8d6.1410930820.git.bhuvanchandra.dv@toradex.com>
- <20140918141705.GM4796@dragon>
-Message-ID: <541C0517.30804@toradex.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Sep 2014 11:33:34 +0100
+Subject: [PATCH] ARM: zImage: add support for ARMv7-M
+In-Reply-To: <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
+References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
+ <201409181938.46996.arnd@arndb.de>
+ <CAGhQ9VxMKD-DcFhobUky3FnKjerTiv66w4PSCPfi+=bo_zWgUg@mail.gmail.com>
+Message-ID: <20140919103334.GB2295@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 18, 2014 at 07:34:47PM +0100, Joachim Eastwood wrote:
+> On 18 September 2014 19:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 18 September 2014, Joachim Eastwood wrote:
+> >>   ARM(          mov     pc, r4  )               @ call kernel
+> >> - THUMB(                bx      r4      )               @ entry point is always ARM
+> >> +#ifdef CONFIG_CPU_V7M
+> >> +               add     r4, r4, #1              @ enter in Thumb mode for ARMv7M
+> >> +#endif
+> >> + THUMB(                bx      r4      )               @ entry point is always ARM for non ARMv7M CPUs
+> >>
+> >
+> > I think it would be much nicer to avoid sprinkling #ifdefs here. We already
+> > have the ARM() and THUMB() macros to deal with the two cases we support, which
+> > are booting in ARM mode vs ARMv7-A with THUMB2 mode. We can probably add
+> > another macro like this to deal with the ARMv7-M case that does not have
+> > ARM mode.
+> 
+> Well, I guess I could make a THUMBONLY macro or something like that.
+> But I think that the macro would only be useful in the case you quoted
+> above. The other ifdefs in the patch are either for large blocks or
+> removing code. So I don't think it would improve the patch a great
+> deal.
+> 
+> btw, do you have better name suggestion than THUMBONLY?
 
-On Thursday 18 September 2014 07:47 PM, Shawn Guo wrote:
+It looks like you would need the reverse as well, !THUMBONLY. What about
+M_CLASS and A_CLASS (with or without underscore and maybe AR_CLASS if we
+ever need to differentiate between A and R)?
 
-> On Wed, Sep 17, 2014 at 01:46:30PM +0530, Bhuvanchandra DV wrote:
->> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
->> ---
->>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
->>  arch/arm/boot/dts/vf610-colibri.dtsi        |    7 +++++++
->>  2 files changed, 13 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> index ba98039..f1988a0 100644
->> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> @@ -52,3 +52,9 @@
->>  &pwm1 {
->>  	status = "okay";
->>  };
->> +
->> +&backlight {
->> +	brightness-levels = <0 4 8 16 32 64 128 255>;
->> +	default-brightness-level = <6>;
->> +	status  = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
->> index 9bd1415..e725306 100644
->> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
->> @@ -25,6 +25,13 @@
->>  		};
->>  	};
->>  
->> +	backlight: bl {
-> I would suggest we name the node following the example in
-> Documentation/devicetree/bindings/pwm/pwm.txt, i.e. bl: backlight.
-
-Will update the node name to bl: backlight
-
->> +		compitable = "pwm-backlight";
->> +		pwms = <&pwm0 0 5000000 0>;
->> +		pwm-names = " backlight";
-> Drop the leading space in the string.
->
-> Shawn
-
-Ok
-
->> +		status = "disabled";
->> +	};
->> +
->>  };
->>  
->>  &esdhc1 {
->> -- 
->> 1.7.9.5
->>
+-- 
+Catalin
