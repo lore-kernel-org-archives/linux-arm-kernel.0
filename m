@@ -1,78 +1,72 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 18 Sep 2014 19:59:53 -0400
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <6318202.hl003vettj@vostro.rjw.lan>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <201409180122.10631.arnd@arndb.de> <20140917234036.GC2464@xora-yoga-13>
- <6318202.hl003vettj@vostro.rjw.lan>
-Message-ID: <541B71F9.70008@redhat.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Fri, 19 Sep 2014 05:34:10 +0530
+Subject: [PATCH] arm64: Fix GIC addresses for APM X-Gene
+In-Reply-To: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
+References: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <CALrVBktfX8SkpdzpHp7Y6WgcLYKA9CMrmbTHtH=iqomsnqhTZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 07:20 PM, Rafael J. Wysocki wrote:
-> On Wednesday, September 17, 2014 04:40:36 PM Graeme Gregory wrote:
->> On Thu, Sep 18, 2014 at 01:22:10AM +0200, Arnd Bergmann wrote:
->>> On Wednesday 17 September 2014, Graeme Gregory wrote:
->>>> It sounds like from the discussions in other threads that ARM64 should
->>>> be following x86 and re-using DT bindings here. In which case there is
->>>> not need to submit things to UEFI organisation.
->>>>
->>>> What I got a little lost in has there been a formal decision about DT
->>>> bindings in _DSD?
->>>
->>> I think this is a discussion that still needs to happen: either we should
->>> recommend everyone to use _DSD in favor of the alternatives, or we
->>> should prohibit the use of _DSD. I have heard arguments both ways, but
->>> hopefully we can find an easy answer.
->>>
->>
->> This discussion is just not going to happen until people at @redhat.com
->> and people who have currently announced/released hardware are actually
->> willing to start talking about it.
->>
->> Id love to be able to put my foot down and ban the use of _DSD for
->> servers but I suspect that will not happen.
-> 
-> I'll probably should stay away from this discussion, but I can't resist. :-)
-> 
-> Please imagine the situation in which the same IP block is included in an ARM64
-> SoC and in an x86 SoC that ships with ACPI tables and a _DSD for that device in
-> them.  What benefit would be there from disallowing systems based on the ARM64
-> SoC in question to ship the same _DSD in their ACPI tables?
+On 27 August 2014 11:25, Anup Patel <anup.patel@linaro.org> wrote:
+> The APM X-Gene CPU does not implement security extensions but uses
+> GIC-400 which has security extensions implemented. To take care of
+> this situation APM HW designers provided two sets of GIC addresses
+> for accessing secured and non-secured GIC registers seperately.
+>
+> Currently, the APM X-Gene DTS file points to secured GIC registers
+> and uses GIC Group0 for all irqs. This works fine in most cases
+> but does not work when routing host irqs to guest or VM using the
+> GICH_LRn.HW bit. It happens because if Guest or VM EOIs routed irqs
+> using GICV_EOI register then GIC-400 treats that Guest or VM is
+> trying to EOI a Group0 irq (i.e. secured irq) from non-secured mode
+> hence GIC-400 does not deactivate the routed irq.
+>
+> To take care of the above issue, we initialize secured GIC registers
+> from bootloader such that all host irqs are treated as Group1 irqs
+> (i.e. non-secured irqs) and we only access non-secured GIC registers
+> from Linux, Xen and other hypervisors. The bootloader GIC initialization
+> part is already taken care and is available to all APM Mustang users
+> in latest APM SW release. This patch updates Linux DTS files to use
+> non-secured GIC registers for Linux and Xen.
+>
+> Folks who want to try this patch, please update your APM Mustang
+> u-boot from any APM SW release after 7th July 2014.
+>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm64/boot/dts/apm-storm.dtsi |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index c0aceef..2b162f1 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -81,10 +81,10 @@
+>                 compatible = "arm,cortex-a15-gic";
+>                 #interrupt-cells = <3>;
+>                 interrupt-controller;
+> -               reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
+> -                     <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
+> -                     <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
+> -                     <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
+> +               reg = <0x0 0x78090000 0x0 0x1000>,      /* GIC Dist */
+> +                     <0x0 0x780A0000 0x0 0x1000>,      /* GIC CPU */
+> +                     <0x0 0x780C0000 0x0 0x2000>,      /* GIC VCPU Control */
+> +                     <0x0 0x780E0000 0x0 0x2000>;      /* GIC VCPU */
+>                 interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
+>         };
+>
+> --
+> 1.7.9.5
+>
 
-"Disallowing" is a strong word in any case, because vendors own the
-platform and will ship _DSD properties to describe those devices. So the
-only "disallowing" Linux can do is to ignore entities present in ACPI
-tables that have already been shipped by vendors.
+Hi All,
 
-Anyway. I think we all don't want a runaway frenzy with _DSD key/values
-(generally there ought to be as few as possible, and additions should
-only happen carefully). Broadly, there are three levels I see here:
+Any comments on this one?
 
-0). Devices that are part of the core ACPI specification. None today
-need key/value pairs, and I want to avoid this from growing.
-1). Devices containing _DSD key/value pairs for a specific device but of
-a common industry type, such as a network device. In this case, the 4-6
-properties that might need to be specified (MAC address, PHY address,
-PHY type, etc.) should be as minimal as possible and then standardized
-into a common binding that vendors agree to support, and which is owned
-and controlled by a neutral group such as ASWG.
-2). Devices containining a specific ACPI ID that is unique to a given
-vendor where that device implements value-add/offload/something non core
-that can be owned entirely within a driver for one device. In that case,
-maybe a vendor would define a minimal set of _DSD key/values and be on
-the hook to maintain compatibility themselves.
+This patch is required to have GICH_LRn.HW bit working
+on X-Gene with Xen and KVM.
 
-I've chatted with a few people, and there will be a nice proposal
-presented to ASWG/UEFI on how to provide an official process for
-defining key/value pairs that are shared between common device types and
-managed by such a forum, as in the cases 0 and 1 above. In the
-meanwhile, there is only one _DSD use case in the early ACPI patches for
-ARM servers (in the network MAC, to pass in the mac address and a couple
-of PHY address/ID bits) and I've connected the vendors together asking
-them to come up with the initial first example covering that.
-
-None of this is core to ACPI enablement. It's specific to a few drivers
-where also on x86 there will be _DSD properties.
-
-Jon.
+Thanks,
+Anup
