@@ -1,112 +1,41 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 19 Sep 2014 18:16:17 +0200
-Subject: [PATCH 1/5] cpufreq: cpu0: disable unsupported OPPs
-In-Reply-To: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
-References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1411143381-10516-2-git-send-email-l.stach@pengutronix.de>
+Date: Fri, 19 Sep 2014 18:16:16 +0200
+Subject: [PATCH 0/5] i.MX53 cpufreq support
+Message-ID: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the regulator connected to the CPU voltage plane doesn't
-support an OPP specified voltage with the acceptable tolerance
-it's better to just disable the OPP instead of constantly
-failing the voltage scaling later on.
+This series implements cpufreq support for the i.MX53 SoC
+using the generic cpufreq-cpu0 driver. The design is based
+on feedback I got on the last round of patches.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/cpufreq/cpufreq-cpu0.c | 60 ++++++++++++++++++++++++++----------------
- 1 file changed, 37 insertions(+), 23 deletions(-)
+Basically this implements a CPU clock type that abstracts away
+all the clock handling required for reprogramming the PLL
+feeding the CPU, so we don't have to worry about this in the
+cpufreq driver. For now this is only used on MX53, but looking
+forward the same approach (and code) could be used on MX6.
 
-diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-index 0d2172b07765..83296bd2089e 100644
---- a/drivers/cpufreq/cpufreq-cpu0.c
-+++ b/drivers/cpufreq/cpufreq-cpu0.c
-@@ -117,6 +117,7 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
- {
- 	struct device_node *np;
- 	int ret;
-+	unsigned long opp_freq = 0, min_uV = ~0, max_uV = 0, tol;
- 
- 	cpu_dev = get_cpu_device(0);
- 	if (!cpu_dev) {
-@@ -155,42 +156,55 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
- 	/* OPPs might be populated at runtime, don't check for error here */
- 	of_init_opp_table(cpu_dev);
- 
--	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
--	if (ret) {
--		pr_err("failed to init cpufreq table: %d\n", ret);
--		goto out_put_clk;
--	}
--
- 	of_property_read_u32(np, "voltage-tolerance", &voltage_tolerance);
- 
- 	if (of_property_read_u32(np, "clock-latency", &transition_latency))
- 		transition_latency = CPUFREQ_ETERNAL;
- 
- 	if (!IS_ERR(cpu_reg)) {
--		struct dev_pm_opp *opp;
--		unsigned long min_uV, max_uV;
--		int i;
--
- 		/*
--		 * OPP is maintained in order of increasing frequency, and
--		 * freq_table initialised from OPP is therefore sorted in the
--		 * same order.
-+		 * Disable any OPPs where the connected regulator isn't able to
-+		 * provide the specified voltage and record minimum and maximum
-+		 * voltage levels.
- 		 */
--		for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
--			;
--		rcu_read_lock();
--		opp = dev_pm_opp_find_freq_exact(cpu_dev,
--				freq_table[0].frequency * 1000, true);
--		min_uV = dev_pm_opp_get_voltage(opp);
--		opp = dev_pm_opp_find_freq_exact(cpu_dev,
--				freq_table[i-1].frequency * 1000, true);
--		max_uV = dev_pm_opp_get_voltage(opp);
--		rcu_read_unlock();
-+		while (1) {
-+			struct dev_pm_opp *opp;
-+			unsigned long opp_uV;
-+
-+			rcu_read_lock();
-+			opp = dev_pm_opp_find_freq_ceil(cpu_dev, &opp_freq);
-+			if (IS_ERR(opp)) {
-+				rcu_read_unlock();
-+				break;
-+			}
-+			opp_uV = dev_pm_opp_get_voltage(opp);
-+			rcu_read_unlock();
-+
-+			tol = opp_uV * voltage_tolerance / 100;
-+			if (regulator_is_supported_voltage(cpu_reg, opp_uV,
-+							   opp_uV + tol)) {
-+				if (opp_uV < min_uV)
-+					min_uV = opp_uV;
-+				if (opp_uV > max_uV)
-+					max_uV = opp_uV;
-+			} else {
-+				dev_pm_opp_disable(cpu_dev, opp_freq);
-+			}
-+
-+			opp_freq++;
-+		}
-+
- 		ret = regulator_set_voltage_time(cpu_reg, min_uV, max_uV);
- 		if (ret > 0)
- 			transition_latency += ret * 1000;
- 	}
- 
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		pr_err("failed to init cpufreq table: %d\n", ret);
-+		goto out_put_clk;
-+	}
-+
- 	ret = cpufreq_register_driver(&cpu0_cpufreq_driver);
- 	if (ret) {
- 		pr_err("failed register driver: %d\n", ret);
+The first patch allows cpufreq-cpu0 to deactivate OPPs where
+the regulator isn't able to provide the required voltage. This
+has been tested on custom a MX53 board.
+
+Lucas Stach (5):
+  cpufreq: cpu0: disable unsupported OPPs
+  clk: imx5: add step clock, used when reprogramming PLL1
+  clk: imx: add CPU clock type
+  arm: imx53: clk: add ARM clock
+  ARM: imx53: add cpufreq support
+
+ arch/arm/boot/dts/imx53.dtsi           |  13 ++++-
+ arch/arm/mach-imx/Makefile             |   2 +-
+ arch/arm/mach-imx/clk-cpu.c            | 104 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk-imx51-imx53.c    |  14 ++++-
+ arch/arm/mach-imx/clk.h                |   4 ++
+ arch/arm/mach-imx/mach-imx53.c         |   4 ++
+ drivers/cpufreq/cpufreq-cpu0.c         |  60 +++++++++++--------
+ include/dt-bindings/clock/imx5-clock.h |   5 +-
+ 8 files changed, 179 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm/mach-imx/clk-cpu.c
+
 -- 
 2.1.0
