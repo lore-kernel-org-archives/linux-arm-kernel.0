@@ -1,51 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Sep 2014 12:38:22 +0200
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <20140907154907.GB3804@lukather>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140907154907.GB3804@lukather>
-Message-ID: <20140919103822.GN2166@lukather>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 19 Sep 2014 12:58:44 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140919102212.GA31784@xps8300>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5419B825.5000201@linutronix.de> <20140919102212.GA31784@xps8300>
+Message-ID: <541C0C64.5010206@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On 09/19/2014 12:22 PM, Heikki Krogerus wrote:
+> Couldn't you just replace the handle_irq with a custom irq routine in
+> the omap driver like you did with set_termios? Where you would do
+> those tricks and/or call serial8250_handle_irq()?
 
-On Sun, Sep 07, 2014 at 05:49:07PM +0200, Maxime Ripard wrote:
-> On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
-> > The current GPL only licensing on the DTSI makes it very impractical for other
-> > software components licensed under another license.
-> > 
-> > In order to make it easier for them to reuse our device trees, relicense our
-> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Carlo Caione <carlo.caione@gmail.com>
-> > Cc: Chen-Yu Tsai <wens@csie.org>
-> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> > Cc: Emilio L?pez <emilio@elopez.com.ar>
-> > Cc: Hans de Goede <hdegoede@redhat.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Oliver Schinagl <oliver@schinagl.nl>
-> > Cc: Roman Byshko <rbyshko@gmail.com>
-> > Cc: Stefan Roese <sr@denx.de>
-> 
-> Ok, so I just merged the patches 3 to 5 since we have everyone's
-> approval, and I'll merge the patches 1-2 once and if Lorenzo give his.
+Tricks within serial8250_handle_irq(), see [0]. It is not a lot but
+still. I could provide my own handle irq, just asking what you would
+prefer.
 
-Any opinion on this?
+[0]
+http://git.breakpoint.cc/cgit/bigeasy/linux.git/commit/?h=uart_v10_pre2&id=f26f161d998ee4a84a0aa6ddff69a435c25f204d
 
-Maxime
+> The 8250_core changes in that patch #10 only modify
+> serial8250_handle_irg right?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140919/7578020a/attachment.sig>
+Correct. However there is another change due to the RX_DMA_BUG. A while
+ago you said that this RX_DMA_BUG thing might be something that other
+SoC could use, too.
+If you ask me now for my own irq routine it would make sense to move RX
+bug handling into omap specific code as well.
+
+> Cheers,
+
+Sebastian
