@@ -1,97 +1,72 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 19 Sep 2014 13:21:16 +0100
-Subject: [RFC PATCH 03/10] drivers: PL011: refactor pl011_shutdown()
-In-Reply-To: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
-References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1411129283-17219-4-git-send-email-andre.przywara@arm.com>
+Date: Fri, 19 Sep 2014 13:21:13 +0100
+Subject: [RFC PATCH 00/10] drivers: PL011: add SBSA subset support
+Message-ID: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the pl011_shutdown() function into smaller chunks to allow
-easier reuse later when adding SBSA support.
+(This version has still issues, but I'd like to have feedback on
+the general feasibility of this approach before wasting even more
+time on debugging).
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- drivers/tty/serial/amba-pl011.c |   57 ++++++++++++++++++++++-----------------
- 1 file changed, 33 insertions(+), 24 deletions(-)
+The ARM Server Base System Architecture[1] document describes a
+generic UART which is a subset of the PL011 UART.
+It lacks DMA support, baud rate control and modem status line
+control, among other things.
+The idea is to move the UART initialization and setup into the
+firmware (which does this job today already) and let the kernel just
+use the UART for sending and receiving characters.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 22f113c..17ba997 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1625,33 +1625,15 @@ static void pl011_shutdown_channel(struct uart_amba_port *uap,
-       writew(val, uap->port.membase + lcrh);
- }
- 
--static void pl011_shutdown(struct uart_port *port)
-+/*
-+ * disable the port. It should not disable RTS and DTR.
-+ * Also RTS and DTR state should be preserved to restore
-+ * it during startup().
-+ */
-+static void pl011_disable_uart(struct uart_amba_port *uap)
- {
--	struct uart_amba_port *uap = (struct uart_amba_port *)port;
- 	unsigned int cr;
- 
--	/*
--	 * disable all interrupts
--	 */
--	spin_lock_irq(&uap->port.lock);
--	uap->im = 0;
--	writew(uap->im, uap->port.membase + UART011_IMSC);
--	writew(0xffff, uap->port.membase + UART011_ICR);
--	spin_unlock_irq(&uap->port.lock);
--
--	pl011_dma_shutdown(uap);
--
--	/*
--	 * Free the interrupt
--	 */
--	free_irq(uap->port.irq, uap);
--
--	/*
--	 * disable the port
--	 * disable the port. It should not disable RTS and DTR.
--	 * Also RTS and DTR state should be preserved to restore
--	 * it during startup().
--	 */
- 	uap->autorts = false;
- 	spin_lock_irq(&uap->port.lock);
- 	cr = readw(uap->port.membase + UART011_CR);
-@@ -1667,6 +1649,33 @@ static void pl011_shutdown(struct uart_port *port)
- 	pl011_shutdown_channel(uap, uap->lcrh_rx);
- 	if (uap->lcrh_rx != uap->lcrh_tx)
- 		pl011_shutdown_channel(uap, uap->lcrh_tx);
-+}
-+
-+static void pl011_disable_interrupts(struct uart_amba_port *uap)
-+{
-+	spin_lock_irq(&uap->port.lock);
-+
-+	/*
-+	 * mask all interrupts and clear all pending ones
-+	 */
-+	uap->im = 0;
-+	writew(uap->im, uap->port.membase + UART011_IMSC);
-+	writew(0xffff, uap->port.membase + UART011_ICR);
-+
-+	spin_unlock_irq(&uap->port.lock);
-+}
-+
-+static void pl011_shutdown(struct uart_port *port)
-+{
-+	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-+
-+	pl011_disable_interrupts(uap);
-+
-+	pl011_dma_shutdown(uap);
-+
-+	free_irq(uap->port.irq, uap);
-+
-+	pl011_disable_uart(uap);
- 
- 	/*
- 	 * Shut down the clock producer
+This patchset is an attempt to integrate support for this UART subset
+into the existing PL011 driver - basically by refactoring some
+functions and providing a new uart_ops structure for it. It also has
+a separate probe function to be not dependent on AMBA/PrimeCell.
+Beside the obvious effect of code sharing it has the advantage of not
+introducing another serial device prefix, so it can go with ttyAMA,
+which seems to be pretty common.
+
+There is still one issue in bringing up the UART. On the PL011 we
+send a dummy character via the loopback facility with the FIFOs
+disabled to get things going, but both FIFO control and loopback are
+outside of the SBSA spec. I consider this loopback approach a kludge
+anyway, but am struggling to find a better way of fixing this due to
+my lack of understanding of the TTY/serial layer.
+If someone with more wisdom could enlighten me, I would be grateful.
+
+
+Patch 1/10 contains a bug fix which applies to the PL011 part also,
+it should be considered regardless of the rest of the series.
+Patch 2-7 refactor some PL011 functions by splitting them up into
+smaller pieces, so that most the code can be reused later by the SBSA
+part.
+Patch 8 and 9 introduce two new properties for the vendor structure,
+this is for SBSA functionality which cannot be controlled by
+separate uart_ops members only.
+Patch 10 then finally drops in the SBSA specific code, by providing
+a new uart_ops, vendor struct and probe function for it.
+
+Please have a look and tell me whether this SBSA driver approach has
+any future.
+
+Regards,
+Andre
+
+Andre Przywara (10):
+  drivers: PL011: avoid potential unregister_driver call
+  drivers: PL011: refactor pl011_startup()
+  drivers: PL011: refactor pl011_shutdown()
+  drivers: PL011: refactor pl011_set_termios()
+  drivers: PL011: refactor pl011_probe()
+  drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
+  drivers: PL011: move cts_event workaround into separate function
+  drivers: PL011: allow avoiding UART enabling/disabling
+  drivers: PL011: allow to supply fixed option string
+  drivers: PL011: add support for the ARM SBSA generic UART
+
+ .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
+ drivers/tty/serial/amba-pl011.c                    |  509 ++++++++++++++------
+ 2 files changed, 380 insertions(+), 138 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+
 -- 
 1.7.9.5
