@@ -1,165 +1,65 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 19 Sep 2014 18:16:19 +0200
-Subject: [PATCH 3/5] clk: imx: add CPU clock type
+Date: Fri, 19 Sep 2014 18:16:21 +0200
+Subject: [PATCH 5/5] ARM: imx53: add cpufreq support
 In-Reply-To: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
 References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1411143381-10516-4-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1411143381-10516-6-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lucas Stach <dev@lynxeye.de>
+Instanciate the platform device for the generic cpufreq-cpu0
+driver and add all required properties to the DT.
 
-This implements a virtual clock used to abstract away
-all the steps needed in order to change the ARM clock,
-so we don't have to push all this clock handling into
-the cpufreq driver.
-
-While it will be used for i.MX53 at first it is generic
-enough to be used on i.MX6 later on.
-
-Signed-off-by: Lucas Stach <dev@lynxeye.de>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/mach-imx/Makefile  |   2 +-
- arch/arm/mach-imx/clk-cpu.c | 104 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h     |   4 ++
- 3 files changed, 109 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-cpu.c
+ arch/arm/boot/dts/imx53.dtsi   | 13 ++++++++++++-
+ arch/arm/mach-imx/mach-imx53.c |  4 ++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index ac88599ca080..4d6071351f4f 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
- obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 64fa27b36be0..bd5226a7ea20 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -46,10 +46,21 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a8";
+ 			reg = <0x0>;
++			clocks = <&clks IMX5_CLK_ARM>;
++			clock-latency = <61036>;
++			voltage-tolerance = <5>;
++			operating-points = <
++				/* kHz */
++				 166666  850000
++				 400000  900000
++				 800000 1050000
++				1000000 1200000
++				1200000 1300000
++			>;
+ 		};
+ 	};
  
- imx5-pm-$(CONFIG_PM) += pm-imx5.o
--obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
-+obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o clk-cpu.o $(imx5-pm-y)
- 
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o clk.o \
-diff --git a/arch/arm/mach-imx/clk-cpu.c b/arch/arm/mach-imx/clk-cpu.c
-new file mode 100644
-index 000000000000..ffba96228d3b
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-cpu.c
-@@ -0,0 +1,104 @@
-+/*
-+ * Copyright (c) 2014 Lucas Stach <l.stach@pengutronix.de>, Pengutronix
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+
-+struct clk_cpu {
-+	struct clk_hw	hw;
-+	struct clk	*div, *mux, *pll, *step;
-+};
-+
-+static inline struct clk_cpu *to_clk_cpu(struct clk_hw *hw)
-+{
-+	return container_of(hw, struct clk_cpu, hw);
-+}
-+
-+static unsigned long clk_cpu_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
-+{
-+	struct clk_cpu *cpu = to_clk_cpu(hw);
-+
-+	return clk_get_rate(cpu->div);
-+}
-+
-+static long clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *prate)
-+{
-+	struct clk_cpu *cpu = to_clk_cpu(hw);
-+
-+	return clk_round_rate(cpu->pll, rate);
-+}
-+
-+static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long parent_rate)
-+{
-+	struct clk_cpu *cpu = to_clk_cpu(hw);
-+	int ret;
-+
-+	/* switch to PLL bypass clock */
-+	ret = clk_set_parent(cpu->mux, cpu->step);
-+	if (ret)
-+		return ret;
-+
-+	/* reprogram PLL */
-+	ret = clk_set_rate(cpu->pll, rate);
-+	if (ret) {
-+		clk_set_parent(cpu->mux, cpu->pll);
-+		return ret;
-+	}
-+	/* switch back to PLL clock */
-+	clk_set_parent(cpu->mux, cpu->pll);
-+
-+	/* Ensure the divider is what we expect */
-+	clk_set_rate(cpu->div, rate);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_cpu_ops = {
-+	.recalc_rate	= clk_cpu_recalc_rate,
-+	.round_rate	= clk_cpu_round_rate,
-+	.set_rate	= clk_cpu_set_rate,
-+};
-+
-+struct clk *imx_clk_cpu(const char *name, const char *parent_name,
-+		struct clk *div, struct clk *mux, struct clk *pll,
-+		struct clk *step)
-+{
-+	struct clk_cpu *cpu;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	cpu = kzalloc(sizeof(*cpu), GFP_KERNEL);
-+	if (!cpu)
-+		return ERR_PTR(-ENOMEM);
-+
-+	cpu->div = div;
-+	cpu->mux = mux;
-+	cpu->pll = pll;
-+	cpu->step = step;
-+
-+	init.name = name;
-+	init.ops = &clk_cpu_ops;
-+	init.flags = 0;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	cpu->hw.init = &init;
-+
-+	clk = clk_register(NULL, &cpu->hw);
-+	if (IS_ERR(clk))
-+		kfree(cpu);
-+
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index d5ba76fee115..5de8b53ec208 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -128,4 +128,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
- 			CLK_SET_RATE_PARENT, mult, div);
+diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+index 03dd6ea13acc..4eb6849c52d2 100644
+--- a/arch/arm/mach-imx/mach-imx53.c
++++ b/arch/arm/mach-imx/mach-imx53.c
+@@ -38,9 +38,13 @@ static void __init imx53_dt_init(void)
+ 	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
  }
  
-+struct clk *imx_clk_cpu(const char *name, const char *parent_name,
-+		struct clk *div, struct clk *mux, struct clk *pll,
-+		struct clk *step);
++static struct platform_device imx53_cpufreq_pdev = { .name = "cpufreq-cpu0", };
 +
- #endif
+ static void __init imx53_init_late(void)
+ {
+ 	imx53_pm_init();
++
++	platform_device_register(&imx53_cpufreq_pdev);
+ }
+ 
+ static const char * const imx53_dt_board_compat[] __initconst = {
 -- 
 2.1.0
