@@ -1,22 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Sep 2014 11:00:02 +0100
-Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
- page aligned
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
-Message-ID: <20140919095959.GA2295@e104818-lin.cambridge.arm.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Fri, 19 Sep 2014 13:22:12 +0300
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <5419B825.5000201@linutronix.de>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
+ <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
+ <5419B825.5000201@linutronix.de>
+Message-ID: <20140919102212.GA31784@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 08:09:47AM +0100, Wang, Yalin wrote:
-> this patch extend the start and end address of initrd to be page aligned,
-> so that we can free all memory including the un-page aligned head or tail
-> page of initrd, if the start or end address of initrd are not page
-> aligned, the page can't be freed by free_initrd_mem() function.
+On Wed, Sep 17, 2014 at 06:34:45PM +0200, Sebastian Andrzej Siewior wrote:
+> On 09/11/2014 01:42 PM, Sebastian Andrzej Siewior wrote:
+> >> We should add hooks like tx_dma and rx_dma to struct uart_8250_dma so
+> >> that the probe drivers can replace serial8250_tx_dma and
+> >> seria8250_rx_dma, like I think Alan already suggested.
+> > 
+> > Okay. Wasn't aware that Alan already suggested that.
+> > I also need a watchdog timer for TX since it seems that on omap3 the
+> > DMA engine suddenly forgets to continue with DMA?
+> > 
+> > If this is really what we want, I would need to refactor a few things?
+> > 
+> >> Let's keep serial8250_tx_dma/rx_dma as the default, and not add any
+> >> quirks to them. Only if there is a very common case should it be
+> >> handled in those. The case of RX req needing to be sent before data in
+> >> FIFO maybe one of those, but I'm no sure.
+> > 
+> > keep in mind that both (RX & TX bugs/hacks) need also a bit of handling
+> > in the 8250-core so it works together (like the tx_err member so we
+> > fall back to manual xmit)
 > 
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> Done. I've kept the RX workarounds in the 8250_dma and moved the TX
+> part into the omap driver.
+> I needed to add the 8250_core pieces of patch #10 [0]. Now If you say,
+> couldn't this done in an other way then I could move the RX workarounds
+> pieces to the omap driver as well as the interrupt routine. Any
+> preferences?
+> 
+> [0] [PATCH 10/16] tty: serial: 8250_dma: optimize the xmit path due to
+>     UART_BUG_DMA_TX
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Couldn't you just replace the handle_irq with a custom irq routine in
+the omap driver like you did with set_termios? Where you would do
+those tricks and/or call serial8250_handle_irq()?
 
-(as I said, if Russell doesn't have any objections please send the patch
-to his patch system)
+The 8250_core changes in that patch #10 only modify
+serial8250_handle_irg right?
+
+
+Cheers,
+
+-- 
+heikki
