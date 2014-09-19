@@ -1,111 +1,112 @@
-From: pvo@apm.com (Phong Vo)
-Date: Fri, 19 Sep 2014 07:48:48 +0700
-Subject: [PATCH] arm64: Fix GIC addresses for APM X-Gene
-In-Reply-To: <CALrVBktfX8SkpdzpHp7Y6WgcLYKA9CMrmbTHtH=iqomsnqhTZQ@mail.gmail.com>
-References: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
- <CALrVBktfX8SkpdzpHp7Y6WgcLYKA9CMrmbTHtH=iqomsnqhTZQ@mail.gmail.com>
-Message-ID: <cf8f7752f98d66effec7e7f7e63580fd@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 18 Sep 2014 17:57:33 -0700 (PDT)
+Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <1411067086-16613-4-git-send-email-nm@ti.com>
+References: <1411067086-16613-1-git-send-email-nm@ti.com>
+ <1411067086-16613-4-git-send-email-nm@ti.com>
+Message-ID: <alpine.DEB.2.10.1409181749170.4206@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anup,
+On Thu, 18 Sep 2014, Nishanth Menon wrote:
+> +static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
+> +{
+> +	/*
+> +	 * Return Not handled so that interrupt is disabled.
 
-This would break compatibility with older version of U-boot.
-Latest APM U-boot has been implemented such that this change would be taken
-care
-of via U-boot by fixing up the GIC addresses in the DTB accordingly. There
-for
-it's not needed to change in Linux.
+And how is that interrupt disabled by returning IRQ_NONE? You mean it
+gets disabled after it got reraised 100000 times and the spurious
+detector kills it?
 
------Original Message-----
-From: Anup Patel [mailto:anup.patel at linaro.org]
-Sent: Friday, September 19, 2014 7:04 AM
-To: linux-arm-kernel
-Cc: kvmarm at lists.cs.columbia.edu; patches; Marc Zyngier; Catalin Marinas;
-Christoffer Dall; Will Deacon; Ian Campbell; stefano.stabellini; Anup Patel;
-Pranavkumar Sawargaonkar; Rob Herring; Arnd Bergmann
-Subject: Re: [PATCH] arm64: Fix GIC addresses for APM X-Gene
+> +	 * Level event ensures that the event is eventually handled
+> +	 * by the appropriate chip handler already registered
 
-On 27 August 2014 11:25, Anup Patel <anup.patel@linaro.org> wrote:
-> The APM X-Gene CPU does not implement security extensions but uses
-> GIC-400 which has security extensions implemented. To take care of
-> this situation APM HW designers provided two sets of GIC addresses
-> for accessing secured and non-secured GIC registers seperately.
->
-> Currently, the APM X-Gene DTS file points to secured GIC registers
-> and uses GIC Group0 for all irqs. This works fine in most cases
-> but does not work when routing host irqs to guest or VM using the
-> GICH_LRn.HW bit. It happens because if Guest or VM EOIs routed irqs
-> using GICV_EOI register then GIC-400 treats that Guest or VM is
-> trying to EOI a Group0 irq (i.e. secured irq) from non-secured mode
-> hence GIC-400 does not deactivate the routed irq.
->
-> To take care of the above issue, we initialize secured GIC registers
-> from bootloader such that all host irqs are treated as Group1 irqs
-> (i.e. non-secured irqs) and we only access non-secured GIC registers
-> from Linux, Xen and other hypervisors. The bootloader GIC initialization
-> part is already taken care and is available to all APM Mustang users
-> in latest APM SW release. This patch updates Linux DTS files to use
-> non-secured GIC registers for Linux and Xen.
->
-> Folks who want to try this patch, please update your APM Mustang
-> u-boot from any APM SW release after 7th July 2014.
->
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> ---
->  arch/arm64/boot/dts/apm-storm.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi
-> b/arch/arm64/boot/dts/apm-storm.dtsi
-> index c0aceef..2b162f1 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -81,10 +81,10 @@
->                 compatible = "arm,cortex-a15-gic";
->                 #interrupt-cells = <3>;
->                 interrupt-controller;
-> -               reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
-> -                     <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
-> -                     <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU
-> Control */
-> -                     <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
-> +               reg = <0x0 0x78090000 0x0 0x1000>,      /* GIC Dist */
-> +                     <0x0 0x780A0000 0x0 0x1000>,      /* GIC CPU */
-> +                     <0x0 0x780C0000 0x0 0x2000>,      /* GIC VCPU
-> Control */
-> +                     <0x0 0x780E0000 0x0 0x2000>;      /* GIC VCPU */
->                 interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
->         };
->
-> --
-> 1.7.9.5
->
+Eventually handled? So eventually it's not handled?
 
-Hi All,
+> +	 */
+> +	return IRQ_NONE;
+> +}
+> +
+>  int palmas_ext_control_req_config(struct palmas *palmas,
+>  	enum palmas_external_requestor_id id,  int ext_ctrl, bool enable)
+>  {
+> @@ -409,6 +420,7 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
+>  		pdata->mux_from_pdata = 1;
+>  		pdata->pad2 = prop;
+>  	}
+> +	pdata->wakeirq = irq_of_parse_and_map(node, 1);
+>  
+>  	/* The default for this register is all masked */
+>  	ret = of_property_read_u32(node, "ti,power-ctrl", &prop);
+> @@ -521,6 +533,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
+>  	i2c_set_clientdata(i2c, palmas);
+>  	palmas->dev = &i2c->dev;
+>  	palmas->irq = i2c->irq;
+> +	palmas->wakeirq = pdata->wakeirq;
+>  
+>  	match = of_match_device(of_palmas_match_tbl, &i2c->dev);
+>  
+> @@ -587,6 +600,25 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
+>  	if (ret < 0)
+>  		goto err_i2c;
+>  
+> +	if (!palmas->wakeirq)
+> +		goto no_wake_irq;
+> +
+> +	ret = devm_request_irq(palmas->dev, palmas->wakeirq,
+> +			       palmas_wake_irq,
+> +			       pdata->irq_flags,
+> +			       dev_name(palmas->dev),
+> +			       &palmas);
+> +	if (ret < 0) {
+> +		dev_err(palmas->dev, "Invalid wakeirq(%d) (res: %d), skiping\n",
+> +			palmas->wakeirq, ret);
+> +		palmas->wakeirq = 0;
+> +	} else {
+> +		/* We use wakeirq only during suspend-resume path */
+> +		device_set_wakeup_capable(palmas->dev, true);
+> +		disable_irq_nosync(palmas->wakeirq);
 
-Any comments on this one?
+Urgh. Why nosysnc? And why do you want to do that at all?
 
-This patch is required to have GICH_LRn.HW bit working
-on X-Gene with Xen and KVM.
+	irq_set_status_flags(irq, IRQ_NOAUTOEN);
 
-Thanks,
-Anup
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments,
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation
-or its subsidiaries.
-It is to be used solely for the purpose of furthering the parties' business
-relationship.
-All unauthorized review, use, disclosure or distribution is prohibited.
-If you are not the intended recipient, please contact the sender by reply
-e-mail
-and destroy all copies of the original message.
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, 
-is for the sole use of the intended recipient(s) and contains information
-that is confidential and proprietary to Applied Micro Circuits Corporation or its subsidiaries. 
-It is to be used solely for the purpose of furthering the parties' business relationship. 
-All unauthorized review, use, disclosure or distribution is prohibited. 
-If you are not the intended recipient, please contact the sender by reply e-mail 
-and destroy all copies of the original message.
+Is what you want to set before requesting the irq.
+
+
+> +	}
+> +
+> +no_wake_irq:
+>  no_irq:
+>  	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
+>  	addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
+> @@ -706,6 +738,34 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
+>  	return 0;
+>  }
+>  
+> +static int palmas_i2c_suspend(struct i2c_client *i2c,  pm_message_t mesg)
+> +{
+> +	struct palmas *palmas = i2c_get_clientdata(i2c);
+> +	struct device *dev = &i2c->dev;
+> +
+> +	if (!palmas->wakeirq)
+> +		return 0;
+> +
+> +	if (device_may_wakeup(dev))
+> +		enable_irq(palmas->wakeirq);
+> +
+> +	return 0;
+> +}
+> +
+> +static int palmas_i2c_resume(struct i2c_client *i2c)
+> +{
+> +	struct palmas *palmas = i2c_get_clientdata(i2c);
+> +	struct device *dev = &i2c->dev;
+> +
+> +	if (!palmas->wakeirq)
+> +		return 0;
+> +
+> +	if (device_may_wakeup(dev))
+> +		disable_irq_nosync(palmas->wakeirq);
+
+Again, why nosync?
