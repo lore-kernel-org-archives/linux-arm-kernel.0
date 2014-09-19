@@ -1,50 +1,59 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 19 Sep 2014 22:14:43 +0200
-Subject: [PATCH 7/8] ARM: mvebu: armada-xp: Add I2C eeprom on Lenovo ix4-300d
-In-Reply-To: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1411157684-6991-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1411157684-6991-8-git-send-email-sebastian.hesselbarth@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 19 Sep 2014 13:17:22 -0700
+Subject: [PATCH v2 1/2] bus: brcmstb_gisb: register the fault code hook
+In-Reply-To: <1411156230-24024-2-git-send-email-f.fainelli@gmail.com>
+References: <1411156230-24024-1-git-send-email-f.fainelli@gmail.com>
+ <1411156230-24024-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20140919201722.GL1193@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an I2C eeprom connected on Lenovo ix4-300d, add the
-corresponding node.
+On Fri, Sep 19, 2014 at 12:50:29PM -0700, Florian Fainelli wrote:
+> Commit 44127b771d9c31 ("bus: add Broadcom GISB bus arbiter timeout/error
+> handler") added everything that is required to register an ARM fault
+> handler for imprecise external aborts, except that there is nothing
+> calling this currently.
+> 
+> We do not need to export that specific function and have to update
+> arch/arm/mach-bcm/brcmstb.c to call it, simply, register the fault
+> handler with an arch_initcall.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-IIRC, the eeprom contains some register init pairs (address, data) for
-and is empty otherwise. I'll have to check the boot loader code again,
-but (again) IIRC, stock u-boot already does the sequence in code and
-ignores the eeprom.
+Am I missing something, or does that mean that this error handler will
+be registered for *all* kernels which include this driver? e.g., anyone
+using multi_v7_defconfig?
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Benoit Masson <yahoo@perenite.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+So it seems we need to gate this behind some kind of machine check;
+either called from mach-bcm/*, or better, from something that is probed
+via device tree. Is it a problem to register this in the probe()
+function, like drivers/pci/host/pci-imx6.c?
 
-diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-index c5ee6c00766c..cef50da88e45 100644
---- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-+++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-@@ -98,6 +98,11 @@
- 					reg = <0x2e>;
- 				};
- 
-+				at24c64 at 50 {
-+					compatible = "atmel,24c64";
-+					reg = <0x50>;
-+				};
-+
- 				pcf8563 at 51 {
- 					compatible = "nxp,pcf8563";
- 					reg = <0x51>;
--- 
-2.0.0
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+> Changes in v2:
+> - removed the accidental hunk that added saved_timeout since it does
+>   not belong in this patch
+> 
+>  drivers/bus/brcmstb_gisb.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+> index f2cd6a2d40b4..5b608955957a 100644
+> --- a/drivers/bus/brcmstb_gisb.c
+> +++ b/drivers/bus/brcmstb_gisb.c
+> @@ -160,11 +160,13 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+>  	return ret;
+>  }
+>  
+> -void __init brcmstb_hook_fault_code(void)
+> +static int __init brcmstb_hook_fault_code(void)
+>  {
+>  	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
+>  			"imprecise external abort");
+> +	return 0;
+>  }
+> +arch_initcall(brcmstb_hook_fault_code)
+>  
+>  static irqreturn_t brcmstb_gisb_timeout_handler(int irq, void *dev_id)
+>  {
+
+Brian
