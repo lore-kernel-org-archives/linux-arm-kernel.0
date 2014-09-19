@@ -1,81 +1,78 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 19 Sep 2014 14:15:21 +0200
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <1411055145666.72178@freescale.com>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <201409172114.36617.marex@denx.de> <1411055145666.72178@freescale.com>
-Message-ID: <201409191415.21528.marex@denx.de>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 19 Sep 2014 13:21:20 +0100
+Subject: [RFC PATCH 07/10] drivers: PL011: move cts_event workaround into
+ separate function
+In-Reply-To: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1411129283-17219-8-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 18, 2014 at 05:46:04 PM, Yao Yuan wrote:
-> Marek Vasut wrote:
-> > On Wednesday, September 17, 2014 at 04:50:34 PM, Yao Yuan wrote:
-> > [...]
-> > 
-> > > > > > Would that mean that the "crashed" DMA would be running until the
-> > > > > > next transmission is scheduled ?
-> > > > > 
-> > > > > [Yuan Yao] No, In fact any DMA timeout will result the failure of
-> > > > > I2C transmission and then it will turn to report the exception and
-> > > > > wait for next transmission.
-> > > > 
-> > > > Can you tell when the next transmission will happen? What if I issue
-> > > > a single transmission and that one fails ? Will the DMA run until
-> > > > who knows when ?
-> > > 
-> > > [Yuan Yao]
-> > > Sorry for my unclear description. In fact, During the DMA transmission 
-> > > if an error happened or time out, DMA will stop at once and be
-> > > disabled. I just continue to route the TX and RX request to signal the
-> > > DMA controller. Because the DMA is disabled, it will ignore those
-> > > signals.
-> > > 
-> > > In a word, I just want to block the I2C TX, RX and interrupt signal
-> > > when DMA mode failed until the next I2C transmission start.
-> > 
-> > So the I2C block is in error state until you clean it up upon next
-> > transmission?
-> 
-> [Yuan Yao]
-> No, just DMAEN bit.
-> Other I2C error state will clean soon.
-> 
-> > > In fact, the bit "I2CR_DMAEN" is a switch which decide whether I2C
-> > > route the TX, RX and interrupt signal to DMA controller.
-> > > 
-> > > > The only thing I worried about is I2C may still receive some
-> > > > feedbacks after DMA timeout. In this case the feedbacks may lead to
-> > > > abnormal state in PIO mode.But it will be ignored in DMA model.
-> > > > That's why I tend to delay force-disable DMA until the next
-> > > > transmission begin. Could you please give me some suggestion?
-> > > > 
-> > > > No, this design just seems flawed to me. You should stop the DMA
-> > > > immediatelly if there is an error to avoid wasting resources and
-> > > > prevent possible other adverse effects.
-> > > 
-> > > [Yuan Yao]
-> > > Yes, I have stopped the DMA immediately. However I keep the I2C DMA
-> > > single route.
-> > > 
-> > > I don't have the exact evidence to prove that my design is acceptable.
-> > > So if you are sure it's flawed, I will change it in the next
-> > > version(V8).
-> > 
-> > I'm just trying to understand it.
-> 
-> [Yuan Yao]
-> Both of us know that we should stop DMA immediately when issue happened.
-> The only argument is that I want to set the DMAEN bit just before the next
-> transmission starts. But you think when I stop the DMA I should set it at
-> the same time. The bit is the switch which is used to decide whether Rx
-> and Tx signal can be routed to DMA. In fact, I deeply think about what is
-> the difference between our arguments for those days. I think the two ways
-> are almost the same. Your way is more acceptable because people tend to
-> clear the DMA status just after stopping it. So I think your way is
-> better.
+To avoid lines with more than 80 characters and to make the
+pl011_int() function more readable, move the workaround out into a
+separate function.
 
-OK, I am a bit lost, so let's see V8 and then go with that one I'd say.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   33 ++++++++++++++++++++-------------
+ 1 file changed, 20 insertions(+), 13 deletions(-)
 
-Best regards,
-Marek Vasut
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index e7566ed..65a0411 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1293,6 +1293,25 @@ static void pl011_modem_status(struct uart_amba_port *uap)
+ 	wake_up_interruptible(&uap->port.state->port.delta_msr_wait);
+ }
+ 
++static void check_apply_cts_event_workaround(struct uart_amba_port *uap)
++{
++	unsigned int dummy_read;
++
++	if (!uap->vendor->cts_event_workaround)
++		return;
++
++	/* workaround to make sure that all bits are unlocked.. */
++	writew(0x00, uap->port.membase + UART011_ICR);
++
++	/*
++	 * WA: introduce 26ns(1 uart clk) delay before W1C;
++	 * single apb access will incur 2 pclk(133.12Mhz) delay,
++	 * so add 2 dummy reads
++	 */
++	dummy_read = readw(uap->port.membase + UART011_ICR);
++	dummy_read = readw(uap->port.membase + UART011_ICR);
++}
++
+ static irqreturn_t pl011_int(int irq, void *dev_id)
+ {
+ 	struct uart_amba_port *uap = dev_id;
+@@ -1300,25 +1319,13 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
+ 	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
+ 	u16 imsc;
+ 	int handled = 0;
+-	unsigned int dummy_read;
+ 
+ 	spin_lock_irqsave(&uap->port.lock, flags);
+ 	imsc = readw(uap->port.membase + UART011_IMSC);
+ 	status = readw(uap->port.membase + UART011_RIS) & imsc;
+ 	if (status) {
+ 		do {
+-			if (uap->vendor->cts_event_workaround) {
+-				/* workaround to make sure that all bits are unlocked.. */
+-				writew(0x00, uap->port.membase + UART011_ICR);
+-
+-				/*
+-				 * WA: introduce 26ns(1 uart clk) delay before W1C;
+-				 * single apb access will incur 2 pclk(133.12Mhz) delay,
+-				 * so add 2 dummy reads
+-				 */
+-				dummy_read = readw(uap->port.membase + UART011_ICR);
+-				dummy_read = readw(uap->port.membase + UART011_ICR);
+-			}
++			check_apply_cts_event_workaround(uap);
+ 
+ 			writew(status & ~(UART011_TXIS|UART011_RTIS|
+ 					  UART011_RXIS),
+-- 
+1.7.9.5
