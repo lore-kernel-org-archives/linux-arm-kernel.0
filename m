@@ -1,188 +1,57 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 19 Sep 2014 20:27:43 +0200
-Subject: [PATCH v5 10/11] ARM: exynos: Move to generic PM domain DT bindings
-In-Reply-To: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1411151264-16245-11-git-send-email-ulf.hansson@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 19 Sep 2014 20:30:07 +0200
+Subject: [PATCH v4 4/7] ARM: l2c: Add support for overriding prefetch
+ settings
+In-Reply-To: <20140919163932.GH12379@n2100.arm.linux.org.uk>
+References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
+ <1409062680-15906-5-git-send-email-t.figa@samsung.com>
+ <20140919095000.GF29620@piout.net>
+ <20140919163932.GH12379@n2100.arm.linux.org.uk>
+Message-ID: <20140919183007.GG29620@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tomasz.figa@gmail.com>
+On 19/09/2014 at 17:39:32 +0100, Russell King - ARM Linux wrote :
+> On Fri, Sep 19, 2014 at 11:50:01AM +0200, Alexandre Belloni wrote:
+> > On 26/08/2014 at 16:17:57 +0200, Tomasz Figa wrote :
+> > > Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+> > > settings configured in registers leading to crashes if L2C is enabled
+> > > without overriding them. This patch introduces bindings to enable
+> > > prefetch settings to be specified from DT and necessary support in the
+> > > driver.
+> > > 
+> > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > 
+> > Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > It is working and useful on Atmel's sama5d4 were the bootloader is not
+> > configuring the L2C prefetch. However, I'm wondering whether we should
+> > add support for setting L310_PREFETCH_CTRL_DATA_PREFETCH and
+> > L310_PREFETCH_CTRL_INSTR_PREFETCH. I'm currently doing it by using
+> > ".l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
+> > L310_AUX_CTRL_INSTR_PREFETCH" (those are the same bits) but this has the
+> > disadvantage of displaying the "L2C: platform modifies aux control
+> > register:" twice.
+> 
+> The L2C documentation, freely available from the ARM infocentre website,
+> has the answer to this for you.
+> 
+> The two bits in the prefetch control register which control the data
+> and instruction prefetching are aliases of the aux control register.
+> If you set them to a value in one register, they are reflected in the
+> other.
+> 
+> The reason for that is that once the L2 cache is enabled, writes to
+> the aux control register are no longer permitted, but it's safe to
+> enable and disable the prefetching with the cache already enabled.
+> This reason is even stated in the documentation.
+> 
 
-This patch moves Exynos PM domain code to use the new generic PM domain
-look-up framework introduced in previous patches, thus also allowing
-the new code to be compiled with CONFIG_ARCH_EXYNOS.
+Yeah, so my question still holds, should we have an other way to
+enable/disable I/D prefetch by adding two other DT bindings ?
 
-This patch was originally submitted by Tomasz Figa when he was employed
-by Samsung.
-http://marc.info/?l=linux-pm&m=139955336002083&w=2
 
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
----
- .../bindings/arm/exynos/power_domain.txt           | 13 ++--
- arch/arm/mach-exynos/pm_domains.c                  | 78 +---------------------
- kernel/power/Kconfig                               |  2 +-
- 3 files changed, 8 insertions(+), 85 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 8b4f7b7f..abde1ea 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -8,6 +8,8 @@ Required Properties:
-     * samsung,exynos4210-pd - for exynos4210 type power domain.
- - reg: physical base address of the controller and length of memory mapped
-     region.
-+- #power-domain-cells: number of cells in power domain specifier;
-+    must be 0.
- 
- Optional Properties:
- - clocks: List of clock handles. The parent clocks of the input clocks to the
-@@ -29,6 +31,7 @@ Example:
- 	lcd0: power-domain-lcd0 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C00 0x10>;
-+		#power-domain-cells = <0>;
- 	};
- 
- 	mfc_pd: power-domain at 10044060 {
-@@ -37,12 +40,8 @@ Example:
- 		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
- 			<&clock CLK_MOUT_USER_ACLK333>;
- 		clock-names = "oscclk", "pclk0", "clk0";
-+		#power-domain-cells = <0>;
- 	};
- 
--Example of the node using power domain:
--
--	node {
--		/* ... */
--		samsung,power-domain = <&lcd0>;
--		/* ... */
--	};
-+See Documentation/devicetree/bindings/power/power_domain.txt for description
-+of consumer-side bindings.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index fd76e1b..20f2671 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -105,78 +105,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
- }
- 
--static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
--					 struct device *dev)
--{
--	int ret;
--
--	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
--
--	while (1) {
--		ret = pm_genpd_add_device(&pd->pd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--
--	pm_genpd_dev_need_restore(dev, true);
--}
--
--static void exynos_remove_device_from_domain(struct device *dev)
--{
--	struct generic_pm_domain *genpd = dev_to_genpd(dev);
--	int ret;
--
--	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
--
--	while (1) {
--		ret = pm_genpd_remove_device(genpd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--}
--
--static void exynos_read_domain_from_dt(struct device *dev)
--{
--	struct platform_device *pd_pdev;
--	struct exynos_pm_domain *pd;
--	struct device_node *node;
--
--	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
--	if (!node)
--		return;
--	pd_pdev = of_find_device_by_node(node);
--	if (!pd_pdev)
--		return;
--	pd = platform_get_drvdata(pd_pdev);
--	exynos_add_device_to_domain(pd, dev);
--}
--
--static int exynos_pm_notifier_call(struct notifier_block *nb,
--				    unsigned long event, void *data)
--{
--	struct device *dev = data;
--
--	switch (event) {
--	case BUS_NOTIFY_BIND_DRIVER:
--		if (dev->of_node)
--			exynos_read_domain_from_dt(dev);
--
--		break;
--
--	case BUS_NOTIFY_UNBOUND_DRIVER:
--		exynos_remove_device_from_domain(dev);
--
--		break;
--	}
--	return NOTIFY_DONE;
--}
--
--static struct notifier_block platform_nb = {
--	.notifier_call = exynos_pm_notifier_call,
--};
--
- static __init int exynos4_pm_init_power_domain(void)
- {
- 	struct platform_device *pdev;
-@@ -202,7 +130,6 @@ static __init int exynos4_pm_init_power_domain(void)
- 		pd->base = of_iomap(np, 0);
- 		pd->pd.power_off = exynos_pd_power_off;
- 		pd->pd.power_on = exynos_pd_power_on;
--		pd->pd.of_node = np;
- 
- 		pd->oscclk = clk_get(dev, "oscclk");
- 		if (IS_ERR(pd->oscclk))
-@@ -228,15 +155,12 @@ static __init int exynos4_pm_init_power_domain(void)
- 			clk_put(pd->oscclk);
- 
- no_clk:
--		platform_set_drvdata(pdev, pd);
--
- 		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
-+		of_genpd_add_provider_simple(np, &pd->pd);
- 	}
- 
--	bus_register_notifier(&platform_bus_type, &platform_nb);
--
- 	return 0;
- }
- arch_initcall(exynos4_pm_init_power_domain);
-diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-index 897619b..bbef57f 100644
---- a/kernel/power/Kconfig
-+++ b/kernel/power/Kconfig
-@@ -304,7 +304,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
- 
- config PM_GENERIC_DOMAINS_OF
- 	def_bool y
--	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
-+	depends on PM_GENERIC_DOMAINS && OF
- 
- config CPU_PM
- 	bool
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
