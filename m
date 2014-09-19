@@ -1,70 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 19 Sep 2014 08:40:36 -0700
-Subject: [PATCH 1/2] watchdog: sunxi: support parameterized compatible
- strings
-In-Reply-To: <CAGb2v67vB-mr1-fM7inWq7wntt31mYroEj-Hq7sMUfWDwV878w@mail.gmail.com>
-References: <1410878523-4924-1-git-send-email-wens@csie.org>
- <1410878523-4924-2-git-send-email-wens@csie.org>
- <541BB712.6020607@roeck-us.net>
- <CAGb2v67vB-mr1-fM7inWq7wntt31mYroEj-Hq7sMUfWDwV878w@mail.gmail.com>
-Message-ID: <20140919154036.GA30723@roeck-us.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 19 Sep 2014 15:47:17 +0000 (UTC)
+Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
+In-Reply-To: <20140918171650.GK14505@atomide.com>
+References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+ <20140918171650.GK14505@atomide.com>
+Message-ID: <alpine.DEB.2.02.1409191547070.22526@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 10:00:36PM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Fri, Sep 19, 2014 at 12:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On 09/16/2014 07:42 AM, Chen-Yu Tsai wrote:
-> >>
-> >> This patch adds support for hardware parameters tied to compatible
-> >> strings, so similar hardware can reuse the driver.
-> >>
-> >> This will be used to support the newer watchdog found in A31 and
-> >> later SoCs. Differences in the new hardware include separate
-> >> interrupt lines for each watchdog, and corresponding interrupt
-> >> control/status registers. Watchdog control registers were also
-> >> slightly rearranged.
-> >>
-> > You might also mention that you replace some iowrite32 with writel.
-> 
-> Ah.... Had that in mind, but forgot about it when finishing the series :(
-> 
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> >
-> > Have you considered using regmap ? Seems to be an ideal candidate.
-> 
-> I don't follow. Do you mean using regmap to share the interrupt registers
-> with the timer on sun4i? Otherwise I don't really see a difference.
-> 
-Use regmap instead of direct writel. Nice thing about it is that regmap offers
-bit manipulation functions, so you could replace the read / mask / modify /write
-in a single regmap function call. See imx2_wdt.c for an example how it is used.
+On Thu, 18 Sep 2014, Tony Lindgren wrote:
 
-> Am I missing something?
+> * Tero Kristo <t-kristo@ti.com> [140901 11:09]:
+> > Hi,
+> > 
+> > This set contains PRCM related cleanups meant for 3.18 merge window.
+> > These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
+> > (http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
+> > set is used as basis to avoid merge issues.
+> > 
+> > Purpose of this work is to eventually convert the PRCM code into a
+> > separate driver, but this is done in incremental parts as the amount
+> > of changes is substantial. Expected conclusion of this work is 3.19
+> > if everything goes fine.
+> > 
+> > This part of the work mostly moves some of the SoC specific PRCM driver
+> > calls under generic version of the same, and adds SoC-ops to support
+> > these on the driver level.
+> > 
+> > Working branch posted here:
+> > 
+> > tree: https://github.com/t-kristo/linux-pm.git
+> > branch: for-v3.18/prcm-cleanup
 > 
-Not really. Just a suggestion.
+> Paul, any comments on this series?
 
-> >>
-> >> -       /* Enable timer and set reset bit in the watchdog */
-> >> -       writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
-> >> +       /* Set lowest timeout and enable watchdog */
-> >> +       val = readl(wdt_base + regs->wdt_mode);
-> >> +       val &= ~(WDT_TIMEOUT_MASK << regs->wdt_timeout_shift);
-> >> +       val |= WDT_MODE_EN;
-> >
-> >
-> > I think it would make sense to also define WDT_MODE_EN and
-> > WDT_TIMEOUT_MASK as configurable, even if not currently needed.
-> > It is odd to have the shift configurable but not the mask,
-> > and to have the mode register configurable but not the mode value.
-> 
-> I think keeping these values constants clearly shows that they are
-> the same and shared among the hardware. Making them configurable
-> shouldn't impose much penalty, but I'd prefer to keep them as is
-> until we need to change them.
-> 
-Ok, guess we have a different philosophy ;-). I'll leave it up to you.
+Yeah, I'll send a few comments today.
 
-Guenter
+
+- Paul
