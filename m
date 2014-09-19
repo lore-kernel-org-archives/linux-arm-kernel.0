@@ -1,37 +1,46 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 19 Sep 2014 12:58:44 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140919102212.GA31784@xps8300>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5419B825.5000201@linutronix.de> <20140919102212.GA31784@xps8300>
-Message-ID: <541C0C64.5010206@linutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Sep 2014 11:58:45 +0100
+Subject: [PATCH] arm64: insn: Add return statements after BUG_ON()
+In-Reply-To: <20140916164953.GE32073@arm.com>
+References: <1410885753-25025-1-git-send-email-broonie@kernel.org>
+ <20140916164953.GE32073@arm.com>
+Message-ID: <20140919105843.GC2295@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2014 12:22 PM, Heikki Krogerus wrote:
-> Couldn't you just replace the handle_irq with a custom irq routine in
-> the omap driver like you did with set_termios? Where you would do
-> those tricks and/or call serial8250_handle_irq()?
+On Tue, Sep 16, 2014 at 05:49:53PM +0100, Will Deacon wrote:
+> On Tue, Sep 16, 2014 at 05:42:33PM +0100, Mark Brown wrote:
+> > Following a recent series of enhancements to the insn code the ARMv8
+> > allnoconfig build has been generating a large number of warnings in the
+> > form of:
+> > 
+> > arch/arm64/kernel/insn.c:689:8: warning: 'insn' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> > 
+> > This is because BUG() and related macros can be compiled out so we get
+> > execution paths which normally result in a panic compiling out to noops
+> > instead.
+> > 
+> > I wasn't able to immediately identify a sensible return value to use in
+> > these cases so just return 0 - this is all "should never happen" code so
+> > hopefully it never has a practical impact.
+> 
+> Hmm, I had a similar complaint when we merged the code. I'd much rather see
+> those BUG statements removed entirely, and have an error return code back to
+> the jit. However, the counter argument was that the jitted code has already
+> been verified at this point, so any errors really are fatal.
 
-Tricks within serial8250_handle_irq(), see [0]. It is not a lot but
-still. I could provide my own handle irq, just asking what you would
-prefer.
+It's BPF, ftrace and jump label all using the insn.c code. What's funny,
+ftrace.c passes the type as true/false rather than an enum (not sure
+how/when we missed this).
 
-[0]
-http://git.breakpoint.cc/cgit/bigeasy/linux.git/commit/?h=uart_v10_pre2&id=f26f161d998ee4a84a0aa6ddff69a435c25f204d
+> So, I think your patch is probably the best thing we can do without
+> reopening that discussion.
 
-> The 8250_core changes in that patch #10 only modify
-> serial8250_handle_irg right?
+We can merge this patch for now but I would rather return an error. It
+may be better if we actually return a fault generating instruction (BRK)
+rather than 0 like the AARCH64_BREAK_FAULT defined here:
 
-Correct. However there is another change due to the RX_DMA_BUG. A while
-ago you said that this RX_DMA_BUG thing might be something that other
-SoC could use, too.
-If you ask me now for my own irq routine it would make sense to move RX
-bug handling into omap specific code as well.
+http://lkml.kernel.org/g/1410853730-16470-1-git-send-email-dborkman at redhat.com
 
-> Cheers,
-
-Sebastian
+-- 
+Catalin
