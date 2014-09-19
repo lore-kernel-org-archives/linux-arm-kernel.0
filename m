@@ -1,89 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Sep 2014 11:12:51 -0700
-Subject: [GIT PULL] RealView Device Tree support for v3.18
-Message-ID: <CACRpkdbHcJgnXDxO=yjuqbppT6OSR=N=4T80FFsrwKNM9Dy=sA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 19 Sep 2014 11:17:11 -0700
+Subject: [PATCH] ARM: mach-bcm: offer a new maintainer and process
+Message-ID: <1411150632-25695-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Hi all,
 
-this is the push forward for DT on the ARM RealView boards.
-I've tried to fix up the patches and get ACKs from the maintainers
-as far as possible.
+As some of you may have seen in the news, Broadcom has recently stopped
+its mobile SoC activities. Upstream support for Broadcom's Mobile SoCs
+was an effort initially started by Christian Daudt and his team, and then
+continued by Alex Eleder and Matter Porter assigned to a particular landing
+team within Linaro to help Broadcom doing so.
 
-Outstanding issue: no ACK from LED maintainers Bryan Wu or
-Richard Purdie on the syscon LED stuff. I have requested this
-early in the series and now for two weeks on the latest patch set.
-The driver is reviewed by others, I foresee no problems with
-merging it.
+As part of this effort, Christian and Matt volunteered for centralizing pull
+requests coming from the arch/arm/mach-bcm/* directory and as of today, they
+are still responsible for merging mach-bcm pull requests coming from brcmstb,
+bcm5301x, bcm2835 and bcm63xx, creating an intermediate layer to the arm-soc
+tree.
 
-The rest is throroughly reviewed and discussions on the DT
-bindings appear to have settled.
+Following the mobile group shut down, our group (in which Brian, Gregory, Marc,
+Kevin and myself are) inherited these mobile SoC platforms, although at this
+point we cannot comment on the future of mobile platforms, we know that our
+Linaro activities have been stopped.
 
-Please pull this in so we can get some rotation in linux-next now,
-we need to move forward with device tree conversion.
+We have not heard much from Christian and Matt in a while, and some of our pull
+requests have been stalling as a result. We would like to offer both a new
+maintainer for the mobile platforms as well as reworking the pull request
+process:
 
-Yours,
-Linus Walleij
+- our group has now full access to these platforms, putting us in the best
+  position to support Mobile SoCs questions
 
-The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
+- over time, we think that the brcmstb, bcm5301x, bcm63xx and now Cygnus code
+  bases will represent the major bulk of the mach-bcm code changes submitted,
+  mobile SoCs being in deep maintenance mode
 
-  Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
+- we want to keep our submission pace high, and keep a smooth and responsive
+  process in place for other maintainers such as Hauke Merthens and Stephen
+  Warren and now Scott Branden and his team for Cygnus/Northstar+.
 
-are available in the git repository at:
+- there is little to no code sharing within mach-bcm, so we think each group
+  of maintainers should send individual pull requests towards Arnd and Olof,
+  the only conflicts they should ever have to resolve are for the Makefile and
+  Kconfig files, not different than any other pull requests
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/realview-dt-for-v3.18
+Ideally, we would like Christian and Matt to acknowledge that change, if we
+cannot get an answer within the next 3 weeks, we think this change
+should go in to unblock the current situation.
 
-for you to fetch changes up to 56660647c5400f6ea2b3497f112f036e744cf75b:
+Florian Fainelli (1):
+  MAINTAINERS: add a third maintainer to mach-bcm
 
-  ARM: realview: basic device tree implementation (2014-09-19 13:00:34 -0500)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-----------------------------------------------------------------
-This is the RealView Device Tree support branch for v3.18
-- A new syscon LEDs driver
-- A new reset driver for the versatile family
-- Setting up the L2$ from DT
-- Base DT support code for all RealView boards
-- Booting to serial console plus LEDs and reset on PB1176
-
-----------------------------------------------------------------
-Linus Walleij (6):
-      leds: add a driver for syscon-based LEDs
-      leds: add device tree bindings for register bit LEDs
-      power: reset: driver for the Versatile syscon reboot
-      soc: add driver for the ARM RealView
-      ARM: l2c: parse cache properties from ePAPR definitions
-      ARM: realview: basic device tree implementation
-
- Documentation/devicetree/bindings/arm/arm-boards   |  65 ++++++
- Documentation/devicetree/bindings/arm/gic.txt      |   1 +
- Documentation/devicetree/bindings/arm/l2cc.txt     |  10 +
- .../devicetree/bindings/leds/register-bit-led.txt  |  99 +++++++++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/arm-realview-pb1176.dts          | 247 +++++++++++++++++++++
- arch/arm/mach-realview/Kconfig                     |  13 ++
- arch/arm/mach-realview/Makefile                    |   1 +
- arch/arm/mach-realview/realview-dt.c               |  32 +++
- arch/arm/mm/cache-l2x0.c                           | 121 ++++++++++
- drivers/irqchip/irq-gic.c                          |   2 +
- drivers/leds/Kconfig                               |  10 +
- drivers/leds/Makefile                              |   1 +
- drivers/leds/leds-syscon.c                         | 166 ++++++++++++++
- drivers/power/reset/Kconfig                        |   9 +
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/arm-versatile-reboot.c         | 111 +++++++++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/versatile/Kconfig                      |  10 +
- drivers/soc/versatile/Makefile                     |   1 +
- drivers/soc/versatile/soc-realview.c               | 144 ++++++++++++
- 22 files changed, 1047 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/leds/register-bit-led.txt
- create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
- create mode 100644 arch/arm/mach-realview/realview-dt.c
- create mode 100644 drivers/leds/leds-syscon.c
- create mode 100644 drivers/power/reset/arm-versatile-reboot.c
- create mode 100644 drivers/soc/versatile/Kconfig
- create mode 100644 drivers/soc/versatile/Makefile
- create mode 100644 drivers/soc/versatile/soc-realview.c
+-- 
+1.9.1
