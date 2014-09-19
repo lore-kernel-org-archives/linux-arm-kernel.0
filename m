@@ -1,49 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Sep 2014 17:39:32 +0100
-Subject: [PATCH v4 4/7] ARM: l2c: Add support for overriding prefetch
- settings
-In-Reply-To: <20140919095000.GF29620@piout.net>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-5-git-send-email-t.figa@samsung.com>
- <20140919095000.GF29620@piout.net>
-Message-ID: <20140919163932.GH12379@n2100.arm.linux.org.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 19 Sep 2014 12:42:14 -0400
+Subject: [PATCH] arm64/pci: fix dma coherency inheritance for PCI devices
+In-Reply-To: <20140919162859.GG20773@arm.com>
+References: <1411141886-11310-1-git-send-email-msalter@redhat.com>
+ <20140919162859.GG20773@arm.com>
+Message-ID: <1411144934.25340.34.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 11:50:01AM +0200, Alexandre Belloni wrote:
-> On 26/08/2014 at 16:17:57 +0200, Tomasz Figa wrote :
-> > Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
-> > settings configured in registers leading to crashes if L2C is enabled
-> > without overriding them. This patch introduces bindings to enable
-> > prefetch settings to be specified from DT and necessary support in the
-> > driver.
+On Fri, 2014-09-19 at 17:28 +0100, Will Deacon wrote:
+> On Fri, Sep 19, 2014 at 04:51:26PM +0100, Mark Salter wrote:
+> > The default dma_ops for devices on arm64 systems are noncoherent in
+> > nature and rely upon special operations and bounce buffers to
+> > perform a device DMA operation to/from memory. Some drivers rely
+> > upon coherent operations involving suitably capable hardware. In
+> > this case, a "dma-coherent" property will exist on the corresponding
+> > Device Tree node for the bridge device, or one of its ancestors.
+> > This patch adds support for applying a DMA coherent dma_ops for
+> > PCI devices in the case of such a property.
 > > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Jon Masters <jcm@redhat.com>
+> > [added search for device with of_node]
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> >  arch/arm64/mm/dma-mapping.c | 21 +++++++++++++++++++--
+> >  1 file changed, 19 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> > index 4164c5a..0e26bd7 100644
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -23,10 +23,12 @@
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/dma-contiguous.h>
+> >  #include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/vmalloc.h>
+> >  #include <linux/swiotlb.h>
+> >  #include <linux/amba/bus.h>
+> > +#include <linux/pci.h>
+> >  
+> >  #include <asm/cacheflush.h>
+> >  
+> > @@ -316,8 +318,18 @@ static int dma_bus_notifier(struct notifier_block *nb,
+> >  	if (event != BUS_NOTIFY_ADD_DEVICE)
+> >  		return NOTIFY_DONE;
+> >  
+> > -	if (of_property_read_bool(dev->of_node, "dma-coherent"))
+> > -		set_dma_ops(dev, &coherent_swiotlb_dma_ops);
+> > +	/*
+> > +	 * Some devices won't have an of_node but a bus controller/bridge will.
+> > +	 * Search up the device chain until we find an of_node to check.
+> > +	 */
+> > +	while (dev) {
+> > +		if (dev->of_node) {
+> > +			if (of_dma_is_coherent(dev->of_node))
+> > +				set_dma_ops(_dev, &coherent_swiotlb_dma_ops);
+> > +			break;
+> > +		}
+> > +		dev = dev->parent;
+> > +	}
 > 
-> Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Hmm, how does this interact with of_dma_configure? I don't think the
+> dma-coherent property is inherited there, so I'm uneasy about doing this for
+> buses other than PCI (i.e. the platform bus).
+
+of_dma_configure() only gets called for platform bus and it
+uses of_dma_is_coherent() which searches device ancestors for
+dma-coherent property. But it uses set_arch_dma_coherent_ops()
+which is a no-op on arm64 now. Catalin mentions this in another
+thread: https://lkml.org/lkml/2014/9/15/363
+
+So maybe we should fix set_arch_dma_coherent_ops() and drop
+platform bus from the notifier handler.
+
 > 
-> It is working and useful on Atmel's sama5d4 were the bootloader is not
-> configuring the L2C prefetch. However, I'm wondering whether we should
-> add support for setting L310_PREFETCH_CTRL_DATA_PREFETCH and
-> L310_PREFETCH_CTRL_INSTR_PREFETCH. I'm currently doing it by using
-> ".l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
-> L310_AUX_CTRL_INSTR_PREFETCH" (those are the same bits) but this has the
-> disadvantage of displaying the "L2C: platform modifies aux control
-> register:" twice.
-
-The L2C documentation, freely available from the ARM infocentre website,
-has the answer to this for you.
-
-The two bits in the prefetch control register which control the data
-and instruction prefetching are aliases of the aux control register.
-If you set them to a value in one register, they are reflected in the
-other.
-
-The reason for that is that once the L2 cache is enabled, writes to
-the aux control register are no longer permitted, but it's safe to
-enable and disable the prefetching with the cache already enabled.
-This reason is even stated in the documentation.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> In other words, we should move to using of_dma_configure for the platform
+> and amba buses, and have a separate notifier for the PCI bus. Is it likely
+> that people will have a mixture of coherent and non-coherent devices behind
+> the same host controller?
+> 
+> Will
+> 
+> >  	return NOTIFY_OK;
+> >  }
+> > @@ -330,6 +342,10 @@ static struct notifier_block amba_bus_nb = {
+> >  	.notifier_call = dma_bus_notifier,
+> >  };
+> >  
+> > +static struct notifier_block pci_bus_nb = {
+> > +	.notifier_call = dma_bus_notifier,
+> > +};
+> > +
+> >  extern int swiotlb_late_init_with_default_size(size_t default_size);
+> >  
+> >  static int __init swiotlb_late_init(void)
+> > @@ -341,6 +357,7 @@ static int __init swiotlb_late_init(void)
+> >  	 */
+> >  	bus_register_notifier(&platform_bus_type, &platform_bus_nb);
+> >  	bus_register_notifier(&amba_bustype, &amba_bus_nb);
+> > +	bus_register_notifier(&pci_bus_type, &pci_bus_nb);
+> >  
+> >  	dma_ops = &noncoherent_swiotlb_dma_ops;
+> >  
+> > -- 
+> > 1.9.3
+> > 
+> > 
