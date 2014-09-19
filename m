@@ -1,44 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 19 Sep 2014 20:27:24 +0100
-Subject: [PATCH] ARM: at91: sama5: configure L2 cache
-In-Reply-To: <20140918212836.GD29620@piout.net>
-References: <1411072716-20769-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20140918210212.GD5182@n2100.arm.linux.org.uk>
- <20140918212836.GD29620@piout.net>
-Message-ID: <20140919192724.GH26036@leverpostej>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 19 Sep 2014 15:37:58 -0400 (EDT)
+Subject: [Patch net-next v3 0/4] net: fec: add interrupt coalescence
+In-Reply-To: <1410902334-7827-1-git-send-email-Frank.Li@freescale.com>
+References: <1410902334-7827-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20140919.153758.2070105844475669082.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+From: <Frank.Li@freescale.com>
+Date: Wed, 17 Sep 2014 05:18:50 +0800
 
-> > There have been DT bindings proposed for prefetch control register.  I
-> > suggest that you search this mailing list for that patch, and check
-> > whether it is acceptable for your platform.
-> > 
+> From: Frank Li <Frank.Li@freescale.com>
+> improve error handle when parse queue number.
+> add interrupt coalescence feature.
 > 
-> I'm really wondering whether we should really put that in the device
-> tree... We will soon end up with a property for each bit of each
-> registers and the binding will end up being huge. Also, that is
-> configuration, not HW description.
-
-If it's configuration, why is putting it in a board file any better?
-The optimal values will depend on the workload, which depends on more
-than the just the machine. If anything this kind of tuning might be
-better handled using kernel command line parameters.
-
-> I actually tried multiple things, without any satisfaction:
->  - using DT, with the main issue that we will definitely end up with one
->    property per bit of configuration
+> Change from v2 to v3
+>  - add error check in fec_enet_set_coalesce
+>  - fix a run time warning to get clock rate in interrupt
+>  - fix commit message use TKT number
 > 
->  - adding an .l2c_prefetch_val to the machine start but that is kind of
->    ugly.
-> 
->  - adding a new parameter to l2x0_of_init()
-> 
-> So I ended up choosing to do it in the platform code. But if everybody
-> is fine with adding more properties to DT, I can go that way.
+> Change from v1 to v2
+>  - fix indention
+>  - use errata number instead of TKT
 
-We can add properties as necessary. The fun part is deciding what is
-necessary.
-
-Mark.
+Series applied, thanks Frank.
