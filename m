@@ -1,59 +1,71 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 19 Sep 2014 13:17:22 -0700
-Subject: [PATCH v2 1/2] bus: brcmstb_gisb: register the fault code hook
-In-Reply-To: <1411156230-24024-2-git-send-email-f.fainelli@gmail.com>
-References: <1411156230-24024-1-git-send-email-f.fainelli@gmail.com>
- <1411156230-24024-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20140919201722.GL1193@ld-irv-0074>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 19 Sep 2014 22:22:10 +0200
+Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
+In-Reply-To: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Fri, 29 Aug 2014 22:07:55 +0200")
+References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87tx43xswd.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 12:50:29PM -0700, Florian Fainelli wrote:
-> Commit 44127b771d9c31 ("bus: add Broadcom GISB bus arbiter timeout/error
-> handler") added everything that is required to register an ARM fault
-> handler for imprecise external aborts, except that there is nothing
-> calling this currently.
-> 
-> We do not need to export that specific function and have to update
-> arch/arm/mach-bcm/brcmstb.c to call it, simply, register the fault
-> handler with an arch_initcall.
+Hi Arnd,
 
-Am I missing something, or does that mean that this error handler will
-be registered for *all* kernels which include this driver? e.g., anyone
-using multi_v7_defconfig?
+I think I met the necessary number of acks. I amended the patch to reflect this,
+attached to this mail.
 
-So it seems we need to gate this behind some kind of machine check;
-either called from mach-bcm/*, or better, from something that is probed
-via device tree. Is it a problem to register this in the probe()
-function, like drivers/pci/host/pci-imx6.c?
+Could you schedule this single patch for your maintainers branch (or for-next by
+default) in arm-soc please ?
 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
-> Changes in v2:
-> - removed the accidental hunk that added saved_timeout since it does
->   not belong in this patch
-> 
->  drivers/bus/brcmstb_gisb.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-> index f2cd6a2d40b4..5b608955957a 100644
-> --- a/drivers/bus/brcmstb_gisb.c
-> +++ b/drivers/bus/brcmstb_gisb.c
-> @@ -160,11 +160,13 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
->  	return ret;
->  }
->  
-> -void __init brcmstb_hook_fault_code(void)
-> +static int __init brcmstb_hook_fault_code(void)
->  {
->  	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
->  			"imprecise external abort");
-> +	return 0;
->  }
-> +arch_initcall(brcmstb_hook_fault_code)
->  
->  static irqreturn_t brcmstb_gisb_timeout_handler(int irq, void *dev_id)
->  {
+Cheers.
 
-Brian
+--
+Robert
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-MAINTAINERS-update-ARM-pxa-maintainers.patch
+Type: text/x-diff
+Size: 1325 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140919/607fe573/attachment.bin>
+-------------- next part --------------
+
+--<8--
+>From c4d1e8e185c76654452c5161c86f3cc34b3ba103 Mon Sep 17 00:00:00 2001
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Fri, 29 Aug 2014 22:07:55 +0200
+Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
+
+Change pxa active maintainers, and remove more busy people.
+Remove Eric's tree as it is not accessible anymore.
+
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Daniel Mack <zonque@gmail.com>
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ MAINTAINERS | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1ff06de..d7ec0f6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7291,12 +7291,12 @@ F:	drivers/video/backlight/pwm_bl.c
+ F:	include/linux/pwm_backlight.h
+ 
+ PXA2xx/PXA3xx SUPPORT
+-M:	Eric Miao <eric.y.miao@gmail.com>
+-M:	Russell King <linux@arm.linux.org.uk>
+ M:	Haojian Zhuang <haojian.zhuang@gmail.com>
++M:	Robert Jarzmik <robert.jarzmik@free.fr>
++M:	Daniel Mack <daniel@zonque.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://github.com/hzhuang1/linux.git
+-T:	git git://git.linaro.org/people/ycmiao/pxa-linux.git
++T:	git git://github.com/rjarzmik/linux.git
+ S:	Maintained
+ F:	arch/arm/mach-pxa/
+ F:	drivers/pcmcia/pxa2xx*
+-- 
+2.0.0.rc2
