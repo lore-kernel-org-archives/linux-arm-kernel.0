@@ -1,105 +1,129 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 18 Sep 2014 19:47:54 -0700
-Subject: [PATCH 3/3] watchdog: qcom: register a restart notifier
-In-Reply-To: <d0f4cd93ad3f6690d637413b1171ac3c71aba861.1411078426.git.joshc@codeaurora.org>
-References: <cover.1411078425.git.joshc@codeaurora.org>
- <d0f4cd93ad3f6690d637413b1171ac3c71aba861.1411078426.git.joshc@codeaurora.org>
-Message-ID: <541B995A.6000609@roeck-us.net>
+Date: Thu, 18 Sep 2014 19:54:18 -0700
+Subject: [PATCH] pinctrl: qcom: use restart_notifier mechanism for ps_hold
+In-Reply-To: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
+References: <1411079579-10172-1-git-send-email-joshc@codeaurora.org>
+Message-ID: <541B9ADA.2070107@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 03:27 PM, Josh Cartwright wrote:
-> The WDT's BITE_TIME warm-reset behavior can be leveraged as a last
-> resort mechanism for triggering chip reset.  Usually, other restart
-> methods (such as PS_HOLD) are preferrable for issuing a more complete
-> reset of the chip.  As such, keep the priority of the watchdog notifier
-> low.
+On 09/18/2014 03:32 PM, Josh Cartwright wrote:
+> By converting to the restart_notifier mechanism for restart, we allow
+> for other mechanisms, like the watchdog, to be used for restart in the
+> case where PS_HOLD has failed to reset the chip.
 >
+> Choose priority 128, as according to documentation, this mechanism "is
+> sufficient to restart the entire system".
+>
+> Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
 > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 > ---
->   drivers/watchdog/qcom-wdt.c | 31 +++++++++++++++++++++++++++++++
->   1 file changed, 31 insertions(+)
+>   drivers/pinctrl/qcom/pinctrl-msm.c | 38 ++++++++++++++++++++++++++------------
+>   1 file changed, 26 insertions(+), 12 deletions(-)
 >
-> diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
-> index e9409f5..710ab43 100644
-> --- a/drivers/watchdog/qcom-wdt.c
-> +++ b/drivers/watchdog/qcom-wdt.c
-> @@ -15,6 +15,7 @@
->   #include <linux/module.h>
->   #include <linux/of.h>
->   #include <linux/platform_device.h>
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+> index d5ed127..9fced3b 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+> @@ -27,8 +27,7 @@
+>   #include <linux/gpio.h>
+>   #include <linux/interrupt.h>
+>   #include <linux/spinlock.h>
+> -
+> -#include <asm/system_misc.h>
 > +#include <linux/reboot.h>
->   #include <linux/watchdog.h>
 >
->   #define WDT_RST		0x0
-> @@ -24,6 +25,7 @@
->   struct qcom_wdt {
->   	struct watchdog_device	wdd;
->   	unsigned long		freq;
-> +	struct notifier_block	restart_nb;
->   	void __iomem		*base;
->   };
+>   #include "../core.h"
+>   #include "../pinconf.h"
+> @@ -43,6 +42,7 @@
+>    * @dev:            device handle.
+>    * @pctrl:          pinctrl handle.
+>    * @chip:           gpiochip handle.
+> + * @restart_nb:     restart notifier block.
+>    * @irq:            parent irq for the TLMM irq_chip.
+>    * @lock:           Spinlock to protect register resources as well
+>    *                  as msm_pinctrl data structures.
+> @@ -56,6 +56,7 @@ struct msm_pinctrl {
+>   	struct device *dev;
+>   	struct pinctrl_dev *pctrl;
+>   	struct gpio_chip chip;
+> +	struct notifier_block restart_nb;
+>   	int irq;
 >
-> @@ -82,6 +84,24 @@ static const struct watchdog_info qcom_wdt_info = {
->   	.identity	= KBUILD_MODNAME,
->   };
+>   	spinlock_t lock;
+> @@ -852,13 +853,14 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>   	return 0;
+>   }
 >
-> +static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
-> +			    void *data)
-> +{
-> +	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
-> +
-> +	/*
-> +	 * Trigger watchdog bite:
-> +	 *    Setup BITE_TIME to be very low, and enable WDT.
-> +	 */
-> +	mutex_lock(&wdt->wdd.lock);
+> -#ifdef CONFIG_ARM
 
-At this time you don't need to worry about locks.
+Unrelated to this patch, but is this going to be executed (and potentially used)
+on any non-arm architectures ?
 
-Actually, this might be dangerous if the lock happens to be taken,
-as it won't be released (there is no other code running anymore
-when this function is called).
+Reason for asking that the restart handler mechanism is currently only
+implemented on arm and arm64. If it is going to be used with other
+architectures, we'll have to add the necessary call into the architecture
+restart code.
 
-> +	writel_relaxed(0, wdt->base + WDT_EN);
-> +	writel_relaxed(1, wdt->base + WDT_RST);
-> +	writel_relaxed(0x31F3, wdt->base + WDT_BITE_TIME);
-
-What is the magic here, ie what does 0x31F3 stand for ?
-
-> +	writel_relaxed(1, wdt->base + WDT_EN);
-> +	mutex_unlock(&wdt->wdd.lock);
-> +	return NOTIFY_DONE;
-> +}
-> +
->   static int qcom_watchdog_probe(struct platform_device *pdev)
+> -static void __iomem *msm_ps_hold;
+> -
+> -static void msm_reset(enum reboot_mode reboot_mode, const char *cmd)
+> +static int msm_ps_hold_restart(struct notifier_block *nb, unsigned long action,
+> +			       void *data)
 >   {
->   	struct qcom_wdt *wdt;
-> @@ -121,6 +141,17 @@ static int qcom_watchdog_probe(struct platform_device *pdev)
->   		return ret;
->   	}
->
-> +	/*
-> +	 * WDT restart notifier has priority 0 (use as a last resort)
-> +	 */
-> +	wdt->restart_nb.notifier_call = qcom_wdt_restart;
-> +	ret = register_restart_handler(&wdt->restart_nb);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to setup restart handler\n");
-> +		watchdog_unregister_device(&wdt->wdd);
-> +		return ret;
+> -	writel(0, msm_ps_hold);
+> +	struct msm_pinctrl *pctrl = container_of(nb, struct msm_pinctrl, restart_nb);
+> +
+> +	writel(0, pctrl->regs + PS_HOLD_OFFSET);
+>   	mdelay(10000);
 
-Sure you want to return an error here ? The watchdog itself is still working,
-and this is supposed to be a restart method of last resort. Causing the driver
-to fail loading because it can not register its restart handler seems to be
-a bit aggressive.
+Sure you still want to wait for 10 seconds here ?
+Would it make sense to choose a more reasonable timeout ?
 
 Thanks,
 Guenter
 
+> +	return NOTIFY_DONE;
+>   }
+>
+>   static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
+> @@ -868,13 +870,16 @@ static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
+>
+>   	for (; i <= pctrl->soc->nfunctions; i++)
+>   		if (!strcmp(func[i].name, "ps_hold")) {
+> -			msm_ps_hold = pctrl->regs + PS_HOLD_OFFSET;
+> -			arm_pm_restart = msm_reset;
+> +			pctrl->restart_nb.notifier_call = msm_ps_hold_restart;
+> +			pctrl->restart_nb.priority = 128;
+> +			if (register_restart_handler(&pctrl->restart_nb)) {
+> +				dev_err(pctrl->dev,
+> +					"failed to setup restart handler.\n");
+> +				pctrl->restart_nb.notifier_call = NULL;
+> +			}
+> +			break;
+>   		}
+>   }
+> -#else
+> -static void msm_pinctrl_setup_pm_reset(const struct msm_pinctrl *pctrl) {}
+> -#endif
+>
+>   int msm_pinctrl_probe(struct platform_device *pdev,
+>   		      const struct msm_pinctrl_soc_data *soc_data)
+> @@ -943,6 +948,15 @@ int msm_pinctrl_remove(struct platform_device *pdev)
+>
+>   	pinctrl_unregister(pctrl->pctrl);
+>
+> +	if (pctrl->restart_nb.notifier_call) {
+> +		ret = unregister_restart_handler(&pctrl->restart_nb);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"unable to unregister restart handler\n");
+> +			return ret;
+> +		}
 > +	}
 > +
 >   	return 0;
 >   }
->
+>   EXPORT_SYMBOL(msm_pinctrl_remove);
 >
