@@ -1,25 +1,73 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 19 Sep 2014 09:49:39 -0700
-Subject: [PATCH 1/5] cpufreq: cpu0: disable unsupported OPPs
-In-Reply-To: <1411143381-10516-2-git-send-email-l.stach@pengutronix.de>
-References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
- <1411143381-10516-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <CAKohpo=s+X8dXZpcj5q5exR+Q=E-CxTNbdYem4D=zHeQ3A_qXA@mail.gmail.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Fri, 19 Sep 2014 09:52:17 -0700
+Subject: [RFC] arm: Handle starting up in secure mode
+In-Reply-To: <20140919133056.GE2295@e104818-lin.cambridge.arm.com>
+References: <1410901756-20694-1-git-send-email-cov@codeaurora.org>
+ <5418AA80.4090102@codeaurora.org> <54198BDE.8000509@codeaurora.org>
+ <CAFEAcA-Z_KqCrBRKLxtEaca3jAH35Xx=CqOr36KgAGfFrE91nw@mail.gmail.com>
+ <541C2E02.5000303@codeaurora.org>
+ <20140919133056.GE2295@e104818-lin.cambridge.arm.com>
+Message-ID: <CAPz6YkU0rJBAniFidASQm8E15bo=jCrbo1QeWFtXELeuj33Lsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc'ing Mark Brown to get his views on the idea.
-
-On 19 September 2014 09:16, Lucas Stach <l.stach@pengutronix.de> wrote:
-> If the regulator connected to the CPU voltage plane doesn't
-> support an OPP specified voltage with the acceptable tolerance
-> it's better to just disable the OPP instead of constantly
-> failing the voltage scaling later on.
+On Fri, Sep 19, 2014 at 6:30 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Sep 19, 2014 at 02:22:10PM +0100, Christopher Covington wrote:
+>> On 09/19/2014 01:56 AM, Peter Maydell wrote:
+>> > On 17 September 2014 06:25, Christopher Covington <cov@codeaurora.org> wrote:
+>> >> On 09/16/2014 05:24 PM, Christopher Covington wrote:
+>> >>> On 09/16/2014 05:09 PM, Christopher Covington wrote:
+>> >>>> ARM Linux currently has the most features available to it in hypervisor
+>> >>>> (HYP) mode, so switch to it when possible. This can also ensure proper
+>> >>>> reset of newer registers such as CNTVOFF.
+>> >>>>
+>> >>>> The permissions on the Non-Secure Access Control Register (NSACR) are
+>> >>>> used to probe what the security setting currently is when in supervisor
+>> >>>> (SVC) mode.
+>> >>>
+>> >>> Sorry, this doesn't work yet. I was misinterpreting my test results. For what
+>> >>> it's worth, my testing and development methodology is to run it after hacked
+>> >>> up versions of the semihosting bootwrapper on the simulator that corresponds
+>> >>> to rtsm_ve-aemv8a.dtb (AEM VE FVP these days?) and examine the instruction traces.
+>> >>
+>> >> Looks like the real problem was that I was hacking up the bootwrapper
+>> >> incorrectly--my start-in-secure-mode bootwrapper variant wasn't setting up the
+>> >> GIC for non-secure access. With that changed, I've tested the following
+>> >> variations using the Image file in a single core configuration.
+>> >>
+>> >> Start in non-secure SVC with non-secure access to GIC configured.
+>> >>
+>> >> Start in secure SVC with non-secure access to GIC configured.
+>> >>
+>> >> Start in secure SVC with non-secure access to GIC configured and hypervisor
+>> >> support disabled in the model (-C cluster.has_el2=0). This required setting
+>> >> the VBAR again in non-secure SVC but with that fix it seems to work. I'll
+>> >> include this change in v2.
+>> >
+>> > If you're relying on the boot loader to set up the GIC to support
+>> > non-secure access anyway, why not just have it boot the kernel in Hyp
+>> > like the boot protocol document recommends? (The same thing as the GIC
+>> > is going to apply for any other hardware that needs configuration to
+>> > allow NS access; if we need the firmware to deal with this we might as
+>> > well just have it boot us in the right mode too.)
+>>
+>> I'd like to get rid of as much of the bootwrapper as possible (having gotten
+>> spoiled by using QEMU's built-in bootloader). I'm just taking it one step at a
+>> time. Handling GIC initialization in the kernel is probably the next step.
 >
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  drivers/cpufreq/cpufreq-cpu0.c | 60 ++++++++++++++++++++++++++----------------
->  1 file changed, 37 insertions(+), 23 deletions(-)
+> The problem is that the kernel doesn't know about GIC until much later.
+> So I don't see an easy workaround, other than relying on the boot-loader
+> to do the right thing (and then we go to the point Peter made about
+> changing it to start Linux in Hyp mode directly).
 
-And this file doesn't exist anymore (its renamed). Rebase over
-Rafael's linux-next branch for that.
+Well, for us, the issue is that our boot-loader isn't involved in
+secondary cpu startup, either at boot time nor suspend/resume or cpu
+hotplug/power gating.
+So we certainly could have the boot loader set up the GIC for
+non-secure access and then this type of solution would work, though
+I'm not sure what else might need to be set up for non-secure access.
+
+>
+> --
+> Catalin
