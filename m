@@ -1,36 +1,68 @@
 From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Fri, 19 Sep 2014 11:04:18 +0800
-Subject: [PATCH v3 6/7] arm: dts: Build dtb for mt8127 & mt8135
+Date: Fri, 19 Sep 2014 11:04:19 +0800
+Subject: [PATCH v3 7/7] arm: mediatek: Add earlyprintk support for mt8127 &
+ mt8135
 In-Reply-To: <1411095859-18737-1-git-send-email-srv_yingjoe.chen@mediatek.com>
 References: <1411095859-18737-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1411095859-18737-7-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <1411095859-18737-8-git-send-email-srv_yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-This allows the "make dtbs" to build the moose and mt8135-evbp1
-for MediaTek SoC
+Enable low-level debug for Mediatek mt8127 & mt8135 SoC.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig.debug | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 055b20c..1e7380d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -491,7 +491,9 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
--dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb \
-+	mt8127-moose.dtb \
-+	mt8135-evbp1.dtb
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index cfdd1c0..ecc9984 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -842,6 +842,22 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  for Mediatek mt6589 based platforms on UART0.
  
- targets += dtbs dtbs_install
- targets += $(dtb-y)
++	config DEBUG_MT8127_UART0
++		bool "Mediatek mt8127 UART0"
++		depends on ARCH_MEDIATEK
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  for Mediatek mt8127 based platforms on UART0.
++
++	config DEBUG_MT8135_UART3
++		bool "Mediatek mt8135 UART3"
++		depends on ARCH_MEDIATEK
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  for Mediatek mt8135 based platforms on UART3.
++
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -1083,7 +1099,9 @@ config DEBUG_UART_PHYS
+ 	default 0x10126000 if DEBUG_RK3X_UART1
+ 	default 0x101f1000 if ARCH_VERSATILE
+ 	default 0x101fb000 if DEBUG_NOMADIK_UART
++	default 0x11002000 if DEBUG_MT8127_UART0
+ 	default 0x11006000 if DEBUG_MT6589_UART0
++	default 0x11009000 if DEBUG_MT8135_UART3
+ 	default 0x16000000 if ARCH_INTEGRATOR
+ 	default 0x18000300 if DEBUG_BCM_5301X
+ 	default 0x1c090000 if DEBUG_VEXPRESS_UART0_RS1
+@@ -1146,7 +1164,9 @@ config DEBUG_UART_VIRT
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835
+ 	default 0xf1000300 if DEBUG_BCM_5301X
++	default 0xf1002000 if DEBUG_MT8127_UART0
+ 	default 0xf1006000 if DEBUG_MT6589_UART0
++	default 0xf1009000 if DEBUG_MT8135_UART3
+ 	default 0xf11f1000 if ARCH_VERSATILE
+ 	default 0xf1600000 if ARCH_INTEGRATOR
+ 	default 0xf1c28000 if DEBUG_SUNXI_UART0
 -- 
 1.8.1.1.dirty
