@@ -1,76 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 19 Sep 2014 14:38:35 +0200
-Subject: [PATCHv3 7/7] ARM: at91: document Atmel SMART compatibles
-In-Reply-To: <1410797759-18675-8-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410797759-18675-8-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <541C23CB.9060208@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Sep 2014 13:40:04 +0100
+Subject: [RFC PATCH 05/10] drivers: PL011: refactor pl011_probe()
+In-Reply-To: <1411129283-17219-6-git-send-email-andre.przywara@arm.com>
+References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+ <1411129283-17219-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <20140919124004.GI5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/2014 18:15, Alexandre Belloni :
-> Document all the available compatibles for Atmel "SMART" SoCs.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Fri, Sep 19, 2014 at 01:21:18PM +0100, Andre Przywara wrote:
+> Currently the pl011_probe() function is relying on some AMBA IDs
+> and a device tree node to initialize the driver and a port.
+> Both features are not necessarily required for the driver:
+> - we lack AMBA IDs in the ARM SBSA generic UART and
+> - we lack a DT node in ACPI systems.
+> So lets refactor the function to ease later reuse.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Both features are not "necessary" for any driver, but that doesn't mean
+we work around it by throwing a platform driver at it.  We already have
+this same problem with PL010 UARTs, and the DT support for AMBA has the
+ability to specify the AMBA ID.
 
-Thanks
-
-> ---
->  .../devicetree/bindings/arm/atmel-at91.txt         | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index 6e3e3e5c611f..562cda9d86d9 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -1,6 +1,43 @@
->  Atmel AT91 device tree bindings.
->  ================================
->  
-> +Boards with a SoC of the Atmel AT91 or SMART family shall have the following
-> +properties:
-> +
-> +Required root node properties:
-> +compatible: must be one of:
-> + * "atmel,at91rm9200"
-> +
-> + * "atmel,at91sam9" for SoCs using an ARM926EJ-S core, shall be extended with
-> +   the specific SoC family or compatible:
-> +    o "atmel,at91sam9260"
-> +    o "atmel,at91sam9261"
-> +    o "atmel,at91sam9263"
-> +    o "atmel,at91sam9x5" for the 5 series, shall be extended with the specific
-> +      SoC compatible:
-> +       - "atmel,at91sam9g15"
-> +       - "atmel,at91sam9g25"
-> +       - "atmel,at91sam9g35"
-> +       - "atmel,at91sam9x25"
-> +       - "atmel,at91sam9x35"
-> +    o "atmel,at91sam9g20"
-> +    o "atmel,at91sam9g45"
-> +    o "atmel,at91sam9n12"
-> +    o "atmel,at91sam9rl"
-> + * "atmel,sama5" for SoCs using a Cortex-A5, shall be extended with the specific
-> +   SoC family:
-> +    o "atmel,sama5d3" shall be extended with the specific SoC compatible:
-> +       - "atmel,sama5d31"
-> +       - "atmel,sama5d33"
-> +       - "atmel,sama5d34"
-> +       - "atmel,sama5d35"
-> +       - "atmel,sama5d36"
-> +    o "atmel,sama5d4" shall be extended with the specific SoC compatible:
-> +       - "atmel,sama5d41"
-> +       - "atmel,sama5d42"
-> +       - "atmel,sama5d43"
-> +       - "atmel,sama5d44"
-> +
->  PIT Timer required properties:
->  - compatible: Should be "atmel,at91sam9260-pit"
->  - reg: Should contain registers location and length
-> 
-
+Moreover, there is nothing which prevents you from declaring an AMBA
+device with an appropriate AMBA ID for the driver to bind to - which is
+presumably something very similar to what you're already doing with a
+platform device.
 
 -- 
-Nicolas Ferre
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
