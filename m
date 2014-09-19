@@ -1,46 +1,273 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 19 Sep 2014 07:25:24 -0400
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <541C0C64.5010206@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-10-git-send-email-bigeasy@linutronix.de>
- <20140911111721.GB17476@xps8300> <54118AAB.2010205@linutronix.de>
- <5419B825.5000201@linutronix.de> <20140919102212.GA31784@xps8300>
- <541C0C64.5010206@linutronix.de>
-Message-ID: <541C12A4.8020901@hurleysoftware.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 19 Sep 2014 20:26:04 +0900
+Subject: [PATCH v4 5/8] arm64: dts: Add initial device tree support for
+ EXYNOS7
+In-Reply-To: <1410535592-5782-7-git-send-email-ch.naveen@samsung.com>
+References: <1410535592-5782-1-git-send-email-ch.naveen@samsung.com>
+ <1410535592-5782-7-git-send-email-ch.naveen@samsung.com>
+Message-ID: <010f01cfd3fc$80eabb00$82c03100$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2014 06:58 AM, Sebastian Andrzej Siewior wrote:
-> On 09/19/2014 12:22 PM, Heikki Krogerus wrote:
->> Couldn't you just replace the handle_irq with a custom irq routine in
->> the omap driver like you did with set_termios? Where you would do
->> those tricks and/or call serial8250_handle_irq()?
+Naveen Krishna Chatradhi wrote:
 > 
-> Tricks within serial8250_handle_irq(), see [0]. It is not a lot but
-> still. I could provide my own handle irq, just asking what you would
-> prefer.
+> Add initial device tree nodes for EXYNOS7 SoC and board dts file
+> to support Espresso board based on Exynos7 SoC.
 > 
-> [0]
-> http://git.breakpoint.cc/cgit/bigeasy/linux.git/commit/?h=uart_v10_pre2&id=f26f161d998ee4a84a0aa6ddff69a435c25f204d
-> 
->> The 8250_core changes in that patch #10 only modify
->> serial8250_handle_irg right?
-> 
-> Correct. However there is another change due to the RX_DMA_BUG. A while
-> ago you said that this RX_DMA_BUG thing might be something that other
-> SoC could use, too.
-> If you ask me now for my own irq routine it would make sense to move RX
-> bug handling into omap specific code as well.
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
 
-I'm not excited at the prospect of an omap-specific irq handler, especially
-if this is just a silicon bug. I think it will create and encourage
-unnecessary code variation in the 8250 driver. The inertia of an
-omap-specific irq handler will mean it will probable stay forever. Suppose
-this tx dma bug is later discovered to be fixable inline (rather than by
-state), then we'll be stuck with an irq handler that no one will want to
-integrate.
+Looks good to me,
 
-Regards,
-Peter Hurley
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks,
+Kukjin
+
+> ---
+>  arch/arm64/boot/dts/Makefile                    |    1 +
+>  arch/arm64/boot/dts/exynos/Makefile             |    5 +
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |   39 ++++++
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi         |  160 +++++++++++++++++++++++
+>  4 files changed, 205 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos/Makefile
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index 309c3dc..b13bf21 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,5 +1,6 @@
+>  dts-dirs += apm
+>  dts-dirs += arm
+> +dts-dirs += exynos
+> 
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/exynos/Makefile b/arch/arm64/boot/dts/exynos/Makefile
+> new file mode 100644
+> index 0000000..20310e5
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/exynos/Makefile
+> @@ -0,0 +1,5 @@
+> +dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
+> +
+> +always		:= $(dtb-y)
+> +subdir-y	:= $(dts-dirs)
+> +clean-files	:= *.dtb
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-
+> espresso.dts
+> new file mode 100644
+> index 0000000..e2c8283
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> @@ -0,0 +1,39 @@
+> +/*
+> + * SAMSUNG Exynos7 Espresso board device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +#include "exynos7.dtsi"
+> +
+> +/ {
+> +	model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+> +	compatible = "samsung,exynos7-espresso", "samsung,exynos7";
+> +
+> +	aliases {
+> +		serial0 = &serial_2;
+> +	};
+> +
+> +	chosen {
+> +		linux,stdout-path = &serial_2;
+> +	};
+> +
+> +	memory at 40000000 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x40000000 0x0 0xC0000000>;
+> +	};
+> +};
+> +
+> +&fin_pll {
+> +	clock-frequency = <24000000>;
+> +};
+> +
+> +&serial_2 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> new file mode 100644
+> index 0000000..c5b1b86
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> @@ -0,0 +1,160 @@
+> +/*
+> + * SAMSUNG EXYNOS7 SoC device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <dt-bindings/clock/exynos7-clk.h>
+> +
+> +/ {
+> +	compatible = "samsung,exynos7";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a57", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a57", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x1>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a57", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x2>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a57", "arm,armv8";
+> +			enable-method = "psci";
+> +			reg = <0x3>;
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+> +
+> +	soc: soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0 0x18000000>;
+> +
+> +		chipid at 10000000 {
+> +			compatible = "samsung,exynos4210-chipid";
+> +			reg = <0x10000000 0x100>;
+> +		};
+> +
+> +		fin_pll: xxti {
+> +			compatible = "fixed-clock";
+> +			clock-output-names = "fin_pll";
+> +			#clock-cells = <0>;
+> +		};
+> +
+> +		gic: interrupt-controller at 11001000 {
+> +			compatible = "arm,gic-400";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <0>;
+> +			interrupt-controller;
+> +			reg =	<0x11001000 0x1000>,
+> +				<0x11002000 0x1000>,
+> +				<0x11004000 0x2000>,
+> +				<0x11006000 0x2000>;
+> +		};
+> +
+> +		clock_topc: clock-controller at 10570000 {
+> +			compatible = "samsung,exynos7-clock-topc";
+> +			reg = <0x10570000 0x10000>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		clock_top0: clock-controller at 105d0000 {
+> +			compatible = "samsung,exynos7-clock-top0";
+> +			reg = <0x105d0000 0xb000>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		clock_peric0: clock-controller at 13610000 {
+> +			compatible = "samsung,exynos7-clock-peric0";
+> +			reg = <0x13610000 0xd00>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		clock_peric1: clock-controller at 14C80000 {
+> +			compatible = "samsung,exynos7-clock-peric1";
+> +			reg = <0x14c80000 0xd00>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		clock_peris: clock-controller at 10040000 {
+> +			compatible = "samsung,exynos7-clock-peris";
+> +			reg = <0x10040000 0xd00>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		serial_0: serial at 13630000 {
+> +			compatible = "samsung,exynos4210-uart";
+> +			reg = <0x13630000 0x100>;
+> +			interrupts = <0 440 0>;
+> +			clocks = <&clock_peric0 PCLK_UART0>, <&clock_peric0 SCLK_UART0>;
+> +			clock-names = "uart", "clk_uart_baud0";
+> +			status = "disabled";
+> +		};
+> +
+> +		serial_1: serial at 14c20000 {
+> +			compatible = "samsung,exynos4210-uart";
+> +			reg = <0x14c20000 0x100>;
+> +			interrupts = <0 456 0>;
+> +			clocks = <&clock_peric1 PCLK_UART1>, <&clock_peric1 SCLK_UART1>;
+> +			clock-names = "uart", "clk_uart_baud0";
+> +			status = "disabled";
+> +		};
+> +
+> +		serial_2: serial at 14c30000 {
+> +			compatible = "samsung,exynos4210-uart";
+> +			reg = <0x14c30000 0x100>;
+> +			interrupts = <0 457 0>;
+> +			clocks = <&clock_peric1 PCLK_UART2>, <&clock_peric1 SCLK_UART2>;
+> +			clock-names = "uart", "clk_uart_baud0";
+> +			status = "disabled";
+> +		};
+> +
+> +		serial_3: serial at 14c40000 {
+> +			compatible = "samsung,exynos4210-uart";
+> +			reg = <0x14c40000 0x100>;
+> +			interrupts = <0 458 0>;
+> +			clocks = <&clock_peric1 PCLK_UART3>, <&clock_peric1 SCLK_UART3>;
+> +			clock-names = "uart", "clk_uart_baud0";
+> +			status = "disabled";
+> +		};
+> +
+> +		timer {
+> +			compatible = "arm,armv8-timer";
+> +			interrupts = <1 13 0xff01>,
+> +				     <1 14 0xff01>,
+> +				     <1 11 0xff01>,
+> +				     <1 10 0xff01>;
+> +		};
+> +	};
+> +};
+> --
+> 1.7.9.5
