@@ -1,52 +1,22 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 19 Sep 2014 15:25:51 +0530
-Subject: [PATCH 1/2] ARM: dts: vf610-colibri: Add ADC support
-In-Reply-To: <20140918134613.GK4796@dragon>
-References: <cover.1410873422.git.maitysanchayan@gmail.com>
- <1015e874d5b13795e38069402a66b4798d79b632.1410873422.git.maitysanchayan@gmail.com>
- <20140918134613.GK4796@dragon>
-Message-ID: <CANkTNWDXkGSENi0QE2RJ96mWvRpiGdudMP24Wrw=Q_Df=1jKpw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Sep 2014 11:00:02 +0100
+Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
+ page aligned
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
+Message-ID: <20140919095959.GA2295@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Enable ADC support for Colibri VF61 modules
->>
->> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> ---
->>  arch/arm/boot/dts/vf610-colibri.dtsi |   10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
->> index 0cd8343..275ebec 100644
->> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
->> @@ -69,6 +69,16 @@
->>       status = "okay";
->>  };
->>
->> +&adc0 {
->> +     pinctrl-names = "default";
->> +     status = "okay";
->> +};
->> +
->> +&adc1 {
->> +     pinctrl-names = "default";
->> +     status = "okay";
->> +};
->> +
->
-> Please sort the nodes alphabetically in node name.
+On Fri, Sep 19, 2014 at 08:09:47AM +0100, Wang, Yalin wrote:
+> this patch extend the start and end address of initrd to be page aligned,
+> so that we can free all memory including the un-page aligned head or tail
+> page of initrd, if the start or end address of initrd are not page
+> aligned, the page can't be freed by free_initrd_mem() function.
+> 
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
 
-Thanks for the input. Will clean and resend.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Sanchayan
-
->
-> Shawn
->
->>  &iomuxc {
->>       vf610-colibri {
->>               pinctrl_esdhc1: esdhc1grp {
->> --
->> 1.7.9.5
->>
+(as I said, if Russell doesn't have any objections please send the patch
+to his patch system)
