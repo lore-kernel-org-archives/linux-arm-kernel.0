@@ -1,112 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 19 Sep 2014 16:50:50 -0700
-Subject: [PATCH 1/2] ARM: DT: msm8660: Add sdcc nodes
-Message-ID: <1411170651-28855-1-git-send-email-sboyd@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 19 Sep 2014 17:14:06 -0700
+Subject: [PATCH v10 0/6] Add Maxim 77802 RTC support
+In-Reply-To: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=VHVWVtgOoB83cJ9XKAcyBmHwSawh2EWEZViqcQrTpQjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the sdcc nodes to support the SD card controller using pl180
-mmci driver. We also add a temporary fixed regulator until the
-regulator driver is mainlined.
+Javier,
 
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8660-surf.dts | 12 ++++++++
- arch/arm/boot/dts/qcom-msm8660.dtsi     | 51 +++++++++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
+On Fri, Sep 19, 2014 at 3:26 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Andrew,
+>
+> This series add support for the Real Time clock present in
+> the Maxim 77802 Power Managment IC. The version number is
+> quite high because it previously was part of a bigger series
+> [0] that aimed to add support for all the devices in the
+> max77802 PMIC. But now that the max77802 dependencies were
+> already merged for 3.17, the series were split but I kept
+> the version numbering.
+>
+> While working on the max77802 rtc support a lot of feedback
+> was given and the issues pointed out also apply to a driver
+> for a similar PMIC RTC (max77686). So patches 01/06 to 05/06
+> in the series are cleanups for the max77686 driver and patch
+> 06/06 adds the support for the max77802 RTC.
+>
+> This version address the issues pointed out on the previous
+> version [1] and changelog are present on each patch when is
+> applicable.
+>
+> The series were tested on an Exynos5250 Snow (max77686) and
+> Exynos5420 Peach Pit (max77802) machines and applies cleanly
+> to both 3.17-rc1 and today's linux-next (20140919).
+>
+> NOTE: The patches from the previous version [1] were already
+> present in the -mm tree [2] so I didn't know if I should had
+> sent this as a delta or as a new revision. I decided to do
+> the later but please let me know if you expected the former.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-index ff7c53f58a06..e0883c376248 100644
---- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-@@ -14,6 +14,18 @@
- 				status = "ok";
- 			};
- 		};
-+
-+		amba {
-+			/* eMMC */
-+			sdcc1: sdcc at 12400000 {
-+				status = "okay";
-+			};
-+
-+			/* External micro SD card */
-+			sdcc3: sdcc at 12180000 {
-+				status = "okay";
-+			};
-+		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index a3fd26b8139f..0affd6193f56 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -2,6 +2,7 @@
- 
- /include/ "skeleton.dtsi"
- 
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/qcom,gcc-msm8660.h>
- #include <dt-bindings/soc/qcom,gsbi.h>
- 
-@@ -146,5 +147,55 @@
- 				};
- 			};
- 		};
-+
-+		/* Temporary fixed regulator */
-+		vsdcc_fixed: vsdcc-regulator {
-+			compatible = "regulator-fixed";
-+			regulator-name = "SDCC Power";
-+			regulator-min-microvolt = <2700000>;
-+			regulator-max-microvolt = <2700000>;
-+			regulator-always-on;
-+		};
-+
-+		amba {
-+			compatible = "arm,amba-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			sdcc1: sdcc at 12400000 {
-+				status		= "disabled";
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				reg		= <0x12400000 0x8000>;
-+				interrupts	= <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC1_CLK>, <&gcc SDC1_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <8>;
-+				max-frequency	= <48000000>;
-+				non-removable;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+				vmmc-supply = <&vsdcc_fixed>;
-+			};
-+
-+			sdcc3: sdcc at 12180000 {
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				status		= "disabled";
-+				reg		= <0x12180000 0x8000>;
-+				interrupts	= <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC3_CLK>, <&gcc SDC3_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <4>;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+				max-frequency	= <48000000>;
-+				no-1-8-v;
-+				vmmc-supply = <&vsdcc_fixed>;
-+			};
-+		};
- 	};
-+
- };
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+My records show that Andrew has already accepted most of these.  They
+may not show up in linuxnext yet, but that doesn't mean Andrew hasn't
+taken them (I think).
+
+
+> Doug Anderson (1):
+>   rtc: max77686: Allow the max77686 rtc to wakeup the system
+
+    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-allow-the-max77686-rtc-to-wakeup-the-system.patch
+
+> Javier Martinez Canillas (5):
+>   rtc: max77686: Remove dead code for SMPL and WTSR.
+
+    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-remove-dead-code-for-smpl-and-wtsr.patch
+
+>   rtc: max77686: Fail to probe if no RTC regmap irqchip is set
+
+    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-fail-to-probe-if-no-rtc-regmap-irqchip-is-set.patch
+
+>   rtc: max77686: Remove unneded info log
+
+    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-remove-unneded-info-log.patch
+
+>   rtc: max77686: Use ffs() to calculate tm_wday
+
+This one hasn't been accepted...
+
+>   rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
+
+    http://ozlabs.org/~akpm/mmots/broken-out/rtc-add-driver-for-maxim-77802-pmic-real-time-clock.patch
+
+
+-Doug
