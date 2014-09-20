@@ -1,59 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 20 Sep 2014 04:52:31 +0200
-Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
-In-Reply-To: <87tx43xswd.fsf@free.fr>
-References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
- <87tx43xswd.fsf@free.fr>
-Message-ID: <201409200452.31999.arnd@arndb.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 19 Sep 2014 20:07:50 -0700
+Subject: [PATCH 2/2] watchdog: dw_wdt: add restart handler support
+In-Reply-To: <1411108199-1280-3-git-send-email-jszhang@marvell.com>
+References: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
+ <1411108199-1280-3-git-send-email-jszhang@marvell.com>
+Message-ID: <541CEF86.9070606@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 September 2014, Robert Jarzmik wrote:
-> Hi Arnd,
-> 
-> I think I met the necessary number of acks. I amended the patch to reflect this,
-> attached to this mail.
-
-I disagree. For any other patch I'd be fine with this, but changing
-maintainership is a delicate issue, and I don't want to remove Russell
-from the list without having seen a comment from him with either
-Ack or Nak.
-
-> > Could you schedule this single patch for your maintainers branch (or for-next by
-> default) in arm-soc please ?
-
-Let's give Russell a few more days to comment, if we don't here anything from him,
-I'd suggest to leave him listed as maintainer and just do the other changes.
-You can reorder the list in any way you see fit.
-
-	Arnd
-
-> From c4d1e8e185c76654452c5161c86f3cc34b3ba103 Mon Sep 17 00:00:00 2001
-> From: Robert Jarzmik <robert.jarzmik@free.fr>
-> Date: Fri, 29 Aug 2014 22:07:55 +0200
-> Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
-> 
-> Change pxa active maintainers, and remove more busy people.
-> Remove Eric's tree as it is not accessible anymore.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Acked-by: Daniel Mack <zonque@gmail.com>
-> Acked-by: Eric Miao <eric.y.miao@gmail.com>
-> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On 09/18/2014 11:29 PM, Jisheng Zhang wrote:
+> The kernel core now provides an API to trigger a system restart.
+> Register with it to support restarting the system via. watchdog.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  MAINTAINERS | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 1ff06de..d7ec0f6 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7291,12 +7291,12 @@ F:      drivers/video/backlight/pwm_bl.c
->  F:     include/linux/pwm_backlight.h
->  
->  PXA2xx/PXA3xx SUPPORT
-> -M:     Eric Miao <eric.y.miao@gmail.com>
-> -M:     Russell King <linux@arm.linux.org.uk>
->  M:     Haojian Zhuang <haojian.zhuang@gmail.com>
-> +M:     Robert Jarzmik <robert.jarzmik@free.fr>
-> +M:     Daniel Mack <daniel@zonque.org>
+>   drivers/watchdog/dw_wdt.c | 27 +++++++++++++++++++++++++++
+>   1 file changed, 27 insertions(+)
+>
+> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> index ad0619d..4ca41e9 100644
+> --- a/drivers/watchdog/dw_wdt.c
+> +++ b/drivers/watchdog/dw_wdt.c
+> @@ -29,9 +29,11 @@
+>   #include <linux/miscdevice.h>
+>   #include <linux/module.h>
+>   #include <linux/moduleparam.h>
+> +#include <linux/notifier.h>
+>   #include <linux/of.h>
+>   #include <linux/pm.h>
+>   #include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+>   #include <linux/spinlock.h>
+>   #include <linux/timer.h>
+>   #include <linux/uaccess.h>
+> @@ -62,6 +64,7 @@ static struct {
+>   	unsigned long		next_heartbeat;
+>   	struct timer_list	timer;
+>   	int			expect_close;
+> +	struct notifier_block	restart_handler;
+>   } dw_wdt;
+>
+>   static inline int dw_wdt_is_enabled(void)
+> @@ -119,6 +122,22 @@ static void dw_wdt_keepalive(void)
+>   	       WDOG_COUNTER_RESTART_REG_OFFSET);
+>   }
+>
+> +static int dw_wdt_restart_handle(struct notifier_block *this,
+> +				unsigned long mode, void *cmd)
+> +{
+> +	u32 val;
+> +
+> +	writel(0, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
+> +	val = readl(dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
+> +	if (val & WDOG_CONTROL_REG_WDT_EN_MASK)
+> +		writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt.regs +
+> +			WDOG_COUNTER_RESTART_REG_OFFSET);
+> +	else
+> +		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+> +		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
+
+Don't you have to write WDOG_COUNTER_RESTART_KICK_VALUE into
+WDOG_COUNTER_RESTART_REG_OFFSET in the else case as well ?
+
+Guenter
