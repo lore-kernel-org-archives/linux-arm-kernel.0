@@ -1,51 +1,63 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 20 Sep 2014 09:29:23 -0700
-Subject: [PATCH v3 2/4] ARM: meson: add watchdog driver
-In-Reply-To: <CAOQ7t2a09zB2=qyDfsnJN94Wrj9Zu1c33R1bG5NC2QwzndtmcA@mail.gmail.com>
-References: <1411158989-8075-1-git-send-email-carlo@caione.org>	<1411158989-8075-3-git-send-email-carlo@caione.org>	<541D9D94.2010400@roeck-us.net>
- <CAOQ7t2a09zB2=qyDfsnJN94Wrj9Zu1c33R1bG5NC2QwzndtmcA@mail.gmail.com>
-Message-ID: <541DAB63.4010108@roeck-us.net>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Sat, 20 Sep 2014 09:31:36 -0700
+Subject: [V8 0/2] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1411230698-8081-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2014 09:15 AM, Carlo Caione wrote:
-> On Sat, Sep 20, 2014 at 5:30 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 09/19/2014 01:36 PM, Carlo Caione wrote:
->>>
->>> This patch adds the watchdog driver for the Amlogic Meson SoCs used also
->>> to reboot the device.
->>>
->>> Signed-off-by: Carlo Caione <carlo@caione.org>
->>> ---
->>
->> [ ... ]
->>>
->>> +module_param(nowayout, bool, 0);
->>> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
->>> +               "(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
->>> +
->>
->>
->> Checkpatch says:
->>
->> WARNING: quoted string split across lines
->> #295: FILE: drivers/watchdog/meson_wdt.c:231:
->> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
->> +               "(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
->
-> Thought that it was "somehow tolerated" :)
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Not me, at least not in this case.
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
-> But since I'm wrong I'll submit a v4.
->
+This depends on and has been tested with the following patch set which
+implements PCI supports for ARM64:
 
-MODULE_PARAM_DESC(nowayout,
-                   "Watchdog cannot be stopped once started (default="
-                   __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+    [PATCH v11 00/10] Support for creating generic PCI host bridges from DT
+    https://lkml.org/lkml/2014/9/17/732
 
-is a really simple way of ensuring that you meet both the 80-column limit
-and avoid the warning. The idea should not be to try to get away with
-as many checkpatch warnings as possible ;-).
+    [PATCH v11] Add support for PCI in AArch64
+    https://lkml.org/lkml/2014/9/17/736
 
-Guenter
+This patch set is rebased from:
+    git://git.infradead.org/users/jcooper/linux.git irqchip/core
+ 
+Changes in V8:
+    * Minor clean up suggested by Marc
+    * Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Changes in V7:
+    * Fix error handling logic in gicv2m_of_init() and gicv2m_init_one().
+      per Marc suggestions.
+    * Restructure the patch to integrate the multi-MSI support for V2m
+      into the patch 2/2.
+    * Introduce "arm,gic-v2m-frame" compatible ID for the v2m DT binding.
+    * Introduce "arm,msi-base-spi" and "arm,msi-num-spi" property in the
+      v2m DT binding for overwriting value in MSI_TYPER register.
+    * Add irq-gic-v2m.c: is_msi_spi_valid() to validate the SPI base and
+      number of SPIs.
+    * Fix various comments from Marc (Many thanks).
+    * Add the missing CONFIG_ARM_GICV2M (per Marcin Juszkiewicz comment)
+
+Suravee Suthikulpanit (2):
+  irqchip: gic: Add support for multiple MSI for ARM64
+  irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
+
+ Documentation/devicetree/bindings/arm/gic.txt |  55 ++++
+ arch/arm64/Kconfig                            |   1 +
+ arch/arm64/kernel/Makefile                    |   1 +
+ arch/arm64/kernel/msi.c                       |  41 +++
+ drivers/irqchip/Kconfig                       |   5 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-gic-common.c              |  12 +
+ drivers/irqchip/irq-gic-common.h              |   4 +
+ drivers/irqchip/irq-gic-v2m.c                 | 356 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                     |  82 +++---
+ drivers/irqchip/irq-gic.h                     |  54 ++++
+ 11 files changed, 582 insertions(+), 30 deletions(-)
+ create mode 100644 arch/arm64/kernel/msi.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
+ create mode 100644 drivers/irqchip/irq-gic.h
+
+-- 
+1.9.3
