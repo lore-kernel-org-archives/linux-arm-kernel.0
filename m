@@ -1,82 +1,60 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 19 Sep 2014 21:34:38 -0700
-Subject: [PATCH v4 0/2] mtd: nand: add sunxi NAND flash controller support
-In-Reply-To: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140920043438.GD8127@brian-ubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 20 Sep 2014 09:31:49 +0100
+Subject: [PATCH v4 4/7] ARM: l2c: Add support for overriding prefetch
+ settings
+In-Reply-To: <20140919183007.GG29620@piout.net>
+References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
+ <1409062680-15906-5-git-send-email-t.figa@samsung.com>
+ <20140919095000.GF29620@piout.net>
+ <20140919163932.GH12379@n2100.arm.linux.org.uk>
+ <20140919183007.GG29620@piout.net>
+Message-ID: <20140920083149.GI12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Fri, Sep 19, 2014 at 08:30:07PM +0200, Alexandre Belloni wrote:
+> On 19/09/2014 at 17:39:32 +0100, Russell King - ARM Linux wrote :
+> > On Fri, Sep 19, 2014 at 11:50:01AM +0200, Alexandre Belloni wrote:
+> > > On 26/08/2014 at 16:17:57 +0200, Tomasz Figa wrote :
+> > > > Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+> > > > settings configured in registers leading to crashes if L2C is enabled
+> > > > without overriding them. This patch introduces bindings to enable
+> > > > prefetch settings to be specified from DT and necessary support in the
+> > > > driver.
+> > > > 
+> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > > 
+> > > Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > 
+> > > It is working and useful on Atmel's sama5d4 were the bootloader is not
+> > > configuring the L2C prefetch. However, I'm wondering whether we should
+> > > add support for setting L310_PREFETCH_CTRL_DATA_PREFETCH and
+> > > L310_PREFETCH_CTRL_INSTR_PREFETCH. I'm currently doing it by using
+> > > ".l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
+> > > L310_AUX_CTRL_INSTR_PREFETCH" (those are the same bits) but this has the
+> > > disadvantage of displaying the "L2C: platform modifies aux control
+> > > register:" twice.
+> > 
+> > The L2C documentation, freely available from the ARM infocentre website,
+> > has the answer to this for you.
+> > 
+> > The two bits in the prefetch control register which control the data
+> > and instruction prefetching are aliases of the aux control register.
+> > If you set them to a value in one register, they are reflected in the
+> > other.
+> > 
+> > The reason for that is that once the L2 cache is enabled, writes to
+> > the aux control register are no longer permitted, but it's safe to
+> > enable and disable the prefetching with the cache already enabled.
+> > This reason is even stated in the documentation.
+> > 
+> 
+> Yeah, so my question still holds, should we have an other way to
+> enable/disable I/D prefetch by adding two other DT bindings ?
 
-On Mon, Aug 18, 2014 at 07:26:26PM +0200, Boris BREZILLON wrote:
-> This patch series adds support for the sunxi NAND Flash Controller (NFC)
-> block.
-> 
-> These two patches only add support for the basic NAND stuff:
->  - NAND controller operations
->  - SW and HW ECC handling (with both syndrome and normal ECC scheme)
-> 
-> If you want support for advanced features you can find it on my github
-> repo [1]:
->  - HW randomization support
->  - per partition ECC/Randomizer to handle bootloader partitions
-> 
-> DMA transfers are not supported yet, but I have reworked the OOB layout
-> when using the HW ECC scheme to match the one used when accessing the NAND
-> with DMA transfers (the available OOB bytes are placed at the end of the
-> OOB area).
-> 
-> This patch series depends on this other one [2] which adds support for ONFI
-> timing mode retrieval on non-ONFI NANDs.
+Your question doesn't hold, because the above answers it conclusively.
+No.
 
-Were you planning to send v2 of your series [2]? I see you made a
-mistake you were planning on fixing:
-
-  https://lkml.org/lkml/2014/7/30/423
-
-Brian
-
-> Best Regards,
-> 
-> Boris
-> 
-> [1]https://github.com/bbrezillon/linux-sunxi/tree/sunxi-nand-v4
-> [2]https://lkml.org/lkml/2014/7/28/156
-> 
-> Changes since v3:
->  - removed nand core code modifications from the patch series (submitted
->    separately)
->  - added documentation to the code
->  - forced timeout (a default timeout is used when none is provided by the
->    caller) on controller operations
->  - fixed coding style issues
->  - removed unneeded irq field from the sunxi_nfc struct
->  - fixed several memory leaks
->  - reworked the NFC reset code (to avoid potential garbage config from the
->    bootloader)
->  - made use of ECC_EXCEPTION flag to prevent erased page from generating
->    ECC errors
->  - changed the OOB layout for HW ECC scheme
-> 
-> Changes since v2:
->  - merge HW ECC implementation in base implementation patch
->  - fix timing config when interfacing with an ONFI compatible chip
-> 
-> Changes since v1:
->  - add HW ECC support
->  - rework NAND timings retrieval (use ONFI timing mode instead of raw timings)
->  - add nand-ecc-level property to specify NAND ECC requirements from DT
-> 
-> Boris BREZILLON (2):
->   mtd: nand: add sunxi NAND flash controller support
->   mtd: nand: add sunxi NFC dt bindings doc
-> 
->  .../devicetree/bindings/mtd/sunxi-nand.txt         |   45 +
->  drivers/mtd/nand/Kconfig                           |    6 +
->  drivers/mtd/nand/Makefile                          |    1 +
->  drivers/mtd/nand/sunxi_nand.c                      | 1362 ++++++++++++++++++++
->  4 files changed, 1414 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
->  create mode 100644 drivers/mtd/nand/sunxi_nand.c
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
