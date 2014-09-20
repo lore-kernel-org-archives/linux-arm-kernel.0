@@ -1,60 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 20 Sep 2014 09:31:49 +0100
-Subject: [PATCH v4 4/7] ARM: l2c: Add support for overriding prefetch
- settings
-In-Reply-To: <20140919183007.GG29620@piout.net>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
- <1409062680-15906-5-git-send-email-t.figa@samsung.com>
- <20140919095000.GF29620@piout.net>
- <20140919163932.GH12379@n2100.arm.linux.org.uk>
- <20140919183007.GG29620@piout.net>
-Message-ID: <20140920083149.GI12379@n2100.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 20 Sep 2014 11:11:07 +0200
+Subject: [PATCH 1/2] i2c: cadence: Remove .owner field for driver
+In-Reply-To: <c076984af7e65c433fdfd3a3b0f8d20da2c18013.1407931005.git.michal.simek@xilinx.com>
+References: <c076984af7e65c433fdfd3a3b0f8d20da2c18013.1407931005.git.michal.simek@xilinx.com>
+Message-ID: <20140920091106.GB1612@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 08:30:07PM +0200, Alexandre Belloni wrote:
-> On 19/09/2014 at 17:39:32 +0100, Russell King - ARM Linux wrote :
-> > On Fri, Sep 19, 2014 at 11:50:01AM +0200, Alexandre Belloni wrote:
-> > > On 26/08/2014 at 16:17:57 +0200, Tomasz Figa wrote :
-> > > > Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
-> > > > settings configured in registers leading to crashes if L2C is enabled
-> > > > without overriding them. This patch introduces bindings to enable
-> > > > prefetch settings to be specified from DT and necessary support in the
-> > > > driver.
-> > > > 
-> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > > 
-> > > Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > 
-> > > It is working and useful on Atmel's sama5d4 were the bootloader is not
-> > > configuring the L2C prefetch. However, I'm wondering whether we should
-> > > add support for setting L310_PREFETCH_CTRL_DATA_PREFETCH and
-> > > L310_PREFETCH_CTRL_INSTR_PREFETCH. I'm currently doing it by using
-> > > ".l2c_aux_val    = L310_AUX_CTRL_DATA_PREFETCH |
-> > > L310_AUX_CTRL_INSTR_PREFETCH" (those are the same bits) but this has the
-> > > disadvantage of displaying the "L2C: platform modifies aux control
-> > > register:" twice.
-> > 
-> > The L2C documentation, freely available from the ARM infocentre website,
-> > has the answer to this for you.
-> > 
-> > The two bits in the prefetch control register which control the data
-> > and instruction prefetching are aliases of the aux control register.
-> > If you set them to a value in one register, they are reflected in the
-> > other.
-> > 
-> > The reason for that is that once the L2 cache is enabled, writes to
-> > the aux control register are no longer permitted, but it's safe to
-> > enable and disable the prefetching with the cache already enabled.
-> > This reason is even stated in the documentation.
-> > 
+On Wed, Aug 13, 2014 at 01:56:51PM +0200, Michal Simek wrote:
+> There is no need to init .owner field.
 > 
-> Yeah, so my question still holds, should we have an other way to
-> enable/disable I/D prefetch by adding two other DT bindings ?
+> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+> "mmc: remove .owner field for drivers using module_platform_driver"
+> 
+> This patch removes the superflous .owner field for drivers which
 
-Your question doesn't hold, because the above answers it conclusively.
-No.
+It says drivers, but does only one...
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway."
+
+... so: any interest in doing this for the whole subsystem? Basically
+good catch, though.
+
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  drivers/i2c/busses/i2c-cadence.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> index 63f3f03ecc9b..04d0a7e449ef 100644
+> --- a/drivers/i2c/busses/i2c-cadence.c
+> +++ b/drivers/i2c/busses/i2c-cadence.c
+> @@ -890,7 +890,6 @@ MODULE_DEVICE_TABLE(of, cdns_i2c_of_match);
+>  static struct platform_driver cdns_i2c_drv = {
+>  	.driver = {
+>  		.name  = DRIVER_NAME,
+> -		.owner = THIS_MODULE,
+>  		.of_match_table = cdns_i2c_of_match,
+>  		.pm = &cdns_i2c_dev_pm_ops,
+>  	},
+> --
+> 1.8.2.3
+> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/ec4cb1c1/attachment.sig>
