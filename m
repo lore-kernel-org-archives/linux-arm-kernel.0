@@ -1,23 +1,26 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 20 Sep 2014 14:17:42 +0200
-Subject: [PATCH] i2c: rk3x: Remove unlikely() annotations
-In-Reply-To: <1408729424-11433-1-git-send-email-dianders@chromium.org>
-References: <1408729424-11433-1-git-send-email-dianders@chromium.org>
-Message-ID: <20140920121740.GA3850@katana>
+Date: Sat, 20 Sep 2014 14:19:05 +0200
+Subject: [PATCH v2] i2c: rk3x: fix divisor calculation for SCL frequency
+In-Reply-To: <1410147505-5930-1-git-send-email-addy.ke@rock-chips.com>
+References: <1409884333-3544-1-git-send-email-addy.ke@rock-chips.com>
+ <1410147505-5930-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20140920121904.GB3850@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 10:43:44AM -0700, Doug Anderson wrote:
-> Having a transfer more than 32 bits is not all that unlikely.  Remove
-> the annotation.
+On Mon, Sep 08, 2014 at 11:38:25AM +0800, Addy Ke wrote:
+> I2C_CLKDIV register descripted in the previous version of
+> RK3x chip manual is incorrect. Plus 1 is required.
 > 
-> The unlikely in the IRQ handler can't gain us much.  It's not in a
-> loop, so at most it would save 1 instruction per IRQ, which isn't
-> much.  In fact on the compiler I tested it produced the exact same
-> code.  Remove it too.
+> The correct formula:
+> - T(SCL_HIGH) = T(PCLK) * (CLKDIVH + 1) * 8
+> - T(SCL_LOW) = T(PCLK) * (CLKDIVL + 1) * 8
+> - (SCL Divsor) = 8 * ((CLKDIVL + 1) + (CLKDIVH + 1))
+> - SCL = PCLK / (CLK Divsor)
 > 
-> Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> It will be updated to the latest version of chip manual.
+> 
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 
 Applied to for-next, thanks!
 
@@ -27,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/65f1f968/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/133ac9df/attachment.sig>
