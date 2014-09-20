@@ -1,52 +1,59 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 19 Sep 2014 19:50:25 -0700
-Subject: [PATCH v3 0/4] ARM: meson: watchdog driver
-In-Reply-To: <1411158989-8075-1-git-send-email-carlo@caione.org>
-References: <1411158989-8075-1-git-send-email-carlo@caione.org>
-Message-ID: <541CEB71.5060800@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 20 Sep 2014 04:52:31 +0200
+Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
+In-Reply-To: <87tx43xswd.fsf@free.fr>
+References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
+ <87tx43xswd.fsf@free.fr>
+Message-ID: <201409200452.31999.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2014 01:36 PM, Carlo Caione wrote:
-> This patchset adds support for the watchdog found on Amlogic MesonX SoCs. The
-> watchdog is used also to reboot the device.
->
-> DTSI and multi_v7_defconfig are updated and proper documentation is added.
->
-> No documentation is provided by Amlogic, the code is reverse-engineered by the
-> code available at http://openlinux.amlogic.com:8000/download/
->
-> This patchset depends on:
-> [1] [PATCH 0/6] ARM: meson: initial support for MesonX SoCs
-> [2] [PATCH 0/2] ARM: meson: add clocksource support
->
-> Changes since v2:
-> * changed compatible to "amlogic,meson6-wdt"
-> * removed useless code
-> * code refactored
->
-> Changes since v1:
-> * added restart handler support
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg362521.html
-> [2] http://www.spinics.net/lists/arm-kernel/msg362483.html
->
-> Carlo Caione (4):
->    ARM: docs: add documentation binding for meson watchdog
->    ARM: meson: add watchdog driver
->    ARM: DTS: meson: update DTSI to add watchdog node
->    ARM: defconfig: update multi_v7_defconfig
->
->   .../devicetree/bindings/watchdog/meson6-wdt.txt    |  13 ++
->   arch/arm/boot/dts/meson.dtsi                       |   5 +
->   arch/arm/configs/multi_v7_defconfig                |   1 +
->   drivers/watchdog/Kconfig                           |  10 +
->   drivers/watchdog/Makefile                          |   1 +
->   drivers/watchdog/meson_wdt.c                       | 235 +++++++++++++++++++++
->   6 files changed, 265 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
->   create mode 100644 drivers/watchdog/meson_wdt.c
->
-For the series:
+On Friday 19 September 2014, Robert Jarzmik wrote:
+> Hi Arnd,
+> 
+> I think I met the necessary number of acks. I amended the patch to reflect this,
+> attached to this mail.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+I disagree. For any other patch I'd be fine with this, but changing
+maintainership is a delicate issue, and I don't want to remove Russell
+from the list without having seen a comment from him with either
+Ack or Nak.
+
+> > Could you schedule this single patch for your maintainers branch (or for-next by
+> default) in arm-soc please ?
+
+Let's give Russell a few more days to comment, if we don't here anything from him,
+I'd suggest to leave him listed as maintainer and just do the other changes.
+You can reorder the list in any way you see fit.
+
+	Arnd
+
+> From c4d1e8e185c76654452c5161c86f3cc34b3ba103 Mon Sep 17 00:00:00 2001
+> From: Robert Jarzmik <robert.jarzmik@free.fr>
+> Date: Fri, 29 Aug 2014 22:07:55 +0200
+> Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
+> 
+> Change pxa active maintainers, and remove more busy people.
+> Remove Eric's tree as it is not accessible anymore.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Acked-by: Daniel Mack <zonque@gmail.com>
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
+> Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  MAINTAINERS | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 1ff06de..d7ec0f6 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7291,12 +7291,12 @@ F:      drivers/video/backlight/pwm_bl.c
+>  F:     include/linux/pwm_backlight.h
+>  
+>  PXA2xx/PXA3xx SUPPORT
+> -M:     Eric Miao <eric.y.miao@gmail.com>
+> -M:     Russell King <linux@arm.linux.org.uk>
+>  M:     Haojian Zhuang <haojian.zhuang@gmail.com>
+> +M:     Robert Jarzmik <robert.jarzmik@free.fr>
+> +M:     Daniel Mack <daniel@zonque.org>
