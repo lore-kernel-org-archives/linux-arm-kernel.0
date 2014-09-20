@@ -1,82 +1,32 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 19 Sep 2014 18:50:12 -0700
-Subject: [PATCH] ARM: dts: Add initial DTS file for Sony Xperia Z1 phone
-In-Reply-To: <5418C471.9000807@sonymobile.com>
-References: <5418C1D2.4000303@sonymobile.com>
- <27E278AA-EBC0-4368-B75C-DCB2DD906612@codeaurora.org>
- <5418C471.9000807@sonymobile.com>
-Message-ID: <541CDD54.3020203@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 19 Sep 2014 21:07:06 -0500 (CDT)
+Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <20140919195738.GR14505@atomide.com>
+References: <1411067086-16613-1-git-send-email-nm@ti.com>
+ <1411067086-16613-4-git-send-email-nm@ti.com>
+ <alpine.DEB.2.10.1409181749170.4206@nanos> <20140919030333.GA6088@kahuna>
+ <alpine.DEB.2.10.1409190710320.5612@nanos> <20140919161927.GA28613@kahuna>
+ <alpine.DEB.2.10.1409191027330.5612@nanos>
+ <20140919191649.GQ14505@atomide.com>
+ <alpine.DEB.2.10.1409191233590.4213@nanos>
+ <20140919195738.GR14505@atomide.com>
+Message-ID: <alpine.DEB.2.10.1409192100380.23826@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/16/2014 4:14 PM, Tim Bird wrote:
+On Fri, 19 Sep 2014, Tony Lindgren wrote:
+> * Thomas Gleixner <tglx@linutronix.de> [140919 12:47]:
+> > Why on earth are you wanting tasklets in there? That's just silly,
+> > really.
 > 
-> 
-> On 09/16/2014 04:08 PM, Kumar Gala wrote:
->>
->> On Sep 16, 2014, at 4:03 PM, Tim Bird <tim.bird@sonymobile.com> wrote:
->>
->>> This DTS has initial support for just a serial console, for the
->>> Sony Xperia Z1 phone.  This phone uses a QualComm 8074 processor.
->>>
->>
->> Qualcomm, the C isn?t caps.
-> 
-> Will fix.
->>
->>> Signed-off-by: Tim Bird <tim.bird@sonymobile.com>
->>> ---
->>> arch/arm/boot/dts/Makefile                   |    1 +
->>> arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts |   18 ++++++++++++++++++
->>> 2 files changed, 19 insertions(+)
->>> create mode 100644 arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index b8c5cd3..680ce7e 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -341,6 +341,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
->>> dtb-$(CONFIG_ARCH_QCOM) += \
->>> 	qcom-apq8064-ifc6410.dtb \
->>> 	qcom-apq8074-dragonboard.dtb \
->>> +	qcom-apq8074-xperia-z1.dtb \
->>> 	qcom-apq8084-mtp.dtb \
->>> 	qcom-msm8660-surf.dtb \
->>> 	qcom-msm8960-cdp.dtb
->>> diff --git a/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts b/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
->>> new file mode 100644
->>> index 0000000..59b3fa1
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
->>> @@ -0,0 +1,18 @@
->>> +#include "qcom-msm8974.dtsi"
->>> +
->>> +/ {
->>> +	model = "Sony Xperia Z1 phone";
->>> +	compatible = "qcom,msm8974?;
->>
->> Should have a board compat as well
+> Lack of a framework on driver side to cope with this in a generic
+> way? :p
 
-Also need to add the board compat string, and "qcom,msm8974? to the list of
-strings in arch/arm/mach-qcom/board.c: qcom_dt_match[].
+So instead of creating such a thing we rather have a completely ass
+backward workaround which spreads itself all over the tree?
 
+You SoC folks really need a quarterly sanity check.
 
-> I'll ask Bjorn what we want to do here.  There was a compat that I stripped,
-> but I'm not sure we settled on the official name we want.  In any event,
-> will fix.
->>
->>> +	qcom,msm-id = <126 8 0>, <185 8 0>, <186 8 0>;
->>
->> We don?t have qcom,msm-id upstream at this time.
-> Do I just leave this out, then?
-> 
-> Thanks.
->  -- Tim
-> 
-> P.S. By now you probably noticed I mis-typed device-tree at vger.kernel.org.  I'll fix that also.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> .
-> 
+Thanks,
+
+	tglx
