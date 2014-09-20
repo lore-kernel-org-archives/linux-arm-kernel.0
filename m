@@ -1,45 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 20 Sep 2014 20:43:14 +0200
-Subject: [PATCH 4/7] clk: add clk-asm9260 driver
-In-Reply-To: <541DC21D.7050303@rempel-privat.de>
-References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
- <1410646408-28901-5-git-send-email-linux@rempel-privat.de>
- <20140917135440.GG27054@piout.net>
- <541A7FE1.8060202@rempel-privat.de>
- <20140918075650.GB29620@piout.net>
- <541DC21D.7050303@rempel-privat.de>
-Message-ID: <20140920184313.GH29620@piout.net>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sat, 20 Sep 2014 22:00:37 +0200
+Subject: [PATCH] ARM: BCM5301X: select GPIOLIB as optional
+In-Reply-To: <1411232446.828292358@f282.i.mail.ru>
+References: <1411231282-7180-1-git-send-email-zajec5@gmail.com>
+ <1411232446.828292358@f282.i.mail.ru>
+Message-ID: <CACna6rxHSWuu1ucgnsMX_7qkEfLkgzdfC6LV_NMc05kWodabKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/2014 at 20:06:21 +0200, Oleksij Rempel wrote :
-> Am 18.09.2014 um 09:56 schrieb Alexandre Belloni:
-> > You can have a look at how it has been done for the berlin SoCs to see
-> > how you can easily reuse code between drivers.
-> 
-> What is the correct way to handle/define i2s MCLK input? I have I2S mux
-> clock with choice of 3 sources: Xtal, PLL and MCLK. One of pins can be
-> configured as MCLK src. Should i define fixedrate-clk?
-> 
+On 20 September 2014 19:00, Alexander Shiyan <shc_work@mail.ru> wrote:
+> Sat, 20 Sep 2014 18:41:22 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
+>> All routers (or 99% of them) based on BCM5301X use GPIOs to control LEDs
+>> and buttons.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>> ---
+>>  arch/arm/mach-bcm/Kconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>> index fc93800..d967c98 100644
+>> --- a/arch/arm/mach-bcm/Kconfig
+>> +++ b/arch/arm/mach-bcm/Kconfig
+>> @@ -80,8 +80,10 @@ config ARCH_BCM2835
+>>
+>>  config ARCH_BCM_5301X
+>>       bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+>> +     select ARCH_WANT_OPTIONAL_GPIOLIB
+>>       select ARM_GIC
+>>       select CACHE_L2X0
+>> +     select GPIOLIB
+> ...
+>
+> GPIOLIB is selected automatically by ARCH_WANT_OPTIONAL_GPIOLIB.
 
-It depends on where is your mux, if it is in the I2S controller adress
-range, I would simply give 3 parent clocks to your I2S controller, like:
+I don't think so, I believe selecting is done by ARCH_REQUIRE_GPIOLIB only.
 
-i2s at 8fffffff {
- compatible = "...";
- reg = <0x8fffffff 0x100>;
- clocks = <&xtal, &clkc CLKID_MCK, &clkc CLKID_PLL>;
-}
-
-If it is part of your clock generator, then simply register a clock mux
-with 3 parents as part of your clock controller binding. And use
-something like:
- clocks = <&clck CLKID_I2S>;
-
-Have a look at how this is done for berlin2, search for
-clk_register_mux()
+Reading drivers/gpio/Kconfig confuses me a bit. I believe I should
+select ARCH_WANT_OPTIONAL_GPIOLIB, because the board can boot without
+GPIOs, they are needed for LEDs and buttons only. Also most users will
+want LEDs and buttons, so I "select GPIOLIB".
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Rafa?
