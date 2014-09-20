@@ -1,108 +1,77 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 21 Sep 2014 01:48:57 +0200
-Subject: [PATCH v5 06/11] i2c: core: Convert to
- dev_pm_domain_attach|detach()
-In-Reply-To: <20140920122318.GC3850@katana>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <1411151264-16245-7-git-send-email-ulf.hansson@linaro.org>
- <20140920122318.GC3850@katana>
-Message-ID: <2089327.LENgA8tdGF@vostro.rjw.lan>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 21 Sep 2014 01:46:03 +0200
+Subject: [PATCH 3/5] ARM: mvebu: armada-xp: Correct misnumbered PCIe port
+ nodes
+In-Reply-To: <1411236391-422-4-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1411236391-422-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1411236391-422-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <541E11BB.7070202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, September 20, 2014 02:23:19 PM Wolfram Sang wrote:
+On 09/20/2014 08:06 PM, Sebastian Hesselbarth wrote:
+> Currently, Armada XP PCIe nodes are numbered pcie@<N>,0 with N just
+> incrementing. To reflect port/lane relationship, rename the nodes
+> to pcie@<port>,<lane>. While at it, add node aliases to each of pcie
+> controller and port nodes and get rid of now redundant port/lane
+> comments.
 > 
-> --bAmEntskrkuBymla
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
-> Content-Transfer-Encoding: quoted-printable
-> 
-> On Fri, Sep 19, 2014 at 08:27:39PM +0200, Ulf Hansson wrote:
-> > Previously only the ACPI PM domain was supported by the i2c bus.
-> >=20
-> > Let's convert to the common attach/detach functions for PM domains,
-> > which currently means we are extending the support to include the
-> > generic PM domain as well.
-> >=20
-> > Cc: linux-i2c at vger.kernel.org
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> 
-> Looks good to me, but I'd like to give Mika a chance to look at it,
-> since he does ACPI with I2C. Adding to CC.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
 
-It is not applicable without the [4/9] in this series anyway.
+After thinking a while about the current numbering scheme, I have to
+admit that it is correct. The @numbers represent assigned-address of
+the pcie port and this what it is right now.
 
-> > ---
-> >  drivers/i2c/i2c-core.c | 13 ++++++++-----
-> >  1 file changed, 8 insertions(+), 5 deletions(-)
-> >=20
-> > diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> > index 632057a..3cd8f11 100644
-> > --- a/drivers/i2c/i2c-core.c
-> > +++ b/drivers/i2c/i2c-core.c
-> > @@ -279,10 +279,13 @@ static int i2c_device_probe(struct device *dev)
-> >  	if (status < 0)
-> >  		return status;
-> > =20
-> > -	acpi_dev_pm_attach(&client->dev, true);
-> > -	status =3D driver->probe(client, i2c_match_id(driver->id_table, client)=
-> );
-> > -	if (status)
-> > -		acpi_dev_pm_detach(&client->dev, true);
-> > +	status =3D dev_pm_domain_attach(&client->dev, true);
-> > +	if (status !=3D -EPROBE_DEFER) {
-> > +		status =3D driver->probe(client, i2c_match_id(driver->id_table,
-> > +					client));
-> 
-> Very minor: I think it is more readable to keep this in one line.
+If there are no more comments, I'll resend the series without messing
+with the numbering scheme.
 
-Agreed.
+Sebastian
 
-> > +		if (status)
-> > +			dev_pm_domain_detach(&client->dev, true);
-> > +	}
-> > =20
-> >  	return status;
-> >  }
-> > @@ -302,7 +305,7 @@ static int i2c_device_remove(struct device *dev)
-> >  		status =3D driver->remove(client);
-> >  	}
-> > =20
-> > -	acpi_dev_pm_detach(&client->dev, true);
-> > +	dev_pm_domain_detach(&client->dev, true);
-> >  	return status;
-> >  }
-> > =20
-> > --=20
-> > 1.9.1
-> >=20
+> ---
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 11 ++++-------
+>  arch/arm/boot/dts/armada-xp-db.dts               | 20 +++++++-------------
+>  arch/arm/boot/dts/armada-xp-gp.dts               | 11 ++++-------
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  8 +++-----
+>  arch/arm/boot/dts/armada-xp-matrix.dts           |  5 ++---
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 12 ++++++------
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 20 ++++++++++----------
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 22 +++++++++++-----------
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 11 ++++-------
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  5 ++---
+>  10 files changed, 53 insertions(+), 72 deletions(-)
 > 
-> --bAmEntskrkuBymla
-> Content-Type: application/pgp-signature; name="signature.asc"
-> Content-Description: Digital signature
-> 
-> -----BEGIN PGP SIGNATURE-----
-> Version: GnuPG v1
-> 
-> iQIcBAEBAgAGBQJUHXG2AAoJEBQN5MwUoCm2E7EP/1ykOCTRgrozlYwdbXxO9X8Z
-> b6ad23VambrSiQJTZcYheydiVW9qrXIsn8TQf1flWChXtkD06odQRy8tGN8Vw3MQ
-> MTdhyB19x1Z0TMkdmcrbhohsRchjsaeMgcpCNklW8ul8nASuDjY9KUdhVfUaY07q
-> O1zyZxrA5ykPCq/xP2gakHTTOrB6pj0zwOlDe4yQOd1hJcWrhX0/EBxY4DgvvQIr
-> o05w2rdr+s6qCCgV3WSY9EJ0JBOqNhvvGpGnpZe6tms8e1RmrEnSil3piBC1nhHP
-> LPeZr/ZHdoRbEgUPNnr/otLhufVeE5uMLu7FFhmZi3DTVXXVb+kMjE17C6XYc3mM
-> DIumY2ubMBInCIZDjFZa0BvwuodKqkWrG5cmgimDw8VywhDfmCXm7Q1immbKZ0rw
-> p9R4YHkBl5ii0KCyTSrf5M4+ksV80iplb4jmIwfmU0kKnOIan1fgkmyHXR/WN67M
-> d6sZUpMsuCUNTRj7Axe6LdKuuQe/EbO9GC66umjxtckJIesM/BSHHgGAGqnxQolQ
-> q/NnP2JBTVz6sSjoBRb+EMw5cri2Yb2M1Ak24nw+uoveiqBGGMuFFQGoHyV9UXVP
-> zA0MaUKKESiwO1RIaqhYe5lRwIwFSUktD5s/yYQqKbSF0zGAeRn79O+U2ei7xI9a
-> gv2ABkxPmYxBPoSf9y1B
-> =izqF
-> -----END PGP SIGNATURE-----
-> 
-> --bAmEntskrkuBymla--
-> 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index 0e53fad111de..1b2dd3a4000b 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -37,24 +37,21 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
+>  
+> -		pcie-controller {
+> +		pcie: pcie-controller {
+>  			status = "okay";
+>  
+>  			/* First mini-PCIe port */
+> -			pcie at 1,0 {
+> -				/* Port 0, Lane 0 */
+> +			pcie00: pcie at 0,0 {
+>  				status = "okay";
+>  			};
+>  
+>  			/* Second mini-PCIe port */
+> -			pcie at 2,0 {
+> -				/* Port 0, Lane 1 */
+> +			pcie01: pcie at 0,1 {
+>  				status = "okay";
+>  			};
+>  
+>  			/* Renesas uPD720202 USB 3.0 controller */
+> -			pcie at 3,0 {
+> -				/* Port 0, Lane 3 */
+> +			pcie03: pcie at 0,3 {
+>  				status = "okay";
+>  			};
+>  		};
+[...]
