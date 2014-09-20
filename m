@@ -1,59 +1,56 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 20 Sep 2014 22:23:00 +0200
-Subject: [PATCH] ARM: BCM5301X: select GPIOLIB as optional
-In-Reply-To: <1411244081.659348996@f383.i.mail.ru>
-References: <1411231282-7180-1-git-send-email-zajec5@gmail.com>
- <1411232446.828292358@f282.i.mail.ru>
- <CACna6rxHSWuu1ucgnsMX_7qkEfLkgzdfC6LV_NMc05kWodabKw@mail.gmail.com>
- <1411244081.659348996@f383.i.mail.ru>
-Message-ID: <CACna6rzf6mVVWHs=6diuCsAAdPsnDpfUL4z6Bv-WChSJC5N3Cg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 20 Sep 2014 22:28:55 +0200
+Subject: [GIT PULL] Allwinner drivers additions for 3.18
+Message-ID: <20140920202855.GA20329@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2014 22:14, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Sat, 20 Sep 2014 22:00:37 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
->> On 20 September 2014 19:00, Alexander Shiyan <shc_work@mail.ru> wrote:
->> > Sat, 20 Sep 2014 18:41:22 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
->> >> All routers (or 99% of them) based on BCM5301X use GPIOs to control LEDs
->> >> and buttons.
->> >>
->> >> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->> >> ---
->> >>  arch/arm/mach-bcm/Kconfig | 2 ++
->> >>  1 file changed, 2 insertions(+)
->> >>
->> >> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> >> index fc93800..d967c98 100644
->> >> --- a/arch/arm/mach-bcm/Kconfig
->> >> +++ b/arch/arm/mach-bcm/Kconfig
->> >> @@ -80,8 +80,10 @@ config ARCH_BCM2835
->> >>
->> >>  config ARCH_BCM_5301X
->> >>       bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->> >> +     select ARCH_WANT_OPTIONAL_GPIOLIB
->> >>       select ARM_GIC
->> >>       select CACHE_L2X0
->> >> +     select GPIOLIB
->> > ...
->> >
->> > GPIOLIB is selected automatically by ARCH_WANT_OPTIONAL_GPIOLIB.
->>
->> I don't think so, I believe selecting is done by ARCH_REQUIRE_GPIOLIB only.
->>
->> Reading drivers/gpio/Kconfig confuses me a bit. I believe I should
->> select ARCH_WANT_OPTIONAL_GPIOLIB, because the board can boot without
->> GPIOs, they are needed for LEDs and buttons only. Also most users will
->> want LEDs and buttons, so I "select GPIOLIB".
->
-> Yes, my bad :)
->
-> ARCH_REQUIRE_GPIOLIB selects GPIOLIB.
-> ARCH_WANT_OPTIONAL_GPIOLIB make GPIOLIB user selectable, so, in any
-> case you need to add ARCH_WANT_OPTIONAL_GPIOLIB only.
+Hi,
 
-So is there any way to make GPIOLIB optional (by using
-ARCH_WANT_OPTIONAL_GPIOLIB) and make it enabled by default? I wish
-GPIOLIB to be enabled by default as 99% users will want it.
+Please pull the following changes for the next merge window.
+
+Thanks!
+Maxime
+
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-3.18
+
+for you to fetch changes up to 64a1925c00706253aa887431fc45f96db48aa727:
+
+  rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc (2014-09-19 12:39:30 +0200)
+
+----------------------------------------------------------------
+Allwinner drivers additions for 3.18
+
+Nothing major, just handling the RTC driver changes needed for the A31/A23.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (2):
+      rtc: sun6i: Add sun6i RTC driver
+      rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc
+
+ .../devicetree/bindings/rtc/sun6i-rtc.txt          |  17 +
+ drivers/rtc/Kconfig                                |   9 +-
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-sun6i.c                            | 447 +++++++++++++++++++++
+ 4 files changed, 473 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+ create mode 100644 drivers/rtc/rtc-sun6i.c
 
 -- 
-Rafa?
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/341e63c3/attachment.sig>
