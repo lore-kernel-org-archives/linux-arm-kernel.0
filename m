@@ -1,62 +1,89 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sun, 21 Sep 2014 00:30:22 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBCQ001MzAxWDogc2VsZWN0IEdQSU9MSUIgYXMg?=
- =?UTF-8?B?b3B0aW9uYWw=?=
-In-Reply-To: <CACna6rzf6mVVWHs=6diuCsAAdPsnDpfUL4z6Bv-WChSJC5N3Cg@mail.gmail.com>
-References: <1411231282-7180-1-git-send-email-zajec5@gmail.com>
- <1411244081.659348996@f383.i.mail.ru>
- <CACna6rzf6mVVWHs=6diuCsAAdPsnDpfUL4z6Bv-WChSJC5N3Cg@mail.gmail.com>
-Message-ID: <1411245022.509392841@f140.i.mail.ru>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Sat, 20 Sep 2014 20:35:08 +0000
+Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
+ <6499926.sQm3J8L764@wuerfel> <20140904091319.GA32228@leverpostej>
+ <3563146.jh46O3eIbG@wuerfel>
+Message-ID: <55b3149b2264460abaa5b4c07fb19b09@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sat, 20 Sep 2014 22:23:00 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
-> On 20 September 2014 22:14, Alexander Shiyan <shc_work@mail.ru> wrote:
-> > Sat, 20 Sep 2014 22:00:37 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
-> >> On 20 September 2014 19:00, Alexander Shiyan <shc_work@mail.ru> wrote:
-> >> > Sat, 20 Sep 2014 18:41:22 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
-> >> >> All routers (or 99% of them) based on BCM5301X use GPIOs to control LEDs
-> >> >> and buttons.
-> >> >>
-> >> >> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> >> >> ---
-> >> >>  arch/arm/mach-bcm/Kconfig | 2 ++
-> >> >>  1 file changed, 2 insertions(+)
-> >> >>
-> >> >> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> >> >> index fc93800..d967c98 100644
-> >> >> --- a/arch/arm/mach-bcm/Kconfig
-> >> >> +++ b/arch/arm/mach-bcm/Kconfig
-> >> >> @@ -80,8 +80,10 @@ config ARCH_BCM2835
-> >> >>
-> >> >>  config ARCH_BCM_5301X
-> >> >>       bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
-> >> >> +     select ARCH_WANT_OPTIONAL_GPIOLIB
-> >> >>       select ARM_GIC
-> >> >>       select CACHE_L2X0
-> >> >> +     select GPIOLIB
-> >> > ...
-> >> >
-> >> > GPIOLIB is selected automatically by ARCH_WANT_OPTIONAL_GPIOLIB.
-> >>
-> >> I don't think so, I believe selecting is done by ARCH_REQUIRE_GPIOLIB only.
-> >>
-> >> Reading drivers/gpio/Kconfig confuses me a bit. I believe I should
-> >> select ARCH_WANT_OPTIONAL_GPIOLIB, because the board can boot without
-> >> GPIOs, they are needed for LEDs and buttons only. Also most users will
-> >> want LEDs and buttons, so I "select GPIOLIB".
-> >
-> > Yes, my bad :)
-> >
-> > ARCH_REQUIRE_GPIOLIB selects GPIOLIB.
-> > ARCH_WANT_OPTIONAL_GPIOLIB make GPIOLIB user selectable, so, in any
-> > case you need to add ARCH_WANT_OPTIONAL_GPIOLIB only.
+Ping?
+
+> -----Original Message-----
+> From: Sharma Bhupesh-B45370
+> Sent: Tuesday, September 09, 2014 5:16 PM
+> To: 'Arnd Bergmann'; Mark Rutland
+> Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org; Catalin
+> Marinas; Will Deacon; Yoder Stuart-B08248; grant.likely at secretlab.ca;
+> Marc Zyngier; Basu Arnab-B45036; Geoff Levand
+> Subject: RE: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
 > 
-> So is there any way to make GPIOLIB optional (by using
-> ARCH_WANT_OPTIONAL_GPIOLIB) and make it enabled by default? I wish
-> GPIOLIB to be enabled by default as 99% users will want it.
-
-Not so elegant, but you can select GPIOLIB for particular boards, which contain GPIO
-functionality. I add Linus Walleij to CC for possible comments on this.
-
----
+> Hi Mark, Arnd
+> 
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Thursday, September 04, 2014 3:09 PM
+> > To: Mark Rutland
+> > Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org;
+> > Sharma Bhupesh-B45370; Catalin Marinas; Will Deacon; Yoder
+> > Stuart-B08248; grant.likely at secretlab.ca; Marc Zyngier; Basu
+> > Arnab-B45036; Geoff Levand
+> > Subject: Re: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+> >
+> > On Thursday 04 September 2014 10:13:19 Mark Rutland wrote:
+> > > On Wed, Sep 03, 2014 at 07:31:44PM +0100, Arnd Bergmann wrote:
+> > > > On Wednesday 03 September 2014 17:31:30 Mark Rutland wrote:
+> > > > >
+> > > > > However, I'm not sure I follow the reasoning for making this
+> > > > > significantly harder, and even ignoring that I don't think this
+> > > > > does make things significantly harder. Especially so if we have
+> > > > > a PSCI node but not an enable method -- in that case its trivial
+> > > > > to patch in an unrelated enable-method anyhow.
+> > > >
+> > > > Right, it's not actually much harder. A better way to look at it
+> > > > is probably that we document what which parts we expect to stay
+> > > > constant and which parts are to be filled out by the boot loader.
+> > > > Independent of what PSCI implementation the boot loader provides,
+> > > > we would like to see enable-method="psci".
+> > >
+> > > So in the /cpus node, have a comment like:
+> > >
+> > > /*
+> > >  * We expect the enable-method to be "psci", but this is dependent
+> > > on
+> > >  * the FW, which will fill this in.
+> > >  */
+> >
+> > I was thinking of leaving the enable-method in the cpus node, but
+> > having an empty psci node with a similar comment.
+> >
+> > > Or, should we put together a soc-guidance.txt with that, ensuring
+> > > things are initialised correctly (CNTVOFF, CNTFREQ), etc?
+> >
+> > I would very much welcome documentation like that!
+> 
+> Is this documentation planned (already being worked upon), or should I
+> try to spin-out a RFC patch which tries to add this guidance
+> documentation.
+> 
+> Regards,
+> Bhupesh
+> 
+> >
+> > > > I just saw that Geoff had a related comment, and documenting this
+> > > > would make it clearer to other reviewers, as well as people that
+> > > > happen to look at this file as a base for new platforms.
+> > >
+> > > I agree that having something to point people in the right direction
+> > > is a good idea. The only point I disagree with is putitng something
+> > > in the DT that can be trivially made false (and possibly with good
+> > reason).
+> > >
+> > > I'm happy with having comments.
+> >
+> > Right, but I see no good reason for having something else in the
+> > enable- method, the only way I can see why that would be done is for
+> > the boot loader or firmware implementer to be misinformed.
+> >
+> > 	Arnd
