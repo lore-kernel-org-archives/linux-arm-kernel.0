@@ -1,164 +1,82 @@
-From: wanghaibin.wang@huawei.com (wanghaibin)
-Date: Sat, 20 Sep 2014 09:15:40 +0800
-Subject: [PATCH v2 15/15] arm/arm64: KVM: allow userland to request a
- virtual GICv3
-In-Reply-To: <1408626416-11326-16-git-send-email-andre.przywara@arm.com>
-References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
- <1408626416-11326-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <541CD53C.5050109@huawei.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 19 Sep 2014 18:50:12 -0700
+Subject: [PATCH] ARM: dts: Add initial DTS file for Sony Xperia Z1 phone
+In-Reply-To: <5418C471.9000807@sonymobile.com>
+References: <5418C1D2.4000303@sonymobile.com>
+ <27E278AA-EBC0-4368-B75C-DCB2DD906612@codeaurora.org>
+ <5418C471.9000807@sonymobile.com>
+Message-ID: <541CDD54.3020203@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/8/21 21:06, Andre Przywara wrote:
-
-> With everything in place we allow userland to request the kernel
-> using a virtual GICv3 in the guest, which finally lifts the 8 vCPU
-> limit for a guest.
-> Also we provide the necessary support for guests setting the memory
-> addresses for the virtual distributor and redistributors.
-> This requires some userland code to make use of that feature and
-> explicitly ask for a virtual GICv3.
+On 9/16/2014 4:14 PM, Tim Bird wrote:
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/include/uapi/asm/kvm.h |    7 ++++++
->  include/kvm/arm_vgic.h            |    4 ++--
->  virt/kvm/arm/vgic-v3-emul.c       |    3 +++
->  virt/kvm/arm/vgic.c               |   46 ++++++++++++++++++++++++++-----------
->  4 files changed, 45 insertions(+), 15 deletions(-)
 > 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 5513de4..9a62081 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -77,6 +77,13 @@ struct kvm_regs {
->  #define KVM_VGIC_V2_DIST_SIZE		0x1000
->  #define KVM_VGIC_V2_CPU_SIZE		0x2000
->  
-> +/* Supported VGICv3 address types  */
-> +#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
-> +#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
-> +
-> +#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
-> +#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
-> +
->  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
->  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
->  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 3b164ee..82e00a5 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -35,8 +35,8 @@
->  #define VGIC_MAX_IRQS		1024
->  
->  /* Sanity checks... */
-> -#if (KVM_MAX_VCPUS > 8)
-> -#error	Invalid number of CPU interfaces
-> +#if (KVM_MAX_VCPUS > 255)
-> +#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
->  #endif
->  
->  #if (VGIC_NR_IRQS_LEGACY & 31)
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index ac5c5ee..d4d9fe4 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -874,6 +874,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->  		case KVM_VGIC_V2_ADDR_TYPE_DIST:
->  		case KVM_VGIC_V2_ADDR_TYPE_CPU:
->  			return -ENXIO;
-> +		case KVM_VGIC_V3_ADDR_TYPE_DIST:
-> +		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-> +			return 0;
->  		}
->  		break;
->  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index b1bcb6d..f13ab4e 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1567,7 +1567,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
->  /**
->   * kvm_vgic_addr - set or get vgic VM base addresses
->   * @kvm:   pointer to the vm struct
-> - * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
-> + * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
->   * @addr:  pointer to address value
->   * @write: if true set the address in the VM address space, if false read the
->   *          address
-> @@ -1581,29 +1581,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
->  {
->  	int r = 0;
->  	struct vgic_dist *vgic = &kvm->arch.vgic;
-> +	int type_needed;
-> +	phys_addr_t *addr_ptr, block_size;
->  
->  	mutex_lock(&kvm->lock);
->  	switch (type) {
->  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-> -		if (write) {
-> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
-> -					       *addr, KVM_VGIC_V2_DIST_SIZE);
-> -		} else {
-> -			*addr = vgic->vgic_dist_base;
-> -		}
-> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-> +		addr_ptr = &vgic->vgic_dist_base;
-> +		block_size = KVM_VGIC_V2_DIST_SIZE;
->  		break;
->  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-> -		if (write) {
-> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
-> -					       *addr, KVM_VGIC_V2_CPU_SIZE);
-> -		} else {
-> -			*addr = vgic->vgic_cpu_base;
-> -		}
-> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-> +		addr_ptr = &vgic->vgic_cpu_base;
-> +		block_size = KVM_VGIC_V2_CPU_SIZE;
->  		break;
-> +#ifdef CONFIG_ARM_GIC_V3
-> +	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-> +		addr_ptr = &vgic->vgic_dist_base;
-> +		block_size = KVM_VGIC_V3_DIST_SIZE;
-> +		break;
-> +	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> On 09/16/2014 04:08 PM, Kumar Gala wrote:
+>>
+>> On Sep 16, 2014, at 4:03 PM, Tim Bird <tim.bird@sonymobile.com> wrote:
+>>
+>>> This DTS has initial support for just a serial console, for the
+>>> Sony Xperia Z1 phone.  This phone uses a QualComm 8074 processor.
+>>>
+>>
+>> Qualcomm, the C isn?t caps.
+> 
+> Will fix.
+>>
+>>> Signed-off-by: Tim Bird <tim.bird@sonymobile.com>
+>>> ---
+>>> arch/arm/boot/dts/Makefile                   |    1 +
+>>> arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts |   18 ++++++++++++++++++
+>>> 2 files changed, 19 insertions(+)
+>>> create mode 100644 arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index b8c5cd3..680ce7e 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -341,6 +341,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+>>> dtb-$(CONFIG_ARCH_QCOM) += \
+>>> 	qcom-apq8064-ifc6410.dtb \
+>>> 	qcom-apq8074-dragonboard.dtb \
+>>> +	qcom-apq8074-xperia-z1.dtb \
+>>> 	qcom-apq8084-mtp.dtb \
+>>> 	qcom-msm8660-surf.dtb \
+>>> 	qcom-msm8960-cdp.dtb
+>>> diff --git a/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts b/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
+>>> new file mode 100644
+>>> index 0000000..59b3fa1
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/qcom-apq8074-xperia-z1.dts
+>>> @@ -0,0 +1,18 @@
+>>> +#include "qcom-msm8974.dtsi"
+>>> +
+>>> +/ {
+>>> +	model = "Sony Xperia Z1 phone";
+>>> +	compatible = "qcom,msm8974?;
+>>
+>> Should have a board compat as well
+
+Also need to add the board compat string, and "qcom,msm8974? to the list of
+strings in arch/arm/mach-qcom/board.c: qcom_dt_match[].
 
 
-Hi, Andre, here is the redist region base address, is it?
-So, I think the block_size should be (online_vcpus * KVM_VGIC_V3_REDIST_SIZE).
-
-> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-> +		addr_ptr = &vgic->vgic_redist_base;
-> +		block_size = KVM_VGIC_V3_REDIST_SIZE;
-> +		break;
-> +#endif
->  	default:
->  		r = -ENODEV;
-> +		goto out;
->  	}
->  
-> +	if (vgic->vgic_model != type_needed) {
-> +		r = -ENODEV;
-> +		goto out;
-> +	}
-> +
-
-
-Here, call vgic_ioaddr_assign func to assign redist region base address may be wrong...
-In this func, it will check the GICD and GICC assign base address is overlap each other or not,
-and, there is not the GICR check action.
-
-Thanks!
-
-> +	if (write)
-> +		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
-> +	else
-> +		*addr = *addr_ptr;
-> +
-> +out:
->  	mutex_unlock(&kvm->lock);
->  	return r;
->  }
+> I'll ask Bjorn what we want to do here.  There was a compat that I stripped,
+> but I'm not sure we settled on the official name we want.  In any event,
+> will fix.
+>>
+>>> +	qcom,msm-id = <126 8 0>, <185 8 0>, <186 8 0>;
+>>
+>> We don?t have qcom,msm-id upstream at this time.
+> Do I just leave this out, then?
+> 
+> Thanks.
+>  -- Tim
+> 
+> P.S. By now you probably noticed I mis-typed device-tree at vger.kernel.org.  I'll fix that also.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> .
+> 
