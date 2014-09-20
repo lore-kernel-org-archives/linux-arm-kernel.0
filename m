@@ -1,52 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 20 Sep 2014 09:10:33 -0700
-Subject: [PATCH v3 1/4] ARM: docs: add documentation binding for meson
- watchdog
-In-Reply-To: <CAOQ7t2bBA3kW59z++Ewjch9+iTTzf7f0kE_9sytgLGqDAq3COQ@mail.gmail.com>
-References: <1411158989-8075-1-git-send-email-carlo@caione.org>	<1411158989-8075-2-git-send-email-carlo@caione.org>	<541D9D20.6080503@roeck-us.net>
- <CAOQ7t2bBA3kW59z++Ewjch9+iTTzf7f0kE_9sytgLGqDAq3COQ@mail.gmail.com>
-Message-ID: <541DA6F9.8070601@roeck-us.net>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 20 Sep 2014 18:13:45 +0200
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <20140903184956.11368.47800@quantum> (Mike Turquette's message of
+ "Wed, 03 Sep 2014 11:49:56 -0700")
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <1465795.XsPpj3dZHX@wuerfel> <87d2bq43pc.fsf@free.fr>
+ <201408241408.19861.arnd@arndb.de>
+ <20140903184956.11368.47800@quantum>
+Message-ID: <874mw2xoau.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2014 09:08 AM, Carlo Caione wrote:
-> On Sat, Sep 20, 2014 at 5:28 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 09/19/2014 01:36 PM, Carlo Caione wrote:
->>>
->>> Signed-off-by: Carlo Caione <carlo@caione.org>
->>> ---
->>>    Documentation/devicetree/bindings/watchdog/meson6-wdt.txt | 13
->>> +++++++++++++
->>>    1 file changed, 13 insertions(+)
->>>    create mode 100644
->>> Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
->>> b/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
->>> new file mode 100644
->>> index 0000000..9200fc2
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
->>> @@ -0,0 +1,13 @@
->>> +Meson SoCs Watchdog timer
->>> +
->>> +Required properties:
->>> +
->>> +- compatible : should be "amlogic,meson6-wdt"
->>> +- reg : Specifies base physical address and size of the registers.
->>> +
->>
->>
->> The 'amlogic' vendor prefix is undefined.
->> It will have to be added to
->> Documentation/devicetree/bindings/vendor-prefixes.txt.
->
-> As stated in the cover, this patchset depends on
-> http://www.spinics.net/lists/arm-kernel/msg362521.html where the
-> vendor-prefixes.txt is updated.
-> Probably I should ping it.
->
-Ah, sorry, I missed that.
+Mike Turquette <mturquette@linaro.org> writes:
 
-Thanks,
-Guenter
+> Quoting Arnd Bergmann (2014-08-24 05:08:19)
+>> On Sunday 24 August 2014, Robert Jarzmik wrote:
+>> > > By default, I'd expect Haojian to pick up the patches and send
+>> > > us a pull request. He sent an Ack, but also didn't make it clear
+>> > > that we should pick them up.
+>> > I was thinking that they would go through the clk maintainers, hence Haojian's
+>> > ack. If they should go through arm-soc, they would need Mike's ack.
+>
+> Robert,
+>
+> I'm happy to take the patches but they will need to be rebased onto
+> clk-next and refactored to take into account Tomeu's api split[0].
+
+Hi Mike,
+
+I have had a look at clk-next and Tomeu's split.
+My current understanding is that Tomeu's patches don't apply on your clk-next,
+as I get conflicts.
+
+So either I rebase my patches on top of Tomeu's tree (as this is what will drive
+most of the rebase work AFAIU), or I wait for Tomeu's tree to be merged into
+your clk-next. Is there any chance Tomeu's work ends up in your clk-next tree
+soon ?
+
+Cheers.
+
+-- 
+Robert
