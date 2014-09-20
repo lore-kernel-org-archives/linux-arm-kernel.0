@@ -1,104 +1,105 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Sat, 20 Sep 2014 18:11:04 +0530
-Subject: [PATCH] tty/serial: samsung: Add earlycon support
-In-Reply-To: <1410867163-27962-1-git-send-email-alim.akhtar@samsung.com>
-References: <1410867163-27962-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CAGOxZ535gC4cqogQrpgbjqf4qU1NrhJD7oNnReu8OwzjcWTkqg@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 20 Sep 2014 15:02:05 +0200
+Subject: [PATCH v3 2/2] bcma: get IRQ numbers from dt
+In-Reply-To: <1411218125-32670-1-git-send-email-hauke@hauke-m.de>
+References: <1411218125-32670-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1411218125-32670-2-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just realized that linux-arm-kernel email-id was wrongly typed.
+It is not possible to auto detect the irq numbers used by the cores on
+an arm SoC. If bcma was registered with device tree it will search for
+some device tree nodes with the irq number and add it to the core
+configuration.
 
-CCing the correct linux-arm-kernel email-id now.
-
-Sorry for the noise.
-
-
-On Tue, Sep 16, 2014 at 5:02 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> Add earlycon support for the samsung serial port. This allows enabling
-> the samsung serial port for console when early_params are parse and processed.
->
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  Documentation/kernel-parameters.txt |    6 ++++++
->  drivers/tty/serial/Kconfig          |    1 +
->  drivers/tty/serial/samsung.c        |   17 +++++++++++++++++
->  3 files changed, 24 insertions(+)
->
-> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-> index 5ae8608..e01c0e5 100644
-> --- a/Documentation/kernel-parameters.txt
-> +++ b/Documentation/kernel-parameters.txt
-> @@ -936,6 +936,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->                         must already be setup and configured. Options are not
->                         yet supported.
->
-> +               samsung,<addr>
-> +                       Start an early, polled-mode console on a samsung serial
-> +                       port at the specified address. The samsung serial port
-> +                       must already be setup and configured. Options are not
-> +                       yet supported.
-> +
->                 smh     Use ARM semihosting calls for early console.
->
->         earlyprintk=    [X86,SH,BLACKFIN,ARM,M68k]
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 249e340..9d42ac8 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -257,6 +257,7 @@ config SERIAL_SAMSUNG_CONSOLE
->         bool "Support for console on Samsung SoC serial port"
->         depends on SERIAL_SAMSUNG=y
->         select SERIAL_CORE_CONSOLE
-> +       select SERIAL_EARLYCON
->         help
->           Allow selection of the S3C24XX on-board serial ports for use as
->           an virtual console.
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index c78f43a..f32e9c8 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -917,6 +917,7 @@ s3c24xx_serial_verify_port(struct uart_port *port, struct serial_struct *ser)
->  #ifdef CONFIG_SERIAL_SAMSUNG_CONSOLE
->
->  static struct console s3c24xx_serial_console;
-> +static void s3c24xx_serial_console_putchar(struct uart_port *port, int ch);
->
->  static int __init s3c24xx_serial_console_init(void)
->  {
-> @@ -926,6 +927,22 @@ static int __init s3c24xx_serial_console_init(void)
->  console_initcall(s3c24xx_serial_console_init);
->
->  #define S3C24XX_SERIAL_CONSOLE &s3c24xx_serial_console
-> +static void samsung_early_write(struct console *con, const char *s, unsigned n)
-> +{
-> +       struct earlycon_device *dev = con->data;
-> +
-> +       uart_console_write(&dev->port, s, n, s3c24xx_serial_console_putchar);
-> +}
-> +
-> +static int __init samsung_early_console_setup(struct earlycon_device *device,
-> +                                             const char *opt)
-> +{
-> +       if (!device->port.membase)
-> +               return -ENODEV;
-> +       device->con->write = samsung_early_write;
-> +       return 0;
-> +}
-> +EARLYCON_DECLARE(samsung, samsung_early_console_setup);
->  #else
->  #define S3C24XX_SERIAL_CONSOLE NULL
->  #endif
-> --
-> 1.7.10.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ drivers/bcma/main.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 1 deletion(-)
 
 
+This is based on wireless-testing and should go into that tree.
 
+changes since:
+v2:
+ - use of_translate_address() to support ranges
+
+RFC:
+ - add #ifdef CONFIG_OF
+ 
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index 19ef685..5e7a3d4 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -10,6 +10,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/bcma/bcma.h>
+ #include <linux/slab.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
+ 
+ MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
+ MODULE_LICENSE("GPL");
+@@ -131,6 +133,45 @@ static bool bcma_is_core_needed_early(u16 core_id)
+ 	return false;
+ }
+ 
++#ifdef CONFIG_OF
++static struct device_node *bcma_of_find_child_device(struct platform_device *parent,
++						     struct bcma_device *core)
++{
++	struct device_node *node;
++	u64 size;
++	const __be32 *reg;
++
++	if (!parent || !parent->dev.of_node)
++		return NULL;
++
++	for_each_child_of_node(parent->dev.of_node, node) {
++		reg = of_get_address(node, 0, &size, NULL);
++		if (!reg)
++			continue;
++		if (of_translate_address(node, reg) == core->addr)
++			return node;
++	}
++	return NULL;
++}
++
++static void bcma_of_fill_device(struct platform_device *parent,
++				struct bcma_device *core)
++{
++	struct device_node *node;
++
++	node = bcma_of_find_child_device(parent, core);
++	if (!node)
++		return;
++	core->dev.of_node = node;
++	core->irq = irq_of_parse_and_map(node, 0);
++}
++#else
++static void bcma_of_fill_device(struct platform_device *parent,
++				struct bcma_device *core)
++{
++}
++#endif /* CONFIG_OF */
++
+ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
+ {
+ 	int err;
+@@ -147,7 +188,13 @@ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
+ 		break;
+ 	case BCMA_HOSTTYPE_SOC:
+ 		core->dev.dma_mask = &core->dev.coherent_dma_mask;
+-		core->dma_dev = &core->dev;
++		if (bus->host_pdev) {
++			core->dma_dev = &bus->host_pdev->dev;
++			core->dev.parent = &bus->host_pdev->dev;
++			bcma_of_fill_device(bus->host_pdev, core);
++		} else {
++			core->dma_dev = &core->dev;
++		}
+ 		break;
+ 	case BCMA_HOSTTYPE_SDIO:
+ 		break;
 -- 
-Regards,
-Alim
+1.9.1
