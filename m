@@ -1,75 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 19 Sep 2014 17:14:06 -0700
-Subject: [PATCH v10 0/6] Add Maxim 77802 RTC support
-In-Reply-To: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1411122377-10426-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=VHVWVtgOoB83cJ9XKAcyBmHwSawh2EWEZViqcQrTpQjA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 19 Sep 2014 19:28:38 -0500
+Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host bridge
+ resources from DT
+In-Reply-To: <20140919210610.GI19374@google.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140919210610.GI19374@google.com>
+Message-ID: <541CCA36.8010606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On 09/19/2014 04:06 PM, Bjorn Helgaas wrote:
+> On Thu, Sep 18, 2014 at 02:30:23AM +0100, Liviu Dudau wrote:
+>> Provide a function to parse the PCI DT ranges that can be used to
+>> create a pci_host_bridge structure together with its associated
+>> bus.
+>>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> ---
 
-On Fri, Sep 19, 2014 at 3:26 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Andrew,
->
-> This series add support for the Real Time clock present in
-> the Maxim 77802 Power Managment IC. The version number is
-> quite high because it previously was part of a bigger series
-> [0] that aimed to add support for all the devices in the
-> max77802 PMIC. But now that the max77802 dependencies were
-> already merged for 3.17, the series were split but I kept
-> the version numbering.
->
-> While working on the max77802 rtc support a lot of feedback
-> was given and the issues pointed out also apply to a driver
-> for a similar PMIC RTC (max77686). So patches 01/06 to 05/06
-> in the series are cleanups for the max77686 driver and patch
-> 06/06 adds the support for the max77802 RTC.
->
-> This version address the issues pointed out on the previous
-> version [1] and changelog are present on each patch when is
-> applicable.
->
-> The series were tested on an Exynos5250 Snow (max77686) and
-> Exynos5420 Peach Pit (max77802) machines and applies cleanly
-> to both 3.17-rc1 and today's linux-next (20140919).
->
-> NOTE: The patches from the previous version [1] were already
-> present in the -mm tree [2] so I didn't know if I should had
-> sent this as a delta or as a new revision. I decided to do
-> the later but please let me know if you expected the former.
+[...]
 
-My records show that Andrew has already accepted most of these.  They
-may not show up in linuxnext yet, but that doesn't mean Andrew hasn't
-taken them (I think).
+>> +int of_pci_get_host_bridge_resources(struct device_node *dev,
+>> +			unsigned char busno, unsigned char bus_max,
+>> +			struct list_head *resources, resource_size_t *io_base)
+>> +{
+>> +	struct resource *res;
+>> +	struct resource *bus_range;
+>> +	struct of_pci_range range;
+>> +	struct of_pci_range_parser parser;
+>> +	char range_type[4];
+>> +	int err;
+>> +
+>> +	if (!io_base)
+>> +		return -EINVAL;
+>> +	*io_base = OF_BAD_ADDR;
+>> +
+>> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
 
+This function does a lot of kalloc's but there is not an easy way to
+undo those allocations. Hot unplug of a host bridge or probe error
+handling would leak memory.
 
-> Doug Anderson (1):
->   rtc: max77686: Allow the max77686 rtc to wakeup the system
+You could pass in struct device and use the devm_ variant (also
+addressing Bjorn's comment), but not having an uninit/remove function
+make what clean-up drivers have to do error prone. For example, on
+uninit a driver needs to call pci_free_resource_list.
 
-    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-allow-the-max77686-rtc-to-wakeup-the-system.patch
-
-> Javier Martinez Canillas (5):
->   rtc: max77686: Remove dead code for SMPL and WTSR.
-
-    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-remove-dead-code-for-smpl-and-wtsr.patch
-
->   rtc: max77686: Fail to probe if no RTC regmap irqchip is set
-
-    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-fail-to-probe-if-no-rtc-regmap-irqchip-is-set.patch
-
->   rtc: max77686: Remove unneded info log
-
-    http://ozlabs.org/~akpm/mmots/broken-out/rtc-max77686-remove-unneded-info-log.patch
-
->   rtc: max77686: Use ffs() to calculate tm_wday
-
-This one hasn't been accepted...
-
->   rtc: Add driver for Maxim 77802 PMIC Real-Time-Clock
-
-    http://ozlabs.org/~akpm/mmots/broken-out/rtc-add-driver-for-maxim-77802-pmic-real-time-clock.patch
-
-
--Doug
+Rob
