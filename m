@@ -1,73 +1,104 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 20 Sep 2014 14:23:19 +0200
-Subject: [PATCH v5 06/11] i2c: core: Convert to
- dev_pm_domain_attach|detach()
-In-Reply-To: <1411151264-16245-7-git-send-email-ulf.hansson@linaro.org>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <1411151264-16245-7-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140920122318.GC3850@katana>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Sat, 20 Sep 2014 18:11:04 +0530
+Subject: [PATCH] tty/serial: samsung: Add earlycon support
+In-Reply-To: <1410867163-27962-1-git-send-email-alim.akhtar@samsung.com>
+References: <1410867163-27962-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CAGOxZ535gC4cqogQrpgbjqf4qU1NrhJD7oNnReu8OwzjcWTkqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 08:27:39PM +0200, Ulf Hansson wrote:
-> Previously only the ACPI PM domain was supported by the i2c bus.
-> 
-> Let's convert to the common attach/detach functions for PM domains,
-> which currently means we are extending the support to include the
-> generic PM domain as well.
-> 
-> Cc: linux-i2c at vger.kernel.org
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Just realized that linux-arm-kernel email-id was wrongly typed.
 
-Looks good to me, but I'd like to give Mika a chance to look at it,
-since he does ACPI with I2C. Adding to CC.
+CCing the correct linux-arm-kernel email-id now.
 
+Sorry for the noise.
+
+
+On Tue, Sep 16, 2014 at 5:02 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+> Add earlycon support for the samsung serial port. This allows enabling
+> the samsung serial port for console when early_params are parse and processed.
+>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
 > ---
->  drivers/i2c/i2c-core.c | 13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 632057a..3cd8f11 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -279,10 +279,13 @@ static int i2c_device_probe(struct device *dev)
->  	if (status < 0)
->  		return status;
->  
-> -	acpi_dev_pm_attach(&client->dev, true);
-> -	status = driver->probe(client, i2c_match_id(driver->id_table, client));
-> -	if (status)
-> -		acpi_dev_pm_detach(&client->dev, true);
-> +	status = dev_pm_domain_attach(&client->dev, true);
-> +	if (status != -EPROBE_DEFER) {
-> +		status = driver->probe(client, i2c_match_id(driver->id_table,
-> +					client));
+>  Documentation/kernel-parameters.txt |    6 ++++++
+>  drivers/tty/serial/Kconfig          |    1 +
+>  drivers/tty/serial/samsung.c        |   17 +++++++++++++++++
+>  3 files changed, 24 insertions(+)
+>
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 5ae8608..e01c0e5 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -936,6 +936,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>                         must already be setup and configured. Options are not
+>                         yet supported.
+>
+> +               samsung,<addr>
+> +                       Start an early, polled-mode console on a samsung serial
+> +                       port at the specified address. The samsung serial port
+> +                       must already be setup and configured. Options are not
+> +                       yet supported.
+> +
+>                 smh     Use ARM semihosting calls for early console.
+>
+>         earlyprintk=    [X86,SH,BLACKFIN,ARM,M68k]
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 249e340..9d42ac8 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -257,6 +257,7 @@ config SERIAL_SAMSUNG_CONSOLE
+>         bool "Support for console on Samsung SoC serial port"
+>         depends on SERIAL_SAMSUNG=y
+>         select SERIAL_CORE_CONSOLE
+> +       select SERIAL_EARLYCON
+>         help
+>           Allow selection of the S3C24XX on-board serial ports for use as
+>           an virtual console.
+> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> index c78f43a..f32e9c8 100644
+> --- a/drivers/tty/serial/samsung.c
+> +++ b/drivers/tty/serial/samsung.c
+> @@ -917,6 +917,7 @@ s3c24xx_serial_verify_port(struct uart_port *port, struct serial_struct *ser)
+>  #ifdef CONFIG_SERIAL_SAMSUNG_CONSOLE
+>
+>  static struct console s3c24xx_serial_console;
+> +static void s3c24xx_serial_console_putchar(struct uart_port *port, int ch);
+>
+>  static int __init s3c24xx_serial_console_init(void)
+>  {
+> @@ -926,6 +927,22 @@ static int __init s3c24xx_serial_console_init(void)
+>  console_initcall(s3c24xx_serial_console_init);
+>
+>  #define S3C24XX_SERIAL_CONSOLE &s3c24xx_serial_console
+> +static void samsung_early_write(struct console *con, const char *s, unsigned n)
+> +{
+> +       struct earlycon_device *dev = con->data;
+> +
+> +       uart_console_write(&dev->port, s, n, s3c24xx_serial_console_putchar);
+> +}
+> +
+> +static int __init samsung_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       if (!device->port.membase)
+> +               return -ENODEV;
+> +       device->con->write = samsung_early_write;
+> +       return 0;
+> +}
+> +EARLYCON_DECLARE(samsung, samsung_early_console_setup);
+>  #else
+>  #define S3C24XX_SERIAL_CONSOLE NULL
+>  #endif
+> --
+> 1.7.10.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Very minor: I think it is more readable to keep this in one line.
 
-> +		if (status)
-> +			dev_pm_domain_detach(&client->dev, true);
-> +	}
->  
->  	return status;
->  }
-> @@ -302,7 +305,7 @@ static int i2c_device_remove(struct device *dev)
->  		status = driver->remove(client);
->  	}
->  
-> -	acpi_dev_pm_detach(&client->dev, true);
-> +	dev_pm_domain_detach(&client->dev, true);
->  	return status;
->  }
->  
-> -- 
-> 1.9.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/d5eb39c5/attachment.sig>
+
+-- 
+Regards,
+Alim
