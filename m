@@ -1,30 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 20 Sep 2014 12:39:33 +0200
-Subject: [PATCH v2 3/3] ARM: dts: sun8i: Add DMA controller node
-In-Reply-To: <1411010680-4481-4-git-send-email-wens@csie.org>
-References: <1411010680-4481-1-git-send-email-wens@csie.org>
- <1411010680-4481-4-git-send-email-wens@csie.org>
-Message-ID: <20140920103933.GS2166@lukather>
+From: penguin-kernel@I-love.SAKURA.ne.jp (Tetsuo Handa)
+Date: Sat, 20 Sep 2014 19:40:30 +0900
+Subject: [PATCH 3.17-rc5] Fix confusing PFA_NO_NEW_PRIVS constant.
+In-Reply-To: <541D16EA.70407@huawei.com>
+References: <201409192053.IHJ35462.JLOMOSOFFVtQFH@I-love.SAKURA.ne.jp>
+ <541D16EA.70407@huawei.com>
+Message-ID: <201409201940.AHG21834.LJOFFHSFQOtVMO@I-love.SAKURA.ne.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 11:24:40AM +0800, Chen-Yu Tsai wrote:
-> Add the DMA controller node and DMA bindings to the supported devices.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Can you apply below patch before new PFA_* are defined?
+Cgroups code might want to define PFA_SPREAD_PAGE as 1 and PFA_SPREAD_SLAB as 2.
+----------------------------------------
+>From 8543e68adb210142fa347d8bc9d83df0bb2c5291 Mon Sep 17 00:00:00 2001
+From: Tetsuo Handa <penguin-kernel@I-love.SAKURA.ne.jp>
+Date: Sat, 20 Sep 2014 19:24:23 +0900
+Subject: [PATCH 3.17-rc5] Fix confusing PFA_NO_NEW_PRIVS constant.
 
-Applied, thanks!
+Commit 1d4457f99928 ("sched: move no_new_privs into new atomic flags")
+defined PFA_NO_NEW_PRIVS as hexadecimal value, but it is confusing
+because it is used as bit number. Redefine it as decimal bit number.
 
-Maxime
+Signed-off-by: Tetsuo Handa <penguin-kernel@I-love.SAKURA.ne.jp>
+---
+ include/linux/sched.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 5c2c885..4557765 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1957,7 +1957,7 @@ static inline void memalloc_noio_restore(unsigned int flags)
+ }
+ 
+ /* Per-process atomic flags. */
+-#define PFA_NO_NEW_PRIVS 0x00000001	/* May not gain new privileges. */
++#define PFA_NO_NEW_PRIVS 0	/* May not gain new privileges. */
+ 
+ static inline bool task_no_new_privs(struct task_struct *p)
+ {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/05d3cc2b/attachment.sig>
+1.7.1
