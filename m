@@ -1,64 +1,69 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sat, 20 Sep 2014 20:06:21 +0200
-Subject: [PATCH 4/7] clk: add clk-asm9260 driver
-In-Reply-To: <20140918075650.GB29620@piout.net>
-References: <1410646408-28901-1-git-send-email-linux@rempel-privat.de>
- <1410646408-28901-5-git-send-email-linux@rempel-privat.de>
- <20140917135440.GG27054@piout.net> <541A7FE1.8060202@rempel-privat.de>
- <20140918075650.GB29620@piout.net>
-Message-ID: <541DC21D.7050303@rempel-privat.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 20 Sep 2014 20:06:28 +0200
+Subject: [PATCH 2/5] PCI: mvebu: Count number of lanes
+In-Reply-To: <1411236391-422-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1411236391-422-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1411236391-422-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 18.09.2014 um 09:56 schrieb Alexandre Belloni:
-> Hi,
-> 
-> On 18/09/2014 at 08:46:57 +0200, Oleksij Rempel wrote :
->> Am 17.09.2014 um 15:54 schrieb Alexandre Belloni:
->>> Hi,
->>>
->>> Please have a look at https://lkml.org/lkml/2014/5/14/598 which describe
->>> the preferred way of implementing clocks in the CCF where you only
->>> declare the clock generator in the DT instead of each separate clocks.
->>
->> hm... if i see it correctly. i will need to move almost everything from
->> DT to clk-driver. And i will need to create separate driver for other
->> SoC provided by AlphaScale. On other side with current (generic) driver
->> i will need only to change DT and it will work.
->>
->> May be instead of going qcom way, it will be better to have generic
->> gate, div and mux bindings for DT? Sure it will make DT a bit fuzzy, but
->> it will dramatically reduce kernel code and reduce the time of providing
->> code to upstream.
->>
->> I don't think drivers/clk/qcom/gcc-msm8974.c is less complicated solution.
-> 
-> IT is not less complicated but it is more flexible (for exemple when
-> setting flags on individual clocks, like CLK_SET_RATE_PARENT or
-> CLK_IGNORE_UNUSED). Describing all the individual clocks in DT is a
-> mistake we made in at91 and it will definitely bother you in the future,
-> for example when you realize that your clock controller is also taking
-> care of reset or power management.
-> 
-> Also, this is the kind of driver you write only once per SoC so it is
-> about the same doing it in DT or in C with the added advantage that
-> doing it in C takes less memory and is probably faster.
-> 
-> You can have a look at how it has been done for the berlin SoCs to see
-> how you can easily reuse code between drivers.
+Some PCIe controllers found on Armada XP SoCs can be configured as
+either four single-lane x1 or one quad-lane x4 PCIe. Although we are
+not (yet) interested in the physical configuration of the PCIe
+controller, we will need it when proper PHY support for PCIe is added.
+Adapt the driver to the amended DT semantic and count the number of
+PCIe lanes.
 
-What is the correct way to handle/define i2s MCLK input? I have I2S mux
-clock with choice of 3 sources: Xtal, PLL and MCLK. One of pins can be
-configured as MCLK src. Should i define fixedrate-clk?
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Rob Herring <robh+dt@kernel.org> 
+Cc: Pawel Moll <pawel.moll@arm.com> 
+Cc: Mark Rutland <mark.rutland@arm.com> 
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk> 
+Cc: Kumar Gala <galak@codeaurora.org> 
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Jason Cooper <jason@lakedaemon.net> 
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com> 
+Cc: devicetree at vger.kernel.org 
+Cc: linux-kernel at vger.kernel.org 
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/pci/host/pci-mvebu.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index a8c6f1a92e0f..0feee6cd395c 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -115,6 +115,7 @@ struct mvebu_pcie_port {
+ 	void __iomem *base;
+ 	u32 port;
+ 	u32 lane;
++	int num_lanes;
+ 	int devfn;
+ 	unsigned int mem_target;
+ 	unsigned int mem_attr;
+@@ -982,9 +983,17 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
+-		if (of_property_read_u32(child, "marvell,pcie-lane",
+-					 &port->lane))
++		/*
++		 * If there are multiple lanes, we are only interested in the
++		 * number of the first lane and the lane count.
++		 */
++		if (of_property_read_u32_index(child, "marvell,pcie-lane",
++					       0, &port->lane))
+ 			port->lane = 0;
++		port->num_lanes = of_property_count_u32_elems(child,
++						      "marvell,pcie-lane");
++		if (!port->num_lanes)
++			port->num_lanes = 1;
+ 
+ 		port->name = kasprintf(GFP_KERNEL, "pcie%d.%d",
+ 				       port->port, port->lane);
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/0b0c4daf/attachment.sig>
+2.0.0
