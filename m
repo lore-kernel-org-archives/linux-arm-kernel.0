@@ -1,72 +1,65 @@
-From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Sat, 20 Sep 2014 20:35:24 +0000
-Subject: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <1409757194-28155-5-git-send-email-bhupesh.sharma@freescale.com>
- <3908508.RbGYaA1nXT@wuerfel>
-Message-ID: <7ebd47eba0864edfbeccf2c5c6d13066@BN1PR03MB220.namprd03.prod.outlook.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 20 Sep 2014 14:09:12 -0700
+Subject: [PATCH 2/2] watchdog: dw_wdt: add restart handler support
+In-Reply-To: <1411108199-1280-3-git-send-email-jszhang@marvell.com>
+References: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
+ <1411108199-1280-3-git-send-email-jszhang@marvell.com>
+Message-ID: <541DECF8.5020503@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
+On 09/18/2014 11:29 PM, Jisheng Zhang wrote:
+> The kernel core now provides an API to trigger a system restart.
+> Register with it to support restarting the system via. watchdog.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   drivers/watchdog/dw_wdt.c | 27 +++++++++++++++++++++++++++
+>   1 file changed, 27 insertions(+)
+>
+> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> index ad0619d..4ca41e9 100644
+> --- a/drivers/watchdog/dw_wdt.c
+> +++ b/drivers/watchdog/dw_wdt.c
+> @@ -29,9 +29,11 @@
+>   #include <linux/miscdevice.h>
+>   #include <linux/module.h>
+>   #include <linux/moduleparam.h>
+> +#include <linux/notifier.h>
+>   #include <linux/of.h>
+>   #include <linux/pm.h>
+>   #include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+>   #include <linux/spinlock.h>
+>   #include <linux/timer.h>
+>   #include <linux/uaccess.h>
+> @@ -62,6 +64,7 @@ static struct {
+>   	unsigned long		next_heartbeat;
+>   	struct timer_list	timer;
+>   	int			expect_close;
+> +	struct notifier_block	restart_handler;
+>   } dw_wdt;
+>
+>   static inline int dw_wdt_is_enabled(void)
+> @@ -119,6 +122,22 @@ static void dw_wdt_keepalive(void)
+>   	       WDOG_COUNTER_RESTART_REG_OFFSET);
+>   }
+>
+> +static int dw_wdt_restart_handle(struct notifier_block *this,
+> +				unsigned long mode, void *cmd)
+> +{
+> +	u32 val;
+> +
+> +	writel(0, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
+> +	val = readl(dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
+> +	if (val & WDOG_CONTROL_REG_WDT_EN_MASK)
+> +		writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt.regs +
+> +			WDOG_COUNTER_RESTART_REG_OFFSET);
+> +	else
+> +		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+> +		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
 
+Another comment: You should probably wait here for a bit to let the reset catch.
 
-> -----Original Message-----
-> From: Sharma Bhupesh-B45370
-> Sent: Thursday, September 04, 2014 1:25 PM
-> To: 'Arnd Bergmann'; linux-arm-kernel at lists.infradead.org
-> Cc: Catalin.Marinas at arm.com; mark.rutland at arm.com;
-> rob.herring at linaro.org; marc.zyngier at arm.com; Will.Deacon at arm.com; Yoder
-> Stuart-B08248; grant.likely at secretlab.ca; Basu Arnab-B45036
-> Subject: RE: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-> 
-> Hi Arnd,
-> 
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Thursday, September 04, 2014 12:05 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: Sharma Bhupesh-B45370; Catalin.Marinas at arm.com;
-> > mark.rutland at arm.com; rob.herring at linaro.org; marc.zyngier at arm.com;
-> > Will.Deacon at arm.com; Yoder Stuart-B08248; grant.likely at secretlab.ca;
-> > Basu Arnab-B45036
-> > Subject: Re: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A
-> > SoC
-> >
-> > On Wednesday 03 September 2014 20:43:12 Bhupesh Sharma wrote:
-> > > diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> > > b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> > > new file mode 100644
-> > > index 0000000..3c0f953
-> > > --- /dev/null
-> > > +++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> > > @@ -0,0 +1,26 @@
-> > > +/*
-> > > + * Device Tree file for Freescale LS2085a software Simulator model
-> > > + *
-> > > + * Copyright (C) 2014, Freescale Semiconductor
-> > > + *
-> > > + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > > + *
-> > > + * This file is licensed under the terms of the GNU General Public
-> > > + * License version 2.  This program is licensed "as is" without any
-> > > + * warranty of any kind, whether express or implied.
-> > > + */
-> > >
-> >
-> > One more thing, same comment as for the respective Exynos7 patch:
-> > can this please be a permissive license, like GPLv2+MIT dual license?
-> >
-> 
-> Yes. I saw Russell's email in which he mentions that Linus is ok with
-> using the MIT
-> X11 licenses ([1]). However, I am not sure I understand the GPLv2+MIT
-> dual license.
-> Is it listed separately on [2], or is it a sum of the X11 + GPLv2 clauses
-> mentioned in [2].
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg358782.html
-> [2] http://www.gnu.org/licenses/license-list.html
-> 
-> Regards,
-> Bhupesh
+Thanks,
+Guenter
