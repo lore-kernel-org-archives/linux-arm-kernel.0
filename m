@@ -1,33 +1,52 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 20 Sep 2014 08:30:28 -0700
-Subject: [PATCH v3 2/4] ARM: meson: add watchdog driver
-In-Reply-To: <1411158989-8075-3-git-send-email-carlo@caione.org>
-References: <1411158989-8075-1-git-send-email-carlo@caione.org>
- <1411158989-8075-3-git-send-email-carlo@caione.org>
-Message-ID: <541D9D94.2010400@roeck-us.net>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Sat, 20 Sep 2014 21:10:08 +0530
+Subject: [PATCH v3 1/2] bcma: register bcma as device tree driver
+In-Reply-To: <1411218125-32670-1-git-send-email-hauke@hauke-m.de>
+References: <1411218125-32670-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <541D9FD8.4000404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2014 01:36 PM, Carlo Caione wrote:
-> This patch adds the watchdog driver for the Amlogic Meson SoCs used also
-> to reboot the device.
->
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
-[ ... ]
-> +module_param(nowayout, bool, 0);
-> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
-> +		"(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+On Saturday 20 September 2014 06:32 PM, Hauke Mehrtens wrote:
+> This driver is used by the bcm53xx ARM SoC code. Now it is possible to
+> give the address of the chipcommon core in device tree and bcma will
+> search for all the other cores.
+
+(...)
+
 > +
+> +static const struct of_device_id bcma_host_soc_of_match[] = {
+> +	{ .compatible = "brcm,bus-axi", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, bcma_host_soc_of_match);
+> +
+> +static struct platform_driver bcma_host_soc_driver = {
+> +	.driver = {
+> +		.name = "bcma-host-soc",
+> +		.owner = THIS_MODULE,
 
-Checkpatch says:
+This field updated automatically...
 
-WARNING: quoted string split across lines
-#295: FILE: drivers/watchdog/meson_wdt.c:231:
-+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
-+		"(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> +		.of_match_table = bcma_host_soc_of_match,
+> +	},
+> +	.probe		= bcma_host_soc_probe,
+> +	.remove		= bcma_host_soc_remove,
+> +};
+> +
+> +int __init bcma_host_soc_register_driver(void)
+> +{
+> +	return platform_driver_register(&bcma_host_soc_driver);
+> +}
+> +
+> +void __exit bcma_host_soc_unregister_driver(void)
+> +{
+> +	platform_driver_unregister(&bcma_host_soc_driver);
+> +}
+> +#endif /* CONFIG_OF */
 
-Please fix.
+Why dont you use module_platform_driver(...)...?
 
-Thanks,
-Guenter
+-- 
+Regards,
+Varka Bhadram.
