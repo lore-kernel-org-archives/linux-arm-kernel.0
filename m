@@ -1,42 +1,41 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 20 Sep 2014 06:51:56 -0700
-Subject: [PATCH 1/2] watchdog: dw_wdt: restart the counter immediately
- after enabling WDT
-In-Reply-To: <1411108199-1280-2-git-send-email-jszhang@marvell.com>
-References: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
- <1411108199-1280-2-git-send-email-jszhang@marvell.com>
-Message-ID: <541D867C.6080407@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 20 Sep 2014 07:07:12 -0700
+Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <alpine.DEB.2.10.1409192100380.23826@nanos>
+References: <1411067086-16613-4-git-send-email-nm@ti.com>
+ <alpine.DEB.2.10.1409181749170.4206@nanos>
+ <20140919030333.GA6088@kahuna>
+ <alpine.DEB.2.10.1409190710320.5612@nanos>
+ <20140919161927.GA28613@kahuna>
+ <alpine.DEB.2.10.1409191027330.5612@nanos>
+ <20140919191649.GQ14505@atomide.com>
+ <alpine.DEB.2.10.1409191233590.4213@nanos>
+ <20140919195738.GR14505@atomide.com>
+ <alpine.DEB.2.10.1409192100380.23826@nanos>
+Message-ID: <20140920140712.GA27096@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 11:29 PM, Jisheng Zhang wrote:
-> The TOP_INIT may be zero, so the timeout period may be very short after
-> initialization is done, thus the system may be reset soon after enabling.
-> We fix this problem by restarting the counter immediately after enabling
-> WDT.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   drivers/watchdog/dw_wdt.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> index 9f21029..ad0619d 100644
-> --- a/drivers/watchdog/dw_wdt.c
-> +++ b/drivers/watchdog/dw_wdt.c
-> @@ -146,6 +146,7 @@ static int dw_wdt_open(struct inode *inode, struct file *filp)
->   		dw_wdt_set_top(DW_WDT_MAX_TOP);
->   		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
->   		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-> +		dw_wdt_keepalive();
->   	}
->
->   	dw_wdt_set_next_heartbeat();
->
-After getting access to the datasheet, I concluded that this fix is wrong
-or at least more risky than necessary. The datasheet states that top_init,
-ie bit 4-7 of the wdt_torr register, needs to be initialized with the desired
-timeout period prior to enabling the watchdog. dw_wdt_set_top() sets it to
-0 instead, ie to the lowest possible timeout period.
+* Thomas Gleixner <tglx@linutronix.de> [140919 19:08]:
+> On Fri, 19 Sep 2014, Tony Lindgren wrote:
+> > * Thomas Gleixner <tglx@linutronix.de> [140919 12:47]:
+> > > Why on earth are you wanting tasklets in there? That's just silly,
+> > > really.
+> > 
+> > Lack of a framework on driver side to cope with this in a generic
+> > way? :p
+> 
+> So instead of creating such a thing we rather have a completely ass
+> backward workaround which spreads itself all over the tree?
 
-Guenter
+I'm not kidding, you're the first one who was able to come up with
+such a simple solution and also describe why it should be done
+that way.
+ 
+> You SoC folks really need a quarterly sanity check.
+
+Probably time for me to file a bios bug on that yeah :)
+
+Regards,
+
+Tony
