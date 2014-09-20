@@ -1,32 +1,23 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 19 Sep 2014 21:07:06 -0500 (CDT)
-Subject: [PATCH V3 3/3] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <20140919195738.GR14505@atomide.com>
-References: <1411067086-16613-1-git-send-email-nm@ti.com>
- <1411067086-16613-4-git-send-email-nm@ti.com>
- <alpine.DEB.2.10.1409181749170.4206@nanos> <20140919030333.GA6088@kahuna>
- <alpine.DEB.2.10.1409190710320.5612@nanos> <20140919161927.GA28613@kahuna>
- <alpine.DEB.2.10.1409191027330.5612@nanos>
- <20140919191649.GQ14505@atomide.com>
- <alpine.DEB.2.10.1409191233590.4213@nanos>
- <20140919195738.GR14505@atomide.com>
-Message-ID: <alpine.DEB.2.10.1409192100380.23826@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 20 Sep 2014 04:14:10 +0200
+Subject: [PATCH v11 03/10] ARM: Define PCI_IOBASE as the base of virtual
+ PCI IO space.
+In-Reply-To: <1411003825-21521-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411003825-21521-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <201409200414.10675.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Sep 2014, Tony Lindgren wrote:
-> * Thomas Gleixner <tglx@linutronix.de> [140919 12:47]:
-> > Why on earth are you wanting tasklets in there? That's just silly,
-> > really.
+On Thursday 18 September 2014, Liviu Dudau wrote:
+> This is needed for calls into OF code that parses PCI ranges.
+> It signals support for memory mapped PCI I/O accesses that
+> are described be device trees.
 > 
-> Lack of a framework on driver side to cope with this in a generic
-> way? :p
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-So instead of creating such a thing we rather have a completely ass
-backward workaround which spreads itself all over the tree?
-
-You SoC folks really need a quarterly sanity check.
-
-Thanks,
-
-	tglx
+Acked-by: Arnd Bergmann <arnd@arndb.de>
