@@ -1,56 +1,108 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 20 Sep 2014 11:11:07 +0200
-Subject: [PATCH 1/2] i2c: cadence: Remove .owner field for driver
-In-Reply-To: <c076984af7e65c433fdfd3a3b0f8d20da2c18013.1407931005.git.michal.simek@xilinx.com>
-References: <c076984af7e65c433fdfd3a3b0f8d20da2c18013.1407931005.git.michal.simek@xilinx.com>
-Message-ID: <20140920091106.GB1612@katana>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 20 Sep 2014 11:59:27 +0200
+Subject: [PATCH 6/7] ARM: dts: sun6i: Add required ahb1 clock parent and
+ rates for dma controller
+In-Reply-To: <CAGb2v64BLvB3v8Wnep5Fqh1COTXYJ5_uyeuevejqD-KpYiptQg@mail.gmail.com>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-7-git-send-email-wens@csie.org>
+ <20140911211531.GN31276@lukather>
+ <CAGb2v64+RxJ52DzawhAtYCn=sw+28e4Q11jzG02KQE=8hxa0tQ@mail.gmail.com>
+ <20140916154849.GE2166@lukather>
+ <CAGb2v64BLvB3v8Wnep5Fqh1COTXYJ5_uyeuevejqD-KpYiptQg@mail.gmail.com>
+Message-ID: <20140920095927.GQ2166@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 01:56:51PM +0200, Michal Simek wrote:
-> There is no need to init .owner field.
+On Wed, Sep 17, 2014 at 12:01:46AM +0800, Chen-Yu Tsai wrote:
+> On Tue, Sep 16, 2014 at 11:48 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Sep 12, 2014 at 10:10:25AM +0800, Chen-Yu Tsai wrote:
+> >> On Fri, Sep 12, 2014 at 5:15 AM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Sat, Sep 06, 2014 at 06:47:27PM +0800, Chen-Yu Tsai wrote:
+> >> >> The DMA controller requires AHB1 bus clock to be clocked from PLL6.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >> ---
+> >> >>  arch/arm/boot/dts/sun6i-a31.dtsi | 5 +++++
+> >> >>  1 file changed, 5 insertions(+)
+> >> >>
+> >> >> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> >> >> index 8eb2c6d..1117989 100644
+> >> >> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> >> >> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> >> >> @@ -317,6 +317,11 @@
+> >> >>                       clocks = <&ahb1_gates 6>;
+> >> >>                       resets = <&ahb1_rst 6>;
+> >> >>                       #dma-cells = <1>;
+> >> >> +
+> >> >> +                     /* DMA controller requires AHB1 clocked from PLL6 */
+> >> >> +                     assigned-clocks = <&ahb1>;
+> >> >> +                     assigned-clock-parents = <&pll6>;
+> >> >> +                     assigned-clock-rates = <200000000>;
+> >> >
+> >> > Where did you get that from?
+> >> >
+> >> > The user manual says that it should be clocked at 600MHz, and I'm not
+> >> > sure it should be enforced there either.
+> >>
+> >> The bindings mean that ahb1 should be clocked from pll6 and at 200 MHz,
+> >> not "pll6 should be 200 MHz". I assume you were misled by them.
+> >>
+> >> Clocking ahb1 from pll6 and at 200 MHz with the /3 pre-divider is the
+> >> vendor BSP default:
+> >>
+> >> On sun6i, the clock init code calls aw_ccu_switch_ahb_2_pll6(), which muxes
+> >> ahb1 from pll6 with the highest dividers, then sets the rate for ahb1 to
+> >> pll6, which sets pre-divider to /3 and divider to /1.
+> >>
+> >> Hope this clears it up. :)
+> >
+> > It does, thanks :)
+> >
+> > But still, I find it the wrong place to enforce such a limit. This
+> > should go into the clock driver itself. The DMA controller requires
+> > such a parenting, but it doesn't require any specific rate, this is
+> > more something of the global system policy.
 > 
-> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
-> "mmc: remove .owner field for drivers using module_platform_driver"
+> But I am guessing the AHB bus clock cannot be clock at any arbitrary
+> rate. Just muxing without setting a specific clock rate might result
+> in a hang. We could address this with per clock limitations, like the
+> patch you posted earlier. Not sure if there's anything in the kernel
+> like that at the moment, or how the clock framework handles clock rates
+> after re-parenting.
+
+There's the Tomeu patch series that allows to set clock rate
+requirements from the user side, I guess that could be easily extended
+to integrate some clock side boundaries. That's why I stopped working
+on the sun5i MMC clock issue until that patch is merged.
+
+> Or we could just specify in the clock driver, or in the DT via clock
+> supplier defaults, that the AHB bus should be clocked from PLL6 @ 200 MHz.
 > 
-> This patch removes the superflous .owner field for drivers which
+> The latter seems easier to do.
 
-It says drivers, but does only one...
+IIRC, there was some opposition to having the muxing assignment in the
+clock driver.
 
-> use the module_platform_driver API, as this is overriden in
-> platform_driver_register anyway."
+> Also, I tested the DMA controller using dmatest on my A31 Hummingbird
+> without this re-parenting patch. It worked fine. How did your tests fail?
 
-... so: any interest in doing this for the whole subsystem? Basically
-good catch, though.
+It was just timeouting, and actually, it was only working to the SRAM,
+and not the DRAM.
 
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
->  drivers/i2c/busses/i2c-cadence.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-> index 63f3f03ecc9b..04d0a7e449ef 100644
-> --- a/drivers/i2c/busses/i2c-cadence.c
-> +++ b/drivers/i2c/busses/i2c-cadence.c
-> @@ -890,7 +890,6 @@ MODULE_DEVICE_TABLE(of, cdns_i2c_of_match);
->  static struct platform_driver cdns_i2c_drv = {
->  	.driver = {
->  		.name  = DRIVER_NAME,
-> -		.owner = THIS_MODULE,
->  		.of_match_table = cdns_i2c_of_match,
->  		.pm = &cdns_i2c_dev_pm_ops,
->  	},
-> --
-> 1.8.2.3
-> 
+Maybe the bootloader sets up the clock muxing already?
 
+Maxime
 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/ec4cb1c1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140920/000ec49f/attachment.sig>
