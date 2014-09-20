@@ -1,45 +1,68 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 20 Sep 2014 22:00:37 +0200
-Subject: [PATCH] ARM: BCM5301X: select GPIOLIB as optional
-In-Reply-To: <1411232446.828292358@f282.i.mail.ru>
-References: <1411231282-7180-1-git-send-email-zajec5@gmail.com>
- <1411232446.828292358@f282.i.mail.ru>
-Message-ID: <CACna6rxHSWuu1ucgnsMX_7qkEfLkgzdfC6LV_NMc05kWodabKw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 20 Sep 2014 22:06:36 +0200
+Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
+In-Reply-To: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2014 19:00, Alexander Shiyan <shc_work@mail.ru> wrote:
-> Sat, 20 Sep 2014 18:41:22 +0200 ?? Rafa? Mi?ecki <zajec5@gmail.com>:
->> All routers (or 99% of them) based on BCM5301X use GPIOs to control LEDs
->> and buttons.
->>
->> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->> ---
->>  arch/arm/mach-bcm/Kconfig | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index fc93800..d967c98 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -80,8 +80,10 @@ config ARCH_BCM2835
->>
->>  config ARCH_BCM_5301X
->>       bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->> +     select ARCH_WANT_OPTIONAL_GPIOLIB
->>       select ARM_GIC
->>       select CACHE_L2X0
->> +     select GPIOLIB
-> ...
->
-> GPIOLIB is selected automatically by ARCH_WANT_OPTIONAL_GPIOLIB.
+Add the AXP209 PMIC with the regulators in use on the cubie2.
 
-I don't think so, I believe selecting is done by ARCH_REQUIRE_GPIOLIB only.
+The RTC regulator can be disabled, but since the RTC driver doesn't grab the
+regulator for now, the driver wouldn't work anymore.
 
-Reading drivers/gpio/Kconfig confuses me a bit. I believe I should
-select ARCH_WANT_OPTIONAL_GPIOLIB, because the board can boot without
-GPIOs, they are needed for LEDs and buttons only. Also most users will
-want LEDs and buttons, so I "select GPIOLIB".
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 31 +++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 53680983461a..f0b74a38a800 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+@@ -91,6 +91,29 @@
+ 
+ 				interrupt-controller;
+ 				#interrupt-cells = <1>;
++
++				regulators {
++					x-powers,dcdc-freq = <1500>;
++
++					vdd_cpu: dcdc2 {
++						vin-supply = <&reg_axp_ipsout>;
++						regulator-always-on;
++					};
++
++					vdd_dll: dcdc3 {
++						vin-supply = <&reg_axp_ipsout>;
++						regulator-always-on;
++					};
++
++					vdd_rtc: ldo1 {
++						vin-supply = <&reg_axp_ipsout>;
++					};
++
++					avcc: ldo2 {
++						vin-supply = <&reg_axp_ipsout>;
++						regulator-always-on;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -140,4 +163,12 @@
+ 	reg_usb2_vbus: usb2-vbus {
+ 		status = "okay";
+ 	};
++
++	reg_axp_ipsout: axp_ipsout {
++		compatible = "regulator-fixed";
++		regulator-name = "axp-ipsout";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
+ };
 -- 
-Rafa?
+2.1.0
