@@ -1,251 +1,39 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 20 Sep 2014 15:02:04 +0200
-Subject: [PATCH v3 1/2] bcma: register bcma as device tree driver
-Message-ID: <1411218125-32670-1-git-send-email-hauke@hauke-m.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 20 Sep 2014 15:19:50 +0200
+Subject: [PATCH 1/2] bus: brcmstb_gisb: register the fault code hook
+In-Reply-To: <1411155880-23447-2-git-send-email-f.fainelli@gmail.com>
+References: <1411155880-23447-1-git-send-email-f.fainelli@gmail.com>
+ <1411155880-23447-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20140920151950.443b7ea9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is used by the bcm53xx ARM SoC code. Now it is possible to
-give the address of the chipcommon core in device tree and bcma will
-search for all the other cores.
+Dear Florian Fainelli,
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- Documentation/devicetree/bindings/bus/bcma.txt | 39 ++++++++++++
- drivers/bcma/bcma_private.h                    | 14 +++++
- drivers/bcma/host_soc.c                        | 82 ++++++++++++++++++++++++++
- drivers/bcma/main.c                            |  6 ++
- include/linux/bcma/bcma.h                      |  2 +
- 5 files changed, 143 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
+On Fri, 19 Sep 2014 12:44:39 -0700, Florian Fainelli wrote:
 
-This is based on wireless-testing and should go into that tree.
+> -void __init brcmstb_hook_fault_code(void)
+> +static int __init brcmstb_hook_fault_code(void)
+>  {
+>  	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
+>  			"imprecise external abort");
+> +	return 0;
+>  }
+> +arch_initcall(brcmstb_hook_fault_code)
 
-changes since:
-v2:
- - fix description
- - use ranges dt in the example
- - always define a empty implementation of 
-   bcma_host_soc_{un}register_driver() when it is build and remove some ifdefs
+I don't have the entire context, but if your platform is part of
+multi-platform, it means that regardless of which platform is actually
+booting your system, you will register your fault hook. Is this the
+intended behavior?
 
-v1:
- - renamed aix to axi
+Generally speaking, in a multiplatform context, many arch_initcall()
+should have a conditional to check whether we're really on a platform
+where the initcall is needed.
 
-RFC:
- - reworded the irq description
- - improved the example
- - hocked into bcma_modeinit() and bcma_modexit()
+Best regards,
 
-diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
-new file mode 100644
-index 0000000..33fc6eb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/bcma.txt
-@@ -0,0 +1,39 @@
-+Driver for ARM AXI Bus with Broadcom Plugins (bcma)
-+
-+Required properties:
-+
-+- compatible : brcm,bus-axi
-+
-+- reg : iomem address range of chipcommon core
-+
-+The cores on the AXI bus are automatically detected by bcma with the
-+memory ranges they are using and they get registered afterwards.
-+Automatic detection of the IRQ number is not reliable on
-+BCM47xx/BCM53xx ARM SoCs. To assign IRQ numbers to the cores, provide
-+them manually through device tree. The IRQ number and the device tree
-+child entry will get assigned to the core with the matching reg address.
-+
-+Example:
-+
-+	axi at 18000000 {
-+		compatible = "brcm,bus-axi";
-+		reg = <0x18000000 0x1000>;
-+		ranges = <0x00000000 0x18000000 0x00100000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		pcie at 12000 {
-+			reg = <0x00012000 0x1000>;
-+			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		ethernet at 24000 {
-+			reg = <0x00024000 0x1000>;
-+			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		ethernet at 25000 {
-+			reg = <0x00025000 0x1000>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+	};
-diff --git a/drivers/bcma/bcma_private.h b/drivers/bcma/bcma_private.h
-index b40be43..b6412b2 100644
---- a/drivers/bcma/bcma_private.h
-+++ b/drivers/bcma/bcma_private.h
-@@ -88,6 +88,20 @@ extern int __init bcma_host_pci_init(void);
- extern void __exit bcma_host_pci_exit(void);
- #endif /* CONFIG_BCMA_HOST_PCI */
- 
-+/* host_soc.c */
-+#if defined(CONFIG_BCMA_HOST_SOC) && defined(CONFIG_OF)
-+extern int __init bcma_host_soc_register_driver(void);
-+extern void __exit bcma_host_soc_unregister_driver(void);
-+#else
-+static inline int __init bcma_host_soc_register_driver(void)
-+{
-+	return 0;
-+}
-+static inline void __exit bcma_host_soc_unregister_driver(void)
-+{
-+}
-+#endif /* CONFIG_BCMA_HOST_SOC && CONFIG_OF */
-+
- /* driver_pci.c */
- u32 bcma_pcie_read(struct bcma_drv_pci *pc, u32 address);
- 
-diff --git a/drivers/bcma/host_soc.c b/drivers/bcma/host_soc.c
-index 718e054..cfbf3b3 100644
---- a/drivers/bcma/host_soc.c
-+++ b/drivers/bcma/host_soc.c
-@@ -7,6 +7,9 @@
- 
- #include "bcma_private.h"
- #include "scan.h"
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
- #include <linux/bcma/bcma.h>
- #include <linux/bcma/bcma_soc.h>
- 
-@@ -176,6 +179,7 @@ int __init bcma_host_soc_register(struct bcma_soc *soc)
- 	/* Host specific */
- 	bus->hosttype = BCMA_HOSTTYPE_SOC;
- 	bus->ops = &bcma_host_soc_ops;
-+	bus->host_pdev = NULL;
- 
- 	/* Initialize struct, detect chip */
- 	bcma_init_bus(bus);
-@@ -195,3 +199,81 @@ int __init bcma_host_soc_init(struct bcma_soc *soc)
- 
- 	return err;
- }
-+
-+#ifdef CONFIG_OF
-+static int bcma_host_soc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct bcma_bus *bus;
-+	int err;
-+
-+	/* Alloc */
-+	bus = devm_kzalloc(dev, sizeof(*bus), GFP_KERNEL);
-+	if (!bus)
-+		return -ENOMEM;
-+
-+	/* Map MMIO */
-+	bus->mmio = of_iomap(np, 0);
-+	if (!bus->mmio)
-+		return -ENOMEM;
-+
-+	/* Host specific */
-+	bus->hosttype = BCMA_HOSTTYPE_SOC;
-+	bus->ops = &bcma_host_soc_ops;
-+	bus->host_pdev = pdev;
-+
-+	/* Initialize struct, detect chip */
-+	bcma_init_bus(bus);
-+
-+	/* Register */
-+	err = bcma_bus_register(bus);
-+	if (err)
-+		goto err_unmap_mmio;
-+
-+	platform_set_drvdata(pdev, bus);
-+
-+	return err;
-+
-+err_unmap_mmio:
-+	iounmap(bus->mmio);
-+	return err;
-+}
-+
-+static int bcma_host_soc_remove(struct platform_device *pdev)
-+{
-+	struct bcma_bus *bus = platform_get_drvdata(pdev);
-+
-+	bcma_bus_unregister(bus);
-+	iounmap(bus->mmio);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcma_host_soc_of_match[] = {
-+	{ .compatible = "brcm,bus-axi", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcma_host_soc_of_match);
-+
-+static struct platform_driver bcma_host_soc_driver = {
-+	.driver = {
-+		.name = "bcma-host-soc",
-+		.owner = THIS_MODULE,
-+		.of_match_table = bcma_host_soc_of_match,
-+	},
-+	.probe		= bcma_host_soc_probe,
-+	.remove		= bcma_host_soc_remove,
-+};
-+
-+int __init bcma_host_soc_register_driver(void)
-+{
-+	return platform_driver_register(&bcma_host_soc_driver);
-+}
-+
-+void __exit bcma_host_soc_unregister_driver(void)
-+{
-+	platform_driver_unregister(&bcma_host_soc_driver);
-+}
-+#endif /* CONFIG_OF */
-diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-index c421403..19ef685 100644
---- a/drivers/bcma/main.c
-+++ b/drivers/bcma/main.c
-@@ -528,6 +528,11 @@ static int __init bcma_modinit(void)
- 	if (err)
- 		return err;
- 
-+	err = bcma_host_soc_register_driver();
-+	if (err) {
-+		pr_err("SoC host initialization failed\n");
-+		err = 0;
-+	}
- #ifdef CONFIG_BCMA_HOST_PCI
- 	err = bcma_host_pci_init();
- 	if (err) {
-@@ -545,6 +550,7 @@ static void __exit bcma_modexit(void)
- #ifdef CONFIG_BCMA_HOST_PCI
- 	bcma_host_pci_exit();
- #endif
-+	bcma_host_soc_unregister_driver();
- 	bus_unregister(&bcma_bus_type);
- }
- module_exit(bcma_modexit)
-diff --git a/include/linux/bcma/bcma.h b/include/linux/bcma/bcma.h
-index 6345979..729f48e 100644
---- a/include/linux/bcma/bcma.h
-+++ b/include/linux/bcma/bcma.h
-@@ -323,6 +323,8 @@ struct bcma_bus {
- 		struct pci_dev *host_pci;
- 		/* Pointer to the SDIO device (only for BCMA_HOSTTYPE_SDIO) */
- 		struct sdio_func *host_sdio;
-+		/* Pointer to platform device (only for BCMA_HOSTTYPE_SOC) */
-+		struct platform_device *host_pdev;
- 	};
- 
- 	struct bcma_chipinfo chipinfo;
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
