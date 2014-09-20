@@ -1,73 +1,164 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 19 Sep 2014 19:34:48 -0500
-Subject: [PATCH v11 10/10] PCI: Introduce pci_remap_iospace() for remapping
- PCI I/O bus resources into CPU space
-In-Reply-To: <1411003825-21521-11-git-send-email-Liviu.Dudau@arm.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-11-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <541CCBA8.8030406@gmail.com>
+From: wanghaibin.wang@huawei.com (wanghaibin)
+Date: Sat, 20 Sep 2014 09:15:40 +0800
+Subject: [PATCH v2 15/15] arm/arm64: KVM: allow userland to request a
+ virtual GICv3
+In-Reply-To: <1408626416-11326-16-git-send-email-andre.przywara@arm.com>
+References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+ <1408626416-11326-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <541CD53C.5050109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 08:30 PM, Liviu Dudau wrote:
-> Introduce a default implementation for remapping PCI bus I/O resources
-> onto the CPU address space. Architectures with special needs may
-> provide their own version, but most should be able to use this one.
+On 2014/8/21 21:06, Andre Przywara wrote:
+
+> With everything in place we allow userland to request the kernel
+> using a virtual GICv3 in the guest, which finally lifts the 8 vCPU
+> limit for a guest.
+> Also we provide the necessary support for guests setting the memory
+> addresses for the virtual distributor and redistributors.
+> This requires some userland code to make use of that feature and
+> explicitly ask for a virtual GICv3.
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-One nit below, otherwise:
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  drivers/pci/pci.c             | 33 +++++++++++++++++++++++++++++++++
->  include/asm-generic/pgtable.h |  4 ++++
->  include/linux/pci.h           |  3 +++
->  3 files changed, 40 insertions(+)
+>  arch/arm64/include/uapi/asm/kvm.h |    7 ++++++
+>  include/kvm/arm_vgic.h            |    4 ++--
+>  virt/kvm/arm/vgic-v3-emul.c       |    3 +++
+>  virt/kvm/arm/vgic.c               |   46 ++++++++++++++++++++++++++-----------
+>  4 files changed, 45 insertions(+), 15 deletions(-)
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 2c9ac70..654b44c 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -2704,6 +2704,39 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
->  }
->  EXPORT_SYMBOL(pci_request_regions_exclusive);
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 5513de4..9a62081 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -77,6 +77,13 @@ struct kvm_regs {
+>  #define KVM_VGIC_V2_DIST_SIZE		0x1000
+>  #define KVM_VGIC_V2_CPU_SIZE		0x2000
 >  
-> +/**
-> + *	pci_remap_iospace - Remap the memory mapped I/O space
-> + *	@res: Resource describing the I/O space
-> + *	@phys_addr: physical address where the range will be mapped.
-> + *
-> + *	Remap the memory mapped I/O space described by the @res
-> + *	into the CPU physical address space. Only architectures
-> + *	that have memory mapped IO defined (and hence PCI_IOBASE)
-> + *	should call this function.
-> + */
-> +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> +{
-> +	int err = -ENODEV;
+> +/* Supported VGICv3 address types  */
+> +#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+> +#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
 > +
-> +#ifdef PCI_IOBASE
-> +	if (!(res->flags & IORESOURCE_IO))
-> +		return -EINVAL;
+> +#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+> +#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
 > +
-> +	if (res->end > IO_SPACE_LIMIT)
-> +		return -EINVAL;
-> +
-> +	err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
-> +				res->end + 1 + (unsigned long)PCI_IOBASE,
-> +				phys_addr, pgprot_device(PAGE_KERNEL));
-> +#else
-> +	/* this architecture does not have memory mapped I/O space,
-> +	   so this function should never be called */
-> +	WARN_ON(1);
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 3b164ee..82e00a5 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -35,8 +35,8 @@
+>  #define VGIC_MAX_IRQS		1024
+>  
+>  /* Sanity checks... */
+> -#if (KVM_MAX_VCPUS > 8)
+> -#error	Invalid number of CPU interfaces
+> +#if (KVM_MAX_VCPUS > 255)
+> +#error Too many KVM VCPUs, the VGIC only supports up to 255 VCPUs for now
+>  #endif
+>  
+>  #if (VGIC_NR_IRQS_LEGACY & 31)
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index ac5c5ee..d4d9fe4 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -874,6 +874,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>  		case KVM_VGIC_V2_ADDR_TYPE_DIST:
+>  		case KVM_VGIC_V2_ADDR_TYPE_CPU:
+>  			return -ENXIO;
+> +		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> +		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+> +			return 0;
+>  		}
+>  		break;
+>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index b1bcb6d..f13ab4e 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1567,7 +1567,7 @@ static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
+>  /**
+>   * kvm_vgic_addr - set or get vgic VM base addresses
+>   * @kvm:   pointer to the vm struct
+> - * @type:  the VGIC addr type, one of KVM_VGIC_V2_ADDR_TYPE_XXX
+> + * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
+>   * @addr:  pointer to address value
+>   * @write: if true set the address in the VM address space, if false read the
+>   *          address
+> @@ -1581,29 +1581,49 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>  {
+>  	int r = 0;
+>  	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	int type_needed;
+> +	phys_addr_t *addr_ptr, block_size;
+>  
+>  	mutex_lock(&kvm->lock);
+>  	switch (type) {
+>  	case KVM_VGIC_V2_ADDR_TYPE_DIST:
+> -		if (write) {
+> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
+> -					       *addr, KVM_VGIC_V2_DIST_SIZE);
+> -		} else {
+> -			*addr = vgic->vgic_dist_base;
+> -		}
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		addr_ptr = &vgic->vgic_dist_base;
+> +		block_size = KVM_VGIC_V2_DIST_SIZE;
+>  		break;
+>  	case KVM_VGIC_V2_ADDR_TYPE_CPU:
+> -		if (write) {
+> -			r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
+> -					       *addr, KVM_VGIC_V2_CPU_SIZE);
+> -		} else {
+> -			*addr = vgic->vgic_cpu_base;
+> -		}
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
+> +		addr_ptr = &vgic->vgic_cpu_base;
+> +		block_size = KVM_VGIC_V2_CPU_SIZE;
+>  		break;
+> +#ifdef CONFIG_ARM_GIC_V3
+> +	case KVM_VGIC_V3_ADDR_TYPE_DIST:
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		addr_ptr = &vgic->vgic_dist_base;
+> +		block_size = KVM_VGIC_V3_DIST_SIZE;
+> +		break;
+> +	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
 
-Printing what the comment says in the warning would be better than
-making the user look-up why they got a warning.
 
-Rob
+Hi, Andre, here is the redist region base address, is it?
+So, I think the block_size should be (online_vcpus * KVM_VGIC_V3_REDIST_SIZE).
+
+> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+> +		addr_ptr = &vgic->vgic_redist_base;
+> +		block_size = KVM_VGIC_V3_REDIST_SIZE;
+> +		break;
+> +#endif
+>  	default:
+>  		r = -ENODEV;
+> +		goto out;
+>  	}
+>  
+> +	if (vgic->vgic_model != type_needed) {
+> +		r = -ENODEV;
+> +		goto out;
+> +	}
+> +
+
+
+Here, call vgic_ioaddr_assign func to assign redist region base address may be wrong...
+In this func, it will check the GICD and GICC assign base address is overlap each other or not,
+and, there is not the GICR check action.
+
+Thanks!
+
+> +	if (write)
+> +		r = vgic_ioaddr_assign(kvm, addr_ptr, *addr, block_size);
+> +	else
+> +		*addr = *addr_ptr;
+> +
+> +out:
+>  	mutex_unlock(&kvm->lock);
+>  	return r;
+>  }
