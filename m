@@ -1,68 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 20 Sep 2014 22:06:36 +0200
-Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
+Date: Sat, 20 Sep 2014 22:06:35 +0200
+Subject: [PATCH 2/3] mfd: axp209x: Drop the parent supplies field
 In-Reply-To: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1411243596-15117-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the AXP209 PMIC with the regulators in use on the cubie2.
-
-The RTC regulator can be disabled, but since the RTC driver doesn't grab the
-regulator for now, the driver wouldn't work anymore.
+Now that the regulator code get its parent supplies purely from the DT, we can
+drop the parent supplies resources in the MFD driver.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 31 +++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/mfd/axp20x.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 53680983461a..f0b74a38a800 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -91,6 +91,29 @@
- 
- 				interrupt-controller;
- 				#interrupt-cells = <1>;
-+
-+				regulators {
-+					x-powers,dcdc-freq = <1500>;
-+
-+					vdd_cpu: dcdc2 {
-+						vin-supply = <&reg_axp_ipsout>;
-+						regulator-always-on;
-+					};
-+
-+					vdd_dll: dcdc3 {
-+						vin-supply = <&reg_axp_ipsout>;
-+						regulator-always-on;
-+					};
-+
-+					vdd_rtc: ldo1 {
-+						vin-supply = <&reg_axp_ipsout>;
-+					};
-+
-+					avcc: ldo2 {
-+						vin-supply = <&reg_axp_ipsout>;
-+						regulator-always-on;
-+					};
-+				};
- 			};
- 		};
- 
-@@ -140,4 +163,12 @@
- 	reg_usb2_vbus: usb2-vbus {
- 		status = "okay";
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index dee653989e3a..6231adbb295d 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -140,15 +140,6 @@ static const struct regmap_irq_chip axp20x_regmap_irq_chip = {
+ 	.init_ack_masked	= true,
  };
+ 
+-static const char * const axp20x_supplies[] = {
+-	"acin",
+-	"vin2",
+-	"vin3",
+-	"ldo24in",
+-	"ldo3in",
+-	"ldo5in",
+-};
+-
+ static struct mfd_cell axp20x_cells[] = {
+ 	{
+ 		.name			= "axp20x-pek",
+@@ -156,8 +147,6 @@ static struct mfd_cell axp20x_cells[] = {
+ 		.resources		= axp20x_pek_resources,
+ 	}, {
+ 		.name			= "axp20x-regulator",
+-		.parent_supplies	= axp20x_supplies,
+-		.num_parent_supplies	= ARRAY_SIZE(axp20x_supplies),
+ 	},
+ };
+ 
 -- 
 2.1.0
