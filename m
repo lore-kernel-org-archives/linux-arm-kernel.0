@@ -1,89 +1,72 @@
 From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Sat, 20 Sep 2014 20:35:08 +0000
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+Date: Sat, 20 Sep 2014 20:35:24 +0000
+Subject: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <6499926.sQm3J8L764@wuerfel> <20140904091319.GA32228@leverpostej>
- <3563146.jh46O3eIbG@wuerfel>
-Message-ID: <55b3149b2264460abaa5b4c07fb19b09@BN1PR03MB220.namprd03.prod.outlook.com>
+ <1409757194-28155-5-git-send-email-bhupesh.sharma@freescale.com>
+ <3908508.RbGYaA1nXT@wuerfel>
+Message-ID: <7ebd47eba0864edfbeccf2c5c6d13066@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Ping?
 
+
 > -----Original Message-----
 > From: Sharma Bhupesh-B45370
-> Sent: Tuesday, September 09, 2014 5:16 PM
-> To: 'Arnd Bergmann'; Mark Rutland
-> Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org; Catalin
-> Marinas; Will Deacon; Yoder Stuart-B08248; grant.likely at secretlab.ca;
-> Marc Zyngier; Basu Arnab-B45036; Geoff Levand
-> Subject: RE: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+> Sent: Thursday, September 04, 2014 1:25 PM
+> To: 'Arnd Bergmann'; linux-arm-kernel at lists.infradead.org
+> Cc: Catalin.Marinas at arm.com; mark.rutland at arm.com;
+> rob.herring at linaro.org; marc.zyngier at arm.com; Will.Deacon at arm.com; Yoder
+> Stuart-B08248; grant.likely at secretlab.ca; Basu Arnab-B45036
+> Subject: RE: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 > 
-> Hi Mark, Arnd
+> Hi Arnd,
 > 
 > > -----Original Message-----
 > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Thursday, September 04, 2014 3:09 PM
-> > To: Mark Rutland
-> > Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org;
-> > Sharma Bhupesh-B45370; Catalin Marinas; Will Deacon; Yoder
-> > Stuart-B08248; grant.likely at secretlab.ca; Marc Zyngier; Basu
-> > Arnab-B45036; Geoff Levand
-> > Subject: Re: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+> > Sent: Thursday, September 04, 2014 12:05 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: Sharma Bhupesh-B45370; Catalin.Marinas at arm.com;
+> > mark.rutland at arm.com; rob.herring at linaro.org; marc.zyngier at arm.com;
+> > Will.Deacon at arm.com; Yoder Stuart-B08248; grant.likely at secretlab.ca;
+> > Basu Arnab-B45036
+> > Subject: Re: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A
+> > SoC
 > >
-> > On Thursday 04 September 2014 10:13:19 Mark Rutland wrote:
-> > > On Wed, Sep 03, 2014 at 07:31:44PM +0100, Arnd Bergmann wrote:
-> > > > On Wednesday 03 September 2014 17:31:30 Mark Rutland wrote:
-> > > > >
-> > > > > However, I'm not sure I follow the reasoning for making this
-> > > > > significantly harder, and even ignoring that I don't think this
-> > > > > does make things significantly harder. Especially so if we have
-> > > > > a PSCI node but not an enable method -- in that case its trivial
-> > > > > to patch in an unrelated enable-method anyhow.
-> > > >
-> > > > Right, it's not actually much harder. A better way to look at it
-> > > > is probably that we document what which parts we expect to stay
-> > > > constant and which parts are to be filled out by the boot loader.
-> > > > Independent of what PSCI implementation the boot loader provides,
-> > > > we would like to see enable-method="psci".
+> > On Wednesday 03 September 2014 20:43:12 Bhupesh Sharma wrote:
+> > > diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+> > > b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+> > > new file mode 100644
+> > > index 0000000..3c0f953
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+> > > @@ -0,0 +1,26 @@
+> > > +/*
+> > > + * Device Tree file for Freescale LS2085a software Simulator model
+> > > + *
+> > > + * Copyright (C) 2014, Freescale Semiconductor
+> > > + *
+> > > + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> > > + *
+> > > + * This file is licensed under the terms of the GNU General Public
+> > > + * License version 2.  This program is licensed "as is" without any
+> > > + * warranty of any kind, whether express or implied.
+> > > + */
 > > >
-> > > So in the /cpus node, have a comment like:
-> > >
-> > > /*
-> > >  * We expect the enable-method to be "psci", but this is dependent
-> > > on
-> > >  * the FW, which will fill this in.
-> > >  */
 > >
-> > I was thinking of leaving the enable-method in the cpus node, but
-> > having an empty psci node with a similar comment.
+> > One more thing, same comment as for the respective Exynos7 patch:
+> > can this please be a permissive license, like GPLv2+MIT dual license?
 > >
-> > > Or, should we put together a soc-guidance.txt with that, ensuring
-> > > things are initialised correctly (CNTVOFF, CNTFREQ), etc?
-> >
-> > I would very much welcome documentation like that!
 > 
-> Is this documentation planned (already being worked upon), or should I
-> try to spin-out a RFC patch which tries to add this guidance
-> documentation.
+> Yes. I saw Russell's email in which he mentions that Linus is ok with
+> using the MIT
+> X11 licenses ([1]). However, I am not sure I understand the GPLv2+MIT
+> dual license.
+> Is it listed separately on [2], or is it a sum of the X11 + GPLv2 clauses
+> mentioned in [2].
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg358782.html
+> [2] http://www.gnu.org/licenses/license-list.html
 > 
 > Regards,
 > Bhupesh
-> 
-> >
-> > > > I just saw that Geoff had a related comment, and documenting this
-> > > > would make it clearer to other reviewers, as well as people that
-> > > > happen to look at this file as a base for new platforms.
-> > >
-> > > I agree that having something to point people in the right direction
-> > > is a good idea. The only point I disagree with is putitng something
-> > > in the DT that can be trivially made false (and possibly with good
-> > reason).
-> > >
-> > > I'm happy with having comments.
-> >
-> > Right, but I see no good reason for having something else in the
-> > enable- method, the only way I can see why that would be done is for
-> > the boot loader or firmware implementer to be misinformed.
-> >
-> > 	Arnd
