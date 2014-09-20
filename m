@@ -1,55 +1,82 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Sat, 20 Sep 2014 12:19:24 +0800
-Subject: [PATCH] drivers/usb/host/ehci-xilinx-of.c: Include
- "linux/of_irq.h" to avoid compiling error
-In-Reply-To: <540D3C89.6080702@monstr.eu>
-References: <540738C7.5000106@gmail.com> <540D3C89.6080702@monstr.eu>
-Message-ID: <541D004C.6020108@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 19 Sep 2014 21:34:38 -0700
+Subject: [PATCH v4 0/2] mtd: nand: add sunxi NAND flash controller support
+In-Reply-To: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140920043438.GD8127@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+Hi Boris,
 
-Please help check this patch, when you have time.
-
-Thanks.
-
-On 09/08/2014 01:20 PM, Michal Simek wrote:
-> On 09/03/2014 05:50 PM, Chen Gang wrote:
->> Need include it for irq_of_parse_and_map(), the related error with
->> allmodconfig under microblaze:
->>
->>   drivers/usb/host/ehci-xilinx-of.c: In function ?ehci_hcd_xilinx_of_probe?:
->>   drivers/usb/host/ehci-xilinx-of.c:156:2: error: implicit declaration of function ?irq_of_parse_and_map? [-Werror=implicit-function-declaration]
->>     irq = irq_of_parse_and_map(dn, 0);
->>     ^
->>
->> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
->> ---
->>  drivers/usb/host/ehci-xilinx-of.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
->> index fe57710..a232836 100644
->> --- a/drivers/usb/host/ehci-xilinx-of.c
->> +++ b/drivers/usb/host/ehci-xilinx-of.c
->> @@ -31,6 +31,7 @@
->>  #include <linux/of.h>
->>  #include <linux/of_platform.h>
->>  #include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->>  
->>  /**
->>   * ehci_xilinx_port_handed_over - hand the port out if failed to enable it
->>
+On Mon, Aug 18, 2014 at 07:26:26PM +0200, Boris BREZILLON wrote:
+> This patch series adds support for the sunxi NAND Flash Controller (NFC)
+> block.
 > 
-> Acked-by: Michal Simek <monstr@monstr.eu>
+> These two patches only add support for the basic NAND stuff:
+>  - NAND controller operations
+>  - SW and HW ECC handling (with both syndrome and normal ECC scheme)
 > 
-> Thanks,
-> Michal
+> If you want support for advanced features you can find it on my github
+> repo [1]:
+>  - HW randomization support
+>  - per partition ECC/Randomizer to handle bootloader partitions
 > 
+> DMA transfers are not supported yet, but I have reworked the OOB layout
+> when using the HW ECC scheme to match the one used when accessing the NAND
+> with DMA transfers (the available OOB bytes are placed at the end of the
+> OOB area).
+> 
+> This patch series depends on this other one [2] which adds support for ONFI
+> timing mode retrieval on non-ONFI NANDs.
 
--- 
-Chen Gang
+Were you planning to send v2 of your series [2]? I see you made a
+mistake you were planning on fixing:
 
-Open, share, and attitude like air, water, and life which God blessed
+  https://lkml.org/lkml/2014/7/30/423
+
+Brian
+
+> Best Regards,
+> 
+> Boris
+> 
+> [1]https://github.com/bbrezillon/linux-sunxi/tree/sunxi-nand-v4
+> [2]https://lkml.org/lkml/2014/7/28/156
+> 
+> Changes since v3:
+>  - removed nand core code modifications from the patch series (submitted
+>    separately)
+>  - added documentation to the code
+>  - forced timeout (a default timeout is used when none is provided by the
+>    caller) on controller operations
+>  - fixed coding style issues
+>  - removed unneeded irq field from the sunxi_nfc struct
+>  - fixed several memory leaks
+>  - reworked the NFC reset code (to avoid potential garbage config from the
+>    bootloader)
+>  - made use of ECC_EXCEPTION flag to prevent erased page from generating
+>    ECC errors
+>  - changed the OOB layout for HW ECC scheme
+> 
+> Changes since v2:
+>  - merge HW ECC implementation in base implementation patch
+>  - fix timing config when interfacing with an ONFI compatible chip
+> 
+> Changes since v1:
+>  - add HW ECC support
+>  - rework NAND timings retrieval (use ONFI timing mode instead of raw timings)
+>  - add nand-ecc-level property to specify NAND ECC requirements from DT
+> 
+> Boris BREZILLON (2):
+>   mtd: nand: add sunxi NAND flash controller support
+>   mtd: nand: add sunxi NFC dt bindings doc
+> 
+>  .../devicetree/bindings/mtd/sunxi-nand.txt         |   45 +
+>  drivers/mtd/nand/Kconfig                           |    6 +
+>  drivers/mtd/nand/Makefile                          |    1 +
+>  drivers/mtd/nand/sunxi_nand.c                      | 1362 ++++++++++++++++++++
+>  4 files changed, 1414 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+>  create mode 100644 drivers/mtd/nand/sunxi_nand.c
+> 
