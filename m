@@ -1,77 +1,62 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 21 Sep 2014 01:46:03 +0200
-Subject: [PATCH 3/5] ARM: mvebu: armada-xp: Correct misnumbered PCIe port
- nodes
-In-Reply-To: <1411236391-422-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1411236391-422-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1411236391-422-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <541E11BB.7070202@gmail.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Sun, 21 Sep 2014 07:56:28 +0000
+Subject: [PATCH] iommu/arm-smmu: fix bug in pmd construction
+In-Reply-To: <1411163922-8833-1-git-send-email-mitchelh@codeaurora.org>
+References: <1411163922-8833-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <1dbe5bf443a44828bf27d282a93c1065@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2014 08:06 PM, Sebastian Hesselbarth wrote:
-> Currently, Armada XP PCIe nodes are numbered pcie@<N>,0 with N just
-> incrementing. To reflect port/lane relationship, rename the nodes
-> to pcie@<port>,<lane>. While at it, add node aliases to each of pcie
-> controller and port nodes and get rid of now redundant port/lane
-> comments.
+Hi Mitchel,
+I have made changes to the arm smmu driver paging support, as a part of the huge page support patch. Will is currently reviewing changes made by me. I should be able to post my patch in the next couple of weeks.
+
+Regards
+Vaun
+
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Mitchel Humpherys
+> Sent: Saturday, September 20, 2014 3:29 AM
+> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-foundation.org;
+> Will Deacon
+> Subject: [PATCH] iommu/arm-smmu: fix bug in pmd construction
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-
-After thinking a while about the current numbering scheme, I have to
-admit that it is correct. The @numbers represent assigned-address of
-the pcie port and this what it is right now.
-
-If there are no more comments, I'll resend the series without messing
-with the numbering scheme.
-
-Sebastian
-
-> ---
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 11 ++++-------
->  arch/arm/boot/dts/armada-xp-db.dts               | 20 +++++++-------------
->  arch/arm/boot/dts/armada-xp-gp.dts               | 11 ++++-------
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts  |  8 +++-----
->  arch/arm/boot/dts/armada-xp-matrix.dts           |  5 ++---
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi         | 12 ++++++------
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi         | 20 ++++++++++----------
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi         | 22 +++++++++++-----------
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts   | 11 ++++-------
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  5 ++---
->  10 files changed, 53 insertions(+), 72 deletions(-)
+> We are using the same pfn for every pte we create while constructing the pmd.
+> Fix this by actually updating the pfn on each iteration of the pmd construction
+> loop.
 > 
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> index 0e53fad111de..1b2dd3a4000b 100644
-> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -37,24 +37,21 @@
->  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
->  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
->  
-> -		pcie-controller {
-> +		pcie: pcie-controller {
->  			status = "okay";
->  
->  			/* First mini-PCIe port */
-> -			pcie at 1,0 {
-> -				/* Port 0, Lane 0 */
-> +			pcie00: pcie at 0,0 {
->  				status = "okay";
->  			};
->  
->  			/* Second mini-PCIe port */
-> -			pcie at 2,0 {
-> -				/* Port 0, Lane 1 */
-> +			pcie01: pcie at 0,1 {
->  				status = "okay";
->  			};
->  
->  			/* Renesas uPD720202 USB 3.0 controller */
-> -			pcie at 3,0 {
-> -				/* Port 0, Lane 3 */
-> +			pcie03: pcie at 0,3 {
->  				status = "okay";
->  			};
->  		};
-[...]
+> It's not clear if we can actually hit this bug right now since iommu_map splits up
+> the calls to .map based on the page size, so we only ever seem to iterate this
+> loop once. However, things might change in the future that might cause us to
+> hit this.
+> 
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+> Will, I was unable to come up with a test case to hit this bug based on what I
+> said in the commit message above. Not sure if my analysis is completely off
+> base, my head is still spinning from all these page tables :).
+> ---
+>  drivers/iommu/arm-smmu.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> ca18d6d42a..eba4cb390c 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1368,6 +1368,7 @@ static int arm_smmu_alloc_init_pmd(struct
+> arm_smmu_device *smmu, pud_t *pud,
+>  		ret = arm_smmu_alloc_init_pte(smmu, pmd, addr, next, pfn,
+>  					      prot, stage);
+>  		phys += next - addr;
+> +		pfn = __phys_to_pfn(phys);
+>  	} while (pmd++, addr = next, addr < end);
+> 
+>  	return ret;
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
