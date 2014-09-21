@@ -1,132 +1,177 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 21 Sep 2014 19:24:04 +0200
-Subject: [PATCH] tty/serial: samsung: Add earlycon support
-In-Reply-To: <CAGOxZ52HY0eEukbWdt0OnUzcfrLi3Y726om+GQAQ_Q0vmwk-=Q@mail.gmail.com>
-References: <1410867163-27962-1-git-send-email-alim.akhtar@samsung.com>
- <541D83AE.1050006@gmail.com>
- <CAGOxZ52HY0eEukbWdt0OnUzcfrLi3Y726om+GQAQ_Q0vmwk-=Q@mail.gmail.com>
-Message-ID: <541F09B4.6050907@gmail.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Sun, 21 Sep 2014 20:41:37 +0200
+Subject: [PATCH v2 1/8] ARM: add mach-asm9260
+In-Reply-To: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1411324904-14881-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.09.2014 16:36, Alim Akhtar wrote:
-> Hi Tomasz,
-> Thanks for your valuable feedback on this patch.
+it is low cost (?) SoC targeted for market in China and India which
+trying to compete with AT91SAM9G25.
 
-You're welcome.
+Here is some info:
+http://www.alphascale.com/index.asp?ics/615.html
 
->>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
->>> index 5ae8608..e01c0e5 100644
->>> --- a/Documentation/kernel-parameters.txt
->>> +++ b/Documentation/kernel-parameters.txt
->>> @@ -936,6 +936,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->>>                       must already be setup and configured. Options are not
->>>                       yet supported.
->>>
->>> +             samsung,<addr>
->>> +                     Start an early, polled-mode console on a samsung serial
->>> +                     port at the specified address. The samsung serial port
->>> +                     must already be setup and configured. Options are not
->>> +                     yet supported.
->>> +
->>
->> Couldn't you simply parse this from DT? I believe there is already code
->> parsing stdout property in chosen node for earlycon purposes present in
->> the kernel.
->>
->> Anyway, we already had a patch for this in our internal tree, but it
->> wasn't submitted because there was no support for early ioremap on ARM
->> at that time. I haven't been following it since then (and I'm no longer
->> at Samsung; Marek might be able to take this topic), is it already
->> available?
-> I am not sure what you have internally, any further suggestions on
-> this is most welcome.
+One of products:
+http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
 
-I believe Marek should be able to post our internal patch, so maybe you
-could reuse it and adapt for your needs.
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/Kconfig                    | 14 +++++++
+ arch/arm/Makefile                   |  1 +
+ arch/arm/mach-asm9260/Makefile      | 11 ++++++
+ arch/arm/mach-asm9260/Makefile.boot |  2 +
+ arch/arm/mach-asm9260/core.c        | 77 +++++++++++++++++++++++++++++++++++++
+ 5 files changed, 105 insertions(+)
+ create mode 100644 arch/arm/mach-asm9260/Makefile
+ create mode 100644 arch/arm/mach-asm9260/Makefile.boot
+ create mode 100644 arch/arm/mach-asm9260/core.c
 
-> As you said there is no support for ioremap on ARM, so this is not
-> tested on ARM.
-
-Don't forget that this driver is primarily targeted for ARM platforms
-(versus just one ARM64-based Exynos7), so either this feature should be
-clearly added as ARM64-specific (and compiled in conditionally) or made
-work for all supported platforms.
-
->>
->>>               smh     Use ARM semihosting calls for early console.
->>>
->>>       earlyprintk=    [X86,SH,BLACKFIN,ARM,M68k]
->>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
->>> index 249e340..9d42ac8 100644
->>> --- a/drivers/tty/serial/Kconfig
->>> +++ b/drivers/tty/serial/Kconfig
->>> @@ -257,6 +257,7 @@ config SERIAL_SAMSUNG_CONSOLE
->>>       bool "Support for console on Samsung SoC serial port"
->>>       depends on SERIAL_SAMSUNG=y
->>>       select SERIAL_CORE_CONSOLE
->>> +     select SERIAL_EARLYCON
->>>       help
->>>         Allow selection of the S3C24XX on-board serial ports for use as
->>>         an virtual console.
->>> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
->>> index c78f43a..f32e9c8 100644
->>> --- a/drivers/tty/serial/samsung.c
->>> +++ b/drivers/tty/serial/samsung.c
->>> @@ -917,6 +917,7 @@ s3c24xx_serial_verify_port(struct uart_port *port, struct serial_struct *ser)
->>>  #ifdef CONFIG_SERIAL_SAMSUNG_CONSOLE
->>>
->>>  static struct console s3c24xx_serial_console;
->>> +static void s3c24xx_serial_console_putchar(struct uart_port *port, int ch);
->>>
->>>  static int __init s3c24xx_serial_console_init(void)
->>>  {
->>> @@ -926,6 +927,22 @@ static int __init s3c24xx_serial_console_init(void)
->>>  console_initcall(s3c24xx_serial_console_init);
->>>
->>>  #define S3C24XX_SERIAL_CONSOLE &s3c24xx_serial_console
->>> +static void samsung_early_write(struct console *con, const char *s, unsigned n)
->>> +{
->>> +     struct earlycon_device *dev = con->data;
->>> +
->>> +     uart_console_write(&dev->port, s, n, s3c24xx_serial_console_putchar);
->>
->> Hmm, I'm not sure how this is supposed to work before the driver is
->> fully initialized.
->>
->> s3c24xx_serial_console_putchar() will call
->> s3c24xx_serial_console_txrdy(), which in turn requires the port argument
->> to be a pointer to the member of a s3c24xx_uart_port struct, with filled
->> info pointer, which I believe is ready only after s3c24xx_serial_probe().
->>
-> I see your point here, but I did not hit any error or any  runtime
-> crash with this patch when test on ARM64. In order to keep my changes
-> minimal I tried to reused the code already there in this file and that
-> worked for me. The reason why this is working is, if you see
-> s3c24xx_serial_console_txdy(), _info_ pointer is used in a conditional
-> operator and not really involved in any manipulation.
-> I am not sure if compiler should have give some warnings or error here.
-> 
-
-The info pointer is always used whenever FIFO mode is enabled at
-boot-up, which is often the case on many boards (and depends on
-firmware). So the fact that it worked for you was purely a coincidence
-due to your bootloader not using this mode. (Btw. it should be mentioned
-in patch description on what hardware it was tested.)
-
-> But certainly this is not the way this is suppose to work probably.
-> Let me avoid a call to s3c24xx_serial_console_putchar() in my next respin.
-> As this is a very early call and earlycon expect that port are already
-> initialized (by bootloader), I will write a new function to be used
-> instead of s3c24xx_serial_console_putchar() that will directly write
-> to the serial port.
-> 
-
-The mentioned patch already has this implemented, including support for
-all hardware variants. I'd strongly suggest basing your work on top of that.
-
-Marek, could you post that patch as an RFC, so that Alim could continue
-his work?
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5918d40..1a71feb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -379,6 +379,20 @@ config ARCH_AT91
+ 	  This enables support for systems based on Atmel
+ 	  AT91RM9200 and AT91SAM9* processors.
+ 
++config MACH_ASM9260
++	bool "Alphascale ASM9260"
++	select ARCH_REQUIRE_GPIOLIB
++	select COMMON_CLK
++	select IRQ_DOMAIN
++	select SPARSE_IRQ
++	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_CHIP
++	select GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
++	select CPU_ARM926T
++	help
++	  Support for Alpascale ASM9260 based platform.
++
+ config ARCH_CLPS711X
+ 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0ce9d0f..dda8f6d 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -146,6 +146,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+ machine-$(CONFIG_ARCH_AT91)		+= at91
++machine-$(CONFIG_MACH_ASM9260)		+= asm9260
+ machine-$(CONFIG_ARCH_AXXIA)		+= axxia
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+ machine-$(CONFIG_ARCH_BERLIN)		+= berlin
+diff --git a/arch/arm/mach-asm9260/Makefile b/arch/arm/mach-asm9260/Makefile
+new file mode 100644
+index 0000000..4bd8ebd
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Makefile
+@@ -0,0 +1,11 @@
++#
++# Makefile for the linux kernel.
++#
++
++# Object file lists.
++
++obj-y			:= core.o
++obj-m			:=
++obj-n			:=
++obj-			:=
++
+diff --git a/arch/arm/mach-asm9260/Makefile.boot b/arch/arm/mach-asm9260/Makefile.boot
+new file mode 100644
+index 0000000..c57b3b4
+--- /dev/null
++++ b/arch/arm/mach-asm9260/Makefile.boot
+@@ -0,0 +1,2 @@
++zreladdr-y	:= 0x20008000
++
+diff --git a/arch/arm/mach-asm9260/core.c b/arch/arm/mach-asm9260/core.c
+new file mode 100644
+index 0000000..331af96
+--- /dev/null
++++ b/arch/arm/mach-asm9260/core.c
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
++ *  Co-author: Du Huanpeng <u74147@gmail.com>
++ * map_desc based on:
++ *  linux/arch/arm/mach-asm9260/core.c
++ *  Copyright (C) 2011-2014 Alphascale
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++static struct map_desc asm9260_io_desc[] __initdata = {
++	{	/* IO space */
++		.virtual	= (unsigned long)0xf0000000,
++		.pfn		= __phys_to_pfn(0x80000000),
++		.length		= 0x00800000,
++		.type		= MT_DEVICE
++	},
++	{	/* LCD IO space	*/
++		.virtual	= (unsigned long)0xf0a00000,
++		.pfn		= __phys_to_pfn(0x80800000),
++		.length		= 0x00009000,
++		.type		= MT_DEVICE
++	},
++	{	/* GPIO IO space */
++		.virtual	= (unsigned long)0xf0800000,
++		.pfn		= __phys_to_pfn(0x50000000),
++		.length		= 0x00100000,
++		.type		= MT_DEVICE
++	},
++	{	/* SRAM space Cacheable */
++		.virtual	= (unsigned long)0xd0000000,
++		.pfn		= __phys_to_pfn(0x40000000),
++		.length		= 0x00100000,
++#ifdef CONFIG_SRAM_MEM_CACHED
++		.type		= MT_MEMORY
++#else
++		.type		= MT_DEVICE
++#endif
++	},
++};
++
++static void __init asm9260_map_io(void)
++{
++	iotable_init(asm9260_io_desc, ARRAY_SIZE(asm9260_io_desc));
++}
++
++static void __init asm9260_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static const char * const asm9260_dt_board_compat[] __initconst = {
++	"alphascale,asm9260",
++	NULL
++};
++
++DT_MACHINE_START(ASM9260, "Alphascale ASM9260 (Device Tree Support)")
++	.map_io		= asm9260_map_io,
++	.init_machine	= asm9260_init,
++	.dt_compat	= asm9260_dt_board_compat,
++MACHINE_END
+-- 
+1.9.1
