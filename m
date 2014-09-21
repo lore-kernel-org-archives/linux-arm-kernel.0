@@ -1,113 +1,78 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 21 Sep 2014 22:58:11 +0800
-Subject: [PATCH 4/6] ARM: dts: sun9i: Add A80 Optimus Board support
-In-Reply-To: <1411311493-24344-1-git-send-email-wens@csie.org>
-References: <1411311493-24344-1-git-send-email-wens@csie.org>
-Message-ID: <1411311493-24344-5-git-send-email-wens@csie.org>
+Date: Sun, 21 Sep 2014 23:49:09 +0800
+Subject: [PATCH 1/2] watchdog: sunxi: support parameterized compatible
+ strings
+In-Reply-To: <20140919154036.GA30723@roeck-us.net>
+References: <1410878523-4924-1-git-send-email-wens@csie.org>
+ <1410878523-4924-2-git-send-email-wens@csie.org>
+ <541BB712.6020607@roeck-us.net>
+ <CAGb2v67vB-mr1-fM7inWq7wntt31mYroEj-Hq7sMUfWDwV878w@mail.gmail.com>
+ <20140919154036.GA30723@roeck-us.net>
+Message-ID: <CAGb2v65X45dT91No-y8a9k-R557aGjXhbR4jTSdPhGE7FFTB1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 Optimus Board is was launched with the Allwinner A80 SoC.
-It was jointly developed by Allwinner and Merrii.
+On Fri, Sep 19, 2014 at 11:40 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Fri, Sep 19, 2014 at 10:00:36PM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Fri, Sep 19, 2014 at 12:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> > On 09/16/2014 07:42 AM, Chen-Yu Tsai wrote:
+>> >>
+>> >> This patch adds support for hardware parameters tied to compatible
+>> >> strings, so similar hardware can reuse the driver.
+>> >>
+>> >> This will be used to support the newer watchdog found in A31 and
+>> >> later SoCs. Differences in the new hardware include separate
+>> >> interrupt lines for each watchdog, and corresponding interrupt
+>> >> control/status registers. Watchdog control registers were also
+>> >> slightly rearranged.
+>> >>
+>> > You might also mention that you replace some iowrite32 with writel.
+>>
+>> Ah.... Had that in mind, but forgot about it when finishing the series :(
+>>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >
+>> >
+>> > Have you considered using regmap ? Seems to be an ideal candidate.
+>>
+>> I don't follow. Do you mean using regmap to share the interrupt registers
+>> with the timer on sun4i? Otherwise I don't really see a difference.
+>>
+> Use regmap instead of direct writel. Nice thing about it is that regmap offers
+> bit manipulation functions, so you could replace the read / mask / modify /write
+> in a single regmap function call. See imx2_wdt.c for an example how it is used.
+>
+>> Am I missing something?
+>>
+> Not really. Just a suggestion.
 
-This board has a UART port, a JTAG connector, USB host ports, a USB
-3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
-4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
-jack, IR receiver, and additional GPIO headers.
+As the register range and offsets are configurable, using regmap might add
+more code than it saves. I'll keep the it the way it is for now.
 
-This patch adds only basic support.
+>> >>
+>> >> -       /* Enable timer and set reset bit in the watchdog */
+>> >> -       writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
+>> >> +       /* Set lowest timeout and enable watchdog */
+>> >> +       val = readl(wdt_base + regs->wdt_mode);
+>> >> +       val &= ~(WDT_TIMEOUT_MASK << regs->wdt_timeout_shift);
+>> >> +       val |= WDT_MODE_EN;
+>> >
+>> >
+>> > I think it would make sense to also define WDT_MODE_EN and
+>> > WDT_TIMEOUT_MASK as configurable, even if not currently needed.
+>> > It is odd to have the shift configurable but not the mask,
+>> > and to have the mode register configurable but not the mode value.
+>>
+>> I think keeping these values constants clearly shows that they are
+>> the same and shared among the hardware. Making them configurable
+>> shouldn't impose much penalty, but I'd prefer to keep them as is
+>> until we need to change them.
+>>
+> Ok, guess we have a different philosophy ;-). I'll leave it up to you.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/Makefile              |  2 +
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+:)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2f42b18..098f319 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -424,6 +424,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-pcduino3.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a23-ippo-q8h-v5.dtb
-+dtb-$(CONFIG_MACH_SUN9I) += \
-+	sun9i-a80-optimus.dtb
- dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
- 	tegra20-medcom-wide.dtb \
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-new file mode 100644
-index 0000000..b46391a
---- /dev/null
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright 2014 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun9i-a80.dtsi"
-+
-+/ {
-+	model = "Merrii A80 Optimus Board";
-+	compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
-+
-+	chosen {
-+		bootargs = "earlyprintk console=ttyS0,115200";
-+	};
-+
-+	soc at 00000000 {
-+		uart0: serial at 07000000 {
-+			status = "okay";
-+		};
-+	};
-+};
--- 
-2.1.0
+Thanks!
+ChenYu
