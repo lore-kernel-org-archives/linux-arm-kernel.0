@@ -1,141 +1,121 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sun, 21 Sep 2014 20:45:45 +0200
-Subject: [PATCH v2 2/8] add include/debug/asm9260.S
-In-Reply-To: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+Date: Sun, 21 Sep 2014 20:45:46 +0200
+Subject: [PATCH v2 3/8] add alphascale,asm9260.h binding
+In-Reply-To: <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
 References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1411325151-15107-2-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
- arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/include/debug/asm9260.S
+ include/dt-bindings/clock/alphascale,asm9260.h | 97 ++++++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+ create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..6902a57 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -953,6 +953,27 @@ choice
- 		  options; the platform specific options are deprecated
- 		  and will be soon removed.
- 
-+	config DEBUG_ASM9260_UART
-+		bool "Kernel low-level debugging via asm9260 UART"
-+		depends on MACH_ASM9260
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to an UART or USART port on asm9260 based
-+		  machines.
-+
-+		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
-+
-+		    0x80000000      | 0xf0000000     | UART0
-+		    0x80004000      | 0xf0004000     | UART1
-+		    0x80008000      | 0xf0008000     | UART2
-+		    0x8000c000      | 0xf000c000     | UART3
-+		    0x80010000      | 0xf0010000     | UART4
-+		    0x80014000      | 0xf0014000     | UART5
-+		    0x80018000      | 0xf0018000     | UART6
-+		    0x8001c000      | 0xf001c000     | UART7
-+		    0x80020000      | 0xf0020000     | UART8
-+		    0x80024000      | 0xf0024000     | UART9
-+
- endchoice
- 
- config DEBUG_EXYNOS_UART
-@@ -1038,6 +1059,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/vf.S" if DEBUG_VF_UART
- 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
-+	default "debug/asm9260.S" if DEBUG_ASM9260_UART
- 	default "mach/debug-macro.S"
- 
- # Compatibility options for PL01x
-@@ -1094,6 +1116,7 @@ config DEBUG_UART_PHYS
- 	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
- 				DEBUG_S3C2410_UART2)
- 	default 0x7c0003f8 if FOOTBRIDGE
-+	default 0x80010000 if DEBUG_ASM9260_UART
- 	default 0x80070000 if DEBUG_IMX23_UART
- 	default 0x80074000 if DEBUG_IMX28_UART
- 	default 0x80230000 if DEBUG_PICOXCELL_UART
-@@ -1126,7 +1149,8 @@ config DEBUG_UART_PHYS
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_LL_UART_EFM32 || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
--		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-+		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
-+		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
- 
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
-@@ -1134,6 +1158,7 @@ config DEBUG_UART_VIRT
- 	default 0xe1000000 if DEBUG_MSM_UART
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf0009000 if DEBUG_CNS3XXX
-+	default 0xf0010000 if DEBUG_ASM9260_UART
- 	default 0xf01fb000 if DEBUG_NOMADIK_UART
- 	default 0xf0201000 if DEBUG_BCM2835
- 	default 0xf1000300 if DEBUG_BCM_5301X
-@@ -1194,7 +1219,8 @@ config DEBUG_UART_VIRT
- 	default DEBUG_UART_PHYS if !MMU
- 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
--		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
-+		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
-+		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
- 
- config DEBUG_UART_8250_SHIFT
- 	int "Register offset shift for the 8250 debug UART"
-@@ -1236,7 +1262,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARCH_EFM32
-+					PLAT_SAMSUNG || ARCH_EFM32 || \
-+					MACH_ASM9260
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/include/debug/asm9260.S b/arch/arm/include/debug/asm9260.S
+diff --git a/include/dt-bindings/clock/alphascale,asm9260.h b/include/dt-bindings/clock/alphascale,asm9260.h
 new file mode 100644
-index 0000000..c70d51f
+index 0000000..04e8db2
 --- /dev/null
-+++ b/arch/arm/include/debug/asm9260.S
-@@ -0,0 +1,31 @@
-+/* arch/arm/mach-imx/include/mach/debug-macro.S
++++ b/include/dt-bindings/clock/alphascale,asm9260.h
+@@ -0,0 +1,97 @@
++/*
++ * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
 + *
-+ * Debugging macro include header
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
 + *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *  Modified for ASM9260 by Oleksij Remepl <linux@rempel-privat.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+		.macro	addruart, rp, rv, tmp
-+		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
-+		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
-+		.endm
++#ifndef _DT_BINDINGS_CLK_ASM9260_H
++#define _DT_BINDINGS_CLK_ASM9260_H
 +
-+		.macro	waituart,rd,rx
-+		.endm
++/* ahb gate */
++#define CLKID_AHB_ROM		0
++#define CLKID_AHB_RAM		1
++#define CLKID_AHB_GPIO		2
++#define CLKID_AHB_MAC		3
++#define CLKID_AHB_EMI		4
++#define CLKID_AHB_USB0		5
++#define CLKID_AHB_USB1		6
++#define CLKID_AHB_DMA0		7
++#define CLKID_AHB_DMA1		8
++#define CLKID_AHB_UART0		9
++#define CLKID_AHB_UART1		10
++#define CLKID_AHB_UART2		11
++#define CLKID_AHB_UART3		12
++#define CLKID_AHB_UART4		13
++#define CLKID_AHB_UART5		14
++#define CLKID_AHB_UART6		15
++#define CLKID_AHB_UART7		16
++#define CLKID_AHB_UART8		17
++#define CLKID_AHB_UART9		18
++#define CLKID_AHB_I2S0		19
++#define CLKID_AHB_I2C0		20
++#define CLKID_AHB_I2C1		21
++#define CLKID_AHB_SSP0		22
++#define CLKID_AHB_IOCONFIG	23
++#define CLKID_AHB_WDT		24
++#define CLKID_AHB_CAN0		25
++#define CLKID_AHB_CAN1		26
++#define CLKID_AHB_MPWM		27
++#define CLKID_AHB_SPI0		28
++#define CLKID_AHB_SPI1		29
++#define CLKID_AHB_QEI		30
++#define CLKID_AHB_QUADSPI0	31
++#define CLKID_AHB_CAMIF		32
++#define CLKID_AHB_LCDIF		33
++#define CLKID_AHB_TIMER0	34
++#define CLKID_AHB_TIMER1	35
++#define CLKID_AHB_TIMER2	36
++#define CLKID_AHB_TIMER3	37
++#define CLKID_AHB_IRQ		38
++#define CLKID_AHB_RTC		39
++#define CLKID_AHB_NAND		40
++#define CLKID_AHB_ADC0		41
++#define CLKID_AHB_LED		42
++#define CLKID_AHB_DAC0		43
++#define CLKID_AHB_LCD		44
++#define CLKID_AHB_I2S1		45
++#define CLKID_AHB_MAC1		46
 +
-+		.macro	senduart,rd,rx
-+		str	\rd, [\rx, #0x50]	@ TXDATA
-+		.endm
++/* devider */
++#define CLKID_SYS_CPU		47
++#define CLKID_SYS_AHB		48
++#define CLKID_SYS_I2S0M		49
++#define CLKID_SYS_I2S0S		50
++#define CLKID_SYS_I2S1M		51
++#define CLKID_SYS_I2S1S		52
++#define CLKID_SYS_UART0		53
++#define CLKID_SYS_UART1		54
++#define CLKID_SYS_UART2		55
++#define CLKID_SYS_UART3		56
++#define CLKID_SYS_UART4		56
++#define CLKID_SYS_UART5		57
++#define CLKID_SYS_UART6		58
++#define CLKID_SYS_UART7		59
++#define CLKID_SYS_UART8		60
++#define CLKID_SYS_UART9		61
++#define CLKID_SYS_SPI0		62
++#define CLKID_SYS_SPI1		63
++#define CLKID_SYS_QUADSPI	64
++#define CLKID_SYS_SSP0		65
++#define CLKID_SYS_NAND		66
++#define CLKID_SYS_TRACE		67
++#define CLKID_SYS_CAMM		68
++#define CLKID_SYS_WDT		69
++#define CLKID_SYS_CLKOUT	70
++#define CLKID_SYS_MAC		71
++#define CLKID_SYS_LCD		72
++#define CLKID_SYS_ADCANA	73
 +
-+		.macro	busyuart,rd,rx
-+1002:		ldr	\rd, [\rx, #0x60]	@ STAT
-+		tst	\rd, #1 << 27		@ TXEMPTY
-+		beq	1002b			@ wait until transmit done
-+		.endm
++#define MAX_CLKS		74
++#endif
 -- 
 1.9.1
