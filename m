@@ -1,174 +1,54 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Sun, 21 Sep 2014 20:06:26 +0530
-Subject: [PATCH] tty/serial: samsung: Add earlycon support
-In-Reply-To: <541D83AE.1050006@gmail.com>
-References: <1410867163-27962-1-git-send-email-alim.akhtar@samsung.com>
- <541D83AE.1050006@gmail.com>
-Message-ID: <CAGOxZ52HY0eEukbWdt0OnUzcfrLi3Y726om+GQAQ_Q0vmwk-=Q@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 21 Sep 2014 22:58:09 +0800
+Subject: [PATCH 2/6] ARM: sunxi: Add debug uart used by sun9i (Allwinner A80)
+In-Reply-To: <1411311493-24344-1-git-send-email-wens@csie.org>
+References: <1411311493-24344-1-git-send-email-wens@csie.org>
+Message-ID: <1411311493-24344-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-Thanks for your valuable feedback on this patch.
-Please see my comments inline.
+The uarts on sun9i are still compatible with the dw_8250, but are
+located at different addresses.
 
-On Sat, Sep 20, 2014 at 7:09 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Alim,
->
-> Please see my comments inline.
->
-> On 16.09.2014 13:32, Alim Akhtar wrote:
->> Add earlycon support for the samsung serial port. This allows enabling
->> the samsung serial port for console when early_params are parse and processed.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>  Documentation/kernel-parameters.txt |    6 ++++++
->>  drivers/tty/serial/Kconfig          |    1 +
->>  drivers/tty/serial/samsung.c        |   17 +++++++++++++++++
->>  3 files changed, 24 insertions(+)
->>
->> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
->> index 5ae8608..e01c0e5 100644
->> --- a/Documentation/kernel-parameters.txt
->> +++ b/Documentation/kernel-parameters.txt
->> @@ -936,6 +936,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->>                       must already be setup and configured. Options are not
->>                       yet supported.
->>
->> +             samsung,<addr>
->> +                     Start an early, polled-mode console on a samsung serial
->> +                     port at the specified address. The samsung serial port
->> +                     must already be setup and configured. Options are not
->> +                     yet supported.
->> +
->
-> Couldn't you simply parse this from DT? I believe there is already code
-> parsing stdout property in chosen node for earlycon purposes present in
-> the kernel.
->
-> Anyway, we already had a patch for this in our internal tree, but it
-> wasn't submitted because there was no support for early ioremap on ARM
-> at that time. I haven't been following it since then (and I'm no longer
-> at Samsung; Marek might be able to take this topic), is it already
-> available?
-I am not sure what you have internally, any further suggestions on
-this is most welcome.
-As you said there is no support for ioremap on ARM, so this is not
-tested on ARM.
->
->>               smh     Use ARM semihosting calls for early console.
->>
->>       earlyprintk=    [X86,SH,BLACKFIN,ARM,M68k]
->> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
->> index 249e340..9d42ac8 100644
->> --- a/drivers/tty/serial/Kconfig
->> +++ b/drivers/tty/serial/Kconfig
->> @@ -257,6 +257,7 @@ config SERIAL_SAMSUNG_CONSOLE
->>       bool "Support for console on Samsung SoC serial port"
->>       depends on SERIAL_SAMSUNG=y
->>       select SERIAL_CORE_CONSOLE
->> +     select SERIAL_EARLYCON
->>       help
->>         Allow selection of the S3C24XX on-board serial ports for use as
->>         an virtual console.
->> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
->> index c78f43a..f32e9c8 100644
->> --- a/drivers/tty/serial/samsung.c
->> +++ b/drivers/tty/serial/samsung.c
->> @@ -917,6 +917,7 @@ s3c24xx_serial_verify_port(struct uart_port *port, struct serial_struct *ser)
->>  #ifdef CONFIG_SERIAL_SAMSUNG_CONSOLE
->>
->>  static struct console s3c24xx_serial_console;
->> +static void s3c24xx_serial_console_putchar(struct uart_port *port, int ch);
->>
->>  static int __init s3c24xx_serial_console_init(void)
->>  {
->> @@ -926,6 +927,22 @@ static int __init s3c24xx_serial_console_init(void)
->>  console_initcall(s3c24xx_serial_console_init);
->>
->>  #define S3C24XX_SERIAL_CONSOLE &s3c24xx_serial_console
->> +static void samsung_early_write(struct console *con, const char *s, unsigned n)
->> +{
->> +     struct earlycon_device *dev = con->data;
->> +
->> +     uart_console_write(&dev->port, s, n, s3c24xx_serial_console_putchar);
->
-> Hmm, I'm not sure how this is supposed to work before the driver is
-> fully initialized.
->
-> s3c24xx_serial_console_putchar() will call
-> s3c24xx_serial_console_txrdy(), which in turn requires the port argument
-> to be a pointer to the member of a s3c24xx_uart_port struct, with filled
-> info pointer, which I believe is ready only after s3c24xx_serial_probe().
->
-I see your point here, but I did not hit any error or any  runtime
-crash with this patch when test on ARM64. In order to keep my changes
-minimal I tried to reused the code already there in this file and that
-worked for me. The reason why this is working is, if you see
-s3c24xx_serial_console_txdy(), _info_ pointer is used in a conditional
-operator and not really involved in any manipulation.
-I am not sure if compiler should have give some warnings or error here.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-But certainly this is not the way this is suppose to work probably.
-Let me avoid a call to s3c24xx_serial_console_putchar() in my next respin.
-As this is a very early call and earlycon expect that port are already
-initialized (by bootloader), I will write a new function to be used
-instead of s3c24xx_serial_console_putchar() that will directly write
-to the serial port.
-
-> Has this patch been tested with earlycon enabled and it was indeed
-> verified that earlycon is actually used?
->
-Yes, this is tested on ARM64 with earlycon enabled, the way I tested is:
-"Disabled" serial dt node in the device tree file,
-passed earlycon = samsung,<addr> in CMDLINE
-put some debug prints in setup() method, and it is getting printed on
-console very early.
-Below is my partial bootlog:
-
------
-Initializing cgroup subsys cpu
-Linux version 3.17.0-rc5+ (alim at alim) (gcc version 4.8.3 20140106 (prerelease)
-CPU: AArch64 Processor
-Detected VIPT I-cache on CPU0
-Early serial console at I/O port 0x0 (options '')
-samsung_early_console_setup:954
-bootconsole [uart0] enabled
-.
-.
-Kernel command line: earlycon=samsung,0x14c30000 console=ttySAC0,115200
-.
-.
-io scheduler noop registered
-io scheduler cfq registered (default)
-Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-.
-.
-TCP: cubic registered
-NET: Registered protocol family 17
-9pnet: Installing 9P2000 support
-bootconsole [uart0] disabled
--------
-As I disabled serial node from DT, it did not printed any further
-bootlog after "bootconsole [uar0] disabled"
-And removing "earlycon" from CMDLINE does not give any bootlog on console.
-So I believe earlycon is working on this platform atleast.
-
-Let me know if this test is convincing to you.
-
-Thanks,
-
-> Best regards,
-> Tomasz
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..58b5218 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -707,6 +707,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on SOCFPGA based platforms.
+ 
++	config DEBUG_SUN9I_UART0
++		bool "Kernel low-level debugging messages via sun9i UART0"
++		depends on ARCH_SUNXI && MACH_SUN9I
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A80 based platforms on the UART0.
++
+ 	config DEBUG_SUNXI_UART0
+ 		bool "Kernel low-level debugging messages via sunXi UART0"
+ 		depends on ARCH_SUNXI
+@@ -1068,6 +1076,7 @@ config DEBUG_UART_PHYS
+ 	default 0x02530c00 if DEBUG_KEYSTONE_UART0
+ 	default 0x02531000 if DEBUG_KEYSTONE_UART1
+ 	default 0x03010fe0 if ARCH_RPC
++	default 0x07000000 if DEBUG_SUN9I_UART0
+ 	default 0x10009000 if DEBUG_REALVIEW_STD_PORT || DEBUG_CNS3XXX || \
+ 				DEBUG_VEXPRESS_UART0_CA9
+ 	default 0x1010c000 if DEBUG_REALVIEW_PB1176_PORT
+@@ -1145,6 +1154,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
++	default 0xf7000000 if DEBUG_SUN9I_UART0
+ 	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
+ 				DEBUG_S3C2410_UART0)
+ 	default 0xf7004000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART1 || \
 -- 
-Regards,
-Alim
+2.1.0
