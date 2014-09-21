@@ -1,78 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 21 Sep 2014 23:49:09 +0800
-Subject: [PATCH 1/2] watchdog: sunxi: support parameterized compatible
- strings
-In-Reply-To: <20140919154036.GA30723@roeck-us.net>
-References: <1410878523-4924-1-git-send-email-wens@csie.org>
- <1410878523-4924-2-git-send-email-wens@csie.org>
- <541BB712.6020607@roeck-us.net>
- <CAGb2v67vB-mr1-fM7inWq7wntt31mYroEj-Hq7sMUfWDwV878w@mail.gmail.com>
- <20140919154036.GA30723@roeck-us.net>
-Message-ID: <CAGb2v65X45dT91No-y8a9k-R557aGjXhbR4jTSdPhGE7FFTB1A@mail.gmail.com>
+Date: Mon, 22 Sep 2014 00:05:19 +0800
+Subject: [PATCH v2 2/2] watchdog: sunxi: Add A31 watchdog support
+In-Reply-To: <1411315519-26257-1-git-send-email-wens@csie.org>
+References: <1411315519-26257-1-git-send-email-wens@csie.org>
+Message-ID: <1411315519-26257-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 11:40 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Fri, Sep 19, 2014 at 10:00:36PM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Fri, Sep 19, 2014 at 12:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> > On 09/16/2014 07:42 AM, Chen-Yu Tsai wrote:
->> >>
->> >> This patch adds support for hardware parameters tied to compatible
->> >> strings, so similar hardware can reuse the driver.
->> >>
->> >> This will be used to support the newer watchdog found in A31 and
->> >> later SoCs. Differences in the new hardware include separate
->> >> interrupt lines for each watchdog, and corresponding interrupt
->> >> control/status registers. Watchdog control registers were also
->> >> slightly rearranged.
->> >>
->> > You might also mention that you replace some iowrite32 with writel.
->>
->> Ah.... Had that in mind, but forgot about it when finishing the series :(
->>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >
->> >
->> > Have you considered using regmap ? Seems to be an ideal candidate.
->>
->> I don't follow. Do you mean using regmap to share the interrupt registers
->> with the timer on sun4i? Otherwise I don't really see a difference.
->>
-> Use regmap instead of direct writel. Nice thing about it is that regmap offers
-> bit manipulation functions, so you could replace the read / mask / modify /write
-> in a single regmap function call. See imx2_wdt.c for an example how it is used.
->
->> Am I missing something?
->>
-> Not really. Just a suggestion.
+This patch adds support for the watchdog hardware found in A31 and
+newer SoCs. This new hardware has registers at different offsets, and
+the system reset control has been split out of the "mode" register
+into a new "configuration" register.
 
-As the register range and offsets are configurable, using regmap might add
-more code than it saves. I'll keep the it the way it is for now.
+Differences not supported by this driver include separate interrupt
+lines for each watchdog, instead of sharing an interrupt line and
+registers with the timer block.
 
->> >>
->> >> -       /* Enable timer and set reset bit in the watchdog */
->> >> -       writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
->> >> +       /* Set lowest timeout and enable watchdog */
->> >> +       val = readl(wdt_base + regs->wdt_mode);
->> >> +       val &= ~(WDT_TIMEOUT_MASK << regs->wdt_timeout_shift);
->> >> +       val |= WDT_MODE_EN;
->> >
->> >
->> > I think it would make sense to also define WDT_MODE_EN and
->> > WDT_TIMEOUT_MASK as configurable, even if not currently needed.
->> > It is odd to have the shift configurable but not the mask,
->> > and to have the mode register configurable but not the mode value.
->>
->> I think keeping these values constants clearly shows that they are
->> the same and shared among the hardware. Making them configurable
->> shouldn't impose much penalty, but I'd prefer to keep them as is
->> until we need to change them.
->>
-> Ok, guess we have a different philosophy ;-). I'll leave it up to you.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/watchdog/sunxi_wdt.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-:)
-
-Thanks!
-ChenYu
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index a1f7113..b62301e 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -219,8 +219,18 @@ static const struct sunxi_wdt_reg sun4i_wdt_reg = {
+ 	.wdt_reset_val = 0x02,
+ };
+ 
++static const struct sunxi_wdt_reg sun6i_wdt_reg = {
++	.wdt_ctrl = 0x10,
++	.wdt_cfg = 0x14,
++	.wdt_mode = 0x18,
++	.wdt_timeout_shift = 4,
++	.wdt_reset_mask = 0x03,
++	.wdt_reset_val = 0x01,
++};
++
+ static const struct of_device_id sunxi_wdt_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-wdt", .data = &sun4i_wdt_reg },
++	{ .compatible = "allwinner,sun6i-a31-wdt", .data = &sun6i_wdt_reg },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
+-- 
+2.1.0
