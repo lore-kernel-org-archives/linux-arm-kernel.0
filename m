@@ -1,177 +1,141 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sun, 21 Sep 2014 20:41:37 +0200
-Subject: [PATCH v2 1/8] ARM: add mach-asm9260
+Date: Sun, 21 Sep 2014 20:41:38 +0200
+Subject: [PATCH v2 2/8] add include/debug/asm9260.S
 In-Reply-To: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
 References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <1411324904-14881-2-git-send-email-linux@rempel-privat.de>
+Message-ID: <1411324904-14881-3-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-it is low cost (?) SoC targeted for market in China and India which
-trying to compete with AT91SAM9G25.
-
-Here is some info:
-http://www.alphascale.com/index.asp?ics/615.html
-
-One of products:
-http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
-
 Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 ---
- arch/arm/Kconfig                    | 14 +++++++
- arch/arm/Makefile                   |  1 +
- arch/arm/mach-asm9260/Makefile      | 11 ++++++
- arch/arm/mach-asm9260/Makefile.boot |  2 +
- arch/arm/mach-asm9260/core.c        | 77 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 105 insertions(+)
- create mode 100644 arch/arm/mach-asm9260/Makefile
- create mode 100644 arch/arm/mach-asm9260/Makefile.boot
- create mode 100644 arch/arm/mach-asm9260/core.c
+ arch/arm/Kconfig.debug           | 33 ++++++++++++++++++++++++++++++---
+ arch/arm/include/debug/asm9260.S | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/debug/asm9260.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5918d40..1a71feb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -379,6 +379,20 @@ config ARCH_AT91
- 	  This enables support for systems based on Atmel
- 	  AT91RM9200 and AT91SAM9* processors.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..6902a57 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -953,6 +953,27 @@ choice
+ 		  options; the platform specific options are deprecated
+ 		  and will be soon removed.
  
-+config MACH_ASM9260
-+	bool "Alphascale ASM9260"
-+	select ARCH_REQUIRE_GPIOLIB
-+	select COMMON_CLK
-+	select IRQ_DOMAIN
-+	select SPARSE_IRQ
-+	select MULTI_IRQ_HANDLER
-+	select GENERIC_IRQ_CHIP
-+	select GENERIC_CLOCKEVENTS
-+	select CLKSRC_MMIO
-+	select CPU_ARM926T
-+	help
-+	  Support for Alpascale ASM9260 based platform.
++	config DEBUG_ASM9260_UART
++		bool "Kernel low-level debugging via asm9260 UART"
++		depends on MACH_ASM9260
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to an UART or USART port on asm9260 based
++		  machines.
 +
- config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
- 	select ARCH_REQUIRE_GPIOLIB
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0ce9d0f..dda8f6d 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -146,6 +146,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
- machine-$(CONFIG_ARCH_AT91)		+= at91
-+machine-$(CONFIG_MACH_ASM9260)		+= asm9260
- machine-$(CONFIG_ARCH_AXXIA)		+= axxia
- machine-$(CONFIG_ARCH_BCM)		+= bcm
- machine-$(CONFIG_ARCH_BERLIN)		+= berlin
-diff --git a/arch/arm/mach-asm9260/Makefile b/arch/arm/mach-asm9260/Makefile
++		    DEBUG_UART_PHYS | DEBUG_UART_VIRT
++
++		    0x80000000      | 0xf0000000     | UART0
++		    0x80004000      | 0xf0004000     | UART1
++		    0x80008000      | 0xf0008000     | UART2
++		    0x8000c000      | 0xf000c000     | UART3
++		    0x80010000      | 0xf0010000     | UART4
++		    0x80014000      | 0xf0014000     | UART5
++		    0x80018000      | 0xf0018000     | UART6
++		    0x8001c000      | 0xf001c000     | UART7
++		    0x80020000      | 0xf0020000     | UART8
++		    0x80024000      | 0xf0024000     | UART9
++
+ endchoice
+ 
+ config DEBUG_EXYNOS_UART
+@@ -1038,6 +1059,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/vf.S" if DEBUG_VF_UART
+ 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
+ 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
++	default "debug/asm9260.S" if DEBUG_ASM9260_UART
+ 	default "mach/debug-macro.S"
+ 
+ # Compatibility options for PL01x
+@@ -1094,6 +1116,7 @@ config DEBUG_UART_PHYS
+ 	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+ 				DEBUG_S3C2410_UART2)
+ 	default 0x7c0003f8 if FOOTBRIDGE
++	default 0x80010000 if DEBUG_ASM9260_UART
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+@@ -1126,7 +1149,8 @@ config DEBUG_UART_PHYS
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+@@ -1134,6 +1158,7 @@ config DEBUG_UART_VIRT
+ 	default 0xe1000000 if DEBUG_MSM_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf0009000 if DEBUG_CNS3XXX
++	default 0xf0010000 if DEBUG_ASM9260_UART
+ 	default 0xf01fb000 if DEBUG_NOMADIK_UART
+ 	default 0xf0201000 if DEBUG_BCM2835
+ 	default 0xf1000300 if DEBUG_BCM_5301X
+@@ -1194,7 +1219,8 @@ config DEBUG_UART_VIRT
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART || DEBUG_ASM9260_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+@@ -1236,7 +1262,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARCH_EFM32
++					PLAT_SAMSUNG || ARCH_EFM32 || \
++					MACH_ASM9260
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/include/debug/asm9260.S b/arch/arm/include/debug/asm9260.S
 new file mode 100644
-index 0000000..4bd8ebd
+index 0000000..c70d51f
 --- /dev/null
-+++ b/arch/arm/mach-asm9260/Makefile
-@@ -0,0 +1,11 @@
-+#
-+# Makefile for the linux kernel.
-+#
-+
-+# Object file lists.
-+
-+obj-y			:= core.o
-+obj-m			:=
-+obj-n			:=
-+obj-			:=
-+
-diff --git a/arch/arm/mach-asm9260/Makefile.boot b/arch/arm/mach-asm9260/Makefile.boot
-new file mode 100644
-index 0000000..c57b3b4
---- /dev/null
-+++ b/arch/arm/mach-asm9260/Makefile.boot
-@@ -0,0 +1,2 @@
-+zreladdr-y	:= 0x20008000
-+
-diff --git a/arch/arm/mach-asm9260/core.c b/arch/arm/mach-asm9260/core.c
-new file mode 100644
-index 0000000..331af96
---- /dev/null
-+++ b/arch/arm/mach-asm9260/core.c
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2014 Oleksij Rempel <linux@rempel-privat.de>
-+ *  Co-author: Du Huanpeng <u74147@gmail.com>
-+ * map_desc based on:
-+ *  linux/arch/arm/mach-asm9260/core.c
-+ *  Copyright (C) 2011-2014 Alphascale
++++ b/arch/arm/include/debug/asm9260.S
+@@ -0,0 +1,31 @@
++/* arch/arm/mach-imx/include/mach/debug-macro.S
++ *
++ * Debugging macro include header
++ *
++ *  Copyright (C) 1994-1999 Russell King
++ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
++ *  Modified for ASM9260 by Oleksij Remepl <linux@rempel-privat.de>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 + */
 +
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
++		.macro	addruart, rp, rv, tmp
++		ldr	\rp, = CONFIG_DEBUG_UART_PHYS
++		ldr	\rv, = CONFIG_DEBUG_UART_VIRT
++		.endm
 +
-+static struct map_desc asm9260_io_desc[] __initdata = {
-+	{	/* IO space */
-+		.virtual	= (unsigned long)0xf0000000,
-+		.pfn		= __phys_to_pfn(0x80000000),
-+		.length		= 0x00800000,
-+		.type		= MT_DEVICE
-+	},
-+	{	/* LCD IO space	*/
-+		.virtual	= (unsigned long)0xf0a00000,
-+		.pfn		= __phys_to_pfn(0x80800000),
-+		.length		= 0x00009000,
-+		.type		= MT_DEVICE
-+	},
-+	{	/* GPIO IO space */
-+		.virtual	= (unsigned long)0xf0800000,
-+		.pfn		= __phys_to_pfn(0x50000000),
-+		.length		= 0x00100000,
-+		.type		= MT_DEVICE
-+	},
-+	{	/* SRAM space Cacheable */
-+		.virtual	= (unsigned long)0xd0000000,
-+		.pfn		= __phys_to_pfn(0x40000000),
-+		.length		= 0x00100000,
-+#ifdef CONFIG_SRAM_MEM_CACHED
-+		.type		= MT_MEMORY
-+#else
-+		.type		= MT_DEVICE
-+#endif
-+	},
-+};
++		.macro	waituart,rd,rx
++		.endm
 +
-+static void __init asm9260_map_io(void)
-+{
-+	iotable_init(asm9260_io_desc, ARRAY_SIZE(asm9260_io_desc));
-+}
++		.macro	senduart,rd,rx
++		str	\rd, [\rx, #0x50]	@ TXDATA
++		.endm
 +
-+static void __init asm9260_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char * const asm9260_dt_board_compat[] __initconst = {
-+	"alphascale,asm9260",
-+	NULL
-+};
-+
-+DT_MACHINE_START(ASM9260, "Alphascale ASM9260 (Device Tree Support)")
-+	.map_io		= asm9260_map_io,
-+	.init_machine	= asm9260_init,
-+	.dt_compat	= asm9260_dt_board_compat,
-+MACHINE_END
++		.macro	busyuart,rd,rx
++1002:		ldr	\rd, [\rx, #0x60]	@ STAT
++		tst	\rd, #1 << 27		@ TXEMPTY
++		beq	1002b			@ wait until transmit done
++		.endm
 -- 
 1.9.1
