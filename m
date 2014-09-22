@@ -1,102 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 22 Sep 2014 17:42:41 +0200
-Subject: [PATCH v6 7/9] rtc: at91sam9: use clk API instead of relying on
- AT91_SLOW_CLOCK
-In-Reply-To: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411400563-570-8-git-send-email-boris.brezillon@free-electrons.com>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Mon, 22 Sep 2014 10:56:58 -0500
+Subject: [PATCH v6] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140919172846.GA12331@e104818-lin.cambridge.arm.com>
+References: <20140908230852.2118.97400.stgit@joelaarch64.amd.com>
+ <20140919152853.GH2295@e104818-lin.cambridge.arm.com>
+ <20140919172846.GA12331@e104818-lin.cambridge.arm.com>
+Message-ID: <542046CA.1060508@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTT block is using the slow clock which is accessible through the clk
-API.
-Use the clk API to retrieve, enable and get the slow clk rate instead of
-the AT91_SLOW_CLOCK macro (which hardcodes the slow clk rate).
-Doing this allows us to reference the clk thus preventing the CCF from
-disabling it during the "disable unused" phase.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/rtc/rtc-at91sam9.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+>>> -#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+>>> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+> Actually, after some more thinking, why don't we just make the upper
+> limit of this mask 48-bit always or even 64-bit. That's a physical mask
+> for checking whether the pgd pointer in vttbr is aligned as per the
+> architecture requirements. Given that the pointer is allocated from the
+> platform memory, it's clear that it is within the PA range. So basically
+> you just need a mask to check the bottom alignment based on
+> VTCR_EL2.T0SZ (which should be independent from the PA range). I guess
+> it should be enough as:
+This sounds fine to me.  I would say that there is no harm in
+re-checking the upper bits, but I agree it is unnecessary.
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 902cd01..d20e118 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -23,6 +23,7 @@
- #include <linux/io.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/clk.h>
- 
- /*
-  * This driver uses two configurable hardware resources that live in the
-@@ -61,8 +62,6 @@
- #define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
- #define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
- 
--#define AT91_SLOW_CLOCK		32768
--
- /*
-  * We store ALARM_DISABLED in ALMV to record that no alarm is set.
-  * It's also the reset value for that field.
-@@ -77,6 +76,7 @@ struct sam9_rtc {
- 	struct regmap		*gpbr;
- 	unsigned int		gpbr_offset;
- 	int 			irq;
-+	struct clk		*sclk;
- };
- 
- #define rtt_readl(rtc, field) \
-@@ -328,6 +328,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 	struct sam9_rtc	*rtc;
- 	int		ret, irq;
- 	u32		mr;
-+	unsigned int	sclk_rate;
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
-@@ -385,11 +386,27 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	rtc->sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(rtc->sclk))
-+		return PTR_ERR(rtc->sclk);
-+
-+	sclk_rate = clk_get_rate(rtc->sclk);
-+	if (!sclk_rate || sclk_rate > AT91_RTT_RTTRST) {
-+		dev_err(&pdev->dev, "Invalid slow clock rate");
-+		return -EINVAL;
-+	}
-+
-+	ret = clk_prepare_enable(rtc->sclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Could not enable slow clock");
-+		return ret;
-+	}
-+
- 	mr = rtt_readl(rtc, MR);
- 
- 	/* unless RTT is counting at 1 Hz, re-initialize it */
--	if ((mr & AT91_RTT_RTPRES) != AT91_SLOW_CLOCK) {
--		mr = AT91_RTT_RTTRST | (AT91_SLOW_CLOCK & AT91_RTT_RTPRES);
-+	if ((mr & AT91_RTT_RTPRES) != sclk_rate) {
-+		mr = AT91_RTT_RTTRST | (sclk_rate & AT91_RTT_RTPRES);
- 		gpbr_writel(rtc, 0);
- 	}
- 
-@@ -434,6 +451,9 @@ static int at91_rtc_remove(struct platform_device *pdev)
- 	/* disable all interrupts */
- 	rtt_writel(rtc, MR, mr & ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
- 
-+	if (!IS_ERR(rtc->sclk))
-+		clk_disable_unprepare(rtc->sclk);
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+>
+> #define VTTBR_BADDR_MASK  (~0ULL << VTTBR_BADDR_SHIFT)
+>
+> without any other changes to T0SZ.
+>
+> The TCR_EL2.PS setting should be done based on the ID_A64MMFR0_EL1
+> but you can do this in __do_hyp_init (it looks like this function
+> handles VTCR_EL2.PS already, not sure why it does do it for TCR_EL2 as
+> well).
+>
+> So IMO you only need about a few lines patch.
+>
+My original patch to fix this problem was one line, so I'm perfectly
+happy with simplification.  But it would be nice if the other reviewers
+could agree with this approach.  With six versions that each addressed
+all the comments from reviewers I'd like it if the v7 that throws away
+most of that feedback didn't result in a v8 that puts it all back again.
