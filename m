@@ -1,108 +1,51 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 22 Sep 2014 15:28:42 -0700
-Subject: [PATCH 2/2] iommu/arm-smmu: add support for access-protected
- mappings
-In-Reply-To: <20140919220535.GM20773@arm.com> (Will Deacon's message of "Fri,
- 19 Sep 2014 23:05:36 +0100")
-References: <1410984969-2340-1-git-send-email-mitchelh@codeaurora.org>
- <1410984969-2340-3-git-send-email-mitchelh@codeaurora.org>
- <20140919220535.GM20773@arm.com>
-Message-ID: <vnkwtx3zb885.fsf@mitchelh-linux.qualcomm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Sep 2014 23:30:23 +0100
+Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
+ consolidation
+In-Reply-To: <20140922153919.GQ25809@arm.com>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+ <20140922153919.GQ25809@arm.com>
+Message-ID: <20140922223022.GO5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19 2014 at 03:05:36 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 17, 2014 at 09:16:09PM +0100, Mitchel Humpherys wrote:
->> ARM SMMUs support memory access control via some bits in the translation
->> table descriptor memory attributes. Currently we assume all translations
->> are "unprivileged". Add support for privileged mappings, controlled by
->> the IOMMU_PRIV prot flag.
->> 
->> Also sneak in a whitespace change for consistency with nearby code.
->> 
->> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu.c | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index ca18d6d42a..93999ec22c 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1256,10 +1256,11 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
->>  	}
->>  
->>  	if (stage == 1) {
->> -		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
->> +		pteval |= ARM_SMMU_PTE_nG;
->> +		if (!(prot & IOMMU_PRIV))
->> +			pteval |= ARM_SMMU_PTE_AP_UNPRIV;
->
-> I think this actually makes more sense if we invert the logic, i.e. have
-> IOMMU_USER as a flag which sets the UNPRIV bit in the pte.
+On Mon, Sep 22, 2014 at 04:39:19PM +0100, Will Deacon wrote:
+> On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
+> > This series contains the necessary changes to allow architected timer
+> > access from user-space on 32-bit ARM.  This allows the VDSO to support
+> > high resolution timestamps for clock_gettime and gettimeofday.  This
+> > also merges substantially similar code from arm and arm64 into the
+> > core arm_arch_timer driver.
+> > 
+> > The functional changes are:
+> > - When available, CNTVCT is made readable by user space on arm, as it
+> >   is on arm64.
+> > - The clocksource name becomes "arch_mem_counter" if CP15 access to
+> >   the counter is not available.
+> > 
+> > These changes have been carried as part of the ARM VDSO patch set over
+> > the last several months, but I am splitting them out here as I assume
+> > they should go through the clocksource maintainers.
+> 
+> For the series:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> I'm not sure which tree the arch-timer stuff usually goes through, but
+> the arm/arm64 bits look fine so I'm happy for them to merged together.
 
-I'm fine either way but the common case seems to be unprivileged
-mappings (at least in our system).  We have one user of this flag out of
-a dozen or so users.
+I raised a while back with Will whether there's much point to having
+this on ARM.  While it's useful for virtualisation, the majority of
+32-bit ARM doesn't run virtualised.  So there's little point in having
+the VDSO on the majority of platforms - it will just add additional
+unnecessary cycles slowing down the system calls that the VDSO is
+designed to try to speed up.
 
->
-> I don't have the spec to hand, but I guess you can't enforce this at
-> stage-2? If so, do we also need a new IOMMU capability so people don't try
-> to use this for stage-2 only SMMUs?
-
-Hmm, actually we do have S2AP although it doesn't make a distinction
-between accesses from EL0 and EL1.  But maybe it would make sense to
-make the `IOMMU_PRIV' mean `no access from EL0 or EL1' for stage 2
-mappings?  Something like:
-
-
--- >8 --
-Subject: iommu/arm-smmu: add support for access-protected mappings
-
-ARM SMMUs support memory access control via some bits in the translation
-table descriptor memory attributes. Currently we assume all translations
-are "unprivileged". Add support for privileged mappings, controlled by
-the IOMMU_PRIV prot flag.
-
-Also sneak in a whitespace change for consistency with nearby code.
-
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/iommu/arm-smmu.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ca18d6d42a..4f85b64f74 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1256,18 +1256,19 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
- 	}
- 
- 	if (stage == 1) {
--		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
-+		pteval |= ARM_SMMU_PTE_nG;
-+		if (!(prot & IOMMU_PRIV))
-+			pteval |= ARM_SMMU_PTE_AP_UNPRIV;
- 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
- 			pteval |= ARM_SMMU_PTE_AP_RDONLY;
--
- 		if (prot & IOMMU_CACHE)
- 			pteval |= (MAIR_ATTR_IDX_CACHE <<
- 				   ARM_SMMU_PTE_ATTRINDX_SHIFT);
- 	} else {
- 		pteval |= ARM_SMMU_PTE_HAP_FAULT;
--		if (prot & IOMMU_READ)
-+		if (prot & IOMMU_READ && !(prot & IOMMU_PRIV))
- 			pteval |= ARM_SMMU_PTE_HAP_READ;
--		if (prot & IOMMU_WRITE)
-+		if (prot & IOMMU_WRITE && !(prot & IOMMU_PRIV))
- 			pteval |= ARM_SMMU_PTE_HAP_WRITE;
- 		if (prot & IOMMU_CACHE)
- 			pteval |= ARM_SMMU_PTE_MEMATTR_OIWB;
-
-
-
+So, my view is that this VDSO will only be of very limited use for
+32-bit ARM, and should not be exposed to userspace unless there is
+a reason for it to be exposed (iow, the hardware necessary to support
+it is present.)
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
