@@ -1,73 +1,45 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 22 Sep 2014 11:10:52 +0200
-Subject: [PATCH v5 3/9] rtc: at91sam9: replace devm_ioremap by
- devm_ioremap_resource
+Date: Mon, 22 Sep 2014 11:10:58 +0200
+Subject: [PATCH v5 9/9] mfd: syscon: add Atmel GPBR DT bindings documention
 In-Reply-To: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411377058-26155-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411377058-26155-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace devm_ioremap calls by devm_ioremap_resource which already check
-resource consistency (resource != NULL) and print an error in case of
-failure.
+The GPBR block provides a set of battery-backed registers that can be used
+to save data which need to be kept when the system is powered down and
+VDD-core is maintained by an external battery.
+
+A typical usage is the RTT block (when used as an RTC) which needs one of
+those registers to save the current time.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- drivers/rtc/rtc-at91sam9.c | 29 ++++++++++-------------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+ Documentation/devicetree/bindings/mfd/atmel,gpbr.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 74a9ca0..38a2693 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -306,18 +306,11 @@ static const struct rtc_class_ops at91_rtc_ops = {
-  */
- static int at91_rtc_probe(struct platform_device *pdev)
- {
--	struct resource	*r, *r_gpbr;
-+	struct resource	*r;
- 	struct sam9_rtc	*rtc;
- 	int		ret, irq;
- 	u32		mr;
- 
--	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	r_gpbr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!r || !r_gpbr) {
--		dev_err(&pdev->dev, "need 2 ressources\n");
--		return -ENODEV;
--	}
--
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		dev_err(&pdev->dev, "failed to get interrupt resource\n");
-@@ -335,18 +328,16 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 		device_init_wakeup(&pdev->dev, 1);
- 
- 	platform_set_drvdata(pdev, rtc);
--	rtc->rtt = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (!rtc->rtt) {
--		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
--		return -ENOMEM;
--	}
- 
--	rtc->gpbr = devm_ioremap(&pdev->dev, r_gpbr->start,
--				resource_size(r_gpbr));
--	if (!rtc->gpbr) {
--		dev_err(&pdev->dev, "failed to map gpbr registers, aborting.\n");
--		return -ENOMEM;
--	}
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rtc->rtt = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(rtc->rtt))
-+		return PTR_ERR(rtc->rtt);
+diff --git a/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+new file mode 100644
+index 0000000..a285695
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+@@ -0,0 +1,15 @@
++* Device tree bindings for Atmel GPBR (General Purpose Backup Registers)
 +
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(rtc->gpbr))
-+		return PTR_ERR(rtc->rtt);
- 
- 	mr = rtt_readl(rtc, MR);
- 
++The GPBR are a set of battery-backed registers.
++
++Required properties:
++- compatible:		"atmel,at91sam9260-gpbr", "syscon"
++- reg:			contains offset/length value of the GPBR memory
++			region.
++
++Example:
++
++gpbr: gpbr at fffffd50 {
++	compatible = "atmel,at91sam9260-gpbr", "syscon";
++	reg = <0xfffffd50 0x10>;
++};
 -- 
 1.9.1
