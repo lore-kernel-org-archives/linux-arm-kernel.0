@@ -1,136 +1,50 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 22 Sep 2014 14:15:47 +0200
-Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
- <20140922093228.GA20256@rric.localhost>
- <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
-Message-ID: <20140922121547.GD20170@rric.localhost>
+From: anders.berg@avagotech.com (Anders Berg)
+Date: Mon, 22 Sep 2014 14:18:24 +0200
+Subject: [PATCH] i2c: axxia: Add I2C driver for AXM55xx
+In-Reply-To: <20140922110455.GA1463@katana>
+References: <1408967482-17723-1-git-send-email-anders.berg@avagotech.com>
+ <20140920121242.GA3833@katana>
+ <CAE0=X_0VQ8rWrUgbsgKm1MwCP8bwWm3UJPq9p=xNDfjP4CC7Bg@mail.gmail.com>
+ <20140922095939.GB1406@katana>
+ <CAE0=X_1v_1eNr=dPTgofamFuy6zP9ff=LS7dyexj4CeutDqaPA@mail.gmail.com>
+ <20140922110455.GA1463@katana>
+Message-ID: <CAE0=X_2bZQSk=hBm4FoffOiVNwebHRm7XmnBwOa=rUhXHjsuLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.09.14 12:43:17, Liviu Dudau wrote:
-> On Mon, Sep 22, 2014 at 10:32:28AM +0100, Robert Richter wrote:
-> > On 18.09.14 02:30:23, Liviu Dudau wrote:
-> > > +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > > +			unsigned char busno, unsigned char bus_max,
-> > > +			struct list_head *resources, resource_size_t *io_base)
-> > > +{
-> > > +	struct resource *res;
-> > > +	struct resource *bus_range;
-> > > +	struct of_pci_range range;
-> > > +	struct of_pci_range_parser parser;
-> > > +	char range_type[4];
-> > > +	int err;
-> > > +
-> > > +	if (!io_base)
-> > > +		return -EINVAL;
-> > > +	*io_base = OF_BAD_ADDR;
-> > 
-> 
-> Hi Robert,
-> 
-> > This breaks for mem-mapped pci host controllers. The patch below fixes
-> > this.
-> 
-> I think you mean PCI host controller that have only memory mapped ranges,
-> am I right? Initially I've read your reply as to mean that the host
-> controller is accessed through some memory mapped area, which I believe is
-> the case for all host controllers.
+On Mon, Sep 22, 2014 at 1:04 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> >> >> +     if (msg->len == 0 || msg->len > 255)
+>> >> >> +             return -EINVAL;
+>> >> >
+>> >> > Ouch, really? Maybe we should warn the user here.
+>> >>
+>> >> Yeah, the transfer length register limits the length to 255. I'll add
+>> >> a warning here.
+>> >
+>> > Please also add this information to the Kconfig description and
+>> > somewhere at the top of the source file. This is an important flaw which
+>> > people should easily find out about.
+>> >
+>>
+>> You are referring to the "len <= 255" restriction being the flaw here,
+>> right? I'll add a note to Kconfig and the driver about that.
+>
+> Yes, I meant that. I just remembered we should do something else:
+>
+> Remove I2C_FUNC_I2C (because it cannot do endless transfers) from
+> functionality and simply use I2C_FUNC_SMBUS_I2C_BLOCK which does I2C
+> like transfers with the SMBus Limit of 32 bytes. It seems PMBus allows
+> for 255 byte which this HW could support, yet I don't recall we have
+> support for that size currently.
+>
 
-Right, that's meant here. Sorry for the misleading comment.
+Just tried this out... With the above change (I2C_FUNC_I2C replaced
+with I2C_FUNC_SMBUS_I2C_BLOCK) an EEPROM device fails (at24 driver)
+since it can't do a 16-bit offset when using the SMBUS_I2C_BLOCK
+transfer.
 
-> 
-> > 
-> > This series was tested with the fix on top for Cavium Thunder.
-> > 
-> > Tested-by: Robert Richter <rrichter@cavium.com>
-> 
-> Thanks for that!
-> 
-> > 
-> > -Robert
-> > 
-> > 
-> > 
-> > From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
-> > From: Robert Richter <rrichter@cavium.com>
-> > Date: Mon, 22 Sep 2014 10:46:01 +0200
-> > Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
-> > 
-> > The pci host bridge was not created if io_base was not set when
-> > calling of_pci_get_host_bridge_resources(). This is esp. the case for
-> > mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
-> > parameter io_base is optional now.
-> 
-> I think the message is misleading. What you want to do is make io_base
-> optional for the case where the PCI host bridge only expects to have only
-> IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
-> 
-> As I'm going to touch this area again to address a comment from Bjorn,
-> do you mind if I roll this patch into mine with your Signed-off-by and
-> the mention that you have made io_base optional?
+Would you be OK with keeping the I2C_FUNC_I2C capability and
+documenting the restriction (as per your initial suggestion)?
 
-Sure, fine with me.
-
-Thanks,
-
--Robert
-
-
-> 
-> Best regards,
-> Liviu
-> 
-> > 
-> > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > ---
-> >  drivers/of/of_pci.c | 7 +++----
-> >  1 file changed, 3 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > index ffdb45ed8682..1f0e7c2505ee 100644
-> > --- a/drivers/of/of_pci.c
-> > +++ b/drivers/of/of_pci.c
-> > @@ -182,9 +182,8 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> >  	char range_type[4];
-> >  	int err;
-> >  
-> > -	if (!io_base)
-> > -		return -EINVAL;
-> > -	*io_base = OF_BAD_ADDR;
-> > +	if (io_base)
-> > +		*io_base = OF_BAD_ADDR;
-> >  
-> >  	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> >  	if (!bus_range)
-> > @@ -242,7 +241,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
-> >  			goto parse_failed;
-> >  		}
-> >  
-> > -		if (resource_type(res) == IORESOURCE_IO) {
-> > +		if (io_base && resource_type(res) == IORESOURCE_IO) {
-> >  			if (*io_base != OF_BAD_ADDR)
-> >  				pr_warn("More than one I/O resource converted. CPU offset for old range lost!\n");
-> >  			*io_base = range.cpu_addr;
-> > -- 
-> > 2.1.0
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-> 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
-> 
+/Anders
