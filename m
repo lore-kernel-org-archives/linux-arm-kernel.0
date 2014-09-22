@@ -1,32 +1,50 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 22 Sep 2014 16:49:05 +0200
-Subject: [PATCH] i2c: axxia: Add I2C driver for AXM55xx
-In-Reply-To: <20140922130351.GL5182@n2100.arm.linux.org.uk>
-References: <1408967482-17723-1-git-send-email-anders.berg@avagotech.com>
- <20140920121242.GA3833@katana>
- <CAE0=X_0VQ8rWrUgbsgKm1MwCP8bwWm3UJPq9p=xNDfjP4CC7Bg@mail.gmail.com>
- <20140922095939.GB1406@katana>
- <20140922130351.GL5182@n2100.arm.linux.org.uk>
-Message-ID: <20140922144904.GA1465@katana>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 22 Sep 2014 15:52:48 +0100
+Subject: [PATCH] arm: kvm: fix CPU hotplug
+Message-ID: <1411397568-4738-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 02:03:51PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 22, 2014 at 11:59:39AM +0200, Wolfram Sang wrote:
-> > IRQ_NONE is "this interrupt wasn't by me" so for shared IRQs, the next
-> > handler can check.
-> 
-> Err, no it isn't.  IRQ_NONE has no such effect.  All handlers on a
-> shared interrupt are always run irrespective of the return value from
-> any particular interrupt handler.  See kernel/irq/handle.c.
+On some platforms with no power management capabilities, the hotplug
+implementation is allowed to return from a smp_ops.cpu_die() call as a
+function return. Upon a CPU onlining event, the KVM CPU notifier tries
+to reinstall the hyp stub, which fails on platform where no reset took
+place following a hotplug event, with the message:
 
-/me picks the brown paper bag. I was sure I did. Need to update my
-notes, it seems. Thanks for the heads up!
+CPU1: smp_ops.cpu_die() returned, trying to resuscitate
+CPU1: Booted secondary processor
+Kernel panic - not syncing: unexpected prefetch abort in Hyp mode at: 0x80409540
+unexpected data abort in Hyp mode at: 0x80401fe8
+unexpected HVC/SVC trap in Hyp mode at: 0x805c6170
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/ea2da8ea/attachment.sig>
+since KVM code is trying to reinstall the stub on a system where it is
+already configured.
+
+To prevent this issue, this patch adds a check in the KVM hotplug
+notifier that detects if the HYP stub really needs re-installing when a
+CPU is onlined and skips the installation call if the stub is already in
+place, which means that the CPU has not been reset.
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index a99e0cd..9b43f54 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -826,7 +826,8 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
+ 	switch (action) {
+ 	case CPU_STARTING:
+ 	case CPU_STARTING_FROZEN:
+-		cpu_init_hyp_mode(NULL);
++		if (__hyp_get_vectors() == hyp_default_vectors)
++			cpu_init_hyp_mode(NULL);
+ 		break;
+ 	}
+ 
+-- 
+2.0.0
