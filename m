@@ -1,145 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 22 Sep 2014 15:14:15 +0200
-Subject: [PATCH/RFC 2/2] ARM: dts: exynos4: Add stdout-path properties
-In-Reply-To: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
-References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1411391655-6291-3-git-send-email-m.szyprowski@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 22 Sep 2014 15:15:33 +0200
+Subject: [GIT PULL] at91: soc for 3.18 #2
+Message-ID: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Arnd, Olof, Kevin,
 
-This patch adds stdout-path property to chosen nodes of Exynos4 boards
-to enable use of earlycon feature without the need to hardcode port
-number in kernel itself.
+This is the second SoC pull-request for AT91 and it's dedicated to the addition
+of our new SAMA5D4: C-A5+neon+L2CC+vdec (in sort). The AT91 SoC support is now
+pretty simple in relation with the enhancements done recently.
+The patches go on top of the previous tag at91-soc and has no dependency.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/boot/dts/exynos4210-origen.dts         | 1 +
- arch/arm/boot/dts/exynos4210-smdkv310.dts       | 1 +
- arch/arm/boot/dts/exynos4210-trats.dts          | 1 +
- arch/arm/boot/dts/exynos4210-universal_c210.dts | 1 +
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 4 ++++
- arch/arm/boot/dts/exynos4412-origen.dts         | 1 +
- arch/arm/boot/dts/exynos4412-smdk4412.dts       | 1 +
- arch/arm/boot/dts/exynos4412-tiny4412.dts       | 4 ++++
- arch/arm/boot/dts/exynos4412-trats2.dts         | 1 +
- 9 files changed, 15 insertions(+)
+The merge with other AT91 branches can lead to little conflicts that I resolved
+for you in the at91-3.18-resolved2 branch that you can take as an example.
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index f767c425d0b5..b81146141402 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -31,6 +31,7 @@
- 
- 	chosen {
- 		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC2,115200 init=/linuxrc";
-+		stdout-path = &serial_2;
- 	};
- 
- 	regulators {
-diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-index 676e6e0c8cf3..86216fff1b4f 100644
---- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-+++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-@@ -27,6 +27,7 @@
- 
- 	chosen {
- 		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc";
-+		stdout-path = &serial_1;
- 	};
- 
- 	sdhci at 12530000 {
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index f516da9e8b3a..b351c7bddf2d 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -28,6 +28,7 @@
- 
- 	chosen {
- 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rootwait earlyprintk panic=5";
-+		stdout-path = &serial_2;
- 	};
- 
- 	regulators {
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-index d50eb3aa708e..e65ee3cb36c3 100644
---- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -26,6 +26,7 @@
- 
- 	chosen {
- 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
-+		stdout-path = &serial_2;
- 	};
- 
- 	sysram at 02020000 {
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index adadaf97ac01..0841fd34f9dd 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -11,6 +11,10 @@
- #include "exynos4412.dtsi"
- 
- / {
-+	chosen {
-+		stdout-path = &serial_1;
-+	};
-+
- 	firmware at 0204F000 {
- 		compatible = "samsung,secure-firmware";
- 		reg = <0x0204F000 0x1000>;
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-index e925c9fbfb07..979dc07c929c 100644
---- a/arch/arm/boot/dts/exynos4412-origen.dts
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -26,6 +26,7 @@
- 
- 	chosen {
- 		bootargs ="console=ttySAC2,115200";
-+		stdout-path = &serial_2;
- 	};
- 
- 	firmware at 0203F000 {
-diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-index ded0b70f7644..b9256afbcc68 100644
---- a/arch/arm/boot/dts/exynos4412-smdk4412.dts
-+++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-@@ -25,6 +25,7 @@
- 
- 	chosen {
- 		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc";
-+		stdout-path = &serial_1;
- 	};
- 
- 	g2d at 10800000 {
-diff --git a/arch/arm/boot/dts/exynos4412-tiny4412.dts b/arch/arm/boot/dts/exynos4412-tiny4412.dts
-index ea6929d9c621..d46fd4c2aeaa 100644
---- a/arch/arm/boot/dts/exynos4412-tiny4412.dts
-+++ b/arch/arm/boot/dts/exynos4412-tiny4412.dts
-@@ -18,6 +18,10 @@
- 	model = "FriendlyARM TINY4412 board based on Exynos4412";
- 	compatible = "friendlyarm,tiny4412", "samsung,exynos4412", "samsung,exynos4";
- 
-+	chosen {
-+		stdout-path = &serial_0;
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 11967f4561e0..ade31d3174b0 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -30,6 +30,7 @@
- 
- 	chosen {
- 		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rootwait earlyprintk panic=5";
-+		stdout-path = &serial_2;
- 	};
- 
- 	firmware at 0204F000 {
+Thanks, best regards,
+
+The following changes since commit 5db722eeba0051c68e638114f6720e715b03cd2c:
+
+  ARM: at91: Remove the support for the RSI EWS board (2014-09-19 13:13:23 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-soc2
+
+for you to fetch changes up to 02037a9719fa89b7e5dc25cb22afc06c4eae406e:
+
+  ARM: at91: document Atmel SMART compatibles (2014-09-22 14:42:40 +0200)
+
+----------------------------------------------------------------
+Second SoC batch for 3.18:
+- introduction of the new SAMA5D4 SoC and associated Evaluation Kit
+- low level soc detection and early printk code
+- taking advantage of this, documentation of all AT91 SoC DT strings
+
+----------------------------------------------------------------
+Alexandre Belloni (3):
+      clk: at91: add a driver for the h32mx clock
+      ARM: at91: add sama5d4 support to sama5_defconfig
+      ARM: at91: document Atmel SMART compatibles
+
+Nicolas Ferre (4):
+      ARM: at91: introduce basic SAMA5D4 support
+      ARM: at91: SAMA5D4 SoC detection code and low level routines
+      ARM: at91: dt: add device tree file for SAMA5D4 SoC
+      ARM: at91: dt: add device tree file for SAMA5D4ek board
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |   37 +
+ .../devicetree/bindings/clock/at91-clock.txt       |   14 +
+ arch/arm/Kconfig.debug                             |    4 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/at91-sama5d4ek.dts               |  260 ++++
+ arch/arm/boot/dts/sama5d4.dtsi                     | 1240 ++++++++++++++++++++
+ arch/arm/configs/sama5_defconfig                   |    1 +
+ arch/arm/mach-at91/Kconfig                         |   21 +
+ arch/arm/mach-at91/Makefile                        |    1 +
+ arch/arm/mach-at91/board-dt-sama5.c                |   16 +-
+ arch/arm/mach-at91/generic.h                       |    1 +
+ arch/arm/mach-at91/include/mach/cpu.h              |   22 +-
+ arch/arm/mach-at91/include/mach/debug-macro.S      |    5 +-
+ arch/arm/mach-at91/include/mach/hardware.h         |   19 +-
+ arch/arm/mach-at91/include/mach/sama5d4.h          |   33 +
+ arch/arm/mach-at91/include/mach/uncompress.h       |   21 +-
+ arch/arm/mach-at91/sama5d4.c                       |   64 +
+ arch/arm/mach-at91/setup.c                         |   97 +-
+ arch/arm/mach-at91/soc.h                           |    5 +
+ drivers/clk/at91/Makefile                          |    1 +
+ drivers/clk/at91/clk-h32mx.c                       |  123 ++
+ drivers/clk/at91/pmc.c                             |    6 +
+ drivers/clk/at91/pmc.h                             |    5 +
+ include/linux/clk/at91_pmc.h                       |    1 +
+ 24 files changed, 1987 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4ek.dts
+ create mode 100644 arch/arm/boot/dts/sama5d4.dtsi
+ create mode 100644 arch/arm/mach-at91/include/mach/sama5d4.h
+ create mode 100644 arch/arm/mach-at91/sama5d4.c
+ create mode 100644 drivers/clk/at91/clk-h32mx.c
+
 -- 
-1.9.2
+Nicolas Ferre
