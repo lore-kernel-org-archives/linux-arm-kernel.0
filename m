@@ -1,44 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Sep 2014 23:07:10 +0100
-Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
- access
-In-Reply-To: <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
-References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
- <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20140922220710.GA24499@arm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 22 Sep 2014 16:09:03 -0600
+Subject: [PATCH v9 1/4] pci:host: APM X-Gene PCIe host controller driver
+In-Reply-To: <CACoXjcnVU3+fQHQ0-zEVRjoedrrod-aua6AVybj7UuSHO9HBaw@mail.gmail.com>
+References: <1410906824-9321-1-git-send-email-tinamdar@apm.com>
+ <1410906824-9321-2-git-send-email-tinamdar@apm.com>
+ <20140919223258.GA32208@google.com>
+ <CACoXjcnVU3+fQHQ0-zEVRjoedrrod-aua6AVybj7UuSHO9HBaw@mail.gmail.com>
+Message-ID: <CAErSpo4C_6mh7hais14254rYBeMYArvf=nETmgvBjgP290aD4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 10:12:30PM +0100, Christoffer Dall wrote:
-> We were using an atomic bitop on the vgic_v2.vgic_elrsr field which was
-> not aligned to the natural size on 64-bit platforms.  This bug showed up
-> after QEMU correctly identifies the pl011 line as being level-triggered,
-> and not edge-triggered.
-> 
-> These data structures are protected by a spinlock so simply use a
-> non-atomic version of the accessor instead.
-> 
-> Tested-by: Joel Schopp <joel.schopp@amd.com>
-> Reported-by: Riku Voipio <riku.voipio@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic-v2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-> index 01124ef..416baed 100644
-> --- a/virt/kvm/arm/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic-v2.c
-> @@ -71,7 +71,7 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
->  				  struct vgic_lr lr_desc)
->  {
->  	if (!(lr_desc.state & LR_STATE_MASK))
-> -		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-> +		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
->  }
+On Mon, Sep 22, 2014 at 3:33 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
 
-Does this work for big-endian arm64 machines? Surely the bug is due to
-casting a u32 * to an unsigned long *, and not specifically related to
-atomics (which is where it happened to explode)?
+>>> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+>>> +{
+>>> +     int i;
+>>> +
+>>> +     /* Hide the PCI host BARs from the kernel as their content doesn't
+>>> +      * fit well in the resource management
+>>> +      */
+>>
+>> This needs a better explanation than "doesn't fit well."
+>>
+>> I *think* you're probably talking about something similar to the MVEBU
+>> devices mentioned here:
+>> http://lkml.kernel.org/r/CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA at mail.gmail.com
+>>
+>> where the device can be configured as either an endpoint or a root port,
+>> and the endpoint BARs are still visible when configured as a root port.
+>>
+>
+> It is true that X-Gene PCIe port can be configured as EP, however the
+> the FIXUP is required not because of the BARs are still visible when
+> configured as EP in past. X-Gene PCIe port, when configured as RC,
+> uses BAR0-BAR1 of RC's configuration space as inbound BARs. Entire DDR
+> region is mapped in these BARs so that it is accessible for EP devices
+> for DMA. So if the fixup is not done during enumeration, whole
+> outbound memory resource space gets assigned to RC and nothing is left
+> EP devices.
 
-Will
+I'm not familiar with the concept of an "inbound BAR"; at least I'm
+not aware of anything like this in the PCI specs.  I think it might
+reduce confusion if we avoided calling them "BARs".  They happen to be
+at the same addresses where real BARs would be, but they certainly
+don't behave like real BARs.
+
+It sounds like this is basically a trivial IOMMU that determines which
+DMA accesses can reach main memory.
+
+>> In any event, I'd like a description of exactly what these BARs are and wha
+>> the problem is.
+>
+> Is it ok to put above description in comment to explain the fixup?
+>
+>> Presumably the BARs exist and were sized by the PCI core
+>> in __pci_read_base().  That will generate some log messages and possibly
+>> some warnings, depending on how the host bridge windows are set up.
+
+Instead of doing this in a fixup, can you change the PCI config
+accessors so that when accessing these inbound DMA mapping registers,
+they drop writes and return zeros for reads?  Then the PCI core won't
+think there are BARs there, and it won't mistakenly corrupt them when
+it tries to size them.
+
+Bjorn
