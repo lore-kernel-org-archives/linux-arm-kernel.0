@@ -1,31 +1,25 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Sep 2014 10:29:39 +0200
-Subject: [PATCH v2 1/3] clk: samsung: exynos3250: Register DMC clk provider
-In-Reply-To: <1409664077-27121-1-git-send-email-k.kozlowski@samsung.com>
-References: <1409664077-27121-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <541FDDF3.6020609@gmail.com>
+Date: Mon, 22 Sep 2014 10:35:01 +0200
+Subject: [PATCH] clk: samsung: exynos3250: fix width field of mout_mmc0/1
+In-Reply-To: <540EEF0B.3040202@samsung.com>
+References: <1409918081-2464-1-git-send-email-pankaj.dubey@samsung.com>
+ <540EEF0B.3040202@samsung.com>
+Message-ID: <541FDF35.6010401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.09.2014 15:21, Krzysztof Kozlowski wrote:
-> Add clock provider for clocks in DMC domain including EPLL and BPLL. The
-> DMC clocks are necessary for Exynos3 devfreq driver.
+On 09.09.2014 14:14, Krzysztof Kozlowski wrote:
+> On 05.09.2014 13:54, Pankaj Dubey wrote:
+>> As per Exynos3250 user manual mmc0/1 mux selection has 4 bit wide.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   drivers/clk/samsung/clk-exynos3250.c |    4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> The DMC clock domain uses different address space (0x105C0000) than
-> standard clock domain (0x10030000 - 0x10050000). The difference is huge
-> enough to add new DT node for the clock provider, rather than extending
-> existing address space.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> 
-> Changes since v1:
-> =================
-> 1. Fix overwritteing main clock provider reg_base with DMC clock domain
->    reg_basr. This leads to OOPS in suspend.
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Applied the whole series for next.
+Applied for next.
 
 Best regards,
 Tomasz
