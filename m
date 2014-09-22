@@ -1,129 +1,67 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Sep 2014 09:55:59 +0200
-Subject: [PATCH 2/4] pinctrl: exynos: Add irq_chip instance for Exynos7
- wakeup interrupts
-In-Reply-To: <CAM4voamF8aydh7-2aC+vLrO1rmPm5GL3Pn6i6rZ3XnzCDHzgJg@mail.gmail.com>
-References: <1410598252-30931-1-git-send-email-a.kesavan@samsung.com>	<1410598252-30931-4-git-send-email-a.kesavan@samsung.com>	<54142A36.5050703@gmail.com>
- <CAM4voamF8aydh7-2aC+vLrO1rmPm5GL3Pn6i6rZ3XnzCDHzgJg@mail.gmail.com>
-Message-ID: <541FD60F.8060008@gmail.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Mon, 22 Sep 2014 15:56:09 +0800
+Subject: [PATCH] clk: rockchip: add initcall to set clk defaults after
+ syscons are available
+In-Reply-To: <1566610.B4NH8lpaoI@diego>
+References: <1566610.B4NH8lpaoI@diego>
+Message-ID: <541FD619.3060108@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.09.2014 08:17, Abhilash Kesavan wrote:
-> Hi Tomasz,
-> 
-> On Sat, Sep 13, 2014 at 4:57 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Abhilash,
->>
->> Please see my comments inline.
->>
->> On 13.09.2014 10:50, Abhilash Kesavan wrote:
->>> Exynos7 uses different offsets for wakeup interrupt configuration registers.
->>> So a new irq_chip instance for Exynos7 wakeup interrupts is added. The irq_chip
->>> selection is now based on the wakeup interrupt controller compatible string.
->>
->> [snip]
->>
->>> @@ -328,9 +322,11 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
->>>  /*
->>>   * irq_chip for wakeup interrupts
->>>   */
->>> -static struct exynos_irq_chip exynos_wkup_irq_chip = {
->>> +static struct exynos_irq_chip exynos_wkup_irq_chip;
->>> +
->>
->> Why do you still need this, if you have both variants below?
-> 
-> After adding __initdata to the two variants, I will require to have a
-> copy of one of them.
-> 
->>
->>> +static struct exynos_irq_chip exynos4210_wkup_irq_chip = {
->>>       .chip = {
->>> -             .name = "exynos_wkup_irq_chip",
->>> +             .name = "exynos4210_wkup_irq_chip",
->>>               .irq_unmask = exynos_irq_unmask,
->>>               .irq_mask = exynos_irq_mask,
->>>               .irq_ack = exynos_irq_ack,
->>> @@ -342,6 +338,29 @@ static struct exynos_irq_chip exynos_wkup_irq_chip = {
->>>       .eint_pend = EXYNOS_WKUP_EPEND_OFFSET,
->>>  };
->>>
->>> +static struct exynos_irq_chip exynos7_wkup_irq_chip = {
->>> +     .chip = {
->>> +             .name = "exynos7_wkup_irq_chip",
->>> +             .irq_unmask = exynos_irq_unmask,
->>> +             .irq_mask = exynos_irq_mask,
->>> +             .irq_ack = exynos_irq_ack,
->>> +             .irq_set_type = exynos_irq_set_type,
->>> +             .irq_set_wake = exynos_wkup_irq_set_wake,
->>> +     },
->>> +     .eint_con = EXYNOS7_WKUP_ECON_OFFSET,
->>> +     .eint_mask = EXYNOS7_WKUP_EMASK_OFFSET,
->>> +     .eint_pend = EXYNOS7_WKUP_EPEND_OFFSET,
->>> +};
->>> +
->>> +/* list of external wakeup controllers supported */
->>> +static const struct of_device_id exynos_wkup_irq_ids[] = {
->>> +     { .compatible = "samsung,exynos4210-wakeup-eint",
->>> +                     .data = &exynos4210_wkup_irq_chip },
->>> +     { .compatible = "samsung,exynos7-wakeup-eint",
->>> +                     .data = &exynos7_wkup_irq_chip },
->>> +     { }
->>> +};
->>> +
->>>  /* interrupt handler for wakeup interrupts 0..15 */
->>>  static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
->>>  {
->>> @@ -434,7 +453,12 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
->>>       int idx, irq;
->>>
->>>       for_each_child_of_node(dev->of_node, np) {
->>> -             if (of_match_node(exynos_wkup_irq_ids, np)) {
->>> +             const struct of_device_id *match;
->>> +
->>> +             match = of_match_node(exynos_wkup_irq_ids, np);
->>> +             if (match) {
->>> +                     memcpy(&exynos_wkup_irq_chip, match->data,
->>> +                             sizeof(struct exynos_irq_chip));
->>
->> Hmm, this doesn't look correct to me. You are modifying a static struct
->> here. Why couldn't you simply use the exynos irq chip pointed by
->> match->data in further registration code?
-> 
-> That will not be available later once I use __initdata.
-> 
+Heiko,
 
-Then either __initdata shouldn't be necessary or kmemdup() should be
-used to allocate a copy.
-
->>
->>>                       wkup_np = np;
->>>                       break;
->>>               }
->>> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.h b/drivers/pinctrl/samsung/pinctrl-exynos.h
->>> index e060722..0db1e52 100644
->>> --- a/drivers/pinctrl/samsung/pinctrl-exynos.h
->>> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.h
->>> @@ -25,6 +25,9 @@
->>>  #define EXYNOS_WKUP_ECON_OFFSET              0xE00
->>>  #define EXYNOS_WKUP_EMASK_OFFSET     0xF00
->>>  #define EXYNOS_WKUP_EPEND_OFFSET     0xF40
->>> +#define EXYNOS7_WKUP_ECON_OFFSET     0x700
->>> +#define EXYNOS7_WKUP_EMASK_OFFSET    0x900
->>> +#define EXYNOS7_WKUP_EPEND_OFFSET    0xA00
->>
->> Interestingly enough, the offsets look just like the normal GPIO
->> interrupt controller of previous Exynos SoCs. Are you sure those are
->> correct? Also if somehow the controller now resembles the normal one,
->> doesn't it have the SVC register making it possible to reuse the non
->> wake-up code instead?
-> 
-> The wakeup interrupt register offsets are the same as the GPIO
-> interrupt offsets in earlier Exynos SoCs. There is no SVC register for
-> the wakeup interrupt block.
-
-OK, your code is fine then.
-
-Best regards,
-Tomasz
+On 08/07/2014 08:57 PM, Heiko St?bner wrote:
+> PLLs on Rockchip platforms report their locking state in an external
+> register situated in the "General Register Files" which is provided
+> through a syscon device.
+>
+> When the initial clk init runs, this syscon is of course not yet
+> available, making it impossible to set PLLs to other frequencies
+> through the assigned-rate property of the clock-controller node.
+>
+> Syscon devices are initialized through a postcore initcall, so add an
+> arch_initcall to rerun the rockchip specific clock initalization when
+> the GRF is available.
+>
+> As the clock init already runs two times (through of_clk_add_provider
+> and of_clk_init), a third time shouldn't hurt to much and in the best
+> case wouldn't change any settings at all.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   drivers/clk/rockchip/clk.c | 13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+>
+> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+> index 9a3adb1..e14b108 100644
+> --- a/drivers/clk/rockchip/clk.c
+> +++ b/drivers/clk/rockchip/clk.c
+> @@ -23,6 +23,7 @@
+>   #include <linux/slab.h>
+>   #include <linux/clk.h>
+>   #include <linux/clk-provider.h>
+> +#include <linux/clk/clk-conf.h>
+>   #include <linux/mfd/syscon.h>
+>   #include <linux/regmap.h>
+>   #include "clk.h"
+> @@ -126,6 +127,18 @@ void __init rockchip_clk_init(struct device_node *np, void __iomem *base,
+>   	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>   }
+>   
+> +/**
+> + * Set clock-defaults again, after grf regmap is available for PLLs.
+> + */
+> +static int __init rockchip_clk_set_defaults(void)
+> +{
+> +	if (cru_node)
+> +		return of_clk_set_defaults(cru_node, true);
+> +
+> +	return 0;
+> +}
+> +arch_initcall(rockchip_clk_set_defaults);
+> +
+>   struct regmap *rockchip_clk_get_grf(void)
+>   {
+>   	if (IS_ERR(grf))
+This patch works on my rk3288 evb, so,
+Tested-by: Kever Yang <kever.yang@rock-chips.com>
