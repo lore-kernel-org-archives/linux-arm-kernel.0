@@ -1,77 +1,40 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 22 Sep 2014 12:35:23 +0100
-Subject: [PATCH v11 00/10] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <20140919215905.GB30239@google.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <20140919215905.GB30239@google.com>
-Message-ID: <20140922113523.GM1994@e106497-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 22 Sep 2014 13:40:40 +0200
+Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
+ of_platform_populate
+In-Reply-To: <11868654.D6MinQlF2p@wuerfel>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-7-git-send-email-will.deacon@arm.com>
+ <20140922093614.GK1470@ulmo> <11868654.D6MinQlF2p@wuerfel>
+Message-ID: <20140922114039.GT1470@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 10:59:05PM +0100, Bjorn Helgaas wrote:
-> On Thu, Sep 18, 2014 at 02:30:15AM +0100, Liviu Dudau wrote:
-> > This is my version 11 of the attempt at adding support for generic PCI host
-> > bridge controllers that make use of device tree information to
-> > configure themselves. It contains minor cleanups compared with v10 to address
-> > the existing comments.
-> > ...
-> > Catalin Marinas (1):
-> >   PCI: Introduce generic domain handling for PCI busses.
+On Mon, Sep 22, 2014 at 01:08:27PM +0200, Arnd Bergmann wrote:
+> On Monday 22 September 2014 11:36:15 Thierry Reding wrote:
+> > On Fri, Sep 12, 2014 at 05:34:54PM +0100, Will Deacon wrote:
+> > > We need to ensure that the IOMMUs in the system have a chance to perform
+> > > some basic initialisation before we start adding masters to them.
+> > > 
+> > > This patch adds a call to of_iommu_init before of_platform_populate.
 > > 
-> > Liviu Dudau (9):
-> >   Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
-> >   PCI: Introduce helper functions to deal with PCI I/O ranges.
-> >   ARM: Define PCI_IOBASE as the base of virtual PCI IO space.
-> >   PCI: OF: Fix the conversion of IO ranges into IO resources.
-> >   PCI: Create pci_host_bridge before its associated bus in
-> >     pci_create_root_bus.
-> >   OF: Introduce helper function for getting PCI domain_nr
-> >   OF: PCI: Add support for parsing PCI host bridge resources from DT
-> >   PCI: Assign unassigned bus resources in pci_scan_root_bus()
-> >   PCI: Introduce pci_remap_iospace() for remapping PCI I/O bus resources
-> >     into CPU space
-> > 
-> >  arch/arm/include/asm/io.h         |   1 +
-> >  arch/arm/mach-integrator/pci_v3.c |  23 +++---
-> >  drivers/of/address.c              | 146 ++++++++++++++++++++++++++++++++
-> >  drivers/of/of_pci.c               | 170 ++++++++++++++++++++++++++++++++++++++
-> >  drivers/pci/host/pci-tegra.c      |  10 ++-
-> >  drivers/pci/host/pcie-rcar.c      |  21 +++--
-> >  drivers/pci/pci.c                 |  33 ++++++++
-> >  drivers/pci/probe.c               |  46 +++++++----
-> >  include/asm-generic/io.h          |   2 +-
-> >  include/asm-generic/pgtable.h     |   4 +
-> >  include/linux/of_address.h        |  15 +---
-> >  include/linux/of_pci.h            |  18 ++++
-> >  include/linux/pci.h               |  24 ++++++
-> >  13 files changed, 463 insertions(+), 50 deletions(-)
+> > Why can't you call it from of_platform_populate() directly? That way it
+> > would be usable for all architectures rather than just ARM. Eventually
+> > we're going to need the same thing for 64-bit ARM (and possibly others
+> > as well).
 > 
-> I put this on a pci/liviu-generic-v11 branch.  I mentioned a couple things
-> in response to the individual patches, so I'm hoping you can send me
-> incremental patches to address them.  Then I'll update this branch, rename
-> it, and get it into linux-next.
+> IIRC, of_platform_populate can be called multiple times, even recursively
+> be drivers that populate their own child devices.
 
-Thanks a lot for that!
+Indeed. Perhaps it could be conditionally called when root == NULL. But
+perhaps that's not safe either. Anyway, I still think we shouldn't be
+making this some randomly placed early initcall anyway.
 
-As I've mentioned in the other email, I can send incremental patches for most
-of the comments (and Acks?). Don't know how to handle the split of 
-"[PATH v11 4/10] PCI: OF: Fix the conversion of IO ranges into IO resources."
-that you are asking for.
-
-Best regards,
-Liviu
-
-> 
-> Bjorn
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/ce0536c5/attachment.sig>
