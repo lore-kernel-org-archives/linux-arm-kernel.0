@@ -1,54 +1,35 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 22 Sep 2014 15:00:38 -0600
-Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
-In-Reply-To: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20140922210038.GJ1880@google.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 22 Sep 2014 23:12:29 +0200
+Subject: [GIT PULL] Last-minute fix for kvm/arm64
+Message-ID: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
-> The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller drivers,
-> one for an external PCIe slot, the other for an internal PCI bridge to USB
-> controllers.
-> 
-> However, they currently do not work at the same time as they use the same PCI
-> domain and use the same root bus number. We can't use different root bus numbers
-> due to the way root bus numbers are assigned in pcibios_init_hw() in
-> arch/arm/kernel/bios32.c.
-> 
-> Since the two PCI controllers are completely independent, I think it makes sense
-> to use different PCI domains for them.
-> 
-> I've marked the third patch as RFC as I am not sure of the impact of enabling
-> PCI domains for all ARM devices. In the march to 'one kernel to rule them all',
-> I steered clear of mach specific changes.
-> 
-> These patches require the following patch from Liviu Dudau:
->   [PATCH v11 07/10] OF: Introduce helper function for getting PCI domain_nr
-> Based on comments on this patch from Jason Gunthorpe, there is still the issue
-> that the domain numbers may change depending on the ordering at probe time.
-> However, this can be fixed later on by adding the entries in the DT files.
-> 
-> 
-> Phil Edworthy (3):
->   PCI: rcar-pcie: Add call to get domain nr
->   PCI: rcar-internal-pci: Add call to get domain nr
->   ARM: Enable PCI domains
+Hi Paolo and Gleb,
 
-I'm deferring these for now because they depend on Liviu's work, which I
-haven't merged yet, and I suspect some minor adaptation will be required
-here.
+Can you forward this single fix to Linus before he releases v3.17?
 
-For what it's worth, I agree with Rob's hesitation about mixing lookup with
-domain number allocation in of_pci_get_domain_nr().  That seems
-unnecessarily complicated.
+The following changes since commit 05e0127f9e362b36aa35f17b1a3d52bca9322a3a:
 
->  arch/arm/Kconfig                 | 2 +-
->  drivers/pci/host/pci-rcar-gen2.c | 6 ++++++
->  drivers/pci/host/pcie-rcar.c     | 9 ++++++---
->  3 files changed, 13 insertions(+), 4 deletions(-)
-> 
-> -- 
-> 2.1.0
-> 
+  arm/arm64: KVM: Complete WFI/WFE instructions (2014-08-29 11:53:53 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v3.17-rc7-or-final
+
+for you to fetch changes up to 1f2bb4acc125edc2c06db3ad3e8c699bc075ad52:
+
+  arm/arm64: KVM: Fix unaligned access bug on gicv2 access (2014-09-22 23:05:56 +0200)
+
+Thanks!
+-Christoffer
+
+----------------------------------------------------------------
+Fixes unaligned access to the gicv2 virtual cpu status.
+
+----------------------------------------------------------------
+Christoffer Dall (1):
+      arm/arm64: KVM: Fix unaligned access bug on gicv2 access
+
+ virt/kvm/arm/vgic-v2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
