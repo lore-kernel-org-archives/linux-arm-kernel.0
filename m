@@ -1,31 +1,38 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 22 Sep 2014 09:52:04 +0300
-Subject: [PATCH] clk: ti: change clock init to use generic of_clk_init
-In-Reply-To: <alpine.DEB.2.02.1409191632170.22526@utopia.booyaka.com>
-References: <1408628959-32442-1-git-send-email-t-kristo@ti.com>
- <20140918171725.GL14505@atomide.com>
- <alpine.DEB.2.02.1409191632170.22526@utopia.booyaka.com>
-Message-ID: <541FC714.9050203@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 22 Sep 2014 08:57:45 +0200
+Subject: [PATCH 1/2] bus: brcmstb_gisb: register the fault code hook
+In-Reply-To: <20140921231010.GN7362@norris-Latitude-E6410>
+References: <1411155880-23447-1-git-send-email-f.fainelli@gmail.com>
+ <1411155880-23447-2-git-send-email-f.fainelli@gmail.com>
+ <20140920151950.443b7ea9@free-electrons.com>
+ <20140921231010.GN7362@norris-Latitude-E6410>
+Message-ID: <20140922085745.1c515be8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2014 07:33 PM, Paul Walmsley wrote:
-> On Thu, 18 Sep 2014, Tony Lindgren wrote:
->
->> * Tero Kristo <t-kristo@ti.com> [140821 06:52]:
->>> Previously, the TI clock driver initialized all the clocks hierarchically
->>> under each separate clock provider node. Now, each clock that requires
->>> IO access will instead check their parent node to find out which IO range
->>> to use.
->>>
->>> This patch allows the TI clock driver to use a few new features provided
->>> by the generic of_clk_init, and also allows registration of clock nodes
->>> outside the clock hierarchy (for example, any external clocks.)
->>
->> Paul, any comments on this one?
->
-> Not at this point.
+Brian,
 
-Tony, ok to merge this through clock tree?
+On Sun, 21 Sep 2014 16:10:10 -0700, Brian Norris wrote:
 
--Tero
+> > I don't have the entire context, but if your platform is part of
+> > multi-platform, it means that regardless of which platform is actually
+> > booting your system, you will register your fault hook. Is this the
+> > intended behavior?
+> > 
+> > Generally speaking, in a multiplatform context, many arch_initcall()
+> > should have a conditional to check whether we're really on a platform
+> > where the initcall is needed.
+> 
+> Florian already sent v2, about which I already made a similar comment:
+> 
+>   https://lkml.org/lkml/2014/9/19/516
+
+Yes, sorry. I saw your review after I sent my e-mail :)
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
