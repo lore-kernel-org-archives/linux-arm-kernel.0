@@ -1,57 +1,37 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 22 Sep 2014 14:48:42 +0100
-Subject: [PATCH RESEND] arm: don't break misaligned NEON load/store
-Message-ID: <15fc86b0d2b4984377d7116113b0f2f9498bd088.1411392970.git.robin.murphy@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 22 Sep 2014 15:51:33 +0200
+Subject: [RESEND PATCH] ARM: at91/PMC: don't forget to write PMC_PCDR register
+ to disable clocks
+Message-ID: <1411393893-12291-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The alignment fixup incorrectly decodes faulting ARM VLDn/VSTn
-instructions (where the optional alignment hint is given but incorrect)
-as LDR/STR, leading to register corruption. Detect these and correctly
-treat them as unhandled, so that userspace gets the fault it expects.
+When introducing support for sama5d3, the write to PMC_PCDR register has
+been accidentally removed.
 
-Reported-by: Simon Hosie <simon.hosie@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-Cc: <stable@vger.kernel.org>
+Reported-by: Nathalie Cyrille <nathalie.cyrille@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: <stable@vger.kernel.org> # 3.10.x and later
 ---
 
-Hi all,
+Sorry for the noise, typo in the cc list!
 
-This was met with a resounding silence a while back[1], but the bug is
-still causing annoyance - apparently Clang intrinsics can be a little
-over-eager with alignment hints. Regardless of whose fault that is,
-the kernel shouldn't be silently mangling registers unexpectedly.
+Ludovic
 
-Any objections to me dropping this into the patch system?
+ arch/arm/mach-at91/clock.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Robin.
-
-[1]:http://www.spinics.net/lists/arm-kernel/msg328889.html
-
-
- arch/arm/mm/alignment.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 0c1ab49..83792f4 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -41,6 +41,7 @@
-  * This code is not portable to processors with late data abort handling.
-  */
- #define CODING_BITS(i)	(i & 0x0e000000)
-+#define COND_BITS(i)	(i & 0xf0000000)
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 034529d..d66f102 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -962,6 +962,7 @@ static int __init at91_clock_reset(void)
+ 	}
  
- #define LDST_I_BIT(i)	(i & (1 << 26))		/* Immediate constant	*/
- #define LDST_P_BIT(i)	(i & (1 << 24))		/* Preindex		*/
-@@ -821,6 +822,8 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 		break;
+ 	at91_pmc_write(AT91_PMC_SCDR, scdr);
++	at91_pmc_write(AT91_PMC_PCDR, pcdr);
+ 	if (cpu_is_sama5d3())
+ 		at91_pmc_write(AT91_PMC_PCDR1, pcdr1);
  
- 	case 0x04000000:	/* ldr or str immediate */
-+		if (COND_BITS(instr) == 0xf0000000) /* NEON VLDn, VSTn */
-+			goto bad;
- 		offset.un = OFFSET_BITS(instr);
- 		handler = do_alignment_ldrstr;
- 		break;
 -- 
-1.9.1
+2.0.3
