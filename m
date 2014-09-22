@@ -1,29 +1,108 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 22 Sep 2014 23:28:10 +0100
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <2486199.jzqMgLksH8@vostro.rjw.lan>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <20140922194841.GA9868@amd> <20140922203136.GA32156@srcf.ucam.org>
- <2486199.jzqMgLksH8@vostro.rjw.lan>
-Message-ID: <20140922222810.GA9421@srcf.ucam.org>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Mon, 22 Sep 2014 15:28:42 -0700
+Subject: [PATCH 2/2] iommu/arm-smmu: add support for access-protected
+ mappings
+In-Reply-To: <20140919220535.GM20773@arm.com> (Will Deacon's message of "Fri,
+ 19 Sep 2014 23:05:36 +0100")
+References: <1410984969-2340-1-git-send-email-mitchelh@codeaurora.org>
+ <1410984969-2340-3-git-send-email-mitchelh@codeaurora.org>
+ <20140919220535.GM20773@arm.com>
+Message-ID: <vnkwtx3zb885.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 12:46:24AM +0200, Rafael J. Wysocki wrote:
-> On Monday, September 22, 2014 09:31:36 PM Matthew Garrett wrote:
-> > Explicit Change Request. These can only be filed by paid-up members of 
-> > the UEFI Forum, so I suspect this requirement is going to be unworkable 
-> > (there's plenty of ACPI support code for large x86 vendors which isn't 
-> > part of any ACPI spec).
-> 
-> Why do you think so?
+On Fri, Sep 19 2014 at 03:05:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Sep 17, 2014 at 09:16:09PM +0100, Mitchel Humpherys wrote:
+>> ARM SMMUs support memory access control via some bits in the translation
+>> table descriptor memory attributes. Currently we assume all translations
+>> are "unprivileged". Add support for privileged mappings, controlled by
+>> the IOMMU_PRIV prot flag.
+>> 
+>> Also sneak in a whitespace change for consistency with nearby code.
+>> 
+>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index ca18d6d42a..93999ec22c 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1256,10 +1256,11 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+>>  	}
+>>  
+>>  	if (stage == 1) {
+>> -		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
+>> +		pteval |= ARM_SMMU_PTE_nG;
+>> +		if (!(prot & IOMMU_PRIV))
+>> +			pteval |= ARM_SMMU_PTE_AP_UNPRIV;
+>
+> I think this actually makes more sense if we invert the logic, i.e. have
+> IOMMU_USER as a flag which sets the UNPRIV bit in the pte.
 
-The IP rules in the membership agreements.
+I'm fine either way but the common case seems to be unprivileged
+mappings (at least in our system).  We have one user of this flag out of
+a dozen or so users.
 
-> Linux Foundation can do that on behalf of the community if no one else.
+>
+> I don't have the spec to hand, but I guess you can't enforce this at
+> stage-2? If so, do we also need a new IOMMU capability so people don't try
+> to use this for stage-2 only SMMUs?
 
-Unfortunately not - any work contributed must be the work of the 
-contributing member. There can't be any public discussion.
+Hmm, actually we do have S2AP although it doesn't make a distinction
+between accesses from EL0 and EL1.  But maybe it would make sense to
+make the `IOMMU_PRIV' mean `no access from EL0 or EL1' for stage 2
+mappings?  Something like:
+
+
+-- >8 --
+Subject: iommu/arm-smmu: add support for access-protected mappings
+
+ARM SMMUs support memory access control via some bits in the translation
+table descriptor memory attributes. Currently we assume all translations
+are "unprivileged". Add support for privileged mappings, controlled by
+the IOMMU_PRIV prot flag.
+
+Also sneak in a whitespace change for consistency with nearby code.
+
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ca18d6d42a..4f85b64f74 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1256,18 +1256,19 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+ 	}
+ 
+ 	if (stage == 1) {
+-		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
++		pteval |= ARM_SMMU_PTE_nG;
++		if (!(prot & IOMMU_PRIV))
++			pteval |= ARM_SMMU_PTE_AP_UNPRIV;
+ 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+ 			pteval |= ARM_SMMU_PTE_AP_RDONLY;
+-
+ 		if (prot & IOMMU_CACHE)
+ 			pteval |= (MAIR_ATTR_IDX_CACHE <<
+ 				   ARM_SMMU_PTE_ATTRINDX_SHIFT);
+ 	} else {
+ 		pteval |= ARM_SMMU_PTE_HAP_FAULT;
+-		if (prot & IOMMU_READ)
++		if (prot & IOMMU_READ && !(prot & IOMMU_PRIV))
+ 			pteval |= ARM_SMMU_PTE_HAP_READ;
+-		if (prot & IOMMU_WRITE)
++		if (prot & IOMMU_WRITE && !(prot & IOMMU_PRIV))
+ 			pteval |= ARM_SMMU_PTE_HAP_WRITE;
+ 		if (prot & IOMMU_CACHE)
+ 			pteval |= ARM_SMMU_PTE_MEMATTR_OIWB;
+
+
+
 
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
