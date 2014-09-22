@@ -1,59 +1,31 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 22 Sep 2014 15:32:38 +0800
-Subject: [PATCHv4 0/6] ARM: imx: Add Freescale LS1021A SoC and board support
-Message-ID: <1411371164-25282-1-git-send-email-jingchang.lu@freescale.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Sep 2014 10:29:39 +0200
+Subject: [PATCH v2 1/3] clk: samsung: exynos3250: Register DMC clk provider
+In-Reply-To: <1409664077-27121-1-git-send-email-k.kozlowski@samsung.com>
+References: <1409664077-27121-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <541FDDF3.6020609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
-and LS1021A-TWR board.
+On 02.09.2014 15:21, Krzysztof Kozlowski wrote:
+> Add clock provider for clocks in DMC domain including EPLL and BPLL. The
+> DMC clocks are necessary for Exynos3 devfreq driver.
+> 
+> The DMC clock domain uses different address space (0x105C0000) than
+> standard clock domain (0x10030000 - 0x10050000). The difference is huge
+> enough to add new DT node for the clock provider, rather than extending
+> existing address space.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> ---
+> 
+> Changes since v1:
+> =================
+> 1. Fix overwritteing main clock provider reg_base with DMC clock domain
+>    reg_basr. This leads to OOPS in suspend.
 
-The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
-for high reliability and pack the highest level of integration available
-for sub-3W embedded communications processors and with a comprehensive
-enablement model focused on ease of programmability.
+Applied the whole series for next.
 
-The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
-PowerPC platform. 
-
-For the detail information about LS1021A SoC, please refer to the RM doc.
-
----
-changes in v4:
-add "syscon" compatible to scfg and dcfg dts node.
-remove mxc_restart in the platform machine desc.
-remove dma_zone_size defination.
-
-changes in v3:
-rewrite scfg and dcfg binding doc description.
-remove sai related node leaving to the driver support.
-
-changes in v2:
-remove unused nodes.
-wakeup the secondary core by IPI call to u-boot standby procedure. 
-add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
-
-----------------------------------------------------------------
-Jingchang Lu (6):
-	ARM: dts: Add SoC level device tree support for LS1021A
-	ARM: dts: Add initial LS1021A QDS board dts support
-	ARM: dts: Add initial LS1021A TWR board dts support
-	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
-	ARM: imx: Add initial support for Freescale LS1021A
-	ARM: imx: Add Freescale LS1021A SMP support
-
-Documentation/devicetree/bindings/arm/fsl.txt |  38 ++++
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/ls1021a-qds.dts             | 285 ++++++++++++++++++++++++++
- arch/arm/boot/dts/ls1021a-twr.dts             | 117 +++++++++++
- arch/arm/boot/dts/ls1021a.dtsi                | 539 ++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/Kconfig                     |  14 ++
- arch/arm/mach-imx/Makefile                    |   4 +-
- arch/arm/mach-imx/common.h                    |   1 +
- arch/arm/mach-imx/mach-ls1021a.c              |  22 +++
- arch/arm/mach-imx/platsmp.c                   |  32 +++
- 10 files changed, 1053 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
- create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
- create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
- create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+Best regards,
+Tomasz
