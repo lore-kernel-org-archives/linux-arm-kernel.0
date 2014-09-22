@@ -1,59 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Sep 2014 14:18:10 +0100
-Subject: [GIT PULL] iommu/arm-smmu: updates for 3.18
-Message-ID: <20140922131810.GE25809@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 22 Sep 2014 15:22:15 +0200
+Subject: [PATCH v5 0/3] new Atmel DMA controller
+Message-ID: <1411392138-5014-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi,
 
-Please can you pull these arm-smmu updates for 3.18? Apologies for sending
-this later than usual, but I was at a conference last week and couldn't
-easily run the usual series of tests.
+This set of patches introduces support for the new Atmel DMA controller know as
+XDMAC and available on SAMA5D4.
 
-The main changes are:
+Driver updated according to Arnd and Nicolas comments.
 
-  - Explicit support for MMU-401 (as opposed to choosing an SMMU
-    architecture version)
-  - Some address size fixes that became apparent when running under KVM
-  - A new debugging option to force the use of stage-1 or stage-2 only
-  - A fix for a benign bug in the page table code
-  - Initial support for multi-master IOMMU groups, but there is likely
-    more to come in this area
+Changes from:
+- v4
+  - compile the driver if COMPILE_TEST is selected
+  - merge header file into at_xdmac.c
+  - use write memory barriers before starting the channel
+  - init active_xfer to false when taking a descriptor from the free
+  descriptors list
+  - remove dma capabilities mask
+  - use CONFIG_PM instead of CONFIG_PM_SLEEP for prepare function
+  - style fixes
+  - update documentation to add the <chip> compatible description
+  - add maintener entry
+- v3
+  - use dma_get_any_slave_channel instead of dma_request_channel
+  - fix tx_status behavior for non active transfers
+  - rename at_xdmac_terminate_xfer
+  - replace suspend/resume no irq variants by late/early variants
+  - no more use dev res to request the irq, use the legacy way
+  - add slave capabilities
+- v2
+  - documentation updated
+  - fix locking issues
+- v1
+  - add power management stuff
+  - check maxburst value
+  - revert subsys_initcall remove, EPROBE_DEFER not yet available on the kernel
+  version I use to do the tests, moreover other devices are not ready to use it
+- RFC:
+  - DMA_SUCCESS replaced by DMA_COMPLETE
+  - fix memcpy issue caused by a mistake in interfaces used
+  - add filter function
+  - remove some parameters from device tree since we can get them through the
+  dma slave configuration
+  - use readl/writel relaxed
+  - remove subsys_initcall
+  - synchronize irq before killing tasklets
+  - use BIT macro
+  - misc cleanup
 
-Thanks,
 
-Will
+Ludovic Desroches (3):
+  dma: at_xdmac: creation of the atmel eXtended DMA Controller driver
+  ARM: dts: at_xdmac: add bindings documentation
+  MAINTAINERS: add entry for Atmel XDMA driver
 
---->8
+ .../devicetree/bindings/dma/atmel-xdma.txt         |   50 +
+ MAINTAINERS                                        |    7 +
+ drivers/dma/Kconfig                                |    7 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/at_xdmac.c                             | 1491 ++++++++++++++++++++
+ include/dt-bindings/dma/at91.h                     |   25 +
+ 6 files changed, 1581 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
+ create mode 100644 drivers/dma/at_xdmac.c
 
-The following changes since commit 9e82bf014195d6f0054982c463575cdce24292be:
-
-  Linux 3.17-rc5 (2014-09-14 17:50:12 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to ccd359f219bee914501a8892b148e2a1315066d3:
-
-  iommu/arm-smmu: fix bug in pmd construction (2014-09-22 11:13:01 +0100)
-
-----------------------------------------------------------------
-Mitchel Humpherys (1):
-      iommu/arm-smmu: fix bug in pmd construction
-
-Robin Murphy (2):
-      iommu/arm-smmu: fix architecture version detection
-      iommu/arm-smmu: support MMU-401
-
-Will Deacon (5):
-      iommu/arm-smmu: allow translation stage to be forced on the cmdline
-      iommu/arm-smmu: add support for multi-master iommu groups
-      iommu/arm-smmu: put iommu_domain pointer in dev->archdata.iommu
-      iommu/arm-smmu: use page shift instead of page size to avoid division
-      iommu/arm-smmu: don't bother truncating the s1 output size to VA_BITS
-
- .../devicetree/bindings/iommu/arm,smmu.txt         |   1 +
- drivers/iommu/arm-smmu.c                           | 201 ++++++++++++---------
- 2 files changed, 121 insertions(+), 81 deletions(-)
+-- 
+2.0.3
