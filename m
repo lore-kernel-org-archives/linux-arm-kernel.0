@@ -1,95 +1,41 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 22 Sep 2014 15:09:46 -0500
-Subject: [PATCH 2/2] ata: qcom: Add device tree bindings information
-In-Reply-To: <1411416586-18320-1-git-send-email-galak@codeaurora.org>
-References: <1411416586-18320-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1411416586-18320-2-git-send-email-galak@codeaurora.org>
+Date: Mon, 22 Sep 2014 15:14:34 -0500
+Subject: [GIT PULL] qcom defconfig changes for v3.18
+Message-ID: <676B1050-4098-4E8C-A60D-07D86C3BF289@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding for Qualcomm AHCI SATA controller and specifically
-the sata controller on the IPQ806x family of SoCs.
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-We can utilize the "generic-ahci" platform driver with the addition of the
-sata phy to enable SATA support on Qualcomm SoCs with AHCI controllers.
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
-v5:
-* Moved to using "generic-ahci" binding support and assigned-clocks
-  so we can use upstream generic ahci support w/o a special driver.
-  Updated binding spec to reflect that.
+are available in the git repository at:
 
-v4:
-* Added simple PM ops implementation
-* Added setting of pmalive clk
+  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-defconfig-for-3.18
 
-v3:
-* Added comment about suspend/resume not supported
-* Fixup ahci_platform_init_host for upstream change to interface
-* cleanup error handling of rxoob clk, moved to devm_clk_get/put
+for you to fetch changes up to 3b6357a79b7b0a2c3b31c5c92d5dd0c51cda0391:
 
-v2:
-* Fixed MODULE_LICENSE to be GPL v2
+  ARM: qcom: Update defconfig (2014-09-22 13:59:08 -0500)
 
- .../devicetree/bindings/ata/qcom-sata.txt          | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/qcom-sata.txt
+----------------------------------------------------------------
+Qualcomm ARM Based defconfig Updates for v3.18
 
-diff --git a/Documentation/devicetree/bindings/ata/qcom-sata.txt b/Documentation/devicetree/bindings/ata/qcom-sata.txt
-new file mode 100644
-index 0000000..094de91
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/qcom-sata.txt
-@@ -0,0 +1,48 @@
-+* Qualcomm AHCI SATA Controller
-+
-+SATA nodes are defined to describe on-chip Serial ATA controllers.
-+Each SATA controller should have its own node.
-+
-+Required properties:
-+- compatible		: compatible list, must contain "generic-ahci"
-+- interrupts		: <interrupt mapping for SATA IRQ>
-+- reg			: <registers mapping>
-+- phys			: Must contain exactly one entry as specified
-+			  in phy-bindings.txt
-+- phy-names		: Must be "sata-phy"
-+
-+Required properties for "qcom,ipq806x-ahci" compatible:
-+- clocks		: Must contain an entry for each entry in clock-names.
-+- clock-names		: Shall be:
-+				"slave_iface" - Fabric port AHB clock for SATA
-+				"iface" - AHB clock
-+				"core" - core clock
-+				"rxoob" - RX out-of-band clock
-+				"pmalive" - Power Module Alive clock
-+- assigned-clocks	: Shall be:
-+				SATA_RXOOB_CLK
-+				SATA_PMALIVE_CLK
-+- assigned-clock-rates	: Shall be:
-+				100Mhz (100000000) for SATA_RXOOB_CLK
-+				100Mhz (100000000) for SATA_PMALIVE_CLK
-+
-+Example:
-+	sata at 29000000 {
-+		compatible = "qcom,ipq806x-ahci", "generic-ahci";
-+		reg = <0x29000000 0x180>;
-+
-+		interrupts = <0 209 0x0>;
-+
-+		clocks = <&gcc SFAB_SATA_S_H_CLK>,
-+			 <&gcc SATA_H_CLK>,
-+			 <&gcc SATA_A_CLK>,
-+			 <&gcc SATA_RXOOB_CLK>,
-+			 <&gcc SATA_PMALIVE_CLK>;
-+		clock-names = "slave_iface", "iface", "core",
-+				"rxoob", "pmalive";
-+		assigned-clocks = <&gcc SATA_RXOOB_CLK>, <&gcc SATA_PMALIVE_CLK>;
-+		assigned-clock-rates = <100000000>, <100000000>;
-+
-+		phys = <&sata_phy>;
-+		phy-names = "sata-phy";
-+	};
+* General defconfig update to match upstream changes
+* Enable IPQ806x & APQ8084 clk support
+* Enable pinctrl on MSM8960 & APQ8084
+* Enable CPU_IDLE to get basic wfi support
+* Enable SPI NOR and MTD M25P80 support (used on AP148 board)
+* Enable SATA PHY support on IPQ806x and APQ8064
+* Enable Fixed regulator and ARM MMCI support (mmc support on APQ8064)
+
+----------------------------------------------------------------
+Kumar Gala (2):
+      ARM: qcom: Update defconfig
+      ARM: qcom: Update defconfig
+
+ arch/arm/configs/qcom_defconfig | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
