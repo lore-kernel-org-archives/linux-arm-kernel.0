@@ -1,44 +1,72 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 22 Sep 2014 09:25:13 -0600
-Subject: [PATCH v11 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <20140922110522.GK1994@e106497-lin.cambridge.arm.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-8-git-send-email-Liviu.Dudau@arm.com>
- <20140919210313.GH19374@google.com>
- <20140922110522.GK1994@e106497-lin.cambridge.arm.com>
-Message-ID: <CAErSpo7bnOFo4-uZmVsMqNpVQS+dQaMNedjmJ=sH_d9Kp2fGPg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Sep 2014 16:26:14 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
+ ATS1PR
+In-Reply-To: <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
+References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
+ <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140922152614.GP25809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 5:05 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> On Fri, Sep 19, 2014 at 10:03:13PM +0100, Bjorn Helgaas wrote:
->> On Thu, Sep 18, 2014 at 02:30:22AM +0100, Liviu Dudau wrote:
->> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
->> > of a given device from DT. If the information is not present,
->> > the function can be requested to allocate a new domain number.
->>
->> Is of_pci_get_domain_nr() used somewhere?  If the use is in some future
->> series, please mention it explicitly.  I'm just trying to avoid merging
->> unused code.
->
-> It is used in the arm64 specific patch that I have dropped out of my
-> pull request. After discussions with Catalin I will add the patch back
-> into the tree that you've pulled from as he is OK with your tree carrying
-> the whole package.
->
-> I need to ask for some guidance here: for addressing some of your comments
-> and Rob's I can add more patches in my v11 branch and you can pull them
-> when you think they are ready. But one of your comments was requesting
-> splitting a patch into two blocks - one that moves of_pci_range_to_resource()
-> into drivers/of/address.c and one that fixes it's behaviour - and I don't
-> know how you would like that handled. Should I revert the original patch
-> and add the new ones, or should I rebase the whole series into a different
-> branch that you can pull from?
+Hi Mitch,
 
-I guess the easiest thing is probably just to send a v12 series.  I
-was hoping we were close enough for me to just hand-integrate minor
-tweaks into my branch, but I think that will just create more
-confusion.
+On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
+> Currently, we provide the iommu_ops.iova_to_phys service by doing a
+> table walk in software to translate IO virtual addresses to physical
+> addresses. On SMMUs that support it, it can be useful to ask the SMMU
+> itself to do the translation. This can be used to warm the TLBs for an
+> SMMU. It can also be useful for testing and hardware validation.
+> 
+> Since the address translation registers are optional on SMMUv2, only
+> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
+> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
 
-Bjorn
+[...]
+
+> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+> +					dma_addr_t iova)
+> +{
+> +	struct arm_smmu_domain *smmu_domain = domain->priv;
+> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
+> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+> +	struct device *dev = smmu->dev;
+> +	void __iomem *cb_base;
+> +	u32 tmp;
+> +	u64 phys;
+> +
+> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+> +
+> +	if (smmu->version == 1) {
+> +		u32 reg = iova & ~0xFFF;
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+> +	} else {
+> +		u32 reg = iova & ~0xFFF;
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+> +		reg = (iova & ~0xFFF) >> 32;
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
+> +	}
+> +
+> +	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
+> +				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
+> +		dev_err(dev,
+> +			"iova to phys timed out on 0x%pa for %s. Falling back to software table walk.\n",
+> +			&iova, dev_name(dev));
+
+dev_err already prints the device name.
+
+> +		return arm_smmu_iova_to_phys_soft(domain, iova);
+> +	}
+> +
+> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
+> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
+> +
+> +	if (phys & CB_PAR_F) {
+> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
+> +		dev_err(dev, "PAR = 0x%llx\n", phys);
+> +	}
+> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
+
+How does this work for 64k pages?
+
+Will
