@@ -1,50 +1,37 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 22 Sep 2014 15:52:48 +0100
-Subject: [PATCH] arm: kvm: fix CPU hotplug
-Message-ID: <1411397568-4738-1-git-send-email-vladimir.murzin@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Sep 2014 16:02:17 +0100
+Subject: [PATCH] ARM: mm: clear SCTLR.HA instead of setting it for LPAE
+Message-ID: <1411398137-5521-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms with no power management capabilities, the hotplug
-implementation is allowed to return from a smp_ops.cpu_die() call as a
-function return. Upon a CPU onlining event, the KVM CPU notifier tries
-to reinstall the hyp stub, which fails on platform where no reset took
-place following a hotplug event, with the message:
+SCTLR.HA (hardware access flag) is deprecated, not actually implemented
+by any CPUs and would probably break Linux if it was (since we don't use
+atomics when accessing page table entries). Furthermore, it can confuse
+cr_alignment checks where the whole value of SCTLR is compared against
+the value sitting in the hardware, since the bit is actually RAZ/WI and
+will not match the saved cr_alignment value.
 
-CPU1: smp_ops.cpu_die() returned, trying to resuscitate
-CPU1: Booted secondary processor
-Kernel panic - not syncing: unexpected prefetch abort in Hyp mode at: 0x80409540
-unexpected data abort in Hyp mode at: 0x80401fe8
-unexpected HVC/SVC trap in Hyp mode at: 0x805c6170
-
-since KVM code is trying to reinstall the stub on a system where it is
-already configured.
-
-To prevent this issue, this patch adds a check in the KVM hotplug
-notifier that detects if the HYP stub really needs re-installing when a
-CPU is onlined and skips the installation call if the stub is already in
-place, which means that the CPU has not been reset.
-
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kvm/arm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mm/proc-v7-3level.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a99e0cd..9b43f54 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -826,7 +826,8 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
- 	switch (action) {
- 	case CPU_STARTING:
- 	case CPU_STARTING_FROZEN:
--		cpu_init_hyp_mode(NULL);
-+		if (__hyp_get_vectors() == hyp_default_vectors)
-+			cpu_init_hyp_mode(NULL);
- 		break;
- 	}
- 
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index b64e67c7f176..d3daed0ae0ad 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -157,9 +157,9 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	 *  TFR   EV X F   IHD LR    S
+ 	 * .EEE ..EE PUI. .TAT 4RVI ZWRS BLDP WCAM
+ 	 * rxxx rrxx xxx0 0101 xxxx xxxx x111 xxxx < forced
+-	 *   11    0 110    1  0011 1100 .111 1101 < we want
++	 *   11    0 110    0  0011 1100 .111 1101 < we want
+ 	 */
+ 	.align	2
+ 	.type	v7_crval, #object
+ v7_crval:
+-	crval	clear=0x0120c302, mmuset=0x30c23c7d, ucset=0x00c01c7c
++	crval	clear=0x0122c302, mmuset=0x30c03c7d, ucset=0x00c01c7c
 -- 
-2.0.0
+2.1.0
