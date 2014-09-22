@@ -1,40 +1,66 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 22 Sep 2014 13:40:40 +0200
-Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
- of_platform_populate
-In-Reply-To: <11868654.D6MinQlF2p@wuerfel>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <1410539695-29128-7-git-send-email-will.deacon@arm.com>
- <20140922093614.GK1470@ulmo> <11868654.D6MinQlF2p@wuerfel>
-Message-ID: <20140922114039.GT1470@ulmo>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Mon, 22 Sep 2014 11:40:42 +0000
+Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
+In-Reply-To: <20140922112849.GL1994@e106497-lin.cambridge.arm.com>
+References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
+ <20140922112849.GL1994@e106497-lin.cambridge.arm.com>
+Message-ID: <a9539cb545eb4ce6b6636a28ff498f90@HKXPR06MB168.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 01:08:27PM +0200, Arnd Bergmann wrote:
-> On Monday 22 September 2014 11:36:15 Thierry Reding wrote:
-> > On Fri, Sep 12, 2014 at 05:34:54PM +0100, Will Deacon wrote:
-> > > We need to ensure that the IOMMUs in the system have a chance to perform
-> > > some basic initialisation before we start adding masters to them.
-> > > 
-> > > This patch adds a call to of_iommu_init before of_platform_populate.
-> > 
-> > Why can't you call it from of_platform_populate() directly? That way it
-> > would be usable for all architectures rather than just ARM. Eventually
-> > we're going to need the same thing for 64-bit ARM (and possibly others
-> > as well).
+Hi Liviu,
+
+On 22 September 2014 12:29, Liviu wrote:
+> On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
+> > The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller
+> drivers,
+> > one for an external PCIe slot, the other for an internal PCI bridge to USB
+> > controllers.
+> >
+> > However, they currently do not work at the same time as they use the
+> same PCI
+> > domain and use the same root bus number. We can't use different root
+> bus numbers
+> > due to the way root bus numbers are assigned in pcibios_init_hw() in
+> > arch/arm/kernel/bios32.c.
+> >
+> > Since the two PCI controllers are completely independent, I think it makes
+> sense
+> > to use different PCI domains for them.
+> >
+> > I've marked the third patch as RFC as I am not sure of the impact of
+> enabling
+> > PCI domains for all ARM devices. In the march to 'one kernel to rule them
+> all',
+> > I steered clear of mach specific changes.
+> >
+> > These patches require the following patch from Liviu Dudau:
+> >   [PATCH v11 07/10] OF: Introduce helper function for getting PCI
+> domain_nr
+> > Based on comments on this patch from Jason Gunthorpe, there is still the
+> issue
+> > that the domain numbers may change depending on the ordering at probe
+> time.
+> > However, this can be fixed later on by adding the entries in the DT files.
 > 
-> IIRC, of_platform_populate can be called multiple times, even recursively
-> be drivers that populate their own child devices.
+> Hi Phil,
+> 
+> I'm happy that you found use for my patch, but I can't help wondering if it is
+> not a better idea to convert your drivers to the whole new API in my series.
+> Do you have any thoughts on that?
+The main reason being that Renesas also supports the LTSI trees, so this fix
+will also need backporting to v3.10. 
 
-Indeed. Perhaps it could be conditionally called when root == NULL. But
-perhaps that's not safe either. Anyway, I still think we shouldn't be
-making this some randomly placed early initcall anyway.
+> One other thing to note: Rob Herring is not very happy with the mix of OF
+> parsing and domain number allocation going in together, so I might remove
+> the
+> OF parsing entirely for now. Would that cause you any problems (other than
+> the fact that if of_pci_get_domain_nr() doesn't do anything OF related I
+> might
+> rename it to pci_get_domain_nr()). You don't seem to have any alias defined
+> for pci-domain in the DT, so I'll guess not.
+In the covering letter I mentioned that controllers should always use the same
+domain number, so I was planning to add pci-domain into the DTs later on.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/ce0536c5/attachment.sig>
+Thanks
+Phil
