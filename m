@@ -1,78 +1,120 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 22 Sep 2014 10:04:49 +0530
-Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-Message-ID: <1411360497-17958-1-git-send-email-a.kesavan@samsung.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Mon, 22 Sep 2014 10:08:33 +0530
+Subject: [PATCH v2 1/2] ARM: dts: vf610-colibri: Add PWM support
+In-Reply-To: <e63381e2dd14625e5395f892928b38f2@agner.ch>
+References: <cover.1411130205.git.bhuvanchandra.dv@toradex.com>
+ <d28bb6c5aeee7b5b4b7b20484fbaf0ba4eeb4ad4.1411130205.git.bhuvanchandra.dv@toradex.com>
+ <e63381e2dd14625e5395f892928b38f2@agner.ch>
+Message-ID: <541FA7C9.30509@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v4:
-- Fixed comments from Tomasz Figa:
-	- Changed the namespace prefix from exynos to samsung
-	- Defined bindings to take all input clocks
-	- Sorted the Kconfig entries alphabetically in clock Makefile
-	- Used consistent 1 tab line breaks across the clock file
-	- Statically initialized the samsung_cmu_info struct
-- Enabled exynos7 in the arm64 defconfig as per Catalin Marinas' comment.
-- Added Kukjin Kim's ack along with Thomas Abraham's tested and reviewed tags.
 
-Changes since v3:
-- Removed aliases for serial controllers from dtsi file and moved it
-  into board specific dts file as suggested by Arnd.
-- Based this series on Robert Richter's patches for adding vendor
-  device tree sub-directories for arm64.
-  http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+On Friday 19 September 2014 09:30 PM, Stefan Agner wrote:
 
-This patchset supports the new Exynos7 Samsung SoC based on Cortex-A57.
-Exynos7 is a System-On-Chip (SoC) that is based on 64-bit ARMv8 RISC
-processor.
+> Am 2014-09-19 15:38, schrieb Bhuvanchandra DV:
+>> The Colibri standard defines four pins as PWM outputs, two of them (PWM
+>> A and C) are routed to FTM instance 0 and the other two (PWM B and D)
+>> are routed to FTM instance 1. Hence enable both FTM instances for the
+>> Colibri module and mux the four pins accordingly.
+>>
+>> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+>> ---
+>>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    8 +++++++
+>>  arch/arm/boot/dts/vf610-colibri.dtsi        |   31 +++++++++++++++++++++++----
+>>  2 files changed, 35 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> index 7fb3066..00f63d9 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> @@ -33,6 +33,14 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&pwm0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pwm1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>  	status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi
+>> b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> index 0cd8343..560cd69 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+>> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> @@ -13,10 +13,6 @@
+>>  	model = "Toradex Colibri VF61 COM";
+>>  	compatible = "toradex,vf610-colibri_vf61", "fsl,vf610";
+>>  
+>> -	memory {
+>> -		reg = <0x80000000 0x10000000>;
+>> -	};
+>> -
+>>  	clocks {
+>>  		enet_ext {
+>>  			compatible = "fixed-clock";
+>> @@ -25,6 +21,9 @@
+>>  		};
+>>  	};
+>>  
+>> +	memory {
+>> +		reg = <0x80000000 0x10000000>;
+>> +	};
+> Memory is a bit an exception here: In almost all device tree this is the
+> first node after model/compatible. Also, it's generally not allowed to
+> make changes outside of the topic (PWM in this case)... Hence I would
+> drop this change.
+>
+> The rest
+> Acked-By: Stefan Agner <stefan@agner.ch>
 
-The following patches are tested based on linux-next tree (20140919).
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/
+OK. Will drop the change.
 
-Following patches are required for this series:
-1- "tty/serial: fix config dependencies for samsung serial"
-   https://www.mail-archive.com/linux-samsung-soc <at> vger.kernel.org/msg36208.html
-2- "dts, kbuild: Implement support for dtb vendor subdirs" patchset 
-   http://comments.gmane.org/gmane.linux.kbuild.devel/12131
-
-Alim Akhtar (2):
-  arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
-  arm64: Enable Exynos7 SOC in the defconfig
-
-Naveen Krishna Chatradhi (5):
-  clk: samsung: add support for 145xx and 1460x PLLs
-  clk: samsung: Factor out the common code to clk.c
-  clk: samsung: Add fixed_factor_clocks field to struct exynos_cmu_info
-  clk: samsung: add initial clock support for Exynos7 SoC
-  arm64: dts: Add initial device tree support for EXYNOS7
-
-Pankaj Dubey (1):
-  arm64: dts: add <dt-bindings/> symlink
-
- .../devicetree/bindings/clock/exynos7-clock.txt    |  67 ++++
- arch/arm64/Kconfig                                 |  12 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/exynos/Makefile                |   5 +
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  39 ++
- arch/arm64/boot/dts/exynos/exynos7.dtsi            | 183 +++++++++
- arch/arm64/boot/dts/include/dt-bindings            |   1 +
- arch/arm64/configs/defconfig                       |   4 +
- drivers/clk/samsung/Makefile                       |   1 +
- drivers/clk/samsung/clk-exynos5260.c               | 185 ++-------
- drivers/clk/samsung/clk-exynos7.c                  | 425 +++++++++++++++++++++
- drivers/clk/samsung/clk-pll.c                      |  25 +-
- drivers/clk/samsung/clk-pll.h                      |   4 +
- drivers/clk/samsung/clk.c                          |  98 +++++
- drivers/clk/samsung/clk.h                          |  37 ++
- include/dt-bindings/clock/exynos7-clk.h            |  49 +++
- 16 files changed, 972 insertions(+), 164 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/exynos7-clock.txt
- create mode 100644 arch/arm64/boot/dts/exynos/Makefile
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7-espresso.dts
- create mode 100644 arch/arm64/boot/dts/exynos/exynos7.dtsi
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
- create mode 100644 drivers/clk/samsung/clk-exynos7.c
- create mode 100644 include/dt-bindings/clock/exynos7-clk.h
-
--- 
-2.1.0
+>>  };
+>>  
+>>  &esdhc1 {
+>> @@ -44,6 +43,16 @@
+>>  	arm,tag-latency = <3 2 3>;
+>>  };
+>>  
+>> +&pwm0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pwm0>;
+>> +};
+>> +
+>> +&pwm1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pwm1>;
+>> +};
+>> +
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&pinctrl_uart0>;
+>> @@ -97,6 +106,20 @@
+>>  			>;
+>>  		};
+>>  
+>> +		pinctrl_pwm0: pwm0grp {
+>> +			fsl,pins = <
+>> +				VF610_PAD_PTB0__FTM0_CH0		0x1182
+>> +				VF610_PAD_PTB1__FTM0_CH1		0x1182
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pwm1: pwm1grp {
+>> +			fsl,pins = <
+>> +				VF610_PAD_PTB8__FTM1_CH0		0x1182
+>> +				VF610_PAD_PTB9__FTM1_CH1		0x1182
+>> +			>;
+>> +		};
+>> +
+>>  		pinctrl_uart0: uart0grp {
+>>  			fsl,pins = <
+>>  				VF610_PAD_PTB10__UART0_TX		0x21a2
