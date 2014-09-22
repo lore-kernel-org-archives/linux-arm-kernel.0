@@ -1,43 +1,50 @@
 From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Mon, 22 Sep 2014 10:51:10 +0100
-Subject: [RFC PATCH 3/3] ARM: Enable PCI domains
+Date: Mon, 22 Sep 2014 10:51:09 +0100
+Subject: [PATCH 2/3] PCI: rcar-internal-pci: Add call to get domain nr
 In-Reply-To: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
 References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <1411379470-20639-4-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <1411379470-20639-3-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there are ARM devices with multiple independant PCI controllers, enable
-PCI domains for all ARM devices.
+R-Car devices (r8a7790 and r8a7791) need to place the internal PCI and external
+PCIe controllers on separate domains so that they can work at the same time.
 
 Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 ---
-Marked as RFC as I am not sure of the impact of enabling PCI domains for all
-ARM devices. In the march to 'one kernel to rule them all', I steered clear of
-mach specific changes.
+ drivers/pci/host/pci-rcar-gen2.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 32cbbd5..8741d3d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1274,6 +1274,7 @@ config ISA_DMA_API
+diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
+index 3ef854f..17681ea 100644
+--- a/drivers/pci/host/pci-rcar-gen2.c
++++ b/drivers/pci/host/pci-rcar-gen2.c
+@@ -99,6 +99,7 @@ struct rcar_pci_priv {
+ 	struct resource io_res;
+ 	struct resource mem_res;
+ 	struct resource *cfg_res;
++	int domain;
+ 	unsigned busnr;
+ 	int irq;
+ 	unsigned long window_size;
+@@ -373,6 +374,8 @@ static int rcar_pci_probe(struct platform_device *pdev)
  
- config PCI
- 	bool "PCI support" if MIGHT_HAVE_PCI
-+	select PCI_DOMAINS
- 	help
- 	  Find out whether you have a PCI motherboard. PCI is the name of a
- 	  bus system, i.e. the way the CPU talks to the other stuff inside
-@@ -1282,7 +1283,6 @@ config PCI
+ 	priv->window_size = SZ_1G;
  
- config PCI_DOMAINS
- 	bool
--	depends on PCI
- 
- config PCI_NANOENGINE
- 	bool "BSE nanoEngine PCI support"
++	priv->domain = of_pci_get_domain_nr(pdev->dev.of_node, true);
++
+ 	if (pdev->dev.of_node) {
+ 		struct resource busnr;
+ 		int ret;
+@@ -397,6 +400,9 @@ static int rcar_pci_probe(struct platform_device *pdev)
+ 	hw.map_irq = rcar_pci_map_irq;
+ 	hw.ops = &rcar_pci_ops;
+ 	hw.setup = rcar_pci_setup;
++#ifdef CONFIG_PCI_DOMAINS
++	hw.domain = priv->domain;
++#endif
+ 	pci_common_init_dev(&pdev->dev, &hw);
+ 	return 0;
+ }
 -- 
 2.1.0
