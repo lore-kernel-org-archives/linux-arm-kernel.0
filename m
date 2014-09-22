@@ -1,61 +1,31 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 22 Sep 2014 15:44:52 +0900
-Subject: [PATCH 2/2] ARM: dts: Add rtc_src clk for s3c-rtc on
- exynos5250-snow
-In-Reply-To: <1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
-References: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>
- <1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <541FC564.8000002@samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 22 Sep 2014 09:52:04 +0300
+Subject: [PATCH] clk: ti: change clock init to use generic of_clk_init
+In-Reply-To: <alpine.DEB.2.02.1409191632170.22526@utopia.booyaka.com>
+References: <1408628959-32442-1-git-send-email-t-kristo@ti.com>
+ <20140918171725.GL14505@atomide.com>
+ <alpine.DEB.2.02.1409191632170.22526@utopia.booyaka.com>
+Message-ID: <541FC714.9050203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Javier,
+On 09/19/2014 07:33 PM, Paul Walmsley wrote:
+> On Thu, 18 Sep 2014, Tony Lindgren wrote:
+>
+>> * Tero Kristo <t-kristo@ti.com> [140821 06:52]:
+>>> Previously, the TI clock driver initialized all the clocks hierarchically
+>>> under each separate clock provider node. Now, each clock that requires
+>>> IO access will instead check their parent node to find out which IO range
+>>> to use.
+>>>
+>>> This patch allows the TI clock driver to use a few new features provided
+>>> by the generic of_clk_init, and also allows registration of clock nodes
+>>> outside the clock hierarchy (for example, any external clocks.)
+>>
+>> Paul, any comments on this one?
+>
+> Not at this point.
 
-On 09/17/2014 08:50 PM, Javier Martinez Canillas wrote:
-> commit 546b117fdf17 ("rtc: s3c: add support for RTC of Exynos3250 SoC")
-> added an "rtc_src" DT property for the Samsung's S3C Real Time Clock
-> controller that specifies the 32.768 kHz clock that uses the RTC as its
-> source clock. In the case of the Exynos5250 based Snow board, the Maxim
-> 77686 32kHz AP clock is used as the source clock.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index e51fcef..56eec56 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -10,6 +10,7 @@
->  
->  /dts-v1/;
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/clock/maxim,max77686.h>
->  #include "exynos5250.dtsi"
->  
->  / {
-> @@ -29,6 +30,8 @@
->  
->  	rtc at 101E0000 {
->  		status = "okay";
-> +		clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
-> +		clock-names = "rtc", "rtc_src";
->  	};
->  
->  	pinctrl at 11400000 {
-> @@ -350,7 +353,7 @@
->  	samsung,i2c-sda-delay = <100>;
->  	samsung,i2c-max-bus-freq = <378000>;
->  
-> -	max77686 at 09 {
-> +	max77686: max77686 at 09 {
->  		compatible = "maxim,max77686";
->  		interrupt-parent = <&gpx3>;
->  		interrupts = <2 0>;
-> 
+Tony, ok to merge this through clock tree?
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-Thanks,
-Chanwoo Choi
+-Tero
