@@ -1,34 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 22 Sep 2014 18:10:25 +0100
-Subject: [PATCH v6] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <542046CA.1060508@amd.com>
-References: <20140908230852.2118.97400.stgit@joelaarch64.amd.com>
- <20140919152853.GH2295@e104818-lin.cambridge.arm.com>
- <20140919172846.GA12331@e104818-lin.cambridge.arm.com>
- <542046CA.1060508@amd.com>
-Message-ID: <20140922171025.GN30085@e104818-lin.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 22 Sep 2014 19:13:27 +0200
+Subject: [PATCH] i2c-rk3x: move setup to the earlier subsys initcall
+In-Reply-To: <CAD=FV=VUoK8SDng6O4-VVq8UZf88b3bSe-hQMht3R2nmYXqMFQ@mail.gmail.com>
+References: <1411370675-27866-1-git-send-email-zyw@rock-chips.com>
+ <7192455.FveG5nGWsJ@xq-nb>
+ <CAD=FV=VUoK8SDng6O4-VVq8UZf88b3bSe-hQMht3R2nmYXqMFQ@mail.gmail.com>
+Message-ID: <20140922171325.GB1404@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 04:56:58PM +0100, Joel Schopp wrote:
-> > The TCR_EL2.PS setting should be done based on the ID_A64MMFR0_EL1
-> > but you can do this in __do_hyp_init (it looks like this function
-> > handles VTCR_EL2.PS already, not sure why it does do it for TCR_EL2 as
-> > well).
-> >
-> > So IMO you only need about a few lines patch.
->
-> My original patch to fix this problem was one line, so I'm perfectly
-> happy with simplification.  But it would be nice if the other reviewers
-> could agree with this approach.  With six versions that each addressed
-> all the comments from reviewers I'd like it if the v7 that throws away
-> most of that feedback didn't result in a v8 that puts it all back again.
+Hi,
 
-I'm having some discussion with Christoffer around this. He will come up
-with some patches on top of yours but I don't think the problem is that
-simple. Basically the IPA size is restricted by the PARange but also
-affected by the number of page table levels used by the host (both
-having implications on VTCR_EL2.SL0).
+> In general you are correct.  You can get by with lots of probe
+> deferrals.  I don't personally know of any case where things are
+> broken with the current code, but it's really nice to avoid the
+> deferrals if possible.
 
--- 
-Catalin
+Yes, we all want proper dependencies and ordering, yet deferred probing
+is the best we have.
+
+> Given that this is a core SoC i2c bus and is used for _a lot_ of
+> external connectivity (including for connecting to the primary
+> regulator on most boards), bumping up the priority in the init order
+> makes a lot of sense to me.
+> 
+> This also matches the i2c busses of most other major SoCs.  A selected
+> few examples:
+> 
+> i2c-gpio.c:subsys_initcall(i2c_gpio_init);
+> i2c-omap.c:subsys_initcall(omap_i2c_init_driver);
+> i2c-s3c2410.c:subsys_initcall(i2c_adap_s3c_init);
+> i2c-tegra.c:subsys_initcall(tegra_i2c_init_driver);
+
+They were "lucky" to be around before deferred probing and using
+subsys_initcall was always considered a hack. I am not accepting new
+users of this hack unless there is really no other solution.
+
+So, NACK, since it doesn't solve a problem.
+
+Regards,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/4c05c670/attachment.sig>
