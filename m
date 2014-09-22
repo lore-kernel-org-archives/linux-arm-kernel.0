@@ -1,43 +1,108 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 22 Sep 2014 14:52:02 +0200
-Subject: [PATCH] [media] s5p-mfc: Use decode status instead of display status
- on MFCv5
-Message-ID: <1411390322-25212-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 22 Sep 2014 08:02:27 -0500
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <541AE314.5040107@ti.com>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com>,
+ <5419D7BD.30003@linaro.org>
+ <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>
+ <541A25DA.8030101@linaro.org> <541AE102.2070407@ti.com>
+ <541AE314.5040107@ti.com>
+Message-ID: <54201DE3.6030207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 90c0ae50097 changed how the frame_type of a decoded frame
-gets determined, by switching from the get_dec_frame_type to
-get_disp_frame_type operation. Unfortunately it seems that on MFC v5 the
-result of get_disp_frame_type is always 0 (no display) when decoding
-(tested with H264), resulting in no frame ever being output from the
-decoder.
+On 09/18/2014 08:50 AM, Nishanth Menon wrote:
+> On 09/18/2014 08:41 AM, Nishanth Menon wrote:
+>> On 09/17/2014 07:22 PM, Daniel Lezcano wrote:
+>>> On 09/17/2014 04:20 PM, Shilimkar, Santosh wrote:
+>> [...]
+>>>> Could you try a long run of this little program:
+>>>>
+>>>> https://git.linaro.org/power/pm-qa.git/blob/HEAD:/cpuidle/cpuidle_killer.c
+>>>>
+>>>> [Santosh] I am sure there will not be any issue with the long run test case here.
+>>>> Lets see if Nishant sees anything otherwise
+>>>
+>>> Ok. Make sure the cpu is effectively entering your C2 state with the
+>>> sleep duration in the test program.
+>>
+>> Test kernel:
+>> https://github.com/nmenon/linux-2.6-playground/commits/testing/tmlind-test-suspend-resume
+>> (I decided to merge in various send for pull branches from maintainers
+>> and apply cpuidle on top)..
+>>
+>> Controlled test run as follows on 4 different impacted platforms and 1
+>> platform as legacy reference.
+>>
+>> What we are looking for is
+>>> cpu1_pwrdm (ON),OFF:0,RET:2677,INA:0,ON:2678,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+>> RET:2677 indicated CPU1 hit C2
+>>> cpu0_pwrdm (ON),OFF:0,RET:2677,INA:0,ON:2678,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+>> RET:2677 indicated CPU0 hit C2
+>>> mpu_pwrdm (ON),OFF:0,RET:2667,INA:0,ON:2668,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:2667,RET-MEMBANK2-OFF:0
+>> RET:2667 indicates that CPU0 and CPU1 managed to achieve RET together,
+>> else by hardware constraints in place, MPU power domain will fail to
+>> transition.
+>>
+>> What I see in all cases below is that transitions do take place (C2 is
+>> successfully hit).
+>>
+>> Test #1: 120 seconds:
+>> CMD: set -x;uname -a;cat /sys/kernel/debug/pm_debug/count;sleep
+>> 1;./cpuidle_killer_120;sleep 1;cat /sys/kernel/debug/pm_debug/count;set +x
+>>
+>> OMAP4 Panda-ES: (2 a9) - not impacted as part of this patch - just
+>> base test vector
+>> http://fpaste.org/134547/14110454/
+>>
+>> OMAP5 uEVM: (2 a15)
+>> http://fpaste.org/134546/10454181/
+>>
+>> DRA74x: (2 a15)
+>> http://fpaste.org/134543/11045286/
+>>
+>> DRA72: (2 a15)
+> 	  ^^
+> Correction should have been 1 a15
+>
+>> http://fpaste.org/134544/11045335/
+>>
+>> AM572x(DRA74x variant): (2 A15)
+>> http://fpaste.org/134545/10453761/
+>>
+>>
+>> Test #2: 1200 seconds: (http://fpaste.org/134564/47289141/)
+>> CMD: set -x;uname -a;cat /sys/kernel/debug/pm_debug/count;sleep
+>> 1;./cpuidle_killer_1200;sleep 1;cat
+>> /sys/kernel/debug/pm_debug/count;set +x
+>>
+>> OMAP4 Panda-ES: (2 a9) - not impacted as part of this patch - just
+>> base test vector
+>> http://fpaste.org/134563/41104728/
+>>
+>> OMAP5 uEVM: (2 a15)
+>> http://fpaste.org/134562/47221141/
+>>
+>> DRA74x EVM: (2 a15)
+>> http://fpaste.org/134559/11047098/
+>>
+>> DRA72 EVM: (2 a15)
+> 	      ^^
+> Correction should have been 1 a15
+>
+>> http://fpaste.org/134560/11047151/
+>>
+>> AM572x EVM: (2 A15)
+>> http://fpaste.org/134561/47189141/
+>>
+>>
 
-This patch reverts MFC v5 to the previous behaviour while keeping the
-new behaviour for v6 and up.
+Daniel, Santosh: Gentle ping:
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Any further comments? OR are we ok for this for being merged?
+
+
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index d35b041..27ca9d0 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -264,7 +264,12 @@ static void s5p_mfc_handle_frame_new(struct s5p_mfc_ctx *ctx, unsigned int err)
- 	unsigned int frame_type;
- 
- 	dspl_y_addr = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_y_adr, dev);
--	frame_type = s5p_mfc_hw_call(dev->mfc_ops, get_disp_frame_type, ctx);
-+	if (IS_MFCV6_PLUS(dev))
-+		frame_type = s5p_mfc_hw_call(dev->mfc_ops,
-+			get_disp_frame_type, ctx);
-+	else
-+		frame_type = s5p_mfc_hw_call(dev->mfc_ops,
-+			get_dec_frame_type, dev);
- 
- 	/* If frame is same as previous then skip and do not dequeue */
- 	if (frame_type == S5P_FIMV_DECODE_FRAME_SKIPPED) {
--- 
-2.1.0
+Regards,
+Nishanth Menon
