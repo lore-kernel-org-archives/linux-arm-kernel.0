@@ -1,63 +1,87 @@
 From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 22 Sep 2014 15:45:50 +0800
-Subject: [PATCHv4 4/6] dt-bindings: arm: add Freescale LS1021A SoC device tree
- binding
+Date: Mon, 22 Sep 2014 15:45:51 +0800
+Subject: [PATCHv4 5/6] ARM: imx: Add initial support for Freescale LS1021A
 In-Reply-To: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
 References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1411371952-5618-5-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <1411371952-5618-6-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
- Documentation/devicetree/bindings/arm/fsl.txt | 38 +++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+From: Jingchang Lu <b35083@freescale.com>
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index e935d7d..2e0ba09 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -74,3 +74,41 @@ Required root node properties:
- i.MX6q generic board
- Required root node properties:
-     - compatible = "fsl,imx6q";
+The LS1021A SoC is a dual-core Cortex-A7 based processor,
+this add the initial support for it.
+
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig        | 14 ++++++++++++++
+ arch/arm/mach-imx/Makefile       |  2 ++
+ arch/arm/mach-imx/mach-ls1021a.c | 21 +++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
+ create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 11b2957..2cc64a3 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -639,6 +639,20 @@ config SOC_VF610
+ 	help
+ 	  This enable support for Freescale Vybrid VF610 processor.
+ 
++config SOC_LS1021A
++	bool "Freescale LS1021A support"
++	select CPU_V7
++	select ARM_GIC
++	select CLKSRC_OF
++	select HAVE_ARM_ARCH_TIMER
++	select HAVE_SMP
++	select MIGHT_HAVE_PCI
++	select PCI_DOMAINS if PCI
++	select ZONE_DMA if ARM_LPAE
 +
++	help
++	  This enable support for Freescale LS1021A processor.
 +
-+Freescale LS1021A Platform Device Tree Bindings
-+------------------------------------------------
+ endif
+ 
+ source "arch/arm/mach-imx/devices/Kconfig"
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 6e4fcd8..ce137bc 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -110,4 +110,6 @@ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+ 
+ obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
+ 
++obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
 +
-+Required root node compatible properties:
-+  - compatible = "fsl,ls1021a";
+ obj-y += devices/
+diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+new file mode 100644
+index 0000000..9d2034b
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-ls1021a.c
+@@ -0,0 +1,21 @@
++/*
++ * Copyright 2013-2014 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
-+Freescale LS1021A SoC-specific Device Tree Bindings
-+-------------------------------------------
++#include <asm/mach/arch.h>
 +
-+Freescale SCFG
-+  scfg is the supplemental configuration unit, that provides SoC specific
-+configuration and status registers for the chip. Such as getting PEX port
-+status.
-+  Required properties:
-+  - compatible: should be "fsl,ls1021a-scfg"
-+  - reg: should contain base address and length of SCFG memory-mapped registers
++#include "common.h"
 +
-+Example:
-+	scfg: scfg at 1570000 {
-+		compatible = "fsl,ls1021a-scfg";
-+		reg = <0x0 0x1570000 0x0 0x10000>;
-+	};
++static const char * const ls1021a_dt_compat[] __initconst = {
++	"fsl,ls1021a",
++	NULL,
++};
 +
-+Freescale DCFG
-+  dcfg is the device configuration unit, that provides general purpose
-+configuration and status for the device. Such as setting the secondary
-+core start address and release the secondary core from holdoff and startup.
-+  Required properties:
-+  - compatible: should be "fsl,ls1021a-dcfg"
-+  - reg : should contain base address and length of DCFG memory-mapped registers
-+
-+Example:
-+	dcfg: dcfg at 1ee0000 {
-+		compatible = "fsl,ls1021a-dcfg";
-+		reg = <0x0 0x1ee0000 0x0 0x10000>;
-+	};
++DT_MACHINE_START(LS1021A, "Freescale LS1021A")
++	.dt_compat	= ls1021a_dt_compat,
++MACHINE_END
 -- 
 1.8.0
