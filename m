@@ -1,58 +1,54 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 22 Sep 2014 22:59:10 +0200
-Subject: [GIT PULL] arm: mediatek: Add support for mt8127 and mt8135 SoCs
-Message-ID: <CABuKBeK6iUdRqTuOZyTHW-Xt3O4giXoQTJ76vkh4Mv4cA52THQ@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 22 Sep 2014 15:00:38 -0600
+Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
+In-Reply-To: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
+References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <20140922210038.GJ1880@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Arnd,
+On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
+> The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller drivers,
+> one for an external PCIe slot, the other for an internal PCI bridge to USB
+> controllers.
+> 
+> However, they currently do not work at the same time as they use the same PCI
+> domain and use the same root bus number. We can't use different root bus numbers
+> due to the way root bus numbers are assigned in pcibios_init_hw() in
+> arch/arm/kernel/bios32.c.
+> 
+> Since the two PCI controllers are completely independent, I think it makes sense
+> to use different PCI domains for them.
+> 
+> I've marked the third patch as RFC as I am not sure of the impact of enabling
+> PCI domains for all ARM devices. In the march to 'one kernel to rule them all',
+> I steered clear of mach specific changes.
+> 
+> These patches require the following patch from Liviu Dudau:
+>   [PATCH v11 07/10] OF: Introduce helper function for getting PCI domain_nr
+> Based on comments on this patch from Jason Gunthorpe, there is still the issue
+> that the domain numbers may change depending on the ordering at probe time.
+> However, this can be fixed later on by adding the entries in the DT files.
+> 
+> 
+> Phil Edworthy (3):
+>   PCI: rcar-pcie: Add call to get domain nr
+>   PCI: rcar-internal-pci: Add call to get domain nr
+>   ARM: Enable PCI domains
 
-Here comes the pull request to introduce mt8127 and mt8135 support.
-It is based on the former pull request I send [0].
+I'm deferring these for now because they depend on Liviu's work, which I
+haven't merged yet, and I suspect some minor adaptation will be required
+here.
 
-Cheers,
-Matthias
+For what it's worth, I agree with Rob's hesitation about mixing lookup with
+domain number allocation in of_pci_get_domain_nr().  That seems
+unnecessarily complicated.
 
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287506.html
-
----
-
-The following changes since commit 467dc3a11b4c82dd94f4d0e8d6894cc60adef5ea:
-
-  arm: dts: mt6589: Change compatible string for GIC (2014-09-09 18:37:50 +0200)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v3.18-next-mt81xx
-
-for you to fetch changes up to f107b96ea9705aac9fd28c4278d4856062d3ebe8:
-
-  arm: mediatek: Add earlyprintk support for mt8127 & mt8135
-(2014-09-22 22:34:50 +0200)
-
-----------------------------------------------------------------
-Add support for mt8127 and mt8135 SoCs
-
-----------------------------------------------------------------
-Joe.C (7):
-      arm: mediatek: Add basic support for mt8127
-      arm: mediatek: add dts for 8127 Moose board
-      arm: mediatek: Add basic support for mt8135
-      arm: mediatek: add dts for MT8135 evaluation board.
-      dt-bindings: add more chips in documentation for Mediatek SoC
-      arm: dts: Build dtb for mt8127 & mt8135
-      arm: mediatek: Add earlyprintk support for mt8127 & mt8135
-
- Documentation/devicetree/bindings/arm/mediatek.txt |  15 ++-
- arch/arm/Kconfig.debug                             |  20 ++++
- arch/arm/boot/dts/Makefile                         |   4 +-
- arch/arm/boot/dts/mt8127-moose.dts                 |  24 +++++
- arch/arm/boot/dts/mt8127.dtsi                      |  93 +++++++++++++++++
- arch/arm/boot/dts/mt8135-evbp1.dts                 |  24 +++++
- arch/arm/boot/dts/mt8135.dtsi                      | 115 +++++++++++++++++++++
- arch/arm/mach-mediatek/mediatek.c                  |   2 +
- 8 files changed, 293 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
- create mode 100644 arch/arm/boot/dts/mt8127.dtsi
- create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
- create mode 100644 arch/arm/boot/dts/mt8135.dtsi
+>  arch/arm/Kconfig                 | 2 +-
+>  drivers/pci/host/pci-rcar-gen2.c | 6 ++++++
+>  drivers/pci/host/pcie-rcar.c     | 9 ++++++---
+>  3 files changed, 13 insertions(+), 4 deletions(-)
+> 
+> -- 
+> 2.1.0
+> 
