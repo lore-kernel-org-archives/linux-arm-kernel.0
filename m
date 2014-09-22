@@ -1,42 +1,60 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Mon, 22 Sep 2014 18:04:10 +0200
-Subject: [PATCH v2 8/8] tty/serial: add asm9260-serial driver
-In-Reply-To: <3430001.JjzmzIerfp@wuerfel>
-References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
- <1411325151-15107-7-git-send-email-linux@rempel-privat.de>
- <3430001.JjzmzIerfp@wuerfel>
-Message-ID: <5420487A.4010306@rempel-privat.de>
+From: max.schwarz@online.de (Max Schwarz)
+Date: Mon, 22 Sep 2014 18:05:43 +0200
+Subject: [PATCH] i2c-rk3x: move setup to the earlier subsys initcall
+In-Reply-To: <1411370675-27866-1-git-send-email-zyw@rock-chips.com>
+References: <1411370675-27866-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <7192455.FveG5nGWsJ@xq-nb>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 22.09.2014 um 17:26 schrieb Arnd Bergmann:
-> On Sunday 21 September 2014 20:45:51 Oleksij Rempel wrote:
->> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
->> ---
->>  drivers/tty/serial/Kconfig          |   17 +
->>  drivers/tty/serial/Makefile         |    1 +
->>  drivers/tty/serial/asm9260_serial.c | 1485 +++++++++++++++++++++++++++++++++++
->>  include/uapi/linux/serial_core.h    |    2 +
->>  4 files changed, 1505 insertions(+)
->>  create mode 100644 drivers/tty/serial/asm9260_serial.c
->>
+Hi Chris,
+
+Am Montag, 22. September 2014, 15:24:35 schrieb Chris Zhong:
+> Some device using this bus, such as regulators, they should register
+> as early as possible, so the I2C bus master needs to be loaded early.
+> Therefore initialize via subsys_initcall() is better.
+
+You could also use probe deferral in the regulator driver to wait until the 
+bus is ready. I don't know if you're already doing it, just wanted to point 
+that out.
+
+That said, this change will make the boot faster in any case by avoiding 
+unnecessary deferrals, so I'm for it if you fix the minor issue below.
+
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 > 
-> Similar to the irqchip driver, this one in turns seems to be a duplicate
-> of drivers/tty/serial/mxs-auart.c. Please see if you can make that one
-> work instead of adding a new copy.
+> ---
+> 
+>  drivers/i2c/busses/i2c-rk3x.c |   13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index e637c32..5b91901 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -760,7 +760,18 @@ static struct platform_driver rk3x_i2c_driver = {
+>  	},
+>  };
+> 
+> -module_platform_driver(rk3x_i2c_driver);
+> +static int __init rk3x_i2c_init_driver(void)
+> +{
+> +	return platform_driver_register(&rk3x_i2c_driver);
+> +}
+> +
+> +static void __exit rk3x_i2c_exit_driver(void)
+> +{
+> +	platform_driver_unregister(&rk3x_i2c_driver);
+> +}
+> +
+> +subsys_initcall(rk3x_i2c_init_driver);
+> +module_exit(rk3x_i2c_exit_driver);
 
-Ok, thank you for reviewing :)
+This means that the driver cannot be used as a loadable module any more, 
+right?
 
+In that case, you should probably turn the tristate option in Kconfig into a 
+bool.
 
--- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/a732849b/attachment-0001.sig>
+Cheers,
+  Max
