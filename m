@@ -1,88 +1,59 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Mon, 22 Sep 2014 19:39:56 -0300
-Subject: [PATCH 0/3] media:st-rc: Misc fixes.
-In-Reply-To: <1411424501-12673-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411424501-12673-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20140922193956.6e445cd9@recife.lan>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 22 Sep 2014 16:40:11 -0600
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140922194841.GA9868@amd>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
+ <20140922194841.GA9868@amd>
+Message-ID: <5420A54B.8080202@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 22 Sep 2014 23:21:41 +0100
-Srinivas Kandagatla <srinivas.kandagatla@linaro.org> escreveu:
-
-> Hi Mauro,
+On 09/22/2014 01:48 PM, Pavel Machek wrote:
+> On Fri 2014-09-12 22:00:16, Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> Add documentation for the guidelines of how to use ACPI
+>> on ARM64.
 > 
-> Thankyou for the "[media] enable COMPILE_TEST for media drivers" patch
-> which picked up few things in st-rc driver in linux-next testing.
-
-Anytime. Yeah, the idea is to let more people to test and check for
-hidden issues there.
+>> +No code shall be accepted into the kernel unless it complies with the released
+>> +standards from UEFI ASWG. If there are features missing from ACPI to make it
+>> +function on a platform, ECRs should be submitted to ASWG and go through the
+>> +approval process.
 > 
-> Here is a few minor fixes to the driver, could you consider them for
-> the next merge window.
+> Surely this should be narrowed down somehow? Or is reading all the
+> released standards from ASWG mandatory before patching the kernel now?
 
-Applied, thanks!
+Asking someone to read the ACPI standard when implementing ACPI
+functionality is no different than doing the same thing for PCI,
+SCSI, TCP/IP or any of a bazillion others that are used by the
+kernel.  Yes, the wording of this sentence is awkward; that's a
+very different problem and easily fixed.
 
-Btw, there are still lots of warnings there produced with smatch:
+> Spelling out wtf ECR is would be nice, too.
 
-$ make ARCH=i386 C=1 CF=-D__CHECK_ENDIAN__ CONFIG_DEBUG_SECTION_MISMATCH=y W=1 CF=-D__CHECK_ENDIAN__ M=drivers/media
-drivers/media/rc/st_rc.c:107:38: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:107:38:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:107:38:    got void *
-drivers/media/rc/st_rc.c:110:53: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:110:53:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:110:53:    got void *
-drivers/media/rc/st_rc.c:116:54: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:116:54:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:116:54:    got void *
-drivers/media/rc/st_rc.c:120:45: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:120:45:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:120:45:    got void *
-drivers/media/rc/st_rc.c:121:43: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:121:43:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:121:43:    got void *
-drivers/media/rc/st_rc.c:150:46: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:150:46:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:150:46:    got void *
-drivers/media/rc/st_rc.c:153:42: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:153:42:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:153:42:    got void *
-drivers/media/rc/st_rc.c:174:32: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:174:32:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:174:32:    got void *
-drivers/media/rc/st_rc.c:177:48: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:177:48:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:177:48:    got void *
-drivers/media/rc/st_rc.c:187:48: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:187:48:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:187:48:    got void *
-drivers/media/rc/st_rc.c:204:42: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:204:42:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:204:42:    got void *
-drivers/media/rc/st_rc.c:205:35: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:205:35:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:205:35:    got void *
-drivers/media/rc/st_rc.c:215:35: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:215:35:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:215:35:    got void *
-drivers/media/rc/st_rc.c:216:35: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:216:35:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:216:35:    got void *
-drivers/media/rc/st_rc.c:269:22: warning: incorrect type in assignment (different address spaces)
-drivers/media/rc/st_rc.c:269:22:    expected void *base
-drivers/media/rc/st_rc.c:269:22:    got void [noderef] <asn:2>*
-drivers/media/rc/st_rc.c:349:46: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:349:46:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:349:46:    got void *
-drivers/media/rc/st_rc.c:350:46: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:350:46:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:350:46:    got void *
-drivers/media/rc/st_rc.c:371:61: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:371:61:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:371:61:    got void *
-drivers/media/rc/st_rc.c:372:54: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:372:54:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:372:54:    got void *
+ECR stands for "Engineering Change Request".  It is simply a
+recommended document format for requesting changes to be made to
+the ACPI specification (and is also used by other UEFI working
+groups).  The text can easily be fixed to make that clear.
 
-Regards,
-Mauro
+> And if you expect all kernel contributors to comply with your
+> favourite standards, you should put an URL where the standards can be
+> downloaded here.
+> 
+
+Easily enough corrected; until the patch is updated, one can find
+the specs at the oh so very cleverly named URL:
+
+    http://www.uefi.org/specifications
+
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
