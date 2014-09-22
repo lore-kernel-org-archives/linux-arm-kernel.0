@@ -1,52 +1,21 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 22 Sep 2014 16:20:48 +0100
-Subject: [PATCH v11 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <201409200424.20538.arnd@arndb.de>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-8-git-send-email-Liviu.Dudau@arm.com>
- <201409200424.20538.arnd@arndb.de>
-Message-ID: <20140922152048.GZ1994@e106497-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Sep 2014 17:22:22 +0200
+Subject: [PATCH v2 7/8] irqchip: add irq-asm9260 driver
+In-Reply-To: <1411325151-15107-6-git-send-email-linux@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-6-git-send-email-linux@rempel-privat.de>
+Message-ID: <2829481.qsohvqlupS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 20, 2014 at 03:24:20AM +0100, Arnd Bergmann wrote:
-> On Thursday 18 September 2014, Liviu Dudau wrote:
-> > 
-> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
-> > of a given device from DT. If the information is not present,
-> > the function can be requested to allocate a new domain number.
-> > 
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> This is more elaborate than I remember it, and while the simpler
-> version (which potentially resulted in a conflict for inconsistent
-> DTs) was fine, this one also seems ok.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Sunday 21 September 2014 20:45:50 Oleksij Rempel wrote:
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+> ---
+>  drivers/irqchip/Makefile      |   1 +
+>  drivers/irqchip/irq-asm9260.c | 257 ++++++++++++++++++++++++++++++++++++++++++
 
-Thanks Arnd!
+This driver seems to be closely related to drivers/irqchip/irq-mxs.c.
+Are you perhaps able to share some or all of the code?
 
-Best regards,
-Liviu
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+	Arnd
