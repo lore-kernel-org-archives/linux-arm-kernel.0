@@ -1,143 +1,249 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 22 Sep 2014 19:09:29 +0200
-Subject: [PATCH 8/9] ARM: imx: clk-gate2: allow custom gate configuration
+Date: Mon, 22 Sep 2014 19:09:27 +0200
+Subject: [PATCH 6/9] ARM: imx: gpc: Support vf610 global power controller
 In-Reply-To: <cover.1411404079.git.stefan@agner.ch>
 References: <cover.1411404079.git.stefan@agner.ch>
-Message-ID: <2ad051b257bae6249a48443a30d14b152407504e.1411404079.git.stefan@agner.ch>
+Message-ID: <cb9924da68e800bffa27aa30fb16dcf92e10ae70.1411404079.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2-bit gates found i.MX and Vybrid SoC support different clock
-configuration:
-
-0b00: clk disabled
-0b01: clk enabled in RUN mode but disabled in WAIT and STOP mode
-0b10: clk enabled in RUN, WAIT and STOP mode (only Vybrid)
-0b11: clk enabled in RUN and WAIT mode
-
-For some clocks, we might want to configure different behaviour,
-e.g. a memory clock should be on even in STOP mode. Add a new
-function imx_clk_gate2_cgr which allow to configure specific
-gate values through the cgr_val parameter.
+Support Vybrid SoC which has a similar global power controller
+found in i.MX6 SoC's. The extension for the GIC interrupt
+controller can be reused. However, Vybrid's GPC has no CPU
+powerdown flag, hence we write this conditional.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mach-imx/clk-gate2.c           |  7 +++++--
- arch/arm/mach-imx/clk-vf610.c           |  3 +++
- arch/arm/mach-imx/clk.h                 | 13 ++++++++++---
- include/dt-bindings/clock/vf610-clock.h |  3 ++-
- 4 files changed, 20 insertions(+), 6 deletions(-)
+ arch/arm/mach-imx/Kconfig       |  1 +
+ arch/arm/mach-imx/common.h      |  3 +-
+ arch/arm/mach-imx/gpc.c         | 61 +++++++++++++++++++++++++++--------------
+ arch/arm/mach-imx/mach-imx6q.c  |  2 +-
+ arch/arm/mach-imx/mach-imx6sl.c |  2 +-
+ arch/arm/mach-imx/mach-vf610.c  |  7 +++++
+ 6 files changed, 53 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-index 84acdfd..8c22a84 100644
---- a/arch/arm/mach-imx/clk-gate2.c
-+++ b/arch/arm/mach-imx/clk-gate2.c
-@@ -31,6 +31,7 @@ struct clk_gate2 {
- 	struct clk_hw hw;
- 	void __iomem	*reg;
- 	u8		bit_idx;
-+	u8		cgr_val;
- 	u8		flags;
- 	spinlock_t	*lock;
- 	unsigned int	*share_count;
-@@ -50,7 +51,8 @@ static int clk_gate2_enable(struct clk_hw *hw)
- 		goto out;
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index a566fbf3..70e6d56 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -633,6 +633,7 @@ config SOC_VF610
+ 	bool "Vybrid Family VF610 support"
+ 	select ARM_GIC
+ 	select PINCTRL_VF610
++	select HAVE_IMX_GPC
+ 	select ARM_GLOBAL_TIMER
+ 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 1dabf43..4b753f5 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -103,7 +103,8 @@ static inline void imx_scu_map_io(void) {}
+ static inline void imx_smp_prepare(void) {}
+ #endif
+ void imx_src_init(void);
+-void imx_gpc_init(void);
++void imx6_gpc_init(void);
++void vf610_gpc_init(void);
+ void imx_gpc_pre_suspend(bool arm_power_off);
+ void imx_gpc_post_resume(void);
+ void imx_gpc_mask_all(void);
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 82ea74e..4ac7a48 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -18,40 +18,42 @@
+ #include <linux/irqchip/arm-gic.h>
+ #include "common.h"
  
- 	reg = readl(gate->reg);
--	reg |= 3 << gate->bit_idx;
-+	reg &= ~(3 << gate->bit_idx);
-+	reg |= gate->cgr_val << gate->bit_idx;
- 	writel(reg, gate->reg);
+-#define GPC_IMR1		0x008
++#define IMX6_GPC_IMR1		0x008
++#define VF610_GPC_IMR1		0x044
+ #define GPC_PGC_CPU_PDN		0x2a0
  
- out:
-@@ -110,7 +112,7 @@ static struct clk_ops clk_gate2_ops = {
+ #define IMR_NUM			4
  
- struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
--		void __iomem *reg, u8 bit_idx,
-+		void __iomem *reg, u8 bit_idx, u8 cgr_val,
- 		u8 clk_gate2_flags, spinlock_t *lock,
- 		unsigned int *share_count)
+ static void __iomem *gpc_base;
++static void __iomem *gpc_imr_base;
++static bool has_cpu_pdn;
+ static u32 gpc_wake_irqs[IMR_NUM];
+ static u32 gpc_saved_imrs[IMR_NUM];
+ 
+ void imx_gpc_pre_suspend(bool arm_power_off)
  {
-@@ -125,6 +127,7 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- 	/* struct clk_gate2 assignments */
- 	gate->reg = reg;
- 	gate->bit_idx = bit_idx;
-+	gate->cgr_val = cgr_val;
- 	gate->flags = clk_gate2_flags;
- 	gate->lock = lock;
+-	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
+ 	int i;
  
-diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-index a178184..1034e78 100644
---- a/arch/arm/mach-imx/clk-vf610.c
-+++ b/arch/arm/mach-imx/clk-vf610.c
-@@ -103,6 +103,7 @@ static struct clk_onecell_data clk_data;
- static unsigned int const clks_init_on[] __initconst = {
- 	VF610_CLK_SYS_BUS,
- 	VF610_CLK_DDR_SEL,
-+	VF610_CLK_DDRMC,
- };
+ 	/* Tell GPC to power off ARM core when suspend */
+-	if (arm_power_off)
++	if (arm_power_off && has_cpu_pdn)
+ 		writel_relaxed(0x1, gpc_base + GPC_PGC_CPU_PDN);
  
- static void __init vf610_clocks_init(struct device_node *ccm_node)
-@@ -171,6 +172,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 	clk[VF610_CLK_PLL4_MAIN_DIV] = clk_register_divider_table(NULL, "pll4_main_div", "pll4_main", 0, CCM_CACRR, 6, 3, 0, pll4_main_div_table, &imx_ccm_lock);
- 	clk[VF610_CLK_PLL6_MAIN_DIV] = imx_clk_divider("pll6_main_div", "pll6_main", CCM_CACRR, 21, 1);
- 
-+	clk[VF610_CLK_DDRMC] = imx_clk_gate2_cgr("ddrmc", "ddr_sel", CCM_CCGR6, CCM_CCGRx_CGn(14), 0x2);
-+
- 	clk[VF610_CLK_USBPHY0] = imx_clk_gate("usbphy0", "pll3_main", PLL3_CTRL, 6);
- 	clk[VF610_CLK_USBPHY1] = imx_clk_gate("usbphy1", "pll7_main", PLL7_CTRL, 6);
- 
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index 4cdf8b6..d22e339 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -29,7 +29,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 
- struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		const char *parent_name, unsigned long flags,
--		void __iomem *reg, u8 bit_idx,
-+		void __iomem *reg, u8 bit_idx, u8 cgr_val,
- 		u8 clk_gate_flags, spinlock_t *lock,
- 		unsigned int *share_count);
- 
-@@ -43,7 +43,7 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
- 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
--			shift, 0, &imx_ccm_lock, NULL);
-+			shift, 0x3, 0, &imx_ccm_lock, NULL);
+ 	for (i = 0; i < IMR_NUM; i++) {
+-		gpc_saved_imrs[i] = readl_relaxed(reg_imr1 + i * 4);
+-		writel_relaxed(~gpc_wake_irqs[i], reg_imr1 + i * 4);
++		gpc_saved_imrs[i] = readl_relaxed(gpc_imr_base + i * 4);
++		writel_relaxed(~gpc_wake_irqs[i], gpc_imr_base + i * 4);
+ 	}
  }
  
- static inline struct clk *imx_clk_gate2_shared(const char *name,
-@@ -51,7 +51,14 @@ static inline struct clk *imx_clk_gate2_shared(const char *name,
- 		unsigned int *share_count)
+ void imx_gpc_post_resume(void)
  {
- 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
--			shift, 0, &imx_ccm_lock, share_count);
-+			shift, 0x3, 0, &imx_ccm_lock, share_count);
+-	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
+ 	int i;
+ 
+ 	/* Keep ARM core powered on for other low-power modes */
+-	writel_relaxed(0x0, gpc_base + GPC_PGC_CPU_PDN);
++	if (has_cpu_pdn)
++		writel_relaxed(0x0, gpc_base + GPC_PGC_CPU_PDN);
+ 
+ 	for (i = 0; i < IMR_NUM; i++)
+-		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
++		writel_relaxed(gpc_saved_imrs[i], gpc_imr_base + i * 4);
+ }
+ 
+ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
+@@ -72,23 +74,21 @@ static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
+ 
+ void imx_gpc_mask_all(void)
+ {
+-	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
+ 	int i;
+ 
+ 	for (i = 0; i < IMR_NUM; i++) {
+-		gpc_saved_imrs[i] = readl_relaxed(reg_imr1 + i * 4);
+-		writel_relaxed(~0, reg_imr1 + i * 4);
++		gpc_saved_imrs[i] = readl_relaxed(gpc_imr_base + i * 4);
++		writel_relaxed(~0, gpc_imr_base + i * 4);
+ 	}
+ 
+ }
+ 
+ void imx_gpc_restore_all(void)
+ {
+-	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
+ 	int i;
+ 
+ 	for (i = 0; i < IMR_NUM; i++)
+-		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
++		writel_relaxed(gpc_saved_imrs[i], gpc_imr_base + i * 4);
+ }
+ 
+ void imx_gpc_irq_unmask(struct irq_data *d)
+@@ -100,7 +100,7 @@ void imx_gpc_irq_unmask(struct irq_data *d)
+ 	if (d->irq < 32)
+ 		return;
+ 
+-	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
++	reg = gpc_imr_base + (d->irq / 32 - 1) * 4;
+ 	val = readl_relaxed(reg);
+ 	val &= ~(1 << d->irq % 32);
+ 	writel_relaxed(val, reg);
+@@ -115,27 +115,48 @@ void imx_gpc_irq_mask(struct irq_data *d)
+ 	if (d->irq < 32)
+ 		return;
+ 
+-	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
++	reg = gpc_imr_base + (d->irq / 32 - 1) * 4;
+ 	val = readl_relaxed(reg);
+ 	val |= 1 << (d->irq % 32);
+ 	writel_relaxed(val, reg);
+ }
+ 
+-void __init imx_gpc_init(void)
++static void __init imx_gpc_init(void)
+ {
+-	struct device_node *np;
+ 	int i;
+ 
+-	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+-	gpc_base = of_iomap(np, 0);
+ 	WARN_ON(!gpc_base);
+ 
+ 	/* Initially mask all interrupts */
+ 	for (i = 0; i < IMR_NUM; i++)
+-		writel_relaxed(~0, gpc_base + GPC_IMR1 + i * 4);
++		writel_relaxed(~0, gpc_imr_base + i * 4);
+ 
+ 	/* Register GPC as the secondary interrupt controller behind GIC */
+ 	gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+ 	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+ 	gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+ }
++
++void __init imx6_gpc_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
++	gpc_base = of_iomap(np, 0);
++	gpc_imr_base = gpc_base + IMX6_GPC_IMR1;
++	has_cpu_pdn = true;
++
++	imx_gpc_init();
 +}
 +
-+static inline struct clk *imx_clk_gate2_cgr(const char *name,
-+		const char *parent, void __iomem *reg, u8 shift, u8 cgr_val)
++void __init vf610_gpc_init(void)
 +{
-+	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+			shift, cgr_val, 0, &imx_ccm_lock, NULL);
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,vf610-gpc");
++	gpc_base = of_iomap(np, 0);
++	gpc_imr_base = gpc_base + VF610_GPC_IMR1;
++	has_cpu_pdn = false;
++
++	imx_gpc_init();
++}
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index d51c6e9..b26dc73 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -392,7 +392,7 @@ static void __init imx6q_init_irq(void)
+ 	imx_init_revision_from_anatop();
+ 	imx_init_l2cache();
+ 	imx_src_init();
+-	imx_gpc_init();
++	imx6_gpc_init();
+ 	irqchip_init();
  }
  
- struct clk *imx_clk_pfd(const char *name, const char *parent_name,
-diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
-index d6b56b2..84c4809 100644
---- a/include/dt-bindings/clock/vf610-clock.h
-+++ b/include/dt-bindings/clock/vf610-clock.h
-@@ -169,6 +169,7 @@
- #define VF610_CLK_PLL7_MAIN		156
- #define VF610_CLK_USBPHY0		157
- #define VF610_CLK_USBPHY1		158
--#define VF610_CLK_END			159
-+#define VF610_CLK_DDRMC			159
-+#define VF610_CLK_END			160
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index ed263a2..df462d6 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -66,7 +66,7 @@ static void __init imx6sl_init_irq(void)
+ 	imx_init_revision_from_anatop();
+ 	imx_init_l2cache();
+ 	imx_src_init();
+-	imx_gpc_init();
++	imx6_gpc_init();
+ 	irqchip_init();
+ }
  
- #endif /* __DT_BINDINGS_CLOCK_VF610_H */
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+index ee7e57b..532f18f 100644
+--- a/arch/arm/mach-imx/mach-vf610.c
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -14,6 +14,12 @@
+ 
+ #include "common.h"
+ 
++static void __init vf610_init_irq(void)
++{
++	vf610_gpc_init();
++	irqchip_init();
++}
++
+ static void __init vf610_init_machine(void)
+ {
+ 	mxc_arch_reset_init_dt();
+@@ -29,6 +35,7 @@ DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+ 	.init_machine   = vf610_init_machine,
++	.init_irq	= vf610_init_irq,
+ 	.dt_compat	= vf610_dt_compat,
+ 	.restart	= mxc_restart,
+ MACHINE_END
 -- 
 2.1.0
