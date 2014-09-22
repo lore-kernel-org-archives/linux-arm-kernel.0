@@ -1,38 +1,63 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 22 Sep 2014 10:17:08 +0530
-Subject: [PATCH v5 8/8] arm64: dts: add <dt-bindings/> symlink
-In-Reply-To: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1411361228-18279-9-git-send-email-a.kesavan@samsung.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Mon, 22 Sep 2014 10:19:36 +0530
+Subject: [PATCH v2 2/2] ARM: dts: vf610-colibri: Add backlight support
+In-Reply-To: <6548345144e6eb9f252bfa35e9783079@agner.ch>
+References: <cover.1411130205.git.bhuvanchandra.dv@toradex.com>
+ <bae435d33cac93fd5f0c763fbe7bb302b52a6f0f.1411130205.git.bhuvanchandra.dv@toradex.com>
+ <6548345144e6eb9f252bfa35e9783079@agner.ch>
+Message-ID: <541FAA60.8080506@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
-match the ones in ARM architectures so that preprocessed device
-tree files can include various useful constant definitions.
+On Friday 19 September 2014 09:33 PM, Stefan Agner wrote:
+> Am 2014-09-19 15:38, schrieb Bhuvanchandra DV:
+>> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+>> ---
+>>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
+>>  arch/arm/boot/dts/vf610-colibri.dtsi        |    6 ++++++
+>>  2 files changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> index 00f63d9..711cf82 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+>> @@ -19,6 +19,12 @@
+>>  	};
+>>  };
+>>  
+>> +&bl {
+>> +	brightness-levels = <0 4 8 16 32 64 128 255>;
+>> +	default-brightness-level = <6>;
+>> +	status  = "okay";
+>> +};
+>> +
+>>  &esdhc1 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&pinctrl_esdhc1>;
+>> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi
+>> b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> index 560cd69..20b1c15 100644
+>> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+>> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+>> @@ -13,6 +13,12 @@
+>>  	model = "Toradex Colibri VF61 COM";
+>>  	compatible = "toradex,vf610-colibri_vf61", "fsl,vf610";
+>>  
+>> +	bl: backlight {
+>> +		compitable = "pwm-backlight";
+>> +		pwms = <&pwm0 0 5000000 0>;
+>> +		status = "disabled";
+>> +	};
+>> +
+> Typo, "compitable" is not a valid property...
+>
+> When this is fixed,
+> Acked-By: Stefan Agner <stefan@agner.ch>
 
-See commit c58299aa8754 ("kbuild: create an "include chroot" for DT bindings")
-merged in v3.10-rc1 for details.
+Thanks for pointing it out. Will update accordingly. 
 
-CC: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-Tested-by: Thomas Abraham <thomas.ab@samsung.com>
----
- arch/arm64/boot/dts/include/dt-bindings | 1 +
- 1 file changed, 1 insertion(+)
- create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-
-diff --git a/arch/arm64/boot/dts/include/dt-bindings b/arch/arm64/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..1e89bce
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings/
-\ No newline at end of file
--- 
-2.1.0
+>>  	clocks {
+>>  		enet_ext {
+>>  			compatible = "fixed-clock";
