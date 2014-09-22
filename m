@@ -1,46 +1,59 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 22 Sep 2014 17:12:09 +0800
-Subject: [PATCH v2 6/8] mmc: sdhci-esdhc-imx: using specific compatible string
- in binding doc
+Date: Mon, 22 Sep 2014 17:12:11 +0800
+Subject: [PATCH v2 8/8] mmc: sdhci-esdhc-imx: add quirk
+ SDHCI_QUIRK2_BROKEN_HS200 for imx6qdl
 In-Reply-To: <1411377131-19741-1-git-send-email-b29396@freescale.com>
 References: <1411377131-19741-1-git-send-email-b29396@freescale.com>
-Message-ID: <1411377131-19741-7-git-send-email-b29396@freescale.com>
+Message-ID: <1411377131-19741-9-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using specific compatible string in binding doc to make the binding
-more clear.
-It's also used to avoid checkpatch warning in the future like follows:
-0005-mmc-sdhci-do-not-enable-card-cd-wakeup-for-gpio-case.patch has no obvious style problems and is ready for submission.
-WARNING: DT compatible string "fsl,imx6sx-usdhc" appears un-documented -- check ./Documentation/devicetree/bindings/
-+       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
-
-total: 0 errors, 1 warnings, 18 lines checked
+The iMX6Q/DL can not support HS200 mode while iMX6SL and iMX6SX can,
+so introduce a new flag to distinguish them.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 9046ba06..c415d34 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -7,7 +7,14 @@ This file documents differences between the core properties described
- by mmc.txt and the properties used by the sdhci-esdhc-imx driver.
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 87179c4..16eff00 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -120,6 +120,8 @@
+  * when reading data from the card
+  */
+ #define ESDHC_FLAG_ERR004536		BIT(7)
++/* The IP supports HS200 mode */
++#define ESDHC_FLAG_HS200		BIT(8)
  
- Required properties:
--- compatible : Should be "fsl,<chip>-esdhc"
-+- compatible : Should be "fsl,<chip>-esdhc", the supported chips include
-+	       "fsl,imx25-esdhc"
-+	       "fsl,imx35-esdhc"
-+	       "fsl,imx51-esdhc"
-+	       "fsl,imx53-esdhc"
-+	       "fsl,imx6q-usdhc"
-+	       "fsl,imx6sl-usdhc"
-+	       "fsl,imx6sx-usdhc"
+ struct esdhc_soc_data {
+ 	u32 flags;
+@@ -147,12 +149,13 @@ static struct esdhc_soc_data usdhc_imx6q_data = {
  
- Optional properties:
- - fsl,cd-controller : Indicate to use controller internal card detection
+ static struct esdhc_soc_data usdhc_imx6sl_data = {
+ 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+-			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536,
++			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536
++			| ESDHC_FLAG_HS200,
+ };
+ 
+ static struct esdhc_soc_data usdhc_imx6sx_data = {
+ 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+-			| ESDHC_FLAG_HAVE_CAP1,
++			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+ };
+ 
+ struct pltfm_imx_data {
+@@ -1063,6 +1066,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+ 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+ 
++		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
++			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
++
+ 		/*
+ 		 * errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+ 		 * TO1.1, it's harmless for MX6SL
 -- 
 1.7.8
