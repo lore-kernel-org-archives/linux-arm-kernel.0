@@ -1,37 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Sep 2014 16:02:17 +0100
-Subject: [PATCH] ARM: mm: clear SCTLR.HA instead of setting it for LPAE
-Message-ID: <1411398137-5521-1-git-send-email-will.deacon@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 22 Sep 2014 17:04:19 +0200
+Subject: [PATCH v5 3/9] rtc: at91sam9: replace devm_ioremap by
+ devm_ioremap_resource
+In-Reply-To: <1411377058-26155-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411377058-26155-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140922150418.GA3026@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCTLR.HA (hardware access flag) is deprecated, not actually implemented
-by any CPUs and would probably break Linux if it was (since we don't use
-atomics when accessing page table entries). Furthermore, it can confuse
-cr_alignment checks where the whole value of SCTLR is compared against
-the value sitting in the hardware, since the bit is actually RAZ/WI and
-will not match the saved cr_alignment value.
+On 22/09/2014 at 11:10:52 +0200, Boris Brezillon wrote :
+> Replace devm_ioremap calls by devm_ioremap_resource which already check
+> resource consistency (resource != NULL) and print an error in case of
+> failure.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/proc-v7-3level.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index b64e67c7f176..d3daed0ae0ad 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -157,9 +157,9 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	 *  TFR   EV X F   IHD LR    S
- 	 * .EEE ..EE PUI. .TAT 4RVI ZWRS BLDP WCAM
- 	 * rxxx rrxx xxx0 0101 xxxx xxxx x111 xxxx < forced
--	 *   11    0 110    1  0011 1100 .111 1101 < we want
-+	 *   11    0 110    0  0011 1100 .111 1101 < we want
- 	 */
- 	.align	2
- 	.type	v7_crval, #object
- v7_crval:
--	crval	clear=0x0120c302, mmuset=0x30c23c7d, ucset=0x00c01c7c
-+	crval	clear=0x0122c302, mmuset=0x30c03c7d, ucset=0x00c01c7c
+> ---
+>  drivers/rtc/rtc-at91sam9.c | 29 ++++++++++-------------------
+>  1 file changed, 10 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index 74a9ca0..38a2693 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -306,18 +306,11 @@ static const struct rtc_class_ops at91_rtc_ops = {
+>   */
+>  static int at91_rtc_probe(struct platform_device *pdev)
+>  {
+> -	struct resource	*r, *r_gpbr;
+> +	struct resource	*r;
+>  	struct sam9_rtc	*rtc;
+>  	int		ret, irq;
+>  	u32		mr;
+>  
+> -	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	r_gpbr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> -	if (!r || !r_gpbr) {
+> -		dev_err(&pdev->dev, "need 2 ressources\n");
+> -		return -ENODEV;
+> -	}
+> -
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+>  		dev_err(&pdev->dev, "failed to get interrupt resource\n");
+> @@ -335,18 +328,16 @@ static int at91_rtc_probe(struct platform_device *pdev)
+>  		device_init_wakeup(&pdev->dev, 1);
+>  
+>  	platform_set_drvdata(pdev, rtc);
+> -	rtc->rtt = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+> -	if (!rtc->rtt) {
+> -		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
+> -		return -ENOMEM;
+> -	}
+>  
+> -	rtc->gpbr = devm_ioremap(&pdev->dev, r_gpbr->start,
+> -				resource_size(r_gpbr));
+> -	if (!rtc->gpbr) {
+> -		dev_err(&pdev->dev, "failed to map gpbr registers, aborting.\n");
+> -		return -ENOMEM;
+> -	}
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	rtc->rtt = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(rtc->rtt))
+> +		return PTR_ERR(rtc->rtt);
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(rtc->gpbr))
+> +		return PTR_ERR(rtc->rtt);
+>  
+>  	mr = rtt_readl(rtc, MR);
+>  
+> -- 
+> 1.9.1
+> 
+
 -- 
-2.1.0
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
