@@ -1,52 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 22 Sep 2014 21:37:55 +0200
-Subject: [PATCH] mfd: inherit coherent_dma_mask from parent device
-Message-ID: <1411414675-19010-1-git-send-email-boris.brezillon@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 22 Sep 2014 15:41:19 -0400
+Subject: No subject
+Message-ID: <1411414879-11551-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_mask and dma_parms are already inherited from the parent device but
-dma_coherent_mask was left uninitialized (set to zero thanks to kzalloc).
-Set sub-device coherent_dma_mask to its parent value to simplify
-sub-drivers making use of dma coherent helper functions (those drivers
-currently have to explicitly set the dma coherent mask using
-dma_set_coherent_mask function).
+Subject: [GIT PULL] ARM: dts: Keystone DTS updates for 3.18
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
+Hi Arm-soc folks,
 
-Hi,
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-This patch is follow-up of a discussion we had on a KMS driver thread [1].
-This patch is only copying the parent device coherent_dma_mask to avoid
-calling specific dma_set_coherent_mask in case the coherent mask is the
-default one.
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-I'm a bit surprised this hasn't been done earlier while other dma fields
-(mask and parms) are already inherited from the parent device, so please
-tell me if there already was an attempt to do the same, and if so, what
-was the reson for rejecting it :-).
+are available in the git repository at:
 
-Best Regards,
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts
 
-Boris
+for you to fetch changes up to b2ed7d98e1c7098f452cf95ab69211a2f8e02ac8:
 
-[1]https://lkml.org/lkml/2014/9/22/392
+  ARM: dts: keystone: fix bindings for pcie and usb clock nodes (2014-09-22 15:19:36 -0400)
 
- drivers/mfd/mfd-core.c | 1 +
- 1 file changed, 1 insertion(+)
+----------------------------------------------------------------
+Keystone DTS updates for v3.18
 
-diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-index 892d343..5d0fbe1 100644
---- a/drivers/mfd/mfd-core.c
-+++ b/drivers/mfd/mfd-core.c
-@@ -101,6 +101,7 @@ static int mfd_add_device(struct device *parent, int id,
- 	pdev->dev.type = &mfd_dev_type;
- 	pdev->dev.dma_mask = parent->dma_mask;
- 	pdev->dev.dma_parms = parent->dma_parms;
-+	pdev->dev.coherent_dma_mask = parent->coherent_dma_mask;
- 
- 	ret = regulator_bulk_register_supply_alias(
- 			&pdev->dev, cell->parent_supplies,
--- 
-1.9.1
+- Add IRQ and GPIO nodes
+- Fix SPI chip select
+- Fix usb and pcie clock nodes
+
+----------------------------------------------------------------
+Grygorii Strashko (2):
+      ARM: dts: keystone: add keystone irq controller node
+      ARM: dts: keystone: add dsp gpio controllers nodes
+
+Karicheri Muralidharan (1):
+      ARM: dts: keystone: k2l: Fix chip selects for SPI devices
+
+Karicheri, Muralidharan (1):
+      ARM: dts: keystone: fix bindings for pcie and usb clock nodes
+
+ arch/arm/boot/dts/k2e-clocks.dtsi |    6 ++--
+ arch/arm/boot/dts/k2e.dtsi        |    7 +++++
+ arch/arm/boot/dts/k2hk.dtsi       |   56 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/k2l.dtsi        |   42 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone.dtsi   |    8 ++++++
+ 5 files changed, 116 insertions(+), 3 deletions(-)
