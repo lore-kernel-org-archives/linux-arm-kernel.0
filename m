@@ -1,63 +1,90 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Sep 2014 12:18:16 -0700
-Subject: [PATCH] clk: prevent erronous parsing of children during rate
- change
-In-Reply-To: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
-References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20140922191816.GF10233@codeaurora.org>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Mon, 22 Sep 2014 14:18:05 -0500
+Subject: [PATCH v10 6/6] ARM: add CONFIG_VDSO Kconfig and Makefile bits
+In-Reply-To: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1411413485-7675-7-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21, Tero Kristo wrote:
-> In some cases, clocks can switch their parent with clk_set_rate, for
-> example clk_mux can do this in some cases. Current implementation of
-> clk_change_rate uses un-safe list iteration on the clock children, which
-> will cause wrong clocks to be parsed in case any of the clock children
-> change their parents during the change rate operation. Fixed by using
-> the safe list iterator instead.
-> 
-> The problem was detected due to some divide by zero errors generated
-> by clock init on dra7-evm board, see discussion under
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/349180 for details.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> To: Mike Turquette <mturquette@linaro.org>
-> Reported-by: Nishanth Menon <nm@ti.com>
-> ---
->  drivers/clk/clk.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index b76fa69..bacc06f 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1467,6 +1467,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
->  static void clk_change_rate(struct clk *clk)
->  {
->  	struct clk *child;
-> +	struct hlist_node *tmp;
->  	unsigned long old_rate;
->  	unsigned long best_parent_rate = 0;
->  	bool skip_set_rate = false;
-> @@ -1502,7 +1503,11 @@ static void clk_change_rate(struct clk *clk)
->  	if (clk->notifier_count && old_rate != clk->rate)
->  		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
->  
-> -	hlist_for_each_entry(child, &clk->children, child_node) {
-> +	/*
-> +	 * Use safe iteration, as change_rate can actually swap parents
-> +	 * for certain clock types.
-> +	 */
-> +	hlist_for_each_entry_safe(child, tmp, &clk->children, child_node) {
->  		/* Skip children who will be reparented to another clock */
->  		if (child->new_parent && child->new_parent != clk)
->  			continue;
+Allow users to enable the vdso in Kconfig; include the vdso in the
+build if CONFIG_VDSO is enabled.  Add 'vdso_install' target.
 
-Are we not hitting the new_parent check here? I don't understand
-how we can be changing parents here unless the check is being
-avoided, in which case I wonder why determine_rate isn't being
-used.
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/Makefile        |  8 ++++++++
+ arch/arm/kernel/Makefile |  1 +
+ arch/arm/mm/Kconfig      | 15 +++++++++++++++
+ 3 files changed, 24 insertions(+)
 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 0ce9d0f71f2a..109c011ef4ed 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -264,6 +264,7 @@ core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
+ core-$(CONFIG_VFP)		+= arch/arm/vfp/
+ core-$(CONFIG_XEN)		+= arch/arm/xen/
+ core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
++core-$(CONFIG_VDSO)		+= arch/arm/vdso/
+ 
+ # If we have a machine-specific directory, then include it in the build.
+ core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+@@ -316,6 +317,12 @@ PHONY += dtbs dtbs_install
+ dtbs dtbs_install: prepare scripts
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $@
+ 
++PHONY += vdso_install
++vdso_install:
++ifeq ($(CONFIG_VDSO),y)
++	$(Q)$(MAKE) $(build)=arch/arm/vdso $@
++endif
++
+ # We use MRPROPER_FILES and CLEAN_FILES now
+ archclean:
+ 	$(Q)$(MAKE) $(clean)=$(boot)
+@@ -340,4 +347,5 @@ define archhelp
+   echo  '                  Install using (your) ~/bin/$(INSTALLKERNEL) or'
+   echo  '                  (distribution) /sbin/$(INSTALLKERNEL) or'
+   echo  '                  install to $$(INSTALL_PATH) and run lilo'
++  echo  '  vdso_install  - Install unstripped vdso.so to $$(INSTALL_MOD_PATH)/vdso'
+ endef
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 38ddd9f83d0e..3e2b80658344 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -86,6 +86,7 @@ obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
++obj-$(CONFIG_VDSO)		+= vdso.o
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index ae69809a9e47..c256323040d6 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -824,6 +824,21 @@ config KUSER_HELPERS
+ 	  Say N here only if you are absolutely certain that you do not
+ 	  need these helpers; otherwise, the safe option is to say Y.
+ 
++config VDSO
++	bool "Enable vDSO for acceleration of some system calls"
++	depends on AEABI && MMU
++	default y if ARM_ARCH_TIMER
++	select GENERIC_TIME_VSYSCALL
++	help
++	  Place in the process address space an ELF shared object
++	  providing fast implementations of several system calls,
++	  including gettimeofday and clock_gettime.  Systems that
++	  implement the ARM architected timer will receive maximum
++	  benefit.
++
++	  You must have glibc 2.21 or later for programs to seamlessly
++	  take advantage of this.
++
+ config DMA_CACHE_RWFO
+ 	bool "Enable read/write for ownership DMA cache maintenance"
+ 	depends on CPU_V6K && SMP
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.3
