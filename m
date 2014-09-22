@@ -1,63 +1,38 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Mon, 22 Sep 2014 10:19:36 +0530
-Subject: [PATCH v2 2/2] ARM: dts: vf610-colibri: Add backlight support
-In-Reply-To: <6548345144e6eb9f252bfa35e9783079@agner.ch>
-References: <cover.1411130205.git.bhuvanchandra.dv@toradex.com>
- <bae435d33cac93fd5f0c763fbe7bb302b52a6f0f.1411130205.git.bhuvanchandra.dv@toradex.com>
- <6548345144e6eb9f252bfa35e9783079@agner.ch>
-Message-ID: <541FAA60.8080506@toradex.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 22 Sep 2014 10:25:28 +0530
+Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
+References: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
+ <54122962.5020903@gmail.com>
+Message-ID: <001b01cfd621$738ed8c0$5aac8a40$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
-On Friday 19 September 2014 09:33 PM, Stefan Agner wrote:
-> Am 2014-09-19 15:38, schrieb Bhuvanchandra DV:
->> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
->> ---
->>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
->>  arch/arm/boot/dts/vf610-colibri.dtsi        |    6 ++++++
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> index 00f63d9..711cf82 100644
->> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> @@ -19,6 +19,12 @@
->>  	};
->>  };
->>  
->> +&bl {
->> +	brightness-levels = <0 4 8 16 32 64 128 255>;
->> +	default-brightness-level = <6>;
->> +	status  = "okay";
->> +};
->> +
->>  &esdhc1 {
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&pinctrl_esdhc1>;
->> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi
->> b/arch/arm/boot/dts/vf610-colibri.dtsi
->> index 560cd69..20b1c15 100644
->> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
->> @@ -13,6 +13,12 @@
->>  	model = "Toradex Colibri VF61 COM";
->>  	compatible = "toradex,vf610-colibri_vf61", "fsl,vf610";
->>  
->> +	bl: backlight {
->> +		compitable = "pwm-backlight";
->> +		pwms = <&pwm0 0 5000000 0>;
->> +		status = "disabled";
->> +	};
->> +
-> Typo, "compitable" is not a valid property...
->
-> When this is fixed,
-> Acked-By: Stefan Agner <stefan@agner.ch>
+Will you please take this patch and following three Exynos3250 clock fixes
+in your tree.
 
-Thanks for pointing it out. Will update accordingly. 
+1: clk: samsung: exynos3250: fix width field of mout_mmc0/1
+   https://lkml.org/lkml/2014/9/5/265
+2: clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
+   https://lkml.org/lkml/2014/9/9/364
+3: clk: samsung: exynos3250: fix mout_cam_blk parent list
+  https://lkml.org/lkml/2014/9/6/41
 
->>  	clocks {
->>  		enet_ext {
->>  			compatible = "fixed-clock";
+Thanks,
+Pankaj Dubey
+
+> 
+> Please add my sign-off as
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> >
+> > Missed your sign-off? You can reply with it inline and I will add it
+> > when applying this weekend.
+> >
+> > P.S. Please keep me on CC when sending patches for Samsung clock
+drivers.
+> >
+> > Best regards,
+> > Tomasz
