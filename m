@@ -1,32 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 22 Sep 2014 20:56:37 +0200
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation,
- code consolidation
-In-Reply-To: <54204B32.5000905@mentor.com>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <20140922153919.GQ25809@arm.com> <54204B32.5000905@mentor.com>
-Message-ID: <542070E5.8060107@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 22 Sep 2014 21:04:28 +0200
+Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
+In-Reply-To: <2161168.GXttgFlE1X@vostro.rjw.lan>
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+ <20140919184849.GA14832@core.coreip.homeip.net>
+ <2161168.GXttgFlE1X@vostro.rjw.lan>
+Message-ID: <CAPDyKFqT1A=N6=CFHVMq-u+zkYK9zp_Ztmm8OWpftmHY2w68DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 06:15 PM, Nathan Lynch wrote:
-
-[ ... ]
-
-> MAINTAINERS does not have a specific entry for
-> drivers/clocksource/arm_arch_timer.c, so I am working under the
-> assumption that the series would go through Daniel or Thomas.
+On 22 September 2014 16:19, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, September 19, 2014 11:48:49 AM Dmitry Torokhov wrote:
+>> Hi Ulf,
+>>
+>> On Fri, Sep 19, 2014 at 08:27:33PM +0200, Ulf Hansson wrote:
+>> > Changes in v5:
+>> >     - Converted dev_pm_domain_detach() to a void function
+>> >     - Added a ->detach() callback to the PM domain struct, invoked from the
+>> >       dev_pm_domain_detach().
+>> >     - Make ACPI and genpd both assign the ->detach() callback at successfull
+>> >       attachment.
+>> >     - The above changes made it possible to make acpi_pm_domain_detach() to
+>> >       be static, added a separate patch for that.
+>>
+>> Thank you for making these changes. For the series:
+>>
+>> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 >
-> Daniel and/or Thomas, can you take this series please?
->
+> I've queued up this patchset for 3.18 (I fixed up the two minor issues pointed
+> to by Geert in the process).
 
-Yes, I will take care of it.
+Thanks Rafael!
 
-   -- Daniel
+Feel free to apply Wolfram's comment on patch 6 as well.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kind regards
+Uffe
