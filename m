@@ -1,68 +1,145 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 22 Sep 2014 16:54:21 -0500
-Subject: [GIT PULL] qcom SoC changes for v3.18 (updated)
-In-Reply-To: <A246CCDC-948C-429E-9FC5-934D317EB9D4@codeaurora.org>
-References: <A246CCDC-948C-429E-9FC5-934D317EB9D4@codeaurora.org>
-Message-ID: <A9208907-75E3-487C-B1CF-21AF3E3B5841@codeaurora.org>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Mon, 22 Sep 2014 23:25:20 +0200
+Subject: ARM: mx28: cpufreq-cpu0 support?
+In-Reply-To: <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
+References: <53F9B4BF.2050802@lategoodbye.de>	<20140825080123.GA12289@dragon>	<53FB1041.5010208@lategoodbye.de>	<CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>	<CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>	<540412A9.4090806@lategoodbye.de>
+ <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
+Message-ID: <542093C0.1040004@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ some how scm-boot.c got dropped, fixed now ]
+Hi,
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+Am 01.09.2014 15:33, schrieb Fabio Estevam:
+> Hi Stefan,
+>
+> On Mon, Sep 1, 2014 at 3:31 AM, Stefan Wahren <info@lategoodbye.de> wrote:
+>
+>> thanks. Okay, that leads to more questions:
+>>
+>> How can i test a ported mxs-regulator driver, that it's really working? Is
+>> there any userspace interface?
+>
+> After you ported the mxs regulator you can check whether it probed
+> correctly and if the reported voltages in the kernel log match the
+> register settings. You can also check if the voltages are really in
+> the correct reported value with a scope.
+>
+> On mx6q we have the following:
+>
+> [    0.070554] vdd1p1: 800 <--> 1375 mV at 1100 mV
+> [    0.071521] vdd3p0: 2800 <--> 3150 mV at 3000 mV
+> [    0.072397] vdd2p5: 2000 <--> 2750 mV at 2400 mV
+> [    0.073369] vddarm: 725 <--> 1450 mV at 1150 mV
+> [    0.074282] vddpu: 725 <--> 1450 mV at 1150 mV
+> [    0.075247] vddsoc: 725 <--> 1450 mV at 1200 mV
+>
+> and you should get something like that in your kernel log after you
+> ported the mxs regulator driver.
+>
+>
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+i've ported the mxs-regulator driver and now i'm getting an probing 
+output like above with Linux 3.17-rc4.
 
-are available in the git repository at:
+Now i want to test the mxs-regulator driver with the cpufreq-cpu0 as 
+consumer. So i defined cpu at 0 according to cpufreq-cpu0 binding in 
+imx28.dtsi and enabled cpufreq-cpu0 driver and userspace gov in Kernel 
+config.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.18
+But if i modprobe cpufreq-cpu0 i don't get any output and the entry 
+/sys/devices/system/cpu/cpu0/cpufreq is also missing.
 
-for you to fetch changes up to 6d42c5c5ce79b20139eec15dc359dfbcda3b3557:
+Any ideas, what's wrong or missing?
 
-  ARM: qcom: Move scm-boot files to drivers/soc and include/soc (2014-09-22 16:49:13 -0500)
+Best regards
+Stefan
 
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v3.18
+PS: Here the relevant config:
 
-* Moved scm support into drivers/soc/qcom (allows for use by drivers)
-* Various bug fixes and minor feature additions to scm code
-* Added big-endian support to debug MSM uart
+# .config
+#
+# CPU Frequency scaling
+#
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_STAT=y
+# CONFIG_CPU_FREQ_STAT_DETAILS is not set
+# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set
+CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE=y
+# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
+# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
+# CONFIG_CPU_FREQ_GOV_PERFORMANCE is not set
+# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
+CONFIG_CPU_FREQ_GOV_USERSPACE=y
+# CONFIG_CPU_FREQ_GOV_ONDEMAND is not set
+# CONFIG_CPU_FREQ_GOV_CONSERVATIVE is not set
+CONFIG_GENERIC_CPUFREQ_CPU0=m
 
-----------------------------------------------------------------
-Lina Iyer (2):
-      ARM: qcom: Add SCM warmboot flags for quad core targets.
-      ARM: qcom: Move scm-boot files to drivers/soc and include/soc
+# imx28.dtsi
 
-Olav Haugan (1):
-      ARM: qcom: scm: Add logging of actual return code from scm call
+[...]
 
-Stephen Boyd (6):
-      ARM: debug: Update MSM and QCOM DEBUG_LL help
-      ARM: debug: msm: Support big-endian CPUs
-      ARM: qcom: scm: Fix incorrect cache invalidation
-      ARM: qcom: scm: Get cacheline size from CTR
-      ARM: qcom: scm: Move the scm driver to drivers/soc/qcom
-      ARM: qcom: scm: Add atomic SCM APIs
+cpus {
+	#address-cells = <1>;
+	#size-cells = <0>;
 
-Vikram Mulukutla (1):
-      ARM: qcom: scm: Flush the command buffer only instead of the entire cache
+	cpu: cpu at 0 {
+		compatible = "arm,arm926ej-s";
+		device_type = "cpu";
+		operating-points = <
+			/* kHz	uV */
+			454736	1550000
+			392727	1475000
+			360000	1375000
+			261818	1275000
+			64000	1050000
+		>;
+		clock-latency = <61036>; /* two CLK32 periods */
+		cpu0-supply = <&reg_vddd>;
+	};
+};
 
- arch/arm/Kconfig.debug                             |   5 +-
- arch/arm/include/debug/msm.S                       |   6 +
- arch/arm/mach-qcom/Kconfig                         |   3 -
- arch/arm/mach-qcom/Makefile                        |   3 -
- arch/arm/mach-qcom/platsmp.c                       |   2 +-
- drivers/soc/qcom/Kconfig                           |   2 +
- drivers/soc/qcom/Makefile                          |   2 +
- .../arm/mach-qcom => drivers/soc/qcom}/scm-boot.c  |   4 +-
- {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c     | 131 ++++++++++++++++++---
- .../arm/mach-qcom => include/soc/qcom}/scm-boot.h  |   2 +
- {arch/arm/mach-qcom => include/soc/qcom}/scm.h     |   5 +-
- 11 files changed, 137 insertions(+), 28 deletions(-)
- rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm-boot.c (95%)
- rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c (67%)
- rename {arch/arm/mach-qcom => include/soc/qcom}/scm-boot.h (92%)
- rename {arch/arm/mach-qcom => include/soc/qcom}/scm.h (80%)
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+[...]
+
+power: power at 80044000 {
+	compatible = "simple-bus";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	reg = <0x80044000 0x2000>;
+	ranges;
+
+	reg_vddd: regulator at 80044040 {
+		reg = <0x80044040 0x10>;
+		compatible = "fsl,mxs-regulator";
+		regulator-name = "vddd";
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <1575000>;
+		regulator-boot-on;
+		vddd-supply = <&reg_vdda>;
+	};
+
+	reg_vdda: regulator at 80044050 {
+		reg = <0x80044050 0x10>;
+		compatible = "fsl,mxs-regulator";
+		regulator-name = "vdda";
+		regulator-min-microvolt = <1500000>;
+		regulator-max-microvolt = <2275000>;
+		regulator-boot-on;
+		vdda-supply = <&reg_vddio>;
+	};
+
+	reg_vddio: regulator at 80044060 {
+		reg = <0x80044060 0x10>;
+		compatible = "fsl,mxs-regulator";
+		regulator-name = "vddio";
+		regulator-min-microvolt = <2800000>;
+		regulator-max-microvolt = <3600000>;
+		regulator-microvolt-offset = <80000>;
+		regulator-boot-on;
+	};
+
+	power_sts: power_sts at 800440c0 {
+		reg = <0x800440c0 0x10>;
+		status = "disabled";
+	};
+};
