@@ -1,60 +1,43 @@
-From: max.schwarz@online.de (Max Schwarz)
-Date: Mon, 22 Sep 2014 18:05:43 +0200
-Subject: [PATCH] i2c-rk3x: move setup to the earlier subsys initcall
-In-Reply-To: <1411370675-27866-1-git-send-email-zyw@rock-chips.com>
-References: <1411370675-27866-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <7192455.FveG5nGWsJ@xq-nb>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 22 Sep 2014 11:15:46 -0500
+Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation,
+ code consolidation
+In-Reply-To: <20140922153919.GQ25809@arm.com>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+ <20140922153919.GQ25809@arm.com>
+Message-ID: <54204B32.5000905@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-Am Montag, 22. September 2014, 15:24:35 schrieb Chris Zhong:
-> Some device using this bus, such as regulators, they should register
-> as early as possible, so the I2C bus master needs to be loaded early.
-> Therefore initialize via subsys_initcall() is better.
-
-You could also use probe deferral in the regulator driver to wait until the 
-bus is ready. I don't know if you're already doing it, just wanted to point 
-that out.
-
-That said, this change will make the boot faster in any case by avoiding 
-unnecessary deferrals, so I'm for it if you fix the minor issue below.
-
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+On 09/22/2014 10:39 AM, Will Deacon wrote:
+> On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
+>> This series contains the necessary changes to allow architected timer
+>> access from user-space on 32-bit ARM.  This allows the VDSO to support
+>> high resolution timestamps for clock_gettime and gettimeofday.  This
+>> also merges substantially similar code from arm and arm64 into the
+>> core arm_arch_timer driver.
+>>
+>> The functional changes are:
+>> - When available, CNTVCT is made readable by user space on arm, as it
+>>   is on arm64.
+>> - The clocksource name becomes "arch_mem_counter" if CP15 access to
+>>   the counter is not available.
+>>
+>> These changes have been carried as part of the ARM VDSO patch set over
+>> the last several months, but I am splitting them out here as I assume
+>> they should go through the clocksource maintainers.
 > 
-> ---
+> For the series:
 > 
->  drivers/i2c/busses/i2c-rk3x.c |   13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index e637c32..5b91901 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -760,7 +760,18 @@ static struct platform_driver rk3x_i2c_driver = {
->  	},
->  };
-> 
-> -module_platform_driver(rk3x_i2c_driver);
-> +static int __init rk3x_i2c_init_driver(void)
-> +{
-> +	return platform_driver_register(&rk3x_i2c_driver);
-> +}
-> +
-> +static void __exit rk3x_i2c_exit_driver(void)
-> +{
-> +	platform_driver_unregister(&rk3x_i2c_driver);
-> +}
-> +
-> +subsys_initcall(rk3x_i2c_init_driver);
-> +module_exit(rk3x_i2c_exit_driver);
+> I'm not sure which tree the arch-timer stuff usually goes through, but
+> the arm/arm64 bits look fine so I'm happy for them to merged together.
 
-This means that the driver cannot be used as a loadable module any more, 
-right?
+Thanks Will.
 
-In that case, you should probably turn the tristate option in Kconfig into a 
-bool.
+MAINTAINERS does not have a specific entry for
+drivers/clocksource/arm_arch_timer.c, so I am working under the
+assumption that the series would go through Daniel or Thomas.
 
-Cheers,
-  Max
+Daniel and/or Thomas, can you take this series please?
