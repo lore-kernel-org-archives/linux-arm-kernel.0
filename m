@@ -1,32 +1,27 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 22 Sep 2014 17:26:38 +0200
-Subject: [PATCH v5 4/9] rtc: at91sam9: add DT support
-In-Reply-To: <20140922151754.GH5237@localhost>
-References: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411377058-26155-5-git-send-email-boris.brezillon@free-electrons.com>
- <20140922151754.GH5237@localhost>
-Message-ID: <20140922172638.1c699ec9@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Sep 2014 17:26:45 +0200
+Subject: [PATCH v2 8/8] tty/serial: add asm9260-serial driver
+In-Reply-To: <1411325151-15107-7-git-send-email-linux@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-7-git-send-email-linux@rempel-privat.de>
+Message-ID: <3430001.JjzmzIerfp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Sep 2014 17:17:54 +0200
-Johan Hovold <johan@kernel.org> wrote:
-
-> [ Please don't drop people from CC. ]
+On Sunday 21 September 2014 20:45:51 Oleksij Rempel wrote:
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+> ---
+>  drivers/tty/serial/Kconfig          |   17 +
+>  drivers/tty/serial/Makefile         |    1 +
+>  drivers/tty/serial/asm9260_serial.c | 1485 +++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/serial_core.h    |    2 +
+>  4 files changed, 1505 insertions(+)
+>  create mode 100644 drivers/tty/serial/asm9260_serial.c
 > 
-> On Mon, Sep 22, 2014 at 11:10:53AM +0200, Boris BREZILLON wrote:
-> > Add of_match_table to the existing driver so that rtc nodes defined in at91
-> > DTs can be attached to this driver.
-> 
-> That should be rtt nodes.
 
-Oh crap! Hopefully this is the last occurrence of 'rtc' in my commit logs :-).
+Similar to the irqchip driver, this one in turns seems to be a duplicate
+of drivers/tty/serial/mxs-auart.c. Please see if you can make that one
+work instead of adding a new copy.
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+	Arnd
