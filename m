@@ -1,60 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 22 Sep 2014 09:55:18 +0100
-Subject: [PATCH v4 04/11] drivers: base: support cpu cache information
- interface to userspace via sysfs
-In-Reply-To: <541CAD16.6030309@codeaurora.org>
-References: <1409763617-17074-1-git-send-email-sudeep.holla@arm.com>
- <1409763617-17074-5-git-send-email-sudeep.holla@arm.com>
- <541CAD16.6030309@codeaurora.org>
-Message-ID: <541FE3F6.4070806@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 22 Sep 2014 11:04:25 +0200
+Subject: [PATCHv3 1/7] clk: at91: add a driver for the h32mx clock
+In-Reply-To: <541C228F.70207@atmel.com>
+References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1410797759-18675-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <541C228F.70207@atmel.com>
+Message-ID: <20140922110425.2ec8a0af@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, 19 Sep 2014 14:33:19 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-On 19/09/14 23:24, Stephen Boyd wrote:
-> On 09/03/14 10:00, Sudeep Holla wrote:
->> From: Sudeep Holla <sudeep.holla@arm.com>
->>
->> This patch adds initial support for providing processor cache information
->> to userspace through sysfs interface. This is based on already existing
->> implementations(x86, ia64, s390 and powerpc) and hence the interface is
->> intended to be fully compatible.
->>
->> The main purpose of this generic support is to avoid further code
->> duplication to support new architectures and also to unify all the existing
->> different implementations.
->>
->> This implementation maintains the hierarchy of cache objects which reflects
->> the system's cache topology. Cache devices are instantiated as needed as
->> CPUs come online. The cache information is replicated per-cpu even if they are
->> shared. A per-cpu array of cache information maintained is used mainly for
->> sysfs-related book keeping.
->>
->> It also implements the shared_cpu_map attribute, which is essential for
->> enabling both kernel and user-space to discover the system's overall cache
->> topology.
->>
->> This patch also add the missing ABI documentation for the cacheinfo sysfs
->> interface already, which is well defined and widely used.
->>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: linux-api at vger.kernel.org
->> Cc: linux390 at de.ibm.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-ia64 at vger.kernel.org
->> Cc: linuxppc-dev at lists.ozlabs.org
->> Cc: linux-s390 at vger.kernel.org
->> Cc: x86 at kernel.org
->>
->
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
->
+> On 15/09/2014 18:15, Alexandre Belloni :
+> > Newer SoCs have two different AHB interconnect. The AHB 32 bits Matrix
+> > interconnect (h32mx) has a clock that can be setup at the half of the h64mx
+> > clock (which is mck). The h32mx clock can not exceed 90 MHz.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Okay on my side:
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> 
+> > ---
+> > Cc:Mike Turquette <mturquette@linaro.org>
+> 
+> Mike,
+> 
+> I guess that you didn't get this v3. Can you "Ack" this one of should we
+> re-sent to you?
+> 
+> I would like to take this patch with the rest of the SAMA5D4 series: is
+> it okay for you?
 
-Thanks for all the reviews and testings of the series.
 
-Regards,
-Sudeep
+Hi Mike,
+
+I gave my ack to this patch, so, if you don't mind letting Nicolas
+take it through his tree, I think it will ease integration of the
+sama5d4 support (no external dependencies on the clk tree).
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
