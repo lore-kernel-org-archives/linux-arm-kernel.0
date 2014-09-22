@@ -1,42 +1,55 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Mon, 22 Sep 2014 10:56:58 -0500
-Subject: [PATCH v6] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <20140919172846.GA12331@e104818-lin.cambridge.arm.com>
-References: <20140908230852.2118.97400.stgit@joelaarch64.amd.com>
- <20140919152853.GH2295@e104818-lin.cambridge.arm.com>
- <20140919172846.GA12331@e104818-lin.cambridge.arm.com>
-Message-ID: <542046CA.1060508@amd.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Sep 2014 18:03:47 +0200
+Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
+ of_platform_populate
+In-Reply-To: <20140922114039.GT1470@ulmo>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <11868654.D6MinQlF2p@wuerfel> <20140922114039.GT1470@ulmo>
+Message-ID: <3261451.zpO6MVx5yo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 22 September 2014 13:40:40 Thierry Reding wrote:
+> On Mon, Sep 22, 2014 at 01:08:27PM +0200, Arnd Bergmann wrote:
+> > On Monday 22 September 2014 11:36:15 Thierry Reding wrote:
+> > > On Fri, Sep 12, 2014 at 05:34:54PM +0100, Will Deacon wrote:
+> > > > We need to ensure that the IOMMUs in the system have a chance to perform
+> > > > some basic initialisation before we start adding masters to them.
+> > > > 
+> > > > This patch adds a call to of_iommu_init before of_platform_populate.
+> > > 
+> > > Why can't you call it from of_platform_populate() directly? That way it
+> > > would be usable for all architectures rather than just ARM. Eventually
+> > > we're going to need the same thing for 64-bit ARM (and possibly others
+> > > as well).
+> > 
+> > IIRC, of_platform_populate can be called multiple times, even recursively
+> > be drivers that populate their own child devices.
+> 
+> Indeed. Perhaps it could be conditionally called when root == NULL. But
+> perhaps that's not safe either. Anyway, I still think we shouldn't be
+> making this some randomly placed early initcall anyway.
 
->>> -#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
->>> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-> Actually, after some more thinking, why don't we just make the upper
-> limit of this mask 48-bit always or even 64-bit. That's a physical mask
-> for checking whether the pgd pointer in vttbr is aligned as per the
-> architecture requirements. Given that the pointer is allocated from the
-> platform memory, it's clear that it is within the PA range. So basically
-> you just need a mask to check the bottom alignment based on
-> VTCR_EL2.T0SZ (which should be independent from the PA range). I guess
-> it should be enough as:
-This sounds fine to me.  I would say that there is no harm in
-re-checking the upper bits, but I agree it is unnecessary.
+I disagree. IOMMUs are special in the same sense that irqchips, clocks and
+timers are. This is not just a random call, it is being explicit about a
+base functionality that is needed for all devices attached to it.
 
->
-> #define VTTBR_BADDR_MASK  (~0ULL << VTTBR_BADDR_SHIFT)
->
-> without any other changes to T0SZ.
->
-> The TCR_EL2.PS setting should be done based on the ID_A64MMFR0_EL1
-> but you can do this in __do_hyp_init (it looks like this function
-> handles VTCR_EL2.PS already, not sure why it does do it for TCR_EL2 as
-> well).
->
-> So IMO you only need about a few lines patch.
->
-My original patch to fix this problem was one line, so I'm perfectly
-happy with simplification.  But it would be nice if the other reviewers
-could agree with this approach.  With six versions that each addressed
-all the comments from reviewers I'd like it if the v7 that throws away
-most of that feedback didn't result in a v8 that puts it all back again.
+While we pretend that these are just device drivers in some sense, I think
+it's perfectly reasonable to have an explicit entry point for each subsystem
+here.
+
+I see two problems with using deferred probing here: 
+
+- we don't actually need to defer the probing but the binding to the driver
+  when no dma ops are set, but it seems silly to even create the device
+  before we can find out which ops it should use.
+  The reason is that a driver does not actively ask for an IOMMU as it would
+  for other subsystems (gpio, led, dmaengine, ...).
+
+- As long as the dma_ops are not set, we can't actually call probe() for
+  any device other than iommus, and even that would require adding special
+  magic in the platform_device_probe(), so we'd just defer every device
+  until we get to the iommu. This likely causes a lot of overhead at probe
+  time.
+
+	Arnd
