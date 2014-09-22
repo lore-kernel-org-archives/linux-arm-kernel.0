@@ -1,33 +1,49 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 22 Sep 2014 17:12:03 +0800
-Subject: [PATCH v2 0/8] mmc: sdhci/imx: a few clean up and fixes
-Message-ID: <1411377131-19741-1-git-send-email-b29396@freescale.com>
+Date: Mon, 22 Sep 2014 17:12:04 +0800
+Subject: [PATCH v2 1/8] mmc: sdhci-esdhc-imx: remove duplicated lines
+In-Reply-To: <1411377131-19741-1-git-send-email-b29396@freescale.com>
+References: <1411377131-19741-1-git-send-email-b29396@freescale.com>
+Message-ID: <1411377131-19741-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change since v1:
-  Add patch 6 which resolves a checkpatch warning like below in v1:
-0005-mmc-sdhci-do-not-enable-card-cd-wakeup-for-gpio-case.patch has no obvious style problems and is ready for submission.
-WARNING: DT compatible string "fsl,imx6sx-usdhc" appears un-documented -- check ./Documentation/devicetree/bindings/
-+       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
+There is already the same register check above, no need the later one.
+Move them into one place and delete the later one.
 
-total: 0 errors, 1 warnings, 18 lines checked
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |   12 +++++-------
+ 1 files changed, 5 insertions(+), 7 deletions(-)
 
-Dong Aisheng (8):
-  mmc: sdhci-esdhc-imx: remove duplicated lines
-  mmc: sdhci-esdhc-imx: usdhc does not have missing card interrupt
-    issue
-  mmc: sdhci-esdhc-imx: add ADMA Length Mismatch errata fix
-  mmc: sdhci: do not enable card detect interrupt for gpio cd type
-  mmc: sdhci: do not enable card cd wakeup for gpio case
-  mmc: sdhci-esdhc-imx: using specific compatible string in binding doc
-  mmc: sdhci-esdhc-imx: add imx6sx support
-  mmc: sdhci-esdhc-imx: add quirk SDHCI_QUIRK2_BROKEN_HS200 for imx6qdl
-
- .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    9 ++++-
- drivers/mmc/host/sdhci-esdhc-imx.c                 |   44 ++++++++++++++++----
- drivers/mmc/host/sdhci.c                           |    8 +++-
- 3 files changed, 49 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 587ee0e..256c901 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -315,6 +315,11 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 			data |= ESDHC_CTRL_D3CD;
+ 			writel(data, host->ioaddr + SDHCI_HOST_CONTROL);
+ 		}
++
++		if (val & SDHCI_INT_ADMA_ERROR) {
++			val &= ~SDHCI_INT_ADMA_ERROR;
++			val |= ESDHC_INT_VENDOR_SPEC_DMA_ERR;
++		}
+ 	}
+ 
+ 	if (unlikely((imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
+@@ -335,13 +340,6 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 			}
+ 	}
+ 
+-	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
+-		if (val & SDHCI_INT_ADMA_ERROR) {
+-			val &= ~SDHCI_INT_ADMA_ERROR;
+-			val |= ESDHC_INT_VENDOR_SPEC_DMA_ERR;
+-		}
+-	}
+-
+ 	writel(val, host->ioaddr + reg);
+ }
+ 
 -- 
 1.7.8
