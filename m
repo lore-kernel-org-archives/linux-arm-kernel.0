@@ -1,71 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 22 Sep 2014 16:35:27 +0200
-Subject: [PATCH v2] ARM: dts: add rk3288 i2s controller
-In-Reply-To: <1410519295-18980-1-git-send-email-jay.xu@rock-chips.com>
-References: <1410509511-16667-1-git-send-email-jay.xu@rock-chips.com>
- <1410519295-18980-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <2576845.mbFzWJ2q3T@phil>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 22 Sep 2014 16:49:05 +0200
+Subject: [PATCH] i2c: axxia: Add I2C driver for AXM55xx
+In-Reply-To: <20140922130351.GL5182@n2100.arm.linux.org.uk>
+References: <1408967482-17723-1-git-send-email-anders.berg@avagotech.com>
+ <20140920121242.GA3833@katana>
+ <CAE0=X_0VQ8rWrUgbsgKm1MwCP8bwWm3UJPq9p=xNDfjP4CC7Bg@mail.gmail.com>
+ <20140922095939.GB1406@katana>
+ <20140922130351.GL5182@n2100.arm.linux.org.uk>
+Message-ID: <20140922144904.GA1465@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 12. September 2014, 18:54:55 schrieb Jianqun:
-> Add dt for rk3288 i2s controller, since i2s clock pins and data pins
-> default to be GPIO, this patch also add pinctrl to mux them.
+On Mon, Sep 22, 2014 at 02:03:51PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 22, 2014 at 11:59:39AM +0200, Wolfram Sang wrote:
+> > IRQ_NONE is "this interrupt wasn't by me" so for shared IRQs, the next
+> > handler can check.
 > 
-> Tested on RK3288 board.
-> 
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> Err, no it isn't.  IRQ_NONE has no such effect.  All handlers on a
+> shared interrupt are always run irrespective of the return value from
+> any particular interrupt handler.  See kernel/irq/handle.c.
 
-I've added this to my tree.
+/me picks the brown paper bag. I was sure I did. Need to update my
+notes, it seems. Thanks for the heads up!
 
-> ---
-> change since v1:
-> - move i2s relate codes later in order by CPU address map
-> 
->  arch/arm/boot/dts/rk3288.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 5950b0a..5b17718 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -271,6 +271,21 @@
->  		status = "disabled";
->  	};
-> 
-> +	i2s: i2s at ff890000 {
-> +		compatible = "rockchip,rk3288-i2s", "rockchip,rk3066-i2s";
-> +		reg = <0xff890000 0x10000>;
-> +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dmas = <&dmac_bus_s 0>, <&dmac_bus_s 1>;
-> +		dma-names = "tx", "rx";
-> +		clock-names = "i2s_hclk", "i2s_clk";
-> +		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&i2s0_clk>;
-> +		status = "disabled";
-> +	};
-> +
->  	gic: interrupt-controller at ffc01000 {
->  		compatible = "arm,gic-400";
->  		interrupt-controller;
-> @@ -463,6 +478,17 @@
->  			};
->  		};
-> 
-> +		i2s0 {
-> +			i2s0_clk: i2s0_clk {
-> +				rockchip,pins = <6 0 RK_FUNC_1 &pcfg_pull_none>,
-> +						<6 1 RK_FUNC_1 &pcfg_pull_none>,
-> +						<6 2 RK_FUNC_1 &pcfg_pull_none>,
-> +						<6 3 RK_FUNC_1 &pcfg_pull_none>,
-> +						<6 4 RK_FUNC_1 &pcfg_pull_none>,
-> +						<6 8 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
->  		sdmmc {
->  			sdmmc_clk: sdmmc-clk {
->  				rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none>;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/ea2da8ea/attachment.sig>
