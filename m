@@ -1,51 +1,31 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Mon, 22 Sep 2014 15:38:12 +0530
-Subject: [PATCH v3 2/2] ARM: dts: vf610-colibri: Add backlight support
-In-Reply-To: <cover.1411378369.git.bhuvanchandra.dv@toradex.com>
-References: <cover.1411378369.git.bhuvanchandra.dv@toradex.com>
-Message-ID: <a4346c3f08566b61dc829116e50f34c94e3268e5.1411378369.git.bhuvanchandra.dv@toradex.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Sep 2014 11:09:12 +0100
+Subject: [PATCH v3] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <1411167781-18571-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1411167781-18571-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140922100912.GG30085@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Sep 20, 2014 at 12:03:01AM +0100, Ard Biesheuvel wrote:
+> From: Yi Li <yi.li@linaro.org>
+> 
+> SMBIOS is important for server hardware vendors. It implements a spec for
+> providing descriptive information about the platform. Things like serial
+> numbers, physical layout of the ports, build configuration data, and the like.
+> 
+> This has been tested by dmidecode and lshw tools.
+> 
+> This patch adds the call to dmi_scan_machine() to arm64_enter_virtual_mode(),
+> as that is the point where the EFI Configuration Tables are registered as
+> being available. It needs to be in an early_initcall anyway as dmi_id_init(),
+> which is an arch_initcall itself, depends on dmi_scan_machine() having been
+> called already.
+> 
+> Signed-off-by: Yi Li <yi.li@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
----
- arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    6 ++++++
- arch/arm/boot/dts/vf610-colibri.dtsi        |    5 +++++
- 2 files changed, 11 insertions(+)
+Merged (until the next revert ;)). Thanks.
 
-diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-index 00f63d9..711cf82 100644
---- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-@@ -19,6 +19,12 @@
- 	};
- };
- 
-+&bl {
-+	brightness-levels = <0 4 8 16 32 64 128 255>;
-+	default-brightness-level = <6>;
-+	status  = "okay";
-+};
-+
- &esdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
-diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-index 1f73c1c..807953b 100644
---- a/arch/arm/boot/dts/vf610-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-@@ -25,6 +25,11 @@
- 		};
- 	};
- 
-+	bl: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm0 0 5000000 0>;
-+		status = "disabled";
-+	};
- };
- 
- &esdhc1 {
 -- 
-1.7.9.5
+Catalin
