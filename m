@@ -1,51 +1,52 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 22 Sep 2014 13:04:55 +0200
-Subject: [PATCH] i2c: axxia: Add I2C driver for AXM55xx
-In-Reply-To: <CAE0=X_1v_1eNr=dPTgofamFuy6zP9ff=LS7dyexj4CeutDqaPA@mail.gmail.com>
-References: <1408967482-17723-1-git-send-email-anders.berg@avagotech.com>
- <20140920121242.GA3833@katana>
- <CAE0=X_0VQ8rWrUgbsgKm1MwCP8bwWm3UJPq9p=xNDfjP4CC7Bg@mail.gmail.com>
- <20140922095939.GB1406@katana>
- <CAE0=X_1v_1eNr=dPTgofamFuy6zP9ff=LS7dyexj4CeutDqaPA@mail.gmail.com>
-Message-ID: <20140922110455.GA1463@katana>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 22 Sep 2014 12:05:22 +0100
+Subject: [PATCH v11 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <20140919210313.GH19374@google.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411003825-21521-8-git-send-email-Liviu.Dudau@arm.com>
+ <20140919210313.GH19374@google.com>
+Message-ID: <20140922110522.GK1994@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> >> >> +     if (msg->len == 0 || msg->len > 255)
-> >> >> +             return -EINVAL;
-> >> >
-> >> > Ouch, really? Maybe we should warn the user here.
-> >>
-> >> Yeah, the transfer length register limits the length to 255. I'll add
-> >> a warning here.
-> >
-> > Please also add this information to the Kconfig description and
-> > somewhere at the top of the source file. This is an important flaw which
-> > people should easily find out about.
-> >
+On Fri, Sep 19, 2014 at 10:03:13PM +0100, Bjorn Helgaas wrote:
+> On Thu, Sep 18, 2014 at 02:30:22AM +0100, Liviu Dudau wrote:
+> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
+> > of a given device from DT. If the information is not present,
+> > the function can be requested to allocate a new domain number.
 > 
-> You are referring to the "len <= 255" restriction being the flaw here,
-> right? I'll add a note to Kconfig and the driver about that.
+> Is of_pci_get_domain_nr() used somewhere?  If the use is in some future
+> series, please mention it explicitly.  I'm just trying to avoid merging
+> unused code.
 
-Yes, I meant that. I just remembered we should do something else:
+It is used in the arm64 specific patch that I have dropped out of my
+pull request. After discussions with Catalin I will add the patch back
+into the tree that you've pulled from as he is OK with your tree carrying
+the whole package.
 
-Remove I2C_FUNC_I2C (because it cannot do endless transfers) from
-functionality and simply use I2C_FUNC_SMBUS_I2C_BLOCK which does I2C
-like transfers with the SMBus Limit of 32 bytes. It seems PMBus allows
-for 255 byte which this HW could support, yet I don't recall we have
-support for that size currently.
+I need to ask for some guidance here: for addressing some of your comments
+and Rob's I can add more patches in my v11 branch and you can pull them
+when you think they are ready. But one of your comments was requesting
+splitting a patch into two blocks - one that moves of_pci_range_to_resource()
+into drivers/of/address.c and one that fixes it's behaviour - and I don't
+know how you would like that handled. Should I revert the original patch
+and add the new ones, or should I rebase the whole series into a different
+branch that you can pull from?
 
-> The other part of the condition (msg->len == 0) should actually go
-> away. The controller can do zero-length-data transfers. I'll fix that
-> for next round.
+Best regards,
+Liviu
 
-Great!
+> 
+> Bjorn
+> 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/1e878942/attachment.sig>
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
