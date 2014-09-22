@@ -1,67 +1,38 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Mon, 22 Sep 2014 15:56:09 +0800
-Subject: [PATCH] clk: rockchip: add initcall to set clk defaults after
- syscons are available
-In-Reply-To: <1566610.B4NH8lpaoI@diego>
-References: <1566610.B4NH8lpaoI@diego>
-Message-ID: <541FD619.3060108@rock-chips.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 22 Sep 2014 10:06:14 +0200
+Subject: net/fec: Unable to get a permanent link when connecting to a
+ PC
+In-Reply-To: <1XUuZV-0zjkn20@fwd01.aul.t-online.de>
+References: <1XUuZV-0zjkn20@fwd01.aul.t-online.de>
+Message-ID: <541FD876.4090109@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Am 19.09.2014 um 11:33 schrieb to-fleischer at t-online.de:
+> I have an i.MX283 board with a KSZ8081 PHY that is connected to the controller
+> via RMII. The PHY's interrupt line is currently unused, but connected to the
+> controller. The board runs the linux version 3.17-rc5.
+> When I connect the board directly to a PC the ethernet link goes up and a second
+> later down. This is repeated again and again.
+> After some investigation I found that this is caused by the reset of the FEC at
+> the begin of fec_restart() that is called by fec_enet_adjust_link() if the link
+> is up.
+> Due to the reset the mode is set to MII. After switching back to RMII the PHY 
+> seems to restart the autonegotiation. Since this takes a while the next call of 
+> phy_state_machine() detects that the link is down.
+> It would work, if the reset in fec_restart is avoided for the case that the link
+> goes up and the fec is still stopped.
+>
+> Its quite remarkable that this issue does not occur if I connect the board to a
+> switch or if I use the PHY's interrupt line.
+>
+> What do you think?
+>
+> Best Regards,
+> Torsten Fleischer
+>
 
-On 08/07/2014 08:57 PM, Heiko St?bner wrote:
-> PLLs on Rockchip platforms report their locking state in an external
-> register situated in the "General Register Files" which is provided
-> through a syscon device.
->
-> When the initial clk init runs, this syscon is of course not yet
-> available, making it impossible to set PLLs to other frequencies
-> through the assigned-rate property of the clock-controller node.
->
-> Syscon devices are initialized through a postcore initcall, so add an
-> arch_initcall to rerun the rockchip specific clock initalization when
-> the GRF is available.
->
-> As the clock init already runs two times (through of_clk_add_provider
-> and of_clk_init), a third time shouldn't hurt to much and in the best
-> case wouldn't change any settings at all.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   drivers/clk/rockchip/clk.c | 13 +++++++++++++
->   1 file changed, 13 insertions(+)
->
-> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-> index 9a3adb1..e14b108 100644
-> --- a/drivers/clk/rockchip/clk.c
-> +++ b/drivers/clk/rockchip/clk.c
-> @@ -23,6 +23,7 @@
->   #include <linux/slab.h>
->   #include <linux/clk.h>
->   #include <linux/clk-provider.h>
-> +#include <linux/clk/clk-conf.h>
->   #include <linux/mfd/syscon.h>
->   #include <linux/regmap.h>
->   #include "clk.h"
-> @@ -126,6 +127,18 @@ void __init rockchip_clk_init(struct device_node *np, void __iomem *base,
->   	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->   }
->   
-> +/**
-> + * Set clock-defaults again, after grf regmap is available for PLLs.
-> + */
-> +static int __init rockchip_clk_set_defaults(void)
-> +{
-> +	if (cru_node)
-> +		return of_clk_set_defaults(cru_node, true);
-> +
-> +	return 0;
-> +}
-> +arch_initcall(rockchip_clk_set_defaults);
-> +
->   struct regmap *rockchip_clk_get_grf(void)
->   {
->   	if (IS_ERR(grf))
-This patch works on my rk3288 evb, so,
-Tested-by: Kever Yang <kever.yang@rock-chips.com>
+Add netdev list
+
+Best regards
+Stefan Wahren
