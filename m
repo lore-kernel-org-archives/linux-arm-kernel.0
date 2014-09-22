@@ -1,66 +1,71 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 22 Sep 2014 16:09:03 -0600
-Subject: [PATCH v9 1/4] pci:host: APM X-Gene PCIe host controller driver
-In-Reply-To: <CACoXjcnVU3+fQHQ0-zEVRjoedrrod-aua6AVybj7UuSHO9HBaw@mail.gmail.com>
-References: <1410906824-9321-1-git-send-email-tinamdar@apm.com>
- <1410906824-9321-2-git-send-email-tinamdar@apm.com>
- <20140919223258.GA32208@google.com>
- <CACoXjcnVU3+fQHQ0-zEVRjoedrrod-aua6AVybj7UuSHO9HBaw@mail.gmail.com>
-Message-ID: <CAErSpo4C_6mh7hais14254rYBeMYArvf=nETmgvBjgP290aD4Q@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 22 Sep 2014 17:11:29 -0500
+Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140922175505.GH1994@e106497-lin.cambridge.arm.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140919210610.GI19374@google.com> <541CCA36.8010606@gmail.com>
+ <20140922175505.GH1994@e106497-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqKw-KSdDGgFuHytONKA-53-z+QtQd+0JzLhW+Xs0+knsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 3:33 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
-
->>> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
->>> +{
->>> +     int i;
->>> +
->>> +     /* Hide the PCI host BARs from the kernel as their content doesn't
->>> +      * fit well in the resource management
->>> +      */
+On Mon, Sep 22, 2014 at 12:55 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Sat, Sep 20, 2014 at 01:28:38AM +0100, Rob Herring wrote:
+>> On 09/19/2014 04:06 PM, Bjorn Helgaas wrote:
+>> > On Thu, Sep 18, 2014 at 02:30:23AM +0100, Liviu Dudau wrote:
+>> >> Provide a function to parse the PCI DT ranges that can be used to
+>> >> create a pci_host_bridge structure together with its associated
+>> >> bus.
+>> >>
+>> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> >> Cc: Arnd Bergmann <arnd@arndb.de>
+>> >> Cc: Grant Likely <grant.likely@linaro.org>
+>> >> Cc: Rob Herring <robh+dt@kernel.org>
+>> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> >> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> >> ---
 >>
->> This needs a better explanation than "doesn't fit well."
+>> [...]
 >>
->> I *think* you're probably talking about something similar to the MVEBU
->> devices mentioned here:
->> http://lkml.kernel.org/r/CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA at mail.gmail.com
+>> >> +int of_pci_get_host_bridge_resources(struct device_node *dev,
+>> >> +                  unsigned char busno, unsigned char bus_max,
+>> >> +                  struct list_head *resources, resource_size_t *io_base)
+>> >> +{
+>> >> +  struct resource *res;
+>> >> +  struct resource *bus_range;
+>> >> +  struct of_pci_range range;
+>> >> +  struct of_pci_range_parser parser;
+>> >> +  char range_type[4];
+>> >> +  int err;
+>> >> +
+>> >> +  if (!io_base)
+>> >> +          return -EINVAL;
+>> >> +  *io_base = OF_BAD_ADDR;
+>> >> +
+>> >> +  bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
 >>
->> where the device can be configured as either an endpoint or a root port,
->> and the endpoint BARs are still visible when configured as a root port.
+>> This function does a lot of kalloc's but there is not an easy way to
+>> undo those allocations. Hot unplug of a host bridge or probe error
+>> handling would leak memory.
 >>
+>> You could pass in struct device and use the devm_ variant (also
+>> addressing Bjorn's comment), but not having an uninit/remove function
+>> make what clean-up drivers have to do error prone. For example, on
+>> uninit a driver needs to call pci_free_resource_list.
 >
-> It is true that X-Gene PCIe port can be configured as EP, however the
-> the FIXUP is required not because of the BARs are still visible when
-> configured as EP in past. X-Gene PCIe port, when configured as RC,
-> uses BAR0-BAR1 of RC's configuration space as inbound BARs. Entire DDR
-> region is mapped in these BARs so that it is accessible for EP devices
-> for DMA. So if the fixup is not done during enumeration, whole
-> outbound memory resource space gets assigned to RC and nothing is left
-> EP devices.
-
-I'm not familiar with the concept of an "inbound BAR"; at least I'm
-not aware of anything like this in the PCI specs.  I think it might
-reduce confusion if we avoided calling them "BARs".  They happen to be
-at the same addresses where real BARs would be, but they certainly
-don't behave like real BARs.
-
-It sounds like this is basically a trivial IOMMU that determines which
-DMA accesses can reach main memory.
-
->> In any event, I'd like a description of exactly what these BARs are and wha
->> the problem is.
+> If the function fails to parse the ranges for whatever reason it will
+> call pci_free_resource_list on the resources that have been added already
+> and it will clean up. If it is successful, then it is the job of the caller
+> to free the list, as mentioned in the comment associated with the function.
 >
-> Is it ok to put above description in comment to explain the fixup?
->
->> Presumably the BARs exist and were sized by the PCI core
->> in __pci_read_base().  That will generate some log messages and possibly
->> some warnings, depending on how the host bridge windows are set up.
+> The reason why I am reluctant to use devm_ here is that the ranges are only
+> parsed here, no filtering is applied. Architectures and/or host bridge
+> drivers can/could impose additional restrictions to the list before passing
+> it to pci_scan_root_bus() for example.
 
-Instead of doing this in a fixup, can you change the PCI config
-accessors so that when accessing these inbound DMA mapping registers,
-they drop writes and return zeros for reads?  Then the PCI core won't
-think there are BARs there, and it won't mistakenly corrupt them when
-it tries to size them.
+Okay, as long as the caller has a single clean-up responsibility, I
+guess it is fine.
 
-Bjorn
+Rob
