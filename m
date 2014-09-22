@@ -1,21 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Sep 2014 17:22:22 +0200
-Subject: [PATCH v2 7/8] irqchip: add irq-asm9260 driver
-In-Reply-To: <1411325151-15107-6-git-send-email-linux@rempel-privat.de>
-References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
- <1411325151-15107-6-git-send-email-linux@rempel-privat.de>
-Message-ID: <2829481.qsohvqlupS@wuerfel>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 22 Sep 2014 17:18:54 +0200
+Subject: [PATCH v5 5/9] rtc: at91sam9: make use of syscon/regmap to
+ access GPBR registers
+In-Reply-To: <1411377058-26155-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411377058-26155-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140922151854.GI5237@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 21 September 2014 20:45:50 Oleksij Rempel wrote:
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> ---
->  drivers/irqchip/Makefile      |   1 +
->  drivers/irqchip/irq-asm9260.c | 257 ++++++++++++++++++++++++++++++++++++++++++
+On Mon, Sep 22, 2014 at 11:10:54AM +0200, Boris BREZILLON wrote:
+> The GPBR registers are not part of the RTT block and thus should not be
+> defined in the reg property of the rtt node.
+> 
+> Use syscon to provide a proper DT representation and reference the GPBR
+> syscon device in a new "atmel,time-reg" property which store both the
 
-This driver seems to be closely related to drivers/irqchip/irq-mxs.c.
-Are you perhaps able to share some or all of the code?
+You forgot to update the commit message with the new property name.
 
-	Arnd
+Johan
