@@ -1,23 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Sep 2014 14:03:51 +0100
-Subject: [PATCH] i2c: axxia: Add I2C driver for AXM55xx
-In-Reply-To: <20140922095939.GB1406@katana>
-References: <1408967482-17723-1-git-send-email-anders.berg@avagotech.com>
- <20140920121242.GA3833@katana>
- <CAE0=X_0VQ8rWrUgbsgKm1MwCP8bwWm3UJPq9p=xNDfjP4CC7Bg@mail.gmail.com>
- <20140922095939.GB1406@katana>
-Message-ID: <20140922130351.GL5182@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 22 Sep 2014 15:14:13 +0200
+Subject: [PATCH/RFC 0/2] serial: samsung: add support for early console
+Message-ID: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 11:59:39AM +0200, Wolfram Sang wrote:
-> IRQ_NONE is "this interrupt wasn't by me" so for shared IRQs, the next
-> handler can check.
+Hello,
 
-Err, no it isn't.  IRQ_NONE has no such effect.  All handlers on a
-shared interrupt are always run irrespective of the return value from
-any particular interrupt handler.  See kernel/irq/handle.c.
+This patchset adds support for early console defined in device tree. As
+an example, DTS files for all Exynos4 based machines are updated with
+the correct value for common chosen/sdtout property.
+
+To get it fully functional additional improvements (support for
+early_ioremap) are needed in early console code.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Patch summary:
+
+Tomasz Figa (2):
+  serial: samsung: Add support for of_earlycon
+  ARM: dts: exynos4: Add stdout-path properties
+
+ arch/arm/boot/dts/exynos4210-origen.dts         |  1 +
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |  1 +
+ arch/arm/boot/dts/exynos4210-trats.dts          |  1 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |  1 +
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 +
+ arch/arm/boot/dts/exynos4412-origen.dts         |  1 +
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |  1 +
+ arch/arm/boot/dts/exynos4412-tiny4412.dts       |  4 +
+ arch/arm/boot/dts/exynos4412-trats2.dts         |  1 +
+ drivers/tty/serial/Kconfig                      |  1 +
+ drivers/tty/serial/samsung.c                    | 97 +++++++++++++++++++++++++
+ 11 files changed, 113 insertions(+)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.2
