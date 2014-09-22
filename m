@@ -1,34 +1,48 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 22 Sep 2014 19:09:23 +0200
-Subject: [PATCH 2/9] ARM: dts: vf610: add global power controller (GPC)
+Date: Mon, 22 Sep 2014 19:09:24 +0200
+Subject: [PATCH 3/9] ARM: dts: vf610: add on-chip SRAM
 In-Reply-To: <cover.1411404079.git.stefan@agner.ch>
 References: <cover.1411404079.git.stefan@agner.ch>
-Message-ID: <21796ac49b3b40094cdea25f6d7c887dc53eefab.1411404079.git.stefan@agner.ch>
+Message-ID: <593e881b5050795076426a4071bfa1bff66cb215.1411404079.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add global power controller module (GPC) to Vybrid device tree.
-
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/vf610.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 122a64956..67bb3b7 100644
+index 67bb3b7..d2128e5 100644
 --- a/arch/arm/boot/dts/vf610.dtsi
 +++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -367,6 +367,11 @@
- 				clocks = <&clks VF610_CLK_USBC0>;
- 			};
+@@ -69,6 +69,27 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges;
  
-+			gpc: gpc at 4006c000 {
-+				compatible = "fsl,vf610-gpc";
-+				reg = <0x4006c000 0x1000>;
-+			};
++		ocram0: sram at 3f000000 {
++			compatible = "mmio-sram";
++			reg = <0x3f000000 0x40000>;
++		};
 +
- 			src: src at 4006e000 {
- 				compatible = "fsl,vf610-src";
- 				reg = <0x4006e000 0x1000>;
++		ocram1: sram at 3f040000 {
++			compatible = "mmio-sram";
++			reg = <0x3f040000 0x40000>;
++		};
++
++		gfxram0: sram at 3f400000 {
++			compatible = "mmio-sram";
++			reg = <0x3f400000 0x80000>;
++		};
++
++		/* used by L2 cache */
++		gfxram1: sram at 3f480000 {
++			compatible = "mmio-sram";
++			reg = <0x3f480000 0x80000>;
++		};
++
+ 		aips0: aips-bus at 40000000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
 -- 
 2.1.0
