@@ -1,74 +1,43 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 22 Sep 2014 12:28:50 +0100
-Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
-In-Reply-To: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20140922112849.GL1994@e106497-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 22 Sep 2014 13:31:33 +0200
+Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
+In-Reply-To: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140922113133.GF15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
-> The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller drivers,
-> one for an external PCIe slot, the other for an internal PCI bridge to USB
-> controllers.
-> 
-> However, they currently do not work at the same time as they use the same PCI
-> domain and use the same root bus number. We can't use different root bus numbers
-> due to the way root bus numbers are assigned in pcibios_init_hw() in
-> arch/arm/kernel/bios32.c.
-> 
-> Since the two PCI controllers are completely independent, I think it makes sense
-> to use different PCI domains for them.
-> 
-> I've marked the third patch as RFC as I am not sure of the impact of enabling
-> PCI domains for all ARM devices. In the march to 'one kernel to rule them all',
-> I steered clear of mach specific changes.
-> 
-> These patches require the following patch from Liviu Dudau:
->   [PATCH v11 07/10] OF: Introduce helper function for getting PCI domain_nr
-> Based on comments on this patch from Jason Gunthorpe, there is still the issue
-> that the domain numbers may change depending on the ordering at probe time.
-> However, this can be fixed later on by adding the entries in the DT files.
+Mike,
 
-Hi Phil,
+On Thu, Sep 11, 2014 at 10:18:14PM +0200, Maxime Ripard wrote:
+> Hi everyone,
+> 
+> Here is an attempt at improving the MMC clock support in the Allwinner
+> SoCs.
+> 
+> Until now, the MMC clocks were having a custom phase function that was
+> directly setting an obscure value in the right register, because we
+> were not really having any idea of what these values were.
+> 
+> Now that we have more informations, we can introduce a common function
+> call to get and set the phase of a particular clock, and use this in
+> both our provider and our client.
 
-I'm happy that you found use for my patch, but I can't help wondering if it is
-not a better idea to convert your drivers to the whole new API in my series.
-Do you have any thoughts on that?
+It would be great that we have that custom phase API out of the kernel
+for 3.18, and you were one of the greatest supporters to that idea,
+could we please have your view on this?
 
-One other thing to note: Rob Herring is not very happy with the mix of OF
-parsing and domain number allocation going in together, so I might remove the
-OF parsing entirely for now. Would that cause you any problems (other than
-the fact that if of_pci_get_domain_nr() doesn't do anything OF related I might
-rename it to pci_get_domain_nr()). You don't seem to have any alias defined
-for pci-domain in the DT, so I'll guess not.
-
-Best regards,
-Liviu
-
-> 
-> 
-> Phil Edworthy (3):
->   PCI: rcar-pcie: Add call to get domain nr
->   PCI: rcar-internal-pci: Add call to get domain nr
->   ARM: Enable PCI domains
-> 
->  arch/arm/Kconfig                 | 2 +-
->  drivers/pci/host/pci-rcar-gen2.c | 6 ++++++
->  drivers/pci/host/pcie-rcar.c     | 9 ++++++---
->  3 files changed, 13 insertions(+), 4 deletions(-)
-> 
-> -- 
-> 2.1.0
-> 
-> 
+Thanks,
+Maxime
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/b6ddffc8/attachment.sig>
