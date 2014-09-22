@@ -1,50 +1,42 @@
 From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Mon, 22 Sep 2014 10:51:09 +0100
-Subject: [PATCH 2/3] PCI: rcar-internal-pci: Add call to get domain nr
-In-Reply-To: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <1411379470-20639-3-git-send-email-phil.edworthy@renesas.com>
+Date: Mon, 22 Sep 2014 10:51:07 +0100
+Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
+Message-ID: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R-Car devices (r8a7790 and r8a7791) need to place the internal PCI and external
-PCIe controllers on separate domains so that they can work at the same time.
+The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller drivers,
+one for an external PCIe slot, the other for an internal PCI bridge to USB
+controllers.
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
----
+However, they currently do not work at the same time as they use the same PCI
+domain and use the same root bus number. We can't use different root bus numbers
+due to the way root bus numbers are assigned in pcibios_init_hw() in
+arch/arm/kernel/bios32.c.
+
+Since the two PCI controllers are completely independent, I think it makes sense
+to use different PCI domains for them.
+
+I've marked the third patch as RFC as I am not sure of the impact of enabling
+PCI domains for all ARM devices. In the march to 'one kernel to rule them all',
+I steered clear of mach specific changes.
+
+These patches require the following patch from Liviu Dudau:
+  [PATCH v11 07/10] OF: Introduce helper function for getting PCI domain_nr
+Based on comments on this patch from Jason Gunthorpe, there is still the issue
+that the domain numbers may change depending on the ordering at probe time.
+However, this can be fixed later on by adding the entries in the DT files.
+
+
+Phil Edworthy (3):
+  PCI: rcar-pcie: Add call to get domain nr
+  PCI: rcar-internal-pci: Add call to get domain nr
+  ARM: Enable PCI domains
+
+ arch/arm/Kconfig                 | 2 +-
  drivers/pci/host/pci-rcar-gen2.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/pci/host/pcie-rcar.c     | 9 ++++++---
+ 3 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-index 3ef854f..17681ea 100644
---- a/drivers/pci/host/pci-rcar-gen2.c
-+++ b/drivers/pci/host/pci-rcar-gen2.c
-@@ -99,6 +99,7 @@ struct rcar_pci_priv {
- 	struct resource io_res;
- 	struct resource mem_res;
- 	struct resource *cfg_res;
-+	int domain;
- 	unsigned busnr;
- 	int irq;
- 	unsigned long window_size;
-@@ -373,6 +374,8 @@ static int rcar_pci_probe(struct platform_device *pdev)
- 
- 	priv->window_size = SZ_1G;
- 
-+	priv->domain = of_pci_get_domain_nr(pdev->dev.of_node, true);
-+
- 	if (pdev->dev.of_node) {
- 		struct resource busnr;
- 		int ret;
-@@ -397,6 +400,9 @@ static int rcar_pci_probe(struct platform_device *pdev)
- 	hw.map_irq = rcar_pci_map_irq;
- 	hw.ops = &rcar_pci_ops;
- 	hw.setup = rcar_pci_setup;
-+#ifdef CONFIG_PCI_DOMAINS
-+	hw.domain = priv->domain;
-+#endif
- 	pci_common_init_dev(&pdev->dev, &hw);
- 	return 0;
- }
 -- 
 2.1.0
