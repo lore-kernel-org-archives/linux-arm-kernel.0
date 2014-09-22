@@ -1,48 +1,69 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 23 Sep 2014 00:41:25 +0200
-Subject: [GIT PULL] ARM: berlin: DT changes for v3.18
-In-Reply-To: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1411425685-27276-3-git-send-email-sebastian.hesselbarth@gmail.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 22 Sep 2014 16:55:48 -0600
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <2486199.jzqMgLksH8@vostro.rjw.lan>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <20140922194841.GA9868@amd> <20140922203136.GA32156@srcf.ucam.org>
+ <2486199.jzqMgLksH8@vostro.rjw.lan>
+Message-ID: <5420A8F4.20909@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antoine is still working on GenPHY support for ChipIdea USB, but at least
-AHCI support made it in. Also, there is reset bindings and corresponding
-changes. Finally, enable a second timer on BG2Q.
+On 09/22/2014 04:46 PM, Rafael J. Wysocki wrote:
+> On Monday, September 22, 2014 09:31:36 PM Matthew Garrett wrote:
+>> On Mon, Sep 22, 2014 at 09:48:41PM +0200, Pavel Machek wrote:
+>>> On Fri 2014-09-12 22:00:16, Hanjun Guo wrote:
+>>>> +No code shall be accepted into the kernel unless it complies with the released
+>>>> +standards from UEFI ASWG. If there are features missing from ACPI to make it
+>>>> +function on a platform, ECRs should be submitted to ASWG and go through the
+>>>> +approval process.
+>>>
+>>> Surely this should be narrowed down somehow? Or is reading all the
+>>> released standards from ASWG mandatory before patching the kernel now?
+>>>
+>>> Spelling out wtf ECR is would be nice, too.
+>>
+>> Explicit Change Request.
 
-Please pull,
+Actually, it's "Engineering Change Request" -- a standard document
+format used by several of the UEFI working groups, including the ASWG.
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+ These can only be filed by paid-up members of
+>> the UEFI Forum, so I suspect this requirement is going to be unworkable 
+>> (there's plenty of ACPI support code for large x86 vendors which isn't 
+>> part of any ACPI spec).
+> 
+> Why do you think so?
+> 
+> Linux Foundation can do that on behalf of the community if no one else.
+> 
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+Exactly so.  Or, collaborate with the hardware vendor, or a distro
+or anyone else that is a Promoter or Contributor as defined by UEFI
+[0].  The only thing to keep clear when doing so is who owns the
+intellectual property for any proposed change; this is one of the
+reasons the UEFI Forum has paid membership levels -- to pay for the
+legal assistance to make sure that the specs can be freely used.  As
+someone who is part of the ASWG, I'd personally be glad to help out
+however I can in this regard.
 
-are available in the git repository at:
+I'm also curious as to what's being referred to as ACPI support
+code for large x86 vendors which is not part of the spec; I *think*
+I know what's being described but a specific example would really
+help me understand better.
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-for-3.18-1
+Thanks.
 
-for you to fetch changes up to 7e782845040985ab7e431682505ddb419bc1d701:
 
-  ARM: dts: berlin: enable timer 1 for sched_clock (2014-09-11 23:06:29 +0200)
 
-----------------------------------------------------------------
-Great work again from Antoine, adding AHCI nodes to BG2Q. This also
-contains reset binding docs and corresponding dtsi additions. Last
-patch enables a second timer on BG2Q used for sched_clock.
+[0] http://www.uefi.org/join
 
-----------------------------------------------------------------
-Antoine Tenart (3):
-      Documentation: bindings: add reset bindings docs for Marvell Berlin SoCs
-      ARM: dts: berlin: add a required reset property in the chip controller node
-      ARM: dts: berlin: enable timer 1 for sched_clock
-
-Antoine T?nart (2):
-      ARM: berlin: add the AHCI node for the BG2Q
-      ARM: berlin: enable the eSATA interface on the BG2Q DMP
-
- .../devicetree/bindings/arm/marvell,berlin.txt     | 10 ++++++
- arch/arm/boot/dts/berlin2.dtsi                     |  1 +
- arch/arm/boot/dts/berlin2cd.dtsi                   |  1 +
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  8 +++++
- arch/arm/boot/dts/berlin2q.dtsi                    | 41 +++++++++++++++++++++-
- 5 files changed, 60 insertions(+), 1 deletion(-)
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
