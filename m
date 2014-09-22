@@ -1,59 +1,41 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Mon, 22 Sep 2014 16:40:11 -0600
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <20140922194841.GA9868@amd>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
- <20140922194841.GA9868@amd>
-Message-ID: <5420A54B.8080202@redhat.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 23 Sep 2014 00:41:23 +0200
+Subject: [GIT PULL] ARM: berlin: Driver changes for v3.18
+Message-ID: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 01:48 PM, Pavel Machek wrote:
-> On Fri 2014-09-12 22:00:16, Hanjun Guo wrote:
->> From: Graeme Gregory <graeme.gregory@linaro.org>
->>
->> Add documentation for the guidelines of how to use ACPI
->> on ARM64.
-> 
->> +No code shall be accepted into the kernel unless it complies with the released
->> +standards from UEFI ASWG. If there are features missing from ACPI to make it
->> +function on a platform, ECRs should be submitted to ASWG and go through the
->> +approval process.
-> 
-> Surely this should be narrowed down somehow? Or is reading all the
-> released standards from ASWG mandatory before patching the kernel now?
+Guys,
 
-Asking someone to read the ACPI standard when implementing ACPI
-functionality is no different than doing the same thing for PCI,
-SCSI, TCP/IP or any of a bazillion others that are used by the
-kernel.  Yes, the wording of this sentence is awkward; that's a
-very different problem and easily fixed.
+Berlin is a little quiet this time. Antoine is still doing a great job
+but ChipIdea USB didn't make it again this time. Let's hope it makes it
+next time.
 
-> Spelling out wtf ECR is would be nice, too.
+At least we can add the reset driver contained in this PR.
 
-ECR stands for "Engineering Change Request".  It is simply a
-recommended document format for requesting changes to be made to
-the ACPI specification (and is also used by other UEFI working
-groups).  The text can easily be fixed to make that clear.
+Please pull,
 
-> And if you expect all kernel contributors to comply with your
-> favourite standards, you should put an URL where the standards can be
-> downloaded here.
-> 
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-Easily enough corrected; until the patch is updated, one can find
-the specs at the oh so very cleverly named URL:
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-    http://www.uefi.org/specifications
+are available in the git repository at:
 
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-driver-for-3.18-1
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+for you to fetch changes up to 72a3643a5f09791a95a85e1ffed6723bafe49a0e:
+
+  reset: add the Berlin reset controller driver (2014-09-11 23:00:48 +0200)
+
+----------------------------------------------------------------
+Marvell Berlin SoCs gained a reset driver, which has been
+Acked-by Philipp Zabel.
+
+----------------------------------------------------------------
+Antoine Tenart (1):
+      reset: add the Berlin reset controller driver
+
+ drivers/reset/Makefile       |   1 +
+ drivers/reset/reset-berlin.c | 131 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 132 insertions(+)
+ create mode 100644 drivers/reset/reset-berlin.c
