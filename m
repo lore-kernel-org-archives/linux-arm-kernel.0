@@ -1,52 +1,63 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 22 Sep 2014 11:04:25 +0200
-Subject: [PATCHv3 1/7] clk: at91: add a driver for the h32mx clock
-In-Reply-To: <541C228F.70207@atmel.com>
-References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410797759-18675-2-git-send-email-alexandre.belloni@free-electrons.com>
- <541C228F.70207@atmel.com>
-Message-ID: <20140922110425.2ec8a0af@bbrezillon>
+Date: Mon, 22 Sep 2014 11:10:50 +0200
+Subject: [PATCH v5 1/9] rtc: at91sam9: remove references to mach specific
+ headers
+In-Reply-To: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411377058-26155-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 19 Sep 2014 14:33:19 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+In order to support multi platform kernel drivers should not include
+machine specific headers.
+Copy RTT macros in the driver code and remove any machine specific
+headers.
 
-> On 15/09/2014 18:15, Alexandre Belloni :
-> > Newer SoCs have two different AHB interconnect. The AHB 32 bits Matrix
-> > interconnect (h32mx) has a clock that can be setup at the half of the h64mx
-> > clock (which is mck). The h32mx clock can not exceed 90 MHz.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Okay on my side:
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> 
-> > ---
-> > Cc:Mike Turquette <mturquette@linaro.org>
-> 
-> Mike,
-> 
-> I guess that you didn't get this v3. Can you "Ack" this one of should we
-> re-sent to you?
-> 
-> I would like to take this patch with the rest of the SAMA5D4 series: is
-> it okay for you?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/rtc/rtc-at91sam9.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-
-Hi Mike,
-
-I gave my ack to this patch, so, if you don't mind letting Nicolas
-take it through his tree, I think it will ease integration of the
-sama5d4 support (no external dependencies on the clk tree).
-
-Best Regards,
-
-Boris
-
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 5963743..51f0038 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -22,10 +22,6 @@
+ #include <linux/platform_data/atmel.h>
+ #include <linux/io.h>
+ 
+-#include <mach/at91_rtt.h>
+-#include <mach/cpu.h>
+-#include <mach/hardware.h>
+-
+ /*
+  * This driver uses two configurable hardware resources that live in the
+  * AT91SAM9 backup power domain (intended to be powered at all times)
+@@ -47,6 +43,24 @@
+  * registers available, likewise usable for more than "RTC" support.
+  */
+ 
++#define AT91_RTT_MR		0x00			/* Real-time Mode Register */
++#define AT91_RTT_RTPRES		(0xffff << 0)		/* Real-time Timer Prescaler Value */
++#define AT91_RTT_ALMIEN		(1 << 16)		/* Alarm Interrupt Enable */
++#define AT91_RTT_RTTINCIEN	(1 << 17)		/* Real Time Timer Increment Interrupt Enable */
++#define AT91_RTT_RTTRST		(1 << 18)		/* Real Time Timer Restart */
++
++#define AT91_RTT_AR		0x04			/* Real-time Alarm Register */
++#define AT91_RTT_ALMV		(0xffffffff)		/* Alarm Value */
++
++#define AT91_RTT_VR		0x08			/* Real-time Value Register */
++#define AT91_RTT_CRTV		(0xffffffff)		/* Current Real-time Value */
++
++#define AT91_RTT_SR		0x0c			/* Real-time Status Register */
++#define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
++#define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
++
++#define AT91_SLOW_CLOCK		32768
++
+ /*
+  * We store ALARM_DISABLED in ALMV to record that no alarm is set.
+  * It's also the reset value for that field.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
