@@ -1,31 +1,74 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 22 Sep 2014 23:38:19 +0100
-Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
-In-Reply-To: <5420A402.2060809@linaro.org>
-References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
- <20140922194841.GA9868@amd> <20140922203136.GA32156@srcf.ucam.org>
- <2486199.jzqMgLksH8@vostro.rjw.lan>
- <20140922222810.GA9421@srcf.ucam.org> <5420A402.2060809@linaro.org>
-Message-ID: <20140922223819.GA10057@srcf.ucam.org>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Mon, 22 Sep 2014 15:40:03 -0700
+Subject: [PATCH v9 1/4] pci:host: APM X-Gene PCIe host controller driver
+In-Reply-To: <CAErSpo4C_6mh7hais14254rYBeMYArvf=nETmgvBjgP290aD4Q@mail.gmail.com>
+References: <1410906824-9321-1-git-send-email-tinamdar@apm.com>
+ <1410906824-9321-2-git-send-email-tinamdar@apm.com>
+ <20140919223258.GA32208@google.com>
+ <CACoXjcnVU3+fQHQ0-zEVRjoedrrod-aua6AVybj7UuSHO9HBaw@mail.gmail.com>
+ <CAErSpo4C_6mh7hais14254rYBeMYArvf=nETmgvBjgP290aD4Q@mail.gmail.com>
+Message-ID: <CACoXjc=od24kz4RbMLOZNGbMwsAjc8+Ko0rEXNc=2yKnN_3NkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 06:34:42AM +0800, Hanjun Guo wrote:
-> On Sep 23, 2014, 06:28AM, Matthew Garrett wrote:
-> > On Tue, Sep 23, 2014 at 12:46:24AM +0200, Rafael J. Wysocki wrote:
-> >> On Monday, September 22, 2014 09:31:36 PM Matthew Garrett wrote:
-> >>> Explicit Change Request. These can only be filed by paid-up members of 
-> >>> the UEFI Forum, so I suspect this requirement is going to be unworkable 
-> >>> (there's plenty of ACPI support code for large x86 vendors which isn't 
-> >>> part of any ACPI spec).
-> >> Why do you think so?
-> > The IP rules in the membership agreements.
-> 
-> If I'm not mistaken, I think there is no IP issues for the _DSD bindings,
-> it just some key value pairs.
+On Mon, Sep 22, 2014 at 3:09 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Mon, Sep 22, 2014 at 3:33 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+>
+>>>> +static void xgene_pcie_fixup_bridge(struct pci_dev *dev)
+>>>> +{
+>>>> +     int i;
+>>>> +
+>>>> +     /* Hide the PCI host BARs from the kernel as their content doesn't
+>>>> +      * fit well in the resource management
+>>>> +      */
+>>>
+>>> This needs a better explanation than "doesn't fit well."
+>>>
+>>> I *think* you're probably talking about something similar to the MVEBU
+>>> devices mentioned here:
+>>> http://lkml.kernel.org/r/CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA at mail.gmail.com
+>>>
+>>> where the device can be configured as either an endpoint or a root port,
+>>> and the endpoint BARs are still visible when configured as a root port.
+>>>
+>>
+>> It is true that X-Gene PCIe port can be configured as EP, however the
+>> the FIXUP is required not because of the BARs are still visible when
+>> configured as EP in past. X-Gene PCIe port, when configured as RC,
+>> uses BAR0-BAR1 of RC's configuration space as inbound BARs. Entire DDR
+>> region is mapped in these BARs so that it is accessible for EP devices
+>> for DMA. So if the fixup is not done during enumeration, whole
+>> outbound memory resource space gets assigned to RC and nothing is left
+>> EP devices.
+>
+> I'm not familiar with the concept of an "inbound BAR"; at least I'm
+> not aware of anything like this in the PCI specs.  I think it might
+> reduce confusion if we avoided calling them "BARs".  They happen to be
+> at the same addresses where real BARs would be, but they certainly
+> don't behave like real BARs.
+>
+> It sounds like this is basically a trivial IOMMU that determines which
+> DMA accesses can reach main memory.
+>
 
-That paragraph is talking about ACPI support in general, not just the 
-_DSD code.
+Yes. That is correct.
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+>>> In any event, I'd like a description of exactly what these BARs are and wha
+>>> the problem is.
+>>
+>> Is it ok to put above description in comment to explain the fixup?
+>>
+>>> Presumably the BARs exist and were sized by the PCI core
+>>> in __pci_read_base().  That will generate some log messages and possibly
+>>> some warnings, depending on how the host bridge windows are set up.
+>
+> Instead of doing this in a fixup, can you change the PCI config
+> accessors so that when accessing these inbound DMA mapping registers,
+> they drop writes and return zeros for reads?  Then the PCI core won't
+> think there are BARs there, and it won't mistakenly corrupt them when
+> it tries to size them.
+>
+
+I suppose this can be done. I will fix this in next revision.
+
+> Bjorn
