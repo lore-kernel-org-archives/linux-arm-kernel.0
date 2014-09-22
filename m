@@ -1,37 +1,35 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 22 Sep 2014 23:22:48 +0100
-Subject: [PATCH 3/3] media: st-rc: Remove .owner field for driver
-In-Reply-To: <1411424501-12673-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411424501-12673-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1411424568-12803-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 23 Sep 2014 00:46:24 +0200
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140922203136.GA32156@srcf.ucam.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <20140922194841.GA9868@amd> <20140922203136.GA32156@srcf.ucam.org>
+Message-ID: <2486199.jzqMgLksH8@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to init .owner field.
+On Monday, September 22, 2014 09:31:36 PM Matthew Garrett wrote:
+> On Mon, Sep 22, 2014 at 09:48:41PM +0200, Pavel Machek wrote:
+> > On Fri 2014-09-12 22:00:16, Hanjun Guo wrote:
+> > > +No code shall be accepted into the kernel unless it complies with the released
+> > > +standards from UEFI ASWG. If there are features missing from ACPI to make it
+> > > +function on a platform, ECRs should be submitted to ASWG and go through the
+> > > +approval process.
+> > 
+> > Surely this should be narrowed down somehow? Or is reading all the
+> > released standards from ASWG mandatory before patching the kernel now?
+> > 
+> > Spelling out wtf ECR is would be nice, too.
+> 
+> Explicit Change Request. These can only be filed by paid-up members of 
+> the UEFI Forum, so I suspect this requirement is going to be unworkable 
+> (there's plenty of ACPI support code for large x86 vendors which isn't 
+> part of any ACPI spec).
 
-Based on the patch from Peter Griffin <peter.griffin@linaro.org>
-"mmc: remove .owner field for drivers using module_platform_driver"
+Why do you think so?
 
-This patch removes the superflous .owner field for drivers which
-use the module_platform_driver API, as this is overriden in
-platform_driver_register anyway."
+Linux Foundation can do that on behalf of the community if no one else.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/media/rc/st_rc.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-index 03bbb09..e309441 100644
---- a/drivers/media/rc/st_rc.c
-+++ b/drivers/media/rc/st_rc.c
-@@ -392,7 +392,6 @@ MODULE_DEVICE_TABLE(of, st_rc_match);
- static struct platform_driver st_rc_driver = {
- 	.driver = {
- 		.name = IR_ST_NAME,
--		.owner	= THIS_MODULE,
- 		.of_match_table = of_match_ptr(st_rc_match),
- 		.pm     = &st_rc_pm_ops,
- 	},
 -- 
-1.9.1
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
