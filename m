@@ -1,122 +1,47 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 22 Sep 2014 12:43:17 +0100
-Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140922093228.GA20256@rric.localhost>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
- <20140922093228.GA20256@rric.localhost>
-Message-ID: <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 22 Sep 2014 14:01:57 +0200
+Subject: [PATCH] ARM: dts: s3c64xx: Enable PWM node by default
+Message-ID: <1411387317-4837-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 10:32:28AM +0100, Robert Richter wrote:
-> On 18.09.14 02:30:23, Liviu Dudau wrote:
-> > +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > +			unsigned char busno, unsigned char bus_max,
-> > +			struct list_head *resources, resource_size_t *io_base)
-> > +{
-> > +	struct resource *res;
-> > +	struct resource *bus_range;
-> > +	struct of_pci_range range;
-> > +	struct of_pci_range_parser parser;
-> > +	char range_type[4];
-> > +	int err;
-> > +
-> > +	if (!io_base)
-> > +		return -EINVAL;
-> > +	*io_base = OF_BAD_ADDR;
-> 
+The PWM block is required for system clock source so it must be always
+enabled. This patch fixes boot issues on SMDK6410 which did not have the
+node enabled explicitly for other purposes.
 
-Hi Robert,
+Fixes: eeb93d02c5d8 ("clocksource: of: Respect device tree node status")
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ arch/arm/boot/dts/s3c6410-mini6410.dts | 4 ----
+ arch/arm/boot/dts/s3c64xx.dtsi         | 1 -
+ 2 files changed, 5 deletions(-)
 
-> This breaks for mem-mapped pci host controllers. The patch below fixes
-> this.
-
-I think you mean PCI host controller that have only memory mapped ranges,
-am I right? Initially I've read your reply as to mean that the host
-controller is accessed through some memory mapped area, which I believe is
-the case for all host controllers.
-
-> 
-> This series was tested with the fix on top for Cavium Thunder.
-> 
-> Tested-by: Robert Richter <rrichter@cavium.com>
-
-Thanks for that!
-
-> 
-> -Robert
-> 
-> 
-> 
-> From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
-> From: Robert Richter <rrichter@cavium.com>
-> Date: Mon, 22 Sep 2014 10:46:01 +0200
-> Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
-> 
-> The pci host bridge was not created if io_base was not set when
-> calling of_pci_get_host_bridge_resources(). This is esp. the case for
-> mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
-> parameter io_base is optional now.
-
-I think the message is misleading. What you want to do is make io_base
-optional for the case where the PCI host bridge only expects to have only
-IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
-
-As I'm going to touch this area again to address a comment from Bjorn,
-do you mind if I roll this patch into mine with your Signed-off-by and
-the mention that you have made io_base optional?
-
-Best regards,
-Liviu
-
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  drivers/of/of_pci.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index ffdb45ed8682..1f0e7c2505ee 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -182,9 +182,8 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
->  	char range_type[4];
->  	int err;
->  
-> -	if (!io_base)
-> -		return -EINVAL;
-> -	*io_base = OF_BAD_ADDR;
-> +	if (io_base)
-> +		*io_base = OF_BAD_ADDR;
->  
->  	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
->  	if (!bus_range)
-> @@ -242,7 +241,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
->  			goto parse_failed;
->  		}
->  
-> -		if (resource_type(res) == IORESOURCE_IO) {
-> +		if (io_base && resource_type(res) == IORESOURCE_IO) {
->  			if (*io_base != OF_BAD_ADDR)
->  				pr_warn("More than one I/O resource converted. CPU offset for old range lost!\n");
->  			*io_base = range.cpu_addr;
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
+diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
+index a171cdd26b7f..42c2bcdf2626 100644
+--- a/arch/arm/boot/dts/s3c6410-mini6410.dts
++++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
+@@ -252,10 +252,6 @@
+ 	status = "okay";
+ };
+ 
+-&pwm {
+-	status = "okay";
+-};
+-
+ &pinctrl0 {
+ 	gpio_leds: gpio-leds {
+ 		samsung,pins = "gpk-4", "gpk-5", "gpk-6", "gpk-7";
+diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
+index 05c717ad1edd..196fe6ea205d 100644
+--- a/arch/arm/boot/dts/s3c64xx.dtsi
++++ b/arch/arm/boot/dts/s3c64xx.dtsi
+@@ -239,7 +239,6 @@
+ 			clocks = <&clocks PCLK_PWM>;
+ 			samsung,pwm-outputs = <0>, <1>;
+ 			#pwm-cells = <3>;
+-			status = "disabled";
+ 		};
+ 
+ 		pinctrl0: pinctrl at 7f008000 {
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.1.0
