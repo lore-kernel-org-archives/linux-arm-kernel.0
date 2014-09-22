@@ -1,232 +1,118 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 22 Sep 2014 10:10:07 +0530
-Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
- devices
-Message-ID: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Mon, 22 Sep 2014 10:17:01 +0530
+Subject: [PATCH v5 1/8] clk: samsung: add support for 145xx and 1460x PLLs
+In-Reply-To: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
+References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1411361228-18279-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently a syscon entity can be only registered directly through a
-platform device that binds to a dedicated syscon driver. However in
-certain use cases it is desirable to make a device used with another
-driver a syscon interface provider.
+From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
 
-For example, certain SoCs (e.g. Exynos) contain system controller
-blocks which perform various functions such as power domain control,
-CPU power management, low power mode control, but in addition contain
-certain IP integration glue, such as various signal masks,
-coprocessor power control, etc. In such case, there is a need to have
-a dedicated driver for such system controller but also share registers
-with other drivers. The latter is where the syscon interface is helpful.
+PLL145xx is similar to PLL35xx and PLL1460x is almost similar
+to PLL46xx with minor differences in bit positions. Hence,
+reuse the functions defined for pll_35xx and pll_46xx to
+support 145xx and 1460x PLLs respectively.
 
-In case of DT based platforms, this patch decouples syscon object from
-syscon platform driver, and allows to create syscon objects first time
-when it is required by calling of syscon_regmap_lookup_by APIs and keep
-a list of such syscon objects along with syscon provider device_nodes
-and regmap handles.
-
-For non-DT based platforms, this patch keeps syscon platform driver
-structure where is can be probed and such non-DT based drivers can use
-syscon_regmap_lookup_by_pdev API and get access to regmap handles.
-Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-we can completly remove platform driver of syscon, and keep only helper
-functions to get regmap handles.
-
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+Tested-by: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 ---
-Patch v4 and related discussions can be found here [1].
+ drivers/clk/samsung/clk-pll.c | 25 ++++++++++++++++++++-----
+ drivers/clk/samsung/clk-pll.h |  4 ++++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
 
-Changes since v4:
- - Addressed Tomasz Figa's comments for v4.
- - Added error handing in of_syscon_register function.
- - Using devm_regmap_init_mmio instead of regmap_init_mmio.
-
-Changes since v3:
- - Addressed Arnd's comment for v2.
- - Updated of_syscon_register for adding dev pointer in regmap_init_mmio.
- - For early users created dummy platform device.
-   
-Changes since v2:
- - Added back platform device support from syscon, with one change that
-   syscon will not be probed for DT based platform.
- - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
-   users of syscon will not be broken.
- - Removed unwanted change in syscon.h.
- - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
-   Arnd Bergmann.
- - Added Tested-by of Vivek Gautam for testing on Exynos platform.
-
-Changes since v1:
- - Removed of_syscon_unregister function.
- - Modified of_syscon_register function and it will be used by syscon.c
-   to create syscon objects whenever required.
- - Removed platform device support from syscon.
- - Removed syscon_regmap_lookup_by_pdevname API support.
- - As there are significant changes w.r.t patchset v1, I am taking over
-   author for this patchset from Tomasz Figa.
-
-[1]: https://lkml.org/lkml/2014/9/19/267
-
- drivers/mfd/syscon.c |  107 +++++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 85 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index ca15878..0b17f50 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -15,6 +15,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/list.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -22,31 +23,105 @@
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/slab.h>
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index b07fad2..9d70e5c 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -482,6 +482,8 @@ static const struct clk_ops samsung_pll45xx_clk_min_ops = {
  
- static struct platform_driver syscon_driver;
+ #define PLL46XX_VSEL_MASK	(1)
+ #define PLL46XX_MDIV_MASK	(0x1FF)
++#define PLL1460X_MDIV_MASK	(0x3FF)
++
+ #define PLL46XX_PDIV_MASK	(0x3F)
+ #define PLL46XX_SDIV_MASK	(0x7)
+ #define PLL46XX_VSEL_SHIFT	(27)
+@@ -511,13 +513,15 @@ static unsigned long samsung_pll46xx_recalc_rate(struct clk_hw *hw,
  
-+static DEFINE_SPINLOCK(syscon_list_slock);
-+static LIST_HEAD(syscon_list);
+ 	pll_con0 = __raw_readl(pll->con_reg);
+ 	pll_con1 = __raw_readl(pll->con_reg + 4);
+-	mdiv = (pll_con0 >> PLL46XX_MDIV_SHIFT) & PLL46XX_MDIV_MASK;
++	mdiv = (pll_con0 >> PLL46XX_MDIV_SHIFT) & ((pll->type == pll_1460x) ?
++				PLL1460X_MDIV_MASK : PLL46XX_MDIV_MASK);
+ 	pdiv = (pll_con0 >> PLL46XX_PDIV_SHIFT) & PLL46XX_PDIV_MASK;
+ 	sdiv = (pll_con0 >> PLL46XX_SDIV_SHIFT) & PLL46XX_SDIV_MASK;
+ 	kdiv = pll->type == pll_4650c ? pll_con1 & PLL4650C_KDIV_MASK :
+ 					pll_con1 & PLL46XX_KDIV_MASK;
+ 
+-	shift = pll->type == pll_4600 ? 16 : 10;
++	shift = ((pll->type == pll_4600) || (pll->type == pll_1460x)) ? 16 : 10;
 +
- struct syscon {
-+	struct device_node *np;
- 	struct regmap *regmap;
-+	struct list_head list;
-+};
+ 	fvco *= (mdiv << shift) + kdiv;
+ 	do_div(fvco, (pdiv << sdiv));
+ 	fvco >>= shift;
+@@ -573,14 +577,21 @@ static int samsung_pll46xx_set_rate(struct clk_hw *hw, unsigned long drate,
+ 		lock = 0xffff;
+ 
+ 	/* Set PLL PMS and VSEL values. */
+-	con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
++	if (pll->type == pll_1460x) {
++		con0 &= ~((PLL1460X_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
++			(PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT) |
++			(PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT));
++	} else {
++		con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
+ 			(PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT) |
+ 			(PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT) |
+ 			(PLL46XX_VSEL_MASK << PLL46XX_VSEL_SHIFT));
++		con0 |=	rate->vsel << PLL46XX_VSEL_SHIFT;
++	}
 +
-+static struct regmap_config syscon_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
+ 	con0 |= (rate->mdiv << PLL46XX_MDIV_SHIFT) |
+ 			(rate->pdiv << PLL46XX_PDIV_SHIFT) |
+-			(rate->sdiv << PLL46XX_SDIV_SHIFT) |
+-			(rate->vsel << PLL46XX_VSEL_SHIFT);
++			(rate->sdiv << PLL46XX_SDIV_SHIFT);
+ 
+ 	/* Set PLL K, MFR and MRR values. */
+ 	con1 = __raw_readl(pll->con_reg + 0x4);
+@@ -1190,6 +1201,9 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+ 	/* clk_ops for 35xx and 2550 are similar */
+ 	case pll_35xx:
+ 	case pll_2550:
++	case pll_1450x:
++	case pll_1451x:
++	case pll_1452x:
+ 		if (!pll->rate_table)
+ 			init.ops = &samsung_pll35xx_clk_min_ops;
+ 		else
+@@ -1223,6 +1237,7 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+ 	case pll_4600:
+ 	case pll_4650:
+ 	case pll_4650c:
++	case pll_1460x:
+ 		if (!pll->rate_table)
+ 			init.ops = &samsung_pll46xx_clk_min_ops;
+ 		else
+diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+index c0ed4d4..213de9a 100644
+--- a/drivers/clk/samsung/clk-pll.h
++++ b/drivers/clk/samsung/clk-pll.h
+@@ -33,6 +33,10 @@ enum samsung_pll_type {
+ 	pll_s3c2440_mpll,
+ 	pll_2550xx,
+ 	pll_2650xx,
++	pll_1450x,
++	pll_1451x,
++	pll_1452x,
++	pll_1460x,
  };
  
--static int syscon_match_node(struct device *dev, void *data)
-+static struct syscon *of_syscon_register(struct device_node *np)
- {
--	struct device_node *dn = data;
-+	struct platform_device *pdev = NULL;
-+	struct syscon *syscon;
-+	struct regmap *regmap;
-+	void __iomem *base;
-+	int ret;
-+
-+	if (!of_device_is_compatible(np, "syscon"))
-+		return ERR_PTR(-EINVAL);
-+
-+	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
-+	if (!syscon)
-+		return ERR_PTR(-ENOMEM);
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		ret = -ENOMEM;
-+		goto err_map;
-+	}
-+
-+	/* if device is already populated and available then use it */
-+	pdev = of_find_device_by_node(np);
-+	if (!pdev) {
-+		/* for early users create dummy syscon device and use it */
-+		pdev = platform_device_alloc("dummy-syscon", -1);
-+		if (!pdev) {
-+			ret = -ENOMEM;
-+			goto err_pdev;
-+		}
-+		pdev->dev.of_node = of_node_get(np);
-+	}
-+
-+	regmap = devm_regmap_init_mmio(&pdev->dev, base, &syscon_regmap_config);
-+	if (IS_ERR(regmap)) {
-+		dev_err(&pdev->dev, "regmap init failed\n");
-+		ret = PTR_ERR(regmap);
-+		goto err_regmap;
-+	}
-+
-+	syscon->regmap = regmap;
-+	syscon->np = np;
- 
--	return (dev->of_node == dn) ? 1 : 0;
-+	spin_lock(&syscon_list_slock);
-+	list_add_tail(&syscon->list, &syscon_list);
-+	spin_unlock(&syscon_list_slock);
-+
-+	return syscon;
-+
-+err_regmap:
-+	if (!strcmp(pdev->name, "dummy-syscon")) {
-+		of_node_put(np);
-+		platform_device_put(pdev);
-+	}
-+err_pdev:
-+	iounmap(base);
-+err_map:
-+	kfree(syscon);
-+	return ERR_PTR(ret);
- }
- 
- struct regmap *syscon_node_to_regmap(struct device_node *np)
- {
--	struct syscon *syscon;
--	struct device *dev;
-+	struct syscon *entry, *syscon = NULL;
- 
--	dev = driver_find_device(&syscon_driver.driver, NULL, np,
--				 syscon_match_node);
--	if (!dev)
--		return ERR_PTR(-EPROBE_DEFER);
-+	spin_lock(&syscon_list_slock);
- 
--	syscon = dev_get_drvdata(dev);
-+	list_for_each_entry(entry, &syscon_list, list)
-+		if (entry->np == np) {
-+			syscon = entry;
-+			break;
-+		}
-+
-+	spin_unlock(&syscon_list_slock);
-+
-+	if (!syscon)
-+		syscon = of_syscon_register(np);
-+
-+	if (IS_ERR(syscon))
-+		return ERR_CAST(syscon);
- 
- 	return syscon->regmap;
- }
-@@ -110,17 +185,6 @@ struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
- }
- EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
- 
--static const struct of_device_id of_syscon_match[] = {
--	{ .compatible = "syscon", },
--	{ },
--};
--
--static struct regmap_config syscon_regmap_config = {
--	.reg_bits = 32,
--	.val_bits = 32,
--	.reg_stride = 4,
--};
--
- static int syscon_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -167,7 +231,6 @@ static struct platform_driver syscon_driver = {
- 	.driver = {
- 		.name = "syscon",
- 		.owner = THIS_MODULE,
--		.of_match_table = of_syscon_match,
- 	},
- 	.probe		= syscon_probe,
- 	.id_table	= syscon_ids,
+ #define PLL_35XX_RATE(_rate, _m, _p, _s)			\
 -- 
-1.7.9.5
+2.1.0
