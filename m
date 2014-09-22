@@ -1,45 +1,46 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 22 Sep 2014 11:10:58 +0200
-Subject: [PATCH v5 9/9] mfd: syscon: add Atmel GPBR DT bindings documention
+Date: Mon, 22 Sep 2014 11:10:57 +0200
+Subject: [PATCH v5 8/9] rtc: at91sam9: add DT bindings documentation
 In-Reply-To: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1411377058-26155-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411377058-26155-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411377058-26155-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPBR block provides a set of battery-backed registers that can be used
-to save data which need to be kept when the system is powered down and
-VDD-core is maintained by an external battery.
-
-A typical usage is the RTT block (when used as an RTC) which needs one of
-those registers to save the current time.
-
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- Documentation/devicetree/bindings/mfd/atmel,gpbr.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+ .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
+diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
 new file mode 100644
-index 0000000..a285695
+index 0000000..5b2bb73
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
-@@ -0,0 +1,15 @@
-+* Device tree bindings for Atmel GPBR (General Purpose Backup Registers)
-+
-+The GPBR are a set of battery-backed registers.
++++ b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+@@ -0,0 +1,23 @@
++Atmel AT91SAM9260 Real Time Timer
 +
 +Required properties:
-+- compatible:		"atmel,at91sam9260-gpbr", "syscon"
-+- reg:			contains offset/length value of the GPBR memory
-+			region.
++- compatible: should be: "atmel,at91sam9260-rtt"
++- reg: should encode the memory region of the RTT controller
++- interrupts: rtc alarm/event interrupt
++- clocks: should contain one clock pointing the the slow clk
++- atmel,rtt-rtc-time-reg: should encode the GPBR register used to store
++	the RTC time. The first cell should point to the GPBR node and
++	the second one encode the offset within the GPBR block (or in
++	other words, the GPBR register used to store the current time
++	value).
++
 +
 +Example:
 +
-+gpbr: gpbr at fffffd50 {
-+	compatible = "atmel,at91sam9260-gpbr", "syscon";
-+	reg = <0xfffffd50 0x10>;
++rtt at fffffe00 {
++	compatible = "atmel,at91sam9260-rtt";
++	reg = <0xfffffd20 0x10>;
++	interrupts = <1 4 7>;
++	clocks = <&clk32k>;
++	atmel,rtt-rtc-time-reg = <&gpbr 0x0>;
 +};
 -- 
 1.9.1
