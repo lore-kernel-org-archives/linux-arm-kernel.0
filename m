@@ -1,132 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Sep 2014 15:36:33 -0700
-Subject: [PATCH] ARM: qcom: Fix SCM interface for big-endian kernels
-Message-ID: <1411425393-5537-1-git-send-email-sboyd@codeaurora.org>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Mon, 22 Sep 2014 23:38:19 +0100
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <5420A402.2060809@linaro.org>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <20140922194841.GA9868@amd> <20140922203136.GA32156@srcf.ucam.org>
+ <2486199.jzqMgLksH8@vostro.rjw.lan>
+ <20140922222810.GA9421@srcf.ucam.org> <5420A402.2060809@linaro.org>
+Message-ID: <20140922223819.GA10057@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The secure environment only runs in little-endian mode, so any
-buffers shared with the secure environment should have their
-contents converted to little-endian. We also mark such elements
-with __le32 to allow sparse to catch such problems.
+On Tue, Sep 23, 2014 at 06:34:42AM +0800, Hanjun Guo wrote:
+> On Sep 23, 2014, 06:28AM, Matthew Garrett wrote:
+> > On Tue, Sep 23, 2014 at 12:46:24AM +0200, Rafael J. Wysocki wrote:
+> >> On Monday, September 22, 2014 09:31:36 PM Matthew Garrett wrote:
+> >>> Explicit Change Request. These can only be filed by paid-up members of 
+> >>> the UEFI Forum, so I suspect this requirement is going to be unworkable 
+> >>> (there's plenty of ACPI support code for large x86 vendors which isn't 
+> >>> part of any ACPI spec).
+> >> Why do you think so?
+> > The IP rules in the membership agreements.
+> 
+> If I'm not mistaken, I think there is no IP issues for the _DSD bindings,
+> it just some key value pairs.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/soc/qcom/scm-boot.c |  8 ++++----
- drivers/soc/qcom/scm.c      | 34 ++++++++++++++++++----------------
- 2 files changed, 22 insertions(+), 20 deletions(-)
+That paragraph is talking about ACPI support in general, not just the 
+_DSD code.
 
-diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
-index 60ff7b482141..3e4d77b371c6 100644
---- a/drivers/soc/qcom/scm-boot.c
-+++ b/drivers/soc/qcom/scm-boot.c
-@@ -27,12 +27,12 @@
- int scm_set_boot_addr(phys_addr_t addr, int flags)
- {
- 	struct {
--		unsigned int flags;
--		phys_addr_t  addr;
-+		__le32 flags;
-+		__le32 addr;
- 	} cmd;
- 
--	cmd.addr = addr;
--	cmd.flags = flags;
-+	cmd.addr = cpu_to_le32(addr);
-+	cmd.flags = cpu_to_le32(flags);
- 	return scm_call(SCM_SVC_BOOT, SCM_BOOT_ADDR,
- 			&cmd, sizeof(cmd), NULL, 0);
- }
-diff --git a/drivers/soc/qcom/scm.c b/drivers/soc/qcom/scm.c
-index be1e2beec796..feeb4e4bb22d 100644
---- a/drivers/soc/qcom/scm.c
-+++ b/drivers/soc/qcom/scm.c
-@@ -62,11 +62,11 @@ static DEFINE_MUTEX(scm_lock);
-  * to access the buffers in a safe manner.
-  */
- struct scm_command {
--	u32	len;
--	u32	buf_offset;
--	u32	resp_hdr_offset;
--	u32	id;
--	u32	buf[0];
-+	__le32 len;
-+	__le32 buf_offset;
-+	__le32 resp_hdr_offset;
-+	__le32 id;
-+	__le32 buf[0];
- };
- 
- /**
-@@ -76,9 +76,9 @@ struct scm_command {
-  * @is_complete: indicates if the command has finished processing
-  */
- struct scm_response {
--	u32	len;
--	u32	buf_offset;
--	u32	is_complete;
-+	__le32 len;
-+	__le32 buf_offset;
-+	__le32 is_complete;
- };
- 
- /**
-@@ -96,12 +96,14 @@ static struct scm_command *alloc_scm_command(size_t cmd_size, size_t resp_size)
- 	struct scm_command *cmd;
- 	size_t len = sizeof(*cmd) + sizeof(struct scm_response) + cmd_size +
- 		resp_size;
-+	u32 offset;
- 
- 	cmd = kzalloc(PAGE_ALIGN(len), GFP_KERNEL);
- 	if (cmd) {
--		cmd->len = len;
--		cmd->buf_offset = offsetof(struct scm_command, buf);
--		cmd->resp_hdr_offset = cmd->buf_offset + cmd_size;
-+		cmd->len = cpu_to_le32(len);
-+		offset = offsetof(struct scm_command, buf);
-+		cmd->buf_offset = cpu_to_le32(offset);
-+		cmd->resp_hdr_offset = cpu_to_le32(offset + cmd_size);
- 	}
- 	return cmd;
- }
-@@ -126,7 +128,7 @@ static inline void free_scm_command(struct scm_command *cmd)
- static inline struct scm_response *scm_command_to_response(
- 		const struct scm_command *cmd)
- {
--	return (void *)cmd + cmd->resp_hdr_offset;
-+	return (void *)cmd + le32_to_cpu(cmd->resp_hdr_offset);
- }
- 
- /**
-@@ -148,7 +150,7 @@ static inline void *scm_get_command_buffer(const struct scm_command *cmd)
-  */
- static inline void *scm_get_response_buffer(const struct scm_response *rsp)
- {
--	return (void *)rsp + rsp->buf_offset;
-+	return (void *)rsp + le32_to_cpu(rsp->buf_offset);
- }
- 
- static int scm_remap_error(int err)
-@@ -201,8 +203,8 @@ static int __scm_call(const struct scm_command *cmd)
- 	 * Flush the command buffer so that the secure world sees
- 	 * the correct data.
- 	 */
--	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
--	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
-+	__cpuc_flush_dcache_area((void *)cmd, le32_to_cpu(cmd->len));
-+	outer_flush_range(cmd_addr, cmd_addr + le32_to_cpu(cmd->len));
- 
- 	ret = smc(cmd_addr);
- 	if (ret < 0)
-@@ -260,7 +262,7 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
- 	if (!cmd)
- 		return -ENOMEM;
- 
--	cmd->id = (svc_id << 10) | cmd_id;
-+	cmd->id = cpu_to_le32((svc_id << 10) | cmd_id);
- 	if (cmd_buf)
- 		memcpy(scm_get_command_buffer(cmd), cmd_buf, cmd_len);
- 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Matthew Garrett | mjg59 at srcf.ucam.org
