@@ -1,51 +1,141 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 22 Sep 2014 19:13:27 +0200
-Subject: [PATCH] i2c-rk3x: move setup to the earlier subsys initcall
-In-Reply-To: <CAD=FV=VUoK8SDng6O4-VVq8UZf88b3bSe-hQMht3R2nmYXqMFQ@mail.gmail.com>
-References: <1411370675-27866-1-git-send-email-zyw@rock-chips.com>
- <7192455.FveG5nGWsJ@xq-nb>
- <CAD=FV=VUoK8SDng6O4-VVq8UZf88b3bSe-hQMht3R2nmYXqMFQ@mail.gmail.com>
-Message-ID: <20140922171325.GB1404@katana>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Sep 2014 18:13:52 +0100
+Subject: [RFC PATCH v3 4/7] iommu: provide helper function to configure
+ an IOMMU for an of master
+In-Reply-To: <4801495.ovhjCBfpBC@avalon>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-5-git-send-email-will.deacon@arm.com>
+ <4801495.ovhjCBfpBC@avalon>
+Message-ID: <20140922171352.GF7936@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 18, 2014 at 12:13:13PM +0100, Laurent Pinchart wrote:
+> Hi Will,
 
-> In general you are correct.  You can get by with lots of probe
-> deferrals.  I don't personally know of any case where things are
-> broken with the current code, but it's really nice to avoid the
-> deferrals if possible.
+Hi Laurent,
 
-Yes, we all want proper dependencies and ordering, yet deferred probing
-is the best we have.
+> Thank you for the patch.
 
-> Given that this is a core SoC i2c bus and is used for _a lot_ of
-> external connectivity (including for connecting to the primary
-> regulator on most boards), bumping up the priority in the init order
-> makes a lot of sense to me.
+Sorry for the delay in replying, I was at Connect last week and the email
+has backed up.
+
+> On Friday 12 September 2014 17:34:52 Will Deacon wrote:
+> > The generic IOMMU device-tree bindings can be used to add arbitrary OF
+> > masters to an IOMMU with a compliant binding.
+> > 
+> > This patch introduces of_iommu_configure, which does exactly that. A
+> > list of iommu_dma_mapping structures are created for each device, which
+> > represent the set of IOMMU instances through which the device can
+> > master. The list is protected by a kref count and freed when no users
+> > remain. It is expected that DMA-mapping code will take a reference if it
+> > wishes to make use of the IOMMU information.
+
+[...]
+
+> > +struct iommu_dma_mapping *of_iommu_configure(struct device *dev)
+> > +{
+> > +	struct of_phandle_args iommu_spec;
+> > +	struct iommu_dma_mapping *mapping;
+> > +	struct device_node *np;
+> > +	struct iommu_data *iommu = NULL;
+> > +	int idx = 0;
+> > +
+> > +	/*
+> > +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> > +	 * See the `Notes:' section of
+> > +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> > +	 */
+> > +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> > +					   "#iommu-cells", idx,
+> > +					   &iommu_spec)) {
+> > +		struct iommu_data *data;
+> > +
+> > +		np = iommu_spec.np;
+> > +		data = of_iommu_get_data(np);
+> > +
+> > +		if (!data || !data->ops || !data->ops->of_xlate)
+> > +			goto err_put_node;
+> > +
+> > +		if (!iommu) {
+> > +			iommu = data;
+> > +		} else if (iommu != data) {
+> > +			/* We don't currently support multi-IOMMU masters */
+> > +			pr_warn("Rejecting device %s with multiple IOMMU instances\n",
+> > +				dev_name(dev));
+> > +			goto err_put_node;
+> > +		}
+> > +
+> > +		if (!data->ops->of_xlate(dev, &iommu_spec))
+> > +			goto err_put_node;
+> > +
+> > +		of_node_put(np);
+> > +		idx++;
+> > +	}
+> > +
+> > +	if (!iommu)
+> > +		return NULL;
+> > +
+> > +	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+> > +	if (!mapping)
+> > +		return NULL;
+> > +
+> > +	kref_init(&mapping->kref);
+> > +	INIT_LIST_HEAD(&mapping->node);
 > 
-> This also matches the i2c busses of most other major SoCs.  A selected
-> few examples:
+> I might be missing something, but that doesn't seem to match the commit 
+> message. This creates a single iommu_dma_mapping per device, where is the list 
+> supposed to be populated ?
+
+Right. I currently only populate the first node in the list, and the loop
+above barfs if we find multiple IOMMUs. I was hoping you'd add support for
+that later on, as you mentioned the need for this so I guess you can test it
+too?
+
+> > +void of_iommu_deconfigure(struct kref *kref)
+> > +{
+> > +	struct iommu_dma_mapping *mapping, *curr, *next;
+> > +
+> > +	mapping = container_of(kref, struct iommu_dma_mapping, kref);
+> > +	list_for_each_entry_safe(curr, next, &mapping->node, node) {
+> > +		list_del(&curr->node);
+> > +		kfree(curr);
+> > +	}
 > 
-> i2c-gpio.c:subsys_initcall(i2c_gpio_init);
-> i2c-omap.c:subsys_initcall(omap_i2c_init_driver);
-> i2c-s3c2410.c:subsys_initcall(i2c_adap_s3c_init);
-> i2c-tegra.c:subsys_initcall(tegra_i2c_init_driver);
+> Don't you need to also kfree(mapping) here ?
 
-They were "lucky" to be around before deferred probing and using
-subsys_initcall was always considered a hack. I am not accepting new
-users of this hack unless there is really no other solution.
+Yup, thanks.
 
-So, NACK, since it doesn't solve a problem.
+> > +}
+> > +
+> 
+> Do you expect other users of of_iommu_deconfigure() than kref_put() ? If not, 
+> how about exposing an of_iommu_put(struct iommu_dma_mapping *) that would call 
+> kref_put() internally, and hiding of_iommu_deconfigure() ?
 
-Regards,
+That's a good idea, I'll do that.
 
-   Wolfram
+> >  void __init of_iommu_init(void)
+> >  {
+> >  	struct device_node *np;
+> > diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> > index 1e944e77d38d..e60e52d82db9 100644
+> > --- a/include/linux/dma-mapping.h
+> > +++ b/include/linux/dma-mapping.h
+> > @@ -62,6 +62,14 @@ struct dma_map_ops {
+> >  	int is_phys;
+> >  };
+> > 
+> > +struct iommu_data;
+> > +
+> > +struct iommu_dma_mapping {
+> > +	struct iommu_data *iommu;
+> > +	struct list_head node;
+> > +	struct kref kref;
+> > +};
+> 
+> Could you please document the structure with kerneldoc ?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/4c05c670/attachment.sig>
+Ok, I'll try!
+
+Will
