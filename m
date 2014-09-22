@@ -1,55 +1,33 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 22 Sep 2014 11:36:53 +0200
-Subject: [PATCH 1/2] i2c: cadence: Remove .owner field for driver
-In-Reply-To: <20140920091106.GB1612@katana>
-References: <c076984af7e65c433fdfd3a3b0f8d20da2c18013.1407931005.git.michal.simek@xilinx.com>
- <20140920091106.GB1612@katana>
-Message-ID: <541FEDB5.7050305@monstr.eu>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Mon, 22 Sep 2014 17:12:03 +0800
+Subject: [PATCH v2 0/8] mmc: sdhci/imx: a few clean up and fixes
+Message-ID: <1411377131-19741-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2014 11:11 AM, Wolfram Sang wrote:
-> On Wed, Aug 13, 2014 at 01:56:51PM +0200, Michal Simek wrote:
->> There is no need to init .owner field.
->>
->> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
->> "mmc: remove .owner field for drivers using module_platform_driver"
-								     ^
-this shouldn't be there.
+Change since v1:
+  Add patch 6 which resolves a checkpatch warning like below in v1:
+0005-mmc-sdhci-do-not-enable-card-cd-wakeup-for-gpio-case.patch has no obvious style problems and is ready for submission.
+WARNING: DT compatible string "fsl,imx6sx-usdhc" appears un-documented -- check ./Documentation/devicetree/bindings/
++       { .compatible = "fsl,imx6sx-usdhc", .data = &usdhc_imx6sx_data, },
 
->>
->> This patch removes the superflous .owner field for drivers which
-> 
-> It says drivers, but does only one...
+total: 0 errors, 1 warnings, 18 lines checked
 
-I have c&p this from Peter's description that's why there are just drivers.
+Dong Aisheng (8):
+  mmc: sdhci-esdhc-imx: remove duplicated lines
+  mmc: sdhci-esdhc-imx: usdhc does not have missing card interrupt
+    issue
+  mmc: sdhci-esdhc-imx: add ADMA Length Mismatch errata fix
+  mmc: sdhci: do not enable card detect interrupt for gpio cd type
+  mmc: sdhci: do not enable card cd wakeup for gpio case
+  mmc: sdhci-esdhc-imx: using specific compatible string in binding doc
+  mmc: sdhci-esdhc-imx: add imx6sx support
+  mmc: sdhci-esdhc-imx: add quirk SDHCI_QUIRK2_BROKEN_HS200 for imx6qdl
 
-> 
->> use the module_platform_driver API, as this is overriden in
->> platform_driver_register anyway."
-> 
-> ... so: any interest in doing this for the whole subsystem? Basically
-> good catch, though.
-
-Mark was also interested about doing this for spi. Doing this for the whole
-kernel will be the best. coccinelle script
-is good option I have never played with it.
-
-Thanks,
-Michal
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |    9 ++++-
+ drivers/mmc/host/sdhci-esdhc-imx.c                 |   44 ++++++++++++++++----
+ drivers/mmc/host/sdhci.c                           |    8 +++-
+ 3 files changed, 49 insertions(+), 12 deletions(-)
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/9088a705/attachment.sig>
+1.7.8
