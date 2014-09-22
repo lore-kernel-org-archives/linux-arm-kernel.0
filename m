@@ -1,27 +1,60 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 22 Sep 2014 10:38:11 +0200
-Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
-In-Reply-To: <001b01cfd621$738ed8c0$5aac8a40$@samsung.com>
-References: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
- <54122962.5020903@gmail.com> <001b01cfd621$738ed8c0$5aac8a40$@samsung.com>
-Message-ID: <541FDFF3.2000006@gmail.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Mon, 22 Sep 2014 15:45:46 +0800
+Subject: No subject
+Message-ID: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.09.2014 06:55, Pankaj Dubey wrote:
-> Hi Tomasz,
-> 
-> Will you please take this patch and following three Exynos3250 clock fixes
-> in your tree.
-> 
-> 1: clk: samsung: exynos3250: fix width field of mout_mmc0/1
->    https://lkml.org/lkml/2014/9/5/265
-> 2: clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
->    https://lkml.org/lkml/2014/9/9/364
-> 3: clk: samsung: exynos3250: fix mout_cam_blk parent list
->   https://lkml.org/lkml/2014/9/6/41
+This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
+and LS1021A-TWR board.
 
-Applied all four patches for next.
+The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
+for high reliability and pack the highest level of integration available
+for sub-3W embedded communications processors and with a comprehensive
+enablement model focused on ease of programmability.
 
-Best regards,
-Tomasz
+The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
+PowerPC platform. 
+
+For the detail information about LS1021A SoC, please refer to the RM doc.
+
+---
+changes in v4:
+add "syscon" compatible to device tree scfg and dcfg node, and 
+remove uncompleted dcsr related node.
+remove mxc_restart reference in DT_MACHINE_START.
+remove dma_zone_size defination in DT_MACHINE_START.
+
+changes in v3:
+rewrite scfg and dcfg binding doc description.
+remove sai related node leaving to the driver support.
+
+changes in v2:
+remove unused nodes.
+wakeup the secondary core by IPI call to u-boot standby procedure. 
+add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
+
+----------------------------------------------------------------
+Jingchang Lu (6):
+	ARM: dts: Add SoC level device tree support for LS1021A
+	ARM: dts: Add initial LS1021A QDS board dts support
+	ARM: dts: Add initial LS1021A TWR board dts support
+	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
+	ARM: imx: Add initial support for Freescale LS1021A
+	ARM: imx: Add Freescale LS1021A SMP support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |  38 ++++
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/ls1021a-qds.dts             | 285 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/ls1021a-twr.dts             | 117 +++++++++++
+ arch/arm/boot/dts/ls1021a.dtsi                | 539 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig                     |  14 ++
+ arch/arm/mach-imx/Makefile                    |   4 +-
+ arch/arm/mach-imx/common.h                    |   1 +
+ arch/arm/mach-imx/mach-ls1021a.c              |  22 +++
+ arch/arm/mach-imx/platsmp.c                   |  32 +++
+ 10 files changed, 1053 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
+ create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
+ create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
