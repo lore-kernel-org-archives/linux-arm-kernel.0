@@ -1,38 +1,78 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Sep 2014 21:04:28 +0200
-Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
-In-Reply-To: <2161168.GXttgFlE1X@vostro.rjw.lan>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <20140919184849.GA14832@core.coreip.homeip.net>
- <2161168.GXttgFlE1X@vostro.rjw.lan>
-Message-ID: <CAPDyKFqT1A=N6=CFHVMq-u+zkYK9zp_Ztmm8OWpftmHY2w68DA@mail.gmail.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Mon, 22 Sep 2014 14:18:00 -0500
+Subject: [PATCH v10 1/6] ARM: use _install_special_mapping for sigpage
+In-Reply-To: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+References: <1411413485-7675-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1411413485-7675-2-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 September 2014 16:19, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, September 19, 2014 11:48:49 AM Dmitry Torokhov wrote:
->> Hi Ulf,
->>
->> On Fri, Sep 19, 2014 at 08:27:33PM +0200, Ulf Hansson wrote:
->> > Changes in v5:
->> >     - Converted dev_pm_domain_detach() to a void function
->> >     - Added a ->detach() callback to the PM domain struct, invoked from the
->> >       dev_pm_domain_detach().
->> >     - Make ACPI and genpd both assign the ->detach() callback at successfull
->> >       attachment.
->> >     - The above changes made it possible to make acpi_pm_domain_detach() to
->> >       be static, added a separate patch for that.
->>
->> Thank you for making these changes. For the series:
->>
->> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->
-> I've queued up this patchset for 3.18 (I fixed up the two minor issues pointed
-> to by Geert in the process).
+_install_special_mapping allows the VMA to be identifed in
+/proc/pid/maps without the use of arch_vma_name, providing a
+slight net reduction in object size:
 
-Thanks Rafael!
+  text    data     bss     dec     hex filename
+  2996      96     144    3236     ca4 arch/arm/kernel/process.o (before)
+  2956     104     144    3204     c84 arch/arm/kernel/process.o (after)
 
-Feel free to apply Wolfram's comment on patch 6 as well.
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+Reviewed-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/kernel/process.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
 
-Kind regards
-Uffe
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 81ef686a91ca..46fbbb3701a0 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -472,19 +472,23 @@ int in_gate_area_no_mm(unsigned long addr)
+ 
+ const char *arch_vma_name(struct vm_area_struct *vma)
+ {
+-	return is_gate_vma(vma) ? "[vectors]" :
+-		(vma->vm_mm && vma->vm_start == vma->vm_mm->context.sigpage) ?
+-		 "[sigpage]" : NULL;
++	return is_gate_vma(vma) ? "[vectors]" : NULL;
+ }
+ 
+ static struct page *signal_page;
+ extern struct page *get_signal_page(void);
+ 
++static const struct vm_special_mapping sigpage_mapping = {
++	.name = "[sigpage]",
++	.pages = &signal_page,
++};
++
+ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
++	struct vm_area_struct *vma;
+ 	unsigned long addr;
+-	int ret;
++	int ret = 0;
+ 
+ 	if (!signal_page)
+ 		signal_page = get_signal_page();
+@@ -498,12 +502,16 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ 		goto up_fail;
+ 	}
+ 
+-	ret = install_special_mapping(mm, addr, PAGE_SIZE,
++	vma = _install_special_mapping(mm, addr, PAGE_SIZE,
+ 		VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC,
+-		&signal_page);
++		&sigpage_mapping);
++
++	if (IS_ERR(vma)) {
++		ret = PTR_ERR(vma);
++		goto up_fail;
++	}
+ 
+-	if (ret == 0)
+-		mm->context.sigpage = addr;
++	mm->context.sigpage = addr;
+ 
+  up_fail:
+ 	up_write(&mm->mmap_sem);
+-- 
+1.9.3
