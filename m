@@ -1,49 +1,42 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 22 Sep 2014 16:15:53 +0200
-Subject: [PATCH v12 10/10] clk: Add docs about calling clk_put after
- clk_get_parent
-In-Reply-To: <1411395353-3189-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1411395124-2476-1-git-send-email-tomeu.vizoso@collabora.com>
- <1411395353-3189-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1411395353-3189-7-git-send-email-tomeu.vizoso@collabora.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 22 Sep 2014 16:26:26 +0200
+Subject: [GIT PULL RESEND] rk3288 i2s controller
+Message-ID: <4038555.EtoLsBADBk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As otherwise the per-user clk will be leaked.
+Hi Arnd, Olof,
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/clk/clk.c   | 3 ++-
- include/linux/clk.h | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+this one is separate and based on the dma pull, as it uses the new dma nodes.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 5d23ff3..8f17b4e 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1784,7 +1784,8 @@ EXPORT_SYMBOL_GPL(clk_provider_get_parent);
-  * clk_get_parent - return the parent of a clk
-  * @clk_user: the clk whose parent gets returned
-  *
-- * Simply returns clk->parent.  Returns NULL if clk is NULL.
-+ * Simply returns clk->parent.  Returns NULL if clk is NULL. Caller must call
-+ * clk_put() to release the returned struct clk.
-  */
- struct clk *clk_get_parent(struct clk *clk_user)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 066b100..4f54952 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -306,7 +306,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
-  * @clk: clock source
-  *
-  * Returns struct clk corresponding to parent clock source, or
-- * valid IS_ERR() condition containing errno.
-+ * valid IS_ERR() condition containing errno. Caller must call
-+ * clk_put() to release the returned struct clk.
-  */
- struct clk *clk_get_parent(struct clk *clk);
- 
--- 
-1.9.3
+While everything will of course work in next/dt of arm-soc where both my
+past pulls landed, it would produce build errors in rockchip/dts1 [if the 
+kbuild
+robot tried to "make dtbs" there] as the dma patches not in there.
+
+[RESEND because I forgot the mailinglists :-( ]
+
+
+The following changes since commit ac42f481b75b98076b47fac60796657508f80abe:
+
+  ARM: dts: rockchip: add rk3066 and rk3188 dma controllers (2014-09-02 
+22:28:32 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git 
+tags/v3.18-rockchip-i2s-dts
+
+for you to fetch changes up to a73a62aa4c99e9df1574ac6e54fbddffa88a460f:
+
+  ARM: dts: add rk3288 i2s controller (2014-09-22 11:53:12 +0200)
+
+----------------------------------------------------------------
+I2S controller support or rk3288
+
+----------------------------------------------------------------
+Jianqun (1):
+      ARM: dts: add rk3288 i2s controller
+
+ arch/arm/boot/dts/rk3288.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
