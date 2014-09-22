@@ -1,102 +1,103 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 22 Sep 2014 11:29:10 +0200
-Subject: [RFC PATCH v3 5/7] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <4252161.sBJZLIS2WH@avalon>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <1410539695-29128-6-git-send-email-will.deacon@arm.com>
- <4252161.sBJZLIS2WH@avalon>
-Message-ID: <20140922092909.GJ1470@ulmo>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Mon, 22 Sep 2014 11:28:54 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140921204100.GA10111@linutronix.de>
+References: <20140911151114.GD28458@ci00147.xsens-tech.local>
+ <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140917102812.GA20438@ci00147.xsens-tech.local>
+ <20140921204100.GA10111@linutronix.de>
+Message-ID: <20140922092853.GH20438@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 02:17:33PM +0300, Laurent Pinchart wrote:
-> Hi Will,
+On Sun, Sep 21, 2014 at 10:41:00PM +0200, Sebastian Andrzej Siewior wrote:
+> * Frans Klaver | 2014-09-17 12:28:12 [+0200]:
 > 
-> Thank you for the patch.
+> >- Bone Black: Yocto poky, core-image-minimal
+> >  Login, "less file" locks up, doesn't show anything. I can exit using
+> >  Ctrl-C.
 > 
-> On Friday 12 September 2014 17:34:53 Will Deacon wrote:
-> > This patch extends of_dma_configure so that it sets up the IOMMU for a
-> > device, as well as the coherent/non-coherent DMA mapping ops.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/include/asm/dma-mapping.h |  4 +++-
-> >  drivers/of/platform.c              | 24 +++++++++++++++++-------
-> >  include/linux/dma-mapping.h        |  8 +++++++-
-> >  3 files changed, 27 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/dma-mapping.h
-> > b/arch/arm/include/asm/dma-mapping.h index 7e9ac4f604c3..a8bb0c494bb3
-> > 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -121,7 +121,9 @@ static inline unsigned long dma_max_pfn(struct device
-> > *dev) }
-> >  #define dma_max_pfn(dev) dma_max_pfn(dev)
-> > 
-> > -static inline void arch_setup_dma_ops(struct device *dev, bool coherent)
-> > +static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-> > +				      u64 size, struct iommu_dma_mapping *iommu,
-> > +				      bool coherent)
-> >  {
-> >  	if (coherent)
-> >  		set_dma_ops(dev, &arm_coherent_dma_ops);
-> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > index 946dd7ae0394..95ebd38db545 100644
-> > --- a/drivers/of/platform.c
-> > +++ b/drivers/of/platform.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/of_address.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/of_iommu.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/platform_device.h>
-> > @@ -166,6 +167,7 @@ static void of_dma_configure(struct platform_device
-> > *pdev) int ret;
-> >  	bool coherent;
-> >  	unsigned long offset;
-> > +	struct iommu_dma_mapping *iommu;
-> >  	struct device *dev = &pdev->dev;
-> > 
-> >  	/*
-> > @@ -195,7 +197,19 @@ static void of_dma_configure(struct platform_device
-> > *pdev) dev_dbg(dev, "device is%sdma coherent\n",
-> >  		coherent ? " " : " not ");
-> > 
-> > -	arch_setup_dma_ops(dev, coherent);
-> > +	iommu = of_iommu_configure(dev);
-> > +	dev_dbg(dev, "device is%sbehind an iommu\n",
-> > +		iommu ? " " : " not ");
-> > +
-> > +	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> > +
-> > +	if (iommu)
-> > +		kref_put(&iommu->kref, of_iommu_deconfigure);
+> So I have the same with my and the serial-omap driver. No difference
+> here. The trace looks like this:
+> |           <idle>-0     [000] d.h.   444.393585: serial8250_handle_irq: iir cc lsr 61
+> |           <idle>-0     [000] d.h.   444.393605: serial8250_rx_chars: get 0d
+> received the enter key
 > 
-> What's the expected life cycle of the iommu_dma_mapping structure ? It gets 
-> created by of_iommu_configure() and the initial reference gets dropped here. I 
-> suppose you expect arch code to need to keep a reference to the structure, but 
-> your implementation in patch 7/7 doesn't. As far as I can see, you don't even 
-> use the contents of the structure in the ARM arch_setup_dma_ops() 
-> implementation. Do you expect that to change later, or other architectures to 
-> need it ?
+> |           <idle>-0     [000] d.h.   444.393609: serial8250_rx_chars: insert d lsr 61
+> |           <idle>-0     [000] d.h.   444.393614: uart_insert_char: 1
+> |           <idle>-0     [000] d.h.   444.393617: uart_insert_char: 2
+> |           <idle>-0     [000] dnh.   444.393636: serial8250_tx_chars: empty
+> |      kworker/0:2-753   [000] d...   444.393686: serial8250_start_tx: empty?1
+> |      kworker/0:2-753   [000] d.h.   444.393699: serial8250_handle_irq: iir c2 lsr 60
+> |      kworker/0:2-753   [000] d.h.   444.393705: serial8250_tx_chars: empty
+> |               sh-1042  [000] d...   444.393822: serial8250_start_tx: empty?1
+> |               sh-1042  [000] d.h.   444.393836: serial8250_handle_irq: iir c2 lsr 60
+> |               sh-1042  [000] d.h.   444.393842: serial8250_tx_chars: empty
+> |               sh-1042  [000] d...   444.393855: serial8250_start_tx: empty?0
+> |               sh-1042  [000] d.h.   444.393863: serial8250_handle_irq: iir c2 lsr 60
+> |               sh-1042  [000] d.h.   444.393867: serial8250_tx_chars: put 0d
+> |               sh-1042  [000] d.h.   444.393871: serial8250_tx_chars: put 0a
 > 
-> By the way, now that I think about it, I find struct iommu_dma_mapping and 
-> struct dma_iommu_mapping very confusing.
+> shell responded with "\r\n" which I see and then
+> 
+> |               sh-1042  [000] d.h.   444.394057: serial8250_handle_irq: iir c2 lsr 60
+> |               sh-1042  [000] d.h.   444.394065: serial8250_tx_chars: empty
+> 
+> nothing more. less isn't sending data for some reason. Exactly the same
+> thing happens in a Debian environment except that it continues:
+> ?
+> |             bash-2468  [000] d.h.    99.657899: serial8250_tx_chars: put 0a
+> |             bash-2468  [000] d.h.    99.658089: serial8250_handle_irq: iir c2 lsr 60
+> |             bash-2468  [000] d.h.    99.658095: serial8250_tx_chars: empty
+> =>
+> |             less-2474  [000] d...    99.696038: serial8250_start_tx: empty?0
+> |             less-2474  [000] d.h.    99.696069: serial8250_handle_irq: iir c2 lsr 60
+> |             less-2474  [000] d.h.    99.696078: serial8250_tx_chars: put 1b
+> |             less-2474  [000] d.h.    99.696082: serial8250_tx_chars: put 5b
+> |             less-2474  [000] d.h.    99.696085: serial8250_tx_chars: put 3f
+> |             less-2474  [000] d.h.    99.696087: serial8250_tx_chars: put 31
+> 
+> It has to be something about the environment. Booting Debian and chroot
+> into this RFS and less works perfectly. But since it behaves like that
+> with both drivers, I guess the problem is somewhere else?
+> 
+> >  vi runs normally, only occupies part of the total screen estate in
+> >  minicom. After quitting, a weird character shows up (typically I see
+> >  ? there), but minicom can use the rest of the screen estate again.
+> >  If we disregard the odd character, this is much like the behavior we
+> >  have on the omap-serial driver.
+> >- Custom board: Yocto poky, custom image
+> >  Login, "less file" locks up, showing only "?" in the top left corner
+> >  of the screen. Can get out of there by having something dumped through
+> >  /dev/kmsg.
+> 
+> I managed to run into something like that with vi on dra7 and with
+> little more patience on am335x as well by "vi *" and then ":n".
+> 
+> This gets fixed indeed by writing. Hours of debugging and a lot of hair
+> less later: the yocto RFS calls set_termios quite a lot. This includes
+> changing the baudrate (not by yocto but the driver sets it to 0 and then
+> to the requested one) and this seems to be responsible for the "bad
+> bytes". I haven't figured out yet I don't see this with omap-serial.
+> Even worse: If this (set_termios()) happens while the DMA is still
+> active then it might stall it. A write into the FIFO seems to fix it and
+> this is where your "echo >/dev/kmsg" fixes things.
+> If I delay the restore_registers part of set_termios() until TX-DMA is
+> complete then it seems that the TX-DMA stall does not tall anymore.
 
-Agreed. I wonder how useful it is to know the set of IOMMU instances
-that each device can master through. Wouldn't it be more useful to keep
-a list of master interfaces for each device? The set of IOMMU instances
-can trivially be derived from that.
+Wow, thanks for your work here. This does indeed sound hard to trap.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/12e75db0/attachment.sig>
+I guess then we'd still have to answer the question why the yocto build
+calls set_termios() so often, but that's not on you then. Did you notice
+it even changing settings? We might want to fix this even if the kernel
+should be able to cope.
+
+Thanks again,
+Frans
