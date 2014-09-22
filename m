@@ -1,35 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 22 Sep 2014 16:39:19 +0100
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
- consolidation
-In-Reply-To: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140922153919.GQ25809@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 22 Sep 2014 17:42:36 +0200
+Subject: [PATCH v6 2/9] rtc: at91sam9: use standard readl/writel functions
+ instead of raw versions
+In-Reply-To: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411400563-570-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
-> This series contains the necessary changes to allow architected timer
-> access from user-space on 32-bit ARM.  This allows the VDSO to support
-> high resolution timestamps for clock_gettime and gettimeofday.  This
-> also merges substantially similar code from arm and arm64 into the
-> core arm_arch_timer driver.
-> 
-> The functional changes are:
-> - When available, CNTVCT is made readable by user space on arm, as it
->   is on arm64.
-> - The clocksource name becomes "arch_mem_counter" if CP15 access to
->   the counter is not available.
-> 
-> These changes have been carried as part of the ARM VDSO patch set over
-> the last several months, but I am splitting them out here as I assume
-> they should go through the clocksource maintainers.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/rtc/rtc-at91sam9.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-For the series:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-I'm not sure which tree the arch-timer stuff usually goes through, but
-the arm/arm64 bits look fine so I'm happy for them to merged together.
-
-Will
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 51f0038..74a9ca0 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -77,14 +77,14 @@ struct sam9_rtc {
+ };
+ 
+ #define rtt_readl(rtc, field) \
+-	__raw_readl((rtc)->rtt + AT91_RTT_ ## field)
++	readl((rtc)->rtt + AT91_RTT_ ## field)
+ #define rtt_writel(rtc, field, val) \
+-	__raw_writel((val), (rtc)->rtt + AT91_RTT_ ## field)
++	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+ 
+ #define gpbr_readl(rtc) \
+-	__raw_readl((rtc)->gpbr)
++	readl((rtc)->gpbr)
+ #define gpbr_writel(rtc, val) \
+-	__raw_writel((val), (rtc)->gpbr)
++	writel((val), (rtc)->gpbr)
+ 
+ /*
+  * Read current time and date in RTC
+-- 
+1.9.1
