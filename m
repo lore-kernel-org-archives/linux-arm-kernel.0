@@ -1,45 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 22 Sep 2014 15:16:40 +0200
-Subject: [PATCH] i2c: axxia: Add I2C driver for AXM55xx
-In-Reply-To: <20140920121242.GA3833@katana>
-References: <1408967482-17723-1-git-send-email-anders.berg@avagotech.com>
- <20140920121242.GA3833@katana>
-Message-ID: <20140922131640.GU3755@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 22 Sep 2014 08:17:08 -0500
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <54201DE3.6030207@ti.com>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com>
+ <5419D7BD.30003@linaro.org>
+ <448912EABC71F84BBCADFD3C67C4BE52CAC748@DBDE04.ent.ti.com>
+ <541A25DA.8030101@linaro.org> <541AE102.2070407@ti.com>
+ <541AE314.5040107@ti.com> <54201DE3.6030207@ti.com>
+Message-ID: <20140922131708.GA17009@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 20, 2014 at 02:12:43PM +0200, Wolfram Sang wrote:
-> Hi,
-> 
-> thanks for the submission.
-> 
-> On Mon, Aug 25, 2014 at 01:51:22PM +0200, Anders Berg wrote:
-> > Add I2C bus driver for the controller found in the LSI Axxia family SoCs. The
-> > driver implements 10-bit addressing and SMBus transfer modes via emulation
-> > (including SMBus block data read).
-> > 
-> > Signed-off-by: Anders Berg <anders.berg@avagotech.com>
-> 
-> Looks pretty good already. Still, some comments:
-> 
-> > +config I2C_AXXIA
-> > +	tristate "Axxia I2C controller"
-> > +	depends on ARCH_AXXIA
-> > +	help
-> > +	  Say yes if you want to support the I2C bus on Axxia platforms.
-> > +
-> > +	  If you don't know, say Y.
-> 
-> I'd say skip this sentence and consider 'default y' if it is really
-> needed on this platform.
-Still better:
+Daniel,
+On 08:02-20140922, Nishanth Menon wrote:
+[...]
+> >>Test #2: 1200 seconds: (http://fpaste.org/134564/47289141/)
 
-	depends on ARCH_AXXIA || COMPILE_TEST
-	default ARCH_AXXIA
+Santosh wanted me to make certain that the following is noted;
+^^ -> is around 20 mins. -> So highlighting again.. I assume this is
+long enough test duration you requested for.
 
-Best regards
-Uwe
-
+> >>CMD: set -x;uname -a;cat /sys/kernel/debug/pm_debug/count;sleep
+> >>1;./cpuidle_killer_1200;sleep 1;cat
+> >>/sys/kernel/debug/pm_debug/count;set +x
+> >>
+> >>OMAP4 Panda-ES: (2 a9) - not impacted as part of this patch - just
+> >>base test vector
+> >>http://fpaste.org/134563/41104728/
+> >>
+> >>OMAP5 uEVM: (2 a15)
+> >>http://fpaste.org/134562/47221141/
+> >>
+> >>DRA74x EVM: (2 a15)
+> >>http://fpaste.org/134559/11047098/
+> >>
+> >>DRA72 EVM: (2 a15)
+> >	      ^^
+> >Correction should have been 1 a15
+> >
+> >>http://fpaste.org/134560/11047151/
+> >>
+> >>AM572x EVM: (2 A15)
+> >>http://fpaste.org/134561/47189141/
+> >>
+> >>
+> 
+> Daniel, Santosh: Gentle ping:
+> 
+> Any further comments? OR are we ok for this for being merged?
+> 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Nishanth Menon
