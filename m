@@ -1,43 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 22 Sep 2014 13:31:33 +0200
-Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
-In-Reply-To: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140922113133.GF15315@lukather>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 22 Sep 2014 12:35:23 +0100
+Subject: [PATCH v11 00/10] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <20140919215905.GB30239@google.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140919215905.GB30239@google.com>
+Message-ID: <20140922113523.GM1994@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
-
-On Thu, Sep 11, 2014 at 10:18:14PM +0200, Maxime Ripard wrote:
-> Hi everyone,
+On Fri, Sep 19, 2014 at 10:59:05PM +0100, Bjorn Helgaas wrote:
+> On Thu, Sep 18, 2014 at 02:30:15AM +0100, Liviu Dudau wrote:
+> > This is my version 11 of the attempt at adding support for generic PCI host
+> > bridge controllers that make use of device tree information to
+> > configure themselves. It contains minor cleanups compared with v10 to address
+> > the existing comments.
+> > ...
+> > Catalin Marinas (1):
+> >   PCI: Introduce generic domain handling for PCI busses.
+> > 
+> > Liviu Dudau (9):
+> >   Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
+> >   PCI: Introduce helper functions to deal with PCI I/O ranges.
+> >   ARM: Define PCI_IOBASE as the base of virtual PCI IO space.
+> >   PCI: OF: Fix the conversion of IO ranges into IO resources.
+> >   PCI: Create pci_host_bridge before its associated bus in
+> >     pci_create_root_bus.
+> >   OF: Introduce helper function for getting PCI domain_nr
+> >   OF: PCI: Add support for parsing PCI host bridge resources from DT
+> >   PCI: Assign unassigned bus resources in pci_scan_root_bus()
+> >   PCI: Introduce pci_remap_iospace() for remapping PCI I/O bus resources
+> >     into CPU space
+> > 
+> >  arch/arm/include/asm/io.h         |   1 +
+> >  arch/arm/mach-integrator/pci_v3.c |  23 +++---
+> >  drivers/of/address.c              | 146 ++++++++++++++++++++++++++++++++
+> >  drivers/of/of_pci.c               | 170 ++++++++++++++++++++++++++++++++++++++
+> >  drivers/pci/host/pci-tegra.c      |  10 ++-
+> >  drivers/pci/host/pcie-rcar.c      |  21 +++--
+> >  drivers/pci/pci.c                 |  33 ++++++++
+> >  drivers/pci/probe.c               |  46 +++++++----
+> >  include/asm-generic/io.h          |   2 +-
+> >  include/asm-generic/pgtable.h     |   4 +
+> >  include/linux/of_address.h        |  15 +---
+> >  include/linux/of_pci.h            |  18 ++++
+> >  include/linux/pci.h               |  24 ++++++
+> >  13 files changed, 463 insertions(+), 50 deletions(-)
 > 
-> Here is an attempt at improving the MMC clock support in the Allwinner
-> SoCs.
-> 
-> Until now, the MMC clocks were having a custom phase function that was
-> directly setting an obscure value in the right register, because we
-> were not really having any idea of what these values were.
-> 
-> Now that we have more informations, we can introduce a common function
-> call to get and set the phase of a particular clock, and use this in
-> both our provider and our client.
+> I put this on a pci/liviu-generic-v11 branch.  I mentioned a couple things
+> in response to the individual patches, so I'm hoping you can send me
+> incremental patches to address them.  Then I'll update this branch, rename
+> it, and get it into linux-next.
 
-It would be great that we have that custom phase API out of the kernel
-for 3.18, and you were one of the greatest supporters to that idea,
-could we please have your view on this?
+Thanks a lot for that!
 
-Thanks,
-Maxime
+As I've mentioned in the other email, I can send incremental patches for most
+of the comments (and Acks?). Don't know how to handle the split of 
+"[PATH v11 4/10] PCI: OF: Fix the conversion of IO ranges into IO resources."
+that you are asking for.
+
+Best regards,
+Liviu
+
+> 
+> Bjorn
+> 
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/b6ddffc8/attachment.sig>
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
