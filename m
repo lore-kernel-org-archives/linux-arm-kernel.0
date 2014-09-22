@@ -1,63 +1,35 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 22 Sep 2014 16:33:12 +0100
-Subject: [PATCH v11 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <CAErSpo7bnOFo4-uZmVsMqNpVQS+dQaMNedjmJ=sH_d9Kp2fGPg@mail.gmail.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <1411003825-21521-8-git-send-email-Liviu.Dudau@arm.com>
- <20140919210313.GH19374@google.com>
- <20140922110522.GK1994@e106497-lin.cambridge.arm.com>
- <CAErSpo7bnOFo4-uZmVsMqNpVQS+dQaMNedjmJ=sH_d9Kp2fGPg@mail.gmail.com>
-Message-ID: <20140922153311.GB1994@e106497-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 22 Sep 2014 16:39:19 +0100
+Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
+ consolidation
+In-Reply-To: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20140922153919.GQ25809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 04:25:13PM +0100, Bjorn Helgaas wrote:
-> On Mon, Sep 22, 2014 at 5:05 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Fri, Sep 19, 2014 at 10:03:13PM +0100, Bjorn Helgaas wrote:
-> >> On Thu, Sep 18, 2014 at 02:30:22AM +0100, Liviu Dudau wrote:
-> >> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
-> >> > of a given device from DT. If the information is not present,
-> >> > the function can be requested to allocate a new domain number.
-> >>
-> >> Is of_pci_get_domain_nr() used somewhere?  If the use is in some future
-> >> series, please mention it explicitly.  I'm just trying to avoid merging
-> >> unused code.
-> >
-> > It is used in the arm64 specific patch that I have dropped out of my
-> > pull request. After discussions with Catalin I will add the patch back
-> > into the tree that you've pulled from as he is OK with your tree carrying
-> > the whole package.
-> >
-> > I need to ask for some guidance here: for addressing some of your comments
-> > and Rob's I can add more patches in my v11 branch and you can pull them
-> > when you think they are ready. But one of your comments was requesting
-> > splitting a patch into two blocks - one that moves of_pci_range_to_resource()
-> > into drivers/of/address.c and one that fixes it's behaviour - and I don't
-> > know how you would like that handled. Should I revert the original patch
-> > and add the new ones, or should I rebase the whole series into a different
-> > branch that you can pull from?
+On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
+> This series contains the necessary changes to allow architected timer
+> access from user-space on 32-bit ARM.  This allows the VDSO to support
+> high resolution timestamps for clock_gettime and gettimeofday.  This
+> also merges substantially similar code from arm and arm64 into the
+> core arm_arch_timer driver.
 > 
-> I guess the easiest thing is probably just to send a v12 series.  I
-> was hoping we were close enough for me to just hand-integrate minor
-> tweaks into my branch, but I think that will just create more
-> confusion.
-
-OK, I will send v12 then with all the acquired ACKs and fixes.
-
-Best regards,
-Liviu
-
+> The functional changes are:
+> - When available, CNTVCT is made readable by user space on arm, as it
+>   is on arm64.
+> - The clocksource name becomes "arch_mem_counter" if CP15 access to
+>   the counter is not available.
 > 
-> Bjorn
-> 
+> These changes have been carried as part of the ARM VDSO patch set over
+> the last several months, but I am splitting them out here as I assume
+> they should go through the clocksource maintainers.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+For the series:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+I'm not sure which tree the arch-timer stuff usually goes through, but
+the arm/arm64 bits look fine so I'm happy for them to merged together.
+
+Will
