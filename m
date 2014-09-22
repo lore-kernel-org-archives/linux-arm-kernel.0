@@ -1,35 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Sep 2014 14:42:39 -0700
-Subject: [PATCH] ARM: qcom: Select ARCH_SUPPORTS_BIG_ENDIAN
-Message-ID: <1411422159-25534-1-git-send-email-sboyd@codeaurora.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 22 Sep 2014 14:45:51 -0700
+Subject: [PATCH 01/13] arm64: Add ESR_EL2_EC macros to hyp-stub
+In-Reply-To: <20140915161014.GB13789@leverpostej>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <5e1b1892eb3ecc3bccff47766675c24c650a1a14.1410302383.git.geoff@infradead.org>
+ <20140915161014.GB13789@leverpostej>
+Message-ID: <1411422351.6001.28.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can run qcom platforms in big-endian mode. Select the option.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+Hi Mark,
 
-It's sad that we have to select this Kconfig. I'm tempted to remove
-the config given that we don't have anything like this for other things
-like LPAE support. Anyway, this is required to actually test big-endian
-on qcom platforms.
+On Mon, 2014-09-15 at 17:10 +0100, Mark Rutland wrote:
+> On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
+> > +#define ESR_EL2_EC_SHIFT	26
+> > +#define ESR_EL2_EC_HVC64	0x16
+> 
+> These exist in arch/arm64/include/asm/kvm_arm.h, no?
+> 
+> If anything that should be folded into arch/arm64/include/asm/esr.h...
 
- arch/arm/mach-qcom/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+OK, I'll remove this patch and add the esr.h fixup into my generic
+'arm64 enhancements' series.
 
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index ee5697ba05bc..29aa8e1970b0 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -1,6 +1,7 @@
- menuconfig ARCH_QCOM
- 	bool "Qualcomm Support" if ARCH_MULTI_V7
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_GIC
- 	select ARM_AMBA
- 	select CLKSRC_OF
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+-Geoff
