@@ -1,92 +1,72 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 22 Sep 2014 11:02:46 -0700
-Subject: [PATCH v3 2/2] bus: brcmstb_gisb: save and restore GISB timeout
-In-Reply-To: <1411408966-15390-1-git-send-email-f.fainelli@gmail.com>
-References: <1411408966-15390-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1411408966-15390-3-git-send-email-f.fainelli@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Sep 2014 19:08:07 +0100
+Subject: [PATCH v12 04/10] clk: use struct clk only for external API
+In-Reply-To: <1411395353-3189-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1411395124-2476-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1411395353-3189-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20140922180807.GN5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the system enters S3, we will lose the GISB timeout value we have
-configured, make sure that we do save this timeout value, and restore
-this timeout value prior to re-enabling interrupts such that the GISB
-timeout interrupt will fire with the expected timeout.
+On Mon, Sep 22, 2014 at 04:15:47PM +0200, Tomeu Vizoso wrote:
+> diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+> index d278572..3b3068b 100644
+> --- a/drivers/clk/clk.h
+> +++ b/drivers/clk/clk.h
+> @@ -9,9 +9,15 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/clk-private.h>
+> +
+>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+>  struct clk_core *of_clk_get_by_clkspec(struct of_phandle_args *clkspec);
+>  struct clk_core *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  void of_clk_lock(void);
+>  void of_clk_unlock(void);
+>  #endif
+> +
+> +#if defined(CONFIG_COMMON_CLK)
+> +struct clk *__clk_create_clk(struct clk_core *clk_core);
+> +#endif
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
-Changes in v2:
-- took the hunk that adds the saved_timeout here instead of in patch 1
+Why does any of the above need ifdefs?
 
- drivers/bus/brcmstb_gisb.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+> index c751d0c..060041b 100644
+> --- a/drivers/clk/clkdev.c
+> +++ b/drivers/clk/clkdev.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/string.h>
+>  #include <linux/mutex.h>
+>  #include <linux/clk.h>
+> +#include <linux/clk-private.h>
+>  #include <linux/clk-provider.h>
+>  #include <linux/clkdev.h>
+>  #include <linux/of.h>
+> @@ -33,13 +34,13 @@ static DEFINE_MUTEX(clocks_mutex);
 
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 41b09418f515..e7ccd21a45c9 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -23,6 +23,7 @@
- #include <linux/list.h>
- #include <linux/of.h>
- #include <linux/bitops.h>
-+#include <linux/pm.h>
- 
- #include <asm/bug.h>
- #include <asm/signal.h>
-@@ -48,6 +49,7 @@ struct brcmstb_gisb_arb_device {
- 	struct list_head next;
- 	u32 valid_mask;
- 	const char *master_names[sizeof(u32) * BITS_PER_BYTE];
-+	u32 saved_timeout;
- };
- 
- static LIST_HEAD(brcmstb_gisb_arb_device_list);
-@@ -264,6 +266,39 @@ static int brcmstb_gisb_arb_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int brcmstb_gisb_arb_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
-+
-+	gdev->saved_timeout = ioread32(gdev->base + ARB_TIMER);
-+
-+	return 0;
-+}
-+
-+/* Make sure we provide the same timeout value that was configured before, and
-+ * do this before the GISB timeout interrupt handler has any chance to run.
-+ */
-+static int brcmstb_gisb_arb_resume_noirq(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct brcmstb_gisb_arb_device *gdev = platform_get_drvdata(pdev);
-+
-+	iowrite32(gdev->saved_timeout, gdev->base + ARB_TIMER);
-+
-+	return 0;
-+}
-+#else
-+#define brcmstb_gisb_arb_suspend       NULL
-+#define brcmstb_gisb_arb_resume_noirq  NULL
-+#endif
-+
-+static const struct dev_pm_ops brcmstb_gisb_arb_pm_ops = {
-+	.suspend	= brcmstb_gisb_arb_suspend,
-+	.resume_noirq	= brcmstb_gisb_arb_resume_noirq,
-+};
-+
- static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
- 	{ .compatible = "brcm,gisb-arb" },
- 	{ },
-@@ -275,6 +310,7 @@ static struct platform_driver brcmstb_gisb_arb_driver = {
- 		.name	= "brcm-gisb-arb",
- 		.owner	= THIS_MODULE,
- 		.of_match_table = brcmstb_gisb_arb_of_match,
-+		.pm	= &brcmstb_gisb_arb_pm_ops,
- 	},
- };
- 
+I'm not happy with any of these changes, because it introduces a huge
+number of ifdefs.
+
+Instead of doing this, please introduce a local typedef in this .c file
+which is conditional on whether we're using your new struct clk_core
+or not, eg, clkdev_ret_t.
+
+Then, rename all the functions here to be _provider based, and arrange
+for these to return clkdev_ret_t.
+
+Then provide the original functions, with your __clk_create_clk() call
+to allocate your struct clk.  A dummy version which merely returns its
+argument can be provided when we're not using clk_core.
+
+This should result in substantially fewer ifdefs - probably just one
+ifdef.
+
+Another concern here is what happens when __clk_create_clk() fails.
+Your __clk_create_clk() function does nothing in that regard, so any
+references which the parent function took are never released.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
