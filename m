@@ -1,17 +1,13 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 23 Sep 2014 00:41:23 +0200
-Subject: [GIT PULL] ARM: berlin: Driver changes for v3.18
-Message-ID: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Tue, 23 Sep 2014 00:41:24 +0200
+Subject: [GIT PULL] ARM: berlin: SoC changes for v3.18
+In-Reply-To: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1411425685-27276-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1411425685-27276-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
-
-Berlin is a little quiet this time. Antoine is still doing a great job
-but ChipIdea USB didn't make it again this time. Let's hope it makes it
-next time.
-
-At least we can add the reset driver contained in this PR.
+Nothing scary in here, just select the new reset driver.
 
 Please pull,
 
@@ -21,21 +17,18 @@ The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-driver-for-3.18-1
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-for-3.18-1
 
-for you to fetch changes up to 72a3643a5f09791a95a85e1ffed6723bafe49a0e:
+for you to fetch changes up to 95ef63ffb4a027a1e74a6225a0feca3c1a6984ec:
 
-  reset: add the Berlin reset controller driver (2014-09-11 23:00:48 +0200)
+  ARM: Berlin: select the reset controller (2014-09-11 23:01:24 +0200)
 
 ----------------------------------------------------------------
-Marvell Berlin SoCs gained a reset driver, which has been
-Acked-by Philipp Zabel.
+Just select the new reset driver for Marvell Berlin SoCs.
 
 ----------------------------------------------------------------
 Antoine Tenart (1):
-      reset: add the Berlin reset controller driver
+      ARM: Berlin: select the reset controller
 
- drivers/reset/Makefile       |   1 +
- drivers/reset/reset-berlin.c | 131 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 132 insertions(+)
- create mode 100644 drivers/reset/reset-berlin.c
+ arch/arm/mach-berlin/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
