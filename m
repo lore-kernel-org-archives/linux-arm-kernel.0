@@ -1,128 +1,68 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 22 Sep 2014 14:46:06 -0700
-Subject: [PATCH 03/13] arm64: Convert hcalls to use ISS field
-In-Reply-To: <20140915175708.GD13789@leverpostej>
-References: <cover.1410302383.git.geoff@infradead.org>
- <2d8dd1ea41dc51878dd4ce75de00eaec2518a76b.1410302383.git.geoff@infradead.org>
- <20140915175708.GD13789@leverpostej>
-Message-ID: <1411422366.6001.29.camel@smoke>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 22 Sep 2014 16:54:21 -0500
+Subject: [GIT PULL] qcom SoC changes for v3.18 (updated)
+In-Reply-To: <A246CCDC-948C-429E-9FC5-934D317EB9D4@codeaurora.org>
+References: <A246CCDC-948C-429E-9FC5-934D317EB9D4@codeaurora.org>
+Message-ID: <A9208907-75E3-487C-B1CF-21AF3E3B5841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[ some how scm-boot.c got dropped, fixed now ]
 
-Hi Mark,
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-On Mon, 2014-09-15 at 18:57 +0100, Mark Rutland wrote:
-> On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> > +/*
-> > + * HVC_GET_VECTORS - Return the value of the vbar_el2 register.
-> > + */
-> > +
-> > +#define HVC_GET_VECTORS 1
-> > +
-> > +/*
-> > + * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
-> > + *
-> > + * @x0: Physical address of the new vector table.
-> > + */
-> > +
-> > +#define HVC_SET_VECTORS 2
-> > +
-> > +/*
-> > + * HVC_KVM_CALL_HYP - Execute kvm_call_hyp routine.
-> > + */
-> > +
-> > +#define HVC_KVM_CALL_HYP 3
-> 
-> If this can be used without KVM (e.g. in the hyp stub) I'd just call
-> this HVC_CALL_HYP, or the name will be a little misleading.
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-Yes, it is more or less generic, so we could have it as HVC_CALL_HYP.
+are available in the git repository at:
 
-> >  #ifndef __ASSEMBLY__
-> >  
-> >  /*
-> > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> > index 2d960a9..9ab5f70 100644
-> > --- a/arch/arm64/kernel/hyp-stub.S
-> > +++ b/arch/arm64/kernel/hyp-stub.S
-> > @@ -54,16 +54,29 @@ ENDPROC(__hyp_stub_vectors)
-> >  
-> >  #define ESR_EL2_EC_SHIFT	26
-> >  #define ESR_EL2_EC_HVC64	0x16
-> > +#define ESR_EL2_ISS		0xffff
-> 
-> The last patch tried to add an identical macro to a header file. Can we
-> use that header please?
+  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.18
 
-As I mentioned in my reply to your comment on that patch, I'll prepare a
-separate header/macro cleanup patch.
+for you to fetch changes up to 6d42c5c5ce79b20139eec15dc359dfbcda3b3557:
 
-> >  
-> >  el1_sync:
-> > -	mrs	x1, esr_el2
-> > -	lsr	x1, x1, #ESR_EL2_EC_SHIFT
-> > -	cmp	x1, #ESR_EL2_EC_HVC64
-> > -	b.ne	2f				// Not an HVC trap
-> > -	cbz	x0, 1f
-> > -	msr	vbar_el2, x0			// Set vbar_el2
-> > +	mrs	x10, esr_el2
-> 
-> Any reason for using x10?
-> 
-> If we want to preserve the lowest register numbers, start with the
-> highest caller-saved register numbers (i.e. x18). At least for me it
-> makes the code far easier to read; it doesn't make it look like x10 is
-> special.
+  ARM: qcom: Move scm-boot files to drivers/soc and include/soc (2014-09-22 16:49:13 -0500)
 
-OK, sure.
+----------------------------------------------------------------
+Qualcomm ARM Based SoC Updates for v3.18
 
-> > +	lsr	x9, x10, #ESR_EL2_EC_SHIFT	// x9=EC
-> > +	and	x10, x10, #ESR_EL2_ISS		// x10=ISS
-> 
-> The mnemonics make these comments redundant.
-> 
-> > +	cmp     x9, #ESR_EL2_EC_HVC64
-> > +	b.ne    2f                              // Not a host HVC trap
-> 
-> Now that we have the nice mnemonic, we could get rid of the comment
-> here. I'd drop the 'host' from the comment; it wasn't there orginally
-> and it's somewhat meaningless for the stub (KVM isn't up yet, and the
-> only the native OS can make a HVC).
+* Moved scm support into drivers/soc/qcom (allows for use by drivers)
+* Various bug fixes and minor feature additions to scm code
+* Added big-endian support to debug MSM uart
 
-Sure, I copied this from the KVM vector so they would be more similar.
+----------------------------------------------------------------
+Lina Iyer (2):
+      ARM: qcom: Add SCM warmboot flags for quad core targets.
+      ARM: qcom: Move scm-boot files to drivers/soc and include/soc
 
-> 
-> > +	mrs     x9, vttbr_el2
-> > +	cbnz    x9, 2f                          // Not a host HVC trap
-> 
-> I don't understand this. When is vttbr_el2 non-zero, and why do we want
-> to silently return from a HVC in that case? That didn't seem to be the
-> case in the original code.
+Olav Haugan (1):
+      ARM: qcom: scm: Add logging of actual return code from scm call
 
-No it is not in the original.  I copied this from the KVM vector so they
-would be more similar.
+Stephen Boyd (6):
+      ARM: debug: Update MSM and QCOM DEBUG_LL help
+      ARM: debug: msm: Support big-endian CPUs
+      ARM: qcom: scm: Fix incorrect cache invalidation
+      ARM: qcom: scm: Get cacheline size from CTR
+      ARM: qcom: scm: Move the scm driver to drivers/soc/qcom
+      ARM: qcom: scm: Add atomic SCM APIs
 
-> > +
-> > +	cmp	x10, #HVC_GET_VECTORS
-> > +	b.ne	1f
-> > +	mrs	x0, vbar_el2
-> >  	b	2f
-> > -1:	mrs	x0, vbar_el2			// Return vbar_el2
-> > +
-> > +1:	cmp	x10, #HVC_SET_VECTORS
-> > +	b.ne	1f
-> > +	msr	vbar_el2, x0
-> > +
-> > +1:
-> 
-> It feels like we should explode if we ever reach here from the host --
-> if we've made an unsupported HVC wereally want to know that we've done
-> so.
+Vikram Mulukutla (1):
+      ARM: qcom: scm: Flush the command buffer only instead of the entire cache
 
-Sure, I can put something in, but I would think that whoever tries a bad
-hcall is going to find out it doesn't work regardless.
-
-Do you have a good idea of how we can do this 'explode'?
-
--Geoff
+ arch/arm/Kconfig.debug                             |   5 +-
+ arch/arm/include/debug/msm.S                       |   6 +
+ arch/arm/mach-qcom/Kconfig                         |   3 -
+ arch/arm/mach-qcom/Makefile                        |   3 -
+ arch/arm/mach-qcom/platsmp.c                       |   2 +-
+ drivers/soc/qcom/Kconfig                           |   2 +
+ drivers/soc/qcom/Makefile                          |   2 +
+ .../arm/mach-qcom => drivers/soc/qcom}/scm-boot.c  |   4 +-
+ {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c     | 131 ++++++++++++++++++---
+ .../arm/mach-qcom => include/soc/qcom}/scm-boot.h  |   2 +
+ {arch/arm/mach-qcom => include/soc/qcom}/scm.h     |   5 +-
+ 11 files changed, 137 insertions(+), 28 deletions(-)
+ rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm-boot.c (95%)
+ rename {arch/arm/mach-qcom => drivers/soc/qcom}/scm.c (67%)
+ rename {arch/arm/mach-qcom => include/soc/qcom}/scm-boot.h (92%)
+ rename {arch/arm/mach-qcom => include/soc/qcom}/scm.h (80%)
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
