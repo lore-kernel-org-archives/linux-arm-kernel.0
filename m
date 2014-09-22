@@ -1,66 +1,122 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Mon, 22 Sep 2014 11:40:42 +0000
-Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
-In-Reply-To: <20140922112849.GL1994@e106497-lin.cambridge.arm.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
- <20140922112849.GL1994@e106497-lin.cambridge.arm.com>
-Message-ID: <a9539cb545eb4ce6b6636a28ff498f90@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 22 Sep 2014 12:43:17 +0100
+Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140922093228.GA20256@rric.localhost>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411003825-21521-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140922093228.GA20256@rric.localhost>
+Message-ID: <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
-
-On 22 September 2014 12:29, Liviu wrote:
-> On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
-> > The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller
-> drivers,
-> > one for an external PCIe slot, the other for an internal PCI bridge to USB
-> > controllers.
-> >
-> > However, they currently do not work at the same time as they use the
-> same PCI
-> > domain and use the same root bus number. We can't use different root
-> bus numbers
-> > due to the way root bus numbers are assigned in pcibios_init_hw() in
-> > arch/arm/kernel/bios32.c.
-> >
-> > Since the two PCI controllers are completely independent, I think it makes
-> sense
-> > to use different PCI domains for them.
-> >
-> > I've marked the third patch as RFC as I am not sure of the impact of
-> enabling
-> > PCI domains for all ARM devices. In the march to 'one kernel to rule them
-> all',
-> > I steered clear of mach specific changes.
-> >
-> > These patches require the following patch from Liviu Dudau:
-> >   [PATCH v11 07/10] OF: Introduce helper function for getting PCI
-> domain_nr
-> > Based on comments on this patch from Jason Gunthorpe, there is still the
-> issue
-> > that the domain numbers may change depending on the ordering at probe
-> time.
-> > However, this can be fixed later on by adding the entries in the DT files.
+On Mon, Sep 22, 2014 at 10:32:28AM +0100, Robert Richter wrote:
+> On 18.09.14 02:30:23, Liviu Dudau wrote:
+> > +int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > +			unsigned char busno, unsigned char bus_max,
+> > +			struct list_head *resources, resource_size_t *io_base)
+> > +{
+> > +	struct resource *res;
+> > +	struct resource *bus_range;
+> > +	struct of_pci_range range;
+> > +	struct of_pci_range_parser parser;
+> > +	char range_type[4];
+> > +	int err;
+> > +
+> > +	if (!io_base)
+> > +		return -EINVAL;
+> > +	*io_base = OF_BAD_ADDR;
 > 
-> Hi Phil,
+
+Hi Robert,
+
+> This breaks for mem-mapped pci host controllers. The patch below fixes
+> this.
+
+I think you mean PCI host controller that have only memory mapped ranges,
+am I right? Initially I've read your reply as to mean that the host
+controller is accessed through some memory mapped area, which I believe is
+the case for all host controllers.
+
 > 
-> I'm happy that you found use for my patch, but I can't help wondering if it is
-> not a better idea to convert your drivers to the whole new API in my series.
-> Do you have any thoughts on that?
-The main reason being that Renesas also supports the LTSI trees, so this fix
-will also need backporting to v3.10. 
+> This series was tested with the fix on top for Cavium Thunder.
+> 
+> Tested-by: Robert Richter <rrichter@cavium.com>
 
-> One other thing to note: Rob Herring is not very happy with the mix of OF
-> parsing and domain number allocation going in together, so I might remove
-> the
-> OF parsing entirely for now. Would that cause you any problems (other than
-> the fact that if of_pci_get_domain_nr() doesn't do anything OF related I
-> might
-> rename it to pci_get_domain_nr()). You don't seem to have any alias defined
-> for pci-domain in the DT, so I'll guess not.
-In the covering letter I mentioned that controllers should always use the same
-domain number, so I was planning to add pci-domain into the DTs later on.
+Thanks for that!
 
-Thanks
-Phil
+> 
+> -Robert
+> 
+> 
+> 
+> From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
+> From: Robert Richter <rrichter@cavium.com>
+> Date: Mon, 22 Sep 2014 10:46:01 +0200
+> Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
+> 
+> The pci host bridge was not created if io_base was not set when
+> calling of_pci_get_host_bridge_resources(). This is esp. the case for
+> mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
+> parameter io_base is optional now.
+
+I think the message is misleading. What you want to do is make io_base
+optional for the case where the PCI host bridge only expects to have only
+IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
+
+As I'm going to touch this area again to address a comment from Bjorn,
+do you mind if I roll this patch into mine with your Signed-off-by and
+the mention that you have made io_base optional?
+
+Best regards,
+Liviu
+
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/of/of_pci.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index ffdb45ed8682..1f0e7c2505ee 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -182,9 +182,8 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>  	char range_type[4];
+>  	int err;
+>  
+> -	if (!io_base)
+> -		return -EINVAL;
+> -	*io_base = OF_BAD_ADDR;
+> +	if (io_base)
+> +		*io_base = OF_BAD_ADDR;
+>  
+>  	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+>  	if (!bus_range)
+> @@ -242,7 +241,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+>  			goto parse_failed;
+>  		}
+>  
+> -		if (resource_type(res) == IORESOURCE_IO) {
+> +		if (io_base && resource_type(res) == IORESOURCE_IO) {
+>  			if (*io_base != OF_BAD_ADDR)
+>  				pr_warn("More than one I/O resource converted. CPU offset for old range lost!\n");
+>  			*io_base = range.cpu_addr;
+> -- 
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
