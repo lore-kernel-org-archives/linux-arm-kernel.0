@@ -1,81 +1,165 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Mon, 22 Sep 2014 11:20:16 +0800
-Subject: [PATCH v5 4/4] clk: hix5hd2: add I2C clocks
-In-Reply-To: <1411356016-20553-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1411356016-20553-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1411356016-20553-5-git-send-email-zhangfei.gao@linaro.org>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 22 Sep 2014 09:41:54 +0530
+Subject: [PATCH v4] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <541C47BD.3070601@gmail.com>
+References: <1411132009-11173-1-git-send-email-pankaj.dubey@samsung.com>
+ <541C47BD.3070601@gmail.com>
+Message-ID: <001a01cfd61b$5ac95a00$105c0e00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yan <sledge.yanwei@huawei.com>
+Hi Tomasz,
 
-hix5hd2 add I2C clocks (I2C0~i2C5)
+On Friday, September 19, 2014 Tomasz Figa wrote,
+> Hi Pankaj,
+> 
+> Please see my comments inline.
+> 
+> On 19.09.2014 15:06, Pankaj Dubey wrote:
+> > Currently a syscon entity can be only registered directly through a
+> > platform device that binds to a dedicated syscon driver. However in
+> > certain use cases it is desirable to make a device used with another
+> > driver a syscon interface provider.
+> 
+> [snip]
+> 
+> > -static int syscon_match_node(struct device *dev, void *data)
+> > +static struct syscon *of_syscon_register(struct device_node *np)
+> >  {
+> > -	struct device_node *dn = data;
+> > +	struct platform_device *pdev = NULL;
+> > +	struct syscon *syscon;
+> > +	struct regmap *regmap;
+> > +	void __iomem *base;
+> > +
+> > +
+> 
+> nit: Stray blank line.
+> 
 
-Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/clk/hisilicon/clk-hix5hd2.c       |   25 +++++++++++++++++++++++++
- include/dt-bindings/clock/hix5hd2-clock.h |   12 ++++++++++++
- 2 files changed, 37 insertions(+)
+OK. Will remove this.
 
-diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-index 6e97e54..3f369c6 100644
---- a/drivers/clk/hisilicon/clk-hix5hd2.c
-+++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-@@ -100,6 +100,31 @@ static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
- 		CLK_SET_RATE_PARENT, 0x178, 0, 0, },
- 	{ HIX5HD2_WDG0_RST, "rst_wdg0", "clk_wdg0",
- 		CLK_SET_RATE_PARENT, 0x178, 4, CLK_GATE_SET_TO_DISABLE, },
-+	/* I2C */
-+	{HIX5HD2_I2C0_CLK, "clk_i2c0", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 4, 0, },
-+	{HIX5HD2_I2C0_RST, "rst_i2c0", "clk_i2c0",
-+		 CLK_SET_RATE_PARENT, 0x06c, 5, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C1_CLK, "clk_i2c1", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 8, 0, },
-+	{HIX5HD2_I2C1_RST, "rst_i2c1", "clk_i2c1",
-+		 CLK_SET_RATE_PARENT, 0x06c, 9, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C2_CLK, "clk_i2c2", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 12, 0, },
-+	{HIX5HD2_I2C2_RST, "rst_i2c2", "clk_i2c2",
-+		 CLK_SET_RATE_PARENT, 0x06c, 13, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C3_CLK, "clk_i2c3", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 16, 0, },
-+	{HIX5HD2_I2C3_RST, "rst_i2c3", "clk_i2c3",
-+		 CLK_SET_RATE_PARENT, 0x06c, 17, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C4_CLK, "clk_i2c4", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 20, 0, },
-+	{HIX5HD2_I2C4_RST, "rst_i2c4", "clk_i2c4",
-+		 CLK_SET_RATE_PARENT, 0x06c, 21, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C5_CLK, "clk_i2c5", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 0, 0, },
-+	{HIX5HD2_I2C5_RST, "rst_i2c5", "clk_i2c5",
-+		 CLK_SET_RATE_PARENT, 0x06c, 1, CLK_GATE_SET_TO_DISABLE, },
- };
+> > +	if (!of_device_is_compatible(np, "syscon"))
+> > +		return ERR_PTR(-EINVAL);
+> 
+> I don't think this check is needed at all. I'd say that drivers should be
+free to register a
+> syscon provider for any node.
+
+I think this check is correct, as only nodes having "syscon" as secondary
+compatibility should be
+used to create a syscon provider. And that's why we have "syscon" as
+secondary compatibility in
+device nodes which can be a syscon provider.
+
+> 
+> > +
+> > +	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
+> > +	if (!syscon)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	base = of_iomap(np, 0);
+> > +	if (!base)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	if (!of_device_is_available(np) ||
+> 
+> Wouldn't it be enough to simply call of_find_device_by_node(np) and if it
+fails then
+> instead create a dummy device?
+> 
+
+OK, this could be also one of approach, I will change accordingly.
+
+> > +			of_node_test_and_set_flag(np, OF_POPULATED)) {
+> > +		/* if device is already populated and avaiable then use it
+*/
+> > +		pdev = of_find_device_by_node(np);
+> > +		if (!(&pdev->dev))
+> 
+> This is just plain wrong, because this condition will always evaluate to
+true (see the
+> definition of struct platform_device). Shouldn't you rather just check the
+pdev
+> pointer?
+
+OK, will update this.
+
+> 
+> > +			return ERR_PTR(-ENODEV);
+> > +
+> > +	} else {
+> > +		/* for early users create dummy syscon device and use it */
+> > +		pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
+> > +		if (!pdev)
+> > +			return ERR_PTR(-ENOMEM);
+> 
+> Any clean-up on error path?
+
+OK, will add error path. Also will use platform_device_alloc as suggested.
+
+> 
+> > +
+> > +		pdev->name = "dummy-syscon";
+> > +		pdev->id = -1;
+> 
+> Wouldn't you get an ID collision if more than one syscon is registered
+early? Maybe
+> the naming scheme from of_device_alloc() could be adopted partially?
+
+I think this should not be an issue, passing id as -1 should take care of
+this.
+As you know Exynos has two syscon providers "pmu" and "sysreg" I have
+written a test
+code to check this scenario and tested it during early stage and I am
+successfully able to get
+PMU and SYSREG handle.
  
- enum hix5hd2_clk_type {
-diff --git a/include/dt-bindings/clock/hix5hd2-clock.h b/include/dt-bindings/clock/hix5hd2-clock.h
-index b8e3c9d..fd29c17 100644
---- a/include/dt-bindings/clock/hix5hd2-clock.h
-+++ b/include/dt-bindings/clock/hix5hd2-clock.h
-@@ -62,6 +62,18 @@
- #define HIX5HD2_SD_CIU_RST		138
- #define HIX5HD2_WDG0_CLK		139
- #define HIX5HD2_WDG0_RST		140
-+#define HIX5HD2_I2C0_CLK		141
-+#define HIX5HD2_I2C0_RST		142
-+#define HIX5HD2_I2C1_CLK		143
-+#define HIX5HD2_I2C1_RST		144
-+#define HIX5HD2_I2C2_CLK		145
-+#define HIX5HD2_I2C2_RST		146
-+#define HIX5HD2_I2C3_CLK		147
-+#define HIX5HD2_I2C3_RST		148
-+#define HIX5HD2_I2C4_CLK		149
-+#define HIX5HD2_I2C4_RST		150
-+#define HIX5HD2_I2C5_CLK		151
-+#define HIX5HD2_I2C5_RST		152
- 
- /* complex */
- #define HIX5HD2_MAC0_CLK		192
--- 
-1.7.9.5
+> 
+> > +		device_initialize(&pdev->dev);
+> 
+> I wonder if you couldn't simply reuse platform_device_alloc() for all of
+this, except
+> the line below, which would still have to be handled separately.
+> 
+> > +		pdev->dev.of_node = np;
+> > +	}
+> > +
+> > +	regmap = regmap_init_mmio(&pdev->dev, base, &syscon_regmap_config);
+> > +	if (IS_ERR(regmap)) {
+> > +		pr_err("regmap init failed\n");
+> 
+> If you have a dev here then you should be able to use dev_err() already.
+
+OK.
+
+> 
+> > +		return ERR_CAST(regmap);
+> > +	}
+
+[snip]
+
+> > +
+> > +	if (!syscon)
+> > +		syscon = of_syscon_register(np);
+> > +
+> > +	if (!IS_ERR(syscon))
+> > +		return syscon->regmap;
+> > +
+> > +	return ERR_CAST(syscon);
+> 
+> nit: Usually error checking is done the opposite way, i.e.
+
+OK, will change accordingly.
+
+Thanks,
+Pankaj Dubey
+> 
+> 	if (IS_ERR(syscon))
+> 		return ERR_CAST(syscon);
+> 
+> 	return syscon->regmap;
+> 
+> Best regards,
+> Tomasz
