@@ -1,83 +1,30 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 22 Sep 2014 15:15:47 -0500
-Subject: [GIT PULL] qcom DT changes for v3.18-2
-In-Reply-To: <13536005-9FFF-4362-8B87-5F0DC9930D29@codeaurora.org>
-References: <13536005-9FFF-4362-8B87-5F0DC9930D29@codeaurora.org>
-Message-ID: <C891343A-AC78-4CF0-8A6A-9BF741CDA58A@codeaurora.org>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Mon, 22 Sep 2014 21:31:36 +0100
+Subject: [PATCH v4 18/18] Documentation: ACPI for ARM64
+In-Reply-To: <20140922194841.GA9868@amd>
+References: <1410530416-30200-1-git-send-email-hanjun.guo@linaro.org>
+ <1410530416-30200-19-git-send-email-hanjun.guo@linaro.org>
+ <20140922194841.GA9868@amd>
+Message-ID: <20140922203136.GA32156@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+On Mon, Sep 22, 2014 at 09:48:41PM +0200, Pavel Machek wrote:
+> On Fri 2014-09-12 22:00:16, Hanjun Guo wrote:
+> > +No code shall be accepted into the kernel unless it complies with the released
+> > +standards from UEFI ASWG. If there are features missing from ACPI to make it
+> > +function on a platform, ECRs should be submitted to ASWG and go through the
+> > +approval process.
+> 
+> Surely this should be narrowed down somehow? Or is reading all the
+> released standards from ASWG mandatory before patching the kernel now?
+> 
+> Spelling out wtf ECR is would be nice, too.
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.18-2
-
-for you to fetch changes up to aabff7bfe55afd01d71a5f11d4a84bd873c20f5e:
-
-  ARM: DT: msm8960: Add sdcc nodes (2014-09-22 13:49:43 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Device Tree Updates for v3.18-2
-
-* Added SDCC nodes on MSM8960/CDP and MSM8660/SURF
-* Added I2C and SDCC4/WLAN on APQ8064/IFC6410
-* Added I2C on MSM8984/DB8074
-
-----------------------------------------------------------------
-Georgi Djakov (4):
-      ARM: dts: qcom: Add APQ8084 Global Clock Controller DT node
-      ARM: dts: qcom: Add APQ8084 serial port DT node
-      ARM: dts: qcom: Add initial IFC6540 board device tree
-      ARM: dts: qcom: Add TLMM DT node for APQ8084
-
-Kumar Gala (1):
-      ARM: qcom: Add initial IPQ8064 SoC and AP148 device trees
-
-Pramod Gurav (2):
-      ARM: DT: APQ8064: Add pinctrl support
-      ARM: DT: APQ8064: Add node for ps_hold function in pinctrl
-
-Srinivas Kandagatla (3):
-      ARM: DT: apq8064: Add sdcc support via mcci driver.
-      ARM: DT: QCOM: apq8064: Add dma support for sdcc node
-      ARM: DT: apq8064: add support to sdcc4 for wlan.
-
-Stephen Boyd (5):
-      ARM: dts: msm: Add 8921 PMIC to ssbi bus
-      ARM: dts: msm: Add 8058 PMIC to ssbi bus
-      ARM: dts: qcom: Add 8064 multimedia clock controller node
-      ARM: DT: msm8660: Add sdcc nodes
-      ARM: DT: msm8960: Add sdcc nodes
-
-kiran.padwal at smartplayin.com (2):
-      ARM: dts: qcom: Add I2C dt node for MSM8974 and DB8074 board
-      ARM: DT: apq8064: Add i2c device nodes
-
- arch/arm/boot/dts/Makefile                     |   2 +
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts     |  43 +++++
- arch/arm/boot/dts/qcom-apq8064.dtsi            | 183 ++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts |  21 +++
- arch/arm/boot/dts/qcom-apq8084-ifc6540.dts     |  23 +++
- arch/arm/boot/dts/qcom-apq8084-mtp.dts         |   6 +
- arch/arm/boot/dts/qcom-apq8084.dtsi            |  51 +++++
- arch/arm/boot/dts/qcom-ipq8064-ap148.dts       |  85 +++++++++
- arch/arm/boot/dts/qcom-ipq8064-v1.0.dtsi       |   1 +
- arch/arm/boot/dts/qcom-ipq8064.dtsi            | 250 +++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8660-surf.dts        |  42 +++++
- arch/arm/boot/dts/qcom-msm8660.dtsi            |  93 +++++++++
- arch/arm/boot/dts/qcom-msm8960-cdp.dts         |  27 +++
- arch/arm/boot/dts/qcom-msm8960.dtsi            |  87 +++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi            |  15 +-
- arch/arm/mach-qcom/board.c                     |   2 +
- 16 files changed, 929 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
- create mode 100644 arch/arm/boot/dts/qcom-ipq8064-ap148.dts
- create mode 100644 arch/arm/boot/dts/qcom-ipq8064-v1.0.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-ipq8064.dtsi
+Explicit Change Request. These can only be filed by paid-up members of 
+the UEFI Forum, so I suspect this requirement is going to be unworkable 
+(there's plenty of ACPI support code for large x86 vendors which isn't 
+part of any ACPI spec)
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Matthew Garrett | mjg59 at srcf.ucam.org
