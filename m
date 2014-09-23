@@ -1,72 +1,24 @@
-From: gvormayr@gmail.com (Gernot Vormayr)
-Date: Wed, 24 Sep 2014 00:58:45 +0200
-Subject: [PATCH v2 1/1] gpio: Fix ngpio in gpio-xilinx driver
-In-Reply-To: <1411031032-20649-1-git-send-email-gvormayr@gmail.com>
-References: <1411031032-20649-1-git-send-email-gvormayr@gmail.com>
-Message-ID: <1411513125-20712-1-git-send-email-gvormayr@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 23 Sep 2014 17:00:11 -0600
+Subject: [PATCH v12 00/12] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <20140923224810.GA32643@bart.dudau.co.uk>
+References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140923215435.GD27117@google.com> <20140923224810.GA32643@bart.dudau.co.uk>
+Message-ID: <CAErSpo5PBXSUeU_LP2m=9jxibmqxreL4tEeHBsc5To7D=_bAJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If one adds gpio-controller; to the chip in the devicetree, then
-initialization fails with 'gpiochip_find_base: cannot find free range',
-because ngpio is 0. This patch fixes the bug.
+On Tue, Sep 23, 2014 at 4:48 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> ...
+> While the next immediate target is converting pci-host-generic.c, pci-imx6.c
+> and probably pcie-designware.c to my series, I would like to ask you what
+> is your longer term plan. Now that I have got my head full of PCI code,
+> I have some ideas but feel that meeting with you and all those involved
+> in core PCI support would be a better venue than sending emails back and
+> forth. When is your next plan to attend a Linux conference?
 
-This version includes the suggestions from Linus Walleij.
+That would be nice.  Unfortunately, I don't know what the next
+conference will be yet.
 
-Tested on ml507 board.
-
-Signed-off-by: Gernot Vormayr <gvormayr@gmail.com>
----
- drivers/gpio/gpio-xilinx.c | 23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
-index 1248186..c11bc11 100644
---- a/drivers/gpio/gpio-xilinx.c
-+++ b/drivers/gpio/gpio-xilinx.c
-@@ -197,6 +197,7 @@ static int xgpio_of_probe(struct device_node *np)
- 	struct xgpio_instance *chip;
- 	int status = 0;
- 	const u32 *tree_info;
-+	u32 ngpio;
- 
- 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
- 	if (!chip)
-@@ -211,12 +212,11 @@ static int xgpio_of_probe(struct device_node *np)
- 	/* Update GPIO direction shadow register with default value */
- 	of_property_read_u32(np, "xlnx,tri-default", &chip->gpio_dir);
- 
--	/* By default assume full GPIO controller */
--	chip->mmchip.gc.ngpio = 32;
--
--	/* Check device node and parent device node for device width */
--	of_property_read_u32(np, "xlnx,gpio-width",
--			      (u32 *)&chip->mmchip.gc.ngpio);
-+	/* Check device node and parent device node for device width
-+	   and assume default width of 32 */
-+	if (of_property_read_u32(np, "xlnx,gpio-width", &ngpio))
-+		ngpio = 32;
-+	chip->mmchip.gc.ngpio = (u16)ngpio;
- 
- 	spin_lock_init(&chip->gpio_lock);
- 
-@@ -258,12 +258,11 @@ static int xgpio_of_probe(struct device_node *np)
- 		/* Update GPIO direction shadow register with default value */
- 		of_property_read_u32(np, "xlnx,tri-default-2", &chip->gpio_dir);
- 
--		/* By default assume full GPIO controller */
--		chip->mmchip.gc.ngpio = 32;
--
--		/* Check device node and parent device node for device width */
--		of_property_read_u32(np, "xlnx,gpio2-width",
--				     (u32 *)&chip->mmchip.gc.ngpio);
-+		/* Check device node and parent device node for device width
-+		   and assume default width of 32 */
-+		if (of_property_read_u32(np, "xlnx,gpio2-width", &ngpio))
-+			ngpio = 32;
-+		chip->mmchip.gc.ngpio = (u16)ngpio;
- 
- 		spin_lock_init(&chip->gpio_lock);
- 
--- 
-2.1.0
+Bjorn
