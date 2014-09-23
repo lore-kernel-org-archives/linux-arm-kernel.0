@@ -1,92 +1,168 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 23 Sep 2014 10:04:37 -0700
-Subject: [V8 1/2] irqchip: gic: Add support for multiple MSI for ARM64
-In-Reply-To: <alpine.DEB.2.10.1409222349560.4604@nanos>
-References: <1411230698-8081-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411230698-8081-2-git-send-email-suravee.suthikulpanit@amd.com>
- <alpine.DEB.2.10.1409222349560.4604@nanos>
-Message-ID: <5421A825.70201@amd.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 23 Sep 2014 19:16:19 +0200
+Subject: [PATCH v3 2/3] mtd: nand: gpmi: add proper raw access support
+In-Reply-To: <20140923161041.GA2147@localhost.localdomain>
+References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411481256-29141-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20140923161041.GA2147@localhost.localdomain>
+Message-ID: <20140923191619.0c0a667e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Wed, 24 Sep 2014 00:10:44 +0800
+Huang Shijie <shijie8@gmail.com> wrote:
 
-Sorry again for the mistake on my part. Let me try to address some other 
-concerns you have below.
+> On Tue, Sep 23, 2014 at 04:07:35PM +0200, Boris BREZILLON wrote:
+> > Several MTD users (either in user or kernel space) expect a valid raw
+> > access support to NAND chip devices.
+> > This is particularly true for testing tools which are often touching the
+> > data stored in a NAND chip in raw mode to artificially generate errors.
+> > 
+> > The GPMI drivers do not implemenent raw access functions, and thus rely on
+> > default HW_ECC scheme implementation.
+> > The default implementation consider the data and OOB area as properly
+> > separated in their respective NAND section, which is not true for the GPMI
+> > controller.
+> > In this driver/controller some OOB data are stored at the beginning of the
+> > NAND data area (these data are called metadata in the driver), then ECC
+> > bytes are interleaved with data chunk (which is similar to the
+> > HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
+> > OOB data.
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 126 +++++++++++++++++++++++++++++++++
+> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   2 +
+> >  2 files changed, 128 insertions(+)
+> > 
+> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > index 959cb9b..7921ba7 100644
+> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> > @@ -791,6 +791,7 @@ static void gpmi_free_dma_buffer(struct gpmi_nand_data *this)
+> >  					this->page_buffer_phys);
+> >  	kfree(this->cmd_buffer);
+> >  	kfree(this->data_buffer_dma);
+> > +	kfree(this->raw_buffer);
+> >  
+> >  	this->cmd_buffer	= NULL;
+> >  	this->data_buffer_dma	= NULL;
+> > @@ -837,6 +838,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
+> >  	if (!this->page_buffer_virt)
+> >  		goto error_alloc;
+> >  
+> > +	this->raw_buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
+> > +	if (!this->raw_buffer)
+> > +		goto error_alloc;
+> >  
+> >  	/* Slice up the page buffer. */
+> >  	this->payload_virt = this->page_buffer_virt;
+> > @@ -1347,6 +1351,126 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
+> >  	return status & NAND_STATUS_FAIL ? -EIO : 0;
+> >  }
+> >  
+> > +static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
+> > +				  struct nand_chip *chip, uint8_t *buf,
+> > +				  int oob_required, int page)
+> 
+> 	In actually, i suggest to call the ecc->read_page() in this
+> 	hook. And after the ecc->read_page(), copy the relative data to
+> 	the relative buffers. Is my suggestion right? please correct me.
 
+Unfortunately it's not. The user expect that ECC correction is not
+involved when accessing the NAND in raw mode, which is not the case in
+your read_page implementation.
+This is particularly useful when one want to see the real page status
+(including bitflips).
 
-On 09/22/2014 04:08 PM, Thomas Gleixner wrote:
-> On Sat, 20 Sep 2014, suravee.suthikulpanit at amd.com wrote:
->
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> This patch implelments the ARM64 version of arch_setup_msi_irqs(),
->> which does not return 1 for when PCI_CAP_ID_MSI and nvec > 1.
->
-> I can see that myself. What your changelog is missing is the reason
-> WHY you think that copying that code from drivers/pci/msi.c and
-> removing the "PCI_CAP_ID_MSI and nvec > 1" has any value.
+Moreover, I like to see the generated ECC bytes/bits when using raw
+access (but I'm not sure this is a requirement). This will help
+deducing the BCH algorithm and/or XOR mask applied after producing
+these bits if someone ever want to spend some time reverse engineering
+it.
 
-[Suravee] This is mainly be cause the weak version of 
-arch_setup_msi_irqs() in the drivers/pci/msi.c doesn't support 
-multi-MSI. Sorry for not being clear in the commit message.
+> 
+> 
+> 
+> > +{
+> > +	struct gpmi_nand_data *this = chip->priv;
+> > +	struct bch_geometry *nfc_geo = &this->bch_geometry;
+> > +	int eccsize = nfc_geo->ecc_chunk_size;
+> > +	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
+> > +	u8 *tmp_buf = this->raw_buffer;
+> > +	size_t src_bit_off;
+> > +	size_t oob_bit_off;
+> > +	size_t oob_byte_off;
+> > +	uint8_t *oob = chip->oob_poi;
+> > +	int step;
+> > +
+> > +	chip->read_buf(mtd, tmp_buf,
+> > +		       mtd->writesize + mtd->oobsize);
+> > +
+> > +	if (this->swap_block_mark) {
+> > +		u8 swap = tmp_buf[0];
+> > +
+> > +		tmp_buf[0] = tmp_buf[mtd->writesize];
+> > +		tmp_buf[mtd->writesize] = swap;
+> > +	}
+> > +
+> > +	if (oob_required)
+> > +		memcpy(oob, tmp_buf, nfc_geo->metadata_size);
+> > +
+> > +	oob_bit_off = nfc_geo->metadata_size * 8;
+> > +	src_bit_off = oob_bit_off;
+> > +
+> > +	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
+> > +		if (buf)
+> > +			gpmi_move_bits(buf, step * eccsize * 8,
+> > +				       tmp_buf, src_bit_off,
+> > +				       eccsize * 8);
+> > +		src_bit_off += eccsize * 8;
+> > +
+> > +		if (oob_required)
+> > +			gpmi_move_bits(oob, oob_bit_off,
+> > +				       tmp_buf, src_bit_off,
+> > +				       eccbits);
+> > +
+> > +		src_bit_off += eccbits;
+> > +		oob_bit_off += eccbits;
+> > +	}
+> > +
+> > +	if (oob_required && oob_bit_off % 8)
+> > +		oob[oob_bit_off / 8] &= GENMASK(oob_bit_off - 1, 0);
+> > +
+> > +	oob_byte_off = DIV_ROUND_UP(oob_bit_off, 8);
+> > +
+> > +	if (oob_required && oob_byte_off  < mtd->oobsize)
+> > +		memcpy(oob + oob_byte_off,
+> > +		       tmp_buf + mtd->writesize + oob_byte_off,
+> > +		       mtd->oobsize - oob_byte_off);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
+> > +				   struct nand_chip *chip,
+> > +				   const uint8_t *buf,
+> > +				   int oob_required)
+> > +{
+> 
+> 
+> give me more time to think over this hook :(
 
->
-> And that new function "arm64_setup_msi_irqs" is declared in which
-> header file exactly?
+Sure, no problem.
 
-[Suravee] This was supposed to be arch_setup_msi_irqs(). My bad. I'm 
-fixing this in the next version.
+Actually it's doing the exact same thing read_page_raw is doing expect
+it's applying on a write access.
+I copy the provided data (in-band and out-of-band is required) into a
+temporary buffer to match the GPMI controller layout, then write it
+without involving the BCH block (which means no ECC bits generation).
 
-......
+Best Regards,
 
->> + *
->> + * Note:
->> + * Current implementation assumes that all interrupt controller used in
->> + * ARM64 architecture _MUST_ supports multi-MSI.
->
-> Great assumption....
->
+Boris
 
-[Suravee] So, Marc and I have discussed in the past that at this point, 
-we are not seeing the case that there will be interrupt or 
-MSI-controller that will not support multi-MSI.  If you think this 
-should not be the case, would you please share your thought.
-
-......
-
->
-> At least you are consistent on the useless side of affairs:
->
->> +{
->> +	struct msi_desc *entry;
->> +	int ret;
->> +
->> +	list_for_each_entry(entry, &dev->msi_list, list) {
->> +		ret = arch_setup_msi_irq(dev, entry);
->
-> Anyone who has the slightest idea how multi-MSI works will know that
-> this CANNOT work at all, but that's none of my business.
-
-[Suravee] I noticed that in the x86 version, there is a callback that 
-each MSI controller need to register for handling the multi-MSI stuff.
-
-In gicv2m_setup_msi_irq(), there is logic which handles the setup for 
-multi-MSI and MSIx separately. In case of multi-MSI, the vectors are 
-allocated on the first call to arch_setup_msi_irq(). Here, Marc and I 
-are trying to simplify the arch-specific code so that each GIC 
-controller (V2m and V3) would not need to implement and register the 
-callbacks separately for handling multi-MSI.
-
-The thing that is broken here is the error handling where the 
-arch_setup_msi_irqs() is supposed to return the number of available MSI 
-vectors. It would fail to do so because the arch_setup_msi_irq() would 
-not return positive value. We should be able to fix this by 
-re-implementing the arch_setup_msi_irq() and arch_setup_msi_irqs() to 
-allow returning of positive values.
-
-Please let me know what you think. I am open for suggestions :)
-
-Thanks,
-
-Suravee
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
