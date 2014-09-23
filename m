@@ -1,107 +1,121 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 23 Sep 2014 19:37:53 +0200
-Subject: [PATCH v2 1/5] pinctrl: imx: detect uninitialized pins
+Date: Tue, 23 Sep 2014 19:37:54 +0200
+Subject: [PATCH v2 2/5] pinctrl: imx: add gpio pinmux support for vf610
 In-Reply-To: <cover.1411492954.git.stefan@agner.ch>
 References: <cover.1411492954.git.stefan@agner.ch>
-Message-ID: <6d676a88eb82a47f8fa9e16abbc768e3e9ac236a.1411492954.git.stefan@agner.ch>
+Message-ID: <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl driver initialized the register offsets for the pins
-with 0. On Vybrid an offset of 0 is a valid offset for the pinctrl
-mux register. So far, this was solved using the ZERO_OFFSET_VALID
-flag which allowed offsets of 0. However, this does not allow to
-verify whether a pins struct imx_pmx_func was initialized or not.
-
-Use signed offset values for register offsets and initialize those
-with -1 in order to detect uninitialized offset values reliable.
+Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
+This is needed since direction configuration is not part of the
+GPIO module in Vybrid.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/pinctrl/pinctrl-imx.c   | 9 +++++----
- drivers/pinctrl/pinctrl-imx.h   | 7 +++----
- drivers/pinctrl/pinctrl-vf610.c | 2 +-
- 3 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/pinctrl/pinctrl-imx.c   | 54 +++++++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx.h   |  1 +
+ drivers/pinctrl/pinctrl-vf610.c |  2 +-
+ 3 files changed, 56 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index 946d594..0d4558b 100644
+index 0d4558b..64d1b59 100644
 --- a/drivers/pinctrl/pinctrl-imx.c
 +++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -204,7 +204,7 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
- 		pin_id = pin->pin;
- 		pin_reg = &info->pin_regs[pin_id];
+@@ -294,10 +294,59 @@ static int imx_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
+ 	return 0;
+ }
  
--		if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->mux_reg) {
-+		if (pin_reg->mux_reg == -1) {
- 			dev_err(ipctl->dev, "Pin(%s) does not support mux function\n",
- 				info->pins[pin_id].name);
- 			return -EINVAL;
-@@ -308,7 +308,7 @@ static int imx_pinconf_get(struct pinctrl_dev *pctldev,
- 	const struct imx_pinctrl_soc_info *info = ipctl->info;
- 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
++static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
++			struct pinctrl_gpio_range *range, unsigned offset)
++{
++	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	const struct imx_pin_reg *pin_reg;
++	u32 reg;
++
++	if (!(info->flags & GPIO_CONTROL))
++		return -EINVAL;
++
++	pin_reg = &info->pin_regs[offset];
++	if (pin_reg->mux_reg == -1)
++		return -EINVAL;
++
++	reg = readl(ipctl->base + pin_reg->mux_reg);
++	reg &= ~(0x7 << 20);
++	writel(reg, ipctl->base + pin_reg->mux_reg);
++
++	return 0;
++}
++
++static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
++	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
++{
++	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct imx_pinctrl_soc_info *info = ipctl->info;
++	const struct imx_pin_reg *pin_reg;
++	u32 reg;
++
++	if (!(info->flags & GPIO_CONTROL))
++		return -EINVAL;
++
++	pin_reg = &info->pin_regs[offset];
++	if (pin_reg->mux_reg == -1)
++		return -EINVAL;
++
++	reg = readl(ipctl->base + pin_reg->mux_reg);
++	if (input)
++		reg &= ~0x2;
++	else
++		reg |= 0x2;
++	writel(reg, ipctl->base + pin_reg->mux_reg);
++
++	return 0;
++}
++
+ static const struct pinmux_ops imx_pmx_ops = {
+ 	.get_functions_count = imx_pmx_get_funcs_count,
+ 	.get_function_name = imx_pmx_get_func_name,
+ 	.get_function_groups = imx_pmx_get_groups,
++	.gpio_request_enable = imx_pmx_gpio_request_enable,
++	.gpio_set_direction = imx_pmx_gpio_set_direction,
+ 	.enable = imx_pmx_enable,
+ };
  
--	if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->conf_reg) {
-+	if (pin_reg->conf_reg == -1) {
- 		dev_err(info->dev, "Pin(%s) does not support config function\n",
- 			info->pins[pin_id].name);
+@@ -579,6 +628,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+ 		dev_err(&pdev->dev, "wrong pinctrl info\n");
  		return -EINVAL;
-@@ -331,7 +331,7 @@ static int imx_pinconf_set(struct pinctrl_dev *pctldev,
- 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
- 	int i;
+ 	}
++
++	/* GPIO control functions only intended for shared mux/conf register */
++	if (info->flags & GPIO_CONTROL)
++		BUG_ON(!(info->flags & SHARE_MUX_CONF_REG));
++
+ 	info->dev = &pdev->dev;
  
--	if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->conf_reg) {
-+	if (pin_reg->conf_reg == -1) {
- 		dev_err(info->dev, "Pin(%s) does not support config function\n",
- 			info->pins[pin_id].name);
- 		return -EINVAL;
-@@ -586,10 +586,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
- 	if (!ipctl)
- 		return -ENOMEM;
- 
--	info->pin_regs = devm_kzalloc(&pdev->dev, sizeof(*info->pin_regs) *
-+	info->pin_regs = devm_kmalloc(&pdev->dev, sizeof(*info->pin_regs) *
- 				      info->npins, GFP_KERNEL);
- 	if (!info->pin_regs)
- 		return -ENOMEM;
-+	memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	ipctl->base = devm_ioremap_resource(&pdev->dev, res);
+ 	/* Create state holders etc for this driver */
 diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-index db408b0..49e55d3 100644
+index 49e55d3..8f37ca4 100644
 --- a/drivers/pinctrl/pinctrl-imx.h
 +++ b/drivers/pinctrl/pinctrl-imx.h
-@@ -67,8 +67,8 @@ struct imx_pmx_func {
-  * @conf_reg: config register offset
-  */
- struct imx_pin_reg {
--	u16 mux_reg;
--	u16 conf_reg;
-+	s16 mux_reg;
-+	s16 conf_reg;
+@@ -84,6 +84,7 @@ struct imx_pinctrl_soc_info {
  };
  
- struct imx_pinctrl_soc_info {
-@@ -83,8 +83,7 @@ struct imx_pinctrl_soc_info {
- 	unsigned int flags;
- };
- 
--#define ZERO_OFFSET_VALID	0x1
--#define SHARE_MUX_CONF_REG	0x2
-+#define SHARE_MUX_CONF_REG	0x1
+ #define SHARE_MUX_CONF_REG	0x1
++#define GPIO_CONTROL		0x2
  
  #define NO_MUX		0x0
  #define NO_PAD		0x0
 diff --git a/drivers/pinctrl/pinctrl-vf610.c b/drivers/pinctrl/pinctrl-vf610.c
-index bddd913..b788e15 100644
+index b788e15..fdf5661 100644
 --- a/drivers/pinctrl/pinctrl-vf610.c
 +++ b/drivers/pinctrl/pinctrl-vf610.c
 @@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
  static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
  	.pins = vf610_pinctrl_pads,
  	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
--	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
-+	.flags = SHARE_MUX_CONF_REG,
+-	.flags = SHARE_MUX_CONF_REG,
++	.flags = SHARE_MUX_CONF_REG | GPIO_CONTROL,
  };
  
  static struct of_device_id vf610_pinctrl_of_match[] = {
