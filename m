@@ -1,89 +1,151 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 23 Sep 2014 10:59:47 +0200
-Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
- of_platform_populate
-In-Reply-To: <3765297.6j3Rv68iqn@wuerfel>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <3261451.zpO6MVx5yo@wuerfel> <20140923070238.GH30514@ulmo>
- <3765297.6j3Rv68iqn@wuerfel>
-Message-ID: <20140923085946.GP30514@ulmo>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Tue, 23 Sep 2014 11:00:32 +0200
+Subject: [PATCH v2 1/8] ARM: add mach-asm9260
+In-Reply-To: <71905861.S3QD6rl7jU@wuerfel>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <1411324904-14881-2-git-send-email-linux@rempel-privat.de>
+ <71905861.S3QD6rl7jU@wuerfel>
+Message-ID: <542136B0.3020305@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 09:44:25AM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 09:02:39 Thierry Reding wrote:
+Am 22.09.2014 um 17:08 schrieb Arnd Bergmann:
+> On Sunday 21 September 2014 20:41:37 Oleksij Rempel wrote:
+>> it is low cost (?) SoC targeted for market in China and India which
+>> trying to compete with AT91SAM9G25.
+>>
+>> Here is some info:
+>> http://www.alphascale.com/index.asp?ics/615.html
+>>
+>> One of products:
+>> http://www.aliexpress.com/store/product/2014-hot-sales-FREE-SHIPPING-new-Purple-core-ARM9-development-board-ASM9260T-SDRAM-power-line/433637_1931495721.html
+>>
+>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 > 
-> > > I see two problems with using deferred probing here: 
-> > > 
-> > > - we don't actually need to defer the probing but the binding to the driver
-> > >   when no dma ops are set, but it seems silly to even create the device
-> > >   before we can find out which ops it should use.
-> > 
-> > What does device creation have to do with anything? Surely a device
-> > won't need IOMMU services before the device is bound to a driver.
+> Thanks for the submission! It looks pretty good, but has one main mistake
+> in being incompatible with ARCH_MULTIPLATFORM. I think that should be easy
+> to fix. There are also a few minor issues that can be improved.
 > 
-> The problem is that the driver will start using the IOMMU as soon
-> as it calls dma_map_*, but that happens at runtime, not necessarily
-> during the probe function.
-
-But it won't call dma_map_*() before probe, right? If this is done in
-the core we can defer probing before the driver's probe is called, so
-there shouldn't be an issue.
-
-> So we can get into the weird situation that probe() returns success,
-> but then you can't use the device yet because you don't know whether
-> it is supposed to use an IOMMU or not.
-
-Of course any such solution would only work under the assumption that
-the driver (or core) knows what it's doing and doesn't call dma_map_*()
-until IOMMU support has properly been set up.
-
-For DMA/IOMMU integration users I'd expect the core to set everything up
-before proceeding to calling the driver's .probe() function. For others
-they will need a way to either explicitly check for the IOMMU master
-interface or have the core do that for them (similar to how it would do
-that for DMA/IOMMU integration users).
-
-> > >   The reason is that a driver does not actively ask for an IOMMU as it would
-> > >   for other subsystems (gpio, led, dmaengine, ...).
-> > 
-> > Actually it does. At least in some cases. If you want to use the IOMMU
-> > API directly you'd call something like iommu_present() on the bus type
-> > and then allocate an IOMMU domain and attach to it. Unfortunately the
-> > API seems to have been designed under the assumption that IOMMU will
-> > have been registered before any users, so the API doesn't propagate any
-> > meaningful errors.
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 5918d40..1a71feb 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -379,6 +379,20 @@ config ARCH_AT91
+>>  	  This enables support for systems based on Atmel
+>>  	  AT91RM9200 and AT91SAM9* processors.
+>>  
+>> +config MACH_ASM9260
+>> +	bool "Alphascale ASM9260"
+>> +	select ARCH_REQUIRE_GPIOLIB
+>> +	select COMMON_CLK
+>> +	select IRQ_DOMAIN
+>> +	select SPARSE_IRQ
+>> +	select MULTI_IRQ_HANDLER
+>> +	select GENERIC_IRQ_CHIP
+>> +	select GENERIC_CLOCKEVENTS
+>> +	select CLKSRC_MMIO
+>> +	select CPU_ARM926T
+>> +	help
+>> +	  Support for Alpascale ASM9260 based platform.
 > 
-> That's just a special case that does not even work as it should yet,
+> To enable multiplatform support, please move this to its own
+> arch/arm/mach-asm9260/Kconfig file and make it depend on ARCH_MULTI_V5,
+> then remove all 'select' statements that are implicitly enabled there
+> already (most of the above).
 
-Of course it works. I count at least 3 drivers in mainline (and 1 local)
-that do exactly this.
+Should they be only in defconfig or selected by driver?
 
-> please don't confuse the matter more by talking about drivers that
-> use the IOMMU API explicitly, this series has very little to do with
-> that.
 
-It has everything to do with it. If we go and implement everything in
-terms of DMA/IOMMU then we leave out all other users. Depending on who
-you talk to the direct IOMMU users are the actually important ones.
-
-> > Also, even if in other cases the drivers don't actively ask for an IOMMU
-> > that doesn't mean that they couldn't be made to. For drivers that use
-> > the DMA/IOMMU integration layer this is probably not practicable, but
-> > there is no reason the core couldn't do it.
+>> diff --git a/arch/arm/mach-asm9260/Makefile b/arch/arm/mach-asm9260/Makefile
+>> new file mode 100644
+>> index 0000000..4bd8ebd
+>> --- /dev/null
+>> +++ b/arch/arm/mach-asm9260/Makefile
+>> @@ -0,0 +1,11 @@
+>> +#
+>> +# Makefile for the linux kernel.
+>> +#
+>> +
+>> +# Object file lists.
+>> +
+>> +obj-y			:= core.o
+>> +obj-m			:=
+>> +obj-n			:=
+>> +obj-			:=
 > 
-> We intentionally have an abstraction that is meant to let you write drivers
-> without knowing about iommu, swiotlb or coherency, these are all hidden
-> behind the dma_map_ops implementation.
+> You can remove most of these and just leave the one line.
+> 
+>> diff --git a/arch/arm/mach-asm9260/Makefile.boot b/arch/arm/mach-asm9260/Makefile.boot
+>> new file mode 100644
+>> index 0000000..c57b3b4
+>> --- /dev/null
+>> +++ b/arch/arm/mach-asm9260/Makefile.boot
+>> @@ -0,0 +1,2 @@
+>> +zreladdr-y	:= 0x20008000
+> 
+> This file should be removed, nowadays we use AUTO_ZRELADDR, which is
+> implied by multiplatform.
+> 
+>> +static struct map_desc asm9260_io_desc[] __initdata = {
+>> +	{	/* IO space */
+>> +		.virtual	= (unsigned long)0xf0000000,
+>> +		.pfn		= __phys_to_pfn(0x80000000),
+>> +		.length		= 0x00800000,
+>> +		.type		= MT_DEVICE
+>> +	},
+>> +	{	/* LCD IO space	*/
+>> +		.virtual	= (unsigned long)0xf0a00000,
+>> +		.pfn		= __phys_to_pfn(0x80800000),
+>> +		.length		= 0x00009000,
+>> +		.type		= MT_DEVICE
+>> +	},
+>> +	{	/* GPIO IO space */
+>> +		.virtual	= (unsigned long)0xf0800000,
+>> +		.pfn		= __phys_to_pfn(0x50000000),
+>> +		.length		= 0x00100000,
+>> +		.type		= MT_DEVICE
+>> +	},
+>> +	{	/* SRAM space Cacheable */
+>> +		.virtual	= (unsigned long)0xd0000000,
+>> +		.pfn		= __phys_to_pfn(0x40000000),
+>> +		.length		= 0x00100000,
+>> +#ifdef CONFIG_SRAM_MEM_CACHED
+>> +		.type		= MT_MEMORY
+>> +#else
+>> +		.type		= MT_DEVICE
+>> +#endif
+>> +	},
+>> +};
+>
+> This should not be necessary, as all drivers are supposed to
+> ioremap their own device registers. For large register ranges
+> that are used a lot, you could use these as an optimization to
+> get 1 MB sections mapped using a large TLB entry, but usually
+> the benefit is very small.
 
-Perhaps I'm missing something then. How can you associate two devices
-with the same domain with dma_map_ops?
+Do you mean only "SRAM space Cacheable" section?
 
-Thierry
+
+>> +static void __init asm9260_init(void)
+>> +{
+>> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> +}
+> 
+> When you don't do anything else in the init_machine callback, you can
+> remove it entirely.
+> 
+> 	Arnd
+> 
+
+
+-- 
+Regards,
+Oleksij
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/7f666936/attachment.sig>
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/206fb525/attachment-0001.sig>
