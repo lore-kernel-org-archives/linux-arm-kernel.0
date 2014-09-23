@@ -1,83 +1,139 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 23 Sep 2014 12:34:26 +0530
-Subject: [PATCH] tty/serial: fix config dependencies for samsung serial
-In-Reply-To: <10202237.9vbtDF9MIQ@wuerfel>
-References: <1409671320-7604-1-git-send-email-ch.naveen@samsung.com>
- <3749760.naNt3fHoTI@wuerfel>
- <CAHfPSqAn5gHjDA75Zf1W5=GH9_W+X6+4oc9rDK7CqeSoF3DURw@mail.gmail.com>
- <10202237.9vbtDF9MIQ@wuerfel>
-Message-ID: <CAM4voaky-zin8ikdkLBwpTKy13hz3iON8tmNsd55-kr8po8Qaw@mail.gmail.com>
+Date: Tue, 23 Sep 2014 12:34:33 +0530
+Subject: [PATCH 2/4] pinctrl: exynos: Add irq_chip instance for Exynos7
+ wakeup interrupts
+In-Reply-To: <541FD60F.8060008@gmail.com>
+References: <1410598252-30931-1-git-send-email-a.kesavan@samsung.com>
+ <1410598252-30931-4-git-send-email-a.kesavan@samsung.com>
+ <54142A36.5050703@gmail.com>
+ <CAM4voamF8aydh7-2aC+vLrO1rmPm5GL3Pn6i6rZ3XnzCDHzgJg@mail.gmail.com>
+ <541FD60F.8060008@gmail.com>
+Message-ID: <CAM4voam5KW+gO5QDB_CHOON6v9GXp=7tCpZ-9A9jO99yj+G-=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Tomasz,
 
-I will be taking this forward as Naveen is no longer with Samsung.
-
-On Wed, Sep 3, 2014 at 4:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 03 September 2014 13:51:56 Naveen Krishna Ch wrote:
->> On 2 September 2014 21:16, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday 02 September 2014 20:52:00 Naveen Krishna Chatradhi wrote:
->> >> Make the config symbols SERIAL_SAMSUNG_UARTS_4 and
->> >> SERIAL_SAMSUNG_UARTS depend on SERIAL_SAMSUNG rather than
->> >> PLAT_SAMSUNG.
->> >
->> > Please always describe why you are doing a change. This patch
->> > seems really pointless.
-
-I will re-post the patch with a better commit message once we sort the
-below issue.
-
+On Mon, Sep 22, 2014 at 1:25 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 22.09.2014 08:17, Abhilash Kesavan wrote:
+>> Hi Tomasz,
 >>
->> The SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS config options are
->> meaningful only if SERIAL_SAMSUNG is enabled. Hence the dependency
->> rules were changed. I will repost this patch with better description.
+>> On Sat, Sep 13, 2014 at 4:57 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>> Hi Abhilash,
+>>>
+>>> Please see my comments inline.
+>>>
+>>> On 13.09.2014 10:50, Abhilash Kesavan wrote:
+>>>> Exynos7 uses different offsets for wakeup interrupt configuration registers.
+>>>> So a new irq_chip instance for Exynos7 wakeup interrupts is added. The irq_chip
+>>>> selection is now based on the wakeup interrupt controller compatible string.
+>>>
+>>> [snip]
+>>>
+>>>> @@ -328,9 +322,11 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
+>>>>  /*
+>>>>   * irq_chip for wakeup interrupts
+>>>>   */
+>>>> -static struct exynos_irq_chip exynos_wkup_irq_chip = {
+>>>> +static struct exynos_irq_chip exynos_wkup_irq_chip;
+>>>> +
+>>>
+>>> Why do you still need this, if you have both variants below?
+>>
+>> After adding __initdata to the two variants, I will require to have a
+>> copy of one of them.
+>>
+>>>
+>>>> +static struct exynos_irq_chip exynos4210_wkup_irq_chip = {
+>>>>       .chip = {
+>>>> -             .name = "exynos_wkup_irq_chip",
+>>>> +             .name = "exynos4210_wkup_irq_chip",
+>>>>               .irq_unmask = exynos_irq_unmask,
+>>>>               .irq_mask = exynos_irq_mask,
+>>>>               .irq_ack = exynos_irq_ack,
+>>>> @@ -342,6 +338,29 @@ static struct exynos_irq_chip exynos_wkup_irq_chip = {
+>>>>       .eint_pend = EXYNOS_WKUP_EPEND_OFFSET,
+>>>>  };
+>>>>
+>>>> +static struct exynos_irq_chip exynos7_wkup_irq_chip = {
+>>>> +     .chip = {
+>>>> +             .name = "exynos7_wkup_irq_chip",
+>>>> +             .irq_unmask = exynos_irq_unmask,
+>>>> +             .irq_mask = exynos_irq_mask,
+>>>> +             .irq_ack = exynos_irq_ack,
+>>>> +             .irq_set_type = exynos_irq_set_type,
+>>>> +             .irq_set_wake = exynos_wkup_irq_set_wake,
+>>>> +     },
+>>>> +     .eint_con = EXYNOS7_WKUP_ECON_OFFSET,
+>>>> +     .eint_mask = EXYNOS7_WKUP_EMASK_OFFSET,
+>>>> +     .eint_pend = EXYNOS7_WKUP_EPEND_OFFSET,
+>>>> +};
+>>>> +
+>>>> +/* list of external wakeup controllers supported */
+>>>> +static const struct of_device_id exynos_wkup_irq_ids[] = {
+>>>> +     { .compatible = "samsung,exynos4210-wakeup-eint",
+>>>> +                     .data = &exynos4210_wkup_irq_chip },
+>>>> +     { .compatible = "samsung,exynos7-wakeup-eint",
+>>>> +                     .data = &exynos7_wkup_irq_chip },
+>>>> +     { }
+>>>> +};
+>>>> +
+>>>>  /* interrupt handler for wakeup interrupts 0..15 */
+>>>>  static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
+>>>>  {
+>>>> @@ -434,7 +453,12 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+>>>>       int idx, irq;
+>>>>
+>>>>       for_each_child_of_node(dev->of_node, np) {
+>>>> -             if (of_match_node(exynos_wkup_irq_ids, np)) {
+>>>> +             const struct of_device_id *match;
+>>>> +
+>>>> +             match = of_match_node(exynos_wkup_irq_ids, np);
+>>>> +             if (match) {
+>>>> +                     memcpy(&exynos_wkup_irq_chip, match->data,
+>>>> +                             sizeof(struct exynos_irq_chip));
+>>>
+>>> Hmm, this doesn't look correct to me. You are modifying a static struct
+>>> here. Why couldn't you simply use the exynos irq chip pointed by
+>>> match->data in further registration code?
+>>
+>> That will not be available later once I use __initdata.
+>>
 >
-> My point is that the options are used by both the uart driver and
-> the platform code, e.g. for the purpose of PM debugging which can
-> be enabled even when the serial-samsung driver is turned off.
-
-I looked through the code and could find two references to these
-symbols in the platform-specific code: arch/arm/plat-samsung/init.c
-and arch/arm/mach-s3c64xx/irq-pm.c. The first one is being used to
-initialize the uart platform device in non-dt way while the second one
-saves and restores the uart irq masks for all channels across a
-suspend/resume cycle. Also, the save/restore will get bypassed in case
-CONFIG_SERIAL_SAMSUNG_UARTS is not defined. It does not look like
-either of these cases would cause any issue with the current patch,
-can you please help me understand the problem ?
+> Then either __initdata shouldn't be necessary or kmemdup() should be
+> used to allocate a copy.
+Will fix this and send out a new version soon.
 
 Regards,
 Abhilash
 >
->> >>  config SERIAL_SAMSUNG_UARTS_4
->> >>         bool
->> >> -       depends on PLAT_SAMSUNG
->> >> +       depends on SERIAL_SAMSUNG
->> >>         default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
->> >>         help
->> >>           Internal node for the common case of 4 Samsung compatible UARTs
->> >>
->> >>  config SERIAL_SAMSUNG_UARTS
->> >>         int
->> >> -       depends on PLAT_SAMSUNG
->> >> +       depends on SERIAL_SAMSUNG
->> >>         default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
->> >>         default 3
->> >>         help
->> >>
->> >
->> > Have you checked that it still builds on all samsung platforms when
->> > SERIAL_SAMSUNG is disabled? We have had build errors in this area
->> > in the past.
+>>>
+>>>>                       wkup_np = np;
+>>>>                       break;
+>>>>               }
+>>>> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.h b/drivers/pinctrl/samsung/pinctrl-exynos.h
+>>>> index e060722..0db1e52 100644
+>>>> --- a/drivers/pinctrl/samsung/pinctrl-exynos.h
+>>>> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.h
+>>>> @@ -25,6 +25,9 @@
+>>>>  #define EXYNOS_WKUP_ECON_OFFSET              0xE00
+>>>>  #define EXYNOS_WKUP_EMASK_OFFSET     0xF00
+>>>>  #define EXYNOS_WKUP_EPEND_OFFSET     0xF40
+>>>> +#define EXYNOS7_WKUP_ECON_OFFSET     0x700
+>>>> +#define EXYNOS7_WKUP_EMASK_OFFSET    0x900
+>>>> +#define EXYNOS7_WKUP_EPEND_OFFSET    0xA00
+>>>
+>>> Interestingly enough, the offsets look just like the normal GPIO
+>>> interrupt controller of previous Exynos SoCs. Are you sure those are
+>>> correct? Also if somehow the controller now resembles the normal one,
+>>> doesn't it have the SVC register making it possible to reuse the non
+>>> wake-up code instead?
 >>
->> Yes, it builds for other Samsung platforms.
+>> The wakeup interrupt register offsets are the same as the GPIO
+>> interrupt offsets in earlier Exynos SoCs. There is no SVC register for
+>> the wakeup interrupt block.
 >
-> Ok.
+> OK, your code is fine then.
 >
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Best regards,
+> Tomasz
