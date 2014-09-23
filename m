@@ -1,75 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 22 Sep 2014 21:51:57 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.17
-In-Reply-To: <20140914083423.GV21986@titan.lakedaemon.net>
-References: <20140914083423.GV21986@titan.lakedaemon.net>
-Message-ID: <20140923045157.GB7487@localhost>
+Date: Mon, 22 Sep 2014 21:53:52 -0700
+Subject: [GIT PULL] ARM: Keystone fixes for 3.17-rc4
+In-Reply-To: <1410472179-12796-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1410472179-12796-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140923045352.GC7487@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 14, 2014 at 04:34:23AM -0400, Jason Cooper wrote:
-> oops, resend to include the arm alias.  sorry.
+On Thu, Sep 11, 2014 at 05:49:39PM -0400, Santosh Shilimkar wrote:
+> The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
 > 
-> Guys,
-> 
-> Here's everything we've collected so far wrt mvebu.  I don't see
-> anything else on the horizon atm.  These have been in -next for a while.
-> 
-> Please pull.
-> 
-> thx,
-> 
-> Jason.
-> 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>   Linux 3.17-rc4 (2014-09-07 16:09:43 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-3.17
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/fixes-v3.17-rc4
 > 
-> for you to fetch changes up to ace8578182dc347b043c0825b9873f62fdaa5b77:
+> for you to fetch changes up to 99897500e54560397054aa238c771fa8284d0eb2:
 > 
->   ARM: mvebu: Netgear RN102: Use Hardware BCH ECC (2014-09-14 04:17:13 +0000)
+>   ARM: keystone: dts: fix bindings for pcie and usb clock nodes (2014-09-11 17:41:25 -0400)
 > 
-> ----------------------------------------------------------------
-> mvebu fixes for v3.17
-> 
->  - kirkwood
->     - final driver cleanup of ARCH_KIRKWOOD removal
->     - fix DT based DSA
-> 
->  - mvebu
->     - use BCH ECC for the RN2120 and RN104/2 nand chips
-> 
-> ----------------------------------------------------------------
-> Andrew Lunn (8):
->       cpuidle: kirkwood: Remove ARCH_KIRKWOOD dependency
->       ata: Remove ARCH_KIRKWOOD dependency
->       thermal: Remove ARCH_KIRKWOOD dependency
->       leds: Remove ARCH_KIRKWOOD dependency
->       rtc: Remove ARCH_KIRKWOOD dependency
->       watchdog: Remove ARCH_KIRKWOOD dependency
->       cpufreq: Remove ARCH_KIRKWOOD dependency
->       ARM: Kirkwood: Fix DT based DSA.
-> 
-> Arnaud Ebalard (2):
->       ARM: mvebu: Netgear RN104: Use Hardware BCH ECC
->       ARM: mvebu: Netgear RN2120: Use Hardware BCH ECC
-> 
-> klightspeed at killerwolves.net (1):
->       ARM: mvebu: Netgear RN102: Use Hardware BCH ECC
 
-Hi,
-
-We've been dragging pull requests for a while (we've both been
-busy). However, we're past possibly the last -rc and need to crank down
-in what we consider a fix to be.
-
-Are any of these strictly required for 3.17 or should I just queue them
-for 3.18 at this point? "Fix DT based DSA" seems from the description
-like it might be the sole 3.17 candidate?
+Merged, thanks -- but the patch is mislabelled. It's fixing a DT specification, not a binding.
 
 
 -Olof
