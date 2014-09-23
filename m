@@ -1,173 +1,58 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 23 Sep 2014 18:08:01 +0200
-Subject: [PATCH v6 2/6] sched: move cfs task on a CPU with higher capacity
+Date: Tue, 23 Sep 2014 18:08:03 +0200
+Subject: [PATCH v6 4/6] sched: get CPU's usage statistic
 In-Reply-To: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
 References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1411488485-10025-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the CPU is used for handling lot of IRQs, trig a load balance to check if
-it's worth moving its tasks on another CPU that has more capacity.
-
-As a sidenote, this will note generate more spurious ilb because we already
-trig an ilb if there is more than 1 busy cpu. If this cpu is the only one that
-has a task, we will trig the ilb once for migrating the task.
-
-The nohz_kick_needed function has been cleaned up a bit while adding the new
-test
-
-env.src_cpu and env.src_rq must be set unconditionnaly because they are used
-in need_active_balance which is called even if busiest->nr_running equals 1
+Monitor the usage level of each group of each sched_domain level. The usage is
+the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
+We use the utilization_load_avg to evaluate the usage level of each group.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 70 ++++++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 50 insertions(+), 20 deletions(-)
+ kernel/sched/fair.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 622f8b0..7422044 100644
+index 2cf153d..4097e3f 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -5885,6 +5885,18 @@ fix_small_capacity(struct sched_domain *sd, struct sched_group *group)
+@@ -4523,6 +4523,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
+ 	return target;
  }
  
- /*
-+ * Check whether the capacity of the rq has been noticeably reduced by side
-+ * activity. The imbalance_pct is used for the threshold.
-+ * Return true is the capacity is reduced
-+ */
-+static inline int
-+check_cpu_capacity(struct rq *rq, struct sched_domain *sd)
++static int get_cpu_usage(int cpu)
 +{
-+	return ((rq->cpu_capacity * sd->imbalance_pct) <
-+				(rq->cpu_capacity_orig * 100));
++	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
++	unsigned long capacity = capacity_orig_of(cpu);
++
++	if (usage >= SCHED_LOAD_SCALE)
++		return capacity + 1;
++
++	return (usage * capacity) >> SCHED_LOAD_SHIFT;
 +}
 +
-+/*
-  * Group imbalance indicates (and tries to solve) the problem where balancing
-  * groups is inadequate due to tsk_cpus_allowed() constraints.
-  *
-@@ -6555,6 +6567,14 @@ static int need_active_balance(struct lb_env *env)
- 		 */
- 		if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
- 			return 1;
-+
-+		/*
-+		 * The src_cpu's capacity is reduced because of other
-+		 * sched_class or IRQs, we trig an active balance to move the
-+		 * task
-+		 */
-+		if (check_cpu_capacity(env->src_rq, sd))
-+			return 1;
- 	}
- 
- 	return unlikely(sd->nr_balance_failed > sd->cache_nice_tries+2);
-@@ -6656,6 +6676,9 @@ static int load_balance(int this_cpu, struct rq *this_rq,
- 
- 	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
- 
-+	env.src_cpu = busiest->cpu;
-+	env.src_rq = busiest;
-+
- 	ld_moved = 0;
- 	if (busiest->nr_running > 1) {
- 		/*
-@@ -6665,8 +6688,6 @@ static int load_balance(int this_cpu, struct rq *this_rq,
- 		 * correctly treated as an imbalance.
- 		 */
- 		env.flags |= LBF_ALL_PINNED;
--		env.src_cpu   = busiest->cpu;
--		env.src_rq    = busiest;
- 		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
- 
- more_balance:
-@@ -7372,10 +7393,12 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
- 
  /*
-  * Current heuristic for kicking the idle load balancer in the presence
-- * of an idle cpu is the system.
-+ * of an idle cpu in the system.
-  *   - This rq has more than one task.
-- *   - At any scheduler domain level, this cpu's scheduler group has multiple
-- *     busy cpu's exceeding the group's capacity.
-+ *   - This rq has at least one CFS task and the capacity of the CPU is
-+ *     significantly reduced because of RT tasks or IRQs.
-+ *   - At parent of LLC scheduler domain level, this cpu's scheduler group has
-+ *     multiple busy cpu.
-  *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
-  *     domain span are idle.
-  */
-@@ -7385,9 +7408,10 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	struct sched_domain *sd;
- 	struct sched_group_capacity *sgc;
- 	int nr_busy, cpu = rq->cpu;
-+	bool kick = false;
+  * select_task_rq_fair: Select target runqueue for the waking task in domains
+  * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
+@@ -5663,6 +5674,7 @@ struct sg_lb_stats {
+ 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+ 	unsigned long load_per_task;
+ 	unsigned long group_capacity;
++	unsigned long group_usage; /* Total usage of the group */
+ 	unsigned int sum_nr_running; /* Nr tasks running in the group */
+ 	unsigned int group_capacity_factor;
+ 	unsigned int idle_cpus;
+@@ -6037,6 +6049,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 			load = source_load(i, load_idx);
  
- 	if (unlikely(rq->idle_balance))
--		return 0;
-+		return false;
+ 		sgs->group_load += load;
++		sgs->group_usage += get_cpu_usage(i);
+ 		sgs->sum_nr_running += rq->cfs.h_nr_running;
  
-        /*
- 	* We may be recently in ticked or tickless idle mode. At the first
-@@ -7401,38 +7425,44 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	 * balancing.
- 	 */
- 	if (likely(!atomic_read(&nohz.nr_cpus)))
--		return 0;
-+		return false;
- 
- 	if (time_before(now, nohz.next_balance))
--		return 0;
-+		return false;
- 
- 	if (rq->nr_running >= 2)
--		goto need_kick;
-+		return true;
- 
- 	rcu_read_lock();
- 	sd = rcu_dereference(per_cpu(sd_busy, cpu));
--
- 	if (sd) {
- 		sgc = sd->groups->sgc;
- 		nr_busy = atomic_read(&sgc->nr_busy_cpus);
- 
--		if (nr_busy > 1)
--			goto need_kick_unlock;
-+		if (nr_busy > 1) {
-+			kick = true;
-+			goto unlock;
-+		}
-+
- 	}
- 
--	sd = rcu_dereference(per_cpu(sd_asym, cpu));
-+	sd = rcu_dereference(rq->sd);
-+	if (sd) {
-+		if ((rq->cfs.h_nr_running >= 1) &&
-+				check_cpu_capacity(rq, sd)) {
-+			kick = true;
-+			goto unlock;
-+		}
-+	}
- 
-+	sd = rcu_dereference(per_cpu(sd_asym, cpu));
- 	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
- 				  sched_domain_span(sd)) < cpu))
--		goto need_kick_unlock;
--
--	rcu_read_unlock();
--	return 0;
-+		kick = true;
- 
--need_kick_unlock:
-+unlock:
- 	rcu_read_unlock();
--need_kick:
--	return 1;
-+	return kick;
- }
- #else
- static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
+ 		if (rq->nr_running > 1)
 -- 
 1.9.1
