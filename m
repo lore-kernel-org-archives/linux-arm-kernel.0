@@ -1,100 +1,109 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 23 Sep 2014 19:37:56 +0200
-Subject: [PATCH v2 4/5] ARM: dts: vf610: use new GPIO support
+Date: Tue, 23 Sep 2014 19:37:53 +0200
+Subject: [PATCH v2 1/5] pinctrl: imx: detect uninitialized pins
 In-Reply-To: <cover.1411492954.git.stefan@agner.ch>
 References: <cover.1411492954.git.stefan@agner.ch>
-Message-ID: <b3cc02fe58757a4181119149900a1aef92a37058.1411492954.git.stefan@agner.ch>
+Message-ID: <6d676a88eb82a47f8fa9e16abbc768e3e9ac236a.1411492954.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use GPIO support by adding SD card detection configuration and
-GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
-pins to the iomuxc node to get the GPIO pin settings applied.
+The pinctrl driver initialized the register offsets for the pins
+with 0. On Vybrid an offset of 0 is a valid offset for the pinctrl
+mux register. So far, this was solved using the ZERO_OFFSET_VALID
+flag which allowed offsets of 0. However, this does not allow to
+verify whether a pins struct imx_pmx_func was initialized or not.
+
+Use signed offset values for register offsets and initialize those
+with -1 in order to detect uninitialized offset values reliable.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610-colibri-eval-v3.dts |  5 +++++
- arch/arm/boot/dts/vf610-colibri.dtsi        | 19 +++++++++++++++++++
- arch/arm/boot/dts/vf610-twr.dts             |  1 +
- arch/arm/boot/dts/vf610.dtsi                |  1 +
- 4 files changed, 26 insertions(+)
+ drivers/pinctrl/pinctrl-imx.c   | 9 +++++----
+ drivers/pinctrl/pinctrl-imx.h   | 7 +++----
+ drivers/pinctrl/pinctrl-vf610.c | 2 +-
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-index 7fb3066..9a0e304 100644
---- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
-@@ -33,6 +33,11 @@
- 	status = "okay";
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index 946d594..0d4558b 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -204,7 +204,7 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 		pin_id = pin->pin;
+ 		pin_reg = &info->pin_regs[pin_id];
+ 
+-		if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->mux_reg) {
++		if (pin_reg->mux_reg == -1) {
+ 			dev_err(ipctl->dev, "Pin(%s) does not support mux function\n",
+ 				info->pins[pin_id].name);
+ 			return -EINVAL;
+@@ -308,7 +308,7 @@ static int imx_pinconf_get(struct pinctrl_dev *pctldev,
+ 	const struct imx_pinctrl_soc_info *info = ipctl->info;
+ 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
+ 
+-	if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->conf_reg) {
++	if (pin_reg->conf_reg == -1) {
+ 		dev_err(info->dev, "Pin(%s) does not support config function\n",
+ 			info->pins[pin_id].name);
+ 		return -EINVAL;
+@@ -331,7 +331,7 @@ static int imx_pinconf_set(struct pinctrl_dev *pctldev,
+ 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
+ 	int i;
+ 
+-	if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->conf_reg) {
++	if (pin_reg->conf_reg == -1) {
+ 		dev_err(info->dev, "Pin(%s) does not support config function\n",
+ 			info->pins[pin_id].name);
+ 		return -EINVAL;
+@@ -586,10 +586,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+ 	if (!ipctl)
+ 		return -ENOMEM;
+ 
+-	info->pin_regs = devm_kzalloc(&pdev->dev, sizeof(*info->pin_regs) *
++	info->pin_regs = devm_kmalloc(&pdev->dev, sizeof(*info->pin_regs) *
+ 				      info->npins, GFP_KERNEL);
+ 	if (!info->pin_regs)
+ 		return -ENOMEM;
++	memset(info->pin_regs, 0xff, sizeof(*info->pin_regs) * info->npins);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	ipctl->base = devm_ioremap_resource(&pdev->dev, res);
+diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
+index db408b0..49e55d3 100644
+--- a/drivers/pinctrl/pinctrl-imx.h
++++ b/drivers/pinctrl/pinctrl-imx.h
+@@ -67,8 +67,8 @@ struct imx_pmx_func {
+  * @conf_reg: config register offset
+  */
+ struct imx_pin_reg {
+-	u16 mux_reg;
+-	u16 conf_reg;
++	s16 mux_reg;
++	s16 conf_reg;
  };
  
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpio_ext0 &pinctrl_gpio_ext1 &pinctrl_gpio_ext2>;
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-index 0cd8343..c940e14 100644
---- a/arch/arm/boot/dts/vf610-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-@@ -31,6 +31,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
-+	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+ struct imx_pinctrl_soc_info {
+@@ -83,8 +83,7 @@ struct imx_pinctrl_soc_info {
+ 	unsigned int flags;
  };
  
- &fec1 {
-@@ -71,6 +72,24 @@
+-#define ZERO_OFFSET_VALID	0x1
+-#define SHARE_MUX_CONF_REG	0x2
++#define SHARE_MUX_CONF_REG	0x1
  
- &iomuxc {
- 	vf610-colibri {
-+		pinctrl_gpio_ext0: gpio_ext0 {
-+			fsl,pins = <
-+				VF610_PAD_PTD10__GPIO_89	0x219d
-+			>;
-+		};
-+
-+		pinctrl_gpio_ext1: gpio_ext1 {
-+			fsl,pins = <
-+				VF610_PAD_PTD9__GPIO_88		0x219d
-+			>;
-+		};
-+
-+		pinctrl_gpio_ext2: gpio_ext2 {
-+			fsl,pins = <
-+				VF610_PAD_PTD26__GPIO_68	0x219d
-+			>;
-+		};
-+
- 		pinctrl_esdhc1: esdhc1grp {
- 			fsl,pins = <
- 				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 189b697..3fe8a8f 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -116,6 +116,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
-+	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
- 	status = "okay";
+ #define NO_MUX		0x0
+ #define NO_PAD		0x0
+diff --git a/drivers/pinctrl/pinctrl-vf610.c b/drivers/pinctrl/pinctrl-vf610.c
+index bddd913..b788e15 100644
+--- a/drivers/pinctrl/pinctrl-vf610.c
++++ b/drivers/pinctrl/pinctrl-vf610.c
+@@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
+ static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
+ 	.pins = vf610_pinctrl_pads,
+ 	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
+-	.flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
++	.flags = SHARE_MUX_CONF_REG,
  };
  
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 4d2ec32..467c97e 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -11,6 +11,7 @@
- #include "vf610-pinfunc.h"
- #include <dt-bindings/clock/vf610-clock.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	aliases {
+ static struct of_device_id vf610_pinctrl_of_match[] = {
 -- 
 2.1.0
