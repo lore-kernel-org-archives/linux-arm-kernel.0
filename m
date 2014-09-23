@@ -1,23 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Sep 2014 11:59:32 +0200
-Subject: [PATCH 4/4] ARM: dts: vf610: Use new GPIO support
-In-Reply-To: <00b4375542ac3698ed59d3ea353cc14e1c00a5bc.1410020459.git.stefan@agner.ch>
-References: <cover.1410020458.git.stefan@agner.ch>
- <00b4375542ac3698ed59d3ea353cc14e1c00a5bc.1410020459.git.stefan@agner.ch>
-Message-ID: <CACRpkdZcp7r3XPFDqWZ-owLNhn491wzMzBjGAHi79ozzePU+UQ@mail.gmail.com>
+From: b38611@freescale.com (Fugang Duan)
+Date: Tue, 23 Sep 2014 17:36:17 +0800
+Subject: [PATCH v1 0/3] ARM: imx6sx: add enet support
+Message-ID: <1411464980-2495-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 6, 2014 at 6:25 PM, Stefan Agner <stefan@agner.ch> wrote:
+The three patches just to enable enet1 and enet2 for imx6sx boards.
 
-> Use GPIO support by adding SD card detection configuration and
-> GPIO pinmux for Colibri's standard GPIO pins.
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Fugang Duan (3):
+  ARM: imx6sx: add imx6sx iomux-gpr field define
+  ARM: imx: add enet init for i.mx6sx
+  ARM: dts: imx6x: Add enet2 support for imx6sx-sdb board
 
-I guess you need the rest to be merged first though?
+ arch/arm/boot/dts/imx6sx-sdb.dts            |   28 +++++++++++++++
+ arch/arm/boot/dts/imx6sx.dtsi               |    2 +-
+ arch/arm/mach-imx/mach-imx6sx.c             |   51 +++++++++++++++++++++++++++
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |   39 ++++++++++++++++++++
+ 4 files changed, 119 insertions(+), 1 deletions(-)
 
-Yours,
-Linus Walleij
+-- 
+1.7.8
