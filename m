@@ -1,54 +1,63 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 23 Sep 2014 15:45:01 +0800
-Subject: [PATCH 1/2] watchdog: dw_wdt: restart the counter immediately
- after enabling WDT
-In-Reply-To: <541D867C.6080407@roeck-us.net>
-References: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
- <1411108199-1280-2-git-send-email-jszhang@marvell.com>
- <541D867C.6080407@roeck-us.net>
-Message-ID: <20140923154501.50dc8111@xhacker>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Tue, 23 Sep 2014 16:50:07 +0900
+Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
+In-Reply-To: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
+References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <013001cfd702$feb42900$fc1c7b00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Guenter,
+Hi,
 
-On Sat, 20 Sep 2014 06:51:56 -0700
-Guenter Roeck <linux@roeck-us.net> wrote:
-
-> On 09/18/2014 11:29 PM, Jisheng Zhang wrote:
-> > The TOP_INIT may be zero, so the timeout period may be very short after
-> > initialization is done, thus the system may be reset soon after enabling.
-> > We fix this problem by restarting the counter immediately after enabling
-> > WDT.
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >   drivers/watchdog/dw_wdt.c | 1 +
-> >   1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> > index 9f21029..ad0619d 100644
-> > --- a/drivers/watchdog/dw_wdt.c
-> > +++ b/drivers/watchdog/dw_wdt.c
-> > @@ -146,6 +146,7 @@ static int dw_wdt_open(struct inode *inode, struct
-> > file *filp) dw_wdt_set_top(DW_WDT_MAX_TOP);
-> >   		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
-> >   		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-> > +		dw_wdt_keepalive();
-> >   	}
-> >
-> >   	dw_wdt_set_next_heartbeat();
-> >
-> After getting access to the datasheet, I concluded that this fix is wrong
-> or at least more risky than necessary. The datasheet states that top_init,
-> ie bit 4-7 of the wdt_torr register, needs to be initialized with the
-> desired timeout period prior to enabling the watchdog. dw_wdt_set_top()
-> sets it to 0 instead, ie to the lowest possible timeout period.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Abhilash Kesavan
+> Sent: Monday, September 22, 2014 1:47 PM
+> To: linux-samsung-soc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> catalin.marinas at arm.com
+> Cc: naveenkrishna.ch at gmail.com; kesavan.abhilash at gmail.com;
+> tomasz.figa at gmail.com
+> Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7
+> SoC
 > 
+> Changes since v4:
+> - Fixed comments from Tomasz Figa:
+> 	- Changed the namespace prefix from exynos to samsung
+> 	- Defined bindings to take all input clocks
+> 	- Sorted the Kconfig entries alphabetically in clock Makefile
+> 	- Used consistent 1 tab line breaks across the clock file
+> 	- Statically initialized the samsung_cmu_info struct
+> - Enabled exynos7 in the arm64 defconfig as per Catalin Marinas' comment.
+> - Added Kukjin Kim's ack along with Thomas Abraham's tested and reviewed
+> tags.
+> 
+> Changes since v3:
+> - Removed aliases for serial controllers from dtsi file and moved it
+>   into board specific dts file as suggested by Arnd.
+> - Based this series on Robert Richter's patches for adding vendor
+>   device tree sub-directories for arm64.
+>   http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+> 
+> This patchset supports the new Exynos7 Samsung SoC based on Cortex-A57.
+> Exynos7 is a System-On-Chip (SoC) that is based on 64-bit ARMv8 RISC
+> processor.
+> 
+> The following patches are tested based on linux-next tree (20140919).
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/
+> 
+> Following patches are required for this series:
+> 1- "tty/serial: fix config dependencies for samsung serial"
+>    https://www.mail-archive.com/linux-samsung-soc <at>
+> vger.kernel.org/msg36208.html
+> 2- "dts, kbuild: Implement support for dtb vendor subdirs" patchset
+>    http://comments.gmane.org/gmane.linux.kbuild.devel/12131
 
-In patch V2, 
-I initialize the TOP_INIT when setting TOP in function dw_wdt_set_top(), this
-also can fix the "reboot soon" problem. Could you please have a review again?
+Maybe you make this patch on top of the Robert's patch.
+As I know, Robert's patch is not yet merged in mainline.
+You should specify this dependency in mail thread.
 
-Thanks,
-Jisheng
+[1]: https://lkml.org/lkml/2014/9/5/64
+
+Best Regards,
+Chanho Park
