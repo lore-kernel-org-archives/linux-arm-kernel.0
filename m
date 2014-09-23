@@ -1,55 +1,56 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 23 Sep 2014 20:12:50 +0200
-Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAGhQ9VzZ8LadDT5RWUSX89q0WP3fGiQ8f=bWbRVfEz5Vy_zZKw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 20:13:16 +0200
+Subject: [RFT PATCH] mtd: ixp4xx: Unrequire CONFIG_MTD_CFI_BE_BYTE_SWAP
+In-Reply-To: <719460394.273364.1411492720358.JavaMail.zimbra@xes-inc.com>
+References: <719460394.273364.1411492720358.JavaMail.zimbra@xes-inc.com>
+Message-ID: <3290917.AsGO4THCdo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 September 2014 06:40, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> Currently a syscon entity can be only registered directly through a
-> platform device that binds to a dedicated syscon driver. However in
-> certain use cases it is desirable to make a device used with another
-> driver a syscon interface provider.
->
-> For example, certain SoCs (e.g. Exynos) contain system controller
-> blocks which perform various functions such as power domain control,
-> CPU power management, low power mode control, but in addition contain
-> certain IP integration glue, such as various signal masks,
-> coprocessor power control, etc. In such case, there is a need to have
-> a dedicated driver for such system controller but also share registers
-> with other drivers. The latter is where the syscon interface is helpful.
->
-> In case of DT based platforms, this patch decouples syscon object from
-> syscon platform driver, and allows to create syscon objects first time
-> when it is required by calling of syscon_regmap_lookup_by APIs and keep
-> a list of such syscon objects along with syscon provider device_nodes
-> and regmap handles.
->
-> For non-DT based platforms, this patch keeps syscon platform driver
-> structure where is can be probed and such non-DT based drivers can use
-> syscon_regmap_lookup_by_pdev API and get access to regmap handles.
-> Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-> we can completly remove platform driver of syscon, and keep only helper
-> functions to get regmap handles.
->
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+On Tuesday 23 September 2014 12:18:40 Aaron Sierra wrote:
+> -#ifndef __ARMEB__
+> -#ifndef CONFIG_MTD_CFI_BE_BYTE_SWAP
+> -#  error CONFIG_MTD_CFI_BE_BYTE_SWAP required
+> -#endif
+>  
+>  static inline u16 flash_read16(void __iomem *addr)
+>  {
+> -       return be16_to_cpu(__raw_readw((void __iomem *)((unsigned long)addr ^ 0x2)));
+> +       return be16_to_cpu(__raw_readw(addr));
+>  }
+>  
+>  static inline void flash_write16(u16 d, void __iomem *addr)
+>  {
+> -       __raw_writew(cpu_to_be16(d), (void __iomem *)((unsigned long)addr ^ 0x2));
+> +       __raw_writew(cpu_to_be16(d), addr);
+>  }
+>  
+>  #define        BYTE0(h)        ((h) & 0xFF)
+>  #define        BYTE1(h)        (((h) >> 8) & 0xFF)
+> 
 
-Hi Pankaj,
+Your patch looks like a good idea, but I think the above is still wrong
+because you no longer fix up the address to swap the 16-bit halves of
+a 32-bit word.
 
-I wrote a clk driver using syscon and your patch. clk driver uses
-CLK_OF_DECLARE, btw.
+My guess is that you can just do 
 
-It works but I get a '(null): Failed to create debugfs directory'
-message in the boot log.
+static inline u16 flash_read16(void __iomem *addr)
+{
+	if (!IS_ENABLED(CPU_BIG_ENDIAN))
+		addr = (void __iomem *)((unsigned long)addr ^ 0x2));
 
-Tested-by: Joachim Eastwood <manabian@gmail.com>
+        return readl_relaxed(addr);
+}
 
-regards,
-Joachim Eastwood
+static inline void flash_write16(u16 d, void __iomem *addr)
+{
+	if (!IS_ENABLED(CPU_BIG_ENDIAN))
+		addr = (void __iomem *)((unsigned long)addr ^ 0x2));
+
+        writel_relaxed(d, addr);
+}
+
+to do this.
+
+	Arnd
