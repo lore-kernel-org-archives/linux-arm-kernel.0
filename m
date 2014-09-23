@@ -1,64 +1,37 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Tue, 23 Sep 2014 23:04:28 +0800
-Subject: [PATCH v3 1/3] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <20140923165822.27cfde69@bbrezillon>
-References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140923145413.GA1633@localhost.localdomain>
- <20140923165822.27cfde69@bbrezillon>
-Message-ID: <20140923150427.GB1633@localhost.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Sep 2014 17:06:28 +0200
+Subject: [periperi] How to set default GPIO pin ?
+In-Reply-To: <2862746.g5u9pdpKDi@avalon>
+References: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
+ <2862746.g5u9pdpKDi@avalon>
+Message-ID: <CACRpkdb1jF-ro3XcFHFC+Lhgi+0dEHzQYVSSLV6AWnAxiwNLdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 04:58:22PM +0200, Boris BREZILLON wrote:
-> On Tue, 23 Sep 2014 22:54:15 +0800
-> Huang Shijie <shijie8@gmail.com> wrote:
-> 
-> > On Tue, Sep 23, 2014 at 04:07:34PM +0200, Boris BREZILLON wrote:
-> > > Add a new function to move bits (not bytes) from a memory region to
-> > > another one.
-> > > This function is similar to memmove except it acts at bit level.
-> > > This function is needed to implement GPMI raw access functions, given the
-> > > fact that ECC engine does not pad ECC bits to the next byte boundary.
-> > sorry for not comment your v2 patch set.
-> > 
-> > > 
-> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 88 ++++++++++++++++++++++++++++++++++
-> > >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
-> > >  2 files changed, 92 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > > index 87e658c..e2f706a 100644
-> > > --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > > @@ -1353,3 +1353,91 @@ int gpmi_read_page(struct gpmi_nand_data *this,
-> > >  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
-> > >  	return start_dma_with_bch_irq(this, desc);
-> > >  }
-> > > +
-> > > +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-> > > +		    const u8 *src, size_t src_bit_off,
-> > > +		    size_t nbits)
-> > we can simplify the code.
-> 
-> Any suggestions ?
-> 
-> > 
-> > We could use the bytes to replace the @nbits.
-> > 
-> > The chunk data is always byte aligned.
-> 
-> This function is also used to store ECC bits in the OOB buffer and
-> these chunk of data are not byte aligned :-).
-yes. you are right. I missed it.
+On Wed, Sep 10, 2014 at 10:55 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Sunday 31 August 2014 22:08:52 Kuninori Morimoto wrote:
+>>
+>> I know we can use "defalt" PFC settings on DT.
+>> But, how to use "defalt" GPIO pin settings on DT ?
+>>
+>> We would like to use GPIO 7-17 as Low output,
+>> and do nothing after boot.
+>
+> From a DT point of view I believe this is supposed to be done by specifying
+> the output-low or output-high properties in the pinctrl configuration node.
+> However, these properties are not supported by the PFC driver, and there's no
+> easy way for the PFC driver to configure GPIOs handled by a different driver
+> such as the gpio-rcar driver for instance.
+>
+> Linus, do you have any hindsight on how this should be implemented ?
 
-could you also comment these two hooks in the patch set.
+I have suggested adding GPIO hogs, so that a GPIO node can specify
+that some GPIO's specified on the local ship be hogged high or
+low at probe. Generic DT bindings and generic code in gpiolib.c.
 
-I hope Brian also can check it, and we can make it more clear about how
-to implement them.
+gpios-hog-high = <....>;
+gpios-hog-low = <....>;
 
-
-thanks
-Huang Shijie
+Yours,
+Linus Walleij
