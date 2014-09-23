@@ -1,46 +1,21 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 15:50:07 +0200
-Subject: [PATCH v4 7/9] net: pxa168_eth: allow Berlin SoCs to use the
- pxa168_eth driver
-In-Reply-To: <4458671.9hKSvmlZNz@wuerfel>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
- <1411474536-22626-8-git-send-email-antoine.tenart@free-electrons.com>
- <4458671.9hKSvmlZNz@wuerfel>
-Message-ID: <20140923135007.GB18924@kwain>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 23 Sep 2014 15:52:49 +0200
+Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
+ access
+In-Reply-To: <20140923135241.GI12187@cbox>
+References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
+ <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
+ <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
+ <20140923111412.GG12187@cbox> <54215E6D.6090308@redhat.com>
+ <54216B1B.2010205@arm.com> <20140923135241.GI12187@cbox>
+Message-ID: <54217B31.1010309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Il 23/09/2014 15:52, Christoffer Dall ha scritto:
+> Therefore, I think we should really just merge the one-line fix or the
+> patch I sent before.  Paolo seems fine with it either way.
 
-On Tue, Sep 23, 2014 at 02:40:01PM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 14:15:34 Antoine Tenart wrote:
-> > diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-> > index 1b4fc7c639e6..48b9466d1781 100644
-> > --- a/drivers/net/ethernet/marvell/Kconfig
-> > +++ b/drivers/net/ethernet/marvell/Kconfig
-> > @@ -64,7 +64,7 @@ config MVPP2
-> >  
-> >  config PXA168_ETH
-> >         tristate "Marvell pxa168 ethernet support"
-> > -       depends on CPU_PXA168
-> > +       depends on CPU_PXA168 || ARCH_BERLIN
-> >         select PHYLIB
-> >         ---help---
-> >           This driver supports the pxa168 Ethernet ports.
-> > 
-> 
-> Myabe you can also add '|| COMPILE_TEST' here, to allow building it
+Yes, it's on its way to Linus.
 
-We can add this.
-
-> on other architectures. Check if you need 'depends on OF' though.
-
-I don't think that's needed, the driver still supports non-dt cases.
-I'll check.
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Paolo
