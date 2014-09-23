@@ -1,51 +1,56 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 23 Sep 2014 09:44:11 +0200
-Subject: [RESEND PATCH 1/4] ARM: STi: DT: STiH407: 407 DT Entry for
- clockgen A0
-In-Reply-To: <1408977888-10473-2-git-send-email-gabriel.fernandez@linaro.org>
-References: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
- <1408977888-10473-2-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <542124CB.1080307@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 09:44:25 +0200
+Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
+ of_platform_populate
+In-Reply-To: <20140923070238.GH30514@ulmo>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <3261451.zpO6MVx5yo@wuerfel> <20140923070238.GH30514@ulmo>
+Message-ID: <3765297.6j3Rv68iqn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 23 September 2014 09:02:39 Thierry Reding wrote:
+
+> > I see two problems with using deferred probing here: 
+> > 
+> > - we don't actually need to defer the probing but the binding to the driver
+> >   when no dma ops are set, but it seems silly to even create the device
+> >   before we can find out which ops it should use.
+> 
+> What does device creation have to do with anything? Surely a device
+> won't need IOMMU services before the device is bound to a driver.
+
+The problem is that the driver will start using the IOMMU as soon
+as it calls dma_map_*, but that happens at runtime, not necessarily
+during the probe function.
+
+So we can get into the weird situation that probe() returns success,
+but then you can't use the device yet because you don't know whether
+it is supposed to use an IOMMU or not.
+
+> >   The reason is that a driver does not actively ask for an IOMMU as it would
+> >   for other subsystems (gpio, led, dmaengine, ...).
+> 
+> Actually it does. At least in some cases. If you want to use the IOMMU
+> API directly you'd call something like iommu_present() on the bus type
+> and then allocate an IOMMU domain and attach to it. Unfortunately the
+> API seems to have been designed under the assumption that IOMMU will
+> have been registered before any users, so the API doesn't propagate any
+> meaningful errors.
+
+That's just a special case that does not even work as it should yet,
+please don't confuse the matter more by talking about drivers that
+use the IOMMU API explicitly, this series has very little to do with
+that.
+
+> Also, even if in other cases the drivers don't actively ask for an IOMMU
+> that doesn't mean that they couldn't be made to. For drivers that use
+> the DMA/IOMMU integration layer this is probably not practicable, but
+> there is no reason the core couldn't do it.
+
+We intentionally have an abstraction that is meant to let you write drivers
+without knowing about iommu, swiotlb or coherency, these are all hidden
+behind the dma_map_ops implementation.
 
 
-On 08/25/2014 04:44 PM, Gabriel FERNANDEZ wrote:
-> Patch adds DT entries for clockgen A0
->
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
-> ---
->   arch/arm/boot/dts/stih407-clock.dtsi | 32 ++++++++++++++++++++++++++++++++
->   1 file changed, 32 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
-> index 800f46f..e03e86e 100644
-> --- a/arch/arm/boot/dts/stih407-clock.dtsi
-> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
-> @@ -7,6 +7,10 @@
->    */
->   / {
->   	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
->   		/*
->   		 * Fixed 30MHz oscillator inputs to SoC
->   		 */
-> @@ -35,5 +39,33 @@
->   			clock-frequency = <200000000>;
->   			clock-output-names = "clk-s-icn-reg-0";
->   		};
-> +
-> +		/*
-> +		 * ClockGenAs on SASG2
-> +		 */
-Note that I removed this comment since no SASG2 on STiH407.
-
-> +		clockgen-a at 090ff000 {
-> +			compatible = "st,clkgen-c32";
-> +			reg = <0x90ff000 0x1000>;
-...
+	Arnd
