@@ -1,44 +1,90 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 23 Sep 2014 18:04:35 -0500
-Subject: [PATCH v2 0/3] watchdog: add support for QCOM WDT
-Message-ID: <cover.1411513109.git.joshc@codeaurora.org>
+Date: Tue, 23 Sep 2014 18:04:38 -0500
+Subject: [PATCH v2 3/3] watchdog: qcom: register a restart notifier
+In-Reply-To: <cover.1411513109.git.joshc@codeaurora.org>
+References: <cover.1411513109.git.joshc@codeaurora.org>
+Message-ID: <2d539bc944f3e8fc70f39728b0f61fd171b2e5bf.1411513109.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset provides support for the Watchdog Timer (WDT) found in the Krait
-Processor Sub-system (KPSS) of the MSM8960, APQ8064, and IPQ8064 chips.
+The WDT's BITE_TIME warm-reset behavior can be leveraged as a last
+resort mechanism for triggering chip reset.  Usually, other restart
+methods (such as PS_HOLD) are preferrable for issuing a more complete
+reset of the chip.  As such, keep the priority of the watchdog notifier
+low.
 
-This driver is implemented ontop of WATCHDOG_CORE, and therefore its primary
-interface is through userspace.  The implemantion is currently very basic (i.e.
-it doesn't support PRETIMEOUT, even though it could be implemented through the
-WDT's BARK functionality).  It should also be fairly easy to extend this driver
-in the future to support newer chipsets as well.
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
+ drivers/watchdog/qcom-wdt.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Patch 3 also extends the driver to also register a restart_notifier, making it
-possible for the WDT to act as a restart mechanism if more favorable mechanisms
-don't work.  This is important for some boards which don't support PS_HOLD,
-like the IPQ8064-based AP148 board.
-
-Changes since v1:
-  - Make use of clock API instead of using a 'clock-frequency' property
-  - Setup default timeout of 30 seconds when one is not specified
-  - Add remove() function to allow for module unloading
-  - Don't acquire/release watchdog lock on restart
-  - Don't bail completely if restart_handler registration fails
-
-Josh Cartwright (3):
-  watchdog: qcom: add support for KPSS WDT
-  watchdog: qcom: document device tree bindings
-  watchdog: qcom: register a restart notifier
-
- .../devicetree/bindings/watchdog/qcom-wdt.txt      |  22 +++
- drivers/watchdog/Kconfig                           |  13 ++
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/qcom-wdt.c                        | 204 +++++++++++++++++++++
- 4 files changed, 240 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
- create mode 100644 drivers/watchdog/qcom-wdt.c
-
+diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+index d5e46e2..eba92ef 100644
+--- a/drivers/watchdog/qcom-wdt.c
++++ b/drivers/watchdog/qcom-wdt.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/reboot.h>
+ #include <linux/watchdog.h>
+ 
+ #define WDT_RST		0x0
+@@ -25,6 +26,7 @@
+ struct qcom_wdt {
+ 	struct watchdog_device	wdd;
+ 	struct clk		*clk;
++	struct notifier_block	restart_nb;
+ 	void __iomem		*base;
+ };
+ 
+@@ -86,6 +88,23 @@ static const struct watchdog_info qcom_wdt_info = {
+ 	.identity	= KBUILD_MODNAME,
+ };
+ 
++static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
++			    void *data)
++{
++	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
++
++	/*
++	 * Trigger watchdog bite:
++	 *    Setup BITE_TIME to be very low, and enable WDT.
++	 *      0x31F3 => 390ms @ 32kHz, also value at reset
++	 */
++	writel(0, wdt->base + WDT_EN);
++	writel(1, wdt->base + WDT_RST);
++	writel(0x31F3, wdt->base + WDT_BITE_TIME);
++	writel(1, wdt->base + WDT_EN);
++	return NOTIFY_DONE;
++}
++
+ static int qcom_wdt_probe(struct platform_device *pdev)
+ {
+ 	struct qcom_wdt *wdt;
+@@ -141,6 +160,14 @@ static int qcom_wdt_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/*
++	 * WDT restart notifier has priority 0 (use as a last resort)
++	 */
++	wdt->restart_nb.notifier_call = qcom_wdt_restart;
++	ret = register_restart_handler(&wdt->restart_nb);
++	if (ret)
++		dev_err(&pdev->dev, "failed to setup restart handler\n");
++
+ 	platform_set_drvdata(pdev, wdt);
+ 	return 0;
+ }
+@@ -149,6 +176,7 @@ static int qcom_wdt_remove(struct platform_device *pdev)
+ {
+ 	struct qcom_wdt *wdt = platform_get_drvdata(pdev);
+ 
++	unregister_restart_handler(&wdt->restart_nb);
+ 	watchdog_unregister_device(&wdt->wdd);
+ 	clk_disable_unprepare(wdt->clk);
+ 	return 0;
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
