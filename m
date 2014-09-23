@@ -1,69 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 20:18:19 +0200
-Subject: [PATCH v4 3/9] Documentation: bindings: net: add the Marvell
- PXA168 Ethernet controller
-In-Reply-To: <5421AE7C.30504@gmail.com>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
- <5150779.ibmzDh88cj@wuerfel> <5421AE7C.30504@gmail.com>
-Message-ID: <3847496.NqfTxpsf9X@wuerfel>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 23 Sep 2014 13:21:41 -0500
+Subject: [PATCH 2/2] ARM: dts: qcom: Add SATA support on IPQ8064/AP148
+In-Reply-To: <1411496501-20130-1-git-send-email-galak@codeaurora.org>
+References: <1411496501-20130-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1411496501-20130-2-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 19:31:40 Sebastian Hesselbarth wrote:
-> It has been a while I looked it up in the pxa168 datasheet, but IIRC
-> there is only one port per controller. FWIW, there actually is also
-> just one port per controller for Orion SoCs. The multiple ports per
-> controller comes from the PPC system controllers, i.e. mv643xx hence
-> the name. We just made the binding look like it is more ports available
-> to make it backwards compatible.. although I doubt anyone is still using
-> mv643xx anywhere.
+Add SATA PHY and SATA AHCI controller nodes to device tree to enable
+generic ahci support on the IPQ8064/AP148 board.
 
-Ok, I see.
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq8064-ap148.dts |  8 ++++++++
+ arch/arm/boot/dts/qcom-ipq8064.dtsi      | 33 ++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
 
-> > If there is only one port and we just have to know which one that is,
-> > I don't think we need the child nodes, but if one can have multiple
-> > ports operate independently then the driver will need a rework
-> > to actually be usable with that configuration.
-> 
-> I doubt pxa168 needs port nodes at all, i.e. we have the phy-handle
-> directly as property of the controller node.
-
-Ah, good.
-
-> The HEC PHY node itself will be a sub-node of some future CEC node,
-> while the (internal) MII PHY node can stay as a sub-node of the
-> controller, e.g.
-> 
-> (one final example to make sure we agree on the same)
-> 
-> eth0: ethernet at f7b90000 {
->         compatible = "marvell,pxa168-eth";
->         reg = <...>;
->         #address-cells = <1>;
->         #size-cells = <0>;
->         phy-handle = <&ethphy0>;
-> 
->         ethphy0: ethernet-phy at 0 {
->                 reg = <0>;
->         };
-> };
-> 
-> cec0: cec at f7f00baa {
->         compatible = "marvell,berlin-cec";
->         reg = <...>;
->         #address-cells = <1>;
->         #size-cells = <0>;
->         
->         hecphy0: hdmi-ethernet-phy at 0 {
->                 reg = <0>;
->         };
-> };
-> 
-> With berlin2cd-google-chromecast.dts overwriting
-> 
-> &eth0 { phy-handle = <&hecphy0>; };
-
-Ok, now I also understood how the cec fits into this. Yes, I think this
-looks very good.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+index 95e6495..55b2910 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
++++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
+@@ -81,5 +81,13 @@
+ 				};
+ 			};
+ 		};
++
++		sata-phy at 1b400000 {
++			status = "ok";
++		};
++
++		sata at 29000000 {
++			status = "ok";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+index 244f857..63b2146 100644
+--- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
+@@ -234,6 +234,39 @@
+ 			};
+ 		};
+ 
++		sata_phy: sata-phy at 1b400000 {
++			compatible = "qcom,ipq806x-sata-phy";
++			reg = <0x1b400000 0x200>;
++
++			clocks = <&gcc SATA_PHY_CFG_CLK>;
++			clock-names = "cfg";
++
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
++		sata at 29000000 {
++			compatible = "qcom,ipq806x-ahci", "generic-ahci";
++			reg = <0x29000000 0x180>;
++
++			interrupts = <0 209 0x0>;
++
++			clocks = <&gcc SFAB_SATA_S_H_CLK>,
++				 <&gcc SATA_H_CLK>,
++				 <&gcc SATA_A_CLK>,
++				 <&gcc SATA_RXOOB_CLK>,
++				 <&gcc SATA_PMALIVE_CLK>;
++			clock-names = "slave_face", "iface", "core",
++					"rxoob", "pmalive";
++
++			assigned-clocks = <&gcc SATA_RXOOB_CLK>, <&gcc SATA_PMALIVE_CLK>;
++			assigned-clock-rates = <100000000>, <100000000>;
++
++			phys = <&sata_phy>;
++			phy-names = "sata-phy";
++			status = "disabled";
++		};
++
+ 		qcom,ssbi at 500000 {
+ 			compatible = "qcom,ssbi";
+ 			reg = <0x00500000 0x1000>;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
