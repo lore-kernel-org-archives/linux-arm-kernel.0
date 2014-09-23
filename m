@@ -1,75 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 23 Sep 2014 10:05:36 +0200
-Subject: [PATCH v2 0/3] CMA & device tree, another approach
-In-Reply-To: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
-References: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <542129D0.1040808@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 10:07:31 +0200
+Subject: [PATCH] tty/serial: fix config dependencies for samsung serial
+In-Reply-To: <CAM4voaky-zin8ikdkLBwpTKy13hz3iON8tmNsd55-kr8po8Qaw@mail.gmail.com>
+References: <1409671320-7604-1-git-send-email-ch.naveen@samsung.com>
+ <10202237.9vbtDF9MIQ@wuerfel>
+ <CAM4voaky-zin8ikdkLBwpTKy13hz3iON8tmNsd55-kr8po8Qaw@mail.gmail.com>
+Message-ID: <5903767.VzDJhUfQDI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Tuesday 23 September 2014 12:34:26 Abhilash Kesavan wrote:
+> >>
+> >> The SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS config options are
+> >> meaningful only if SERIAL_SAMSUNG is enabled. Hence the dependency
+> >> rules were changed. I will repost this patch with better description.
+> >
+> > My point is that the options are used by both the uart driver and
+> > the platform code, e.g. for the purpose of PM debugging which can
+> > be enabled even when the serial-samsung driver is turned off.
+> 
+> I looked through the code and could find two references to these
+> symbols in the platform-specific code: arch/arm/plat-samsung/init.c
+> and arch/arm/mach-s3c64xx/irq-pm.c. The first one is being used to
+> initialize the uart platform device in non-dt way while the second one
+> saves and restores the uart irq masks for all channels across a
+> suspend/resume cycle. Also, the save/restore will get bypassed in case
+> CONFIG_SERIAL_SAMSUNG_UARTS is not defined. It does not look like
+> either of these cases would cause any issue with the current patch,
+> can you please help me understand the problem ?
 
-On 2014-09-11 13:22, Marek Szyprowski wrote:
-> Hello,
->
-> This is another approach to finish support for reserved memory regions
-> defined in device tree. Previous attempts
-> (http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html
-> and https://lkml.org/lkml/2014/7/14/108) ended in merging parts of the
-> code and documentation. Merged patches allow to reserve memory, but
-> there is still no reserved memory drivers nor any code that actually
-> uses reserved memory regions.
->
-> The final conclusion from the above mentioned threads is that there is
-> no automated reserved memory initialization. All drivers that want to
-> use reserved memory, should initialize it on their own.
->
-> This patch series provides two driver for reserved memory regions (one
-> based on CMA and one based on dma_coherent allocator). The main
-> improvement comparing to the previous version is removal of automated
-> reserved memory for every device and support for named memory regions.
->
-> Those patches are for merging, rebased on top of recent linux-next tree.
+It's possible that it works fine now, I just pointed out that we
+had bugs in this area in the past, so it would be good if you can
+add to the changelog a statement that you have checked that the
+new patch does not cause problems here.
 
-Andrew: could you take those patches to your "next" branch together with
-other CMA-related changes that are already there?
-
-> Best regards
-> Marek Szyprowski
-> Samsung R&D Institute Poland
->
-> Changes since v1 (https://lkml.org/lkml/2014/8/26/339):
-> - removed patches for named reserved regions - they will be discussed
->    separately
-> - added a check for 'no-map' property to dma coherent allocator
->    (suggested by Laura Abbott)
-> - removed example code for s5p-mfc driver
->
-> Changes since '[PATCH v2 RESEND 0/4] CMA & device tree, once again' version:
-> (https://lkml.org/lkml/2014/7/14/108)
-> - added return error value to of_reserved_mem_device_init()
-> - added support for named memory regions (so more than one region can be
->    defined per device)
-> - added usage example - converted custom reserved memory code used by
->    s5p-mfc driver to the generic reserved memory handling code
->
-> Patch summary:
->
-> Marek Szyprowski (3):
->    drivers: of: add return value to of_reserved_mem_device_init
->    drivers: dma-coherent: add initialization from device tree
->    drivers: dma-contiguous: add initialization from device tree
->
->   drivers/base/dma-coherent.c     | 145 ++++++++++++++++++++++++++++++++++------
->   drivers/base/dma-contiguous.c   |  71 ++++++++++++++++++++
->   drivers/of/of_reserved_mem.c    |   3 +-
->   include/linux/cma.h             |   3 +
->   include/linux/of_reserved_mem.h |   9 ++-
->   mm/cma.c                        |  62 ++++++++++++++---
->   6 files changed, 259 insertions(+), 34 deletions(-)
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+	Arnd
