@@ -1,54 +1,109 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 23 Sep 2014 17:50:07 +0800
-Subject: unalignment access to device / strongly ordered memory
-In-Reply-To: <20140923093751.GP5182@n2100.arm.linux.org.uk>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491629@CNBJMBX05.corpusers.net>
- <20140923093751.GP5182@n2100.arm.linux.org.uk>
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49162A@CNBJMBX05.corpusers.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Sep 2014 11:58:00 +0200
+Subject: [PATCH 3/4] gpio: vf610: add gpiolib/IRQ chip driver for Vybird
+In-Reply-To: <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
+References: <cover.1410020458.git.stefan@agner.ch>
+ <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
+Message-ID: <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sat, Sep 6, 2014 at 6:25 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-I see,
-Very Thanks for your clarification!
+> Add a gpiolib and IRQ chip driver for Vybrid ARM SoC using the
+> Vybrid's GPIO and PORT module. The driver is instanced once per
+> each GPIO/PORT module pair and handles 32 GPIO's.
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+(...)
+>  obj-$(CONFIG_GPIO_UCB1400)     += gpio-ucb1400.o
+> +obj-$(CONFIG_GPIO_VF610)       += gpio-vf610.o
 
------Original Message-----
-On Tue, Sep 23, 2014 at 01:25:17PM +0800, Wang, Yalin wrote:
-> Hi
-> 
-> I have a question about
-> unalignment access to device / strongly ordered memory.
-> The TRM said that :
-> 
-> Unaligned data accesson page A3-108identifies the instructions that 
-> can make an unaligned memory access, and the required configuration 
-> setting. If such an access is to Device or Strongly-ordered memory
-> then:
-> - if the implementation does not include the Virtualization 
-> Extensions, the effect is UNPREDICTABLE
-> - if the implementation includes the Virtualization Extensions, the access generates an Alignment fault.
-> 
-> 
-> But I see arch\arm\mm\alignment.c,
-> It don't check if the fault address is a device / strongly ordered 
-> memory address.
+Some like to keep GPIOs tightly associated with a pin controller
+in a file next to the pin controller.
 
-Doing so is too expensive.
+I.e. in drivers/pinctrl/freescale/gpio-vf610.c
 
-> Is it safe ?
+But this works too. Any preference?
 
-Yes - if you use misaligned accesses to a device or strongly ordered region, you will get unpredictable results.  If it triggers an alignment fault, we will fix up the load by performing multiple accesses to the address and combining their results.
+> +#define GPIO_PER_PORT          32
 
-If reading or writing to the region has side effects (maybe the device is read sensitive) maybe it won't like the multiple reads - that's not the problem of the OS to resolve.  That still comes under "unpredictable".
+Very generic define. VF610_GPIOS_PER_PORT?
 
-Hence, whether or not you have virtualisation extensions, the result of performing an unaligned access will be UNPREDICTABLE.
+> +struct vf610_gpio_port {
+> +       struct gpio_chip gc;
+> +       void __iomem *base;
+> +       void __iomem *gpio_base;
+> +       u8 irqc[GPIO_PER_PORT];
+> +       int irq;
 
-> Do we need check it and then panic kernel or kill the user process
+irq? Why do you need to keep this around?
 
-How would we do that when non-virtualised cases may not produce an exception?
+> +static const struct of_device_id vf610_gpio_dt_ids[] = {
+> +       { .compatible = "fsl,vf610-gpio" },
+> +       { /* sentinel */ }
+> +};
+> +
+> +static inline void vf610_gpio_writel(u32 val, void __iomem *reg)
+> +{
+> +       __raw_writel(val, reg);
 
-The bottom line on this is quite simply: never generate misaligned loads and stores to devices.
+Use writel_relaxed() instead unless you can explain why you want this.
 
---
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up according to speedtest.net.
+(Same for all occurences.)
+
+> +static int vf610_gpio_get(struct gpio_chip *gc, unsigned int gpio)
+> +{
+> +       struct vf610_gpio_port *port =
+> +               container_of(gc, struct vf610_gpio_port, gc);
+> +
+> +       return !!(vf610_gpio_readl(port->gpio_base + GPIO_PDIR) & 1 << gpio);
+
+#include <linux/bitops.h>
+
+... & BIT(gpio)
+
+> +static void vf610_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+> +{
+> +       struct vf610_gpio_port *port =
+> +               container_of(gc, struct vf610_gpio_port, gc);
+> +       unsigned long mask = 1 << gpio;
+
+= BIT(gpio);
+
+> +static void vf610_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+> +{
+> +       struct vf610_gpio_port *port = irq_get_handler_data(irq);
+> +       struct irq_chip *chip = irq_desc_get_chip(desc);
+> +       int pin;
+> +       unsigned long irq_isfr;
+> +
+> +       chained_irq_enter(chip, desc);
+> +
+> +       irq_isfr = vf610_gpio_readl(port->base + PORT_ISFR);
+> +
+> +       for_each_set_bit(pin, &irq_isfr, GPIO_PER_PORT) {
+> +               vf610_gpio_writel(1 << pin, port->base + PORT_ISFR);
+
+BIT(pin)
+
+(etc)
+
+> +       port->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> +       if (port->irq == NO_IRQ)
+> +               return -ENODEV;
+
+Can't you just use a local int irq; variable for this?
+
+> +static int __init gpio_vf610_init(void)
+> +{
+> +       return platform_driver_register(&vf610_gpio_driver);
+> +}
+> +postcore_initcall(gpio_vf610_init);
+
+postcore again. I don't like this, can you get rid of it?
+
+Overall the driver looks very nice except for these nitty gritty details.
+
+Yours,
+Linus Walleij
