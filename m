@@ -1,57 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 23 Sep 2014 18:40:46 +0200
-Subject: [PATCH v4 3/9] Documentation: bindings: net: add the Marvell
- PXA168 Ethernet controller
-In-Reply-To: <9401592.hUYDkriFVO@wuerfel>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
- <4014272.rJbSfrLcuB@wuerfel> <542195B0.6080706@gmail.com>
- <9401592.hUYDkriFVO@wuerfel>
-Message-ID: <5421A28E.7060600@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 23 Sep 2014 11:42:45 -0500
+Subject: [PATCH 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <CAK=WgbZanJYN7-vXW=wo0H40piauHGQHYPPppcCpc+6VapXmeg@mail.gmail.com>
+References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
+ <1404836521-59637-3-git-send-email-s-anna@ti.com>
+ <CAK=WgbY-WmcJdnLHDf1CSkJqNBUeUMPTLcEZyLGKnECbxH1OAQ@mail.gmail.com>
+ <53D7F6F3.9020804@ti.com>
+ <CAK=WgbZ+NhA5AAhURUOojwnCbi2wYkJ11i-C5e7-kpZL5vD_3g@mail.gmail.com>
+ <54174082.4010008@ti.com>
+ <CAK=WgbZanJYN7-vXW=wo0H40piauHGQHYPPppcCpc+6VapXmeg@mail.gmail.com>
+Message-ID: <5421A305.1050509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 06:29 PM, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 17:45:52 Sebastian Hesselbarth wrote:
->> For reference, this is what we have for MVEBU SoCs with multiple ports
->> per controller:
->>
->> eth: ethernet-ctrl at 72000 {
->>          compatible = "marvell,orion-eth";
-...
->>          reg = <0x72000 0x4000>;
-...
->>
->>          ethernet-port at 0 {
->>                  compatible = "marvell,orion-eth-port";
-...
->>                  phy-handle = <&ethphy>;
->>          };
->> };
->>
->> mdio: mdio-bus at 72004 {
->>          compatible = "marvell,orion-mdio";
-...
->>          reg = <0x72004 0x84>;
-..
->>          ethphy: ethernet-phy {
->>                  /* set phy address in board file */
->>          };
->> };
+Hi Ohad,
 
-> But in this example, you have the same registers and the same
-> clocks in two nodes, which are even used by the same device driver
-> at the moment. It's not a big issue, but my feeling is that Antoine's
-> approach was actually better because it more closely reflects
-> the way that the hardware is built.
+On 09/23/2014 09:16 AM, Ohad Ben-Cohen wrote:
+> Hi Suman,
+> 
+> On Mon, Sep 15, 2014 at 10:39 PM, Suman Anna <s-anna@ti.com> wrote:
+>> These processors need to use their internal RAM for loading, which is
+>> not for generic usage by the kernel, so defining a CMA block for this
+>> memory doesn't make sense.
+> 
+> Ok - so just to make sure I understand, this is physical memory you
+> want to use, which belongs to the remote processor, and which isn't
+> mapped normally by the kernel?
 
-I was not referring to the separate mdio bus node, but putting the
-ethernet-phy node as a child of ethernet-ctrl.
+Yes, this is not the regular DDR that is mapped into kernel normally,
+but is a RAM internal to the remote processor subsystem. The MPU can
+access it through a bus address/
 
-Anyway, I can live with the ethernet-phy being a child of the controller
-node until we discover where it is hooked up.
+> 
+>> Will it suffice to replace the memcpy() with memcpy_toio()?
+> 
+> Yes, memcpy_toio should be fine (and then you don't need to cast the
+> cookie returned by ioremap).
 
-For the internal MII PHY the controller node maybe is the only sane
-place to put it in. The HEC PHY will reside within the CEC IP node but
-that is compatible with Antoine's proposal.
+I have posted v2, and have not modified for this. The memcpy portion is
+actually present in the remoteproc_elf_loader.c, and looks like I need
+to export some flags from rproc_va_to_da if I were to differentiate
+this. Is that ok with you?
 
-Sebastian
+regards
+Suman
