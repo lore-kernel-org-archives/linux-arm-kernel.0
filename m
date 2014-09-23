@@ -1,27 +1,45 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 23 Sep 2014 13:25:17 +0800
-Subject: unalignment access to device / strongly ordered memory
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB491629@CNBJMBX05.corpusers.net>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 23 Sep 2014 15:17:17 +0900
+Subject: [PATCH 2/2] ARM: dts: Add rtc_src clk for s3c-rtc on
+ exynos5250-snow
+References: <1410954633-27025-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410954633-27025-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=W7xJ01m2oLtuDnogOmrpwpztbir=59oSWU6oojFYUWKw@mail.gmail.com>
+ <5419ADF9.3010509@suse.de>
+Message-ID: <00f801cfd6f6$07e10500$17a30f00$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi 
+Kukjin Kim wrote:
+> > 
+> Andreas F?rber wrote:
 
-I have a question about
-unalignment access to device / strongly ordered memory.
-The TRM said that :
+[...]
 
-Unaligned data accesson page A3-108identifies the instructions that can make an unaligned memory 
-access, and the required configuration setting. If such an access is to Device or Strongly-ordered memory 
-then:
-- if the implementation does not include the Virtualization Extensions, the effect is UNPREDICTABLE
-- if the implementation includes the Virtualization Extensions, the access generates an Alignment fault.
+> > > Kukjin: Andreas's patch series was Reviewed long ago I think and by
+> > > now I'd imagine it's got some conflicts due to it not having been
+> > > applied in a timely fashion.  Perhaps you could fix it up for Andreas
+> > > (since he's already rebased it several times) and land it?
+> > >
+> > > If I had to guess, outstanding from Andreas's series (patchwork IDs listed):
+> > >
+> > > 4751131 New          [v7] ARM: dts: Prepare node labels for exynos5250
+> > > 4664801 New          [v6,04/10] ARM: dts: Clean up exynos5250-snow
+> > > 4664771 New          [v6,05/10] ARM: dts: Fill in bootargs for exynos5250-snow
+> > > 4664731 New          [v6,06/10] ARM: dts: Clean up exynos5250-smdk5250
+> > > 4664751 New          [v6,07/10] ARM: dts: Clean up exynos5250-arndale
+> > > 4664711 New          [v6,08/10] ARM: dts: Fix apparent GPIO typo in
+> > > exynos5250-arndale
+> > > 4664681 New          [v6,09/10] ARM: dts: Simplify USB3503 on exynos5250-arndale
+> > > 4664691 New          [v6,10/10] ARM: dts: Add exynos5250-spring device tree
+> >
+> > Yes, Kukjin told me not to resend anything, and I haven't heard back
+> > from him since his Kernel Summit trip.
+> >
+> Sorry about that and I thought I took them :( I'll sort them out tonight
+> including this series together.
+> 
+Hmm...since some conflicts with dp and mmc_slot related patches, I couldn't,
+but Andreas' patches will be handled by tonight :(
 
-
-But I see arch\arm\mm\alignment.c,
-It don't check if the fault address is a device / strongly ordered memory address.
-Is it safe ?
-Do we need check it and then panic kernel or kill the user process
-If the fault address is device / strongly ordered memory before simulate the unalign access?
-
-Thanks
+- Kukjin
