@@ -1,34 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 23 Sep 2014 13:59:50 -0700
-Subject: [PATCH v13 0/9] Per-user clock constraints
-In-Reply-To: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <5421DF46.2010107@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 23 Sep 2014 15:09:36 -0600
+Subject: [PATCH v1 00/21] Use MSI chip to configure MSI/MSI-X in all
+ platforms
+In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20140923210936.GC27117@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/14 11:40, Tomeu Vizoso wrote:
-> Hello,
->
-> this version of the patchset addresses some issues that Russell pointed out
-> yesterday:
->
-> * Refactor the changes to clkdev.c to reduce the amount of ifdefs.
->
-> * Properly release clocks when there isn't enough memory to create the per-user
-> wrapper.
->
-> * Add clk_provider_put(struct clk_core*) for clock implementations to call
-> instead of clk_put(struct clk*) (instead of exposing __clk_put).
->
-> As the previous versions, this is based on top of 3.17-rc4 and Mike's patch at
-> [0].
+On Fri, Sep 05, 2014 at 06:09:45PM +0800, Yijing Wang wrote:
+> This series is based Bjorn's pci-next branch + Alexander Gordeev's two patches
+> "Remove arch_msi_check_device()" link: https://lkml.org/lkml/2014/7/12/41
+> 
+> Currently, there are a lot of weak arch functions in MSI code.
+> Thierry Reding Introduced MSI chip framework to configure MSI/MSI-X in arm.
+> This series use MSI chip framework to refactor MSI code across all platforms
+> to eliminate weak arch functions. It has been tested fine in x86(with or without
+> irq remap).
 
-Any thoughts on my comments on patch set #10[1]? It seems like we can
-avoid having a flag day to support this.
+I see you plan some updates, so I'll look for a v2 posting after v3.17 releases.
+It will be great to get rid of some of those weak functions!
 
-[1] https://lkml.org/lkml/2014/9/9/960
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Bjorn
