@@ -1,99 +1,79 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 23 Sep 2014 14:48:54 +0200
-Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
- access
-In-Reply-To: <54216B1B.2010205@arm.com>
-References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
- <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
- <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
- <20140923111412.GG12187@cbox> <54215E6D.6090308@redhat.com>
- <54216B1B.2010205@arm.com>
-Message-ID: <54216C36.60903@redhat.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Tue, 23 Sep 2014 18:23:07 +0530
+Subject: [PATCH/RFC 0/2] serial: samsung: add support for early console
+In-Reply-To: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
+References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAGOxZ51aghOqbZuv34TuBuQdKjmHdkhaYJvH=VxNjxb-pZKE8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 23/09/2014 14:44, Andre Przywara ha scritto:
-> Hi,
-> 
-> On 23/09/14 12:50, Paolo Bonzini wrote:
->> Il 23/09/2014 13:14, Christoffer Dall ha scritto:
->>> On Tue, Sep 23, 2014 at 10:36:30AM +0200, Paolo Bonzini wrote:
->>>> Il 23/09/2014 00:07, Will Deacon ha scritto:
->>>>>>>  {
->>>>>>>  	if (!(lr_desc.state & LR_STATE_MASK))
->>>>>>> -		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
->>>>>>> +		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
->>>>>>>  }
->>>>> Does this work for big-endian arm64 machines? Surely the bug is due to
->>>>> casting a u32 * to an unsigned long *, and not specifically related to
->>>>> atomics (which is where it happened to explode)?
->>>>
->>> It does look like the whole thing is broken on BE systems, but fixing
->>> that becomes non-trivial.  I don't think this fix is incorrect in
->>> itself, but we do have a larger issue with BE.
->>>
->>> I took a stab at fixing this (untested for BE), which looks something
->>> like the following, but I'm a bit uneasy about having to test and merge
->>> this as a fix given the rush before 3.17 is released.
->>>
->>> Thoughts?
->>
->> If big-endian is broken anyway, let's apply this only:
->>
->>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>> index 35b0c12..c66dc9ed 100644
->>> --- a/include/kvm/arm_vgic.h
->>> +++ b/include/kvm/arm_vgic.h
->>> @@ -168,8 +168,8 @@ struct vgic_v2_cpu_if {
->>>  	u32		vgic_hcr;
->>>  	u32		vgic_vmcr;
->>>  	u32		vgic_misr;	/* Saved only */
->>> -	u32		vgic_eisr[2];	/* Saved only */
->>> -	u32		vgic_elrsr[2];	/* Saved only */
->>> +	u64		vgic_eisr;	/* Saved only */
->>> +	u64		vgic_elrsr;	/* Saved only */
->>>  	u32		vgic_apr;
->>>  	u32		vgic_lr[VGIC_V2_MAX_LRS];
->>>  };
-> 
-> I think Marc's point on this was not to spoil 32bit code (as this is the
-> GIC, which is shared). In the GICv2 spec the register are declared as a
-> number of 32 bit registers, so there is some sense in keeping it u32.
-> So I came up with the following this morning:
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 35b0c12..6f884df 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -168,8 +168,14 @@ struct vgic_v2_cpu_if {
->         u32             vgic_hcr;
->         u32             vgic_vmcr;
->         u32             vgic_misr;      /* Saved only */
-> -       u32             vgic_eisr[2];   /* Saved only */
-> -       u32             vgic_elrsr[2];  /* Saved only */
-> +       union {
-> +               u32             vgic_eisr[2];   /* Saved only */
-> +               unsigned long   vgic_eisr_bm[8 / sizeof(long)];
-> +       };
-> +       union {
-> +               u32             vgic_elrsr[2];  /* Saved only */
-> +               unsigned long   vgic_elrsr_bm[8 / sizeof(long)];
-> +       };
->         u32             vgic_apr;
->         u32             vgic_lr[VGIC_V2_MAX_LRS];
->  };
-> 
-> And then use vgic_elrsr_bm in set_bit().
-> 
-> Admittedly a bit hacky, but fixes the alignment issue while still
-> retaining sane code for ARM.
-> If anyone knows a good fix for that "8 / sizeof(long)" kludge, I am all
-> ears.
+Hi Marek,
 
-	u32		vgic_eisr[2] __aligned(BITS_PER_LONG/8);
-	u32		vgic_elrsr[2] __aligned(BITS_PER_LONG/8);
+On Mon, Sep 22, 2014 at 6:44 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> This patchset adds support for early console defined in device tree. As
+> an example, DTS files for all Exynos4 based machines are updated with
+> the correct value for common chosen/sdtout property.
+>
+> To get it fully functional additional improvements (support for
+> early_ioremap) are needed in early console code.
+>
+Is these really tested?
+So that mean we need to wait till __ioremap__ support available for ARM.
+How to take this forward then? Here is a platform (exynos7) which
+needs earlycon support for debugging some of the early core things and
+ARM64 has ioremap support as well. There is no reason why we should
+hold earlycon support for exyons7.
+I see two solution here:
+1> How about re-spin patch-1 which will just add ealrycon support for
+__exynos4210__ serial type only? And rest of the types can be added as
+incremental patches, as and when ioremap for ARM available.
+Atleast this approch will solve exynos7 problem of not having earlycon support.
+And This patch can be tested on exynos7 (I can do that).
+2> Take  my patch which is working and tested for exynos7 and can be
+easily extended and generalized when ioremap for ARM is available.
 
-Still wouldn't fix big-endian, however, and it's not necessary if we go
-for set_bit as in Christoffer's original patch.
+My preference would be the the first one.
+Let me know your thoughts please.
+In case you are ok with 1st approach, can you please re-spin patch1
+with needed changes?
 
-Paolo
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
+>
+>
+> Patch summary:
+>
+> Tomasz Figa (2):
+>   serial: samsung: Add support for of_earlycon
+>   ARM: dts: exynos4: Add stdout-path properties
+>
+>  arch/arm/boot/dts/exynos4210-origen.dts         |  1 +
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |  1 +
+>  arch/arm/boot/dts/exynos4210-trats.dts          |  1 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |  1 +
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 +
+>  arch/arm/boot/dts/exynos4412-origen.dts         |  1 +
+>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |  1 +
+>  arch/arm/boot/dts/exynos4412-tiny4412.dts       |  4 +
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |  1 +
+>  drivers/tty/serial/Kconfig                      |  1 +
+>  drivers/tty/serial/samsung.c                    | 97 +++++++++++++++++++++++++
+>  11 files changed, 113 insertions(+)
+>
+> --
+> 1.9.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Regards,
+Alim
