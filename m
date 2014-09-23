@@ -1,34 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 12:28:08 +0200
-Subject: [PATCH v6 12/12] ARM: dts: berlin: enable USB on the Google Chromecast
+Date: Tue, 23 Sep 2014 12:28:02 +0200
+Subject: [PATCH v6 06/12] Documentation: bindings: add doc for the Berlin USB
+ PHY
 In-Reply-To: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1411468088-5702-13-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1411468088-5702-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Document the bindings of the Marvell Berlin USB PHY driver.
 
-Enable usb1 on Google Chromecast which is connected to micro-USB
-plug used for external power supply, too.
-
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/phy/berlin-usb-phy.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
 
-diff --git a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-index bcd81ffc495d..5c42c3bfb613 100644
---- a/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-+++ b/arch/arm/boot/dts/berlin2cd-google-chromecast.dts
-@@ -27,3 +27,7 @@
- };
- 
- &uart0 { status = "okay"; };
+diff --git a/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+new file mode 100644
+index 000000000000..be33780f668e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+@@ -0,0 +1,16 @@
++* Marvell Berlin USB PHY
 +
-+&usb_phy1 { status = "okay"; };
++Required properties:
++- compatible: "marvell,berlin2-usb-phy" or "marvell,berlin2cd-usb-phy"
++- reg: base address and length of the registers
++- #phys-cells: should be 0
++- resets: reference to the reset controller
 +
-+&usb1 { status = "okay"; };
++Example:
++
++	usb-phy at f774000 {
++		compatible = "marvell,berlin2-usb-phy";
++		reg = <0xf774000 0x128>;
++		#phy-cells = <0>;
++		resets = <&chip 0x104 14>;
++	};
 -- 
 1.9.1
