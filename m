@@ -1,139 +1,74 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 23 Sep 2014 12:34:33 +0530
-Subject: [PATCH 2/4] pinctrl: exynos: Add irq_chip instance for Exynos7
- wakeup interrupts
-In-Reply-To: <541FD60F.8060008@gmail.com>
-References: <1410598252-30931-1-git-send-email-a.kesavan@samsung.com>
- <1410598252-30931-4-git-send-email-a.kesavan@samsung.com>
- <54142A36.5050703@gmail.com>
- <CAM4voamF8aydh7-2aC+vLrO1rmPm5GL3Pn6i6rZ3XnzCDHzgJg@mail.gmail.com>
- <541FD60F.8060008@gmail.com>
-Message-ID: <CAM4voam5KW+gO5QDB_CHOON6v9GXp=7tCpZ-9A9jO99yj+G-=A@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 23 Sep 2014 09:14:01 +0200
+Subject: [RFC PATCH v3 7/7] arm: dma-mapping: plumb our iommu mapping ops
+ into arch_setup_dma_ops
+In-Reply-To: <20140922174337.GI7936@arm.com>
+References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
+ <1410539695-29128-8-git-send-email-will.deacon@arm.com>
+ <20140922091934.GH1470@ulmo> <20140922174337.GI7936@arm.com>
+Message-ID: <20140923071355.GI30514@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Mon, Sep 22, 2014 at 06:43:37PM +0100, Will Deacon wrote:
+> Hi Thierry,
+> 
+> On Mon, Sep 22, 2014 at 10:19:35AM +0100, Thierry Reding wrote:
+> > On Fri, Sep 12, 2014 at 05:34:55PM +0100, Will Deacon wrote:
+> > [...]
+> > > +static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size)
+> > > +{
+> > > +	struct dma_iommu_mapping *mapping;
+> > > +
+> > > +	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+> > 
+> > If I understand correctly this will be called for each device that has
+> > an IOMMU master interface and will end up creating a new mapping for
+> > each of the devices. Each of these mappings will translate to a domain
+> > in the IOMMU API, which in turn is a separate address space.
+> 
+> Correct, although that's largely because I've bolted on the existing ARM
+> IOMMU code.
+> 
+> > How do you envision to support use-cases where a set of devices need to
+> > share a single domain? This is needed for example in DRM where SoCs
+> > often have a set of hardware blocks (each with its own master interface)
+> > that compose the display device. On Tegra for example there are two
+> > display controllers that need access to the same IOVA domain so that
+> > they can scan out framebuffers.
+> 
+> Yup. In this case, the iommu_dma_mapping passed to arch_setup_dma_ops
+> contains a domain and an allocator for each IOMMU instance in the system.
+> It would then be up to the architecture how it makes use of those, but
+> the most obvious thing to do would be to attach devices mastering through
+> an IOMMU instance to that per-instance domain.
+> 
+> The other use-case is isolation (one domain per device), which I guess
+> matches what the ARM code is doing at the moment.
 
-On Mon, Sep 22, 2014 at 1:25 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 22.09.2014 08:17, Abhilash Kesavan wrote:
->> Hi Tomasz,
->>
->> On Sat, Sep 13, 2014 at 4:57 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>> Hi Abhilash,
->>>
->>> Please see my comments inline.
->>>
->>> On 13.09.2014 10:50, Abhilash Kesavan wrote:
->>>> Exynos7 uses different offsets for wakeup interrupt configuration registers.
->>>> So a new irq_chip instance for Exynos7 wakeup interrupts is added. The irq_chip
->>>> selection is now based on the wakeup interrupt controller compatible string.
->>>
->>> [snip]
->>>
->>>> @@ -328,9 +322,11 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
->>>>  /*
->>>>   * irq_chip for wakeup interrupts
->>>>   */
->>>> -static struct exynos_irq_chip exynos_wkup_irq_chip = {
->>>> +static struct exynos_irq_chip exynos_wkup_irq_chip;
->>>> +
->>>
->>> Why do you still need this, if you have both variants below?
->>
->> After adding __initdata to the two variants, I will require to have a
->> copy of one of them.
->>
->>>
->>>> +static struct exynos_irq_chip exynos4210_wkup_irq_chip = {
->>>>       .chip = {
->>>> -             .name = "exynos_wkup_irq_chip",
->>>> +             .name = "exynos4210_wkup_irq_chip",
->>>>               .irq_unmask = exynos_irq_unmask,
->>>>               .irq_mask = exynos_irq_mask,
->>>>               .irq_ack = exynos_irq_ack,
->>>> @@ -342,6 +338,29 @@ static struct exynos_irq_chip exynos_wkup_irq_chip = {
->>>>       .eint_pend = EXYNOS_WKUP_EPEND_OFFSET,
->>>>  };
->>>>
->>>> +static struct exynos_irq_chip exynos7_wkup_irq_chip = {
->>>> +     .chip = {
->>>> +             .name = "exynos7_wkup_irq_chip",
->>>> +             .irq_unmask = exynos_irq_unmask,
->>>> +             .irq_mask = exynos_irq_mask,
->>>> +             .irq_ack = exynos_irq_ack,
->>>> +             .irq_set_type = exynos_irq_set_type,
->>>> +             .irq_set_wake = exynos_wkup_irq_set_wake,
->>>> +     },
->>>> +     .eint_con = EXYNOS7_WKUP_ECON_OFFSET,
->>>> +     .eint_mask = EXYNOS7_WKUP_EMASK_OFFSET,
->>>> +     .eint_pend = EXYNOS7_WKUP_EPEND_OFFSET,
->>>> +};
->>>> +
->>>> +/* list of external wakeup controllers supported */
->>>> +static const struct of_device_id exynos_wkup_irq_ids[] = {
->>>> +     { .compatible = "samsung,exynos4210-wakeup-eint",
->>>> +                     .data = &exynos4210_wkup_irq_chip },
->>>> +     { .compatible = "samsung,exynos7-wakeup-eint",
->>>> +                     .data = &exynos7_wkup_irq_chip },
->>>> +     { }
->>>> +};
->>>> +
->>>>  /* interrupt handler for wakeup interrupts 0..15 */
->>>>  static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
->>>>  {
->>>> @@ -434,7 +453,12 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
->>>>       int idx, irq;
->>>>
->>>>       for_each_child_of_node(dev->of_node, np) {
->>>> -             if (of_match_node(exynos_wkup_irq_ids, np)) {
->>>> +             const struct of_device_id *match;
->>>> +
->>>> +             match = of_match_node(exynos_wkup_irq_ids, np);
->>>> +             if (match) {
->>>> +                     memcpy(&exynos_wkup_irq_chip, match->data,
->>>> +                             sizeof(struct exynos_irq_chip));
->>>
->>> Hmm, this doesn't look correct to me. You are modifying a static struct
->>> here. Why couldn't you simply use the exynos irq chip pointed by
->>> match->data in further registration code?
->>
->> That will not be available later once I use __initdata.
->>
->
-> Then either __initdata shouldn't be necessary or kmemdup() should be
-> used to allocate a copy.
-Will fix this and send out a new version soon.
+I think there are two cases here. You can have a composite device that
+wants to manage a single domain (using its own allocator) for a set of
+hardware devices. At the same time a set of devices (think 2D and 3D
+engines) could want to use a multiple domains for process separation.
+In that case I'd expect a logical DRM device to allocate one domain per
+process and then associate the 2D and 3D engines with that same domain
+on process switch.
 
-Regards,
-Abhilash
->
->>>
->>>>                       wkup_np = np;
->>>>                       break;
->>>>               }
->>>> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.h b/drivers/pinctrl/samsung/pinctrl-exynos.h
->>>> index e060722..0db1e52 100644
->>>> --- a/drivers/pinctrl/samsung/pinctrl-exynos.h
->>>> +++ b/drivers/pinctrl/samsung/pinctrl-exynos.h
->>>> @@ -25,6 +25,9 @@
->>>>  #define EXYNOS_WKUP_ECON_OFFSET              0xE00
->>>>  #define EXYNOS_WKUP_EMASK_OFFSET     0xF00
->>>>  #define EXYNOS_WKUP_EPEND_OFFSET     0xF40
->>>> +#define EXYNOS7_WKUP_ECON_OFFSET     0x700
->>>> +#define EXYNOS7_WKUP_EMASK_OFFSET    0x900
->>>> +#define EXYNOS7_WKUP_EPEND_OFFSET    0xA00
->>>
->>> Interestingly enough, the offsets look just like the normal GPIO
->>> interrupt controller of previous Exynos SoCs. Are you sure those are
->>> correct? Also if somehow the controller now resembles the normal one,
->>> doesn't it have the SVC register making it possible to reuse the non
->>> wake-up code instead?
->>
->> The wakeup interrupt register offsets are the same as the GPIO
->> interrupt offsets in earlier Exynos SoCs. There is no SVC register for
->> the wakeup interrupt block.
->
-> OK, your code is fine then.
->
-> Best regards,
-> Tomasz
+What I proposed a while back was to leave it up to the IOMMU driver to
+choose an allocator for the device. Or rather, choose whether to use a
+custom allocator or the DMA/IOMMU integration allocator. The way this
+worked was to keep a list of devices in the IOMMU driver. Devices in
+this list would be added to domain reserved for DMA/IOMMU integration.
+Those would typically be devices such as SD/MMC, audio, ... devices that
+are in-kernel and need no per-process separation. By default devices
+wouldn't be added to a domain, so devices forming a composite DRM device
+would be able to manage their own domain.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/5c5ff690/attachment-0001.sig>
