@@ -1,48 +1,42 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Tue, 23 Sep 2014 22:54:15 +0800
-Subject: [PATCH v3 1/3] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140923145413.GA1633@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 16:54:19 +0200
+Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
+In-Reply-To: <1411371952-5618-4-git-send-email-jingchang.lu@freescale.com>
+References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
+ <1411371952-5618-4-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <3321146.kBfn28qbNM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 04:07:34PM +0200, Boris BREZILLON wrote:
-> Add a new function to move bits (not bytes) from a memory region to
-> another one.
-> This function is similar to memmove except it acts at bit level.
-> This function is needed to implement GPMI raw access functions, given the
-> fact that ECC engine does not pad ECC bits to the next byte boundary.
-sorry for not comment your v2 patch set.
+On Monday 22 September 2014 15:45:49 Jingchang Lu wrote:
+> @@ -0,0 +1,117 @@
+> +/*
+> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
 
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 88 ++++++++++++++++++++++++++++++++++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
->  2 files changed, 92 insertions(+)
-> 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> index 87e658c..e2f706a 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> @@ -1353,3 +1353,91 @@ int gpmi_read_page(struct gpmi_nand_data *this,
->  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
->  	return start_dma_with_bch_irq(this, desc);
->  }
+Can you change the license so this file is available under both GPL and
+BSD or X11 license?
+
+> +/dts-v1/;
+> +#include "ls1021a.dtsi"
 > +
-> +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-> +		    const u8 *src, size_t src_bit_off,
-> +		    size_t nbits)
-we can simplify the code.
+> +/ {
+> +       model = "LS1021A TWR Board";
+> +
+> +       aliases {
+> +               enet2_rgmii_phy = &rgmii_phy1;
+> +               enet0_sgmii_phy = &sgmii_phy2;
+> +               enet1_sgmii_phy = &sgmii_phy0;
+> +       };
+> +};
+> 
 
-We could use the bytes to replace the @nbits.
+I've never seen alias nodes for mdio devices. What are these used for?
+Shouldn't you use 'phy-handle' properties in the ethernet nodes instead?
 
-The chunk data is always byte aligned.
-
-
-Btw: please add more comments in this function.
-
-thanks
-Huang Shijie
+	Arnd
