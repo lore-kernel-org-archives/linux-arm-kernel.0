@@ -1,82 +1,166 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 23 Sep 2014 11:09:05 +0200
-Subject: [PATCH v12 04/10] clk: use struct clk only for external API
-In-Reply-To: <20140922180807.GN5182@n2100.arm.linux.org.uk>
-References: <1411395124-2476-1-git-send-email-tomeu.vizoso@collabora.com>
- <1411395353-3189-1-git-send-email-tomeu.vizoso@collabora.com>
- <20140922180807.GN5182@n2100.arm.linux.org.uk>
-Message-ID: <542138B1.1020107@collabora.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 23 Sep 2014 12:24:27 +0300
+Subject: [PATCH] spi: qup: Fix incorrect block transfers
+In-Reply-To: <1411360048-3388-1-git-send-email-agross@codeaurora.org>
+References: <1411360048-3388-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1411464267.18580.46.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 08:08 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 22, 2014 at 04:15:47PM +0200, Tomeu Vizoso wrote:
->> diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
->> index d278572..3b3068b 100644
->> --- a/drivers/clk/clk.h
->> +++ b/drivers/clk/clk.h
->> @@ -9,9 +9,15 @@
->>   * published by the Free Software Foundation.
->>   */
->>  
->> +#include <linux/clk-private.h>
->> +
->>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->>  struct clk_core *of_clk_get_by_clkspec(struct of_phandle_args *clkspec);
->>  struct clk_core *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
->>  void of_clk_lock(void);
->>  void of_clk_unlock(void);
->>  #endif
->> +
->> +#if defined(CONFIG_COMMON_CLK)
->> +struct clk *__clk_create_clk(struct clk_core *clk_core);
->> +#endif
+
+Hi Andy,
+
+On Sun, 2014-09-21 at 23:27 -0500, Andy Gross wrote:
+> This patch fixes a number of errors with the QUP block transfer mode.  Errors
+> manifested themselves as input underruns, output overruns, and timed out
+> transactions.
+
+At what speeds are you seeing those errors?
+
 > 
-> Why does any of the above need ifdefs?
-
-Because struct clk_core is only defined if CONFIG_COMMON_CLK, so clock
-implementations that don't use the CCF don't have to be converted to
-clk_core.
-
->> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
->> index c751d0c..060041b 100644
->> --- a/drivers/clk/clkdev.c
->> +++ b/drivers/clk/clkdev.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/string.h>
->>  #include <linux/mutex.h>
->>  #include <linux/clk.h>
->> +#include <linux/clk-private.h>
->>  #include <linux/clk-provider.h>
->>  #include <linux/clkdev.h>
->>  #include <linux/of.h>
->> @@ -33,13 +34,13 @@ static DEFINE_MUTEX(clocks_mutex);
+> The block mode does not require the priming that occurs in FIFO mode.  At the
+> moment that the QUP is placed into the RUN state, the QUP may immediately raise
+> an interrupt if the request is a write.  Therefore, there is no need to prime
+> the pump.
 > 
-> I'm not happy with any of these changes, because it introduces a huge
-> number of ifdefs.
+> In addition, the block transfers require that whole blocks of data are
+> read/written at a time.  The last block of data that completes a transaction may
+> contain less than a full blocks worth of data.
+
+Does this mean that block transfer will start only if the required
+bytes from block is written into buffer?
+
 > 
-> Instead of doing this, please introduce a local typedef in this .c file
-> which is conditional on whether we're using your new struct clk_core
-> or not, eg, clkdev_ret_t.
+> Each block of data results in an input/output service interrupt accompanied with
+> a input/output block flag set.  Additional block reads/writes require clearing
+> of the service flag.  It is ok to check for additional blocks of data in the
+> ISR, but you have to ack every block you transfer.  Imbalanced acks result in
+> early return from complete transactions with pending interrupts that still have
+> to be ack'd.  The next transaction can be affected by these interrupts.
 > 
-> Then, rename all the functions here to be _provider based, and arrange
-> for these to return clkdev_ret_t.
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  drivers/spi/spi-qup.c |  194 +++++++++++++++++++++++++++++++++++--------------
+>  1 file changed, 141 insertions(+), 53 deletions(-)
 > 
-> Then provide the original functions, with your __clk_create_clk() call
-> to allocate your struct clk.  A dummy version which merely returns its
-> argument can be provided when we're not using clk_core.
-> 
-> This should result in substantially fewer ifdefs - probably just one
-> ifdef.
 
-Sounds like a neat improvement, will send soon v13 with this.
+<snip>
 
-> Another concern here is what happens when __clk_create_clk() fails.
-> Your __clk_create_clk() function does nothing in that regard, so any
-> references which the parent function took are never released.
+> +static void qup_fill_read_buffer(struct spi_qup *controller,
+> +	struct spi_transfer *xfer, u32 data)
 
-Yeah, will address this in v13 as well.
+Please, could prefix this whit spi_ to be consistent with the
+rest of the code.
 
-Thanks a lot for the feedback,
+>  {
+>  	u8 *rx_buf = xfer->rx_buf;
+> -	u32 word, state;
+> -	int idx, shift, w_size;
+> -
+> -	w_size = controller->w_size;
+> -
+> -	while (controller->rx_bytes < xfer->len) {
+> -
+> -		state = readl_relaxed(controller->base + QUP_OPERATIONAL);
+> -		if (0 == (state & QUP_OP_IN_FIFO_NOT_EMPTY))
+> -			break;
+> +	int idx, shift;
+> +	int read_len = min_t(int, xfer->len - controller->rx_bytes,
+> +				controller->w_size);
 
-Tomeu
+You should not need this check here. xfer->len is multiple of controller->w_size
+and you always read one word at time.
+
+>  
+> -		word = readl_relaxed(controller->base + QUP_INPUT_FIFO);
+> -
+> -		if (!rx_buf) {
+> -			controller->rx_bytes += w_size;
+> -			continue;
+> -		}
+> -
+> -		for (idx = 0; idx < w_size; idx++, controller->rx_bytes++) {
+> +	if (rx_buf)
+> +		for (idx = 0; idx < read_len; idx++) {
+>  			/*
+>  			 * The data format depends on bytes per SPI word:
+>  			 *  4 bytes: 0x12345678
+> @@ -229,40 +218,129 @@ static void spi_qup_fifo_read(struct spi_qup *controller,
+>  			 *  1 byte : 0x00000012
+>  			 */
+>  			shift = BITS_PER_BYTE;
+> -			shift *= (w_size - idx - 1);
+> -			rx_buf[controller->rx_bytes] = word >> shift;
+> +			shift *= (controller->w_size - idx - 1);
+> +			rx_buf[controller->rx_bytes + idx] = data >> shift;
+>  		}
+> -	}
+> +
+> +	controller->rx_bytes += read_len;
+>  }
+>  
+> -static void spi_qup_fifo_write(struct spi_qup *controller,
+> -			    struct spi_transfer *xfer)
+> +static void qup_prepare_write_data(struct spi_qup *controller,
+> +	struct spi_transfer *xfer, u32 *data)
+>  {
+>  	const u8 *tx_buf = xfer->tx_buf;
+> -	u32 word, state, data;
+> -	int idx, w_size;
+> +	u32 val;
+> +	int idx;
+> +	int write_len = min_t(int, xfer->len - controller->tx_bytes,
+> +				controller->w_size);
+>  
+
+Same here.
+
+> -	w_size = controller->w_size;
+> +	*data = 0;
+>  
+> -	while (controller->tx_bytes < xfer->len) {
+> +	if (tx_buf)
+> +		for (idx = 0; idx < write_len; idx++) {
+> +			val = tx_buf[controller->tx_bytes + idx];
+> +			*data |= val << (BITS_PER_BYTE * (3 - idx));
+> +		}
+>  
+> -		state = readl_relaxed(controller->base + QUP_OPERATIONAL);
+> -		if (state & QUP_OP_OUT_FIFO_FULL)
+> -			break;
+> +	controller->tx_bytes += write_len;
+> +}
+>  
+> -		word = 0;
+> -		for (idx = 0; idx < w_size; idx++, controller->tx_bytes++) {
+> +static void spi_qup_service_block(struct spi_qup *controller,
+> +	struct spi_transfer *xfer, bool is_read)
+> +{
+
+Please, could you split this function to read and write, so we can use:
+
+spi_qup_fifo_read() and spi_qup_fifo_write() in FIFO modes and 
+spi_qup_block_read() and spi_qup_block_write() for BLOCK mode.
+
+> +	u32 data, words_per_blk, num_words, ack_flag, op_flag;
+> +	int i;
+> +
+> +	if (is_read) {
+> +		op_flag = QUP_OP_IN_BLOCK_READ_REQ;
+> +		ack_flag = QUP_OP_IN_SERVICE_FLAG;
+> +		num_words = DIV_ROUND_UP(xfer->len - controller->rx_bytes,
+> +					controller->w_size);
+
+Same here and below.
+
+> +		words_per_blk = controller->in_blk_sz >> 2;
+> +	} else {
+> +		op_flag = QUP_OP_OUT_BLOCK_WRITE_REQ;
+> +		ack_flag = QUP_OP_OUT_SERVICE_FLAG;
+> +		num_words = DIV_ROUND_UP(xfer->len - controller->tx_bytes,
+> +					controller->w_size);
+> +		words_per_blk = controller->out_blk_sz >> 2;
+> +	}
+
+Thank you.
+Ivan
