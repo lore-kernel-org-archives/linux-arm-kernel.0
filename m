@@ -1,70 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Sep 2014 01:04:04 +0900
-Subject: [PATCH 0/3 v3] Fix Exynos USB on kernels with USB Gadget support
-In-Reply-To: <1411112614.29071.1.camel@collabora.co.uk>
-References: <1410778354-31210-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1411112614.29071.1.camel@collabora.co.uk>
-Message-ID: <542199F4.3090601@samsung.com>
+Date: Wed, 24 Sep 2014 01:08:12 +0900
+Subject: [PATCH] ARM: cacheflush: Fix exynos build breakage on ARMv6 by
+ using macros for ISB/DSB
+In-Reply-To: <1410871979-12470-1-git-send-email-k.kozlowski@samsung.com>
+References: <1410871979-12470-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <54219AEC.2060204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/14 16:43, Sjoerd Simons wrote:
-> Hey Kukjin,
+On 09/16/14 21:52, Krzysztof Kozlowski wrote:
+> This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
+> time options (e.g. by building allmodconfig):
 >
-Hi,
-
-Sorry for late response...
-
-> It's been almost a month since I posted the first iteration of this
-> patchset on the list, with only trivial cosmetic changes and an addition
-> of a similar fix for Arndale Octa boards. Do you feel it needs more
-> review from specific folks before pulling it in or ?
+> $ make allmodconfig
+> $ make
+>    CC      arch/arm/mach-exynos/platsmp.o
+> /tmp/ccdQM0Eg.s: Assembler messages:
+> /tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode `isb '
+> /tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode `isb '
+> /tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode `dsb '
+> make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
 >
-> Seems a bit of a shame if this would fail to make it for 3.18 (one could
-> even argue the dt patches are 3.17 RC material!) as it fixes USB
-> functionality being broken depending on the kernel configuration used.
+> The error was introduced in commit "ARM: EXYNOS: Move code from
+> hotplug.c to platsmp.c".  Previously code using
+> v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
+> this flag dissapeared during the movement.
 >
+> Use isb() and dsb() macros in v7_exit_coherency_flush() so the proper
+> code will be generated for ARMv6.
 >
-> On Mon, 2014-09-15 at 12:52 +0200, Sjoerd Simons wrote:
->> When building a kernel with support for both USB host and USB Gadget support on
->> the dwc3 controller on the Exynos5 soc will go into USB OTG mode unless
->> otherwise specified in the dtb, which is unhelpful for boards hooked up to run
->> as USB host.
->>
->> First patch in this set explicitely set the dual-role mode for the dwc3
->> controller on Peach pi and Peach pit boards to host mode. Second patch adds
->> similar updates for Arndale Octa as reported by Andreas F?rber. Last patch
->> enables gadget mode in the default exynos config to more easily catch/trigger
->> issues like these.
->>
->> I suspect the Samsung SMDK5420 DTS might need similar changes, so it would be
->> great if users of those board could verify this.
->>
->> Changes in v2: alphabetically sort the dts entries
->> Changes in v3: Add DTS updates for arndale octa
->>
->> Sjoerd Simons (3):
->>    ARM: dts: exynos: Explicitly set dr_mode on peach-pit and peach-pi
->>    ARM: dts: exynos: Explicitly set dr_mode on arndale-octa
->>    ARM: exynos_defconfig: enable USB gadget support
->>
->>   arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
->>   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 8 ++++++++
->>   arch/arm/boot/dts/exynos5420.dtsi             | 4 ++--
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 8 ++++++++
->>   arch/arm/configs/exynos_defconfig             | 1 +
->>   5 files changed, 23 insertions(+), 2 deletions(-)
->>
-I have no objection on this series but needs to be rebased on my tree, 
-can you please respin on top of my tree?
+> Signed-off-by: Krzysztof Kozlowski<k.kozlowski@samsung.com>
+> Reported-by: Mark Brown<broonie@kernel.org>
+> Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
+> ---
+>   arch/arm/include/asm/cacheflush.h | 17 +++++++++++------
+>   1 file changed, 11 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+> index 79ecb4f34ffb..b74eeec971c0 100644
+> --- a/arch/arm/include/asm/cacheflush.h
+> +++ b/arch/arm/include/asm/cacheflush.h
+> @@ -464,22 +464,27 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
+>    *   CONFIG_FRAME_POINTER=y.  ip is saved as well if ever r12-clobbering
+>    *   trampoline are inserted by the linker and to keep sp 64-bit aligned.
+>    */
+> -#define v7_exit_coherency_flush(level) \
+> +#define v7_exit_coherency_flush(level) do { \
+>   	asm volatile( \
+>   	"stmfd	sp!, {fp, ip} \n\t" \
+>   	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
+>   	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
+>   	"mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR \n\t" \
+> -	"isb	\n\t" \
+> +	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
+> +	      "r9","r10","lr","memory" ); \
+> +	isb(); \
+> +	asm volatile( \
+>   	"bl	v7_flush_dcache_"__stringify(level)" \n\t" \
+>   	"mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR \n\t" \
+>   	"bic	r0, r0, #(1<<  6)	@ disable local coherency \n\t" \
+>   	"mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR \n\t" \
+> -	"isb	\n\t" \
+> -	"dsb	\n\t" \
+> -	"ldmfd	sp!, {fp, ip}" \
+>   	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
+> -	      "r9","r10","lr","memory" )
+> +	      "r9","r10","lr","memory" ); \
+> +	isb(); \
+> +	dsb(); \
+> +	asm volatile( \
+> +	"ldmfd	sp!, {fp, ip}" ); \
+> +	} while (0)
+>
+>   int set_memory_ro(unsigned long addr, int numpages);
+>   int set_memory_rw(unsigned long addr, int numpages);
 
-Thanks,
-Kukjin
--- 
-Thanks.
+Hi Russell,
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Can you please check this patch? Unfortunately I'm not sure about this, 
+this should resolve the build error though...
+
+- Kukjin
