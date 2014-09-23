@@ -1,43 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 23 Sep 2014 10:42:23 -0700
-Subject: [PATCH] ARM: qcom: Fix SCM interface for big-endian kernels
-In-Reply-To: <F694D53D-F606-4B35-AED9-9B3927E4E9F1@codeaurora.org>
-References: <1411425393-5537-1-git-send-email-sboyd@codeaurora.org>
- <F694D53D-F606-4B35-AED9-9B3927E4E9F1@codeaurora.org>
-Message-ID: <5421B0FF.4060307@codeaurora.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 23 Sep 2014 12:42:49 -0500
+Subject: [PATCH v1] soc: qcom: do not disable the iface clock in probe
+In-Reply-To: <1408081268-5748-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1408081268-5748-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <A61C4CA5-7558-4B3D-BF05-BBDD1C3F550F@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/14 09:47, Kumar Gala wrote:
-> On Sep 22, 2014, at 5:36 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->
->> The secure environment only runs in little-endian mode, so any
->> buffers shared with the secure environment should have their
->> contents converted to little-endian. We also mark such elements
->> with __le32 to allow sparse to catch such problems.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->> drivers/soc/qcom/scm-boot.c |  8 ++++----
->> drivers/soc/qcom/scm.c      | 34 ++++++++++++++++++----------------
->> 2 files changed, 22 insertions(+), 20 deletions(-)
->>
->> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
->> index 60ff7b482141..3e4d77b371c6 100644
->> --- a/drivers/soc/qcom/scm-boot.c
->> +++ b/drivers/soc/qcom/scm-boot.c
->> @@ -27,12 +27,12 @@
->> int scm_set_boot_addr(phys_addr_t addr, int flags)
->> {
->> 	struct {
->> -		unsigned int flags;
->> -		phys_addr_t  addr;
->> +		__le32 flags;
->> +		__le32 addr;
-> Hmm, was phys_addr_t wrong here before?  I ask because don?t we support LPAE on some systems?
 
-Yes it was wrong. It is exactly 32 bits wide.
+On Aug 15, 2014, at 12:41 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+
+> The use case here is when we have a bootconsole which is printing the
+> characters on serial console and gsbi driver comes up after some time.
+> As gsbi driver disables the clock in probe the bootconsole locks up.
+> 
+> This patch fixes the problem by disabling the clock in platform remove
+> rather than in probe.
+> 
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+> Changes since RFC:
+> 	- none, just a subject line change.
+
+Srini,
+
+We need some changes to the commit message for this to get into v3.17.
+
+Probably some references to:
+
+http://www.spinics.net/lists/linux-arm-msm/msg10589.html
+
+Adding Kevin to provide details on what else should be in commit message w/regards to the regression we introduced.
+
+- k
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
