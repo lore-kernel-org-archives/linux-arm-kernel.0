@@ -1,54 +1,51 @@
 From: srv_hongzhou.yang@mediatek.com (Hongzhou.Yang)
-Date: Tue, 23 Sep 2014 11:39:01 +0800
-Subject: [PATCH v2 0/4] Add Mediatek SoC Pinctrl/GPIO driver for MT8135. 
-Message-ID: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+Date: Tue, 23 Sep 2014 11:39:02 +0800
+Subject: [PATCH v2 1/4] arm: mediatek: Add config option for mediatek SoCs.
+In-Reply-To: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+Message-ID: <1411443545-24951-2-git-send-email-srv_hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v2 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
-It is based on Joe.C' basic device tree support.
-See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288582.html
+From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
-and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
+Add config options for ARCH_MT6589, ARCH_MT8127, ARCH_MT8135. This
+allow drivers to isolate support base on these options.
 
-Changes in v2:
-- According to Heiko Stubner' suggestion, use generic pinconfig.
-- Remove pinmux_ops.disable implement.
-- Due to limit of message body, move mt8135-pinfunc.h to '[PATCH 3/4] add pinctrl node for MT8135'.
+Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
+---
+ arch/arm/mach-mediatek/Kconfig | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-
-Hongzhou Yang (3):
-ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
-dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
-ARM: dts: mt8135: Add pinctrl node for mt8135.
-
-Joe.C (1):
-arm: mediatek: Add config option for mediatek SoCs.
-
-.../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |   98 +
-arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
-arch/arm/boot/dts/mt8135.dtsi                      |   11 +
-arch/arm/mach-mediatek/Kconfig                     |   23 +-
-drivers/pinctrl/Kconfig                            |    1 +
-drivers/pinctrl/Makefile                           |    1 +
-drivers/pinctrl/mediatek/Kconfig                   |   12 +
-drivers/pinctrl/mediatek/Makefile                  |    5 +
-drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   82 +
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  792 +++++++
-drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   95 +
-drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
-include/dt-bindings/pinctrl/mt65xx.h               |   23 +
-13 files changed, 4904 insertions(+), 3 deletions(-)
-create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
-create mode 100644 drivers/pinctrl/mediatek/Kconfig
-create mode 100644 drivers/pinctrl/mediatek/Makefile
-create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
-create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
-
---
+diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+index 2c043a2..25fe6cf 100644
+--- a/arch/arm/mach-mediatek/Kconfig
++++ b/arch/arm/mach-mediatek/Kconfig
+@@ -1,6 +1,22 @@
+-config ARCH_MEDIATEK
+-	bool "Mediatek MT6589 SoC" if ARCH_MULTI_V7
++menuconfig ARCH_MEDIATEK
++	bool "Mediatek MT65xx & MT81xx SoC" if ARCH_MULTI_V7
+ 	select ARM_GIC
+ 	select MTK_TIMER
+ 	help
+-	  Support for Mediatek Cortex-A7 Quad-Core-SoC MT6589.
++	  Support for Mediatek MT65xx & MT81xx SoCs
++
++if ARCH_MEDIATEK
++
++config MACH_MT6589
++	bool "MediaTek MT6589 SoCs support"
++	default ARCH_MEDIATEK
++
++config MACH_MT8127
++	bool "MediaTek MT8127 SoCs support"
++	default ARCH_MEDIATEK
++
++config MACH_MT8135
++	bool "MediaTek MT8135 SoCs support"
++	default ARCH_MEDIATEK
++
++endif
+-- 
 1.8.1.1.dirty
