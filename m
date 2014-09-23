@@ -1,98 +1,87 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 24 Sep 2014 00:04:18 +0200
-Subject: [PATCH v4 1/2] bcma: register bcma as device tree driver
-In-Reply-To: <4345256.UGZH9SeRYG@wuerfel>
-References: <1411339108-22307-1-git-send-email-hauke@hauke-m.de>
- <4345256.UGZH9SeRYG@wuerfel>
-Message-ID: <5421EE62.2080701@hauke-m.de>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 23 Sep 2014 17:10:02 -0500
+Subject: [PATCH 1/2] dmaengine: Add QCOM ADM DMA driver
+In-Reply-To: <20140923102850.GI24663@intel.com>
+References: <1410401933-20621-1-git-send-email-agross@codeaurora.org>
+ <1410401933-20621-2-git-send-email-agross@codeaurora.org>
+ <20140923102850.GI24663@intel.com>
+Message-ID: <20140923221002.GC5975@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 09:26 AM, Arnd Bergmann wrote:
-> On Monday 22 September 2014 00:38:27 Hauke Mehrtens wrote:
->> +
->> +- reg : iomem address range of chipcommon core
->> +
->> +The cores on the AXI bus are automatically detected by bcma with the
->> +memory ranges they are using and they get registered afterwards.
->> +Automatic detection of the IRQ number is not reliable on
->> +BCM47xx/BCM53xx ARM SoCs. To assign IRQ numbers to the cores, provide
->> +them manually through device tree. The IRQ number and the device tree
->> +child entry will get assigned to the core with the matching reg address.
->> +
->> +Example:
->> +
->> +       axi at 18000000 {
->> +               compatible = "brcm,bus-axi";
->> +               reg = <0x18000000 0x1000>;
->> +               ranges = <0x00000000 0x18000000 0x00100000>;
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +
->> +               pcie at 12000 {
->> +                       reg = <0x00012000 0x1000>;
->> +                       interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
->> +               };
->> +
->> +               ethernet at 24000 {
->> +                       reg = <0x00024000 0x1000>;
->> +                       interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
->> +               };
->> +
->> +               ethernet at 25000 {
->> +                       reg = <0x00025000 0x1000>;
->> +                       interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
->> +               };
->> +       };
->>
+<snip>
+
+> > +			break;
+> > +		default:
+> > +			achan->slave.src_maxburst = 0;
+> > +			achan->slave.dst_maxburst = 0;
+> Why clear these for error cases
+
+With the return I shouldn't need to.  I'll fix this.
+
+> > +			ret = -EINVAL;
+> > +			break;
+> > +		}
+> > +
+> > +		if (!ret)
+> > +			writel(achan->blk_size,
+> > +				adev->regs + HI_CRCI_CTL(achan->id, adev->ee));
+> and why do we write to HW on this. Shouldn't this be done when you program
+> the descriptor?
+
+It could be deferred to later.  The main point is that I don't see the
+slave_config happening every transaction.  I was only modifying it now instead
+of making a register write for every transaction.
+
 > 
-> While reading through this new version, I had a new idea about how
-> this could be handled better for any machines that have a unique
-> number in the interrupt field: If you do the same thing as PCI
-> and add an interrupt-map property [1], you can translate that
-> number into a real interrupt specifier for the child nodes.
+> > +static enum dma_status adm_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+> > +	struct dma_tx_state *txstate)
+> > +{
+> > +	struct adm_chan *achan = to_adm_chan(chan);
+> > +	struct virt_dma_desc *vd;
+> > +	enum dma_status ret;
+> > +	unsigned long flags;
+> > +	size_t residue = 0;
+> > +
+> > +	ret = dma_cookie_status(chan, cookie, txstate);
+> > +
+> Last arg can be null to this, so before you do residue calcluation and block
+> interrupts would make sense to return from here if arg is NULL
+
+Good catch.  Will fix.
+
 > 
-> This can work even if every device lists the local interrupt
-> as '0', since you can have device-specific lookup entries if you
-> use the correct interrupt-map-mask property.
+> > +	spin_lock_irqsave(&achan->vc.lock, flags);
+> > +
+> > +	vd = vchan_find_desc(&achan->vc, cookie);
+> > +	if (vd)
+> > +		residue = container_of(vd, struct adm_async_desc, vd)->length;
+> > +	else if (achan->curr_txd && achan->curr_txd->vd.tx.cookie == cookie)
+> > +		residue = achan->curr_txd->length;
+> so this is current cookie, so you need to read from HW on current position
+
+There is no way to get current position unfortunately without relying on
+unreliable debug registers.
+
+> > +
+> > +	spin_unlock_irqrestore(&achan->vc.lock, flags);
+> > +
+> > +	dma_set_residue(txstate, residue);
+> > +
+> > +	if (achan->error)
+> > +		return DMA_ERROR;
+> > +
+> > +	return ret;
 > 
-> 	Arnd
+> -- 
+> ~Vinod
 > 
-> [1] http://www.openfirmware.org/1275/practice/imap/imap0_9d.pdf
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-I assume this should then look somehow like this:
-
-axi at 18000000 {
-	compatible = "brcm,bus-axi";
-	reg = <0x18000000 0x1000>;
-	ranges = <0x00000000 0x18000000 0x00100000>;
-	#address-cells = <1>;
-	#size-cells = <1>;
-
-	#interrupt-cells = <1>;
-	interrupt-map = <
-		/* ChipCommon */
-		0x00000000 0 &gic  GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH
-
-		/* PCIe Controller 0 */
-		0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH
-		0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH
-		0x00012000 2 &gic GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH
-		0x00012000 3 &gic GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH
-		0x00012000 4 &gic GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH
-		0x00012000 5 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH
-
-		/* USB 2.0 Controller */
-		0x00021000 0 &gic GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH
-		>;
-	};
-
-How does the mapping of these interrupts to the devices work?
-
-Do I have to add a device tree entry for every device after all?
-
-Do you have some example code where this is handled in code, I could not
-find the code doing this for PCI.
-
-Hauke
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
