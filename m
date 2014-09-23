@@ -1,82 +1,39 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Tue, 23 Sep 2014 10:24:45 +0200
-Subject: [PATCH 3/4] tty: omap-serial: use threaded interrupt handler
-In-Reply-To: <20140917121303.GB20438@ci00147.xsens-tech.local>
-References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
- <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
- <54170823.7040801@hurleysoftware.com>
- <5417228C.5070503@hurleysoftware.com>
- <20140916085037.GI28458@ci00147.xsens-tech.local>
- <54197804.3020302@hurleysoftware.com>
- <20140917121303.GB20438@ci00147.xsens-tech.local>
-Message-ID: <20140923082445.GA16218@ci00147.xsens-tech.local>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 23 Sep 2014 10:27:37 +0200
+Subject: [PATCH] ARM: shmobile: Remove ARCH_HAS_OPP completely
+In-Reply-To: <1411459730.20236.6.camel@x220>
+References: <1406551632.5397.17.camel@x220> <1410511111.31130.4.camel@x220>
+ <20140916000916.GD9847@verge.net.au>
+ <20140916002333.GI9847@verge.net.au>
+ <1411459730.20236.6.camel@x220>
+Message-ID: <CAMuHMdUP_SUjAgjhC3hFXjsSzpR=jCP0iaD5AXLWSUkg0V6hig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 02:13:03PM +0200, Frans Klaver wrote:
-> On Wed, Sep 17, 2014 at 08:01:08AM -0400, Peter Hurley wrote:
-> > On 09/16/2014 04:50 AM, Frans Klaver wrote:
-> > > On Mon, Sep 15, 2014 at 01:31:56PM -0400, Peter Hurley wrote:
-> > >> On 09/15/2014 11:39 AM, Peter Hurley wrote:
-> > >>> On 09/15/2014 10:00 AM, Frans Klaver wrote:
-> > >>>> At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
-> > >>>> rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
-> > >>>> this to about 170 overflows in 10 minutes.
-> > >>>
-> > >>> Why is the threadirqs kernel boot option not sufficient?
-> > >>> Or conversely, shouldn't this be selectable?
-> > >>
-> > > 
-> > > I wasn't aware of the threadirqs boot option. I also wouldn't know if
-> > > this should be selectable. What would be a reason to favor the
-> > > non-threaded irq over the threaded irq?
-> > 
-> > Not everyone cares enough about serial to dedicate kthreads to it :)
-> 
-> Fair enough. In that light, we might not care enough about other
-> subsystems to dedicate kthreads to it :). Selectable seems reasonable in
-> that case.
-> 
-> 
-> > >> Also, do you see the same performance differential when you implement this
-> > >> in the 8250 driver (that is, on top of Sebastian's omap->8250 conversion)?
-> > >>
-> > > 
-> > > I haven't gotten Sebastian's driver to work properly yet on the console.
-> > > There was no reason for me yet to throw my omap changes on top of
-> > > Sebastian's queue.
+On Tue, Sep 23, 2014 at 10:08 AM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
+> 049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
+> removed the only dependency that used it. Setting it had no effect
+> anymore.
+>
+> So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
+> some reason that commit did not remove all select statements for that
+> symbol. These statements are now useless. Remove one from shmobile too.
 
-Doing the threaded interrupt change on the 8250 driver doesn't seem as
-trivial. Unless I'm mistaken, that version of this patch would mess with
-all other 8250 based serial drivers, if it's done properly. Incidentally
-I did try using threadirqs, but that didn't give my any significant
-results. I mostly noticed a difference in the console.
+The explanation for "some reason" is very simple: new selects were introduced
+in parallel with the removal of the existing ones.
 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-> > > 
-> > >>> PS - To overflow the 64 byte RX FIFO at those data rates means interrupt
-> > >>> latency in excess of 250us?
-> > > 
-> > > At 3686400 baud it should take about 174 us to fill a 64 byte buffer. I
-> > > haven't done any measurements on the interrupt latency though. If you
-> > > consider that we're sending about 1kB of data, 240 times a second, we're
-> > > spending a lot of time reading data from the uart. I can imagine the
-> > > system has other work to do as well.
-> > 
-> > System work should not keep irqs from being serviced. Even 174us is a long
-> > time not to service an interrupt. Maybe console writes are keeping the isr
-> > from running?
-> 
-> That's quite possible. I'll have to redo the test setup I had for this to
-> give you a decent answer. I'll have to do that anyway as Sebastian's
-> 8250 conversion improves.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I haven't had time yet to look into this any further. I'll accept that
-this patch may fix a case most people aren't the least interested in.
-I'll also happily accept that I probably need a better argumentation
-than "this works better for us".Would it make sense to drop this patch
-and resubmit the other three? As I mentioned in the previous run, I
-think these are useful in any case.
+Gr{oetje,eeting}s,
 
-Thanks,
-Frans
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
