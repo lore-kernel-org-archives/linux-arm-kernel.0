@@ -1,75 +1,94 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 12:28:07 +0200
-Subject: [PATCH v6 11/12] ARM: dts: berlin: add BG2CD nodes for USB support
+Date: Tue, 23 Sep 2014 12:28:06 +0200
+Subject: [PATCH v6 10/12] ARM: dts: Berlin: enable USB on the BG2Q DMP
 In-Reply-To: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1411468088-5702-12-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1411468088-5702-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Enable the 2 available USB PHY and USB nodes on the Marvell Berlin BG2Q
+DMP.
 
-Adds nodes describing the Marvell Berlin BG2CD USB PHY and USB. The BG2CD
-SoC has 2 USB ChipIdea controllers, with usb0 host-only and usb1 dual-role
-capable.
-
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 53 ++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 68f7032b4686..5c6950531327 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -66,6 +66,22 @@
- 			clocks = <&chip CLKID_TWD>;
- 		};
+diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+index a357ce02a64e..663aedb173e0 100644
+--- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
++++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+@@ -7,6 +7,8 @@
+  */
  
-+		usb_phy0: usb-phy at b74000 {
-+			compatible = "marvell,berlin2cd-usb-phy";
-+			reg = <0xb74000 0x128>;
-+			#phy-cells = <0>;
-+			resets = <&chip 0x178 23>;
-+			status = "disabled";
-+		};
+ /dts-v1/;
 +
-+		usb_phy1: usb-phy at b78000 {
-+			compatible = "marvell,berlin2cd-usb-phy";
-+			reg = <0xb78000 0x128>;
-+			#phy-cells = <0>;
-+			resets = <&chip 0x178 24>;
-+			status = "disabled";
-+		};
-+
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -242,6 +258,24 @@
- 			};
- 		};
++#include <dt-bindings/gpio/gpio.h>
+ #include "berlin2q.dtsi"
  
-+		usb0: usb at ed0000 {
-+			compatible = "chipidea,usb2";
-+			reg = <0xed0000 0x200>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_USB0>;
-+			usb-phy = <&usb_phy0>;
-+			status = "disabled";
+ / {
+@@ -21,6 +23,39 @@
+ 	choosen {
+ 		bootargs = "console=ttyS0,115200 earlyprintk";
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_usb0_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "usb0_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&portb 8 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
 +		};
 +
-+		usb1: usb at ee0000 {
-+			compatible = "chipidea,usb2";
-+			reg = <0xee0000 0x200>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_USB1>;
-+			usb-phy = <&usb_phy1>;
-+			status = "disabled";
++		reg_usb1_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			regulator-name = "usb1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&portb 10 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
 +		};
 +
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++		reg_usb2_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			regulator-name = "usb2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++	};
+ };
+ 
+ &sdhci1 {
+@@ -45,3 +80,21 @@
+ &uart0 {
+ 	status = "okay";
+ };
++
++&usb_phy0 {
++	status = "okay";
++};
++
++&usb_phy2 {
++	status = "okay";
++};
++
++&usb0 {
++	vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
++
++&usb2 {
++	vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
 1.9.1
