@@ -1,45 +1,35 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 16:01:13 +0200
-Subject: [PATCH v4 3/9] Documentation: bindings: net: add the Marvell
- PXA168 Ethernet controller
-In-Reply-To: <51745791.Wuu5QiQB2e@wuerfel>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
- <1411474536-22626-4-git-send-email-antoine.tenart@free-electrons.com>
- <51745791.Wuu5QiQB2e@wuerfel>
-Message-ID: <20140923140113.GC18924@kwain>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 23 Sep 2014 15:01:09 +0100
+Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
+ access
+In-Reply-To: <20140923135241.GI12187@cbox>
+References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
+ <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
+ <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
+ <20140923111412.GG12187@cbox> <54215E6D.6090308@redhat.com>
+ <54216B1B.2010205@arm.com> <20140923135241.GI12187@cbox>
+Message-ID: <CAFEAcA8pYezWttDHRpoNYn0wWvHg5M2xQLE4-D84uDC37k8emQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On 23 September 2014 14:52, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> If anyone feels like reviewing my patch and giving it a quick test on a
+> BE system with a version of QEMU with the pl011 level-triggered patch,
 
-On Tue, Sep 23, 2014 at 02:38:39PM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 14:15:30 Antoine Tenart wrote:
-> > +Optional properties:
-> > +- port-id: should be '0','1' or '2'.
-> > +- phy-addr: MDIO address of the PHY.
-> > +- local-mac-address: see ethernet.txt file in the same directory.
-> > +
-> > 
-> 
-> I believe new bindings should not use "phy-addr" properties, but
-> instead use a phy-handle property pointing to a phy device instead.
+FWIW, any old version of QEMU running the vexpress-a15 model
+will also use level-triggered interrupts for pl011, because
+the upstream DTB which we use for that board has always
+correctly marked the pl011 and all the other motherboard
+devices as being level-triggered.
 
-That's the MDIO address of the PHY. It's a bit difficult to use a phy
-device as the driver uses the libphy. And that would break the platform
-using it.
+I'm still not 100% convinced we shouldn't mark the
+virtio-mmio devices as level-triggered, incidentally.
+I *think* that (a) the spec pretty heavily implies that
+the lines behave as level triggered but (b) the
+specific text in the spec about required guest code
+to avoid races (s.2.4.2 of the 0.9.5 spec) means that
+even if the interrupt controller treats them as edge
+triggered it's OK.
 
-Or maybe you have something in mind?
-
-> 
-> The port-id property description could be a little more verbose.
-> What do those numbers actually mean?
-
-I'll add some description. That's the Ethernet port number. I reused a
-property (port-id) already used by other drivers.
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-- PMM
