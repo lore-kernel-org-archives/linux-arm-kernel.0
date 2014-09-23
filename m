@@ -1,71 +1,77 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 22 Sep 2014 16:25:26 -0700
-Subject: [PATCH v7 0/3] Qualcomm Resource Power Manager driver
-Message-ID: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 22 Sep 2014 17:09:49 -0700
+Subject: kernel BUG at kernel/smpboot.c:134!
+Message-ID: <20140923000949.GV1193@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a regulator driver for the Resource Power Manager found in
-Qualcomm 8660, 8960 and 8064 based devices.
+Hi all,
 
-The RPM driver exposes resources to its child devices, that can be accessed to
-implement drivers for the regulators, clocks and bus frequency control that's
-owned by the RPM in these devices.
+I'm asking here just to see if anyone had any good suggestions for me
+here, or if the BUG() I hit looks familiar to anyone; I'm not expecting
+anyone to solve my problem for me.
 
-Changes since v6:
-  - Changed filenames from qcom,rpm.{txt,h} to qcom-rpm.{txt,h}
+I've been testing out CPU hotplug [1] on an ARM v7 A15-based SMP system,
+and I've seen various sorts of oopses, crashes, etc., most of which seem
+to be in the scheduler code. Sometimes my $PC is somewhere out in the
+weeds (jumping to 0x00000000, or some address not in the kernel text
+region).
 
-Changes since v5:
-  - Clarified dt binding
-  - Converted regulator qcom,force-mode to enum instead of multi-boolean
-  - Remove unecessary version handshake
-  - Cleaned up naming of RPM resources between different RPM versions
-  - Updated regulator qcom,force-mode parsing
-  - Updated regulator qcom,power-mode-* parsing
-  - Cleanups in rpm driver
-  - Dropped dev_get_qcom_rpm helper function
+Anyway, the most promising result--for debugging purposes--was when I
+was toggling CPU#1 on/off with a loop like this:
 
-Changes since v4:
-  - Moved RPM driver to mfd
+	while :
+	do
+		echo 0 > /sys/devices/system/cpu/cpu1/online
+		echo 1 > /sys/devices/system/cpu/cpu1/online
+	done
 
-Changes since v3:
-  - IPC register is acquired through syscon, as it's shared with others
+which managed to trigger the following BUG(), after about 4700 cycles
+(oddly, on multiple occasions, failures happen at around 4700 to 4800
+cycles):
 
-Changes since v2:
-  - Fix copy-paste error in dt binding
-  - Correct incomplete move from mfd to soc
-  - Correct const mistake in regulator driver
+...
+[  164.737561] CPU1: Booted secondary processor
+[  164.785821] CPU1: shutdown
+[  164.788883] ------------[ cut here ]------------
+[  164.793537] kernel BUG at kernel/smpboot.c:134!
+[  164.793540] Internal error: Oops - BUG: 0 [#1] SMP ARM
+[  164.793547] Modules linked in:
+[  164.793553] CPU: 2 PID: 3 Comm: ksoftirqd/0 Not tainted 3.14.13-1.0pre-00342-g95275cee3dcd #220
+[  164.793557] task: cd087140 ti: cd09a000 task.ti: cd09a000
+[  164.793569] PC is at smpboot_thread_fn+0x174/0x17c
+[  164.793572] LR is at smpboot_thread_fn+0x40/0x17c
+[  164.793576] pc : [<c0046bb4>]    lr : [<c0046a80>]    psr: 800f0013
+[  164.793576] sp : cd09bf40  ip : 00000000  fp : 00000000
+[  164.793577] r10: cd09a000  r9 : 00000002  r8 : 00000000
+[  164.793580] r7 : 00000001  r6 : c0f89548  r5 : cd09a000  r4 : cd03abc0
+[  164.793582] r3 : 00000002  r2 : cd09bf40  r1 : 00000000  r0 : 00000000
+[  164.793586] Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[  164.793589] Control: 30c5387d  Table: 0d35b5c0  DAC: 55555555
+[  164.793592] Process ksoftirqd/0 (pid: 3, stack limit = 0xcd09a240)
+[  164.793594] Stack: (0xcd09bf40 to 0xcd09c000)
+[  164.793600] bf40: cd087140 cd03ab80 00000000 cd03abc0 c0046a40 00000000 00000000 00000000
+[  164.793604] bf60: 00000000 c0040424 52bdbfb4 00000001 00000000 cd03abc0 00000000 00030003
+[  164.793608] bf80: cd09bf80 cd09bf80 00000000 00000000 cd09bf90 cd09bf90 cd09bfac cd03ab80
+[  164.793611] bfa0: c0040350 00000000 00000000 c000edb8 00000000 00000000 00000000 00000000
+[  164.793614] bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[  164.793617] bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 87fd818d 2b1a63eb
+[  164.793630] [<c0046bb4>] (smpboot_thread_fn) from [<c0040424>] (kthread+0xd4/0xec)
+[  164.793639] [<c0040424>] (kthread) from [<c000edb8>] (ret_from_fork+0x14/0x3c)
+[  164.793644] Code: e1a00004 eb0204ba e3a00000 e8bd8ff8 (e7f001f2) 
+[  164.793651] ---[ end trace d7127a76ecca6b80 ]---
 
-Changes since v1:
-  - Moved rpm driver to drivers/soc
-  - Extracted resource table structs from rpm struct, as per Srinivas request
-  - Dropped mode setting support for the regulators for now. Unsure if we need
-    it and it requires some rework from the codeaurora solution.
-  - Using set_voltage_sel instead of rolling my own "snapping", as per Marks
-    request
-  - Split regulator ops in mV, uV and swtich versions as per Marks request.
-  - Added devicetree property to enable pull down.
+This test is on a 3.14.13-based kernel, but I retested on a more recent
+kernel (around 3.17-rc3), and I see very similar corruption and failures
+(although I haven't yet triggered this specific BUG() in my limited
+testing).
 
-Bjorn Andersson (3):
-  mfd: devicetree: bindings: Add Qualcomm RPM DT binding
-  mfd: qcom-rpm: Driver for the Qualcomm RPM
-  regulator: qcom-rpm: Regulator driver for the Qualcomm RPM
+Any comments are welcome. I'll try to remember to update here if I
+figure anything out.
 
- Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  246 ++++++
- drivers/mfd/Kconfig                                |   14 +
- drivers/mfd/Makefile                               |    1 +
- drivers/mfd/qcom_rpm.c                             |  580 ++++++++++++++
- drivers/regulator/Kconfig                          |   12 +
- drivers/regulator/Makefile                         |    1 +
- drivers/regulator/qcom_rpm-regulator.c             |  798 ++++++++++++++++++++
- include/dt-bindings/mfd/qcom-rpm.h                 |  154 ++++
- include/linux/mfd/qcom_rpm.h                       |   10 +
- 9 files changed, 1816 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
- create mode 100644 drivers/mfd/qcom_rpm.c
- create mode 100644 drivers/regulator/qcom_rpm-regulator.c
- create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
- create mode 100644 include/linux/mfd/qcom_rpm.h
+Thanks,
+Brian
 
--- 
-1.7.9.5
+[1] I actually encountered errors while testing suspend-to-RAM, but I
+    (correctly) suspected the problems were occurring in the hotplug /
+    disable_nonboot_cpus() code path.
