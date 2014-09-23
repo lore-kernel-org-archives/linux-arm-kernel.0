@@ -1,96 +1,75 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 23 Sep 2014 13:17:20 -0400
-Subject: [PATCH 3/4] tty: omap-serial: use threaded interrupt handler
-In-Reply-To: <20140923082445.GA16218@ci00147.xsens-tech.local>
-References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
- <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
- <54170823.7040801@hurleysoftware.com> <5417228C.5070503@hurleysoftware.com>
- <20140916085037.GI28458@ci00147.xsens-tech.local>
- <54197804.3020302@hurleysoftware.com>
- <20140917121303.GB20438@ci00147.xsens-tech.local>
- <20140923082445.GA16218@ci00147.xsens-tech.local>
-Message-ID: <5421AB20.8040606@hurleysoftware.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 23 Sep 2014 17:18:43 +0000
+Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support
+ in big-endian model
+In-Reply-To: <45444544.Xl4NeUiTm0@wuerfel>
+References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>,
+ <45444544.Xl4NeUiTm0@wuerfel>
+Message-ID: <1411492720444.3205@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 04:24 AM, Frans Klaver wrote:
-> On Wed, Sep 17, 2014 at 02:13:03PM +0200, Frans Klaver wrote:
->> On Wed, Sep 17, 2014 at 08:01:08AM -0400, Peter Hurley wrote:
->>> On 09/16/2014 04:50 AM, Frans Klaver wrote:
->>>> On Mon, Sep 15, 2014 at 01:31:56PM -0400, Peter Hurley wrote:
->>>>> On 09/15/2014 11:39 AM, Peter Hurley wrote:
->>>>>> On 09/15/2014 10:00 AM, Frans Klaver wrote:
->>>>>>> At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
->>>>>>> rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
->>>>>>> this to about 170 overflows in 10 minutes.
->>>>>>
->>>>>> Why is the threadirqs kernel boot option not sufficient?
->>>>>> Or conversely, shouldn't this be selectable?
->>>>>
->>>>
->>>> I wasn't aware of the threadirqs boot option. I also wouldn't know if
->>>> this should be selectable. What would be a reason to favor the
->>>> non-threaded irq over the threaded irq?
->>>
->>> Not everyone cares enough about serial to dedicate kthreads to it :)
->>
->> Fair enough. In that light, we might not care enough about other
->> subsystems to dedicate kthreads to it :). Selectable seems reasonable in
->> that case.
->>
->>
->>>>> Also, do you see the same performance differential when you implement this
->>>>> in the 8250 driver (that is, on top of Sebastian's omap->8250 conversion)?
->>>>>
->>>>
->>>> I haven't gotten Sebastian's driver to work properly yet on the console.
->>>> There was no reason for me yet to throw my omap changes on top of
->>>> Sebastian's queue.
-> 
-> Doing the threaded interrupt change on the 8250 driver doesn't seem as
-> trivial. Unless I'm mistaken, that version of this patch would mess with
-> all other 8250 based serial drivers, if it's done properly. Incidentally
-> I did try using threadirqs, but that didn't give my any significant
-> results. I mostly noticed a difference in the console.
-> 
-> 
->>>>
->>>>>> PS - To overflow the 64 byte RX FIFO at those data rates means interrupt
->>>>>> latency in excess of 250us?
->>>>
->>>> At 3686400 baud it should take about 174 us to fill a 64 byte buffer. I
->>>> haven't done any measurements on the interrupt latency though. If you
->>>> consider that we're sending about 1kB of data, 240 times a second, we're
->>>> spending a lot of time reading data from the uart. I can imagine the
->>>> system has other work to do as well.
->>>
->>> System work should not keep irqs from being serviced. Even 174us is a long
->>> time not to service an interrupt. Maybe console writes are keeping the isr
->>> from running?
->>
->> That's quite possible. I'll have to redo the test setup I had for this to
->> give you a decent answer. I'll have to do that anyway as Sebastian's
->> 8250 conversion improves.
-> 
-> I haven't had time yet to look into this any further. I'll accept that
-> this patch may fix a case most people aren't the least interested in.
-> I'll also happily accept that I probably need a better argumentation
-> than "this works better for us".Would it make sense to drop this patch
-> and resubmit the other three? As I mentioned in the previous run, I
-> think these are useful in any case.
+________________________________________
+From: Arnd Bergmann <arnd@arndb.de>
+Sent: Tuesday, September 23, 2014 8:30 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Lu Jingchang-B35083; vinod.koul at intel.com; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org
+Subject: Re: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support in big-endian model
 
-I would've thought the first 2 patches had already been picked up because
-they fix div-by-zero faults.
+On Tuesday 23 September 2014 17:15:19 Jingchang Lu wrote:
+> @@ -459,20 +480,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
+>         u16 csr = 0;
+>
+>         /*
+> -        * eDMA hardware SGs require the TCD parameters stored in memory
+> -        * the same endian as the eDMA module so that they can be loaded
+> -        * automatically by the engine
+> +        * eDMA hardware SGs requires the TCDs to be auto loaded
+> +        * in the same endian as the core whenver the eDAM engine's
+> +        * register endian. So we don't swap the value, waitting
+> +        * for fsl_set_tcd_params doing the swap.
+>          */
 
-I don't really have a problem with the patch (except for it should be
-selectable, even if that's just a CONFIG_ setting). At the same time,
-the performance results don't really make sense; so if there's actually
-an underlying problem, I'd rather that get addressed (and the long
-interrupt latency may be the underlying problem).
+This makes no sense: how would the eDMA hardware know what endianess
+the CPU is using to write this data? Have you tried this running on
+the same hardware with both big-endian and little-endian kernels?
 
-As far as the 8250 driver and threaded irqs go, I just was hoping for
-another data point with a simple hard-coded test jig, not a full-blown
-patch series for all of them. Sorry for the misunderstanding.
+Also, you access this as little-endian data unconditionally rather
+than cpu-endian as the comment suggests, maybe that is what you meant
+here?
 
-Regards,
-Peter Hurley
+I will rewrite this comment, thanks.
+
+> -       edma_writel(edma, src, &(tcd->saddr));
+> -       edma_writel(edma, dst, &(tcd->daddr));
+> -       edma_writew(edma, attr, &(tcd->attr));
+> -       edma_writew(edma, EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
+> -       edma_writel(edma, EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
+> -       edma_writel(edma, EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
+> -       edma_writew(edma, EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
+> -       edma_writew(edma, EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
+> -       edma_writel(edma, EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
+> -       edma_writew(edma, EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
+> +       writel(src, &(tcd->saddr));
+> +       writel(dst, &(tcd->daddr));
+> +
+> +       writew(attr, &(tcd->attr));
+
+You seem to have another preexisting bug: The tcd pointer actually does not
+point to mmio registers here at all, but instead points to memory that
+has been returned from dma_pool_alloc. It is not valid to use writel()
+on such memory, that is only meant to work on real MMIO registers.
+
+You should use regular assignments to the registers here, e.g.
+
+        tcd->saddr = cpu_to_le32(src);
+        tcd->daddr = cpu_to_le32(dst);
+        ...
+
+        Arnd
+
+I will reconsider this setting. BTW, why writel() can't be used for memory location since it's still mapped and registers space is
+also memory mapped? Thanks.
+
+Best Regards,
+Jingchang
