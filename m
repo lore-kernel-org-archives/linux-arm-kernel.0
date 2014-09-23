@@ -1,85 +1,88 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 12:11:44 +0200
-Subject: [PATCH v7 06/10] rtc: at91sam9: rework the Kconfig description
-In-Reply-To: <542146AF.3060807@atmel.com>
-References: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411465130-29011-7-git-send-email-boris.brezillon@free-electrons.com>
- <542146AF.3060807@atmel.com>
-Message-ID: <20140923121144.0fd5d3c8@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 12:19:42 +0200
+Subject: [PATCH v2 1/8] ARM: add mach-asm9260
+In-Reply-To: <542136B0.3020305@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <71905861.S3QD6rl7jU@wuerfel> <542136B0.3020305@rempel-privat.de>
+Message-ID: <6072405.iL4RqHeZrt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Sep 2014 12:08:47 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> On 23/09/2014 11:38, Boris BREZILLON :
-> > Remove all references to AT91CAP9 SoC which has been removed.
-> > Rework the help message to remove any specific references to AT91SAM9 SoCs.
+On Tuesday 23 September 2014 11:00:32 Oleksij Rempel wrote:
+> Am 22.09.2014 um 17:08 schrieb Arnd Bergmann:
+> > On Sunday 21 September 2014 20:41:37 Oleksij Rempel wrote:
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index 5918d40..1a71feb 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -379,6 +379,20 @@ config ARCH_AT91
+> >>  	  This enables support for systems based on Atmel
+> >>  	  AT91RM9200 and AT91SAM9* processors.
+> >>  
+> >> +config MACH_ASM9260
+> >> +	bool "Alphascale ASM9260"
+> >> +	select ARCH_REQUIRE_GPIOLIB
+> >> +	select COMMON_CLK
+> >> +	select IRQ_DOMAIN
+> >> +	select SPARSE_IRQ
+> >> +	select MULTI_IRQ_HANDLER
+> >> +	select GENERIC_IRQ_CHIP
+> >> +	select GENERIC_CLOCKEVENTS
+> >> +	select CLKSRC_MMIO
+> >> +	select CPU_ARM926T
+> >> +	help
+> >> +	  Support for Alpascale ASM9260 based platform.
 > > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/rtc/Kconfig | 17 +++++++++--------
-> >  1 file changed, 9 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-> > index 7d76da8..455f2c3 100644
-> > --- a/drivers/rtc/Kconfig
-> > +++ b/drivers/rtc/Kconfig
-> > @@ -1079,17 +1079,18 @@ config RTC_DRV_AT91RM9200
-> >  	  this is powered by the backup power supply.
-> >  
-> >  config RTC_DRV_AT91SAM9
-> > -	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
-> > +	tristate "AT91SAM9 RTT as RTC"
-> >  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
-> >  	select MFD_SYSCON
-> >  	help
-> > -	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
-> > -	  (Real Time Timer). These timers are powered by the backup power
-> > -	  supply (such as a small coin cell battery), but do not need to
-> > -	  be used as RTCs.
-> > -
-> > -	  (On AT91SAM9rl and AT91SAM9G45 chips you probably want to use the
-> > -	  dedicated RTC module and leave the RTT available for other uses.)
-> > +	  Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
-> > +	  can be used as an RTC thanks to the backup power supply (e.g. a
-> > +	  small coin cell battery) which keeps this block and the GPBR
-> > +	  (General Purpose Backup Registers) block powered when the device
-> > +	  is shutdown.
-> > +	  Some AT91SAM9 SoCs provide a real RTC block, on those ones you'd
-> > +	  probably want to use the real RTC block instead of the RTT as an
-> > +	  RTT driver.
+> > To enable multiplatform support, please move this to its own
+> > arch/arm/mach-asm9260/Kconfig file and make it depend on ARCH_MULTI_V5,
+> > then remove all 'select' statements that are implicitly enabled there
+> > already (most of the above).
 > 
-> You mean:
-> "instead of the RTT as an RTC"
+> Should they be only in defconfig or selected by driver?
 
-Yep, that's what I meant.
+The dependencies should match whatever the platform requires. Anything
+that is optional and user-selectable better goes into the defconfig.
 
+> >> +static struct map_desc asm9260_io_desc[] __initdata = {
+> >> +	{	/* IO space */
+> >> +		.virtual	= (unsigned long)0xf0000000,
+> >> +		.pfn		= __phys_to_pfn(0x80000000),
+> >> +		.length		= 0x00800000,
+> >> +		.type		= MT_DEVICE
+> >> +	},
+> >> +	{	/* LCD IO space	*/
+> >> +		.virtual	= (unsigned long)0xf0a00000,
+> >> +		.pfn		= __phys_to_pfn(0x80800000),
+> >> +		.length		= 0x00009000,
+> >> +		.type		= MT_DEVICE
+> >> +	},
+> >> +	{	/* GPIO IO space */
+> >> +		.virtual	= (unsigned long)0xf0800000,
+> >> +		.pfn		= __phys_to_pfn(0x50000000),
+> >> +		.length		= 0x00100000,
+> >> +		.type		= MT_DEVICE
+> >> +	},
+> >> +	{	/* SRAM space Cacheable */
+> >> +		.virtual	= (unsigned long)0xd0000000,
+> >> +		.pfn		= __phys_to_pfn(0x40000000),
+> >> +		.length		= 0x00100000,
+> >> +#ifdef CONFIG_SRAM_MEM_CACHED
+> >> +		.type		= MT_MEMORY
+> >> +#else
+> >> +		.type		= MT_DEVICE
+> >> +#endif
+> >> +	},
+> >> +};
+> >
+> > This should not be necessary, as all drivers are supposed to
+> > ioremap their own device registers. For large register ranges
+> > that are used a lot, you could use these as an optimization to
+> > get 1 MB sections mapped using a large TLB entry, but usually
+> > the benefit is very small.
 > 
-> With that, good description: thanks!
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> So, now we can think of what to do with the series:
-> 
-> - Johan, do you want to "Ack" it?
-> - may I take it through the arm-soc git tree (likely for the 3.19 dev.
-> phase).
-> 
-> Your thoughts?
-> 
-> Bye,
-> 
-> >  
-> >  config RTC_DRV_AT91SAM9_RTT
-> >  	int
-> > 
-> 
-> 
+> Do you mean only "SRAM space Cacheable" section?
+
+No, all of them.
 
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+	Arnd
