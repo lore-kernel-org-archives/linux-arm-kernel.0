@@ -1,28 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Sep 2014 11:48:05 +0200
-Subject: [PATCH 2/4] pinctrl: imx: add gpio pinmux support for vf610
-In-Reply-To: <4cf96e22ce2c7646513b64260c7bb1a2279e232d.1410020459.git.stefan@agner.ch>
-References: <cover.1410020458.git.stefan@agner.ch>
- <4cf96e22ce2c7646513b64260c7bb1a2279e232d.1410020459.git.stefan@agner.ch>
-Message-ID: <CACRpkdYk0zW12qNXgOstTLmdVDYacu0Un+8quTN+J_azOic7AA@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 23 Sep 2014 17:50:07 +0800
+Subject: unalignment access to device / strongly ordered memory
+In-Reply-To: <20140923093751.GP5182@n2100.arm.linux.org.uk>
+References: <35FD53F367049845BC99AC72306C23D103D6DB491629@CNBJMBX05.corpusers.net>
+ <20140923093751.GP5182@n2100.arm.linux.org.uk>
+Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49162A@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 6, 2014 at 6:25 PM, Stefan Agner <stefan@agner.ch> wrote:
+Hi Russell,
 
-> Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
-> This is needed since direction configuration is not part of the
-> GPIO module in Vybrid.
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-(...)
+I see,
+Very Thanks for your clarification!
 
-> -arch_initcall(vf610_pinctrl_init);
-> +postcore_initcall(vf610_pinctrl_init);
+-----Original Message-----
+On Tue, Sep 23, 2014 at 01:25:17PM +0800, Wang, Yalin wrote:
+> Hi
+> 
+> I have a question about
+> unalignment access to device / strongly ordered memory.
+> The TRM said that :
+> 
+> Unaligned data accesson page A3-108identifies the instructions that 
+> can make an unaligned memory access, and the required configuration 
+> setting. If such an access is to Device or Strongly-ordered memory
+> then:
+> - if the implementation does not include the Virtualization 
+> Extensions, the effect is UNPREDICTABLE
+> - if the implementation includes the Virtualization Extensions, the access generates an Alignment fault.
+> 
+> 
+> But I see arch\arm\mm\alignment.c,
+> It don't check if the fault address is a device / strongly ordered 
+> memory address.
 
-Why is this necessary? You should be able to rely on deferred
-probing to do its work here. I think this should be module_init()
-or driver_initcall() really.
+Doing so is too expensive.
 
-Yours,
-Linus Walleij
+> Is it safe ?
+
+Yes - if you use misaligned accesses to a device or strongly ordered region, you will get unpredictable results.  If it triggers an alignment fault, we will fix up the load by performing multiple accesses to the address and combining their results.
+
+If reading or writing to the region has side effects (maybe the device is read sensitive) maybe it won't like the multiple reads - that's not the problem of the OS to resolve.  That still comes under "unpredictable".
+
+Hence, whether or not you have virtualisation extensions, the result of performing an unaligned access will be UNPREDICTABLE.
+
+> Do we need check it and then panic kernel or kill the user process
+
+How would we do that when non-virtualised cases may not produce an exception?
+
+The bottom line on this is quite simply: never generate misaligned loads and stores to devices.
+
+--
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up according to speedtest.net.
