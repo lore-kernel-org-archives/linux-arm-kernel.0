@@ -1,59 +1,49 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 12:28:00 +0200
-Subject: [PATCH v6 04/12] ARM: dts: berlin: add a required reset property in
- the chip controller node
+Date: Tue, 23 Sep 2014 12:27:58 +0200
+Subject: [PATCH v6 02/12] Documentation: bindings: add reset bindings docs for
+ Marvell Berlin SoCs
 In-Reply-To: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1411468088-5702-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1411468088-5702-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip controller node now also describes the Marvell Berlin reset
-controller. Add the required 'reset-cells' property.
+Add the reset binding documentation to the SoC binding documentation as
+the reset driver in Marvell Berlin SoC is part of the chip/system
+control registers. This patch adds the required properties to configure
+the reset controller.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/berlin2.dtsi   | 1 +
- arch/arm/boot/dts/berlin2cd.dtsi | 1 +
- arch/arm/boot/dts/berlin2q.dtsi  | 1 +
- 3 files changed, 3 insertions(+)
+ Documentation/devicetree/bindings/arm/marvell,berlin.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index 9d7c810ebd0b..d7e81e124de0 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -249,6 +249,7 @@
- 		chip: chip-control at ea0000 {
- 			compatible = "marvell,berlin2-chip-ctrl";
- 			#clock-cells = <1>;
-+			#reset-cells = <2>;
- 			reg = <0xea0000 0x400>;
- 			clocks = <&refclk>;
- 			clock-names = "refclk";
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index cc1df65da504..68f7032b4686 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -231,6 +231,7 @@
- 		chip: chip-control at ea0000 {
- 			compatible = "marvell,berlin2cd-chip-ctrl";
- 			#clock-cells = <1>;
-+			#reset-cells = <2>;
- 			reg = <0xea0000 0x400>;
- 			clocks = <&refclk>;
- 			clock-names = "refclk";
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 400c40fceccc..ffba5c3bdab8 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -332,6 +332,7 @@
- 		chip: chip-control at ea0000 {
- 			compatible = "marvell,berlin2q-chip-ctrl";
- 			#clock-cells = <1>;
-+			#reset-cells = <2>;
- 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
- 			clocks = <&refclk>;
- 			clock-names = "refclk";
+diff --git a/Documentation/devicetree/bindings/arm/marvell,berlin.txt b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+index 904de5781f44..a99eb9eb14c0 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,berlin.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,berlin.txt
+@@ -106,11 +106,21 @@ Required subnode-properties:
+ - groups: a list of strings describing the group names.
+ - function: a string describing the function used to mux the groups.
+ 
++* Reset controller binding
++
++A reset controller is part of the chip control registers set. The chip control
++node also provides the reset. The register set is not at the same offset between
++Berlin SoCs.
++
++Required property:
++- #reset-cells: must be set to 2
++
+ Example:
+ 
+ chip: chip-control at ea0000 {
+ 	compatible = "marvell,berlin2-chip-ctrl";
+ 	#clock-cells = <1>;
++	#reset-cells = <2>;
+ 	reg = <0xea0000 0x400>;
+ 	clocks = <&refclk>, <&externaldev 0>;
+ 	clock-names = "refclk", "video_ext0";
 -- 
 1.9.1
