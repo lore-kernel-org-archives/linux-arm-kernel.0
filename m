@@ -1,156 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 13:24:01 +0200
-Subject: [PATCH v8 07/10] ARM: at91: add clk_lookup entry for RTT devices
-In-Reply-To: <1411471444-2764-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411471444-2764-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411471444-2764-8-git-send-email-boris.brezillon@free-electrons.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 23 Sep 2014 13:24:18 +0200
+Subject: [PATCH 2/4] pinctrl: imx: add gpio pinmux support for vf610
+In-Reply-To: <CACRpkdYk0zW12qNXgOstTLmdVDYacu0Un+8quTN+J_azOic7AA@mail.gmail.com>
+References: <cover.1410020458.git.stefan@agner.ch>
+ <4cf96e22ce2c7646513b64260c7bb1a2279e232d.1410020459.git.stefan@agner.ch>
+ <CACRpkdYk0zW12qNXgOstTLmdVDYacu0Un+8quTN+J_azOic7AA@mail.gmail.com>
+Message-ID: <0498face86b4dcbdf35619c8b124675c@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First export the clk32k clk.
-Then add clk_lookup entries for RTT devices so that rtc-at91sam9 driver
-can retrieve and manipulate the slow clk.
+Am 2014-09-23 11:48, schrieb Linus Walleij:
+> On Sat, Sep 6, 2014 at 6:25 PM, Stefan Agner <stefan@agner.ch> wrote:
+> 
+>> Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
+>> This is needed since direction configuration is not part of the
+>> GPIO module in Vybrid.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> (...)
+> 
+>> -arch_initcall(vf610_pinctrl_init);
+>> +postcore_initcall(vf610_pinctrl_init);
+> 
+> Why is this necessary? You should be able to rely on deferred
+> probing to do its work here. I think this should be module_init()
+> or driver_initcall() really.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Johan Hovold <johan@kernel.org>
----
- arch/arm/mach-at91/at91sam9260.c | 2 ++
- arch/arm/mach-at91/at91sam9261.c | 2 ++
- arch/arm/mach-at91/at91sam9263.c | 4 ++++
- arch/arm/mach-at91/at91sam9g45.c | 2 ++
- arch/arm/mach-at91/at91sam9rl.c  | 2 ++
- arch/arm/mach-at91/clock.c       | 2 +-
- arch/arm/mach-at91/clock.h       | 1 +
- 7 files changed, 14 insertions(+), 1 deletion(-)
+Currently deferred probe doesn't work for gpiolib drivers which try to
+add gpio-ranges from device tree:
+gpiochip_add calls of_gpiochip_add_pin_range (through of_gpiochip_add).
+This function tries to get the pinctrl driver, which is not registred at
+that time. Currently the driver does not defer probing but fails
+silently...
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 3477ba9..a853d4c 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -217,6 +217,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more usart lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -237,6 +238,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index fb164a5..3f5a299 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -192,6 +192,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -209,6 +210,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 810fa5f..bef5b96 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -201,6 +201,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.1", &clk32k),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-@@ -227,6 +229,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd50.rtc", &clk32k),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 9d45496..69fdfcc 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "atmel_aes", &aestdessha_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more usart lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
-@@ -279,6 +280,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioDE_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 878d501..a82dc61 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -205,6 +205,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
- 	CLKDEV_CON_ID("pioD", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -223,6 +224,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 	CLKDEV_CON_ID("adc_clk", &tsc_clk),
- };
- 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 034529d..f5cfed75 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -115,7 +115,7 @@ static u32 at91_pllb_usb_init;
-  * 48 MHz (unless no USB function clocks are needed).  The main clock and
-  * both PLLs are turned off to run in "slow clock mode" (system suspend).
-  */
--static struct clk clk32k = {
-+struct clk clk32k = {
- 	.name		= "clk32k",
- 	.rate_hz	= AT91_SLOW_CLOCK,
- 	.users		= 1,		/* always on */
-diff --git a/arch/arm/mach-at91/clock.h b/arch/arm/mach-at91/clock.h
-index a98a39b..6eb825a 100644
---- a/arch/arm/mach-at91/clock.h
-+++ b/arch/arm/mach-at91/clock.h
-@@ -34,6 +34,7 @@ struct clk {
- extern int __init clk_register(struct clk *clk);
- extern struct clk mck;
- extern struct clk utmi_clk;
-+extern struct clk clk32k;
- 
- #define CLKDEV_CON_ID(_id, _clk)			\
- 	{						\
--- 
-1.9.1
+We would need to alter the return values of those two functions
+(of_gpiochip_add_pin_range/of_gpiochip_add) and honor the return value
+in gpiochip_add. 
+
+Currently, it seems that we quite often use an early initcall to get the
+pinctrl loaded early:
+$ grep -h -o ".*_initcall" drivers/pinctrl/*.c | sort | uniq -c
+     18 arch_initcall
+      3 core_initcall
+      3 postcore_initcall
+      1 subsys_initcall
+
+IMHO for those core services, it also makes sense to have them
+initialized early. I'd rather prefer this hard coded than having dozens
+of "requests probe deferral" messages...
+
+--
+Stefan
