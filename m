@@ -1,29 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 20:23:21 +0200
-Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support
- in big-endian model
-In-Reply-To: <1411492720444.3205@freescale.com>
-References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
- <45444544.Xl4NeUiTm0@wuerfel> <1411492720444.3205@freescale.com>
-Message-ID: <4465641.JLAzuEs1O5@wuerfel>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 23 Sep 2014 11:27:51 -0700
+Subject: [PATCH v2 1/2] watchdog: dw_wdt: initialise TOP_INIT in
+ dw_wdt_set_top()
+In-Reply-To: <1411458132-5410-2-git-send-email-jszhang@marvell.com>
+References: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
+ <1411458132-5410-2-git-send-email-jszhang@marvell.com>
+Message-ID: <20140923182751.GA24930@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 17:18:43 Jingchang Lu wrote:
-> I will reconsider this setting. BTW, why writel() can't be used
-> for memory location since it's still mapped and registers space is
-> also memory mapped? Thanks.
+On Tue, Sep 23, 2014 at 03:42:11PM +0800, Jisheng Zhang wrote:
+> The TOP_INIT, ie bit 4-7 of the WDOG_TIMEOUT_RANGE_REG_OFFSET register
+> may be zero, so the timeout period may be very short after initialization
+> is done, thus the system may be reset soon after enabling. We fix this
+> problem by also initialising the TOP_INIT when setting TOP in function
+> dw_wdt_set_top().
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-You cannot rely on an '__iomem' token to actually be a pointer, even
-if that is currently the case on ARM.
+That should do it.
 
-On other architectures, the bits in the pointer can encode something
-completely different, e.g. it may be the physical address on
-architectures that have instructions to load/store on that directly,
-and ioremap() in that case returns an identity mapping.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-If you install sparse and build with 'make C=1', you will in fact
-get a warning about the code when you assign a regular pointer to
-an __iomem pointer or vice versa.
-
-	Arnd
+> ---
+>  drivers/watchdog/dw_wdt.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> index 9f21029..449c885 100644
+> --- a/drivers/watchdog/dw_wdt.c
+> +++ b/drivers/watchdog/dw_wdt.c
+> @@ -40,6 +40,7 @@
+>  #define WDOG_CONTROL_REG_OFFSET		    0x00
+>  #define WDOG_CONTROL_REG_WDT_EN_MASK	    0x01
+>  #define WDOG_TIMEOUT_RANGE_REG_OFFSET	    0x04
+> +#define WDOG_TIMEOUT_RANGE_TOPINIT_SHIFT    4
+>  #define WDOG_CURRENT_COUNT_REG_OFFSET	    0x08
+>  #define WDOG_COUNTER_RESTART_REG_OFFSET     0x0c
+>  #define WDOG_COUNTER_RESTART_KICK_VALUE	    0x76
+> @@ -106,7 +107,8 @@ static int dw_wdt_set_top(unsigned top_s)
+>  		}
+>  
+>  	/* Set the new value in the watchdog. */
+> -	writel(top_val, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
+> +	writel(top_val | top_val << WDOG_TIMEOUT_RANGE_TOPINIT_SHIFT,
+> +		dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
+>  
+>  	dw_wdt_set_next_heartbeat();
+>  
+> -- 
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
