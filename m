@@ -1,56 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 09:44:25 +0200
-Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
- of_platform_populate
-In-Reply-To: <20140923070238.GH30514@ulmo>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <3261451.zpO6MVx5yo@wuerfel> <20140923070238.GH30514@ulmo>
-Message-ID: <3765297.6j3Rv68iqn@wuerfel>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Tue, 23 Sep 2014 16:46:33 +0900
+Subject: [PATCH v5 8/8] arm64: dts: add <dt-bindings/> symlink
+In-Reply-To: <1411361228-18279-9-git-send-email-a.kesavan@samsung.com>
+References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
+ <1411361228-18279-9-git-send-email-a.kesavan@samsung.com>
+Message-ID: <012f01cfd702$7ed15c30$7c741490$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 09:02:39 Thierry Reding wrote:
+Hi,
 
-> > I see two problems with using deferred probing here: 
-> > 
-> > - we don't actually need to defer the probing but the binding to the driver
-> >   when no dma ops are set, but it seems silly to even create the device
-> >   before we can find out which ops it should use.
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Abhilash Kesavan
+> Sent: Monday, September 22, 2014 1:47 PM
+> To: linux-samsung-soc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> catalin.marinas at arm.com
+> Cc: naveenkrishna.ch at gmail.com; kesavan.abhilash at gmail.com;
+> tomasz.figa at gmail.com
+> Subject: [PATCH v5 8/8] arm64: dts: add <dt-bindings/> symlink
 > 
-> What does device creation have to do with anything? Surely a device
-> won't need IOMMU services before the device is bound to a driver.
-
-The problem is that the driver will start using the IOMMU as soon
-as it calls dma_map_*, but that happens at runtime, not necessarily
-during the probe function.
-
-So we can get into the weird situation that probe() returns success,
-but then you can't use the device yet because you don't know whether
-it is supposed to use an IOMMU or not.
-
-> >   The reason is that a driver does not actively ask for an IOMMU as it would
-> >   for other subsystems (gpio, led, dmaengine, ...).
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
 > 
-> Actually it does. At least in some cases. If you want to use the IOMMU
-> API directly you'd call something like iommu_present() on the bus type
-> and then allocate an IOMMU domain and attach to it. Unfortunately the
-> API seems to have been designed under the assumption that IOMMU will
-> have been registered before any users, so the API doesn't propagate any
-> meaningful errors.
+> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
+> match the ones in ARM architectures so that preprocessed device
+> tree files can include various useful constant definitions.
+> 
+> See commit c58299aa8754 ("kbuild: create an "include chroot" for DT
+> bindings")
+> merged in v3.10-rc1 for details.
+> 
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+> Tested-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  arch/arm64/boot/dts/include/dt-bindings | 1 +
+>  1 file changed, 1 insertion(+)
+>  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
+> 
+> diff --git a/arch/arm64/boot/dts/include/dt-bindings
+> b/arch/arm64/boot/dts/include/dt-bindings
+> new file mode 120000
+> index 0000000..1e89bce
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/include/dt-bindings
+> @@ -0,0 +1 @@
+> +../../../../../include/dt-bindings/
+> \ No newline at end of file
+^
+It generates incorrect symlink. Please remove last line like below:
 
-That's just a special case that does not even work as it should yet,
-please don't confuse the matter more by talking about drivers that
-use the IOMMU API explicitly, this series has very little to do with
-that.
+diff --git a/arch/arm64/boot/dts/include/dt-bindings
+b/arch/arm64/boot/dts/include/dt-bindings
+new file mode 120000
+index 0000000..499472b
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/dt-bindings
+@@ -0,0 +1 @@
++../../../../../include/dt-bindings/
+--
 
-> Also, even if in other cases the drivers don't actively ask for an IOMMU
-> that doesn't mean that they couldn't be made to. For drivers that use
-> the DMA/IOMMU integration layer this is probably not practicable, but
-> there is no reason the core couldn't do it.
-
-We intentionally have an abstraction that is meant to let you write drivers
-without knowing about iommu, swiotlb or coherency, these are all hidden
-behind the dma_map_ops implementation.
-
-
-	Arnd
+Best Regards,
+Chanho Park
