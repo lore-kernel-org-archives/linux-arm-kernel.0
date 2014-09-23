@@ -1,70 +1,74 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Tue, 23 Sep 2014 11:36:32 -0400
-Subject: [PATCH 0/9] ARM: vf610: Suspend/resume support
-References: <cover.1411404079.git.stefan@agner.ch>
-Message-ID: <87zjdqmjr3.fsf@nbsps.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Sep 2014 17:38:51 +0200
+Subject: [PATCH 1/1] gpio: Fix ngpio in gpio-xilinx driver
+In-Reply-To: <1411031032-20649-1-git-send-email-gvormayr@gmail.com>
+References: <1411031032-20649-1-git-send-email-gvormayr@gmail.com>
+Message-ID: <CACRpkdZJajGr+Y4OTBf0W697G9ipBKH-y67EU69C-6cCiVbSRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 Sep 2014, stefan at agner.ch wrote:
+On Thu, Sep 18, 2014 at 11:03 AM, Gernot Vormayr <gvormayr@gmail.com> wrote:
 
-> This patchset provides suspend/resume support for Freescale Vybrid
-> SoC (vf610). The code is generally aligned to the implementation
-> for i.MX6. The subsystems SRC and GPC need some changes to support
-> the Vybrid specific implementation.
+> If one adds 'gpio-controller;' to the chip in the devicetree, then
+> initialization fails with 'gpiochip_find_base: cannot find free range',
+> because ngpio is 0. This patch fixes the bug.
 >
-> This patchset relies on GPIO driver to be present (in order to
-> provide a wakeup source) as well as using the ARM Global Timer
-> clock source (the Vybrid specifc PIT clock source, vf_pit_timer.c
-> does not support shutdown).
+> Tested on ml507 board.
 >
-> The implemented sleep states (LP-RUN and STOP), are not the most
-> power saving functions available on Vybrid. Especially for
-> suspend-to-memory one of the LPSTOP modes looks more appropriate.
-> However, the complexity is somewhat higher (we would need to move
-> execution path to SRAM and store IOMUX and DDRMC configuration).
-> Currently, I have not the resources to look into that so I hope
-> that this initial code qualifies as power saving functions to be
-> applied.
+> Signed-off-by: Gernot Vormayr <gvormayr@gmail.com>
+> ---
+>  drivers/gpio/gpio-xilinx.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
 >
-> Suspend-to-memory as well as standby mode is tested on Colibri
-> VF61.
-
-> Power measurement (Colibri VF61, whole module):
-> - Idle: 540mW
-> - LP-RUN: 220mW (standby)
-> - STOP: 200mW (mem)
-
-> Stefan Agner (9):
-> ARM: dts: vf610: Add system reset controller (SRC)
-> ARM: dts: vf610: add global power controller (GPC)
-> ARM: dts: vf610: add on-chip SRAM
-
-These above three change sets have some implications for dual-chip
-(Cortex-A5/Cortex-M4) configurations.  Epecially those running MQX.
-There is not harm to define the register space (except DT size).
-However, if you activate drivers that manipulate the registers for all
-systems, then there is no choice to have MQX work on the 2nd core.
-
-I think that Shawn Guo already did a patchset to remove stuff from the
-vf610.dtsi to the machine/configuration DT files.
-
-> ARM: dts: vf610-colibri: GPIO power key
-> gpio: vf610: Extend with wakeup support
-> ARM: imx: gpc: Support vf610 global power controller
-> ARM: imx: src: Support vf610 system reset controller
-> ARM: imx: clk-gate2: allow custom gate configuration
-> ARM: vf610: initial suspend/resume support
+> diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+> index 1248186..4606ad2 100644
+> --- a/drivers/gpio/gpio-xilinx.c
+> +++ b/drivers/gpio/gpio-xilinx.c
+> @@ -197,6 +197,7 @@ static int xgpio_of_probe(struct device_node *np)
+>         struct xgpio_instance *chip;
+>         int status = 0;
+>         const u32 *tree_info;
+> +       u32 ngpio;
 >
-> arch/arm/boot/dts/vf610-colibri-eval-v3.dts | 26 ++
-> arch/arm/boot/dts/vf610.dtsi | 33 +++ arch/arm/mach-imx/Kconfig | 2 +
-> arch/arm/mach-imx/Makefile | 1 + arch/arm/mach-imx/clk-gate2.c | 7 +-
-> arch/arm/mach-imx/clk-vf610.c | 6 + arch/arm/mach-imx/clk.h | 13 +-
-> arch/arm/mach-imx/common.h | 14 +- arch/arm/mach-imx/gpc.c | 61 ++--
-> arch/arm/mach-imx/mach-imx6q.c | 2 +- arch/arm/mach-imx/mach-imx6sl.c
-> | 2 +- arch/arm/mach-imx/mach-vf610.c | 9 +
-> arch/arm/mach-imx/pm-vf610.c | 428 ++++++++++++++++++++++++++++
-> arch/arm/mach-imx/src.c | 11 + drivers/gpio/gpio-vf610.c | 16 ++
-> include/dt-bindings/clock/vf610-clock.h | 3 +- 16 files changed, 605
-> insertions(+), 29 deletions(-) create mode 100644
-> arch/arm/mach-imx/pm-vf610.c
+>         chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+>         if (!chip)
+> @@ -215,8 +216,9 @@ static int xgpio_of_probe(struct device_node *np)
+>         chip->mmchip.gc.ngpio = 32;
+
+Delete that line ^
+
+>
+>         /* Check device node and parent device node for device width */
+> -       of_property_read_u32(np, "xlnx,gpio-width",
+> -                             (u32 *)&chip->mmchip.gc.ngpio);
+> +       status = of_property_read_u32(np, "xlnx,gpio-width", &ngpio);
+> +       if (status == 0)
+> +               chip->mmchip.gc.ngpio = (u16)ngpio;
+
+Rewrite like this:
+
+if (of_property_read_u32(np, "xlnx,gpio-width", &ngpio))
+    ngpio = 32;
+chip->mmchip.gc.ngpio = (u16)ngpio;
+
+>
+>         spin_lock_init(&chip->gpio_lock);
+>
+> @@ -262,8 +264,9 @@ static int xgpio_of_probe(struct device_node *np)
+>                 chip->mmchip.gc.ngpio = 32;
+>
+>                 /* Check device node and parent device node for device width */
+> -               of_property_read_u32(np, "xlnx,gpio2-width",
+> -                                    (u32 *)&chip->mmchip.gc.ngpio);
+> +               status = of_property_read_u32(np, "xlnx,gpio2-width", &ngpio);
+> +               if (status == 0)
+> +                       chip->mmchip.gc.ngpio = (u16)ngpio;
+
+Same comment.
+
+The fact that the same code appears in two places tells us something
+is not quite right. Can you look into consolidating this (in a separate
+patch)?
+
+Yours,
+Linus Walleij
