@@ -1,67 +1,54 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Tue, 23 Sep 2014 16:46:33 +0900
-Subject: [PATCH v5 8/8] arm64: dts: add <dt-bindings/> symlink
-In-Reply-To: <1411361228-18279-9-git-send-email-a.kesavan@samsung.com>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
- <1411361228-18279-9-git-send-email-a.kesavan@samsung.com>
-Message-ID: <012f01cfd702$7ed15c30$7c741490$@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 23 Sep 2014 15:45:01 +0800
+Subject: [PATCH 1/2] watchdog: dw_wdt: restart the counter immediately
+ after enabling WDT
+In-Reply-To: <541D867C.6080407@roeck-us.net>
+References: <1411108199-1280-1-git-send-email-jszhang@marvell.com>
+ <1411108199-1280-2-git-send-email-jszhang@marvell.com>
+ <541D867C.6080407@roeck-us.net>
+Message-ID: <20140923154501.50dc8111@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Guenter,
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Abhilash Kesavan
-> Sent: Monday, September 22, 2014 1:47 PM
-> To: linux-samsung-soc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> catalin.marinas at arm.com
-> Cc: naveenkrishna.ch at gmail.com; kesavan.abhilash at gmail.com;
-> tomasz.figa at gmail.com
-> Subject: [PATCH v5 8/8] arm64: dts: add <dt-bindings/> symlink
-> 
-> From: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
-> match the ones in ARM architectures so that preprocessed device
-> tree files can include various useful constant definitions.
-> 
-> See commit c58299aa8754 ("kbuild: create an "include chroot" for DT
-> bindings")
-> merged in v3.10-rc1 for details.
-> 
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-> Tested-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm64/boot/dts/include/dt-bindings | 1 +
->  1 file changed, 1 insertion(+)
->  create mode 120000 arch/arm64/boot/dts/include/dt-bindings
-> 
-> diff --git a/arch/arm64/boot/dts/include/dt-bindings
-> b/arch/arm64/boot/dts/include/dt-bindings
-> new file mode 120000
-> index 0000000..1e89bce
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/include/dt-bindings
-> @@ -0,0 +1 @@
-> +../../../../../include/dt-bindings/
-> \ No newline at end of file
-^
-It generates incorrect symlink. Please remove last line like below:
+On Sat, 20 Sep 2014 06:51:56 -0700
+Guenter Roeck <linux@roeck-us.net> wrote:
 
-diff --git a/arch/arm64/boot/dts/include/dt-bindings
-b/arch/arm64/boot/dts/include/dt-bindings
-new file mode 120000
-index 0000000..499472b
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/dt-bindings
-@@ -0,0 +1 @@
-+../../../../../include/dt-bindings/
---
+> On 09/18/2014 11:29 PM, Jisheng Zhang wrote:
+> > The TOP_INIT may be zero, so the timeout period may be very short after
+> > initialization is done, thus the system may be reset soon after enabling.
+> > We fix this problem by restarting the counter immediately after enabling
+> > WDT.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >   drivers/watchdog/dw_wdt.c | 1 +
+> >   1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> > index 9f21029..ad0619d 100644
+> > --- a/drivers/watchdog/dw_wdt.c
+> > +++ b/drivers/watchdog/dw_wdt.c
+> > @@ -146,6 +146,7 @@ static int dw_wdt_open(struct inode *inode, struct
+> > file *filp) dw_wdt_set_top(DW_WDT_MAX_TOP);
+> >   		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+> >   		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
+> > +		dw_wdt_keepalive();
+> >   	}
+> >
+> >   	dw_wdt_set_next_heartbeat();
+> >
+> After getting access to the datasheet, I concluded that this fix is wrong
+> or at least more risky than necessary. The datasheet states that top_init,
+> ie bit 4-7 of the wdt_torr register, needs to be initialized with the
+> desired timeout period prior to enabling the watchdog. dw_wdt_set_top()
+> sets it to 0 instead, ie to the lowest possible timeout period.
+> 
 
-Best Regards,
-Chanho Park
+In patch V2, 
+I initialize the TOP_INIT when setting TOP in function dw_wdt_set_top(), this
+also can fix the "reboot soon" problem. Could you please have a review again?
+
+Thanks,
+Jisheng
