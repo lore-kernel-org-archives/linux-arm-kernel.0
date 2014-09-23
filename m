@@ -1,59 +1,20 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 23 Sep 2014 15:08:41 +0200
-Subject: [PATCH/RFC 0/2] serial: samsung: add support for early console
-In-Reply-To: <CAGOxZ51aghOqbZuv34TuBuQdKjmHdkhaYJvH=VxNjxb-pZKE8w@mail.gmail.com>
-References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
- <CAGOxZ51aghOqbZuv34TuBuQdKjmHdkhaYJvH=VxNjxb-pZKE8w@mail.gmail.com>
-Message-ID: <542170D9.4020605@samsung.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 23 Sep 2014 09:17:30 -0400
+Subject: [PATCH v5 1/2] ahci-platform: Bump max number of clocks to 5
+In-Reply-To: <1411416586-18320-1-git-send-email-galak@codeaurora.org>
+References: <1411416586-18320-1-git-send-email-galak@codeaurora.org>
+Message-ID: <20140923131730.GD14905@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Sep 22, 2014 at 03:09:45PM -0500, Kumar Gala wrote:
+> Qualcomm IPQ806x SoCs with SATA controllers need 5 clocks to be enabled.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 
-On 2014-09-23 14:53, Alim Akhtar wrote:
-> Hi Marek,
->
-> On Mon, Sep 22, 2014 at 6:44 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Hello,
->>
->> This patchset adds support for early console defined in device tree. As
->> an example, DTS files for all Exynos4 based machines are updated with
->> the correct value for common chosen/sdtout property.
->>
->> To get it fully functional additional improvements (support for
->> early_ioremap) are needed in early console code.
->>
-> Is these really tested?
+Applied 1-2 to libata/for-3.18.
 
-I've tested it on Exynos4412 based OdroidU3 board. It works fine, although
-early console is not initialized as early as it might be. That's the only
-drawback, besides that it works fine.
+Thanks.
 
-> So that mean we need to wait till __ioremap__ support available for ARM.
-> How to take this forward then? Here is a platform (exynos7) which
-> needs earlycon support for debugging some of the early core things and
-> ARM64 has ioremap support as well. There is no reason why we should
-> hold earlycon support for exyons7.
-
-I prefer to simply merge the patch as is. Once early con gets full
-functionality, all required samsung code will be already in then.
-
-> I see two solution here:
-> 1> How about re-spin patch-1 which will just add ealrycon support for
-> __exynos4210__ serial type only? And rest of the types can be added as
-> incremental patches, as and when ioremap for ARM available.
-> Atleast this approch will solve exynos7 problem of not having earlycon support.
-> And This patch can be tested on exynos7 (I can do that).
-> 2> Take  my patch which is working and tested for exynos7 and can be
-> easily extended and generalized when ioremap for ARM is available.
->
-> My preference would be the the first one.
-> Let me know your thoughts please.
-> In case you are ok with 1st approach, can you please re-spin patch1
-> with needed changes?
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+tejun
