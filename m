@@ -1,64 +1,70 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 23 Sep 2014 15:25:51 +0200
-Subject: [PATCH/RFC 0/2] serial: samsung: add support for early console
-In-Reply-To: <CAGOxZ51aghOqbZuv34TuBuQdKjmHdkhaYJvH=VxNjxb-pZKE8w@mail.gmail.com>
-References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
- <CAGOxZ51aghOqbZuv34TuBuQdKjmHdkhaYJvH=VxNjxb-pZKE8w@mail.gmail.com>
-Message-ID: <542174DF.8000703@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 23 Sep 2014 15:28:00 +0200
+Subject: [PATCH v2 0/4] Add Mediatek SoC Pinctrl/GPIO driver for MT8135.
+In-Reply-To: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+Message-ID: <54217560.20803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.09.2014 14:53, Alim Akhtar wrote:
-> Hi Marek,
+
+
+On 23/09/14 05:39, Hongzhou.Yang wrote:
+> This is v2 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
+> It is based on Joe.C' basic device tree support.
+> See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288582.html
 > 
-> On Mon, Sep 22, 2014 at 6:44 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Hello,
->>
->> This patchset adds support for early console defined in device tree. As
->> an example, DTS files for all Exynos4 based machines are updated with
->> the correct value for common chosen/sdtout property.
->>
->> To get it fully functional additional improvements (support for
->> early_ioremap) are needed in early console code.
->>
-> Is these really tested?
-> So that mean we need to wait till __ioremap__ support available for ARM.
-
-This was originally tested by creating a fixed mapping for all UART
-ports on respective platforms in .map_io() callback of machine
-descriptor. This might be the way to support this on 32-bit ARM
-platforms until early ioremap is available.
-
-However if no mapping is available, the earlycon will simply not
-register and won't break anything, so it should be safe to keep.
-
-> How to take this forward then? Here is a platform (exynos7) which
-> needs earlycon support for debugging some of the early core things and
-> ARM64 has ioremap support as well. There is no reason why we should
-> hold earlycon support for exyons7.
-> I see two solution here:
-> 1> How about re-spin patch-1 which will just add ealrycon support for
-> __exynos4210__ serial type only? And rest of the types can be added as
-> incremental patches, as and when ioremap for ARM available.
-> Atleast this approch will solve exynos7 problem of not having earlycon support.
-> And This patch can be tested on exynos7 (I can do that).
-
-I don't really think there is a need to remove support for other
-variants. As I mentioned, they can be supported without early_ioremap()
-by static IO mapping.
-
-> 2> Take  my patch which is working and tested for exynos7 and can be
-> easily extended and generalized when ioremap for ARM is available.
+> This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
+> and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
 > 
-> My preference would be the the first one.
-> Let me know your thoughts please.
-> In case you are ok with 1st approach, can you please re-spin patch1
-> with needed changes?
+> Changes in v2:
+> - According to Heiko Stubner' suggestion, use generic pinconfig.
 
-I'd say this patch could be merged as is. For 32-bit platforms
-additional patches might be posted separately to add early static
-mapping or just wait until early ioremap becomes availabl.e
+Please always add people that made comments on your former versions in
+CC. This way it is easier for them to follow the debate about your patches.
 
-Best regards,
-Tomasz
+Thanks,
+Matthias
+
+> - Remove pinmux_ops.disable implement.
+> - Due to limit of message body, move mt8135-pinfunc.h to '[PATCH 3/4] add pinctrl node for MT8135'.
+> 
+> 
+> Hongzhou Yang (3):
+> ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
+> dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
+> ARM: dts: mt8135: Add pinctrl node for mt8135.
+> 
+> Joe.C (1):
+> arm: mediatek: Add config option for mediatek SoCs.
+> 
+> .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |   98 +
+> arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
+> arch/arm/boot/dts/mt8135.dtsi                      |   11 +
+> arch/arm/mach-mediatek/Kconfig                     |   23 +-
+> drivers/pinctrl/Kconfig                            |    1 +
+> drivers/pinctrl/Makefile                           |    1 +
+> drivers/pinctrl/mediatek/Kconfig                   |   12 +
+> drivers/pinctrl/mediatek/Makefile                  |    5 +
+> drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   82 +
+> drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  792 +++++++
+> drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   95 +
+> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
+> include/dt-bindings/pinctrl/mt65xx.h               |   23 +
+> 13 files changed, 4904 insertions(+), 3 deletions(-)
+> create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+> create mode 100644 drivers/pinctrl/mediatek/Kconfig
+> create mode 100644 drivers/pinctrl/mediatek/Makefile
+> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
+> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+> create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
+> 
+> --
+> 1.8.1.1.dirty
+> 
+> 
+> 
+> 
