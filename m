@@ -1,88 +1,42 @@
-From: asierra@xes-inc.com (Aaron Sierra)
-Date: Tue, 23 Sep 2014 12:18:40 -0500 (CDT)
-Subject: [RFT PATCH] mtd: ixp4xx: Unrequire CONFIG_MTD_CFI_BE_BYTE_SWAP
-In-Reply-To: <786499164.272880.1411492623841.JavaMail.zimbra@xes-inc.com>
-Message-ID: <719460394.273364.1411492720358.JavaMail.zimbra@xes-inc.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 23 Sep 2014 17:21:06 +0000
+Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G	support
+ in big-endian model
+In-Reply-To: <20140923103721.GQ5182@n2100.arm.linux.org.uk>
+References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>,
+ <20140923103721.GQ5182@n2100.arm.linux.org.uk>
+Message-ID: <1411492862884.42316@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .swap member of the map_info structure is provided for situations
-where a mapping must always be big or little-endian regardless of the
-endianness of the system performing the access.
+_______________________________________
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Sent: Tuesday, September 23, 2014 6:37 PM
+To: Lu Jingchang-B35083
+Cc: vinod.koul at intel.com; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G   support in big-endian model
 
-Signed-off-by: Aaron Sierra <asierra@xes-inc.com>
----
- drivers/mtd/maps/ixp4xx.c | 31 +++++++------------------------
- 1 file changed, 7 insertions(+), 24 deletions(-)
+On Tue, Sep 23, 2014 at 05:15:19PM +0800, Jingchang Lu wrote:
+>  static u16 edma_readw(struct fsl_edma_engine *edma, void __iomem *addr)
+>  {
+> -     if (edma->big_endian)
+> -             return ioread16be(addr);
+> -     else
+> +     u32 dst;
 
-diff --git a/drivers/mtd/maps/ixp4xx.c b/drivers/mtd/maps/ixp4xx.c
-index 6a589f1..decaefe 100644
---- a/drivers/mtd/maps/ixp4xx.c
-+++ b/drivers/mtd/maps/ixp4xx.c
-@@ -26,6 +26,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/map.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/mtd/cfi_endian.h>
- 
- #include <asm/io.h>
- #include <asm/mach/flash.h>
-@@ -48,43 +49,24 @@
-  *     | C | D | 2
-  *     +---+---+
-  * This means that on LE systems each 16 bit word must be swapped. Note that
-- * this requires CONFIG_MTD_CFI_BE_BYTE_SWAP to be enabled to 'unswap' the CFI
-- * data and other flash commands which are always in D7-D0.
-+ * this is accounted for by defining map_info.swap to be CFI_BIG_ENDIAN to
-+ * 'unswap' the CFI commands and using cpu_to_be16/be16_to_cpu to 'unswap'
-+ * the data.
-  */
--#ifndef __ARMEB__
--#ifndef CONFIG_MTD_CFI_BE_BYTE_SWAP
--#  error CONFIG_MTD_CFI_BE_BYTE_SWAP required
--#endif
- 
- static inline u16 flash_read16(void __iomem *addr)
- {
--	return be16_to_cpu(__raw_readw((void __iomem *)((unsigned long)addr ^ 0x2)));
-+	return be16_to_cpu(__raw_readw(addr));
- }
- 
- static inline void flash_write16(u16 d, void __iomem *addr)
- {
--	__raw_writew(cpu_to_be16(d), (void __iomem *)((unsigned long)addr ^ 0x2));
-+	__raw_writew(cpu_to_be16(d), addr);
- }
- 
- #define	BYTE0(h)	((h) & 0xFF)
- #define	BYTE1(h)	(((h) >> 8) & 0xFF)
- 
--#else
--
--static inline u16 flash_read16(const void __iomem *addr)
--{
--	return __raw_readw(addr);
--}
--
--static inline void flash_write16(u16 d, void __iomem *addr)
--{
--	__raw_writew(d, addr);
--}
--
--#define	BYTE0(h)	(((h) >> 8) & 0xFF)
--#define	BYTE1(h)	((h) & 0xFF)
--#endif
--
- static map_word ixp4xx_read16(struct map_info *map, unsigned long ofs)
- {
- 	map_word val;
-@@ -200,6 +182,7 @@ static int ixp4xx_flash_probe(struct platform_device *dev)
- 	 * Tell the MTD layer we're not 1:1 mapped so that it does
- 	 * not attempt to do a direct access on us.
- 	 */
-+	info->map.swap = CFI_BIG_ENDIAN;
- 	info->map.phys = NO_XIP;
- 	info->map.size = resource_size(dev->resource);
- 
--- 
-1.9.1
+This should be unsigned long, if it needs to exist.
+
+> +     /* swap the reg offset for these in big-endian mode */
+> +     if (edma->big_endian) {
+> +             dst = ((u32)addr & ~0x3) | (((u32)addr & 0x3) ^ 0x2);
+
+This can be simplified to:
+
+                addr = (void __iomem *)((unsigned long)addr ^ 2);
+
+Ditto for all the other cases.
+
+I will do that, Thanks.
+
+Best Regards,
+Jingchang
