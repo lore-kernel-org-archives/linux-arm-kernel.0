@@ -1,75 +1,88 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 23 Sep 2014 17:18:43 +0000
-Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support
- in big-endian model
-In-Reply-To: <45444544.Xl4NeUiTm0@wuerfel>
-References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>,
- <45444544.Xl4NeUiTm0@wuerfel>
-Message-ID: <1411492720444.3205@freescale.com>
+From: asierra@xes-inc.com (Aaron Sierra)
+Date: Tue, 23 Sep 2014 12:18:40 -0500 (CDT)
+Subject: [RFT PATCH] mtd: ixp4xx: Unrequire CONFIG_MTD_CFI_BE_BYTE_SWAP
+In-Reply-To: <786499164.272880.1411492623841.JavaMail.zimbra@xes-inc.com>
+Message-ID: <719460394.273364.1411492720358.JavaMail.zimbra@xes-inc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-________________________________________
-From: Arnd Bergmann <arnd@arndb.de>
-Sent: Tuesday, September 23, 2014 8:30 PM
-To: linux-arm-kernel at lists.infradead.org
-Cc: Lu Jingchang-B35083; vinod.koul at intel.com; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org
-Subject: Re: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support in big-endian model
+The .swap member of the map_info structure is provided for situations
+where a mapping must always be big or little-endian regardless of the
+endianness of the system performing the access.
 
-On Tuesday 23 September 2014 17:15:19 Jingchang Lu wrote:
-> @@ -459,20 +480,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
->         u16 csr = 0;
->
->         /*
-> -        * eDMA hardware SGs require the TCD parameters stored in memory
-> -        * the same endian as the eDMA module so that they can be loaded
-> -        * automatically by the engine
-> +        * eDMA hardware SGs requires the TCDs to be auto loaded
-> +        * in the same endian as the core whenver the eDAM engine's
-> +        * register endian. So we don't swap the value, waitting
-> +        * for fsl_set_tcd_params doing the swap.
->          */
+Signed-off-by: Aaron Sierra <asierra@xes-inc.com>
+---
+ drivers/mtd/maps/ixp4xx.c | 31 +++++++------------------------
+ 1 file changed, 7 insertions(+), 24 deletions(-)
 
-This makes no sense: how would the eDMA hardware know what endianess
-the CPU is using to write this data? Have you tried this running on
-the same hardware with both big-endian and little-endian kernels?
-
-Also, you access this as little-endian data unconditionally rather
-than cpu-endian as the comment suggests, maybe that is what you meant
-here?
-
-I will rewrite this comment, thanks.
-
-> -       edma_writel(edma, src, &(tcd->saddr));
-> -       edma_writel(edma, dst, &(tcd->daddr));
-> -       edma_writew(edma, attr, &(tcd->attr));
-> -       edma_writew(edma, EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
-> -       edma_writel(edma, EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
-> -       edma_writel(edma, EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
-> -       edma_writew(edma, EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
-> -       edma_writew(edma, EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
-> -       edma_writel(edma, EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
-> -       edma_writew(edma, EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
-> +       writel(src, &(tcd->saddr));
-> +       writel(dst, &(tcd->daddr));
-> +
-> +       writew(attr, &(tcd->attr));
-
-You seem to have another preexisting bug: The tcd pointer actually does not
-point to mmio registers here at all, but instead points to memory that
-has been returned from dma_pool_alloc. It is not valid to use writel()
-on such memory, that is only meant to work on real MMIO registers.
-
-You should use regular assignments to the registers here, e.g.
-
-        tcd->saddr = cpu_to_le32(src);
-        tcd->daddr = cpu_to_le32(dst);
-        ...
-
-        Arnd
-
-I will reconsider this setting. BTW, why writel() can't be used for memory location since it's still mapped and registers space is
-also memory mapped? Thanks.
-
-Best Regards,
-Jingchang
+diff --git a/drivers/mtd/maps/ixp4xx.c b/drivers/mtd/maps/ixp4xx.c
+index 6a589f1..decaefe 100644
+--- a/drivers/mtd/maps/ixp4xx.c
++++ b/drivers/mtd/maps/ixp4xx.c
+@@ -26,6 +26,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/map.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/mtd/cfi_endian.h>
+ 
+ #include <asm/io.h>
+ #include <asm/mach/flash.h>
+@@ -48,43 +49,24 @@
+  *     | C | D | 2
+  *     +---+---+
+  * This means that on LE systems each 16 bit word must be swapped. Note that
+- * this requires CONFIG_MTD_CFI_BE_BYTE_SWAP to be enabled to 'unswap' the CFI
+- * data and other flash commands which are always in D7-D0.
++ * this is accounted for by defining map_info.swap to be CFI_BIG_ENDIAN to
++ * 'unswap' the CFI commands and using cpu_to_be16/be16_to_cpu to 'unswap'
++ * the data.
+  */
+-#ifndef __ARMEB__
+-#ifndef CONFIG_MTD_CFI_BE_BYTE_SWAP
+-#  error CONFIG_MTD_CFI_BE_BYTE_SWAP required
+-#endif
+ 
+ static inline u16 flash_read16(void __iomem *addr)
+ {
+-	return be16_to_cpu(__raw_readw((void __iomem *)((unsigned long)addr ^ 0x2)));
++	return be16_to_cpu(__raw_readw(addr));
+ }
+ 
+ static inline void flash_write16(u16 d, void __iomem *addr)
+ {
+-	__raw_writew(cpu_to_be16(d), (void __iomem *)((unsigned long)addr ^ 0x2));
++	__raw_writew(cpu_to_be16(d), addr);
+ }
+ 
+ #define	BYTE0(h)	((h) & 0xFF)
+ #define	BYTE1(h)	(((h) >> 8) & 0xFF)
+ 
+-#else
+-
+-static inline u16 flash_read16(const void __iomem *addr)
+-{
+-	return __raw_readw(addr);
+-}
+-
+-static inline void flash_write16(u16 d, void __iomem *addr)
+-{
+-	__raw_writew(d, addr);
+-}
+-
+-#define	BYTE0(h)	(((h) >> 8) & 0xFF)
+-#define	BYTE1(h)	((h) & 0xFF)
+-#endif
+-
+ static map_word ixp4xx_read16(struct map_info *map, unsigned long ofs)
+ {
+ 	map_word val;
+@@ -200,6 +182,7 @@ static int ixp4xx_flash_probe(struct platform_device *dev)
+ 	 * Tell the MTD layer we're not 1:1 mapped so that it does
+ 	 * not attempt to do a direct access on us.
+ 	 */
++	info->map.swap = CFI_BIG_ENDIAN;
+ 	info->map.phys = NO_XIP;
+ 	info->map.size = resource_size(dev->resource);
+ 
+-- 
+1.9.1
