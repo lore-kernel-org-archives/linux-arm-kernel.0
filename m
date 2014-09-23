@@ -1,75 +1,148 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 16:48:41 +0200
-Subject: [PATCH v9 06/10] rtc: at91sam9: rework the Kconfig description
+Date: Tue, 23 Sep 2014 16:48:40 +0200
+Subject: [PATCH v9 05/10] rtc: at91sam9: make use of syscon/regmap to access
+ GPBR registers
 In-Reply-To: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411483725-31532-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411483725-31532-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all references to AT91CAP9 SoC which has been removed.
-Rework help message to remove any specific references to AT91SAM9 SoCs.
-State that RTC_DRV_AT91SAM9_RTT and RTC_DRV_AT91SAM9_GPBR options are only
-used when booting non DT boards.
+The GPBR registers are not part of the RTT block and thus should not be
+defined in the reg property of the rtt node.
+
+Use syscon to provide a proper DT representation and reference the GPBR
+syscon device in a new "atmel,rtt-rtc-time-reg" property which store both
+the syscon device phandle and the register offset within the GPBR block.
+
+When using non DT boards, we won't be able to retrieve the syscon regmap,
+hence we need to create our own regmap using the memory region defined
+in the 2nd memory resource assigned to the RTT platform device.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Johan Hovold <johan@kernel.org>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/rtc/Kconfig | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
+ drivers/rtc/Kconfig        |  1 +
+ drivers/rtc/rtc-at91sam9.c | 64 +++++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 56 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 7d76da8..9b56882 100644
+index a168e96..7d76da8 100644
 --- a/drivers/rtc/Kconfig
 +++ b/drivers/rtc/Kconfig
-@@ -1079,17 +1079,18 @@ config RTC_DRV_AT91RM9200
- 	  this is powered by the backup power supply.
- 
+@@ -1081,6 +1081,7 @@ config RTC_DRV_AT91RM9200
  config RTC_DRV_AT91SAM9
--	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
-+	tristate "AT91SAM9 RTT as RTC"
+ 	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
- 	select MFD_SYSCON
++	select MFD_SYSCON
  	help
--	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
--	  (Real Time Timer). These timers are powered by the backup power
--	  supply (such as a small coin cell battery), but do not need to
--	  be used as RTCs.
--
--	  (On AT91SAM9rl and AT91SAM9G45 chips you probably want to use the
--	  dedicated RTC module and leave the RTT available for other uses.)
-+	  Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
-+	  can be used as an RTC thanks to the backup power supply (e.g. a
-+	  small coin cell battery) which keeps this block and the GPBR
-+	  (General Purpose Backup Registers) block powered when the device
-+	  is shutdown.
-+	  Some AT91SAM9 SoCs provide a real RTC block, on those ones you'd
-+	  probably want to use the real RTC block instead of the "RTT as an
-+	  RTC" driver.
+ 	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
+ 	  (Real Time Timer). These timers are powered by the backup power
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index d72c34d..be9c28b 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -21,6 +21,8 @@
+ #include <linux/slab.h>
+ #include <linux/platform_data/atmel.h>
+ #include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
  
- config RTC_DRV_AT91SAM9_RTT
- 	int
-@@ -1098,6 +1099,9 @@ config RTC_DRV_AT91SAM9_RTT
- 	prompt "RTT module Number" if ARCH_AT91SAM9263
- 	depends on RTC_DRV_AT91SAM9
- 	help
-+	  This option is only relevant for legacy board support and
-+	  won't be used when booting a DT board.
+ /*
+  * This driver uses two configurable hardware resources that live in the
+@@ -72,7 +74,8 @@ struct sam9_rtc {
+ 	void __iomem		*rtt;
+ 	struct rtc_device	*rtcdev;
+ 	u32			imr;
+-	void __iomem		*gpbr;
++	struct regmap		*gpbr;
++	unsigned int		gpbr_offset;
+ 	int 			irq;
+ };
+ 
+@@ -81,10 +84,19 @@ struct sam9_rtc {
+ #define rtt_writel(rtc, field, val) \
+ 	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+ 
+-#define gpbr_readl(rtc) \
+-	readl((rtc)->gpbr)
+-#define gpbr_writel(rtc, val) \
+-	writel((val), (rtc)->gpbr)
++static inline unsigned int gpbr_readl(struct sam9_rtc *rtc)
++{
++	unsigned int val;
 +
- 	  More than one RTT module is available. You can choose which
- 	  one will be used as an RTC. The default of zero is normally
- 	  OK to use, though some systems use that for non-RTC purposes.
-@@ -1110,6 +1114,9 @@ config RTC_DRV_AT91SAM9_GPBR
- 	prompt "Backup Register Number"
- 	depends on RTC_DRV_AT91SAM9
- 	help
-+	  This option is only relevant for legacy board support and
-+	  won't be used when booting a DT board.
++	regmap_read(rtc->gpbr, rtc->gpbr_offset, &val);
 +
- 	  The RTC driver needs to use one of the General Purpose Backup
- 	  Registers (GPBRs) as well as the RTT. You can choose which one
- 	  will be used. The default of zero is normally OK to use, but
++	return val;
++}
++
++static inline void gpbr_writel(struct sam9_rtc *rtc, unsigned int val)
++{
++	regmap_write(rtc->gpbr, rtc->gpbr_offset, val);
++}
+ 
+ /*
+  * Read current time and date in RTC
+@@ -301,6 +313,12 @@ static const struct rtc_class_ops at91_rtc_ops = {
+ 	.alarm_irq_enable = at91_rtc_alarm_irq_enable,
+ };
+ 
++static struct regmap_config gpbr_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = 4,
++};
++
+ /*
+  * Initialize and install RTC driver
+  */
+@@ -334,10 +352,38 @@ static int at91_rtc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(rtc->rtt))
+ 		return PTR_ERR(rtc->rtt);
+ 
+-	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
+-	if (IS_ERR(rtc->gpbr))
+-		return PTR_ERR(rtc->rtt);
++	if (!pdev->dev.of_node) {
++		/*
++		 * TODO: Remove this code chunk when removing non DT board
++		 * support. Remember to remove the gpbr_regmap_config
++		 * variable too.
++		 */
++		void __iomem *gpbr;
++
++		r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++		gpbr = devm_ioremap_resource(&pdev->dev, r);
++		if (IS_ERR(gpbr))
++			return PTR_ERR(gpbr);
++
++		rtc->gpbr = regmap_init_mmio(NULL, gpbr,
++					     &gpbr_regmap_config);
++	} else {
++		struct of_phandle_args args;
++
++		ret = of_parse_phandle_with_fixed_args(pdev->dev.of_node,
++						"atmel,rtt-rtc-time-reg", 1, 0,
++						&args);
++		if (ret)
++			return ret;
++
++		rtc->gpbr = syscon_node_to_regmap(args.np);
++		rtc->gpbr_offset = args.args[0];
++	}
++
++	if (IS_ERR(rtc->gpbr)) {
++		dev_err(&pdev->dev, "failed to retrieve gpbr regmap, aborting.\n");
++		return -ENOMEM;
++	}
+ 
+ 	mr = rtt_readl(rtc, MR);
+ 
 -- 
 1.9.1
