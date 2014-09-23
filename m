@@ -1,90 +1,54 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Tue, 23 Sep 2014 11:36:09 +0800
-Subject: [PATCH 3/3] ARM: dts: add rk3288 power-domain node
-In-Reply-To: <1411440916-6830-4-git-send-email-jinkun.hong@rock-chips.com>
-References: <1411440916-6830-1-git-send-email-jinkun.hong@rock-chips.com>
- <1411440916-6830-4-git-send-email-jinkun.hong@rock-chips.com>
-Message-ID: <5420EAA9.5000508@rock-chips.com>
+From: srv_hongzhou.yang@mediatek.com (Hongzhou.Yang)
+Date: Tue, 23 Sep 2014 11:39:01 +0800
+Subject: [PATCH v2 0/4] Add Mediatek SoC Pinctrl/GPIO driver for MT8135. 
+Message-ID: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is v2 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
+It is based on Joe.C' basic device tree support.
+See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288582.html
 
-On 09/23/2014 10:55 AM, jinkun.hong wrote:
-> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
-Any summary for rk3288 power controller?
-Maybe you can say something about how rk3288 TRM described this module.
-> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
-> Signed-off-by: Wang Caesar <caesar.wang@rock-chips.com>
-> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
->
-> ---
->
->   arch/arm/boot/dts/rk3288.dtsi |   45 +++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 45 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 3bb5230..714b9d9 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -15,6 +15,7 @@
->   #include <dt-bindings/interrupt-controller/arm-gic.h>
->   #include <dt-bindings/pinctrl/rockchip.h>
->   #include <dt-bindings/clock/rk3288-cru.h>
-> +#include <dt-bindings/power-domain/rk3288.h>
->   #include "skeleton.dtsi"
->   
->   / {
-> @@ -467,6 +468,50 @@
->   		compatible = "rockchip,rk3288-pmu", "syscon";
->   		reg = <0xff730000 0x100>;
->   	};
-> +	power: power-controller {
-> +		compatible = "rockchip,rk3288-power-controller";
-> +		#power-domain-cells = <1>;
-> +		rockchip,pmu = <&pmu>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		pd_gpu {
-> +			reg = <RK3288_PD_GPU>;
-> +			clocks = <&cru ACLK_GPU>;
-> +		};
-> +
-> +		pd_vio {
-> +			reg = <RK3288_PD_VIO>;
-> +			clocks = <&cru HCLK_RGA>, <&cru HCLK_VOP0>,
-> +				<&cru HCLK_VOP1>, <&cru HCLK_VIO_AHB_ARBI>,
-> +				<&cru HCLK_VIO_NIU>, <&cru HCLK_VIP>,
-> +				<&cru HCLK_IEP>, <&cru HCLK_ISP>,
-> +				<&cru HCLK_VIO2_H2P>, <&cru PCLK_MIPI_DSI0>,
-> +				<&cru PCLK_MIPI_DSI1>, <&cru PCLK_MIPI_CSI>,
-> +				<&cru PCLK_LVDS_PHY>, <&cru PCLK_EDP_CTRL>,
-> +				<&cru PCLK_HDMI_CTRL>, <&cru PCLK_VIO2_H2P>,
-> +				<&cru ACLK_VOP0>, <&cru ACLK_IEP>,
-> +				<&cru ACLK_VIO0_NIU>, <&cru ACLK_VIP>,
-> +				<&cru ACLK_VOP1>, <&cru ACLK_ISP>,
-> +				<&cru ACLK_VIO1_NIU>, <&cru ACLK_RGA>,
-> +				<&cru ACLK_RGA_NIU>,<&cru SCLK_RGA>,
-> +				<&cru DCLK_VOP0>, <&cru DCLK_VOP1>,
-> +				<&cru SCLK_EDP_24M>, <&cru SCLK_EDP>,
-> +				<&cru SCLK_ISP>, <&cru SCLK_ISP_JPE>,
-> +				<&cru SCLK_HDMI_HDCP>, <&cru SCLK_HDMI_CEC>;
-> +		};
-Some of clock id here is not in upstream or list, I will send the patch
-including all these clock IDs later, maybe you should mention it in your
-commit message?
-> +
-> +		pd_video {
-> +			reg = <RK3288_PD_VIDEO>;
-> +			/* FIXME: add clocks */
-> +			};
-> +
-> +		pd_hevc {
-> +			reg = <RK3288_PD_HEVC>;
-> +			clocks = <&cru ACLK_HEVC>, <&cru HCLK_HEVC>,
-> +				<&cru SCLK_HEVC_CABAC>, <&cru SCLK_HEVC_CORE>;
-> +			};
-> +	};
->   
->   	sgrf: syscon at ff740000 {
->   		compatible = "rockchip,rk3288-sgrf", "syscon";
+This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
+and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
+
+Changes in v2:
+- According to Heiko Stubner' suggestion, use generic pinconfig.
+- Remove pinmux_ops.disable implement.
+- Due to limit of message body, move mt8135-pinfunc.h to '[PATCH 3/4] add pinctrl node for MT8135'.
+
+
+Hongzhou Yang (3):
+ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
+dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
+ARM: dts: mt8135: Add pinctrl node for mt8135.
+
+Joe.C (1):
+arm: mediatek: Add config option for mediatek SoCs.
+
+.../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |   98 +
+arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
+arch/arm/boot/dts/mt8135.dtsi                      |   11 +
+arch/arm/mach-mediatek/Kconfig                     |   23 +-
+drivers/pinctrl/Kconfig                            |    1 +
+drivers/pinctrl/Makefile                           |    1 +
+drivers/pinctrl/mediatek/Kconfig                   |   12 +
+drivers/pinctrl/mediatek/Makefile                  |    5 +
+drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   82 +
+drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  792 +++++++
+drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   95 +
+drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
+include/dt-bindings/pinctrl/mt65xx.h               |   23 +
+13 files changed, 4904 insertions(+), 3 deletions(-)
+create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+create mode 100644 drivers/pinctrl/mediatek/Kconfig
+create mode 100644 drivers/pinctrl/mediatek/Makefile
+create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
+create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
+
+--
+1.8.1.1.dirty
