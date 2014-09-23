@@ -1,113 +1,37 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 23 Sep 2014 11:31:59 -0700
-Subject: [PATCH v2 2/2] watchdog: dw_wdt: add restart handler support
-In-Reply-To: <1411458132-5410-3-git-send-email-jszhang@marvell.com>
-References: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
- <1411458132-5410-3-git-send-email-jszhang@marvell.com>
-Message-ID: <20140923183159.GB24930@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Sep 2014 11:38:38 -0700
+Subject: [PATCH 3/4] tty: omap-serial: use threaded interrupt handler
+In-Reply-To: <88924386-79bc-44c7-9a07-249900cbd359@email.android.com>
+References: <1410789610-23059-1-git-send-email-frans.klaver@xsens.com>
+ <1410789610-23059-4-git-send-email-frans.klaver@xsens.com>
+ <54170823.7040801@hurleysoftware.com>
+ <5417228C.5070503@hurleysoftware.com>
+ <20140916085037.GI28458@ci00147.xsens-tech.local>
+ <54197804.3020302@hurleysoftware.com>
+ <20140917121303.GB20438@ci00147.xsens-tech.local>
+ <20140923082445.GA16218@ci00147.xsens-tech.local>
+ <5421AB20.8040606@hurleysoftware.com>
+ <88924386-79bc-44c7-9a07-249900cbd359@email.android.com>
+Message-ID: <20140923183838.GA3122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 03:42:12PM +0800, Jisheng Zhang wrote:
-> The kernel core now provides an API to trigger a system restart.
-> Register with it to support restarting the system via. watchdog.
+* Frans Klaver <fransklaver@gmail.com> [140923 11:12]:
+> On 23 September 2014 19:17:20 CEST, Peter Hurley <peter@hurleysoftware.com> wrote:
+> >
+> >I would've thought the first 2 patches had already been picked up
+> >because
+> >they fix div-by-zero faults.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/watchdog/dw_wdt.c | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> index 449c885..9e577a6 100644
-> --- a/drivers/watchdog/dw_wdt.c
-> +++ b/drivers/watchdog/dw_wdt.c
-> @@ -21,6 +21,7 @@
->  
->  #include <linux/bitops.h>
->  #include <linux/clk.h>
-> +#include <linux/delay.h>
->  #include <linux/device.h>
->  #include <linux/err.h>
->  #include <linux/fs.h>
-> @@ -29,9 +30,11 @@
->  #include <linux/miscdevice.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
-> +#include <linux/notifier.h>
->  #include <linux/of.h>
->  #include <linux/pm.h>
->  #include <linux/platform_device.h>
-> +#include <linux/reboot.h>
->  #include <linux/spinlock.h>
->  #include <linux/timer.h>
->  #include <linux/uaccess.h>
-> @@ -63,6 +66,7 @@ static struct {
->  	unsigned long		next_heartbeat;
->  	struct timer_list	timer;
->  	int			expect_close;
-> +	struct notifier_block	restart_handler;
->  } dw_wdt;
->  
->  static inline int dw_wdt_is_enabled(void)
-> @@ -121,6 +125,26 @@ static void dw_wdt_keepalive(void)
->  	       WDOG_COUNTER_RESTART_REG_OFFSET);
->  }
->  
-> +static int dw_wdt_restart_handle(struct notifier_block *this,
-> +				unsigned long mode, void *cmd)
-> +{
-> +	u32 val;
-> +
-> +	writel(0, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
-> +	val = readl(dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-> +	if (val & WDOG_CONTROL_REG_WDT_EN_MASK)
-> +		writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt.regs +
-> +			WDOG_COUNTER_RESTART_REG_OFFSET);
-> +	else
-> +		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
-> +		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-> +
-> +	/* wait for reset to assert... */
-> +	mdelay(500);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
->  static void dw_wdt_ping(unsigned long data)
->  {
->  	if (time_before(jiffies, dw_wdt.next_heartbeat) ||
-> @@ -316,6 +340,12 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto out_disable_clk;
->  
-> +	dw_wdt.restart_handler.notifier_call = dw_wdt_restart_handle;
-> +	dw_wdt.restart_handler.priority = 128;
-> +	ret = register_restart_handler(&dw_wdt.restart_handler);
-> +	if (ret)
-> +		pr_warn("cannot register restart handler\n");
+> I've had no confirmation of that happening so far. I also don't
+> know if I should expect one. Who'd take these patches? Tony? 
 
-Please use dev_warn(&pdev->dev, ...).
+$ scripts/get_maintainer.pl -f drivers/tty/serial/omap-serial.c
 
-Thanks,
-Guenter
+Shows they should be sent to Greg and linux-serial. Please also Cc
+linux-omap. And if it's a fix, please make sure the subject has the
+magic word fix :)
 
-> +
->  	dw_wdt_set_next_heartbeat();
->  	setup_timer(&dw_wdt.timer, dw_wdt_ping, 0);
->  	mod_timer(&dw_wdt.timer, jiffies + WDT_TIMEOUT);
-> @@ -330,6 +360,8 @@ out_disable_clk:
->  
->  static int dw_wdt_drv_remove(struct platform_device *pdev)
->  {
-> +	unregister_restart_handler(&dw_wdt.restart_handler);
-> +
->  	misc_deregister(&dw_wdt_miscdev);
->  
->  	clk_disable_unprepare(dw_wdt.clk);
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+
+Tony
