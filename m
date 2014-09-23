@@ -1,91 +1,236 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Sep 2014 02:35:25 +0900
-Subject: [PATCH v2 2/3] ARM: mm: Fix ifdef around cpu_*_do_[suspend,
- resume] ops
-In-Reply-To: <1407856317-2457-3-git-send-email-b.zolnierkie@samsung.com>
-References: <1407856317-2457-1-git-send-email-b.zolnierkie@samsung.com>
- <1407856317-2457-3-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5421AF5D.7090606@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 19:37:25 +0200
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <20140923165515.GA26604@saruman>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5140494.LzvyOiyY3U@wuerfel> <20140923165515.GA26604@saruman>
+Message-ID: <62705234.gKJDtUQLyT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/14 00:11, Bartlomiej Zolnierkiewicz wrote:
-> Ifdef around cpu_\name\()_do_suspend and cpu_\name\()_do_resume
-> ops in proc-macros.S should check for CONFIG_ARM_CPU_SUSPEND and
-> not CONFIG_PM_SLEEP.  Fix it.
->
-> [ Please note that cpu_v7_do_[suspend,resume] code in proc-v7.S
->    already correctly checks for CONFIG_ARM_CPU_SUSPEND, same is
->    true for functions for other architectures. ]
->
-> This fix is needed for decoupling suspend/resume and advanced
-> cpuidle support on Exynos platform (next patch fixes build for
-> config with CONFIG_PM_SLEEP=n and CONFIG_ARM_EXYNOS_CPUIDLE=y).
->
-> If this fix is not present then the following OOPS happens on
-> the first attempt to go into advanced cpuidle mode (AFTR):
->
-> [   22.244143] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> [   22.250759] pgd = c0004000
-> [   22.253445] [00000000] *pgd=00000000
-> [   22.257012] Internal error: Oops: 80000007 [#1] PREEMPT SMP ARM
-> [   22.262906] Modules linked in:
-> [   22.265949] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-next-20140811-dirty #730
-> [   22.273757] task: c05dce68 ti: c05d2000 task.ti: c05d2000
-> [   22.279139] PC is at 0x0
-> [   22.281661] LR is at __cpu_suspend_save+0x4c/0xa8
-> [   22.286344] pc : [<00000000>]    lr : [<c00125e0>]    psr: a0000093
-> [   22.286344] sp : c05d3ef4  ip : c05da414  fp : 00000001
-> [   22.297799] r10: c05da414  r9 : c0609cb0  r8 : 0000000f
-> [   22.303008] r7 : c05da444  r6 : 00000038  r5 : ea802c00  r4 : c05d3f14
-> [   22.309517] r3 : 00000000  r2 : c05d3f4c  r1 : 00000038  r0 : c05d3f20
-> [   22.316029] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-> [   22.323406] Control: 10c5387d  Table: 69d5404a  DAC: 00000015
-> [   22.329135] Process swapper/0 (pid: 0, stack limit = 0xc05d2240)
-> [   22.335124] Stack: (0xc05d3ef4 to 0xc05d4000)
-> [   22.339466] 3ee0:                                              ea802c00 00000038 c05d3f4c
-> [   22.347626] 3f00: 00000000 00000007 c00123bc 00000000 c001d468 6a888000 c05d3f4c 80000000
-> [   22.355785] 3f20: 00000007 c003d3a0 0000193d eaf9dde4 eaf9dde4 c02ef0c8 c000969c fffffffe
-> [   22.363944] 3f40: 00000000 c0037b54 eaf9dbb8 e9d1a380 00000000 c001d468 c0609cb0 00000000
-> [   22.372103] 3f60: c0609cb0 c061649e 00000001 c001250c eaf9dbb8 00000001 c0609cb0 c001d618
-> [   22.380262] 3f80: c001d5d0 c02ef56c 2d9d2e1e 00000005 eaf9dbb8 c02edcc4 2d9d2e1e 00000005
-> [   22.388421] 3fa0: c040446c c05da4ec c040446c eaf9dbb8 c05cfbb0 c004c580 c05dce68 c05b3ae8
-> [   22.396580] 3fc0: 00000000 c058bb24 ffffffff ffffffff c058b5e4 00000000 00000000 c05b3ae8
-> [   22.404740] 3fe0: c0616994 c05da47c c05b3ae4 c05ddeec 4000406a 40008074 00000000 00000000
-> [   22.412909] [<c00125e0>] (__cpu_suspend_save) from [<c00123bc>] (__cpu_suspend+0x5c/0x70)
-> [   22.421074] [<c00123bc>] (__cpu_suspend) from [<c05d3f4c>] (init_thread_union+0x1f4c/0x2000)
-> [   22.429479] Code: bad PC value
-> [   22.432518] ---[ end trace fb90ebf4217d0ad9 ]---
-> [   22.437116] Kernel panic - not syncing: Attempted to kill the idle task!
-> [   22.443800] Rebooting in 5 seconds..
->
-> This patch has been tested on Exynos4210 based Origen board.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
-> ---
->   arch/arm/mm/proc-macros.S | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> index ee1d805..ba1196c 100644
-> --- a/arch/arm/mm/proc-macros.S
-> +++ b/arch/arm/mm/proc-macros.S
-> @@ -279,7 +279,7 @@ ENTRY(\name\()_processor_functions)
->
->   	.if \suspend
->   	.word	cpu_\name\()_suspend_size
-> -#ifdef CONFIG_PM_SLEEP
-> +#ifdef CONFIG_ARM_CPU_SUSPEND
->   	.word	cpu_\name\()_do_suspend
->   	.word	cpu_\name\()_do_resume
->   #else
+On Tuesday 23 September 2014 11:55:15 Felipe Balbi wrote:
+> On Tue, Sep 23, 2014 at 06:44:40PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 23 September 2014 15:36:45 Antoine Tenart wrote:
+> > > On Tue, Sep 23, 2014 at 12:39:04PM +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 23 September 2014 12:28:03 Antoine Tenart wrote:
+> > > > > +       if (dev->of_node) {
+> > > > > +               ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> > > > > +               if (ret)
+> > > > > +                       goto clk_err;
+> > > > > +       } else {
+> > > > > +               ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> > > > > +               if (ret)
+> > > > > +                       goto clk_err;
+> > > > > +       }
+> > > > > 
+> > > > 
+> > > > Why do you care about the non-DT case here? I think it would be nicer to
+> > > > open-code the ci_hdrc_usb2_dt_probe() function in here and remove
+> > > > the dma_set_mask_and_coherent(), which should not even be necessary for
+> > > > the case where you have a hardwired platform device.
+> > > > 
+> > > 
+> > > I thought we agreed to call dma_set_mask_and_coherent():
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273335.html
+> > > 
+> > > I do not have a strong opinion on this as I only use the dt case for my
+> > > usage.
+> > 
+> > The question is more about who actually wants the non-DT case.
+> > 
+> > Since this is a new driver, I suspect that the answer is "nobody",
+> > as the existing board files are all for legacy platforms that we
+> > are not going to adapt for this driver.
+> 
+> wait a minute... will the legacy platforms be adapted to DT and, thus,
+> to this driver in the future ? I really don't want to keep several
+> copies of chipidea driver just because there are still some legacy
+> platforms still using them. I have said in the past and will say again,
+> everybody should move to the generic chipidea driver at the earliest
+> opportunity so we avoid duplication of work.
+> 
 
-I'm fine on this but need to get ack from Russell.
+Sorry, my mistake. The intention that this new driver is meant to
+replace the existing ones wasn't clear to me from the changelog,
+and if I'd been involved in the discussion before, then I've forgotten
+about it.
 
-Russell, how do you think about this?
+It absolutely makes sense to migrate to a common driver, and in that
+case we should keep the platform_data handling and dma_set_mask_and_coherent()
+call in there, so we can do the two conversions (migrating from platform
+specific frontends to the generic one, and migrating from platform_data
+to DT) on independent schedules. Eventually I'd like all of the existing
+users of the platform_data path to move to DT, but that should not
+hold up the other cleanup if it takes longer.
 
-Note, I already applied this into samsung tree but if you mind, I'll 
-revert it.
+There is however still my point that we shouldn't have an extra platform
+device that is not attached to the device node. I think the generic driver
+should just be part of the common code, without an extra framework.
+Something like the (entirely untested) patch below.
 
-- Kukjin
+	Arnd
+
+---
+diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
+index 9563cb56d564..a2b20c1342f1 100644
+--- a/drivers/usb/chipidea/ci.h
++++ b/drivers/usb/chipidea/ci.h
+@@ -207,6 +207,7 @@ struct ci_hdrc {
+ 	bool				id_event;
+ 	bool				b_sess_valid_event;
+ 	bool				imx28_write_fix;
++	struct clk			*clk;
+ };
+ 
+ static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
+diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
+index 6eae1de587f2..03ef35997dd8 100644
+--- a/drivers/usb/chipidea/ci_hdrc_usb2.c
++++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
+@@ -70,6 +70,7 @@ static int ci_hdrc_usb2_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (dev->of_node) {
++		ret = ci_get_platdata(dev, platdata);
+ 		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+ 		if (ret)
+ 			goto clk_err;
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 619d13e29995..32613751e731 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -478,6 +478,15 @@ static int ci_get_platdata(struct device *dev,
+ 	if (of_usb_get_maximum_speed(dev->of_node) == USB_SPEED_FULL)
+ 		platdata->flags |= CI_HDRC_FORCE_FULLSPEED;
+ 
++	platdata->phy = of_phy_get(dev->of_node, 0);
++	if (IS_ERR(platdata->phy)) {
++		if (PTR_ERR(platdata->phy) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++
++		/* PHY is optional */
++		platdata->phy = NULL;
++	}
++
+ 	return 0;
+ }
+ 
+@@ -559,6 +568,12 @@ static void ci_get_otg_capable(struct ci_hdrc *ci)
+ 		dev_dbg(ci->dev, "It is OTG capable controller\n");
+ }
+ 
++static const struct ci_hdrc_platform_data ci_default_pdata = {
++	.capoffset	= DEF_CAPOFFSET,
++	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
++			  CI_HDRC_DISABLE_STREAMING,
++};
++
+ static int ci_hdrc_probe(struct platform_device *pdev)
+ {
+ 	struct device	*dev = &pdev->dev;
+@@ -568,11 +583,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	int		ret;
+ 	enum usb_dr_mode dr_mode;
+ 
+-	if (!dev_get_platdata(dev)) {
+-		dev_err(dev, "platform data missing\n");
+-		return -ENODEV;
+-	}
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(base))
+@@ -586,6 +596,32 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 
+ 	ci->dev = dev;
+ 	ci->platdata = dev_get_platdata(dev);
++	if (!ci->platdata) {
++		ci->platdata = devm_kmemdup(dev, &ci_default_pdata,
++					    sizeof(ci_default_pdata),
++					    GFP_KERNEL);
++
++		if (!ci->platdata)
++			return -ENOMEM;
++
++		ret = ci_get_platdata(dev, platdata);
++		if (ret)
++			return ERR_PTR(ret);
++	}
++
++	priv->clk = devm_clk_get(dev, NULL);
++	if (!IS_ERR(priv->clk)) {
++		ret = clk_prepare_enable(priv->clk);
++		if (ret) {
++			dev_err(dev, "failed to enable the clock: %d\n", ret);
++			return ret;
++		}
++	}
++
++	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++	if (ret)
++		return ret;
++
+ 	ci->imx28_write_fix = !!(ci->platdata->flags &
+ 		CI_HDRC_IMX28_WRITE_FIX);
+ 
+@@ -702,8 +738,8 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	platform_set_drvdata(pdev, ci);
+-	ret = request_irq(ci->irq, ci_irq, IRQF_SHARED, ci->platdata->name,
+-			  ci);
++	ret = devm_request_irq(ci->irq, ci_irq, IRQF_SHARED,
++			       ci->platdata->name, ci);
+ 	if (ret)
+ 		goto stop;
+ 
+@@ -711,10 +747,13 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 		ci_hdrc_otg_fsm_start(ci);
+ 
+ 	ret = dbg_create_files(ci);
+-	if (!ret)
+-		return 0;
++	if (ret)
++		goto stop;
++
++	pm_runtime_no_callbacks(dev);
++	pm_runtime_enable(dev);
++	return 0;
+ 
+-	free_irq(ci->irq, ci);
+ stop:
+ 	ci_role_destroy(ci);
+ deinit_phy:
+@@ -727,22 +766,32 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+ {
+ 	struct ci_hdrc *ci = platform_get_drvdata(pdev);
+ 
++	pm_runtime_disable(&pdev->dev);
+ 	dbg_remove_files(ci);
+ 	free_irq(ci->irq, ci);
+ 	ci_role_destroy(ci);
+ 	ci_hdrc_enter_lpm(ci, true);
+ 	usb_phy_shutdown(ci->transceiver);
+ 	kfree(ci->hw_bank.regmap);
++	clk_disable_unprepare(ci->clk);
+ 
+ 	return 0;
+ }
+ 
++static const struct of_device_id ci_hdrc_usb2_of_match[] = {
++	{ .compatible = "chipidea,usb2" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
++
++
+ static struct platform_driver ci_hdrc_driver = {
+ 	.probe	= ci_hdrc_probe,
+ 	.remove	= ci_hdrc_remove,
+ 	.driver	= {
+ 		.name	= "ci_hdrc",
+ 		.owner	= THIS_MODULE,
++		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
+ 	},
+ };
+ 
