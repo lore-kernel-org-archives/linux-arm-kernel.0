@@ -1,32 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Sep 2014 17:18:20 +0200
-Subject: [PATCH v2 1/5] pinctrl: exynos: Generalize the eint16_31 demux
- code
-In-Reply-To: <1411460169-30536-2-git-send-email-a.kesavan@samsung.com>
-References: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
- <1411460169-30536-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CACRpkdZcN0Zszt9QmW309fYDjOm-syA9kpL8nhRK640eKNB1Aw@mail.gmail.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Tue, 23 Sep 2014 23:20:25 +0800
+Subject: [PATCH v3 1/3] mtd: nand: gpmi: add gpmi_move_bits function
+In-Reply-To: <20140923150427.GB1633@localhost.localdomain>
+References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140923145413.GA1633@localhost.localdomain>
+ <20140923165822.27cfde69@bbrezillon>
+ <20140923150427.GB1633@localhost.localdomain>
+Message-ID: <20140923152023.GB1791@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 10:16 AM, Abhilash Kesavan
-<a.kesavan@samsung.com> wrote:
+On Tue, Sep 23, 2014 at 11:04:28PM +0800, Huang Shijie wrote:
+> On Tue, Sep 23, 2014 at 04:58:22PM +0200, Boris BREZILLON wrote:
+> > On Tue, 23 Sep 2014 22:54:15 +0800
+> > Huang Shijie <shijie8@gmail.com> wrote:
+> > 
+> > > On Tue, Sep 23, 2014 at 04:07:34PM +0200, Boris BREZILLON wrote:
+> > > > Add a new function to move bits (not bytes) from a memory region to
+> > > > another one.
+> > > > This function is similar to memmove except it acts at bit level.
+> > > > This function is needed to implement GPMI raw access functions, given the
+> > > > fact that ECC engine does not pad ECC bits to the next byte boundary.
+> > > sorry for not comment your v2 patch set.
+> > > 
+> > > > 
+> > > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > > ---
+> > > >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 88 ++++++++++++++++++++++++++++++++++
+> > > >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
+> > > >  2 files changed, 92 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> > > > index 87e658c..e2f706a 100644
+> > > > --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> > > > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> > > > @@ -1353,3 +1353,91 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+> > > >  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
+> > > >  	return start_dma_with_bch_irq(this, desc);
+> > > >  }
+> > > > +
+> > > > +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
+> > > > +		    const u8 *src, size_t src_bit_off,
+> > > > +		    size_t nbits)
+> > > we can simplify the code.
+> > 
+> > Any suggestions ?
+> > 
+> > > 
+> > > We could use the bytes to replace the @nbits.
+> > > 
+> > > The chunk data is always byte aligned.
+> > 
+> > This function is also used to store ECC bits in the OOB buffer and
+> > these chunk of data are not byte aligned :-).
+> yes. you are right. I missed it.
+> 
+> could you also comment these two hooks in the patch set.
+I mean the @ecc->read_page_raw and @ecc->write_page_raw.
 
-> The function exynos_irq_demux_eint16_31 uses pre-defined offsets for external
-> interrupt pending status and mask registers. So this function is not extensible
-> for Exynos7 SoC which have these registers at different offsets. So generalize
-> the exynos_irq_demux_eint16_31 function by using the pending/mask register
-> offset values from the exynos_irq_chip structure.
->
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-> Tested-by: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-
-I'm waiting for the maintainers to ACK these patches
-before I take them.
-
-Yours,
-Linus Walleij
+thanks
+Huang Shijie
