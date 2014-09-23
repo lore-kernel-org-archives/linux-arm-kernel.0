@@ -1,27 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 22 Sep 2014 18:42:10 -0700
-Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
-In-Reply-To: <2161168.GXttgFlE1X@vostro.rjw.lan>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <20140919184849.GA14832@core.coreip.homeip.net>
- <2161168.GXttgFlE1X@vostro.rjw.lan>
-Message-ID: <20140923014210.GC27755@sirena.org.uk>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 23 Sep 2014 11:11:26 +0900
+Subject: [RFC PATCH 2/5] devfreq: event: Add exynos-ppmu devfreq evnet
+ driver
+In-Reply-To: <1410511274.31130.7.camel@x220>
+References: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
+ <1409891419-28560-3-git-send-email-cw00.choi@samsung.com>
+ <1410511274.31130.7.camel@x220>
+Message-ID: <5420D6CE.7050606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 04:19:54PM +0200, Rafael J. Wysocki wrote:
+Hi Paul,
 
-> I've queued up this patchset for 3.18 (I fixed up the two minor issues pointed
-> to by Geert in the process).
+On 09/12/2014 05:41 PM, Paul Bolle wrote:
+> On Fri, 2014-09-05 at 13:30 +0900, Chanwoo Choi wrote:
+>> This patch add exynos-ppmu devfreq event driver to provider raw data about
+>> the utilization of each IP in Exynos SoC series.
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  drivers/devfreq/Kconfig             |  10 +
+>>  drivers/devfreq/event/Makefile      |   1 +
+>>  drivers/devfreq/event/exynos-ppmu.c | 410 ++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 421 insertions(+)
+>>  create mode 100644 drivers/devfreq/event/exynos-ppmu.c
+>>
+>> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+>> index ef839e7..4fbbcea 100644
+>> --- a/drivers/devfreq/Kconfig
+>> +++ b/drivers/devfreq/Kconfig
+>> @@ -90,4 +90,14 @@ config ARM_EXYNOS5_BUS_DEVFREQ
+>>  
+>>  comment "DEVFREQ Event Drivers"
+>>  
+>> +config DEVFREQ_EVENT_EXYNOS_PPMU
+>> +	bool "EXYNOS PPMU (Performance Profiling Monitoring Unit) DEVFREQ event Driver"
+>> +	depends on ARCH_EXYNOS
+>> +	select ARCH_HAS_OPP
+> 
+> This select statement can be dropped: see commit 78c5e0bb145d ("PM /
+> OPP: Remove ARCH_HAS_OPP").
 
-Oh, dear.  I'd been hoping to be able to test the series on my s3c4xx
-system but I don't get home until tomorrow :/
+I'll drop it. 
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140922/fa2449c3/attachment-0001.sig>
+> 
+> By the way: there's a typo in the commit summary ("evnet").
+
+My mistake, I'll fix typo.
+
+Thanks for your review.
+Chanwoo Choi
+
+> 
+>> +	select PM_OPP
+>> +	help
+>> +	 This add the DEVFREQ event driver for Exynos SoC. It provides PPMU
+>> +	 (Performance Profiling Monitoring Unit) counters to estimate the
+>> +	 utilization of each module.
+>> +
+>>  endif # PM_DEVFREQ
+> 
+> 
+> Paul Bolle
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
