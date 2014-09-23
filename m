@@ -1,79 +1,68 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Tue, 23 Sep 2014 18:23:07 +0530
-Subject: [PATCH/RFC 0/2] serial: samsung: add support for early console
-In-Reply-To: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
-References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAGOxZ51aghOqbZuv34TuBuQdKjmHdkhaYJvH=VxNjxb-pZKE8w@mail.gmail.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Tue, 23 Sep 2014 08:54:23 -0400
+Subject: [PATCH] ARM: mach-bcm: offer a new maintainer and process
+In-Reply-To: <20140923050339.GF7487@localhost>
+References: <1411150632-25695-1-git-send-email-f.fainelli@gmail.com>
+ <20140923050339.GF7487@localhost>
+Message-ID: <20140923125423.GC12283@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Mon, Sep 22, 2014 at 10:03:39PM -0700, Olof Johansson wrote:
+> On Fri, Sep 19, 2014 at 11:17:11AM -0700, Florian Fainelli wrote:
+> > Hi all,
+> > 
+> > As some of you may have seen in the news, Broadcom has recently stopped
+> > its mobile SoC activities. Upstream support for Broadcom's Mobile SoCs
+> > was an effort initially started by Christian Daudt and his team, and then
+> > continued by Alex Eleder and Matter Porter assigned to a particular landing
+> > team within Linaro to help Broadcom doing so.
+> > 
+> > As part of this effort, Christian and Matt volunteered for centralizing pull
+> > requests coming from the arch/arm/mach-bcm/* directory and as of today, they
+> > are still responsible for merging mach-bcm pull requests coming from brcmstb,
+> > bcm5301x, bcm2835 and bcm63xx, creating an intermediate layer to the arm-soc
+> > tree.
+> > 
+> > Following the mobile group shut down, our group (in which Brian, Gregory, Marc,
+> > Kevin and myself are) inherited these mobile SoC platforms, although at this
+> > point we cannot comment on the future of mobile platforms, we know that our
+> > Linaro activities have been stopped.
+> > 
+> > We have not heard much from Christian and Matt in a while, and some of our pull
+> > requests have been stalling as a result. We would like to offer both a new
+> > maintainer for the mobile platforms as well as reworking the pull request
+> > process:
+> > 
+> > - our group has now full access to these platforms, putting us in the best
+> >   position to support Mobile SoCs questions
+> 
+> So, one question I have is whether it makes sense to keep the mobile
+> platforms in the kernel if the line of business is ending?
+> 
+> While I truly do appreciate the work done by Matt and others, there's
+> also little chance that it'll see substantial use by anyone. The Capri
+> boards aren't common out in the wild and I'm not aware of any dev
+> boards or consumer products with these SoCs that might want to run
+> mainline? Critical things such as power management and graphics are
+> missing from the current platform support in the kernel, so nobody is
+> likely to want it on their Android phone, etc.
+> 
+> Maybe the answer to this is "keep it for now, revisit sometime later",
+> which is perfectly sane -- it has practically no cost to keep it around
+> the way it's looking now.
 
-On Mon, Sep 22, 2014 at 6:44 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> This patchset adds support for early console defined in device tree. As
-> an example, DTS files for all Exynos4 based machines are updated with
-> the correct value for common chosen/sdtout property.
->
-> To get it fully functional additional improvements (support for
-> early_ioremap) are needed in early console code.
->
-Is these really tested?
-So that mean we need to wait till __ioremap__ support available for ARM.
-How to take this forward then? Here is a platform (exynos7) which
-needs earlycon support for debugging some of the early core things and
-ARM64 has ioremap support as well. There is no reason why we should
-hold earlycon support for exyons7.
-I see two solution here:
-1> How about re-spin patch-1 which will just add ealrycon support for
-__exynos4210__ serial type only? And rest of the types can be added as
-incremental patches, as and when ioremap for ARM available.
-Atleast this approch will solve exynos7 problem of not having earlycon support.
-And This patch can be tested on exynos7 (I can do that).
-2> Take  my patch which is working and tested for exynos7 and can be
-easily extended and generalized when ioremap for ARM is available.
+It won't hurt my feelings if it's decided that it has no value being in
+the kernel. :) All I can offer is that *maybe* somebody will have a root
+exploit for the bcm281xx Roku platforms (that lasts) and/or some of the
+capri and hawaii handsets out there and find it useful as a starting
+point to work from an Android vendor tree. I don't know if anybody cares
+about hacking those platforms or not.
 
-My preference would be the the first one.
-Let me know your thoughts please.
-In case you are ok with 1st approach, can you please re-spin patch1
-with needed changes?
+As mentioned in a followup, the VoIP parts (or some of them, at least)
+are part of the bcm281xx family and we were expecting them to submit an
+ethernet driver for the past year. There were repeated reminders that
+they really care about mainline so I would expect it would be premature
+to remove that support until we hear from them.
 
-> Best regards
-> Marek Szyprowski
-> Samsung R&D Institute Poland
->
->
-> Patch summary:
->
-> Tomasz Figa (2):
->   serial: samsung: Add support for of_earlycon
->   ARM: dts: exynos4: Add stdout-path properties
->
->  arch/arm/boot/dts/exynos4210-origen.dts         |  1 +
->  arch/arm/boot/dts/exynos4210-smdkv310.dts       |  1 +
->  arch/arm/boot/dts/exynos4210-trats.dts          |  1 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |  1 +
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 +
->  arch/arm/boot/dts/exynos4412-origen.dts         |  1 +
->  arch/arm/boot/dts/exynos4412-smdk4412.dts       |  1 +
->  arch/arm/boot/dts/exynos4412-tiny4412.dts       |  4 +
->  arch/arm/boot/dts/exynos4412-trats2.dts         |  1 +
->  drivers/tty/serial/Kconfig                      |  1 +
->  drivers/tty/serial/samsung.c                    | 97 +++++++++++++++++++++++++
->  11 files changed, 113 insertions(+)
->
-> --
-> 1.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Regards,
-Alim
+-Matt
