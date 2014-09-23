@@ -1,111 +1,92 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 23 Sep 2014 13:03:51 -0400
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140921204100.GA10111@linutronix.de>
-References: <54119AAA.9080907@linutronix.de>
- <20140911151114.GD28458@ci00147.xsens-tech.local>
- <5411C810.7070906@linutronix.de>
- <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
- <54129F6C.7040508@linutronix.de>
- <20140912094010.GE28458@ci00147.xsens-tech.local>
- <5412C21A.8020203@linutronix.de>
- <20140912102816.GF28458@ci00147.xsens-tech.local>
- <541716DC.9020904@linutronix.de>
- <20140917102812.GA20438@ci00147.xsens-tech.local>
- <20140921204100.GA10111@linutronix.de>
-Message-ID: <5421A7F7.3070109@hurleysoftware.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Tue, 23 Sep 2014 10:04:37 -0700
+Subject: [V8 1/2] irqchip: gic: Add support for multiple MSI for ARM64
+In-Reply-To: <alpine.DEB.2.10.1409222349560.4604@nanos>
+References: <1411230698-8081-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1411230698-8081-2-git-send-email-suravee.suthikulpanit@amd.com>
+ <alpine.DEB.2.10.1409222349560.4604@nanos>
+Message-ID: <5421A825.70201@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2014 04:41 PM, Sebastian Andrzej Siewior wrote:
-> * Frans Klaver | 2014-09-17 12:28:12 [+0200]:
-> 
->> - Bone Black: Yocto poky, core-image-minimal
->>  Login, "less file" locks up, doesn't show anything. I can exit using
->>  Ctrl-C.
-> 
-> So I have the same with my and the serial-omap driver. No difference
-> here. The trace looks like this:
-> |           <idle>-0     [000] d.h.   444.393585: serial8250_handle_irq: iir cc lsr 61
-> |           <idle>-0     [000] d.h.   444.393605: serial8250_rx_chars: get 0d
-> received the enter key
-> 
-> |           <idle>-0     [000] d.h.   444.393609: serial8250_rx_chars: insert d lsr 61
-> |           <idle>-0     [000] d.h.   444.393614: uart_insert_char: 1
-> |           <idle>-0     [000] d.h.   444.393617: uart_insert_char: 2
-> |           <idle>-0     [000] dnh.   444.393636: serial8250_tx_chars: empty
-> |      kworker/0:2-753   [000] d...   444.393686: serial8250_start_tx: empty?1
-> |      kworker/0:2-753   [000] d.h.   444.393699: serial8250_handle_irq: iir c2 lsr 60
-> |      kworker/0:2-753   [000] d.h.   444.393705: serial8250_tx_chars: empty
-> |               sh-1042  [000] d...   444.393822: serial8250_start_tx: empty?1
-> |               sh-1042  [000] d.h.   444.393836: serial8250_handle_irq: iir c2 lsr 60
-> |               sh-1042  [000] d.h.   444.393842: serial8250_tx_chars: empty
-> |               sh-1042  [000] d...   444.393855: serial8250_start_tx: empty?0
-> |               sh-1042  [000] d.h.   444.393863: serial8250_handle_irq: iir c2 lsr 60
-> |               sh-1042  [000] d.h.   444.393867: serial8250_tx_chars: put 0d
-> |               sh-1042  [000] d.h.   444.393871: serial8250_tx_chars: put 0a
-> 
-> shell responded with "\r\n" which I see and then
-> 
-> |               sh-1042  [000] d.h.   444.394057: serial8250_handle_irq: iir c2 lsr 60
-> |               sh-1042  [000] d.h.   444.394065: serial8250_tx_chars: empty
-> 
-> nothing more. less isn't sending data for some reason. Exactly the same
-> thing happens in a Debian environment except that it continues:
-> ?
-> |             bash-2468  [000] d.h.    99.657899: serial8250_tx_chars: put 0a
-> |             bash-2468  [000] d.h.    99.658089: serial8250_handle_irq: iir c2 lsr 60
-> |             bash-2468  [000] d.h.    99.658095: serial8250_tx_chars: empty
-> =>
-> |             less-2474  [000] d...    99.696038: serial8250_start_tx: empty?0
-> |             less-2474  [000] d.h.    99.696069: serial8250_handle_irq: iir c2 lsr 60
-> |             less-2474  [000] d.h.    99.696078: serial8250_tx_chars: put 1b
-> |             less-2474  [000] d.h.    99.696082: serial8250_tx_chars: put 5b
-> |             less-2474  [000] d.h.    99.696085: serial8250_tx_chars: put 3f
-> |             less-2474  [000] d.h.    99.696087: serial8250_tx_chars: put 31
-> 
-> It has to be something about the environment. Booting Debian and chroot
-> into this RFS and less works perfectly. But since it behaves like that
-> with both drivers, I guess the problem is somewhere else?
-> 
->>  vi runs normally, only occupies part of the total screen estate in
->>  minicom. After quitting, a weird character shows up (typically I see
->>  ? there), but minicom can use the rest of the screen estate again.
->>  If we disregard the odd character, this is much like the behavior we
->>  have on the omap-serial driver.
->> - Custom board: Yocto poky, custom image
->>  Login, "less file" locks up, showing only "?" in the top left corner
->>  of the screen. Can get out of there by having something dumped through
->>  /dev/kmsg.
-> 
-> I managed to run into something like that with vi on dra7 and with
-> little more patience on am335x as well by "vi *" and then ":n".
-> 
-> This gets fixed indeed by writing. Hours of debugging and a lot of hair
-> less later: the yocto RFS calls set_termios quite a lot.
+Thomas,
 
-readline() does this; it 'saves' the caller's termios, sets termios
-for non-canonical reads, reads one char, and 'restores' the caller's
-termios.
+Sorry again for the mistake on my part. Let me try to address some other 
+concerns you have below.
 
-> This includes
-> changing the baudrate (not by yocto but the driver sets it to 0 and then
-> to the requested one) and this seems to be responsible for the "bad
-> bytes". I haven't figured out yet I don't see this with omap-serial.
-> Even worse: If this (set_termios()) happens while the DMA is still
-> active then it might stall it. A write into the FIFO seems to fix it and
-> this is where your "echo >/dev/kmsg" fixes things.
-> If I delay the restore_registers part of set_termios() until TX-DMA is
-> complete then it seems that the TX-DMA stall does not tall anymore.
 
-The tty core calls the driver's wait_until_sent() method before changing
-the termios (if TCSADRAIN is used for tcsetattr(), which I think for readline()
-it does).
+On 09/22/2014 04:08 PM, Thomas Gleixner wrote:
+> On Sat, 20 Sep 2014, suravee.suthikulpanit at amd.com wrote:
+>
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> This patch implelments the ARM64 version of arch_setup_msi_irqs(),
+>> which does not return 1 for when PCI_CAP_ID_MSI and nvec > 1.
+>
+> I can see that myself. What your changelog is missing is the reason
+> WHY you think that copying that code from drivers/pci/msi.c and
+> removing the "PCI_CAP_ID_MSI and nvec > 1" has any value.
 
-But DMA is cheating if the UART driver's tx_empty() method is saying the
-transmitter is empty while TX DMA is still running.
+[Suravee] This is mainly be cause the weak version of 
+arch_setup_msi_irqs() in the drivers/pci/msi.c doesn't support 
+multi-MSI. Sorry for not being clear in the commit message.
 
-Regards,
-Peter Hurley
- 
+>
+> And that new function "arm64_setup_msi_irqs" is declared in which
+> header file exactly?
+
+[Suravee] This was supposed to be arch_setup_msi_irqs(). My bad. I'm 
+fixing this in the next version.
+
+......
+
+>> + *
+>> + * Note:
+>> + * Current implementation assumes that all interrupt controller used in
+>> + * ARM64 architecture _MUST_ supports multi-MSI.
+>
+> Great assumption....
+>
+
+[Suravee] So, Marc and I have discussed in the past that at this point, 
+we are not seeing the case that there will be interrupt or 
+MSI-controller that will not support multi-MSI.  If you think this 
+should not be the case, would you please share your thought.
+
+......
+
+>
+> At least you are consistent on the useless side of affairs:
+>
+>> +{
+>> +	struct msi_desc *entry;
+>> +	int ret;
+>> +
+>> +	list_for_each_entry(entry, &dev->msi_list, list) {
+>> +		ret = arch_setup_msi_irq(dev, entry);
+>
+> Anyone who has the slightest idea how multi-MSI works will know that
+> this CANNOT work at all, but that's none of my business.
+
+[Suravee] I noticed that in the x86 version, there is a callback that 
+each MSI controller need to register for handling the multi-MSI stuff.
+
+In gicv2m_setup_msi_irq(), there is logic which handles the setup for 
+multi-MSI and MSIx separately. In case of multi-MSI, the vectors are 
+allocated on the first call to arch_setup_msi_irq(). Here, Marc and I 
+are trying to simplify the arch-specific code so that each GIC 
+controller (V2m and V3) would not need to implement and register the 
+callbacks separately for handling multi-MSI.
+
+The thing that is broken here is the error handling where the 
+arch_setup_msi_irqs() is supposed to return the number of available MSI 
+vectors. It would fail to do so because the arch_setup_msi_irq() would 
+not return positive value. We should be able to fix this by 
+re-implementing the arch_setup_msi_irq() and arch_setup_msi_irqs() to 
+allow returning of positive values.
+
+Please let me know what you think. I am open for suggestions :)
+
+Thanks,
+
+Suravee
