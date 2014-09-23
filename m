@@ -1,38 +1,33 @@
-From: yocto6@gmail.com (Nicholas Krause)
-Date: Tue, 23 Sep 2014 11:30:04 -0400
-Subject: FIX Me in pgtable.h
-In-Reply-To: <542179BD.9070406@samsung.com>
-References: <54216FC9.5060605@gmail.com>
-	<542179BD.9070406@samsung.com>
-Message-ID: <CAAxn8Jnz2CJJmp6Pc2ctRVgTSi=W203EvhAshDq-WK9fM4JR+w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Sep 2014 17:30:19 +0200
+Subject: [PATCH v2] spi: pl022: Add support for chip select extension
+In-Reply-To: <1410936418-26443-1-git-send-email-anders.berg@avagotech.com>
+References: <20140916183431.GX7960@sirena.org.uk>
+ <1410936418-26443-1-git-send-email-anders.berg@avagotech.com>
+Message-ID: <CACRpkdZhhfLM027THE6Gb_QGf4+eswybH3kEun18XCznJcLH8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't have any hardware to test this over, however I can emulate a
-arm system over qemu if needed.
-I was just trying to help out if we need hardware I can't test and
-again I am sorry for the terrible patches.
-It was never my goal to be a nuisance.
-Nick
-On Tue, Sep 23, 2014 at 9:46 AM, Krzysztof Koz?owski
-<k.kozlowski@samsung.com> wrote:
-> On 23.09.2014 15:04, nick wrote:
->>
->> Greetings Arm Maintainers,
->> I am wondering about the fix me in pgtable.h for define kern_addr_valid
->> and how to set it to a correct
->> value as you state that this needs to be fixed as the defined macro is
->> still 1. This is probably incorrect
->> and should be changed.
+On Wed, Sep 17, 2014 at 8:46 AM, Anders Berg <anders.berg@avagotech.com> wrote:
+
+> Add support for a extended PL022 which has an extra register for controlling up
+> to five chip select signals. This controller is found on the AXM5516 SoC.
+> Unfortunately the PrimeCell identification registers are identical to a
+> standard ARM PL022. To work around this, the peripheral ID must be overridden
+> in the device tree using the "arm,primecell-periphid" property with the value
+> 0x000b6022.
 >
+> Signed-off-by: Anders Berg <anders.berg@avagotech.com>
+> ---
 >
-> Dear Nick Krause,
+> Adding Russell to Cc.
 >
-> Before you start coding - do you have necessary ARM-based hardware to test
-> your changes?
+> Changelog:
 >
-> Changing email won't remove LKML archives...
->
-> Best regards,
-> Krzysztof
->
+> v2:
+>     - added constant to <linux/amba/bus.h>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
