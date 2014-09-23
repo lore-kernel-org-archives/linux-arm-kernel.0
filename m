@@ -1,91 +1,88 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 14:15:33 +0200
-Subject: [PATCH v4 6/9] net: pxa168_eth: rework the MAC address setup
-In-Reply-To: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1411474536-22626-7-git-send-email-antoine.tenart@free-electrons.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 23 Sep 2014 14:14:55 +0200
+Subject: [PATCH v8 08/10] rtc: at91sam9: use clk API instead of relying
+ on AT91_SLOW_CLOCK
+In-Reply-To: <1411471444-2764-9-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411471444-2764-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411471444-2764-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140923121455.GC404@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rework the way the MAC address is retrieved. The MAC address
-can now, in addition to being random, be set in the device tree or
-retrieved from the Ethernet controller MAC address registers. The
-probing function will try to get a MAC address in the following order:
-- From the device tree.
-- From the Ethernet controller MAC address registers.
-- Generate a random one.
+On Tue, Sep 23, 2014 at 01:24:02PM +0200, Boris BREZILLON wrote:
+> The RTT block is using the slow clock which is accessible through the clk
+> API.
+> Use the clk API to retrieve, enable and get the slow clk rate instead of
+> the AT91_SLOW_CLOCK macro (which hardcodes the slow clk rate).
+> Doing this allows us to reference the clk thus preventing the CCF from
+> disabling it during the "disable unused" phase.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Johan Hovold <johan@kernel.org>
+> ---
+>  drivers/rtc/rtc-at91sam9.c | 28 ++++++++++++++++++++++++----
+>  1 file changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index be9c28b..2eca624 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/io.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+> +#include <linux/clk.h>
+>  
+>  /*
+>   * This driver uses two configurable hardware resources that live in the
+> @@ -61,8 +62,6 @@
+>  #define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
+>  #define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
+>  
+> -#define AT91_SLOW_CLOCK		32768
+> -
+>  /*
+>   * We store ALARM_DISABLED in ALMV to record that no alarm is set.
+>   * It's also the reset value for that field.
+> @@ -77,6 +76,7 @@ struct sam9_rtc {
+>  	struct regmap		*gpbr;
+>  	unsigned int		gpbr_offset;
+>  	int 			irq;
+> +	struct clk		*sclk;
+>  };
+>  
+>  #define rtt_readl(rtc, field) \
+> @@ -328,6 +328,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
+>  	struct sam9_rtc	*rtc;
+>  	int		ret, irq;
+>  	u32		mr;
+> +	unsigned int	sclk_rate;
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+> @@ -385,11 +386,27 @@ static int at91_rtc_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	rtc->sclk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(rtc->sclk))
+> +		return PTR_ERR(rtc->sclk);
+> +
+> +	sclk_rate = clk_get_rate(rtc->sclk);
+> +	if (!sclk_rate || sclk_rate > AT91_RTT_RTPRES) {
+> +		dev_err(&pdev->dev, "Invalid slow clock rate");
 
-This patch also adds a function to read the MAC address from the
-Ethernet Controller registers.
+dev_err message needs a newline.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/net/ethernet/marvell/pxa168_eth.c | 32 +++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = clk_prepare_enable(rtc->sclk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Could not enable slow clock");
 
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index 897589455186..4a57f640b424 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -35,6 +35,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_net.h>
- #include <linux/phy.h>
- #include <linux/platform_device.h>
- #include <linux/pxa168_eth.h>
-@@ -606,6 +607,21 @@ static void pxa168_eth_set_rx_mode(struct net_device *dev)
- 		update_hash_table_mac_address(pep, NULL, ha->addr);
- }
- 
-+static void pxa168_eth_get_mac_address(struct net_device *dev,
-+				       unsigned char *addr)
-+{
-+	struct pxa168_eth_private *pep = netdev_priv(dev);
-+	unsigned int mac_h = rdl(pep, MAC_ADDR_HIGH);
-+	unsigned int mac_l = rdl(pep, MAC_ADDR_LOW);
-+
-+	addr[0] = (mac_h >> 24) & 0xff;
-+	addr[1] = (mac_h >> 16) & 0xff;
-+	addr[2] = (mac_h >> 8) & 0xff;
-+	addr[3] = mac_h & 0xff;
-+	addr[4] = (mac_l >> 8) & 0xff;
-+	addr[5] = mac_l & 0xff;
-+}
-+
- static int pxa168_eth_set_mac_address(struct net_device *dev, void *addr)
- {
- 	struct sockaddr *sa = addr;
-@@ -1466,6 +1482,7 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 	struct net_device *dev = NULL;
- 	struct resource *res;
- 	struct clk *clk;
-+	const unsigned char *mac_addr = NULL;
- 	int err;
- 
- 	printk(KERN_NOTICE "PXA168 10/100 Ethernet Driver\n");
-@@ -1507,8 +1524,19 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 
- 	INIT_WORK(&pep->tx_timeout_task, pxa168_eth_tx_timeout_task);
- 
--	dev_info(&pdev->dev, "Using random mac address\n");
--	eth_hw_addr_random(dev);
-+	if (pdev->dev.of_node)
-+		mac_addr = of_get_mac_address(pdev->dev.of_node);
-+
-+	if (mac_addr && is_valid_ether_addr(mac_addr)) {
-+		ether_addr_copy(dev->dev_addr, mac_addr);
-+	} else {
-+		/* try reading the mac address, if set by the bootloader */
-+		pxa168_eth_get_mac_address(dev, dev->dev_addr);
-+		if (!is_valid_ether_addr(dev->dev_addr)) {
-+			dev_info(&pdev->dev, "Using random mac address\n");
-+			eth_hw_addr_random(dev);
-+		}
-+	}
- 
- 	pep->rx_ring_size = NUM_RX_DESCS;
- 	pep->tx_ring_size = NUM_TX_DESCS;
--- 
-1.9.1
+Here too.
+
+Johan
