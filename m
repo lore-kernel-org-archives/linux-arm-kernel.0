@@ -1,50 +1,95 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 23 Sep 2014 23:33:44 +0200 (CEST)
-Subject: [V8 1/2] irqchip: gic: Add support for multiple MSI for ARM64
-In-Reply-To: <5421A825.70201@amd.com>
-References: <1411230698-8081-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411230698-8081-2-git-send-email-suravee.suthikulpanit@amd.com>
- <alpine.DEB.2.10.1409222349560.4604@nanos> <5421A825.70201@amd.com>
-Message-ID: <alpine.DEB.2.10.1409232036200.4604@nanos>
+From: asierra@xes-inc.com (Aaron Sierra)
+Date: Tue, 23 Sep 2014 16:43:25 -0500 (CDT)
+Subject: [RFT PATCH v2] mtd: ixp4xx: Unrequire CONFIG_MTD_CFI_BE_BYTE_SWAP
+In-Reply-To: <474471133.324147.1411508523465.JavaMail.zimbra@xes-inc.com>
+Message-ID: <1800715024.324263.1411508605796.JavaMail.zimbra@xes-inc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Sep 2014, Suravee Suthikulpanit wrote:
-> > > This patch implelments the ARM64 version of arch_setup_msi_irqs(),
-> > > which does not return 1 for when PCI_CAP_ID_MSI and nvec > 1.
-> > 
-> > I can see that myself. What your changelog is missing is the reason
-> > WHY you think that copying that code from drivers/pci/msi.c and
-> > removing the "PCI_CAP_ID_MSI and nvec > 1" has any value.
-> 
-> [Suravee] This is mainly be cause the weak version of arch_setup_msi_irqs() in
-> the drivers/pci/msi.c doesn't support multi-MSI. Sorry for not being clear in
-> the commit message.
+The .swap member of the map_info structure is provided for situations
+where a mapping must always be big or little endian regardless of the
+endianness of the system performing the access.
 
-Groan. I asked you: 
+Signed-off-by: Aaron Sierra <asierra@xes-inc.com>
+---
+v2: Account for 32-bit swapping
 
-> > WHY you think that copying that code from drivers/pci/msi.c and
-> > removing the "PCI_CAP_ID_MSI and nvec > 1" has any value.
+ drivers/mtd/maps/ixp4xx.c | 35 ++++++++++++-----------------------
+ 1 file changed, 12 insertions(+), 23 deletions(-)
 
-And your answer is that the function in drivers/pci/msi.c does not
-support Multi-MSI. Hell I know that myself. And there is a fricking
-good reason why allocating multi-MSI via
-
-    for_each_msi()
-	alloc_msi_irq();
-
-is wrong. And while it might work by chance, there is no guarantee
-that it will work. It works for Multi-MSIX, but that has an additional
-X at the end and is a different beast when it comes to interrupts.
-
-I have no idea how crooked you are trying to work around that on the
-GIC side, but its going to be wrong and convoluted.
-
-Read and understand the MSI and MSI-X spec and the subtle differences
-of interrupt delivery. And if you groked that come back with a proper
-explanation why that patch makes sense or just go back to the drawing
-board and do it proper.
-
-Thanks,
-
-	tglx
+diff --git a/drivers/mtd/maps/ixp4xx.c b/drivers/mtd/maps/ixp4xx.c
+index 6a589f1..541727e 100644
+--- a/drivers/mtd/maps/ixp4xx.c
++++ b/drivers/mtd/maps/ixp4xx.c
+@@ -26,6 +26,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/map.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/mtd/cfi_endian.h>
+ 
+ #include <asm/io.h>
+ #include <asm/mach/flash.h>
+@@ -48,43 +49,30 @@
+  *     | C | D | 2
+  *     +---+---+
+  * This means that on LE systems each 16 bit word must be swapped. Note that
+- * this requires CONFIG_MTD_CFI_BE_BYTE_SWAP to be enabled to 'unswap' the CFI
+- * data and other flash commands which are always in D7-D0.
++ * this is accounted for by defining map_info.swap to be CFI_BIG_ENDIAN to
++ * 'unswap' the CFI commands and using cpu_to_be16/be16_to_cpu to 'unswap'
++ * the data.
+  */
+-#ifndef __ARMEB__
+-#ifndef CONFIG_MTD_CFI_BE_BYTE_SWAP
+-#  error CONFIG_MTD_CFI_BE_BYTE_SWAP required
++
++#ifdef __ARMEB__
++#define fixup_32(io) (io)
++#else
++#define fixup_32(io) (void __iomem *)((unsigned long)(io) ^ 2)
+ #endif
+ 
+ static inline u16 flash_read16(void __iomem *addr)
+ {
+-	return be16_to_cpu(__raw_readw((void __iomem *)((unsigned long)addr ^ 0x2)));
++	return be16_to_cpu(__raw_readw(fixup_32(addr)));
+ }
+ 
+ static inline void flash_write16(u16 d, void __iomem *addr)
+ {
+-	__raw_writew(cpu_to_be16(d), (void __iomem *)((unsigned long)addr ^ 0x2));
++	__raw_writew(cpu_to_be16(d), fixup_32(addr));
+ }
+ 
+ #define	BYTE0(h)	((h) & 0xFF)
+ #define	BYTE1(h)	(((h) >> 8) & 0xFF)
+ 
+-#else
+-
+-static inline u16 flash_read16(const void __iomem *addr)
+-{
+-	return __raw_readw(addr);
+-}
+-
+-static inline void flash_write16(u16 d, void __iomem *addr)
+-{
+-	__raw_writew(d, addr);
+-}
+-
+-#define	BYTE0(h)	(((h) >> 8) & 0xFF)
+-#define	BYTE1(h)	((h) & 0xFF)
+-#endif
+-
+ static map_word ixp4xx_read16(struct map_info *map, unsigned long ofs)
+ {
+ 	map_word val;
+@@ -200,6 +188,7 @@ static int ixp4xx_flash_probe(struct platform_device *dev)
+ 	 * Tell the MTD layer we're not 1:1 mapped so that it does
+ 	 * not attempt to do a direct access on us.
+ 	 */
++	info->map.swap = CFI_BIG_ENDIAN;
+ 	info->map.phys = NO_XIP;
+ 	info->map.size = resource_size(dev->resource);
+ 
+-- 
+1.9.1
