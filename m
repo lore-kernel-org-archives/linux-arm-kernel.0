@@ -1,46 +1,56 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 23 Sep 2014 11:42:45 -0500
-Subject: [PATCH 2/2] remoteproc: add support to handle internal memories
-In-Reply-To: <CAK=WgbZanJYN7-vXW=wo0H40piauHGQHYPPppcCpc+6VapXmeg@mail.gmail.com>
-References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
- <1404836521-59637-3-git-send-email-s-anna@ti.com>
- <CAK=WgbY-WmcJdnLHDf1CSkJqNBUeUMPTLcEZyLGKnECbxH1OAQ@mail.gmail.com>
- <53D7F6F3.9020804@ti.com>
- <CAK=WgbZ+NhA5AAhURUOojwnCbi2wYkJ11i-C5e7-kpZL5vD_3g@mail.gmail.com>
- <54174082.4010008@ti.com>
- <CAK=WgbZanJYN7-vXW=wo0H40piauHGQHYPPppcCpc+6VapXmeg@mail.gmail.com>
-Message-ID: <5421A305.1050509@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 18:44:40 +0200
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <20140923133645.GA18924@kwain>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <2909480.SL9c0XWUbW@wuerfel> <20140923133645.GA18924@kwain>
+Message-ID: <5140494.LzvyOiyY3U@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On 09/23/2014 09:16 AM, Ohad Ben-Cohen wrote:
-> Hi Suman,
+On Tuesday 23 September 2014 15:36:45 Antoine Tenart wrote:
+> On Tue, Sep 23, 2014 at 12:39:04PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 23 September 2014 12:28:03 Antoine Tenart wrote:
+> > > +       if (dev->of_node) {
+> > > +               ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> > > +               if (ret)
+> > > +                       goto clk_err;
+> > > +       } else {
+> > > +               ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> > > +               if (ret)
+> > > +                       goto clk_err;
+> > > +       }
+> > > 
+> > 
+> > Why do you care about the non-DT case here? I think it would be nicer to
+> > open-code the ci_hdrc_usb2_dt_probe() function in here and remove
+> > the dma_set_mask_and_coherent(), which should not even be necessary for
+> > the case where you have a hardwired platform device.
+> > 
 > 
-> On Mon, Sep 15, 2014 at 10:39 PM, Suman Anna <s-anna@ti.com> wrote:
->> These processors need to use their internal RAM for loading, which is
->> not for generic usage by the kernel, so defining a CMA block for this
->> memory doesn't make sense.
+> I thought we agreed to call dma_set_mask_and_coherent():
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273335.html
 > 
-> Ok - so just to make sure I understand, this is physical memory you
-> want to use, which belongs to the remote processor, and which isn't
-> mapped normally by the kernel?
+> I do not have a strong opinion on this as I only use the dt case for my
+> usage.
 
-Yes, this is not the regular DDR that is mapped into kernel normally,
-but is a RAM internal to the remote processor subsystem. The MPU can
-access it through a bus address/
+The question is more about who actually wants the non-DT case.
 
-> 
->> Will it suffice to replace the memcpy() with memcpy_toio()?
-> 
-> Yes, memcpy_toio should be fine (and then you don't need to cast the
-> cookie returned by ioremap).
+Since this is a new driver, I suspect that the answer is "nobody",
+as the existing board files are all for legacy platforms that we
+are not going to adapt for this driver.
 
-I have posted v2, and have not modified for this. The memcpy portion is
-actually present in the remoteproc_elf_loader.c, and looks like I need
-to export some flags from rproc_va_to_da if I were to differentiate
-this. Is that ok with you?
+I see in the thread that at least Peter Chen was assuming the non-DT
+case was still needed, but I can't find a reason for this in the code.
+If we no longer care about that, the call to dev_get_platdata()
+can also get removed.
 
-regards
-Suman
+Looking through the code some more, I also notice that it's using
+a strange way of doing the abstraction: ci_hdrc_add_device()
+actually creates a child device node, while the preferred way would
+be to just call into ci_hdrc_probe(), or a generalized version of
+that.
+That should probably be changed, but can be done as a later cleanup.
+
+
+	Arnd
