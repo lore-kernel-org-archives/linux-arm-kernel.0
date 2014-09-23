@@ -1,33 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Sep 2014 11:37:21 +0100
-Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G
- support in big-endian model
-In-Reply-To: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
-References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140923103721.GQ5182@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 12:39:04 +0200
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <2909480.SL9c0XWUbW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 05:15:19PM +0800, Jingchang Lu wrote:
->  static u16 edma_readw(struct fsl_edma_engine *edma, void __iomem *addr)
->  {
-> -	if (edma->big_endian)
-> -		return ioread16be(addr);
-> -	else
-> +	u32 dst;
+On Tuesday 23 September 2014 12:28:03 Antoine Tenart wrote:
+> +       if (dev->of_node) {
+> +               ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> +               if (ret)
+> +                       goto clk_err;
+> +       } else {
+> +               ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +               if (ret)
+> +                       goto clk_err;
+> +       }
+> 
 
-This should be unsigned long, if it needs to exist.
+Why do you care about the non-DT case here? I think it would be nicer to
+open-code the ci_hdrc_usb2_dt_probe() function in here and remove
+the dma_set_mask_and_coherent(), which should not even be necessary for
+the case where you have a hardwired platform device.
 
-> +	/* swap the reg offset for these in big-endian mode */
-> +	if (edma->big_endian) {
-> +		dst = ((u32)addr & ~0x3) | (((u32)addr & 0x3) ^ 0x2);
-
-This can be simplified to:
-
-		addr = (void __iomem *)((unsigned long)addr ^ 2);
-
-Ditto for all the other cases.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
