@@ -1,105 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Sep 2014 12:54:16 -0400 (EDT)
-Subject: [PATCH] ARM: cacheflush: Fix exynos build breakage on ARMv6 by
- using macros for ISB/DSB
-In-Reply-To: <54219AEC.2060204@samsung.com>
-References: <1410871979-12470-1-git-send-email-k.kozlowski@samsung.com>
- <54219AEC.2060204@samsung.com>
-Message-ID: <alpine.LFD.2.11.1409231244470.8647@knanqh.ubzr>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Sep 2014 11:55:15 -0500
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <5140494.LzvyOiyY3U@wuerfel>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <2909480.SL9c0XWUbW@wuerfel> <20140923133645.GA18924@kwain>
+ <5140494.LzvyOiyY3U@wuerfel>
+Message-ID: <20140923165515.GA26604@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Sep 2014, Kukjin Kim wrote:
+HI,
 
-> On 09/16/14 21:52, Krzysztof Kozlowski wrote:
-> > This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
-> > time options (e.g. by building allmodconfig):
-> >
-> > $ make allmodconfig
-> > $ make
-> >    CC      arch/arm/mach-exynos/platsmp.o
-> > /tmp/ccdQM0Eg.s: Assembler messages:
-> > /tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode
-> > `isb '
-> > /tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode
-> > `isb '
-> > /tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode
-> > `dsb '
-> > make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
-> >
-> > The error was introduced in commit "ARM: EXYNOS: Move code from
-> > hotplug.c to platsmp.c".  Previously code using
-> > v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
-> > this flag dissapeared during the movement.
-> >
-> > Use isb() and dsb() macros in v7_exit_coherency_flush() so the proper
-> > code will be generated for ARMv6.
-> >
-> > Signed-off-by: Krzysztof Kozlowski<k.kozlowski@samsung.com>
-> > Reported-by: Mark Brown<broonie@kernel.org>
-> > Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
-> > ---
-> >   arch/arm/include/asm/cacheflush.h | 17 +++++++++++------
-> >   1 file changed, 11 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm/include/asm/cacheflush.h
-> > b/arch/arm/include/asm/cacheflush.h
-> > index 79ecb4f34ffb..b74eeec971c0 100644
-> > --- a/arch/arm/include/asm/cacheflush.h
-> > +++ b/arch/arm/include/asm/cacheflush.h
-> > @@ -464,22 +464,27 @@ static inline void __sync_cache_range_r(volatile void
-> > *p, size_t size)
-> >    *   CONFIG_FRAME_POINTER=y.  ip is saved as well if ever r12-clobbering
-> >    *   trampoline are inserted by the linker and to keep sp 64-bit aligned.
-> >    */
-> > -#define v7_exit_coherency_flush(level) \
-> > +#define v7_exit_coherency_flush(level) do { \
-> >    asm volatile( \
-> >    "stmfd	sp!, {fp, ip} \n\t" \
-> >    "mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
-> >    "bic	r0, r0, #"__stringify(CR_C)" \n\t" \
-> >    "mcr	p15, 0, r0, c1, c0, 0	@ set SCTLR \n\t" \
-> > -	"isb	\n\t" \
-> > +	: : : "r0","r1","r2","r3","r4","r5","r6","r7", \
-> > +	      "r9","r10","lr","memory" ); \
-> > +	isb(); \
-> > +	asm volatile( \
-> >    "bl	v7_flush_dcache_"__stringify(level)" \n\t" \
-> >    "mrc	p15, 0, r0, c1, c0, 1	@ get ACTLR \n\t" \
-> >    "bic	r0, r0, #(1<<  6)	@ disable local coherency \n\t" \
-> >    "mcr	p15, 0, r0, c1, c0, 1	@ set ACTLR \n\t" \
-> > -	"isb	\n\t" \
-> > -	"dsb	\n\t" \
-> > -	"ldmfd	sp!, {fp, ip}" \
-> > : : : "r0","r1","r2","r3","r4","r5","r6","r7", \
-> > -	      "r9","r10","lr","memory" )
-> > +	      "r9","r10","lr","memory" ); \
-> > +	isb(); \
-> > +	dsb(); \
-> > +	asm volatile( \
-> > +	"ldmfd	sp!, {fp, ip}" ); \
-> > +	} while (0)
-> >
-> >   int set_memory_ro(unsigned long addr, int numpages);
-> >   int set_memory_rw(unsigned long addr, int numpages);
+On Tue, Sep 23, 2014 at 06:44:40PM +0200, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014 15:36:45 Antoine Tenart wrote:
+> > On Tue, Sep 23, 2014 at 12:39:04PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 23 September 2014 12:28:03 Antoine Tenart wrote:
+> > > > +       if (dev->of_node) {
+> > > > +               ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> > > > +               if (ret)
+> > > > +                       goto clk_err;
+> > > > +       } else {
+> > > > +               ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> > > > +               if (ret)
+> > > > +                       goto clk_err;
+> > > > +       }
+> > > > 
+> > > 
+> > > Why do you care about the non-DT case here? I think it would be nicer to
+> > > open-code the ci_hdrc_usb2_dt_probe() function in here and remove
+> > > the dma_set_mask_and_coherent(), which should not even be necessary for
+> > > the case where you have a hardwired platform device.
+> > > 
+> > 
+> > I thought we agreed to call dma_set_mask_and_coherent():
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273335.html
+> > 
+> > I do not have a strong opinion on this as I only use the dt case for my
+> > usage.
 > 
-> Hi Russell,
+> The question is more about who actually wants the non-DT case.
 > 
-> Can you please check this patch? Unfortunately I'm not sure about this, this
-> should resolve the build error though...
+> Since this is a new driver, I suspect that the answer is "nobody",
+> as the existing board files are all for legacy platforms that we
+> are not going to adapt for this driver.
 
-I don't like this patch at all.
+wait a minute... will the legacy platforms be adapted to DT and, thus,
+to this driver in the future ? I really don't want to keep several
+copies of chipidea driver just because there are still some legacy
+platforms still using them. I have said in the past and will say again,
+everybody should move to the generic chipidea driver at the earliest
+opportunity so we avoid duplication of work.
 
-The original assembly sequence was carefully written in a single segment 
-because it is important that the compiler does not attempt to schedule 
-anything in the middle.  Some definitions of isb() and dsb() need a 
-temporary register which needs to be allocated and initialized and who 
-knows what the compiler might do (such as spilling to the stack which 
-might be fatal here).
-
-Instead, you should insert ".arch armv7-a" in the assembly sequence to 
-tell the assembler the isb and dsb instructions are going to be executed 
-on an ARMv7 capable CPU.
-
-
-Nicolas
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/c517e821/attachment.sig>
