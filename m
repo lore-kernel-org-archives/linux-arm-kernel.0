@@ -1,101 +1,157 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 23 Sep 2014 13:50:05 +0200
-Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
- access
-In-Reply-To: <20140923111412.GG12187@cbox>
-References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
- <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
- <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
- <20140923111412.GG12187@cbox>
-Message-ID: <54215E6D.6090308@redhat.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 23 Sep 2014 13:51:17 +0200
+Subject: [PATCH 3/4] gpio: vf610: add gpiolib/IRQ chip driver for Vybird
+In-Reply-To: <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
+References: <cover.1410020458.git.stefan@agner.ch>
+ <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
+ <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
+Message-ID: <a7c933339713dc1783770faf1eceb734@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 23/09/2014 13:14, Christoffer Dall ha scritto:
-> On Tue, Sep 23, 2014 at 10:36:30AM +0200, Paolo Bonzini wrote:
->> Il 23/09/2014 00:07, Will Deacon ha scritto:
->>>>>  {
->>>>>  	if (!(lr_desc.state & LR_STATE_MASK))
->>>>> -		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
->>>>> +		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
->>>>>  }
->>> Does this work for big-endian arm64 machines? Surely the bug is due to
->>> casting a u32 * to an unsigned long *, and not specifically related to
->>> atomics (which is where it happened to explode)?
+Hi Linus,
+
+Thanks for your review!
+
+Am 2014-09-23 11:58, schrieb Linus Walleij:
+> On Sat, Sep 6, 2014 at 6:25 PM, Stefan Agner <stefan@agner.ch> wrote:
+> 
+>> Add a gpiolib and IRQ chip driver for Vybrid ARM SoC using the
+>> Vybrid's GPIO and PORT module. The driver is instanced once per
+>> each GPIO/PORT module pair and handles 32 GPIO's.
 >>
-> It does look like the whole thing is broken on BE systems, but fixing
-> that becomes non-trivial.  I don't think this fix is incorrect in
-> itself, but we do have a larger issue with BE.
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> (...)
+>>  obj-$(CONFIG_GPIO_UCB1400)     += gpio-ucb1400.o
+>> +obj-$(CONFIG_GPIO_VF610)       += gpio-vf610.o
 > 
-> I took a stab at fixing this (untested for BE), which looks something
-> like the following, but I'm a bit uneasy about having to test and merge
-> this as a fix given the rush before 3.17 is released.
+> Some like to keep GPIOs tightly associated with a pin controller
+> in a file next to the pin controller.
 > 
-> Thoughts?
+> I.e. in drivers/pinctrl/freescale/gpio-vf610.c
+> 
+> But this works too. Any preference?
 
-If big-endian is broken anyway, let's apply this only:
+The other Freescale GPIO drivers (e.g. gpio-mxs.c/gpio-mxc.c) are
+located under drivers/gpio/ hence I would prefer to leave them there,
+even we use pinctrl here. Unless someone at Freescale has another
+opinion on this?
 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 35b0c12..c66dc9ed 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -168,8 +168,8 @@ struct vgic_v2_cpu_if {
->  	u32		vgic_hcr;
->  	u32		vgic_vmcr;
->  	u32		vgic_misr;	/* Saved only */
-> -	u32		vgic_eisr[2];	/* Saved only */
-> -	u32		vgic_elrsr[2];	/* Saved only */
-> +	u64		vgic_eisr;	/* Saved only */
-> +	u64		vgic_elrsr;	/* Saved only */
->  	u32		vgic_apr;
->  	u32		vgic_lr[VGIC_V2_MAX_LRS];
->  };
-> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-> index 416baed..2935405 100644
-> --- a/virt/kvm/arm/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic-v2.c
-> @@ -71,35 +71,17 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
->  				  struct vgic_lr lr_desc)
->  {
->  	if (!(lr_desc.state & LR_STATE_MASK))
-> -		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-> +		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
->  }
->  
->  static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
->  {
-> -	u64 val;
-> -
-> -#if BITS_PER_LONG == 64
-> -	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[1];
-> -	val <<= 32;
-> -	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[0];
-> -#else
-> -	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
-> -#endif
-> -	return val;
-> +	return vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
->  }
->  
->  static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
->  {
-> -	u64 val;
-> -
-> -#if BITS_PER_LONG == 64
-> -	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[1];
-> -	val <<= 32;
-> -	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[0];
-> -#else
-> -	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
-> -#endif
-> -	return val;
-> +	return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
->  }
->  
->  static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
 
-which matches what vgic-v3 already does.
+> 
+>> +#define GPIO_PER_PORT          32
+> 
+> Very generic define. VF610_GPIOS_PER_PORT?
 
-BE can be fixed in 3.18.
+Agreed
 
-Paolo
+> 
+>> +struct vf610_gpio_port {
+>> +       struct gpio_chip gc;
+>> +       void __iomem *base;
+>> +       void __iomem *gpio_base;
+>> +       u8 irqc[GPIO_PER_PORT];
+>> +       int irq;
+> 
+> irq? Why do you need to keep this around?
+> 
+>> +static const struct of_device_id vf610_gpio_dt_ids[] = {
+>> +       { .compatible = "fsl,vf610-gpio" },
+>> +       { /* sentinel */ }
+>> +};
+>> +
+>> +static inline void vf610_gpio_writel(u32 val, void __iomem *reg)
+>> +{
+>> +       __raw_writel(val, reg);
+> 
+> Use writel_relaxed() instead unless you can explain why you want this.
+> 
+> (Same for all occurences.)
+
+Agreed, I have don't know why I used the __raw variant here. I think its
+because copied this two stubs from gpio-tegra.c.
+
+> 
+>> +static int vf610_gpio_get(struct gpio_chip *gc, unsigned int gpio)
+>> +{
+>> +       struct vf610_gpio_port *port =
+>> +               container_of(gc, struct vf610_gpio_port, gc);
+>> +
+>> +       return !!(vf610_gpio_readl(port->gpio_base + GPIO_PDIR) & 1 << gpio);
+> 
+> #include <linux/bitops.h>
+> 
+> ... & BIT(gpio)
+> 
+>> +static void vf610_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+>> +{
+>> +       struct vf610_gpio_port *port =
+>> +               container_of(gc, struct vf610_gpio_port, gc);
+>> +       unsigned long mask = 1 << gpio;
+> 
+> = BIT(gpio);
+> 
+>> +static void vf610_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>> +{
+>> +       struct vf610_gpio_port *port = irq_get_handler_data(irq);
+>> +       struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +       int pin;
+>> +       unsigned long irq_isfr;
+>> +
+>> +       chained_irq_enter(chip, desc);
+>> +
+>> +       irq_isfr = vf610_gpio_readl(port->base + PORT_ISFR);
+>> +
+>> +       for_each_set_bit(pin, &irq_isfr, GPIO_PER_PORT) {
+>> +               vf610_gpio_writel(1 << pin, port->base + PORT_ISFR);
+> 
+> BIT(pin)
+> 
+> (etc)
+
+Ok, will replace those bit operations.
+
+> 
+>> +       port->irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+>> +       if (port->irq == NO_IRQ)
+>> +               return -ENODEV;
+> 
+> Can't you just use a local int irq; variable for this?
+> 
+>> +static int __init gpio_vf610_init(void)
+>> +{
+>> +       return platform_driver_register(&vf610_gpio_driver);
+>> +}
+>> +postcore_initcall(gpio_vf610_init);
+> 
+> postcore again. I don't like this, can you get rid of it?
+
+I guess we could load this driver easily a bit later. IMHO, since lots
+of other driver use GPIO's, we should it load before all the drivers
+gets loaded (before device_initcall).
+
+Most GPIO driver do this, some statistic again:
+$ grep -h -o ".*_initcall" drivers/gpio/*.c | sort | uniq -c | sort -n
+-r
+     33 subsys_initcall
+     14 postcore_initcall
+      2 device_initcall
+      2 arch_initcall
+      1 late_initcall
+      1 core_initcall
+
+My proposal:
+Use subsys_initcall (which is called after arch_initcall) in this GPIO
+driver and leave the pinctrl driver as arch_initcall. This way we are
+absolutely sure that the GPIO driver gets loaded after the pinctrl and
+also leave the pinctrl at its current value.
+
+--
+Stefan
+
+
+> 
+> Overall the driver looks very nice except for these nitty gritty details.
+> 
+> Yours,
+> Linus Walleij
