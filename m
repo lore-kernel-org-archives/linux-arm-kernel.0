@@ -1,115 +1,74 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 23 Sep 2014 15:52:41 +0200
-Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
- access
-In-Reply-To: <54216B1B.2010205@arm.com>
-References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
- <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
- <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
- <20140923111412.GG12187@cbox> <54215E6D.6090308@redhat.com>
- <54216B1B.2010205@arm.com>
-Message-ID: <20140923135241.GI12187@cbox>
+From: k.debski@samsung.com (Kamil Debski)
+Date: Tue, 23 Sep 2014 15:58:12 +0200
+Subject: [PATCH] [media] s5p-mfc: Use decode status instead of display
+ status on MFCv5
+In-Reply-To: <1411390322-25212-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1411390322-25212-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <085901cfd736$6ae349c0$40a9dd40$%debski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 01:44:11PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> On 23/09/14 12:50, Paolo Bonzini wrote:
-> > Il 23/09/2014 13:14, Christoffer Dall ha scritto:
-> >> On Tue, Sep 23, 2014 at 10:36:30AM +0200, Paolo Bonzini wrote:
-> >>> Il 23/09/2014 00:07, Will Deacon ha scritto:
-> >>>>>>  {
-> >>>>>>  	if (!(lr_desc.state & LR_STATE_MASK))
-> >>>>>> -		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-> >>>>>> +		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-> >>>>>>  }
-> >>>> Does this work for big-endian arm64 machines? Surely the bug is due to
-> >>>> casting a u32 * to an unsigned long *, and not specifically related to
-> >>>> atomics (which is where it happened to explode)?
-> >>>
-> >> It does look like the whole thing is broken on BE systems, but fixing
-> >> that becomes non-trivial.  I don't think this fix is incorrect in
-> >> itself, but we do have a larger issue with BE.
-> >>
-> >> I took a stab at fixing this (untested for BE), which looks something
-> >> like the following, but I'm a bit uneasy about having to test and merge
-> >> this as a fix given the rush before 3.17 is released.
-> >>
-> >> Thoughts?
-> > 
-> > If big-endian is broken anyway, let's apply this only:
-> > 
-> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> index 35b0c12..c66dc9ed 100644
-> >> --- a/include/kvm/arm_vgic.h
-> >> +++ b/include/kvm/arm_vgic.h
-> >> @@ -168,8 +168,8 @@ struct vgic_v2_cpu_if {
-> >>  	u32		vgic_hcr;
-> >>  	u32		vgic_vmcr;
-> >>  	u32		vgic_misr;	/* Saved only */
-> >> -	u32		vgic_eisr[2];	/* Saved only */
-> >> -	u32		vgic_elrsr[2];	/* Saved only */
-> >> +	u64		vgic_eisr;	/* Saved only */
-> >> +	u64		vgic_elrsr;	/* Saved only */
-> >>  	u32		vgic_apr;
-> >>  	u32		vgic_lr[VGIC_V2_MAX_LRS];
-> >>  };
-> 
-> I think Marc's point on this was not to spoil 32bit code (as this is the
-> GIC, which is shared). In the GICv2 spec the register are declared as a
-> number of 32 bit registers, so there is some sense in keeping it u32.
-> So I came up with the following this morning:
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 35b0c12..6f884df 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -168,8 +168,14 @@ struct vgic_v2_cpu_if {
->         u32             vgic_hcr;
->         u32             vgic_vmcr;
->         u32             vgic_misr;      /* Saved only */
-> -       u32             vgic_eisr[2];   /* Saved only */
-> -       u32             vgic_elrsr[2];  /* Saved only */
-> +       union {
-> +               u32             vgic_eisr[2];   /* Saved only */
-> +               unsigned long   vgic_eisr_bm[8 / sizeof(long)];
-> +       };
-> +       union {
-> +               u32             vgic_elrsr[2];  /* Saved only */
-> +               unsigned long   vgic_elrsr_bm[8 / sizeof(long)];
-> +       };
->         u32             vgic_apr;
->         u32             vgic_lr[VGIC_V2_MAX_LRS];
->  };
-> 
-> And then use vgic_elrsr_bm in set_bit().
-> 
-> Admittedly a bit hacky, but fixes the alignment issue while still
-> retaining sane code for ARM.
-> If anyone knows a good fix for that "8 / sizeof(long)" kludge, I am all
-> ears.
-> 
+Hi Sjoerd,
 
-I honestly thing this obfuscates what's going on more than it helps.  I
-think in general complicating your data structure because of the way you
-consume it is the wrong way to go, unless it significantly simplifies a
-complicated set of manipulators.
+> From: linux-media-owner at vger.kernel.org [mailto:linux-media-
+> owner at vger.kernel.org] On Behalf Of Sjoerd Simons
+> Sent: Monday, September 22, 2014 2:52 PM
+> To: Kyungmin Park; Kamil Debski; Arun Kumar K
+> Cc: Mauro Carvalho Chehab; linux-arm-kernel at lists.infradead.org; linux-
+> media at vger.kernel.org; linux-kernel at vger.kernel.org; linux-samsung-
+> soc at vger.kernel.org; Daniel Drake; Sjoerd Simons
+> Subject: [PATCH] [media] s5p-mfc: Use decode status instead of display
+> status on MFCv5
+> 
+> Commit 90c0ae50097 changed how the frame_type of a decoded frame
+> gets determined, by switching from the get_dec_frame_type to
+> get_disp_frame_type operation. Unfortunately it seems that on MFC v5
+> the
+> result of get_disp_frame_type is always 0 (no display) when decoding
+> (tested with H264), resulting in no frame ever being output from the
+> decoder.
 
-Another thing is that this fix does not address the fact that you're
-still returning a u64 from vgic_get_elrsr() and related functions, which
-will break with the use of for_each_set_bit() in the callers when the
-host is a 32-bit BE system.  You'd have to change the accessor functions
-to return an (unsigned long *) as well with your change above and 64-bit
-BE systems would have to switch the order of the words when accessing
-your vgic_elrsr_bm field.  I tried this, and it doesn't look nice.
+Could you tell me which firmware version do you use (date)?
 
-Therefore, I think we should really just merge the one-line fix or the
-patch I sent before.  Paolo seems fine with it either way.
-
-If anyone feels like reviewing my patch and giving it a quick test on a
-BE system with a version of QEMU with the pl011 level-triggered patch,
-real soon, like today'ish, then we can use that, but otherwise let's go
-with the one-liner.
-
--Christoffer
+Best wishes,
+-- 
+Kamil Debski
+Samsung R&D Institute Poland
+ 
+> This patch reverts MFC v5 to the previous behaviour while keeping the
+> new behaviour for v6 and up.
+> 
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> index d35b041..27ca9d0 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> @@ -264,7 +264,12 @@ static void s5p_mfc_handle_frame_new(struct
+> s5p_mfc_ctx *ctx, unsigned int err)
+>  	unsigned int frame_type;
+> 
+>  	dspl_y_addr = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_y_adr, dev);
+> -	frame_type = s5p_mfc_hw_call(dev->mfc_ops, get_disp_frame_type,
+> ctx);
+> +	if (IS_MFCV6_PLUS(dev))
+> +		frame_type = s5p_mfc_hw_call(dev->mfc_ops,
+> +			get_disp_frame_type, ctx);
+> +	else
+> +		frame_type = s5p_mfc_hw_call(dev->mfc_ops,
+> +			get_dec_frame_type, dev);
+> 
+>  	/* If frame is same as previous then skip and do not dequeue */
+>  	if (frame_type == S5P_FIMV_DECODE_FRAME_SKIPPED) {
+> --
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
