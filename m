@@ -1,74 +1,156 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 13:24:00 +0200
-Subject: [PATCH v8 06/10] rtc: at91sam9: rework the Kconfig description
+Date: Tue, 23 Sep 2014 13:24:01 +0200
+Subject: [PATCH v8 07/10] ARM: at91: add clk_lookup entry for RTT devices
 In-Reply-To: <1411471444-2764-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1411471444-2764-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411471444-2764-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411471444-2764-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove all references to AT91CAP9 SoC which has been removed.
-Rework help message to remove any specific references to AT91SAM9 SoCs.
-State that RTC_DRV_AT91SAM9_RTT and RTC_DRV_AT91SAM9_GPBR options are only
-used when booting non DT boards.
+First export the clk32k clk.
+Then add clk_lookup entries for RTT devices so that rtc-at91sam9 driver
+can retrieve and manipulate the slow clk.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Johan Hovold <johan@kernel.org>
 ---
- drivers/rtc/Kconfig | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
+ arch/arm/mach-at91/at91sam9260.c | 2 ++
+ arch/arm/mach-at91/at91sam9261.c | 2 ++
+ arch/arm/mach-at91/at91sam9263.c | 4 ++++
+ arch/arm/mach-at91/at91sam9g45.c | 2 ++
+ arch/arm/mach-at91/at91sam9rl.c  | 2 ++
+ arch/arm/mach-at91/clock.c       | 2 +-
+ arch/arm/mach-at91/clock.h       | 1 +
+ 7 files changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 7d76da8..9b56882 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1079,17 +1079,18 @@ config RTC_DRV_AT91RM9200
- 	  this is powered by the backup power supply.
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 3477ba9..a853d4c 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -217,6 +217,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi_clk),
++	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
+ 	/* more usart lookup table for DT entries */
+ 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+ 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+@@ -237,6 +238,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index fb164a5..3f5a299 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -192,6 +192,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+ 	CLKDEV_CON_ID("pioB", &pioB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioC_clk),
++	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
+ 	/* more lookup table for DT entries */
+ 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+ 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+@@ -209,6 +210,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
+ };
  
- config RTC_DRV_AT91SAM9
--	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
-+	tristate "AT91SAM9 RTT as RTC"
- 	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
- 	select MFD_SYSCON
- 	help
--	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
--	  (Real Time Timer). These timers are powered by the backup power
--	  supply (such as a small coin cell battery), but do not need to
--	  be used as RTCs.
--
--	  (On AT91SAM9rl and AT91SAM9G45 chips you probably want to use the
--	  dedicated RTC module and leave the RTT available for other uses.)
-+	  Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
-+	  can be used as an RTC thanks to the backup power supply (e.g. a
-+	  small coin cell battery) which keeps this block and the GPBR
-+	  (General Purpose Backup Registers) block powered when the device
-+	  is shutdown.
-+	  Some AT91SAM9 SoCs provide a real RTC block, on those ones you'd
-+	  probably want to use the real RTC block instead of the "RTT as an
-+	  RTC" driver.
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 810fa5f..bef5b96 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -201,6 +201,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
++	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
++	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.1", &clk32k),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+@@ -227,6 +229,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
++	CLKDEV_CON_DEV_ID(NULL, "fffffd50.rtc", &clk32k),
+ };
  
- config RTC_DRV_AT91SAM9_RTT
- 	int
-@@ -1098,6 +1099,9 @@ config RTC_DRV_AT91SAM9_RTT
- 	prompt "RTT module Number" if ARCH_AT91SAM9263
- 	depends on RTC_DRV_AT91SAM9
- 	help
-+	  This option is only relevant for legacy board support and
-+	  won't be used when booting a DT board.
-+
- 	  More than one RTT module is available. You can choose which
- 	  one will be used as an RTC. The default of zero is normally
- 	  OK to use, though some systems use that for non-RTC purposes.
-@@ -1110,6 +1114,9 @@ config RTC_DRV_AT91SAM9_GPBR
- 	prompt "Backup Register Number"
- 	depends on RTC_DRV_AT91SAM9
- 	help
-+	  This option is only relevant for legacy board support and
-+	  won't be used when booting a DT board.
-+
- 	  The RTC driver needs to use one of the General Purpose Backup
- 	  Registers (GPBRs) as well as the RTT. You can choose which one
- 	  will be used. The default of zero is normally OK to use, but
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 9d45496..69fdfcc 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "atmel_aes", &aestdessha_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
++	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
+ 	/* more usart lookup table for DT entries */
+ 	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
+ 	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
+@@ -279,6 +280,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioDE_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioDE_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
+ 
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+ 	CLKDEV_CON_ID("pioB", &pioB_clk),
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 878d501..a82dc61 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -205,6 +205,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioB", &pioB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioC_clk),
+ 	CLKDEV_CON_ID("pioD", &pioD_clk),
++	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
+ 	/* more lookup table for DT entries */
+ 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+ 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+@@ -223,6 +224,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
+ 	CLKDEV_CON_ID("adc_clk", &tsc_clk),
+ };
+ 
+diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+index 034529d..f5cfed75 100644
+--- a/arch/arm/mach-at91/clock.c
++++ b/arch/arm/mach-at91/clock.c
+@@ -115,7 +115,7 @@ static u32 at91_pllb_usb_init;
+  * 48 MHz (unless no USB function clocks are needed).  The main clock and
+  * both PLLs are turned off to run in "slow clock mode" (system suspend).
+  */
+-static struct clk clk32k = {
++struct clk clk32k = {
+ 	.name		= "clk32k",
+ 	.rate_hz	= AT91_SLOW_CLOCK,
+ 	.users		= 1,		/* always on */
+diff --git a/arch/arm/mach-at91/clock.h b/arch/arm/mach-at91/clock.h
+index a98a39b..6eb825a 100644
+--- a/arch/arm/mach-at91/clock.h
++++ b/arch/arm/mach-at91/clock.h
+@@ -34,6 +34,7 @@ struct clk {
+ extern int __init clk_register(struct clk *clk);
+ extern struct clk mck;
+ extern struct clk utmi_clk;
++extern struct clk clk32k;
+ 
+ #define CLKDEV_CON_ID(_id, _clk)			\
+ 	{						\
 -- 
 1.9.1
