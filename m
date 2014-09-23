@@ -1,54 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Sep 2014 10:37:51 +0100
-Subject: unalignment access to device / strongly ordered memory
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103D6DB491629@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103D6DB491629@CNBJMBX05.corpusers.net>
-Message-ID: <20140923093751.GP5182@n2100.arm.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 23 Sep 2014 11:38:42 +0200
+Subject: [PATCH v7 02/10] rtc: at91sam9: use standard readl/writel functions
+ instead of raw versions
+In-Reply-To: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411465130-29011-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 01:25:17PM +0800, Wang, Yalin wrote:
-> Hi 
-> 
-> I have a question about
-> unalignment access to device / strongly ordered memory.
-> The TRM said that :
-> 
-> Unaligned data accesson page A3-108identifies the instructions that can make an unaligned memory 
-> access, and the required configuration setting. If such an access is to Device or Strongly-ordered memory 
-> then:
-> - if the implementation does not include the Virtualization Extensions, the effect is UNPREDICTABLE
-> - if the implementation includes the Virtualization Extensions, the access generates an Alignment fault.
-> 
-> 
-> But I see arch\arm\mm\alignment.c,
-> It don't check if the fault address is a device / strongly ordered memory
-> address.
+Raw versions of writel and writel should not be directly used and should
+be replaced by their relaxed versions (readl/writel_relaxed), which take
+endianness conversion into account.
 
-Doing so is too expensive.
+In this driver we prefer the standard readl/writel function which add the
+appropriate memory barrier around the access (the performance penalty is
+negligible for this kind of application).
 
-> Is it safe ?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/rtc/rtc-at91sam9.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Yes - if you use misaligned accesses to a device or strongly ordered
-region, you will get unpredictable results.  If it triggers an alignment
-fault, we will fix up the load by performing multiple accesses to the
-address and combining their results.
-
-If reading or writing to the region has side effects (maybe the device is
-read sensitive) maybe it won't like the multiple reads - that's not the
-problem of the OS to resolve.  That still comes under "unpredictable".
-
-Hence, whether or not you have virtualisation extensions, the result of
-performing an unaligned access will be UNPREDICTABLE.
-
-> Do we need check it and then panic kernel or kill the user process
-
-How would we do that when non-virtualised cases may not produce an
-exception?
-
-The bottom line on this is quite simply: never generate misaligned loads
-and stores to devices.
-
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 51f0038..74a9ca0 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -77,14 +77,14 @@ struct sam9_rtc {
+ };
+ 
+ #define rtt_readl(rtc, field) \
+-	__raw_readl((rtc)->rtt + AT91_RTT_ ## field)
++	readl((rtc)->rtt + AT91_RTT_ ## field)
+ #define rtt_writel(rtc, field, val) \
+-	__raw_writel((val), (rtc)->rtt + AT91_RTT_ ## field)
++	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+ 
+ #define gpbr_readl(rtc) \
+-	__raw_readl((rtc)->gpbr)
++	readl((rtc)->gpbr)
+ #define gpbr_writel(rtc, val) \
+-	__raw_writel((val), (rtc)->gpbr)
++	writel((val), (rtc)->gpbr)
+ 
+ /*
+  * Read current time and date in RTC
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
