@@ -1,145 +1,80 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 23 Sep 2014 17:51:18 -0600
-Subject: [PATCH v6 2/5] arm: dts: qcom: Add SPM device bindings for 8974
+Date: Tue, 23 Sep 2014 17:51:21 -0600
+Subject: [PATCH v6 5/5] arm: dts: qcom: Add idle states device nodes for 8974
 In-Reply-To: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
 References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1411516281-58328-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPM device bindings for QCOM 8974 based cpus. SPM is the sub-system
-power manager and controls the logic around the cores (cpu and L2).
-
-Each core has an instance of SPM and controls only that core. Each cpu
-SPM is configured to support WFI and SPC (standalone-power collapse).
+Add allowable C-States for each cpu using the cpu-idle-states node.
+ARM spec dictates WFI as the default idle state at 0. Support standalone
+power collapse (power down that does not affect any SoC idle states) for
+each cpu.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/boot/dts/qcom-msm8974-pm.dtsi | 69 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi    | 10 +++--
- 2 files changed, 75 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/qcom-msm8974-pm.dtsi
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974-pm.dtsi b/arch/arm/boot/dts/qcom-msm8974-pm.dtsi
-new file mode 100644
-index 0000000..bbfb1d5
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-msm8974-pm.dtsi
-@@ -0,0 +1,69 @@
-+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+&soc {
-+	spm at f9089000 {
-+		compatible = "qcom,spm-v2.1";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0xf9089000 0x1000>;
-+		qcom,cpu = <&CPU0>;
-+		qcom,saw2-clk-div = <0x01>;
-+		qcom,saw2-delays = <0x3C102800>;
-+		qcom,saw2-enable = <0x01>;
-+		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
-+		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
-+			30 06 26 30 0F];
-+	};
-+
-+	spm at f9099000 {
-+		compatible = "qcom,spm-v2.1";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0xf9099000 0x1000>;
-+		qcom,cpu = <&CPU1>;
-+		qcom,saw2-clk-div = <0x01>;
-+		qcom,saw2-delays = <0x3C102800>;
-+		qcom,saw2-enable = <0x01>;
-+		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
-+		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
-+			30 06 26 30 0F];
-+	};
-+
-+	spm at f90a9000 {
-+		compatible = "qcom,spm-v2.1";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0xf90a9000 0x1000>;
-+		qcom,cpu = <&CPU2>;
-+		qcom,saw2-clk-div = <0x01>;
-+		qcom,saw2-delays = <0x3C102800>;
-+		qcom,saw2-enable = <0x01>;
-+		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
-+		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
-+			30 06 26 30 0F];
-+	};
-+
-+	spm at f90b9000 {
-+		compatible = "qcom,spm-v2.1";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0xf90b9000 0x1000>;
-+		qcom,cpu = <&CPU3>;
-+		qcom,saw2-clk-div = <0x01>;
-+		qcom,saw2-delays = <0x3C102800>;
-+		qcom,saw2-enable = <0x01>;
-+		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
-+		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
-+			30 06 26 30 0F];
-+	};
-+};
 diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 69dca2a..0580bc2 100644
+index 0580bc2..e87b24f 100644
 --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
 +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -14,7 +14,7 @@
- 		#size-cells = <0>;
- 		interrupts = <1 9 0xf04>;
- 
--		cpu at 0 {
-+		CPU0: cpu at 0 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
-@@ -23,7 +23,7 @@
+@@ -21,6 +21,7 @@
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
  			qcom,acc = <&acc0>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
  		};
  
--		cpu at 1 {
-+		CPU1: cpu at 1 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
-@@ -32,7 +32,7 @@
+ 		CPU1: cpu at 1 {
+@@ -30,6 +31,7 @@
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
  			qcom,acc = <&acc1>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
  		};
  
--		cpu at 2 {
-+		CPU2: cpu at 2 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
-@@ -41,7 +41,7 @@
+ 		CPU2: cpu at 2 {
+@@ -39,6 +41,7 @@
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
  			qcom,acc = <&acc2>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
  		};
  
--		cpu at 3 {
-+		CPU3: cpu at 3 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
-@@ -238,3 +238,5 @@
+ 		CPU3: cpu at 3 {
+@@ -48,6 +51,7 @@
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc3>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
  		};
- 	};
- };
+ 
+ 		L2: l2-cache {
+@@ -55,6 +59,22 @@
+ 			cache-level = <2>;
+ 			qcom,saw = <&saw_l2>;
+ 		};
 +
-+#include "qcom-msm8974-pm.dtsi"
++		idle-states {
++			CPU_WFI: wfi {
++				compatible = "qcom,idle-state-wfi", "arm,idle-state";
++				entry-latency-us = <1>;
++				exit-latency-us = <1>;
++				min-residency-us = <2>;
++			};
++
++			CPU_SPC: spc {
++				compatible = "qcom,idle-state-spc", "arm,idle-state";
++				entry-latency-us = <150>;
++				exit-latency-us = <200>;
++				min-residency-us = <2000>;
++			};
++		};
+ 	};
+ 
+ 	cpu-pmu {
 -- 
 1.9.1
