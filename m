@@ -1,132 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Sep 2014 09:08:56 -0700
-Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
-In-Reply-To: <542021C5.5060201@ti.com>
-References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
- <20140918171650.GK14505@atomide.com>
- <alpine.DEB.2.02.1409191606310.22526@utopia.booyaka.com>
- <542021C5.5060201@ti.com>
-Message-ID: <20140923160856.GD2451@atomide.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 23 Sep 2014 18:08:00 +0200
+Subject: [PATCH v6 1/6] sched: add per rq cpu_capacity_orig
+In-Reply-To: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1411488485-10025-2-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140922 06:18]:
-> On 09/19/2014 07:30 PM, Paul Walmsley wrote:
-> >On Thu, 18 Sep 2014, Tony Lindgren wrote:
-> >
-> >>* Tero Kristo <t-kristo@ti.com> [140901 11:09]:
-> >>>Hi,
-> >>>
-> >>>This set contains PRCM related cleanups meant for 3.18 merge window.
-> >>>These are based on top of 3.17-rc1 + the PRM set from Nishanth Menon
-> >>>(http://article.gmane.org/gmane.linux.ports.arm.kernel/350305.) Nishanth's
-> >>>set is used as basis to avoid merge issues.
-> >>>
-> >>>Purpose of this work is to eventually convert the PRCM code into a
-> >>>separate driver, but this is done in incremental parts as the amount
-> >>>of changes is substantial. Expected conclusion of this work is 3.19
-> >>>if everything goes fine.
-> >>>
-> >>>This part of the work mostly moves some of the SoC specific PRCM driver
-> >>>calls under generic version of the same, and adds SoC-ops to support
-> >>>these on the driver level.
-> >>>
-> >>>Working branch posted here:
-> >>>
-> >>>tree: https://github.com/t-kristo/linux-pm.git
-> >>>branch: for-v3.18/prcm-cleanup
-> 
-> Hi,
-> 
-> I pushed v2 of this set as 'for-v3.18/prcm-cleanup-v2' to my tree. Basically
-> to address the below comments, and additionally I changed a few public cm_*
-> api names to omap_cm_* + add the tested-by/acked-by statuses. Tony/Paul, do
-> you want me to repost the series, or are you ok with a local diff / pull
-> only?
+This new field cpu_capacity_orig reflects the original capacity of a CPU
+before being altered by frequency scaling, rt tasks and/or IRQ
 
-If the changes were minor, at least I'm fine without reposting.
-But let's wait to hear from Paul in case he has further comments.
+The cpu_capacity_orig  will be used in several places to detect when the
+capapcity of a CPU has been noticeably reduced so we can trig load balance
+to look for a CPU with better capacity.
+As an example, we can detect when a CPU handles a significant amount of irq
+(with CONFIG_IRQ_TIME_ACCOUNTING) but this CPU is seen as an idle CPU by
+scheduler whereas CPUs, which are really idle, are available
 
-Regards,
+In addition, this new cpu_capacity_orig will be used to evaluate the usage of
+a the CPU by CFS tasks
 
-Tony
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Reviewed-by: Kamalesh Babulal <kamalesh@linux.vnet.ibm.com>
+---
+ kernel/sched/core.c  | 2 +-
+ kernel/sched/fair.c  | 8 +++++++-
+ kernel/sched/sched.h | 1 +
+ 3 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 2a93b87..e20f203 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -7056,7 +7056,7 @@ void __init sched_init(void)
+ #ifdef CONFIG_SMP
+ 		rq->sd = NULL;
+ 		rq->rd = NULL;
+-		rq->cpu_capacity = SCHED_CAPACITY_SCALE;
++		rq->cpu_capacity = rq->cpu_capacity_orig = SCHED_CAPACITY_SCALE;
+ 		rq->post_schedule = 0;
+ 		rq->active_balance = 0;
+ 		rq->next_balance = jiffies;
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 2a1e6ac..622f8b0 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4092,6 +4092,11 @@ static unsigned long capacity_of(int cpu)
+ 	return cpu_rq(cpu)->cpu_capacity;
+ }
  
-> >>
-> >>Paul, any comments on this series?
-> >
-> >Patches 1, 3, 5, 8, 10, 13, 17, 18, 20, 21, 22, 23, 24 are:
-> >
-> >Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> Thanks, added acks to v2 patches.
-> 
-> >
-> >Here are some specific comments on a few other patches:
-> >
-> >Regarding patch 7:  The kerneldoc-nano function comments are good, but
-> >should begin with "/**" rather than "/*".  When that's fixed, it can be
-> >considered acked by me.
-> 
-> Yea, this was a typo, thanks for noticing.
-> 
-> >
-> >Regarding patches 14, 15, 16: Non-static prm_* functions really should
-> >start with omap*_ to avoid potential naming conflicts with other drivers
-> >when these are moved to drivers/.  (Obviously the same would apply for any
-> >CM function names in other, future patches.)  When that's fixed, it can be
-> >considered acked by me.
-> 
-> Ok, changed. Additionally I changed some cm_* prototypes in patches #6, #7
-> and #9 to be of form omap_cm_*.
-> 
-> >Regarding patch 25: What are "I/O wakeup gaes" -- gates?  When that's
-> >fixed, an acked-by for me can be added.
-> 
-> Yes, gates. Fixed.
-> 
-> >Regarding patch 26: It seems wise to ensure that omap_prm_reset_system()
-> >ends with a 'while(1) { cpu_relax(); }' or something similar, to ensure
-> >that execution flow does not proceed past that point. At that point, it
-> >should be possible to remove the "while(1) {}"s from omap44xx_restart(),
-> >omap2xxx_restart(), etc.  When that's fixed, an acked-by for me can be
-> >added.
-> 
-> Ok, changed this also. Added the while(1) cpu_relax(); part to the public
-> API, and removed the loops from everywhere else.
-> 
-> >
-> >...
-> >
-> >And some general comments: none of which should probably block this
-> >series, but seemed worth noting:
-> >
-> >Regarding patches 6 and 19: Tero, could you please share the DT node data
-> >that you're planning to submit for the PRM, CM1, and CM2 on the OMAP4*
-> >platforms? According to the TRM, these are separate IP blocks, with
-> >separate OCP header register areas.  So these should probably have
-> >separate DT nodes, regs, etc. if the DTS files are to match the hardware.
-> >The planned DTS data may impact the way these patches are written, at
-> >least, if more patches are to be avoided later.
-> 
-> We already have the nodes for these. Check out omap4.dtsi for example, we
-> have nodes for prm/cm1/cm2/scrm there already. These were already defined
-> when the clock DT data was introduced, and I don't foresee any changes to
-> the nodes as of now. The nodes only contain register space info as of now,
-> and Nishanth is adding the interrupt property for PRM interrupt purposes,
-> but rest of the features are probably going to be hardcoded within the PRCM
-> drivers themselves.
-> 
-> If you are interested, feel free to look at for-3.19/prcm-cleanup branch in
-> my git tree, this contains the remaining patches I have for PRCM cleanup
-> after this set available as of now.
-> 
-> -Tero
-> 
-> >
-> >As far as patches 2, 4, 9, 11, and 12 go, I'll let those go without
-> >comment.
-> >
-> >
-> >- Paul
-> >
-> 
++static unsigned long capacity_orig_of(int cpu)
++{
++	return cpu_rq(cpu)->cpu_capacity_orig;
++}
++
+ static unsigned long cpu_avg_load_per_task(int cpu)
+ {
+ 	struct rq *rq = cpu_rq(cpu);
+@@ -5765,6 +5770,7 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
+ 
+ 	capacity >>= SCHED_CAPACITY_SHIFT;
+ 
++	cpu_rq(cpu)->cpu_capacity_orig = capacity;
+ 	sdg->sgc->capacity_orig = capacity;
+ 
+ 	if (sched_feat(ARCH_CAPACITY))
+@@ -5826,7 +5832,7 @@ void update_group_capacity(struct sched_domain *sd, int cpu)
+ 			 * Runtime updates will correct capacity_orig.
+ 			 */
+ 			if (unlikely(!rq->sd)) {
+-				capacity_orig += capacity_of(cpu);
++				capacity_orig += capacity_orig_of(cpu);
+ 				capacity += capacity_of(cpu);
+ 				continue;
+ 			}
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 1bc6aad..f332e45 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -575,6 +575,7 @@ struct rq {
+ 	struct sched_domain *sd;
+ 
+ 	unsigned long cpu_capacity;
++	unsigned long cpu_capacity_orig;
+ 
+ 	unsigned char idle_balance;
+ 	/* For active balancing */
+-- 
+1.9.1
