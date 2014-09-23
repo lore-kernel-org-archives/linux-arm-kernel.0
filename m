@@ -1,97 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Sep 2014 12:43:10 -0500
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <62705234.gKJDtUQLyT@wuerfel>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <5140494.LzvyOiyY3U@wuerfel> <20140923165515.GA26604@saruman>
- <62705234.gKJDtUQLyT@wuerfel>
-Message-ID: <20140923174310.GG28592@saruman>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 23 Sep 2014 12:45:25 -0500
+Subject: [PATCH] ARM: qcom: Fix SCM interface for big-endian kernels
+In-Reply-To: <5421B0FF.4060307@codeaurora.org>
+References: <1411425393-5537-1-git-send-email-sboyd@codeaurora.org>
+ <F694D53D-F606-4B35-AED9-9B3927E4E9F1@codeaurora.org>
+ <5421B0FF.4060307@codeaurora.org>
+Message-ID: <D8A10276-E912-4268-AAB8-48A0C8C7E62D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Sep 23, 2014 at 07:37:25PM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 11:55:15 Felipe Balbi wrote:
-> > On Tue, Sep 23, 2014 at 06:44:40PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 23 September 2014 15:36:45 Antoine Tenart wrote:
-> > > > On Tue, Sep 23, 2014 at 12:39:04PM +0200, Arnd Bergmann wrote:
-> > > > > On Tuesday 23 September 2014 12:28:03 Antoine Tenart wrote:
-> > > > > > +       if (dev->of_node) {
-> > > > > > +               ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-> > > > > > +               if (ret)
-> > > > > > +                       goto clk_err;
-> > > > > > +       } else {
-> > > > > > +               ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> > > > > > +               if (ret)
-> > > > > > +                       goto clk_err;
-> > > > > > +       }
-> > > > > > 
-> > > > > 
-> > > > > Why do you care about the non-DT case here? I think it would be nicer to
-> > > > > open-code the ci_hdrc_usb2_dt_probe() function in here and remove
-> > > > > the dma_set_mask_and_coherent(), which should not even be necessary for
-> > > > > the case where you have a hardwired platform device.
-> > > > > 
-> > > > 
-> > > > I thought we agreed to call dma_set_mask_and_coherent():
-> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273335.html
-> > > > 
-> > > > I do not have a strong opinion on this as I only use the dt case for my
-> > > > usage.
-> > > 
-> > > The question is more about who actually wants the non-DT case.
-> > > 
-> > > Since this is a new driver, I suspect that the answer is "nobody",
-> > > as the existing board files are all for legacy platforms that we
-> > > are not going to adapt for this driver.
-> > 
-> > wait a minute... will the legacy platforms be adapted to DT and, thus,
-> > to this driver in the future ? I really don't want to keep several
-> > copies of chipidea driver just because there are still some legacy
-> > platforms still using them. I have said in the past and will say again,
-> > everybody should move to the generic chipidea driver at the earliest
-> > opportunity so we avoid duplication of work.
-> > 
+On Sep 23, 2014, at 12:42 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> On 09/23/14 09:47, Kumar Gala wrote:
+>> On Sep 22, 2014, at 5:36 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> 
+>>> The secure environment only runs in little-endian mode, so any
+>>> buffers shared with the secure environment should have their
+>>> contents converted to little-endian. We also mark such elements
+>>> with __le32 to allow sparse to catch such problems.
+>>> 
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> ---
+>>> drivers/soc/qcom/scm-boot.c |  8 ++++----
+>>> drivers/soc/qcom/scm.c      | 34 ++++++++++++++++++----------------
+>>> 2 files changed, 22 insertions(+), 20 deletions(-)
+>>> 
+>>> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
+>>> index 60ff7b482141..3e4d77b371c6 100644
+>>> --- a/drivers/soc/qcom/scm-boot.c
+>>> +++ b/drivers/soc/qcom/scm-boot.c
+>>> @@ -27,12 +27,12 @@
+>>> int scm_set_boot_addr(phys_addr_t addr, int flags)
+>>> {
+>>> 	struct {
+>>> -		unsigned int flags;
+>>> -		phys_addr_t  addr;
+>>> +		__le32 flags;
+>>> +		__le32 addr;
+>> Hmm, was phys_addr_t wrong here before?  I ask because don?t we support LPAE on some systems?
 > 
-> Sorry, my mistake. The intention that this new driver is meant to
-> replace the existing ones wasn't clear to me from the changelog, and
-> if I'd been involved in the discussion before, then I've forgotten
-> about it.
-> 
-> It absolutely makes sense to migrate to a common driver, and in that
-> case we should keep the platform_data handling and
-> dma_set_mask_and_coherent() call in there, so we can do the two
-> conversions (migrating from platform specific frontends to the generic
-> one, and migrating from platform_data to DT) on independent schedules.
+> Yes it was wrong. It is exactly 32 bits wide.
 
-makes sense to me.
+So we should probably have a patch to fix the interface scm_set_boot_addr() to take a u32 addr instead of a phys_addr_t
 
-> Eventually I'd like all of the existing users of the platform_data
-> path to move to DT, but that should not hold up the other cleanup if
-> it takes longer.
-
-yeah, certainly.
-
-> There is however still my point that we shouldn't have an extra
-> platform device that is not attached to the device node. I think the
-> generic driver should just be part of the common code, without an
-> extra framework.  Something like the (entirely untested) patch below.
-
-yeah, that's what I did on dwc3 at least. We support platform_data and
-DT on the core driver. As for glue layers, we have ST, Qcom, PCI, OMAP,
-Exynos and Keystone.
-
-The only difference is that core dwc3 still doesn't know about clocks,
-but that's not an issue right now because we're not yet supporting
-pm_runtime.
+- k
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/7ed4d1ba/attachment.sig>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
