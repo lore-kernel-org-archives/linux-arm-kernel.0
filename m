@@ -1,26 +1,100 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 23 Sep 2014 11:16:14 -0700
-Subject: [PATCH v3 6/8] clk: rockchip: add new clock-type for the cpuclk
-In-Reply-To: <CAJuA9agRa65eL=YTUJ=MOu2akO6i61Es0m3v8sPsTQ1NaK-L7Q@mail.gmail.com>
-References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
- <1410991974-12235-7-git-send-email-heiko@sntech.de>
- <CAD=FV=Xtd9F23vePiDOKbn8GMpS615qrs6FDCep_cdGNC=KP0w@mail.gmail.com>
- <2964934.WLjiJxGorQ@phil>
- <CAJuA9agRa65eL=YTUJ=MOu2akO6i61Es0m3v8sPsTQ1NaK-L7Q@mail.gmail.com>
-Message-ID: <CAD=FV=Vj4WkiT7TPJORPS9k2atxu4oeim1JD4izKMD-4ZgvwkQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Sep 2014 19:16:17 +0100
+Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <2444560.uIlK6FC0A9@amdc1032>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140911085727.GA25773@e102568-lin.cambridge.arm.com>
+ <5415C968.90303@gmail.com> <2444560.uIlK6FC0A9@amdc1032>
+Message-ID: <20140923181617.GB6269@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Tue, Sep 23, 2014 at 02:42:48PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> 
+> Hi,
+> 
+> On Sunday, September 14, 2014 06:59:20 PM Tomasz Figa wrote:
+> > [dropping my old @samsung.com address]
+> > 
+> > On 11.09.2014 10:57, Lorenzo Pieralisi wrote:
+> > > On Thu, Sep 11, 2014 at 09:28:06AM +0100, Daniel Lezcano wrote:
+> > >> On 09/05/2014 05:34 PM, Lorenzo Pieralisi wrote:
+> > >>> On Fri, Sep 05, 2014 at 10:21:20AM +0100, Will Deacon wrote:
+> > >>>> On Thu, Sep 04, 2014 at 06:29:10PM +0100, Lorenzo Pieralisi wrote:
+> > >>>>> On Thu, Sep 04, 2014 at 05:03:20PM +0100, Catalin Marinas wrote:
+> > >>>>>> On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
+> > >>>>>>> This patch should be ready to go too, is it ok if I split the series
+> > >>>>>>> in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
+> > >>>>>>> (inclusive of DT bindings and !!this patch!!) and send two separate pull
+> > >>>>>>> requests ?
+> > >>>>>>
+> > >>>>>> If Daniel/Rafael don't have any objection, I can take the whole series
+> > >>>>>> through the arm64 tree (it seems that patches have been already acked by
+> > >>>>>> Daniel).
+> > >>>>>
+> > >>>>> Thanks a lot Catalin. Since this one is a brand new CPUidle driver and it
+> > >>>>> follows a different pattern from arm legacy drivers I would like to get
+> > >>>>> Daniel's ack on this patch too before pushing it. For the records I have
+> > >>>>> just added two pr_err to signal driver probing error, ultraminor changes
+> > >>>>> that do not justify a repost.
+> > >>>>>
+> > >>>>> If Samsung guys do not manifest themselves I would drop patch 8 from
+> > >>>>> the series till it gets tested and its patch dependency queued too.
+> > >>>>
+> > >>>> The last patch also has a dependency, as you mentioned to Daniel. I think
+> > >>>> we can certainly merge the arm64 parts, and if Daniel doesn't object, then
+> > >>>> we can take the driver stuff too but leaving the exynos bits out (i.e. drop
+> > >>>> the last patch).
+> > >>>>
+> > >>>> Anyway, if you could repost with the acks you've collected and rearrange it
+> > >>>> so the arm64 patches are first in the series, that would be great.
+> > >>>
+> > >>> I can repost it with the acks and rearrange the patches, but for the
+> > >>> pull request I have to know what code can be merged, since there are
+> > >>> some arm64 patches (PSCI and CPUidle arm64 back-end) that are strictly
+> > >>> tied to the arm64 CPUidle driver, so I *have* to know if the arm64
+> > >>> CPUidle driver (this patch) can get merged and that requires an ack.
+> > >>>
+> > >>> If I do not hear from Samsung guys I will drop patch 8.
+> > >>
+> > >> Well I would prefer to have this patch merged (Cc'ing Tomasz).
+> > > 
+> > > Ok, but:
+> > > 
+> > > a) I only compile tested it
+> > > b) There is a dts patch dependency for patch 8 to apply cleanly and it
+> > >    hasn't been acked (I can't really do it since I can't test it)
+> > > 
+> > >    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274179.html
+> > > 
+> > > So, what should we do ? Tomasz ?
+> > 
+> > Sorry for late reply. I don't work for Samsung anymore so I don't focus
+> > that much on areas other than I still maintain.
+> > 
+> > As for b) I believe all my patches have been already merged and now
+> > we're just waiting for Kukjin to apply Bart's patch (although it's been
+> > sitting on the ML since July, so probably needs rebasing).
+> > 
+> > About the patch 8 alone, somebody would have to test it. Maybe Bart or
+> > Krzysztof could find some time to look at this? Other than that, I'm not
+> > quite sure about entry latency you specified. It would look like
+> > entering the state takes longer time than leaving, which I believe is
+> > not the case. However I can't find any place in the code which would use
+> > entry latency, so it might not be that important for now.
+> 
+> I tested this patch series on both Exynos4210 (Origen board) and Exynos5250
+> (Arndale board).  On Exynos4210 AFTR cpuidle mode is still working fine
+> with the patch series applied.  On Exynos5250 AFTR is not working but it is
+> an upstream problem (same happens with v3.17-rc4).
+> 
+> Lorenzo, you can add
+> 
+> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> 
+> to the Exynos patch (patch #8).
 
-On Mon, Sep 22, 2014 at 10:25 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> In the samsung cpuclk implementation, the ratio between PLL output and
-> armclk is always 1:1. So the divider that divides the PLL output to
-> get the armclk clock is always set to zero (div by 1). That divider
-> gets a non-zero value only when using an alternate parent clock source
-> during rate change operations.
+Thanks a lot, that's great. I hope Daniel can add the tag and get this
+merged.
 
-The dividers we're discussing here are extra dividers.  In exynos
-speak this would be things like "CPUD", "ATB", "PCLK_DBG".
-
--Doug
+Lorenzo
