@@ -1,33 +1,52 @@
-From: a.motakis@virtualopensystems.com (Antonios Motakis)
-Date: Tue, 23 Sep 2014 16:46:02 +0200
-Subject: [PATCHv7 03/26] iommu/arm-smmu: add IOMMU_CAP_NOEXEC to the ARM SMMU
- driver
-In-Reply-To: <1411483586-29304-1-git-send-email-a.motakis@virtualopensystems.com>
-References: <1411483586-29304-1-git-send-email-a.motakis@virtualopensystems.com>
-Message-ID: <1411483586-29304-4-git-send-email-a.motakis@virtualopensystems.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 23 Sep 2014 16:48:37 +0200
+Subject: [PATCH v9 02/10] rtc: at91sam9: use standard readl/writel functions
+ instead of raw versions
+In-Reply-To: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411483725-31532-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM SMMU supports the IOMMU_NOEXEC protection flag. Add the
-corresponding IOMMU capability.
+Raw versions of writel and writel should not be directly used and should
+be replaced by their relaxed versions (readl/writel_relaxed), which take
+endianness conversion into account.
 
-Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+In this driver we prefer the standard readl/writel function which add the
+appropriate memory barrier around the access (the performance penalty is
+negligible for this kind of application).
+
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Johan Hovold <johan@kernel.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/iommu/arm-smmu.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/rtc/rtc-at91sam9.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index c7cbdda..7c0fa25 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1539,6 +1539,8 @@ static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
- 		return features & ARM_SMMU_FEAT_COHERENT_WALK;
- 	case IOMMU_CAP_INTR_REMAP:
- 		return 1; /* MSIs are just memory writes */
-+	case IOMMU_CAP_NOEXEC:
-+		return 1;
- 	default:
- 		return 0;
- 	}
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 51f0038..74a9ca0 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -77,14 +77,14 @@ struct sam9_rtc {
+ };
+ 
+ #define rtt_readl(rtc, field) \
+-	__raw_readl((rtc)->rtt + AT91_RTT_ ## field)
++	readl((rtc)->rtt + AT91_RTT_ ## field)
+ #define rtt_writel(rtc, field, val) \
+-	__raw_writel((val), (rtc)->rtt + AT91_RTT_ ## field)
++	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+ 
+ #define gpbr_readl(rtc) \
+-	__raw_readl((rtc)->gpbr)
++	readl((rtc)->gpbr)
+ #define gpbr_writel(rtc, val) \
+-	__raw_writel((val), (rtc)->gpbr)
++	writel((val), (rtc)->gpbr)
+ 
+ /*
+  * Read current time and date in RTC
 -- 
-1.8.3.2
+1.9.1
