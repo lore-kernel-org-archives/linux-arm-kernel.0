@@ -1,55 +1,101 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 13:47:54 +0200
-Subject: [PATCH] ARM: at91: fix at91sam9263ek DT mmc pinmuxing settings
-In-Reply-To: <1411472564-32448-1-git-send-email-andreas.henriksson@endian.se>
-References: <1411472564-32448-1-git-send-email-andreas.henriksson@endian.se>
-Message-ID: <20140923134754.1b2d9a9a@bbrezillon>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 23 Sep 2014 13:50:05 +0200
+Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
+ access
+In-Reply-To: <20140923111412.GG12187@cbox>
+References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
+ <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
+ <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
+ <20140923111412.GG12187@cbox>
+Message-ID: <54215E6D.6090308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-
-On Tue, 23 Sep 2014 13:42:44 +0200
-Andreas Henriksson <andreas.henriksson@endian.se> wrote:
-
-> As discovered on a custom board similar to at91sam9263ek and basing
-> its devicetree on that one apparently the pin muxing doesn't get
-> set up properly. This was discovered since the custom boards u-boot
-> does funky stuff with the pin muxing and leaved it set to SPI
-> which made the MMC driver not work under Linux.
-> The fix is simply to define the given configuration as the default.
-> This probably worked by pure luck before, but it's better to
-> make the muxing explicitly set.
+Il 23/09/2014 13:14, Christoffer Dall ha scritto:
+> On Tue, Sep 23, 2014 at 10:36:30AM +0200, Paolo Bonzini wrote:
+>> Il 23/09/2014 00:07, Will Deacon ha scritto:
+>>>>>  {
+>>>>>  	if (!(lr_desc.state & LR_STATE_MASK))
+>>>>> -		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
+>>>>> +		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
+>>>>>  }
+>>> Does this work for big-endian arm64 machines? Surely the bug is due to
+>>> casting a u32 * to an unsigned long *, and not specifically related to
+>>> atomics (which is where it happened to explode)?
+>>
+> It does look like the whole thing is broken on BE systems, but fixing
+> that becomes non-trivial.  I don't think this fix is incorrect in
+> itself, but we do have a larger issue with BE.
 > 
-> CC: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Signed-off-by: Andreas Henriksson <andreas.henriksson@endian.se>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-Thanks,
-
-Boris
-
-> ---
->  arch/arm/boot/dts/at91sam9263ek.dts | 1 +
->  1 file changed, 1 insertion(+)
+> I took a stab at fixing this (untested for BE), which looks something
+> like the following, but I'm a bit uneasy about having to test and merge
+> this as a fix given the rush before 3.17 is released.
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-> index 5cf93ee..33a4f9a 100644
-> --- a/arch/arm/boot/dts/at91sam9263ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9263ek.dts
-> @@ -64,6 +64,7 @@
->  			};
+> Thoughts?
+
+If big-endian is broken anyway, let's apply this only:
+
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 35b0c12..c66dc9ed 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -168,8 +168,8 @@ struct vgic_v2_cpu_if {
+>  	u32		vgic_hcr;
+>  	u32		vgic_vmcr;
+>  	u32		vgic_misr;	/* Saved only */
+> -	u32		vgic_eisr[2];	/* Saved only */
+> -	u32		vgic_elrsr[2];	/* Saved only */
+> +	u64		vgic_eisr;	/* Saved only */
+> +	u64		vgic_elrsr;	/* Saved only */
+>  	u32		vgic_apr;
+>  	u32		vgic_lr[VGIC_V2_MAX_LRS];
+>  };
+> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+> index 416baed..2935405 100644
+> --- a/virt/kvm/arm/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic-v2.c
+> @@ -71,35 +71,17 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
+>  				  struct vgic_lr lr_desc)
+>  {
+>  	if (!(lr_desc.state & LR_STATE_MASK))
+> -		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
+> +		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
+>  }
 >  
->  			mmc0: mmc at fff80000 {
-> +				pinctrl-names = "default";
->  				pinctrl-0 = <
->  					&pinctrl_board_mmc0
->  					&pinctrl_mmc0_clk
+>  static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
+>  {
+> -	u64 val;
+> -
+> -#if BITS_PER_LONG == 64
+> -	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[1];
+> -	val <<= 32;
+> -	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[0];
+> -#else
+> -	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
+> -#endif
+> -	return val;
+> +	return vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
+>  }
+>  
+>  static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
+>  {
+> -	u64 val;
+> -
+> -#if BITS_PER_LONG == 64
+> -	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[1];
+> -	val <<= 32;
+> -	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[0];
+> -#else
+> -	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
+> -#endif
+> -	return val;
+> +	return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
+>  }
+>  
+>  static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
 
+which matches what vgic-v3 already does.
 
+BE can be fixed in 3.18.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Paolo
