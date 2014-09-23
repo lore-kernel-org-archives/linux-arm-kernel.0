@@ -1,165 +1,92 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 23 Sep 2014 10:23:16 +0200
-Subject: [PATCH v6 6/9] ARM: at91: add clk_lookup entry for RTT devices
-In-Reply-To: <1411400563-570-7-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411400563-570-7-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <54212DF4.1000301@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 23 Sep 2014 10:23:06 +0200
+Subject: [PATCH v3] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <CAKv+Gu8=iSd+o09KAfHxWeXEkXGUZR1BeCuAvjAEem--s6U3zA@mail.gmail.com>
+References: <1411167781-18571-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140922100912.GG30085@e104818-lin.cambridge.arm.com>
+ <20140922170231.GM30085@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8=iSd+o09KAfHxWeXEkXGUZR1BeCuAvjAEem--s6U3zA@mail.gmail.com>
+Message-ID: <CAKv+Gu_F9QSJ-ruZndi=0+wQvXNS8F-LnBXOrNNVps+Rkb6n2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/2014 17:42, Boris BREZILLON :
-> First export the clk32k clk.
-> Then add clk_lookup entries for RTT devices so that rtc-at91sam9 driver
-> can retrieve and manipulate the slow clk.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 22 September 2014 21:44, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 22 September 2014 19:02, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Mon, Sep 22, 2014 at 11:09:12AM +0100, Catalin Marinas wrote:
+>>> On Sat, Sep 20, 2014 at 12:03:01AM +0100, Ard Biesheuvel wrote:
+>>> > From: Yi Li <yi.li@linaro.org>
+>>> >
+>>> > SMBIOS is important for server hardware vendors. It implements a spec for
+>>> > providing descriptive information about the platform. Things like serial
+>>> > numbers, physical layout of the ports, build configuration data, and the like.
+>>> >
+>>> > This has been tested by dmidecode and lshw tools.
+>>> >
+>>> > This patch adds the call to dmi_scan_machine() to arm64_enter_virtual_mode(),
+>>> > as that is the point where the EFI Configuration Tables are registered as
+>>> > being available. It needs to be in an early_initcall anyway as dmi_id_init(),
+>>> > which is an arch_initcall itself, depends on dmi_scan_machine() having been
+>>> > called already.
+>>> >
+>>> > Signed-off-by: Yi Li <yi.li@linaro.org>
+>>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> Merged (until the next revert ;)). Thanks.
+>>
+>> And I'm about to revert it now. If Linux doesn't boot as an EFI
+>> application, with this patch applied I get lots of:
+>>
+>
+> And I guess each warning is for a different driver?
+> That is another x86-ism we hadn't spotted that we need to get rid of:
+> DMI is used for quirks handling on x86, and apparently it gets nervous
+> if CONFIG_DMI is enabled but DMI never gets initialized. Can I assume
+> that quirks handling based on the DMI system name is something you
+> would prefer to steer clear of on arm64?
+>
+> This is non-trivial to fix in any case, so reverting it is the only
+> option. If nobody else picks this up in the mean time, I will revisit
+> this after my vacation (in the hope your patience hasn't run out yet)
+>
 
-Ok until we remove the !CCF for the sam9's:
+As it turns out, this particular issue is caused by how I moved the
+call to dmi_scan_machine() into arm64_enter_virtual_mode(), so it is
+not present in Yi's original patch. When CONFIG_DMI is enabled,
+dmi_scan_machine() needs to be called unconditionally, even if we are
+running without EFI config tables (or any EFI for that matter)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+@Yi: could you rework the patch so dmi_scan_machine() is called from a
+separate function again? But this time, please add it to
+arch/arm64/kernel/efi.c and invoke it using core_initcall not
+arch_initcall. core_initcalls are dispatched before arch_initcall but
+after early_initcall so that should be the right moment to get DMI
+initialized.
 
+Could you also test it with and without EFI?
 
-> ---
->  arch/arm/mach-at91/at91sam9260.c | 2 ++
->  arch/arm/mach-at91/at91sam9261.c | 2 ++
->  arch/arm/mach-at91/at91sam9263.c | 4 ++++
->  arch/arm/mach-at91/at91sam9g45.c | 2 ++
->  arch/arm/mach-at91/at91sam9rl.c  | 2 ++
->  arch/arm/mach-at91/clock.c       | 2 +-
->  arch/arm/mach-at91/clock.h       | 1 +
->  7 files changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index 3477ba9..a853d4c 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -217,6 +217,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
->  	/* more usart lookup table for DT entries */
->  	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
->  	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-> @@ -237,6 +238,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
->  	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
->  	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
->  	/* fake hclk clock */
->  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-> index fb164a5..3f5a299 100644
-> --- a/arch/arm/mach-at91/at91sam9261.c
-> +++ b/arch/arm/mach-at91/at91sam9261.c
-> @@ -192,6 +192,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
->  	CLKDEV_CON_ID("pioB", &pioB_clk),
->  	CLKDEV_CON_ID("pioC", &pioC_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
->  	/* more lookup table for DT entries */
->  	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
->  	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-> @@ -209,6 +210,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
->  };
->  
->  static struct clk_lookup usart_clocks_lookups[] = {
-> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-> index 810fa5f..bef5b96 100644
-> --- a/arch/arm/mach-at91/at91sam9263.c
-> +++ b/arch/arm/mach-at91/at91sam9263.c
-> @@ -201,6 +201,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
-> +	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.1", &clk32k),
->  	/* fake hclk clock */
->  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
-> @@ -227,6 +229,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffd50.rtc", &clk32k),
->  };
->  
->  static struct clk_lookup usart_clocks_lookups[] = {
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index 9d45496..69fdfcc 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "atmel_aes", &aestdessha_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
->  	/* more usart lookup table for DT entries */
->  	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
->  	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
-> @@ -279,6 +280,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioDE_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioDE_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
->  
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
->  	CLKDEV_CON_ID("pioB", &pioB_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-> index 878d501..a82dc61 100644
-> --- a/arch/arm/mach-at91/at91sam9rl.c
-> +++ b/arch/arm/mach-at91/at91sam9rl.c
-> @@ -205,6 +205,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_ID("pioB", &pioB_clk),
->  	CLKDEV_CON_ID("pioC", &pioC_clk),
->  	CLKDEV_CON_ID("pioD", &pioD_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
->  	/* more lookup table for DT entries */
->  	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
->  	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-> @@ -223,6 +224,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
->  	CLKDEV_CON_ID("adc_clk", &tsc_clk),
->  };
->  
-> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-> index 034529d..f5cfed75 100644
-> --- a/arch/arm/mach-at91/clock.c
-> +++ b/arch/arm/mach-at91/clock.c
-> @@ -115,7 +115,7 @@ static u32 at91_pllb_usb_init;
->   * 48 MHz (unless no USB function clocks are needed).  The main clock and
->   * both PLLs are turned off to run in "slow clock mode" (system suspend).
->   */
-> -static struct clk clk32k = {
-> +struct clk clk32k = {
->  	.name		= "clk32k",
->  	.rate_hz	= AT91_SLOW_CLOCK,
->  	.users		= 1,		/* always on */
-> diff --git a/arch/arm/mach-at91/clock.h b/arch/arm/mach-at91/clock.h
-> index a98a39b..6eb825a 100644
-> --- a/arch/arm/mach-at91/clock.h
-> +++ b/arch/arm/mach-at91/clock.h
-> @@ -34,6 +34,7 @@ struct clk {
->  extern int __init clk_register(struct clk *clk);
->  extern struct clk mck;
->  extern struct clk utmi_clk;
-> +extern struct clk clk32k;
->  
->  #define CLKDEV_CON_ID(_id, _clk)			\
->  	{						\
-> 
+Thanks,
+Ard.
 
 
--- 
-Nicolas Ferre
+
+>> WARNING: CPU: 4 PID: 1 at
+>> /work/Linux/linux-2.6-aarch64/drivers/firmware/dmi_scan.c:591
+>> dmi_matches+0x10c/0x110()
+>> dmi check: not initialized yet.
+>> Modules linked in:
+>> CPU: 4 PID: 1 Comm: swapper/0 Not tainted 3.17.0-rc4+ #606
+>> Call trace:
+>> [<ffffffc000087fb0>] dump_backtrace+0x0/0x124
+>> [<ffffffc0000880e4>] show_stack+0x10/0x1c
+>> [<ffffffc0004d58f8>] dump_stack+0x74/0xb8
+>> [<ffffffc0000ab640>] warn_slowpath_common+0x8c/0xb4
+>> [<ffffffc0000ab6b4>] warn_slowpath_fmt+0x4c/0x58
+>> [<ffffffc0003f2d7c>] dmi_matches+0x108/0x110
+>> [<ffffffc0003f2da8>] dmi_check_system+0x24/0x68
+>> [<ffffffc0006974c4>] atkbd_init+0x10/0x34
+>> [<ffffffc0000814ac>] do_one_initcall+0x88/0x1a0
+>> [<ffffffc00067aab4>] kernel_init_freeable+0x148/0x1e8
+>> [<ffffffc0004d2c64>] kernel_init+0x10/0xd4
+>>
+>> --
+>> Catalin
