@@ -1,37 +1,43 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 23 Sep 2014 19:41:43 +0200
-Subject: [PATCH v2] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <20140923163347.GE6858@e104818-lin.cambridge.arm.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
- <1411147367-26824-1-git-send-email-manabian@gmail.com>
- <20140923163347.GE6858@e104818-lin.cambridge.arm.com>
-Message-ID: <CAGhQ9VyZ4ZPNNDm9TNJKiQ2zufasr2vkbepFsg-K+raUha0_8A@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 23 Sep 2014 10:42:23 -0700
+Subject: [PATCH] ARM: qcom: Fix SCM interface for big-endian kernels
+In-Reply-To: <F694D53D-F606-4B35-AED9-9B3927E4E9F1@codeaurora.org>
+References: <1411425393-5537-1-git-send-email-sboyd@codeaurora.org>
+ <F694D53D-F606-4B35-AED9-9B3927E4E9F1@codeaurora.org>
+Message-ID: <5421B0FF.4060307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 September 2014 18:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Sep 19, 2014 at 06:22:47PM +0100, Joachim Eastwood wrote:
->>               .align
->> -             .arm                            @ Always enter in ARM state
->> + AR_CLASS(   .arm    )               @ Always enter in ARM state for AR class
+On 09/23/14 09:47, Kumar Gala wrote:
+> On Sep 22, 2014, at 5:36 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 >
-> Nitpick: A/R class (or classes).
+>> The secure environment only runs in little-endian mode, so any
+>> buffers shared with the secure environment should have their
+>> contents converted to little-endian. We also mark such elements
+>> with __le32 to allow sparse to catch such problems.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>> drivers/soc/qcom/scm-boot.c |  8 ++++----
+>> drivers/soc/qcom/scm.c      | 34 ++++++++++++++++++----------------
+>> 2 files changed, 22 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
+>> index 60ff7b482141..3e4d77b371c6 100644
+>> --- a/drivers/soc/qcom/scm-boot.c
+>> +++ b/drivers/soc/qcom/scm-boot.c
+>> @@ -27,12 +27,12 @@
+>> int scm_set_boot_addr(phys_addr_t addr, int flags)
+>> {
+>> 	struct {
+>> -		unsigned int flags;
+>> -		phys_addr_t  addr;
+>> +		__le32 flags;
+>> +		__le32 addr;
+> Hmm, was phys_addr_t wrong here before?  I ask because don?t we support LPAE on some systems?
 
-Sure.
+Yes it was wrong. It is exactly 32 bits wide.
 
->> +#elif defined(CONFIG_CPU_V7M)
->> +             ldr     r9, =0xe000ed00         @ CPUID register address
->
-> Another nitpick: can you use some macro? We define them in
-> arch/arm/include/asm/v7m.h, so you could write the above as (untested):
->
->                 ldr     r9, =BASEADDR_V7M_SCB + V7M_SCB_CPUID
-
-I'll use the version from head-nommu.S, which does this:
-ldr r9, =BASEADDR_V7M_SCB
-ldr r9, [r9, V7M_SCB_CPUID]
-
-I'll send out an updated patch soon.
-
-regards
-Joachim Eastwood
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
