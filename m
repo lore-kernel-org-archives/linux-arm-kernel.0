@@ -1,47 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 23 Sep 2014 08:30:08 -0500
-Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <8687285.EH4RPBeOB5@wuerfel>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <20140922093228.GA20256@rric.localhost>
- <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
- <8687285.EH4RPBeOB5@wuerfel>
-Message-ID: <CAL_JsqK3yH-uf++haBovWdX6er1PtzeiZ-2-yT1TRfYPxAjFow@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 23 Sep 2014 15:30:57 +0200
+Subject: [PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on
+ wake-up
+In-Reply-To: <20140917121820.GR12361@n2100.arm.linux.org.uk>
+References: <1410955036-1956-1-git-send-email-geert+renesas@glider.be>
+ <20140917121820.GR12361@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdU+ztui5N-2p5Va7b7Tp-JRNVtGfNZ6=GPweR2ig_H5wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 2:56 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 22 September 2014 12:43:17 Liviu Dudau wrote:
->> >
->> > From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
->> > From: Robert Richter <rrichter@cavium.com>
->> > Date: Mon, 22 Sep 2014 10:46:01 +0200
->> > Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
->> >
->> > The pci host bridge was not created if io_base was not set when
->> > calling of_pci_get_host_bridge_resources(). This is esp. the case for
->> > mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
->> > parameter io_base is optional now.
+Hi Russell,
+
+On Wed, Sep 17, 2014 at 2:18 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Sep 17, 2014 at 01:57:16PM +0200, Geert Uytterhoeven wrote:
+>> If power area D4, which contains the Coresight-ETM hardware block, is
+>> powered down on R-Mobile A1 (r8a7740), the kernel crashes when
+>> suspending from s2ram with:
 >>
->> I think the message is misleading. What you want to do is make io_base
->> optional for the case where the PCI host bridge only expects to have only
->> IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
+>>     Internal error: Oops - undefined instruction: 0 [#1] ARM
 >>
->> As I'm going to touch this area again to address a comment from Bjorn,
->> do you mind if I roll this patch into mine with your Signed-off-by and
->> the mention that you have made io_base optional?
+>> This happens because dbg_cpu_pm_notify() calls reset_ctrl_regs(), which
+>> can't access the debug registers as the debug module is powered down.
+>>
+>> Protect the call to reset_ctrl_regs() by an undefined instruction hook,
+>> like was done in commit 0d352e3d006c9589 ("ARM: hw_breakpoint: trap
+>> undef instruction exceptions in reset_ctrl_regs") for another caller.
 >
-> I think the best way to deal with this is to move the check for
-> io_base down into the place where it is used: As long as the DT only
-> specifies IORESOURCE_MEM windows, we don't need to look at io_base,
-> but if the host controller driver does not support IORESOURCE_IO
-> while the DT specifies it, I guess it would be nice to return an
-> error.
+> I'd prefer a better solution to this (such as tracking whether the ETM
+> block is powered down).  This feels very much like a hack than a good
+> solution.
 
-The DT may specify it, but the h/w could be broken in some way so the
-host driver chooses to ignore it. I don't think we should force the
-host driver to provide a pointer in that case. Also, would we want it
-added to the resource list if it is not going to be used?
+That seems to be something to fit into "[PATCH 00/11 v6] Coresight framework
+and drivers" (https://lkml.org/lkml/2014/9/11/733)?
 
-Rob
+However, if I'm not mistaken, while that series introduces extensive handling
+based on the presence of Coresight device nodes in DT, it looks like it doesn't
+affect the current direct accesses to the debug registers in hw_breakpoint.c?
+
+For now, do you consider it acceptable to introduce a global bool (defaulting
+to true) to track whether accessing the debug registers is allowed?
+
+> Also, the undefined instruction hook was not supposed to be used in this
+> way - certainly *not* dynamically like this.  While the lookup of the
+> undef handler is done in a safe atomic way, calling the resulting
+> function is outside of the locks.
+
+Right, that's definitely not optimal.
+I guess this also applies to the existing (ab)users of debug_reg_hook?
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
