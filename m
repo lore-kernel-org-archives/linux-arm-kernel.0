@@ -1,222 +1,74 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Wed, 24 Sep 2014 00:10:44 +0800
-Subject: [PATCH v3 2/3] mtd: nand: gpmi: add proper raw access support
-In-Reply-To: <1411481256-29141-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411481256-29141-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140923161041.GA2147@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Sep 2014 09:14:41 -0700
+Subject: [PATCH 00/26] ARM: OMAP2+: PRCM cleanups for 3.18 merge window
+In-Reply-To: <alpine.DEB.2.02.1409191726050.22526@utopia.booyaka.com>
+References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+ <20140918171650.GK14505@atomide.com>
+ <20140918191615.GN14505@atomide.com>
+ <alpine.DEB.2.02.1409191633180.22526@utopia.booyaka.com>
+ <alpine.DEB.2.02.1409191726050.22526@utopia.booyaka.com>
+Message-ID: <20140923161440.GE2451@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 04:07:35PM +0200, Boris BREZILLON wrote:
-> Several MTD users (either in user or kernel space) expect a valid raw
-> access support to NAND chip devices.
-> This is particularly true for testing tools which are often touching the
-> data stored in a NAND chip in raw mode to artificially generate errors.
+* Paul Walmsley <paul@pwsan.com> [140919 10:28]:
+> On Fri, 19 Sep 2014, Paul Walmsley wrote:
 > 
-> The GPMI drivers do not implemenent raw access functions, and thus rely on
-> default HW_ECC scheme implementation.
-> The default implementation consider the data and OOB area as properly
-> separated in their respective NAND section, which is not true for the GPMI
-> controller.
-> In this driver/controller some OOB data are stored at the beginning of the
-> NAND data area (these data are called metadata in the driver), then ECC
-> bytes are interleaved with data chunk (which is similar to the
-> HW_ECC_SYNDROME scheme), and eventually the remaining bytes are used as
-> OOB data.
+> > However, I saw the following crash at boot on 37xxevm during one of
+> > the boot test.  Ran thirty more boot tests afterwards on that board
+> > and it did not recur.  It seems unlikely that the problem is related
+> > to this series, but looks like we may have some intermittent boot
+> > failure or race on 37xx :-(
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 126 +++++++++++++++++++++++++++++++++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   2 +
->  2 files changed, 128 insertions(+)
+> ...
 > 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> index 959cb9b..7921ba7 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> @@ -791,6 +791,7 @@ static void gpmi_free_dma_buffer(struct gpmi_nand_data *this)
->  					this->page_buffer_phys);
->  	kfree(this->cmd_buffer);
->  	kfree(this->data_buffer_dma);
-> +	kfree(this->raw_buffer);
->  
->  	this->cmd_buffer	= NULL;
->  	this->data_buffer_dma	= NULL;
-> @@ -837,6 +838,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
->  	if (!this->page_buffer_virt)
->  		goto error_alloc;
->  
-> +	this->raw_buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
-> +	if (!this->raw_buffer)
-> +		goto error_alloc;
->  
->  	/* Slice up the page buffer. */
->  	this->payload_virt = this->page_buffer_virt;
-> @@ -1347,6 +1351,126 @@ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
->  	return status & NAND_STATUS_FAIL ? -EIO : 0;
->  }
->  
-> +static int gpmi_ecc_read_page_raw(struct mtd_info *mtd,
-> +				  struct nand_chip *chip, uint8_t *buf,
-> +				  int oob_required, int page)
-
-	In actually, i suggest to call the ecc->read_page() in this
-	hook. And after the ecc->read_page(), copy the relative data to
-	the relative buffers. Is my suggestion right? please correct me.
-
-
-
-> +{
-> +	struct gpmi_nand_data *this = chip->priv;
-> +	struct bch_geometry *nfc_geo = &this->bch_geometry;
-> +	int eccsize = nfc_geo->ecc_chunk_size;
-> +	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
-> +	u8 *tmp_buf = this->raw_buffer;
-> +	size_t src_bit_off;
-> +	size_t oob_bit_off;
-> +	size_t oob_byte_off;
-> +	uint8_t *oob = chip->oob_poi;
-> +	int step;
-> +
-> +	chip->read_buf(mtd, tmp_buf,
-> +		       mtd->writesize + mtd->oobsize);
-> +
-> +	if (this->swap_block_mark) {
-> +		u8 swap = tmp_buf[0];
-> +
-> +		tmp_buf[0] = tmp_buf[mtd->writesize];
-> +		tmp_buf[mtd->writesize] = swap;
-> +	}
-> +
-> +	if (oob_required)
-> +		memcpy(oob, tmp_buf, nfc_geo->metadata_size);
-> +
-> +	oob_bit_off = nfc_geo->metadata_size * 8;
-> +	src_bit_off = oob_bit_off;
-> +
-> +	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-> +		if (buf)
-> +			gpmi_move_bits(buf, step * eccsize * 8,
-> +				       tmp_buf, src_bit_off,
-> +				       eccsize * 8);
-> +		src_bit_off += eccsize * 8;
-> +
-> +		if (oob_required)
-> +			gpmi_move_bits(oob, oob_bit_off,
-> +				       tmp_buf, src_bit_off,
-> +				       eccbits);
-> +
-> +		src_bit_off += eccbits;
-> +		oob_bit_off += eccbits;
-> +	}
-> +
-> +	if (oob_required && oob_bit_off % 8)
-> +		oob[oob_bit_off / 8] &= GENMASK(oob_bit_off - 1, 0);
-> +
-> +	oob_byte_off = DIV_ROUND_UP(oob_bit_off, 8);
-> +
-> +	if (oob_required && oob_byte_off  < mtd->oobsize)
-> +		memcpy(oob + oob_byte_off,
-> +		       tmp_buf + mtd->writesize + oob_byte_off,
-> +		       mtd->oobsize - oob_byte_off);
-> +
-> +	return 0;
-> +}
-> +
-> +static int gpmi_ecc_write_page_raw(struct mtd_info *mtd,
-> +				   struct nand_chip *chip,
-> +				   const uint8_t *buf,
-> +				   int oob_required)
-> +{
-
-
-give me more time to think over this hook :(
-
-sorry.
-
-thanks
-Huang Shijie
-> +	struct gpmi_nand_data *this = chip->priv;
-> +	struct bch_geometry *nfc_geo = &this->bch_geometry;
-> +	int eccsize = nfc_geo->ecc_chunk_size;
-> +	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
-> +	u8 *tmp_buf = this->raw_buffer;
-> +	uint8_t *oob = chip->oob_poi;
-> +	size_t dst_bit_off;
-> +	size_t oob_bit_off;
-> +	size_t oob_byte_off;
-> +	int step;
-> +
-> +	if (!buf || !oob_required)
-> +		memset(tmp_buf, 0xff, mtd->writesize + mtd->oobsize);
-> +
-> +	memcpy(tmp_buf, oob, nfc_geo->metadata_size);
-> +	oob_bit_off = nfc_geo->metadata_size * 8;
-> +	dst_bit_off = oob_bit_off;
-> +
-> +	for (step = 0; step < nfc_geo->ecc_chunk_count; step++) {
-> +		if (buf)
-> +			gpmi_move_bits(tmp_buf, dst_bit_off,
-> +				       buf, step * eccsize * 8, eccsize * 8);
-> +		dst_bit_off += eccsize * 8;
-> +
-> +		/* Pad last ECC block to align following data on a byte */
-> +		if (step == nfc_geo->ecc_chunk_count - 1 &&
-> +		    (oob_bit_off + eccbits) % 8)
-> +			eccbits += 8 - ((oob_bit_off + eccbits) % 8);
-> +
-> +		if (oob_required)
-> +			gpmi_move_bits(tmp_buf, dst_bit_off,
-> +				       oob, oob_bit_off, eccbits);
-> +
-> +		dst_bit_off += eccbits;
-> +		oob_bit_off += eccbits;
-> +	}
-> +
-> +	oob_byte_off = oob_bit_off / 8;
-> +
-> +	if (oob_required && oob_byte_off < mtd->oobsize)
-> +		memcpy(tmp_buf + mtd->writesize + oob_byte_off,
-> +		       oob + oob_byte_off, mtd->oobsize - oob_byte_off);
-> +
-> +	if (this->swap_block_mark) {
-> +		u8 swap = tmp_buf[0];
-> +
-> +		tmp_buf[0] = tmp_buf[mtd->writesize];
-> +		tmp_buf[mtd->writesize] = swap;
-> +	}
-> +
-> +	chip->write_buf(mtd, tmp_buf, mtd->writesize + mtd->oobsize);
-> +
-> +	return 0;
-> +}
-> +
->  static int gpmi_block_markbad(struct mtd_info *mtd, loff_t ofs)
->  {
->  	struct nand_chip *chip = mtd->priv;
-> @@ -1664,6 +1788,8 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
->  	ecc->write_page	= gpmi_ecc_write_page;
->  	ecc->read_oob	= gpmi_ecc_read_oob;
->  	ecc->write_oob	= gpmi_ecc_write_oob;
-> +	ecc->read_page_raw = gpmi_ecc_read_page_raw;
-> +	ecc->write_page_raw = gpmi_ecc_write_page_raw;
->  	ecc->mode	= NAND_ECC_HW;
->  	ecc->size	= bch_geo->ecc_chunk_size;
->  	ecc->strength	= bch_geo->ecc_strength;
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> index 17d0736..89ab5c8 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> @@ -189,6 +189,8 @@ struct gpmi_nand_data {
->  	void			*auxiliary_virt;
->  	dma_addr_t		auxiliary_phys;
->  
-> +	void			*raw_buffer;
-> +
->  	/* DMA channels */
->  #define DMA_CHANS		8
->  	struct dma_chan		*dma_chans[DMA_CHANS];
-> -- 
-> 1.9.1
+> > [    4.892211] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa318034
+> > [    4.900299] Internal error: : 1028 [#1] SMP ARM
+> > [    4.905090] Modules linked in:
+> > [    4.908325] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.17.0-rc5-12866-g0164b2d #1
+> > [    4.916320] task: c0835db0 ti: c082a000 task.ti: c082a000
+> > [    4.922027] PC is at omap2_gp_timer_set_next_event+0x24/0x78
+> > [    4.928009] LR is at clockevents_program_event+0xc0/0x148
+> > [    4.933715] pc : [<c002622c>]    lr : [<c00a2800>]    psr: 00000193
+> > [    4.933715] sp : c082bed8  ip : 00000000  fp : 00000000
+> > [    4.945800] r10: 00000000  r9 : 24101100  r8 : c0839080
+> > [    4.951324] r7 : 00000001  r6 : 237bc339  r5 : 0000009f  r4 : 3d9759e7
+> > [    4.958190] r3 : fa318034  r2 : c08cb920  r1 : 00000003  r0 : fffffec1
+> > [    4.965087] Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+> > [    4.972900] Control: 10c5387d  Table: 80004019  DAC: 00000015      
+> > [    4.978942] Process swapper/0 (pid: 0, stack limit = 0xc082a248)   
+> > [    4.985290] Stack: (0xc082bed8 to 0xc082c000)
+> > [    4.989868] bec0:                                                       237bc339 00000001
+> > [    4.998504] bee0: 00000001 24101100 00000001 cfc7d6c8 00000001 cfc7da50 cfc7d720 c00a4780
+> > [    5.007141] bf00: 00000000 c00962b0 cfc7d720 c0096180 00000001 00000000 00000001 c08256c8
+> > [    5.015777] bf20: c082a000 c08256c8 00000000 c00962b0 237b4c04 00000001 00000002 a0000193
+> > [    5.024414] bf40: 00989680 00000000 00000000 24101100 00000001 cfc7da50 00000000 c108cc78
+> > [    5.033020] bf60: 00000000 c00962b0 00000000 00000002 00000001 00000000 c108cc78 c00a56f0
+> > [    5.041656] bf80: 00000000 00000002 237b4c04 00000001 c08c8ce8 c082a000 00000000 c08c8ce8
+> > [    5.050292] bfa0: c08329dc c0832978 cfc7f0f8 c0072808 c0559928 c08270f0 c08caf40 c080fdc0
+> > [    5.058929] bfc0: 00000000 c07c3b74 ffffffff ffffffff c07c35f0 00000000 00000000 c080fdc0
+> > [    5.067535] bfe0: c08cb154 c0832968 c080fdbc c083763c 80004059 80008074 00000000 00000000
+> > [    5.076171] [<c002622c>] (omap2_gp_timer_set_next_event) from [<c00a2800>] (clockevents_program_event+0xc0/0x148)
+> > [    5.087005] [<c00a2800>] (clockevents_program_event) from [<c00a4780>] (tick_program_event+0x44/0x54)
+> > [    5.096771] [<c00a4780>] (tick_program_event) from [<c0096180>] (__hrtimer_start_range_ns+0x3c0/0x4a0)
+> > [    5.106597] [<c0096180>] (__hrtimer_start_range_ns) from [<c00962b0>] (hrtimer_start_range_ns+0x24/0x2c)
+> > [    5.116577] [<c00962b0>] (hrtimer_start_range_ns) from [<c00a56f0>] (tick_nohz_idle_exit+0x140/0x1ec)
+> > [    5.126342] [<c00a56f0>] (tick_nohz_idle_exit) from [<c0072808>] (cpu_startup_entry+0xf4/0x2d0)
+> > [    5.135528] [<c0072808>] (cpu_startup_entry) from [<c07c3b74>] (start_kernel+0x340/0x3a8)
+> > [    5.144165] [<c07c3b74>] (start_kernel) from [<80008074>] (0x80008074)
+> > [    5.151031] Code: 13a0c000 0a000004 ee07cfba e592301c (e5931000) 
+> > [    5.157470] ---[ end trace f92de024d996d904 ]---
+> > [    5.162353] Kernel panic - not syncing: Attempted to kill the idle task!
+> > [    5.169433] ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
 > 
+> Actually it just occurred to me that if something broke 
+> *wait_target_ready(), we'd expect to see intermittent failures like this, 
+> and this series touches *wait_target_ready().  So it might be worth taking 
+> a look at that with a magnifying glass to make sure that it's working.
+
+Yes errors like this should not happen. Let's make sure things are
+working reliably before merging this.
+
+Regards,
+
+Tony
