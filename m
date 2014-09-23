@@ -1,75 +1,64 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 23 Sep 2014 17:04:08 +0200
-Subject: [PATCH v4] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <20140923140635.GR5182@n2100.arm.linux.org.uk>
-References: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
- <CAErSpo7CX3XiuNZO8tXYVN2tUJudObFKVBthHfxf9mPS6hE6Cg@mail.gmail.com>
- <20140923140635.GR5182@n2100.arm.linux.org.uk>
-Message-ID: <20140923150407.GJ5982@ulmo>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Tue, 23 Sep 2014 23:04:28 +0800
+Subject: [PATCH v3 1/3] mtd: nand: gpmi: add gpmi_move_bits function
+In-Reply-To: <20140923165822.27cfde69@bbrezillon>
+References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20140923145413.GA1633@localhost.localdomain>
+ <20140923165822.27cfde69@bbrezillon>
+Message-ID: <20140923150427.GB1633@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 03:06:35PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 23, 2014 at 07:56:01AM -0600, Bjorn Helgaas wrote:
-> > This doesn't require any coordination with the PCI core, so I was just
-> > leaving this up to the arch.  But I guess I can at least give you my
-> > opinion :)
+On Tue, Sep 23, 2014 at 04:58:22PM +0200, Boris BREZILLON wrote:
+> On Tue, 23 Sep 2014 22:54:15 +0800
+> Huang Shijie <shijie8@gmail.com> wrote:
 > 
-> However, PCI core people have more knowledge of the issues here than I do.
-> 
-> > > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> > > index 17a26c1..03c56ba 100644
-> > > --- a/arch/arm/kernel/bios32.c
-> > > +++ b/arch/arm/kernel/bios32.c
-> > > @@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
-> > >  {
-> > >         struct pci_dev *dev;
-> > >         u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-> > > +       bool has_pcie_dev = false;
-> > >
-> > >         /*
-> > >          * Walk the devices on this bus, working out what we can
-> > > @@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
-> > >         list_for_each_entry(dev, &bus->devices, bus_list) {
-> > >                 u16 status;
-> > >
-> > > +               if (!has_pcie_dev)
-> > > +                       has_pcie_dev = pci_is_pcie(dev);
-> > >                 pci_read_config_word(dev, PCI_STATUS, &status);
-> > >
-> > >                 /*
-> > > @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
-> > >
-> > >         /*
-> > >          * Report what we did for this bus
-> > > +        * (only if the bus doesn't have any PCIe devices)
-> > >          */
-> > > -       printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-> > > -               bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-> > > +       if (!has_pcie_dev)
-> > > +               pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
-> > > +                       bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+> > On Tue, Sep 23, 2014 at 04:07:34PM +0200, Boris BREZILLON wrote:
+> > > Add a new function to move bits (not bytes) from a memory region to
+> > > another one.
+> > > This function is similar to memmove except it acts at bit level.
+> > > This function is needed to implement GPMI raw access functions, given the
+> > > fact that ECC engine does not pad ECC bits to the next byte boundary.
+> > sorry for not comment your v2 patch set.
 > > 
-> > My first choice would be to just drop the printk altogether.
+> > > 
+> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > > ---
+> > >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 88 ++++++++++++++++++++++++++++++++++
+> > >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
+> > >  2 files changed, 92 insertions(+)
+> > > 
+> > > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> > > index 87e658c..e2f706a 100644
+> > > --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> > > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+> > > @@ -1353,3 +1353,91 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+> > >  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
+> > >  	return start_dma_with_bch_irq(this, desc);
+> > >  }
+> > > +
+> > > +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
+> > > +		    const u8 *src, size_t src_bit_off,
+> > > +		    size_t nbits)
+> > we can simplify the code.
 > 
-> It can be useful information.
+> Any suggestions ?
 > 
-> > If we want to keep the printk, it should be enough to test "bus->self
-> > && !pci_is_pcie(bus->self)" to see whether Fast Back-to-Back can be
-> > enabled.
+> > 
+> > We could use the bytes to replace the @nbits.
+> > 
+> > The chunk data is always byte aligned.
 > 
-> This is exactly the kind of issue that needs to be picked up by core
-> PCI people.
+> This function is also used to store ECC bits in the OOB buffer and
+> these chunk of data are not byte aligned :-).
+yes. you are right. I missed it.
 
-I agree. Wouldn't it be more useful to move this into the core?
-Disabling fast back-to-back transfers hardly seems like an ARM-
-specific "fixup" to me.
+could you also comment these two hooks in the patch set.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/14971e59/attachment.sig>
+I hope Brian also can check it, and we can make it more clear about how
+to implement them.
+
+
+thanks
+Huang Shijie
