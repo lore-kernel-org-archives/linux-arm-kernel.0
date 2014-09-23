@@ -1,73 +1,100 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 23 Sep 2014 16:38:45 +0300
-Subject: [PATCH] clk: prevent erronous parsing of children during rate
- change
-In-Reply-To: <20140922191816.GF10233@codeaurora.org>
-References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
- <20140922191816.GF10233@codeaurora.org>
-Message-ID: <542177E5.9060606@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 23 Sep 2014 15:42:48 +0200
+Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <5415C968.90303@gmail.com>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140911085727.GA25773@e102568-lin.cambridge.arm.com>
+ <5415C968.90303@gmail.com>
+Message-ID: <2444560.uIlK6FC0A9@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 10:18 PM, Stephen Boyd wrote:
-> On 08/21, Tero Kristo wrote:
->> In some cases, clocks can switch their parent with clk_set_rate, for
->> example clk_mux can do this in some cases. Current implementation of
->> clk_change_rate uses un-safe list iteration on the clock children, which
->> will cause wrong clocks to be parsed in case any of the clock children
->> change their parents during the change rate operation. Fixed by using
->> the safe list iterator instead.
->>
->> The problem was detected due to some divide by zero errors generated
->> by clock init on dra7-evm board, see discussion under
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/349180 for details.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> To: Mike Turquette <mturquette@linaro.org>
->> Reported-by: Nishanth Menon <nm@ti.com>
->> ---
->>   drivers/clk/clk.c |    7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index b76fa69..bacc06f 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -1467,6 +1467,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
->>   static void clk_change_rate(struct clk *clk)
->>   {
->>   	struct clk *child;
->> +	struct hlist_node *tmp;
->>   	unsigned long old_rate;
->>   	unsigned long best_parent_rate = 0;
->>   	bool skip_set_rate = false;
->> @@ -1502,7 +1503,11 @@ static void clk_change_rate(struct clk *clk)
->>   	if (clk->notifier_count && old_rate != clk->rate)
->>   		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
->>
->> -	hlist_for_each_entry(child, &clk->children, child_node) {
->> +	/*
->> +	 * Use safe iteration, as change_rate can actually swap parents
->> +	 * for certain clock types.
->> +	 */
->> +	hlist_for_each_entry_safe(child, tmp, &clk->children, child_node) {
->>   		/* Skip children who will be reparented to another clock */
->>   		if (child->new_parent && child->new_parent != clk)
->>   			continue;
->
-> Are we not hitting the new_parent check here? I don't understand
-> how we can be changing parents here unless the check is being
-> avoided, in which case I wonder why determine_rate isn't being
-> used.
->
 
-It depends how the clock underneath handles the situation. The error I 
-am seeing actually happens with a SoC specific compound clock (DPLL) 
-which integrates set_rate + mux functionality into a single clock node. 
-A call to the clk_set_rate changes the parent of this clock (from bypass 
-clock to reference clock), in addition to changing the rate (tune the 
-mul+div.) I looked at using the determine rate call with this type but 
-it breaks everything up... the parent gets changed but not the clock 
-rate, in addition to some other issues.
+Hi,
 
--Tero
+On Sunday, September 14, 2014 06:59:20 PM Tomasz Figa wrote:
+> [dropping my old @samsung.com address]
+> 
+> On 11.09.2014 10:57, Lorenzo Pieralisi wrote:
+> > On Thu, Sep 11, 2014 at 09:28:06AM +0100, Daniel Lezcano wrote:
+> >> On 09/05/2014 05:34 PM, Lorenzo Pieralisi wrote:
+> >>> On Fri, Sep 05, 2014 at 10:21:20AM +0100, Will Deacon wrote:
+> >>>> On Thu, Sep 04, 2014 at 06:29:10PM +0100, Lorenzo Pieralisi wrote:
+> >>>>> On Thu, Sep 04, 2014 at 05:03:20PM +0100, Catalin Marinas wrote:
+> >>>>>> On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
+> >>>>>>> This patch should be ready to go too, is it ok if I split the series
+> >>>>>>> in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
+> >>>>>>> (inclusive of DT bindings and !!this patch!!) and send two separate pull
+> >>>>>>> requests ?
+> >>>>>>
+> >>>>>> If Daniel/Rafael don't have any objection, I can take the whole series
+> >>>>>> through the arm64 tree (it seems that patches have been already acked by
+> >>>>>> Daniel).
+> >>>>>
+> >>>>> Thanks a lot Catalin. Since this one is a brand new CPUidle driver and it
+> >>>>> follows a different pattern from arm legacy drivers I would like to get
+> >>>>> Daniel's ack on this patch too before pushing it. For the records I have
+> >>>>> just added two pr_err to signal driver probing error, ultraminor changes
+> >>>>> that do not justify a repost.
+> >>>>>
+> >>>>> If Samsung guys do not manifest themselves I would drop patch 8 from
+> >>>>> the series till it gets tested and its patch dependency queued too.
+> >>>>
+> >>>> The last patch also has a dependency, as you mentioned to Daniel. I think
+> >>>> we can certainly merge the arm64 parts, and if Daniel doesn't object, then
+> >>>> we can take the driver stuff too but leaving the exynos bits out (i.e. drop
+> >>>> the last patch).
+> >>>>
+> >>>> Anyway, if you could repost with the acks you've collected and rearrange it
+> >>>> so the arm64 patches are first in the series, that would be great.
+> >>>
+> >>> I can repost it with the acks and rearrange the patches, but for the
+> >>> pull request I have to know what code can be merged, since there are
+> >>> some arm64 patches (PSCI and CPUidle arm64 back-end) that are strictly
+> >>> tied to the arm64 CPUidle driver, so I *have* to know if the arm64
+> >>> CPUidle driver (this patch) can get merged and that requires an ack.
+> >>>
+> >>> If I do not hear from Samsung guys I will drop patch 8.
+> >>
+> >> Well I would prefer to have this patch merged (Cc'ing Tomasz).
+> > 
+> > Ok, but:
+> > 
+> > a) I only compile tested it
+> > b) There is a dts patch dependency for patch 8 to apply cleanly and it
+> >    hasn't been acked (I can't really do it since I can't test it)
+> > 
+> >    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274179.html
+> > 
+> > So, what should we do ? Tomasz ?
+> 
+> Sorry for late reply. I don't work for Samsung anymore so I don't focus
+> that much on areas other than I still maintain.
+> 
+> As for b) I believe all my patches have been already merged and now
+> we're just waiting for Kukjin to apply Bart's patch (although it's been
+> sitting on the ML since July, so probably needs rebasing).
+> 
+> About the patch 8 alone, somebody would have to test it. Maybe Bart or
+> Krzysztof could find some time to look at this? Other than that, I'm not
+> quite sure about entry latency you specified. It would look like
+> entering the state takes longer time than leaving, which I believe is
+> not the case. However I can't find any place in the code which would use
+> entry latency, so it might not be that important for now.
+
+I tested this patch series on both Exynos4210 (Origen board) and Exynos5250
+(Arndale board).  On Exynos4210 AFTR cpuidle mode is still working fine
+with the patch series applied.  On Exynos5250 AFTR is not working but it is
+an upstream problem (same happens with v3.17-rc4).
+
+Lorenzo, you can add
+
+Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+to the Exynos patch (patch #8).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
