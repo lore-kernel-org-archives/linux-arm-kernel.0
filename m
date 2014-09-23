@@ -1,50 +1,96 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 23 Sep 2014 10:51:36 -0700
-Subject: [PATCH v1] soc: qcom: do not disable the iface clock in probe
-In-Reply-To: <A61C4CA5-7558-4B3D-BF05-BBDD1C3F550F@codeaurora.org>
-References: <1408081268-5748-1-git-send-email-srinivas.kandagatla@linaro.org>
- <A61C4CA5-7558-4B3D-BF05-BBDD1C3F550F@codeaurora.org>
-Message-ID: <CAMAWPa8gxoUkNaB5x=cwM2WTRdECgMJuT-rVnwK7LPjHyKU6TA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 23 Sep 2014 19:52:49 +0200
+Subject: [PATCH 3/3] ARM: dts: add rk3288 power-domain node
+In-Reply-To: <1411440916-6830-4-git-send-email-jinkun.hong@rock-chips.com>
+References: <1411440916-6830-1-git-send-email-jinkun.hong@rock-chips.com>
+ <1411440916-6830-4-git-send-email-jinkun.hong@rock-chips.com>
+Message-ID: <2840362.2VhRfgMh5I@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 10:42 AM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Aug 15, 2014, at 12:41 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
->
->> The use case here is when we have a bootconsole which is printing the
->> characters on serial console and gsbi driver comes up after some time.
->> As gsbi driver disables the clock in probe the bootconsole locks up.
->>
->> This patch fixes the problem by disabling the clock in platform remove
->> rather than in probe.
->>
->> Tested-by: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->> Changes since RFC:
->>       - none, just a subject line change.
->
-> Srini,
->
-> We need some changes to the commit message for this to get into v3.17.
->
-> Probably some references to:
->
-> http://www.spinics.net/lists/linux-arm-msm/msg10589.html
->
-> Adding Kevin to provide details on what else should be in commit message w/regards to the regression we introduced.
+Am Montag, 22. September 2014, 19:55:16 schrieb jinkun.hong:
+> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+> 
+> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+> Signed-off-by: Wang Caesar <caesar.wang@rock-chips.com>
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> 
+> ---
+> 
+>  arch/arm/boot/dts/rk3288.dtsi |   45
+> +++++++++++++++++++++++++++++++++++++++++ 1 file changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 3bb5230..714b9d9 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -15,6 +15,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/pinctrl/rockchip.h>
+>  #include <dt-bindings/clock/rk3288-cru.h>
+> +#include <dt-bindings/power-domain/rk3288.h>
+>  #include "skeleton.dtsi"
+> 
+>  / {
+> @@ -467,6 +468,50 @@
+>  		compatible = "rockchip,rk3288-pmu", "syscon";
+>  		reg = <0xff730000 0x100>;
+>  	};
 
-At this point of the cycle, we're rather strict about what qualifies
-as a fix.  It should be fixing a specific regression.  Looking at the
-above link, it looks like it is, so could you re-spin this with
-changelog, summarizing the regression and how this fixes the
-regression, and we should still be able to get it in for v3.17.
+missing blank line here
 
-Also, it looks like the original was only posted to the msm list.  For
-future reference, for patches that need to go via the arm-soc
-maintainers, make sure to Cc arm at kernel.org.
+Also please mind the ordering. We have the nodes without registers (like the 
+pinctrl) at the bottom, so maybe add the power-controller alphabetically after 
+the pinctrl node.
 
-Thanks,
+> +	power: power-controller {
+> +		compatible = "rockchip,rk3288-power-controller";
+> +		#power-domain-cells = <1>;
+> +		rockchip,pmu = <&pmu>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pd_gpu {
+> +			reg = <RK3288_PD_GPU>;
+> +			clocks = <&cru ACLK_GPU>;
+> +		};
+> +
+> +		pd_vio {
+> +			reg = <RK3288_PD_VIO>;
+> +			clocks = <&cru HCLK_RGA>, <&cru HCLK_VOP0>,
+> +				<&cru HCLK_VOP1>, <&cru HCLK_VIO_AHB_ARBI>,
+> +				<&cru HCLK_VIO_NIU>, <&cru HCLK_VIP>,
+> +				<&cru HCLK_IEP>, <&cru HCLK_ISP>,
+> +				<&cru HCLK_VIO2_H2P>, <&cru PCLK_MIPI_DSI0>,
+> +				<&cru PCLK_MIPI_DSI1>, <&cru PCLK_MIPI_CSI>,
+> +				<&cru PCLK_LVDS_PHY>, <&cru PCLK_EDP_CTRL>,
+> +				<&cru PCLK_HDMI_CTRL>, <&cru PCLK_VIO2_H2P>,
+> +				<&cru ACLK_VOP0>, <&cru ACLK_IEP>,
+> +				<&cru ACLK_VIO0_NIU>, <&cru ACLK_VIP>,
+> +				<&cru ACLK_VOP1>, <&cru ACLK_ISP>,
+> +				<&cru ACLK_VIO1_NIU>, <&cru ACLK_RGA>,
+> +				<&cru ACLK_RGA_NIU>,<&cru SCLK_RGA>,
+> +				<&cru DCLK_VOP0>, <&cru DCLK_VOP1>,
+> +				<&cru SCLK_EDP_24M>, <&cru SCLK_EDP>,
+> +				<&cru SCLK_ISP>, <&cru SCLK_ISP_JPE>,
+> +				<&cru SCLK_HDMI_HDCP>, <&cru SCLK_HDMI_CEC>;
+> +		};
+> +
+> +		pd_video {
+> +			reg = <RK3288_PD_VIDEO>;
+> +			/* FIXME: add clocks */
 
-Kevin
+what is missing for these clocks? If it's just more clock ids, please 
+corrdinate with Kever
+
+> +			};
+> +
+> +		pd_hevc {
+> +			reg = <RK3288_PD_HEVC>;
+> +			clocks = <&cru ACLK_HEVC>, <&cru HCLK_HEVC>,
+> +				<&cru SCLK_HEVC_CABAC>, <&cru SCLK_HEVC_CORE>;
+> +			};
+> +	};
+> 
+>  	sgrf: syscon at ff740000 {
+>  		compatible = "rockchip,rk3288-sgrf", "syscon";
