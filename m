@@ -1,44 +1,30 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 23 Sep 2014 16:10:34 +0200
-Subject: [PATCH] [media] s5p-mfc: Use decode status instead of display
- status on MFCv5
-In-Reply-To: <085901cfd736$6ae349c0$40a9dd40$%debski@samsung.com>
-References: <1411390322-25212-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <085901cfd736$6ae349c0$40a9dd40$%debski@samsung.com>
-Message-ID: <1411481434.4050.16.camel@collabora.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 16:10:09 +0200
+Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
+In-Reply-To: <1411480694.21299.18.camel@mtksdaap41>
+References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <2770365.r419rjIAOU@wuerfel> <1411480694.21299.18.camel@mtksdaap41>
+Message-ID: <7840459.vtELiqVIOL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Kamil,
-
-
-On Tue, 2014-09-23 at 15:58 +0200, Kamil Debski wrote:
-> > Commit 90c0ae50097 changed how the frame_type of a decoded frame
-> > gets determined, by switching from the get_dec_frame_type to
-> > get_disp_frame_type operation. Unfortunately it seems that on MFC v5
-> > the
-> > result of get_disp_frame_type is always 0 (no display) when decoding
-> > (tested with H264), resulting in no frame ever being output from the
-> > decoder.
+On Tuesday 23 September 2014 21:58:14 Joe. C wrote:
+> Thanks for review. 
+> The intend for these macros is helpin pinctrl user to write DT node.
+> With these macro, we could write like this for i2c0:
 > 
-> Could you tell me which firmware version do you use (date)?
+> mediatek,pinfunc = <MT8135_PIN_100_SDA0__FUNC_SDA0 
+>                         MT8135_PIN_101_SCL0__FUNC_SCL0>;
+> 
+> We feel this is less error prone and easier to write than this:
+> 
+> mediatek,pinfunc = <MT_PIN_FUNC(100, 1) MT_PIN_FUNC(101, 1)>
 
-I'm using the firmware version as included in
-http://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/
+But you don't actually use the same macros in the driver, so in effect
+you just move the definitions from the file they are needed in to another
+file as a macro.
 
-Unfortunately there is no specific version information included about
-the firmware. The commit that added it is fb5cda9c70277f6 dated Nov 28
-17:43:06 2012 +0530, so that at least gives some information about the
-time-frame.
+It is no less error prone to define those macros in mt8135-pinfunc.h
+than in the pinctrl node, just less readable.
 
-
--- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/5cc9f3ec/attachment-0001.bin>
+	Arnd
