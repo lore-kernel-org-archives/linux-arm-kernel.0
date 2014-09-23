@@ -1,53 +1,49 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 23 Sep 2014 13:24:18 +0200
-Subject: [PATCH 2/4] pinctrl: imx: add gpio pinmux support for vf610
-In-Reply-To: <CACRpkdYk0zW12qNXgOstTLmdVDYacu0Un+8quTN+J_azOic7AA@mail.gmail.com>
-References: <cover.1410020458.git.stefan@agner.ch>
- <4cf96e22ce2c7646513b64260c7bb1a2279e232d.1410020459.git.stefan@agner.ch>
- <CACRpkdYk0zW12qNXgOstTLmdVDYacu0Un+8quTN+J_azOic7AA@mail.gmail.com>
-Message-ID: <0498face86b4dcbdf35619c8b124675c@agner.ch>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 23 Sep 2014 13:26:19 +0200
+Subject: [PATCH 0/6] dts, kbuild: Implement support for dtb vendor subdirs
+In-Reply-To: <20140919140856.GG2295@e104818-lin.cambridge.arm.com>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <CAL1qeaGCeRyeKLo70E264bZcamOfBKoN9Y8_NDCjV5j4DoOw1Q@mail.gmail.com>
+ <20140919123056.GC20170@rric.localhost>
+ <20140919140856.GG2295@e104818-lin.cambridge.arm.com>
+Message-ID: <20140923112619.GG20170@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-23 11:48, schrieb Linus Walleij:
-> On Sat, Sep 6, 2014 at 6:25 PM, Stefan Agner <stefan@agner.ch> wrote:
+On 19.09.14 15:08:56, Catalin Marinas wrote:
+> On Fri, Sep 19, 2014 at 01:30:56PM +0100, Robert Richter wrote:
+> > On 16.09.14 20:49:18, Andrew Bresticker wrote:
+> > > > Robert Richter (6):
+> > > >   dts, arm64: Add dtbs_install make target
+> > > >   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+> > > >   dts, arm/arm64: Remove dtbs build rules in sub-makes
+> > > >   dts, kbuild: Implement support for dtb vendor subdirs
+> > > >   dts, arm64: Move dts files to vendor subdirs
+> > > >   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+> > > 
+> > > I've tested this for arm64 and by adding a vendor sub-directory
+> > > locally for arm.  This series is also the base for my MIPS DT vendor
+> > > sub-directory series
+> > > (http://www.linux-mips.org/archives/linux-mips/2014-09/msg00217.html).
+> > > So, for the entire series,
+> > > 
+> > > Tested-by: Andrew Bresticker <abrestic@chromium.org>
+> > 
+> > Andrew, thanks for testing and great this also works on mips.
+> > 
+> > Anyone willing to take the patches for 3.18? Are any further acks
+> > needed?
 > 
->> Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
->> This is needed since direction configuration is not part of the
->> GPIO module in Vybrid.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> (...)
+> For the arm64 bits in this series:
 > 
->> -arch_initcall(vf610_pinctrl_init);
->> +postcore_initcall(vf610_pinctrl_init);
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Why is this necessary? You should be able to rely on deferred
-> probing to do its work here. I think this should be module_init()
-> or driver_initcall() really.
+> I think the patches can be merged via arm-soc.
 
-Currently deferred probe doesn't work for gpiolib drivers which try to
-add gpio-ranges from device tree:
-gpiochip_add calls of_gpiochip_add_pin_range (through of_gpiochip_add).
-This function tries to get the pinctrl driver, which is not registred at
-that time. Currently the driver does not defer probing but fails
-silently...
+Olof,
 
-We would need to alter the return values of those two functions
-(of_gpiochip_add_pin_range/of_gpiochip_add) and honor the return value
-in gpiochip_add. 
+please apply the patches.
 
-Currently, it seems that we quite often use an early initcall to get the
-pinctrl loaded early:
-$ grep -h -o ".*_initcall" drivers/pinctrl/*.c | sort | uniq -c
-     18 arch_initcall
-      3 core_initcall
-      3 postcore_initcall
-      1 subsys_initcall
+Thanks,
 
-IMHO for those core services, it also makes sense to have them
-initialized early. I'd rather prefer this hard coded than having dozens
-of "requests probe deferral" messages...
-
---
-Stefan
+-Robert
