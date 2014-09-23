@@ -1,81 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 23 Sep 2014 10:15:38 +0200
-Subject: [PATCH v6 3/9] rtc: at91sam9: replace devm_ioremap by
- devm_ioremap_resource
-In-Reply-To: <1411400563-570-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411400563-570-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <54212C2A.8000109@atmel.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 23 Sep 2014 13:46:05 +0530
+Subject: [PATCH v2 1/5] pinctrl: exynos: Generalize the eint16_31 demux code
+In-Reply-To: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
+References: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1411460169-30536-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/2014 17:42, Boris BREZILLON :
-> Replace devm_ioremap calls by devm_ioremap_resource which already check
-> resource consistency (resource != NULL) and print an error in case of
-> failure.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The function exynos_irq_demux_eint16_31 uses pre-defined offsets for external
+interrupt pending status and mask registers. So this function is not extensible
+for Exynos7 SoC which have these registers at different offsets. So generalize
+the exynos_irq_demux_eint16_31 function by using the pending/mask register
+offset values from the exynos_irq_chip structure.
 
-> ---
->  drivers/rtc/rtc-at91sam9.c | 29 ++++++++++-------------------
->  1 file changed, 10 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index 74a9ca0..38a2693 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -306,18 +306,11 @@ static const struct rtc_class_ops at91_rtc_ops = {
->   */
->  static int at91_rtc_probe(struct platform_device *pdev)
->  {
-> -	struct resource	*r, *r_gpbr;
-> +	struct resource	*r;
->  	struct sam9_rtc	*rtc;
->  	int		ret, irq;
->  	u32		mr;
->  
-> -	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	r_gpbr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> -	if (!r || !r_gpbr) {
-> -		dev_err(&pdev->dev, "need 2 ressources\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0) {
->  		dev_err(&pdev->dev, "failed to get interrupt resource\n");
-> @@ -335,18 +328,16 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  		device_init_wakeup(&pdev->dev, 1);
->  
->  	platform_set_drvdata(pdev, rtc);
-> -	rtc->rtt = devm_ioremap(&pdev->dev, r->start, resource_size(r));
-> -	if (!rtc->rtt) {
-> -		dev_err(&pdev->dev, "failed to map registers, aborting.\n");
-> -		return -ENOMEM;
-> -	}
->  
-> -	rtc->gpbr = devm_ioremap(&pdev->dev, r_gpbr->start,
-> -				resource_size(r_gpbr));
-> -	if (!rtc->gpbr) {
-> -		dev_err(&pdev->dev, "failed to map gpbr registers, aborting.\n");
-> -		return -ENOMEM;
-> -	}
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	rtc->rtt = devm_ioremap_resource(&pdev->dev, r);
-> +	if (IS_ERR(rtc->rtt))
-> +		return PTR_ERR(rtc->rtt);
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	rtc->gpbr = devm_ioremap_resource(&pdev->dev, r);
-> +	if (IS_ERR(rtc->gpbr))
-> +		return PTR_ERR(rtc->rtt);
->  
->  	mr = rtt_readl(rtc, MR);
->  
-> 
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+Tested-by: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/samsung/pinctrl-exynos.c |    6 ++++--
+ drivers/pinctrl/samsung/pinctrl-exynos.h |    1 +
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index d7154ed..b5e1cd4 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -444,10 +444,11 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_enter(chip, desc);
+ 
+ 	for (i = 0; i < eintd->nr_banks; ++i) {
++		struct exynos_irq_chip *our_chip = eintd->chip;
+ 		struct samsung_pin_bank *b = eintd->banks[i];
+-		pend = readl(d->virt_base + EXYNOS_WKUP_EPEND_OFFSET
++		pend = readl(d->virt_base + our_chip->eint_pend
+ 				+ b->eint_offset);
+-		mask = readl(d->virt_base + EXYNOS_WKUP_EMASK_OFFSET
++		mask = readl(d->virt_base + our_chip->eint_mask
+ 				+ b->eint_offset);
+ 		exynos_irq_demux_eint(pend & ~mask, b->irq_domain);
+ 	}
+@@ -565,6 +566,7 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 		muxed_data->banks[idx++] = bank;
+ 	}
+ 	muxed_data->nr_banks = muxed_banks;
++	muxed_data->chip = &exynos_wkup_irq_chip;
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.h b/drivers/pinctrl/samsung/pinctrl-exynos.h
+index 3c91c35..e060722 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.h
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.h
+@@ -94,6 +94,7 @@ struct exynos_weint_data {
+  * @banks: array of banks being part of the mux
+  */
+ struct exynos_muxed_weint_data {
++	struct exynos_irq_chip *chip;
+ 	unsigned int nr_banks;
+ 	struct samsung_pin_bank *banks[];
+ };
 -- 
-Nicolas Ferre
+1.7.9.5
