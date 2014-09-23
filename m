@@ -1,70 +1,47 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 23 Sep 2014 15:28:00 +0200
-Subject: [PATCH v2 0/4] Add Mediatek SoC Pinctrl/GPIO driver for MT8135.
-In-Reply-To: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
-References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
-Message-ID: <54217560.20803@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 23 Sep 2014 08:30:08 -0500
+Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <8687285.EH4RPBeOB5@wuerfel>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140922093228.GA20256@rric.localhost>
+ <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
+ <8687285.EH4RPBeOB5@wuerfel>
+Message-ID: <CAL_JsqK3yH-uf++haBovWdX6er1PtzeiZ-2-yT1TRfYPxAjFow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 23, 2014 at 2:56 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 22 September 2014 12:43:17 Liviu Dudau wrote:
+>> >
+>> > From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
+>> > From: Robert Richter <rrichter@cavium.com>
+>> > Date: Mon, 22 Sep 2014 10:46:01 +0200
+>> > Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
+>> >
+>> > The pci host bridge was not created if io_base was not set when
+>> > calling of_pci_get_host_bridge_resources(). This is esp. the case for
+>> > mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
+>> > parameter io_base is optional now.
+>>
+>> I think the message is misleading. What you want to do is make io_base
+>> optional for the case where the PCI host bridge only expects to have only
+>> IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
+>>
+>> As I'm going to touch this area again to address a comment from Bjorn,
+>> do you mind if I roll this patch into mine with your Signed-off-by and
+>> the mention that you have made io_base optional?
+>
+> I think the best way to deal with this is to move the check for
+> io_base down into the place where it is used: As long as the DT only
+> specifies IORESOURCE_MEM windows, we don't need to look at io_base,
+> but if the host controller driver does not support IORESOURCE_IO
+> while the DT specifies it, I guess it would be nice to return an
+> error.
 
+The DT may specify it, but the h/w could be broken in some way so the
+host driver chooses to ignore it. I don't think we should force the
+host driver to provide a pointer in that case. Also, would we want it
+added to the resource list if it is not going to be used?
 
-On 23/09/14 05:39, Hongzhou.Yang wrote:
-> This is v2 of add Mediatek SoC Pinctrl/GPIO drvier for MT8135.
-> It is based on Joe.C' basic device tree support.
-> See http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288582.html
-> 
-> This driver include common and MT8135 part, other Mediatek SoCs will share the common part,
-> and MT8135 part only support MT8135. MT8135 has GPIO controller, it includes 203 pins.
-> 
-> Changes in v2:
-> - According to Heiko Stubner' suggestion, use generic pinconfig.
-
-Please always add people that made comments on your former versions in
-CC. This way it is easier for them to follow the debate about your patches.
-
-Thanks,
-Matthias
-
-> - Remove pinmux_ops.disable implement.
-> - Due to limit of message body, move mt8135-pinfunc.h to '[PATCH 3/4] add pinctrl node for MT8135'.
-> 
-> 
-> Hongzhou Yang (3):
-> ARM: mediatek: Add Pinctrl/GPIO driver for mt8135.
-> dt-bindings: Add pinctrl bindings for mt65xx/mt81xx.
-> ARM: dts: mt8135: Add pinctrl node for mt8135.
-> 
-> Joe.C (1):
-> arm: mediatek: Add config option for mediatek SoCs.
-> 
-> .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |   98 +
-> arch/arm/boot/dts/mt8135-pinfunc.h                 | 1304 +++++++++++
-> arch/arm/boot/dts/mt8135.dtsi                      |   11 +
-> arch/arm/mach-mediatek/Kconfig                     |   23 +-
-> drivers/pinctrl/Kconfig                            |    1 +
-> drivers/pinctrl/Makefile                           |    1 +
-> drivers/pinctrl/mediatek/Kconfig                   |   12 +
-> drivers/pinctrl/mediatek/Makefile                  |    5 +
-> drivers/pinctrl/mediatek/pinctrl-mt8135.c          |   82 +
-> drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |  792 +++++++
-> drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |   95 +
-> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h      | 2460 ++++++++++++++++++++
-> include/dt-bindings/pinctrl/mt65xx.h               |   23 +
-> 13 files changed, 4904 insertions(+), 3 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
-> create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
-> create mode 100644 drivers/pinctrl/mediatek/Kconfig
-> create mode 100644 drivers/pinctrl/mediatek/Makefile
-> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt8135.c
-> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-> create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-> create mode 100644 include/dt-bindings/pinctrl/mt65xx.h
-> 
-> --
-> 1.8.1.1.dirty
-> 
-> 
-> 
-> 
+Rob
