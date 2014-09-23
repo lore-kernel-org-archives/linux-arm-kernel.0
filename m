@@ -1,85 +1,109 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 23 Sep 2014 09:17:36 +0100
-Subject: [PATCH v7 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <54212CA0.4030700@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 23 Sep 2014 10:21:27 +0200
+Subject: [PATCH v6 7/9] rtc: at91sam9: use clk API instead of relying
+ on AT91_SLOW_CLOCK
+In-Reply-To: <1411400563-570-8-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411400563-570-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54212D87.4060908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 22/09/2014 17:42, Boris BREZILLON :
+> The RTT block is using the slow clock which is accessible through the clk
+> API.
+> Use the clk API to retrieve, enable and get the slow clk rate instead of
+> the AT91_SLOW_CLOCK macro (which hardcodes the slow clk rate).
+> Doing this allows us to reference the clk thus preventing the CCF from
+> disabling it during the "disable unused" phase.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Thankyou for the new patchset.
+> ---
+>  drivers/rtc/rtc-at91sam9.c | 28 ++++++++++++++++++++++++----
+>  1 file changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index 902cd01..d20e118 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/io.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+> +#include <linux/clk.h>
+>  
+>  /*
+>   * This driver uses two configurable hardware resources that live in the
+> @@ -61,8 +62,6 @@
+>  #define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
+>  #define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
+>  
+> -#define AT91_SLOW_CLOCK		32768
+> -
+>  /*
+>   * We store ALARM_DISABLED in ALMV to record that no alarm is set.
+>   * It's also the reset value for that field.
+> @@ -77,6 +76,7 @@ struct sam9_rtc {
+>  	struct regmap		*gpbr;
+>  	unsigned int		gpbr_offset;
+>  	int 			irq;
+> +	struct clk		*sclk;
+>  };
+>  
+>  #define rtt_readl(rtc, field) \
+> @@ -328,6 +328,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
+>  	struct sam9_rtc	*rtc;
+>  	int		ret, irq;
+>  	u32		mr;
+> +	unsigned int	sclk_rate;
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+> @@ -385,11 +386,27 @@ static int at91_rtc_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	rtc->sclk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(rtc->sclk))
+> +		return PTR_ERR(rtc->sclk);
+> +
+> +	sclk_rate = clk_get_rate(rtc->sclk);
+> +	if (!sclk_rate || sclk_rate > AT91_RTT_RTTRST) {
+> +		dev_err(&pdev->dev, "Invalid slow clock rate");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = clk_prepare_enable(rtc->sclk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Could not enable slow clock");
+> +		return ret;
+> +	}
+> +
+>  	mr = rtt_readl(rtc, MR);
+>  
+>  	/* unless RTT is counting at 1 Hz, re-initialize it */
+> -	if ((mr & AT91_RTT_RTPRES) != AT91_SLOW_CLOCK) {
+> -		mr = AT91_RTT_RTTRST | (AT91_SLOW_CLOCK & AT91_RTT_RTPRES);
+> +	if ((mr & AT91_RTT_RTPRES) != sclk_rate) {
+> +		mr = AT91_RTT_RTTRST | (sclk_rate & AT91_RTT_RTPRES);
+>  		gpbr_writel(rtc, 0);
+>  	}
+>  
+> @@ -434,6 +451,9 @@ static int at91_rtc_remove(struct platform_device *pdev)
+>  	/* disable all interrupts */
+>  	rtt_writel(rtc, MR, mr & ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
+>  
+> +	if (!IS_ERR(rtc->sclk))
+> +		clk_disable_unprepare(rtc->sclk);
+> +
+>  	return 0;
+>  }
+>  
+> 
 
-I got few device-tree patches for apq8064 usb, sata, phy and hdmi which 
-depend on rpm header file. It will be nice to get this functionality 
-into 3.18.
 
-Do you think we should take these patches via arm-soc tree?
-
-thanks,
-srini
-
-On 23/09/14 00:25, Bjorn Andersson wrote:
-> This series adds a regulator driver for the Resource Power Manager found in
-> Qualcomm 8660, 8960 and 8064 based devices.
->
-> The RPM driver exposes resources to its child devices, that can be accessed to
-> implement drivers for the regulators, clocks and bus frequency control that's
-> owned by the RPM in these devices.
->
-> Changes since v6:
->    - Changed filenames from qcom,rpm.{txt,h} to qcom-rpm.{txt,h}
->
-> Changes since v5:
->    - Clarified dt binding
->    - Converted regulator qcom,force-mode to enum instead of multi-boolean
->    - Remove unecessary version handshake
->    - Cleaned up naming of RPM resources between different RPM versions
->    - Updated regulator qcom,force-mode parsing
->    - Updated regulator qcom,power-mode-* parsing
->    - Cleanups in rpm driver
->    - Dropped dev_get_qcom_rpm helper function
->
-> Changes since v4:
->    - Moved RPM driver to mfd
->
-> Changes since v3:
->    - IPC register is acquired through syscon, as it's shared with others
->
-> Changes since v2:
->    - Fix copy-paste error in dt binding
->    - Correct incomplete move from mfd to soc
->    - Correct const mistake in regulator driver
->
-> Changes since v1:
->    - Moved rpm driver to drivers/soc
->    - Extracted resource table structs from rpm struct, as per Srinivas request
->    - Dropped mode setting support for the regulators for now. Unsure if we need
->      it and it requires some rework from the codeaurora solution.
->    - Using set_voltage_sel instead of rolling my own "snapping", as per Marks
->      request
->    - Split regulator ops in mV, uV and swtich versions as per Marks request.
->    - Added devicetree property to enable pull down.
->
-> Bjorn Andersson (3):
->    mfd: devicetree: bindings: Add Qualcomm RPM DT binding
->    mfd: qcom-rpm: Driver for the Qualcomm RPM
->    regulator: qcom-rpm: Regulator driver for the Qualcomm RPM
->
->   Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  246 ++++++
->   drivers/mfd/Kconfig                                |   14 +
->   drivers/mfd/Makefile                               |    1 +
->   drivers/mfd/qcom_rpm.c                             |  580 ++++++++++++++
->   drivers/regulator/Kconfig                          |   12 +
->   drivers/regulator/Makefile                         |    1 +
->   drivers/regulator/qcom_rpm-regulator.c             |  798 ++++++++++++++++++++
->   include/dt-bindings/mfd/qcom-rpm.h                 |  154 ++++
->   include/linux/mfd/qcom_rpm.h                       |   10 +
->   9 files changed, 1816 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
->   create mode 100644 drivers/mfd/qcom_rpm.c
->   create mode 100644 drivers/regulator/qcom_rpm-regulator.c
->   create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
->   create mode 100644 include/linux/mfd/qcom_rpm.h
->
+-- 
+Nicolas Ferre
