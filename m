@@ -1,40 +1,33 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 14:15:35 +0200
-Subject: [PATCH v4 8/9] ARM: dts: berlin: add the Ethernet node
+Date: Tue, 23 Sep 2014 14:15:34 +0200
+Subject: [PATCH v4 7/9] net: pxa168_eth: allow Berlin SoCs to use the
+ pxa168_eth driver
 In-Reply-To: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1411474536-22626-9-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1411474536-22626-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Ethernet node, enabling the network unit on Berlin
-BG2Q SoCs.
+Berlin SoCs have an Ethernet controller compatible with the pxa168.
+Allow these SoCs to use the pxa168_eth driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/net/ethernet/marvell/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 902eddb19cd8..a88db4097b47 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -114,6 +114,16 @@
- 			#interrupt-cells = <3>;
- 		};
+diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
+index 1b4fc7c639e6..48b9466d1781 100644
+--- a/drivers/net/ethernet/marvell/Kconfig
++++ b/drivers/net/ethernet/marvell/Kconfig
+@@ -64,7 +64,7 @@ config MVPP2
  
-+		eth0: ethernet at b90000 {
-+			compatible = "marvell,pxa168-eth";
-+			reg = <0xb90000 0x10000>;
-+			clocks = <&chip CLKID_GETH0>;
-+			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+			/* set by bootloader */
-+			local-mac-address = [00 00 00 00 00 00];
-+			status = "disabled";
-+		};
-+
- 		cpu-ctrl at dd0000 {
- 			compatible = "marvell,berlin-cpu-ctrl";
- 			reg = <0xdd0000 0x10000>;
+ config PXA168_ETH
+ 	tristate "Marvell pxa168 ethernet support"
+-	depends on CPU_PXA168
++	depends on CPU_PXA168 || ARCH_BERLIN
+ 	select PHYLIB
+ 	---help---
+ 	  This driver supports the pxa168 Ethernet ports.
 -- 
 1.9.1
