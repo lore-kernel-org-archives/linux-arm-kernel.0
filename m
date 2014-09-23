@@ -1,61 +1,91 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 17:43:33 +0200
-Subject: [PATCH v2] ARM: at91: fix at91sam9263ek DT mmc pinmuxing settings
-In-Reply-To: <1411485172-7984-1-git-send-email-andreas.henriksson@endian.se>
-References: <5421623D.6090609@atmel.com>
- <1411485172-7984-1-git-send-email-andreas.henriksson@endian.se>
-Message-ID: <20140923174333.5a10879e@bbrezillon>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 23 Sep 2014 17:45:52 +0200
+Subject: [PATCH v4 3/9] Documentation: bindings: net: add the Marvell
+ PXA168 Ethernet controller
+In-Reply-To: <4014272.rJbSfrLcuB@wuerfel>
+References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140923140113.GC18924@kwain> <20140923142922.GE18924@kwain>
+ <4014272.rJbSfrLcuB@wuerfel>
+Message-ID: <542195B0.6080706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Sep 2014 17:12:52 +0200
-Andreas Henriksson <andreas.henriksson@endian.se> wrote:
+On 09/23/2014 04:37 PM, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014 16:29:22 Antoine Tenart wrote:
+>>
+>> So I had a look on other Ethernet bindings. Would you agree with
+>> something like the following?
+>>
+>>          eth0: ethernet at f7b90000 {
+>>                  ...
+>>                  #address-cells = <1>;
+>>                  #size-cells = <0>;
+>>                  phy-handle = <&ethphy0>;
+>>
+>>                  ethphy0: ethernet-phy at 0 {
+>>                          reg = <0>;
+>>                  };
+>>          };
+>
+> Yes, that looks good.
 
-> As discovered on a custom board similar to at91sam9263ek and basing
-> its devicetree on that one apparently the pin muxing doesn't get
-> set up properly. This was discovered since the custom boards u-boot
-> does funky stuff with the pin muxing and leaved it set to SPI
-> which made the MMC driver not work under Linux.
-> The fix is simply to define the given configuration as the default.
-> This probably worked by pure luck before, but it's better to
-> make the muxing explicitly set.
-> 
-> CC: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Signed-off-by: Andreas Henriksson <andreas.henriksson@endian.se>
+nit: ethernet-phy at 0 should not be part of the ethernet controller
+but either part of a separate mdio-ctrl node or a separate node itself.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+AFAIKS, Berlin SoCs have internal PHYs, i.e. no MII/MDIO-pins exposed
+but only MLT-3 differential pairs. At least BG2CD also can connect its
+ethernet IP to a PHY capable of HDMI Ethernet Channel (HEC).
 
-> ---
->  arch/arm/boot/dts/at91sam9263.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> v2: put pinctrl-names in dtsi instead as requested/suggested by Nicolas Ferre
-> 
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index bb23c2d..5e95a80 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -834,6 +834,7 @@
->  				compatible = "atmel,hsmci";
->  				reg = <0xfff80000 0x600>;
->  				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				clocks = <&mci0_clk>;
-> @@ -845,6 +846,7 @@
->  				compatible = "atmel,hsmci";
->  				reg = <0xfff84000 0x600>;
->  				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				clocks = <&mci1_clk>;
+So for BG2CD this has to look something like:
 
+eth0: ethernet at f7b90000 {
+	...
+	phy-handle = <&hec>;
+};
 
+cec: cec at f7f00baa {
+	compatible = "marvell,berlin-cec";
+	reg = <0xf7f00baa 0x1234>;
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+	/* CEC unit contains HEC PHY */
+	hec: ethernet-phy {
+		bla;
+	};
+}
+
+For reference, this is what we have for MVEBU SoCs with multiple ports
+per controller:
+
+eth: ethernet-ctrl at 72000 {
+	compatible = "marvell,orion-eth";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	reg = <0x72000 0x4000>;
+	clocks = <&gate_clk 2>;
+	marvell,tx-checksum-limit = <1600>;
+	status = "disabled";
+
+	ethernet-port at 0 {
+		compatible = "marvell,orion-eth-port";
+		reg = <0>;
+		interrupts = <29>;
+		/* overwrite MAC address in bootloader */
+		local-mac-address = [00 00 00 00 00 00];
+		phy-handle = <&ethphy>;
+	};
+};
+
+mdio: mdio-bus at 72004 {
+	compatible = "marvell,orion-mdio";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	reg = <0x72004 0x84>;
+	interrupts = <30>;
+	clocks = <&gate_clk 2>;
+	status = "disabled";
+	ethphy: ethernet-phy {
+		/* set phy address in board file */
+	};
+};
+
+Sebastian
