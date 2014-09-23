@@ -1,86 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 23 Sep 2014 19:37:57 +0200
-Subject: [PATCH v2 5/5] Documentation: dts: Add bindings for Vybrid GPIO/PORT
- module
-In-Reply-To: <cover.1411492954.git.stefan@agner.ch>
-References: <cover.1411492954.git.stefan@agner.ch>
-Message-ID: <f31547327a4bb43c0756dbeed6b5665b5433463b.1411492954.git.stefan@agner.ch>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 23 Sep 2014 19:41:43 +0200
+Subject: [PATCH v2] ARM: zImage: add support for ARMv7-M
+In-Reply-To: <20140923163347.GE6858@e104818-lin.cambridge.arm.com>
+References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
+ <1411147367-26824-1-git-send-email-manabian@gmail.com>
+ <20140923163347.GE6858@e104818-lin.cambridge.arm.com>
+Message-ID: <CAGhQ9VyZ4ZPNNDm9TNJKiQ2zufasr2vkbepFsg-K+raUha0_8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Vybrid SoC device tree (vf610.dtsi) used this bindings since
-its initial commit in May 2013. However, a proper gpiolib driver
-was missing so far. With the addition of the gpiolib driver,
-the bindings proved to be useful and complete, hence a good time
-to add the documentation.
+On 23 September 2014 18:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Sep 19, 2014 at 06:22:47PM +0100, Joachim Eastwood wrote:
+>>               .align
+>> -             .arm                            @ Always enter in ARM state
+>> + AR_CLASS(   .arm    )               @ Always enter in ARM state for AR class
+>
+> Nitpick: A/R class (or classes).
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../devicetree/bindings/gpio/gpio-vf610.txt        | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+Sure.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-new file mode 100644
-index 0000000..da84121
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-@@ -0,0 +1,56 @@
-+* Freescale VF610 PORT/GPIO module
-+
-+The Freescale PORT/GPIO modules are two adjacent modules providing GPIO
-+functionality. Each pair serves 32 GPIOs. The VF610 has 5 instances of
-+each, and each PORT module has its own interrupt.
-+
-+Required properties for GPIO node:
-+- compatible : Should be "fsl,<soc>-gpio", currently "fsl,vf610-gpio"
-+- reg : The first reg tuple represents the PORT module, the second tuple
-+  the GPIO module.
-+- interrupts : Should be the port interrupt shared by all 32 pins.
-+- gpio-controller : Marks the device node as a gpio controller.
-+- #gpio-cells : Should be two. The first cell is the pin number and
-+  the second cell is used to specify the gpio polarity:
-+      0 = active high
-+      1 = active low
-+- interrupt-controller: Marks the device node as an interrupt controller.
-+- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
-+  The second cell bits[3:0] is used to specify trigger type and level flags:
-+      1 = low-to-high edge triggered.
-+      2 = high-to-low edge triggered.
-+      4 = active high level-sensitive.
-+      8 = active low level-sensitive.
-+
-+Note: Each GPIO port should have an alias correctly numbered in "aliases"
-+node.
-+
-+Examples:
-+
-+aliases {
-+	gpio0 = &gpio1;
-+	gpio1 = &gpio2;
-+};
-+
-+gpio1: gpio at 40049000 {
-+	compatible = "fsl,vf610-gpio";
-+	reg = <0x40049000 0x1000 0x400ff000 0x40>;
-+	interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	gpio-ranges = <&iomuxc 0 0 32>;
-+};
-+
-+gpio2: gpio at 4004a000 {
-+	compatible = "fsl,vf610-gpio";
-+	reg = <0x4004a000 0x1000 0x400ff040 0x40>;
-+	interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	gpio-ranges = <&iomuxc 0 32 32>;
-+};
-+
--- 
-2.1.0
+>> +#elif defined(CONFIG_CPU_V7M)
+>> +             ldr     r9, =0xe000ed00         @ CPUID register address
+>
+> Another nitpick: can you use some macro? We define them in
+> arch/arm/include/asm/v7m.h, so you could write the above as (untested):
+>
+>                 ldr     r9, =BASEADDR_V7M_SCB + V7M_SCB_CPUID
+
+I'll use the version from head-nommu.S, which does this:
+ldr r9, =BASEADDR_V7M_SCB
+ldr r9, [r9, V7M_SCB_CPUID]
+
+I'll send out an updated patch soon.
+
+regards
+Joachim Eastwood
