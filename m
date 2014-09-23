@@ -1,41 +1,54 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 23 Sep 2014 13:46:09 +0530
-Subject: [PATCH v2 5/5] arm64: exynos: Enable pinctrl support for Exynos7
-In-Reply-To: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
-References: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1411460169-30536-6-git-send-email-a.kesavan@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 23 Sep 2014 10:16:30 +0200
+Subject: [PATCH v6 4/9] rtc: at91sam9: add DT support
+In-Reply-To: <1411400563-570-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411400563-570-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411400563-570-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <54212C5E.3010301@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
+On 22/09/2014 17:42, Boris BREZILLON :
+> Add of_match_table to the existing driver so that rtt nodes defined in at91
+> DTs can be attached to this driver.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Enable pinctrl support for exynos7 SoCs.
+> ---
+>  drivers/rtc/rtc-at91sam9.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index 38a2693..d72c34d 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -445,6 +445,14 @@ static int at91_rtc_resume(struct device *dev)
+>  
+>  static SIMPLE_DEV_PM_OPS(at91_rtc_pm_ops, at91_rtc_suspend, at91_rtc_resume);
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id at91_rtc_dt_ids[] = {
+> +	{ .compatible = "atmel,at91sam9260-rtt" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
+> +#endif
+> +
+>  static struct platform_driver at91_rtc_driver = {
+>  	.probe		= at91_rtc_probe,
+>  	.remove		= at91_rtc_remove,
+> @@ -453,6 +461,7 @@ static struct platform_driver at91_rtc_driver = {
+>  		.name	= "rtc-at91sam9",
+>  		.owner	= THIS_MODULE,
+>  		.pm	= &at91_rtc_pm_ops,
+> +		.of_match_table = of_match_ptr(at91_rtc_dt_ids),
+>  	},
+>  };
+>  
+> 
 
-Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
-Tested-by: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
----
- arch/arm64/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1874e1a..4ee1250 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -146,6 +146,8 @@ config ARCH_EXYNOS7
- 	bool "ARMv8 based Samsung Exynos7"
- 	select ARCH_EXYNOS
- 	select COMMON_CLK_SAMSUNG
-+	select PINCTRL
-+	select PINCTRL_EXYNOS
- 	help
- 	  This enables support for Samsung Exynos7 SoC family
- 
 -- 
-1.7.9.5
+Nicolas Ferre
