@@ -1,37 +1,29 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 23 Sep 2014 13:21:40 -0500
-Subject: [PATCH 1/2] ARM: qcom: Update defconfig
-Message-ID: <1411496501-20130-1-git-send-email-galak@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 20:23:21 +0200
+Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support
+ in big-endian model
+In-Reply-To: <1411492720444.3205@freescale.com>
+References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
+ <45444544.Xl4NeUiTm0@wuerfel> <1411492720444.3205@freescale.com>
+Message-ID: <4465641.JLAzuEs1O5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enable ATA & AHCI platform support to get SATA on IPQ806x platforms
+On Tuesday 23 September 2014 17:18:43 Jingchang Lu wrote:
+> I will reconsider this setting. BTW, why writel() can't be used
+> for memory location since it's still mapped and registers space is
+> also memory mapped? Thanks.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
- arch/arm/configs/qcom_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+You cannot rely on an '__iomem' token to actually be a pointer, even
+if that is currently the case on ARM.
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c7da33..05372f1 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -57,13 +57,14 @@ CONFIG_MTD_M25P80=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
--CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_CHR_DEV_SG=y
- CONFIG_CHR_DEV_SCH=y
- CONFIG_SCSI_CONSTANTS=y
- CONFIG_SCSI_LOGGING=y
- CONFIG_SCSI_SCAN_ASYNC=y
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
- CONFIG_MDIO_BITBANG=y
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+On other architectures, the bits in the pointer can encode something
+completely different, e.g. it may be the physical address on
+architectures that have instructions to load/store on that directly,
+and ioremap() in that case returns an identity mapping.
+
+If you install sparse and build with 'make C=1', you will in fact
+get a warning about the code when you assign a regular pointer to
+an __iomem pointer or vice versa.
+
+	Arnd
