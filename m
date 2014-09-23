@@ -1,80 +1,41 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 23 Sep 2014 17:51:21 -0600
-Subject: [PATCH v6 5/5] arm: dts: qcom: Add idle states device nodes for 8974
-In-Reply-To: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
-References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1411516281-58328-6-git-send-email-lina.iyer@linaro.org>
+From: jcmvbkbc@gmail.com (Max Filippov)
+Date: Wed, 24 Sep 2014 03:56:39 +0400
+Subject: [PATCH] atomic_read: Use ACCESS_ONCE() instead of cast to volatile
+In-Reply-To: <1411482607-20948-1-git-send-email-bobby.prani@gmail.com>
+References: <1411482607-20948-1-git-send-email-bobby.prani@gmail.com>
+Message-ID: <CAMo8BfKxwq=pc5Lym7X0Qdgmr37jJ-OK_dCmzukkHxtCxz8_7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add allowable C-States for each cpu using the cpu-idle-states node.
-ARM spec dictates WFI as the default idle state at 0. Support standalone
-power collapse (power down that does not affect any SoC idle states) for
-each cpu.
+On Tue, Sep 23, 2014 at 6:29 PM, Pranith Kumar <bobby.prani@gmail.com> wrote:
+> Use the much reader friendly ACCESS_ONCE() instead of the cast to volatile. This
+> is purely a style change.
+>
+> Signed-off-by: Pranith Kumar <bobby.prani@gmail.com>
+> ---
+>  arch/alpha/include/asm/atomic.h    | 4 ++--
+>  arch/arm/include/asm/atomic.h      | 2 +-
+>  arch/arm64/include/asm/atomic.h    | 4 ++--
+>  arch/avr32/include/asm/atomic.h    | 2 +-
+>  arch/cris/include/asm/atomic.h     | 2 +-
+>  arch/frv/include/asm/atomic.h      | 2 +-
+>  arch/ia64/include/asm/atomic.h     | 4 ++--
+>  arch/m32r/include/asm/atomic.h     | 2 +-
+>  arch/m68k/include/asm/atomic.h     | 2 +-
+>  arch/mips/include/asm/atomic.h     | 4 ++--
+>  arch/parisc/include/asm/atomic.h   | 4 ++--
+>  arch/sh/include/asm/atomic.h       | 2 +-
+>  arch/sparc/include/asm/atomic_32.h | 2 +-
+>  arch/sparc/include/asm/atomic_64.h | 4 ++--
+>  arch/x86/include/asm/atomic.h      | 2 +-
+>  arch/x86/include/asm/atomic64_64.h | 2 +-
+>  arch/xtensa/include/asm/atomic.h   | 2 +-
+>  include/asm-generic/atomic.h       | 2 +-
+>  18 files changed, 24 insertions(+), 24 deletions(-)
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+For xtensa:
+Acked-by: Max Filippov <jcmvbkbc@gmail.com>
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 0580bc2..e87b24f 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -21,6 +21,7 @@
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		CPU1: cpu at 1 {
-@@ -30,6 +31,7 @@
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		CPU2: cpu at 2 {
-@@ -39,6 +41,7 @@
- 			reg = <2>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		CPU3: cpu at 3 {
-@@ -48,6 +51,7 @@
- 			reg = <3>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		L2: l2-cache {
-@@ -55,6 +59,22 @@
- 			cache-level = <2>;
- 			qcom,saw = <&saw_l2>;
- 		};
-+
-+		idle-states {
-+			CPU_WFI: wfi {
-+				compatible = "qcom,idle-state-wfi", "arm,idle-state";
-+				entry-latency-us = <1>;
-+				exit-latency-us = <1>;
-+				min-residency-us = <2>;
-+			};
-+
-+			CPU_SPC: spc {
-+				compatible = "qcom,idle-state-spc", "arm,idle-state";
-+				entry-latency-us = <150>;
-+				exit-latency-us = <200>;
-+				min-residency-us = <2000>;
-+			};
-+		};
- 	};
- 
- 	cpu-pmu {
 -- 
-1.9.1
+Thanks.
+-- Max
