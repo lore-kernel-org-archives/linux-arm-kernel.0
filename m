@@ -1,45 +1,51 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 23 Sep 2014 15:42:11 +0800
-Subject: [PATCH v2 1/2] watchdog: dw_wdt: initialise TOP_INIT in
- dw_wdt_set_top()
-In-Reply-To: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
-References: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1411458132-5410-2-git-send-email-jszhang@marvell.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 23 Sep 2014 09:44:11 +0200
+Subject: [RESEND PATCH 1/4] ARM: STi: DT: STiH407: 407 DT Entry for
+ clockgen A0
+In-Reply-To: <1408977888-10473-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1408977888-10473-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <542124CB.1080307@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TOP_INIT, ie bit 4-7 of the WDOG_TIMEOUT_RANGE_REG_OFFSET register
-may be zero, so the timeout period may be very short after initialization
-is done, thus the system may be reset soon after enabling. We fix this
-problem by also initialising the TOP_INIT when setting TOP in function
-dw_wdt_set_top().
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/watchdog/dw_wdt.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-index 9f21029..449c885 100644
---- a/drivers/watchdog/dw_wdt.c
-+++ b/drivers/watchdog/dw_wdt.c
-@@ -40,6 +40,7 @@
- #define WDOG_CONTROL_REG_OFFSET		    0x00
- #define WDOG_CONTROL_REG_WDT_EN_MASK	    0x01
- #define WDOG_TIMEOUT_RANGE_REG_OFFSET	    0x04
-+#define WDOG_TIMEOUT_RANGE_TOPINIT_SHIFT    4
- #define WDOG_CURRENT_COUNT_REG_OFFSET	    0x08
- #define WDOG_COUNTER_RESTART_REG_OFFSET     0x0c
- #define WDOG_COUNTER_RESTART_KICK_VALUE	    0x76
-@@ -106,7 +107,8 @@ static int dw_wdt_set_top(unsigned top_s)
- 		}
- 
- 	/* Set the new value in the watchdog. */
--	writel(top_val, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
-+	writel(top_val | top_val << WDOG_TIMEOUT_RANGE_TOPINIT_SHIFT,
-+		dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
- 
- 	dw_wdt_set_next_heartbeat();
- 
--- 
-2.1.0
+On 08/25/2014 04:44 PM, Gabriel FERNANDEZ wrote:
+> Patch adds DT entries for clockgen A0
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
+> ---
+>   arch/arm/boot/dts/stih407-clock.dtsi | 32 ++++++++++++++++++++++++++++++++
+>   1 file changed, 32 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+> index 800f46f..e03e86e 100644
+> --- a/arch/arm/boot/dts/stih407-clock.dtsi
+> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
+> @@ -7,6 +7,10 @@
+>    */
+>   / {
+>   	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+>   		/*
+>   		 * Fixed 30MHz oscillator inputs to SoC
+>   		 */
+> @@ -35,5 +39,33 @@
+>   			clock-frequency = <200000000>;
+>   			clock-output-names = "clk-s-icn-reg-0";
+>   		};
+> +
+> +		/*
+> +		 * ClockGenAs on SASG2
+> +		 */
+Note that I removed this comment since no SASG2 on STiH407.
+
+> +		clockgen-a at 090ff000 {
+> +			compatible = "st,clkgen-c32";
+> +			reg = <0x90ff000 0x1000>;
+...
