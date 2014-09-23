@@ -1,38 +1,134 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 16:07:33 +0200
-Subject: [PATCH v3 0/3] mtd: nand: gpmi: add proper raw access support
-Message-ID: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 23 Sep 2014 16:07:34 +0200
+Subject: [PATCH v3 1/3] mtd: nand: gpmi: add gpmi_move_bits function
+In-Reply-To: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Huang, Brian,
+Add a new function to move bits (not bytes) from a memory region to
+another one.
+This function is similar to memmove except it acts at bit level.
+This function is needed to implement GPMI raw access functions, given the
+fact that ECC engine does not pad ECC bits to the next byte boundary.
 
-This is just a new proposal to support raw accesses in a more standard way
-in the GPMI driver.
-This series has been tested on an imx28 board.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 88 ++++++++++++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
+ 2 files changed, 92 insertions(+)
 
-Any suggestions are welcome.
-
-Best Regards,
-
-Boris
-
-Changes since v2:
- - fixed a bug in gpmi_move_bits
- - add a raw_buffer field to be used when using raw access methods
-   (experienced memory corruptions when directly using page_buffer_virt
-   buffer)
- - add raw OOB access functions
-
-Boris BREZILLON (3):
-  mtd: nand: gpmi: add gpmi_move_bits function
-  mtd: nand: gpmi: add proper raw access support
-  mtd: nand: gpmi: add raw oob access functions
-
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |  88 ++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 144 +++++++++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   6 ++
- 3 files changed, 238 insertions(+)
-
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index 87e658c..e2f706a 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -1353,3 +1353,91 @@ int gpmi_read_page(struct gpmi_nand_data *this,
+ 	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
+ 	return start_dma_with_bch_irq(this, desc);
+ }
++
++void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
++		    const u8 *src, size_t src_bit_off,
++		    size_t nbits)
++{
++	size_t i;
++	size_t nbytes;
++	u32 src_byte = 0;
++
++	src += src_bit_off / 8;
++	src_bit_off %= 8;
++
++	dst += dst_bit_off / 8;
++	dst_bit_off %= 8;
++
++	if (src_bit_off) {
++		src_byte = src[0] >> src_bit_off;
++		nbits -= 8 - src_bit_off;
++		src++;
++	}
++
++	nbytes = nbits / 8;
++
++	if (dst_bit_off) {
++		if (src_bit_off <= dst_bit_off) {
++			dst[0] &= GENMASK(dst_bit_off - 1, 0);
++			dst[0] |= src_byte << dst_bit_off;
++			src_bit_off += (8 - dst_bit_off);
++			src_byte >>= (8 - dst_bit_off);
++			dst_bit_off = 0;
++			dst++;
++		} else if (nbytes) {
++			src_byte |= src[0] << (8 - src_bit_off);
++			dst[0] &= GENMASK(dst_bit_off - 1, 0);
++			dst[0] |= src_byte << dst_bit_off;
++			src_bit_off += dst_bit_off;
++			src_byte >>= (8 - dst_bit_off);
++			dst_bit_off = 0;
++			dst++;
++			nbytes--;
++			src++;
++			if (src_bit_off > 7) {
++				src_bit_off -= 8;
++				dst[0] = src_byte;
++				dst++;
++				src_byte >>= 8;
++			}
++		}
++	}
++
++	if (!src_bit_off && !dst_bit_off) {
++		if (nbytes)
++			memcpy(dst, src, nbytes);
++	} else {
++		for (i = 0; i < nbytes; i++) {
++			src_byte |= src[i] << (8 - src_bit_off);
++			dst[i] = src_byte;
++			src_byte >>= 8;
++		}
++	}
++
++	dst += nbytes;
++	src += nbytes;
++	nbits %= 8;
++
++	if (!nbits && !src_bit_off)
++		return;
++
++	if (nbits)
++		src_byte |= (*src & GENMASK(nbits - 1, 0)) <<
++			    ((8 - src_bit_off) % 8);
++	nbits += (8 - src_bit_off) % 8;
++
++	if (dst_bit_off)
++		src_byte = (src_byte << dst_bit_off) |
++			   (*dst & GENMASK(dst_bit_off - 1, 0));
++	nbits += dst_bit_off;
++
++	if (nbits % 8)
++		src_byte |= (dst[nbits / 8] & GENMASK(7, nbits % 8)) <<
++			    (nbits / 8);
++
++	nbytes = DIV_ROUND_UP(nbits, 8);
++	for (i = 0; i < nbytes; i++) {
++		dst[i] = src_byte;
++		src_byte >>= 8;
++	}
++}
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 32c6ba4..17d0736 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -290,6 +290,10 @@ extern int gpmi_send_page(struct gpmi_nand_data *,
+ extern int gpmi_read_page(struct gpmi_nand_data *,
+ 			dma_addr_t payload, dma_addr_t auxiliary);
+ 
++void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
++		    const u8 *src, size_t src_bit_off,
++		    size_t nbits);
++
+ /* BCH : Status Block Completion Codes */
+ #define STATUS_GOOD		0x00
+ #define STATUS_ERASED		0xff
 -- 
 1.9.1
