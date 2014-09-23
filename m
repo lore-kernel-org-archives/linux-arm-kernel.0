@@ -1,71 +1,32 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 23 Sep 2014 11:11:26 +0900
-Subject: [RFC PATCH 2/5] devfreq: event: Add exynos-ppmu devfreq evnet
- driver
-In-Reply-To: <1410511274.31130.7.camel@x220>
-References: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
- <1409891419-28560-3-git-send-email-cw00.choi@samsung.com>
- <1410511274.31130.7.camel@x220>
-Message-ID: <5420D6CE.7050606@samsung.com>
+From: jinkun.hong@rock-chips.com (jinkun.hong)
+Date: Mon, 22 Sep 2014 19:55:13 -0700
+Subject: [PATCH 0/3] ARM: rk3288 : Add PM Domain support
+Message-ID: <1411440916-6830-1-git-send-email-jinkun.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+From: "jinkun.hong" <jinkun.hong@rock-chips.com>
 
-On 09/12/2014 05:41 PM, Paul Bolle wrote:
-> On Fri, 2014-09-05 at 13:30 +0900, Chanwoo Choi wrote:
->> This patch add exynos-ppmu devfreq event driver to provider raw data about
->> the utilization of each IP in Exynos SoC series.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  drivers/devfreq/Kconfig             |  10 +
->>  drivers/devfreq/event/Makefile      |   1 +
->>  drivers/devfreq/event/exynos-ppmu.c | 410 ++++++++++++++++++++++++++++++++++++
->>  3 files changed, 421 insertions(+)
->>  create mode 100644 drivers/devfreq/event/exynos-ppmu.c
->>
->> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
->> index ef839e7..4fbbcea 100644
->> --- a/drivers/devfreq/Kconfig
->> +++ b/drivers/devfreq/Kconfig
->> @@ -90,4 +90,14 @@ config ARM_EXYNOS5_BUS_DEVFREQ
->>  
->>  comment "DEVFREQ Event Drivers"
->>  
->> +config DEVFREQ_EVENT_EXYNOS_PPMU
->> +	bool "EXYNOS PPMU (Performance Profiling Monitoring Unit) DEVFREQ event Driver"
->> +	depends on ARCH_EXYNOS
->> +	select ARCH_HAS_OPP
-> 
-> This select statement can be dropped: see commit 78c5e0bb145d ("PM /
-> OPP: Remove ARCH_HAS_OPP").
+Use PM Domain framework to manage the clock.
+It depends on the patch:
+http://www.spinics.net/lists/arm-kernel/msg360672.html
 
-I'll drop it. 
 
-> 
-> By the way: there's a typo in the commit summary ("evnet").
+jinkun.hong (3):
+  power-domain: add power domain drivers for Rockchip platform
+  dt-bindings: add document of Rockchip power domain
+  ARM: dts: add rk3288 power-domain node
 
-My mistake, I'll fix typo.
+ .../bindings/arm/rockchip/power_domain.txt         |   48 +++
+ arch/arm/boot/dts/rk3288.dtsi                      |   45 +++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/pm_domains.c                |  372 ++++++++++++++++++++
+ include/dt-bindings/power-domain/rk3288.h          |   11 +
+ 6 files changed, 478 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+ create mode 100644 arch/arm/mach-rockchip/pm_domains.c
+ create mode 100644 include/dt-bindings/power-domain/rk3288.h
 
-Thanks for your review.
-Chanwoo Choi
-
-> 
->> +	select PM_OPP
->> +	help
->> +	 This add the DEVFREQ event driver for Exynos SoC. It provides PPMU
->> +	 (Performance Profiling Monitoring Unit) counters to estimate the
->> +	 utilization of each module.
->> +
->>  endif # PM_DEVFREQ
-> 
-> 
-> Paul Bolle
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+1.7.9.5
