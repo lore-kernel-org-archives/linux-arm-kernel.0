@@ -1,62 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 07:13:52 +0200
-Subject: [PATCH] mfd: inherit coherent_dma_mask from parent device
-In-Reply-To: <12718317.Y05azLtl8v@wuerfel>
-References: <1411414675-19010-1-git-send-email-boris.brezillon@free-electrons.com>
- <12718317.Y05azLtl8v@wuerfel>
-Message-ID: <20140923071352.65a6e9ec@bbrezillon>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 22 Sep 2014 22:22:47 -0700
+Subject: [PATCH] ARM: mach-bcm: offer a new maintainer and process
+In-Reply-To: <20140923050339.GF7487@localhost>
+References: <1411150632-25695-1-git-send-email-f.fainelli@gmail.com>
+ <20140923050339.GF7487@localhost>
+Message-ID: <CAGVrzcZD+h76CjD925PmcP94JDSqRwt2VgTj_SJNHBTfCNwFqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+2014-09-22 22:03 GMT-07:00 Olof Johansson <olof@lixom.net>:
+> On Fri, Sep 19, 2014 at 11:17:11AM -0700, Florian Fainelli wrote:
+>> Hi all,
+>>
+>> As some of you may have seen in the news, Broadcom has recently stopped
+>> its mobile SoC activities. Upstream support for Broadcom's Mobile SoCs
+>> was an effort initially started by Christian Daudt and his team, and then
+>> continued by Alex Eleder and Matter Porter assigned to a particular landing
+>> team within Linaro to help Broadcom doing so.
+>>
+>> As part of this effort, Christian and Matt volunteered for centralizing pull
+>> requests coming from the arch/arm/mach-bcm/* directory and as of today, they
+>> are still responsible for merging mach-bcm pull requests coming from brcmstb,
+>> bcm5301x, bcm2835 and bcm63xx, creating an intermediate layer to the arm-soc
+>> tree.
+>>
+>> Following the mobile group shut down, our group (in which Brian, Gregory, Marc,
+>> Kevin and myself are) inherited these mobile SoC platforms, although at this
+>> point we cannot comment on the future of mobile platforms, we know that our
+>> Linaro activities have been stopped.
+>>
+>> We have not heard much from Christian and Matt in a while, and some of our pull
+>> requests have been stalling as a result. We would like to offer both a new
+>> maintainer for the mobile platforms as well as reworking the pull request
+>> process:
+>>
+>> - our group has now full access to these platforms, putting us in the best
+>>   position to support Mobile SoCs questions
+>
+> So, one question I have is whether it makes sense to keep the mobile
+> platforms in the kernel if the line of business is ending?
 
-On Mon, 22 Sep 2014 21:45:40 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+I leave it to Scott for more details, but last we talked he mentioned
+what has been upstreamed is useful for some other platforms he cares
+about.
 
-> On Monday 22 September 2014 21:37:55 Boris BREZILLON wrote:
-> > dma_mask and dma_parms are already inherited from the parent device but
-> > dma_coherent_mask was left uninitialized (set to zero thanks to kzalloc).
-> > Set sub-device coherent_dma_mask to its parent value to simplify
-> > sub-drivers making use of dma coherent helper functions (those drivers
-> > currently have to explicitly set the dma coherent mask using
-> > dma_set_coherent_mask function).
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> > 
-> > Hi,
-> > 
-> > This patch is follow-up of a discussion we had on a KMS driver thread [1].
-> > This patch is only copying the parent device coherent_dma_mask to avoid
-> > calling specific dma_set_coherent_mask in case the coherent mask is the
-> > default one.
-> > 
-> > I'm a bit surprised this hasn't been done earlier while other dma fields
-> > (mask and parms) are already inherited from the parent device, so please
-> > tell me if there already was an attempt to do the same, and if so, what
-> > was the reson for rejecting it :-).
-> > 
-> > 
-> 
-> Seems reasonable to me. It's not clear whether we should always inherit
-> the dma_mask, but I see no point in copying just dma_mask but not
-> coherent_dma_mask.
+>
+> While I truly do appreciate the work done by Matt and others, there's
+> also little chance that it'll see substantial use by anyone. The Capri
+> boards aren't common out in the wild and I'm not aware of any dev
+> boards or consumer products with these SoCs that might want to run
+> mainline? Critical things such as power management and graphics are
+> missing from the current platform support in the kernel, so nobody is
+> likely to want it on their Android phone, etc.
+>
+> Maybe the answer to this is "keep it for now, revisit sometime later",
+> which is perfectly sane -- it has practically no cost to keep it around
+> the way it's looking now.
 
-I thought about adding a dma_mask field to mfd_cell to override the
-default behavior (allocate a new dma_mask and copy the value 
-provided by mfd_cell if it's not zero), but I don't see any real use
-case where a sub-device does not share the dma capabilities with its
-parent.
-IMHO, it's safer to keep it as is until someone really need to set a
-different dma_mask on a sub-device.
-
-Best Regards,
-
-Boris
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Right, let's adopt that approach for now, and we can revisit that
+later in light of Scott and his group's work.
+--
+Florian
