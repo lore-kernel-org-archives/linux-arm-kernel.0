@@ -1,142 +1,32 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 23 Sep 2014 17:51:20 -0600
-Subject: [PATCH v6 4/5] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+Date: Tue, 23 Sep 2014 17:51:18 -0600
+Subject: [PATCH v6 2/5] arm: dts: qcom: Add SPM device bindings for 8974
 In-Reply-To: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
 References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1411516281-58328-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add cpuidle driver interface to allow cpus to go into C-States. Use the
-cpuidle DT interface common across ARM architectures to provide the
-C-State information to the cpuidle framework.
+Add SPM device bindings for QCOM 8974 based cpus. SPM is the sub-system
+power manager and controls the logic around the cores (cpu and L2).
 
-Supported modes at this time are clock gating (wfi) and cpu power down
-(Standalone PC or spc).
+Each core has an instance of SPM and controls only that core. Each cpu
+SPM is configured to support WFI and SPC (standalone-power collapse).
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- .../bindings/arm/msm/qcom,idle-state.txt           | 72 +++++++++++++++++
- drivers/cpuidle/Kconfig.arm                        |  7 ++
- drivers/cpuidle/Makefile                           |  1 +
- drivers/cpuidle/cpuidle-qcom.c                     | 89 ++++++++++++++++++++++
- 4 files changed, 169 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
- create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+ arch/arm/boot/dts/qcom-msm8974-pm.dtsi | 69 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi    | 10 +++--
+ 2 files changed, 75 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974-pm.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+diff --git a/arch/arm/boot/dts/qcom-msm8974-pm.dtsi b/arch/arm/boot/dts/qcom-msm8974-pm.dtsi
 new file mode 100644
-index 0000000..47095b9
+index 0000000..bbfb1d5
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-@@ -0,0 +1,72 @@
-+QCOM Idle States for cpuidle driver
-+
-+ARM provides idle-state node to define the cpuidle states, as defined in [1].
-+cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
-+states. Idle states have different enter/exit latency and residency values.
-+The idle states supported by the QCOM SoC are defined as -
-+
-+    * WFI
-+    * Retention
-+    * Standalone Power Collapse (Standalone PC or SPC)
-+    * Power Collapse (PC)
-+
-+WFI: WFI does a little more in addition to architectural clock gating.  ARM
-+processors when execute the wfi instruction will gate their internal clocks.
-+QCOM cpus use this instruction as a trigger for the SPM state machine. Usually
-+with a cpu entering WFI, the SPM is configured to do clock-gating as well. The
-+SPM state machine waits for the interrrupt to trigger the core back in to
-+active. When all CPUs in the SoC, clock gate using the ARM wfi instruction, the
-+second level cache usually can also clock gate sensing no cpu activity. When a
-+cpu is ready to run, it needs the cache to be active before starting execution.
-+Allowing the SPM to execute the clock gating statemachine and waiting for
-+interrupt on behalf of the processor has a benefit of guaranteeing that the
-+system state is conducive for the core to resume execution.
-+
-+Retention: Retention is a low power state where the core is clockgated and the
-+memory and the registers associated with the core are retained.  The voltage
-+may be reduced to the minimum value needed to keep the processor registers
-+active. Retention is triggered when the core executes wfi instruction. The SPM
-+should be configured to execute the retention sequence and would wait for
-+interrupt, before restoring the cpu to execution state. Retention may have a
-+slightly higher latency than WFI.
-+
-+Standalone PC: A cpu can power down and warmboot if there is a sufficient time
-+between now and the next know wake up. SPC mode is used to indicate a core
-+entering a power down state without consulting any other cpu or the system
-+resources. This helps save power only on that core. Like WFI and Retention, the
-+core executes wfi and the SPM programmed to do SPC would use the cpu control
-+logic to power down the core's supply and restore it back when woken up by an
-+interrupt.  Applying power and reseting the core causes the core to warmboot
-+back into secure mode which trampolines the control back to the kernel. To
-+enter a power down state the kernel needs to call into the secure layer which
-+would then execute the ARM wfi instruction. Failing to do so, would result in a
-+crash enforced by the warm boot code in the secure layer. On a SoC with
-+write-back L1 cache, the cache would need to be flushed.
-+
-+Power Collapse: This state is similiar to the SPC mode, but distinguishes
-+itself in the fact that the cpu acknowledges and permits the SoC to enter
-+deeper sleep modes. In a hierarchical power domain SoC, this means L2 and other
-+caches can be flushed, system bus, clocks - lowered, and SoC main XO turned off
-+and voltages reduced, provided all cpus enter this state. In other words, it is
-+a coupled idle state.  Since the span of low power modes possible at this state
-+is vast, the exit latency and the residency of this low power mode would be
-+considered high even though at a cpu level, this essentially is cpu power down.
-+The SPM in this state also may handshake with the Resource power manager
-+processor in the SoC to indicate a complete subsystem shut down.
-+
-+The idle-state for QCOM SoCs are distinguished by the compatible property of
-+the node. They indicate to the cpuidle driver the entry point to use for
-+cpuidle. The devicetree representation of the idle state should be -
-+
-+Required properties:
-+
-+- compatible: Must be "arm,idle-state"
-+		and one of -
-+			"qcom,idle-state-wfi",
-+			"qcom,idle-state-ret",
-+			"qcom,idle-state-spc",
-+			"qcom,idle-state-pc",
-+
-+Other required and optional properties are specified in [1].
-+
-+[1]. Documentation/devicetree/bindings/arm/idle-states.txt
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 38cff69..6a9ee12 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -62,3 +62,10 @@ config ARM_MVEBU_V7_CPUIDLE
- 	depends on ARCH_MVEBU
- 	help
- 	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
-+
-+config ARM_QCOM_CPUIDLE
-+	bool "CPU Idle drivers for Qualcomm processors"
-+	depends on QCOM_PM
-+	select DT_IDLE_STATES
-+	help
-+	  Select this to enable cpuidle for QCOM processors
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 4d177b9..6c222d5 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
- obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
-+obj-$(CONFIG_ARM_QCOM_CPUIDLE)		+= cpuidle-qcom.o
- 
- ###############################################################################
- # MIPS drivers
-diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
-new file mode 100644
-index 0000000..d226ac1
---- /dev/null
-+++ b/drivers/cpuidle/cpuidle-qcom.c
-@@ -0,0 +1,89 @@
-+/*
-+ * Copyright (c) 2014, Linaro Limited.
++++ b/arch/arm/boot/dts/qcom-msm8974-pm.dtsi
+@@ -0,0 +1,69 @@
++/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 and
@@ -146,83 +36,110 @@ index 0000000..d226ac1
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
-+ *
 + */
 +
-+#include <linux/cpu_pm.h>
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
++&soc {
++	spm at f9089000 {
++		compatible = "qcom,spm-v2.1";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0xf9089000 0x1000>;
++		qcom,cpu = <&CPU0>;
++		qcom,saw2-clk-div = <0x01>;
++		qcom,saw2-delays = <0x3C102800>;
++		qcom,saw2-enable = <0x01>;
++		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
++		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
++			30 06 26 30 0F];
++	};
 +
-+#include <soc/qcom/pm.h>
-+#include "dt_idle_states.h"
++	spm at f9099000 {
++		compatible = "qcom,spm-v2.1";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0xf9099000 0x1000>;
++		qcom,cpu = <&CPU1>;
++		qcom,saw2-clk-div = <0x01>;
++		qcom,saw2-delays = <0x3C102800>;
++		qcom,saw2-enable = <0x01>;
++		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
++		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
++			30 06 26 30 0F];
++	};
 +
-+static void (*qcom_idle_enter)(enum msm_pm_sleep_mode);
++	spm at f90a9000 {
++		compatible = "qcom,spm-v2.1";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0xf90a9000 0x1000>;
++		qcom,cpu = <&CPU2>;
++		qcom,saw2-clk-div = <0x01>;
++		qcom,saw2-delays = <0x3C102800>;
++		qcom,saw2-enable = <0x01>;
++		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
++		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
++			30 06 26 30 0F];
++	};
 +
-+static int qcom_lpm_enter_wfi(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int index)
-+{
-+	qcom_idle_enter(MSM_PM_SLEEP_MODE_WFI);
-+
-+	return index;
-+}
-+
-+static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
-+				struct cpuidle_driver *drv, int index)
-+{
-+	cpu_pm_enter();
-+	qcom_idle_enter(MSM_PM_SLEEP_MODE_SPC);
-+	cpu_pm_exit();
-+
-+	return index;
-+}
-+
-+static struct cpuidle_driver qcom_cpuidle_driver = {
-+	.name	= "qcom_cpuidle",
-+	.owner	= THIS_MODULE,
++	spm at f90b9000 {
++		compatible = "qcom,spm-v2.1";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0xf90b9000 0x1000>;
++		qcom,cpu = <&CPU3>;
++		qcom,saw2-clk-div = <0x01>;
++		qcom,saw2-delays = <0x3C102800>;
++		qcom,saw2-enable = <0x01>;
++		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
++		qcom,saw2-spm-cmd-spc = [00 20 80 10 E8 5B 03 3B E8 5B 82 10 0B
++			30 06 26 30 0F];
++	};
 +};
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 69dca2a..0580bc2 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -14,7 +14,7 @@
+ 		#size-cells = <0>;
+ 		interrupts = <1 9 0xf04>;
+ 
+-		cpu at 0 {
++		CPU0: cpu at 0 {
+ 			compatible = "qcom,krait";
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			device_type = "cpu";
+@@ -23,7 +23,7 @@
+ 			qcom,acc = <&acc0>;
+ 		};
+ 
+-		cpu at 1 {
++		CPU1: cpu at 1 {
+ 			compatible = "qcom,krait";
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			device_type = "cpu";
+@@ -32,7 +32,7 @@
+ 			qcom,acc = <&acc1>;
+ 		};
+ 
+-		cpu at 2 {
++		CPU2: cpu at 2 {
+ 			compatible = "qcom,krait";
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			device_type = "cpu";
+@@ -41,7 +41,7 @@
+ 			qcom,acc = <&acc2>;
+ 		};
+ 
+-		cpu at 3 {
++		CPU3: cpu at 3 {
+ 			compatible = "qcom,krait";
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			device_type = "cpu";
+@@ -238,3 +238,5 @@
+ 		};
+ 	};
+ };
 +
-+static const struct of_device_id qcom_idle_state_match[] __initconst = {
-+	{ .compatible = "qcom,idle-state-wfi", .data = qcom_lpm_enter_wfi },
-+	{ .compatible = "qcom,idle-state-spc", .data = qcom_lpm_enter_spc },
-+	{ },
-+};
-+
-+static int qcom_cpuidle_probe(struct platform_device *pdev)
-+{
-+	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
-+	int ret;
-+
-+	qcom_idle_enter = (void *)(pdev->dev.platform_data);
-+	if (!qcom_idle_enter)
-+		return -EFAULT;
-+
-+	 /* Probe for other states including platform WFI */
-+	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
-+	if (ret <= 0) {
-+		pr_err("%s: No cpuidle state found.\n", __func__);
-+		return ret;
-+	}
-+
-+	ret = cpuidle_register(drv, NULL);
-+	if (ret) {
-+		pr_err("%s: failed to register cpuidle driver\n", __func__);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver qcom_cpuidle_plat_driver = {
-+	.probe	= qcom_cpuidle_probe,
-+	.driver = {
-+		.name = "qcom_cpuidle",
-+		.owner = THIS_MODULE,
-+	},
-+};
-+
-+module_platform_driver(qcom_cpuidle_plat_driver);
++#include "qcom-msm8974-pm.dtsi"
 -- 
 1.9.1
