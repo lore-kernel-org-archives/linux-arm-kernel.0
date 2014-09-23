@@ -1,33 +1,45 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 23 Sep 2014 16:01:52 +0200
-Subject: [PATCH v4 0/9] ARM: Berlin: Ethernet support
-In-Reply-To: <3200502.7xjfrZcKCM@wuerfel>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
- <3200502.7xjfrZcKCM@wuerfel>
-Message-ID: <20140923140152.GD18924@kwain>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 23 Sep 2014 16:03:16 +0200
+Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
+ access
+In-Reply-To: <CAFEAcA8pYezWttDHRpoNYn0wWvHg5M2xQLE4-D84uDC37k8emQ@mail.gmail.com>
+References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
+ <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
+ <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
+ <20140923111412.GG12187@cbox> <54215E6D.6090308@redhat.com>
+ <54216B1B.2010205@arm.com> <20140923135241.GI12187@cbox>
+ <CAFEAcA8pYezWttDHRpoNYn0wWvHg5M2xQLE4-D84uDC37k8emQ@mail.gmail.com>
+Message-ID: <CAMJs5B9729eASE9WgbqrG9oj1WJB8grvwugs22NGk1xyJ-v5MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 02:41:47PM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 14:15:27 Antoine Tenart wrote:
-> > 
-> > This series introduce support for the Ethernet controller on Berlin SoCs,
-> > using the existing pxa168 Ethernet driver. In order to do this, DT
-> > support is added to the driver alongside some other modifications and
-> > fixes.
-> > 
-> 
-> Looks great overall, I've commented on two issues I've found, but only
-> the phy-addr one really needs to be addressed. Once that is out of the
-> way, please add
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Tue, Sep 23, 2014 at 4:01 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 23 September 2014 14:52, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+>> If anyone feels like reviewing my patch and giving it a quick test on a
+>> BE system with a version of QEMU with the pl011 level-triggered patch,
+>
+> FWIW, any old version of QEMU running the vexpress-a15 model
+> will also use level-triggered interrupts for pl011, because
+> the upstream DTB which we use for that board has always
+> correctly marked the pl011 and all the other motherboard
+> devices as being level-triggered.
+>
+> I'm still not 100% convinced we shouldn't mark the
+> virtio-mmio devices as level-triggered, incidentally.
+> I *think* that (a) the spec pretty heavily implies that
+> the lines behave as level triggered but (b) the
+> specific text in the spec about required guest code
+> to avoid races (s.2.4.2 of the 0.9.5 spec) means that
+> even if the interrupt controller treats them as edge
+> triggered it's OK.
+>
+I think we should really sit down and figure out the right thing to do
+during KVM Forum if we can allocate a slot for that.  Marc seems to
+also have some input he would like to share on this subject.
 
-Thanks!
+For the record, I'm fine with changing the virtio-mmio devices, but
+it's probably worth quickly measuring the performance impact first.
 
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+-Christoffer
