@@ -1,123 +1,86 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 23 Sep 2014 19:37:54 +0200
-Subject: [PATCH v2 2/5] pinctrl: imx: add gpio pinmux support for vf610
+Date: Tue, 23 Sep 2014 19:37:57 +0200
+Subject: [PATCH v2 5/5] Documentation: dts: Add bindings for Vybrid GPIO/PORT
+ module
 In-Reply-To: <cover.1411492954.git.stefan@agner.ch>
 References: <cover.1411492954.git.stefan@agner.ch>
-Message-ID: <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
+Message-ID: <f31547327a4bb43c0756dbeed6b5665b5433463b.1411492954.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
-This is needed since direction configuration is not part of the
-GPIO module in Vybrid.
+The Vybrid SoC device tree (vf610.dtsi) used this bindings since
+its initial commit in May 2013. However, a proper gpiolib driver
+was missing so far. With the addition of the gpiolib driver,
+the bindings proved to be useful and complete, hence a good time
+to add the documentation.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/pinctrl/pinctrl-imx.c   | 54 +++++++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-imx.h   |  1 +
- drivers/pinctrl/pinctrl-vf610.c |  2 +-
- 3 files changed, 56 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/gpio/gpio-vf610.txt        | 56 ++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vf610.txt
 
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index 0d4558b..64d1b59 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -294,10 +294,59 @@ static int imx_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
- 	return 0;
- }
- 
-+static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
-+			struct pinctrl_gpio_range *range, unsigned offset)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	u32 reg;
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+new file mode 100644
+index 0000000..da84121
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+@@ -0,0 +1,56 @@
++* Freescale VF610 PORT/GPIO module
 +
-+	if (!(info->flags & GPIO_CONTROL))
-+		return -EINVAL;
++The Freescale PORT/GPIO modules are two adjacent modules providing GPIO
++functionality. Each pair serves 32 GPIOs. The VF610 has 5 instances of
++each, and each PORT module has its own interrupt.
 +
-+	pin_reg = &info->pin_regs[offset];
-+	if (pin_reg->mux_reg == -1)
-+		return -EINVAL;
++Required properties for GPIO node:
++- compatible : Should be "fsl,<soc>-gpio", currently "fsl,vf610-gpio"
++- reg : The first reg tuple represents the PORT module, the second tuple
++  the GPIO module.
++- interrupts : Should be the port interrupt shared by all 32 pins.
++- gpio-controller : Marks the device node as a gpio controller.
++- #gpio-cells : Should be two. The first cell is the pin number and
++  the second cell is used to specify the gpio polarity:
++      0 = active high
++      1 = active low
++- interrupt-controller: Marks the device node as an interrupt controller.
++- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
++  The second cell bits[3:0] is used to specify trigger type and level flags:
++      1 = low-to-high edge triggered.
++      2 = high-to-low edge triggered.
++      4 = active high level-sensitive.
++      8 = active low level-sensitive.
 +
-+	reg = readl(ipctl->base + pin_reg->mux_reg);
-+	reg &= ~(0x7 << 20);
-+	writel(reg, ipctl->base + pin_reg->mux_reg);
++Note: Each GPIO port should have an alias correctly numbered in "aliases"
++node.
 +
-+	return 0;
-+}
++Examples:
 +
-+static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-+	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
-+{
-+	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-+	const struct imx_pinctrl_soc_info *info = ipctl->info;
-+	const struct imx_pin_reg *pin_reg;
-+	u32 reg;
++aliases {
++	gpio0 = &gpio1;
++	gpio1 = &gpio2;
++};
 +
-+	if (!(info->flags & GPIO_CONTROL))
-+		return -EINVAL;
++gpio1: gpio at 40049000 {
++	compatible = "fsl,vf610-gpio";
++	reg = <0x40049000 0x1000 0x400ff000 0x40>;
++	interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++	gpio-controller;
++	#gpio-cells = <2>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	gpio-ranges = <&iomuxc 0 0 32>;
++};
 +
-+	pin_reg = &info->pin_regs[offset];
-+	if (pin_reg->mux_reg == -1)
-+		return -EINVAL;
++gpio2: gpio at 4004a000 {
++	compatible = "fsl,vf610-gpio";
++	reg = <0x4004a000 0x1000 0x400ff040 0x40>;
++	interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
++	gpio-controller;
++	#gpio-cells = <2>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	gpio-ranges = <&iomuxc 0 32 32>;
++};
 +
-+	reg = readl(ipctl->base + pin_reg->mux_reg);
-+	if (input)
-+		reg &= ~0x2;
-+	else
-+		reg |= 0x2;
-+	writel(reg, ipctl->base + pin_reg->mux_reg);
-+
-+	return 0;
-+}
-+
- static const struct pinmux_ops imx_pmx_ops = {
- 	.get_functions_count = imx_pmx_get_funcs_count,
- 	.get_function_name = imx_pmx_get_func_name,
- 	.get_function_groups = imx_pmx_get_groups,
-+	.gpio_request_enable = imx_pmx_gpio_request_enable,
-+	.gpio_set_direction = imx_pmx_gpio_set_direction,
- 	.enable = imx_pmx_enable,
- };
- 
-@@ -579,6 +628,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "wrong pinctrl info\n");
- 		return -EINVAL;
- 	}
-+
-+	/* GPIO control functions only intended for shared mux/conf register */
-+	if (info->flags & GPIO_CONTROL)
-+		BUG_ON(!(info->flags & SHARE_MUX_CONF_REG));
-+
- 	info->dev = &pdev->dev;
- 
- 	/* Create state holders etc for this driver */
-diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
-index 49e55d3..8f37ca4 100644
---- a/drivers/pinctrl/pinctrl-imx.h
-+++ b/drivers/pinctrl/pinctrl-imx.h
-@@ -84,6 +84,7 @@ struct imx_pinctrl_soc_info {
- };
- 
- #define SHARE_MUX_CONF_REG	0x1
-+#define GPIO_CONTROL		0x2
- 
- #define NO_MUX		0x0
- #define NO_PAD		0x0
-diff --git a/drivers/pinctrl/pinctrl-vf610.c b/drivers/pinctrl/pinctrl-vf610.c
-index b788e15..fdf5661 100644
---- a/drivers/pinctrl/pinctrl-vf610.c
-+++ b/drivers/pinctrl/pinctrl-vf610.c
-@@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
- static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
- 	.pins = vf610_pinctrl_pads,
- 	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
--	.flags = SHARE_MUX_CONF_REG,
-+	.flags = SHARE_MUX_CONF_REG | GPIO_CONTROL,
- };
- 
- static struct of_device_id vf610_pinctrl_of_match[] = {
 -- 
 2.1.0
