@@ -1,32 +1,34 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 23 Sep 2014 09:43:26 +0200
-Subject: [RESEND PATCH 0/4] Enables STMicroelectronics Flexgen Clock
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 23 Sep 2014 15:42:10 +0800
+Subject: [PATCH v2 0/2] watchdog: dw_wdt: one bug fix and restart handler
  support
-In-Reply-To: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <5421249E.2000700@st.com>
+Message-ID: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabi,
+These patches are intend to improve dw_wdt in the following two aspects:
 
-	Series applied to sti-dt-for-v3.18.
+Firstly, the TOP_INIT, ie bit 4-7 of the WDOG_TIMEOUT_RANGE_REG_OFFSET register
+may be zero at reset on some HW, so the timeout period may be very short, thus
+we will see immediate system reset after openning the watchdog. Fix this
+problem by also initialising the TOP_INIT when setting TOP.
 
-Thanks!
-Maxime
+Secondly, the WDT can also be used to reboot the system with the help of
+recently introduced restart handler.
 
-On 08/25/2014 04:44 PM, Gabriel FERNANDEZ wrote:
-> These patches enables clock drivers for STih407 boards.
->
-> Gabriel Fernandez (4):
->    ARM: STi: DT: STiH407: 407 DT Entry for clockgen A0
->    ARM: STi: DT: STiH407: 407 DT Entry for clockgen C0
->    ARM: STi: DT: STiH407: 407 DT Entry for clockgen D0/D2/D3
->    ARM: STi: DT: STiH407: 407 DT Entry for clockgenA9
->
->   arch/arm/boot/dts/stih407-clock.dtsi     | 295 ++++++++++++++++++++++++++++++-
->   arch/arm/boot/dts/stih407.dtsi           |  18 +-
->   include/dt-bindings/clock/stih407-clks.h |  11 ++
->   3 files changed, 307 insertions(+), 17 deletions(-)
->   create mode 100644 include/dt-bindings/clock/stih407-clks.h
->
+Tested on Marvell BG2Q DMP board.
+
+Changes since v1:
+  - add some wait to let the reset catch, suggested by Guenter Roeck
+  - setting TOP_INIT as well when setting TOP in function dw_wdt_set_top to
+    fix the reboot soon issue.
+
+Jisheng Zhang (2):
+  watchdog: dw_wdt: initialise TOP_INIT in dw_wdt_set_top()
+  watchdog: dw_wdt: add restart handler support
+
+ drivers/watchdog/dw_wdt.c | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
+
+-- 
+2.1.0
