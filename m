@@ -1,40 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 09:56:37 +0200
-Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
-References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
- <20140922093228.GA20256@rric.localhost>
- <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
-Message-ID: <8687285.EH4RPBeOB5@wuerfel>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Tue, 23 Sep 2014 09:58:56 +0200
+Subject: [RESEND PATCH 1/4] ARM: STi: DT: STiH407: 407 DT Entry for
+ clockgen A0
+In-Reply-To: <542124CB.1080307@st.com>
+References: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1408977888-10473-2-git-send-email-gabriel.fernandez@linaro.org>
+ <542124CB.1080307@st.com>
+Message-ID: <54212840.60508@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 September 2014 12:43:17 Liviu Dudau wrote:
-> > 
-> > From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
-> > From: Robert Richter <rrichter@cavium.com>
-> > Date: Mon, 22 Sep 2014 10:46:01 +0200
-> > Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
-> > 
-> > The pci host bridge was not created if io_base was not set when
-> > calling of_pci_get_host_bridge_resources(). This is esp. the case for
-> > mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
-> > parameter io_base is optional now.
-> 
-> I think the message is misleading. What you want to do is make io_base
-> optional for the case where the PCI host bridge only expects to have only
-> IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
-> 
-> As I'm going to touch this area again to address a comment from Bjorn,
-> do you mind if I roll this patch into mine with your Signed-off-by and
-> the mention that you have made io_base optional?
+Thanks Maxime !
 
-I think the best way to deal with this is to move the check for 
-io_base down into the place where it is used: As long as the DT only
-specifies IORESOURCE_MEM windows, we don't need to look at io_base,
-but if the host controller driver does not support IORESOURCE_IO
-while the DT specifies it, I guess it would be nice to return an
-error.
-
-	Arnd
+On 09/23/2014 09:44 AM, Maxime Coquelin wrote:
+>
+>
+> On 08/25/2014 04:44 PM, Gabriel FERNANDEZ wrote:
+>> Patch adds DT entries for clockgen A0
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
+>> ---
+>>   arch/arm/boot/dts/stih407-clock.dtsi | 32 
+>> ++++++++++++++++++++++++++++++++
+>>   1 file changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi 
+>> b/arch/arm/boot/dts/stih407-clock.dtsi
+>> index 800f46f..e03e86e 100644
+>> --- a/arch/arm/boot/dts/stih407-clock.dtsi
+>> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
+>> @@ -7,6 +7,10 @@
+>>    */
+>>   / {
+>>       clocks {
+>> +        #address-cells = <1>;
+>> +        #size-cells = <1>;
+>> +        ranges;
+>> +
+>>           /*
+>>            * Fixed 30MHz oscillator inputs to SoC
+>>            */
+>> @@ -35,5 +39,33 @@
+>>               clock-frequency = <200000000>;
+>>               clock-output-names = "clk-s-icn-reg-0";
+>>           };
+>> +
+>> +        /*
+>> +         * ClockGenAs on SASG2
+>> +         */
+> Note that I removed this comment since no SASG2 on STiH407.
+>
+>> +        clockgen-a at 090ff000 {
+>> +            compatible = "st,clkgen-c32";
+>> +            reg = <0x90ff000 0x1000>;
+> ...
