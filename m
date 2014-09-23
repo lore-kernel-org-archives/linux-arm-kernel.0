@@ -1,49 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 23 Sep 2014 23:22:54 +0200
-Subject: [PATCH v3] ARM: zImage: add support for ARMv7-M
-In-Reply-To: <CAGhQ9VzQSphUoW+rSRdwHVrgrzEEcCoaTKYUA_BntK97zqdY7g@mail.gmail.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
- <1411494565-29534-1-git-send-email-manabian@gmail.com>
- <20140923193251.GB3755@pengutronix.de>
- <CAGhQ9VzQSphUoW+rSRdwHVrgrzEEcCoaTKYUA_BntK97zqdY7g@mail.gmail.com>
-Message-ID: <20140923212254.GD3755@pengutronix.de>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 23 Sep 2014 16:25:11 -0500
+Subject: [PATCH v3 3/3] PCI: Layerscape: Add Layerscape PCIe driver
+In-Reply-To: <1411482540-31297-5-git-send-email-Minghuan.Lian@freescale.com>
+References: <1411482540-31297-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1411482540-31297-5-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <1411507511.13320.155.camel@snotra.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joachim,
+On Tue, 2014-09-23 at 22:29 +0800, Minghuan Lian wrote:
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 34134d6..7c49456 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -82,4 +82,11 @@ config PCIE_XILINX
+>  	  Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
+>  	  Host Bridge driver.
+>  
+> +config PCI_LAYERSCAPE
+> +	bool "Freescale Layerscape PCIe controller"
+> +	select PCIE_DW
+> +	select MFD_SYSCON
+> +	help
+> +	  Say Y here if you want PCIe controller support on Layerscape SoCs.
+> +
+>  endmenu
 
-On Tue, Sep 23, 2014 at 10:42:57PM +0200, Joachim Eastwood wrote:
-> On 23 September 2014 21:32, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> >> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> >> index 413fd94b5301..cd27090625fe 100644
-> >> --- a/arch/arm/boot/compressed/head.S
-> >> +++ b/arch/arm/boot/compressed/head.S
-> >> [...]
-> >> @@ -114,7 +117,7 @@
-> >>   * sort out different calling conventions
-> >>   */
-> >>               .align
-> >> -             .arm                            @ Always enter in ARM state
-> >> + AR_CLASS(   .arm    )               @ Always enter in ARM state for A/R classes
-> > Semantically we don't want .arm when CPU_THUMBONLY is enabled. At least
-> > currently this is equivalent with !AR_CLASS. Maybe this is worth to be
-> > pointed out in a comment?
-> 
-> Won't THUMBONLY always mean !AR_CLASS?
-I don't know what ARM (the company) will invent in the future.
-Today it's equivalent, yes.
+Are you sure there are no dependencies for this to build?  At the least
+you need OF.
 
-> Do you have a particular comment in mind?
-Something like:
+I think you should also be selecting REGMAP.
 
-	Always enter in ARM state for CPUs that support the ARM ISA.
-	As of today (2014) that's exactly the members of the A and R
-	classes.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Scott
