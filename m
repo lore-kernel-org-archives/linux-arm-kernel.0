@@ -1,64 +1,48 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 11:38:41 +0200
-Subject: [PATCH v7 01/10] rtc: at91sam9: remove references to mach specific
- headers
+Date: Tue, 23 Sep 2014 11:38:44 +0200
+Subject: [PATCH v7 04/10] rtc: at91sam9: add DT support
 In-Reply-To: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411465130-29011-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411465130-29011-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support multi platform kernel drivers should not include
-machine specific headers.
-Copy RTT macros in the driver code and remove any machine specific
-headers.
+Add of_match_table to the existing driver so that rtt nodes defined in at91
+DTs can be attached to this driver.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/rtc/rtc-at91sam9.c | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/rtc/rtc-at91sam9.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 5963743..51f0038 100644
+index 38a2693..d72c34d 100644
 --- a/drivers/rtc/rtc-at91sam9.c
 +++ b/drivers/rtc/rtc-at91sam9.c
-@@ -22,10 +22,6 @@
- #include <linux/platform_data/atmel.h>
- #include <linux/io.h>
+@@ -445,6 +445,14 @@ static int at91_rtc_resume(struct device *dev)
  
--#include <mach/at91_rtt.h>
--#include <mach/cpu.h>
--#include <mach/hardware.h>
--
- /*
-  * This driver uses two configurable hardware resources that live in the
-  * AT91SAM9 backup power domain (intended to be powered at all times)
-@@ -47,6 +43,24 @@
-  * registers available, likewise usable for more than "RTC" support.
-  */
+ static SIMPLE_DEV_PM_OPS(at91_rtc_pm_ops, at91_rtc_suspend, at91_rtc_resume);
  
-+#define AT91_RTT_MR		0x00			/* Real-time Mode Register */
-+#define AT91_RTT_RTPRES		(0xffff << 0)		/* Real-time Timer Prescaler Value */
-+#define AT91_RTT_ALMIEN		(1 << 16)		/* Alarm Interrupt Enable */
-+#define AT91_RTT_RTTINCIEN	(1 << 17)		/* Real Time Timer Increment Interrupt Enable */
-+#define AT91_RTT_RTTRST		(1 << 18)		/* Real Time Timer Restart */
++#ifdef CONFIG_OF
++static const struct of_device_id at91_rtc_dt_ids[] = {
++	{ .compatible = "atmel,at91sam9260-rtt" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
++#endif
 +
-+#define AT91_RTT_AR		0x04			/* Real-time Alarm Register */
-+#define AT91_RTT_ALMV		(0xffffffff)		/* Alarm Value */
-+
-+#define AT91_RTT_VR		0x08			/* Real-time Value Register */
-+#define AT91_RTT_CRTV		(0xffffffff)		/* Current Real-time Value */
-+
-+#define AT91_RTT_SR		0x0c			/* Real-time Status Register */
-+#define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
-+#define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
-+
-+#define AT91_SLOW_CLOCK		32768
-+
- /*
-  * We store ALARM_DISABLED in ALMV to record that no alarm is set.
-  * It's also the reset value for that field.
+ static struct platform_driver at91_rtc_driver = {
+ 	.probe		= at91_rtc_probe,
+ 	.remove		= at91_rtc_remove,
+@@ -453,6 +461,7 @@ static struct platform_driver at91_rtc_driver = {
+ 		.name	= "rtc-at91sam9",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &at91_rtc_pm_ops,
++		.of_match_table = of_match_ptr(at91_rtc_dt_ids),
+ 	},
+ };
+ 
 -- 
 1.9.1
