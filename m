@@ -1,40 +1,97 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 23 Sep 2014 12:42:49 -0500
-Subject: [PATCH v1] soc: qcom: do not disable the iface clock in probe
-In-Reply-To: <1408081268-5748-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1408081268-5748-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <A61C4CA5-7558-4B3D-BF05-BBDD1C3F550F@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Sep 2014 12:43:10 -0500
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <62705234.gKJDtUQLyT@wuerfel>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5140494.LzvyOiyY3U@wuerfel> <20140923165515.GA26604@saruman>
+ <62705234.gKJDtUQLyT@wuerfel>
+Message-ID: <20140923174310.GG28592@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Aug 15, 2014, at 12:41 AM, Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
-
-> The use case here is when we have a bootconsole which is printing the
-> characters on serial console and gsbi driver comes up after some time.
-> As gsbi driver disables the clock in probe the bootconsole locks up.
+On Tue, Sep 23, 2014 at 07:37:25PM +0200, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014 11:55:15 Felipe Balbi wrote:
+> > On Tue, Sep 23, 2014 at 06:44:40PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 23 September 2014 15:36:45 Antoine Tenart wrote:
+> > > > On Tue, Sep 23, 2014 at 12:39:04PM +0200, Arnd Bergmann wrote:
+> > > > > On Tuesday 23 September 2014 12:28:03 Antoine Tenart wrote:
+> > > > > > +       if (dev->of_node) {
+> > > > > > +               ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> > > > > > +               if (ret)
+> > > > > > +                       goto clk_err;
+> > > > > > +       } else {
+> > > > > > +               ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> > > > > > +               if (ret)
+> > > > > > +                       goto clk_err;
+> > > > > > +       }
+> > > > > > 
+> > > > > 
+> > > > > Why do you care about the non-DT case here? I think it would be nicer to
+> > > > > open-code the ci_hdrc_usb2_dt_probe() function in here and remove
+> > > > > the dma_set_mask_and_coherent(), which should not even be necessary for
+> > > > > the case where you have a hardwired platform device.
+> > > > > 
+> > > > 
+> > > > I thought we agreed to call dma_set_mask_and_coherent():
+> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/273335.html
+> > > > 
+> > > > I do not have a strong opinion on this as I only use the dt case for my
+> > > > usage.
+> > > 
+> > > The question is more about who actually wants the non-DT case.
+> > > 
+> > > Since this is a new driver, I suspect that the answer is "nobody",
+> > > as the existing board files are all for legacy platforms that we
+> > > are not going to adapt for this driver.
+> > 
+> > wait a minute... will the legacy platforms be adapted to DT and, thus,
+> > to this driver in the future ? I really don't want to keep several
+> > copies of chipidea driver just because there are still some legacy
+> > platforms still using them. I have said in the past and will say again,
+> > everybody should move to the generic chipidea driver at the earliest
+> > opportunity so we avoid duplication of work.
+> > 
 > 
-> This patch fixes the problem by disabling the clock in platform remove
-> rather than in probe.
+> Sorry, my mistake. The intention that this new driver is meant to
+> replace the existing ones wasn't clear to me from the changelog, and
+> if I'd been involved in the discussion before, then I've forgotten
+> about it.
 > 
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> Changes since RFC:
-> 	- none, just a subject line change.
+> It absolutely makes sense to migrate to a common driver, and in that
+> case we should keep the platform_data handling and
+> dma_set_mask_and_coherent() call in there, so we can do the two
+> conversions (migrating from platform specific frontends to the generic
+> one, and migrating from platform_data to DT) on independent schedules.
 
-Srini,
+makes sense to me.
 
-We need some changes to the commit message for this to get into v3.17.
+> Eventually I'd like all of the existing users of the platform_data
+> path to move to DT, but that should not hold up the other cleanup if
+> it takes longer.
 
-Probably some references to:
+yeah, certainly.
 
-http://www.spinics.net/lists/linux-arm-msm/msg10589.html
+> There is however still my point that we shouldn't have an extra
+> platform device that is not attached to the device node. I think the
+> generic driver should just be part of the common code, without an
+> extra framework.  Something like the (entirely untested) patch below.
 
-Adding Kevin to provide details on what else should be in commit message w/regards to the regression we introduced.
+yeah, that's what I did on dwc3 at least. We support platform_data and
+DT on the core driver. As for glue layers, we have ST, Qcom, PCI, OMAP,
+Exynos and Keystone.
 
-- k
+The only difference is that core dwc3 still doesn't know about clocks,
+but that's not an issue right now because we're not yet supporting
+pm_runtime.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/7ed4d1ba/attachment.sig>
