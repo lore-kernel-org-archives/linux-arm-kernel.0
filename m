@@ -1,63 +1,40 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Tue, 23 Sep 2014 16:50:07 +0900
-Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-In-Reply-To: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <013001cfd702$feb42900$fc1c7b00$@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 09:56:37 +0200
+Subject: [PATCH v11 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
+References: <1411003825-21521-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140922093228.GA20256@rric.localhost>
+ <20140922114317.GN1994@e106497-lin.cambridge.arm.com>
+Message-ID: <8687285.EH4RPBeOB5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 22 September 2014 12:43:17 Liviu Dudau wrote:
+> > 
+> > From e798af4fc2f664d1aff7e863489b8298f90e716e Mon Sep 17 00:00:00 2001
+> > From: Robert Richter <rrichter@cavium.com>
+> > Date: Mon, 22 Sep 2014 10:46:01 +0200
+> > Subject: [PATCH] OF: PCI: Fix creation of mem-mapped pci host bridges
+> > 
+> > The pci host bridge was not created if io_base was not set when
+> > calling of_pci_get_host_bridge_resources(). This is esp. the case for
+> > mem-mapped io (IORESOURCE_MEM). This patch fixes this. Function
+> > parameter io_base is optional now.
+> 
+> I think the message is misleading. What you want to do is make io_base
+> optional for the case where the PCI host bridge only expects to have only
+> IORESOURCE_MEM ranges and doesn't care about IORESOURCE_IO ones.
+> 
+> As I'm going to touch this area again to address a comment from Bjorn,
+> do you mind if I roll this patch into mine with your Signed-off-by and
+> the mention that you have made io_base optional?
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Abhilash Kesavan
-> Sent: Monday, September 22, 2014 1:47 PM
-> To: linux-samsung-soc at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> catalin.marinas at arm.com
-> Cc: naveenkrishna.ch at gmail.com; kesavan.abhilash at gmail.com;
-> tomasz.figa at gmail.com
-> Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7
-> SoC
-> 
-> Changes since v4:
-> - Fixed comments from Tomasz Figa:
-> 	- Changed the namespace prefix from exynos to samsung
-> 	- Defined bindings to take all input clocks
-> 	- Sorted the Kconfig entries alphabetically in clock Makefile
-> 	- Used consistent 1 tab line breaks across the clock file
-> 	- Statically initialized the samsung_cmu_info struct
-> - Enabled exynos7 in the arm64 defconfig as per Catalin Marinas' comment.
-> - Added Kukjin Kim's ack along with Thomas Abraham's tested and reviewed
-> tags.
-> 
-> Changes since v3:
-> - Removed aliases for serial controllers from dtsi file and moved it
->   into board specific dts file as suggested by Arnd.
-> - Based this series on Robert Richter's patches for adding vendor
->   device tree sub-directories for arm64.
->   http://comments.gmane.org/gmane.linux.kbuild.devel/12131
-> 
-> This patchset supports the new Exynos7 Samsung SoC based on Cortex-A57.
-> Exynos7 is a System-On-Chip (SoC) that is based on 64-bit ARMv8 RISC
-> processor.
-> 
-> The following patches are tested based on linux-next tree (20140919).
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/
-> 
-> Following patches are required for this series:
-> 1- "tty/serial: fix config dependencies for samsung serial"
->    https://www.mail-archive.com/linux-samsung-soc <at>
-> vger.kernel.org/msg36208.html
-> 2- "dts, kbuild: Implement support for dtb vendor subdirs" patchset
->    http://comments.gmane.org/gmane.linux.kbuild.devel/12131
+I think the best way to deal with this is to move the check for 
+io_base down into the place where it is used: As long as the DT only
+specifies IORESOURCE_MEM windows, we don't need to look at io_base,
+but if the host controller driver does not support IORESOURCE_IO
+while the DT specifies it, I guess it would be nice to return an
+error.
 
-Maybe you make this patch on top of the Robert's patch.
-As I know, Robert's patch is not yet merged in mainline.
-You should specify this dependency in mail thread.
-
-[1]: https://lkml.org/lkml/2014/9/5/64
-
-Best Regards,
-Chanho Park
+	Arnd
