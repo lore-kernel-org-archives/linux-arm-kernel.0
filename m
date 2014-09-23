@@ -1,50 +1,75 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 16:48:44 +0200
-Subject: [PATCH v9 09/10] rtc: at91sam9: add DT bindings documentation
+Date: Tue, 23 Sep 2014 16:48:41 +0200
+Subject: [PATCH v9 06/10] rtc: at91sam9: rework the Kconfig description
 In-Reply-To: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411483725-31532-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1411483725-31532-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add RTT bindings documentation.
+Remove all references to AT91CAP9 SoC which has been removed.
+Rework help message to remove any specific references to AT91SAM9 SoCs.
+State that RTC_DRV_AT91SAM9_RTT and RTC_DRV_AT91SAM9_GPBR options are only
+used when booting non DT boards.
 
 Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Johan Hovold <johan@kernel.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+ drivers/rtc/Kconfig | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-new file mode 100644
-index 0000000..6ae79d1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-@@ -0,0 +1,23 @@
-+Atmel AT91SAM9260 Real Time Timer
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 7d76da8..9b56882 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1079,17 +1079,18 @@ config RTC_DRV_AT91RM9200
+ 	  this is powered by the backup power supply.
+ 
+ config RTC_DRV_AT91SAM9
+-	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
++	tristate "AT91SAM9 RTT as RTC"
+ 	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
+ 	select MFD_SYSCON
+ 	help
+-	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
+-	  (Real Time Timer). These timers are powered by the backup power
+-	  supply (such as a small coin cell battery), but do not need to
+-	  be used as RTCs.
+-
+-	  (On AT91SAM9rl and AT91SAM9G45 chips you probably want to use the
+-	  dedicated RTC module and leave the RTT available for other uses.)
++	  Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
++	  can be used as an RTC thanks to the backup power supply (e.g. a
++	  small coin cell battery) which keeps this block and the GPBR
++	  (General Purpose Backup Registers) block powered when the device
++	  is shutdown.
++	  Some AT91SAM9 SoCs provide a real RTC block, on those ones you'd
++	  probably want to use the real RTC block instead of the "RTT as an
++	  RTC" driver.
+ 
+ config RTC_DRV_AT91SAM9_RTT
+ 	int
+@@ -1098,6 +1099,9 @@ config RTC_DRV_AT91SAM9_RTT
+ 	prompt "RTT module Number" if ARCH_AT91SAM9263
+ 	depends on RTC_DRV_AT91SAM9
+ 	help
++	  This option is only relevant for legacy board support and
++	  won't be used when booting a DT board.
 +
-+Required properties:
-+- compatible: should be: "atmel,at91sam9260-rtt"
-+- reg: should encode the memory region of the RTT controller
-+- interrupts: rtt alarm/event interrupt
-+- clocks: should contain the 32 KHz slow clk that will drive the RTT block.
-+- atmel,rtt-rtc-time-reg: should encode the GPBR register used to store
-+	the time base when the RTT is used as an RTC.
-+	The first cell should point to the GPBR node and the second one
-+	encode the offset within the GPBR block (or in other words, the
-+	GPBR register used to store the time base).
+ 	  More than one RTT module is available. You can choose which
+ 	  one will be used as an RTC. The default of zero is normally
+ 	  OK to use, though some systems use that for non-RTC purposes.
+@@ -1110,6 +1114,9 @@ config RTC_DRV_AT91SAM9_GPBR
+ 	prompt "Backup Register Number"
+ 	depends on RTC_DRV_AT91SAM9
+ 	help
++	  This option is only relevant for legacy board support and
++	  won't be used when booting a DT board.
 +
-+
-+Example:
-+
-+rtt at fffffd20 {
-+	compatible = "atmel,at91sam9260-rtt";
-+	reg = <0xfffffd20 0x10>;
-+	interrupts = <1 4 7>;
-+	clocks = <&clk32k>;
-+	atmel,rtt-rtc-time-reg = <&gpbr 0x0>;
-+};
+ 	  The RTC driver needs to use one of the General Purpose Backup
+ 	  Registers (GPBRs) as well as the RTT. You can choose which one
+ 	  will be used. The default of zero is normally OK to use, but
 -- 
 1.9.1
