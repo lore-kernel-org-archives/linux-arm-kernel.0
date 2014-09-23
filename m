@@ -1,74 +1,42 @@
-From: k.debski@samsung.com (Kamil Debski)
-Date: Tue, 23 Sep 2014 15:58:12 +0200
-Subject: [PATCH] [media] s5p-mfc: Use decode status instead of display
- status on MFCv5
-In-Reply-To: <1411390322-25212-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1411390322-25212-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <085901cfd736$6ae349c0$40a9dd40$%debski@samsung.com>
+From: srv_yingjoe.chen@mediatek.com (Joe.C)
+Date: Tue, 23 Sep 2014 21:58:14 +0800
+Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
+In-Reply-To: <2770365.r419rjIAOU@wuerfel>
+References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <2770365.r419rjIAOU@wuerfel>
+Message-ID: <1411480694.21299.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
 
-> From: linux-media-owner at vger.kernel.org [mailto:linux-media-
-> owner at vger.kernel.org] On Behalf Of Sjoerd Simons
-> Sent: Monday, September 22, 2014 2:52 PM
-> To: Kyungmin Park; Kamil Debski; Arun Kumar K
-> Cc: Mauro Carvalho Chehab; linux-arm-kernel at lists.infradead.org; linux-
-> media at vger.kernel.org; linux-kernel at vger.kernel.org; linux-samsung-
-> soc at vger.kernel.org; Daniel Drake; Sjoerd Simons
-> Subject: [PATCH] [media] s5p-mfc: Use decode status instead of display
-> status on MFCv5
+On Tue, 2014-09-23 at 15:03 +0200, Arnd Bergmann wrote: 
+> On Tuesday 23 September 2014 11:39:05 Hongzhou. Yang wrote:
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_GPIO0 (MT_PIN_NO(0) | 0)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_MSDC0_DAT7 (MT_PIN_NO(0) | 1)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_EINT49 (MT_PIN_NO(0) | 2)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_I2SOUT_DAT (MT_PIN_NO(0) | 3)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_DAC_DAT_OUT (MT_PIN_NO(0) | 4)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_PCM1_DO (MT_PIN_NO(0) | 5)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_SPI1_MO (MT_PIN_NO(0) | 6)
+> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_NALE (MT_PIN_NO(0) | 7)
+> > +
 > 
-> Commit 90c0ae50097 changed how the frame_type of a decoded frame
-> gets determined, by switching from the get_dec_frame_type to
-> get_disp_frame_type operation. Unfortunately it seems that on MFC v5
-> the
-> result of get_disp_frame_type is always 0 (no display) when decoding
-> (tested with H264), resulting in no frame ever being output from the
-> decoder.
+> This list looks like it just describes the hardware, I think it would
+> be better to put the values directly into the DT, rather than
+> using such macros.
 
-Could you tell me which firmware version do you use (date)?
+Hi, 
 
-Best wishes,
--- 
-Kamil Debski
-Samsung R&D Institute Poland
- 
-> This patch reverts MFC v5 to the previous behaviour while keeping the
-> new behaviour for v6 and up.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index d35b041..27ca9d0 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -264,7 +264,12 @@ static void s5p_mfc_handle_frame_new(struct
-> s5p_mfc_ctx *ctx, unsigned int err)
->  	unsigned int frame_type;
-> 
->  	dspl_y_addr = s5p_mfc_hw_call(dev->mfc_ops, get_dspl_y_adr, dev);
-> -	frame_type = s5p_mfc_hw_call(dev->mfc_ops, get_disp_frame_type,
-> ctx);
-> +	if (IS_MFCV6_PLUS(dev))
-> +		frame_type = s5p_mfc_hw_call(dev->mfc_ops,
-> +			get_disp_frame_type, ctx);
-> +	else
-> +		frame_type = s5p_mfc_hw_call(dev->mfc_ops,
-> +			get_dec_frame_type, dev);
-> 
->  	/* If frame is same as previous then skip and do not dequeue */
->  	if (frame_type == S5P_FIMV_DECODE_FRAME_SKIPPED) {
-> --
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks for review. 
+The intend for these macros is helpin pinctrl user to write DT node.
+With these macro, we could write like this for i2c0:
+
+mediatek,pinfunc = <MT8135_PIN_100_SDA0__FUNC_SDA0 
+			MT8135_PIN_101_SCL0__FUNC_SCL0>;
+
+We feel this is less error prone and easier to write than this:
+
+mediatek,pinfunc = <MT_PIN_FUNC(100, 1) MT_PIN_FUNC(101, 1)>
+
+Joe.C
