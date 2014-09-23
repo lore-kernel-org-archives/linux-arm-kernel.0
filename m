@@ -1,186 +1,73 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 23 Sep 2014 17:15:19 +0800
-Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support in
- big-endian model
-Message-ID: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 23 Sep 2014 12:08:47 +0200
+Subject: [PATCH v7 06/10] rtc: at91sam9: rework the Kconfig description
+In-Reply-To: <1411465130-29011-7-git-send-email-boris.brezillon@free-electrons.com>
+References: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411465130-29011-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <542146AF.3060807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The offset of all 8-/16-bit register in big-endian eDMA model are
-swapped in a 32-bit size opposite those in the little-endian model.
+On 23/09/2014 11:38, Boris BREZILLON :
+> Remove all references to AT91CAP9 SoC which has been removed.
+> Rework the help message to remove any specific references to AT91SAM9 SoCs.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/rtc/Kconfig | 17 +++++++++--------
+>  1 file changed, 9 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index 7d76da8..455f2c3 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1079,17 +1079,18 @@ config RTC_DRV_AT91RM9200
+>  	  this is powered by the backup power supply.
+>  
+>  config RTC_DRV_AT91SAM9
+> -	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
+> +	tristate "AT91SAM9 RTT as RTC"
+>  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
+>  	select MFD_SYSCON
+>  	help
+> -	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
+> -	  (Real Time Timer). These timers are powered by the backup power
+> -	  supply (such as a small coin cell battery), but do not need to
+> -	  be used as RTCs.
+> -
+> -	  (On AT91SAM9rl and AT91SAM9G45 chips you probably want to use the
+> -	  dedicated RTC module and leave the RTT available for other uses.)
+> +	  Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
+> +	  can be used as an RTC thanks to the backup power supply (e.g. a
+> +	  small coin cell battery) which keeps this block and the GPBR
+> +	  (General Purpose Backup Registers) block powered when the device
+> +	  is shutdown.
+> +	  Some AT91SAM9 SoCs provide a real RTC block, on those ones you'd
+> +	  probably want to use the real RTC block instead of the RTT as an
+> +	  RTT driver.
 
-The hardware Scatter/Gather requires the subsequent TCDs in memory
-to be auto loaded should retain the same endian as the core independent
-of the register endian model, the dma engine will do the swap if need.
+You mean:
+"instead of the RTT as an RTC"
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
- drivers/dma/fsl-edma.c | 104 +++++++++++++++++++++++++++++++------------------
- 1 file changed, 66 insertions(+), 38 deletions(-)
+With that, good description: thanks!
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 3c5711d..499af8f 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -177,14 +177,20 @@ struct fsl_edma_engine {
- /*
-  * R/W functions for big- or little-endian registers
-  * the eDMA controller's endian is independent of the CPU core's endian.
-+ * for the big-endian IP module, the offset for 8-bit or 16-bit register
-+ * should also be swapped oposite to that in little-endian IP.
-  */
- 
- static u16 edma_readw(struct fsl_edma_engine *edma, void __iomem *addr)
- {
--	if (edma->big_endian)
--		return ioread16be(addr);
--	else
-+	u32 dst;
-+	/* swap the reg offset for these in big-endian mode */
-+	if (edma->big_endian) {
-+		dst = ((u32)addr & ~0x3) | (((u32)addr & 0x3) ^ 0x2);
-+		return ioread16be((void __iomem *)dst);
-+	} else {
- 		return ioread16(addr);
-+	}
- }
- 
- static u32 edma_readl(struct fsl_edma_engine *edma, void __iomem *addr)
-@@ -197,15 +203,26 @@ static u32 edma_readl(struct fsl_edma_engine *edma, void __iomem *addr)
- 
- static void edma_writeb(struct fsl_edma_engine *edma, u8 val, void __iomem *addr)
- {
--	iowrite8(val, addr);
-+	u32 dst;
-+	/* swap the reg offset for these in big-endian mode */
-+	if (edma->big_endian) {
-+		dst = ((u32)addr & ~0x3) | (((u32)addr & 0x3) ^ 0x3);
-+		iowrite8(val, (void __iomem *)dst);
-+	} else {
-+		iowrite8(val, addr);
-+	}
- }
- 
- static void edma_writew(struct fsl_edma_engine *edma, u16 val, void __iomem *addr)
- {
--	if (edma->big_endian)
--		iowrite16be(val, addr);
--	else
-+	u32 dst;
-+	/* swap the reg offset for these in big-endian mode */
-+	if (edma->big_endian) {
-+		dst = ((u32)addr & ~0x3) | (((u32)addr & 0x3) ^ 0x2);
-+		iowrite16be(val, (void __iomem *)dst);
-+	} else {
- 		iowrite16(val, addr);
-+	}
- }
- 
- static void edma_writel(struct fsl_edma_engine *edma, u32 val, void __iomem *addr)
-@@ -256,11 +273,10 @@ static void fsl_edma_chan_mux(struct fsl_edma_chan *fsl_chan,
- 	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
- 
- 	if (enable)
--		edma_writeb(fsl_chan->edma,
--				EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(slot),
-+		writeb(EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(slot),
- 				muxaddr + ch_off);
- 	else
--		edma_writeb(fsl_chan->edma, EDMAMUX_CHCFG_DIS, muxaddr + ch_off);
-+		writeb(EDMAMUX_CHCFG_DIS, muxaddr + ch_off);
- }
- 
- static unsigned int fsl_edma_get_tcd_attr(enum dma_slave_buswidth addr_width)
-@@ -433,21 +449,26 @@ static void fsl_edma_set_tcd_params(struct fsl_edma_chan *fsl_chan,
- 	u32 ch = fsl_chan->vchan.chan.chan_id;
- 
- 	/*
--	 * TCD parameters have been swapped in fill_tcd_params(),
--	 * so just write them to registers in the cpu endian here
-+	 * TCD parameters should be swapped according the eDMA
-+	 * engine requirement.
- 	 */
--	writew(0, addr + EDMA_TCD_CSR(ch));
--	writel(src, addr + EDMA_TCD_SADDR(ch));
--	writel(dst, addr + EDMA_TCD_DADDR(ch));
--	writew(attr, addr + EDMA_TCD_ATTR(ch));
--	writew(soff, addr + EDMA_TCD_SOFF(ch));
--	writel(nbytes, addr + EDMA_TCD_NBYTES(ch));
--	writel(slast, addr + EDMA_TCD_SLAST(ch));
--	writew(citer, addr + EDMA_TCD_CITER(ch));
--	writew(biter, addr + EDMA_TCD_BITER(ch));
--	writew(doff, addr + EDMA_TCD_DOFF(ch));
--	writel(dlast_sga, addr + EDMA_TCD_DLAST_SGA(ch));
--	writew(csr, addr + EDMA_TCD_CSR(ch));
-+	edma_writew(fsl_chan->edma, 0, addr + EDMA_TCD_CSR(ch));
-+	edma_writel(fsl_chan->edma, src, addr + EDMA_TCD_SADDR(ch));
-+	edma_writel(fsl_chan->edma, dst, addr + EDMA_TCD_DADDR(ch));
-+
-+	edma_writew(fsl_chan->edma, attr, addr + EDMA_TCD_ATTR(ch));
-+	edma_writew(fsl_chan->edma, soff, addr + EDMA_TCD_SOFF(ch));
-+
-+	edma_writel(fsl_chan->edma, nbytes, addr + EDMA_TCD_NBYTES(ch));
-+	edma_writel(fsl_chan->edma, slast, addr + EDMA_TCD_SLAST(ch));
-+
-+	edma_writew(fsl_chan->edma, citer, addr + EDMA_TCD_CITER(ch));
-+	edma_writew(fsl_chan->edma, biter, addr + EDMA_TCD_BITER(ch));
-+	edma_writew(fsl_chan->edma, doff, addr + EDMA_TCD_DOFF(ch));
-+
-+	edma_writel(fsl_chan->edma, dlast_sga, addr + EDMA_TCD_DLAST_SGA(ch));
-+
-+	edma_writew(fsl_chan->edma, csr, addr + EDMA_TCD_CSR(ch));
- }
- 
- static void fill_tcd_params(struct fsl_edma_engine *edma,
-@@ -459,20 +480,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
- 	u16 csr = 0;
- 
- 	/*
--	 * eDMA hardware SGs require the TCD parameters stored in memory
--	 * the same endian as the eDMA module so that they can be loaded
--	 * automatically by the engine
-+	 * eDMA hardware SGs requires the TCDs to be auto loaded
-+	 * in the same endian as the core whenver the eDAM engine's
-+	 * register endian. So we don't swap the value, waitting
-+	 * for fsl_set_tcd_params doing the swap.
- 	 */
--	edma_writel(edma, src, &(tcd->saddr));
--	edma_writel(edma, dst, &(tcd->daddr));
--	edma_writew(edma, attr, &(tcd->attr));
--	edma_writew(edma, EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
--	edma_writel(edma, EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
--	edma_writel(edma, EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
--	edma_writew(edma, EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
--	edma_writew(edma, EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
--	edma_writel(edma, EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
--	edma_writew(edma, EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
-+	writel(src, &(tcd->saddr));
-+	writel(dst, &(tcd->daddr));
-+
-+	writew(attr, &(tcd->attr));
-+
-+	writew(EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
-+
-+	writel(EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
-+	writel(EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
-+
-+	writew(EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
-+	writew(EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
-+
-+	writel(EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
-+
-+	writew(EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
- 	if (major_int)
- 		csr |= EDMA_TCD_CSR_INT_MAJOR;
- 
-@@ -482,7 +510,7 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
- 	if (enable_sg)
- 		csr |= EDMA_TCD_CSR_E_SG;
- 
--	edma_writew(edma, csr, &(tcd->csr));
-+	writew(csr, &(tcd->csr));
- }
- 
- static struct fsl_edma_desc *fsl_edma_alloc_desc(struct fsl_edma_chan *fsl_chan,
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+So, now we can think of what to do with the series:
+
+- Johan, do you want to "Ack" it?
+- may I take it through the arm-soc git tree (likely for the 3.19 dev.
+phase).
+
+Your thoughts?
+
+Bye,
+
+>  
+>  config RTC_DRV_AT91SAM9_RTT
+>  	int
+> 
+
+
 -- 
-1.8.0
+Nicolas Ferre
