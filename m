@@ -1,69 +1,85 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 23 Sep 2014 10:10:29 +0000
-Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
-In-Reply-To: <20140922210038.GJ1880@google.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
- <20140922210038.GJ1880@google.com>
-Message-ID: <84672882bcaa4730aae409f092bcbcfb@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue, 23 Sep 2014 12:11:44 +0200
+Subject: [PATCH v7 06/10] rtc: at91sam9: rework the Kconfig description
+In-Reply-To: <542146AF.3060807@atmel.com>
+References: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1411465130-29011-7-git-send-email-boris.brezillon@free-electrons.com>
+ <542146AF.3060807@atmel.com>
+Message-ID: <20140923121144.0fd5d3c8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Tue, 23 Sep 2014 12:08:47 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-On 22 September 2014 22:01, Bjorn wrote:
-> On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
-> > The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller
-> drivers,
-> > one for an external PCIe slot, the other for an internal PCI bridge to USB
-> > controllers.
-> >
-> > However, they currently do not work at the same time as they use the
-> same PCI
-> > domain and use the same root bus number. We can't use different root
-> bus numbers
-> > due to the way root bus numbers are assigned in pcibios_init_hw() in
-> > arch/arm/kernel/bios32.c.
-> >
-> > Since the two PCI controllers are completely independent, I think it makes
-> sense
-> > to use different PCI domains for them.
-> >
-> > I've marked the third patch as RFC as I am not sure of the impact of
-> enabling
-> > PCI domains for all ARM devices. In the march to 'one kernel to rule them
-> all',
-> > I steered clear of mach specific changes.
-> >
-> > These patches require the following patch from Liviu Dudau:
-> >   [PATCH v11 07/10] OF: Introduce helper function for getting PCI
-> domain_nr
-> > Based on comments on this patch from Jason Gunthorpe, there is still the
-> issue
-> > that the domain numbers may change depending on the ordering at probe
-> time.
-> > However, this can be fixed later on by adding the entries in the DT files.
-> >
-> >
-> > Phil Edworthy (3):
-> >   PCI: rcar-pcie: Add call to get domain nr
-> >   PCI: rcar-internal-pci: Add call to get domain nr
-> >   ARM: Enable PCI domains
+> On 23/09/2014 11:38, Boris BREZILLON :
+> > Remove all references to AT91CAP9 SoC which has been removed.
+> > Rework the help message to remove any specific references to AT91SAM9 SoCs.
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/rtc/Kconfig | 17 +++++++++--------
+> >  1 file changed, 9 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> > index 7d76da8..455f2c3 100644
+> > --- a/drivers/rtc/Kconfig
+> > +++ b/drivers/rtc/Kconfig
+> > @@ -1079,17 +1079,18 @@ config RTC_DRV_AT91RM9200
+> >  	  this is powered by the backup power supply.
+> >  
+> >  config RTC_DRV_AT91SAM9
+> > -	tristate "AT91SAM9x/AT91CAP9 RTT as RTC"
+> > +	tristate "AT91SAM9 RTT as RTC"
+> >  	depends on ARCH_AT91 && !(ARCH_AT91RM9200 || ARCH_AT91X40)
+> >  	select MFD_SYSCON
+> >  	help
+> > -	  RTC driver for the Atmel AT91SAM9x and AT91CAP9 internal RTT
+> > -	  (Real Time Timer). These timers are powered by the backup power
+> > -	  supply (such as a small coin cell battery), but do not need to
+> > -	  be used as RTCs.
+> > -
+> > -	  (On AT91SAM9rl and AT91SAM9G45 chips you probably want to use the
+> > -	  dedicated RTC module and leave the RTT available for other uses.)
+> > +	  Some AT91SAM9 SoCs provide an RTT (Real Time Timer) block which
+> > +	  can be used as an RTC thanks to the backup power supply (e.g. a
+> > +	  small coin cell battery) which keeps this block and the GPBR
+> > +	  (General Purpose Backup Registers) block powered when the device
+> > +	  is shutdown.
+> > +	  Some AT91SAM9 SoCs provide a real RTC block, on those ones you'd
+> > +	  probably want to use the real RTC block instead of the RTT as an
+> > +	  RTT driver.
 > 
-> I'm deferring these for now because they depend on Liviu's work, which I
-> haven't merged yet, and I suspect some minor adaptation will be required
-> here.
+> You mean:
+> "instead of the RTT as an RTC"
+
+Yep, that's what I meant.
+
 > 
-> For what it's worth, I agree with Rob's hesitation about mixing lookup with
-> domain number allocation in of_pci_get_domain_nr().  That seems
-> unnecessarily complicated.
-I could create patches to add an optional "pci-domain" property for the R-Car
-PCI drivers, and just attempt to get the property in the drivers. If not found,
-the drivers will assume the domain is 0.
+> With that, good description: thanks!
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> So, now we can think of what to do with the series:
+> 
+> - Johan, do you want to "Ack" it?
+> - may I take it through the arm-soc git tree (likely for the 3.19 dev.
+> phase).
+> 
+> Your thoughts?
+> 
+> Bye,
+> 
+> >  
+> >  config RTC_DRV_AT91SAM9_RTT
+> >  	int
+> > 
+> 
+> 
 
-We would then have fixed PCI domain numbering and I don't have to worry about
-Liviu's work.
 
-Would that be ok?
- 
-Thanks
-Phil
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
