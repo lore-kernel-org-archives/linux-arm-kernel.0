@@ -1,49 +1,31 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 23 Sep 2014 20:44:17 +0200
-Subject: [PATCH v13 9/9] clk: Add docs about calling clk_put after
- clk_get_parent
-In-Reply-To: <1411497857-24726-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
- <1411497857-24726-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1411497857-24726-7-git-send-email-tomeu.vizoso@collabora.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Tue, 23 Sep 2014 11:55:20 -0700
+Subject: [PATCH] ARM: zynq: DT: Remove 222 MHz OPP
+Message-ID: <1411498520-8117-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As otherwise the per-user clk will be leaked.
+Due to dependencies between timer and CPU frequency, only changes by
+powers of two are allowed. The clocksource driver prevents other
+changes, but with cpufreq and its governors it can result in being
+spammed with error messages constantly. Hence, remove the 222 MHz OPP.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/clk/clk.c   | 3 ++-
- include/linux/clk.h | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/zynq-7000.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index c507548..2c7baea 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1828,7 +1828,8 @@ EXPORT_SYMBOL_GPL(clk_provider_get_parent);
-  * clk_get_parent - return the parent of a clk
-  * @clk_user: the clk whose parent gets returned
-  *
-- * Simply returns clk->parent.  Returns NULL if clk is NULL.
-+ * Simply returns clk->parent.  Returns NULL if clk is NULL. Caller must call
-+ * clk_put() to release the returned struct clk.
-  */
- struct clk *clk_get_parent(struct clk *clk_user)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 066b100..4f54952 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -306,7 +306,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
-  * @clk: clock source
-  *
-  * Returns struct clk corresponding to parent clock source, or
-- * valid IS_ERR() condition containing errno.
-+ * valid IS_ERR() condition containing errno. Caller must call
-+ * clk_put() to release the returned struct clk.
-  */
- struct clk *clk_get_parent(struct clk *clk);
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 6cc83d4c6c76..a0ed01d68328 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -30,7 +30,6 @@
+ 				/* kHz    uV */
+ 				666667  1000000
+ 				333334  1000000
+-				222223  1000000
+ 			>;
+ 		};
  
 -- 
-1.9.3
+2.1.0.1.g27b9230
