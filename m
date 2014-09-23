@@ -1,113 +1,83 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 23 Sep 2014 09:02:39 +0200
-Subject: [RFC PATCH v3 6/7] arm: call iommu_init before
- of_platform_populate
-In-Reply-To: <3261451.zpO6MVx5yo@wuerfel>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <11868654.D6MinQlF2p@wuerfel> <20140922114039.GT1470@ulmo>
- <3261451.zpO6MVx5yo@wuerfel>
-Message-ID: <20140923070238.GH30514@ulmo>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 23 Sep 2014 12:34:26 +0530
+Subject: [PATCH] tty/serial: fix config dependencies for samsung serial
+In-Reply-To: <10202237.9vbtDF9MIQ@wuerfel>
+References: <1409671320-7604-1-git-send-email-ch.naveen@samsung.com>
+ <3749760.naNt3fHoTI@wuerfel>
+ <CAHfPSqAn5gHjDA75Zf1W5=GH9_W+X6+4oc9rDK7CqeSoF3DURw@mail.gmail.com>
+ <10202237.9vbtDF9MIQ@wuerfel>
+Message-ID: <CAM4voaky-zin8ikdkLBwpTKy13hz3iON8tmNsd55-kr8po8Qaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 06:03:47PM +0200, Arnd Bergmann wrote:
-> On Monday 22 September 2014 13:40:40 Thierry Reding wrote:
-> > On Mon, Sep 22, 2014 at 01:08:27PM +0200, Arnd Bergmann wrote:
-> > > On Monday 22 September 2014 11:36:15 Thierry Reding wrote:
-> > > > On Fri, Sep 12, 2014 at 05:34:54PM +0100, Will Deacon wrote:
-> > > > > We need to ensure that the IOMMUs in the system have a chance to perform
-> > > > > some basic initialisation before we start adding masters to them.
-> > > > > 
-> > > > > This patch adds a call to of_iommu_init before of_platform_populate.
-> > > > 
-> > > > Why can't you call it from of_platform_populate() directly? That way it
-> > > > would be usable for all architectures rather than just ARM. Eventually
-> > > > we're going to need the same thing for 64-bit ARM (and possibly others
-> > > > as well).
-> > > 
-> > > IIRC, of_platform_populate can be called multiple times, even recursively
-> > > be drivers that populate their own child devices.
-> > 
-> > Indeed. Perhaps it could be conditionally called when root == NULL. But
-> > perhaps that's not safe either. Anyway, I still think we shouldn't be
-> > making this some randomly placed early initcall anyway.
-> 
-> I disagree. IOMMUs are special in the same sense that irqchips, clocks and
-> timers are. This is not just a random call, it is being explicit about a
-> base functionality that is needed for all devices attached to it.
+Hi Arnd,
 
-Why do you say IOMMUs are special? I can understand how clocks and
-timers are somewhat special because they are required at early boot. But
-IOMMUs are not special in that way. I don't think there are any IOMMU
-users that early in the boot process. The only reason why IOMMU is
-special is because of the way it's currently hooked into the driver
-model.
+I will be taking this forward as Naveen is no longer with Samsung.
 
-> While we pretend that these are just device drivers in some sense, I think
-> it's perfectly reasonable to have an explicit entry point for each subsystem
-> here.
+On Wed, Sep 3, 2014 at 4:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 03 September 2014 13:51:56 Naveen Krishna Ch wrote:
+>> On 2 September 2014 21:16, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 02 September 2014 20:52:00 Naveen Krishna Chatradhi wrote:
+>> >> Make the config symbols SERIAL_SAMSUNG_UARTS_4 and
+>> >> SERIAL_SAMSUNG_UARTS depend on SERIAL_SAMSUNG rather than
+>> >> PLAT_SAMSUNG.
+>> >
+>> > Please always describe why you are doing a change. This patch
+>> > seems really pointless.
 
-They aren't really device drivers at all. They don't bind to devices but
-to device tree nodes. And that comes at a high cost. Writing drivers for
-these subsystems is weird, because all of a sudden you can no longer use
-all the goodies that we've become used to (dev_log(), devres, ...) over
-the years.
+I will re-post the patch with a better commit message once we sort the
+below issue.
 
-> I see two problems with using deferred probing here: 
-> 
-> - we don't actually need to defer the probing but the binding to the driver
->   when no dma ops are set, but it seems silly to even create the device
->   before we can find out which ops it should use.
+>>
+>> The SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS config options are
+>> meaningful only if SERIAL_SAMSUNG is enabled. Hence the dependency
+>> rules were changed. I will repost this patch with better description.
+>
+> My point is that the options are used by both the uart driver and
+> the platform code, e.g. for the purpose of PM debugging which can
+> be enabled even when the serial-samsung driver is turned off.
 
-What does device creation have to do with anything? Surely a device
-won't need IOMMU services before the device is bound to a driver.
+I looked through the code and could find two references to these
+symbols in the platform-specific code: arch/arm/plat-samsung/init.c
+and arch/arm/mach-s3c64xx/irq-pm.c. The first one is being used to
+initialize the uart platform device in non-dt way while the second one
+saves and restores the uart irq masks for all channels across a
+suspend/resume cycle. Also, the save/restore will get bypassed in case
+CONFIG_SERIAL_SAMSUNG_UARTS is not defined. It does not look like
+either of these cases would cause any issue with the current patch,
+can you please help me understand the problem ?
 
->   The reason is that a driver does not actively ask for an IOMMU as it would
->   for other subsystems (gpio, led, dmaengine, ...).
-
-Actually it does. At least in some cases. If you want to use the IOMMU
-API directly you'd call something like iommu_present() on the bus type
-and then allocate an IOMMU domain and attach to it. Unfortunately the
-API seems to have been designed under the assumption that IOMMU will
-have been registered before any users, so the API doesn't propagate any
-meaningful errors.
-
-Currently the specifics of how that works is all mostly hidden within
-the IOMMU driver which will decide what IOMMU to attach to. That's
-problematic for cases where a device has multiple master interfaces,
-since it won't be able to decide which one to attach to.
-
-Also, even if in other cases the drivers don't actively ask for an IOMMU
-that doesn't mean that they couldn't be made to. For drivers that use
-the DMA/IOMMU integration layer this is probably not practicable, but
-there is no reason the core couldn't do it.
-
-> - As long as the dma_ops are not set, we can't actually call probe() for
->   any device other than iommus, and even that would require adding special
->   magic in the platform_device_probe(), so we'd just defer every device
->   until we get to the iommu. This likely causes a lot of overhead at probe
->   time.
-
-Why? The patches that I (and Hiroshi before me) posted a while ago did
-exactly that and it worked just fine. The only objection to that was
-that Greg (and you I think) didn't want to have that code in the core
-and therefore -EPROBE_DEFER can't properly be propagated. There's no
-special magic required beyond that. The IOMMU becomes a resource or
-service provider, just like any other driver.
-
-As for the overhead I think that's negligible. Hopefully the IOMMU would
-be standalone enough not to defer probing itself, so at worst all IOMMU
-users would be deferred once. Many of them will already defer because of
-other resources such as GPIOs, clocks or regulators anyway. But that's a
-problem for which a solution could be implemented. Dependency-based
-probe ordering was discussed not so long ago. With that in place the
-IOMMU would be probed before any of its users.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/a3f8d4f4/attachment.sig>
+Regards,
+Abhilash
+>
+>> >>  config SERIAL_SAMSUNG_UARTS_4
+>> >>         bool
+>> >> -       depends on PLAT_SAMSUNG
+>> >> +       depends on SERIAL_SAMSUNG
+>> >>         default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
+>> >>         help
+>> >>           Internal node for the common case of 4 Samsung compatible UARTs
+>> >>
+>> >>  config SERIAL_SAMSUNG_UARTS
+>> >>         int
+>> >> -       depends on PLAT_SAMSUNG
+>> >> +       depends on SERIAL_SAMSUNG
+>> >>         default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
+>> >>         default 3
+>> >>         help
+>> >>
+>> >
+>> > Have you checked that it still builds on all samsung platforms when
+>> > SERIAL_SAMSUNG is disabled? We have had build errors in this area
+>> > in the past.
+>>
+>> Yes, it builds for other Samsung platforms.
+>
+> Ok.
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
