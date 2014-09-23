@@ -1,155 +1,79 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 11:38:47 +0200
-Subject: [PATCH v7 07/10] ARM: at91: add clk_lookup entry for RTT devices
-In-Reply-To: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411465130-29011-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1411465130-29011-8-git-send-email-boris.brezillon@free-electrons.com>
+From: srv_yingjoe.chen@mediatek.com (Joe.C)
+Date: Tue, 23 Sep 2014 17:43:22 +0800
+Subject: [Patch] irqdomain: Introduce new interfaces to support
+ hierarchy irqdomains
+In-Reply-To: <1411373856-9669-1-git-send-email-jiang.liu@linux.intel.com>
+References: <alpine.DEB.2.10.1409160859080.4247@nanos>
+ <1411373856-9669-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1411465402.8922.126.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First export the clk32k clk.
-Then add clk_lookup entries for RTT devices so that rtc-at91sam9 driver
-can retrieve and manipulate the slow clk.
+On Mon, 2014-09-22 at 16:17 +0800, Jiang Liu wrote:
+> @@ -388,7 +389,6 @@ EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
+>  unsigned int irq_create_mapping(struct irq_domain *domain,
+>  				irq_hw_number_t hwirq)
+>  {
+> -	unsigned int hint;
+>  	int virq;
+>  
+>  	pr_debug("irq_create_mapping(0x%p, 0x%lx)\n", domain, hwirq);
+> @@ -410,12 +410,8 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
+>  	}
+>  
+>  	/* Allocate a virtual interrupt number */
+> -	hint = hwirq % nr_irqs;
+> -	if (hint == 0)
+> -		hint++;
+> -	virq = irq_alloc_desc_from(hint, of_node_to_nid(domain->of_node));
+> -	if (virq <= 0)
+> -		virq = irq_alloc_desc_from(1, of_node_to_nid(domain->of_node));
+> +	virq = irq_domain_alloc_descs(-1, 1, hwirq,
+> +				      of_node_to_nid(domain->of_node));
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91sam9260.c | 2 ++
- arch/arm/mach-at91/at91sam9261.c | 2 ++
- arch/arm/mach-at91/at91sam9263.c | 4 ++++
- arch/arm/mach-at91/at91sam9g45.c | 2 ++
- arch/arm/mach-at91/at91sam9rl.c  | 2 ++
- arch/arm/mach-at91/clock.c       | 2 +-
- arch/arm/mach-at91/clock.h       | 1 +
- 7 files changed, 14 insertions(+), 1 deletion(-)
+If I read this correct, the resulting virq is different after your
+change.
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 3477ba9..a853d4c 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -217,6 +217,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more usart lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -237,6 +238,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
- 	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index fb164a5..3f5a299 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -192,6 +192,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -209,6 +210,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 810fa5f..bef5b96 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -201,6 +201,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.1", &clk32k),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
-@@ -227,6 +229,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffb8000.pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd50.rtc", &clk32k),
- };
- 
- static struct clk_lookup usart_clocks_lookups[] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 9d45496..69fdfcc 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -253,6 +253,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "atmel_aes", &aestdessha_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "at91sam9rl-pwm", &pwm_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more usart lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
-@@ -279,6 +280,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioC_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioDE_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioDE_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 
- 	CLKDEV_CON_ID("pioA", &pioA_clk),
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 878d501..a82dc61 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -205,6 +205,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
- 	CLKDEV_CON_ID("pioD", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "rtc-at91sam9.0", &clk32k),
- 	/* more lookup table for DT entries */
- 	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
- 	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-@@ -223,6 +224,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
- 	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffd20.rtc", &clk32k),
- 	CLKDEV_CON_ID("adc_clk", &tsc_clk),
- };
- 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 034529d..f5cfed75 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -115,7 +115,7 @@ static u32 at91_pllb_usb_init;
-  * 48 MHz (unless no USB function clocks are needed).  The main clock and
-  * both PLLs are turned off to run in "slow clock mode" (system suspend).
-  */
--static struct clk clk32k = {
-+struct clk clk32k = {
- 	.name		= "clk32k",
- 	.rate_hz	= AT91_SLOW_CLOCK,
- 	.users		= 1,		/* always on */
-diff --git a/arch/arm/mach-at91/clock.h b/arch/arm/mach-at91/clock.h
-index a98a39b..6eb825a 100644
---- a/arch/arm/mach-at91/clock.h
-+++ b/arch/arm/mach-at91/clock.h
-@@ -34,6 +34,7 @@ struct clk {
- extern int __init clk_register(struct clk *clk);
- extern struct clk mck;
- extern struct clk utmi_clk;
-+extern struct clk clk32k;
- 
- #define CLKDEV_CON_ID(_id, _clk)			\
- 	{						\
--- 
-1.9.1
+>  	if (virq <= 0) {
+>  		pr_debug("-> virq allocation failed\n");
+>  		return 0;
+> @@ -490,7 +486,10 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>  	}
+>  
+>  	/* Create mapping */
+> -	virq = irq_create_mapping(domain, hwirq);
+> +	if (irq_domain_is_hierarchy(domain))
+> +		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
+> +	else
+> +		virq = irq_create_mapping(domain, hwirq);
+>  	if (!virq)
+>  		return virq;
+
+hwirq returned from xlat above is lost. Without hwirq or virq, how do we
+know which irq are we working for?
+Also, if the irq_desc/irq_data was already created, this will create
+another one. Should we do irq_find_mapping just like irq_create_mapping?
+
+> +int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
+> +			    unsigned int nr_irqs, int node, void *arg,
+> +			    bool realloc)
+> +{
+> +	int i, ret, virq;
+> +
+> +	if (domain == NULL) {
+> +		domain = irq_default_domain;
+> +		if (WARN(!domain, "domain is NULL; cannot allocate IRQ\n"))
+> +			return -EINVAL;
+> +	}
+> +
+> +	if (!domain->ops->alloc) {
+> +		pr_debug("domain->ops->alloc() is NULL\n");
+> +		return -ENOSYS;
+> +	}
+> +
+> +	if (realloc && irq_base >= 0) {
+> +		virq =  irq_base;
+                         ^
+extra space here.
+
+Joe.C
