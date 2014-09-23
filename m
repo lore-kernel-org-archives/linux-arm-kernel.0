@@ -1,50 +1,44 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 23 Sep 2014 18:04:37 -0500
-Subject: [PATCH v2 2/3] watchdog: qcom: document device tree bindings
-In-Reply-To: <cover.1411513109.git.joshc@codeaurora.org>
-References: <cover.1411513109.git.joshc@codeaurora.org>
-Message-ID: <337231c0fc8b16b4f37e1e3b85cb0246f357a64d.1411513109.git.joshc@codeaurora.org>
+Date: Tue, 23 Sep 2014 18:04:35 -0500
+Subject: [PATCH v2 0/3] watchdog: add support for QCOM WDT
+Message-ID: <cover.1411513109.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm Krait Processor Sub-system (KPSS) contains one or more
-instances of the WDT.  Provide documentation on how to describe these in
-the device tree.
+This patchset provides support for the Watchdog Timer (WDT) found in the Krait
+Processor Sub-system (KPSS) of the MSM8960, APQ8064, and IPQ8064 chips.
 
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- .../devicetree/bindings/watchdog/qcom-wdt.txt      | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+This driver is implemented ontop of WATCHDOG_CORE, and therefore its primary
+interface is through userspace.  The implemantion is currently very basic (i.e.
+it doesn't support PRETIMEOUT, even though it could be implemented through the
+WDT's BARK functionality).  It should also be fairly easy to extend this driver
+in the future to support newer chipsets as well.
+
+Patch 3 also extends the driver to also register a restart_notifier, making it
+possible for the WDT to act as a restart mechanism if more favorable mechanisms
+don't work.  This is important for some boards which don't support PS_HOLD,
+like the IPQ8064-based AP148 board.
+
+Changes since v1:
+  - Make use of clock API instead of using a 'clock-frequency' property
+  - Setup default timeout of 30 seconds when one is not specified
+  - Add remove() function to allow for module unloading
+  - Don't acquire/release watchdog lock on restart
+  - Don't bail completely if restart_handler registration fails
+
+Josh Cartwright (3):
+  watchdog: qcom: add support for KPSS WDT
+  watchdog: qcom: document device tree bindings
+  watchdog: qcom: register a restart notifier
+
+ .../devicetree/bindings/watchdog/qcom-wdt.txt      |  22 +++
+ drivers/watchdog/Kconfig                           |  13 ++
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/qcom-wdt.c                        | 204 +++++++++++++++++++++
+ 4 files changed, 240 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
+ create mode 100644 drivers/watchdog/qcom-wdt.c
 
-diff --git a/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt b/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
-new file mode 100644
-index 0000000..6a1d758
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/qcom-wdt.txt
-@@ -0,0 +1,22 @@
-+Qualcomm Krait Processor Sub-system (KPSS) Watchdog
-+---------------------------------------------------
-+
-+Required properties :
-+- compatible : shall contain only one of the following:
-+
-+			"qcom,kpss-wdt-msm8960"
-+			"qcom,kpss-wdt-apq8064"
-+			"qcom,kpss-wdt-ipq8064"
-+
-+- reg : shall contain base register location and length
-+- clocks : shall contain the input clock phandle
-+- timeout-sec : shall contain the default watchdog timeout in seconds,
-+                if unset, the default timeout is 30 seconds
-+
-+Example:
-+	watchdog at 208a038 {
-+		compatible = "qcom,kpss-wdt-ipq8064";
-+		reg = <0x0208a038 0x40>;
-+		clocks = <&sleep_clk>;
-+		timeout-sec = <10>;
-+	};
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
