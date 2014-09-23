@@ -1,100 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Sep 2014 19:16:17 +0100
-Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
-In-Reply-To: <2444560.uIlK6FC0A9@amdc1032>
-References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20140911085727.GA25773@e102568-lin.cambridge.arm.com>
- <5415C968.90303@gmail.com> <2444560.uIlK6FC0A9@amdc1032>
-Message-ID: <20140923181617.GB6269@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 20:18:19 +0200
+Subject: [PATCH v4 3/9] Documentation: bindings: net: add the Marvell
+ PXA168 Ethernet controller
+In-Reply-To: <5421AE7C.30504@gmail.com>
+References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
+ <5150779.ibmzDh88cj@wuerfel> <5421AE7C.30504@gmail.com>
+Message-ID: <3847496.NqfTxpsf9X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 02:42:48PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Sunday, September 14, 2014 06:59:20 PM Tomasz Figa wrote:
-> > [dropping my old @samsung.com address]
-> > 
-> > On 11.09.2014 10:57, Lorenzo Pieralisi wrote:
-> > > On Thu, Sep 11, 2014 at 09:28:06AM +0100, Daniel Lezcano wrote:
-> > >> On 09/05/2014 05:34 PM, Lorenzo Pieralisi wrote:
-> > >>> On Fri, Sep 05, 2014 at 10:21:20AM +0100, Will Deacon wrote:
-> > >>>> On Thu, Sep 04, 2014 at 06:29:10PM +0100, Lorenzo Pieralisi wrote:
-> > >>>>> On Thu, Sep 04, 2014 at 05:03:20PM +0100, Catalin Marinas wrote:
-> > >>>>>> On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
-> > >>>>>>> This patch should be ready to go too, is it ok if I split the series
-> > >>>>>>> in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
-> > >>>>>>> (inclusive of DT bindings and !!this patch!!) and send two separate pull
-> > >>>>>>> requests ?
-> > >>>>>>
-> > >>>>>> If Daniel/Rafael don't have any objection, I can take the whole series
-> > >>>>>> through the arm64 tree (it seems that patches have been already acked by
-> > >>>>>> Daniel).
-> > >>>>>
-> > >>>>> Thanks a lot Catalin. Since this one is a brand new CPUidle driver and it
-> > >>>>> follows a different pattern from arm legacy drivers I would like to get
-> > >>>>> Daniel's ack on this patch too before pushing it. For the records I have
-> > >>>>> just added two pr_err to signal driver probing error, ultraminor changes
-> > >>>>> that do not justify a repost.
-> > >>>>>
-> > >>>>> If Samsung guys do not manifest themselves I would drop patch 8 from
-> > >>>>> the series till it gets tested and its patch dependency queued too.
-> > >>>>
-> > >>>> The last patch also has a dependency, as you mentioned to Daniel. I think
-> > >>>> we can certainly merge the arm64 parts, and if Daniel doesn't object, then
-> > >>>> we can take the driver stuff too but leaving the exynos bits out (i.e. drop
-> > >>>> the last patch).
-> > >>>>
-> > >>>> Anyway, if you could repost with the acks you've collected and rearrange it
-> > >>>> so the arm64 patches are first in the series, that would be great.
-> > >>>
-> > >>> I can repost it with the acks and rearrange the patches, but for the
-> > >>> pull request I have to know what code can be merged, since there are
-> > >>> some arm64 patches (PSCI and CPUidle arm64 back-end) that are strictly
-> > >>> tied to the arm64 CPUidle driver, so I *have* to know if the arm64
-> > >>> CPUidle driver (this patch) can get merged and that requires an ack.
-> > >>>
-> > >>> If I do not hear from Samsung guys I will drop patch 8.
-> > >>
-> > >> Well I would prefer to have this patch merged (Cc'ing Tomasz).
-> > > 
-> > > Ok, but:
-> > > 
-> > > a) I only compile tested it
-> > > b) There is a dts patch dependency for patch 8 to apply cleanly and it
-> > >    hasn't been acked (I can't really do it since I can't test it)
-> > > 
-> > >    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274179.html
-> > > 
-> > > So, what should we do ? Tomasz ?
-> > 
-> > Sorry for late reply. I don't work for Samsung anymore so I don't focus
-> > that much on areas other than I still maintain.
-> > 
-> > As for b) I believe all my patches have been already merged and now
-> > we're just waiting for Kukjin to apply Bart's patch (although it's been
-> > sitting on the ML since July, so probably needs rebasing).
-> > 
-> > About the patch 8 alone, somebody would have to test it. Maybe Bart or
-> > Krzysztof could find some time to look at this? Other than that, I'm not
-> > quite sure about entry latency you specified. It would look like
-> > entering the state takes longer time than leaving, which I believe is
-> > not the case. However I can't find any place in the code which would use
-> > entry latency, so it might not be that important for now.
-> 
-> I tested this patch series on both Exynos4210 (Origen board) and Exynos5250
-> (Arndale board).  On Exynos4210 AFTR cpuidle mode is still working fine
-> with the patch series applied.  On Exynos5250 AFTR is not working but it is
-> an upstream problem (same happens with v3.17-rc4).
-> 
-> Lorenzo, you can add
-> 
-> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> 
-> to the Exynos patch (patch #8).
+On Tuesday 23 September 2014 19:31:40 Sebastian Hesselbarth wrote:
+> It has been a while I looked it up in the pxa168 datasheet, but IIRC
+> there is only one port per controller. FWIW, there actually is also
+> just one port per controller for Orion SoCs. The multiple ports per
+> controller comes from the PPC system controllers, i.e. mv643xx hence
+> the name. We just made the binding look like it is more ports available
+> to make it backwards compatible.. although I doubt anyone is still using
+> mv643xx anywhere.
 
-Thanks a lot, that's great. I hope Daniel can add the tag and get this
-merged.
+Ok, I see.
 
-Lorenzo
+> > If there is only one port and we just have to know which one that is,
+> > I don't think we need the child nodes, but if one can have multiple
+> > ports operate independently then the driver will need a rework
+> > to actually be usable with that configuration.
+> 
+> I doubt pxa168 needs port nodes at all, i.e. we have the phy-handle
+> directly as property of the controller node.
+
+Ah, good.
+
+> The HEC PHY node itself will be a sub-node of some future CEC node,
+> while the (internal) MII PHY node can stay as a sub-node of the
+> controller, e.g.
+> 
+> (one final example to make sure we agree on the same)
+> 
+> eth0: ethernet at f7b90000 {
+>         compatible = "marvell,pxa168-eth";
+>         reg = <...>;
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         phy-handle = <&ethphy0>;
+> 
+>         ethphy0: ethernet-phy at 0 {
+>                 reg = <0>;
+>         };
+> };
+> 
+> cec0: cec at f7f00baa {
+>         compatible = "marvell,berlin-cec";
+>         reg = <...>;
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         
+>         hecphy0: hdmi-ethernet-phy at 0 {
+>                 reg = <0>;
+>         };
+> };
+> 
+> With berlin2cd-google-chromecast.dts overwriting
+> 
+> &eth0 { phy-handle = <&hecphy0>; };
+
+Ok, now I also understood how the cec fits into this. Yes, I think this
+looks very good.
+
+	Arnd
