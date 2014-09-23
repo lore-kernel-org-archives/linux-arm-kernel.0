@@ -1,55 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 18:29:48 +0200
-Subject: [PATCH v4 3/9] Documentation: bindings: net: add the Marvell
- PXA168 Ethernet controller
-In-Reply-To: <542195B0.6080706@gmail.com>
-References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
- <4014272.rJbSfrLcuB@wuerfel> <542195B0.6080706@gmail.com>
-Message-ID: <9401592.hUYDkriFVO@wuerfel>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 24 Sep 2014 01:31:01 +0900
+Subject: [PATCH v3 1/5] ARM: firmware: Introduce suspend and resume
+ operations
+In-Reply-To: <1409062228-14690-2-git-send-email-t.figa@samsung.com>
+References: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
+ <1409062228-14690-2-git-send-email-t.figa@samsung.com>
+Message-ID: <5421A045.5020804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 17:45:52 Sebastian Hesselbarth wrote:
-> For reference, this is what we have for MVEBU SoCs with multiple ports
-> per controller:
-> 
-> eth: ethernet-ctrl at 72000 {
->         compatible = "marvell,orion-eth";
->         #address-cells = <1>;
->         #size-cells = <0>;
->         reg = <0x72000 0x4000>;
->         clocks = <&gate_clk 2>;
->         marvell,tx-checksum-limit = <1600>;
->         status = "disabled";
-> 
->         ethernet-port at 0 {
->                 compatible = "marvell,orion-eth-port";
->                 reg = <0>;
->                 interrupts = <29>;
->                 /* overwrite MAC address in bootloader */
->                 local-mac-address = [00 00 00 00 00 00];
->                 phy-handle = <&ethphy>;
->         };
-> };
-> 
-> mdio: mdio-bus at 72004 {
->         compatible = "marvell,orion-mdio";
->         #address-cells = <1>;
->         #size-cells = <0>;
->         reg = <0x72004 0x84>;
->         interrupts = <30>;
->         clocks = <&gate_clk 2>;
->         status = "disabled";
->         ethphy: ethernet-phy {
->                 /* set phy address in board file */
->         };
-> };
-> 
+On 08/26/14 23:10, Tomasz Figa wrote:
+> This patch extends the firmware_ops structure with two new callbacks:
+> .suspend() and .resume(). The former is intended to ask the firmware to
+> save all its volatile state and suspend the system, without returning
+> back to the kernel in between. The latter is to be called early by
+> very low level platform suspend code after waking up to restore low
+> level hardware state, which can't be restored in non-secure mode.
+>
+> While at it, outdated version of the structure is removed from the
+> documentation and replaced with a reference to the header file.
+>
+> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> Acked-by: Alexandre Courbot<acourbot@nvidia.com>
+> ---
+>   Documentation/arm/firmware.txt  | 28 +++++-----------------------
+>   arch/arm/include/asm/firmware.h |  8 ++++++++
+>   2 files changed, 13 insertions(+), 23 deletions(-)
+>
+> diff --git a/Documentation/arm/firmware.txt b/Documentation/arm/firmware.txt
+> index c2e468f..da6713a 100644
+> --- a/Documentation/arm/firmware.txt
+> +++ b/Documentation/arm/firmware.txt
+> @@ -7,32 +7,14 @@ world, which changes the way some things have to be initialized. This makes
+>   a need to provide an interface for such platforms to specify available firmware
+>   operations and call them when needed.
+>
+> -Firmware operations can be specified using struct firmware_ops
+> -
+> -	struct firmware_ops {
+> -		/*
+> -		* Enters CPU idle mode
+> -		*/
+> -		int (*do_idle)(void);
+> -		/*
+> -		* Sets boot address of specified physical CPU
+> -		*/
+> -		int (*set_cpu_boot_addr)(int cpu, unsigned long boot_addr);
+> -		/*
+> -		* Boots specified physical CPU
+> -		*/
+> -		int (*cpu_boot)(int cpu);
+> -		/*
+> -		* Initializes L2 cache
+> -		*/
+> -		int (*l2x0_init)(void);
+> -	};
+> -
+> -and then registered with register_firmware_ops function
+> +Firmware operations can be specified by filling in a struct firmware_ops
+> +with appropriate callbacks and then registering it with register_firmware_ops()
+> +function.
+>
+>   	void register_firmware_ops(const struct firmware_ops *ops)
+>
+> -the ops pointer must be non-NULL.
+> +The ops pointer must be non-NULL. More information about struct firmware_ops
+> +and its members can be found in arch/arm/include/asm/firmware.h header.
+>
+>   There is a default, empty set of operations provided, so there is no need to
+>   set anything if platform does not require firmware operations.
+> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+> index 2c9f10d..5904f59 100644
+> --- a/arch/arm/include/asm/firmware.h
+> +++ b/arch/arm/include/asm/firmware.h
+> @@ -41,6 +41,14 @@ struct firmware_ops {
+>   	 * Initializes L2 cache
+>   	 */
+>   	int (*l2x0_init)(void);
+> +	/*
+> +	 * Enter system-wide suspend.
+> +	 */
+> +	int (*suspend)(void);
+> +	/*
+> +	 * Restore state of privileged hardware after system-wide suspend.
+> +	 */
+> +	int (*resume)(void);
+>   };
+>
+>   /* Global pointer for current firmware_ops structure, can't be NULL. */
 
-But in this example, you have the same registers and the same
-clocks in two nodes, which are even used by the same device driver
-at the moment. It's not a big issue, but my feeling is that Antoine's
-approach was actually better because it more closely reflects
-the way that the hardware is built.
+Hi Russell,
 
-	Arnd
+I've applied this in samsung tree for exynos stuff, if you have any 
+objection, please kindly let me know.
+
+Thanks,
+Kukjin
