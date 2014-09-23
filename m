@@ -1,88 +1,184 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 12:19:42 +0200
-Subject: [PATCH v2 1/8] ARM: add mach-asm9260
-In-Reply-To: <542136B0.3020305@rempel-privat.de>
-References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <71905861.S3QD6rl7jU@wuerfel> <542136B0.3020305@rempel-privat.de>
-Message-ID: <6072405.iL4RqHeZrt@wuerfel>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 23 Sep 2014 15:59:43 +0530
+Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <20140922091925.GA19778@shlinux1.ap.freescale.net>
+References: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140922091925.GA19778@shlinux1.ap.freescale.net>
+Message-ID: <000001cfd719$51e7e560$f5b7b020$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 11:00:32 Oleksij Rempel wrote:
-> Am 22.09.2014 um 17:08 schrieb Arnd Bergmann:
-> > On Sunday 21 September 2014 20:41:37 Oleksij Rempel wrote:
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index 5918d40..1a71feb 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -379,6 +379,20 @@ config ARCH_AT91
-> >>  	  This enables support for systems based on Atmel
-> >>  	  AT91RM9200 and AT91SAM9* processors.
-> >>  
-> >> +config MACH_ASM9260
-> >> +	bool "Alphascale ASM9260"
-> >> +	select ARCH_REQUIRE_GPIOLIB
-> >> +	select COMMON_CLK
-> >> +	select IRQ_DOMAIN
-> >> +	select SPARSE_IRQ
-> >> +	select MULTI_IRQ_HANDLER
-> >> +	select GENERIC_IRQ_CHIP
-> >> +	select GENERIC_CLOCKEVENTS
-> >> +	select CLKSRC_MMIO
-> >> +	select CPU_ARM926T
-> >> +	help
-> >> +	  Support for Alpascale ASM9260 based platform.
-> > 
-> > To enable multiplatform support, please move this to its own
-> > arch/arm/mach-asm9260/Kconfig file and make it depend on ARCH_MULTI_V5,
-> > then remove all 'select' statements that are implicitly enabled there
-> > already (most of the above).
+Hi Dong,
+
+On Monday, September 22, 2014, Dong Aisheng wrote,
+> On Mon, Sep 22, 2014 at 10:10:07AM +0530, Pankaj Dubey wrote:
+
+[snip]
+
+> > -static int syscon_match_node(struct device *dev, void *data)
+> > +static struct syscon *of_syscon_register(struct device_node *np)
+> >  {
+> > -	struct device_node *dn = data;
+> > +	struct platform_device *pdev = NULL;
+> > +	struct syscon *syscon;
+> > +	struct regmap *regmap;
+> > +	void __iomem *base;
+> > +	int ret;
+> > +
+> > +	if (!of_device_is_compatible(np, "syscon"))
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
+> > +	if (!syscon)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	base = of_iomap(np, 0);
+> > +	if (!base) {
+> > +		ret = -ENOMEM;
+> > +		goto err_map;
+> > +	}
+> > +
+> > +	/* if device is already populated and available then use it */
+> > +	pdev = of_find_device_by_node(np);
+> > +	if (!pdev) {
+> > +		/* for early users create dummy syscon device and use it */
+> > +		pdev = platform_device_alloc("dummy-syscon", -1);
 > 
-> Should they be only in defconfig or selected by driver?
+> Can we create specific devices for each syscon device?
+> That looks more reasonable to me.
+> Then we can dump registers in regmap debugfs more clearly, just like other
+devices.
+> And i think it's better to follow device tree way to generate devices from
+node.
+> If DT core find a device is already created, it can ignore that device to
+avoid creating
+> duplicated device during of_platform_populate.
+> 
 
-The dependencies should match whatever the platform requires. Anything
-that is optional and user-selectable better goes into the defconfig.
+If you are referring to use "of_platform_device_create", then I am afraid
+that it can't be used
+in very early stage. For example, current patch I tested by calling
+syscon_lookup_by_phandle from
+"init_irq" hook of machine_desc, and it worked well, but If I use
+"of_platform_device_create"
+instead of dummy device, it fails to create pdev and this I verified on
+Exynos platform. The reason
+I selected "init_irq" is because this comes just before smp init and where
+once we tried to get regmap handle,
+but could not do so. 
 
-> >> +static struct map_desc asm9260_io_desc[] __initdata = {
-> >> +	{	/* IO space */
-> >> +		.virtual	= (unsigned long)0xf0000000,
-> >> +		.pfn		= __phys_to_pfn(0x80000000),
-> >> +		.length		= 0x00800000,
-> >> +		.type		= MT_DEVICE
-> >> +	},
-> >> +	{	/* LCD IO space	*/
-> >> +		.virtual	= (unsigned long)0xf0a00000,
-> >> +		.pfn		= __phys_to_pfn(0x80800000),
-> >> +		.length		= 0x00009000,
-> >> +		.type		= MT_DEVICE
-> >> +	},
-> >> +	{	/* GPIO IO space */
-> >> +		.virtual	= (unsigned long)0xf0800000,
-> >> +		.pfn		= __phys_to_pfn(0x50000000),
-> >> +		.length		= 0x00100000,
-> >> +		.type		= MT_DEVICE
-> >> +	},
-> >> +	{	/* SRAM space Cacheable */
-> >> +		.virtual	= (unsigned long)0xd0000000,
-> >> +		.pfn		= __phys_to_pfn(0x40000000),
-> >> +		.length		= 0x00100000,
-> >> +#ifdef CONFIG_SRAM_MEM_CACHED
-> >> +		.type		= MT_MEMORY
-> >> +#else
-> >> +		.type		= MT_DEVICE
-> >> +#endif
-> >> +	},
-> >> +};
+Also if it was just a matter of creating platform_device at early stage then
+early initialization of
+syscon could have been solved till now.
+
+So I would suggest if we really want this patch to cover early
+initialization of syscon
+(which is not it's main purpose) current patch is sufficient. 
+
+@Arnd, since I have addressed crash issue as reported by Dong Aisheng, I
+would like to take your ack,
+but since there are some more code changes other than what you suggested I
+request you to check this
+and if you are ok, then I would like to your ack so that I can request to
+maintainer for taking this patch.
+
+Thanks,
+Pankaj Dubey
+
+> Regards
+> Dong Aisheng
+> 
+> > +		if (!pdev) {
+> > +			ret = -ENOMEM;
+> > +			goto err_pdev;
+> > +		}
+> > +		pdev->dev.of_node = of_node_get(np);
+> > +	}
+> > +
+> > +	regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> &syscon_regmap_config);
+> > +	if (IS_ERR(regmap)) {
+> > +		dev_err(&pdev->dev, "regmap init failed\n");
+> > +		ret = PTR_ERR(regmap);
+> > +		goto err_regmap;
+> > +	}
+> > +
+> > +	syscon->regmap = regmap;
+> > +	syscon->np = np;
 > >
-> > This should not be necessary, as all drivers are supposed to
-> > ioremap their own device registers. For large register ranges
-> > that are used a lot, you could use these as an optimization to
-> > get 1 MB sections mapped using a large TLB entry, but usually
-> > the benefit is very small.
-> 
-> Do you mean only "SRAM space Cacheable" section?
-
-No, all of them.
-
-
-	Arnd
+> > -	return (dev->of_node == dn) ? 1 : 0;
+> > +	spin_lock(&syscon_list_slock);
+> > +	list_add_tail(&syscon->list, &syscon_list);
+> > +	spin_unlock(&syscon_list_slock);
+> > +
+> > +	return syscon;
+> > +
+> > +err_regmap:
+> > +	if (!strcmp(pdev->name, "dummy-syscon")) {
+> > +		of_node_put(np);
+> > +		platform_device_put(pdev);
+> > +	}
+> > +err_pdev:
+> > +	iounmap(base);
+> > +err_map:
+> > +	kfree(syscon);
+> > +	return ERR_PTR(ret);
+> >  }
+> >
+> >  struct regmap *syscon_node_to_regmap(struct device_node *np)  {
+> > -	struct syscon *syscon;
+> > -	struct device *dev;
+> > +	struct syscon *entry, *syscon = NULL;
+> >
+> > -	dev = driver_find_device(&syscon_driver.driver, NULL, np,
+> > -				 syscon_match_node);
+> > -	if (!dev)
+> > -		return ERR_PTR(-EPROBE_DEFER);
+> > +	spin_lock(&syscon_list_slock);
+> >
+> > -	syscon = dev_get_drvdata(dev);
+> > +	list_for_each_entry(entry, &syscon_list, list)
+> > +		if (entry->np == np) {
+> > +			syscon = entry;
+> > +			break;
+> > +		}
+> > +
+> > +	spin_unlock(&syscon_list_slock);
+> > +
+> > +	if (!syscon)
+> > +		syscon = of_syscon_register(np);
+> > +
+> > +	if (IS_ERR(syscon))
+> > +		return ERR_CAST(syscon);
+> >
+> >  	return syscon->regmap;
+> >  }
+> > @@ -110,17 +185,6 @@ struct regmap
+> > *syscon_regmap_lookup_by_phandle(struct device_node *np,  }
+> > EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
+> >
+> > -static const struct of_device_id of_syscon_match[] = {
+> > -	{ .compatible = "syscon", },
+> > -	{ },
+> > -};
+> > -
+> > -static struct regmap_config syscon_regmap_config = {
+> > -	.reg_bits = 32,
+> > -	.val_bits = 32,
+> > -	.reg_stride = 4,
+> > -};
+> > -
+> >  static int syscon_probe(struct platform_device *pdev)  {
+> >  	struct device *dev = &pdev->dev;
+> > @@ -167,7 +231,6 @@ static struct platform_driver syscon_driver = {
+> >  	.driver = {
+> >  		.name = "syscon",
+> >  		.owner = THIS_MODULE,
+> > -		.of_match_table = of_syscon_match,
+> >  	},
+> >  	.probe		= syscon_probe,
+> >  	.id_table	= syscon_ids,
+> > --
+> > 1.7.9.5
+> >
