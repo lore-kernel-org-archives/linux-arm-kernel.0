@@ -1,53 +1,119 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Sep 2014 17:23:02 +0100
-Subject: [PATCH] ARM: mm: clear SCTLR.HA instead of setting it for LPAE
-In-Reply-To: <20140923161628.GD6858@e104818-lin.cambridge.arm.com>
-References: <1411398137-5521-1-git-send-email-will.deacon@arm.com>
- <20140923161628.GD6858@e104818-lin.cambridge.arm.com>
-Message-ID: <20140923162302.GL28608@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 23 Sep 2014 09:24:34 -0700
+Subject: [PATCH] ARM: mach-bcm: offer a new maintainer and process
+In-Reply-To: <54218B19.8070208@broadcom.com>
+References: <1411150632-25695-1-git-send-email-f.fainelli@gmail.com>
+ <20140923050339.GF7487@localhost> <20140923125423.GC12283@beef>
+ <54218B19.8070208@broadcom.com>
+Message-ID: <CAOesGMjdvs87_hcY1p8E78tm7F_vEhZjToJc4P8h2vcWYgaWTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 05:16:29PM +0100, Catalin Marinas wrote:
-> On Mon, Sep 22, 2014 at 04:02:17PM +0100, Will Deacon wrote:
-> > SCTLR.HA (hardware access flag) is deprecated, not actually implemented
-> > by any CPUs
-> 
-> That I agree.
-> 
-> > and would probably break Linux if it was (since we don't use
-> > atomics when accessing page table entries).
-> 
-> But not here. The ARMv7 ARM states:
-> 
->   Any implementation of hardware management of the Access flag must
->   ensure that any software changes to the translation table are not
->   overwritten. The architecture does not require software that changes
->   translation table entries to use interlocked operations. The hardware
->   management mechanisms for the Access flag must prevent any loss of
->   data written to translation table entries that might occur when, for
->   example, a write by another processor occurs between the read and
->   write phases of a translation table walk that updates the Access flag.
-> 
-> So basically you should not be required to change the OS for atomic
-> accesses to the page table entries. There is indeed a chance that the OS
-> would inadvertently clear the AF bit but that's only affecting the
-> statistics a bit.
+On Tue, Sep 23, 2014 at 8:00 AM, Scott Branden <sbranden@broadcom.com> wrote:
+> On 14-09-23 05:54 AM, Matt Porter wrote:
+>>
+>> On Mon, Sep 22, 2014 at 10:03:39PM -0700, Olof Johansson wrote:
+>>>
+>>> On Fri, Sep 19, 2014 at 11:17:11AM -0700, Florian Fainelli wrote:
+>>>>
+>>>> Hi all,
+>>>>
+>>>> As some of you may have seen in the news, Broadcom has recently stopped
+>>>> its mobile SoC activities. Upstream support for Broadcom's Mobile SoCs
+>>>> was an effort initially started by Christian Daudt and his team, and
+>>>> then
+>>>> continued by Alex Eleder and Matter Porter assigned to a particular
+>>>> landing
+>>>> team within Linaro to help Broadcom doing so.
+>>>>
+>>>> As part of this effort, Christian and Matt volunteered for centralizing
+>>>> pull
+>>>> requests coming from the arch/arm/mach-bcm/* directory and as of today,
+>>>> they
+>>>> are still responsible for merging mach-bcm pull requests coming from
+>>>> brcmstb,
+>>>> bcm5301x, bcm2835 and bcm63xx, creating an intermediate layer to the
+>>>> arm-soc
+>>>> tree.
+>>>>
+>>>> Following the mobile group shut down, our group (in which Brian,
+>>>> Gregory, Marc,
+>>>> Kevin and myself are) inherited these mobile SoC platforms, although at
+>>>> this
+>>>> point we cannot comment on the future of mobile platforms, we know that
+>>>> our
+>>>> Linaro activities have been stopped.
+>>>>
+>>>> We have not heard much from Christian and Matt in a while, and some of
+>>>> our pull
+>>>> requests have been stalling as a result. We would like to offer both a
+>>>> new
+>>>> maintainer for the mobile platforms as well as reworking the pull
+>>>> request
+>>>> process:
+>>>>
+>>>> - our group has now full access to these platforms, putting us in the
+>>>> best
+>>>>    position to support Mobile SoCs questions
+>>>
+>>>
+>>> So, one question I have is whether it makes sense to keep the mobile
+>>> platforms in the kernel if the line of business is ending?
+>
+> I guess one problem is that BCM_MOBILE is quite misnamed.  It should really
+> be called BCM_KONA.  bcm281xx was a successful product in the mobile space.
+> But mobile products have short lifespans as new versions become available
+> every year.  In fact - there have already been more products made with this
+> chipset that are not mobile based nor in the consumer space.  The happen to
+> be based on an older kernel version but we are planning on moving to a newer
+> kernel version in the future. Variants of this chipset will continue to be
+> used in many non-mobile products for many years going forward.  We could
+> also rename it BCM_IMMOBILE going forward if that helps clarify things.
+>>>
+>>>
+>>> While I truly do appreciate the work done by Matt and others, there's
+>>> also little chance that it'll see substantial use by anyone. The Capri
+>>> boards aren't common out in the wild and I'm not aware of any dev
+>>> boards or consumer products with these SoCs that might want to run
+>>> mainline? Critical things such as power management and graphics are
+>>> missing from the current platform support in the kernel, so nobody is
+>>> likely to want it on their Android phone, etc.
+>
+> Yes, thanks for all the hard work in upstreaming this code.  It will be
+> built upon and highly leveraged for other purposes beyond Android phones and
+> power management.
+>>>
+>>>
+>>> Maybe the answer to this is "keep it for now, revisit sometime later",
+>>> which is perfectly sane -- it has practically no cost to keep it around
+>>> the way it's looking now.
+>>
+>>
+>> It won't hurt my feelings if it's decided that it has no value being in
+>> the kernel. :) All I can offer is that *maybe* somebody will have a root
+>> exploit for the bcm281xx Roku platforms (that lasts) and/or some of the
+>> capri and hawaii handsets out there and find it useful as a starting
+>> point to work from an Android vendor tree. I don't know if anybody cares
+>> about hacking those platforms or not.
+>>
+>> As mentioned in a followup, the VoIP parts (or some of them, at least)
+>> are part of the bcm281xx family and we were expecting them to submit an
+>> ethernet driver for the past year. There were repeated reminders that
+>> they really care about mainline so I would expect it would be premature
+>> to remove that support until we hear from them.
+>>
+>> -Matt
+>>
+> Yes, variants of this chipset will be developed in new products. bcm281xx
+> was also a poor choice of naming as well. Capri or Kona family would have
+> been much more appropriate.  This product is used in VoIP and other
+> non-mobile markets.
 
-Well, that explains why nobody managed to implement this in hardware! I'll
-remove that part from the commit message.
+Ok, cool -- and for those markets having mainline support might
+actually make sense. So the answer is fairly simple: Keep it for now.
+I'm glad I asked though since it means we have more knowledge of
+what's going on with the platform. And hopefully we'll see some of
+that missing functionality fill in over time.
 
-> > Furthermore, it can confuse cr_alignment checks where the whole value
-> > of SCTLR is compared against the value sitting in the hardware, since
-> > the bit is actually RAZ/WI and will not match the saved cr_alignment
-> > value.
-> 
-> Is this the right fix for cr_alignment? What if we get other bits in the
-> future which are RAZ/WI on ARMv7 and RW on 32-bit ARMv8?
 
-In that case, we'd need to adjust our masks to avoid setting RAZ/WI bits.
-This will only be a problem where we were trying to use a feature that was
-removed, so it's a useful exercise to go through anyway (an alternative is
-to read back the value and see what stuck, but that feels fragile).
-
-Will
+-Olof
