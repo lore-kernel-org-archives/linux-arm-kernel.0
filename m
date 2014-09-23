@@ -1,88 +1,59 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 23 Sep 2014 14:14:55 +0200
-Subject: [PATCH v8 08/10] rtc: at91sam9: use clk API instead of relying
- on AT91_SLOW_CLOCK
-In-Reply-To: <1411471444-2764-9-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411471444-2764-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411471444-2764-9-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140923121455.GC404@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 14:30:30 +0200
+Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support
+ in big-endian model
+In-Reply-To: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
+References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <45444544.Xl4NeUiTm0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 01:24:02PM +0200, Boris BREZILLON wrote:
-> The RTT block is using the slow clock which is accessible through the clk
-> API.
-> Use the clk API to retrieve, enable and get the slow clk rate instead of
-> the AT91_SLOW_CLOCK macro (which hardcodes the slow clk rate).
-> Doing this allows us to reference the clk thus preventing the CCF from
-> disabling it during the "disable unused" phase.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Johan Hovold <johan@kernel.org>
-> ---
->  drivers/rtc/rtc-at91sam9.c | 28 ++++++++++++++++++++++++----
->  1 file changed, 24 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index be9c28b..2eca624 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -23,6 +23,7 @@
->  #include <linux/io.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/regmap.h>
-> +#include <linux/clk.h>
+On Tuesday 23 September 2014 17:15:19 Jingchang Lu wrote:
+> @@ -459,20 +480,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
+>         u16 csr = 0;
 >  
->  /*
->   * This driver uses two configurable hardware resources that live in the
-> @@ -61,8 +62,6 @@
->  #define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
->  #define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
->  
-> -#define AT91_SLOW_CLOCK		32768
-> -
->  /*
->   * We store ALARM_DISABLED in ALMV to record that no alarm is set.
->   * It's also the reset value for that field.
-> @@ -77,6 +76,7 @@ struct sam9_rtc {
->  	struct regmap		*gpbr;
->  	unsigned int		gpbr_offset;
->  	int 			irq;
-> +	struct clk		*sclk;
->  };
->  
->  #define rtt_readl(rtc, field) \
-> @@ -328,6 +328,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  	struct sam9_rtc	*rtc;
->  	int		ret, irq;
->  	u32		mr;
-> +	unsigned int	sclk_rate;
->  
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0) {
-> @@ -385,11 +386,27 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> +	rtc->sclk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(rtc->sclk))
-> +		return PTR_ERR(rtc->sclk);
+>         /*
+> -        * eDMA hardware SGs require the TCD parameters stored in memory
+> -        * the same endian as the eDMA module so that they can be loaded
+> -        * automatically by the engine
+> +        * eDMA hardware SGs requires the TCDs to be auto loaded
+> +        * in the same endian as the core whenver the eDAM engine's
+> +        * register endian. So we don't swap the value, waitting
+> +        * for fsl_set_tcd_params doing the swap.
+>          */
+
+This makes no sense: how would the eDMA hardware know what endianess
+the CPU is using to write this data? Have you tried this running on
+the same hardware with both big-endian and little-endian kernels?
+
+Also, you access this as little-endian data unconditionally rather
+than cpu-endian as the comment suggests, maybe that is what you meant
+here?
+
+> -       edma_writel(edma, src, &(tcd->saddr));
+> -       edma_writel(edma, dst, &(tcd->daddr));
+> -       edma_writew(edma, attr, &(tcd->attr));
+> -       edma_writew(edma, EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
+> -       edma_writel(edma, EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
+> -       edma_writel(edma, EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
+> -       edma_writew(edma, EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
+> -       edma_writew(edma, EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
+> -       edma_writel(edma, EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
+> -       edma_writew(edma, EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
+> +       writel(src, &(tcd->saddr));
+> +       writel(dst, &(tcd->daddr));
 > +
-> +	sclk_rate = clk_get_rate(rtc->sclk);
-> +	if (!sclk_rate || sclk_rate > AT91_RTT_RTPRES) {
-> +		dev_err(&pdev->dev, "Invalid slow clock rate");
+> +       writew(attr, &(tcd->attr));
 
-dev_err message needs a newline.
+You seem to have another preexisting bug: The tcd pointer actually does not
+point to mmio registers here at all, but instead points to memory that
+has been returned from dma_pool_alloc. It is not valid to use writel()
+on such memory, that is only meant to work on real MMIO registers.
 
-> +		return -EINVAL;
-> +	}
-> +
-> +	ret = clk_prepare_enable(rtc->sclk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Could not enable slow clock");
+You should use regular assignments to the registers here, e.g.
+	
+	tcd->saddr = cpu_to_le32(src);
+	tcd->daddr = cpu_to_le32(dst);
+	...
 
-Here too.
-
-Johan
+	Arnd
