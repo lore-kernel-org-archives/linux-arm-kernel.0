@@ -1,79 +1,95 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Tue, 23 Sep 2014 17:36:20 +0800
-Subject: [PATCH v1 3/3] ARM: dts: imx6x: Add enet2 support for imx6sx-sdb board
+Date: Tue, 23 Sep 2014 17:36:19 +0800
+Subject: [PATCH v1 2/3] ARM: imx: add enet init for i.mx6sx
 In-Reply-To: <1411464980-2495-1-git-send-email-b38611@freescale.com>
 References: <1411464980-2495-1-git-send-email-b38611@freescale.com>
-Message-ID: <1411464980-2495-4-git-send-email-b38611@freescale.com>
+Message-ID: <1411464980-2495-3-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add enet2 support for imx6sx-sdb board, and add the "fsl,imx6q-fec"
-compatible for fec2 node to be compatible with the old version.
+Add enet init for i.mx6sx:
+- Add phy ar8031 fixup
+- Set enet clock source from internal PLL
 
 Signed-off-by: Fugang Duan <B38611@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts |   28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sx.dtsi    |    2 +-
- 2 files changed, 29 insertions(+), 1 deletions(-)
+ arch/arm/mach-imx/mach-imx6sx.c |   51 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index 82d6b34..06e0977 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -133,6 +133,14 @@
- &fec1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet1>;
-+	pinctrl-assert-gpios = <&gpio4 16 GPIO_ACTIVE_HIGH>, <&gpio2 6 GPIO_ACTIVE_LOW>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&fec2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet2>;
- 	phy-mode = "rgmii";
- 	status = "okay";
- };
-@@ -394,6 +402,26 @@
- 				MX6SX_PAD_RGMII1_RD2__ENET1_RX_DATA_2	0x3081
- 				MX6SX_PAD_RGMII1_RD3__ENET1_RX_DATA_3	0x3081
- 				MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081
-+				MX6SX_PAD_QSPI1A_DATA0__GPIO4_IO_16	0x80000000
-+				MX6SX_PAD_QSPI1A_DATA3__GPIO4_IO_19	0x80000000
-+				MX6SX_PAD_ENET2_RX_CLK__ENET2_REF_CLK_25M	0x91
-+			>;
-+		};
-+
-+		pinctrl_enet2: enet2grp {
-+			fsl,pins = <
-+				MX6SX_PAD_RGMII2_TXC__ENET2_RGMII_TXC	0xa0b9
-+				MX6SX_PAD_RGMII2_TD0__ENET2_TX_DATA_0	0xa0b1
-+				MX6SX_PAD_RGMII2_TD1__ENET2_TX_DATA_1	0xa0b1
-+				MX6SX_PAD_RGMII2_TD2__ENET2_TX_DATA_2	0xa0b1
-+				MX6SX_PAD_RGMII2_TD3__ENET2_TX_DATA_3	0xa0b1
-+				MX6SX_PAD_RGMII2_TX_CTL__ENET2_TX_EN	0xa0b1
-+				MX6SX_PAD_RGMII2_RXC__ENET2_RX_CLK	0x3081
-+				MX6SX_PAD_RGMII2_RD0__ENET2_RX_DATA_0	0x3081
-+				MX6SX_PAD_RGMII2_RD1__ENET2_RX_DATA_1	0x3081
-+				MX6SX_PAD_RGMII2_RD2__ENET2_RX_DATA_2	0x3081
-+				MX6SX_PAD_RGMII2_RD3__ENET2_RX_DATA_3	0x3081
-+				MX6SX_PAD_RGMII2_RX_CTL__ENET2_RX_EN	0x3081
- 			>;
- 		};
+diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
+index 3de3b73..9822249 100644
+--- a/arch/arm/mach-imx/mach-imx6sx.c
++++ b/arch/arm/mach-imx/mach-imx6sx.c
+@@ -8,12 +8,62 @@
  
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 888dd76..5a36053 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -875,7 +875,7 @@
- 			};
+ #include <linux/irqchip.h>
+ #include <linux/of_platform.h>
++#include <linux/phy.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
  
- 			fec2: ethernet at 021b4000 {
--				compatible = "fsl,imx6sx-fec";
-+				compatible = "fsl,imx6sx-fec", "fsl,imx6q-fec";
- 				reg = <0x021b4000 0x4000>;
- 				interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+ #include "common.h"
+ #include "cpuidle.h"
+ 
++static int ar8031_phy_fixup(struct phy_device *dev)
++{
++	u16 val;
++
++	/* Set RGMII IO voltage to 1.8V */
++	phy_write(dev, 0x1d, 0x1f);
++	phy_write(dev, 0x1e, 0x8);
++
++	/* introduce tx clock delay */
++	phy_write(dev, 0x1d, 0x5);
++	val = phy_read(dev, 0x1e);
++	val |= 0x0100;
++	phy_write(dev, 0x1e, val);
++
++	return 0;
++}
++
++#define PHY_ID_AR8031   0x004dd074
++static void __init imx6sx_enet_phy_init(void)
++{
++	if (IS_BUILTIN(CONFIG_PHYLIB))
++		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffff,
++					   ar8031_phy_fixup);
++}
++
++static void __init imx6sx_enet_clk_sel(void)
++{
++	struct regmap *gpr;
++
++	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6sx-iomuxc-gpr");
++	if (!IS_ERR(gpr)) {
++		regmap_update_bits(gpr, IOMUXC_GPR1,
++				   IMX6SX_GPR1_FEC_CLOCK_MUX_SEL_MASK, 0);
++		regmap_update_bits(gpr, IOMUXC_GPR1,
++				   IMX6SX_GPR1_FEC_CLOCK_PAD_DIR_MASK, 0);
++	} else {
++		pr_err("failed to find fsl,imx6sx-iomux-gpr regmap\n");
++	}
++}
++
++static inline void imx6sx_enet_init(void)
++{
++	imx6sx_enet_phy_init();
++	imx6sx_enet_clk_sel();
++}
++
+ static void __init imx6sx_init_machine(void)
+ {
+ 	struct device *parent;
+@@ -26,6 +76,7 @@ static void __init imx6sx_init_machine(void)
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
+ 
++	imx6sx_enet_init();
+ 	imx_anatop_init();
+ 	imx6sx_pm_init();
+ }
 -- 
 1.7.8
