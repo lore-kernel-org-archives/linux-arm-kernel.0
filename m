@@ -1,59 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 14:30:30 +0200
-Subject: [PATCH] dmaengine: fsl-edma: fixup reg offset and hw S/G support
- in big-endian model
-In-Reply-To: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
-References: <1411463719-7728-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <45444544.Xl4NeUiTm0@wuerfel>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Tue, 23 Sep 2014 15:33:37 +0300
+Subject: [PATCH v4 0/3] Support for Qualcomm QPNP PMIC's
+In-Reply-To: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+References: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <542168A1.5000406@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 17:15:19 Jingchang Lu wrote:
-> @@ -459,20 +480,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
->         u16 csr = 0;
->  
->         /*
-> -        * eDMA hardware SGs require the TCD parameters stored in memory
-> -        * the same endian as the eDMA module so that they can be loaded
-> -        * automatically by the engine
-> +        * eDMA hardware SGs requires the TCDs to be auto loaded
-> +        * in the same endian as the core whenver the eDAM engine's
-> +        * register endian. So we don't swap the value, waitting
-> +        * for fsl_set_tcd_params doing the swap.
->          */
+Hi Lee,
 
-This makes no sense: how would the eDMA hardware know what endianess
-the CPU is using to write this data? Have you tried this running on
-the same hardware with both big-endian and little-endian kernels?
+There are no comments on this set for more then month,
+could you queue up 1/3 and 2/3 for 3.18 merge window?
 
-Also, you access this as little-endian data unconditionally rather
-than cpu-endian as the comment suggests, maybe that is what you meant
-here?
+On 08/01/2014 05:30 PM, Stanimir Varbanov wrote:
+> Hello all,
+> 
+> Changes since v3:
+>  - rename the driver to qcom-spmi-pmic - suggested by David Collins
+>  - spmi regmap config now initialize .fast_io to true
+>  - added generalized comptatible string in DT binding document and driver
+>  - I dropped the pm8921 rename patch for now, it will be subject of another
+>    patchset later on.
+> 
+> regards,
+> Stan
+> 
+> --------------------------------------------------------------------------------
+> 
+> Changes since v2:
+>  - 1/4 - added new line, signed-off-by / acked-by and module_authors.
+>  - 3/4 - the subject has been changed.
+> 
+> The previous v2 can be found at [1].
+> 
+> I'm still waiting Acks for:
+>  - 4/4 from Qualcomm folks.
+>  - 2/4 and 3/4 from DT folks.
+> 
+> The patchset is ready to merge version and also it can be treated as an
+> intermediate step until we find a solution for non-translatable peripheral
+> addresses.
+> 
+> [1] https://lkml.org/lkml/2014/7/17/877
+> 
+> --------------------------------------------------------------------------------
+> 
+> Hello everyone,
+> 
+> Here is the continuation of patch sets sent recently about Qualcomm
+> QPNP SPMI PMICs.
+> 
+> The previous version of the patch set can be found at [1].
+> 
+> Changes since v1:
+>  - removed completely custom *of* parser
+>  - renamed the mfd driver from qpnp-spmi to pm8xxx-spmi
+>  - now MFD_PM8XXX_SPMI Kconfig option depends on SPMI
+> 
+> Removing of the custom *of* parser leads to that that the *reg* devicetree
+> property cannot exist and therefore cannot be parsed to get PMIC peripheral
+> resources. I took this step aside because no one from mfd drivers does this
+> parsing. This will lead to inconvenience in the peripheral drivers to define
+> internally the SPMI base addresses depending on the compatible property
+> i.e. PMIC version. 
+> 
+> Comments are welcome!
+> 
+> [1] https://lkml.org/lkml/2014/7/8/428
+> 
+> --------------------------------------------------------------------------------
+> 
+> Josh Cartwright (1):
+>   mfd: add support for Qualcomm SPMI PMICs
+> 
+> Stanimir Varbanov (2):
+>   mfd: document DT bindings for Qualcomm SPMI PMICs
+>   ARM: dts: qcom: add pm8941 and pm8841 PMICs device nodes
+> 
+>  .../devicetree/bindings/mfd/qcom,spmi-pmic.txt     |   64 +++++++++++++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                |   37 +++++++++++
+>  drivers/mfd/Kconfig                                |   15 +++++
+>  drivers/mfd/Makefile                               |    1 +
+>  drivers/mfd/qcom-spmi-pmic.c                       |   67 ++++++++++++++++++++
+>  5 files changed, 184 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,spmi-pmic.txt
+>  create mode 100644 drivers/mfd/qcom-spmi-pmic.c
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-> -       edma_writel(edma, src, &(tcd->saddr));
-> -       edma_writel(edma, dst, &(tcd->daddr));
-> -       edma_writew(edma, attr, &(tcd->attr));
-> -       edma_writew(edma, EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
-> -       edma_writel(edma, EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
-> -       edma_writel(edma, EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
-> -       edma_writew(edma, EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
-> -       edma_writew(edma, EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
-> -       edma_writel(edma, EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
-> -       edma_writew(edma, EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
-> +       writel(src, &(tcd->saddr));
-> +       writel(dst, &(tcd->daddr));
-> +
-> +       writew(attr, &(tcd->attr));
 
-You seem to have another preexisting bug: The tcd pointer actually does not
-point to mmio registers here at all, but instead points to memory that
-has been returned from dma_pool_alloc. It is not valid to use writel()
-on such memory, that is only meant to work on real MMIO registers.
-
-You should use regular assignments to the registers here, e.g.
-	
-	tcd->saddr = cpu_to_le32(src);
-	tcd->daddr = cpu_to_le32(dst);
-	...
-
-	Arnd
+-- 
+regards,
+Stan
