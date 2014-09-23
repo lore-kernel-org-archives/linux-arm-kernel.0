@@ -1,51 +1,117 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 23 Sep 2014 13:31:41 -0700
-Subject: [PATCH] ARM: qcom: Fix SCM interface for big-endian kernels
-In-Reply-To: <D8A10276-E912-4268-AAB8-48A0C8C7E62D@codeaurora.org>
-References: <1411425393-5537-1-git-send-email-sboyd@codeaurora.org>
- <F694D53D-F606-4B35-AED9-9B3927E4E9F1@codeaurora.org>
- <5421B0FF.4060307@codeaurora.org>
- <D8A10276-E912-4268-AAB8-48A0C8C7E62D@codeaurora.org>
-Message-ID: <5421D8AD.9010208@codeaurora.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 23 Sep 2014 22:42:57 +0200
+Subject: [PATCH v3] ARM: zImage: add support for ARMv7-M
+In-Reply-To: <20140923193251.GB3755@pengutronix.de>
+References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
+ <1411494565-29534-1-git-send-email-manabian@gmail.com>
+ <20140923193251.GB3755@pengutronix.de>
+Message-ID: <CAGhQ9VzQSphUoW+rSRdwHVrgrzEEcCoaTKYUA_BntK97zqdY7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/14 10:45, Kumar Gala wrote:
-> On Sep 23, 2014, at 12:42 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On 23 September 2014 21:32, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello Joachim,
 >
->> On 09/23/14 09:47, Kumar Gala wrote:
->>> On Sep 22, 2014, at 5:36 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>
->>>> The secure environment only runs in little-endian mode, so any
->>>> buffers shared with the secure environment should have their
->>>> contents converted to little-endian. We also mark such elements
->>>> with __le32 to allow sparse to catch such problems.
->>>>
->>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->>>> ---
->>>> drivers/soc/qcom/scm-boot.c |  8 ++++----
->>>> drivers/soc/qcom/scm.c      | 34 ++++++++++++++++++----------------
->>>> 2 files changed, 22 insertions(+), 20 deletions(-)
->>>>
->>>> diff --git a/drivers/soc/qcom/scm-boot.c b/drivers/soc/qcom/scm-boot.c
->>>> index 60ff7b482141..3e4d77b371c6 100644
->>>> --- a/drivers/soc/qcom/scm-boot.c
->>>> +++ b/drivers/soc/qcom/scm-boot.c
->>>> @@ -27,12 +27,12 @@
->>>> int scm_set_boot_addr(phys_addr_t addr, int flags)
->>>> {
->>>> 	struct {
->>>> -		unsigned int flags;
->>>> -		phys_addr_t  addr;
->>>> +		__le32 flags;
->>>> +		__le32 addr;
->>> Hmm, was phys_addr_t wrong here before?  I ask because don?t we support LPAE on some systems?
->> Yes it was wrong. It is exactly 32 bits wide.
-> So we should probably have a patch to fix the interface scm_set_boot_addr() to take a u32 addr instead of a phys_addr_t
+> On Tue, Sep 23, 2014 at 07:49:25PM +0200, Joachim Eastwood wrote:
+>> This patch makes it possible to enter zImage in Thumb mode for ARMv7M
+>> (Cortex-M) CPUs that does not support ARM mode. The kernel entry is
+>> also made in Thumb mode.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>> Hi,
+>>
+>> Updated patch per comments from Catalin Marinas.
+>>
+>> Changes
+>> v3: Use defines for ARMv7M CPU registers.
+>> v2: Introduce AR_CLASS/M_CLASS macros. This reduces the amount
+>>     of ifdefs needed in compressed/head.S.
+>>
+>> Successfully tested on NXP LPC4357 (Cortex-M4).
+>>
+>>  arch/arm/boot/compressed/head.S | 19 +++++++++++++++----
+>>  arch/arm/include/asm/unified.h  |  8 ++++++++
+>>  2 files changed, 23 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index 413fd94b5301..cd27090625fe 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -10,8 +10,11 @@
+>>   */
+>>  #include <linux/linkage.h>
+>>  #include <asm/assembler.h>
+>> +#include <asm/v7m.h>
+>> +
+>> + AR_CLASS(   .arch   armv7-a )
+>> + M_CLASS(    .arch   armv7-m )
+>>
+>> -     .arch   armv7-a
+>>  /*
+>>   * Debugging stuff
+>>   *
+>> @@ -114,7 +117,7 @@
+>>   * sort out different calling conventions
+>>   */
+>>               .align
+>> -             .arm                            @ Always enter in ARM state
+>> + AR_CLASS(   .arm    )               @ Always enter in ARM state for A/R classes
+> Semantically we don't want .arm when CPU_THUMBONLY is enabled. At least
+> currently this is equivalent with !AR_CLASS. Maybe this is worth to be
+> pointed out in a comment?
+
+Won't THUMBONLY always mean !AR_CLASS?
+
+Do you have a particular comment in mind?
+
+
+>>  start:
+>>               .type   start,#function
+>>               .rept   7
+>> @@ -133,6 +136,7 @@ start:
+>>   THUMB(              .thumb                  )
+>>  1:
+>>   ARM_BE8(    setend  be )                    @ go BE8 if compiled for BE8
+>> +#ifndef CONFIG_CPU_V7M
+>>               mrs     r9, cpsr
+>>  #ifdef CONFIG_ARM_VIRT_EXT
+>>               bl      __hyp_stub_install      @ get into SVC mode, reversibly
+> I think you need to be more precious here. The following is #ifdef'd
+> out:
+>    #endif
+>                 mov     r7, r1                  @ save architecture ID
+>                 mov     r8, r2                  @ save atags pointer
 >
+>                 /*
+>                  * Booting from Angel - need to enter SVC mode and disable
+>                  * FIQs/IRQs (numeric definitions from angel arm.h source).
+>                  * We only do this if we were in user mode on entry.
+>                  */
+>                 mrs     r2, cpsr                @ get current mode
+>                 tst     r2, #3                  @ not user?
+>                 bne     not_angel
+>                 mov     r0, #0x17               @ angel_SWIreason_EnterSVC
+>     ARM(        swi     0x123456        )       @ angel_SWI_ARM
+>     THUMB(      svc     0xab            )       @ angel_SWI_THUMB
+>    not_angel:
+>> @@ -155,6 +159,7 @@ not_angel:
+>>               safe_svcmode_maskall r0
+>>               msr     spsr_cxsf, r9           @ Save the CPU boot mode in
+>>                                               @ SPSR
+>> +#endif
+>
+> At least saving r1 and r2 should be preserved, shouldn't it? I wonder
+> how this could result in a working kernel because r7 and r8 are passed
+> to Image which are not initialized with your patch.
 
-Sure I can send a patch for that too.
+Yes, r1 and r2 should be preserved. I have a workaround for the
+bootloader in my kernel tree which might explain why it still
+worked...
+I'll send an updated patch tomorrow.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks for looking.
+
+regards
+Joachim Eastwood
