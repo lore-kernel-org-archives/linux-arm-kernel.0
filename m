@@ -1,27 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Sep 2014 17:02:35 +0200
-Subject: [PATCH] pinctrl: berlin: fix the dt_free_map function
-In-Reply-To: <1410340551-24023-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1410340551-24023-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CACRpkdbtoOmBE4thmegDDR1Ev+9+Neq5j8z2Nr5MDi_P7yA2hQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 23 Sep 2014 17:04:08 +0200
+Subject: [PATCH v4] ARM: fix debug prints relevant to PCI devices
+In-Reply-To: <20140923140635.GR5182@n2100.arm.linux.org.uk>
+References: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
+ <CAErSpo7CX3XiuNZO8tXYVN2tUJudObFKVBthHfxf9mPS6hE6Cg@mail.gmail.com>
+ <20140923140635.GR5182@n2100.arm.linux.org.uk>
+Message-ID: <20140923150407.GJ5982@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 11:15 AM, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
+On Tue, Sep 23, 2014 at 03:06:35PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 23, 2014 at 07:56:01AM -0600, Bjorn Helgaas wrote:
+> > This doesn't require any coordination with the PCI core, so I was just
+> > leaving this up to the arch.  But I guess I can at least give you my
+> > opinion :)
+> 
+> However, PCI core people have more knowledge of the issues here than I do.
+> 
+> > > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> > > index 17a26c1..03c56ba 100644
+> > > --- a/arch/arm/kernel/bios32.c
+> > > +++ b/arch/arm/kernel/bios32.c
+> > > @@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+> > >  {
+> > >         struct pci_dev *dev;
+> > >         u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
+> > > +       bool has_pcie_dev = false;
+> > >
+> > >         /*
+> > >          * Walk the devices on this bus, working out what we can
+> > > @@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+> > >         list_for_each_entry(dev, &bus->devices, bus_list) {
+> > >                 u16 status;
+> > >
+> > > +               if (!has_pcie_dev)
+> > > +                       has_pcie_dev = pci_is_pcie(dev);
+> > >                 pci_read_config_word(dev, PCI_STATUS, &status);
+> > >
+> > >                 /*
+> > > @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+> > >
+> > >         /*
+> > >          * Report what we did for this bus
+> > > +        * (only if the bus doesn't have any PCIe devices)
+> > >          */
+> > > -       printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+> > > -               bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+> > > +       if (!has_pcie_dev)
+> > > +               pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
+> > > +                       bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+> > 
+> > My first choice would be to just drop the printk altogether.
+> 
+> It can be useful information.
+> 
+> > If we want to keep the printk, it should be enough to test "bus->self
+> > && !pci_is_pcie(bus->self)" to see whether Fast Back-to-Back can be
+> > enabled.
+> 
+> This is exactly the kind of issue that needs to be picked up by core
+> PCI people.
 
-> The berlin_pinctrl_dt_free_map function tries to free memory
-> allocated and handled by the of subsystem. This is wrong and
-> already handled by pinctrl_dt_free_maps() which calls
-> of_node_put().
->
-> This patch fixes the Berlin pinctrl way of freeing its maps,
-> avoiding a kernel BUG(), by using the common
-> pinctrl_utils_dt_free_map function instead.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+I agree. Wouldn't it be more useful to move this into the core?
+Disabling fast back-to-back transfers hardly seems like an ARM-
+specific "fixup" to me.
 
-Patch applied with Sebastian's ACK.
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140923/14971e59/attachment.sig>
