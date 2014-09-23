@@ -1,86 +1,25 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 23 Sep 2014 07:56:01 -0600
-Subject: [PATCH v4] ARM: fix debug prints relevant to PCI devices
-In-Reply-To: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
-References: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
-Message-ID: <CAErSpo7CX3XiuNZO8tXYVN2tUJudObFKVBthHfxf9mPS6hE6Cg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 23 Sep 2014 16:07:10 +0200
+Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
+ access
+In-Reply-To: <54217B31.1010309@redhat.com>
+References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
+ <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
+ <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
+ <20140923111412.GG12187@cbox> <54215E6D.6090308@redhat.com>
+ <54216B1B.2010205@arm.com> <20140923135241.GI12187@cbox>
+ <54217B31.1010309@redhat.com>
+Message-ID: <20140923140710.GJ12187@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 7, 2014 at 4:28 AM, Vidya Sagar <sagar.tv@gmail.com> wrote:
-> From: Vidya Sagar <sagar.tv@gmail.com>
->
-> As per PCIe spec, fast back-to-back transactions feature
-> is not applicable to PCIe devices. Hence, do not print
-> that fast back-to-back trasactions are disabled when
-> there is a PCIe device found on the bus
->
-> Signed-off-by: Vidya Sagar <sagar.tv@gmail.com>
-> ---
-> v4:
-> * initialized 'has_pcie_dev' to 'false'
->
-> v3:
-> * removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
->
-> v2:
-> * Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
-> * replaced printk with pr_info
->
->  arch/arm/kernel/bios32.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+On Tue, Sep 23, 2014 at 03:52:49PM +0200, Paolo Bonzini wrote:
+> Il 23/09/2014 15:52, Christoffer Dall ha scritto:
+> > Therefore, I think we should really just merge the one-line fix or the
+> > patch I sent before.  Paolo seems fine with it either way.
+> 
+> Yes, it's on its way to Linus.
+> 
+Thanks Paolo!
 
-This doesn't require any coordination with the PCI core, so I was just
-leaving this up to the arch.  But I guess I can at least give you my
-opinion :)
-
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 17a26c1..03c56ba 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  {
->         struct pci_dev *dev;
->         u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
-> +       bool has_pcie_dev = false;
->
->         /*
->          * Walk the devices on this bus, working out what we can
-> @@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->         list_for_each_entry(dev, &bus->devices, bus_list) {
->                 u16 status;
->
-> +               if (!has_pcie_dev)
-> +                       has_pcie_dev = pci_is_pcie(dev);
->                 pci_read_config_word(dev, PCI_STATUS, &status);
->
->                 /*
-> @@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->
->         /*
->          * Report what we did for this bus
-> +        * (only if the bus doesn't have any PCIe devices)
->          */
-> -       printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
-> -               bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-> +       if (!has_pcie_dev)
-> +               pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
-> +                       bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
-
-My first choice would be to just drop the printk altogether.
-
-If we want to keep the printk, it should be enough to test "bus->self
-&& !pci_is_pcie(bus->self)" to see whether Fast Back-to-Back can be
-enabled.
-
-Personally, I would like to see everything in the file converted to
-use dev_printk so it's consistent with the PCI core.  That would be a
-separate patch, and there might be other instances under arch/arm,
-too.
-
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
->
-> --
-> 1.8.1.5
->
+-Christoffer
