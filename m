@@ -1,67 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue, 23 Sep 2014 16:58:22 +0200
-Subject: [PATCH v3 1/3] mtd: nand: gpmi: add gpmi_move_bits function
-In-Reply-To: <20140923145413.GA1633@localhost.localdomain>
-References: <1411481256-29141-1-git-send-email-boris.brezillon@free-electrons.com>
- <1411481256-29141-2-git-send-email-boris.brezillon@free-electrons.com>
- <20140923145413.GA1633@localhost.localdomain>
-Message-ID: <20140923165822.27cfde69@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Sep 2014 15:58:16 +0100
+Subject: [PATCHv7 01/26] iommu/arm-smmu: change IOMMU_EXEC to IOMMU_NOEXEC
+In-Reply-To: <1411483586-29304-2-git-send-email-a.motakis@virtualopensystems.com>
+References: <1411483586-29304-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1411483586-29304-2-git-send-email-a.motakis@virtualopensystems.com>
+Message-ID: <20140923145816.GE28608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Sep 2014 22:54:15 +0800
-Huang Shijie <shijie8@gmail.com> wrote:
+Hi Antonios,
 
-> On Tue, Sep 23, 2014 at 04:07:34PM +0200, Boris BREZILLON wrote:
-> > Add a new function to move bits (not bytes) from a memory region to
-> > another one.
-> > This function is similar to memmove except it acts at bit level.
-> > This function is needed to implement GPMI raw access functions, given the
-> > fact that ECC engine does not pad ECC bits to the next byte boundary.
-> sorry for not comment your v2 patch set.
+On Tue, Sep 23, 2014 at 03:46:00PM +0100, Antonios Motakis wrote:
+> Exposing the XN flag of the SMMU driver as IOMMU_NOEXEC instead of
+> IOMMU_EXEC makes it enforceable, since for IOMMUs that don't support
+> the XN flag pages will always be executable.
 > 
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 88 ++++++++++++++++++++++++++++++++++
-> >  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  4 ++
-> >  2 files changed, 92 insertions(+)
-> > 
-> > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > index 87e658c..e2f706a 100644
-> > --- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> > @@ -1353,3 +1353,91 @@ int gpmi_read_page(struct gpmi_nand_data *this,
-> >  	set_dma_type(this, DMA_FOR_READ_ECC_PAGE);
-> >  	return start_dma_with_bch_irq(this, desc);
-> >  }
-> > +
-> > +void gpmi_move_bits(u8 *dst, size_t dst_bit_off,
-> > +		    const u8 *src, size_t src_bit_off,
-> > +		    size_t nbits)
-> we can simplify the code.
+> Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 9 +++++----
+>  include/linux/iommu.h    | 2 +-
+>  2 files changed, 6 insertions(+), 5 deletions(-)
 
-Any suggestions ?
+[...]
 
-> 
-> We could use the bytes to replace the @nbits.
-> 
-> The chunk data is always byte aligned.
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 20f9a52..e1a644c 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -27,7 +27,7 @@
+>  #define IOMMU_READ	(1 << 0)
+>  #define IOMMU_WRITE	(1 << 1)
+>  #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+> -#define IOMMU_EXEC	(1 << 3)
+> +#define IOMMU_NOEXEC	(1 << 3)
 
-This function is also used to store ECC bits in the OOB buffer and
-these chunk of data are not byte aligned :-).
+This hunk needs to be a separate patch merged by Joerg before I can take the
+arm-smmu part (which looks fine).
 
-> 
-> 
-> Btw: please add more comments in this function.
-
-Yep, I should definitely comment it, and I'll do.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Will
