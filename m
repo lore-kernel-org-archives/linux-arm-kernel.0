@@ -1,127 +1,196 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 23 Sep 2014 12:10:00 +0100
-Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
-In-Reply-To: <99f5c020d74b465384e42ef2c883a479@HKXPR06MB168.apcprd06.prod.outlook.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
- <20140922210038.GJ1880@google.com>
- <84672882bcaa4730aae409f092bcbcfb@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140923103224.GO1994@e106497-lin.cambridge.arm.com>
- <99f5c020d74b465384e42ef2c883a479@HKXPR06MB168.apcprd06.prod.outlook.com>
-Message-ID: <20140923111000.GQ1994@e106497-lin.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 23 Sep 2014 13:14:12 +0200
+Subject: [GIT PULL] arm/arm64: KVM: Fix unaligned access bug on gicv2
+ access
+In-Reply-To: <5421310E.9020902@redhat.com>
+References: <1411420350-368-1-git-send-email-christoffer.dall@linaro.org>
+ <1411420350-368-2-git-send-email-christoffer.dall@linaro.org>
+ <20140922220710.GA24499@arm.com> <5421310E.9020902@redhat.com>
+Message-ID: <20140923111412.GG12187@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 12:00:41PM +0100, Phil Edworthy wrote:
-> Hi Liviu,
+On Tue, Sep 23, 2014 at 10:36:30AM +0200, Paolo Bonzini wrote:
+> Il 23/09/2014 00:07, Will Deacon ha scritto:
+> >> >  {
+> >> >  	if (!(lr_desc.state & LR_STATE_MASK))
+> >> > -		set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
+> >> > +		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
+> >> >  }
+> > Does this work for big-endian arm64 machines? Surely the bug is due to
+> > casting a u32 * to an unsigned long *, and not specifically related to
+> > atomics (which is where it happened to explode)?
 > 
-> On 23 September 2014 11:32, Liviu wrote:
-> > On Tue, Sep 23, 2014 at 11:10:29AM +0100, Phil Edworthy wrote:
-> > > Hi Bjorn,
-> > >
-> > > On 22 September 2014 22:01, Bjorn wrote:
-> > > > On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
-> > > > > The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller
-> > > > drivers,
-> > > > > one for an external PCIe slot, the other for an internal PCI bridge to USB
-> > > > > controllers.
-> > > > >
-> > > > > However, they currently do not work at the same time as they use the
-> > > > same PCI
-> > > > > domain and use the same root bus number. We can't use different root
-> > > > bus numbers
-> > > > > due to the way root bus numbers are assigned in pcibios_init_hw() in
-> > > > > arch/arm/kernel/bios32.c.
-> > > > >
-> > > > > Since the two PCI controllers are completely independent, I think it makes
-> > > > sense
-> > > > > to use different PCI domains for them.
-> > > > >
-> > > > > I've marked the third patch as RFC as I am not sure of the impact of
-> > > > enabling
-> > > > > PCI domains for all ARM devices. In the march to 'one kernel to rule them
-> > > > all',
-> > > > > I steered clear of mach specific changes.
-> > > > >
-> > > > > These patches require the following patch from Liviu Dudau:
-> > > > >   [PATCH v11 07/10] OF: Introduce helper function for getting PCI
-> > > > domain_nr
-> > > > > Based on comments on this patch from Jason Gunthorpe, there is still the
-> > > > issue
-> > > > > that the domain numbers may change depending on the ordering at probe
-> > > > time.
-> > > > > However, this can be fixed later on by adding the entries in the DT files.
-> > > > >
-> > > > >
-> > > > > Phil Edworthy (3):
-> > > > >   PCI: rcar-pcie: Add call to get domain nr
-> > > > >   PCI: rcar-internal-pci: Add call to get domain nr
-> > > > >   ARM: Enable PCI domains
-> > > >
-> > > > I'm deferring these for now because they depend on Liviu's work, which I
-> > > > haven't merged yet, and I suspect some minor adaptation will be required
-> > > > here.
-> > > >
-> > > > For what it's worth, I agree with Rob's hesitation about mixing lookup with
-> > > > domain number allocation in of_pci_get_domain_nr().  That seems
-> > > > unnecessarily complicated.
-> > > I could create patches to add an optional "pci-domain" property for the R-Car
-> > > PCI drivers, and just attempt to get the property in the drivers. If not found,
-> > > the drivers will assume the domain is 0.
-> > >
-> > > We would then have fixed PCI domain numbering and I don't have to worry about
-> > > Liviu's work.
-> > 
-> > I will split the current of_pci_get_domain_nr() even further and replace it with
-> > two functions: pci_get_domain_nr() which will do just the allocation (still based
-> > on the boolean flag passed as parameter) and of_get_pci_domain_nr() that will
-> > retrieve a "linux,pci-domain" value from a property belonging to a given device
-> > node.
-> This doesn't solve the problem of different domain numbers based on different
-> probe ordering. If you have multiple domains then I think you must have the
-> "linux,pci-domain" property for each controller.
+It does look like the whole thing is broken on BE systems, but fixing
+that becomes non-trivial.  I don't think this fix is incorrect in
+itself, but we do have a larger issue with BE.
 
-Correct, but I've said I'm going to leave for the moment the check to the host controller(s).
-So if you care about ordering or mandating the presence of "linux,pci-domain" in the
-DT, please add the check in your driver.
+I took a stab at fixing this (untested for BE), which looks something
+like the following, but I'm a bit uneasy about having to test and merge
+this as a fix given the rush before 3.17 is released.
 
-> 
-> If we assume the above, of_get_pci_domain_nr() can just return a bus number of
-> 0 if the "linux,pci-domain" property doesn't exist.
+Thoughts?
 
-You mean *domain* number of 0. But that is still a valid value and you won't be able
-to distinguish between DT providing a "linux,pci-domain" value of zero and the
-property not being present.
+commit e4b2731a8caad09d0b8b469377f4951ce6b70569 (HEAD, vgic_elrsr_fix)
+Author: Christoffer Dall <christoffer.dall@linaro.org>
+Date:   Tue Sep 23 11:54:58 2014 +0200
 
-> 
-> I suppose you could have a temporary solution that allocates the domain numbers
-> until the necessary drivers have been updated.
+    arm/arm64: KVM: Fix BE accesses to GICv2 EISR and ELRSR regs
+    
+    The EIRSR and ELRSR registers are 32-bit registers on GICv2, and we
+    store these as an array of two such registers on the vgic vcpu struct.
+    However, we access them as a single 64-bit value or as a bitmap pointer
+    in the generic vgic code, which breaks BE support.
+    
+    Instead, store them as u64 values on the vgic structure and do the
+    word-swapping in the assembly code, which already handles the byte order
+    for BE systems.
+    
+    Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-And that is what pci_get_domain_nr() will do. If you don't care about ordering, one
-will use that one. If you care about ordering then "linux,pci-domain" is required
-and one can use of_get_pci_domain_nr() to retrieve it and fail if the information
-is missing.
-
-Does that look like a workable solution?
-
-Best regards,
-Liviu
-
-> 
-> > I plan to leave for the moment the check for mandatory presence of
-> > "linux,pci-domain"
-> > to the host bridge driver so that everyone can implement their own policies.
-> > 
-> > How does that sound?
-> 
-> Thanks
-> Phil
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 98c8c5b..14d4883 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -433,10 +433,17 @@ ARM_BE8(rev	r10, r10	)
+ 	str	r3, [r11, #VGIC_V2_CPU_HCR]
+ 	str	r4, [r11, #VGIC_V2_CPU_VMCR]
+ 	str	r5, [r11, #VGIC_V2_CPU_MISR]
++#ifdef CONFIG_CPU_ENDIAN_BE8
++	str	r6, [r11, #(VGIC_V2_CPU_EISR + 4)]
++	str	r7, [r11, #VGIC_V2_CPU_EISR]
++	str	r8, [r11, #(VGIC_V2_CPU_ELRSR + 4)]
++	str	r9, [r11, #VGIC_V2_CPU_ELRSR]
++#else
+ 	str	r6, [r11, #VGIC_V2_CPU_EISR]
+ 	str	r7, [r11, #(VGIC_V2_CPU_EISR + 4)]
+ 	str	r8, [r11, #VGIC_V2_CPU_ELRSR]
+ 	str	r9, [r11, #(VGIC_V2_CPU_ELRSR + 4)]
++#endif
+ 	str	r10, [r11, #VGIC_V2_CPU_APR]
+ 
+ 	/* Clear GICH_HCR */
+diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+index ae21177..f002fe1 100644
+--- a/arch/arm64/kvm/vgic-v2-switch.S
++++ b/arch/arm64/kvm/vgic-v2-switch.S
+@@ -67,10 +67,14 @@ CPU_BE(	rev	w11, w11 )
+ 	str	w4, [x3, #VGIC_V2_CPU_HCR]
+ 	str	w5, [x3, #VGIC_V2_CPU_VMCR]
+ 	str	w6, [x3, #VGIC_V2_CPU_MISR]
+-	str	w7, [x3, #VGIC_V2_CPU_EISR]
+-	str	w8, [x3, #(VGIC_V2_CPU_EISR + 4)]
+-	str	w9, [x3, #VGIC_V2_CPU_ELRSR]
+-	str	w10, [x3, #(VGIC_V2_CPU_ELRSR + 4)]
++CPU_LE(	str	w7, [x3, #VGIC_V2_CPU_EISR] )
++CPU_LE(	str	w8, [x3, #(VGIC_V2_CPU_EISR + 4)] )
++CPU_LE(	str	w9, [x3, #VGIC_V2_CPU_ELRSR] )
++CPU_LE(	str	w10, [x3, #(VGIC_V2_CPU_ELRSR + 4)] )
++CPU_BE(	str	w7, [x3, #(VGIC_V2_CPU_EISR + 4)] )
++CPU_BE(	str	w8, [x3, #VGIC_V2_CPU_EISR] )
++CPU_BE(	str	w9, [x3, #(VGIC_V2_CPU_ELRSR + 4)] )
++CPU_BE(	str	w10, [x3, #VGIC_V2_CPU_ELRSR] )
+ 	str	w11, [x3, #VGIC_V2_CPU_APR]
+ 
+ 	/* Clear GICH_HCR */
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 35b0c12..c66dc9ed 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -168,8 +168,8 @@ struct vgic_v2_cpu_if {
+ 	u32		vgic_hcr;
+ 	u32		vgic_vmcr;
+ 	u32		vgic_misr;	/* Saved only */
+-	u32		vgic_eisr[2];	/* Saved only */
+-	u32		vgic_elrsr[2];	/* Saved only */
++	u64		vgic_eisr;	/* Saved only */
++	u64		vgic_elrsr;	/* Saved only */
+ 	u32		vgic_apr;
+ 	u32		vgic_lr[VGIC_V2_MAX_LRS];
+ };
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index 416baed..2935405 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -71,35 +71,17 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
+ 				  struct vgic_lr lr_desc)
+ {
+ 	if (!(lr_desc.state & LR_STATE_MASK))
+-		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
++		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
+ }
+ 
+ static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
+ {
+-	u64 val;
+-
+-#if BITS_PER_LONG == 64
+-	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[1];
+-	val <<= 32;
+-	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[0];
+-#else
+-	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
+-#endif
+-	return val;
++	return vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
+ }
+ 
+ static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
+ {
+-	u64 val;
+-
+-#if BITS_PER_LONG == 64
+-	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[1];
+-	val <<= 32;
+-	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[0];
+-#else
+-	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
+-#endif
+-	return val;
++	return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
+ }
+ 
+ static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 73eba79..30cf369 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -118,6 +118,20 @@ static const struct vgic_params *vgic;
+ #define REG_OFFSET_SWIZZLE	0
+ #endif
+ 
++/*
++ * Call this function to convert a u64 value to an unsigned long * bitmask
++ * in a way that works on both 32-bit and 64-bit LE and BE platforms.
++ *
++ * Warning: Calling this function may modify *val.
++ */
++static unsigned long *u64_to_bitmask(u64 *val)
++{
++#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
++	*val = (*val >> 32) | (*val << 32);
++#endif
++	return (unsigned long *)val;
++}
++
+ static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
+ 				int cpuid, u32 offset)
+ {
+@@ -1256,7 +1270,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ 		 * active bit.
+ 		 */
+ 		u64 eisr = vgic_get_eisr(vcpu);
+-		unsigned long *eisr_ptr = (unsigned long *)&eisr;
++		unsigned long *eisr_ptr = u64_to_bitmask(&eisr);
+ 		int lr;
+ 
+ 		for_each_set_bit(lr, eisr_ptr, vgic->nr_lr) {
+@@ -1304,7 +1318,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ 
+ 	level_pending = vgic_process_maintenance(vcpu);
+ 	elrsr = vgic_get_elrsr(vcpu);
+-	elrsr_ptr = (unsigned long *)&elrsr;
++	elrsr_ptr = u64_to_bitmask(&elrsr);
+ 
+ 	/* Clear mappings for empty LRs */
+ 	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
