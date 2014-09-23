@@ -1,63 +1,125 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 23 Sep 2014 15:30:57 +0200
-Subject: [PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on
- wake-up
-In-Reply-To: <20140917121820.GR12361@n2100.arm.linux.org.uk>
-References: <1410955036-1956-1-git-send-email-geert+renesas@glider.be>
- <20140917121820.GR12361@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdU+ztui5N-2p5Va7b7Tp-JRNVtGfNZ6=GPweR2ig_H5wA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 23 Sep 2014 15:35:14 +0200
+Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <20140912112643.GA10623@red-moon>
+References: <1409585324-3678-7-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140912103257.GB24416@localhost> <20140912112643.GA10623@red-moon>
+Message-ID: <4228539.nCGoXxuRMK@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
 
-On Wed, Sep 17, 2014 at 2:18 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Sep 17, 2014 at 01:57:16PM +0200, Geert Uytterhoeven wrote:
->> If power area D4, which contains the Coresight-ETM hardware block, is
->> powered down on R-Mobile A1 (r8a7740), the kernel crashes when
->> suspending from s2ram with:
->>
->>     Internal error: Oops - undefined instruction: 0 [#1] ARM
->>
->> This happens because dbg_cpu_pm_notify() calls reset_ctrl_regs(), which
->> can't access the debug registers as the debug module is powered down.
->>
->> Protect the call to reset_ctrl_regs() by an undefined instruction hook,
->> like was done in commit 0d352e3d006c9589 ("ARM: hw_breakpoint: trap
->> undef instruction exceptions in reset_ctrl_regs") for another caller.
->
-> I'd prefer a better solution to this (such as tracking whether the ETM
-> block is powered down).  This feels very much like a hack than a good
-> solution.
+Hi,
 
-That seems to be something to fit into "[PATCH 00/11 v6] Coresight framework
-and drivers" (https://lkml.org/lkml/2014/9/11/733)?
+On Friday, September 12, 2014 12:26:43 PM Lorenzo Pieralisi wrote:
+> On Fri, Sep 12, 2014 at 11:32:57AM +0100, Catalin Marinas wrote:
+> > Daniel, Lorenzo,
+> > 
+> > On Thu, Sep 11, 2014 at 10:32:48AM +0100, Daniel Lezcano wrote:
+> > > On 09/11/2014 10:57 AM, Lorenzo Pieralisi wrote:
+> > > > There is no ARM code in my series. So to sum it up:
+> > > >
+> > > > a) I send a pull request to Catalin for arm64 patches on top of the branch
+> > > >     you are creating with my patches
+> > >  >
+> > > > b) You take care of merging the CPUidle related patches through your
+> > > >     tree
+> > > >
+> > > > Is the above what you meant ?
+> > > 
+> > > Right, that allows to share a branch across the trees and resolve the 
+> > > dependencies when a patchset is touching different subsystems.
+> > > 
+> > > I realize the dependency is inverted regarding what I proposed 
+> > > initially, so it is up to Catalin to create the branch and I will share 
+> > > it with him.
+> > 
+> > I created the branch below with the arm64 specific patches for cpuidle.
+> > I won't rebase it and it should appear in -next tomorrow.
+> > 
+> > Lorenzo, please send a pull request to Daniel with the additional
+> > patches on top of the arm64 branch. Thanks.
+> 
+> Thank you very much, done. Pull request attached for information.
+> 
+> As Daniel knows, last two patches are still pending, waiting for Samsung
+> acks, and will be dropped if we do not get them in time.
+> 
+> Lorenzo
+> 
+> The following changes since commit 18910ab0d916b1a87016d69efd027714a80521dd:
+> 
+>   arm64: add PSCI CPU_SUSPEND based cpu_suspend support (2014-09-12 10:48:56 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-2.6-lp.git for-upstream/arm-generic-cpuidle
+> 
+> for you to fetch changes up to dda773655f9b97570884c4396ad4d63daf177107:
+> 
+>   drivers: cpuidle: initialize Exynos driver through DT (2014-09-12 11:37:43 +0100)
+> 
+> ----------------------------------------------------------------
+> Bartlomiej Zolnierkiewicz (1):
+>       ARM: dts: add CPU nodes for Exynos4 SoCs
 
-However, if I'm not mistaken, while that series introduces extensive handling
-based on the presence of Coresight device nodes in DT, it looks like it doesn't
-affect the current direct accesses to the debug registers in hw_breakpoint.c?
+This patch got broken during merge.  It differs from the version I posted
+on the list by not having the closing "};" which causes a dtb build failure:
 
-For now, do you consider it acceptable to introduce a global bool (defaulting
-to true) to track whether accessing the debug registers is allowed?
+Error: arch/arm/boot/dts/exynos4210-origen.dts:21.1-2 syntax error
+FATAL ERROR: Unable to parse input tree
+make[1]: *** [arch/arm/boot/dts/exynos4210-origen.dtb] Error 1
+make: *** [dtbs] Error 2
+make: *** Waiting for unfinished jobs....
 
-> Also, the undefined instruction hook was not supposed to be used in this
-> way - certainly *not* dynamically like this.  While the lookup of the
-> undef handler is done in a safe atomic way, calling the resulting
-> function is outside of the locks.
+Please regenarate your branch with the fixed version of the patch
+(you can squash the fix below to the broken patch).
 
-Right, that's definitely not optimal.
-I guess this also applies to the existing (ab)users of debug_reg_hook?
+---
+ arch/arm/boot/dts/exynos4210.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks!
+Index: b/arch/arm/boot/dts/exynos4210.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos4210.dtsi	2014-09-23 14:14:29.793571708 +0200
++++ b/arch/arm/boot/dts/exynos4210.dtsi	2014-09-23 14:17:22.029565827 +0200
+@@ -39,6 +39,7 @@
+ 			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
+ 			<&clock CLK_XUSBXTI>;
+ 		#clock-cells = <1>;
++	};
+ 
+ 	cpus {
+ 		#address-cells = <1>;
 
-Gr{oetje,eeting}s,
+> Lorenzo Pieralisi (4):
+>       drivers: cpuidle: implement DT based idle states infrastructure
+>       drivers: cpuidle: CPU idle ARM64 driver
+>       drivers: cpuidle: initialize big.LITTLE driver through DT
+>       drivers: cpuidle: initialize Exynos driver through DT
+> 
+>  arch/arm/boot/dts/exynos4210.dtsi          |  27 ++++
+>  arch/arm/boot/dts/exynos4212.dtsi          |  17 +++
+>  arch/arm/boot/dts/exynos4412.dtsi          |  29 ++++
+>  arch/arm/boot/dts/exynos5250.dtsi          |  11 ++
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |  23 ++++
+>  drivers/cpuidle/Kconfig                    |   8 ++
+>  drivers/cpuidle/Kconfig.arm                |   2 +
+>  drivers/cpuidle/Kconfig.arm64              |  14 ++
+>  drivers/cpuidle/Makefile                   |   5 +
+>  drivers/cpuidle/cpuidle-arm64.c            | 133 ++++++++++++++++++
+>  drivers/cpuidle/cpuidle-big_little.c       |  19 +++
+>  drivers/cpuidle/cpuidle-exynos.c           |  18 ++-
+>  drivers/cpuidle/dt_idle_states.c           | 213 +++++++++++++++++++++++++++++
+>  drivers/cpuidle/dt_idle_states.h           |   7 +
+>  14 files changed, 525 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/cpuidle/Kconfig.arm64
+>  create mode 100644 drivers/cpuidle/cpuidle-arm64.c
+>  create mode 100644 drivers/cpuidle/dt_idle_states.c
+>  create mode 100644 drivers/cpuidle/dt_idle_states.h
 
-                        Geert
-
+Best regards,
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
