@@ -1,65 +1,93 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 22 Sep 2014 19:28:02 -0500
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation,
- code consolidation
-In-Reply-To: <20140922223022.GO5182@n2100.arm.linux.org.uk>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <20140922153919.GQ25809@arm.com>
- <20140922223022.GO5182@n2100.arm.linux.org.uk>
-Message-ID: <5420BE92.7050504@mentor.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 22 Sep 2014 17:54:44 -0700
+Subject: [PATCH v11 0/6] arm: dirty page logging support for ARMv7
+Message-ID: <1411433690-8104-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 05:30 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 22, 2014 at 04:39:19PM +0100, Will Deacon wrote:
->> On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
->>> This series contains the necessary changes to allow architected timer
->>> access from user-space on 32-bit ARM.  This allows the VDSO to support
->>> high resolution timestamps for clock_gettime and gettimeofday.  This
->>> also merges substantially similar code from arm and arm64 into the
->>> core arm_arch_timer driver.
->>>
->>> The functional changes are:
->>> - When available, CNTVCT is made readable by user space on arm, as it
->>>   is on arm64.
->>> - The clocksource name becomes "arch_mem_counter" if CP15 access to
->>>   the counter is not available.
->>>
->>> These changes have been carried as part of the ARM VDSO patch set over
->>> the last several months, but I am splitting them out here as I assume
->>> they should go through the clocksource maintainers.
->>
->> For the series:
->>
->>   Acked-by: Will Deacon <will.deacon@arm.com>
->>
->> I'm not sure which tree the arch-timer stuff usually goes through, but
->> the arm/arm64 bits look fine so I'm happy for them to merged together.
-> 
-> I raised a while back with Will whether there's much point to having
-> this on ARM.  While it's useful for virtualisation, the majority of
-> 32-bit ARM doesn't run virtualised.  So there's little point in having
-> the VDSO on the majority of platforms - it will just add additional
-> unnecessary cycles slowing down the system calls that the VDSO is
-> designed to try to speed up.
+This patch adds support for ARMv7 dirty page logging. Some functions of dirty
+page logging have been split to generic and arch specific implementations,
+details below. Dirty page logging is one of serveral features required for
+live migration, live migration has been tested for ARMv7.
 
-Hmm, this patch set is merely exposing the hardware counter when it is
-present for the VDSO's use; I take it you have no objection to that?
+Testing:
+- QEMU machvirt, VExpress - Exynos 5440, FastModels - lmbench + dirty guest
+  memory cycling.
+- ARMv8 Foundation Model/kvmtool - Due to slight overlap in 2nd stage handlers
+  did a basic bringup and memory test.
+- x86_64 QEMU basic migration on same platform.
 
-While the 32-bit ARM VDSO I've posted (in a different thread) exploits a
-facility that is required by the virtualization option in the
-architecture, its utility is not limited to guest operating systems.
+See https://github.com/mjsmar/arm-migration-howto for details testing and
+setup (see README).
 
+The patch affects armv7,armv8, mips, ia64, powerpc, s390, x86_64. Patch
+series has been compiled for affected architectures:
 
-> So, my view is that this VDSO will only be of very limited use for
-> 32-bit ARM, and should not be exposed to userspace unless there is
-> a reason for it to be exposed (iow, the hardware necessary to support
-> it is present.)
+- x86_64 - defconfig 
+- ia64 - ia64-linux-gcc4.6.3 - defconfig, ia64 Kconfig defines BROKEN worked 
+  around that to make sure new changes don't break build. Eventually build
+  breaks due to other reasons.
+- mips - mips64-linux-gcc4.6.3 - malta_kvm_defconfig
+- ppc - powerpc64-linux-gcc4.6.3 - pseries_defconfig
+- s390 - s390x-linux-gcc4.6.3 - defconfig
+- armv8 - aarch64-linux-gnu-gcc4.8.1 - defconfig
 
-My thinking is that it should prove useful in a growing subset of v7
-CPUs.  It is useful today on Cortex-A15 and -A7, and I believe -A12 and
--A17 implement the generic timer facility as well.
+ARMv7 Dirty page logging support overivew-
+- initially write protects VM RAM memory regions - 2nd stage page tables
+- add support to read dirty page log and again write protect the dirty pages 
+  - second stage page table for next pass.
+- second stage huge page are dissolved into small page tables to keep track of
+  dirty pages at page granularity. Tracking at huge page granularity limits
+  migration to an almost idle system.
+- In the event migration is canceled, normal behavior is resumed huge pages
+  are rebuilt over time.
 
-Now if you're saying that we shouldn't slow down gettimeofday on systems
-which lack a hardware counter that can be safely exposed to userspace, I
-can work with that.
+- Future Work 
+  o Completed ARMv8 additions - need to validate, on hardware juno
+  o ARMv8 Validation test - with no migration support yet, implement  
+    replication of memory DB using dirty page logging in HA environment. 
+
+Changes since v10:
+- addressed wanghaibin comments 
+- addressed Christoffers comments
+
+Changes since v9:
+- Split patches into generic and architecture specific variants for TLB Flushing
+  and dirty log read (patches 1,2 & 3,4,5,6)
+- rebased to 3.16.0-rc1
+- Applied Christoffers comments.
+
+Mario Smarduch (6):
+  KVM: Add architecture-specific TLB flush implementations
+  KVM: Add generic implementation of kvm_vm_ioctl_get_dirty_log
+  arm: KVM: Add ARMv7 API to flush TLBs
+  arm: KVM: Add initial dirty page locking infrastructure
+  arm: KVM: dirty log read write protect support
+  arm: KVM: ARMv7 dirty page logging 2nd stage page fault
+
+ arch/arm/include/asm/kvm_asm.h        |    1 +
+ arch/arm/include/asm/kvm_host.h       |   14 +++
+ arch/arm/include/asm/kvm_mmu.h        |   20 ++++
+ arch/arm/include/asm/pgtable-3level.h |    1 +
+ arch/arm/kvm/Kconfig                  |    1 +
+ arch/arm/kvm/arm.c                    |   13 ++-
+ arch/arm/kvm/interrupts.S             |   12 ++
+ arch/arm/kvm/mmu.c                    |  196 ++++++++++++++++++++++++++++++++-
+ arch/arm64/kvm/Kconfig                |    1 +
+ arch/ia64/kvm/Kconfig                 |    1 +
+ arch/ia64/kvm/kvm-ia64.c              |    2 +-
+ arch/mips/kvm/Kconfig                 |    1 +
+ arch/mips/kvm/mips.c                  |    2 +-
+ arch/powerpc/kvm/Kconfig              |    1 +
+ arch/powerpc/kvm/book3s.c             |    2 +-
+ arch/powerpc/kvm/booke.c              |    2 +-
+ arch/s390/kvm/Kconfig                 |    1 +
+ arch/s390/kvm/kvm-s390.c              |    2 +-
+ arch/x86/kvm/x86.c                    |   86 ---------------
+ include/linux/kvm_host.h              |    7 ++
+ virt/kvm/Kconfig                      |    6 +
+ virt/kvm/kvm_main.c                   |   95 ++++++++++++++++
+ 22 files changed, 369 insertions(+), 98 deletions(-)
+
+-- 
+1.7.9.5
