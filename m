@@ -1,43 +1,32 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 23 Sep 2014 09:40:12 +0200
-Subject: [PATCH v12 00/10] Per-user clock constraints
-In-Reply-To: <20140922150658.GM5182@n2100.arm.linux.org.uk>
-References: <1411395124-2476-1-git-send-email-tomeu.vizoso@collabora.com>
- <20140922150658.GM5182@n2100.arm.linux.org.uk>
-Message-ID: <542123DC.7060408@collabora.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 23 Sep 2014 09:43:26 +0200
+Subject: [RESEND PATCH 0/4] Enables STMicroelectronics Flexgen Clock
+ support
+In-Reply-To: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <5421249E.2000700@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 05:06 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 22, 2014 at 04:12:02PM +0200, Tomeu Vizoso wrote:
->> Hello,
->>
->> my branch was finally processed by the 0day build farm and I have fixed the
->> three issues that came up:
-> 
-> Patch 3 did not come through, so I can't see the changes there.
+Hi Gabi,
 
-Yeah, I think all mailing lists choke on it because of its size and the
-number of recipients, except linuxppc-dev:
+	Series applied to sti-dt-for-v3.18.
 
-http://patchwork.ozlabs.org/patch/391967/
+Thanks!
+Maxime
 
-You were on CC though.
-
-> I'm
-> assuming that there's some changes to clkdev in there which I need to
-> see.
-
-Nope, that one doesn't touch clkdev.
-
->> * export __clk_get and __clk_put, so they can be used by clock implementations
->> in modules that previously used clk_get and clk_put.
-> 
-> This is something I'm not happy about.  We don't want people getting
-> access to these low level functions.
-
-I see, will think something about it.
-
-Thanks,
-
-Tomeu
+On 08/25/2014 04:44 PM, Gabriel FERNANDEZ wrote:
+> These patches enables clock drivers for STih407 boards.
+>
+> Gabriel Fernandez (4):
+>    ARM: STi: DT: STiH407: 407 DT Entry for clockgen A0
+>    ARM: STi: DT: STiH407: 407 DT Entry for clockgen C0
+>    ARM: STi: DT: STiH407: 407 DT Entry for clockgen D0/D2/D3
+>    ARM: STi: DT: STiH407: 407 DT Entry for clockgenA9
+>
+>   arch/arm/boot/dts/stih407-clock.dtsi     | 295 ++++++++++++++++++++++++++++++-
+>   arch/arm/boot/dts/stih407.dtsi           |  18 +-
+>   include/dt-bindings/clock/stih407-clks.h |  11 ++
+>   3 files changed, 307 insertions(+), 17 deletions(-)
+>   create mode 100644 include/dt-bindings/clock/stih407-clks.h
+>
