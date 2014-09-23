@@ -1,37 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Sep 2014 10:07:31 +0200
-Subject: [PATCH] tty/serial: fix config dependencies for samsung serial
-In-Reply-To: <CAM4voaky-zin8ikdkLBwpTKy13hz3iON8tmNsd55-kr8po8Qaw@mail.gmail.com>
-References: <1409671320-7604-1-git-send-email-ch.naveen@samsung.com>
- <10202237.9vbtDF9MIQ@wuerfel>
- <CAM4voaky-zin8ikdkLBwpTKy13hz3iON8tmNsd55-kr8po8Qaw@mail.gmail.com>
-Message-ID: <5903767.VzDJhUfQDI@wuerfel>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 23 Sep 2014 10:08:50 +0200
+Subject: [PATCH] ARM: shmobile: Remove ARCH_HAS_OPP completely
+In-Reply-To: <20140916002333.GI9847@verge.net.au>
+References: <1406551632.5397.17.camel@x220> <1410511111.31130.4.camel@x220>
+ <20140916000916.GD9847@verge.net.au> <20140916002333.GI9847@verge.net.au>
+Message-ID: <1411459730.20236.6.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 September 2014 12:34:26 Abhilash Kesavan wrote:
-> >>
-> >> The SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS config options are
-> >> meaningful only if SERIAL_SAMSUNG is enabled. Hence the dependency
-> >> rules were changed. I will repost this patch with better description.
-> >
-> > My point is that the options are used by both the uart driver and
-> > the platform code, e.g. for the purpose of PM debugging which can
-> > be enabled even when the serial-samsung driver is turned off.
-> 
-> I looked through the code and could find two references to these
-> symbols in the platform-specific code: arch/arm/plat-samsung/init.c
-> and arch/arm/mach-s3c64xx/irq-pm.c. The first one is being used to
-> initialize the uart platform device in non-dt way while the second one
-> saves and restores the uart irq masks for all channels across a
-> suspend/resume cycle. Also, the save/restore will get bypassed in case
-> CONFIG_SERIAL_SAMSUNG_UARTS is not defined. It does not look like
-> either of these cases would cause any issue with the current patch,
-> can you please help me understand the problem ?
+The Kconfig symbol ARCH_HAS_OPP became redundant in v3.16: commit
+049d595a4db3 ("PM / OPP: Make OPP invisible to users in Kconfig")
+removed the only dependency that used it. Setting it had no effect
+anymore.
 
-It's possible that it works fine now, I just pointed out that we
-had bugs in this area in the past, so it would be good if you can
-add to the changelog a statement that you have checked that the
-new patch does not cause problems here.
+So commit 78c5e0bb145d ("PM / OPP: Remove ARCH_HAS_OPP") removed it. For
+some reason that commit did not remove all select statements for that
+symbol. These statements are now useless. Remove one from shmobile too.
 
-	Arnd
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Sent previously as part of the treewide patch "PM / OPP: Remove
+ARCH_HAS_OPP completely". But it turns out the changes for omap2 are
+already queued in omap-for-v3.18/soc (but not in linux-next!). Besides,
+Simon Horman wanted the shmobile change split off.
+
+Done on top of next-20140922. Tested by grepping the tree. 
+
+ arch/arm/mach-shmobile/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 21f457b56c01..f59019dd986e 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -36,7 +36,6 @@ menuconfig ARCH_SHMOBILE_MULTI
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select ARCH_HAS_OPP
+ 
+ if ARCH_SHMOBILE_MULTI
+ 
+-- 
+1.9.3
