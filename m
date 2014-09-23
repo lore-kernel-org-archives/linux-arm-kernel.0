@@ -1,138 +1,22 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 23 Sep 2014 12:40:25 +0000
-Subject: [PATCH 0/3] Add PCI domain support to R-Car drivers
-In-Reply-To: <20140923121050.GR1994@e106497-lin.cambridge.arm.com>
-References: <1411379470-20639-1-git-send-email-phil.edworthy@renesas.com>
- <20140922210038.GJ1880@google.com>
- <84672882bcaa4730aae409f092bcbcfb@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140923103224.GO1994@e106497-lin.cambridge.arm.com>
- <99f5c020d74b465384e42ef2c883a479@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140923111000.GQ1994@e106497-lin.cambridge.arm.com>
- <028b0606cca84f619d1007bbde9693fd@HKXPR06MB168.apcprd06.prod.outlook.com>
- <20140923121050.GR1994@e106497-lin.cambridge.arm.com>
-Message-ID: <9b5a473bfaa3497bbf64f81fc548416b@HKXPR06MB168.apcprd06.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Sep 2014 14:41:47 +0200
+Subject: [PATCH v4 0/9] ARM: Berlin: Ethernet support
+In-Reply-To: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1411474536-22626-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <3200502.7xjfrZcKCM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
-
-On 23 September 2014 13:11, Liviu wrote:
-> On Tue, Sep 23, 2014 at 12:38:28PM +0100, Phil Edworthy wrote:
-> > On 23 September 2014 12:10, Liviu wrote:
-> > > On Tue, Sep 23, 2014 at 12:00:41PM +0100, Phil Edworthy wrote:
-> > > > On 23 September 2014 11:32, Liviu wrote:
-> > > > > On Tue, Sep 23, 2014 at 11:10:29AM +0100, Phil Edworthy wrote:
-> > > > > > Hi Bjorn,
-> > > > > >
-> > > > > > On 22 September 2014 22:01, Bjorn wrote:
-> > > > > > > On Mon, Sep 22, 2014 at 10:51:07AM +0100, Phil Edworthy wrote:
-> > > > > > > > The Renesas R-Car devices (r8a7790 and r8a7791) use two PCI controller
-> > > > > > > drivers,
-> > > > > > > > one for an external PCIe slot, the other for an internal PCI bridge to USB
-> > > > > > > > controllers.
-> > > > > > > >
-> > > > > > > > However, they currently do not work at the same time as they use the
-> > > > > > > same PCI
-> > > > > > > > domain and use the same root bus number. We can't use different root
-> > > > > > > bus numbers
-> > > > > > > > due to the way root bus numbers are assigned in pcibios_init_hw() in
-> > > > > > > > arch/arm/kernel/bios32.c.
-> > > > > > > >
-> > > > > > > > Since the two PCI controllers are completely independent, I think it makes
-> > > > > > > sense
-> > > > > > > > to use different PCI domains for them.
-> > > > > > > >
-> > > > > > > > I've marked the third patch as RFC as I am not sure of the impact of
-> > > > > > > enabling
-> > > > > > > > PCI domains for all ARM devices. In the march to 'one kernel to rule them
-> > > > > > > all',
-> > > > > > > > I steered clear of mach specific changes.
-> > > > > > > >
-> > > > > > > > These patches require the following patch from Liviu Dudau:
-> > > > > > > >   [PATCH v11 07/10] OF: Introduce helper function for getting PCI
-> > > > > > > domain_nr
-> > > > > > > > Based on comments on this patch from Jason Gunthorpe, there is still the
-> > > > > > > issue
-> > > > > > > > that the domain numbers may change depending on the ordering at probe
-> > > > > > > time.
-> > > > > > > > However, this can be fixed later on by adding the entries in the DT files.
-> > > > > > > >
-> > > > > > > >
-> > > > > > > > Phil Edworthy (3):
-> > > > > > > >   PCI: rcar-pcie: Add call to get domain nr
-> > > > > > > >   PCI: rcar-internal-pci: Add call to get domain nr
-> > > > > > > >   ARM: Enable PCI domains
-> > > > > > >
-> > > > > > > I'm deferring these for now because they depend on Liviu's work, which I
-> > > > > > > haven't merged yet, and I suspect some minor adaptation will be required
-> > > > > > > here.
-> > > > > > >
-> > > > > > > For what it's worth, I agree with Rob's hesitation about mixing lookup with
-> > > > > > > domain number allocation in of_pci_get_domain_nr().  That seems
-> > > > > > > unnecessarily complicated.
-> > > > > > I could create patches to add an optional "pci-domain" property for the R-Car
-> > > > > > PCI drivers, and just attempt to get the property in the drivers. If not found,
-> > > > > > the drivers will assume the domain is 0.
-> > > > > >
-> > > > > > We would then have fixed PCI domain numbering and I don't have to worry about
-> > > > > > Liviu's work.
-> > > > >
-> > > > > I will split the current of_pci_get_domain_nr() even further and replace it with
-> > > > > two functions: pci_get_domain_nr() which will do just the allocation (still based
-> > > > > on the boolean flag passed as parameter) and of_get_pci_domain_nr() that will
-> > > > > retrieve a "linux,pci-domain" value from a property belonging to a given device
-> > > > > node.
-> > > > This doesn't solve the problem of different domain numbers based on different
-> > > > probe ordering. If you have multiple domains then I think you must have the
-> > > > "linux,pci-domain" property for each controller.
-> > >
-> > > Correct, but I've said I'm going to leave for the moment the check to the host
-> > > controller(s).
-> > > So if you care about ordering or mandating the presence of "linux,pci-
-> > > domain" in the DT, please add the check in your driver.
-> > >
-> > > >
-> > > > If we assume the above, of_get_pci_domain_nr() can just return a bus number of
-> > > > 0 if the "linux,pci-domain" property doesn't exist.
-> > >
-> > > You mean *domain* number of 0. But that is still a valid value and you won't
-> > > be able to distinguish between DT providing a "linux,pci-domain" value of zero and
-> > > the property not being present.
-> > Yes, I meant domain.
-> > If a device only has a single PCI domain, no "linux,pci-domain" prop is needed
-> > and a default domain number of 0 is ok.
+On Tuesday 23 September 2014 14:15:27 Antoine Tenart wrote:
 > 
-> Agree, except it is not a "device" choice but a platform choice. In other words,
-> having a host bridge capable of running on multi-host-bridge setups, then
-> your HB driver will have to mandate "linux,pci-domain" presence. But the
-> decision
-> to have more than one HB will be present in the device tree, not in the
-> driver.
-Ok, I actually meant the device dtsi, but yes the decision lies with the DT.
-
-
-> > If there is more than one domain, userspace needs to have consistent domain
-> > numbering over kernel versions, so we have to specify the domain in the DT.
+> This series introduce support for the Ethernet controller on Berlin SoCs,
+> using the existing pxa168 Ethernet driver. In order to do this, DT
+> support is added to the driver alongside some other modifications and
+> fixes.
 > 
-> Agree, and the DT will pin down the domain numbers.
-> 
-> >
-> > I am probably missing something, it wouldn't be the first time, but I don't see
-> > why of_get_pci_domain_nr() needs to allocate domain numbers.
-> 
-> Maybe because I have confused you. Let's try again:
->   - of_pci_get_domain_nr(): function present in v11, parses "pci-domain" alias,
->     allocates a new domain number if "pci-domain" info is missing. Will be
->     removed in v12.
->   - of_get_pci_domain_nr(): subtle change of name to flag the change of behaviour
->     from the previous function. Only parses "linux,pci-domain" property of the
->     host bridge node, returns the property value as an integer between 0 and 255,
->     or a negative value if the property is missing.
->   - pci_get_new_domain_nr(): this function is only present in v12 and allocates
->     a new domain number each time it is called.
-Ok, I missed the subtle name change and extra function for v12.
 
-Sounds good to me!
+Looks great overall, I've commented on two issues I've found, but only
+the phy-addr one really needs to be addressed. Once that is out of the
+way, please add
 
-Thanks
-Phil
+Acked-by: Arnd Bergmann <arnd@arndb.de>
