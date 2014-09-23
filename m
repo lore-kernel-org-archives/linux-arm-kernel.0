@@ -1,87 +1,52 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 23 Sep 2014 17:10:02 -0500
-Subject: [PATCH 1/2] dmaengine: Add QCOM ADM DMA driver
-In-Reply-To: <20140923102850.GI24663@intel.com>
-References: <1410401933-20621-1-git-send-email-agross@codeaurora.org>
- <1410401933-20621-2-git-send-email-agross@codeaurora.org>
- <20140923102850.GI24663@intel.com>
-Message-ID: <20140923221002.GC5975@qualcomm.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 23 Sep 2014 16:14:10 -0600
+Subject: [PATCHv7 01/26] iommu/arm-smmu: change IOMMU_EXEC to IOMMU_NOEXEC
+In-Reply-To: <20140923145816.GE28608@arm.com>
+References: <1411483586-29304-1-git-send-email-a.motakis@virtualopensystems.com>
+ <1411483586-29304-2-git-send-email-a.motakis@virtualopensystems.com>
+ <20140923145816.GE28608@arm.com>
+Message-ID: <1411510450.24563.44.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
-
-> > +			break;
-> > +		default:
-> > +			achan->slave.src_maxburst = 0;
-> > +			achan->slave.dst_maxburst = 0;
-> Why clear these for error cases
-
-With the return I shouldn't need to.  I'll fix this.
-
-> > +			ret = -EINVAL;
-> > +			break;
-> > +		}
-> > +
-> > +		if (!ret)
-> > +			writel(achan->blk_size,
-> > +				adev->regs + HI_CRCI_CTL(achan->id, adev->ee));
-> and why do we write to HW on this. Shouldn't this be done when you program
-> the descriptor?
-
-It could be deferred to later.  The main point is that I don't see the
-slave_config happening every transaction.  I was only modifying it now instead
-of making a register write for every transaction.
-
+On Tue, 2014-09-23 at 15:58 +0100, Will Deacon wrote:
+> Hi Antonios,
 > 
-> > +static enum dma_status adm_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> > +	struct dma_tx_state *txstate)
-> > +{
-> > +	struct adm_chan *achan = to_adm_chan(chan);
-> > +	struct virt_dma_desc *vd;
-> > +	enum dma_status ret;
-> > +	unsigned long flags;
-> > +	size_t residue = 0;
-> > +
-> > +	ret = dma_cookie_status(chan, cookie, txstate);
-> > +
-> Last arg can be null to this, so before you do residue calcluation and block
-> interrupts would make sense to return from here if arg is NULL
-
-Good catch.  Will fix.
-
+> On Tue, Sep 23, 2014 at 03:46:00PM +0100, Antonios Motakis wrote:
+> > Exposing the XN flag of the SMMU driver as IOMMU_NOEXEC instead of
+> > IOMMU_EXEC makes it enforceable, since for IOMMUs that don't support
+> > the XN flag pages will always be executable.
+> > 
+> > Signed-off-by: Antonios Motakis <a.motakis@virtualopensystems.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c | 9 +++++----
+> >  include/linux/iommu.h    | 2 +-
+> >  2 files changed, 6 insertions(+), 5 deletions(-)
 > 
-> > +	spin_lock_irqsave(&achan->vc.lock, flags);
-> > +
-> > +	vd = vchan_find_desc(&achan->vc, cookie);
-> > +	if (vd)
-> > +		residue = container_of(vd, struct adm_async_desc, vd)->length;
-> > +	else if (achan->curr_txd && achan->curr_txd->vd.tx.cookie == cookie)
-> > +		residue = achan->curr_txd->length;
-> so this is current cookie, so you need to read from HW on current position
-
-There is no way to get current position unfortunately without relying on
-unreliable debug registers.
-
-> > +
-> > +	spin_unlock_irqrestore(&achan->vc.lock, flags);
-> > +
-> > +	dma_set_residue(txstate, residue);
-> > +
-> > +	if (achan->error)
-> > +		return DMA_ERROR;
-> > +
-> > +	return ret;
+> [...]
 > 
-> -- 
-> ~Vinod
+> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > index 20f9a52..e1a644c 100644
+> > --- a/include/linux/iommu.h
+> > +++ b/include/linux/iommu.h
+> > @@ -27,7 +27,7 @@
+> >  #define IOMMU_READ	(1 << 0)
+> >  #define IOMMU_WRITE	(1 << 1)
+> >  #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+> > -#define IOMMU_EXEC	(1 << 3)
+> > +#define IOMMU_NOEXEC	(1 << 3)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> This hunk needs to be a separate patch merged by Joerg before I can take the
+> arm-smmu part (which looks fine).
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+That separate hunk would be unbuildable since arm-smmu depends on the
+IOMMU_EXEC define.  Patch 2/ is also in iommu code and gates patch 3/ in
+arm-smmu.  The IOMMU-core changes are pretty trivial, so perhaps Joerg
+would be willing to ACK 1&2 and let Will include the first 3 patches
+through his tree.
+
+These first 3 patches should have been sent on their own since they're
+small an obvious so they don't get hung up on the reset of the series.
+Thanks,
+
+Alex
