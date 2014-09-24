@@ -1,53 +1,40 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Sep 2014 17:33:38 +0100
-Subject: [RFC PATCH v3 7/7] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <20140923071355.GI30514@ulmo>
-References: <1410539695-29128-1-git-send-email-will.deacon@arm.com>
- <1410539695-29128-8-git-send-email-will.deacon@arm.com>
- <20140922091934.GH1470@ulmo> <20140922174337.GI7936@arm.com>
- <20140923071355.GI30514@ulmo>
-Message-ID: <20140924163338.GF16244@arm.com>
+Date: Wed, 24 Sep 2014 17:37:12 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
+ ATS1PR
+In-Reply-To: <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
+References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
+ <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
+ <20140922152614.GP25809@arm.com>
+ <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20140924163712.GG16244@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 08:14:01AM +0100, Thierry Reding wrote:
-> On Mon, Sep 22, 2014 at 06:43:37PM +0100, Will Deacon wrote:
-> > Yup. In this case, the iommu_dma_mapping passed to arch_setup_dma_ops
-> > contains a domain and an allocator for each IOMMU instance in the system.
-> > It would then be up to the architecture how it makes use of those, but
-> > the most obvious thing to do would be to attach devices mastering through
-> > an IOMMU instance to that per-instance domain.
-> > 
-> > The other use-case is isolation (one domain per device), which I guess
-> > matches what the ARM code is doing at the moment.
+On Wed, Sep 24, 2014 at 02:12:00AM +0100, Mitchel Humpherys wrote:
+> On Mon, Sep 22 2014 at 08:26:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
+> >> +		return arm_smmu_iova_to_phys_soft(domain, iova);
+> >> +	}
+> >> +
+> >> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
+> >> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
+> >> +
+> >> +	if (phys & CB_PAR_F) {
+> >> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
+> >> +		dev_err(dev, "PAR = 0x%llx\n", phys);
+> >> +	}
+> >> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
+> >
+> > How does this work for 64k pages?
 > 
-> I think there are two cases here. You can have a composite device that
-> wants to manage a single domain (using its own allocator) for a set of
-> hardware devices. At the same time a set of devices (think 2D and 3D
-> engines) could want to use a multiple domains for process separation.
-> In that case I'd expect a logical DRM device to allocate one domain per
-> process and then associate the 2D and 3D engines with that same domain
-> on process switch.
+> So at the moment we're always assuming that we're using v7/v8 long
+> descriptor format, right?  All I see in the spec (14.5.15 SMMU_CBn_PAR)
+> is that bits[47:12]=>PA[47:12]...  Or am I missing something completely?
 
-Sure, but that's well outside of what the dma-mapping API is going to setup
-as a default domain. These specialist setups are certainly possible, but I
-think they should be driven by, for example, the DRM code as opposed to
-being in the core dma-mapping code.
+I think you've got 64k pages confused with the short-descriptor format.
 
-> What I proposed a while back was to leave it up to the IOMMU driver to
-> choose an allocator for the device. Or rather, choose whether to use a
-> custom allocator or the DMA/IOMMU integration allocator. The way this
-> worked was to keep a list of devices in the IOMMU driver. Devices in
-> this list would be added to domain reserved for DMA/IOMMU integration.
-> Those would typically be devices such as SD/MMC, audio, ... devices that
-> are in-kernel and need no per-process separation. By default devices
-> wouldn't be added to a domain, so devices forming a composite DRM device
-> would be able to manage their own domain.
-
-I'd live to have as little of this as possible in the IOMMU drivers, as we
-should leave those to deal with the IOMMU hardware and not domain
-management. Having subsystems manage their own dma ops is an extension to
-the dma-mapping API.
+When we use 64k pages with long descriptors, you're masked off bits 15-12 of
+the iova above, so you'll have a hole in the physical address afaict.
 
 Will
