@@ -1,70 +1,101 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Sep 2014 18:11:12 +0200
-Subject: [PATCH v2] ARM: at91: fix at91sam9263ek DT mmc pinmuxing settings
-In-Reply-To: <1411485172-7984-1-git-send-email-andreas.henriksson@endian.se>
-References: <5421623D.6090609@atmel.com>
- <1411485172-7984-1-git-send-email-andreas.henriksson@endian.se>
-Message-ID: <5422ED20.5010709@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Sep 2014 18:12:26 +0200
+Subject: [PATCH 1/6] pci,
+ thunder: Add support for Thunder PCIe host controller
+In-Reply-To: <1411573068-12952-2-git-send-email-rric@kernel.org>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-2-git-send-email-rric@kernel.org>
+Message-ID: <27476217.5ToIFGoMDz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/2014 17:12, Andreas Henriksson :
-> As discovered on a custom board similar to at91sam9263ek and basing
-> its devicetree on that one apparently the pin muxing doesn't get
-> set up properly. This was discovered since the custom boards u-boot
-> does funky stuff with the pin muxing and leaved it set to SPI
-> which made the MMC driver not work under Linux.
-> The fix is simply to define the given configuration as the default.
-> This probably worked by pure luck before, but it's better to
-> make the muxing explicitly set.
+On Wednesday 24 September 2014 17:37:43 Robert Richter wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> CC: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Signed-off-by: Andreas Henriksson <andreas.henriksson@endian.se>
+> This patch adds support for PCI host controller of Cavium Thunder
+> SoCs.
 
-Thanks, I stacked it on at91-3.18-fixes-non-critical branch.
+I had expected this hardware to be SBSA compliant. Why do you need
+a hardware specific driver, is this a workaround for buggy hardware
+or just noncompliant?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> +/*
+> + * All PCIe devices in Thunder have fixed resources, shouldn't be reassigned.
+> + * Also claim the device's valid resources to set 'res->parent' hierarchy.
+> + */
+> +static void pci_dev_resource_fixup(struct pci_dev *dev)
+> +{
+> +	struct resource *res;
+> +	int resno;
+> +
+> +	for (resno = 0; resno < PCI_NUM_RESOURCES; resno++)
+> +		dev->resource[resno].flags |= IORESOURCE_PCI_FIXED;
 
-For the record, we chose to set this
-pinctrl-names = "default";
-property in the SoC file without the associated pinctrl-0 property
-because there is not "default" setting: we never know if we would use
-the slot A or slot B with different pins in play.
-So, as we must add a pinctrl-0 property in the board anyway, we decided
-to not add pinctrl-0 in the SoC while keeping pinctrl-names as it is
-always needed (as you experienced the hard way ;-)).
+You have listed these as relocatable in DT, why do you have to mark
+them as nonrelocatable here?
 
-Best regards,
+> +static void __iomem *thunder_pcie_cfg_base(struct thunder_pcie *pcie,
+> +				 unsigned int bus, unsigned int devfn)
+> +{
+> +	return  pcie->cfg_base + ((bus << THUNDER_PCIE_BUS_SHIFT)
+> +		| (PCI_SLOT(devfn) << THUNDER_PCIE_DEV_SHIFT)
+> +		| (PCI_FUNC(devfn) << THUNDER_PCIE_FUNC_SHIFT));
+> +}
+> +
+> +static int thunder_pcie_read_config(struct pci_bus *bus, unsigned int devfn,
+> +				  int reg, int size, u32 *val)
+> +{
+> +	struct thunder_pcie *pcie = bus->sysdata;
+> +	void __iomem *addr;
+> +	unsigned int busnr = bus->number;
+> +
+> +	if (busnr > 255 || devfn > 255 || reg > 4095)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +	addr = thunder_pcie_cfg_base(pcie, busnr, devfn) + reg;
+> +
+> +	switch (size) {
+> +	case 1:
+> +		*val = readb(addr);
+> +		break;
+> +	case 2:
+> +		*val = readw(addr);
+> +		break;
+> +	case 4:
+> +		*val = readl(addr);
+> +		break;
+> +	default:
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +	}
+> +
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
 
-> ---
->  arch/arm/boot/dts/at91sam9263.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> v2: put pinctrl-names in dtsi instead as requested/suggested by Nicolas Ferre
-> 
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index bb23c2d..5e95a80 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -834,6 +834,7 @@
->  				compatible = "atmel,hsmci";
->  				reg = <0xfff80000 0x600>;
->  				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				clocks = <&mci0_clk>;
-> @@ -845,6 +846,7 @@
->  				compatible = "atmel,hsmci";
->  				reg = <0xfff84000 0x600>;
->  				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
->  				clocks = <&mci1_clk>;
-> 
+This looks roughly ECAM compliant, are you sure you need a
+private implementation?
 
+> +static int thunder_pcie_msi_enable(struct thunder_pcie *pcie,
+> +					struct pci_bus *bus)
+> +{
+> +	struct device_node *msi_node;
+> +
+> +	msi_node = of_parse_phandle(pcie->node, "msi-parent", 0);
+> +	if (!msi_node)
+> +		return -ENODEV;
+> +
+> +	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
+> +	if (!pcie->msi)
+> +		return -ENODEV;
+> +
+> +	pcie->msi->dev = pcie->dev;
+> +	bus->msi = pcie->msi;
+> +
+> +	return 0;
+> +}
 
--- 
-Nicolas Ferre
+This is probably something we should add to the generic host driver as well,
+so it can work with SBSA compliant implementations that come with an MSI
+controller. Maybe move it into common code so it can be shared with that
+driver.
+
+	Arnd
