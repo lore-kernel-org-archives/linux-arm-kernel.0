@@ -1,68 +1,165 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 24 Sep 2014 15:26:06 -0700
-Subject: [PATCH v2 2/3] drivers: dma-coherent: add initialization from
- device tree
-In-Reply-To: <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
-References: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
- <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140924152606.4f4daa63d01c55b69b1ec617@linux-foundation.org>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 24 Sep 2014 19:27:14 -0300
+Subject: [PATCH 14/18] [media] s5p_mfc_opr_v6: get rid of warnings when
+ compiled with 64 bits
+In-Reply-To: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
+References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
+Message-ID: <dda7cdbd99166519fd47e676915573ced63ec488.1411597610.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014 13:22:40 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+There are several errors related to size_t size and the usage of
+unsigned int for pointers:
 
-> Initialization procedure of dma coherent pool has been split into two
-> parts, so memory pool can now be initialized without assigning to
-> particular struct device. Then initialized region can be assigned to
-> more than one struct device. To protect from concurent allocations from
-> different devices, a spinlock has been added to dma_coherent_mem
-> structure. The last part of this patch adds support for handling
-> 'shared-dma-pool' reserved-memory device tree nodes.
-> 
-> --- a/drivers/base/dma-coherent.c
-> +++ b/drivers/base/dma-coherent.c
-> @@ -14,11 +14,14 @@ struct dma_coherent_mem {
->  	int		size;
->  	int		flags;
->  	unsigned long	*bitmap;
-> +	spinlock_t	spinlock;
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_alloc_codec_buffers_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:103:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+   mfc_debug(2, "recon luma size: %d chroma size: %d\n",
+   ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:103:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_set_dec_frame_buffer_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:472:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?size_t? [-Wformat=]
+   mfc_debug(2, "Luma %d: %x\n", i,
+   ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:476:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?size_t? [-Wformat=]
+   mfc_debug(2, "\tChroma %d: %x\n", i,
+   ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:490:4: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
+    mfc_debug(2, "\tBuf1: %x, size: %d\n",
+    ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:498:2: warning: format ?%u? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
+  mfc_debug(2, "Buf1: %u, buf_size1: %d (frames %d)\n",
+  ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_set_enc_ref_buffer_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:596:2: warning: format ?%u? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
+  mfc_debug(2, "Buf1: %u, buf_size1: %d (ref frames %d)\n",
+  ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_write_info_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:1883:15: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  writel(data, (volatile void __iomem *)ofs);
+               ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_read_info_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:1893:14: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+  ret = readl((volatile void __iomem *)ofs);
+              ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_get_pic_type_top_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2022:3: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+   (__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_top);
+   ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_get_pic_type_bot_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2028:3: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+   (__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
+   ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_get_crop_info_h_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2034:3: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+   (__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info1);
+   ^
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c: In function ?s5p_mfc_get_crop_info_v_v6?:
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2040:3: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+   (__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info2);
 
-A bit of documentation would be nice: explain what the lock protects,
-that it is irq-safe, etc.
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
->  };
->  
-> -int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-> -				dma_addr_t device_addr, size_t size, int flags)
-> +static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
-> +			     size_t size, int flags,
-> +			     struct dma_coherent_mem **mem)
->  {
-> +	struct dma_coherent_mem *dma_mem = NULL;
-
-The only reason to initialise this is so we can kfree() it without
-checking.  In which case we don't need label free1_out?
-
---- a/drivers/base/dma-coherent.c~drivers-dma-coherent-add-initialization-from-device-tree-fix
-+++ a/drivers/base/dma-coherent.c
-@@ -40,7 +40,7 @@ static int dma_init_coherent_memory(phys
- 		goto out;
- 	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
- 	if (!dma_mem->bitmap)
--		goto free1_out;
-+		goto out;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index e38d78f21726..89de7a6daa5b 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -100,7 +100,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 						mb_width, mb_height),
+ 						S5P_FIMV_ME_BUFFER_ALIGN_V6);
  
- 	dma_mem->virt_base = mem_base;
- 	dma_mem->device_base = device_addr;
-@@ -56,9 +56,8 @@ static int dma_init_coherent_memory(phys
+-		mfc_debug(2, "recon luma size: %d chroma size: %d\n",
++		mfc_debug(2, "recon luma size: %zd chroma size: %zd\n",
+ 			  ctx->luma_dpb_size, ctx->chroma_dpb_size);
+ 	} else {
+ 		return -EINVAL;
+@@ -469,11 +469,11 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
  
- 	return DMA_MEMORY_IO;
+ 	for (i = 0; i < ctx->total_dpb_count; i++) {
+ 		/* Bank2 */
+-		mfc_debug(2, "Luma %d: %x\n", i,
++		mfc_debug(2, "Luma %d: %zx\n", i,
+ 					ctx->dst_bufs[i].cookie.raw.luma);
+ 		writel(ctx->dst_bufs[i].cookie.raw.luma,
+ 				mfc_regs->d_first_plane_dpb + i * 4);
+-		mfc_debug(2, "\tChroma %d: %x\n", i,
++		mfc_debug(2, "\tChroma %d: %zx\n", i,
+ 					ctx->dst_bufs[i].cookie.raw.chroma);
+ 		writel(ctx->dst_bufs[i].cookie.raw.chroma,
+ 				mfc_regs->d_second_plane_dpb + i * 4);
+@@ -487,7 +487,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 			align_gap = buf_addr1 - align_gap;
+ 			buf_size1 -= align_gap;
  
-- free1_out:
-+out:
- 	kfree(dma_mem);
-- out:
- 	if (mem_base)
- 		iounmap(mem_base);
- 	return 0;
-_
+-			mfc_debug(2, "\tBuf1: %x, size: %d\n",
++			mfc_debug(2, "\tBuf1: %zx, size: %d\n",
+ 					buf_addr1, buf_size1);
+ 			writel(buf_addr1, mfc_regs->d_mv_buffer + i * 4);
+ 			buf_addr1 += frame_size_mv;
+@@ -495,7 +495,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 		}
+ 	}
+ 
+-	mfc_debug(2, "Buf1: %u, buf_size1: %d (frames %d)\n",
++	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
+ 			buf_addr1, buf_size1, ctx->total_dpb_count);
+ 	if (buf_size1 < 0) {
+ 		mfc_debug(2, "Not enough memory has been allocated.\n");
+@@ -593,7 +593,7 @@ static int s5p_mfc_set_enc_ref_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 	buf_addr1 += ctx->tmv_buffer_size >> 1;
+ 	buf_size1 -= ctx->tmv_buffer_size;
+ 
+-	mfc_debug(2, "Buf1: %u, buf_size1: %d (ref frames %d)\n",
++	mfc_debug(2, "Buf1: %zu, buf_size1: %d (ref frames %d)\n",
+ 			buf_addr1, buf_size1, ctx->pb_count);
+ 	if (buf_size1 < 0) {
+ 		mfc_debug(2, "Not enough memory has been allocated.\n");
+@@ -1880,7 +1880,7 @@ static void s5p_mfc_write_info_v6(struct s5p_mfc_ctx *ctx, unsigned int data,
+ 		unsigned int ofs)
+ {
+ 	s5p_mfc_clock_on();
+-	writel(data, (volatile void __iomem *)ofs);
++	writel(data, (volatile void __iomem *)((unsigned long)ofs));
+ 	s5p_mfc_clock_off();
+ }
+ 
+@@ -1890,7 +1890,7 @@ s5p_mfc_read_info_v6(struct s5p_mfc_ctx *ctx, unsigned int ofs)
+ 	int ret;
+ 
+ 	s5p_mfc_clock_on();
+-	ret = readl((volatile void __iomem *)ofs);
++	ret = readl((volatile void __iomem *)((unsigned long)ofs));
+ 	s5p_mfc_clock_off();
+ 
+ 	return ret;
+@@ -2019,25 +2019,25 @@ static int s5p_mfc_get_mvc_view_id_v6(struct s5p_mfc_dev *dev)
+ static unsigned int s5p_mfc_get_pic_type_top_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_top);
++		(__force unsigned long) ctx->dev->mfc_regs->d_ret_picture_tag_top);
+ }
+ 
+ static unsigned int s5p_mfc_get_pic_type_bot_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
++		(__force unsigned long) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
+ }
+ 
+ static unsigned int s5p_mfc_get_crop_info_h_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info1);
++		(__force unsigned long) ctx->dev->mfc_regs->d_display_crop_info1);
+ }
+ 
+ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info2);
++		(__force unsigned long) ctx->dev->mfc_regs->d_display_crop_info2);
+ }
+ 
+ static struct s5p_mfc_regs mfc_regs;
+-- 
+1.9.3
