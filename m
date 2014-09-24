@@ -1,63 +1,29 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 24 Sep 2014 08:53:20 -0700
-Subject: [PATCH v7 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <20140924082228.GF17801@lee--X1>
-References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
- <20140924082228.GF17801@lee--X1>
-Message-ID: <20140924155319.GA28481@sonymobile.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Sep 2014 17:54:43 +0200
+Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
+In-Reply-To: <bb122a232a1c40559e84a058f3d003b4@BL2PR03MB467.namprd03.prod.outlook.com>
+References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
+ <4264466.HtkUxyxBW8@wuerfel>
+ <bb122a232a1c40559e84a058f3d003b4@BL2PR03MB467.namprd03.prod.outlook.com>
+Message-ID: <3598074.CpE7Waa9La@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 24 Sep 01:22 PDT 2014, Lee Jones wrote:
+On Wednesday 24 September 2014 11:00:34 Jingchang Lu wrote:
+> 
+> We also do the phy-handle fixup on our PowerPC platform based on the aliases,
+> and so I adopt the same way to make these fixup consistent between SoCs.
+> And the u-boot fdt fixup code base on the aliases has been upstreamed, so may
+> we keep this aliases unchanged?
 
-> On Mon, 22 Sep 2014, Bjorn Andersson wrote:
-> 
-> > Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
-> > 8960 and 8064 based devices. The binding currently describes the rpm
-> > itself and the regulator subnodes.
-> > 
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  246 ++++++++++++++++++++
-> 
-> Please adhere to: Documentation/devicetree/bindings/submitting-patches.txt
-> 
+I don't see a strong reason to change it, it just seemed strange to me.
 
-I assume you mean this part:
+> BTW, find a node by alias is easily, could you give me some clue on finding a node
+> by a label directly, Thanks.
 
-  1) The Documentation/ portion of the patch should be a separate patch.
+I haven't used libfdt in this way myself, so I don't know how it would
+be done. However, the idea is that the labels in dts files end up as
+ELF symbols in the dtb, so you can look them up by following the ELF
+headers.
 
-But I doubt this document was written with include/dt-bindings in mind, because
-in my eyes they are part of "device tree bindings".
-
-> >  include/dt-bindings/mfd/qcom-rpm.h                 |  154 ++++++++++++
-> >  2 files changed, 400 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> >  create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> > new file mode 100644
-> > index 0000000..4264021
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> 
-> This requires a DT Ack.
-> 
-> [...]
-> 
-> > +++ b/include/dt-bindings/mfd/qcom-rpm.h
-> 
-> Please split this into a separate patch.
-> 
-
-But this is part of the device tree binding and the binding "depends" on it.
-
-> When you do, for this file only, please apply my:
-> 
->   Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-
-Thanks,
-Bjorn
+	Arnd
