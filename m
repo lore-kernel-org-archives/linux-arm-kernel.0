@@ -1,305 +1,68 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 25 Sep 2014 00:17:27 +0200
-Subject: [PATCH v5 1/2] bcma: register bcma as device tree driver
-Message-ID: <1411597048-25470-1-git-send-email-hauke@hauke-m.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 24 Sep 2014 15:26:06 -0700
+Subject: [PATCH v2 2/3] drivers: dma-coherent: add initialization from
+ device tree
+In-Reply-To: <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
+References: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
+ <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140924152606.4f4daa63d01c55b69b1ec617@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is used by the bcm53xx ARM SoC code. Now it is possible to
-give the address of the chipcommon core in device tree and bcma will
-search for all the other cores.
+On Thu, 11 Sep 2014 13:22:40 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- Documentation/devicetree/bindings/bus/bcma.txt | 20 +++++++
- drivers/bcma/bcma_private.h                    | 14 +++++
- drivers/bcma/host_soc.c                        | 81 ++++++++++++++++++++++++++
- drivers/bcma/main.c                            | 52 ++++++++++++++++-
- include/linux/bcma/bcma.h                      |  2 +
- 5 files changed, 168 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
+> Initialization procedure of dma coherent pool has been split into two
+> parts, so memory pool can now be initialized without assigning to
+> particular struct device. Then initialized region can be assigned to
+> more than one struct device. To protect from concurent allocations from
+> different devices, a spinlock has been added to dma_coherent_mem
+> structure. The last part of this patch adds support for handling
+> 'shared-dma-pool' reserved-memory device tree nodes.
+> 
+> --- a/drivers/base/dma-coherent.c
+> +++ b/drivers/base/dma-coherent.c
+> @@ -14,11 +14,14 @@ struct dma_coherent_mem {
+>  	int		size;
+>  	int		flags;
+>  	unsigned long	*bitmap;
+> +	spinlock_t	spinlock;
 
-This is based on wireless-testing and should go into that tree.
+A bit of documentation would be nice: explain what the lock protects,
+that it is irq-safe, etc.
 
-changes since:
-v4:
- - move the code adding the device tree to the child driver into this patch
- - remove all references to irq from this patch
+>  };
+>  
+> -int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+> -				dma_addr_t device_addr, size_t size, int flags)
+> +static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
+> +			     size_t size, int flags,
+> +			     struct dma_coherent_mem **mem)
+>  {
+> +	struct dma_coherent_mem *dma_mem = NULL;
 
-v3:
- - remove .owner = THIS_MODULE,
+The only reason to initialise this is so we can kfree() it without
+checking.  In which case we don't need label free1_out?
 
-v2:
- - fix description
- - use ranges dt in the example
- - always define a empty implementation of 
-   bcma_host_soc_{un}register_driver() when it is build and remove some ifdefs
-
-v1:
- - renamed aix to axi
-
-RFC:
- - reworded the irq description
- - improved the example
- - hocked into bcma_modeinit() and bcma_modexit()
-
-diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
-new file mode 100644
-index 0000000..e9070c1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/bcma.txt
-@@ -0,0 +1,20 @@
-+Driver for ARM AXI Bus with Broadcom Plugins (bcma)
-+
-+Required properties:
-+
-+- compatible : brcm,bus-axi
-+
-+- reg : iomem address range of chipcommon core
-+
-+The cores on the AXI bus are automatically detected by bcma with the
-+memory ranges they are using and they get registered afterwards.
-+
-+Example:
-+
-+	axi at 18000000 {
-+		compatible = "brcm,bus-axi";
-+		reg = <0x18000000 0x1000>;
-+		ranges = <0x00000000 0x18000000 0x00100000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-diff --git a/drivers/bcma/bcma_private.h b/drivers/bcma/bcma_private.h
-index b40be43..b6412b2 100644
---- a/drivers/bcma/bcma_private.h
-+++ b/drivers/bcma/bcma_private.h
-@@ -88,6 +88,20 @@ extern int __init bcma_host_pci_init(void);
- extern void __exit bcma_host_pci_exit(void);
- #endif /* CONFIG_BCMA_HOST_PCI */
+--- a/drivers/base/dma-coherent.c~drivers-dma-coherent-add-initialization-from-device-tree-fix
++++ a/drivers/base/dma-coherent.c
+@@ -40,7 +40,7 @@ static int dma_init_coherent_memory(phys
+ 		goto out;
+ 	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+ 	if (!dma_mem->bitmap)
+-		goto free1_out;
++		goto out;
  
-+/* host_soc.c */
-+#if defined(CONFIG_BCMA_HOST_SOC) && defined(CONFIG_OF)
-+extern int __init bcma_host_soc_register_driver(void);
-+extern void __exit bcma_host_soc_unregister_driver(void);
-+#else
-+static inline int __init bcma_host_soc_register_driver(void)
-+{
-+	return 0;
-+}
-+static inline void __exit bcma_host_soc_unregister_driver(void)
-+{
-+}
-+#endif /* CONFIG_BCMA_HOST_SOC && CONFIG_OF */
-+
- /* driver_pci.c */
- u32 bcma_pcie_read(struct bcma_drv_pci *pc, u32 address);
+ 	dma_mem->virt_base = mem_base;
+ 	dma_mem->device_base = device_addr;
+@@ -56,9 +56,8 @@ static int dma_init_coherent_memory(phys
  
-diff --git a/drivers/bcma/host_soc.c b/drivers/bcma/host_soc.c
-index 718e054..335cbcf 100644
---- a/drivers/bcma/host_soc.c
-+++ b/drivers/bcma/host_soc.c
-@@ -7,6 +7,9 @@
+ 	return DMA_MEMORY_IO;
  
- #include "bcma_private.h"
- #include "scan.h"
-+#include <linux/slab.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
- #include <linux/bcma/bcma.h>
- #include <linux/bcma/bcma_soc.h>
- 
-@@ -176,6 +179,7 @@ int __init bcma_host_soc_register(struct bcma_soc *soc)
- 	/* Host specific */
- 	bus->hosttype = BCMA_HOSTTYPE_SOC;
- 	bus->ops = &bcma_host_soc_ops;
-+	bus->host_pdev = NULL;
- 
- 	/* Initialize struct, detect chip */
- 	bcma_init_bus(bus);
-@@ -195,3 +199,80 @@ int __init bcma_host_soc_init(struct bcma_soc *soc)
- 
- 	return err;
- }
-+
-+#ifdef CONFIG_OF
-+static int bcma_host_soc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct bcma_bus *bus;
-+	int err;
-+
-+	/* Alloc */
-+	bus = devm_kzalloc(dev, sizeof(*bus), GFP_KERNEL);
-+	if (!bus)
-+		return -ENOMEM;
-+
-+	/* Map MMIO */
-+	bus->mmio = of_iomap(np, 0);
-+	if (!bus->mmio)
-+		return -ENOMEM;
-+
-+	/* Host specific */
-+	bus->hosttype = BCMA_HOSTTYPE_SOC;
-+	bus->ops = &bcma_host_soc_ops;
-+	bus->host_pdev = pdev;
-+
-+	/* Initialize struct, detect chip */
-+	bcma_init_bus(bus);
-+
-+	/* Register */
-+	err = bcma_bus_register(bus);
-+	if (err)
-+		goto err_unmap_mmio;
-+
-+	platform_set_drvdata(pdev, bus);
-+
-+	return err;
-+
-+err_unmap_mmio:
-+	iounmap(bus->mmio);
-+	return err;
-+}
-+
-+static int bcma_host_soc_remove(struct platform_device *pdev)
-+{
-+	struct bcma_bus *bus = platform_get_drvdata(pdev);
-+
-+	bcma_bus_unregister(bus);
-+	iounmap(bus->mmio);
-+	platform_set_drvdata(pdev, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bcma_host_soc_of_match[] = {
-+	{ .compatible = "brcm,bus-axi", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, bcma_host_soc_of_match);
-+
-+static struct platform_driver bcma_host_soc_driver = {
-+	.driver = {
-+		.name = "bcma-host-soc",
-+		.of_match_table = bcma_host_soc_of_match,
-+	},
-+	.probe		= bcma_host_soc_probe,
-+	.remove		= bcma_host_soc_remove,
-+};
-+
-+int __init bcma_host_soc_register_driver(void)
-+{
-+	return platform_driver_register(&bcma_host_soc_driver);
-+}
-+
-+void __exit bcma_host_soc_unregister_driver(void)
-+{
-+	platform_driver_unregister(&bcma_host_soc_driver);
-+}
-+#endif /* CONFIG_OF */
-diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-index c421403..d1656c2 100644
---- a/drivers/bcma/main.c
-+++ b/drivers/bcma/main.c
-@@ -10,6 +10,7 @@
- #include <linux/platform_device.h>
- #include <linux/bcma/bcma.h>
- #include <linux/slab.h>
-+#include <linux/of_address.h>
- 
- MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
- MODULE_LICENSE("GPL");
-@@ -131,6 +132,43 @@ static bool bcma_is_core_needed_early(u16 core_id)
- 	return false;
- }
- 
-+#ifdef CONFIG_OF
-+static struct device_node *bcma_of_find_child_device(struct platform_device *parent,
-+						     struct bcma_device *core)
-+{
-+	struct device_node *node;
-+	u64 size;
-+	const __be32 *reg;
-+
-+	if (!parent || !parent->dev.of_node)
-+		return NULL;
-+
-+	for_each_child_of_node(parent->dev.of_node, node) {
-+		reg = of_get_address(node, 0, &size, NULL);
-+		if (!reg)
-+			continue;
-+		if (of_translate_address(node, reg) == core->addr)
-+			return node;
-+	}
-+	return NULL;
-+}
-+
-+static void bcma_of_fill_device(struct platform_device *parent,
-+				struct bcma_device *core)
-+{
-+	struct device_node *node;
-+
-+	node = bcma_of_find_child_device(parent, core);
-+	if (node)
-+		core->dev.of_node = node;
-+}
-+#else
-+static void bcma_of_fill_device(struct platform_device *parent,
-+				struct bcma_device *core)
-+{
-+}
-+#endif /* CONFIG_OF */
-+
- static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
- {
- 	int err;
-@@ -147,7 +185,13 @@ static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
- 		break;
- 	case BCMA_HOSTTYPE_SOC:
- 		core->dev.dma_mask = &core->dev.coherent_dma_mask;
--		core->dma_dev = &core->dev;
-+		if (bus->host_pdev) {
-+			core->dma_dev = &bus->host_pdev->dev;
-+			core->dev.parent = &bus->host_pdev->dev;
-+			bcma_of_fill_device(bus->host_pdev, core);
-+		} else {
-+			core->dma_dev = &core->dev;
-+		}
- 		break;
- 	case BCMA_HOSTTYPE_SDIO:
- 		break;
-@@ -528,6 +572,11 @@ static int __init bcma_modinit(void)
- 	if (err)
- 		return err;
- 
-+	err = bcma_host_soc_register_driver();
-+	if (err) {
-+		pr_err("SoC host initialization failed\n");
-+		err = 0;
-+	}
- #ifdef CONFIG_BCMA_HOST_PCI
- 	err = bcma_host_pci_init();
- 	if (err) {
-@@ -545,6 +594,7 @@ static void __exit bcma_modexit(void)
- #ifdef CONFIG_BCMA_HOST_PCI
- 	bcma_host_pci_exit();
- #endif
-+	bcma_host_soc_unregister_driver();
- 	bus_unregister(&bcma_bus_type);
- }
- module_exit(bcma_modexit)
-diff --git a/include/linux/bcma/bcma.h b/include/linux/bcma/bcma.h
-index 6345979..729f48e 100644
---- a/include/linux/bcma/bcma.h
-+++ b/include/linux/bcma/bcma.h
-@@ -323,6 +323,8 @@ struct bcma_bus {
- 		struct pci_dev *host_pci;
- 		/* Pointer to the SDIO device (only for BCMA_HOSTTYPE_SDIO) */
- 		struct sdio_func *host_sdio;
-+		/* Pointer to platform device (only for BCMA_HOSTTYPE_SOC) */
-+		struct platform_device *host_pdev;
- 	};
- 
- 	struct bcma_chipinfo chipinfo;
--- 
-1.9.1
+- free1_out:
++out:
+ 	kfree(dma_mem);
+- out:
+ 	if (mem_base)
+ 		iounmap(mem_base);
+ 	return 0;
+_
