@@ -1,97 +1,97 @@
 From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 19:27:02 -0300
-Subject: [PATCH 02/18] [media] st_rc: fix address space casting
+Date: Wed, 24 Sep 2014 19:27:13 -0300
+Subject: [PATCH 13/18] [media] s5p_mfc_opr_v5: Fix lots of warnings on x86_64
 In-Reply-To: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
 References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
-Message-ID: <85bbfa5dbeda81dbef758ee1c450ed938b70ac4d.1411597610.git.mchehab@osg.samsung.com>
+Message-ID: <5824d4d8b177c3778cea8ef5e345d126e6c46767.1411597610.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/media/rc/st_rc.c:107:38: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:107:38:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:107:38:    got void *
-drivers/media/rc/st_rc.c:110:53: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:110:53:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:110:53:    got void *
-drivers/media/rc/st_rc.c:116:54: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:116:54:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:116:54:    got void *
-drivers/media/rc/st_rc.c:120:45: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:120:45:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:120:45:    got void *
-drivers/media/rc/st_rc.c:121:43: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:121:43:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:121:43:    got void *
-drivers/media/rc/st_rc.c:150:46: warning: incorrect type in argument 1 (different address spaces)
-drivers/media/rc/st_rc.c:150:46:    expected void const volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:150:46:    got void *
-drivers/media/rc/st_rc.c:153:42: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:153:42:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:153:42:    got void *
-drivers/media/rc/st_rc.c:174:32: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:174:32:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:174:32:    got void *
-drivers/media/rc/st_rc.c:177:48: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:177:48:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:177:48:    got void *
-drivers/media/rc/st_rc.c:187:48: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:187:48:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:187:48:    got void *
-drivers/media/rc/st_rc.c:204:42: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:204:42:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:204:42:    got void *
-drivers/media/rc/st_rc.c:205:35: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:205:35:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:205:35:    got void *
-drivers/media/rc/st_rc.c:215:35: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:215:35:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:215:35:    got void *
-drivers/media/rc/st_rc.c:216:35: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:216:35:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:216:35:    got void *
-drivers/media/rc/st_rc.c:269:22: warning: incorrect type in assignment (different address spaces)
-drivers/media/rc/st_rc.c:269:22:    expected void *base
-drivers/media/rc/st_rc.c:269:22:    got void [noderef] <asn:2>*
-drivers/media/rc/st_rc.c:349:46: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:349:46:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:349:46:    got void *
-drivers/media/rc/st_rc.c:350:46: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:350:46:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:350:46:    got void *
-drivers/media/rc/st_rc.c:371:61: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:371:61:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:371:61:    got void *
-drivers/media/rc/st_rc.c:372:54: warning: incorrect type in argument 2 (different address spaces)
-drivers/media/rc/st_rc.c:372:54:    expected void volatile [noderef] <asn:2>*addr
-drivers/media/rc/st_rc.c:372:54:    got void *
+When compiled on x86_64, several warnings popup:
+
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:476:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:480:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:485:4: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:493:2: warning: format ?%u? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:570:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:570:2: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:609:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:609:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:640:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:640:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:666:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:666:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
 
 Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-index e309441a266d..0e758ae2e529 100644
---- a/drivers/media/rc/st_rc.c
-+++ b/drivers/media/rc/st_rc.c
-@@ -22,8 +22,8 @@ struct st_rc_device {
- 	int				irq;
- 	int				irq_wake;
- 	struct clk			*sys_clock;
--	void				*base;	/* Register base address */
--	void				*rx_base;/* RX Register base address */
-+	volatile void __iomem		*base;	/* Register base address */
-+	volatile void __iomem		*rx_base;/* RX Register base address */
- 	struct rc_dev			*rdev;
- 	bool				overclocking;
- 	int				sample_mult;
-@@ -267,8 +267,8 @@ static int st_rc_probe(struct platform_device *pdev)
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 
- 	rc_dev->base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(rc_dev->base)) {
--		ret = PTR_ERR(rc_dev->base);
-+	if (IS_ERR((__force void *)rc_dev->base)) {
-+		ret = PTR_ERR((__force void *)rc_dev->base);
- 		goto err;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
+index 6234e4d70596..90e3d61c1b59 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
+@@ -473,16 +473,16 @@ static int s5p_mfc_set_dec_frame_buffer_v5(struct s5p_mfc_ctx *ctx)
+ 								frame_size_mv);
+ 	for (i = 0; i < ctx->total_dpb_count; i++) {
+ 		/* Bank2 */
+-		mfc_debug(2, "Luma %d: %x\n", i,
++		mfc_debug(2, "Luma %d: %zx\n", i,
+ 					ctx->dst_bufs[i].cookie.raw.luma);
+ 		mfc_write(dev, OFFSETB(ctx->dst_bufs[i].cookie.raw.luma),
+ 						S5P_FIMV_DEC_LUMA_ADR + i * 4);
+-		mfc_debug(2, "\tChroma %d: %x\n", i,
++		mfc_debug(2, "\tChroma %d: %zx\n", i,
+ 					ctx->dst_bufs[i].cookie.raw.chroma);
+ 		mfc_write(dev, OFFSETA(ctx->dst_bufs[i].cookie.raw.chroma),
+ 					       S5P_FIMV_DEC_CHROMA_ADR + i * 4);
+ 		if (ctx->codec_mode == S5P_MFC_CODEC_H264_DEC) {
+-			mfc_debug(2, "\tBuf2: %x, size: %d\n",
++			mfc_debug(2, "\tBuf2: %zx, size: %d\n",
+ 							buf_addr2, buf_size2);
+ 			mfc_write(dev, OFFSETB(buf_addr2),
+ 						S5P_FIMV_H264_MV_ADR + i * 4);
+@@ -490,7 +490,7 @@ static int s5p_mfc_set_dec_frame_buffer_v5(struct s5p_mfc_ctx *ctx)
+ 			buf_size2 -= frame_size_mv;
+ 		}
  	}
- 
+-	mfc_debug(2, "Buf1: %u, buf_size1: %d\n", buf_addr1, buf_size1);
++	mfc_debug(2, "Buf1: %zu, buf_size1: %d\n", buf_addr1, buf_size1);
+ 	mfc_debug(2, "Buf 1/2 size after: %d/%d (frames %d)\n",
+ 			buf_size1,  buf_size2, ctx->total_dpb_count);
+ 	if (buf_size1 < 0 || buf_size2 < 0) {
+@@ -567,7 +567,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
+ 		enc_ref_c_size = ALIGN(guard_width * guard_height,
+ 				       S5P_FIMV_NV12MT_SALIGN);
+ 	}
+-	mfc_debug(2, "buf_size1: %d, buf_size2: %d\n", buf_size1, buf_size2);
++	mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n", buf_size1, buf_size2);
+ 	switch (ctx->codec_mode) {
+ 	case S5P_MFC_CODEC_H264_ENC:
+ 		for (i = 0; i < 2; i++) {
+@@ -606,7 +606,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
+ 					S5P_FIMV_H264_NBOR_INFO_ADR);
+ 		buf_addr1 += S5P_FIMV_ENC_NBORINFO_SIZE;
+ 		buf_size1 -= S5P_FIMV_ENC_NBORINFO_SIZE;
+-		mfc_debug(2, "buf_size1: %d, buf_size2: %d\n",
++		mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n",
+ 			buf_size1, buf_size2);
+ 		break;
+ 	case S5P_MFC_CODEC_MPEG4_ENC:
+@@ -637,7 +637,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
+ 						S5P_FIMV_MPEG4_ACDC_COEF_ADR);
+ 		buf_addr1 += S5P_FIMV_ENC_ACDCCOEF_SIZE;
+ 		buf_size1 -= S5P_FIMV_ENC_ACDCCOEF_SIZE;
+-		mfc_debug(2, "buf_size1: %d, buf_size2: %d\n",
++		mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n",
+ 			buf_size1, buf_size2);
+ 		break;
+ 	case S5P_MFC_CODEC_H263_ENC:
+@@ -663,7 +663,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
+ 		mfc_write(dev, OFFSETA(buf_addr1), S5P_FIMV_H263_ACDC_COEF_ADR);
+ 		buf_addr1 += S5P_FIMV_ENC_ACDCCOEF_SIZE;
+ 		buf_size1 -= S5P_FIMV_ENC_ACDCCOEF_SIZE;
+-		mfc_debug(2, "buf_size1: %d, buf_size2: %d\n",
++		mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n",
+ 			buf_size1, buf_size2);
+ 		break;
+ 	default:
 -- 
 1.9.3
