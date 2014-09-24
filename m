@@ -1,66 +1,169 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Wed, 24 Sep 2014 11:52:07 -0600
-Subject: [PATCH] ASoC: samsung-i2s: Maintain CDCLK settings across
- i2s_{shutdown/startup}
-In-Reply-To: <1405008673-15994-1-git-send-email-s.nawrocki@samsung.com>
-References: <1405008673-15994-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAD8Lp47nEcY6nyDE3xkUGUdnYpTOv_1NUMGjuBLoLhGeZ45A6A@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 24 Sep 2014 12:53:08 -0500
+Subject: [PATCH v6 1/5] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <20140924172151.GD422@ilina-mac>
+References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
+ <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
+ <F743E5F0-28C1-4A9D-A27D-73EA70A01B46@codeaurora.org>
+ <20140924172151.GD422@ilina-mac>
+Message-ID: <4BFC9B4E-A3D0-422E-9B55-0DB9F4B04EE9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
 
-On Thu, Jul 10, 2014 at 10:11 AM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Currently configuration of the CDCLK pad is being overwritten in
-> the i2s_shutdown() callback in order to gate the SoC output clock.
-> However if an ASoC machine driver doesn't restore that clock
-> settings each time after opening the sound device this results
-> in the CDCLK pin being permanently configured into input mode.
-> I.e. the output clock will always stay disabled.
-> Fix that by saving the CDCLKCON bit state in i2s_shutdown() and
-> and restoring it in the i2s_startup() callback.
+On Sep 24, 2014, at 12:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-I'm still having trouble in this area on ODROID. Basically, if you
-start pulseaudio, all audio breaks. Even after you kill pulseaudio,
-audio is still broken.
-This happens because CDCLK gets disabled by i2s.c and never enabled again.
+> On Wed, Sep 24 2014 at 10:33 -0600, Kumar Gala wrote:
+>> 
+>> On Sep 23, 2014, at 6:51 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> 
+>>> Based on work by many authors, available at codeaurora.org
+>>> 
+>>> SPM is a hardware block that controls the peripheral logic surrounding
+>>> the application cores (cpu/l$). When the core executes WFI instruction,
+>>> the SPM takes over the putting the core in low power state as
+>>> configured. The wake up for the SPM is an interrupt at the GIC, which
+>>> then completes the rest of low power mode sequence and brings the core
+>>> out of low power mode.
+>>> 
+>>> The SPM has a set of control registers that configure the SPMs
+>>> individually based on the type of the core and the runtime conditions.
+>>> SPM is a finite state machine block to which a sequence is provided and
+>>> it interprets the bytes  and executes them in sequence. Each low power
+>>> mode that the core can enter into is provided to the SPM as a sequence.
+>>> 
+>>> Configure the SPM to set the core (cpu or L2) into its low power mode,
+>>> the index of the first command in the sequence is set in the SPM_CTL
+>>> register. When the core executes ARM wfi instruction, it triggers the
+>>> SPM state machine to start executing from that index. The SPM state
+>>> machine waits until the interrupt occurs and starts executing the rest
+>>> of the sequence until it hits the end of the sequence. The end of the
+>>> sequence jumps the core out of its low power mode.
+>>> 
+>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>> [lina: simplify the driver for initial submission, clean up and update
+>>> commit text]
+>>> ---
+>>> Documentation/devicetree/bindings/arm/msm/spm.txt |  43 +++
+>>> drivers/soc/qcom/Kconfig                          |   8 +
+>>> drivers/soc/qcom/Makefile                         |   1 +
+>>> drivers/soc/qcom/spm.c                            | 388 ++++++++++++++++++++++
+>>> include/soc/qcom/spm.h                            |  38 +++
+>>> 5 files changed, 478 insertions(+)
+>>> create mode 100644 Documentation/devicetree/bindings/arm/msm/spm.txt
+>>> create mode 100644 drivers/soc/qcom/spm.c
+>>> create mode 100644 include/soc/qcom/spm.h
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/arm/msm/spm.txt b/Documentation/devicetree/bindings/arm/msm/spm.txt
+>>> new file mode 100644
+>>> index 0000000..2ff2454
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/msm/spm.txt
+>>> @@ -0,0 +1,43 @@
+>>> +* Subsystem Power Manager (SPM)
+>>> +
+>>> +Qualcomm Snapdragons have SPM hardware blocks to control the Application
+>>> +Processor Sub-System power. These SPM blocks run individual state machine
+>>> +to determine what the core (L2 or Krait/Scorpion) would do when the WFI
+>>> +instruction is executed by the core.
+>>> +
+>>> +The devicetree representation of the SPM block should be:
+>>> +
+>>> +Required properties
+>>> +
+>>> +- compatible: Must be -
+>>> +		 "qcom,spm-v2.1"
+>>> +- reg: The physical address and the size of the SPM's memory mapped registers
+>>> +- qcom,cpu: phandle for the CPU that the SPM block is attached to.
+>>> +	This field is required on only for SPMs that control the CPU.
+>> 
+>> Let?s make this just cpu-handle instead of qcom,cpu.  The concept of a handle to a cpu is pretty generic.
+>> 
+> Okay. Will look into it.
+> You mean just the property name, right?
 
-pulseaudio does:
-1. i2s_startup for playback channel
-2. i2s_startup for capture channel
-3. i2s_shutdown for capture channel
-4. i2s_shutdown for playback channel
+Correct.
 
-In step 3 we disable CDCLK even though playback should still be active, oops.
+> 
+>>> +- qcom,saw2-clk-div: SAW2 configuration register to program the SPM runtime
+>>> +	clocks. The register for this property is MSM_SPM_REG_SAW2_CFG.
+>> 
+>> (add details on how this is used to compute timer tick.  Is it timer tick = saw_clk/saw2-clk-div?  What is valid range of values)
+>> 
+> The SPM spec is not available for open use. The range of values is
+> irrelevant for the SPM clocks, usually, its a constant for an SoC, but
+> may vary between the SoC. Its how the SPM on the SoC interprets it.
 
-In step 4 we do this:
-        u32 mod = readl(i2s->addr + I2SMOD);
-        i2s->cdclk_out = !(mod & MOD_CDCLKCON);
+Does the meaning of the divisor value change from SoC to SoC (not the value itself)?
 
-and now cdclk_out is always going to be 0, so we'll never turn it back on again.
+Is it not always:
 
-Regardless of what we do now, I think there is a bug in i2s_shutdown
-in that it should not do any real shutdown stuff if the other stream
-(playback/capture) is open.
+timer tick = sys_ref_clk / (qcom,saw2-clk-div + 1)
+ 
+>>> +- qcom,saw2-delays: The SPM delay values that SPM sequences would refer to.
+>>> +	The register for this property is MSM_SPM_REG_SAW2_SPM_DLY.
+>> 
+>> Didn?t Stephen asked about splitting this up? Or at least treating it as an array of 3 values?
+>> 
+> Yes he did. My response was similar to the clk-div values, its not
+> something you can change without hardware spec documentation.
+> And I need to mix the three values up, anyways before I write to the
+> register. Splitting it up, doesnt help understanding/configuring the SPM
+> any better, so didnt change it.
 
-However I'm wondering if we should more thoroughly clean up CDCLK
-handling. Right now CDCLK is enabled during boot in
-odroidx2_late_probe() (even if you never play any audio), and then
-sometimes disabled by i2s.c after the sound device has been opened and
-then closed, with a half-broken attempt to sometimes enable it again
-next time it is opened. We're in this situation because that setup is
-pretty fragile and confusing...
+Hmm, will this value change from SPM to SPM on the same SoC?  I?m not a fan of allowing random register values to get poked into the HW from DT.  While this one case might end up being acceptable, its a terrible practice and not something I want use in the habit of doing.
 
-Is CDCLK something ODROID-specific? Perhaps we could have
-startup/shutdown hooks in odroidx2_max98090.c that start and stop the
-clock (with proper refcounting), and remove CDCLK interaction from
-i2s.c.
+>>> +- qcom,saw2-enable: The SPM control register to enable/disable the sleep state
+>>> +	machine. The register for this property is MSM_SPM_REG_SAW2_SPM_CTL.
+>> 
+>> Can this just be a boolean (exist or not), if so, probably change it to qcom,saw2-disable (so lack of property means enable)?
+>> 
+> Okay, sure.
+> 
+>>> +
+>>> +Optional properties
+>>> +
+>>> +- qcom,saw2-spm-cmd-wfi: The WFI command sequence
+>> 
+>> probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
+>> 
+> Okay.
+> 
+>>> +- qcom,saw2-spm-cmd-spc: The Standalone PC command sequence
+>> 
+>> probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
+>> 
+> Okay.
+> 
+>>> +
+>>> +Example:
+>>> +	spm at f9089000 {
+>>> +		compatible = "qcom,spm-v2.1";
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <1>;
+>>> +		reg = <0xf9089000 0x1000>;
+>>> +		qcom,cpu = <&CPU0>;
+>>> +		qcom,saw2-clk-div = <0x1>;
+>>> +		qcom,saw2-delays = <0x20000400>;
+>>> +		qcom,saw2-enable = <0x1>;
+>>> +		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
+>>> +		qcom,saw2-spm-cmd-spc = [00 20 50 80 60 70 10 92
+>>> +				a0 b0 03 68 70 3b 92 a0 b0
+>>> +				82 2b 50 10 30 02 22 30 0f];
+>>> +	};
+>> 
+>> - k
+>> 
+>> 
+>> -- 
+>> Employee of Qualcomm Innovation Center, Inc.
+>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Is CDCLK something more generic for Samsung i2s devices? In that case
-we could enable it in i2s_startup, disable it in i2s_shutdown, and
-avoid interacting with it at all from odroidx2_max98090.c. (again with
-proper refcounting)
-
-Thanks
-Daniel
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
