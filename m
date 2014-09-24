@@ -1,210 +1,97 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Sep 2014 09:22:28 +0100
-Subject: [PATCH v7 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140924082228.GF17801@lee--X1>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 24 Sep 2014 10:22:39 +0200
+Subject: [PATCH 0/9] ARM: vf610: Suspend/resume support
+In-Reply-To: <87zjdqmjr3.fsf@nbsps.com>
+References: <cover.1411404079.git.stefan@agner.ch> <87zjdqmjr3.fsf@nbsps.com>
+Message-ID: <4ee0621b0bf5f4d4e10eae7673bdf1cd@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Sep 2014, Bjorn Andersson wrote:
-
-> Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
-> 8960 and 8064 based devices. The binding currently describes the rpm
-> itself and the regulator subnodes.
+Am 2014-09-23 17:36, schrieb Bill Pringlemeir:
+> On 22 Sep 2014, stefan at agner.ch wrote:
 > 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  246 ++++++++++++++++++++
-
-Please adhere to: Documentation/devicetree/bindings/submitting-patches.txt
-
->  include/dt-bindings/mfd/qcom-rpm.h                 |  154 ++++++++++++
->  2 files changed, 400 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
->  create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
+>> This patchset provides suspend/resume support for Freescale Vybrid
+>> SoC (vf610). The code is generally aligned to the implementation
+>> for i.MX6. The subsystems SRC and GPC need some changes to support
+>> the Vybrid specific implementation.
+>>
+>> This patchset relies on GPIO driver to be present (in order to
+>> provide a wakeup source) as well as using the ARM Global Timer
+>> clock source (the Vybrid specifc PIT clock source, vf_pit_timer.c
+>> does not support shutdown).
+>>
+>> The implemented sleep states (LP-RUN and STOP), are not the most
+>> power saving functions available on Vybrid. Especially for
+>> suspend-to-memory one of the LPSTOP modes looks more appropriate.
+>> However, the complexity is somewhat higher (we would need to move
+>> execution path to SRAM and store IOMUX and DDRMC configuration).
+>> Currently, I have not the resources to look into that so I hope
+>> that this initial code qualifies as power saving functions to be
+>> applied.
+>>
+>> Suspend-to-memory as well as standby mode is tested on Colibri
+>> VF61.
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-> new file mode 100644
-> index 0000000..4264021
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-
-This requires a DT Ack.
-
-[...]
-
-> +++ b/include/dt-bindings/mfd/qcom-rpm.h
-
-Please split this into a separate patch.
-
-When you do, for this file only, please apply my:
-
-  Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> @@ -0,0 +1,154 @@
-> +/*
-> + * This header provides constants for the Qualcomm RPM bindings.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_MFD_QCOM_RPM_H
-> +#define _DT_BINDINGS_MFD_QCOM_RPM_H
-> +
-> +/*
-> + * Constants use to identify individual resources in the RPM.
-> + */
-> +#define QCOM_RPM_APPS_FABRIC_ARB		1
-> +#define QCOM_RPM_APPS_FABRIC_CLK		2
-> +#define QCOM_RPM_APPS_FABRIC_HALT		3
-> +#define QCOM_RPM_APPS_FABRIC_IOCTL		4
-> +#define QCOM_RPM_APPS_FABRIC_MODE		5
-> +#define QCOM_RPM_APPS_L2_CACHE_CTL		6
-> +#define QCOM_RPM_CFPB_CLK			7
-> +#define QCOM_RPM_CXO_BUFFERS			8
-> +#define QCOM_RPM_CXO_CLK			9
-> +#define QCOM_RPM_DAYTONA_FABRIC_CLK		10
-> +#define QCOM_RPM_DDR_DMM			11
-> +#define QCOM_RPM_EBI1_CLK			12
-> +#define QCOM_RPM_HDMI_SWITCH			13
-> +#define QCOM_RPM_MMFPB_CLK			14
-> +#define QCOM_RPM_MM_FABRIC_ARB			15
-> +#define QCOM_RPM_MM_FABRIC_CLK			16
-> +#define QCOM_RPM_MM_FABRIC_HALT			17
-> +#define QCOM_RPM_MM_FABRIC_IOCTL		18
-> +#define QCOM_RPM_MM_FABRIC_MODE			19
-> +#define QCOM_RPM_PLL_4				20
-> +#define QCOM_RPM_PM8058_LDO0			21
-> +#define QCOM_RPM_PM8058_LDO1			22
-> +#define QCOM_RPM_PM8058_LDO2			23
-> +#define QCOM_RPM_PM8058_LDO3			24
-> +#define QCOM_RPM_PM8058_LDO4			25
-> +#define QCOM_RPM_PM8058_LDO5			26
-> +#define QCOM_RPM_PM8058_LDO6			27
-> +#define QCOM_RPM_PM8058_LDO7			28
-> +#define QCOM_RPM_PM8058_LDO8			29
-> +#define QCOM_RPM_PM8058_LDO9			30
-> +#define QCOM_RPM_PM8058_LDO10			31
-> +#define QCOM_RPM_PM8058_LDO11			32
-> +#define QCOM_RPM_PM8058_LDO12			33
-> +#define QCOM_RPM_PM8058_LDO13			34
-> +#define QCOM_RPM_PM8058_LDO14			35
-> +#define QCOM_RPM_PM8058_LDO15			36
-> +#define QCOM_RPM_PM8058_LDO16			37
-> +#define QCOM_RPM_PM8058_LDO17			38
-> +#define QCOM_RPM_PM8058_LDO18			39
-> +#define QCOM_RPM_PM8058_LDO19			40
-> +#define QCOM_RPM_PM8058_LDO20			41
-> +#define QCOM_RPM_PM8058_LDO21			42
-> +#define QCOM_RPM_PM8058_LDO22			43
-> +#define QCOM_RPM_PM8058_LDO23			44
-> +#define QCOM_RPM_PM8058_LDO24			45
-> +#define QCOM_RPM_PM8058_LDO25			46
-> +#define QCOM_RPM_PM8058_LVS0			47
-> +#define QCOM_RPM_PM8058_LVS1			48
-> +#define QCOM_RPM_PM8058_NCP			49
-> +#define QCOM_RPM_PM8058_SMPS0			50
-> +#define QCOM_RPM_PM8058_SMPS1			51
-> +#define QCOM_RPM_PM8058_SMPS2			52
-> +#define QCOM_RPM_PM8058_SMPS3			53
-> +#define QCOM_RPM_PM8058_SMPS4			54
-> +#define QCOM_RPM_PM8821_LDO1			55
-> +#define QCOM_RPM_PM8821_SMPS1			56
-> +#define QCOM_RPM_PM8821_SMPS2			57
-> +#define QCOM_RPM_PM8901_LDO0			58
-> +#define QCOM_RPM_PM8901_LDO1			59
-> +#define QCOM_RPM_PM8901_LDO2			60
-> +#define QCOM_RPM_PM8901_LDO3			61
-> +#define QCOM_RPM_PM8901_LDO4			62
-> +#define QCOM_RPM_PM8901_LDO5			63
-> +#define QCOM_RPM_PM8901_LDO6			64
-> +#define QCOM_RPM_PM8901_LVS0			65
-> +#define QCOM_RPM_PM8901_LVS1			66
-> +#define QCOM_RPM_PM8901_LVS2			67
-> +#define QCOM_RPM_PM8901_LVS3			68
-> +#define QCOM_RPM_PM8901_MVS			69
-> +#define QCOM_RPM_PM8901_SMPS0			70
-> +#define QCOM_RPM_PM8901_SMPS1			71
-> +#define QCOM_RPM_PM8901_SMPS2			72
-> +#define QCOM_RPM_PM8901_SMPS3			73
-> +#define QCOM_RPM_PM8901_SMPS4			74
-> +#define QCOM_RPM_PM8921_CLK1			75
-> +#define QCOM_RPM_PM8921_CLK2			76
-> +#define QCOM_RPM_PM8921_LDO1			77
-> +#define QCOM_RPM_PM8921_LDO2			78
-> +#define QCOM_RPM_PM8921_LDO3			79
-> +#define QCOM_RPM_PM8921_LDO4			80
-> +#define QCOM_RPM_PM8921_LDO5			81
-> +#define QCOM_RPM_PM8921_LDO6			82
-> +#define QCOM_RPM_PM8921_LDO7			83
-> +#define QCOM_RPM_PM8921_LDO8			84
-> +#define QCOM_RPM_PM8921_LDO9			85
-> +#define QCOM_RPM_PM8921_LDO10			86
-> +#define QCOM_RPM_PM8921_LDO11			87
-> +#define QCOM_RPM_PM8921_LDO12			88
-> +#define QCOM_RPM_PM8921_LDO13			89
-> +#define QCOM_RPM_PM8921_LDO14			90
-> +#define QCOM_RPM_PM8921_LDO15			91
-> +#define QCOM_RPM_PM8921_LDO16			92
-> +#define QCOM_RPM_PM8921_LDO17			93
-> +#define QCOM_RPM_PM8921_LDO18			94
-> +#define QCOM_RPM_PM8921_LDO19			95
-> +#define QCOM_RPM_PM8921_LDO20			96
-> +#define QCOM_RPM_PM8921_LDO21			97
-> +#define QCOM_RPM_PM8921_LDO22			98
-> +#define QCOM_RPM_PM8921_LDO23			99
-> +#define QCOM_RPM_PM8921_LDO24			100
-> +#define QCOM_RPM_PM8921_LDO25			101
-> +#define QCOM_RPM_PM8921_LDO26			102
-> +#define QCOM_RPM_PM8921_LDO27			103
-> +#define QCOM_RPM_PM8921_LDO28			104
-> +#define QCOM_RPM_PM8921_LDO29			105
-> +#define QCOM_RPM_PM8921_LVS1			106
-> +#define QCOM_RPM_PM8921_LVS2			107
-> +#define QCOM_RPM_PM8921_LVS3			108
-> +#define QCOM_RPM_PM8921_LVS4			109
-> +#define QCOM_RPM_PM8921_LVS5			110
-> +#define QCOM_RPM_PM8921_LVS6			111
-> +#define QCOM_RPM_PM8921_LVS7			112
-> +#define QCOM_RPM_PM8921_MVS			113
-> +#define QCOM_RPM_PM8921_NCP			114
-> +#define QCOM_RPM_PM8921_SMPS1			115
-> +#define QCOM_RPM_PM8921_SMPS2			116
-> +#define QCOM_RPM_PM8921_SMPS3			117
-> +#define QCOM_RPM_PM8921_SMPS4			118
-> +#define QCOM_RPM_PM8921_SMPS5			119
-> +#define QCOM_RPM_PM8921_SMPS6			120
-> +#define QCOM_RPM_PM8921_SMPS7			121
-> +#define QCOM_RPM_PM8921_SMPS8			122
-> +#define QCOM_RPM_PXO_CLK			123
-> +#define QCOM_RPM_QDSS_CLK			124
-> +#define QCOM_RPM_SFPB_CLK			125
-> +#define QCOM_RPM_SMI_CLK			126
-> +#define QCOM_RPM_SYS_FABRIC_ARB			127
-> +#define QCOM_RPM_SYS_FABRIC_CLK			128
-> +#define QCOM_RPM_SYS_FABRIC_HALT		129
-> +#define QCOM_RPM_SYS_FABRIC_IOCTL		130
-> +#define QCOM_RPM_SYS_FABRIC_MODE		131
-> +#define QCOM_RPM_USB_OTG_SWITCH			132
-> +#define QCOM_RPM_VDDMIN_GPIO			133
-> +
-> +/*
-> + * Constants used to select force mode for regulators.
-> + */
-> +#define QCOM_RPM_FORCE_MODE_NONE		0
-> +#define QCOM_RPM_FORCE_MODE_LPM			1
-> +#define QCOM_RPM_FORCE_MODE_HPM			2
-> +#define QCOM_RPM_FORCE_MODE_AUTO		3
-> +#define QCOM_RPM_FORCE_MODE_BYPASS		4
-> +
-> +#endif
-> -- 
-> 1.7.9.5
+>> Power measurement (Colibri VF61, whole module):
+>> - Idle: 540mW
+>> - LP-RUN: 220mW (standby)
+>> - STOP: 200mW (mem)
 > 
+>> Stefan Agner (9):
+>> ARM: dts: vf610: Add system reset controller (SRC)
+>> ARM: dts: vf610: add global power controller (GPC)
+>> ARM: dts: vf610: add on-chip SRAM
+> 
+> These above three change sets have some implications for dual-chip
+> (Cortex-A5/Cortex-M4) configurations.  Epecially those running MQX.
+> There is not harm to define the register space (except DT size).
+> However, if you activate drivers that manipulate the registers for all
+> systems, then there is no choice to have MQX work on the 2nd core.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On the Timesys BSP, the kernel is fiddling around with this registers
+too, and AFAIK MQX is working with that kernel. Is MQX really using the
+GPC and SRC modules? I thought MQX is just relying on Linux taking care
+of that.
+
+Also, you have this problem with other registers as well, for instance
+the CCM module. In fact, to get into deeper sleep modes, you need to
+access the GPC (global power controller) as well as the CCM (clock
+controller module, for instance the CCM_CLPCR register). When you look
+at all the entry sequences, they all fiddling around with the GPC and
+the CCM. And I don't think that the kernel can work properly without
+having control over the clock module.
+
+IMHO, the SRC and GPC are like the CCM, and need to be under control of
+Linux exclusively.
+
+Another case is the SRAM. There are other peripherals which are much
+more important, e.g. both instances of the EDMA modules are currently
+unconditional part of the device tree.
+
+Besides, afaik you can also use status = "disabled" in a device tree
+including the vf610.dtsi. The device tree is parsed sequential, the last
+settings wins.
+
+> 
+> I think that Shawn Guo already did a patchset to remove stuff from the
+> vf610.dtsi to the machine/configuration DT files.
+> 
+>> ARM: dts: vf610-colibri: GPIO power key
+>> gpio: vf610: Extend with wakeup support
+>> ARM: imx: gpc: Support vf610 global power controller
+>> ARM: imx: src: Support vf610 system reset controller
+>> ARM: imx: clk-gate2: allow custom gate configuration
+>> ARM: vf610: initial suspend/resume support
+>>
+>> arch/arm/boot/dts/vf610-colibri-eval-v3.dts | 26 ++
+>> arch/arm/boot/dts/vf610.dtsi | 33 +++ arch/arm/mach-imx/Kconfig | 2 +
+>> arch/arm/mach-imx/Makefile | 1 + arch/arm/mach-imx/clk-gate2.c | 7 +-
+>> arch/arm/mach-imx/clk-vf610.c | 6 + arch/arm/mach-imx/clk.h | 13 +-
+>> arch/arm/mach-imx/common.h | 14 +- arch/arm/mach-imx/gpc.c | 61 ++--
+>> arch/arm/mach-imx/mach-imx6q.c | 2 +- arch/arm/mach-imx/mach-imx6sl.c
+>> | 2 +- arch/arm/mach-imx/mach-vf610.c | 9 +
+>> arch/arm/mach-imx/pm-vf610.c | 428 ++++++++++++++++++++++++++++
+>> arch/arm/mach-imx/src.c | 11 + drivers/gpio/gpio-vf610.c | 16 ++
+>> include/dt-bindings/clock/vf610-clock.h | 3 +- 16 files changed, 605
+>> insertions(+), 29 deletions(-) create mode 100644
+>> arch/arm/mach-imx/pm-vf610.c
