@@ -1,12 +1,10 @@
 From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
-Date: Wed, 24 Sep 2014 12:12:10 +0800
-Subject: [PATCH v3 1/3] PCI: designware: Rename get_msi_data to
- get_msi_addr
-In-Reply-To: <20140923224555.GE27117@google.com>
+Date: Wed, 24 Sep 2014 12:14:02 +0800
+Subject: [PATCH] PCI: designware: Fix configuration base address
+In-Reply-To: <20140923225306.GF27117@google.com>
 References: <1411482540-31297-1-git-send-email-Minghuan.Lian@freescale.com>
- <1411482540-31297-3-git-send-email-Minghuan.Lian@freescale.com>
- <20140923224555.GE27117@google.com>
-Message-ID: <2CC2A0A4A178534D93D5159BF3BCB661ABCDBA8EEA@EAPEX1MAIL1.st.com>
+ <20140923225306.GF27117@google.com>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB661ABCDBA8EEB@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,82 +12,54 @@ Hello Minghuan,
 
 > -----Original Message-----
 > From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> Sent: Wednesday, September 24, 2014 4:16 AM
+> Sent: Wednesday, September 24, 2014 4:23 AM
 > To: Minghuan Lian
 > Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang
 > Roy-R61911; Hu Mingkai-B21284; Scott Wood; Yoder Stuart-B08248; Arnd
 > Bergmann; Mohit KUMAR DCG; Jingoo Han
-> Subject: Re: [PATCH v3 1/3] PCI: designware: Rename get_msi_data to
-> get_msi_addr
+> Subject: Re: [PATCH] PCI: designware: Fix configuration base address
 > 
 > [+cc Mohit, Jingoo]
 > 
-> On Tue, Sep 23, 2014 at 10:28:58PM +0800, Minghuan Lian wrote:
-> > The function get_msi_data is used to return MSI message address.
-> > In order to accurately express function purpose the patch rename it to
-> > get_msi_addr.
+> On Tue, Sep 23, 2014 at 10:28:56PM +0800, Minghuan Lian wrote:
+> > The code has calculated cfg0_base and cfg1_base when parsing 'reg'
+> > or 'ranges' property of PCI DTS node. so remove duplicate calculation.
+> > And when using 'reg', resource cfg is not used, the removed code will
+> > get incorrect configuration base.
 > >
 > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> 
-> I think this looks like a good idea, but it needs an ack from Mohit and/or
-> Jingoo (cc'd).
-> 
+> > ---
+> >  drivers/pci/host/pcie-designware.c | 2 --
+> >  1 file changed, 2 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pcie-designware.c
+> > b/drivers/pci/host/pcie-designware.c
+> > index c28ca05..0f3cb2a 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -515,7 +515,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >  	pp->mem_base = pp->mem.start;
+> >
+> >  	if (!pp->va_cfg0_base) {
+> > -		pp->cfg0_base = pp->cfg.start;
+> >  		pp->va_cfg0_base = devm_ioremap(pp->dev, pp-
+> >cfg0_base,
+> >  						pp->cfg0_size);
+> >  		if (!pp->va_cfg0_base) {
+> > @@ -525,7 +524,6 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
+> >  	}
+> >
+> >  	if (!pp->va_cfg1_base) {
+> > -		pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+> >  		pp->va_cfg1_base = devm_ioremap(pp->dev, pp-
+> >cfg1_base,
+> >  						pp->cfg1_size);
+> >  		if (!pp->va_cfg1_base) {
+> > --
+> > 1.9.1
+> >
 
 - Acked-by: Mohit KUMAR <mohit.kumar@st.com>
 
 Thanks
 Mohit
-
-> You previously asked whether .get_msi_addr() should also be changed to
-> return u64 instead of u32.  I think it should, and you can do that in a separate
-> patch that also changes the use in dw_msi_setup_irq() to split the 64-bit
-> result into msg.address_lo and msg.address_hi.
-> 
-> I don't see any implementations of .get_msi_data() or .get_msi_addr(), so
-> this seems pretty straightforward.
-> 
-> Bjorn
-> 
-> > ---
-> > Change log:
-> > v3: no change
-> > v2: no change just derived from v1
-> >
-> >  drivers/pci/host/pcie-designware.c | 4 ++--
-> > drivers/pci/host/pcie-designware.h | 2 +-
-> >  2 files changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/pci/host/pcie-designware.c
-> > b/drivers/pci/host/pcie-designware.c
-> > index 5d720c2..1c09f814 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -361,8 +361,8 @@ static int dw_msi_setup_irq(struct msi_chip *chip,
-> struct pci_dev *pdev,
-> >  	 */
-> >  	desc->msi_attrib.multiple = msgvec;
-> >
-> > -	if (pp->ops->get_msi_data)
-> > -		msg.address_lo = pp->ops->get_msi_data(pp);
-> > +	if (pp->ops->get_msi_addr)
-> > +		msg.address_lo = pp->ops->get_msi_addr(pp);
-> >  	else
-> >  		msg.address_lo = virt_to_phys((void *)pp->msi_data);
-> >  	msg.address_hi = 0x0;
-> > diff --git a/drivers/pci/host/pcie-designware.h
-> > b/drivers/pci/host/pcie-designware.h
-> > index 48f8670..904e40a 100644
-> > --- a/drivers/pci/host/pcie-designware.h
-> > +++ b/drivers/pci/host/pcie-designware.h
-> > @@ -70,7 +70,7 @@ struct pcie_host_ops {
-> >  	void (*host_init)(struct pcie_port *pp);
-> >  	void (*msi_set_irq)(struct pcie_port *pp, int irq);
-> >  	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
-> > -	u32 (*get_msi_data)(struct pcie_port *pp);
-> > +	u32 (*get_msi_addr)(struct pcie_port *pp);
-> >  	void (*scan_bus)(struct pcie_port *pp);
-> >  	int (*msi_host_init)(struct pcie_port *pp, struct msi_chip *chip);
-> > };
-> > --
-> > 1.9.1
-> >
