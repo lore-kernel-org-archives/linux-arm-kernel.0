@@ -1,44 +1,97 @@
 From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 19:27:15 -0300
-Subject: [PATCH 15/18] [media] s5p_mfc_opr: Fix warnings
+Date: Wed, 24 Sep 2014 19:27:02 -0300
+Subject: [PATCH 02/18] [media] st_rc: fix address space casting
 In-Reply-To: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
 References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
-Message-ID: <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
+Message-ID: <85bbfa5dbeda81dbef758ee1c450ed938b70ac4d.1411597610.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  CC      drivers/media//platform/s5p-mfc/s5p_mfc_opr.o
-drivers/media//platform/s5p-mfc/s5p_mfc_opr.c: In function ?s5p_mfc_alloc_priv_buf?:
-drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:44:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-  mfc_debug(3, "Allocating priv: %d\n", b->size);
-  ^
-drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:53:2: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
-  mfc_debug(3, "Allocated addr %p %08x\n", b->virt, b->dma);
-  ^
+drivers/media/rc/st_rc.c:107:38: warning: incorrect type in argument 1 (different address spaces)
+drivers/media/rc/st_rc.c:107:38:    expected void const volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:107:38:    got void *
+drivers/media/rc/st_rc.c:110:53: warning: incorrect type in argument 1 (different address spaces)
+drivers/media/rc/st_rc.c:110:53:    expected void const volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:110:53:    got void *
+drivers/media/rc/st_rc.c:116:54: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:116:54:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:116:54:    got void *
+drivers/media/rc/st_rc.c:120:45: warning: incorrect type in argument 1 (different address spaces)
+drivers/media/rc/st_rc.c:120:45:    expected void const volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:120:45:    got void *
+drivers/media/rc/st_rc.c:121:43: warning: incorrect type in argument 1 (different address spaces)
+drivers/media/rc/st_rc.c:121:43:    expected void const volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:121:43:    got void *
+drivers/media/rc/st_rc.c:150:46: warning: incorrect type in argument 1 (different address spaces)
+drivers/media/rc/st_rc.c:150:46:    expected void const volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:150:46:    got void *
+drivers/media/rc/st_rc.c:153:42: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:153:42:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:153:42:    got void *
+drivers/media/rc/st_rc.c:174:32: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:174:32:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:174:32:    got void *
+drivers/media/rc/st_rc.c:177:48: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:177:48:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:177:48:    got void *
+drivers/media/rc/st_rc.c:187:48: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:187:48:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:187:48:    got void *
+drivers/media/rc/st_rc.c:204:42: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:204:42:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:204:42:    got void *
+drivers/media/rc/st_rc.c:205:35: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:205:35:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:205:35:    got void *
+drivers/media/rc/st_rc.c:215:35: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:215:35:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:215:35:    got void *
+drivers/media/rc/st_rc.c:216:35: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:216:35:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:216:35:    got void *
+drivers/media/rc/st_rc.c:269:22: warning: incorrect type in assignment (different address spaces)
+drivers/media/rc/st_rc.c:269:22:    expected void *base
+drivers/media/rc/st_rc.c:269:22:    got void [noderef] <asn:2>*
+drivers/media/rc/st_rc.c:349:46: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:349:46:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:349:46:    got void *
+drivers/media/rc/st_rc.c:350:46: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:350:46:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:350:46:    got void *
+drivers/media/rc/st_rc.c:371:61: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:371:61:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:371:61:    got void *
+drivers/media/rc/st_rc.c:372:54: warning: incorrect type in argument 2 (different address spaces)
+drivers/media/rc/st_rc.c:372:54:    expected void volatile [noderef] <asn:2>*addr
+drivers/media/rc/st_rc.c:372:54:    got void *
 
 Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-index c9a227428e6a..5d311d6ba8f7 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-@@ -41,7 +41,7 @@ int s5p_mfc_alloc_priv_buf(struct device *dev,
- 					struct s5p_mfc_priv_buf *b)
- {
+diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+index e309441a266d..0e758ae2e529 100644
+--- a/drivers/media/rc/st_rc.c
++++ b/drivers/media/rc/st_rc.c
+@@ -22,8 +22,8 @@ struct st_rc_device {
+ 	int				irq;
+ 	int				irq_wake;
+ 	struct clk			*sys_clock;
+-	void				*base;	/* Register base address */
+-	void				*rx_base;/* RX Register base address */
++	volatile void __iomem		*base;	/* Register base address */
++	volatile void __iomem		*rx_base;/* RX Register base address */
+ 	struct rc_dev			*rdev;
+ 	bool				overclocking;
+ 	int				sample_mult;
+@@ -267,8 +267,8 @@ static int st_rc_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
  
--	mfc_debug(3, "Allocating priv: %d\n", b->size);
-+	mfc_debug(3, "Allocating priv: %zd\n", b->size);
- 
- 	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
- 
-@@ -50,7 +50,7 @@ int s5p_mfc_alloc_priv_buf(struct device *dev,
- 		return -ENOMEM;
+ 	rc_dev->base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(rc_dev->base)) {
+-		ret = PTR_ERR(rc_dev->base);
++	if (IS_ERR((__force void *)rc_dev->base)) {
++		ret = PTR_ERR((__force void *)rc_dev->base);
+ 		goto err;
  	}
- 
--	mfc_debug(3, "Allocated addr %p %08x\n", b->virt, b->dma);
-+	mfc_debug(3, "Allocated addr %p %pad\n", b->virt, &b->dma);
- 	return 0;
- }
  
 -- 
 1.9.3
