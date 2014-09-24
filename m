@@ -1,114 +1,54 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 24 Sep 2014 14:48:45 -0400
-Subject: [PATCH v5 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
-In-Reply-To: <542310EB.7050802@kapsi.fi>
-References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
- <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
- <20140924183204.GE27076@developer> <54230EA8.7080604@kapsi.fi>
- <20140924184157.GB7593@developer> <542310EB.7050802@kapsi.fi>
-Message-ID: <20140924184843.GA15798@developer>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Sep 2014 10:32:42 -0700
+Subject: [PATCH] ARM: make arrays containing machine compatible strings
+ const
+In-Reply-To: <20140924050104.GD24803@localhost>
+References: <1410470353-2685-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140924050104.GD24803@localhost>
+Message-ID: <20140924173242.GA18667@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mikko,
-
-On Wed, Sep 24, 2014 at 09:43:55PM +0300, Mikko Perttunen wrote:
-> On 09/24/2014 09:41 PM, Eduardo Valentin wrote:
-> > On Wed, Sep 24, 2014 at 09:34:16PM +0300, Mikko Perttunen wrote:
-> >> On 09/24/2014 09:32 PM, Eduardo Valentin wrote:
-> >>> Hello Mikko,
-> >>>
-> >>> On Thu, Aug 21, 2014 at 01:17:21PM +0300, Mikko Perttunen wrote:
-> >>>> This adds critical trip points to the Jetson TK1 device tree.
-> >>>> The device will do a controlled shutdown when either the CPU, GPU
-> >>>> or MEM thermal zone reaches 101 degrees Celsius.
-> >>>>
-> >>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> >>>> ---
-> >>>> v5: added cooling-maps nodes
-> >>>>
-> >>>
-> >>> OK. But no cooling map entry in it. What was the reason again you don't
-> >>> need/want to add the maps?
-> >>
-> >> There is currently no cooling device to map to.
-> >
-> > Not even cpufreq cooling? Is CPUfreq operational in Tegra?
+On Tue, Sep 23, 2014 at 10:01:04PM -0700, Olof Johansson wrote:
+> On Thu, Sep 11, 2014 at 11:19:13PM +0200, Uwe Kleine-K??nig wrote:
+> > The definition
+> > 
+> > 	static const char *axxia_dt_match[] __initconst = {
+> > 		...
+> > 
+> > defines a changable array of constant strings. That is you must not do:
+> > 
+> > 	*axxia_dt_match[0] = 'k';
+> > 
+> > but
+> > 
+> > 	axxia_dt_match[0] = "different string";
+> > 
+> > is fine. So the annotation __initconst is wrong and yields a compiler
+> > error when other really const variables are added with __initconst.
+> > 
+> > As the struct machine_desc member dt_compat is declared as
+> > 
+> > 	const char *const *dt_compat;
+> > 
+> > making the arrays const is the better alternative over changing all
+> > annotations to __initdata.
+> > 
+> > Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Hello,
+> > 
+> > this is similar to the fix I sent earlier today which only fixed omap2.
+> > Does it make sense to split this patch per platform?
 > 
-> Indeed, it is not currently operational (except on Tegra20). There is a 
-> series for Tegra124 but it needs more work. Not going in during this cycle.
 > 
+> We should be fine applying it as-is. Applied to next/cleanup.
 
-OK. Now I understand. In this case, can you please explain the situation
-with a TODO comment inside the cooling-maps?
+...and dropped again. It conflicts with new platform additions. I'll
+apply and fixup those towards the end of the merge window.
 
-The way it is now, looks awkwards.
+No action needed on your behalf, besides possibly reminding me in case
+I forget about it.
 
-> >
-> >>
-> >> Mikko
-> >>
-> >>>
-> >>>>    arch/arm/boot/dts/tegra124-jetson-tk1.dts | 41 +++++++++++++++++++++++++++++++
-> >>>>    1 file changed, 41 insertions(+)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> >>>> index 0cdb5cf..bcdab7f 100644
-> >>>> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> >>>> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> >>>> @@ -1876,4 +1876,45 @@
-> >>>>    			 <&tegra_car TEGRA124_CLK_EXTERN1>;
-> >>>>    		clock-names = "pll_a", "pll_a_out0", "mclk";
-> >>>>    	};
-> >>>> +
-> >>>> +	thermal-zones {
-> >>>> +		cpu {
-> >>>> +			trips {
-> >>>> +				trip at 0 {
-> >>>> +					temperature = <101000>;
-> >>>> +					hysteresis = <0>;
-> >>>> +					type = "critical";
-> >>>> +				};
-> >>>> +			};
-> >>>> +
-> >>>> +			cooling-maps {
-> >>>> +			};
-> >>>> +		};
-> >>>> +
-> >>>> +		mem {
-> >>>> +			trips {
-> >>>> +				trip at 0 {
-> >>>> +					temperature = <101000>;
-> >>>> +					hysteresis = <0>;
-> >>>> +					type = "critical";
-> >>>> +				};
-> >>>> +			};
-> >>>> +
-> >>>> +			cooling-maps {
-> >>>> +			};
-> >>>> +		};
-> >>>> +
-> >>>> +		gpu {
-> >>>> +			trips {
-> >>>> +				trip at 0 {
-> >>>> +					temperature = <101000>;
-> >>>> +					hysteresis = <0>;
-> >>>> +					type = "critical";
-> >>>> +				};
-> >>>> +			};
-> >>>> +
-> >>>> +			cooling-maps {
-> >>>> +			};
-> >>>> +		};
-> >>>> +	};
-> >>>>    };
-> >>>> --
-> >>>> 1.8.1.5
-> >>>>
-> >>> --
-> >>> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> >>> the body of a message to majordomo at vger.kernel.org
-> >>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >>>
-> >>
-> 
+
+-Olof
