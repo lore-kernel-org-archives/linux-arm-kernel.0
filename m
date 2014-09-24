@@ -1,32 +1,58 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 23 Sep 2014 21:27:38 -0700
-Subject: [PATCH v7 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <54212CA0.4030700@linaro.org>
-References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
- <54212CA0.4030700@linaro.org>
-Message-ID: <20140924042737.GQ10179@sonymobile.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 24 Sep 2014 14:00:07 +0900
+Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
+ based lookup
+In-Reply-To: <2186657.jhIisq7Fok@amdc1032>
+References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
+ <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
+ <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
+ <2186657.jhIisq7Fok@amdc1032>
+Message-ID: <01ef01cfd7b4$696d7560$3c486020$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 23 Sep 01:17 PDT 2014, Srinivas Kandagatla wrote:
-
-> Hi Bjorn,
+Bartlomiej Zolnierkiewicz wrote:
 > 
-> Thankyou for the new patchset.
+> Hi,
 > 
-> I got few device-tree patches for apq8064 usb, sata, phy and hdmi which 
-> depend on rpm header file. It will be nice to get this functionality 
-> into 3.18.
+Hi,
+
+> On Tuesday, August 19, 2014 01:26:49 PM Vikas Sajjan wrote:
+> > Hi Kukjin,
+> >
+> > On Tue, Aug 19, 2014 at 12:22 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> > > Refactoring the pm.c to avoid using "soc_is_exynos" checks,
+> > > instead use the DT based lookup.
+> > >
+> > > While at it, consolidate the common code across SoCs
+> > > and create static helper functions.
+> > >
+> > > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >
+> > Can you pick this series...
+> 
+> I think that my PM_SLEEP=n build fixes should go in before this cleanup
+> series:
+> 
+>   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
 > 
 
-We should be able to send out the dts patches separate of these.
+Bart, your patch has a problem due to dependency, Firmware-assisted suspend/
+resume patch from Tomasz as I emailed today morning in my time. So I will
+apply this series firstly. Please respin the fixes once the build breakage
+resolved. If you have any idea, please let me know.
 
-> Do you think we should take these patches via arm-soc tree?
+Thanks,
+Kukjin
+
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
 > 
-
-Both Lee and Mark indicated that they will pull the parts individually. However
-both of the patches depend on the header file created in patch 1, someone needs
-to take both for it to work out?
-
-Regards,
-Bjorn
+> > > ---
+> > >  arch/arm/mach-exynos/pm.c       |  167 +++++++++++++++++++++++++++++----------
+> > >  arch/arm/mach-exynos/regs-pmu.h |    1 +
+> > >  2 files changed, 126 insertions(+), 42 deletions(-)
