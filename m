@@ -1,139 +1,37 @@
-From: isimatu.yasuaki@jp.fujitsu.com (Yasuaki Ishimatsu)
-Date: Wed, 24 Sep 2014 17:12:33 +0900
-Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <54227C7E.6060506@linux.intel.com>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
- <542279D0.1040603@jp.fujitsu.com> <54227C7E.6060506@linux.intel.com>
-Message-ID: <54227CF1.6020305@jp.fujitsu.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Sep 2014 09:14:55 +0100
+Subject: regulator node names and unit-addresses? (Re: [PATCH v2 1/5]
+ ARM: shmobile: kzm9d: Remove spurious regulator base addresses)
+In-Reply-To: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
+References: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
+Message-ID: <20140924081455.GU4015@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/09/24 17:10), Jiang Liu wrote:
-> 
-> 
-> On 2014/9/24 15:59, Yasuaki Ishimatsu wrote:
->> (2014/09/11 23:03), Jiang Liu wrote:
->>> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
->>> that is to build irqdomains for CPU vector, interrupt remapping unit,
->>> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
->>> Each irqdomain manages corresponding interrupt controller and talks to
->>> parent interrupt controller through public irqdomain interfaces. We also
->>> support stacked irq_chip based on hierarchy irqdomain. It will make the
->>> x86 interrupt architecture much more clear and more easy to maintain
->>> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
->>> interrupt management architecture too.
->>
->> Do you have a documentation which more detailed information is written?
->> I'm interested in this feature. And I want to know more detailed information.
->>
->> I cannot imagine why the feature makes x86 irq architecture much more clear
->> and more easy to maintain in this description. Of course, I have read the
->> following threads:
->>
->> https://lkml.org/lkml/2014/9/11/101
-> Hi Yasuaki,
-> 
-> Do these help?
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg729924.html
-> https://lkml.org/lkml/2014/8/1/67
+On Wed, Sep 24, 2014 at 09:02:23AM +0200, Geert Uytterhoeven wrote:
+> On Wed, Sep 24, 2014 at 3:13 AM, Simon Horman <horms@verge.net.au> wrote:
 
-Thank you for the information. I'll read it.
+> > What should we call the nodes?
 
-Thanks,
-Yasuaki Ishimatsu
+> "regulator0" and "regulator1"?
+> "regulator1v8" and "regulator3v3"?
 
-> 
-> Regards!
-> Gerry
-> 
->>
->> Thanks,
->> Yasuaki Ishimatsu
->>
->>>
->>> This is the second patch set to enable support of hierarchy irqdomain
->>> on x86 platforms. It depends on the first part at:
->>> https://lkml.org/lkml/2014/9/11/101
->>> And you may access it at:
->>> https://github.com/jiangliu/linux.git irqdomain/p2v1
->>>
->>> And there will be a third patch set to convert IOAPIC driver to support
->>> hierarchy irqdomain and clean up code.
->>>
->>> The first patch extends irqdomain interfaces to support hierarchy
->>> irqdomain. Hope this interface could be used by other architectures too,
->>> such as ARM/ARM64.
->>> The second patch introduces two helper functions to support stacked
->>> irq_chip.
->>> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
->>> it's the root irqdomain for x86 platforms.
->>> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
->>> support hierarchy irqdomain.
->>> Patch 14-17 converts HPET, MSI and HT_IRQ drivers to support hierarchy
->>> irqdomain.
->>> Patch 18-21 cleans up unsued code in x86 arch and interrupt remapping
->>> drivers.
->>>
->>> We have tested this patchset on Intel 32-bit and 64-bit systems. But we
->>> have only done compilation tests for HT_IRQ and AMD interrupt remapping
->>> drivers due to hardware resource limitation. Tests on AMD platforms are
->>> warmly welcomed!
->>>
->>> Jiang Liu (21):
->>>     irqdomain: Introduce new interfaces to support hierarchy irqdomains
->>>     genirq: Introduce helper functions to support stacked irq_chip
->>>     x86, irq: Save destination CPU ID in irq_cfg
->>>     x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
->>>     x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
->>>     x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
->>>     x86, uv: Use new irqdomain interfaces to allocate/free IRQ
->>>     x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
->>>     x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
->>>     x86: irq_remapping: Introduce new interfaces to support hierarchy
->>>       irqdomain
->>>     iommu/vt-d: Change prototypes to prepare for enabling hierarchy
->>>       irqdomain
->>>     iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
->>>     iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
->>>     x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
->>>     x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
->>>     x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
->>>     x86, htirq: Use hierarchy irqdomain to manage Hypertransport
->>>       interrupts
->>>     iommu/vt-d: Clean up unused MSI related code
->>>     iommu/amd: Clean up unused MSI related code
->>>     x86: irq_remapping: Clean up unused MSI related code
->>>     x86, irq: Clean up unused MSI related code and interfaces
->>>
->>>    arch/x86/Kconfig                     |    3 +-
->>>    arch/x86/include/asm/hpet.h          |   16 +-
->>>    arch/x86/include/asm/hw_irq.h        |   64 +++++
->>>    arch/x86/include/asm/irq_remapping.h |   66 +++--
->>>    arch/x86/include/asm/pci.h           |    5 -
->>>    arch/x86/include/asm/x86_init.h      |    4 -
->>>    arch/x86/kernel/apic/htirq.c         |  179 +++++++++----
->>>    arch/x86/kernel/apic/io_apic.c       |    3 -
->>>    arch/x86/kernel/apic/msi.c           |  430 +++++++++++++++++++++++--------
->>>    arch/x86/kernel/apic/vector.c        |  158 +++++++++++-
->>>    arch/x86/kernel/hpet.c               |   57 ++---
->>>    arch/x86/kernel/x86_init.c           |    2 -
->>>    arch/x86/platform/uv/uv_irq.c        |   27 +-
->>>    drivers/iommu/amd_iommu.c            |  385 ++++++++++++++++++++++------
->>>    drivers/iommu/amd_iommu_init.c       |    4 +
->>>    drivers/iommu/amd_iommu_proto.h      |    9 +
->>>    drivers/iommu/amd_iommu_types.h      |    5 +
->>>    drivers/iommu/intel_irq_remapping.c  |  468 +++++++++++++++++++++++-----------
->>>    drivers/iommu/irq_remapping.c        |  221 ++++++----------
->>>    drivers/iommu/irq_remapping.h        |   22 +-
->>>    drivers/pci/htirq.c                  |   48 +---
->>>    include/linux/htirq.h                |   22 +-
->>>    include/linux/intel-iommu.h          |    4 +
->>>    include/linux/irq.h                  |    8 +
->>>    include/linux/irqdomain.h            |   60 +++++
->>>    kernel/irq/Kconfig                   |    3 +
->>>    kernel/irq/chip.c                    |   21 ++
->>>    kernel/irq/irqdomain.c               |  349 ++++++++++++++++++++++++-
->>>    28 files changed, 1934 insertions(+), 709 deletions(-)
->>>
->>
->>
+> Documentation/devicetree/bindings/regulator/regulator.txt doesn't mention
+> node names or (presence/lack of) unit-adresses, but the examples do have
+> unit-addresses.
+
+> Is this another case where we don't follow the "no reg, no unit-address"
+> ePAPR rule?
+
+As far as the regulator API is concerned the node name is completly
+immaterial and all this stuff is just verbiage we're forced to include.
+As far as I can tell the requirement that node names be in the form
+"regulator" or whatever is just another thing that wasn't terribly well
+thought through in ePAPR, they were trying to do classes I think.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/ab0007ee/attachment.sig>
