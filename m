@@ -1,69 +1,140 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Wed, 24 Sep 2014 05:47:53 +0000
-Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
-In-Reply-To: <3321146.kBfn28qbNM@wuerfel>
-References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
- <1411371952-5618-4-git-send-email-jingchang.lu@freescale.com>
- <3321146.kBfn28qbNM@wuerfel>
-Message-ID: <a83d5601a26b4e45be5e5016de287287@BL2PR03MB467.namprd03.prod.outlook.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 24 Sep 2014 13:55:16 +0800
+Subject: [Patch] irqdomain: Introduce new interfaces to support hierarchy
+ irqdomains
+In-Reply-To: <1411465402.8922.126.camel@mtksdaap41>
+References: <alpine.DEB.2.10.1409160859080.4247@nanos>	
+ <1411373856-9669-1-git-send-email-jiang.liu@linux.intel.com>
+ <1411465402.8922.126.camel@mtksdaap41>
+Message-ID: <54225CC4.2000403@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->Sent: Tuesday, September 23, 2014 10:54 PM
->To: Lu Jingchang-B35083
->Cc: Guo Shawn-R65073; mark.rutland at arm.com; linux-arm-
->kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Chen-B46807; Fu
->Chao-B44548
->Subject: Re: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts
->support
->
->On Monday 22 September 2014 15:45:49 Jingchang Lu wrote:
->> @@ -0,0 +1,117 @@
->> +/*
->> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or
->> +modify
->> + * it under the terms of the GNU General Public License as published
->> +by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->
->Can you change the license so this file is available under both GPL and
->BSD or X11 license?
->
-I'd like to add this. Is there any template for my reference? Thanks.
 
->> +/dts-v1/;
->> +#include "ls1021a.dtsi"
+
+On 2014/9/23 17:43, Joe.C wrote:
+> On Mon, 2014-09-22 at 16:17 +0800, Jiang Liu wrote:
+>> @@ -388,7 +389,6 @@ EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
+>>  unsigned int irq_create_mapping(struct irq_domain *domain,
+>>  				irq_hw_number_t hwirq)
+>>  {
+>> -	unsigned int hint;
+>>  	int virq;
+>>  
+>>  	pr_debug("irq_create_mapping(0x%p, 0x%lx)\n", domain, hwirq);
+>> @@ -410,12 +410,8 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
+>>  	}
+>>  
+>>  	/* Allocate a virtual interrupt number */
+>> -	hint = hwirq % nr_irqs;
+>> -	if (hint == 0)
+>> -		hint++;
+>> -	virq = irq_alloc_desc_from(hint, of_node_to_nid(domain->of_node));
+>> -	if (virq <= 0)
+>> -		virq = irq_alloc_desc_from(1, of_node_to_nid(domain->of_node));
+>> +	virq = irq_domain_alloc_descs(-1, 1, hwirq,
+>> +				      of_node_to_nid(domain->of_node));
+> 
+> If I read this correct, the resulting virq is different after your
+> change.
+It should have the same effect. We just factored out original code as
+a function, so it could be reused.
+
+> 
+>>  	if (virq <= 0) {
+>>  		pr_debug("-> virq allocation failed\n");
+>>  		return 0;
+>> @@ -490,7 +486,10 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>>  	}
+>>  
+>>  	/* Create mapping */
+>> -	virq = irq_create_mapping(domain, hwirq);
+>> +	if (irq_domain_is_hierarchy(domain))
+>> +		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
+>> +	else
+>> +		virq = irq_create_mapping(domain, hwirq);
+>>  	if (!virq)
+>>  		return virq;
+> 
+> hwirq returned from xlat above is lost. Without hwirq or virq, how do we
+> know which irq are we working for?
+> Also, if the irq_desc/irq_data was already created, this will create
+> another one. Should we do irq_find_mapping just like irq_create_mapping?
+When irq_create_of_mapping is called, IRQ desc/irq_data haven't been
+allocated yet. The parameter irq_data is type of struct of_phandle_args
+instead of struct irq_data:)
+
+We pass irq_data to irq_domain_alloc_irqs(), the we could reconstruct
+hwirq from irq_data if needed.
+
+To make the code clearer, I plan to change code as below:
+unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+{
+        struct irq_domain *domain;
+        irq_hw_number_t hwirq;
+        unsigned int type = IRQ_TYPE_NONE;
+        unsigned int virq;
+
+        domain = irq_data->np ? irq_find_host(irq_data->np) :
+irq_default_domain;
+        if (!domain) {
+                pr_warn("no irq domain found for %s !\n",
+                        of_node_full_name(irq_data->np));
+                return 0;
+        }
+
++        if (irq_domain_is_hierarchy(domain))
++                return irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE,
+irq_data);
++
+        /* If domain has no translation, then we assume interrupt line */
+        if (domain->ops->xlate == NULL)
+                hwirq = irq_data->args[0];
+        else {
+                if (domain->ops->xlate(domain, irq_data->np, irq_data->args,
+                                        irq_data->args_count, &hwirq,
+&type))
+                        return 0;
+        }
+
+        /* Create mapping */
+        virq = irq_create_mapping(domain, hwirq);
+        if (!virq)
+                return virq;
+
+        /* Set type if specified and different than the current one */
+        if (type != IRQ_TYPE_NONE &&
+            type != irq_get_trigger_type(virq))
+                irq_set_irq_type(virq, type);
+        return virq;
+}
+EXPORT_SYMBOL_GPL(irq_create_of_mapping);
+
+>> +int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
+>> +			    unsigned int nr_irqs, int node, void *arg,
+>> +			    bool realloc)
+>> +{
+>> +	int i, ret, virq;
 >> +
->> +/ {
->> +       model = "LS1021A TWR Board";
+>> +	if (domain == NULL) {
+>> +		domain = irq_default_domain;
+>> +		if (WARN(!domain, "domain is NULL; cannot allocate IRQ\n"))
+>> +			return -EINVAL;
+>> +	}
 >> +
->> +       aliases {
->> +               enet2_rgmii_phy = &rgmii_phy1;
->> +               enet0_sgmii_phy = &sgmii_phy2;
->> +               enet1_sgmii_phy = &sgmii_phy0;
->> +       };
->> +};
->>
->
->I've never seen alias nodes for mdio devices. What are these used for?
->Shouldn't you use 'phy-handle' properties in the ethernet nodes instead?
->
->	Arnd
-
-The ethernet device nodes already have the phy-handle properties to their mdio nodes.
-
-The alias for PHY nodes here is:
-  The ethernet has two kind of PHY interface, one is SGMII, and the other is RGMII,
-The selection is done by the reset configuration word(RCW), so Phy-handle properties
-should be change properly to reflecting the PHY interface selection. This is done
-by fixing up dtb in u-boot before booting the kernel. Thus the alias for PHY nodes
-is added here for fdt finding the PHY nodes easily.
-
-Best Regards,
-Jingchang
+>> +	if (!domain->ops->alloc) {
+>> +		pr_debug("domain->ops->alloc() is NULL\n");
+>> +		return -ENOSYS;
+>> +	}
+>> +
+>> +	if (realloc && irq_base >= 0) {
+>> +		virq =  irq_base;
+>                          ^
+> extra space here.
+Will fix it in next version.
+Thanks, Joe!
+Gerry
+> 
+> Joe.C
+> 
+> 
