@@ -1,77 +1,40 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 24 Sep 2014 09:25:28 +0200
-Subject: [PATCH 0/5] pinctrl: samsung: Data structure clean-up
-In-Reply-To: <1411499141-26551-1-git-send-email-tomasz.figa@gmail.com>
-References: <1411499141-26551-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <542271E8.4020606@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 24 Sep 2014 15:27:13 +0800
+Subject: [linux-sunxi] Re: [PATCH 3/6] ARM: dts: sunxi: Add Allwinner A80
+ dtsi
+In-Reply-To: <54227038.2020805@free-electrons.com>
+References: <1411311493-24344-1-git-send-email-wens@csie.org>
+ <1411311493-24344-4-git-send-email-wens@csie.org>
+ <20140924063738.GQ15315@lukather>
+ <CAGb2v64voZpK_82wtkErRowR0vjEUALNUwvCx_sd8Q5wb4Hq-g@mail.gmail.com>
+ <54227038.2020805@free-electrons.com>
+Message-ID: <CAGb2v66WvZXVD6r70wCP_ZyfMH8rf04JO2B4K+DtDvwoBTaP5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Sep 24, 2014 at 3:18 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+>
+>>>> +
+>>>> +     memory {
+>>>> +             reg = <0x20000000 0x40000000>;
+>>>
+>>> Usually, what we put there was the maximum amount of RAM that can be
+>>> handled by the SoC. I think that it can go above 1GB
+>>
+>> With LPAE, it can handle 8GB. But the DT won't take 64bit values.
+>> I'm not sure how to get it in. I'll look around for examples.
+>
+> You can have a look on what we did for Armada XP:
+>
+> arch/arm/boot/dts/armada-370-xp.dtsi
+> arch/arm/boot/dts/armada-xp.dtsi
+> arch/arm/boot/dts/armada-xp-gp.dts
+>
+> I created a skeleton64.dtsi for this case
 
-On 2014-09-23 21:05, Tomasz Figa wrote:
-> This series intends to clean up data structures used by pinctrl-samsung driver.
-> More specifically, it separates initial compile time constants from data used
-> at runtime, allowing unused variant data to be dropped and selected structures
-> constified to improve safety.
->
-> As a side effect, size of vmlinux built from multi_v7_defconfig was reduced
-> from:
->
->   text     data    bss    dec      hex    filename
->   10296708 1227100 313544 11837352 b49fa8 vmlinux
->
-> to:
->
->   text     data    bss    dec      hex    filename
->   10296740 1176860 313544 11787144 b3db88 vmlinux
->
-> and quite a bit of data were moved from normal data sections to .init.data:
->
-> pre:
->
-> Idx Name          Size      VMA       LMA       File off  Algn
->    3 .rodata       0026c080  c0881000  c0881000  00681000  2**6
->   23 .init.data    0003ff7c  c0bdb830  c0bdb830  009e3830  2**3
->   24 .data..percpu 00002100  c0c1c000  c0c1c000  00a24000  2**6
->   25 .data         000e98e0  c0c20000  c0c20000  00a28000  2**6
->
-> post:
->
-> Idx Name          Size      VMA       LMA       File off  Algn
->    3 .rodata       0026bf20  c0881000  c0881000  00681000  2**6
->   23 .init.data    00041bbc  c0bdb830  c0bdb830  009e3830  2**3
->   24 .data..percpu 00002100  c0c1e000  c0c1e000  00a26000  2**6
->   25 .data         000db860  c0c22000  c0c22000  00a2a000  2**6
->
-> This series should not introduce any functional changes.
->
-> Tested on S3C6410-based Mini6410 board, booting with device tree.
->
-> Marek, Bart, could you do some testing on Exynos-based boards,
-> just to make sure?
+Thanks! I was wondering what that was for.
 
-Works fine on Exynos4412 based OdroidU3+ and Exynos4210 Universal C210.
-
-For the whole patchset:
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> Tomasz Figa (5):
->    pinctrl: samsung: Make samsung_pinctrl_get_soc_data use ERR_PTR()
->    pinctrl: samsung: Drop unused label field in samsung_pin_ctrl struct
->    pinctrl: samsung: Constify samsung_pin_bank_type struct
->    pinctrl: samsung: Constify samsung_pin_ctrl struct
->    pinctrl: samsung: Separate per-bank init and runtime data
->
->   drivers/pinctrl/samsung/pinctrl-exynos.c  | 113 +++++++++++----------------
->   drivers/pinctrl/samsung/pinctrl-s3c24xx.c |  30 +++----
->   drivers/pinctrl/samsung/pinctrl-s3c64xx.c |  31 ++++----
->   drivers/pinctrl/samsung/pinctrl-samsung.c | 126 ++++++++++++++++--------------
->   drivers/pinctrl/samsung/pinctrl-samsung.h |  78 ++++++++++++------
->   5 files changed, 193 insertions(+), 185 deletions(-)
->
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+ChenYu
