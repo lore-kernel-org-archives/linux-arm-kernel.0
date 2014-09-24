@@ -1,111 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 24 Sep 2014 10:05:21 -0700
-Subject: [PATCH v2 3/3] watchdog: qcom: register a restart notifier
-In-Reply-To: <2d539bc944f3e8fc70f39728b0f61fd171b2e5bf.1411513109.git.joshc@codeaurora.org>
-References: <cover.1411513109.git.joshc@codeaurora.org>
- <2d539bc944f3e8fc70f39728b0f61fd171b2e5bf.1411513109.git.joshc@codeaurora.org>
-Message-ID: <20140924170521.GB31578@roeck-us.net>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Wed, 24 Sep 2014 13:06:13 -0400
+Subject: [PATCH v2 0/3] ARM: vf610: Fix/add clocksource
+In-Reply-To: <1411575610-20895-1-git-send-email-stefan@agner.ch> (Stefan
+ Agner's message of "Wed, 24 Sep 2014 18:20:07 +0200")
+References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
+Message-ID: <87tx3xkkxm.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 06:04:38PM -0500, Josh Cartwright wrote:
-> The WDT's BITE_TIME warm-reset behavior can be leveraged as a last
-> resort mechanism for triggering chip reset.  Usually, other restart
-> methods (such as PS_HOLD) are preferrable for issuing a more complete
-> reset of the chip.  As such, keep the priority of the watchdog notifier
-> low.
-> 
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> ---
->  drivers/watchdog/qcom-wdt.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
-> index d5e46e2..eba92ef 100644
-> --- a/drivers/watchdog/qcom-wdt.c
-> +++ b/drivers/watchdog/qcom-wdt.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
-> +#include <linux/reboot.h>
->  #include <linux/watchdog.h>
->  
->  #define WDT_RST		0x0
-> @@ -25,6 +26,7 @@
->  struct qcom_wdt {
->  	struct watchdog_device	wdd;
->  	struct clk		*clk;
-> +	struct notifier_block	restart_nb;
->  	void __iomem		*base;
->  };
->  
-> @@ -86,6 +88,23 @@ static const struct watchdog_info qcom_wdt_info = {
->  	.identity	= KBUILD_MODNAME,
->  };
->  
-> +static int qcom_wdt_restart(struct notifier_block *nb, unsigned long action,
-> +			    void *data)
-> +{
-> +	struct qcom_wdt *wdt = container_of(nb, struct qcom_wdt, restart_nb);
-> +
-> +	/*
-> +	 * Trigger watchdog bite:
-> +	 *    Setup BITE_TIME to be very low, and enable WDT.
-> +	 *      0x31F3 => 390ms @ 32kHz, also value at reset
 
-What happens if you set it to a lower value ? If you set it to, say,
-0x100, would the timeout be ~8ms ? Wouldn't that make more sense ?
-Or at least something like 0x800, which should make it around 64 ms,
-or 0x400 for 32 ms.
+On 24 Sep 2014, stefan at agner.ch wrote:
 
-[ In other words, I don't really see the point for a 390 ms wait here ]
+> This patchset came out of need for a clocksource which supports
+> shutdown.  In the first version I proposed to just replace the current
+> clocksource with the ARM Global Timer and even proposed to remove the
+> PIT clocksource driver. But Bill Pringlemeir brought up a reasonable
+> point why we should keep the PIT clocksource.
+>
+> Since we need shutdown support for suspend/resume, I added another
+> patch which fixes shutdown functionality for the PIT driver. Now it's
+> possible to use suspend/resume functionality with each of the two
+> clocksources.
+>
+> Changes in v2:
+> - Added shutdown support for PIT clocksource (and hence clocksource
+> maintainers as receipient).
+> - Create Kconfig entries which allow to choose between the two
+> clocksources
+> - Clarified commit message
+> - Renamed device tree node to "timer"
+>
+> Stefan Agner (3):
+> clocksource: vf_pit_timer: Support shutdown mode
+> ARM: dts: vf610: Add ARM Global Timer
+> ARM: vf610: Add ARM Global Timer clocksource option
+>
+> arch/arm/boot/dts/vf610.dtsi       |  8 ++++++++
+> arch/arm/mach-imx/Kconfig          | 19 ++++++++++++++++++-
+> drivers/clocksource/vf_pit_timer.c |  5 +++++
+> 3 files changed, 31 insertions(+), 1 deletion(-)
 
-> +	 */
-> +	writel(0, wdt->base + WDT_EN);
-> +	writel(1, wdt->base + WDT_RST);
-> +	writel(0x31F3, wdt->base + WDT_BITE_TIME);
-> +	writel(1, wdt->base + WDT_EN);
-
-You should have some mdelay() here, larger than the expected timeout.
-
-Thanks,
-Guenter
-
-> +	return NOTIFY_DONE;
-> +}
-> +
->  static int qcom_wdt_probe(struct platform_device *pdev)
->  {
->  	struct qcom_wdt *wdt;
-> @@ -141,6 +160,14 @@ static int qcom_wdt_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	/*
-> +	 * WDT restart notifier has priority 0 (use as a last resort)
-> +	 */
-> +	wdt->restart_nb.notifier_call = qcom_wdt_restart;
-> +	ret = register_restart_handler(&wdt->restart_nb);
-> +	if (ret)
-> +		dev_err(&pdev->dev, "failed to setup restart handler\n");
-> +
->  	platform_set_drvdata(pdev, wdt);
->  	return 0;
->  }
-> @@ -149,6 +176,7 @@ static int qcom_wdt_remove(struct platform_device *pdev)
->  {
->  	struct qcom_wdt *wdt = platform_get_drvdata(pdev);
->  
-> +	unregister_restart_handler(&wdt->restart_nb);
->  	watchdog_unregister_device(&wdt->wdd);
->  	clk_disable_unprepare(wdt->clk);
->  	return 0;
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
