@@ -1,65 +1,77 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 24 Sep 2014 09:54:53 -0400 (EDT)
-Subject: [PATCH v2] ARM: cacheflush: Fix v7_exit_coherency_flush exynos
- build breakage on ARMv6
-In-Reply-To: <1411547222-677-1-git-send-email-k.kozlowski@samsung.com>
-References: <1411547222-677-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <alpine.LFD.2.11.1409240954220.8647@knanqh.ubzr>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 24 Sep 2014 09:57:05 -0400
+Subject: [GIT PULL] soc: Keystone SOC Navigator drivers for 3.18
+In-Reply-To: <20140924044317.GB24803@localhost>
+References: <1409865234-9932-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140924044317.GB24803@localhost>
+Message-ID: <5422CDB1.9060505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Sep 2014, Krzysztof Kozlowski wrote:
+On Wednesday 24 September 2014 12:43 AM, Olof Johansson wrote:
+> On Thu, Sep 04, 2014 at 05:13:54PM -0400, Santosh Shilimkar wrote:
+>> Hi Arm-soc folks,
+>>
+>> Please pull below Keystone SOC drivers. They have been on the list for review
+>> for last few merge windows. I got handful of comments on DTS bindings which
+>> has been already addressed. This should ungate me to get network support for
+>> Keystone which is missing in mainline.
+>>
+>> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+>>
+>>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/drivers-soc-ti
+>>
+>> for you to fetch changes up to e9e7494bdcc7926237823253707691d0f3787be2:
+>>
+>>   MAINTAINERS: Add Keystone Multicore Navigator drivers entry (2014-09-04 16:40:16 -0400)
+>>
+>> ----------------------------------------------------------------
+>> Keystone SOC Navigator drivers for 3.18
+>>
+>> The Keystone Multi-core Navigator contains QMSS and packet DMA
+>> subsystems which interwork together to form the Navigator cloud
+>> used by various subsystems like NetCP, SRIO, SideBand Crypto
+>> engines etc.
+>>
+>> ----------------------------------------------------------------
+>> Sandeep Nair (3):
+>>       firmware: add Keystone QMSS PDSP accumulator firmware blob
+>>       Documentation: dt: soc: add Keystone Navigator QMSS bindings
+>>       soc: ti: add Keystone Navigator QMSS driver
+>>
+>> Santosh Shilimkar (3):
+>>       Documentation: dt: soc: add Keystone Navigator DMA bindings
+>>       soc: ti: add Keystone Navigator DMA support
+>>       MAINTAINERS: Add Keystone Multicore Navigator drivers entry
+> 
+> Hi Santosh,
+> 
+> I was going through the queue of merges to do and it seems like Arnd
+> missed this one.
+> 
+> Before I merge it though -- it looks like the firmware should be added to
+> the linux-firmware repository instead? We try to avoid adding new firmware
+> files in the kernel tree these days and get them from there instead...
+> 
+Right. Typically firmware files in kernel are not encoraged. This is infrastructure
+driver so the firmware is needed for it to work. I will try to get that
+patch via linux-firmware tree.
 
-> This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
-> time options (e.g. by building allmodconfig):
+> Can you respin with that fixed, or should I cherry-pick the contents from
+> this branch instead (all but that patch)?
 > 
-> $ make allmodconfig
-> $ make
->   CC      arch/arm/mach-exynos/platsmp.o
-> /tmp/ccdQM0Eg.s: Assembler messages:
-> /tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode `dsb '
-> make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
-> 
-> The error was introduced in commit "ARM: EXYNOS: Move code from
-> hotplug.c to platsmp.c".  Previously code using
-> v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
-> this flag dissapeared during the movement.
-> 
-> Fix this by annotating the v7_exit_coherency_flush() asm code with
-> armv7-a architecture.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reported-by: Mark Brown <broonie@kernel.org>
-> Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
+Just refreshed the branch and updated the new tag. 
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+tags/drivers-soc-ti-v2
 
+Can you please pull that one ?
 
-> 
-> ---
-> 
-> Changes since v1:
-> 1. Use armv7-a arch annotation instead replacing isb/dsb with macros.
->    Suggsted by Nicolas Pitre.
-> ---
->  arch/arm/include/asm/cacheflush.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index 79ecb4f34ffb..10e78d00a0bb 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -466,6 +466,7 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
->   */
->  #define v7_exit_coherency_flush(level) \
->  	asm volatile( \
-> +	".arch	armv7-a \n\t" \
->  	"stmfd	sp!, {fp, ip} \n\t" \
->  	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
->  	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
-> -- 
-> 1.9.1
-> 
-> 
+Thanks !!
+
+regards,
+Santosh
