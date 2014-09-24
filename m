@@ -1,47 +1,48 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 24 Sep 2014 18:20:09 +0200
-Subject: [PATCH v2 2/3] ARM: dts: vf610: Add ARM Global Timer
-In-Reply-To: <1411575610-20895-1-git-send-email-stefan@agner.ch>
-References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
-Message-ID: <1411575610-20895-3-git-send-email-stefan@agner.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Sep 2014 17:21:12 +0100
+Subject: [PATCH v7 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <20140924155319.GA28481@sonymobile.com>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140924082228.GF17801@lee--X1>
+ <20140924155319.GA28481@sonymobile.com>
+Message-ID: <20140924162112.GB7113@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Global Timer support which is part of the private peripherals
-of the Cortex-A5 processor. This Global Timer is compatible with the
-Cortex-A9 implementation. It's a 64-bit timer and is clocked by the
-peripheral clock, which is typically 133 or 166MHz on Vybrid.
+On Wed, 24 Sep 2014, Bjorn Andersson wrote:
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf610.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> On Wed 24 Sep 01:22 PDT 2014, Lee Jones wrote:
+> 
+> > On Mon, 22 Sep 2014, Bjorn Andersson wrote:
+> > 
+> > > Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
+> > > 8960 and 8064 based devices. The binding currently describes the rpm
+> > > itself and the regulator subnodes.
+> > > 
+> > > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  246 ++++++++++++++++++++
+> > 
+> > Please adhere to: Documentation/devicetree/bindings/submitting-patches.txt
+> > 
+> 
+> I assume you mean this part:
+> 
+>   1) The Documentation/ portion of the patch should be a separate patch.
+> 
+> But I doubt this document was written with include/dt-bindings in mind, because
+> in my eyes they are part of "device tree bindings".
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 4d2ec32..3232b9a 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -11,6 +11,7 @@
- #include "vf610-pinfunc.h"
- #include <dt-bindings/clock/vf610-clock.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
- 	aliases {
-@@ -83,6 +84,13 @@
- 				      <0x40002100 0x100>;
- 			};
- 
-+			timer: global-timer at 40002200 {
-+				compatible = "arm,cortex-a9-global-timer";
-+				reg = <0x40002200 0x20>;
-+				interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_PLATFORM_BUS>;
-+			};
-+
- 			L2: l2-cache at 40006000 {
- 				compatible = "arm,pl310-cache";
- 				reg = <0x40006000 0x1000>;
+Actually, this is an oversight on my part.  If I would have seen that
+this patch only touched the bindings and include/dt-bindings I
+probably wouldn't have said anything.
+
+This patch still needs a DT Ack though.
+
 -- 
-2.1.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
