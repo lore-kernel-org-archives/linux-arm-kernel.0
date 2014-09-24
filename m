@@ -1,75 +1,72 @@
-From: tim.bird@sonymobile.com (Tim Bird)
-Date: Wed, 24 Sep 2014 08:12:06 -0700
-Subject: [PATCH v2] ARM: dts: Add initial DTS file for Sony Xperia Z1
-Message-ID: <5422DF46.90306@sonymobile.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 24 Sep 2014 17:14:49 +0200
+Subject: [PATCH 3/4] gpio: vf610: add gpiolib/IRQ chip driver for Vybird
+In-Reply-To: <CACRpkdbJePuG0g=AFGqjDS4=yW0CXnkpf1Yr_1P4e9Kkpu9n-g@mail.gmail.com>
+References: <cover.1410020458.git.stefan@agner.ch>
+ <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
+ <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
+ <a7c933339713dc1783770faf1eceb734@agner.ch>
+ <CACRpkdbJePuG0g=AFGqjDS4=yW0CXnkpf1Yr_1P4e9Kkpu9n-g@mail.gmail.com>
+Message-ID: <2543d19c268e9ef1609759e98f3818d9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This DTS has support for the Sony Xperia Z1 phone (codenamed Honami).
-This first version of the DTS supports just a serial console.
+Am 2014-09-24 13:10, schrieb Linus Walleij:
+> On Tue, Sep 23, 2014 at 1:51 PM, Stefan Agner <stefan@agner.ch> wrote:
+>> [Me]
+>>> postcore again. I don't like this, can you get rid of it?
+>>
+>> I guess we could load this driver easily a bit later. IMHO, since lots
+>> of other driver use GPIO's, we should it load before all the drivers
+>> gets loaded (before device_initcall).
+> 
+> Nope. We use deferred probing to control that today. Ideally
+> all drivers should be device_initcall() and deferred probe be used
+> to order things, not by playing around with initcalls.
+> 
 
-changes from v1
- - removed qcom,msm-id attribute
- - removed mis-capitalized Qualcomm word
- - changed dts file name
- - added board-specific compatible-string
+You can not "nope" my humble opinion, this is not possible, its write
+protected! :-)
 
-Signed-off-by: Tim Bird <tim.bird@sonymobile.com>
----
- Documentation/devicetree/bindings/vendor-prefixes.txt |  1 +
- arch/arm/boot/dts/Makefile                            |  3 ++-
- arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts | 17 +++++++++++++++++
- 3 files changed, 20 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+I fully understand the deferred probe approach, and I also think its
+really a good approach for almost all drivers. The system by itself
+makes sure the drivers are loaded in correct order. But if all drivers
+use pinctrl, and the pinctrl happens to be the last initialized driver,
+I first get 30 messages with probe deferred before the pinctrl driver
+finally gets initialized. IMHO, this is a waste of resources... Giving
+the system some hint what we need early (e.g. pinctrl or even GPIO
+drivers) is just sensible. But maybe I miss something here...
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..d3a4579 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -128,6 +128,7 @@ sirf	SiRF Technology, Inc.
- smsc	Standard Microsystems Corporation
- snps 	Synopsys, Inc.
- solidrun	SolidRun
-+sony	Sony Corporation
- spansion	Spansion Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..0c2702e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -343,7 +343,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-apq8084-mtp.dtb \
- 	qcom-msm8660-surf.dtb \
--	qcom-msm8960-cdp.dtb
-+	qcom-msm8960-cdp.dtb \
-+	qcom-msm8974-sony-honami-xperia.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3066a-bqcurie2.dtb \
- 	rk3188-radxarock.dtb \
-diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-new file mode 100644
-index 0000000..cccc21b
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-@@ -0,0 +1,17 @@
-+#include "qcom-msm8974.dtsi"
-+
-+/ {
-+	model = "Sony Xperia Z1";
-+	compatible = "sony,xperia-honami", "qcom,msm8974";
-+
-+	memory at 0 {
-+		reg = <0 0x40000000>, <0x40000000 0x40000000>;
-+		device_type = "memory";
-+	};
-+};
-+
-+&soc {
-+	serial at f991e000 {
-+		status = "ok";
-+	};
-+};
--- 
-1.8.2.2
+Fact is, currently, without touching GPIO infrastructure code, the GPIO
+driver can not be deferred when the pinctrl driver is missing. The
+of_gpiochip_add_pin_range function does not handle the missing pinctrl
+driver. Hence as of now, the pinctrl still needs an earlier initcall.
+But anyway, currently the pinctrl driver is already using arch_initcall,
+this patch set is no longer touching that.
+
+>> Most GPIO driver do this, some statistic again:
+>> $ grep -h -o ".*_initcall" drivers/gpio/*.c | sort | uniq -c | sort -n
+>> -r
+>>      33 subsys_initcall
+>>      14 postcore_initcall
+>>       2 device_initcall
+>>       2 arch_initcall
+>>       1 late_initcall
+>>       1 core_initcall
+> 
+> Yeah old legacy. There are patch attacks to get rid of this.
+> 
+> The reason we can't just change them is because sometimes
+> dependent drivers do not handle the errorpath very well can can't
+> defer cleanly.
+> 
+> With a new driver I expect deferred probe to be used.
+> 
+
+Actually, the esdhc driver gets the cd-gpio directly and does not handle
+EPROBE_DEFER properly, hence Vybrid would be affected too. But I
+understand that we need to start somewhere. I will change the GPIO
+driver to device_initcall and going to fix esdhc driver.
+
+--
+Stefan
