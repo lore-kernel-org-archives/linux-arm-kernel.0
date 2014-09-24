@@ -1,50 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Sep 2014 12:20:26 +0200
-Subject: [PATCH v2 8/8] tty/serial: add asm9260-serial driver
-In-Reply-To: <54228DD5.1090606@rempel-privat.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Sep 2014 11:25:42 +0100
+Subject: [PATCH v2 1/8] ARM: add mach-asm9260
+In-Reply-To: <54229533.8050607@rempel-privat.de>
 References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <3430001.JjzmzIerfp@wuerfel> <54228DD5.1090606@rempel-privat.de>
-Message-ID: <102161224.Tj33eeeN8f@wuerfel>
+ <71905861.S3QD6rl7jU@wuerfel> <542136B0.3020305@rempel-privat.de>
+ <6072405.iL4RqHeZrt@wuerfel> <54227A30.7010805@rempel-privat.de>
+ <20140924094302.GU5182@n2100.arm.linux.org.uk>
+ <54229533.8050607@rempel-privat.de>
+Message-ID: <20140924102542.GV5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 September 2014 11:24:37 Oleksij Rempel wrote:
-> m 22.09.2014 um 17:26 schrieb Arnd Bergmann:
-> > On Sunday 21 September 2014 20:45:51 Oleksij Rempel wrote:
-> >> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
-> >> ---
-> >>  drivers/tty/serial/Kconfig          |   17 +
-> >>  drivers/tty/serial/Makefile         |    1 +
-> >>  drivers/tty/serial/asm9260_serial.c | 1485 +++++++++++++++++++++++++++++++++++
-> >>  include/uapi/linux/serial_core.h    |    2 +
-> >>  4 files changed, 1505 insertions(+)
-> >>  create mode 100644 drivers/tty/serial/asm9260_serial.c
-> >>
-> > 
-> > Similar to the irqchip driver, this one in turns seems to be a duplicate
-> > of drivers/tty/serial/mxs-auart.c. Please see if you can make that one
-> > work instead of adding a new copy.
+On Wed, Sep 24, 2014 at 11:56:03AM +0200, Oleksij Rempel wrote:
+> Am 24.09.2014 um 11:43 schrieb Russell King - ARM Linux:
+> > The "why" is in the text from your oops dump.  That's precisely /why/ we
+> > print that text - so that we know /why/ the fault happened.
 > 
-> Hmmm.... they are identical in some parts, but have some different
-> offsets, and in some cases different bitmask. 
+> Here is oops message:
+> http://pastebin.com/qYWeAyfV
+> 
+> i can avoid this oops by setting size at least 0x2000 per register
+> range. Do it mean my TLB supports only 8 KiB pages?
 
-It really depends on how much is different.
+No, it has nothing to do with the TLB.
 
-> I think it will look
-> messy. Asm9260 has some more extras: RS485, CTRL3, ISO7816.
+Unable to handle kernel paging request at virtual address c2802174
+pgd = c0004000
+[c2802174] *pgd=21805811, *pte=00000000, *ppte=00000000
+Internal error: Oops: 7 [#1] PREEMPT ARM
 
-None of these are used in your driver though. It's possible that
-mxs has the same registers but the driver author did not document
-them.
+The number after the Oops: is the FSR value, which means "page translation
+fault", and sure enough, the pgd/pte values show that there is no page
+table entry at the faulting address.
 
-> Should it be moved to one file? Or may be better to create some
-> common-dma.c and common-pio.c libs?
+That's odd, because ioremap() aligns the size of the requested mapping up
+to a multiple of the page size, and inserts page table entries according
+to the rounded size.
 
-I'd suggest trying to do it in one file first, only splitting things
-out if it gets too messy.
-You will probably have to replace the .driver_data in mxs_auart_devtype
-with a structure that has all the differences, either using function
-pointers for accessing the registers that are not identical, or using
-some data that can be used to look up the the actual registers.
+Where are you calling ioremap(), iounmap() etc?  IOW, please show your
+code for this.
 
-	Arnd
+I also notice that the unwinder failed to unwind the complete backtrace:
+
+[<c02bcb38>] (clk_gate_is_enabled) from [<c02b9a0c>] (clk_disable_unused_subtree+)
+[<c02b9a0c>] (clk_disable_unused_subtree) from [<c02b99c8>] (clk_disable_unused_s)
+
+which is really annoying.  Maybe turning frame pointers on will get is a
+proper backtrace, though I don't think it's that important to this bug.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
