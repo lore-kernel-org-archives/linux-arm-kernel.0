@@ -1,41 +1,128 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 24 Sep 2014 15:44:07 +0300
-Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
-In-Reply-To: <2161168.GXttgFlE1X@vostro.rjw.lan>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <20140919184849.GA14832@core.coreip.homeip.net>
- <2161168.GXttgFlE1X@vostro.rjw.lan>
-Message-ID: <5422BC97.6080608@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 24 Sep 2014 15:09:19 +0200
+Subject: [PATCH v3] ARM: dts: add CPU nodes for Exynos4 SoCs
+Message-ID: <5230569.XLlNbB5NvF@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
+when topology is read from DT") fixed GIC driver to filter cluster ID
+from values returned by cpu_logical_map() for SoCs having registers
+mapped without per-CPU banking making it is possible to add CPU nodes
+for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
+required by future changes adding initialization of cpuidle states in
+Exynos cpuidle driver through DT.
 
-On 09/22/2014 05:19 PM, Rafael J. Wysocki wrote:
-> On Friday, September 19, 2014 11:48:49 AM Dmitry Torokhov wrote:
->> Hi Ulf,
->>
->> On Fri, Sep 19, 2014 at 08:27:33PM +0200, Ulf Hansson wrote:
->>> Changes in v5:
->>> 	- Converted dev_pm_domain_detach() to a void function
->>> 	- Added a ->detach() callback to the PM domain struct, invoked from the
->>> 	  dev_pm_domain_detach().
->>> 	- Make ACPI and genpd both assign the ->detach() callback at successfull
->>> 	  attachment.
->>> 	- The above changes made it possible to make acpi_pm_domain_detach() to
->>> 	  be static, added a separate patch for that.
->>
->> Thank you for making these changes. For the series:
->>
->> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> I've queued up this patchset for 3.18 (I fixed up the two minor issues pointed
-> to by Geert in the process).
-> 
+Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
 
-Could you point me on branch where I can find these patches?
-Also, are there any chances to have these patches  in next/linux-next.git,
-so they will become available for testing and re-using?
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+Based on for-next branch of linux-samsung.git tree.
 
-Best regards,
--grygorii
+v3:
+- refreshed on top of Kukjin's tree
+
+v2:
+- match the unit-address with the reg
+
+ arch/arm/boot/dts/exynos4210.dtsi |   17 +++++++++++++++++
+ arch/arm/boot/dts/exynos4212.dtsi |   17 +++++++++++++++++
+ arch/arm/boot/dts/exynos4412.dtsi |   29 +++++++++++++++++++++++++++++
+ 3 files changed, 63 insertions(+)
+
+Index: b/arch/arm/boot/dts/exynos4210.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos4210.dtsi	2014-09-24 14:38:18.958571829 +0200
++++ b/arch/arm/boot/dts/exynos4210.dtsi	2014-09-24 15:08:14.062510517 +0200
+@@ -31,6 +31,23 @@
+ 		pinctrl2 = &pinctrl_2;
+ 	};
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 900 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x900>;
++		};
++
++		cpu at 901 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x901>;
++		};
++	};
++
+ 	pmu_system_controller: system-controller at 10020000 {
+ 		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
+ 				"clkout4", "clkout8", "clkout9";
+Index: b/arch/arm/boot/dts/exynos4212.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos4212.dtsi	2014-09-24 14:38:18.954571828 +0200
++++ b/arch/arm/boot/dts/exynos4212.dtsi	2014-09-24 14:43:02.198562156 +0200
+@@ -22,6 +22,23 @@
+ / {
+ 	compatible = "samsung,exynos4212", "samsung,exynos4";
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at A00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA00>;
++		};
++
++		cpu at A01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA01>;
++		};
++	};
++
+ 	combiner: interrupt-controller at 10440000 {
+ 		samsung,combiner-nr = <18>;
+ 	};
+Index: b/arch/arm/boot/dts/exynos4412.dtsi
+===================================================================
+--- a/arch/arm/boot/dts/exynos4412.dtsi	2014-09-24 14:38:18.966571830 +0200
++++ b/arch/arm/boot/dts/exynos4412.dtsi	2014-09-24 14:43:02.198562156 +0200
+@@ -22,6 +22,35 @@
+ / {
+ 	compatible = "samsung,exynos4412", "samsung,exynos4";
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at A00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA00>;
++		};
++
++		cpu at A01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA01>;
++		};
++
++		cpu at A02 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA02>;
++		};
++
++		cpu at A03 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0xA03>;
++		};
++	};
++
+ 	combiner: interrupt-controller at 10440000 {
+ 		samsung,combiner-nr = <20>;
+ 	};
