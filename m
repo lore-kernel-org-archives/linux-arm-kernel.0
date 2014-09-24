@@ -1,33 +1,71 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 24 Sep 2014 18:47:46 -0300
-Subject: ARM: mx28: cpufreq-cpu0 support?
-In-Reply-To: <54232D9C.5070404@lategoodbye.de>
-References: <53F9B4BF.2050802@lategoodbye.de> <20140825080123.GA12289@dragon>
- <53FB1041.5010208@lategoodbye.de>
- <CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>
- <CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>
- <540412A9.4090806@lategoodbye.de>
- <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
- <542093C0.1040004@lategoodbye.de>
- <CAOMZO5A0of3_arOx2z0_t7xN37jQjJ5uU4gwcsgCuSdpBJJVzw@mail.gmail.com>
- <54232D9C.5070404@lategoodbye.de>
-Message-ID: <CAOMZO5BN8APenWCsy7uHbYNQ4q0-QxorAdGPKBHOHPcUzp2PYg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Sep 2014 23:12:20 +0100
+Subject: [PATCH v5 4/7] ARM: l2c: Add support for overriding prefetch
+ settings
+In-Reply-To: <20140924121051.GF5729@leverpostej>
+References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
+ <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
+ <20140924111446.GE5729@leverpostej> <5422A8D1.1000507@gmail.com>
+ <20140924121051.GF5729@leverpostej>
+Message-ID: <20140924221220.GJ12379@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 5:46 PM, Stefan Wahren <info@lategoodbye.de> wrote:
+On Wed, Sep 24, 2014 at 01:10:51PM +0100, Mark Rutland wrote:
+> On Wed, Sep 24, 2014 at 12:19:45PM +0100, Tomasz Figa wrote:
+> > On 24.09.2014 13:14, Mark Rutland wrote:
+> > > I'm not too keen on tristate properties. Is this level of flexibility
+> > > really required?
 
-> thanks, registering cpufreq-cpu0 and adding missing properties reg & clocks
-> did the trick.
->
-> Now the sys interface of cpufreq is available and the mxs-regulator seems to
-> handle frequency change. But the frequency selection do not work as
-> expected. If i set cpu frequency to 454736, 392727 or 261818 kHz, the
+I would say that we need a way to enable _and_ disable these features,
+because:
 
-Why 454736 instead of 454MHz? Same for the other values.
+1. When we converted the L2 code to DT, no one thought about creating
+   a full and proper DT specification for the L2 code.  So, we have the
+   situation today where platform code (and firmware code) enables or
+   disables these features depending on platform knowledge.
 
-> cpufreq driver change it silently to 240000 kHz.
+2. If we are going to specify these options as a boolean-enable value,
+   this implies that the lack of the boolean disables the option.
+   We have pre-existing DT files which do not contain this option, but
+   the platform may rely on the feature being enabled.
 
-24MHz is the osc clock. It seems you did not turn on the PLL0.
+This is precisely the kind of mess that happens when incomplete DT
+bindings are accepted.  DT bindings for any device should be _full_
+bindings from the start, and not a half-hearted attempt at the job.
 
-Check the POWER bit of HW_CLKCTRL_PLL0CTRL0 register.
+As much as we don't like tristate properties, we only have ourselves to
+blame for them becoming a necessity in cases like this.
+
+> With the lack of warnings for present but empty properties, I can forsee
+> people placing empty properties (as the names make them sound like
+> booleans which enable features).
+> 
+> Surely for enabling/disabling options we should only need to override
+> one-way, disabling a feature that causes breakage for some reason?
+> Otherwise we can keep the reset value (which might be sub-optimal).
+
+What if enabling prefetching on an existing platform causes a failure?
+That's a regression on a previously working DT file, and needing a DT
+update to resolve.
+
+The obvious alternative is we have two properties per feature - one
+boolean to enable, and one boolean to disable the feature.  We already
+have a number of negative properties because of exactly the same
+problem I mention above (where the driver has assumed defaults for one
+platform which are not appropriate for all platforms.)
+
+> > As for why they cause crashes, I'm not an expert if it is about L2C
+> > internals, so I can't really tell, but apparently the cache can work
+> > correctly only on certain settings.
+> 
+> Likewise, I'm no expert on the l2x0 family. It would be nice to know if
+> this justs masks an issue elsewhere in Linux, is required for some
+> reason by the interconnect, etc. I guess we don't have enough
+> information to figure that out.
+
+No, it would be nice to have some errata information...
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
