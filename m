@@ -1,29 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Sep 2014 10:26:21 +0100
-Subject: [PATCH v2] spi: pl022: Add support for chip select extension
-In-Reply-To: <20140924092312.GS5182@n2100.arm.linux.org.uk>
-References: <20140916183431.GX7960@sirena.org.uk>
- <1410936418-26443-1-git-send-email-anders.berg@avagotech.com>
- <20140924083205.GZ4015@sirena.org.uk>
- <20140924083331.GA4015@sirena.org.uk>
- <20140924092312.GS5182@n2100.arm.linux.org.uk>
-Message-ID: <20140924092621.GD16977@sirena.org.uk>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 24 Sep 2014 17:33:55 +0800
+Subject: [RESEND PATCH] misc: atmel-ssc: prepare clock only when request
+Message-ID: <1411551235-16502-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 10:23:12AM +0100, Russell King - ARM Linux wrote:
+Prepare SSC clock only when request SSC channel, the clock will be
+enabled when initialize the SSC.
 
-> It's fine.  I'd prefer to have seen the vendor list ordered in some way
-> (since it's neither alphabetical nor numerical with its existing three
-> entries) but that would be the subject of a separate patch.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+Send this patch to driver/misc maintainer as Mark Brown suggested.
 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+ drivers/misc/atmel-ssc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks, applied now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/b1bc4c95/attachment.sig>
+diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+index 60843a2..f9807a7 100644
+--- a/drivers/misc/atmel-ssc.c
++++ b/drivers/misc/atmel-ssc.c
+@@ -57,7 +57,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+ 	ssc->user++;
+ 	spin_unlock(&user_lock);
+ 
+-	clk_prepare_enable(ssc->clk);
++	clk_prepare(ssc->clk);
+ 
+ 	return ssc;
+ }
+@@ -77,7 +77,7 @@ void ssc_free(struct ssc_device *ssc)
+ 	spin_unlock(&user_lock);
+ 
+ 	if (disable_clk)
+-		clk_disable_unprepare(ssc->clk);
++		clk_unprepare(ssc->clk);
+ }
+ EXPORT_SYMBOL(ssc_free);
+ 
+-- 
+2.1.0.24.g4109c28
