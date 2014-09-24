@@ -1,51 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Sep 2014 18:06:27 +0100
-Subject: [PATCH v2 01/18] arm: dma-mapping: arm_iommu_attach_device:
- automatically set max_seg_size
-In-Reply-To: <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
-References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
- <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140924170627.GK16244@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 24 Sep 2014 19:06:30 +0200
+Subject: [PATCH 1/2] ARM: zynq: DT: Add missing reference for ADC
+In-Reply-To: <20140924161814.GG13679@xsjandreislx>
+References: <fced9e56dc4ef8df9ead34f6444c010cc31c7a61.1411567289.git.michal.simek@xilinx.com>
+ <20140924161814.GG13679@xsjandreislx>
+Message-ID: <f6b47676-f664-4b01-8c70-a526eb8d1931@BY2FFO11FD011.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 09/24/2014 06:18 PM, S?ren Brinkmann wrote:
+> On Wed, 2014-09-24 at 04:01PM +0200, Michal Simek wrote:
+>> Add missing reference for ADC node.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>>  arch/arm/boot/dts/zynq-7000.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>> index 772381fe07bb..fc90f47f9c03 100644
+>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>> @@ -64,7 +64,7 @@
+>>  		interrupt-parent = <&intc>;
+>>  		ranges;
+>>
+>> -		adc at f8007100 {
+>> +		adc: adc at f8007100 {
+> I think we enumerated all labels. I.e. 'adc0' is probably better.
 
-On Tue, Sep 16, 2014 at 12:54:28PM +0100, Marek Szyprowski wrote:
-> If device has no max_seg_size set, we assume that there is no limit and
-> force it to DMA_BIT_MASK(32) to always use contiguous mappings in DMA
-> address space.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/mm/dma-mapping.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index bcd5f836f27e..84705e24571b 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -2050,6 +2050,22 @@ int arm_iommu_attach_device(struct device *dev,
->  {
->  	int err;
->  
-> +	/*
-> +	 * if device has no max_seg_size set, we assume that there is no limit
-> +	 * and force it to DMA_BIT_MASK(32) to always use contiguous mappings
-> +	 * in DMA address space
-> +	 */
-> +	if (!dev->dma_parms) {
-> +		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
-> +		if (!dev->dma_parms)
-> +			return -ENOMEM;
-> +	}
-> +	if (!dev->dma_parms->max_segment_size) {
-> +		err = dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+I was thinking about it and the reason I didn't use that adc0 was
+that it is unique and it is just one in PS. Maybe there could be another adc in PL
+but it will be probably automated not to use adc key world.
+For PL part names was depending on user description.
 
-Would it make more sense to base this default value off the dma_mask?
-In my IOMMU series, of_dma_configure passes back a size parameter to
-arch_setup_dma_ops which is calculated from the dma-ranges property or the
-coherent dma mask if the ranges property is absent, so maybe we should set
-this there too?
+Anyway logic was not to use enumerated label for unique IPs.
 
-Will
+Thanks,
+Michal
