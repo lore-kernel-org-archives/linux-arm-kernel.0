@@ -1,71 +1,142 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 23:12:20 +0100
-Subject: [PATCH v5 4/7] ARM: l2c: Add support for overriding prefetch
- settings
-In-Reply-To: <20140924121051.GF5729@leverpostej>
-References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
- <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
- <20140924111446.GE5729@leverpostej> <5422A8D1.1000507@gmail.com>
- <20140924121051.GF5729@leverpostej>
-Message-ID: <20140924221220.GJ12379@n2100.arm.linux.org.uk>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 25 Sep 2014 00:17:28 +0200
+Subject: [PATCH v5 2/2] bcma: get IRQ numbers from dt
+In-Reply-To: <1411597048-25470-1-git-send-email-hauke@hauke-m.de>
+References: <1411597048-25470-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1411597048-25470-2-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 01:10:51PM +0100, Mark Rutland wrote:
-> On Wed, Sep 24, 2014 at 12:19:45PM +0100, Tomasz Figa wrote:
-> > On 24.09.2014 13:14, Mark Rutland wrote:
-> > > I'm not too keen on tristate properties. Is this level of flexibility
-> > > really required?
+It is not possible to auto detect the irq numbers used by the cores on
+an arm SoC. If bcma was registered with device tree it will search for
+some device tree nodes with the irq number and add it to the core
+configuration.
 
-I would say that we need a way to enable _and_ disable these features,
-because:
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ Documentation/devicetree/bindings/bus/bcma.txt | 24 +++++++++++++++
+ drivers/bcma/main.c                            | 42 ++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
 
-1. When we converted the L2 code to DT, no one thought about creating
-   a full and proper DT specification for the L2 code.  So, we have the
-   situation today where platform code (and firmware code) enables or
-   disables these features depending on platform knowledge.
+This is based on wireless-testing and should go into that tree.
 
-2. If we are going to specify these options as a boolean-enable value,
-   this implies that the lack of the boolean disables the option.
-   We have pre-existing DT files which do not contain this option, but
-   the platform may rely on the feature being enabled.
+changes since:
+v4:
+ - make use of interrupt-map
+ - only do the irq stuff here
 
-This is precisely the kind of mess that happens when incomplete DT
-bindings are accepted.  DT bindings for any device should be _full_
-bindings from the start, and not a half-hearted attempt at the job.
+v2:
+ - use of_translate_address() to support ranges
 
-As much as we don't like tristate properties, we only have ourselves to
-blame for them becoming a necessity in cases like this.
+RFC:
+ - add #ifdef CONFIG_OF
 
-> With the lack of warnings for present but empty properties, I can forsee
-> people placing empty properties (as the names make them sound like
-> booleans which enable features).
-> 
-> Surely for enabling/disabling options we should only need to override
-> one-way, disabling a feature that causes breakage for some reason?
-> Otherwise we can keep the reset value (which might be sub-optimal).
-
-What if enabling prefetching on an existing platform causes a failure?
-That's a regression on a previously working DT file, and needing a DT
-update to resolve.
-
-The obvious alternative is we have two properties per feature - one
-boolean to enable, and one boolean to disable the feature.  We already
-have a number of negative properties because of exactly the same
-problem I mention above (where the driver has assumed defaults for one
-platform which are not appropriate for all platforms.)
-
-> > As for why they cause crashes, I'm not an expert if it is about L2C
-> > internals, so I can't really tell, but apparently the cache can work
-> > correctly only on certain settings.
-> 
-> Likewise, I'm no expert on the l2x0 family. It would be nice to know if
-> this justs masks an issue elsewhere in Linux, is required for some
-> reason by the interconnect, etc. I guess we don't have enough
-> information to figure that out.
-
-No, it would be nice to have some errata information...
-
+diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+index e9070c1..1dc75d3 100644
+--- a/Documentation/devicetree/bindings/bus/bcma.txt
++++ b/Documentation/devicetree/bindings/bus/bcma.txt
+@@ -8,6 +8,10 @@ Required properties:
+ 
+ The cores on the AXI bus are automatically detected by bcma with the
+ memory ranges they are using and they get registered afterwards.
++Automatic detection of the IRQ number is not reliable on
++BCM47xx/BCM53xx ARM SoCs. To assign IRQ numbers to the cores, provide
++them manually through device tree. The IRQ number and the device tree
++child entry will get assigned to the core with the matching reg address.
+ 
+ Example:
+ 
+@@ -17,4 +21,24 @@ Example:
+ 		ranges = <0x00000000 0x18000000 0x00100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++
++		#interrupt-cells = <0>;
++		interrupt-map-mask = <0x000fffff>;
++		interrupt-map =
++			/* Ethernet Controller 0 */
++			<0x00024000 &gic GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
++
++			/* Ethernet Controller 1 */
++			<0x00025000 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++
++		pcie at 12000 {
++			interrupt-parent = <&gic>;
++			reg = <0x00012000 0x1000>;
++			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index d1656c2..870f01d 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -11,6 +11,7 @@
+ #include <linux/bcma/bcma.h>
+ #include <linux/slab.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
+ MODULE_LICENSE("GPL");
+@@ -153,6 +154,45 @@ static struct device_node *bcma_of_find_child_device(struct platform_device *par
+ 	return NULL;
+ }
+ 
++static int bcma_of_irq_parse(struct platform_device *parent,
++			     struct bcma_device *core,
++			     struct of_phandle_args *out_irq)
++{
++	__be32 laddr[1];
++	int rc;
++
++	if (core->dev.of_node) {
++		rc = of_irq_parse_one(core->dev.of_node, 0, out_irq);
++		if (!rc)
++			return rc;
++	}
++
++	out_irq->np = parent->dev.of_node;
++	out_irq->args_count = 0;
++
++	laddr[0] = cpu_to_be32(core->addr);
++	return of_irq_parse_raw(laddr, out_irq);
++}
++
++static int bcma_of_get_irq(struct platform_device *parent,
++			   struct bcma_device *core)
++{
++	struct of_phandle_args out_irq;
++	int ret;
++
++	if (!parent || !parent->dev.of_node)
++		return 0;
++
++	ret = bcma_of_irq_parse(parent, core, &out_irq);
++	if (ret) {
++		bcma_debug(core->bus, "bcma_of_get_irq() failed with rc=%d\n",
++			   ret);
++		return 0;
++	}
++
++	return irq_create_of_mapping(&out_irq);
++}
++
+ static void bcma_of_fill_device(struct platform_device *parent,
+ 				struct bcma_device *core)
+ {
+@@ -161,6 +201,8 @@ static void bcma_of_fill_device(struct platform_device *parent,
+ 	node = bcma_of_find_child_device(parent, core);
+ 	if (node)
+ 		core->dev.of_node = node;
++
++	core->irq = bcma_of_get_irq(parent, core);
+ }
+ #else
+ static void bcma_of_fill_device(struct platform_device *parent,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
