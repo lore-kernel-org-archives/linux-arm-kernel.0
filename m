@@ -1,35 +1,61 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed, 24 Sep 2014 09:57:45 +0200
-Subject: [PATCH 3/3] ARM: exynos_defconfig: enable USB gadget support
-In-Reply-To: <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Date: Wed, 24 Sep 2014 09:57:42 +0200
+Subject: [PATCH 0/3 v4] Fix Exynos USB on kernels with USB Gadget support
+In-Reply-To: <542199F4.3090601@samsung.com>
 References: <542199F4.3090601@samsung.com>
- <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1411545465-12930-4-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB gadget support without support for any specific gadgets to
-more easily catch cases where a devices dts doesn't specify the usb
-controllers dr_mode while it should.
+Same patches as v3 but rebased on
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
- Changes in v4: Rebased on linux-samsung for-next
+When building a kernel with support for both USB host and USB Gadget support on
+the dwc3 controller on the Exynos5 soc will go into USB OTG mode unless
+otherwise specified in the dtb, which is unhelpful for boards hooked up to run
+as USB host.
 
- arch/arm/configs/exynos_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+First patch in this set explicitely set the dual-role mode for the dwc3
+controller on Peach pi and Peach pit boards to host mode. Second patch adds
+similar updates for Arndale Octa as reported by Andreas F?rber. Last patch
+enables gadget mode in the default exynos config to more easily catch/trigger
+issues like these.
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index b14d8c3..2cf22bb 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -54,6 +54,7 @@ CONFIG_SMSC911X=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_USB_GADGET=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_CROS_EC=y
+I suspect the Samsung SMDK5420 DTS might need similar changes, so it would be
+great if users of those board could verify this.
+
+Changes in v2: alphabetically sort the dts entries
+Changes in v3: Add DTS updates for arndale octa
+Changes in v4: Rebased on todays linux-samsungs for-next branch
+
+Sjoerd Simons (3):
+  ARM: dts: exynos: Explicitly set dr_mode on peach-pit and peach-pi
+  ARM: dts: exynos: Explicitly set dr_mode on arndale-octa
+  ARM: exynos_defconfig: enable USB gadget support
+
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 8 ++++++++
+ arch/arm/boot/dts/exynos5420.dtsi             | 4 ++--
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     | 8 ++++++++
+ arch/arm/configs/exynos_defconfig             | 1 +
+ 5 files changed, 23 insertions(+), 2 deletions(-)
+
+-- 
+2.1.0
+
+
+
+Sjoerd Simons (3):
+  ARM: dts: exynos: Explicitly set dr_mode on peach-pit and peach-pi
+  ARM: dts: exynos: Explicitly set dr_mode on arndale-octa
+  ARM: exynos_defconfig: enable USB gadget support
+
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 8 ++++++++
+ arch/arm/boot/dts/exynos5420.dtsi             | 4 ++--
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     | 8 ++++++++
+ arch/arm/configs/exynos_defconfig             | 1 +
+ 5 files changed, 23 insertions(+), 2 deletions(-)
+
 -- 
 2.1.0
