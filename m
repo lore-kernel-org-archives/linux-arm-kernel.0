@@ -1,41 +1,27 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 24 Sep 2014 16:30:24 +0100
-Subject: [PATCH v2] soc: qcom: do not disable the iface clock in probe
-In-Reply-To: <7hbnq5m4a5.fsf@deeprootsystems.com>
-References: <1411500054-13600-1-git-send-email-srinivas.kandagatla@linaro.org>
- <7hbnq5m4a5.fsf@deeprootsystems.com>
-Message-ID: <5422E390.9060802@linaro.org>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Wed, 24 Sep 2014 23:33:19 +0800
+Subject: [PATCH v2 0/3] Add clock binding id for rk3288
+Message-ID: <1411572802-22042-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch add some clock binding id for different modules
+that under development and going to send upstream.
 
+This patch also add the clock node in PD_VIDEO.
 
-On 24/09/14 16:22, Kevin Hilman wrote:
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> writes:
->
->> since commit 31964ffebbb9 ("tty: serial: msm: Remove direct access to GSBI")'
->> serial hangs if earlyprintk are enabled.
->>
->> This hang is noticed only when the GSBI driver is probed and all the
->> earlyprintks before gsbi probe are seen on the console.
->> The reason why it hangs is because GSBI driver disables hclk in its
->> probe function without realizing that the serial IP might be in use by
->> a bootconsole. As gsbi driver disables the clock in probe the
->> bootconsole locks up.
->
->> Turning off hclk's could be dangerous if there are system components
->> like earlyprintk using the hclk.
->
-> This seems rather fragile.  Isn't the right fix for these other
-> components to use the clk api to ensure the clock does not get enabled?
-Here we are depending on the bootloader to setup the clocks.
+Changes in v2:
+- split into two patches of add clock node in PD_VIDEO and
+  use new defined clock ID
 
-Am not sure if we can really use clk apis at that early stage of bootstrap.
+Kever Yang (3):
+  clk: rockchip: add some needed clock binding id for rk3288
+  clk: rockchip: use the clock id for nodes init
+  clk: rockchip: add clock node in PD_VIDEO
 
---srini
+ drivers/clk/rockchip/clk-rk3288.c      | 79 +++++++++++++++++++---------------
+ include/dt-bindings/clock/rk3288-cru.h | 38 +++++++++++++++-
+ 2 files changed, 82 insertions(+), 35 deletions(-)
 
-
-
->
-> Kevin
->
+-- 
+1.9.1
