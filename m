@@ -1,57 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Sep 2014 17:49:46 +0100
-Subject: [PATCH 1/6] pci, thunder: Add support for Thunder PCIe host
- controller
-In-Reply-To: <27476217.5ToIFGoMDz@wuerfel>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <1411573068-12952-2-git-send-email-rric@kernel.org>
- <27476217.5ToIFGoMDz@wuerfel>
-Message-ID: <20140924164946.GI16244@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 24 Sep 2014 18:51:16 +0200
+Subject: [PATCH 5/9] gpio: vf610: Extend with wakeup support
+In-Reply-To: <1411553179.2735.4.camel@pengutronix.de>
+References: <cover.1411404079.git.stefan@agner.ch>
+ <704b6bb97147b3d0ee1557b43d85ab9376c28666.1411404079.git.stefan@agner.ch>
+ <1411553179.2735.4.camel@pengutronix.de>
+Message-ID: <46921955713f4b155eef9b21e5138064@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 05:12:26PM +0100, Arnd Bergmann wrote:
-> On Wednesday 24 September 2014 17:37:43 Robert Richter wrote:
-> > From: Sunil Goutham <sgoutham@cavium.com>
-> > 
-> > This patch adds support for PCI host controller of Cavium Thunder
-> > SoCs.
+Am 2014-09-24 12:06, schrieb Lucas Stach:
+> Hi Stefan,
 > 
-> I had expected this hardware to be SBSA compliant. Why do you need
-> a hardware specific driver, is this a workaround for buggy hardware
-> or just noncompliant?
-
-Patches welcome to pci-host-generic.c :) Lorenzo already has code to port
-it to Liviu's new API, so do shout if it's not suitable for your needs.
-
-> > +static int thunder_pcie_msi_enable(struct thunder_pcie *pcie,
-> > +					struct pci_bus *bus)
-> > +{
-> > +	struct device_node *msi_node;
-> > +
-> > +	msi_node = of_parse_phandle(pcie->node, "msi-parent", 0);
-> > +	if (!msi_node)
-> > +		return -ENODEV;
-> > +
-> > +	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
-> > +	if (!pcie->msi)
-> > +		return -ENODEV;
-> > +
-> > +	pcie->msi->dev = pcie->dev;
-> > +	bus->msi = pcie->msi;
-> > +
-> > +	return 0;
-> > +}
+> Am Montag, den 22.09.2014, 19:09 +0200 schrieb Stefan Agner:
+>> Support Vybrid GPIO's as wakeup source by requesting the parent
+>> IRQ as wakeup IRQ.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  drivers/gpio/gpio-vf610.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+>> index 5f59424..50326af 100644
+>> --- a/drivers/gpio/gpio-vf610.c
+>> +++ b/drivers/gpio/gpio-vf610.c
+>> @@ -196,12 +196,28 @@ static void vf610_gpio_irq_unmask(struct irq_data *d)
+>>  			  pcr_base);
+>>  }
+>>
+>> +static int vf610_gpio_irq_set_wake(struct irq_data *d, u32 enable)
+>> +{
+>> +	struct vf610_gpio_port *port = irq_data_get_irq_chip_data(d);
+>> +
+>> +	if (enable)
+>> +		enable_irq_wake(port->irq);
+>> +	else
+>> +		disable_irq_wake(port->irq);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +
+>>  static struct irq_chip vf610_gpio_irq_chip = {
+>>  	.name		= "gpio-vf610",
+>>  	.irq_ack	= vf610_gpio_irq_ack,
+>>  	.irq_mask	= vf610_gpio_irq_mask,
+>>  	.irq_unmask	= vf610_gpio_irq_unmask,
+>>  	.irq_set_type	= vf610_gpio_irq_set_type,
+>> +#ifdef CONFIG_PM_SLEEP
+>> +	.irq_set_wake	= vf610_gpio_irq_set_wake,
+>> +#endif
 > 
-> This is probably something we should add to the generic host driver as well,
-> so it can work with SBSA compliant implementations that come with an MSI
-> controller. Maybe move it into common code so it can be shared with that
-> driver.
+> Either you need to get rid of this #ifdef and always assign this
+> function or you need to wrap the function itself into the same #ifdef.
+> Otherwise you provoke a unused function warning with !CONFIG_PM_SLEEP.
+> 
+> Given that this function isn't really that big I would argue to just
+> drop the #ifdef.
+> 
 
-Agreed. I've been carrying something similar [1] (based on a hacked-up version
-of bios32, so not bothered to post it) whilst I've been waiting for the
-arm64 core PCI code to get merged.
+Good point, thx! I will drop the #ifdef when including that patch to the
+GPIO driver (as Linus Walleij suggested).
 
-Will
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/drivers/pci/host/pci-host-generic.c?h=iommu/pci&id=b719acf062ceccfbd79ee7b1ae0b7904ea4da27e
+--
+Stefan
