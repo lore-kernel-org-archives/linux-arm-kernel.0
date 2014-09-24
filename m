@@ -1,46 +1,90 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 24 Sep 2014 15:46:50 +0200
-Subject: [PATCH 3/3] ARM: shmobile: Initial Alt board device tree
-In-Reply-To: <CAMuHMdXx7OmH0WC_MxsYB0X4=yomLtf+HoE8YUBo0aTPHT2zNQ@mail.gmail.com>
-References: <cover.1410396013.git.horms+renesas@verge.net.au>
- <a742795be9ceae2853ca71f216193f29da151da8.1410396013.git.horms+renesas@verge.net.au>
- <CAMuHMdXx7OmH0WC_MxsYB0X4=yomLtf+HoE8YUBo0aTPHT2zNQ@mail.gmail.com>
-Message-ID: <CAMuHMdWDQXeHnpXu2=GxryEiAvVSBz-jCqLb+Z4htV7A-yyd9w@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 24 Sep 2014 07:49:39 -0600
+Subject: [PATCH v6 2/5] arm: dts: qcom: Add SPM device bindings for 8974
+In-Reply-To: <5422621E.2050509@smartplayin.com>
+References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
+ <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
+ <5422621E.2050509@smartplayin.com>
+Message-ID: <20140924134939.GA422@ilina-mac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 2:24 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Thu, Sep 11, 2014 at 2:57 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
+On Wed, Sep 24 2014 at 00:14 -0600, Pramod Gurav wrote:
+>Hi Lina,
 >
->> +/ {
->> +       model = "Alt";
->> +       compatible = "renesas,alt", "renesas,r8a7794";
+>On Wednesday 24 September 2014 05:21 AM, Lina Iyer wrote:
+>> Add SPM device bindings for QCOM 8974 based cpus. SPM is the sub-system
+>> power manager and controls the logic around the cores (cpu and L2).
+>>
+>> Each core has an instance of SPM and controls only that core. Each cpu
+>> SPM is configured to support WFI and SPC (standalone-power collapse).
+>>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/qcom-msm8974-pm.dtsi | 69 ++++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/qcom-msm8974.dtsi    | 10 +++--
+>>  2 files changed, 75 insertions(+), 4 deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/qcom-msm8974-pm.dtsi
+>
+><snip>
+>
+>> +};
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index 69dca2a..0580bc2 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -14,7 +14,7 @@
+>>  		#size-cells = <0>;
+>>  		interrupts = <1 9 0xf04>;
+>>
+>> -		cpu at 0 {
+>> +		CPU0: cpu at 0 {
+>Lina, Stephen boyd has sent some DT change for krait-cpufreq which also
+>renames this node to "cpu0: cpu at 0". If you both could sync up and agree
+>on a common naming('cpu0' with caps or not caps) for this node.
+>
+Sure. Will work with Stephen on that.
+
+>Best Regards
+>Pramod
+>
+>>  			compatible = "qcom,krait";
+>>  			enable-method = "qcom,kpss-acc-v2";
+>>  			device_type = "cpu";
+>> @@ -23,7 +23,7 @@
+>>  			qcom,acc = <&acc0>;
+>>  		};
+>>
+>> -		cpu at 1 {
+>> +		CPU1: cpu at 1 {
+>Ditto
+>>  			compatible = "qcom,krait";
+>>  			enable-method = "qcom,kpss-acc-v2";
+>>  			device_type = "cpu";
+>> @@ -32,7 +32,7 @@
+>>  			qcom,acc = <&acc1>;
+>>  		};
+>>
+>> -		cpu at 2 {
+>> +		CPU2: cpu at 2 {
+>Ditto
+>>  			compatible = "qcom,krait";
+>>  			enable-method = "qcom,kpss-acc-v2";
+>>  			device_type = "cpu";
+>> @@ -41,7 +41,7 @@
+>>  			qcom,acc = <&acc2>;
+>>  		};
+>>
+>> -		cpu at 3 {
+>> +		CPU3: cpu at 3 {
+>Ditto
+>>  			compatible = "qcom,krait";
+>>  			enable-method = "qcom,kpss-acc-v2";
+>>  			device_type = "cpu";
+>> @@ -238,3 +238,5 @@
+>>  		};
+>>  	};
+>>  };
 >> +
->> +       aliases {
->> +               serial0 = &scif2;
->
-> Is this correct, i.e. does "scif2" match "ttySC0" below?
->
->> +       };
->> +
->> +       chosen {
->> +               bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
->> +       };
-
-To answer my own question: the alias means that "ttySC0" will be mapped to
-the scif2 hardware block, using of_alias_get_id().
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>> +#include "qcom-msm8974-pm.dtsi"
+>>
