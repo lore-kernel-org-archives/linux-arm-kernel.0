@@ -1,108 +1,86 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 24 Sep 2014 08:04:21 +0200
-Subject: [PATCH v4 0/8] asm-generic/io.h overhaul
-In-Reply-To: <20140825112630.GA4163@ulmo.nvidia.com>
-References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
- <20140825112630.GA4163@ulmo.nvidia.com>
-Message-ID: <20140924060419.GA20253@ulmo>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Wed, 24 Sep 2014 11:48:06 +0530
+Subject: [PATCH v6 2/5] arm: dts: qcom: Add SPM device bindings for 8974
+In-Reply-To: <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
+References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
+ <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5422621E.2050509@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 01:26:33PM +0200, Thierry Reding wrote:
-> On Wed, Aug 13, 2014 at 12:28:50PM +0200, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Hi,
-> > 
-> > Here is the fourth version of a series that started out as an attempt to
-> > provide string versions of the read*() and write*() accessors to more
-> > architectures so that drivers can use them portably. The series has
-> > since evolved into a more general cleanup of asm-generic/io.h and the
-> > functions defined therein.
-> > 
-> > Patch 1 is trivial and removes a redundant redefinition of PCI_IOBASE
-> > from the asm/io.h header on ARC. Patches 2 and 3 remove unnecessary
-> > volatile keywoards from some functions, which is a prerequisite to clean
-> > up some of the functions in subsequent patches.
-> > 
-> > The xlate_dev_{kmem,mem}_ptr() functions are used to map memory when the
-> > /dev/mem device is accessed. Patches 4 and 5 use more consistent data
-> > types for these functions, which will get a "standard" prototype in the
-> > asm-generic/io.h header in a subsequent patch.
-> > 
-> > Patch 6 is the bulk of this series. It implements the string variants of
-> > the read*() and write*() accessors and cleans up various other parts of
-> > the asm-generic/io.h header file. Macros are converted to static inline
-> > functions for better type checking. Overriding generic implementations
-> > in architectures is handled more consistently.
-> > 
-> > Patches 7 and 8, finally, make use of the asm-generic/io.h header on the
-> > 32-bit and 64-bit ARM architectures.
-> > 
-> > This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
-> > tested on IA64, Microblaze, s390, SPARC, x86 and Xtensa. For ARC,
-> > Blackfin, Metag, OpenRISC, Score and Unicore32 which also use
-> > asm-generic/io.h I couldn't find or build a cross-compiler that would
-> > run on my system. But by code inspection they shouldn't break with this
-> > patch.
-> > 
-> > To ensure bisectability I built multi_v7_defconfig on 32-bit ARM and the
-> > defconfig for 64-bit ARM, IA64, Microblaze, s390, SPARC, x86 and Xtensa
-> > after each commit and verified that the series does not introduce any
-> > build errors or warnings.
-> > 
-> > Provided there are no objections to the patches there's still the matter
-> > of how to merge them. Patch 6 depends on patches 1-5 to avoid warnings
-> > and/or errors during the build. Patches 7 and 8 depend on patch 6. In my
-> > opinion it doesn't make much sense to split them up, so I guess we'll
-> > need a volunteer to take them all into one tree. Ideally that tree would
-> > feed into linux-next so that we can get as much build and test-coverage
-> > as possible during the 3.17 release cycle so that these patches can go
-> > into 3.18.
-> > 
-> > Arnd, I'm opportunistically sending this To: you in the hopes that you
-> > can take it into your asm-generic tree which seems like the best fit for
-> > this.
-> > 
-> > Thierry
-> > 
-> > Thierry Reding (8):
-> >   ARC: Remove redundant PCI_IOBASE declaration
-> >   serial: sunzilog: Remove unnecessary volatile keyword
-> >   sparc: Remove unnecessary volatile usage
-> >   [IA64] Change xlate_dev_{kmem,mem}_ptr() prototypes
-> >   /dev/mem: Use more consistent data types
-> >   asm-generic/io.h: Implement generic {read,write}s*()
-> >   ARM: Use include/asm-generic/io.h
-> >   arm64: Use include/asm-generic/io.h
-> > 
-> >  arch/arc/include/asm/io.h       |   2 -
-> >  arch/arm/include/asm/io.h       |  75 ++---
-> >  arch/arm/include/asm/memory.h   |   2 +
-> >  arch/arm64/Kconfig              |   1 -
-> >  arch/arm64/include/asm/io.h     | 122 ++-----
-> >  arch/arm64/include/asm/memory.h |   2 +
-> >  arch/ia64/include/asm/uaccess.h |  16 +-
-> >  arch/s390/include/asm/io.h      |   5 +-
-> >  arch/s390/mm/maccess.c          |   4 +-
-> >  arch/sparc/include/asm/io_32.h  |  18 +-
-> >  arch/x86/include/asm/io.h       |   4 +-
-> >  arch/x86/mm/ioremap.c           |   4 +-
-> >  drivers/char/mem.c              |  13 +-
-> >  drivers/tty/serial/sunzilog.h   |   8 +-
-> >  include/asm-generic/io.h        | 683 ++++++++++++++++++++++++++++++++--------
-> >  15 files changed, 647 insertions(+), 312 deletions(-)
+Hi Lina,
+
+On Wednesday 24 September 2014 05:21 AM, Lina Iyer wrote:
+> Add SPM device bindings for QCOM 8974 based cpus. SPM is the sub-system
+> power manager and controls the logic around the cores (cpu and L2).
 > 
-> Arnd, do you think this looks good to take for test-driving in
-> linux-next?
+> Each core has an instance of SPM and controls only that core. Each cpu
+> SPM is configured to support WFI and SPC (standalone-power collapse).
+> 
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-msm8974-pm.dtsi | 69 ++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi    | 10 +++--
+>  2 files changed, 75 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/qcom-msm8974-pm.dtsi
 
-Ping?
+<snip>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/df30e9fe/attachment.sig>
+> +};
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index 69dca2a..0580bc2 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -14,7 +14,7 @@
+>  		#size-cells = <0>;
+>  		interrupts = <1 9 0xf04>;
+>  
+> -		cpu at 0 {
+> +		CPU0: cpu at 0 {
+Lina, Stephen boyd has sent some DT change for krait-cpufreq which also
+renames this node to "cpu0: cpu at 0". If you both could sync up and agree
+on a common naming('cpu0' with caps or not caps) for this node.
+
+Best Regards
+Pramod
+
+>  			compatible = "qcom,krait";
+>  			enable-method = "qcom,kpss-acc-v2";
+>  			device_type = "cpu";
+> @@ -23,7 +23,7 @@
+>  			qcom,acc = <&acc0>;
+>  		};
+>  
+> -		cpu at 1 {
+> +		CPU1: cpu at 1 {
+Ditto
+>  			compatible = "qcom,krait";
+>  			enable-method = "qcom,kpss-acc-v2";
+>  			device_type = "cpu";
+> @@ -32,7 +32,7 @@
+>  			qcom,acc = <&acc1>;
+>  		};
+>  
+> -		cpu at 2 {
+> +		CPU2: cpu at 2 {
+Ditto
+>  			compatible = "qcom,krait";
+>  			enable-method = "qcom,kpss-acc-v2";
+>  			device_type = "cpu";
+> @@ -41,7 +41,7 @@
+>  			qcom,acc = <&acc2>;
+>  		};
+>  
+> -		cpu at 3 {
+> +		CPU3: cpu at 3 {
+Ditto
+>  			compatible = "qcom,krait";
+>  			enable-method = "qcom,kpss-acc-v2";
+>  			device_type = "cpu";
+> @@ -238,3 +238,5 @@
+>  		};
+>  	};
+>  };
+> +
+> +#include "qcom-msm8974-pm.dtsi"
+> 
