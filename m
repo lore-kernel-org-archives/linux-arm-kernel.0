@@ -1,24 +1,19 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 24 Sep 2014 20:02:19 -0300
-Subject: [PATCH 15/18] [media] s5p_mfc_opr: Fix warnings
-In-Reply-To: <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
+Date: Wed, 24 Sep 2014 20:05:46 -0300
+Subject: [PATCH 13/18] [media] s5p_mfc_opr_v5: Fix lots of warnings on
+ x86_64
+In-Reply-To: <5824d4d8b177c3778cea8ef5e345d126e6c46767.1411597610.git.mchehab@osg.samsung.com>
 References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
- <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
-Message-ID: <CAOMZO5CoaX05r50p+Ug++napxZEoL_+CR8-T7tN6wtiSRfT1pw@mail.gmail.com>
+ <5824d4d8b177c3778cea8ef5e345d126e6c46767.1411597610.git.mchehab@osg.samsung.com>
+Message-ID: <CAOMZO5BeuqG77tax==sRAWv00YYRcS5x7zKF61uk1Gg15CCPZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Mauro,
 
 On Wed, Sep 24, 2014 at 7:27 PM, Mauro Carvalho Chehab
 <mchehab@osg.samsung.com> wrote:
 
+> -       mfc_debug(2, "buf_size1: %d, buf_size2: %d\n", buf_size1, buf_size2);
+> +       mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n", buf_size1, buf_size2);
 
-> drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:44:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
 
-...
-
-> -       mfc_debug(3, "Allocating priv: %d\n", b->size);
-> +       mfc_debug(3, "Allocating priv: %zd\n", b->size);
-
-This should be %zu instead.
+This should be %zu. Same for other %zd ocurrences.
