@@ -1,44 +1,123 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Sep 2014 13:10:34 +0200
-Subject: [PATCH 3/4] gpio: vf610: add gpiolib/IRQ chip driver for Vybird
-In-Reply-To: <a7c933339713dc1783770faf1eceb734@agner.ch>
-References: <cover.1410020458.git.stefan@agner.ch>
- <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
- <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
- <a7c933339713dc1783770faf1eceb734@agner.ch>
-Message-ID: <CACRpkdbJePuG0g=AFGqjDS4=yW0CXnkpf1Yr_1P4e9Kkpu9n-g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Sep 2014 12:14:47 +0100
+Subject: [PATCH v5 4/7] ARM: l2c: Add support for overriding prefetch
+ settings
+In-Reply-To: <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
+References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
+ <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140924111446.GE5729@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 1:51 PM, Stefan Agner <stefan@agner.ch> wrote:
-> [Me]
->> postcore again. I don't like this, can you get rid of it?
->
-> I guess we could load this driver easily a bit later. IMHO, since lots
-> of other driver use GPIO's, we should it load before all the drivers
-> gets loaded (before device_initcall).
+On Wed, Sep 24, 2014 at 12:05:38PM +0100, Marek Szyprowski wrote:
+> From: Tomasz Figa <t.figa@samsung.com>
+> 
+> Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+> settings configured in registers leading to crashes if L2C is enabled
+> without overriding them. This patch introduces bindings to enable
+> prefetch settings to be specified from DT and necessary support in the
+> driver.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/arm/l2cc.txt | 10 +++++++
+>  arch/arm/mm/cache-l2x0.c                       | 39 ++++++++++++++++++++++++++
+>  2 files changed, 49 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> index af527ee111c2..3443d2d76788 100644
+> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> @@ -47,6 +47,16 @@ Optional properties:
+>  - cache-id-part: cache id part number to be used if it is not present
+>    on hardware
+>  - wt-override: If present then L2 is forced to Write through mode
+> +- arm,double-linefill : Override double linefill enable setting. Enable if
+> +  non-zero, disable if zero.
+> +- arm,double-linefill-incr : Override double linefill on INCR read. Enable
+> +  if non-zero, disable if zero.
+> +- arm,double-linefill-wrap : Override double linefill on WRAP read. Enable
+> +  if non-zero, disable if zero.
+> +- arm,prefetch-drop : Override prefetch drop enable setting. Enable if non-zero,
+> +  disable if zero.
 
-Nope. We use deferred probing to control that today. Ideally
-all drivers should be device_initcall() and deferred probe be used
-to order things, not by playing around with initcalls.
+I'm not too keen on tristate properties. Is this level of flexibility
+really required?
 
-> Most GPIO driver do this, some statistic again:
-> $ grep -h -o ".*_initcall" drivers/gpio/*.c | sort | uniq -c | sort -n
-> -r
->      33 subsys_initcall
->      14 postcore_initcall
->       2 device_initcall
->       2 arch_initcall
->       1 late_initcall
->       1 core_initcall
+What exact overrides do you need for boards you know of? Why do these
+cause crashes if not overridden?
 
-Yeah old legacy. There are patch attacks to get rid of this.
+Mark.
 
-The reason we can't just change them is because sometimes
-dependent drivers do not handle the errorpath very well can can't
-defer cleanly.
-
-With a new driver I expect deferred probe to be used.
-
-Yours,
-Linus Walleij
+> +- arm,prefetch-offset : Override prefetch offset value. Valid values are
+> +  0-7, 15, 23, and 31.
+>  
+>  Example:
+>  
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 84c6c55ab896..af90a6ff6b49 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -1059,6 +1059,8 @@ static void __init l2c310_of_parse(const struct device_node *np,
+>  	u32 data[3] = { 0, 0, 0 };
+>  	u32 tag[3] = { 0, 0, 0 };
+>  	u32 filter[2] = { 0, 0 };
+> +	u32 prefetch;
+> +	u32 val;
+>  
+>  	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+>  	if (tag[0] && tag[1] && tag[2])
+> @@ -1083,6 +1085,43 @@ static void __init l2c310_of_parse(const struct device_node *np,
+>  		l2x0_saved_regs.filter_start = (filter[0] & ~(SZ_1M - 1))
+>  					| L310_ADDR_FILTER_EN;
+>  	}
+> +
+> +	prefetch = l2x0_saved_regs.prefetch_ctrl;
+> +
+> +	if (!of_property_read_u32(np, "arm,double-linefill", &val)) {
+> +		if (val)
+> +			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL;
+> +		else
+> +			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
+> +	}
+> +
+> +	if (!of_property_read_u32(np, "arm,double-linefill-incr", &val)) {
+> +		if (val)
+> +			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+> +		else
+> +			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
+> +	}
+> +
+> +	if (!of_property_read_u32(np, "arm,double-linefill-wrap", &val)) {
+> +		if (!val)
+> +			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
+> +		else
+> +			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
+> +	}
+> +
+> +	if (!of_property_read_u32(np, "arm,prefetch-drop", &val)) {
+> +		if (val)
+> +			prefetch |= L310_PREFETCH_CTRL_PREFETCH_DROP;
+> +		else
+> +			prefetch &= ~L310_PREFETCH_CTRL_PREFETCH_DROP;
+> +	}
+> +
+> +	if (!of_property_read_u32(np, "arm,prefetch-offset", &val)) {
+> +		prefetch &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
+> +		prefetch |= val & L310_PREFETCH_CTRL_OFFSET_MASK;
+> +	}
+> +
+> +	l2x0_saved_regs.prefetch_ctrl = prefetch;
+>  }
+>  
+>  static const struct l2c_init_data of_l2c310_data __initconst = {
+> -- 
+> 1.9.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
