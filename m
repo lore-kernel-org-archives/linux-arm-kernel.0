@@ -1,29 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Sep 2014 08:30:37 -0500
-Subject: [PATCH v12 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <CAErSpo5PBXSUeU_LP2m=9jxibmqxreL4tEeHBsc5To7D=_bAJA@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <20140923215435.GD27117@google.com> <20140923224810.GA32643@bart.dudau.co.uk>
- <CAErSpo5PBXSUeU_LP2m=9jxibmqxreL4tEeHBsc5To7D=_bAJA@mail.gmail.com>
-Message-ID: <CAL_Jsq+U=1JT0qqZgb=aR66Q4NYDyzOogspOmmpsp61pE+aCUg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 24 Sep 2014 06:30:55 -0700
+Subject: [PATCH v6] watchdog: Add DA9063 PMIC watchdog driver.
+In-Reply-To: <20140924091055.GB25366@pengutronix.de>
+References: <1410184713-6436-1-git-send-email-mpa@pengutronix.de>
+ <20140911163035.GA13969@roeck-us.net> <20140924091055.GB25366@pengutronix.de>
+Message-ID: <5422C78F.4020507@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 6:00 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Tue, Sep 23, 2014 at 4:48 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
->> ...
->> While the next immediate target is converting pci-host-generic.c, pci-imx6.c
->> and probably pcie-designware.c to my series, I would like to ask you what
->> is your longer term plan. Now that I have got my head full of PCI code,
->> I have some ideas but feel that meeting with you and all those involved
->> in core PCI support would be a better venue than sending emails back and
->> forth. When is your next plan to attend a Linux conference?
+On 09/24/2014 02:10 AM, Markus Pargmann wrote:
+> Hi,
 >
-> That would be nice.  Unfortunately, I don't know what the next
-> conference will be yet.
+> sorry for the late reply, I was on vacation.
+>
 
-Perhaps an irc meeting or Google hangout. These have been happening on
-several areas like DT and ARM KVM.
+No problem. Hope you had fun :-)
 
-Rob
+>>> +
+>>> +static int da9063_wdt_probe(struct platform_device *pdev)
+>>> +{
+>>> +	int ret;
+>>> +	struct da9063 *da9063;
+>>> +	struct da9063_watchdog *wdt;
+>>> +
+>>> +	if (!pdev->dev.parent)
+>>> +		return -EINVAL;
+>>> +
+>>> +	da9063 = dev_get_drvdata(pdev->dev.parent);
+>>> +	if (!da9063)
+>>> +		return -EINVAL;
+>>> +
+>>
+>> This is not really an invalid argument. -ENODEV seems to be more appropriate,
+>> given the context (presumably it means that there is no parent mfd device).
+>
+> Yes, but ENODEV will not result in a probe error message because the
+> driver core assumes that the driver is not for this device. I would like
+> to have a probe error message so that developers immediately see that
+> something went wrong. This driver without a parent is a invalid setup,
+> so I chose EINVAL.
+> I prefer returning -EINVAL but as an alternative I could add an error
+> message here and return ENODEV.
+>
+
+Good point. Given the context, one can argue that having no driver data _is_
+an invalid argument (to the function), so I am fine with that.
+
+Guenter
