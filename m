@@ -1,127 +1,68 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 24 Sep 2014 09:11:01 +0800
-Subject: [PATCH v2 2/2] watchdog: dw_wdt: add restart handler support
-In-Reply-To: <20140923183159.GB24930@roeck-us.net>
-References: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
- <1411458132-5410-3-git-send-email-jszhang@marvell.com>
- <20140923183159.GB24930@roeck-us.net>
-Message-ID: <20140924091101.60e065cd@xhacker>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 24 Sep 2014 10:13:39 +0900
+Subject: [PATCH v2 1/5] ARM: shmobile: kzm9d: Remove spurious regulator
+ base addresses
+In-Reply-To: <CAMuHMdWo+gNM=GMJ4LiotDQ6LJ5Pa6F1bqyJwW5xqdunw9-AyA@mail.gmail.com>
+References: <1410914896-14395-1-git-send-email-horms+renesas@verge.net.au>
+ <1410914896-14395-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWo+gNM=GMJ4LiotDQ6LJ5Pa6F1bqyJwW5xqdunw9-AyA@mail.gmail.com>
+Message-ID: <20140924011339.GA15079@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Guenter,
-
-On Tue, 23 Sep 2014 11:31:59 -0700
-Guenter Roeck <linux@roeck-us.net> wrote:
-
-> On Tue, Sep 23, 2014 at 03:42:12PM +0800, Jisheng Zhang wrote:
-> > The kernel core now provides an API to trigger a system restart.
-> > Register with it to support restarting the system via. watchdog.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On Wed, Sep 17, 2014 at 09:33:49AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Sep 17, 2014 at 2:48 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > As there is no reg property the regulator nodes should
+> > not include @...
+> 
+> You missed an important part of my comment:
+> 
+> "However, in the absence of a unit-address, the node name must be unique."
+> 
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
 > > ---
-> >  drivers/watchdog/dw_wdt.c | 32 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 32 insertions(+)
-> > 
-> > diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
-> > index 449c885..9e577a6 100644
-> > --- a/drivers/watchdog/dw_wdt.c
-> > +++ b/drivers/watchdog/dw_wdt.c
-> > @@ -21,6 +21,7 @@
-> >  
-> >  #include <linux/bitops.h>
-> >  #include <linux/clk.h>
-> > +#include <linux/delay.h>
-> >  #include <linux/device.h>
-> >  #include <linux/err.h>
-> >  #include <linux/fs.h>
-> > @@ -29,9 +30,11 @@
-> >  #include <linux/miscdevice.h>
-> >  #include <linux/module.h>
-> >  #include <linux/moduleparam.h>
-> > +#include <linux/notifier.h>
-> >  #include <linux/of.h>
-> >  #include <linux/pm.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/reboot.h>
-> >  #include <linux/spinlock.h>
-> >  #include <linux/timer.h>
-> >  #include <linux/uaccess.h>
-> > @@ -63,6 +66,7 @@ static struct {
-> >  	unsigned long		next_heartbeat;
-> >  	struct timer_list	timer;
-> >  	int			expect_close;
-> > +	struct notifier_block	restart_handler;
-> >  } dw_wdt;
-> >  
-> >  static inline int dw_wdt_is_enabled(void)
-> > @@ -121,6 +125,26 @@ static void dw_wdt_keepalive(void)
-> >  	       WDOG_COUNTER_RESTART_REG_OFFSET);
-> >  }
-> >  
-> > +static int dw_wdt_restart_handle(struct notifier_block *this,
-> > +				unsigned long mode, void *cmd)
-> > +{
-> > +	u32 val;
-> > +
-> > +	writel(0, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
-> > +	val = readl(dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-> > +	if (val & WDOG_CONTROL_REG_WDT_EN_MASK)
-> > +		writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt.regs +
-> > +			WDOG_COUNTER_RESTART_REG_OFFSET);
-> > +	else
-> > +		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
-> > +		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
-> > +
-> > +	/* wait for reset to assert... */
-> > +	mdelay(500);
-> > +
-> > +	return NOTIFY_DONE;
-> > +}
-> > +
-> >  static void dw_wdt_ping(unsigned long data)
-> >  {
-> >  	if (time_before(jiffies, dw_wdt.next_heartbeat) ||
-> > @@ -316,6 +340,12 @@ static int dw_wdt_drv_probe(struct platform_device
-> > *pdev) if (ret)
-> >  		goto out_disable_clk;
-> >  
-> > +	dw_wdt.restart_handler.notifier_call = dw_wdt_restart_handle;
-> > +	dw_wdt.restart_handler.priority = 128;
-> > +	ret = register_restart_handler(&dw_wdt.restart_handler);
-> > +	if (ret)
-> > +		pr_warn("cannot register restart handler\n");
+> > v2
+> > * First post
+> > ---
+> >  arch/arm/boot/dts/emev2-kzm9d.dts | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+> > index 50ccd15..f27fcf0 100644
+> > --- a/arch/arm/boot/dts/emev2-kzm9d.dts
+> > +++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+> > @@ -27,7 +27,7 @@
+> >                 bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp";
+> >         };
+> >
+> > -       reg_1p8v: regulator at 0 {
+> > +       reg_1p8v: regulator {
+> >                 compatible = "regulator-fixed";
+> >                 regulator-name = "fixed-1.8V";
+> >                 regulator-min-microvolt = <1800000>;
+> > @@ -36,7 +36,7 @@
+> >                 regulator-boot-on;
+> >         };
+> >
+> > -       reg_3p3v: regulator at 1 {
+> > +       reg_3p3v: regulator {
+> >                 compatible = "regulator-fixed";
+> >                 regulator-name = "fixed-3.3V";
+> >                 regulator-min-microvolt = <3300000>;
 > 
-> Please use dev_warn(&pdev->dev, ...).
-
-Yep, that's what I thought when patching the code. But the original source is
-using pr_*(), so I use pr_warn() to keep unification. Is there any better
-solution?
-
-Thanks for your review,
-Jisheng
-
+> Now there are two "regulator" nodes.
 > 
-> Thanks,
-> Guenter
+> Dtc will not complain, but will assume the second contains overrides for
+> first. "vddvario-supply" and "vdd33a-supply" of node "lan9220 at 20000000"
+> will both the point to the same node, and the network may not work.
 > 
-> > +
-> >  	dw_wdt_set_next_heartbeat();
-> >  	setup_timer(&dw_wdt.timer, dw_wdt_ping, 0);
-> >  	mod_timer(&dw_wdt.timer, jiffies + WDT_TIMEOUT);
-> > @@ -330,6 +360,8 @@ out_disable_clk:
-> >  
-> >  static int dw_wdt_drv_remove(struct platform_device *pdev)
-> >  {
-> > +	unregister_restart_handler(&dw_wdt.restart_handler);
-> > +
-> >  	misc_deregister(&dw_wdt_miscdev);
-> >  
-> >  	clk_disable_unprepare(dw_wdt.clk);
-> > -- 
-> > 2.1.0
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-watchdog"
-> > in the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> You can see this yourself running
+> 
+>     dtc -I dtb -O dts arch/arm/boot/dts/emev2-kzm9d.dtb
+
+What should we call the nodes?
