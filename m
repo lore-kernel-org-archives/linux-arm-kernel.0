@@ -1,100 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 24 Sep 2014 14:30:51 +0200
-Subject: [PATCH v3] ARM: EXYNOS: SWRESET is needed to boot secondary CPU on
- Exynos3250
-Message-ID: <1411561851-13764-1-git-send-email-k.kozlowski@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Sep 2014 14:36:12 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/6] ARM: dts: sunxi: Add Allwinner
+ A80 dtsi
+In-Reply-To: <CAGb2v64yGmdLeWmA=+nxD85DbQf_xxUNx3n3oedFZi51uc50+w@mail.gmail.com>
+References: <1411311493-24344-1-git-send-email-wens@csie.org>
+ <1411311493-24344-4-git-send-email-wens@csie.org>
+ <20140924063738.GQ15315@lukather>
+ <CAGb2v64voZpK_82wtkErRowR0vjEUALNUwvCx_sd8Q5wb4Hq-g@mail.gmail.com>
+ <54227038.2020805@free-electrons.com>
+ <CAGb2v64yGmdLeWmA=+nxD85DbQf_xxUNx3n3oedFZi51uc50+w@mail.gmail.com>
+Message-ID: <5422BABC.7020906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without software reset the secondary CPU does not power up and
-exynos_boot_secondary() ends with pen_release equal to 1. This can be
-observed in dmesg:
-	CPU1: failed to come online
-	Brought up 1 CPUs
-	SMP: Total of 1 processors activated.
-	CPU: All CPU(s) started in SVC mode.
+Hi Chen-Yu,
 
-When booting the secondary CPU on Exynos3250 execute also software
-reset for core 1.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> Thanks for the tip. Before I send v2, I do have a question. I'm using
+> 
+>     ranges = <0 0 0 0x20000000>;
+> 
+> in the clocks and soc node to avoid having to use 64bit values for all
+> addresses and sizes. Would this be undesirable, even bad practice maybe?
 
----
+We did something like that for all the internal registers too as they are all
+under 4GB. In our case the use of a range really makes sens because the hardware
+addresses were configurable. You don't have such requirement so I can't say if
+it is a bad practice. From my point of view it seems sensible but I am not an
+DT expert.
 
-Changes since v2:
-1. Rebase on Kukjin's for-next tree from 24th of September
-(v3.17-rc3-97-gbcf20e084a4b)
 
-Changes since v1:
-1. Removed inline keyword and change if statement to early return as
-   Tomasz suggested.
-2. Added reviewed-by Tomasz Figa.
----
- arch/arm/mach-exynos/platsmp.c  | 23 +++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h |  2 ++
- 2 files changed, 25 insertions(+)
+Gr?gory
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 41ae28d69e6f..8543064dc445 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -121,6 +121,26 @@ static inline void __iomem *cpu_boot_reg(int cpu)
- }
- 
- /*
-+ * Set wake up by local power mode and execute software reset for given core.
-+ *
-+ * Currently this is needed only when booting secondary CPU on Exynos3250.
-+ */
-+static void exynos_core_restart(u32 core_id)
-+{
-+	u32 val;
-+
-+	if (!of_machine_is_compatible("samsung,exynos3250"))
-+		return;
-+
-+	val = pmu_raw_readl(EXYNOS_ARM_CORE_STATUS(core_id));
-+	val |= S5P_CORE_WAKEUP_FROM_LOCAL_CFG;
-+	pmu_raw_writel(val, EXYNOS_ARM_CORE_STATUS(core_id));
-+
-+	pr_info("CPU%u: Software reset\n", core_id);
-+	pmu_raw_writel(EXYNOS_CORE_PO_RESET(core_id), EXYNOS_SWRESET);
-+}
-+
-+/*
-  * Write pen_release in a way that is guaranteed to be visible to all
-  * observers, irrespective of whether they're taking part in coherency
-  * or not.  This is necessary for the hotplug code to work reliably.
-@@ -196,6 +216,9 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 			return -ETIMEDOUT;
- 		}
- 	}
-+
-+	exynos_core_restart(core_id);
-+
- 	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * the boot monitor to read the system wide flags register,
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 30c03017aa6a..4ea5e320c6d1 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -21,6 +21,7 @@
- #define S5P_USE_STANDBY_WFI0			(1 << 16)
- #define S5P_USE_STANDBY_WFE0			(1 << 24)
- 
-+#define EXYNOS_CORE_PO_RESET(n)			((1 << 4) << n)
- #define EXYNOS_WAKEUP_FROM_LOWPWR		(1 << 28)
- #define EXYNOS_SWRESET				0x0400
- #define EXYNOS5440_SWRESET			0x00C4
-@@ -125,6 +126,7 @@
- #define S5P_PAD_RET_EBIB_OPTION			0x31A8
- 
- #define S5P_CORE_LOCAL_PWR_EN			0x3
-+#define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
- 
- /* Only for EXYNOS4210 */
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
