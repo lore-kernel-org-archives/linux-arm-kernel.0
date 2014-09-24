@@ -1,119 +1,40 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 24 Sep 2014 22:01:55 +0300
-Subject: [PATCH v5 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
-In-Reply-To: <20140924184843.GA15798@developer>
-References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
- <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
- <20140924183204.GE27076@developer> <54230EA8.7080604@kapsi.fi>
- <20140924184157.GB7593@developer> <542310EB.7050802@kapsi.fi>
- <20140924184843.GA15798@developer>
-Message-ID: <54231523.9050502@kapsi.fi>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Sep 2014 12:06:29 -0700
+Subject: [PATCH] drivers/soc: ti: fix build break with modules
+In-Reply-To: <5422CDB1.9060505@ti.com>
+References: <5422CDB1.9060505@ti.com>
+Message-ID: <1411585589-6108-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2014 09:48 PM, Eduardo Valentin wrote:
-> Hello Mikko,
->
-> On Wed, Sep 24, 2014 at 09:43:55PM +0300, Mikko Perttunen wrote:
->> On 09/24/2014 09:41 PM, Eduardo Valentin wrote:
->>> On Wed, Sep 24, 2014 at 09:34:16PM +0300, Mikko Perttunen wrote:
->>>> On 09/24/2014 09:32 PM, Eduardo Valentin wrote:
->>>>> Hello Mikko,
->>>>>
->>>>> On Thu, Aug 21, 2014 at 01:17:21PM +0300, Mikko Perttunen wrote:
->>>>>> This adds critical trip points to the Jetson TK1 device tree.
->>>>>> The device will do a controlled shutdown when either the CPU, GPU
->>>>>> or MEM thermal zone reaches 101 degrees Celsius.
->>>>>>
->>>>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->>>>>> ---
->>>>>> v5: added cooling-maps nodes
->>>>>>
->>>>>
->>>>> OK. But no cooling map entry in it. What was the reason again you don't
->>>>> need/want to add the maps?
->>>>
->>>> There is currently no cooling device to map to.
->>>
->>> Not even cpufreq cooling? Is CPUfreq operational in Tegra?
->>
->> Indeed, it is not currently operational (except on Tegra20). There is a
->> series for Tegra124 but it needs more work. Not going in during this cycle.
->>
->
-> OK. Now I understand. In this case, can you please explain the situation
-> with a TODO comment inside the cooling-maps?
->
-> The way it is now, looks awkwards.
+Fixes below build break by not switching to stubs when the driver is a module:
 
-OK, I will add a comment.
+drivers/soc/ti/knav_dma.c:418:7: error: redefinition of 'knav_dma_open_channel'
+ void *knav_dma_open_channel(struct device *dev, const char *name,
+       ^
+In file included from drivers/soc/ti/knav_dma.c:26:0:
+include/linux/soc/ti/knav_dma.h:165:21: note: previous definition of 'knav_dma_open_channel' was here
+ static inline void *knav_dma_open_channel(struct device *dev, const char *name,
+                     ^
 
->
->>>
->>>>
->>>> Mikko
->>>>
->>>>>
->>>>>>     arch/arm/boot/dts/tegra124-jetson-tk1.dts | 41 +++++++++++++++++++++++++++++++
->>>>>>     1 file changed, 41 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->>>>>> index 0cdb5cf..bcdab7f 100644
->>>>>> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->>>>>> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->>>>>> @@ -1876,4 +1876,45 @@
->>>>>>     			 <&tegra_car TEGRA124_CLK_EXTERN1>;
->>>>>>     		clock-names = "pll_a", "pll_a_out0", "mclk";
->>>>>>     	};
->>>>>> +
->>>>>> +	thermal-zones {
->>>>>> +		cpu {
->>>>>> +			trips {
->>>>>> +				trip at 0 {
->>>>>> +					temperature = <101000>;
->>>>>> +					hysteresis = <0>;
->>>>>> +					type = "critical";
->>>>>> +				};
->>>>>> +			};
->>>>>> +
->>>>>> +			cooling-maps {
->>>>>> +			};
->>>>>> +		};
->>>>>> +
->>>>>> +		mem {
->>>>>> +			trips {
->>>>>> +				trip at 0 {
->>>>>> +					temperature = <101000>;
->>>>>> +					hysteresis = <0>;
->>>>>> +					type = "critical";
->>>>>> +				};
->>>>>> +			};
->>>>>> +
->>>>>> +			cooling-maps {
->>>>>> +			};
->>>>>> +		};
->>>>>> +
->>>>>> +		gpu {
->>>>>> +			trips {
->>>>>> +				trip at 0 {
->>>>>> +					temperature = <101000>;
->>>>>> +					hysteresis = <0>;
->>>>>> +					type = "critical";
->>>>>> +				};
->>>>>> +			};
->>>>>> +
->>>>>> +			cooling-maps {
->>>>>> +			};
->>>>>> +		};
->>>>>> +	};
->>>>>>     };
->>>>>> --
->>>>>> 1.8.1.5
->>>>>>
->>>>> --
->>>>> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>
->>>>
->>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ include/linux/soc/ti/knav_dma.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/linux/soc/ti/knav_dma.h b/include/linux/soc/ti/knav_dma.h
+index e864a3e..dad035c 100644
+--- a/include/linux/soc/ti/knav_dma.h
++++ b/include/linux/soc/ti/knav_dma.h
+@@ -157,7 +157,7 @@ struct knav_dma_desc {
+ 	u32	pad[4];
+ } ____cacheline_aligned;
+ 
+-#ifdef CONFIG_KEYSTONE_NAVIGATOR_DMA
++#if IS_ENABLED(CONFIG_KEYSTONE_NAVIGATOR_DMA)
+ void *knav_dma_open_channel(struct device *dev, const char *name,
+ 				struct knav_dma_cfg *config);
+ void knav_dma_close_channel(void *channel);
+-- 
+1.7.10.4
