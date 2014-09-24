@@ -1,50 +1,78 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 24 Sep 2014 15:23:18 +0100
-Subject: [PATCH v12 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <CAL_Jsq+U=1JT0qqZgb=aR66Q4NYDyzOogspOmmpsp61pE+aCUg@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <20140923215435.GD27117@google.com>
- <20140923224810.GA32643@bart.dudau.co.uk>
- <CAErSpo5PBXSUeU_LP2m=9jxibmqxreL4tEeHBsc5To7D=_bAJA@mail.gmail.com>
- <CAL_Jsq+U=1JT0qqZgb=aR66Q4NYDyzOogspOmmpsp61pE+aCUg@mail.gmail.com>
-Message-ID: <20140924142317.GC1994@e106497-lin.cambridge.arm.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 24 Sep 2014 09:32:54 -0500
+Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation,
+ code consolidation
+In-Reply-To: <5422D138.8000002@codeaurora.org>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+ <20140922153919.GQ25809@arm.com>
+ <20140922223022.GO5182@n2100.arm.linux.org.uk> <5420BE92.7050504@mentor.com>
+ <5422D138.8000002@codeaurora.org>
+Message-ID: <5422D616.7060807@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 02:30:37PM +0100, Rob Herring wrote:
-> On Tue, Sep 23, 2014 at 6:00 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> > On Tue, Sep 23, 2014 at 4:48 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> >> ...
-> >> While the next immediate target is converting pci-host-generic.c, pci-imx6.c
-> >> and probably pcie-designware.c to my series, I would like to ask you what
-> >> is your longer term plan. Now that I have got my head full of PCI code,
-> >> I have some ideas but feel that meeting with you and all those involved
-> >> in core PCI support would be a better venue than sending emails back and
-> >> forth. When is your next plan to attend a Linux conference?
-> >
-> > That would be nice.  Unfortunately, I don't know what the next
-> > conference will be yet.
+On 09/24/2014 09:12 AM, Christopher Covington wrote:
+> Hi Nathan,
 > 
-> Perhaps an irc meeting or Google hangout. These have been happening on
-> several areas like DT and ARM KVM.
-
-I'm open to the idea. I don't know if there is a recurring one already for
-PCI or how Bjorn has been handling future planning previously.
-
-Best regards,
-Liviu
-
+> On 09/22/2014 08:28 PM, Nathan Lynch wrote:
+>> On 09/22/2014 05:30 PM, Russell King - ARM Linux wrote:
+>>> On Mon, Sep 22, 2014 at 04:39:19PM +0100, Will Deacon wrote:
+>>>> On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
+>>>>> This series contains the necessary changes to allow architected timer
+>>>>> access from user-space on 32-bit ARM.  This allows the VDSO to support
+>>>>> high resolution timestamps for clock_gettime and gettimeofday.  This
+>>>>> also merges substantially similar code from arm and arm64 into the
+>>>>> core arm_arch_timer driver.
+>>>>>
+>>>>> The functional changes are:
+>>>>> - When available, CNTVCT is made readable by user space on arm, as it
+>>>>>   is on arm64.
+>>>>> - The clocksource name becomes "arch_mem_counter" if CP15 access to
+>>>>>   the counter is not available.
+>>>>>
+>>>>> These changes have been carried as part of the ARM VDSO patch set over
+>>>>> the last several months, but I am splitting them out here as I assume
+>>>>> they should go through the clocksource maintainers.
+>>>>
+>>>> For the series:
+>>>>
+>>>>   Acked-by: Will Deacon <will.deacon@arm.com>
+>>>>
+>>>> I'm not sure which tree the arch-timer stuff usually goes through, but
+>>>> the arm/arm64 bits look fine so I'm happy for them to merged together.
+>>>
+>>> I raised a while back with Will whether there's much point to having
+>>> this on ARM.  While it's useful for virtualisation, the majority of
+>>> 32-bit ARM doesn't run virtualised.  So there's little point in having
+>>> the VDSO on the majority of platforms - it will just add additional
+>>> unnecessary cycles slowing down the system calls that the VDSO is
+>>> designed to try to speed up.
+>>
+>> Hmm, this patch set is merely exposing the hardware counter when it is
+>> present for the VDSO's use; I take it you have no objection to that?
+>>
+>> While the 32-bit ARM VDSO I've posted (in a different thread) exploits a
+>> facility that is required by the virtualization option in the
+>> architecture, its utility is not limited to guest operating systems.
 > 
-> Rob
-> 
+> Just to clarify, were the performance improvements you measured from a
+> virtualized guest or native?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Yeah I should have been explicit about this.  My tests and measurements
+(and all test results I've received from others, I believe) have been on
+native/host kernels, not guests.
+
+
+>>> So, my view is that this VDSO will only be of very limited use for
+>>> 32-bit ARM, and should not be exposed to userspace unless there is
+>>> a reason for it to be exposed (iow, the hardware necessary to support
+>>> it is present.)
+>>
+>> My thinking is that it should prove useful in a growing subset of v7
+>> CPUs.  It is useful today on Cortex-A15 and -A7, and I believe -A12 and
+>> -A17 implement the generic timer facility as well.
+> 
+> I count 18 dts* files that have "arm,armv7-timer", including platforms with
+> Krait, Exynos, and Tegra processors.
+
+Yup.
