@@ -1,118 +1,208 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Wed, 24 Sep 2014 10:00:48 +0200
-Subject: [PATCH v2 1/8] ARM: add mach-asm9260
-In-Reply-To: <6072405.iL4RqHeZrt@wuerfel>
-References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <71905861.S3QD6rl7jU@wuerfel> <542136B0.3020305@rempel-privat.de>
- <6072405.iL4RqHeZrt@wuerfel>
-Message-ID: <54227A30.7010805@rempel-privat.de>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Wed, 24 Sep 2014 15:12:07 +0800
+Subject: [PATCHv2] dmaengine: fsl-edma: fixup reg offset and hw S/G support in
+ big-endian model
+Message-ID: <1411542727-11026-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.09.2014 um 12:19 schrieb Arnd Bergmann:
-> On Tuesday 23 September 2014 11:00:32 Oleksij Rempel wrote:
->> Am 22.09.2014 um 17:08 schrieb Arnd Bergmann:
->>> On Sunday 21 September 2014 20:41:37 Oleksij Rempel wrote:
->>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>>> index 5918d40..1a71feb 100644
->>>> --- a/arch/arm/Kconfig
->>>> +++ b/arch/arm/Kconfig
->>>> @@ -379,6 +379,20 @@ config ARCH_AT91
->>>>  	  This enables support for systems based on Atmel
->>>>  	  AT91RM9200 and AT91SAM9* processors.
->>>>  
->>>> +config MACH_ASM9260
->>>> +	bool "Alphascale ASM9260"
->>>> +	select ARCH_REQUIRE_GPIOLIB
->>>> +	select COMMON_CLK
->>>> +	select IRQ_DOMAIN
->>>> +	select SPARSE_IRQ
->>>> +	select MULTI_IRQ_HANDLER
->>>> +	select GENERIC_IRQ_CHIP
->>>> +	select GENERIC_CLOCKEVENTS
->>>> +	select CLKSRC_MMIO
->>>> +	select CPU_ARM926T
->>>> +	help
->>>> +	  Support for Alpascale ASM9260 based platform.
->>>
->>> To enable multiplatform support, please move this to its own
->>> arch/arm/mach-asm9260/Kconfig file and make it depend on ARCH_MULTI_V5,
->>> then remove all 'select' statements that are implicitly enabled there
->>> already (most of the above).
->>
->> Should they be only in defconfig or selected by driver?
-> 
-> The dependencies should match whatever the platform requires. Anything
-> that is optional and user-selectable better goes into the defconfig.
-> 
->>>> +static struct map_desc asm9260_io_desc[] __initdata = {
->>>> +	{	/* IO space */
->>>> +		.virtual	= (unsigned long)0xf0000000,
->>>> +		.pfn		= __phys_to_pfn(0x80000000),
->>>> +		.length		= 0x00800000,
->>>> +		.type		= MT_DEVICE
->>>> +	},
->>>> +	{	/* LCD IO space	*/
->>>> +		.virtual	= (unsigned long)0xf0a00000,
->>>> +		.pfn		= __phys_to_pfn(0x80800000),
->>>> +		.length		= 0x00009000,
->>>> +		.type		= MT_DEVICE
->>>> +	},
->>>> +	{	/* GPIO IO space */
->>>> +		.virtual	= (unsigned long)0xf0800000,
->>>> +		.pfn		= __phys_to_pfn(0x50000000),
->>>> +		.length		= 0x00100000,
->>>> +		.type		= MT_DEVICE
->>>> +	},
->>>> +	{	/* SRAM space Cacheable */
->>>> +		.virtual	= (unsigned long)0xd0000000,
->>>> +		.pfn		= __phys_to_pfn(0x40000000),
->>>> +		.length		= 0x00100000,
->>>> +#ifdef CONFIG_SRAM_MEM_CACHED
->>>> +		.type		= MT_MEMORY
->>>> +#else
->>>> +		.type		= MT_DEVICE
->>>> +#endif
->>>> +	},
->>>> +};
->>>
->>> This should not be necessary, as all drivers are supposed to
->>> ioremap their own device registers. For large register ranges
->>> that are used a lot, you could use these as an optimization to
->>> get 1 MB sections mapped using a large TLB entry, but usually
->>> the benefit is very small.
->>
->> Do you mean only "SRAM space Cacheable" section?
-> 
-> No, all of them.
+The offset of all 8-/16-bit register in big-endian eDMA model are
+swapped in a 32-bit size opposite those in the little-endian model.
 
-By removing it i triggered one error which i don't really understand. It
-will be great if you can help me.
+The hardware Scatter/Gather requires the subsequent TCDs in memory
+to be auto loaded should retain little endian independent of the
+register endian model, the dma engine will do the swap if need.
 
-By defaul kernel will do fallowing remapping, which will trigger:
-"Unable to handle kernel paging request at virtual address c2802174"
+This patch also use regular assignment for tcd variables r/w
+instead of with io function previously that may not always be true.
 
-phys addr     ioremap        range size
-=======================================
-0x80054000 -> c2800000 size: 0x200
-0x80040000 -> c2802000 size: 0x204
-0x80088000 -> c2808000 size: 0x4000
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+---
+changes in v2:
+ simplify register offset swap calculation.
+ use regular assignment for tcd variables r/w instead of io function.
 
+ drivers/dma/fsl-edma.c | 106 ++++++++++++++++++++++++++-----------------------
+ 1 file changed, 57 insertions(+), 49 deletions(-)
 
-But if change second range from 0x204 to 0x4000, then it works fine.
-0x80054000 -> c2800000 size: 0x200
-0x80040000 -> c2808000 size: 0x4000
-0x80088000 -> c2810000 size: 0x4000
-
-Why?
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 3c5711d..6cbc29c 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -177,16 +177,10 @@ struct fsl_edma_engine {
+ /*
+  * R/W functions for big- or little-endian registers
+  * the eDMA controller's endian is independent of the CPU core's endian.
++ * for the big-endian IP module, the offset for 8-bit or 16-bit register
++ * should also be swapped oposite to that in little-endian IP.
+  */
+ 
+-static u16 edma_readw(struct fsl_edma_engine *edma, void __iomem *addr)
+-{
+-	if (edma->big_endian)
+-		return ioread16be(addr);
+-	else
+-		return ioread16(addr);
+-}
+-
+ static u32 edma_readl(struct fsl_edma_engine *edma, void __iomem *addr)
+ {
+ 	if (edma->big_endian)
+@@ -197,13 +191,18 @@ static u32 edma_readl(struct fsl_edma_engine *edma, void __iomem *addr)
+ 
+ static void edma_writeb(struct fsl_edma_engine *edma, u8 val, void __iomem *addr)
+ {
+-	iowrite8(val, addr);
++	/* swap the reg offset for these in big-endian mode */
++	if (edma->big_endian)
++		iowrite8(val, (void __iomem *)((u32)addr ^ 0x3));
++	else
++		iowrite8(val, addr);
+ }
+ 
+ static void edma_writew(struct fsl_edma_engine *edma, u16 val, void __iomem *addr)
+ {
++	/* swap the reg offset for these in big-endian mode */
+ 	if (edma->big_endian)
+-		iowrite16be(val, addr);
++		iowrite16be(val, (void __iomem *)((u32)addr ^ 0x2));
+ 	else
+ 		iowrite16(val, addr);
+ }
+@@ -256,11 +255,10 @@ static void fsl_edma_chan_mux(struct fsl_edma_chan *fsl_chan,
+ 	muxaddr = fsl_chan->edma->muxbase[ch / chans_per_mux];
+ 
+ 	if (enable)
+-		edma_writeb(fsl_chan->edma,
+-				EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(slot),
++		writeb(EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(slot),
+ 				muxaddr + ch_off);
+ 	else
+-		edma_writeb(fsl_chan->edma, EDMAMUX_CHCFG_DIS, muxaddr + ch_off);
++		writeb(EDMAMUX_CHCFG_DIS, muxaddr + ch_off);
+ }
+ 
+ static unsigned int fsl_edma_get_tcd_attr(enum dma_slave_buswidth addr_width)
+@@ -363,8 +361,8 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
+ 
+ 	/* calculate the total size in this desc */
+ 	for (len = i = 0; i < fsl_chan->edesc->n_tcds; i++)
+-		len += edma_readl(fsl_chan->edma, &(edesc->tcd[i].vtcd->nbytes))
+-			* edma_readw(fsl_chan->edma, &(edesc->tcd[i].vtcd->biter));
++		len += le32_to_cpu(edesc->tcd[i].vtcd->nbytes)
++			* le16_to_cpu(edesc->tcd[i].vtcd->biter);
+ 
+ 	if (!in_progress)
+ 		return len;
+@@ -376,14 +374,12 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
+ 
+ 	/* figure out the finished and calculate the residue */
+ 	for (i = 0; i < fsl_chan->edesc->n_tcds; i++) {
+-		size = edma_readl(fsl_chan->edma, &(edesc->tcd[i].vtcd->nbytes))
+-			* edma_readw(fsl_chan->edma, &(edesc->tcd[i].vtcd->biter));
++		size = le32_to_cpu(edesc->tcd[i].vtcd->nbytes)
++			* le16_to_cpu(edesc->tcd[i].vtcd->biter);
+ 		if (dir == DMA_MEM_TO_DEV)
+-			dma_addr = edma_readl(fsl_chan->edma,
+-					&(edesc->tcd[i].vtcd->saddr));
++			dma_addr = le32_to_cpu(edesc->tcd[i].vtcd->saddr);
+ 		else
+-			dma_addr = edma_readl(fsl_chan->edma,
+-					&(edesc->tcd[i].vtcd->daddr));
++			dma_addr = le32_to_cpu(edesc->tcd[i].vtcd->daddr);
+ 
+ 		len -= size;
+ 		if (cur_addr > dma_addr && cur_addr < dma_addr + size) {
+@@ -433,21 +429,26 @@ static void fsl_edma_set_tcd_params(struct fsl_edma_chan *fsl_chan,
+ 	u32 ch = fsl_chan->vchan.chan.chan_id;
+ 
+ 	/*
+-	 * TCD parameters have been swapped in fill_tcd_params(),
+-	 * so just write them to registers in the cpu endian here
++	 * TCD parameters should be swapped according the eDMA
++	 * engine requirement.
+ 	 */
+-	writew(0, addr + EDMA_TCD_CSR(ch));
+-	writel(src, addr + EDMA_TCD_SADDR(ch));
+-	writel(dst, addr + EDMA_TCD_DADDR(ch));
+-	writew(attr, addr + EDMA_TCD_ATTR(ch));
+-	writew(soff, addr + EDMA_TCD_SOFF(ch));
+-	writel(nbytes, addr + EDMA_TCD_NBYTES(ch));
+-	writel(slast, addr + EDMA_TCD_SLAST(ch));
+-	writew(citer, addr + EDMA_TCD_CITER(ch));
+-	writew(biter, addr + EDMA_TCD_BITER(ch));
+-	writew(doff, addr + EDMA_TCD_DOFF(ch));
+-	writel(dlast_sga, addr + EDMA_TCD_DLAST_SGA(ch));
+-	writew(csr, addr + EDMA_TCD_CSR(ch));
++	edma_writew(fsl_chan->edma, 0, addr + EDMA_TCD_CSR(ch));
++	edma_writel(fsl_chan->edma, src, addr + EDMA_TCD_SADDR(ch));
++	edma_writel(fsl_chan->edma, dst, addr + EDMA_TCD_DADDR(ch));
++
++	edma_writew(fsl_chan->edma, attr, addr + EDMA_TCD_ATTR(ch));
++	edma_writew(fsl_chan->edma, soff, addr + EDMA_TCD_SOFF(ch));
++
++	edma_writel(fsl_chan->edma, nbytes, addr + EDMA_TCD_NBYTES(ch));
++	edma_writel(fsl_chan->edma, slast, addr + EDMA_TCD_SLAST(ch));
++
++	edma_writew(fsl_chan->edma, citer, addr + EDMA_TCD_CITER(ch));
++	edma_writew(fsl_chan->edma, biter, addr + EDMA_TCD_BITER(ch));
++	edma_writew(fsl_chan->edma, doff, addr + EDMA_TCD_DOFF(ch));
++
++	edma_writel(fsl_chan->edma, dlast_sga, addr + EDMA_TCD_DLAST_SGA(ch));
++
++	edma_writew(fsl_chan->edma, csr, addr + EDMA_TCD_CSR(ch));
+ }
+ 
+ static void fill_tcd_params(struct fsl_edma_engine *edma,
+@@ -459,20 +460,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
+ 	u16 csr = 0;
+ 
+ 	/*
+-	 * eDMA hardware SGs require the TCD parameters stored in memory
+-	 * the same endian as the eDMA module so that they can be loaded
+-	 * automatically by the engine
++	 * eDMA hardware SGs requires the TCDs to be auto loaded
++	 * in the little endian whenver the register endian model,
++	 * So we put the value in little endian in memory, waitting
++	 * for fsl_set_tcd_params doing the swap.
+ 	 */
+-	edma_writel(edma, src, &(tcd->saddr));
+-	edma_writel(edma, dst, &(tcd->daddr));
+-	edma_writew(edma, attr, &(tcd->attr));
+-	edma_writew(edma, EDMA_TCD_SOFF_SOFF(soff), &(tcd->soff));
+-	edma_writel(edma, EDMA_TCD_NBYTES_NBYTES(nbytes), &(tcd->nbytes));
+-	edma_writel(edma, EDMA_TCD_SLAST_SLAST(slast), &(tcd->slast));
+-	edma_writew(edma, EDMA_TCD_CITER_CITER(citer), &(tcd->citer));
+-	edma_writew(edma, EDMA_TCD_DOFF_DOFF(doff), &(tcd->doff));
+-	edma_writel(edma, EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga), &(tcd->dlast_sga));
+-	edma_writew(edma, EDMA_TCD_BITER_BITER(biter), &(tcd->biter));
++	tcd->saddr = cpu_to_le32(src);
++	tcd->daddr = cpu_to_le32(dst);
++
++	tcd->attr = cpu_to_le16(attr);
++
++	tcd->soff = cpu_to_le16(EDMA_TCD_SOFF_SOFF(soff));
++
++	tcd->nbytes = cpu_to_le32(EDMA_TCD_NBYTES_NBYTES(nbytes));
++	tcd->slast = cpu_to_le32(EDMA_TCD_SLAST_SLAST(slast));
++
++	tcd->citer = cpu_to_le16(EDMA_TCD_CITER_CITER(citer));
++	tcd->doff = cpu_to_le16(EDMA_TCD_DOFF_DOFF(doff));
++
++	tcd->dlast_sga = cpu_to_le32(EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga));
++
++	tcd->biter = cpu_to_le16(EDMA_TCD_BITER_BITER(biter));
+ 	if (major_int)
+ 		csr |= EDMA_TCD_CSR_INT_MAJOR;
+ 
+@@ -482,7 +490,7 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
+ 	if (enable_sg)
+ 		csr |= EDMA_TCD_CSR_E_SG;
+ 
+-	edma_writew(edma, csr, &(tcd->csr));
++	tcd->csr = cpu_to_le16(csr);
+ }
+ 
+ static struct fsl_edma_desc *fsl_edma_alloc_desc(struct fsl_edma_chan *fsl_chan,
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/94c5ab2e/attachment-0001.sig>
+1.8.0
