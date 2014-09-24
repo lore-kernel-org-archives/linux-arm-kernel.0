@@ -1,32 +1,100 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Wed, 24 Sep 2014 17:57:51 +0530
-Subject: [PATCH v6 6/6] sched: add SD_PREFER_SIBLING for SMT level
-In-Reply-To: <1411488485-10025-7-git-send-email-vincent.guittot@linaro.org>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-7-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <5422B8C7.6090905@linux.vnet.ibm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 24 Sep 2014 14:30:51 +0200
+Subject: [PATCH v3] ARM: EXYNOS: SWRESET is needed to boot secondary CPU on
+ Exynos3250
+Message-ID: <1411561851-13764-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 09:38 PM, Vincent Guittot wrote:
-> add the SD_PREFER_SIBLING flag for SMT level in order to ensure that
-> the scheduler will put at least 1 task per core.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/core.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> index c7c8ac4..f72663e 100644
-> --- a/kernel/sched/core.c
-> +++ b/kernel/sched/core.c
-> @@ -6134,6 +6134,7 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
->  	 */
-> 
->  	if (sd->flags & SD_SHARE_CPUCAPACITY) {
-> +		sd->flags |= SD_PREFER_SIBLING;
->  		sd->imbalance_pct = 110;
->  		sd->smt_gain = 1178; /* ~15% */
-> 
-Reviewed-by: Preeti U. Murthy <preeti@linux.vnet.ibm.com>
+Without software reset the secondary CPU does not power up and
+exynos_boot_secondary() ends with pen_release equal to 1. This can be
+observed in dmesg:
+	CPU1: failed to come online
+	Brought up 1 CPUs
+	SMP: Total of 1 processors activated.
+	CPU: All CPU(s) started in SVC mode.
+
+When booting the secondary CPU on Exynos3250 execute also software
+reset for core 1.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+---
+
+Changes since v2:
+1. Rebase on Kukjin's for-next tree from 24th of September
+(v3.17-rc3-97-gbcf20e084a4b)
+
+Changes since v1:
+1. Removed inline keyword and change if statement to early return as
+   Tomasz suggested.
+2. Added reviewed-by Tomasz Figa.
+---
+ arch/arm/mach-exynos/platsmp.c  | 23 +++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h |  2 ++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 41ae28d69e6f..8543064dc445 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -121,6 +121,26 @@ static inline void __iomem *cpu_boot_reg(int cpu)
+ }
+ 
+ /*
++ * Set wake up by local power mode and execute software reset for given core.
++ *
++ * Currently this is needed only when booting secondary CPU on Exynos3250.
++ */
++static void exynos_core_restart(u32 core_id)
++{
++	u32 val;
++
++	if (!of_machine_is_compatible("samsung,exynos3250"))
++		return;
++
++	val = pmu_raw_readl(EXYNOS_ARM_CORE_STATUS(core_id));
++	val |= S5P_CORE_WAKEUP_FROM_LOCAL_CFG;
++	pmu_raw_writel(val, EXYNOS_ARM_CORE_STATUS(core_id));
++
++	pr_info("CPU%u: Software reset\n", core_id);
++	pmu_raw_writel(EXYNOS_CORE_PO_RESET(core_id), EXYNOS_SWRESET);
++}
++
++/*
+  * Write pen_release in a way that is guaranteed to be visible to all
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
+@@ -196,6 +216,9 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 			return -ETIMEDOUT;
+ 		}
+ 	}
++
++	exynos_core_restart(core_id);
++
+ 	/*
+ 	 * Send the secondary CPU a soft interrupt, thereby causing
+ 	 * the boot monitor to read the system wide flags register,
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index 30c03017aa6a..4ea5e320c6d1 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -21,6 +21,7 @@
+ #define S5P_USE_STANDBY_WFI0			(1 << 16)
+ #define S5P_USE_STANDBY_WFE0			(1 << 24)
+ 
++#define EXYNOS_CORE_PO_RESET(n)			((1 << 4) << n)
+ #define EXYNOS_WAKEUP_FROM_LOWPWR		(1 << 28)
+ #define EXYNOS_SWRESET				0x0400
+ #define EXYNOS5440_SWRESET			0x00C4
+@@ -125,6 +126,7 @@
+ #define S5P_PAD_RET_EBIB_OPTION			0x31A8
+ 
+ #define S5P_CORE_LOCAL_PWR_EN			0x3
++#define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
+ 
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
+-- 
+1.9.1
