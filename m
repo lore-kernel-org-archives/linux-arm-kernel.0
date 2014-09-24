@@ -1,40 +1,37 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 24 Sep 2014 18:20:08 +0200
-Subject: [PATCH v2 1/3] clocksource: vf_pit_timer: Support shutdown mode
-In-Reply-To: <1411575610-20895-1-git-send-email-stefan@agner.ch>
-References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
-Message-ID: <1411575610-20895-2-git-send-email-stefan@agner.ch>
+Date: Wed, 24 Sep 2014 18:20:07 +0200
+Subject: [PATCH v2 0/3] ARM: vf610: Fix/add clocksource
+Message-ID: <1411575610-20895-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid waking up the system in a low power mode, the
-clocksource should not generate interrupts anymore. Disable the PIT
-timer interrupt when changing into the CLOCK_EVT_MODE_SHUTDOWN mode.
+This patchset came out of need for a clocksource which supports shutdown.
+In the first version I proposed to just replace the current clocksource
+with the ARM Global Timer and even proposed to remove the PIT clocksource
+driver. But Bill Pringlemeir brought up a reasonable point why we should
+keep the PIT clocksource.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/clocksource/vf_pit_timer.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Since we need shutdown support for suspend/resume, I added another patch
+which fixes shutdown functionality for the PIT driver. Now it's possible
+to use suspend/resume functionality with each of the two clocksources.
 
-diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
-index a918bc4..eb354b4 100644
---- a/drivers/clocksource/vf_pit_timer.c
-+++ b/drivers/clocksource/vf_pit_timer.c
-@@ -89,10 +89,15 @@ static int pit_set_next_event(unsigned long delta,
- static void pit_set_mode(enum clock_event_mode mode,
- 				struct clock_event_device *evt)
- {
-+
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
- 		pit_set_next_event(cycle_per_jiffy, evt);
- 		break;
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_UNUSED:
-+		pit_timer_disable();
-+		break;
- 	default:
- 		break;
- 	}
+Changes in v2:
+- Added shutdown support for PIT clocksource (and hence clocksource
+  maintainers as receipient).
+- Create Kconfig entries which allow to choose between the two
+  clocksources
+- Clarified commit message
+- Renamed device tree node to "timer"
+
+Stefan Agner (3):
+  clocksource: vf_pit_timer: Support shutdown mode
+  ARM: dts: vf610: Add ARM Global Timer
+  ARM: vf610: Add ARM Global Timer clocksource option
+
+ arch/arm/boot/dts/vf610.dtsi       |  8 ++++++++
+ arch/arm/mach-imx/Kconfig          | 19 ++++++++++++++++++-
+ drivers/clocksource/vf_pit_timer.c |  5 +++++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
+
 -- 
 2.1.0
