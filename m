@@ -1,45 +1,87 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 24 Sep 2014 23:33:22 +0800
-Subject: [PATCH v2 3/3] clk: rockchip: add clock node in PD_VIDEO
-In-Reply-To: <1411572802-22042-1-git-send-email-kever.yang@rock-chips.com>
-References: <1411572802-22042-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1411572802-22042-4-git-send-email-kever.yang@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 24 Sep 2014 23:35:58 +0800
+Subject: [PATCH 1/7] clk: sunxi: Add post clk divider for factor clocks
+In-Reply-To: <20140916155711.GF2166@lukather>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-2-git-send-email-wens@csie.org>
+ <54145822.4020607@elopez.com.ar> <20140916155711.GF2166@lukather>
+Message-ID: <CAGb2v64o-7La6Sd_WVDrPQC0DUTqXZPZoG7u=OpXb+xRB1tcog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the clock node in PD_VIDEO
+Hi Maxime, Emilio,
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
+On Tue, Sep 16, 2014 at 11:57 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Emilio,
+>
+> On Sat, Sep 13, 2014 at 11:43:46AM -0300, Emilio L?pez wrote:
+>> Hi,
+>>
+>> El 06/09/14 a las 07:47, Chen-Yu Tsai escibi?:
+>> >Some factor clocks, mostly PLLs, have an extra fixed divider just before
+>> >the clock output. Add an option to the factor clk driver config data to
+>> >specify this divider.
+>> >
+>> >Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >---
+>> >  drivers/clk/sunxi/clk-factors.c | 3 +++
+>> >  drivers/clk/sunxi/clk-factors.h | 1 +
+>> >  2 files changed, 4 insertions(+)
+>> >
+>> >diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+>> >index 2057c8a..435111d 100644
+>> >--- a/drivers/clk/sunxi/clk-factors.c
+>> >+++ b/drivers/clk/sunxi/clk-factors.c
+>> >@@ -64,6 +64,9 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+>> >     /* Calculate the rate */
+>> >     rate = (parent_rate * (n + config->n_start) * (k + 1) >> p) / (m + 1);
+>> >
+>> >+    if (config->post_div)
+>> >+            rate /= config->post_div;
+>> >+
+>> >     return rate;
+>> >  }
+>> >
+>> >diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
+>> >index d2d0efa..ce70c65 100644
+>> >--- a/drivers/clk/sunxi/clk-factors.h
+>> >+++ b/drivers/clk/sunxi/clk-factors.h
+>> >@@ -16,6 +16,7 @@ struct clk_factors_config {
+>> >     u8 pshift;
+>> >     u8 pwidth;
+>> >     u8 n_start;
+>> >+    u8 post_div;
+>> >  };
+>> >
+>> >  struct clk_factors {
+>> >
+>>
+>> For the record, I liked your solution on[1] more, as it's in line
+>> with what we're doing on the other sunxi platforms, instead of
+>> adding features in factors to cover for some cases. But it's your
+>> and Maxime's call, as I haven't written any of the sun6i code so
+>> far.
+>
+> No, you still wrote most of the clock support, so your opinion is
+> always valuable (and valued).
+>
+> Thing is, unlike what was done in the sun4i driver where there was a
+> "real" technical issue that was preventing us from using only
+> fixed-factor, we're not in such a case in sun6i (and later,
+> apparently).
+>
+> PLL6 has only one output, which is then directly multiplied by
+> fixed-factors, without any (pre|post)-dividers for any of them.
+>
+> That means that following what you did for the sun4i would just
+> register 3 "dumbs" fixed-factors, that we couldn't reference from DT,
+> or through a cryptic index (which is not even documented in our
+> bindings).
+>
+> I'd be fine either way, I just prefer the solution that has less code
+> and is more explicit.
 
-Changes in v2:
-- split out the patch
+What's the verdict on this series?
 
- drivers/clk/rockchip/clk-rk3288.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index d691a56..2cfcfb6 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -296,6 +296,17 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
- 			RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
- 			RK3288_CLKGATE_CON(3), 11, GFLAGS),
-+	/*
-+	 * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
-+	 * so we ignore the mux and make clocks nodes as following,
-+	 * NOTE THAT hclk_vcodec is fix div by 4 from aclk_vcodec_pre.
-+	 */
-+	GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
-+		RK3288_CLKGATE_CON(9), 0, GFLAGS),
-+	GATE(0, "hclk_vcodec_pre", "aclk_vdpu", 0,
-+		RK3288_CLKGATE_CON(3), 10, GFLAGS),
-+	GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
-+		RK3288_CLKGATE_CON(9), 1, GFLAGS),
- 
- 	COMPOSITE(0, "aclk_vio0", mux_pll_src_cpll_gpll_usb480m_p, 0,
- 			RK3288_CLKSEL_CON(31), 6, 2, MFLAGS, 0, 5, DFLAGS,
--- 
-1.9.1
+ChenYu
