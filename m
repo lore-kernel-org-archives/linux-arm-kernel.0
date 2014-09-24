@@ -1,60 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 24 Sep 2014 11:41:55 -0400 (EDT)
-Subject: [PATCH] drivers/usb/host/ehci-xilinx-of.c: Include
- "linux/of_irq.h" to avoid compiling error
-In-Reply-To: <e0dec78e-193e-43ee-bdb0-fa776a6dd044@BY2FFO11FD030.protection.gbl>
-Message-ID: <Pine.LNX.4.44L0.1409241141260.1580-100000@iolanthe.rowland.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Sep 2014 16:45:07 +0100
+Subject: [PATCH v7 3/3] regulator: qcom-rpm: Regulator driver for the
+ Qualcomm RPM
+In-Reply-To: <4437DA50-D8BC-4E78-821C-41440A08B9A9@codeaurora.org>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1411428329-23172-4-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140924083518.GB4015@sirena.org.uk>
+ <4437DA50-D8BC-4E78-821C-41440A08B9A9@codeaurora.org>
+Message-ID: <20140924154507.GJ16977@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Sep 2014, Michal Simek wrote:
+On Wed, Sep 24, 2014 at 08:50:38AM -0500, Kumar Gala wrote:
 
-> Hi Alan and Greg,
-> 
-> On 09/20/2014 06:19 AM, Chen Gang wrote:
-> > Hello Maintainers:
-> > 
-> > Please help check this patch, when you have time.
-> > 
-> > Thanks.
-> > 
-> > On 09/08/2014 01:20 PM, Michal Simek wrote:
-> >> On 09/03/2014 05:50 PM, Chen Gang wrote:
-> >>> Need include it for irq_of_parse_and_map(), the related error with
-> >>> allmodconfig under microblaze:
-> >>>
-> >>>   drivers/usb/host/ehci-xilinx-of.c: In function ?ehci_hcd_xilinx_of_probe?:
-> >>>   drivers/usb/host/ehci-xilinx-of.c:156:2: error: implicit declaration of function ?irq_of_parse_and_map? [-Werror=implicit-function-declaration]
-> >>>     irq = irq_of_parse_and_map(dn, 0);
-> >>>     ^
-> >>>
-> >>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
-> >>> ---
-> >>>  drivers/usb/host/ehci-xilinx-of.c | 1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
-> >>> index fe57710..a232836 100644
-> >>> --- a/drivers/usb/host/ehci-xilinx-of.c
-> >>> +++ b/drivers/usb/host/ehci-xilinx-of.c
-> >>> @@ -31,6 +31,7 @@
-> >>>  #include <linux/of.h>
-> >>>  #include <linux/of_platform.h>
-> >>>  #include <linux/of_address.h>
-> >>> +#include <linux/of_irq.h>
-> >>>  
-> >>>  /**
-> >>>   * ehci_xilinx_port_handed_over - hand the port out if failed to enable it
-> >>>
-> >>
-> >> Acked-by: Michal Simek <monstr@monstr.eu>
-> 
-> Alan: Can you please add this patch to your queue?
-> Greg: If Alan is not maintaining this part of kernel, is this patch in your queue?
-> 
-> I have also not a problem to add this patch through my microblaze tree
-> but I think it will be much better to use any USB tree.
+Fix your mailer to word wrap within paragraphs please.
 
-Greg should be able to accept a trivial patch like this one directly.
+> Mark, can you drop this until we see at least an RFC patch for the RPM
+> support for b-family SoCs (8074, 8084, etc) chips.  The regulator
+> could should either be the same or highly similar for b-family, but
+> until we see the core RPM driver on the b-family SoCs we will not know
+> that.
 
-Alan Stern
+No, send incremental patches.  This is the *seventh* resend of this
+code, I really don't want to have to reread it again.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/0bbeb148/attachment.sig>
