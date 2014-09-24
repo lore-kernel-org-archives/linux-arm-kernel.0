@@ -1,557 +1,279 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 24 Sep 2014 16:57:27 +0100
-Subject: [PATCH V3 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <alpine.LSU.2.11.1409240633190.10068@eggly.anvils>
-References: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
- <1409237107-24228-2-git-send-email-steve.capper@linaro.org>
- <alpine.LSU.2.11.1409240633190.10068@eggly.anvils>
-Message-ID: <20140924155726.GA28390@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 24 Sep 2014 08:58:54 -0700
+Subject: [PATCH v2 1/3] watchdog: qcom: add support for KPSS WDT
+In-Reply-To: <8f4be0230a7fea8c299a0e878d0eb826eaba6099.1411513109.git.joshc@codeaurora.org>
+References: <cover.1411513109.git.joshc@codeaurora.org>
+ <8f4be0230a7fea8c299a0e878d0eb826eaba6099.1411513109.git.joshc@codeaurora.org>
+Message-ID: <20140924155854.GA12620@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 06:34:56AM -0700, Hugh Dickins wrote:
-> On Thu, 28 Aug 2014, Steve Capper wrote:
+On Tue, Sep 23, 2014 at 06:04:36PM -0500, Josh Cartwright wrote:
+> Add a driver for the watchdog timer block found in the Krait Processor
+> Subsystem (KPSS) on the MSM8960, APQ8064, and IPQ8064.
 > 
-> > get_user_pages_fast attempts to pin user pages by walking the page
-> > tables directly and avoids taking locks. Thus the walker needs to be
-> > protected from page table pages being freed from under it, and needs
-> > to block any THP splits.
-> > 
-> > One way to achieve this is to have the walker disable interrupts, and
-> > rely on IPIs from the TLB flushing code blocking before the page table
-> > pages are freed.
-> > 
-> > On some platforms we have hardware broadcast of TLB invalidations, thus
-> > the TLB flushing code doesn't necessarily need to broadcast IPIs; and
-> > spuriously broadcasting IPIs can hurt system performance if done too
-> > often.
-> > 
-> > This problem has been solved on PowerPC and Sparc by batching up page
-> > table pages belonging to more than one mm_user, then scheduling an
-> > rcu_sched callback to free the pages. This RCU page table free logic
-> > has been promoted to core code and is activated when one enables
-> > HAVE_RCU_TABLE_FREE. Unfortunately, these architectures implement
-> > their own get_user_pages_fast routines.
-> > 
-> > The RCU page table free logic coupled with a an IPI broadcast on THP
-> > split (which is a rare event), allows one to protect a page table
-> > walker by merely disabling the interrupts during the walk.
-> > 
-> > This patch provides a general RCU implementation of get_user_pages_fast
-> > that can be used by architectures that perform hardware broadcast of
-> > TLB invalidations.
-> > 
-> > It is based heavily on the PowerPC implementation by Nick Piggin.
-> 
-> That's a helpful description above, thank you; and the patch looks
-> mostly good to me.  I took a look because I see time is running out,
-> and you're having trouble getting review of this one: I was hoping
-> to give you a quick acked-by, but cannot do so as yet.
-> 
-> Most of my remarks below are trivial comments on where it
-> needs a little more, to be presented as a generic implementation in
-> mm/gup.c.  And most come from comparing against an up-to-date version
-> of arch/x86/mm/gup.c: please do the same, I may have missed some.
-> 
-> It would be a pity to mess up your arm schedule for lack of linkage
-> to this one: maybe this patch can go in as is, and be fixed up a
-> litte later (that would be up to Andrew); or maybe you'll have
-> no trouble making the changes before the merge window; or maybe
-> this should just be kept with arm and arm64 for now (but thank
-> you for making the effort to give us a generic version).
-> 
-> Hugh
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 
-Hi Hugh,
-A big thank you for taking a look at this.
+Hi Josh,
 
+looks much better. Couple of comments inline.
+
+Thanks,
+Guenter
+
+> ---
+>  drivers/watchdog/Kconfig    |  13 ++++
+>  drivers/watchdog/Makefile   |   1 +
+>  drivers/watchdog/qcom-wdt.c | 176 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 190 insertions(+)
+>  create mode 100644 drivers/watchdog/qcom-wdt.c
 > 
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > Tested-by: Dann Frazier <dann.frazier@canonical.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> >  mm/Kconfig |   3 +
-> >  mm/gup.c   | 278 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 281 insertions(+)
-> > 
-> > diff --git a/mm/Kconfig b/mm/Kconfig
-> > index 886db21..0ceb8a5 100644
-> > --- a/mm/Kconfig
-> > +++ b/mm/Kconfig
-> > @@ -137,6 +137,9 @@ config HAVE_MEMBLOCK_NODE_MAP
-> >  config HAVE_MEMBLOCK_PHYS_MAP
-> >  	boolean
-> >  
-> > +config HAVE_GENERIC_RCU_GUP
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 1d1330a..0479e3f 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -443,6 +443,19 @@ config TEGRA_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called tegra_wdt.
+>  
+> +config QCOM_WDT
+> +	tristate "QCOM watchdog"
+> +	depends on HAS_IOMEM
+> +	depends on ARCH_QCOM
+> +	select WATCHDOG_CORE
+> +	help
+> +	  Say Y here to include Watchdog timer support for the watchdog found
+> +	  on QCOM chipsets.  Currently supported targets are the MSM8960,
+> +	  APQ8064, and IPQ8064.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called qcom_wdt.
+> +
+>  # AVR32 Architecture
+>  
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 468c320..d645448 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -57,6 +57,7 @@ obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
+>  obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
+>  obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
+>  obj-$(CONFIG_SIRFSOC_WATCHDOG) += sirfsoc_wdt.o
+> +obj-$(CONFIG_QCOM_WDT) += qcom-wdt.o
+>  obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
+>  obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>  
+> diff --git a/drivers/watchdog/qcom-wdt.c b/drivers/watchdog/qcom-wdt.c
+> new file mode 100644
+> index 0000000..d5e46e2
+> --- /dev/null
+> +++ b/drivers/watchdog/qcom-wdt.c
+> @@ -0,0 +1,176 @@
+> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/watchdog.h>
+> +
+> +#define WDT_RST		0x0
+> +#define WDT_EN		0x8
+> +#define WDT_BITE_TIME	0x24
+> +
+> +struct qcom_wdt {
+> +	struct watchdog_device	wdd;
+> +	struct clk		*clk;
+> +	void __iomem		*base;
+> +};
+> +
+> +static inline
+> +struct qcom_wdt *to_qcom_wdt(struct watchdog_device *wdd)
+> +{
+> +	return container_of(wdd, struct qcom_wdt, wdd);
+> +}
+> +
+> +static int qcom_wdt_start(struct watchdog_device *wdd)
+> +{
+> +	struct qcom_wdt *wdt = to_qcom_wdt(wdd);
+> +	unsigned long bite_time;
+> +
+> +	bite_time = wdd->timeout * clk_get_rate(wdt->clk);
+> +
+> +	writel(0, wdt->base + WDT_EN);
+> +	writel(1, wdt->base + WDT_RST);
+> +	writel(bite_time, wdt->base + WDT_BITE_TIME);
+> +	writel(1, wdt->base + WDT_EN);
+> +	return 0;
+> +}
+> +
+> +static int qcom_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct qcom_wdt *wdt = to_qcom_wdt(wdd);
+> +
+> +	writel(0, wdt->base + WDT_EN);
+> +	return 0;
+> +}
+> +
+> +static int qcom_wdt_ping(struct watchdog_device *wdd)
+> +{
+> +	struct qcom_wdt *wdt = to_qcom_wdt(wdd);
+> +
+> +	writel(1, wdt->base + WDT_RST);
+> +	return 0;
+> +}
+> +
+> +static int qcom_wdt_set_timeout(struct watchdog_device *wdd,
+> +				unsigned int timeout)
+> +{
+> +	wdd->timeout = timeout;
+> +	return qcom_wdt_start(wdd);
+> +}
+> +
+> +static const struct watchdog_ops qcom_wdt_ops = {
+> +	.start		= qcom_wdt_start,
+> +	.stop		= qcom_wdt_stop,
+> +	.ping		= qcom_wdt_ping,
+> +	.set_timeout	= qcom_wdt_set_timeout,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static const struct watchdog_info qcom_wdt_info = {
+> +	.options	= WDIOF_KEEPALIVEPING
+> +			| WDIOF_MAGICCLOSE
+> +			| WDIOF_SETTIMEOUT,
+> +	.identity	= KBUILD_MODNAME,
+> +};
+> +
+> +static int qcom_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct qcom_wdt *wdt;
+> +	struct resource *res;
+> +	unsigned long freq;
+> +	int ret;
+> +
+> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	wdt->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(wdt->base))
+> +		return PTR_ERR(wdt->base);
+> +
+> +	wdt->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(wdt->clk))
+> +		return PTR_ERR(wdt->clk);
+> +
+> +	ret = clk_prepare_enable(wdt->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to setup clock\n");
+> +		return ret;
+> +	}
+> +
+> +	/*
+> +	 * We use the clock rate to calculate the max timeout, so ensure it's
+> +	 * not zero to avoid a divide-by-zero exception.
+> +	 */
+> +	freq = clk_get_rate(wdt->clk);
+> +	if (freq == 0) {
+> +		dev_err(&pdev->dev, "invalid clock rate\n");
+> +		return -EINVAL;
+> +	}
+
+This will need clk_disable_unprepare().
+
+Since you are reading the frequency here, it might make sense to store it
+in struct qcom_wdt so you don't have to call clk_get_rate() again in the
+start function.
+
+> +
+> +	wdt->wdd.dev = &pdev->dev;
+> +	wdt->wdd.info = &qcom_wdt_info;
+> +	wdt->wdd.ops = &qcom_wdt_ops;
+> +	wdt->wdd.min_timeout = 1;
+> +	wdt->wdd.max_timeout = 0x10000000U / freq;
+
+What if the frequency turns out to be larger than 8947848 Hz ?
+Then your maximum timeout is below the default timeout.
+And if the frequency is larger than 268435456 Hz, the maximum
+timeout would be 0.
+
+> +
+> +	/*
+> +	 * If 'timeout-sec' unspecified in devicetree, assume a 30 second
+> +	 * default.
+> +	 */
+> +	if (watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev))
+> +		wdt->wdd.timeout = 30;
+
+You can just initialize timeout above with 30 seconds. Saves you the if
+statement here.
+
+> +
+> +	ret = watchdog_register_device(&wdt->wdd);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to register watchdog\n");
+
+This will need a clk_disable_unprepare().
+
+Given that this is needed twice, you might want to consider using
+error exit code below, as suggested in CodingStyle.
+
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +	return 0;
+> +}
+> +
+> +static int qcom_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct qcom_wdt *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdd);
+> +	clk_disable_unprepare(wdt->clk);
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id qcom_wdt_of_table[] = {
+> +	{ .compatible = "qcom,kpss-wdt-msm8960", },
+> +	{ .compatible = "qcom,kpss-wdt-apq8064", },
+> +	{ .compatible = "qcom,kpss-wdt-ipq8064", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, qcom_wdt_of_table);
+> +
+> +static struct platform_driver qcom_watchdog_driver = {
+> +	.probe	= qcom_wdt_probe,
+> +	.remove	= qcom_wdt_remove,
+> +	.driver	= {
+> +		.name		= KBUILD_MODNAME,
+> +		.of_match_table	= qcom_wdt_of_table,
+> +	},
+> +};
+> +module_platform_driver(qcom_watchdog_driver);
+> +
+> +MODULE_DESCRIPTION("QCOM KPSS Watchdog Driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> I'm not wild about that name (fast GUP does require that page tables
-> cannot be freed beneath it, and RCU freeing of page tables is one way
-> in which that can be guaranteed for this implementation); but I cannot
-> suggest a better, so let's stick with it.
-> 
-
-Yeah, we couldn't think of a better one. :-(
-
-> > +	boolean
-> > +
-> >  config ARCH_DISCARD_MEMBLOCK
-> >  	boolean
-> >  
-> > diff --git a/mm/gup.c b/mm/gup.c
-> > index 91d044b..5e6f6cb 100644
-> > --- a/mm/gup.c
-> > +++ b/mm/gup.c
-> > @@ -10,6 +10,10 @@
-> >  #include <linux/swap.h>
-> >  #include <linux/swapops.h>
-> >  
-> > +#include <linux/sched.h>
-> > +#include <linux/rwsem.h>
-> > +#include <asm/pgtable.h>
-> > +
-> >  #include "internal.h"
-> >  
-> >  static struct page *no_page_table(struct vm_area_struct *vma,
-> > @@ -672,3 +676,277 @@ struct page *get_dump_page(unsigned long addr)
-> >  	return page;
-> >  }
-> >  #endif /* CONFIG_ELF_CORE */
-> > +
-> > +#ifdef CONFIG_HAVE_GENERIC_RCU_GUP
-> 
-> This desperately needs a long comment explaining the assumptions made,
-> and what an architecture must supply and guarantee to use this option.
-> 
-> Maybe your commit message already provides a good enough comment (I
-> have not now re-read it in that light) and can simply be inserted here.
-> I don't think it needs to spell everything out, but it does need to
-> direct a maintainer to thinking through the appropriate issues.
-
-Agreed, I think a summary of the logic and the pre-requisites in a
-comment block will make this a lot easier to adopt.
-
-> 
-> > +
-> > +#ifdef __HAVE_ARCH_PTE_SPECIAL
-> > +static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
-> > +			 int write, struct page **pages, int *nr)
-> > +{
-> > +	pte_t *ptep, *ptem;
-> > +	int ret = 0;
-> > +
-> > +	ptem = ptep = pte_offset_map(&pmd, addr);
-> > +	do {
-> > +		pte_t pte = ACCESS_ONCE(*ptep);
-> 
-> Here is my only substantive criticism.  I don't know the arm architecture,
-> but my guess is that your LPAE has a similar problem to x86's PAE: that
-> the pte entry is bigger than the natural word size of the architecture,
-> and so cannot be safely accessed in one operation on SMP or PREEMPT -
-> there's a danger that you get mismatched top and bottom halves here.
-> And how serious that is depends upon the layout of the pte bits.
-> 
-> See comments on gup_get_pte() in arch/x86/mm/gup.c,
-> and pte_unmap_same() in mm/memory.c.
-
-Thanks, on ARM platforms with LPAE support this will be okay as 64-bit
-single-copy atomicity is guaranteed for reading pagetable entries.
-
-> 
-> And even if arm's LPAE is safe, this is unsafe to present in generic
-> code, or not without a big comment that GENERIC_RCU_GUP should not be
-> used for such configs; or, better than a comment, a build time error
-> according to sizeof(pte_t).
-> 
-
-I was thinking of introducing something like: ARCH_HAS_ATOMIC64_PTE_READS,
-then putting in some compiler logic; it looked overkill to me.
-
-Then I thought of adding a comment to this line of code and explicitly
-adding a pre-requisite to the comments block that I'm about to add before
-#ifdef CONFIG_HAVE_GENERIC_RCU_GUP
-Hopefully that'll be okay.
-
-> (It turns out not to be a problem at pmd, pud and pgd level: IIRC
-> that's because the transitions at those levels are much more restricted,
-> limited to setting, then clearing on pagetable teardown - except for
-> the THP transitions which the local_irq_disable() guards against.)
-> 
-> Ah, enlightenment: arm (unlike arm64) does not __HAVE_ARCH_PTE_SPECIAL,
-> so this "dangerous" code won't be compiled in for it, it's only using
-> the stub below.  Well, you can see my point about needing more
-> comments, those would have saved me a LOT of time.
-> 
-
-This is so we can cover the futex on THP tail case without the need for
-__HAVE_ARCH_PTE_SPECIAL.
-
-> > +		struct page *page;
-> > +
-> > +		if (!pte_present(pte) || pte_special(pte)
-> > +			|| (write && !pte_write(pte)))
-> 
-> The " ||" at end of line above please.  And, more importantly,
-> we need a pte_numa() test in here nowadays, for generic use.
-> 
-Will do.
-Ahh, okay, apologies I didn't spot pte_numa tests being introduced.
-I will check for other changes.
-
-> > +			goto pte_unmap;
-> > +
-> > +		VM_BUG_ON(!pfn_valid(pte_pfn(pte)));
-> > +		page = pte_page(pte);
-> > +
-> > +		if (!page_cache_get_speculative(page))
-> > +			goto pte_unmap;
-> > +
-> > +		if (unlikely(pte_val(pte) != pte_val(*ptep))) {
-> > +			put_page(page);
-> > +			goto pte_unmap;
-> > +		}
-> > +
-> > +		pages[*nr] = page;
-> > +		(*nr)++;
-> > +
-> > +	} while (ptep++, addr += PAGE_SIZE, addr != end);
-> > +
-> > +	ret = 1;
-> > +
-> > +pte_unmap:
-> > +	pte_unmap(ptem);
-> > +	return ret;
-> > +}
-> > +#else
-> > +
-> > +/*
-> > + * If we can't determine whether or not a pte is special, then fail immediately
-> > + * for ptes. Note, we can still pin HugeTLB and THP as these are guaranteed not
-> > + * to be special.
-> 
-> From that comment, I just thought it very weird that you were compiling
-> in any of this HAVE_GENERIC_RCU_GUP code in the !__HAVE_ARCH_PTE_SPECIAL
-> case.  But somewhere else, over in the 0/6, you have a very important
-> remark about futex on THP tail which makes sense of it: please add that
-> explanation here.
-
-Sure thing, thanks.
-
-> 
-> > + */
-> > +static inline int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
-> 
-> checkpatch.pl is noisy about that line over 80 characters, whereas
-> you understandably prefer to keep the stub declaration just like the
-> main declaration.  Simply omit the " inline"?  The compiler should be
-> able to work that out for itself, and it doesn't matter if it cannot.
-> 
-
-Okay, thanks.
-
-> > +			 int write, struct page **pages, int *nr)
-> > +{
-> > +	return 0;
-> > +}
-> > +#endif /* __HAVE_ARCH_PTE_SPECIAL */
-> > +
-> > +static int gup_huge_pmd(pmd_t orig, pmd_t *pmdp, unsigned long addr,
-> > +		unsigned long end, int write, struct page **pages, int *nr)
-> > +{
-> > +	struct page *head, *page, *tail;
-> > +	int refs;
-> > +
-> > +	if (write && !pmd_write(orig))
-> > +		return 0;
-> > +
-> > +	refs = 0;
-> > +	head = pmd_page(orig);
-> > +	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
-> > +	tail = page;
-> > +	do {
-> > +		VM_BUG_ON(compound_head(page) != head);
-> 
-> VM_BUG_ON_PAGE() is the latest preference.
-
-Cheers, I will update this...
-
-> 
-> > +		pages[*nr] = page;
-> > +		(*nr)++;
-> > +		page++;
-> > +		refs++;
-> > +	} while (addr += PAGE_SIZE, addr != end);
-> > +
-> > +	if (!page_cache_add_speculative(head, refs)) {
-> > +		*nr -= refs;
-> > +		return 0;
-> > +	}
-> > +
-> > +	if (unlikely(pmd_val(orig) != pmd_val(*pmdp))) {
-> > +		*nr -= refs;
-> > +		while (refs--)
-> > +			put_page(head);
-> > +		return 0;
-> > +	}
-> > +
-> > +	/*
-> > +	 * Any tail pages need their mapcount reference taken before we
-> > +	 * return. (This allows the THP code to bump their ref count when
-> > +	 * they are split into base pages).
-> > +	 */
-> > +	while (refs--) {
-> > +		if (PageTail(tail))
-> > +			get_huge_page_tail(tail);
-> > +		tail++;
-> > +	}
-> > +
-> > +	return 1;
-> > +}
-> > +
-> > +static int gup_huge_pud(pud_t orig, pud_t *pudp, unsigned long addr,
-> > +		unsigned long end, int write, struct page **pages, int *nr)
-> > +{
-> > +	struct page *head, *page, *tail;
-> > +	int refs;
-> > +
-> > +	if (write && !pud_write(orig))
-> > +		return 0;
-> > +
-> > +	refs = 0;
-> > +	head = pud_page(orig);
-> > +	page = head + ((addr & ~PUD_MASK) >> PAGE_SHIFT);
-> > +	tail = page;
-> > +	do {
-> > +		VM_BUG_ON(compound_head(page) != head);
-> 
-> VM_BUG_ON_PAGE() is the latest preference.
-> 
-
-... and that :-).
-
-> > +		pages[*nr] = page;
-> > +		(*nr)++;
-> > +		page++;
-> > +		refs++;
-> > +	} while (addr += PAGE_SIZE, addr != end);
-> > +
-> > +	if (!page_cache_add_speculative(head, refs)) {
-> > +		*nr -= refs;
-> > +		return 0;
-> > +	}
-> > +
-> > +	if (unlikely(pud_val(orig) != pud_val(*pudp))) {
-> > +		*nr -= refs;
-> > +		while (refs--)
-> > +			put_page(head);
-> > +		return 0;
-> > +	}
-> > +
-> > +	while (refs--) {
-> > +		if (PageTail(tail))
-> > +			get_huge_page_tail(tail);
-> > +		tail++;
-> > +	}
-> > +
-> > +	return 1;
-> > +}
-> > +
-> > +static int gup_pmd_range(pud_t pud, unsigned long addr, unsigned long end,
-> > +		int write, struct page **pages, int *nr)
-> > +{
-> > +	unsigned long next;
-> > +	pmd_t *pmdp;
-> > +
-> > +	pmdp = pmd_offset(&pud, addr);
-> > +	do {
-> > +		pmd_t pmd = ACCESS_ONCE(*pmdp);
-> 
-> I like to do it this way too, but checkpatch.pl prefers a blank line.
-> 
-
-Okay, I will add a blank line.
-
-> > +		next = pmd_addr_end(addr, end);
-> > +		if (pmd_none(pmd) || pmd_trans_splitting(pmd))
-> > +			return 0;
-> > +
-> > +		if (unlikely(pmd_trans_huge(pmd) || pmd_huge(pmd))) {
-> 
-> I wonder if you spent any time pondering pmd_large() and whether to
-> use it here (and define it in arm): I have forgotten its relationship
-> to pmd_huge() and pmd_trans_huge(), and you are probably right to
-> steer clear of it.
-
-pmd_large is only defined by a few architectures, I opted for
-generality and clarity.
-
-> 
-> A pmd_numa() test is needed here nowadays, for generic use.
-> 
-
-Thanks, I will add the logic.
-
-> > +			if (!gup_huge_pmd(pmd, pmdp, addr, next, write,
-> > +				pages, nr))
-> > +				return 0;
-> > +		} else {
-> > +			if (!gup_pte_range(pmd, addr, next, write, pages, nr))
-> > +				return 0;
-> > +		}
-> 
-> You've chosen a different (indentation and else) style here from what
-> you use below in the very similar gup_pud_range(): it's easier to see
-> the differences if you keep the style the same, personally I prefer
-> how you did gup_pud_range().
-
-Okay, I will re-structure.
-
-> 
-> > +	} while (pmdp++, addr = next, addr != end);
-> > +
-> > +	return 1;
-> > +}
-> > +
-> > +static int gup_pud_range(pgd_t *pgdp, unsigned long addr, unsigned long end,
-> > +		int write, struct page **pages, int *nr)
-> > +{
-> > +	unsigned long next;
-> > +	pud_t *pudp;
-> > +
-> > +	pudp = pud_offset(pgdp, addr);
-> > +	do {
-> > +		pud_t pud = ACCESS_ONCE(*pudp);
-> 
-> I like to do it this way too, but checkpatch.pl prefers a blank line.
-
-I'll add a line.
-
-> 
-> > +		next = pud_addr_end(addr, end);
-> > +		if (pud_none(pud))
-> > +			return 0;
-> > +		if (pud_huge(pud)) {
-> 
-> I wonder if you spent any time pondering pud_large() and whether to
-> use it here (and define it in arm): I have forgotten its relationship
-> to pud_huge(), and you are probably right to steer clear of it.
-
-I preferred pud_huge, due to it being more well defined.
-
-> 
-> > +			if (!gup_huge_pud(pud, pudp, addr, next, write,
-> > +					pages, nr))
-> > +				return 0;
-> > +		} else if (!gup_pmd_range(pud, addr, next, write, pages, nr))
-> > +			return 0;
-> > +	} while (pudp++, addr = next, addr != end);
-> > +
-> > +	return 1;
-> > +}
-> > +
-> > +/*
-> > + * Like get_user_pages_fast() except its IRQ-safe in that it won't fall
-> > + * back to the regular GUP.
-> > + */
-> > +int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
-> > +			  struct page **pages)
-> > +{
-> > +	struct mm_struct *mm = current->mm;
-> > +	unsigned long addr, len, end;
-> > +	unsigned long next, flags;
-> > +	pgd_t *pgdp;
-> > +	int nr = 0;
-> > +
-> > +	start &= PAGE_MASK;
-> > +	addr = start;
-> > +	len = (unsigned long) nr_pages << PAGE_SHIFT;
-> > +	end = start + len;
-> > +
-> > +	if (unlikely(!access_ok(write ? VERIFY_WRITE : VERIFY_READ,
-> > +					start, len)))
-> > +		return 0;
-> > +
-> > +	/*
-> > +	 * Disable interrupts, we use the nested form as we can already
-> > +	 * have interrupts disabled by get_futex_key.
-> > +	 *
-> > +	 * With interrupts disabled, we block page table pages from being
-> > +	 * freed from under us. See mmu_gather_tlb in asm-generic/tlb.h
-> > +	 * for more details.
-> > +	 *
-> > +	 * We do not adopt an rcu_read_lock(.) here as we also want to
-> > +	 * block IPIs that come from THPs splitting.
-> > +	 */
-> > +
-> > +	local_irq_save(flags);
-> > +	pgdp = pgd_offset(mm, addr);
-> > +	do {
-> > +		next = pgd_addr_end(addr, end);
-> > +		if (pgd_none(*pgdp))
-> > +			break;
-> > +		else if (!gup_pud_range(pgdp, addr, next, write, pages, &nr))
-> > +			break;
-> > +	} while (pgdp++, addr = next, addr != end);
-> > +	local_irq_restore(flags);
-> > +
-> > +	return nr;
-> > +}
-> > +
-> 
-> The x86 version has a comment on this interface:
-> it would be helpful to copy that here.
-> 
-
-Thanks, I'll copy it over.
-
-> > +int get_user_pages_fast(unsigned long start, int nr_pages, int write,
-> > +			struct page **pages)
-> > +{
-> > +	struct mm_struct *mm = current->mm;
-> > +	int nr, ret;
-> > +
-> > +	start &= PAGE_MASK;
-> > +	nr = __get_user_pages_fast(start, nr_pages, write, pages);
-> 
-> The x86 version has a commit from Linus, avoiding the access_ok() check
-> in __get_user_pages_fast(): I confess I just did not spend long enough
-> trying to understand what that's about, and whether it would be
-> important to incorporate here.
-> 
-
-Thanks, I see the commit, I will need to have a think about it as it's
-not immediately obvious to me.
-
-> > +	ret = nr;
-> > +
-> > +	if (nr < nr_pages) {
-> > +		/* Try to get the remaining pages with get_user_pages */
-> > +		start += nr << PAGE_SHIFT;
-> > +		pages += nr;
-> > +
-> > +		down_read(&mm->mmap_sem);
-> > +		ret = get_user_pages(current, mm, start,
-> > +				     nr_pages - nr, write, 0, pages, NULL);
-> > +		up_read(&mm->mmap_sem);
-> > +
-> > +		/* Have to be a bit careful with return values */
-> > +		if (nr > 0) {
-> > +			if (ret < 0)
-> > +				ret = nr;
-> > +			else
-> > +				ret += nr;
-> > +		}
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +#endif /* CONFIG_HAVE_GENERIC_RCU_GUP */
-> > -- 
-> > 1.9.3
-
-Thanks again Hugh for the very useful comments.
-
-Cheers,
--- 
-Steve
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
