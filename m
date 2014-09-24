@@ -1,37 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Sep 2014 09:14:55 +0100
-Subject: regulator node names and unit-addresses? (Re: [PATCH v2 1/5]
- ARM: shmobile: kzm9d: Remove spurious regulator base addresses)
-In-Reply-To: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
-References: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
-Message-ID: <20140924081455.GU4015@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 24 Sep 2014 10:15:24 +0200
+Subject: [PATCH] pinctrl: bcm281xx: make Kconfig dependency more strict
+Message-ID: <1411546524-13345-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 09:02:23AM +0200, Geert Uytterhoeven wrote:
-> On Wed, Sep 24, 2014 at 3:13 AM, Simon Horman <horms@verge.net.au> wrote:
+This driver is only useful on BCM281xx, so let the driver depend on
+ARCH_BCM_MOBILE but allow compile coverage testing.
+The main benefit is that the driver isn't available to be selected for
+machines that don't have the matching hardware.
 
-> > What should we call the nodes?
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+This patch was sent earlier when the Kconfig symbol was still named
+"PINCTRL_CAPRI":
 
-> "regulator0" and "regulator1"?
-> "regulator1v8" and "regulator3v3"?
+	Date: Tue,  1 Apr 2014 22:10:21 +0200
+	Subject: [PATCH] pinctrl: capri: make Kconfig dependency more strict
+	Message-Id: <1396383021-2295-1-git-send-email-u.kleine-koenig@pengutronix.de>
 
-> Documentation/devicetree/bindings/regulator/regulator.txt doesn't mention
-> node names or (presence/lack of) unit-adresses, but the examples do have
-> unit-addresses.
+and got a
 
-> Is this another case where we don't follow the "no reg, no unit-address"
-> ePAPR rule?
+	Reviewed-by: Sherman Yin <syin@broadcom.com>
 
-As far as the regulator API is concerned the node name is completly
-immaterial and all this stuff is just verbiage we're forced to include.
-As far as I can tell the requirement that node names be in the form
-"regulator" or whatever is just another thing that wasn't terribly well
-thought through in ePAPR, they were trying to do classes I think.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/ab0007ee/attachment.sig>
+back then.
+
+Best regards
+Uwe
+
+ drivers/pinctrl/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index bfd2c2e9f6cd..a95d5ca6d830 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -86,7 +86,7 @@ config PINCTRL_BCM2835
+ 
+ config PINCTRL_BCM281XX
+ 	bool "Broadcom BCM281xx pinctrl driver"
+-	depends on OF
++	depends on OF && (ARCH_BCM_MOBILE || COMPILE_TEST)
+ 	select PINMUX
+ 	select PINCONF
+ 	select GENERIC_PINCONF
+-- 
+2.1.0
