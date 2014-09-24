@@ -1,193 +1,102 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 24 Sep 2014 17:43:04 +0100
-Subject: [PATCH v12 09/12] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <1411498874-9864-10-git-send-email-Liviu.Dudau@arm.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-10-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140924164304.GF1994@e106497-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 24 Sep 2014 21:44:52 +0530
+Subject: [PATCH 02/27] dmaengine: ste_dma: use
+ pm_runtime_last_busy_and_autosuspend helper
+In-Reply-To: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
+References: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
+Message-ID: <1411575342-31048-3-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a function to parse the PCI DT ranges that can be used to
-create a pci_host_bridge structure together with its associated
-bus.
+Use the new pm_runtime_last_busy_and_autosuspend helper instead of open
+coding the same code
 
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-[make io_base parameter optional]
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 ---
-Hi Bjorn,
+ drivers/dma/ste_dma40.c |   30 ++++++++++--------------------
+ 1 files changed, 10 insertions(+), 20 deletions(-)
 
-I have fixed the compilation error that this patch was triggering. I
-have validated that the patch applies to your pci/host-generic branch
-as well as to my series.
-
-Best regards,
-Liviu
-
-
- drivers/of/of_pci.c    | 117 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h |   6 +++
- 2 files changed, 123 insertions(+)
-
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 82d172f..3cad1af 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -1,7 +1,9 @@
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_pci.h>
-+#include <linux/slab.h>
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 5fe5933..621b941 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1442,8 +1442,7 @@ static int d40_pause(struct d40_chan *d40c)
  
- static inline int __of_pci_pci_compare(struct device_node *node,
- 				       unsigned int data)
-@@ -114,6 +116,121 @@ int of_get_pci_domain_nr(struct device_node *node)
+ 	res = d40_channel_execute_command(d40c, D40_DMA_SUSPEND_REQ);
+ 
+-	pm_runtime_mark_last_busy(d40c->base->dev);
+-	pm_runtime_put_autosuspend(d40c->base->dev);
++	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 	spin_unlock_irqrestore(&d40c->lock, flags);
+ 	return res;
  }
- EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+@@ -1463,8 +1462,7 @@ static int d40_resume(struct d40_chan *d40c)
+ 	if (d40_residue(d40c) || d40_tx_is_linked(d40c))
+ 		res = d40_channel_execute_command(d40c, D40_DMA_RUN);
  
-+#if defined(CONFIG_OF_ADDRESS)
-+/**
-+ * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-+ * @dev: device node of the host bridge having the range property
-+ * @busno: bus number associated with the bridge root bus
-+ * @bus_max: maximum number of busses for this bridge
-+ * @resources: list where the range of resources will be added after DT parsing
-+ * @io_base: pointer to a variable that will contain on return the physical
-+ * address for the start of the I/O range. Can be NULL if the caller doesn't
-+ * expect IO ranges to be present in the device tree.
-+ *
-+ * It is the callers job to free the @resources list.
-+ *
-+ * This function will parse the "ranges" property of a PCI host bridge device
-+ * node and setup the resource mapping based on its content. It is expected
-+ * that the property conforms with the Power ePAPR document.
-+ *
-+ * It returns zero if the range parsing has been successful or a standard error
-+ * value if it failed.
-+ */
-+int of_pci_get_host_bridge_resources(struct device_node *dev,
-+			unsigned char busno, unsigned char bus_max,
-+			struct list_head *resources, resource_size_t *io_base)
-+{
-+	struct resource *res;
-+	struct resource *bus_range;
-+	struct of_pci_range range;
-+	struct of_pci_range_parser parser;
-+	char range_type[4];
-+	int err;
-+
-+	if (io_base)
-+		*io_base = (resource_size_t)OF_BAD_ADDR;
-+
-+	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-+	if (!bus_range)
-+		return -ENOMEM;
-+
-+	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-+
-+	err = of_pci_parse_bus_range(dev, bus_range);
-+	if (err) {
-+		bus_range->start = busno;
-+		bus_range->end = bus_max;
-+		bus_range->flags = IORESOURCE_BUS;
-+		pr_info("  No bus range found for %s, using %pR\n",
-+			dev->full_name, bus_range);
-+	} else {
-+		if (bus_range->end > bus_range->start + bus_max)
-+			bus_range->end = bus_range->start + bus_max;
-+	}
-+	pci_add_resource(resources, bus_range);
-+
-+	/* Check for ranges property */
-+	err = of_pci_range_parser_init(&parser, dev);
-+	if (err)
-+		goto parse_failed;
-+
-+	pr_debug("Parsing ranges property...\n");
-+	for_each_of_pci_range(&parser, &range) {
-+		/* Read next ranges element */
-+		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-+			snprintf(range_type, 4, " IO");
-+		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
-+			snprintf(range_type, 4, "MEM");
-+		else
-+			snprintf(range_type, 4, "err");
-+		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
-+			range.cpu_addr, range.cpu_addr + range.size - 1,
-+			range.pci_addr);
-+
-+		/*
-+		 * If we failed translation or got a zero-sized region
-+		 * then skip this range
-+		 */
-+		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-+			continue;
-+
-+		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-+		if (!res) {
-+			err = -ENOMEM;
-+			goto parse_failed;
-+		}
-+
-+		err = of_pci_range_to_resource(&range, dev, res);
-+		if (err)
-+			goto conversion_failed;
-+
-+		if (resource_type(res) == IORESOURCE_IO) {
-+			if (!io_base) {
-+				pr_err("I/O range found for %s. Please provide an io_base pointer to save CPU base address\n",
-+					dev->full_name);
-+				err = -EINVAL;
-+				goto conversion_failed;
-+			}
-+			if (*io_base != (resource_size_t)OF_BAD_ADDR)
-+				pr_warn("More than one I/O resource converted for %s. CPU base address for old range lost!\n",
-+					dev->full_name);
-+			*io_base = range.cpu_addr;
-+		}
-+
-+		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
-+	}
-+
-+	return 0;
-+
-+conversion_failed:
-+	kfree(res);
-+parse_failed:
-+	pci_free_resource_list(resources);
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-+#endif /* CONFIG_OF_ADDRESS */
-+
- #ifdef CONFIG_PCI_MSI
- 
- static LIST_HEAD(of_pci_msi_chip_list);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 71062e9..1fd207e 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -52,6 +52,12 @@ of_get_pci_domain_nr(struct device_node *node)
+-	pm_runtime_mark_last_busy(d40c->base->dev);
+-	pm_runtime_put_autosuspend(d40c->base->dev);
++	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 	spin_unlock_irqrestore(&d40c->lock, flags);
+ 	return res;
  }
- #endif
+@@ -1565,8 +1563,7 @@ static void dma_tc_handle(struct d40_chan *d40c)
+ 		if (d40_queue_start(d40c) == NULL) {
+ 			d40c->busy = false;
  
-+#if defined(CONFIG_OF_ADDRESS)
-+int of_pci_get_host_bridge_resources(struct device_node *dev,
-+			unsigned char busno, unsigned char bus_max,
-+			struct list_head *resources, resource_size_t *io_base);
-+#endif
-+
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
- int of_pci_msi_chip_add(struct msi_chip *chip);
- void of_pci_msi_chip_remove(struct msi_chip *chip);
+-			pm_runtime_mark_last_busy(d40c->base->dev);
+-			pm_runtime_put_autosuspend(d40c->base->dev);
++			pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 		}
+ 
+ 		d40_desc_remove(d40d);
+@@ -2045,18 +2042,15 @@ static int d40_free_dma(struct d40_chan *d40c)
+ 	else
+ 		d40c->base->lookup_phy_chans[phy->num] = NULL;
+ 
+-	if (d40c->busy) {
+-		pm_runtime_mark_last_busy(d40c->base->dev);
+-		pm_runtime_put_autosuspend(d40c->base->dev);
+-	}
++	if (d40c->busy)
++		pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 
+ 	d40c->busy = false;
+ 	d40c->phy_chan = NULL;
+ 	d40c->configured = false;
+ out:
+ 
+-	pm_runtime_mark_last_busy(d40c->base->dev);
+-	pm_runtime_put_autosuspend(d40c->base->dev);
++	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 	return res;
+ }
+ 
+@@ -2457,8 +2451,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
+ 	if (is_free_phy)
+ 		d40_config_write(d40c);
+ fail:
+-	pm_runtime_mark_last_busy(d40c->base->dev);
+-	pm_runtime_put_autosuspend(d40c->base->dev);
++	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 	spin_unlock_irqrestore(&d40c->lock, flags);
+ 	return err;
+ }
+@@ -2618,12 +2611,9 @@ static void d40_terminate_all(struct dma_chan *chan)
+ 		chan_err(d40c, "Failed to stop channel\n");
+ 
+ 	d40_term_all(d40c);
+-	pm_runtime_mark_last_busy(d40c->base->dev);
+-	pm_runtime_put_autosuspend(d40c->base->dev);
+-	if (d40c->busy) {
+-		pm_runtime_mark_last_busy(d40c->base->dev);
+-		pm_runtime_put_autosuspend(d40c->base->dev);
+-	}
++	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
++	if (d40c->busy)
++		pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
+ 	d40c->busy = false;
+ 
+ 	spin_unlock_irqrestore(&d40c->lock, flags);
 -- 
-2.1.0
+1.7.0.4
