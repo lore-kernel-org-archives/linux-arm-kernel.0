@@ -1,68 +1,43 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 15:50:25 +0100
+Date: Wed, 24 Sep 2014 15:52:57 +0100
 Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
  consolidation
-In-Reply-To: <5422D616.7060807@mentor.com>
+In-Reply-To: <20140924144541.GJ15842@e104818-lin.cambridge.arm.com>
 References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
  <20140922153919.GQ25809@arm.com>
- <20140922223022.GO5182@n2100.arm.linux.org.uk> <5420BE92.7050504@mentor.com>
- <5422D138.8000002@codeaurora.org> <5422D616.7060807@mentor.com>
-Message-ID: <20140924145025.GX5182@n2100.arm.linux.org.uk>
+ <20140922223022.GO5182@n2100.arm.linux.org.uk>
+ <20140924144541.GJ15842@e104818-lin.cambridge.arm.com>
+Message-ID: <20140924145257.GY5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 09:32:54AM -0500, Nathan Lynch wrote:
-> On 09/24/2014 09:12 AM, Christopher Covington wrote:
-> > Hi Nathan,
-> > 
-> > On 09/22/2014 08:28 PM, Nathan Lynch wrote:
-> >> Hmm, this patch set is merely exposing the hardware counter when it is
-> >> present for the VDSO's use; I take it you have no objection to that?
-> >>
-> >> While the 32-bit ARM VDSO I've posted (in a different thread) exploits a
-> >> facility that is required by the virtualization option in the
-> >> architecture, its utility is not limited to guest operating systems.
-> > 
-> > Just to clarify, were the performance improvements you measured from a
-> > virtualized guest or native?
+On Wed, Sep 24, 2014 at 03:45:41PM +0100, Catalin Marinas wrote:
+> On Mon, Sep 22, 2014 at 11:30:23PM +0100, Russell King - ARM Linux wrote:
+> > I raised a while back with Will whether there's much point to having
+> > this on ARM.  While it's useful for virtualisation, the majority of
+> > 32-bit ARM doesn't run virtualised.
 > 
-> Yeah I should have been explicit about this.  My tests and measurements
-> (and all test results I've received from others, I believe) have been on
-> native/host kernels, not guests.
-
-Have there been any measurements on systems without the architected
-timers?
-
-> > I count 18 dts* files that have "arm,armv7-timer", including platforms with
-> > Krait, Exynos, and Tegra processors.
+> This has nothing to do with virtualisation. The main reason we use
+> CNTVCT is to not require kernel binary differences when running the OS
+> as host or guest. But it does _not_ mean that it is only used when
+> running as a guest.
 > 
-> Yup.
+> > So there's little point in having the VDSO on the majority of
+> > platforms - it will just add additional unnecessary cycles slowing
+> > down the system calls that the VDSO is designed to try to speed up.
+> 
+> A good reason for VDSO is to avoid a system call for gettimeofday when
+> you can read the clocks source from user space. That's a significant
+> improvement on CPUs like A7, A15.
 
-That's not the full story.  Almost every ARM to date has not had an
-architected timer.  Architected timers are a recent addition - as
-pointed out, a Cortex A7/A12/A15 invention.  Most of the platforms I
-see are Cortex A9 which doesn't have any architected timers.
+I'm *not* arguing against having a VDSO to speed up that crap.  What
+I'm trying to get to the bottom of - something which has been totally
+lost sight of - is what the friggin effect of this stuff is on CPUs
+*without* the architected timer.
 
-Yes, it may be fun to work on new hardware and make that perform
-much better than previous, but we should not loose sight that there
-is older hardware out there, and we shouldn't unnecessarily penalise
-it when adding new features.
-
-What we /need/ to know is what the effect providing a VDSO in an
-environment without an architected timer (so using the VDSO fallback
-functions calling the syscalls) and having glibc use it is compared
-to the current situation where there is no VDSO for glibc to use.
-
-If you can show that there's no difference, then I'm happy to go with
-always providing the VDSO.  If there's a detrimental effect (which I
-suspect there may be, since we now have to have glibc test to see if
-the VDSO is there, jump to the VDSO, the VDSO then tests whether we
-have an architected timer, and then we finally get to issue the
-syscall), then we must avoid providing the VDSO on systems which have
-no architected timer.
-
-Things like the time keeping syscalls tend to be hot paths, and having
-extra unnecessary cycles in them can hurt userspace performance.
+Until I get an answer to what the measured effect is, I'm saying no to
+VDSO on ARM, because - as seems to be the norm - the evaluation job is
+only half done.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
