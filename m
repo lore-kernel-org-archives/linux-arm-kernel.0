@@ -1,47 +1,52 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Sep 2014 21:39:05 -0700
-Subject: [PATCH v2] soc: qcom: do not disable the iface clock in probe
-In-Reply-To: <1411500054-13600-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411500054-13600-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20140924043905.GA24803@localhost>
+Date: Tue, 23 Sep 2014 21:59:06 -0700
+Subject: [GIT PULL] at91: drivers for 3.18 #2 (bis)
+In-Reply-To: <1410797563-13378-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
+ <1410797563-13378-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140924045906.GC24803@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 08:20:54PM +0100, Srinivas Kandagatla wrote:
-> since commit 31964ffebbb9 ("tty: serial: msm: Remove direct access to GSBI")'
-> serial hangs if earlyprintk are enabled.
+On Mon, Sep 15, 2014 at 06:12:43PM +0200, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> This hang is noticed only when the GSBI driver is probed and all the
-> earlyprintks before gsbi probe are seen on the console.
-> The reason why it hangs is because GSBI driver disables hclk in its
-> probe function without realizing that the serial IP might be in use by
-> a bootconsole. As gsbi driver disables the clock in probe the
-> bootconsole locks up.
+> I re-send this pull-request with the work done by Maxime to take Arnd's
+> comments into annount: removal of the early_platform devices, and by keeping
+> the old mechanism with a function exported by the PIT timer and called by the
+> board files.
 > 
-> Turning off hclk's could be dangerous if there are system components
-> like earlyprintk using the hclk.
+> Here is the old message that I sent you: just as a reference.
+> "
+> This pull-request is focused on the work that Maxime did for migrating our
+> timer (PIT) to the clocksource sub-system. A big cleanup happened which allows
+> us to be even closer to the point when we have only the bare minimum in our
+> formerly crowded mach-at91 directory.
+> "
 > 
-> This patch fixes the issue by delegating the clock management to
-> probe and remove functions in gsbi rather than disabling the clock in probe.
+> This pull-request goes on top of what is already in your at91/drivers branch.
 > 
-> More detailed problem description can be found here:
-> http://www.spinics.net/lists/linux-arm-msm/msg10589.html
+> Thanks, best regards,
 > 
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> Hi Kevin, 
+> The following changes since commit 405a72c5e78b5c560c8b2711d4000fa5eb063e1b:
 > 
-> Am resending this patch with reference to the problem and adding more
-> details to the log.
+>   power: reset: at91-poweroff: fix wakeup status register index (2014-09-01 18:40:44 +0200)
 > 
-> Could you pick this fix for the next rc, as this fixes a serial console
-> hang with earlyprintk on SOCs like APQ8064.
+> are available in the git repository at:
 > 
-> Changes since v1:
-> 	- added more info in the change log as requested by Kumar and Kevin.
+>   git://github.com/at91linux/linux-at91.git tags/at91-drivers2
+> 
+> for you to fetch changes up to b052ff30cd450c91a32e8e928979bca021462996:
+> 
+>   ARM: at91: PIT: Move the driver to drivers/clocksource (2014-09-15 17:55:48 +0200)
+> 
+> ----------------------------------------------------------------
+> Second drivers series for AT91/3.18:
+> - move of the PIT (basic timer) from mach-at91 to its proper location:
+>   drivers/clocksource
+> - big cleanup of this driver along the way
 
-Applied to fixes.
+Thanks, merged.
 
 
 -Olof
