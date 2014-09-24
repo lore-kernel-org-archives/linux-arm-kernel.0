@@ -1,30 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 24 Sep 2014 21:25:16 +0200 (CEST)
-Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <542279D0.1040603@jp.fujitsu.com>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
- <542279D0.1040603@jp.fujitsu.com>
-Message-ID: <alpine.DEB.2.10.1409242122380.4604@nanos>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 24 Sep 2014 14:26:10 -0500
+Subject: [PATCH] ARM: qcom: Update SoC compatibles we support
+In-Reply-To: <54230E9A.7020109@codeaurora.org>
+References: <1411582838-24159-1-git-send-email-galak@codeaurora.org>
+ <54230E9A.7020109@codeaurora.org>
+Message-ID: <42858D66-62FA-4F89-A1A2-584DD6A7BE34@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Sep 2014, Yasuaki Ishimatsu wrote:
-> I cannot imagine why the feature makes x86 irq architecture much more clear
-> and more easy to maintain in this description. Of course, I have read the
-> following threads:
+
+On Sep 24, 2014, at 1:34 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> On 09/24/14 11:20, Kumar Gala wrote:
+>> Move to just using the SoC name in the compatible list so we don't need
+>> to update this for every board going forward.  Also added "qcom,msm8974"
+>> to the list as we support "qcom,apq8074" already (the modemless version
+>> of "qcom,msm8974").
+>> 
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>> ---
 > 
-> https://lkml.org/lkml/2014/9/11/101
+> Or just remove the file entirely. Things work without having to add
+> anything here anyway.
 
-Here is the long version of the idea:
+I?d prefer there to be some filter, but maybe you are right.  I doubt we?ll add too many other platforms to this going forward.
 
-     https://lkml.org/lkml/2014/8/26/707
+- k
 
-Short version is:
-
-Separate the irq handling entities in a clear layered way instead of
-having vector/[io]apic specific knowledge/data in places like msi,
-remap etc.
-
-Thanks,
-
-	tglx
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
