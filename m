@@ -1,128 +1,93 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 24 Sep 2014 15:09:19 +0200
-Subject: [PATCH v3] ARM: dts: add CPU nodes for Exynos4 SoCs
-Message-ID: <5230569.XLlNbB5NvF@amdc1032>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Wed, 24 Sep 2014 21:13:43 +0800
+Subject: [PATCH 3/3] ARM: dts: add rk3288 power-domain node
+In-Reply-To: <2840362.2VhRfgMh5I@phil>
+References: <1411440916-6830-1-git-send-email-jinkun.hong@rock-chips.com>
+ <1411440916-6830-4-git-send-email-jinkun.hong@rock-chips.com>
+ <2840362.2VhRfgMh5I@phil>
+Message-ID: <5422C387.9050005@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
-when topology is read from DT") fixed GIC driver to filter cluster ID
-from values returned by cpu_logical_map() for SoCs having registers
-mapped without per-CPU banking making it is possible to add CPU nodes
-for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
-required by future changes adding initialization of cpuidle states in
-Exynos cpuidle driver through DT.
+Heiko,
 
-Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
+On 09/24/2014 01:52 AM, Heiko St?bner wrote:
+> Am Montag, 22. September 2014, 19:55:16 schrieb jinkun.hong:
+>> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+>>
+>> Signed-off-by: Jack Dai <jack.dai@rock-chips.com>
+>> Signed-off-by: Wang Caesar <caesar.wang@rock-chips.com>
+>> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+>>
+>> ---
+>>
+>>   arch/arm/boot/dts/rk3288.dtsi |   45
+>> +++++++++++++++++++++++++++++++++++++++++ 1 file changed, 45 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+>> index 3bb5230..714b9d9 100644
+>> --- a/arch/arm/boot/dts/rk3288.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288.dtsi
+>> @@ -15,6 +15,7 @@
+>>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>   #include <dt-bindings/pinctrl/rockchip.h>
+>>   #include <dt-bindings/clock/rk3288-cru.h>
+>> +#include <dt-bindings/power-domain/rk3288.h>
+>>   #include "skeleton.dtsi"
+>>
+>>   / {
+>> @@ -467,6 +468,50 @@
+>>   		compatible = "rockchip,rk3288-pmu", "syscon";
+>>   		reg = <0xff730000 0x100>;
+>>   	};
+> missing blank line here
+>
+> Also please mind the ordering. We have the nodes without registers (like the
+> pinctrl) at the bottom, so maybe add the power-controller alphabetically after
+> the pinctrl node.
+>
+>> +	power: power-controller {
+>> +		compatible = "rockchip,rk3288-power-controller";
+>> +		#power-domain-cells = <1>;
+>> +		rockchip,pmu = <&pmu>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		pd_gpu {
+>> +			reg = <RK3288_PD_GPU>;
+>> +			clocks = <&cru ACLK_GPU>;
+>> +		};
+>> +
+>> +		pd_vio {
+>> +			reg = <RK3288_PD_VIO>;
+>> +			clocks = <&cru HCLK_RGA>, <&cru HCLK_VOP0>,
+>> +				<&cru HCLK_VOP1>, <&cru HCLK_VIO_AHB_ARBI>,
+>> +				<&cru HCLK_VIO_NIU>, <&cru HCLK_VIP>,
+>> +				<&cru HCLK_IEP>, <&cru HCLK_ISP>,
+>> +				<&cru HCLK_VIO2_H2P>, <&cru PCLK_MIPI_DSI0>,
+>> +				<&cru PCLK_MIPI_DSI1>, <&cru PCLK_MIPI_CSI>,
+>> +				<&cru PCLK_LVDS_PHY>, <&cru PCLK_EDP_CTRL>,
+>> +				<&cru PCLK_HDMI_CTRL>, <&cru PCLK_VIO2_H2P>,
+>> +				<&cru ACLK_VOP0>, <&cru ACLK_IEP>,
+>> +				<&cru ACLK_VIO0_NIU>, <&cru ACLK_VIP>,
+>> +				<&cru ACLK_VOP1>, <&cru ACLK_ISP>,
+>> +				<&cru ACLK_VIO1_NIU>, <&cru ACLK_RGA>,
+>> +				<&cru ACLK_RGA_NIU>,<&cru SCLK_RGA>,
+>> +				<&cru DCLK_VOP0>, <&cru DCLK_VOP1>,
+>> +				<&cru SCLK_EDP_24M>, <&cru SCLK_EDP>,
+>> +				<&cru SCLK_ISP>, <&cru SCLK_ISP_JPE>,
+>> +				<&cru SCLK_HDMI_HDCP>, <&cru SCLK_HDMI_CEC>;
+>> +		};
+>> +
+>> +		pd_video {
+>> +			reg = <RK3288_PD_VIDEO>;
+>> +			/* FIXME: add clocks */
+> what is missing for these clocks? If it's just more clock ids, please
+> corrdinate with Kever
+The clock tree in PD_VIDEO is not complete, maybe because the
+MUX which should be set from GRF_SOC_CON0[7].
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-Based on for-next branch of linux-samsung.git tree.
+I will handle this in my patch.
 
-v3:
-- refreshed on top of Kukjin's tree
-
-v2:
-- match the unit-address with the reg
-
- arch/arm/boot/dts/exynos4210.dtsi |   17 +++++++++++++++++
- arch/arm/boot/dts/exynos4212.dtsi |   17 +++++++++++++++++
- arch/arm/boot/dts/exynos4412.dtsi |   29 +++++++++++++++++++++++++++++
- 3 files changed, 63 insertions(+)
-
-Index: b/arch/arm/boot/dts/exynos4210.dtsi
-===================================================================
---- a/arch/arm/boot/dts/exynos4210.dtsi	2014-09-24 14:38:18.958571829 +0200
-+++ b/arch/arm/boot/dts/exynos4210.dtsi	2014-09-24 15:08:14.062510517 +0200
-@@ -31,6 +31,23 @@
- 		pinctrl2 = &pinctrl_2;
- 	};
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 900 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x900>;
-+		};
-+
-+		cpu at 901 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x901>;
-+		};
-+	};
-+
- 	pmu_system_controller: system-controller at 10020000 {
- 		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
- 				"clkout4", "clkout8", "clkout9";
-Index: b/arch/arm/boot/dts/exynos4212.dtsi
-===================================================================
---- a/arch/arm/boot/dts/exynos4212.dtsi	2014-09-24 14:38:18.954571828 +0200
-+++ b/arch/arm/boot/dts/exynos4212.dtsi	2014-09-24 14:43:02.198562156 +0200
-@@ -22,6 +22,23 @@
- / {
- 	compatible = "samsung,exynos4212", "samsung,exynos4";
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at A00 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA00>;
-+		};
-+
-+		cpu at A01 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA01>;
-+		};
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <18>;
- 	};
-Index: b/arch/arm/boot/dts/exynos4412.dtsi
-===================================================================
---- a/arch/arm/boot/dts/exynos4412.dtsi	2014-09-24 14:38:18.966571830 +0200
-+++ b/arch/arm/boot/dts/exynos4412.dtsi	2014-09-24 14:43:02.198562156 +0200
-@@ -22,6 +22,35 @@
- / {
- 	compatible = "samsung,exynos4412", "samsung,exynos4";
- 
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at A00 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA00>;
-+		};
-+
-+		cpu at A01 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA01>;
-+		};
-+
-+		cpu at A02 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA02>;
-+		};
-+
-+		cpu at A03 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0xA03>;
-+		};
-+	};
-+
- 	combiner: interrupt-controller at 10440000 {
- 		samsung,combiner-nr = <20>;
- 	};
+BR
+-Kever
