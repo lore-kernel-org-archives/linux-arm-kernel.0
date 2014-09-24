@@ -1,82 +1,69 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 24 Sep 2014 13:05:10 +0200
-Subject: [PATCHv3] dmaengine: fsl-edma: fixup reg offset and hw S/G
- support in big-endian model
-In-Reply-To: <1411550642-12577-1-git-send-email-jingchang.lu@freescale.com>
-References: <1411550642-12577-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140924130510.62d78440@ipc1.ka-ro>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 24 Sep 2014 13:08:37 +0200
+Subject: [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos
+ platforms
+In-Reply-To: <026501cfd7ca$0857a140$1906e3c0$@kernel.org>
+References: <1411531078-10671-1-git-send-email-thomas.ab@samsung.com>
+ <026501cfd7ca$0857a140$1906e3c0$@kernel.org>
+Message-ID: <5422A635.2020607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 24.09.2014 09:34, Kukjin Kim wrote:
+> Thomas Abraham wrote:
+>>
+>> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
+>> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
+>> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
+>> driver.
+>>
+>> This patch series is dependent on two other patches
+>> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
+>>    - https://lkml.org/lkml/2014/7/21/315
+>> 2. clk: exynos4: remove duplicate div_core2 divider clock instantiation
+>>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
 
-Jingchang Lu wrote:
-> The offset of all 8-/16-bit register in big-endian eDMA model are
-s/register/registers/
+I have applied 2) to Samsung clock tree.
 
-> swapped in a 32-bit size opposite those in the little-endian model.
+>>
+>> Thomas Abraham (6):
+>>   clk: samsung: add infrastructure to register cpu clocks
+>>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
+>>   ARM: dts: Exynos: add CPU OPP and regulator supply property
+>>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
+>>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
+>>   clk: samsung: remove unused clock aliases and update clock flags
+>>
+>>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
+>>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
+>>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
+>>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
+>>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
+>>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
+>>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
+>>  arch/arm/boot/dts/exynos5250.dtsi               |   25 ++-
+>>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
+>>  arch/arm/mach-exynos/exynos.c                   |   24 ++-
+>>  drivers/clk/samsung/Makefile                    |    2 +-
+>>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
+>>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
+>>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
+>>  drivers/clk/samsung/clk-exynos5250.c            |   44 +++-
+>>  drivers/clk/samsung/clk-exynos5420.c            |   72 +++++-
+>>  drivers/cpufreq/Kconfig.arm                     |   22 --
+>>  drivers/cpufreq/Makefile                        |    2 -
+>>  include/dt-bindings/clock/exynos5250.h          |    1 +
+>>  include/dt-bindings/clock/exynos5420.h          |    2 +
 > 
-> The hardware Scatter/Gather requires the subsequent TCDs in memory
-> to be auto loaded should retain little endian independent of the
-> register endian model, the dma engine will do the swap if need.
+> Looks good to me,
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 > 
-> This patch also use regular assignment for tcd variables r/w
-> instead of with io function previously that may not always be true.
-> 
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
-> changes in v3:
->  use unsigned long instead of u32 in reg offset swap cast to avoid warning.
-> 
-> changes in v2:
->  simplify register offset swap calculation.
->  use regular assignment for tcd variables r/w instead of io function.
-> 
->  drivers/dma/fsl-edma.c | 106 ++++++++++++++++++++++++++-----------------------
->  1 file changed, 57 insertions(+), 49 deletions(-)
-> 
-> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-> index 3c5711d..9ca55ee 100644
-> --- a/drivers/dma/fsl-edma.c
-> +++ b/drivers/dma/fsl-edma.c
-> @@ -177,16 +177,10 @@ struct fsl_edma_engine {
->  /*
->   * R/W functions for big- or little-endian registers
->   * the eDMA controller's endian is independent of the CPU core's endian.
-> + * for the big-endian IP module, the offset for 8-bit or 16-bit register
-s/for/For/
+> BTW, who will handle this series? I think this is already ready for v3.18.
 
-> + * should also be swapped oposite to that in little-endian IP.
-s/oposite/opposite/
+I believe Viresh already acked this series too and since it does quite a
+lot of shuffling in clock code, I'd prefer to take this through clock
+tree, but apparently there is a dependency on patch 1), which already
+went through another tree?
 
-[...]
-> @@ -459,20 +460,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
->  	u16 csr = 0;
->  
->  	/*
-> -	 * eDMA hardware SGs require the TCD parameters stored in memory
-> -	 * the same endian as the eDMA module so that they can be loaded
-> -	 * automatically by the engine
-> +	 * eDMA hardware SGs requires the TCDs to be auto loaded
-> +	 * in the little endian whenver the register endian model,
-"in little endian whatever the register endian model"
-
-> +	 * So we put the value in little endian in memory, waitting
-s/waitting/waiting/
-
-> +	 * for fsl_set_tcd_params doing the swap.
-fsl_set_tcd_params()
-
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best regards,
+Tomasz
