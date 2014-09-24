@@ -1,41 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 10:43:02 +0100
-Subject: [PATCH v2 1/8] ARM: add mach-asm9260
-In-Reply-To: <54227A30.7010805@rempel-privat.de>
-References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <71905861.S3QD6rl7jU@wuerfel> <542136B0.3020305@rempel-privat.de>
- <6072405.iL4RqHeZrt@wuerfel> <54227A30.7010805@rempel-privat.de>
-Message-ID: <20140924094302.GU5182@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Sep 2014 11:48:18 +0200
+Subject: [PATCH v4 1/2] bcma: register bcma as device tree driver
+In-Reply-To: <5421EE62.2080701@hauke-m.de>
+References: <1411339108-22307-1-git-send-email-hauke@hauke-m.de>
+ <4345256.UGZH9SeRYG@wuerfel> <5421EE62.2080701@hauke-m.de>
+Message-ID: <3856565.LYF1mvpGOq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 10:00:48AM +0200, Oleksij Rempel wrote:
-> Am 23.09.2014 um 12:19 schrieb Arnd Bergmann:
-> > No, all of them.
+On Wednesday 24 September 2014 00:04:18 Hauke Mehrtens wrote:
+> I assume this should then look somehow like this:
 > 
-> By removing it i triggered one error which i don't really understand. It
-> will be great if you can help me.
+> axi at 18000000 {
+>         compatible = "brcm,bus-axi";
+>         reg = <0x18000000 0x1000>;
+>         ranges = <0x00000000 0x18000000 0x00100000>;
+>         #address-cells = <1>;
+>         #size-cells = <1>;
 > 
-> By defaul kernel will do fallowing remapping, which will trigger:
-> "Unable to handle kernel paging request at virtual address c2802174"
+>         #interrupt-cells = <1>;
+>         interrupt-map = <
+>                 /* ChipCommon */
+>                 0x00000000 0 &gic  GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH
 > 
-> phys addr     ioremap        range size
-> =======================================
-> 0x80054000 -> c2800000 size: 0x200
-> 0x80040000 -> c2802000 size: 0x204
-> 0x80088000 -> c2808000 size: 0x4000
+>                 /* PCIe Controller 0 */
+>                 0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH
+>                 0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH
+>                 0x00012000 2 &gic GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH
+>                 0x00012000 3 &gic GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH
+>                 0x00012000 4 &gic GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH
+>                 0x00012000 5 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH
 > 
-> 
-> But if change second range from 0x204 to 0x4000, then it works fine.
-> 0x80054000 -> c2800000 size: 0x200
-> 0x80040000 -> c2808000 size: 0x4000
-> 0x80088000 -> c2810000 size: 0x4000
-> 
-> Why?
+>                 /* USB 2.0 Controller */
+>                 0x00021000 0 &gic GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH
+>                 >;
+>         };
 
-The "why" is in the text from your oops dump.  That's precisely /why/ we
-print that text - so that we know /why/ the fault happened.
+Right, although I would add a few more '<', '>' and ',' for readability,
+separating each line with a comma.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+You are also missing an 'interrupt-map-mask' property that lists which
+bits of the address are significant.
+
+Are the interrupt numbers you have in the example (0, 0, 1, 2, ... 5, 0)
+the actual numbers that are present in the hw registers?
+
+> How does the mapping of these interrupts to the devices work?
+
+The same way that of_irq_parse_and_map_pci() works (the second half of it).
+It's a very similar situation: you have a discoverable bus on which the
+interrupts are listed in a different domain from which they are supposed to
+be on the parent. The trick is to make up your own address property
+and of_phandle_args on the stack and fill that with the data from
+the hw bus scan, so you can get into the middle of the normal DT
+irq code that gets them from device nodes.
+
+> Do I have to add a device tree entry for every device after all?
+
+No, unless you want to add other properties in the node, such as
+a MAC address, but then you still only need some of the devices.
+
+> Do you have some example code where this is handled in code, I could not
+> find the code doing this for PCI.
+
+drivers/of/of_pci_irq.c, though the hard part is done in drivers/of/irq.c,
+which parses the interrupt-map and interrupt-map-mask properties.
+
+	Arnd
