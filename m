@@ -1,69 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 24 Sep 2014 13:08:37 +0200
-Subject: [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-In-Reply-To: <026501cfd7ca$0857a140$1906e3c0$@kernel.org>
-References: <1411531078-10671-1-git-send-email-thomas.ab@samsung.com>
- <026501cfd7ca$0857a140$1906e3c0$@kernel.org>
-Message-ID: <5422A635.2020607@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Sep 2014 13:10:34 +0200
+Subject: [PATCH 3/4] gpio: vf610: add gpiolib/IRQ chip driver for Vybird
+In-Reply-To: <a7c933339713dc1783770faf1eceb734@agner.ch>
+References: <cover.1410020458.git.stefan@agner.ch>
+ <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
+ <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
+ <a7c933339713dc1783770faf1eceb734@agner.ch>
+Message-ID: <CACRpkdbJePuG0g=AFGqjDS4=yW0CXnkpf1Yr_1P4e9Kkpu9n-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.09.2014 09:34, Kukjin Kim wrote:
-> Thomas Abraham wrote:
->>
->> This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
->> drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
->> series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
->> driver.
->>
->> This patch series is dependent on two other patches
->> 1. ARM: dts: add CPU nodes for Exynos4 SoCs
->>    - https://lkml.org/lkml/2014/7/21/315
->> 2. clk: exynos4: remove duplicate div_core2 divider clock instantiation
->>    - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
+On Tue, Sep 23, 2014 at 1:51 PM, Stefan Agner <stefan@agner.ch> wrote:
+> [Me]
+>> postcore again. I don't like this, can you get rid of it?
+>
+> I guess we could load this driver easily a bit later. IMHO, since lots
+> of other driver use GPIO's, we should it load before all the drivers
+> gets loaded (before device_initcall).
 
-I have applied 2) to Samsung clock tree.
+Nope. We use deferred probing to control that today. Ideally
+all drivers should be device_initcall() and deferred probe be used
+to order things, not by playing around with initcalls.
 
->>
->> Thomas Abraham (6):
->>   clk: samsung: add infrastructure to register cpu clocks
->>   clk: samsung: add cpu clock configuration data and instantiate cpu clock
->>   ARM: dts: Exynos: add CPU OPP and regulator supply property
->>   ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
->>   cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
->>   clk: samsung: remove unused clock aliases and update clock flags
->>
->>  arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
->>  arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
->>  arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
->>  arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
->>  arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
->>  arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
->>  arch/arm/boot/dts/exynos5250.dtsi               |   25 ++-
->>  arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
->>  arch/arm/mach-exynos/exynos.c                   |   24 ++-
->>  drivers/clk/samsung/Makefile                    |    2 +-
->>  drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
->>  drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
->>  drivers/clk/samsung/clk-exynos4.c               |   63 +++--
->>  drivers/clk/samsung/clk-exynos5250.c            |   44 +++-
->>  drivers/clk/samsung/clk-exynos5420.c            |   72 +++++-
->>  drivers/cpufreq/Kconfig.arm                     |   22 --
->>  drivers/cpufreq/Makefile                        |    2 -
->>  include/dt-bindings/clock/exynos5250.h          |    1 +
->>  include/dt-bindings/clock/exynos5420.h          |    2 +
-> 
-> Looks good to me,
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> BTW, who will handle this series? I think this is already ready for v3.18.
+> Most GPIO driver do this, some statistic again:
+> $ grep -h -o ".*_initcall" drivers/gpio/*.c | sort | uniq -c | sort -n
+> -r
+>      33 subsys_initcall
+>      14 postcore_initcall
+>       2 device_initcall
+>       2 arch_initcall
+>       1 late_initcall
+>       1 core_initcall
 
-I believe Viresh already acked this series too and since it does quite a
-lot of shuffling in clock code, I'd prefer to take this through clock
-tree, but apparently there is a dependency on patch 1), which already
-went through another tree?
+Yeah old legacy. There are patch attacks to get rid of this.
 
-Best regards,
-Tomasz
+The reason we can't just change them is because sometimes
+dependent drivers do not handle the errorpath very well can can't
+defer cleanly.
+
+With a new driver I expect deferred probe to be used.
+
+Yours,
+Linus Walleij
