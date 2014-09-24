@@ -1,91 +1,127 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 23 Sep 2014 18:12:00 -0700
-Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
- ATS1PR
-In-Reply-To: <20140922152614.GP25809@arm.com> (Will Deacon's message of "Mon,
- 22 Sep 2014 16:26:14 +0100")
-References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
- <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
- <20140922152614.GP25809@arm.com>
-Message-ID: <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 24 Sep 2014 09:11:01 +0800
+Subject: [PATCH v2 2/2] watchdog: dw_wdt: add restart handler support
+In-Reply-To: <20140923183159.GB24930@roeck-us.net>
+References: <1411458132-5410-1-git-send-email-jszhang@marvell.com>
+ <1411458132-5410-3-git-send-email-jszhang@marvell.com>
+ <20140923183159.GB24930@roeck-us.net>
+Message-ID: <20140924091101.60e065cd@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22 2014 at 08:26:14 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Mitch,
->
-> On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
->> Currently, we provide the iommu_ops.iova_to_phys service by doing a
->> table walk in software to translate IO virtual addresses to physical
->> addresses. On SMMUs that support it, it can be useful to ask the SMMU
->> itself to do the translation. This can be used to warm the TLBs for an
->> SMMU. It can also be useful for testing and hardware validation.
->> 
->> Since the address translation registers are optional on SMMUv2, only
->> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
->> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
->
-> [...]
->
->> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
->> +					dma_addr_t iova)
->> +{
->> +	struct arm_smmu_domain *smmu_domain = domain->priv;
->> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
->> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->> +	struct device *dev = smmu->dev;
->> +	void __iomem *cb_base;
->> +	u32 tmp;
->> +	u64 phys;
->> +
->> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
->> +
->> +	if (smmu->version == 1) {
->> +		u32 reg = iova & ~0xFFF;
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->> +	} else {
->> +		u32 reg = iova & ~0xFFF;
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->> +		reg = (iova & ~0xFFF) >> 32;
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
->> +	}
->> +
->> +	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
->> +				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
->> +		dev_err(dev,
->> +			"iova to phys timed out on 0x%pa for %s. Falling back to software table walk.\n",
->> +			&iova, dev_name(dev));
->
-> dev_err already prints the device name.
+Dear Guenter,
 
-Ah of course.  I'll remove the dev_name.
+On Tue, 23 Sep 2014 11:31:59 -0700
+Guenter Roeck <linux@roeck-us.net> wrote:
 
->
->> +		return arm_smmu_iova_to_phys_soft(domain, iova);
->> +	}
->> +
->> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
->> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
->> +
->> +	if (phys & CB_PAR_F) {
->> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
->> +		dev_err(dev, "PAR = 0x%llx\n", phys);
->> +	}
->> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
->
-> How does this work for 64k pages?
+> On Tue, Sep 23, 2014 at 03:42:12PM +0800, Jisheng Zhang wrote:
+> > The kernel core now provides an API to trigger a system restart.
+> > Register with it to support restarting the system via. watchdog.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/watchdog/dw_wdt.c | 32 ++++++++++++++++++++++++++++++++
+> >  1 file changed, 32 insertions(+)
+> > 
+> > diff --git a/drivers/watchdog/dw_wdt.c b/drivers/watchdog/dw_wdt.c
+> > index 449c885..9e577a6 100644
+> > --- a/drivers/watchdog/dw_wdt.c
+> > +++ b/drivers/watchdog/dw_wdt.c
+> > @@ -21,6 +21,7 @@
+> >  
+> >  #include <linux/bitops.h>
+> >  #include <linux/clk.h>
+> > +#include <linux/delay.h>
+> >  #include <linux/device.h>
+> >  #include <linux/err.h>
+> >  #include <linux/fs.h>
+> > @@ -29,9 +30,11 @@
+> >  #include <linux/miscdevice.h>
+> >  #include <linux/module.h>
+> >  #include <linux/moduleparam.h>
+> > +#include <linux/notifier.h>
+> >  #include <linux/of.h>
+> >  #include <linux/pm.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/reboot.h>
+> >  #include <linux/spinlock.h>
+> >  #include <linux/timer.h>
+> >  #include <linux/uaccess.h>
+> > @@ -63,6 +66,7 @@ static struct {
+> >  	unsigned long		next_heartbeat;
+> >  	struct timer_list	timer;
+> >  	int			expect_close;
+> > +	struct notifier_block	restart_handler;
+> >  } dw_wdt;
+> >  
+> >  static inline int dw_wdt_is_enabled(void)
+> > @@ -121,6 +125,26 @@ static void dw_wdt_keepalive(void)
+> >  	       WDOG_COUNTER_RESTART_REG_OFFSET);
+> >  }
+> >  
+> > +static int dw_wdt_restart_handle(struct notifier_block *this,
+> > +				unsigned long mode, void *cmd)
+> > +{
+> > +	u32 val;
+> > +
+> > +	writel(0, dw_wdt.regs + WDOG_TIMEOUT_RANGE_REG_OFFSET);
+> > +	val = readl(dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
+> > +	if (val & WDOG_CONTROL_REG_WDT_EN_MASK)
+> > +		writel(WDOG_COUNTER_RESTART_KICK_VALUE, dw_wdt.regs +
+> > +			WDOG_COUNTER_RESTART_REG_OFFSET);
+> > +	else
+> > +		writel(WDOG_CONTROL_REG_WDT_EN_MASK,
+> > +		       dw_wdt.regs + WDOG_CONTROL_REG_OFFSET);
+> > +
+> > +	/* wait for reset to assert... */
+> > +	mdelay(500);
+> > +
+> > +	return NOTIFY_DONE;
+> > +}
+> > +
+> >  static void dw_wdt_ping(unsigned long data)
+> >  {
+> >  	if (time_before(jiffies, dw_wdt.next_heartbeat) ||
+> > @@ -316,6 +340,12 @@ static int dw_wdt_drv_probe(struct platform_device
+> > *pdev) if (ret)
+> >  		goto out_disable_clk;
+> >  
+> > +	dw_wdt.restart_handler.notifier_call = dw_wdt_restart_handle;
+> > +	dw_wdt.restart_handler.priority = 128;
+> > +	ret = register_restart_handler(&dw_wdt.restart_handler);
+> > +	if (ret)
+> > +		pr_warn("cannot register restart handler\n");
+> 
+> Please use dev_warn(&pdev->dev, ...).
 
-So at the moment we're always assuming that we're using v7/v8 long
-descriptor format, right?  All I see in the spec (14.5.15 SMMU_CBn_PAR)
-is that bits[47:12]=>PA[47:12]...  Or am I missing something completely?
+Yep, that's what I thought when patching the code. But the original source is
+using pr_*(), so I use pr_warn() to keep unification. Is there any better
+solution?
 
-As a mental note, if we add support for v7 short descriptors (which we
-would like to do sometime soon) then we'll have to handle the
-supersection case here as well.
+Thanks for your review,
+Jisheng
 
-
--Mitch
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Thanks,
+> Guenter
+> 
+> > +
+> >  	dw_wdt_set_next_heartbeat();
+> >  	setup_timer(&dw_wdt.timer, dw_wdt_ping, 0);
+> >  	mod_timer(&dw_wdt.timer, jiffies + WDT_TIMEOUT);
+> > @@ -330,6 +360,8 @@ out_disable_clk:
+> >  
+> >  static int dw_wdt_drv_remove(struct platform_device *pdev)
+> >  {
+> > +	unregister_restart_handler(&dw_wdt.restart_handler);
+> > +
+> >  	misc_deregister(&dw_wdt_miscdev);
+> >  
+> >  	clk_disable_unprepare(dw_wdt.clk);
+> > -- 
+> > 2.1.0
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-watchdog"
+> > in the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
