@@ -1,397 +1,148 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 24 Sep 2014 11:10:55 +0200
-Subject: [PATCH v6] watchdog: Add DA9063 PMIC watchdog driver.
-In-Reply-To: <20140911163035.GA13969@roeck-us.net>
-References: <1410184713-6436-1-git-send-email-mpa@pengutronix.de>
- <20140911163035.GA13969@roeck-us.net>
-Message-ID: <20140924091055.GB25366@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Sep 2014 10:12:50 +0100
+Subject: [PATCH v4 1/3] mfd: add support for Qualcomm SPMI PMICs
+In-Reply-To: <1406903450-27283-2-git-send-email-svarbanov@mm-sol.com>
+References: <1406903450-27283-1-git-send-email-svarbanov@mm-sol.com>
+ <1406903450-27283-2-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <20140924091250.GK17801@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-sorry for the late reply, I was on vacation.
-
-On Thu, Sep 11, 2014 at 09:30:35AM -0700, Guenter Roeck wrote:
-> On Mon, Sep 08, 2014 at 03:58:33PM +0200, Markus Pargmann wrote:
-> > From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-> > 
-> > This driver supports the watchdog device inside the DA9063 PMIC.
-> > 
-> > Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> > 
-> > Notes:
-> >     Changes in v6:
-> >      - Fix compile error
-> >     
-> >     Changes in v5:
-> >      - Kconfig: Add note about the module name.
-> >      - Change selector variables to int
-> >      - Style fixes
-> >      - use unsigned int to remove gcc verbose warning
-> >      - Integrate _kick() and _disable() into the calling functions
-> >     
-> >     Changes in v4:
-> >      - Fixed indentation
-> >      - Fixed lock without unlock
-> >      - Check for parent device and device driver data in probe(). If not present,
-> >        this is an invalid prober initialization, return -EINVAL.
-> >     
-> >     Changes in v3:
-> >      - Cleanup error handling for timeout selection and setting
-> >      - Fix race condition due to late wdt drvdata setup
-> >      - Remove static struct watchdog_device. It is not initialized in the probe
-> >        function
-> >      - Use WATCHDOG_NOWAYOUT_INIT_STATUS for the status
-> >      - Remove 0 shift using DA9063_TWDSCALE_SHIFT
-> > 
-> >  drivers/watchdog/Kconfig      |   9 ++
-> >  drivers/watchdog/Makefile     |   1 +
-> >  drivers/watchdog/da9063_wdt.c | 222 ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 232 insertions(+)
-> >  create mode 100644 drivers/watchdog/da9063_wdt.c
-> > 
-> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> > index f57312fced80..669de63a7a48 100644
-> > --- a/drivers/watchdog/Kconfig
-> > +++ b/drivers/watchdog/Kconfig
-> > @@ -87,6 +87,15 @@ config DA9055_WATCHDOG
-> >  	  This driver can also be built as a module.  If so, the module
-> >  	  will be called da9055_wdt.
-> >  
-> > +config DA9063_WATCHDOG
-> > +	tristate "Dialog DA9063 Watchdog"
-> > +	depends on MFD_DA9063
-> > +	select WATCHDOG_CORE
-> > +	help
-> > +	  Support for the watchdog in the DA9063 PMIC.
-> > +
-> > +	  This driver can be built as a module. The module name is da9063_wdt.
-> > +
-> >  config GPIO_WATCHDOG
-> >  	tristate "Watchdog device controlled through GPIO-line"
-> >  	depends on OF_GPIO
-> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> > index 468c3204c3b1..6c467a9821fe 100644
-> > --- a/drivers/watchdog/Makefile
-> > +++ b/drivers/watchdog/Makefile
-> > @@ -173,6 +173,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
-> >  # Architecture Independent
-> >  obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
-> >  obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
-> > +obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
-> >  obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
-> >  obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
-> >  obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
-> > diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
-> > new file mode 100644
-> > index 000000000000..88441bdd2d1b
-> > --- /dev/null
-> > +++ b/drivers/watchdog/da9063_wdt.c
-> > @@ -0,0 +1,222 @@
-> > +/*
-> > + * Watchdog driver for DA9063 PMICs.
-> > + *
-> > + * Copyright(c) 2012 Dialog Semiconductor Ltd.
-> > + *
-> > + * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
-> > + *
-> > + * This program is free software; you can redistribute  it and/or modify it
-> > + * under  the terms of  the GNU General  Public License as published by the
-> > + * Free Software Foundation;  either version 2 of the  License, or (at your
-> > + * option) any later version.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/watchdog.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/uaccess.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/mfd/da9063/registers.h>
-> > +#include <linux/mfd/da9063/core.h>
-> > +#include <linux/regmap.h>
-> > +
-> > +/*
-> > + * Watchdog selector to timeout in seconds.
-> > + *   0: WDT disabled;
-> > + *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
-> > + */
-> > +static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
-> > +#define DA9063_TWDSCALE_DISABLE		0
-> > +#define DA9063_TWDSCALE_MIN		1
-> > +#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
-> > +#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
-> > +#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
-> > +#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
-> > +
-> > +struct da9063_watchdog {
-> > +	struct da9063 *da9063;
-> > +	struct watchdog_device wdtdev;
-> > +	struct mutex lock;
+On Fri, 01 Aug 2014, Stanimir Varbanov wrote:
+> From: Josh Cartwright <joshc@codeaurora.org>
 > 
-> The watchdog subsystem already provides locking. I don't find a single case
-> where this additional lock is needed. Can you give me one ?
-
-Okay, I removed the lock.
-
+> The Qualcomm SPMI PMIC chips are components used with the
+> Snapdragon 800 series SoC family.  This driver exists
+> largely as a glue mfd component, it exists to be an owner
+> of an SPMI regmap for children devices described in
+> device tree.
 > 
-> > +};
-> > +
-> > +static int da9063_wdt_timeout_to_sel(int secs)
-> > +{
-> > +	unsigned int i;
-> > +
-> > +	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
-> > +		if (wdt_timeout[i] >= secs)
-> > +			return i;
-> > +	}
-> > +
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
-> > +{
-> > +	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-> > +			DA9063_TWDSCALE_MASK, regval);
-> 
-> For hwmon I decided to start enforcing indentation rules, for the simple
-> reason that everyone otherwise uses different second-line indentations.
-> Lucky for you I am not the watchdog maintainer ;-)
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/Kconfig          |   15 +++++++++
+>  drivers/mfd/Makefile         |    1 +
+>  drivers/mfd/qcom-spmi-pmic.c |   67 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 83 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/mfd/qcom-spmi-pmic.c
 
-As a lot of people seem to share your opinion about indentation I
-configured my vim to align to the opening bracket now. So next version
-will have aligned indentation ;-).
-> 
-> > +}
-> > +
-> > +static int da9063_wdt_start(struct watchdog_device *wdd)
-> > +{
-> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> > +	int selector;
-> > +	int ret;
-> > +
-> > +	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev.timeout);
-> > +	if (selector < 0) {
-> > +		dev_err(wdt->da9063->dev, "Timeout out of range (timeout=%d)\n",
-> > +				wdt->wdtdev.timeout);
-> > +		return selector;
-> > +	}
-> > +
-> > +	mutex_lock(&wdt->lock);
-> > +	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-> > +	if (ret) {
-> > +		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
-> > +				ret);
-> > +	}
-> > +	mutex_unlock(&wdt->lock);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int da9063_wdt_stop(struct watchdog_device *wdd)
-> > +{
-> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> > +	int ret;
-> > +
-> > +	mutex_lock(&wdt->lock);
-> > +	ret = regmap_update_bits(wdt->da9063->regmap, DA9063_REG_CONTROL_D,
-> > +			DA9063_TWDSCALE_MASK,
-> > +			DA9063_TWDSCALE_DISABLE);
-> > +	if (ret)
-> > +		dev_alert(wdt->da9063->dev, "Watchdog failed to stop (err = %d)\n",
-> > +				ret);
-> 
-> I am personally not in favor of dumping error mesasges onto the console if the
-> error is also reported to user space. My logic is that if everyone would be
-> doing that logging, the log would be all noise and be completely useless.
+Applied, thanks.
 
-Yes, the userspace should handle error codes and report errors
-appropriately. However as this is a quite serious error message, I would
-prefer to have it as a kernel error message so that the reason for a
-reset by watchdog is obvious and listed in the kernel log.
-
-> 
-> > +	mutex_unlock(&wdt->lock);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int da9063_wdt_ping(struct watchdog_device *wdd)
-> > +{
-> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> > +	int ret;
-> > +
-> > +	mutex_lock(&wdt->lock);
-> > +	ret = regmap_write(wdt->da9063->regmap, DA9063_REG_CONTROL_F,
-> > +			DA9063_WATCHDOG);
-> > +	if (ret)
-> > +		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
-> > +				ret);
-> > +	mutex_unlock(&wdt->lock);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
-> > +		unsigned int timeout)
-> > +{
-> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> > +	int selector;
-> > +	int ret;
-> > +
-> > +	selector = da9063_wdt_timeout_to_sel(timeout);
-> > +	if (selector < 0) {
-> > +		dev_err(wdt->da9063->dev,
-> > +				"Unsupported watchdog timeout, should be between 2 and 131\n");
-> 
-> Since the caller already performs a range check, I wonder if this repeated
-> error check really provides additional value. Seems to me it would be much
-> simpler to have da9063_wdt_timeout_to_sel always return a valid value and
-> to drop all those additional range checks.
-
-Okay, finally removed all these rangechecks.
-
-> 
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	mutex_lock(&wdt->lock);
-> > +
-> > +	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-> > +	if (ret)
-> > +		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
-> > +				ret);
-> > +	else
-> > +		wdd->timeout = wdt_timeout[selector];
-> > +
-> > +	mutex_unlock(&wdt->lock);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static const struct watchdog_info da9063_watchdog_info = {
-> > +	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-> > +	.identity = "DA9063 Watchdog",
-> > +};
-> > +
-> > +static const struct watchdog_ops da9063_watchdog_ops = {
-> > +	.owner = THIS_MODULE,
-> > +	.start = da9063_wdt_start,
-> > +	.stop = da9063_wdt_stop,
-> > +	.ping = da9063_wdt_ping,
-> > +	.set_timeout = da9063_wdt_set_timeout,
-> > +};
-> > +
-> > +static int da9063_wdt_probe(struct platform_device *pdev)
-> > +{
-> > +	int ret;
-> > +	struct da9063 *da9063;
-> > +	struct da9063_watchdog *wdt;
-> > +
-> > +	if (!pdev->dev.parent)
-> > +		return -EINVAL;
-> > +
-> > +	da9063 = dev_get_drvdata(pdev->dev.parent);
-> > +	if (!da9063)
-> > +		return -EINVAL;
-> > +
-> 
-> This is not really an invalid argument. -ENODEV seems to be more appropriate,
-> given the context (presumably it means that there is no parent mfd device).
-
-Yes, but ENODEV will not result in a probe error message because the
-driver core assumes that the driver is not for this device. I would like
-to have a probe error message so that developers immediately see that
-something went wrong. This driver without a parent is a invalid setup,
-so I chose EINVAL.
-I prefer returning -EINVAL but as an alternative I could add an error
-message here and return ENODEV.
-
-> 
-> > +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> > +	if (!wdt)
-> > +		return -ENOMEM;
-> > +
-> > +	wdt->da9063 = da9063;
-> > +	mutex_init(&wdt->lock);
-> > +
-> > +	wdt->wdtdev.info = &da9063_watchdog_info;
-> > +	wdt->wdtdev.ops = &da9063_watchdog_ops;
-> > +	wdt->wdtdev.min_timeout = DA9063_WDT_MIN_TIMEOUT;
-> > +	wdt->wdtdev.max_timeout = DA9063_WDT_MAX_TIMEOUT;
-> > +	wdt->wdtdev.timeout = DA9063_WDG_TIMEOUT;
-> > +
-> > +	wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
-> > +
-> > +	watchdog_set_drvdata(&wdt->wdtdev, wdt);
-> > +	dev_set_drvdata(&pdev->dev, wdt);
-> > +
-> > +	ret = watchdog_register_device(&wdt->wdtdev);
-> > +	if (ret) {
-> > +		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
-> > +				ret);
-> 
-> "da9063-watchdog" is really redundant since dev_err already displays
-> the device name.
-
-Also this error message is redundant, as the driver probing code will
-print an error message when it failed. So I removed the message
-completely.
-
-Thanks for your feedback.
-
-Best regards,
-
-Markus
-
-> 
-> > +		return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int da9063_wdt_remove(struct platform_device *pdev)
-> > +{
-> > +	struct da9063_watchdog *wdt = dev_get_drvdata(&pdev->dev);
-> > +
-> > +	watchdog_unregister_device(&wdt->wdtdev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct platform_driver da9063_wdt_driver = {
-> > +	.probe = da9063_wdt_probe,
-> > +	.remove = da9063_wdt_remove,
-> > +	.driver = {
-> > +		.name = DA9063_DRVNAME_WATCHDOG,
-> > +	},
-> > +};
-> > +module_platform_driver(da9063_wdt_driver);
-> > +
-> > +MODULE_AUTHOR("Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>");
-> > +MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
-> > +MODULE_LICENSE("GPL");
-> > +MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
-> > -- 
-> > 2.1.0
-> > 
-> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 6cc4b6a..abfe12a 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -524,6 +524,21 @@ config MFD_PM8921_CORE
+>  	  Say M here if you want to include support for PM8921 chip as a module.
+>  	  This will build a module called "pm8921-core".
+>  
+> +config MFD_SPMI_PMIC
+> +	tristate "Qualcomm SPMI PMICs"
+> +	depends on ARCH_QCOM || COMPILE_TEST
+> +	depends on OF
+> +	depends on SPMI
+> +	select REGMAP_SPMI
+> +	help
+> +	  This enables support for the Qualcomm SPMI PMICs.
+> +	  These PMICs are currently used with the Snapdragon 800 series of
+> +	  SoCs.  Note, that this will only be useful paired with descriptions
+> +	  of the independent functions as children nodes in the device tree.
+> +
+> +	  Say M here if you want to include support for the SPMI PMIC
+> +	  series as a module.  The module will be called "qcom-spmi-pmic".
+> +
+>  config MFD_RDC321X
+>  	tristate "RDC R-321x southbridge"
+>  	select MFD_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 8afedba..0e7f32e 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -153,6 +153,7 @@ obj-$(CONFIG_MFD_SI476X_CORE)	+= si476x-core.o
+>  obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
+>  obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o omap-usb-tll.o
+>  obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+> +obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
+>  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+>  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+>  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+> diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
+> new file mode 100644
+> index 0000000..4b8beb2
+> --- /dev/null
+> +++ b/drivers/mfd/qcom-spmi-pmic.c
+> @@ -0,0 +1,67 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/spmi.h>
+> +#include <linux/regmap.h>
+> +#include <linux/of_platform.h>
+> +
+> +static const struct regmap_config spmi_regmap_config = {
+> +	.reg_bits	= 16,
+> +	.val_bits	= 8,
+> +	.max_register	= 0xffff,
+> +	.fast_io	= true,
+> +};
+> +
+> +static int pmic_spmi_probe(struct spmi_device *sdev)
+> +{
+> +	struct device_node *root = sdev->dev.of_node;
+> +	struct regmap *regmap;
+> +
+> +	regmap = devm_regmap_init_spmi_ext(sdev, &spmi_regmap_config);
+> +	if (IS_ERR(regmap))
+> +		return PTR_ERR(regmap);
+> +
+> +	return of_platform_populate(root, NULL, NULL, &sdev->dev);
+> +}
+> +
+> +static void pmic_spmi_remove(struct spmi_device *sdev)
+> +{
+> +	of_platform_depopulate(&sdev->dev);
+> +}
+> +
+> +static const struct of_device_id pmic_spmi_id_table[] = {
+> +	{ .compatible = "qcom,spmi-pmic" },
+> +	{ .compatible = "qcom,pm8941" },
+> +	{ .compatible = "qcom,pm8841" },
+> +	{ .compatible = "qcom,pma8084" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, pmic_spmi_id_table);
+> +
+> +static struct spmi_driver pmic_spmi_driver = {
+> +	.probe = pmic_spmi_probe,
+> +	.remove = pmic_spmi_remove,
+> +	.driver = {
+> +		.name = "pmic-spmi",
+> +		.of_match_table = pmic_spmi_id_table,
+> +	},
+> +};
+> +module_spmi_driver(pmic_spmi_driver);
+> +
+> +MODULE_DESCRIPTION("Qualcomm SPMI PMIC driver");
+> +MODULE_ALIAS("spmi:spmi-pmic");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Josh Cartwright <joshc@codeaurora.org>");
+> +MODULE_AUTHOR("Stanimir Varbanov <svarbanov@mm-sol.com>");
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/8e2fb703/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
