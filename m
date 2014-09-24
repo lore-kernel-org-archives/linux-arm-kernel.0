@@ -1,88 +1,44 @@
 From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 19:27:16 -0300
-Subject: [PATCH 16/18] s5p-mfc: Fix several printk warnings
+Date: Wed, 24 Sep 2014 19:27:15 -0300
+Subject: [PATCH 15/18] [media] s5p_mfc_opr: Fix warnings
 In-Reply-To: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
 References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
-Message-ID: <1536700400c83ddd7ec097bd08f1209bf16ca66e.1411597610.git.mchehab@osg.samsung.com>
+Message-ID: <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c:192:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?dma_addr_t? [-Wformat=]
-drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c:196:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?dma_addr_t? [-Wformat=]
-drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c:196:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
-drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:1206:4: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:1206:32: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:1757:3: warning: format ?%zx? expects argument of type ?size_t?, but argument 6 has type ?dma_addr_t? [-Wformat=]
-drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:1879:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
-drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:1206:4: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:1206:32: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+  CC      drivers/media//platform/s5p-mfc/s5p_mfc_opr.o
+drivers/media//platform/s5p-mfc/s5p_mfc_opr.c: In function ?s5p_mfc_alloc_priv_buf?:
+drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:44:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+  mfc_debug(3, "Allocating priv: %d\n", b->size);
+  ^
+drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:53:2: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
+  mfc_debug(3, "Allocated addr %p %08x\n", b->virt, b->dma);
+  ^
 
 Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-index 3c10e31d017b..0c885a8a0e9f 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-@@ -189,12 +189,12 @@ static inline void s5p_mfc_init_memctrl(struct s5p_mfc_dev *dev)
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+index c9a227428e6a..5d311d6ba8f7 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+@@ -41,7 +41,7 @@ int s5p_mfc_alloc_priv_buf(struct device *dev,
+ 					struct s5p_mfc_priv_buf *b)
  {
- 	if (IS_MFCV6_PLUS(dev)) {
- 		mfc_write(dev, dev->bank1, S5P_FIMV_RISC_BASE_ADDRESS_V6);
--		mfc_debug(2, "Base Address : %08x\n", dev->bank1);
-+		mfc_debug(2, "Base Address : %pad\n", &dev->bank1);
- 	} else {
- 		mfc_write(dev, dev->bank1, S5P_FIMV_MC_DRAMBASE_ADR_A);
- 		mfc_write(dev, dev->bank2, S5P_FIMV_MC_DRAMBASE_ADR_B);
--		mfc_debug(2, "Bank1: %08x, Bank2: %08x\n",
--				dev->bank1, dev->bank2);
-+		mfc_debug(2, "Bank1: %pad, Bank2: %pad\n",
-+				&dev->bank1, &dev->bank2);
- 	}
- }
  
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 77eb952a744a..a98fe023deaf 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -1202,7 +1202,7 @@ void s5p_mfc_dec_init(struct s5p_mfc_ctx *ctx)
- 	else
- 		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12MT;
- 	ctx->dst_fmt = find_format(&f, MFC_FMT_RAW);
--	mfc_debug(2, "Default src_fmt is %x, dest_fmt is %x\n",
--			(unsigned int)ctx->src_fmt, (unsigned int)ctx->dst_fmt);
-+	mfc_debug(2, "Default src_fmt is %p, dest_fmt is %p\n",
-+			ctx->src_fmt, ctx->dst_fmt);
- }
+-	mfc_debug(3, "Allocating priv: %d\n", b->size);
++	mfc_debug(3, "Allocating priv: %zd\n", b->size);
  
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index adffdb37746b..a2cc86dbe5db 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -1750,13 +1750,13 @@ static int check_vb_with_fmt(struct s5p_mfc_fmt *fmt, struct vb2_buffer *vb)
- 		return -EINVAL;
+ 	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
+ 
+@@ -50,7 +50,7 @@ int s5p_mfc_alloc_priv_buf(struct device *dev,
+ 		return -ENOMEM;
  	}
- 	for (i = 0; i < fmt->num_planes; i++) {
--		if (!vb2_dma_contig_plane_dma_addr(vb, i)) {
-+		dma_addr_t dma = vb2_dma_contig_plane_dma_addr(vb, i);
-+		if (!dma) {
- 			mfc_err("failed to get plane cookie\n");
- 			return -EINVAL;
- 		}
--		mfc_debug(2, "index: %d, plane[%d] cookie: 0x%08zx\n",
--			  vb->v4l2_buf.index, i,
--			  vb2_dma_contig_plane_dma_addr(vb, i));
-+		mfc_debug(2, "index: %d, plane[%d] cookie: %pad\n",
-+			  vb->v4l2_buf.index, i, &dma);
- 	}
+ 
+-	mfc_debug(3, "Allocated addr %p %08x\n", b->virt, b->dma);
++	mfc_debug(3, "Allocated addr %p %pad\n", b->virt, &b->dma);
  	return 0;
  }
-@@ -1876,7 +1876,7 @@ static int s5p_mfc_buf_prepare(struct vb2_buffer *vb)
- 		ret = check_vb_with_fmt(ctx->dst_fmt, vb);
- 		if (ret < 0)
- 			return ret;
--		mfc_debug(2, "plane size: %ld, dst size: %d\n",
-+		mfc_debug(2, "plane size: %ld, dst size: %zd\n",
- 			vb2_plane_size(vb, 0), ctx->enc_dst_buf_size);
- 		if (vb2_plane_size(vb, 0) < ctx->enc_dst_buf_size) {
- 			mfc_err("plane size is too small for capture\n");
+ 
 -- 
 1.9.3
