@@ -1,43 +1,51 @@
-From: bpringlemeir@nbsps.com (Bill Pringlemeir)
-Date: Wed, 24 Sep 2014 13:06:13 -0400
-Subject: [PATCH v2 0/3] ARM: vf610: Fix/add clocksource
-In-Reply-To: <1411575610-20895-1-git-send-email-stefan@agner.ch> (Stefan
- Agner's message of "Wed, 24 Sep 2014 18:20:07 +0200")
-References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
-Message-ID: <87tx3xkkxm.fsf@nbsps.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Sep 2014 18:06:27 +0100
+Subject: [PATCH v2 01/18] arm: dma-mapping: arm_iommu_attach_device:
+ automatically set max_seg_size
+In-Reply-To: <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
+References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+ <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140924170627.GK16244@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marek,
 
-On 24 Sep 2014, stefan at agner.ch wrote:
+On Tue, Sep 16, 2014 at 12:54:28PM +0100, Marek Szyprowski wrote:
+> If device has no max_seg_size set, we assume that there is no limit and
+> force it to DMA_BIT_MASK(32) to always use contiguous mappings in DMA
+> address space.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  arch/arm/mm/dma-mapping.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index bcd5f836f27e..84705e24571b 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -2050,6 +2050,22 @@ int arm_iommu_attach_device(struct device *dev,
+>  {
+>  	int err;
+>  
+> +	/*
+> +	 * if device has no max_seg_size set, we assume that there is no limit
+> +	 * and force it to DMA_BIT_MASK(32) to always use contiguous mappings
+> +	 * in DMA address space
+> +	 */
+> +	if (!dev->dma_parms) {
+> +		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
+> +		if (!dev->dma_parms)
+> +			return -ENOMEM;
+> +	}
+> +	if (!dev->dma_parms->max_segment_size) {
+> +		err = dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
 
-> This patchset came out of need for a clocksource which supports
-> shutdown.  In the first version I proposed to just replace the current
-> clocksource with the ARM Global Timer and even proposed to remove the
-> PIT clocksource driver. But Bill Pringlemeir brought up a reasonable
-> point why we should keep the PIT clocksource.
->
-> Since we need shutdown support for suspend/resume, I added another
-> patch which fixes shutdown functionality for the PIT driver. Now it's
-> possible to use suspend/resume functionality with each of the two
-> clocksources.
->
-> Changes in v2:
-> - Added shutdown support for PIT clocksource (and hence clocksource
-> maintainers as receipient).
-> - Create Kconfig entries which allow to choose between the two
-> clocksources
-> - Clarified commit message
-> - Renamed device tree node to "timer"
->
-> Stefan Agner (3):
-> clocksource: vf_pit_timer: Support shutdown mode
-> ARM: dts: vf610: Add ARM Global Timer
-> ARM: vf610: Add ARM Global Timer clocksource option
->
-> arch/arm/boot/dts/vf610.dtsi       |  8 ++++++++
-> arch/arm/mach-imx/Kconfig          | 19 ++++++++++++++++++-
-> drivers/clocksource/vf_pit_timer.c |  5 +++++
-> 3 files changed, 31 insertions(+), 1 deletion(-)
+Would it make more sense to base this default value off the dma_mask?
+In my IOMMU series, of_dma_configure passes back a size parameter to
+arch_setup_dma_ops which is calculated from the dma-ranges property or the
+coherent dma mask if the ranges property is absent, so maybe we should set
+this there too?
 
-Acked-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+Will
