@@ -1,66 +1,69 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 24 Sep 2014 14:50:04 +0000
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <3563146.jh46O3eIbG@wuerfel>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <6499926.sQm3J8L764@wuerfel> <20140904091319.GA32228@leverpostej>
- <3563146.jh46O3eIbG@wuerfel>
-Message-ID: <eece3d41d2f0408ab235f9915eed40a6@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Sep 2014 15:50:25 +0100
+Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
+ consolidation
+In-Reply-To: <5422D616.7060807@mentor.com>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+ <20140922153919.GQ25809@arm.com>
+ <20140922223022.GO5182@n2100.arm.linux.org.uk> <5420BE92.7050504@mentor.com>
+ <5422D138.8000002@codeaurora.org> <5422D616.7060807@mentor.com>
+Message-ID: <20140924145025.GX5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So there is still an open issue that has not been closed related to
-what device trees should have with respect to enable-method.  There 
-are 2 proposals from Mark and Arnd--
+On Wed, Sep 24, 2014 at 09:32:54AM -0500, Nathan Lynch wrote:
+> On 09/24/2014 09:12 AM, Christopher Covington wrote:
+> > Hi Nathan,
+> > 
+> > On 09/22/2014 08:28 PM, Nathan Lynch wrote:
+> >> Hmm, this patch set is merely exposing the hardware counter when it is
+> >> present for the VDSO's use; I take it you have no objection to that?
+> >>
+> >> While the 32-bit ARM VDSO I've posted (in a different thread) exploits a
+> >> facility that is required by the virtualization option in the
+> >> architecture, its utility is not limited to guest operating systems.
+> > 
+> > Just to clarify, were the performance improvements you measured from a
+> > virtualized guest or native?
+> 
+> Yeah I should have been explicit about this.  My tests and measurements
+> (and all test results I've received from others, I believe) have been on
+> native/host kernels, not guests.
 
-1.  Put comment in /cpus node in dts (Mark)
+Have there been any measurements on systems without the architected
+timers?
 
-     ...
-        cpus {
-                #address-cells = <2>;
-                #size-cells = <0>;
+> > I count 18 dts* files that have "arm,armv7-timer", including platforms with
+> > Krait, Exynos, and Tegra processors.
+> 
+> Yup.
 
-                /*
-                 * We expect the enable-method to be "psci", but this is dependent on
-                 * the FW, which will fill this in.
-                 */
+That's not the full story.  Almost every ARM to date has not had an
+architected timer.  Architected timers are a recent addition - as
+pointed out, a Cortex A7/A12/A15 invention.  Most of the platforms I
+see are Cortex A9 which doesn't have any architected timers.
 
-                cpu at 0 {
-                        device_type = "cpu";
-                        compatible = "arm,cortex-a57";
-                        reg = <0x0 0x0>;
-                };
-     ...
+Yes, it may be fun to work on new hardware and make that perform
+much better than previous, but we should not loose sight that there
+is older hardware out there, and we shouldn't unnecessarily penalise
+it when adding new features.
 
+What we /need/ to know is what the effect providing a VDSO in an
+environment without an architected timer (so using the VDSO fallback
+functions calling the syscalls) and having glibc use it is compared
+to the current situation where there is no VDSO for glibc to use.
 
-2.  Put explicit psci enable-method in cpu nodes, to make it clear that psci 
-    is expected.  Plus include empty psci node with a comment. (Arnd)
+If you can show that there's no difference, then I'm happy to go with
+always providing the VDSO.  If there's a detrimental effect (which I
+suspect there may be, since we now have to have glibc test to see if
+the VDSO is there, jump to the VDSO, the VDSO then tests whether we
+have an architected timer, and then we finally get to issue the
+syscall), then we must avoid providing the VDSO on systems which have
+no architected timer.
 
-     ...
-       /*
-        * We expect the enable-method to be "psci", but this is dependent on
-        * the FW, which will fill this in.
-        */
-        psci {
-        }
-     ...
-        cpus {
-                #address-cells = <2>;
-                #size-cells = <0>;
+Things like the time keeping syscalls tend to be hot paths, and having
+extra unnecessary cycles in them can hurt userspace performance.
 
-                cpu at 0 {
-                        device_type = "cpu";
-                        compatible = "arm,cortex-a57";
-                        reg = <0x0 0x0>;
-                        enable-method = "psci";
-                };
-     ...
-
-
-I would prefer #1.  I think putting "hints" like the psci node and
-the enable-method are weak at best.  I think the comment in #1 is
-enough to make the preferred approach clear.  In the end firmware will 
-override the nodes and properties if it wants or needs to.
-
-Thanks,
-Stuart
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
