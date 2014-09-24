@@ -1,350 +1,84 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 24 Sep 2014 16:04:58 -0500
-Subject: [Patch v2] spi: qup: Fix incorrect block transfers
-Message-ID: <1411592698-30952-1-git-send-email-agross@codeaurora.org>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 24 Sep 2014 23:19:12 +0200
+Subject: [PATCH v4 1/2] bcma: register bcma as device tree driver
+In-Reply-To: <3856565.LYF1mvpGOq@wuerfel>
+References: <1411339108-22307-1-git-send-email-hauke@hauke-m.de>
+ <4345256.UGZH9SeRYG@wuerfel> <5421EE62.2080701@hauke-m.de>
+ <3856565.LYF1mvpGOq@wuerfel>
+Message-ID: <54233550.60600@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a number of errors with the QUP block transfer mode.  Errors
-manifested themselves as input underruns, output overruns, and timed out
-transactions.
+On 09/24/2014 11:48 AM, Arnd Bergmann wrote:
+> On Wednesday 24 September 2014 00:04:18 Hauke Mehrtens wrote:
+>> I assume this should then look somehow like this:
+>>
+>> axi at 18000000 {
+>>         compatible = "brcm,bus-axi";
+>>         reg = <0x18000000 0x1000>;
+>>         ranges = <0x00000000 0x18000000 0x00100000>;
+>>         #address-cells = <1>;
+>>         #size-cells = <1>;
+>>
+>>         #interrupt-cells = <1>;
+>>         interrupt-map = <
+>>                 /* ChipCommon */
+>>                 0x00000000 0 &gic  GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH
+>>
+>>                 /* PCIe Controller 0 */
+>>                 0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH
+>>                 0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH
+>>                 0x00012000 2 &gic GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH
+>>                 0x00012000 3 &gic GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH
+>>                 0x00012000 4 &gic GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH
+>>                 0x00012000 5 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH
+>>
+>>                 /* USB 2.0 Controller */
+>>                 0x00021000 0 &gic GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH
+>>                 >;
+>>         };
+> 
+> Right, although I would add a few more '<', '>' and ',' for readability,
+> separating each line with a comma.
+> 
+> You are also missing an 'interrupt-map-mask' property that lists which
+> bits of the address are significant.
+> 
+> Are the interrupt numbers you have in the example (0, 0, 1, 2, ... 5, 0)
+> the actual numbers that are present in the hw registers?
 
-The block mode does not require the priming that occurs in FIFO mode.  At the
-moment that the QUP is placed into the RUN state, the QUP will immediately raise
-an interrupt if the request is a write.  Therefore, there is no need to prime
-the pump.
+Some cores do have more than one IRQ. The NAND core uses 8 IRQs and the
+PCIe controller uses 5 (the vendor code just uses the last one which
+gets triggered always). How can I handle this cases where one device has
+more than one IRQ? There is no hardware register these IRQ get mapped
+to. As far as I know the driver just knows that this device needs more
+IRQs. Should I just add a special device node entry for such devices?
 
-In addition, the block transfers require that whole blocks of data are
-read/written at a time.  The last block of data that completes a transaction may
-contain less than a full blocks worth of data.
+>> How does the mapping of these interrupts to the devices work?
+> 
+> The same way that of_irq_parse_and_map_pci() works (the second half of it).
+> It's a very similar situation: you have a discoverable bus on which the
+> interrupts are listed in a different domain from which they are supposed to
+> be on the parent. The trick is to make up your own address property
+> and of_phandle_args on the stack and fill that with the data from
+> the hw bus scan, so you can get into the middle of the normal DT
+> irq code that gets them from device nodes.
 
-Each block of data results in an input/output service interrupt accompanied with
-a input/output block flag set.  Additional block reads/writes require clearing
-of the service flag.  It is ok to check for additional blocks of data in the
-ISR, but you have to ack every block you transfer.  Imbalanced acks result in
-early return from complete transactions with pending interrupts that still have
-to be ack'd.  The next transaction can be affected by these interrupts.
+Thanks for the description, that worked for me.
 
-Changes from v1:
-- Split out read/write block function.
-- Removed extraneous checks for transfer length
+>> Do I have to add a device tree entry for every device after all?
+> 
+> No, unless you want to add other properties in the node, such as
+> a MAC address, but then you still only need some of the devices.
+> 
+>> Do you have some example code where this is handled in code, I could not
+>> find the code doing this for PCI.
+> 
+> drivers/of/of_pci_irq.c, though the hard part is done in drivers/of/irq.c,
+> which parses the interrupt-map and interrupt-map-mask properties.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/spi/spi-qup.c |  198 ++++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 146 insertions(+), 52 deletions(-)
 
-diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
-index 9f83d29..e08cc26 100644
---- a/drivers/spi/spi-qup.c
-+++ b/drivers/spi/spi-qup.c
-@@ -80,6 +80,8 @@
- #define QUP_IO_M_MODE_BAM		3
- 
- /* QUP_OPERATIONAL fields */
-+#define QUP_OP_IN_BLOCK_READ_REQ	BIT(13)
-+#define QUP_OP_OUT_BLOCK_WRITE_REQ	BIT(12)
- #define QUP_OP_MAX_INPUT_DONE_FLAG	BIT(11)
- #define QUP_OP_MAX_OUTPUT_DONE_FLAG	BIT(10)
- #define QUP_OP_IN_SERVICE_FLAG		BIT(9)
-@@ -143,6 +145,7 @@ struct spi_qup {
- 	int			tx_bytes;
- 	int			rx_bytes;
- 	int			qup_v1;
-+	int			mode;
- };
- 
- 
-@@ -198,30 +201,14 @@ static int spi_qup_set_state(struct spi_qup *controller, u32 state)
- 	return 0;
- }
- 
--
--static void spi_qup_fifo_read(struct spi_qup *controller,
--			    struct spi_transfer *xfer)
-+static void spi_qup_fill_read_buffer(struct spi_qup *controller,
-+	struct spi_transfer *xfer, u32 data)
- {
- 	u8 *rx_buf = xfer->rx_buf;
--	u32 word, state;
--	int idx, shift, w_size;
--
--	w_size = controller->w_size;
--
--	while (controller->rx_bytes < xfer->len) {
--
--		state = readl_relaxed(controller->base + QUP_OPERATIONAL);
--		if (0 == (state & QUP_OP_IN_FIFO_NOT_EMPTY))
--			break;
--
--		word = readl_relaxed(controller->base + QUP_INPUT_FIFO);
--
--		if (!rx_buf) {
--			controller->rx_bytes += w_size;
--			continue;
--		}
-+	int idx, shift;
- 
--		for (idx = 0; idx < w_size; idx++, controller->rx_bytes++) {
-+	if (rx_buf)
-+		for (idx = 0; idx < controller->w_size; idx++) {
- 			/*
- 			 * The data format depends on bytes per SPI word:
- 			 *  4 bytes: 0x12345678
-@@ -229,41 +216,139 @@ static void spi_qup_fifo_read(struct spi_qup *controller,
- 			 *  1 byte : 0x00000012
- 			 */
- 			shift = BITS_PER_BYTE;
--			shift *= (w_size - idx - 1);
--			rx_buf[controller->rx_bytes] = word >> shift;
-+			shift *= (controller->w_size - idx - 1);
-+			rx_buf[controller->rx_bytes + idx] = data >> shift;
- 		}
-+
-+	controller->rx_bytes += controller->w_size;
-+}
-+
-+static void spi_qup_prepare_write_data(struct spi_qup *controller,
-+	struct spi_transfer *xfer, u32 *data)
-+{
-+	const u8 *tx_buf = xfer->tx_buf;
-+	u32 val;
-+	int idx;
-+
-+	*data = 0;
-+
-+	if (tx_buf)
-+		for (idx = 0; idx < controller->w_size; idx++) {
-+			val = tx_buf[controller->tx_bytes + idx];
-+			*data |= val << (BITS_PER_BYTE * (3 - idx));
-+		}
-+
-+	controller->tx_bytes += controller->w_size;
-+}
-+
-+static void spi_qup_fifo_read(struct spi_qup *controller,
-+			    struct spi_transfer *xfer)
-+{
-+	u32 data;
-+
-+	/* clear service request */
-+	writel_relaxed(QUP_OP_IN_SERVICE_FLAG,
-+		controller->base + QUP_OPERATIONAL);
-+
-+	while (controller->rx_bytes < xfer->len) {
-+		if (!(readl_relaxed(controller->base + QUP_OPERATIONAL) &
-+			QUP_OP_IN_FIFO_NOT_EMPTY))
-+			break;
-+
-+		data = readl_relaxed(controller->base + QUP_INPUT_FIFO);
-+
-+		spi_qup_fill_read_buffer(controller, xfer, data);
- 	}
- }
- 
- static void spi_qup_fifo_write(struct spi_qup *controller,
--			    struct spi_transfer *xfer)
-+			    struct spi_transfer *xfer, bool irq)
- {
--	const u8 *tx_buf = xfer->tx_buf;
--	u32 word, state, data;
--	int idx, w_size;
-+	u32 data;
- 
--	w_size = controller->w_size;
-+	/* clear service request */
-+	writel_relaxed(QUP_OP_OUT_SERVICE_FLAG,
-+		controller->base + QUP_OPERATIONAL);
- 
- 	while (controller->tx_bytes < xfer->len) {
- 
--		state = readl_relaxed(controller->base + QUP_OPERATIONAL);
--		if (state & QUP_OP_OUT_FIFO_FULL)
-+		if (readl_relaxed(controller->base + QUP_OPERATIONAL) &
-+				QUP_OP_OUT_FIFO_FULL)
- 			break;
- 
--		word = 0;
--		for (idx = 0; idx < w_size; idx++, controller->tx_bytes++) {
-+		spi_qup_prepare_write_data(controller, xfer, &data);
-+		writel_relaxed(data, controller->base + QUP_OUTPUT_FIFO);
- 
--			if (!tx_buf) {
--				controller->tx_bytes += w_size;
--				break;
--			}
-+	}
-+}
- 
--			data = tx_buf[controller->tx_bytes];
--			word |= data << (BITS_PER_BYTE * (3 - idx));
-+static void spi_qup_block_read(struct spi_qup *controller,
-+	struct spi_transfer *xfer)
-+{
-+	u32 data;
-+	u32 words_per_blk = controller->in_blk_sz >> 2;
-+	u32 num_words = (xfer->len - controller->rx_bytes) / controller->w_size;
-+	int i;
-+
-+	do {
-+		/* ACK by clearing service flag */
-+		writel_relaxed(QUP_OP_IN_SERVICE_FLAG,
-+			controller->base + QUP_OPERATIONAL);
-+
-+		/* transfer up to a block size of data in a single pass */
-+		for (i = 0; num_words && i < words_per_blk; i++, num_words--) {
-+
-+			/* read data and fill up rx buffer */
-+			data = readl_relaxed(controller->base + QUP_INPUT_FIFO);
-+			spi_qup_fill_read_buffer(controller, xfer, data);
- 		}
- 
--		writel_relaxed(word, controller->base + QUP_OUTPUT_FIFO);
--	}
-+		/* check to see if next block is ready */
-+		if (!(readl_relaxed(controller->base + QUP_OPERATIONAL) &
-+			QUP_OP_IN_BLOCK_READ_REQ))
-+			break;
-+
-+	} while (num_words);
-+
-+	/*
-+	 * Due to extra stickiness of the QUP_OP_IN_SERVICE_FLAG during block
-+	 * reads, it has to be cleared again at the very end
-+	 */
-+	if (readl_relaxed(controller->base + QUP_OPERATIONAL) &
-+		QUP_OP_MAX_INPUT_DONE_FLAG)
-+		writel_relaxed(QUP_OP_IN_SERVICE_FLAG,
-+			controller->base + QUP_OPERATIONAL);
-+
-+}
-+
-+static void spi_qup_block_write(struct spi_qup *controller,
-+	struct spi_transfer *xfer)
-+{
-+	u32 data;
-+	u32 words_per_blk = controller->out_blk_sz >> 2;
-+	u32 num_words = (xfer->len - controller->tx_bytes) / controller->w_size;
-+	int i;
-+
-+	do {
-+		/* ACK by clearing service flag */
-+		writel_relaxed(QUP_OP_OUT_SERVICE_FLAG,
-+			controller->base + QUP_OPERATIONAL);
-+
-+		/* transfer up to a block size of data in a single pass */
-+		for (i = 0; num_words && i < words_per_blk; i++, num_words--) {
-+
-+			/* swizzle the bytes for output and write out */
-+			spi_qup_prepare_write_data(controller, xfer, &data);
-+			writel_relaxed(data,
-+				controller->base + QUP_OUTPUT_FIFO);
-+		}
-+
-+		/* check to see if next block is ready */
-+		if (!(readl_relaxed(controller->base + QUP_OPERATIONAL) &
-+			QUP_OP_OUT_BLOCK_WRITE_REQ))
-+			break;
-+
-+	} while (num_words);
- }
- 
- static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
-@@ -285,9 +370,9 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
- 
- 	writel_relaxed(qup_err, controller->base + QUP_ERROR_FLAGS);
- 	writel_relaxed(spi_err, controller->base + SPI_ERROR_FLAGS);
--	writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
- 
- 	if (!xfer) {
-+		writel_relaxed(opflags, controller->base + QUP_OPERATIONAL);
- 		dev_err_ratelimited(controller->dev, "unexpected irq %08x %08x %08x\n",
- 				    qup_err, spi_err, opflags);
- 		return IRQ_HANDLED;
-@@ -315,11 +400,19 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
- 		error = -EIO;
- 	}
- 
--	if (opflags & QUP_OP_IN_SERVICE_FLAG)
--		spi_qup_fifo_read(controller, xfer);
-+	if (opflags & QUP_OP_IN_SERVICE_FLAG) {
-+		if (opflags & QUP_OP_IN_BLOCK_READ_REQ)
-+			spi_qup_block_read(controller, xfer);
-+		else
-+			spi_qup_fifo_read(controller, xfer);
-+	}
- 
--	if (opflags & QUP_OP_OUT_SERVICE_FLAG)
--		spi_qup_fifo_write(controller, xfer);
-+	if (opflags & QUP_OP_OUT_SERVICE_FLAG) {
-+		if (opflags & QUP_OP_OUT_BLOCK_WRITE_REQ)
-+			spi_qup_block_write(controller, xfer);
-+		else
-+			spi_qup_fifo_write(controller, xfer,1);
-+	}
- 
- 	spin_lock_irqsave(&controller->lock, flags);
- 	controller->error = error;
-@@ -332,12 +425,11 @@ static irqreturn_t spi_qup_qup_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--
- /* set clock freq ... bits per word */
- static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
- {
- 	struct spi_qup *controller = spi_master_get_devdata(spi->master);
--	u32 config, iomode, mode;
-+	u32 config, iomode;
- 	int ret, n_words, w_size;
- 
- 	if (spi->mode & SPI_LOOP && xfer->len > controller->in_fifo_sz) {
-@@ -368,14 +460,14 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
- 	controller->w_size = w_size;
- 
- 	if (n_words <= (controller->in_fifo_sz / sizeof(u32))) {
--		mode = QUP_IO_M_MODE_FIFO;
-+		controller->mode = QUP_IO_M_MODE_FIFO;
- 		writel_relaxed(n_words, controller->base + QUP_MX_READ_CNT);
- 		writel_relaxed(n_words, controller->base + QUP_MX_WRITE_CNT);
- 		/* must be zero for FIFO */
- 		writel_relaxed(0, controller->base + QUP_MX_INPUT_CNT);
- 		writel_relaxed(0, controller->base + QUP_MX_OUTPUT_CNT);
- 	} else {
--		mode = QUP_IO_M_MODE_BLOCK;
-+		controller->mode = QUP_IO_M_MODE_BLOCK;
- 		writel_relaxed(n_words, controller->base + QUP_MX_INPUT_CNT);
- 		writel_relaxed(n_words, controller->base + QUP_MX_OUTPUT_CNT);
- 		/* must be zero for BLOCK and BAM */
-@@ -387,8 +479,8 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
- 	/* Set input and output transfer mode */
- 	iomode &= ~(QUP_IO_M_INPUT_MODE_MASK | QUP_IO_M_OUTPUT_MODE_MASK);
- 	iomode &= ~(QUP_IO_M_PACK_EN | QUP_IO_M_UNPACK_EN);
--	iomode |= (mode << QUP_IO_M_OUTPUT_MODE_MASK_SHIFT);
--	iomode |= (mode << QUP_IO_M_INPUT_MODE_MASK_SHIFT);
-+	iomode |= (controller->mode << QUP_IO_M_OUTPUT_MODE_MASK_SHIFT);
-+	iomode |= (controller->mode << QUP_IO_M_INPUT_MODE_MASK_SHIFT);
- 
- 	writel_relaxed(iomode, controller->base + QUP_IO_M_MODES);
- 
-@@ -462,7 +554,8 @@ static int spi_qup_transfer_one(struct spi_master *master,
- 		goto exit;
- 	}
- 
--	spi_qup_fifo_write(controller, xfer);
-+	if (controller->mode == QUP_IO_M_MODE_FIFO)
-+		spi_qup_fifo_write(controller, xfer, 0);
- 
- 	if (spi_qup_set_state(controller, QUP_STATE_RUN)) {
- 		dev_warn(controller->dev, "cannot set EXECUTE state\n");
-@@ -478,6 +571,7 @@ exit:
- 	if (!ret)
- 		ret = controller->error;
- 	spin_unlock_irqrestore(&controller->lock, flags);
-+
- 	return ret;
- }
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I will split this patch into two patches, one just adding the bcma
+registration and an additional RFC patch adding the IRQ stuff.
+
+Hauke
