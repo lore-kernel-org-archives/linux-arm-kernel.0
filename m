@@ -1,91 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 24 Sep 2014 16:48:02 +0100
-Subject: [PATCH v2] clocksource: arm_arch_timer: discard unavailable
- timers correctly
-In-Reply-To: <5422E05F.4070405@arm.com>
-References: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
- <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
- <5422E05F.4070405@arm.com>
-Message-ID: <20140924154802.GK5729@leverpostej>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Wed, 24 Sep 2014 08:53:20 -0700
+Subject: [PATCH v7 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <20140924082228.GF17801@lee--X1>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140924082228.GF17801@lee--X1>
+Message-ID: <20140924155319.GA28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 04:16:47PM +0100, Sudeep Holla wrote:
-> Hi Mark,
-> 
-> On 17/09/14 20:39, Sudeep Holla wrote:
-> > Currently we wait until both cp15 and mem timers are probed if we
-> > have both timer device nodes present in the device tree without
-> > checking if the device is actually available. If one of the timer
-> > device node present is disabled, the system locks up on the boot
-> > as no timer gets registered.
-> >
-> > This patch adds the check for the availablity of the timer device
-> > so that we unavailable timers are discarded correctly. It also adds
-> > the missing of_node_put.
-> >
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> 
-> If your are fine with this, can I ask Daniel you pick this up ?
+On Wed 24 Sep 01:22 PDT 2014, Lee Jones wrote:
 
-While I'd prefer to see the cp15 and mmio timer driver pulled apart,
-that's not going to happen at any point soon. For the moment, this is
-far better than the current state of affairs. So:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+> On Mon, 22 Sep 2014, Bjorn Andersson wrote:
 > 
-> Regards,
-> Sudeep
-> 
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
+> > 8960 and 8064 based devices. The binding currently describes the rpm
+> > itself and the regulator subnodes.
+> > 
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > > ---
-> >   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++----
-> >   1 file changed, 16 insertions(+), 4 deletions(-)
-> >
-> > Changes v1->v2:
-> > 	- Added missing of_node_put in the original code
-> > 	- Updated the commit log as suggested
-> >
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index 5163ec13429d..7e267e3990ab 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -616,17 +616,29 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
-> >   	{},
-> >   };
-> >
-> > +static bool __init
-> > +arch_timer_probed(int type, const struct of_device_id *matches)
-> > +{
-> > +	struct device_node *dn;
-> > +	bool probed = false;
-> > +
-> > +	dn = of_find_matching_node(NULL, matches);
-> > +	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-> > +		probed = true;
-> > +	of_node_put(dn);
-> > +
-> > +	return probed;
-> > +}
-> > +
-> >   static void __init arch_timer_common_init(void)
-> >   {
-> >   	unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
-> >
-> >   	/* Wait until both nodes are probed if we have two timers */
-> >   	if ((arch_timers_present & mask) != mask) {
-> > -		if (of_find_matching_node(NULL, arch_timer_mem_of_match) &&
-> > -				!(arch_timers_present & ARCH_MEM_TIMER))
-> > +		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
-> >   			return;
-> > -		if (of_find_matching_node(NULL, arch_timer_of_match) &&
-> > -				!(arch_timers_present & ARCH_CP15_TIMER))
-> > +		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
-> >   			return;
-> >   	}
-> >
-> >
+> >  Documentation/devicetree/bindings/mfd/qcom-rpm.txt |  246 ++++++++++++++++++++
+> 
+> Please adhere to: Documentation/devicetree/bindings/submitting-patches.txt
+> 
+
+I assume you mean this part:
+
+  1) The Documentation/ portion of the patch should be a separate patch.
+
+But I doubt this document was written with include/dt-bindings in mind, because
+in my eyes they are part of "device tree bindings".
+
+> >  include/dt-bindings/mfd/qcom-rpm.h                 |  154 ++++++++++++
+> >  2 files changed, 400 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> >  create mode 100644 include/dt-bindings/mfd/qcom-rpm.h
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > new file mode 100644
+> > index 0000000..4264021
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> 
+> This requires a DT Ack.
+> 
+> [...]
+> 
+> > +++ b/include/dt-bindings/mfd/qcom-rpm.h
+> 
+> Please split this into a separate patch.
+> 
+
+But this is part of the device tree binding and the binding "depends" on it.
+
+> When you do, for this file only, please apply my:
+> 
+>   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+
+Thanks,
+Bjorn
