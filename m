@@ -1,75 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 24 Sep 2014 22:48:54 +0800
-Subject: [PATCH v2 0/7] ARM: sunxi: Add basic support for Allwinner A80 SoC
-Message-ID: <1411570141-29960-1-git-send-email-wens@csie.org>
+Date: Wed, 24 Sep 2014 22:48:56 +0800
+Subject: [PATCH v2 2/7] ARM: sunxi: Add debug uart used by sun9i (Allwinner
+ A80)
+In-Reply-To: <1411570141-29960-1-git-send-email-wens@csie.org>
+References: <1411570141-29960-1-git-send-email-wens@csie.org>
+Message-ID: <1411570141-29960-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The uarts on sun9i are still compatible with the dw_8250, but are
+located at different addresses.
 
-This is v2 of the initial Allwinner A80 support series.
-This patch series adds very basic support for Allwinner's A80 SoC,
-a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Development is done on the A80 Optimus Board, the defacto development
-board for the A80, with the accompanying SDK as a reference. 
-
-So far I've been unable to get the board to boot from MMC, or
-using Android fastboot. I'm using Allwinner's FEL mode to load
-the bootloader and kernel+dtb image over USB. Notes on my attempts
-can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
-
-
-Patch 1 introduces the compatible string for the A80.
-
-Patch 2 adds options to use UART0 on the A80 as the debug port for
-earlyprintk.
-
-Patch 3 adds a barebone dtsi with just the cpu, memory and uart nodes.
-
-Patch 4 adds a barebone dts for the A80 Optimus Board.
-
-Patch 5 documents the vendor prefix for Merrii Technology Co., Ltd,
-the designer and vendor of the A80 Optimus Board.
-
-Patch 6 documents all the Allwinner SoCs we currently support.
-
-Patch 7 updates the sunxi README with a link to the A80's datasheet.
-
-
-Changes since v1:
-
-  - Use skeleton64.dtsi as basis to support maximum of 8GB DRAM
-  - Dropped dependency on ARCH_SUNXI for DEBUG_SUN9I_UART0
-  - Added empty lines separating cores in the DT cpu-map node
-  - Added patch 7 to update sunxi README
-
-Cheers
-ChenYu
-
-Chen-Yu Tsai (7):
-  ARM: sunxi: Introduce Allwinner A80 support
-  ARM: sunxi: Add debug uart used by sun9i (Allwinner A80)
-  ARM: dts: sunxi: Add Allwinner A80 dtsi
-  ARM: dts: sun9i: Add A80 Optimus Board support
-  devicetree: bindings: Add vendor prefix for Merrii Technology Co.,
-    Ltd.
-  devicetree: bindings: Document supported Allwinner sunxi SoCs
-  Documentation: sunxi: Add A80 datasheet link
-
- Documentation/arm/sunxi/README                     |   3 +-
- Documentation/devicetree/bindings/arm/sunxi.txt    |  12 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/Kconfig.debug                             |  10 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/sun9i-a80-optimus.dts            |  66 +++++
- arch/arm/boot/dts/sun9i-a80.dtsi                   | 287 +++++++++++++++++++++
- arch/arm/mach-sunxi/Kconfig                        |   5 +
- arch/arm/mach-sunxi/sunxi.c                        |   9 +
- 9 files changed, 394 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/sunxi.txt
- create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
- create mode 100644 arch/arm/boot/dts/sun9i-a80.dtsi
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..1e191d1 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -707,6 +707,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on SOCFPGA based platforms.
+ 
++	config DEBUG_SUN9I_UART0
++		bool "Kernel low-level debugging messages via sun9i UART0"
++		depends on MACH_SUN9I
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Allwinner A80 based platforms on the UART0.
++
+ 	config DEBUG_SUNXI_UART0
+ 		bool "Kernel low-level debugging messages via sunXi UART0"
+ 		depends on ARCH_SUNXI
+@@ -1068,6 +1076,7 @@ config DEBUG_UART_PHYS
+ 	default 0x02530c00 if DEBUG_KEYSTONE_UART0
+ 	default 0x02531000 if DEBUG_KEYSTONE_UART1
+ 	default 0x03010fe0 if ARCH_RPC
++	default 0x07000000 if DEBUG_SUN9I_UART0
+ 	default 0x10009000 if DEBUG_REALVIEW_STD_PORT || DEBUG_CNS3XXX || \
+ 				DEBUG_VEXPRESS_UART0_CA9
+ 	default 0x1010c000 if DEBUG_REALVIEW_PB1176_PORT
+@@ -1145,6 +1154,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf2100000 if DEBUG_PXA_UART1
+ 	default 0xf4090000 if ARCH_LPC32XX
+ 	default 0xf4200000 if ARCH_GEMINI
++	default 0xf7000000 if DEBUG_SUN9I_UART0
+ 	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
+ 				DEBUG_S3C2410_UART0)
+ 	default 0xf7004000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART1 || \
 -- 
 2.1.0
