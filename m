@@ -1,169 +1,219 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 24 Sep 2014 12:53:08 -0500
-Subject: [PATCH v6 1/5] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20140924172151.GD422@ilina-mac>
-References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
- <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
- <F743E5F0-28C1-4A9D-A27D-73EA70A01B46@codeaurora.org>
- <20140924172151.GD422@ilina-mac>
-Message-ID: <4BFC9B4E-A3D0-422E-9B55-0DB9F4B04EE9@codeaurora.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 24 Sep 2014 18:53:31 +0100
+Subject: [PATCH v12 09/12] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140924173109.GA20416@google.com>
+References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411498874-9864-10-git-send-email-Liviu.Dudau@arm.com>
+ <20140924164304.GF1994@e106497-lin.cambridge.arm.com>
+ <20140924173109.GA20416@google.com>
+Message-ID: <20140924175330.GI1994@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 24, 2014 at 06:31:09PM +0100, Bjorn Helgaas wrote:
+> On Wed, Sep 24, 2014 at 05:43:04PM +0100, Liviu Dudau wrote:
+> > Provide a function to parse the PCI DT ranges that can be used to
+> > create a pci_host_bridge structure together with its associated
+> > bus.
+> > 
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > [make io_base parameter optional]
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > ---
+> > Hi Bjorn,
+> > 
+> > I have fixed the compilation error that this patch was triggering. I
+> > have validated that the patch applies to your pci/host-generic branch
+> > as well as to my series.
+> 
+> I applied this to pci/host-generic along with the following patches and
+> pushed the branch, thanks!
 
-On Sep 24, 2014, at 12:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+Thanks again and sorry for lack of thorough testing. I still haven't managed
+to get a cross compiler for sparc and as I don't run Ubuntu or debian the
+make.cross script doesn't work for me.
 
-> On Wed, Sep 24 2014 at 10:33 -0600, Kumar Gala wrote:
->> 
->> On Sep 23, 2014, at 6:51 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> 
->>> Based on work by many authors, available at codeaurora.org
->>> 
->>> SPM is a hardware block that controls the peripheral logic surrounding
->>> the application cores (cpu/l$). When the core executes WFI instruction,
->>> the SPM takes over the putting the core in low power state as
->>> configured. The wake up for the SPM is an interrupt at the GIC, which
->>> then completes the rest of low power mode sequence and brings the core
->>> out of low power mode.
->>> 
->>> The SPM has a set of control registers that configure the SPMs
->>> individually based on the type of the core and the runtime conditions.
->>> SPM is a finite state machine block to which a sequence is provided and
->>> it interprets the bytes  and executes them in sequence. Each low power
->>> mode that the core can enter into is provided to the SPM as a sequence.
->>> 
->>> Configure the SPM to set the core (cpu or L2) into its low power mode,
->>> the index of the first command in the sequence is set in the SPM_CTL
->>> register. When the core executes ARM wfi instruction, it triggers the
->>> SPM state machine to start executing from that index. The SPM state
->>> machine waits until the interrupt occurs and starts executing the rest
->>> of the sequence until it hits the end of the sequence. The end of the
->>> sequence jumps the core out of its low power mode.
->>> 
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>> [lina: simplify the driver for initial submission, clean up and update
->>> commit text]
->>> ---
->>> Documentation/devicetree/bindings/arm/msm/spm.txt |  43 +++
->>> drivers/soc/qcom/Kconfig                          |   8 +
->>> drivers/soc/qcom/Makefile                         |   1 +
->>> drivers/soc/qcom/spm.c                            | 388 ++++++++++++++++++++++
->>> include/soc/qcom/spm.h                            |  38 +++
->>> 5 files changed, 478 insertions(+)
->>> create mode 100644 Documentation/devicetree/bindings/arm/msm/spm.txt
->>> create mode 100644 drivers/soc/qcom/spm.c
->>> create mode 100644 include/soc/qcom/spm.h
->>> 
->>> diff --git a/Documentation/devicetree/bindings/arm/msm/spm.txt b/Documentation/devicetree/bindings/arm/msm/spm.txt
->>> new file mode 100644
->>> index 0000000..2ff2454
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/msm/spm.txt
->>> @@ -0,0 +1,43 @@
->>> +* Subsystem Power Manager (SPM)
->>> +
->>> +Qualcomm Snapdragons have SPM hardware blocks to control the Application
->>> +Processor Sub-System power. These SPM blocks run individual state machine
->>> +to determine what the core (L2 or Krait/Scorpion) would do when the WFI
->>> +instruction is executed by the core.
->>> +
->>> +The devicetree representation of the SPM block should be:
->>> +
->>> +Required properties
->>> +
->>> +- compatible: Must be -
->>> +		 "qcom,spm-v2.1"
->>> +- reg: The physical address and the size of the SPM's memory mapped registers
->>> +- qcom,cpu: phandle for the CPU that the SPM block is attached to.
->>> +	This field is required on only for SPMs that control the CPU.
->> 
->> Let?s make this just cpu-handle instead of qcom,cpu.  The concept of a handle to a cpu is pretty generic.
->> 
-> Okay. Will look into it.
-> You mean just the property name, right?
-
-Correct.
+Best regards,
+Liviu
 
 > 
->>> +- qcom,saw2-clk-div: SAW2 configuration register to program the SPM runtime
->>> +	clocks. The register for this property is MSM_SPM_REG_SAW2_CFG.
->> 
->> (add details on how this is used to compute timer tick.  Is it timer tick = saw_clk/saw2-clk-div?  What is valid range of values)
->> 
-> The SPM spec is not available for open use. The range of values is
-> irrelevant for the SPM clocks, usually, its a constant for an SoC, but
-> may vary between the SoC. Its how the SPM on the SoC interprets it.
-
-Does the meaning of the divisor value change from SoC to SoC (not the value itself)?
-
-Is it not always:
-
-timer tick = sys_ref_clk / (qcom,saw2-clk-div + 1)
- 
->>> +- qcom,saw2-delays: The SPM delay values that SPM sequences would refer to.
->>> +	The register for this property is MSM_SPM_REG_SAW2_SPM_DLY.
->> 
->> Didn?t Stephen asked about splitting this up? Or at least treating it as an array of 3 values?
->> 
-> Yes he did. My response was similar to the clk-div values, its not
-> something you can change without hardware spec documentation.
-> And I need to mix the three values up, anyways before I write to the
-> register. Splitting it up, doesnt help understanding/configuring the SPM
-> any better, so didnt change it.
-
-Hmm, will this value change from SPM to SPM on the same SoC?  I?m not a fan of allowing random register values to get poked into the HW from DT.  While this one case might end up being acceptable, its a terrible practice and not something I want use in the habit of doing.
-
->>> +- qcom,saw2-enable: The SPM control register to enable/disable the sleep state
->>> +	machine. The register for this property is MSM_SPM_REG_SAW2_SPM_CTL.
->> 
->> Can this just be a boolean (exist or not), if so, probably change it to qcom,saw2-disable (so lack of property means enable)?
->> 
-> Okay, sure.
+> Bjorn
 > 
->>> +
->>> +Optional properties
->>> +
->>> +- qcom,saw2-spm-cmd-wfi: The WFI command sequence
->> 
->> probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
->> 
-> Okay.
+> >  drivers/of/of_pci.c    | 117 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/of_pci.h |   6 +++
+> >  2 files changed, 123 insertions(+)
+> > 
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 82d172f..3cad1af 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -1,7 +1,9 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/export.h>
+> >  #include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/of_pci.h>
+> > +#include <linux/slab.h>
+> >  
+> >  static inline int __of_pci_pci_compare(struct device_node *node,
+> >  				       unsigned int data)
+> > @@ -114,6 +116,121 @@ int of_get_pci_domain_nr(struct device_node *node)
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
+> >  
+> > +#if defined(CONFIG_OF_ADDRESS)
+> > +/**
+> > + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+> > + * @dev: device node of the host bridge having the range property
+> > + * @busno: bus number associated with the bridge root bus
+> > + * @bus_max: maximum number of busses for this bridge
+> > + * @resources: list where the range of resources will be added after DT parsing
+> > + * @io_base: pointer to a variable that will contain on return the physical
+> > + * address for the start of the I/O range. Can be NULL if the caller doesn't
+> > + * expect IO ranges to be present in the device tree.
+> > + *
+> > + * It is the callers job to free the @resources list.
+> > + *
+> > + * This function will parse the "ranges" property of a PCI host bridge device
+> > + * node and setup the resource mapping based on its content. It is expected
+> > + * that the property conforms with the Power ePAPR document.
+> > + *
+> > + * It returns zero if the range parsing has been successful or a standard error
+> > + * value if it failed.
+> > + */
+> > +int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > +			unsigned char busno, unsigned char bus_max,
+> > +			struct list_head *resources, resource_size_t *io_base)
+> > +{
+> > +	struct resource *res;
+> > +	struct resource *bus_range;
+> > +	struct of_pci_range range;
+> > +	struct of_pci_range_parser parser;
+> > +	char range_type[4];
+> > +	int err;
+> > +
+> > +	if (io_base)
+> > +		*io_base = (resource_size_t)OF_BAD_ADDR;
+> > +
+> > +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+> > +	if (!bus_range)
+> > +		return -ENOMEM;
+> > +
+> > +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> > +
+> > +	err = of_pci_parse_bus_range(dev, bus_range);
+> > +	if (err) {
+> > +		bus_range->start = busno;
+> > +		bus_range->end = bus_max;
+> > +		bus_range->flags = IORESOURCE_BUS;
+> > +		pr_info("  No bus range found for %s, using %pR\n",
+> > +			dev->full_name, bus_range);
+> > +	} else {
+> > +		if (bus_range->end > bus_range->start + bus_max)
+> > +			bus_range->end = bus_range->start + bus_max;
+> > +	}
+> > +	pci_add_resource(resources, bus_range);
+> > +
+> > +	/* Check for ranges property */
+> > +	err = of_pci_range_parser_init(&parser, dev);
+> > +	if (err)
+> > +		goto parse_failed;
+> > +
+> > +	pr_debug("Parsing ranges property...\n");
+> > +	for_each_of_pci_range(&parser, &range) {
+> > +		/* Read next ranges element */
+> > +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
+> > +			snprintf(range_type, 4, " IO");
+> > +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
+> > +			snprintf(range_type, 4, "MEM");
+> > +		else
+> > +			snprintf(range_type, 4, "err");
+> > +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
+> > +			range.cpu_addr, range.cpu_addr + range.size - 1,
+> > +			range.pci_addr);
+> > +
+> > +		/*
+> > +		 * If we failed translation or got a zero-sized region
+> > +		 * then skip this range
+> > +		 */
+> > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > +			continue;
+> > +
+> > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > +		if (!res) {
+> > +			err = -ENOMEM;
+> > +			goto parse_failed;
+> > +		}
+> > +
+> > +		err = of_pci_range_to_resource(&range, dev, res);
+> > +		if (err)
+> > +			goto conversion_failed;
+> > +
+> > +		if (resource_type(res) == IORESOURCE_IO) {
+> > +			if (!io_base) {
+> > +				pr_err("I/O range found for %s. Please provide an io_base pointer to save CPU base address\n",
+> > +					dev->full_name);
+> > +				err = -EINVAL;
+> > +				goto conversion_failed;
+> > +			}
+> > +			if (*io_base != (resource_size_t)OF_BAD_ADDR)
+> > +				pr_warn("More than one I/O resource converted for %s. CPU base address for old range lost!\n",
+> > +					dev->full_name);
+> > +			*io_base = range.cpu_addr;
+> > +		}
+> > +
+> > +		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +conversion_failed:
+> > +	kfree(res);
+> > +parse_failed:
+> > +	pci_free_resource_list(resources);
+> > +	return err;
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
+> > +#endif /* CONFIG_OF_ADDRESS */
+> > +
+> >  #ifdef CONFIG_PCI_MSI
+> >  
+> >  static LIST_HEAD(of_pci_msi_chip_list);
+> > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+> > index 71062e9..1fd207e 100644
+> > --- a/include/linux/of_pci.h
+> > +++ b/include/linux/of_pci.h
+> > @@ -52,6 +52,12 @@ of_get_pci_domain_nr(struct device_node *node)
+> >  }
+> >  #endif
+> >  
+> > +#if defined(CONFIG_OF_ADDRESS)
+> > +int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > +			unsigned char busno, unsigned char bus_max,
+> > +			struct list_head *resources, resource_size_t *io_base);
+> > +#endif
+> > +
+> >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+> >  int of_pci_msi_chip_add(struct msi_chip *chip);
+> >  void of_pci_msi_chip_remove(struct msi_chip *chip);
+> > -- 
+> > 2.1.0
+> > 
+> > 
 > 
->>> +- qcom,saw2-spm-cmd-spc: The Standalone PC command sequence
->> 
->> probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
->> 
-> Okay.
-> 
->>> +
->>> +Example:
->>> +	spm at f9089000 {
->>> +		compatible = "qcom,spm-v2.1";
->>> +		#address-cells = <1>;
->>> +		#size-cells = <1>;
->>> +		reg = <0xf9089000 0x1000>;
->>> +		qcom,cpu = <&CPU0>;
->>> +		qcom,saw2-clk-div = <0x1>;
->>> +		qcom,saw2-delays = <0x20000400>;
->>> +		qcom,saw2-enable = <0x1>;
->>> +		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
->>> +		qcom,saw2-spm-cmd-spc = [00 20 50 80 60 70 10 92
->>> +				a0 b0 03 68 70 3b 92 a0 b0
->>> +				82 2b 50 10 30 02 22 30 0f];
->>> +	};
->> 
->> - k
->> 
->> 
->> -- 
->> Employee of Qualcomm Innovation Center, Inc.
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
