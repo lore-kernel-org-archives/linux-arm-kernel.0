@@ -1,84 +1,281 @@
 From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Wed, 24 Sep 2014 09:27:57 +0530
-Subject: [PATCH v10 5/6] cpufreq: exynos: remove exynos4210/5250 specific
- cpufreq driver support
-In-Reply-To: <1411531078-10671-5-git-send-email-thomas.ab@samsung.com>
+Date: Wed, 24 Sep 2014 09:27:55 +0530
+Subject: [PATCH v10 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
+ property
+In-Reply-To: <1411531078-10671-3-git-send-email-thomas.ab@samsung.com>
 References: <1411531078-10671-1-git-send-email-thomas.ab@samsung.com>
  <1411531078-10671-2-git-send-email-thomas.ab@samsung.com>
  <1411531078-10671-3-git-send-email-thomas.ab@samsung.com>
- <1411531078-10671-4-git-send-email-thomas.ab@samsung.com>
- <1411531078-10671-5-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1411531078-10671-6-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1411531078-10671-4-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4210 and Exynos5250 based platforms have switched over to use generic
-cpufreq drivers for cpufreq functionality. So the Exynos specific cpufreq
-drivers for these platforms can be removed.
+For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
+regulator supply properties for migrating from Exynos specific cpufreq driver
+to using generic cpufreq drivers.
 
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Andreas Faerber <afaerber@suse.de>
+Cc: Sachin Kamat <sachin.kamat@linaro.org>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Andreas Farber <afaerber@suse.de>
 Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Tested-by: Chander Kashyap <k.chander@samsung.com>
 ---
- drivers/cpufreq/Kconfig.arm |   22 ----------------------
- drivers/cpufreq/Makefile    |    2 --
- 2 files changed, 0 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/exynos4210-origen.dts         |    4 ++
+ arch/arm/boot/dts/exynos4210-trats.dts          |    4 ++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 ++
+ arch/arm/boot/dts/exynos4210.dtsi               |   14 ++++++++-
+ arch/arm/boot/dts/exynos5250-arndale.dts        |    4 ++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 ++
+ arch/arm/boot/dts/exynos5250-snow.dts           |    4 ++
+ arch/arm/boot/dts/exynos5250.dtsi               |   25 ++++++++++++++-
+ arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
+ 9 files changed, 99 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 193a137..78df4e6 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -28,17 +28,6 @@ config ARM_VEXPRESS_SPC_CPUFREQ
- config ARM_EXYNOS_CPUFREQ
- 	bool
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index f767c42..887dded 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -334,3 +334,7 @@
+ 		};
+ 	};
+ };
++
++&cpu0 {
++	cpu0-supply = <&buck1_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index f516da9..66119dd 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -446,3 +446,7 @@
+ 		};
+ 	};
+ };
++
++&cpu0 {
++	cpu0-supply = <&varm_breg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+index d50eb3a..bf0a39c 100644
+--- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -492,3 +492,7 @@
+ &mdma1 {
+ 	reg = <0x12840000 0x1000>;
+ };
++
++&cpu0 {
++	cpu0-supply = <&vdd_arm_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index bcc9e63..69bac07 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -35,10 +35,22 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
--config ARM_EXYNOS4210_CPUFREQ
--	bool "SAMSUNG EXYNOS4210"
--	depends on CPU_EXYNOS4210
--	default y
--	select ARM_EXYNOS_CPUFREQ
--	help
--	  This adds the CPUFreq driver for Samsung EXYNOS4210
--	  SoC (S5PV310 or S5PC210).
--
--	  If in doubt, say N.
--
- config ARM_EXYNOS4X12_CPUFREQ
- 	bool "SAMSUNG EXYNOS4x12"
- 	depends on SOC_EXYNOS4212 || SOC_EXYNOS4412
-@@ -50,17 +39,6 @@ config ARM_EXYNOS4X12_CPUFREQ
+-		cpu at 900 {
++		cpu0: cpu at 900 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0x900>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			clock-latency = <160000>;
++
++			operating-points = <
++				1200000 1250000
++				1000000 1150000
++				800000	1075000
++				500000	975000
++				400000	975000
++				200000	950000
++			>;
+ 		};
  
- 	  If in doubt, say N.
+ 		cpu at 901 {
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 3acd97e..da2b3e1 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -563,3 +563,7 @@
+ 		};
+ 	};
+ };
++
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 6a0f4c0..0eedb88 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -406,3 +406,7 @@
+ 		};
+ 	};
+ };
++
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index e51fcef..f954e82 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -624,4 +624,8 @@
+ 	num-cs = <1>;
+ };
  
--config ARM_EXYNOS5250_CPUFREQ
--	bool "SAMSUNG EXYNOS5250"
--	depends on SOC_EXYNOS5250
--	default y
--	select ARM_EXYNOS_CPUFREQ
--	help
--	  This adds the CPUFreq driver for Samsung EXYNOS5250
--	  SoC.
--
--	  If in doubt, say N.
--
- config ARM_EXYNOS5440_CPUFREQ
- 	bool "SAMSUNG EXYNOS5440"
- 	depends on SOC_EXYNOS5440
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 40c53dc..74e55f9 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -52,9 +52,7 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
- obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
++
+ #include "cros-ec-keyboard.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index f21b9aa..d4b418e 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -58,11 +58,34 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			clock-frequency = <1700000000>;
++
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			clock-latency = <140000>;
++
++			operating-points = <
++				1700000 1300000
++				1600000 1250000
++				1500000 1225000
++				1400000 1200000
++				1300000 1150000
++				1200000 1125000
++				1100000 1100000
++				1000000 1075000
++				 900000 1050000
++				 800000 1025000
++				 700000 1012500
++				 600000 1000000
++				 500000  975000
++				 400000  950000
++				 300000  937500
++				 200000  925000
++			>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index bfe056d..912deeb 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -59,8 +59,26 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0x0>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu-cluster.0";
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
++			clock-latency = <140000>;
++
++			operating-points = <
++				1800000 1250000
++				1700000 1212500
++				1600000 1175000
++				1500000 1137500
++				1400000 1112500
++				1300000 1062500
++				1200000 1037500
++				1100000 1012500
++				1000000 987500
++				 900000 962500
++				 800000 937500
++				 700000 912500
++			>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -69,6 +87,7 @@
+ 			reg = <0x1>;
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
++			clock-latency = <140000>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -77,6 +96,7 @@
+ 			reg = <0x2>;
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
++			clock-latency = <140000>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -85,14 +105,29 @@
+ 			reg = <0x3>;
+ 			clock-frequency = <1800000000>;
+ 			cci-control-port = <&cci_control1>;
++			clock-latency = <140000>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
++			clocks = <&clock CLK_KFC_CLK>;
++			clock-names = "cpu-cluster.1";
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
++			clock-latency = <140000>;
++
++			operating-points = <
++				1300000 1275000
++				1200000 1212500
++				1100000 1162500
++				1000000 1112500
++				 900000 1062500
++				 800000 1025000
++				 700000 975000
++				 600000 937500
++			>;
+ 		};
+ 
+ 		cpu5: cpu at 101 {
+@@ -101,6 +136,7 @@
+ 			reg = <0x101>;
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
++			clock-latency = <140000>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -109,6 +145,7 @@
+ 			reg = <0x102>;
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
++			clock-latency = <140000>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -117,6 +154,7 @@
+ 			reg = <0x103>;
+ 			clock-frequency = <1000000000>;
+ 			cci-control-port = <&cci_control0>;
++			clock-latency = <140000>;
+ 		};
+ 	};
+ 
 -- 
 1.6.6.rc2
