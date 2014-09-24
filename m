@@ -1,93 +1,91 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 24 Sep 2014 10:07:31 +0900
-Subject: [PATCH] ARM: dts: Sort SHMOBILE dtbs alphabetically
-In-Reply-To: <20140902011608.GC12650@verge.net.au>
-References: <1409227243-25102-1-git-send-email-geert+renesas@glider.be>
- <20140829003204.GA22661@verge.net.au>
- <20140902011608.GC12650@verge.net.au>
-Message-ID: <20140924010730.GE20233@verge.net.au>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 23 Sep 2014 18:12:00 -0700
+Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
+ ATS1PR
+In-Reply-To: <20140922152614.GP25809@arm.com> (Will Deacon's message of "Mon,
+ 22 Sep 2014 16:26:14 +0100")
+References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
+ <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
+ <20140922152614.GP25809@arm.com>
+Message-ID: <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 10:16:08AM +0900, Simon Horman wrote:
-> On Fri, Aug 29, 2014 at 09:32:04AM +0900, Simon Horman wrote:
-> > On Thu, Aug 28, 2014 at 02:00:43PM +0200, Geert Uytterhoeven wrote:
-> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > ---
-> > > This depends on Magnus' series "[PATCH 00/05] ARM: shmobile: r8a7740 and
-> > > Armadillo cleanup".
-> > 
-> > As per my response to that series:
-> > 
-> >    Thanks. I have tentatively queued this up.
-> > 
-> >    I got some push back from Olof [CCed] about putting cleanups on top of
-> >    development when sending pull-requests for v3.17. This series falls
-> >    into the same category: cleaning up board and related files on top
-> >    of changes to initialise devices using DT.
-> > 
-> >    Olof, ideally I'd like this to go into v3.18.
-> >    Let me know if you have preference to delay it.
-> 
-> Hi Geert,
-> 
-> I have reconsidered this and I think that it would be best to
-> defer this cleanup until v3.19. The reason for this is that
-> I believe that there are plans to both add and DTS files during
-> v3.18, which would conflict with this release cycle.
-> 
-> Please repost this patch once v3.17-rc6 has been released.
+On Mon, Sep 22 2014 at 08:26:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Mitch,
+>
+> On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
+>> Currently, we provide the iommu_ops.iova_to_phys service by doing a
+>> table walk in software to translate IO virtual addresses to physical
+>> addresses. On SMMUs that support it, it can be useful to ask the SMMU
+>> itself to do the translation. This can be used to warm the TLBs for an
+>> SMMU. It can also be useful for testing and hardware validation.
+>> 
+>> Since the address translation registers are optional on SMMUv2, only
+>> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
+>> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
+>
+> [...]
+>
+>> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+>> +					dma_addr_t iova)
+>> +{
+>> +	struct arm_smmu_domain *smmu_domain = domain->priv;
+>> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+>> +	struct device *dev = smmu->dev;
+>> +	void __iomem *cb_base;
+>> +	u32 tmp;
+>> +	u64 phys;
+>> +
+>> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+>> +
+>> +	if (smmu->version == 1) {
+>> +		u32 reg = iova & ~0xFFF;
+>> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+>> +	} else {
+>> +		u32 reg = iova & ~0xFFF;
+>> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+>> +		reg = (iova & ~0xFFF) >> 32;
+>> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
+>> +	}
+>> +
+>> +	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
+>> +				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
+>> +		dev_err(dev,
+>> +			"iova to phys timed out on 0x%pa for %s. Falling back to software table walk.\n",
+>> +			&iova, dev_name(dev));
+>
+> dev_err already prints the device name.
 
-I have queued up the following for v3.19.
-I will push it to a branch that will be included in linux-next
-once v3.18-rc1 has been released.
+Ah of course.  I'll remove the dev_name.
 
-There was a conflict due to the addition of r8a7794-alt.dtb after
-you posted your patch. I have resolved it as follows. Please
-let me know if I have made an error.
+>
+>> +		return arm_smmu_iova_to_phys_soft(domain, iova);
+>> +	}
+>> +
+>> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
+>> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
+>> +
+>> +	if (phys & CB_PAR_F) {
+>> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
+>> +		dev_err(dev, "PAR = 0x%llx\n", phys);
+>> +	}
+>> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
+>
+> How does this work for 64k pages?
+
+So at the moment we're always assuming that we're using v7/v8 long
+descriptor format, right?  All I see in the spec (14.5.15 SMMU_CBn_PAR)
+is that bits[47:12]=>PA[47:12]...  Or am I missing something completely?
+
+As a mental note, if we add support for v7 short descriptors (which we
+would like to do sometime soon) then we'll have to handle the
+supersection case here as well.
 
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+-Mitch
 
-[PATCH] ARM: dts: Sort SHMOBILE dtbs alphabetically
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[horms+renesas at verge.net.au:  update for addition of r8a7794-alt.dtb]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 783126b..a9125b8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -358,24 +358,24 @@ dtb-$(CONFIG_ARCH_S5PV210) += s5pv210-aquila.dtb \
- 	s5pv210-smdkv210.dtb \
- 	s5pv210-torbreck.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += r7s72100-genmai.dtb \
-+	r8a73a4-ape6evm.dtb \
-+	r8a73a4-ape6evm-reference.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7778-bockw-reference.dtb \
- 	r8a7779-marzen.dtb \
--	r8a7791-koelsch.dtb \
- 	r8a7790-lager.dtb \
-+	r8a7791-koelsch.dtb \
-+	sh7372-mackerel.dtb \
- 	sh73a0-kzm9g.dtb \
--	sh73a0-kzm9g-reference.dtb \
--	r8a73a4-ape6evm.dtb \
--	r8a73a4-ape6evm-reference.dtb \
--	sh7372-mackerel.dtb
-+	sh73a0-kzm9g-reference.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
- 	r7s72100-genmai.dtb \
- 	r8a7740-armadillo800eva.dtb \
-+	r8a7779-marzen.dtb \
-+	r8a7790-lager.dtb \
- 	r8a7791-henninger.dtb \
- 	r8a7791-koelsch.dtb \
--	r8a7790-lager.dtb \
--	r8a7779-marzen.dtb \
- 	r8a7794-alt.dtb
- dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
- 	socfpga_cyclone5_socdk.dtb \
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
