@@ -1,90 +1,28 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 24 Sep 2014 07:49:39 -0600
-Subject: [PATCH v6 2/5] arm: dts: qcom: Add SPM device bindings for 8974
-In-Reply-To: <5422621E.2050509@smartplayin.com>
-References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
- <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
- <5422621E.2050509@smartplayin.com>
-Message-ID: <20140924134939.GA422@ilina-mac>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 24 Sep 2014 08:50:38 -0500
+Subject: [PATCH v7 3/3] regulator: qcom-rpm: Regulator driver for the
+ Qualcomm RPM
+In-Reply-To: <20140924083518.GB4015@sirena.org.uk>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1411428329-23172-4-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140924083518.GB4015@sirena.org.uk>
+Message-ID: <4437DA50-D8BC-4E78-821C-41440A08B9A9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24 2014 at 00:14 -0600, Pramod Gurav wrote:
->Hi Lina,
->
->On Wednesday 24 September 2014 05:21 AM, Lina Iyer wrote:
->> Add SPM device bindings for QCOM 8974 based cpus. SPM is the sub-system
->> power manager and controls the logic around the cores (cpu and L2).
->>
->> Each core has an instance of SPM and controls only that core. Each cpu
->> SPM is configured to support WFI and SPC (standalone-power collapse).
->>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->>  arch/arm/boot/dts/qcom-msm8974-pm.dtsi | 69 ++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/qcom-msm8974.dtsi    | 10 +++--
->>  2 files changed, 75 insertions(+), 4 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/qcom-msm8974-pm.dtsi
->
-><snip>
->
->> +};
->> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> index 69dca2a..0580bc2 100644
->> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> @@ -14,7 +14,7 @@
->>  		#size-cells = <0>;
->>  		interrupts = <1 9 0xf04>;
->>
->> -		cpu at 0 {
->> +		CPU0: cpu at 0 {
->Lina, Stephen boyd has sent some DT change for krait-cpufreq which also
->renames this node to "cpu0: cpu at 0". If you both could sync up and agree
->on a common naming('cpu0' with caps or not caps) for this node.
->
-Sure. Will work with Stephen on that.
 
->Best Regards
->Pramod
->
->>  			compatible = "qcom,krait";
->>  			enable-method = "qcom,kpss-acc-v2";
->>  			device_type = "cpu";
->> @@ -23,7 +23,7 @@
->>  			qcom,acc = <&acc0>;
->>  		};
->>
->> -		cpu at 1 {
->> +		CPU1: cpu at 1 {
->Ditto
->>  			compatible = "qcom,krait";
->>  			enable-method = "qcom,kpss-acc-v2";
->>  			device_type = "cpu";
->> @@ -32,7 +32,7 @@
->>  			qcom,acc = <&acc1>;
->>  		};
->>
->> -		cpu at 2 {
->> +		CPU2: cpu at 2 {
->Ditto
->>  			compatible = "qcom,krait";
->>  			enable-method = "qcom,kpss-acc-v2";
->>  			device_type = "cpu";
->> @@ -41,7 +41,7 @@
->>  			qcom,acc = <&acc2>;
->>  		};
->>
->> -		cpu at 3 {
->> +		CPU3: cpu at 3 {
->Ditto
->>  			compatible = "qcom,krait";
->>  			enable-method = "qcom,kpss-acc-v2";
->>  			device_type = "cpu";
->> @@ -238,3 +238,5 @@
->>  		};
->>  	};
->>  };
->> +
->> +#include "qcom-msm8974-pm.dtsi"
->>
+On Sep 24, 2014, at 3:35 AM, Mark Brown <broonie@kernel.org> wrote:
+
+> On Mon, Sep 22, 2014 at 04:25:29PM -0700, Bjorn Andersson wrote:
+>> Driver for regulators exposed by the Resource Power Manager (RPM) found
+>> in Qualcomm 8660, 8960 and 8064 based devices.
+> 
+> Applied, thanks.
+
+Mark, can you drop this until we see at least an RFC patch for the RPM support for b-family SoCs (8074, 8084, etc) chips.  The regulator could should either be the same or highly similar for b-family, but until we see the core RPM driver on the b-family SoCs we will not know that.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
