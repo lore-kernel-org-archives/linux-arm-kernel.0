@@ -1,124 +1,150 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 24 Sep 2014 11:33:00 -0500
-Subject: [PATCH v6 1/5] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
-References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
- <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <F743E5F0-28C1-4A9D-A27D-73EA70A01B46@codeaurora.org>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Wed, 24 Sep 2014 12:33:00 -0400
+Subject: [PATCH 0/9] ARM: vf610: Suspend/resume support
+In-Reply-To: <4ee0621b0bf5f4d4e10eae7673bdf1cd@agner.ch> (Stefan Agner's
+ message of "Wed, 24 Sep 2014 10:22:39 +0200")
+References: <cover.1411404079.git.stefan@agner.ch> <87zjdqmjr3.fsf@nbsps.com>
+ <4ee0621b0bf5f4d4e10eae7673bdf1cd@agner.ch>
+Message-ID: <87y4t9kmgz.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24 Sep 2014, stefan at agner.ch wrote:
 
-On Sep 23, 2014, at 6:51 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Am 2014-09-23 17:36, schrieb Bill Pringlemeir:
+>> On 22 Sep 2014, stefan at agner.ch wrote:
 
-> Based on work by many authors, available at codeaurora.org
-> 
-> SPM is a hardware block that controls the peripheral logic surrounding
-> the application cores (cpu/l$). When the core executes WFI instruction,
-> the SPM takes over the putting the core in low power state as
-> configured. The wake up for the SPM is an interrupt at the GIC, which
-> then completes the rest of low power mode sequence and brings the core
-> out of low power mode.
-> 
-> The SPM has a set of control registers that configure the SPMs
-> individually based on the type of the core and the runtime conditions.
-> SPM is a finite state machine block to which a sequence is provided and
-> it interprets the bytes  and executes them in sequence. Each low power
-> mode that the core can enter into is provided to the SPM as a sequence.
-> 
-> Configure the SPM to set the core (cpu or L2) into its low power mode,
-> the index of the first command in the sequence is set in the SPM_CTL
-> register. When the core executes ARM wfi instruction, it triggers the
-> SPM state machine to start executing from that index. The SPM state
-> machine waits until the interrupt occurs and starts executing the rest
-> of the sequence until it hits the end of the sequence. The end of the
-> sequence jumps the core out of its low power mode.
-> 
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> [lina: simplify the driver for initial submission, clean up and update
-> commit text]
-> ---
-> Documentation/devicetree/bindings/arm/msm/spm.txt |  43 +++
-> drivers/soc/qcom/Kconfig                          |   8 +
-> drivers/soc/qcom/Makefile                         |   1 +
-> drivers/soc/qcom/spm.c                            | 388 ++++++++++++++++++++++
-> include/soc/qcom/spm.h                            |  38 +++
-> 5 files changed, 478 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/arm/msm/spm.txt
-> create mode 100644 drivers/soc/qcom/spm.c
-> create mode 100644 include/soc/qcom/spm.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/spm.txt b/Documentation/devicetree/bindings/arm/msm/spm.txt
-> new file mode 100644
-> index 0000000..2ff2454
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/spm.txt
-> @@ -0,0 +1,43 @@
-> +* Subsystem Power Manager (SPM)
-> +
-> +Qualcomm Snapdragons have SPM hardware blocks to control the Application
-> +Processor Sub-System power. These SPM blocks run individual state machine
-> +to determine what the core (L2 or Krait/Scorpion) would do when the WFI
-> +instruction is executed by the core.
-> +
-> +The devicetree representation of the SPM block should be:
-> +
-> +Required properties
-> +
-> +- compatible: Must be -
-> +		 "qcom,spm-v2.1"
-> +- reg: The physical address and the size of the SPM's memory mapped registers
-> +- qcom,cpu: phandle for the CPU that the SPM block is attached to.
-> +	This field is required on only for SPMs that control the CPU.
+[snip]
 
-Let?s make this just cpu-handle instead of qcom,cpu.  The concept of a handle to a cpu is pretty generic.
+>>> Power measurement (Colibri VF61, whole module):
+>>> - Idle: 540mW
+>>> - LP-RUN: 220mW (standby)
+>>> - STOP: 200mW (mem)
+>>
+>>> Stefan Agner (9):
+>>> ARM: dts: vf610: Add system reset controller (SRC)
+>>> ARM: dts: vf610: add global power controller (GPC)
+>>> ARM: dts: vf610: add on-chip SRAM
+>>
+>> These above three change sets have some implications for dual-chip
+>> (Cortex-A5/Cortex-M4) configurations.  Epecially those running MQX.
+>> There is not harm to define the register space (except DT size).
+>> However, if you activate drivers that manipulate the registers for
+>> all systems, then there is no choice to have MQX work on the 2nd
+>> core.
 
-> +- qcom,saw2-clk-div: SAW2 configuration register to program the SPM runtime
-> +	clocks. The register for this property is MSM_SPM_REG_SAW2_CFG.
+> On the Timesys BSP, the kernel is fiddling around with this registers
+> too, and AFAIK MQX is working with that kernel. Is MQX really using
+> the GPC and SRC modules? I thought MQX is just relying on Linux taking
+> care of that.
 
-(add details on how this is used to compute timer tick.  Is it timer tick = saw_clk/saw2-clk-div?  What is valid range of values)
+> Also, you have this problem with other registers as well, for instance
+> the CCM module. In fact, to get into deeper sleep modes, you need to
+> access the GPC (global power controller) as well as the CCM (clock
+> controller module, for instance the CCM_CLPCR register). When you look
+> at all the entry sequences, they all fiddling around with the GPC and
+> the CCM. And I don't think that the kernel can work properly without
+> having control over the clock module.
 
-> +- qcom,saw2-delays: The SPM delay values that SPM sequences would refer to.
-> +	The register for this property is MSM_SPM_REG_SAW2_SPM_DLY.
+> IMHO, the SRC and GPC are like the CCM, and need to be under control
+> of Linux exclusively.
 
-Didn?t Stephen asked about splitting this up? Or at least treating it as an array of 3 values?
+Yes, it is difficult to see the existing Linux infrastructure working
+without these.  The two cores both depend on the same clocks.  You must
+use 'clk_ignore_unused' if you want to run both.
 
-> +- qcom,saw2-enable: The SPM control register to enable/disable the sleep state
-> +	machine. The register for this property is MSM_SPM_REG_SAW2_SPM_CTL.
+> Another case is the SRAM. There are other peripherals which are much
+> more important, e.g. both instances of the EDMA modules are currently
+> unconditional part of the device tree.
 
-Can this just be a boolean (exist or not), if so, probably change it to qcom,saw2-disable (so lack of property means enable)?
+The SRAM is even more of an issue.  Often the MQX is running from the
+SRAM.  I agree that the EDMA are actually a bit of an issue as well.
+You need to modify MQX to not use them.  However, the MQX use of EDMA
+seems stupid, so I prefer Linux to have this feature.  I didn't see
+the edma patches when they went in and/or I didn't think of this until I
+actually encounter the 'emda' conflict issue.
 
-> +
-> +Optional properties
-> +
-> +- qcom,saw2-spm-cmd-wfi: The WFI command sequence
+> Besides, afaik you can also use status = "disabled" in a device tree
+> including the vf610.dtsi. The device tree is parsed sequential, the
+> last settings wins.
 
-probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
+This is true, but in some cases the code is depending on the device
+being enabled?  Also, we have automatically compiled in the drivers if
+'SOC_VF610' is active.  Ie, there is no way to exclude the code.  The
+device tree also becomes a little heavier instead of including them in
+the machine file.
 
-> +- qcom,saw2-spm-cmd-spc: The Standalone PC command sequence
+>> I think that Shawn Guo already did a patchset to remove stuff from
+>> the vf610.dtsi to the machine/configuration DT files.
 
-probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
+In this patchset, I suggested that we could include the notation in the
+headers which are included in the 'DT' files.  So instead of 'dtsi', we
+could use,
 
-> +
-> +Example:
-> +	spm at f9089000 {
-> +		compatible = "qcom,spm-v2.1";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0xf9089000 0x1000>;
-> +		qcom,cpu = <&CPU0>;
-> +		qcom,saw2-clk-div = <0x1>;
-> +		qcom,saw2-delays = <0x20000400>;
-> +		qcom,saw2-enable = <0x1>;
-> +		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
-> +		qcom,saw2-spm-cmd-spc = [00 20 50 80 60 70 10 92
-> +				a0 b0 03 68 70 3b 92 a0 b0
-> +				82 2b 50 10 30 02 22 30 0f];
-> +	};
+   #define VF610_GPC_SUPPORT \
+           gpc: gpc at 4006c000 {                \
+                   compatible = "fsl,vf610-gpc"; \
+                   reg = <0x4006c000 0x1000>;    \
+           };
 
-- k
+Or even,
 
+   #define VF610_SUSPEND_DT_SUPPORT \ ...
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Anyways, the DT issue doesn't matter so much.  People will have to make
+custom versions for their own boards.  Although, I don't think it is not
+that hard to support it at the machine level.
+
+I agree that so far there are some peripherals that make it difficult to
+run the mainline Linux with an MQX.  However, I think this patch set
+seems to bring it closer to making it impossible.  I am only suggesting
+that we make it a configuration option and not include it for all Vybrid
+devices.
+
+Is it clear that the desired way is to use,
+
+   &gpc { status = "disabled"; };
+   &src { status = "disabled"; };
+
+We have,
+
+arch/arm/mach-imx/gpc.c
+
+      void __init vf610_gpc_init(void)
+      {
+              struct device_node *np;
+
+              np = of_find_compatible_node(NULL, NULL, "fsl,vf610-gpc");
+              gpc_base = of_iomap(np, 0);
+              gpc_imr_base = gpc_base + VF610_GPC_IMR1;
+   ...
+
+arch/arm/mach-imx/mach-vf610.c
+
+   static void __init vf610_init_irq(void)
+   {
+           vf610_gpc_init();
+           irqchip_init();
+   }
+
+   ...
+
+   +	.init_irq	= vf610_init_irq,
+
+I don't think this will work.  Not to mention that 'mach-vf610.c' will
+not build if HAVE_IMX_GPC is not defined.  Also, I don't really see a
+use of the GPC module unless suspend/resume is active?   Even some wall
+powered designs may wish to exclude this functionality?
+
+I think that the SRC maybe needed for secure parts.  I think that some
+designs might wish to restrict Linux's access to these registers as
+well.  I don't actually see why we need this module?  I think the imx6
+needs it due to multi-CPU bring-up, but in the Vybrid case, this does
+not exist.  Can you check to see why we need the SRC?  I don't see where
+we actually use it?  In patch9/9, we record it but do we actually access
+the registers?  Is it just for the vf610_src_init() code?  Even that
+seems the whole 'src.c' file is only needed for the 'src_base'
+reference, which we don't use?
+
+Thanks,
+Bill Pringlemeir.
