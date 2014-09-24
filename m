@@ -1,29 +1,42 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 23 Sep 2014 20:21:51 -0700
-Subject: FIX Me in pgtable.h
-In-Reply-To: <54216FC9.5060605@gmail.com>
-References: <54216FC9.5060605@gmail.com>
-Message-ID: <542238CF.30505@codeaurora.org>
+From: behanw@converseincode.com (Behan Webster)
+Date: Tue, 23 Sep 2014 20:44:44 -0700
+Subject: [PATCH] arm, vt8500,
+ LLVMLlinux: Use mcr instead of mcr% for mach-vt8500
+Message-ID: <1411530284-28807-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/23/2014 6:04 AM, nick wrote:
-> Greetings Arm Maintainers,
-> I am wondering about the fix me in pgtable.h for define kern_addr_valid and how to set it to a correct
-> value as you state that this needs to be fixed as the defined macro is still 1. This is probably incorrect
-> and should be changed.
-> Thanks,
-> Nick
->
+The ASM below does not compile with clang and is not the way that the mcr
+command is used in other parts of the kernel.
 
-It's not clear to me how valuable fixing kern_addr_valid would actually
-be for arm. It seems to be used in exactly one place, fs/proc/kcore.c
-and the associated Kconfig is explicitly marked if !ARM. Nearly all
-other archs minus x86, arm64 and sparc are in the same boat as well.
+arch/arm/mach-vt8500/vt8500.c:72:11: error: invalid % escape in inline assembly string
+        asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
+            ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
 
-Thanks,
-Laura
+There are other forms that are supported on different ARM instruction sets but
+generally the kernel just uses mcr as it is supported in all ARM instruction
+sets.
 
+Signed-off-by: Behan Webster <behanw@converseincode.com>
+Reviewed-by: Mark Charlebois <charlebm@gmail.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-vt8500/vt8500.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+index 2da7be3..3bc0dc9 100644
+--- a/arch/arm/mach-vt8500/vt8500.c
++++ b/arch/arm/mach-vt8500/vt8500.c
+@@ -69,7 +69,7 @@ static void vt8500_power_off(void)
+ {
+ 	local_irq_disable();
+ 	writew(5, pmc_base + VT8500_HCR_REG);
+-	asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
++	asm("mcr p15, 0, %0, c7, c0, 4" : : "r" (0));
+ }
+ 
+ static void __init vt8500_init(void)
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum, hosted by The Linux Foundation
+1.9.1
