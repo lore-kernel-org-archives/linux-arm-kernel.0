@@ -1,51 +1,38 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 24 Sep 2014 16:59:57 +0300
-Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
-In-Reply-To: <1724421.fbdO6SWIjA@vostro.rjw.lan>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <2161168.GXttgFlE1X@vostro.rjw.lan> <5422BC97.6080608@ti.com>
- <1724421.fbdO6SWIjA@vostro.rjw.lan>
-Message-ID: <5422CE5D.4010003@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 24 Sep 2014 16:01:32 +0200
+Subject: [PATCH 1/2] ARM: zynq: DT: Add missing reference for ADC
+Message-ID: <fced9e56dc4ef8df9ead34f6444c010cc31c7a61.1411567289.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2014 04:51 PM, Rafael J. Wysocki wrote:
-> On Wednesday, September 24, 2014 03:44:07 PM Grygorii Strashko wrote:
->> Hi Rafael,
->>
->> On 09/22/2014 05:19 PM, Rafael J. Wysocki wrote:
->>> On Friday, September 19, 2014 11:48:49 AM Dmitry Torokhov wrote:
->>>> Hi Ulf,
->>>>
->>>> On Fri, Sep 19, 2014 at 08:27:33PM +0200, Ulf Hansson wrote:
->>>>> Changes in v5:
->>>>> 	- Converted dev_pm_domain_detach() to a void function
->>>>> 	- Added a ->detach() callback to the PM domain struct, invoked from the
->>>>> 	  dev_pm_domain_detach().
->>>>> 	- Make ACPI and genpd both assign the ->detach() callback at successfull
->>>>> 	  attachment.
->>>>> 	- The above changes made it possible to make acpi_pm_domain_detach() to
->>>>> 	  be static, added a separate patch for that.
->>>>
->>>> Thank you for making these changes. For the series:
->>>>
->>>> Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>>
->>> I've queued up this patchset for 3.18 (I fixed up the two minor issues pointed
->>> to by Geert in the process).
->>>
->>
->> Could you point me on branch where I can find these patches?
->> Also, are there any chances to have these patches  in next/linux-next.git,
->> so they will become available for testing and re-using?
->
-> It is in the bleeding-edge branch of the linux-pm.git tree at the moment,
-> which is rebased quite often, but you can use it for testing.
->
-> It should appear in linux-next tomorrow.
->
+Add missing reference for ADC node.
 
-Thank you.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Regards,
-- grygorii
+ arch/arm/boot/dts/zynq-7000.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index 772381fe07bb..fc90f47f9c03 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -64,7 +64,7 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges;
+
+-		adc at f8007100 {
++		adc: adc at f8007100 {
+ 			compatible = "xlnx,zynq-xadc-1.00.a";
+ 			reg = <0xf8007100 0x20>;
+ 			interrupts = <0 7 4>;
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/ea25650a/attachment.sig>
