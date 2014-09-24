@@ -1,19 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 24 Sep 2014 20:05:46 -0300
-Subject: [PATCH 13/18] [media] s5p_mfc_opr_v5: Fix lots of warnings on
- x86_64
-In-Reply-To: <5824d4d8b177c3778cea8ef5e345d126e6c46767.1411597610.git.mchehab@osg.samsung.com>
-References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
- <5824d4d8b177c3778cea8ef5e345d126e6c46767.1411597610.git.mchehab@osg.samsung.com>
-Message-ID: <CAOMZO5BeuqG77tax==sRAWv00YYRcS5x7zKF61uk1Gg15CCPZA@mail.gmail.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Thu, 25 Sep 2014 04:37:18 +0530
+Subject: [PATCH/RFC 0/2] serial: samsung: add support for early console
+In-Reply-To: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
+References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAGOxZ53+8g5CKHo5GQUQQd=o6rcdWJEWGdHG6CP8z2eS8cYRXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 7:27 PM, Mauro Carvalho Chehab
-<mchehab@osg.samsung.com> wrote:
+Hi Marek,
 
-> -       mfc_debug(2, "buf_size1: %d, buf_size2: %d\n", buf_size1, buf_size2);
-> +       mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n", buf_size1, buf_size2);
+On Mon, Sep 22, 2014 at 6:44 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello,
+>
+> This patchset adds support for early console defined in device tree. As
+> an example, DTS files for all Exynos4 based machines are updated with
+> the correct value for common chosen/sdtout property.
+>
+> To get it fully functional additional improvements (support for
+> early_ioremap) are needed in early console code.
+>
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
+>
+>
+> Patch summary:
+>
+> Tomasz Figa (2):
+>   serial: samsung: Add support for of_earlycon
+Probably you can re-spin this series without RFC tag and fixing a nit.
+Please add command line support also and update the Documentation with
+command line param.
+>   ARM: dts: exynos4: Add stdout-path properties
+>
+Have tested this on ARM64 based exynos7, both DT and command line way.
+Both works.
+Compile tested on ARM.
+Probably you can rebase on top of
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36208.html
+maybe.
+>  arch/arm/boot/dts/exynos4210-origen.dts         |  1 +
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |  1 +
+>  arch/arm/boot/dts/exynos4210-trats.dts          |  1 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |  1 +
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 +
+>  arch/arm/boot/dts/exynos4412-origen.dts         |  1 +
+>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |  1 +
+>  arch/arm/boot/dts/exynos4412-tiny4412.dts       |  4 +
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |  1 +
+>  drivers/tty/serial/Kconfig                      |  1 +
+>  drivers/tty/serial/samsung.c                    | 97 +++++++++++++++++++++++++
+>  11 files changed, 113 insertions(+)
+>
+> --
+> 1.9.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
-This should be %zu. Same for other %zd ocurrences.
+
+-- 
+Regards,
+Alim
