@@ -1,43 +1,81 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 25 Sep 2014 06:23:22 +1200
-Subject: [PATCH] arm, vt8500, LLVMLlinux: Use mcr instead of mcr% for
- mach-vt8500
-In-Reply-To: <7810937.UX61PvX9nB@wuerfel>
-References: <1411530284-28807-1-git-send-email-behanw@converseincode.com>
- <7810937.UX61PvX9nB@wuerfel>
-Message-ID: <54230C1A.30801@prisktech.co.nz>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 24 Sep 2014 14:32:06 -0400
+Subject: [PATCH v5 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
+In-Reply-To: <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
+References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
+ <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
+Message-ID: <20140924183204.GE27076@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Mikko,
 
-On 24/09/14 21:16, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 20:44:44 Behan Webster wrote:
->> The ASM below does not compile with clang and is not the way that the mcr
->> command is used in other parts of the kernel.
->>
->> arch/arm/mach-vt8500/vt8500.c:72:11: error: invalid % escape in inline assembly string
->>          asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
->>              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
->> 1 error generated.
->>
->> There are other forms that are supported on different ARM instruction sets but
->> generally the kernel just uses mcr as it is supported in all ARM instruction
->> sets.
-> Just for confirm: both forms are actually correct and we don't need this
-> backported for stable, right?
->
->> Signed-off-by: Behan Webster <behanw@converseincode.com>
->> Reviewed-by: Mark Charlebois <charlebm@gmail.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> Tony, would you like to pick this one up and send it in a pull request
-> to arm-soc, or should we apply it to fixes-non-critical directly?
->
-> 	Arnd
-Arnd,
+On Thu, Aug 21, 2014 at 01:17:21PM +0300, Mikko Perttunen wrote:
+> This adds critical trip points to the Jetson TK1 device tree.
+> The device will do a controlled shutdown when either the CPU, GPU
+> or MEM thermal zone reaches 101 degrees Celsius.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+> v5: added cooling-maps nodes
+> 
 
-You can apply it directly to fixes-non-critical if that's ok.
+OK. But no cooling map entry in it. What was the reason again you don't
+need/want to add the maps?
 
-Regards
-Tony Prisk
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 41 +++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> index 0cdb5cf..bcdab7f 100644
+> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> @@ -1876,4 +1876,45 @@
+>  			 <&tegra_car TEGRA124_CLK_EXTERN1>;
+>  		clock-names = "pll_a", "pll_a_out0", "mclk";
+>  	};
+> +
+> +	thermal-zones {
+> +		cpu {
+> +			trips {
+> +				trip at 0 {
+> +					temperature = <101000>;
+> +					hysteresis = <0>;
+> +					type = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +			};
+> +		};
+> +
+> +		mem {
+> +			trips {
+> +				trip at 0 {
+> +					temperature = <101000>;
+> +					hysteresis = <0>;
+> +					type = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +			};
+> +		};
+> +
+> +		gpu {
+> +			trips {
+> +				trip at 0 {
+> +					temperature = <101000>;
+> +					hysteresis = <0>;
+> +					type = "critical";
+> +				};
+> +			};
+> +
+> +			cooling-maps {
+> +			};
+> +		};
+> +	};
+>  };
+> -- 
+> 1.8.1.5
+> 
