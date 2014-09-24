@@ -1,44 +1,41 @@
-From: behanw@converseincode.com (Behan Webster)
-Date: Wed, 24 Sep 2014 11:11:43 -0700
-Subject: [PATCH] arm, vt8500, LLVMLlinux: Use mcr instead of mcr% for
- mach-vt8500
-In-Reply-To: <7810937.UX61PvX9nB@wuerfel>
-References: <1411530284-28807-1-git-send-email-behanw@converseincode.com>
- <7810937.UX61PvX9nB@wuerfel>
-Message-ID: <5423095F.9030802@converseincode.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 24 Sep 2014 13:20:38 -0500
+Subject: [PATCH] ARM: qcom: Update SoC compatibles we support
+Message-ID: <1411582838-24159-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/14 02:16, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 20:44:44 Behan Webster wrote:
->> The ASM below does not compile with clang and is not the way that the mcr
->> command is used in other parts of the kernel.
->>
->> arch/arm/mach-vt8500/vt8500.c:72:11: error: invalid % escape in inline assembly string
->>          asm("mcr%? p15, 0, %0, c7, c0, 4" : : "r" (0));
->>              ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
->> 1 error generated.
->>
->> There are other forms that are supported on different ARM instruction sets but
->> generally the kernel just uses mcr as it is supported in all ARM instruction
->> sets.
-> Just for confirm: both forms are actually correct and we don't need this
-> backported for stable, right?
-My understanding is that the %? carries a condition code to the next 
-instruction (which in this case is then ignored). So essentially in this 
-situation both are equivalent.
+Move to just using the SoC name in the compatible list so we don't need
+to update this for every board going forward.  Also added "qcom,msm8974"
+to the list as we support "qcom,apq8074" already (the modemless version
+of "qcom,msm8974").
 
->> Signed-off-by: Behan Webster <behanw@converseincode.com>
->> Reviewed-by: Mark Charlebois <charlebm@gmail.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> Tony, would you like to pick this one up and send it in a pull request
-> to arm-soc, or should we apply it to fixes-non-critical directly?
-Thanks,
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/mach-qcom/board.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Behan
-
+diff --git a/arch/arm/mach-qcom/board.c b/arch/arm/mach-qcom/board.c
+index 6d8bbf7..e3e44aa 100644
+--- a/arch/arm/mach-qcom/board.c
++++ b/arch/arm/mach-qcom/board.c
+@@ -16,12 +16,13 @@
+ 
+ static const char * const qcom_dt_match[] __initconst = {
+ 	"qcom,apq8064",
+-	"qcom,apq8074-dragonboard",
++	"qcom,apq8074",
+ 	"qcom,apq8084",
+ 	"qcom,ipq8062",
+ 	"qcom,ipq8064",
+-	"qcom,msm8660-surf",
+-	"qcom,msm8960-cdp",
++	"qcom,msm8660",
++	"qcom,msm8960",
++	"qcom,msm8974",
+ 	NULL
+ };
+ 
 -- 
-Behan Webster
-behanw at converseincode.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
