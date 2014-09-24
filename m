@@ -1,32 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Sep 2014 11:16:25 -0700
-Subject: [GIT PULL] arm: mediatek: Add more basic features
-In-Reply-To: <CABuKBeJJ5ijy6CXPHbrzrkgJDVz99BmdACx+wRZ-KbVjKx2kLg@mail.gmail.com>
-References: <CABuKBeJJ5ijy6CXPHbrzrkgJDVz99BmdACx+wRZ-KbVjKx2kLg@mail.gmail.com>
-Message-ID: <20140924181625.GE19284@localhost>
+Date: Wed, 24 Sep 2014 11:18:00 -0700
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Defconfig
+ Updates for v3.18
+In-Reply-To: <cover.1410832469.git.horms+renesas@verge.net.au>
+References: <cover.1410832469.git.horms+renesas@verge.net.au>
+Message-ID: <20140924181800.GF19284@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 15, 2014 at 05:59:28PM +0200, Matthias Brugger wrote:
-> Hi Arnd and Olof,
+On Tue, Sep 16, 2014 at 10:57:43AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please prepare for the next round of Mediatek patches for the mt6589.
-> This patch set adds some minor changes to the Mediatek mt6589 support.
+> Please consider these fourth round of Renesas ARM based SoC defconfig updates for v3.18.
 > 
-> Features are low-level debugging on the mt6589, the addition to the
-> "make dtbs" and multi_v7_defconfig,as well as some small changes in
-> the DTS files.
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-defconfig3-for-v3.18,
+> which you have pulled.
+> 
+> 
+> The following changes since commit de46e95cdb8671e2b0728923b8113654779c3ba8:
+> 
+>   ARM: shmobile: Enable Armadillo 800 EVA board in multiplatform defconfig (2014-09-01 10:46:57 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig4-for-v3.18
+> 
+> for you to fetch changes up to 7d984c95723725d26f3961c1655c20256f0affdf:
+> 
+>   ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig (2014-09-11 09:49:40 +0900)
+> 
+> ----------------------------------------------------------------
+> Fourth Round of Renesas ARM Based SoC Defconfig Updates for v3.18
+> 
+> * Enable r8a7794 SoC in shmobile_defconfig
 
-Hi Matthias,
-
-The contents in this branch look OK to me, but I'd prefer to spread them out
-across some of our branches (most of it is DT, one is defconfig and one is soc stuff).
-
-Because of this, I've ended up applying patches manually (cherry-picking them out of this branch).
-
-In other words: Code is merged, but branch is not. Thanks!
-
-(Also, we tend to use a capital ARM: as prefix on patch subjects, I fixed that up).
-
+Merged, thanks.
 
 -Olof
