@@ -1,33 +1,76 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 20:25:14 -0300
-Subject: [PATCH 15/18] [media] s5p_mfc_opr: Fix warnings
-In-Reply-To: <CAOMZO5CoaX05r50p+Ug++napxZEoL_+CR8-T7tN6wtiSRfT1pw@mail.gmail.com>
-References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
- <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
- <CAOMZO5CoaX05r50p+Ug++napxZEoL_+CR8-T7tN6wtiSRfT1pw@mail.gmail.com>
-Message-ID: <20140924202514.0b1c6a3c@recife.lan>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 24 Sep 2014 16:27:07 -0700
+Subject: [PATCH v3] PM / AVS: rockchip-io: add driver handling Rockchip io
+ domains
+In-Reply-To: <7hy4tog61r.fsf@deeprootsystems.com> (Kevin Hilman's message of
+ "Fri, 12 Sep 2014 09:25:04 -0700")
+References: <1410475735-10278-1-git-send-email-dianders@chromium.org>
+ <7hy4tog61r.fsf@deeprootsystems.com>
+Message-ID: <7hwq8sk3as.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 24 Sep 2014 20:02:19 -0300
-Fabio Estevam <festevam@gmail.com> escreveu:
+Kevin Hilman <khilman@kernel.org> writes:
 
-> Hi Mauro,
-> 
-> On Wed, Sep 24, 2014 at 7:27 PM, Mauro Carvalho Chehab
-> <mchehab@osg.samsung.com> wrote:
-> 
-> 
-> > drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:44:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-> 
-> ...
-> 
-> > -       mfc_debug(3, "Allocating priv: %d\n", b->size);
-> > +       mfc_debug(3, "Allocating priv: %zd\n", b->size);
-> 
-> This should be %zu instead.
+> Rafael,
+>
+> Doug Anderson <dianders@chromium.org> writes:
+>
+>> From: Heiko St?bner <heiko@sntech.de>
+>>
+>> IO domain voltages on some Rockchip SoCs are variable but need to be
+>> kept in sync between the regulators and the SoC using a special
+>> register.
+>>
+>> A specific example using rk3288:
+>> - If the regulator hooked up to a pin like SDMMC0_VDD is 3.3V then
+>>   bit 7 of GRF_IO_VSEL needs to be 0.  If the regulator hooked up to
+>>   that same pin is 1.8V then bit 7 of GRF_IO_VSEL needs to be 1.
+>>
+>> Said another way, this driver simply handles keeping bits in the SoC's
+>> general register file (GRF) in sync with the actual value of a voltage
+>> hooked up to the pins.
+>>
+>> Note that this driver specifically doesn't include:
+>> - any logic for deciding what voltage we should set regulators to
+>> - any logic for deciding whether regulators (or internal SoC blocks)
+>>   should have power or not have power
+>>
+>> If there were some other software that had the smarts of making
+>> decisions about regulators, it would work in conjunction with this
+>> driver.  When that other software adjusted a regulator's voltage then
+>> this driver would handle telling the SoC about it.  A good example is
+>> vqmmc for SD.  In that case the dw_mmc driver simply is told about a
+>> regulator.  It changes the regulator between 3.3V and 1.8V at the
+>> right time.  This driver notices the change and makes sure that the
+>> SoC is on the same page.
+>>
+>> Signed-off-by: Heiko St?bner <heiko@sntech.de>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>> Changes in v3:
+>> - Changed compatible string as per Santosh.
+>
+> Thanks, I like the new string better.
+>
+>> - Added code docs about the slop in 1.8V and 3.3V as per Santosh.
+>> - Moved some #defines to the top as per Santosh.
+>
+> All nice changes, thanks Santosh!
+>
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>
+> Rafael, how do you want to handle drivers/avs/* ?  Along with Nishanth,
+> I'm maintaining everything there currently (only one driver :)), and
+> since I recommended $SUBJECT driver go into drivers/avs[1], I'm happy to
+> queue it for you and update MAINTAINERS to cover drivers/avs/* instead
+> of just smartreflex.c.
+>
+> Let me know how you'd like to proceed.
 
-Thanks! fixed on both patches.
+For the benefit of the archives... Rafael and I talked off-list and
+agreed that I'll queue it up for him and update MAINTAINERS to reflect
+maintenance of drivesr/power/avs
 
-Regards,
-Mauro
+Kevin
