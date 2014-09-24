@@ -1,45 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Sep 2014 11:28:15 -0700
-Subject: [GIT PULL 2/3] ARM: imx: SoC updates for 3.18
-In-Reply-To: <20140916044758.GB25583@dragon>
-References: <20140916044758.GB25583@dragon>
-Message-ID: <20140924182815.GI19284@localhost>
+Date: Wed, 24 Sep 2014 11:30:54 -0700
+Subject: [GIT PULL 3/3] ARM: imx: device tree changes for 3.18
+In-Reply-To: <20140916044940.GC25583@dragon>
+References: <20140916044940.GC25583@dragon>
+Message-ID: <20140924183054.GJ19284@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 12:47:59PM +0800, Shawn Guo wrote:
+Hi,
+
+[Adding Lee so he knows we've merged in the dependency now]
+
+On Tue, Sep 16, 2014 at 12:49:41PM +0800, Shawn Guo wrote:
 > Hi arm-soc folks,
 > 
-> This is the i.MX SoC changes for 3.18.  It's based on imx-cleanup-3.18
-> pull request for dependency reason.
+> This is the i.MX device tree updates for 3.18.  Per request from MFD
+> maintainer Lee Jones, the following tag was pull into my DT branch to
+> to avoid potential conflicts.
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-arm-v3.18
+
+Excellent, thanks for the heads up. Added as depends/mfd-ib in our tree
+so we've got it labelled as an external dependency.
+
+> Besides of that, the pull request is also based on imx-soc-3.18 one for
+> sake of dependency.
 > 
 > Please pull, thanks.
 > 
 > Shawn
 > 
-> The following changes since commit 64d14a31d5410ea34641c41795e0ba222bda740c:
+> The following changes since commit 155b2fd3d6862509ccb356ff20fff8115d36eedb:
 > 
->   ARM: imx: Remove mach-mxt_td60 board file (2014-09-10 11:17:44 +0800)
+>   Merge branch 'imx/soc' into imx/dt (2014-09-16 10:24:58 +0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-3.18
 > 
-> for you to fetch changes up to 64546e9fe3a5b8cf62c946521c71d0532d399850:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-3.18
 > 
->   ARM: imx_v6_v7_defconfig updates (2014-09-16 10:09:43 +0800)
+> for you to fetch changes up to 2b2244a3e7c3d537f436a3580999b3032628d17d:
 > 
-> ----------------------------------------------------------------
-> The i.MX SoC updates for 3.18:
->  - Add initial devicetree support for i.MX1
->  - Support GPT per clock source from OSC for i.MX6
->  - A couple of parent selection corrections for i.MX6SL clock driver
->  - Support more chip revision for i.MX6
->  - Convert pr_warning to pr_warn
->  - Add exclusive gate clock support
->  - Add BYPASS support for i.MX6 PLL clocks
->  - Update i.MX6 clock tree for audio use case
->  - A couple of VF610 clock driver updates
+>   ARM: dts: imx6: make gpt per clock can be from OSC (2014-09-16 10:27:32 +0800)
 
 Merged, thanks.
 
