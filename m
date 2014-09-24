@@ -1,32 +1,51 @@
-From: yocto6@gmail.com (nick)
-Date: Wed, 24 Sep 2014 07:38:15 -0400
-Subject: FIX Me in pgtable.h
-In-Reply-To: <542238CF.30505@codeaurora.org>
-References: <54216FC9.5060605@gmail.com> <542238CF.30505@codeaurora.org>
-Message-ID: <5422AD27.30101@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 24 Sep 2014 19:53:33 +0800
+Subject: [linux-sunxi] Re: [PATCH 3/6] ARM: dts: sunxi: Add Allwinner A80
+ dtsi
+In-Reply-To: <54227038.2020805@free-electrons.com>
+References: <1411311493-24344-1-git-send-email-wens@csie.org>
+ <1411311493-24344-4-git-send-email-wens@csie.org>
+ <20140924063738.GQ15315@lukather>
+ <CAGb2v64voZpK_82wtkErRowR0vjEUALNUwvCx_sd8Q5wb4Hq-g@mail.gmail.com>
+ <54227038.2020805@free-electrons.com>
+Message-ID: <CAGb2v64yGmdLeWmA=+nxD85DbQf_xxUNx3n3oedFZi51uc50+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 14-09-23 11:21 PM, Laura Abbott wrote:
-> On 9/23/2014 6:04 AM, nick wrote:
->> Greetings Arm Maintainers,
->> I am wondering about the fix me in pgtable.h for define kern_addr_valid and how to set it to a correct
->> value as you state that this needs to be fixed as the defined macro is still 1. This is probably incorrect
->> and should be changed.
->> Thanks,
->> Nick
+On Wed, Sep 24, 2014 at 3:18 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+>
+>>>> +
+>>>> +     memory {
+>>>> +             reg = <0x20000000 0x40000000>;
+>>>
+>>> Usually, what we put there was the maximum amount of RAM that can be
+>>> handled by the SoC. I think that it can go above 1GB
 >>
-> 
-> It's not clear to me how valuable fixing kern_addr_valid would actually
-> be for arm. It seems to be used in exactly one place, fs/proc/kcore.c
-> and the associated Kconfig is explicitly marked if !ARM. Nearly all
-> other archs minus x86, arm64 and sparc are in the same boat as well.
-> 
-> Thanks,
-> Laura
-> 
-Laura,
-Can we remove it then as it seems that it's not needed at all.
-Cheers Nick 
+>> With LPAE, it can handle 8GB. But the DT won't take 64bit values.
+>> I'm not sure how to get it in. I'll look around for examples.
+>
+> You can have a look on what we did for Armada XP:
+>
+> arch/arm/boot/dts/armada-370-xp.dtsi
+> arch/arm/boot/dts/armada-xp.dtsi
+> arch/arm/boot/dts/armada-xp-gp.dts
+>
+> I created a skeleton64.dtsi for this case
+
+Thanks for the tip. Before I send v2, I do have a question. I'm using
+
+    ranges = <0 0 0 0x20000000>;
+
+in the clocks and soc node to avoid having to use 64bit values for all
+addresses and sizes. Would this be undesirable, even bad practice maybe?
+
+http://linux-sunxi.org/A80/Memory_map is a document I pieced together
+from Allwinner's SDK header files. AFAIK only the memory goes above
+the 4GB limit. All peripherals are under 512 MB, 256MB even.
+
+
+Thanks
+ChenYu
