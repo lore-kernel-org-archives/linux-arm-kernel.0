@@ -1,68 +1,72 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 24 Sep 2014 13:05:41 +0200
-Subject: [PATCH v5 7/7] ARM: dts: exynos4: Add nodes for L2 cache controller
+Date: Wed, 24 Sep 2014 13:05:36 +0200
+Subject: [PATCH v5 2/7] ARM: l2c: Add interface to ask hypervisor to configure
+ L2C
 In-Reply-To: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
 References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1411556741-5810-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1411556741-5810-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Figa <t.figa@samsung.com>
 
-This patch adds device tree nodes for L2 cache controller present on
-Exynos4 SoCs.
+Because certain secure hypervisor do not allow writes to individual L2C
+registers, but rather expect set of parameters to be passed as argument
+to secure monitor calls, there is a need to provide an interface for the
+L2C driver to ask the firmware to configure the hardware according to
+specified parameters. This patch adds such.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi |  9 +++++++++
- arch/arm/boot/dts/exynos4x12.dtsi | 14 ++++++++++++++
- 2 files changed, 23 insertions(+)
+ arch/arm/include/asm/outercache.h | 3 +++
+ arch/arm/mm/cache-l2x0.c          | 6 ++++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index b31315fc0afa..3b8e094144e6 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -64,6 +64,15 @@
- 		reg = <0x10023CA0 0x20>;
- 	};
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index 891a56b35bcf..563b92fc2f41 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -23,6 +23,8 @@
  
-+	l2c: l2-cache-controller at 10502000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x10502000 0x1000>;
-+		cache-unified;
-+		cache-level = <2>;
-+		arm,tag-latency = <2 2 1>;
-+		arm,data-latency = <2 2 1>;
-+	};
-+
- 	gic: interrupt-controller at 10490000 {
- 		cpu-offset = <0x8000>;
- 	};
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 771412e7c06c..6ee773921559 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -54,6 +54,20 @@
- 		reg = <0x10023CA0 0x20>;
- 	};
+ #include <linux/types.h>
  
-+	l2c: l2-cache-controller at 10502000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x10502000 0x1000>;
-+		cache-unified;
-+		cache-level = <2>;
-+		arm,tag-latency = <2 2 1>;
-+		arm,data-latency = <3 2 1>;
-+		arm,double-linefill = <1>;
-+		arm,double-linefill-incr = <0>;
-+		arm,double-linefill-wrap = <1>;
-+		arm,prefetch-drop = <1>;
-+		arm,prefetch-offset = <7>;
-+	};
++struct l2x0_regs;
 +
- 	clock: clock-controller at 10030000 {
- 		compatible = "samsung,exynos4412-clock";
- 		reg = <0x10030000 0x20000>;
+ struct outer_cache_fns {
+ 	void (*inv_range)(unsigned long, unsigned long);
+ 	void (*clean_range)(unsigned long, unsigned long);
+@@ -36,6 +38,7 @@ struct outer_cache_fns {
+ 
+ 	/* This is an ARM L2C thing */
+ 	void (*write_sec)(unsigned long, unsigned);
++	void (*configure)(const struct l2x0_regs *);
+ };
+ 
+ extern struct outer_cache_fns outer_cache;
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b0735634f12c..84c6c55ab896 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -109,6 +109,11 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
+ 
+ static void l2c_configure(void __iomem *base)
+ {
++	if (outer_cache.configure) {
++		outer_cache.configure(&l2x0_saved_regs);
++		return;
++	}
++
+ 	if (l2x0_data->configure)
+ 		l2x0_data->configure(base);
+ 
+@@ -909,6 +914,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 
+ 	fns = data->outer_cache;
+ 	fns.write_sec = outer_cache.write_sec;
++	fns.configure = outer_cache.configure;
+ 	if (data->fixup)
+ 		data->fixup(l2x0_base, cache_id, &fns);
+ 
 -- 
 1.9.2
