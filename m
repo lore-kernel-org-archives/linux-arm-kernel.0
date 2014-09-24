@@ -1,40 +1,97 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 24 Sep 2014 14:24:26 +0200
-Subject: [PATCH 3/3] ARM: shmobile: Initial Alt board device tree
-In-Reply-To: <a742795be9ceae2853ca71f216193f29da151da8.1410396013.git.horms+renesas@verge.net.au>
-References: <cover.1410396013.git.horms+renesas@verge.net.au>
- <a742795be9ceae2853ca71f216193f29da151da8.1410396013.git.horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXx7OmH0WC_MxsYB0X4=yomLtf+HoE8YUBo0aTPHT2zNQ@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 24 Sep 2014 14:24:43 +0200
+Subject: [PATCH v7 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
+ secure firmware enabled
+Message-ID: <1411561488-1739-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 2:57 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
+Hi,
 
-> +/ {
-> +       model = "Alt";
-> +       compatible = "renesas,alt", "renesas,r8a7794";
-> +
-> +       aliases {
-> +               serial0 = &scif2;
+This patch series adds support for AFTR idle mode on boards with
+secure firmware enabled and allows EXYNOS cpuidle driver usage on
+Exynos4x12 SoCs.
 
-Is this correct, i.e. does "scif2" match "ttySC0" below?
+It has been tested on Trats2 board (using Exynos4412 SoC with secure
+firmware enabled) on which AFTR mode reduces power consumption by ~12%
+when EXYNOS cpuidle driver is enabled (in both cases the default
+exynos_defconfig config is used and CPU1-3 are offlined).
 
-> +       };
-> +
-> +       chosen {
-> +               bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
-> +       };
+Currently Exynos4412 SoC support is limited to Trats2 board.
 
-Gr{oetje,eeting}s,
+Depends on:
+- for-next branch of linux-samsung.git kernel tree
+- [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+  (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35921.html)
 
-                        Geert
+Changes since v6:
+- rebased on top of for-next branch of linux-samsung.git kernel tree +
+  [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+  (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35921.html)
+- fixed build on Tegra
+- updated patch #2 summary line
 
+Changes since v5:
+- rebased on top of next-20140904 +
+  "irqchip: Properly fetch the per cpu offset" patch
+  (https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg716674.html)
+  [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+  (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35921.html)
+- limit Exynos4412 SoC support to Trats2 board for now
+
+Changes since v4:
+- rebased on top of next-20140804 +
+  [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
+  [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+- call exynos_save_cp15() only on A9 type core (this is needed for the future
+  Exynos3250 SoC support)
+
+Changes since v3:
+- rebased on top of next-20140804 +
+  [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
+  [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+- (re-)added patch fixing S5P_CENTRAL_SEQ_OPTION register setup
+
+Changes since v2:
+- rebased on top of next-20140708 +
+  [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html)
+  [with rejects fixed]
+  [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html)
+  [PATCH 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html)
+  [with rejects fixed in patch #2]
+- addressed review comments from Tomasz Figa and Daniel Lezcano
+
+Changes since v1:
+- synced against next-20140602
+- added missing Acked-by-s
+
+Best regards,
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Bartlomiej Zolnierkiewicz (5):
+  ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+  ARM: add AFTR mode support to firmware do_idle method
+  ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
+  ARM: EXYNOS: PM: fix register setup for AFTR mode code
+  ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
+
+ arch/arm/include/asm/firmware.h        |  2 +-
+ arch/arm/mach-exynos/common.h          |  5 +++
+ arch/arm/mach-exynos/exynos.c          |  5 ++-
+ arch/arm/mach-exynos/firmware.c        | 34 ++++++++++++++-----
+ arch/arm/mach-exynos/pm.c              | 60 ++++++++++++++++++++--------------
+ arch/arm/mach-tegra/cpuidle-tegra114.c |  2 +-
+ 6 files changed, 72 insertions(+), 36 deletions(-)
+
+-- 
+1.8.2.3
