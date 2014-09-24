@@ -1,56 +1,129 @@
 From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 09:41:42 -0300
-Subject: [PATCH 4/4] [media] s5p_mfc_opr_v6: remove address space removal
- warnings
+Date: Wed, 24 Sep 2014 09:41:39 -0300
+Subject: [PATCH 1/4] [media] s5p_mfc: use static for some structs
 In-Reply-To: <cover.1411562226.git.mchehab@osg.samsung.com>
 References: <cover.1411562226.git.mchehab@osg.samsung.com>
-Message-ID: <1c554a0b25c8802e2d58bdc711548ebad52af28d.1411562226.git.mchehab@osg.samsung.com>
+Message-ID: <5b874048f59a9688a47e15b026d3318d1b32f9bf.1411562226.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Smatch still has 3 warnings for s5p_mfc_opr_v6:
-
-drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2028:18: warning: cast removes address space of expression
-drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2034:18: warning: cast removes address space of expression
-drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2040:18: warning: cast removes address space of expression
-
-Remove them.
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1334:28: warning: symbol 'mfc_buf_size_v5' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1341:25: warning: symbol 'buf_size_v5' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1347:26: warning: symbol 'mfc_buf_align_v5' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1360:28: warning: symbol 'mfc_buf_size_v6' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1368:25: warning: symbol 'buf_size_v6' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1374:26: warning: symbol 'mfc_buf_align_v6' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1392:28: warning: symbol 'mfc_buf_size_v7' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1400:25: warning: symbol 'buf_size_v7' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1406:26: warning: symbol 'mfc_buf_align_v7' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1419:28: warning: symbol 'mfc_buf_size_v8' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1427:25: warning: symbol 'buf_size_v8' was not declared. Should it be static?
+drivers/media/platform/s5p-mfc/s5p_mfc.c:1433:26: warning: symbol 'mfc_buf_align_v8' was not declared. Should it be static?
 
 Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index ed3d20f12184..e38d78f21726 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -2019,25 +2019,25 @@ static int s5p_mfc_get_mvc_view_id_v6(struct s5p_mfc_dev *dev)
- static unsigned int s5p_mfc_get_pic_type_top_v6(struct s5p_mfc_ctx *ctx)
- {
- 	return s5p_mfc_read_info_v6(ctx,
--		(unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_top);
-+		(__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_top);
- }
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index d95769f99901..165bc86c5962 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -1331,20 +1331,20 @@ static const struct dev_pm_ops s5p_mfc_pm_ops = {
+ 			   NULL)
+ };
  
- static unsigned int s5p_mfc_get_pic_type_bot_v6(struct s5p_mfc_ctx *ctx)
- {
- 	return s5p_mfc_read_info_v6(ctx,
--		(unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
-+		(__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
- }
+-struct s5p_mfc_buf_size_v5 mfc_buf_size_v5 = {
++static struct s5p_mfc_buf_size_v5 mfc_buf_size_v5 = {
+ 	.h264_ctx	= MFC_H264_CTX_BUF_SIZE,
+ 	.non_h264_ctx	= MFC_CTX_BUF_SIZE,
+ 	.dsc		= DESC_BUF_SIZE,
+ 	.shm		= SHARED_BUF_SIZE,
+ };
  
- static unsigned int s5p_mfc_get_crop_info_h_v6(struct s5p_mfc_ctx *ctx)
- {
- 	return s5p_mfc_read_info_v6(ctx,
--		(unsigned int) ctx->dev->mfc_regs->d_display_crop_info1);
-+		(__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info1);
- }
+-struct s5p_mfc_buf_size buf_size_v5 = {
++static struct s5p_mfc_buf_size buf_size_v5 = {
+ 	.fw	= MAX_FW_SIZE,
+ 	.cpb	= MAX_CPB_SIZE,
+ 	.priv	= &mfc_buf_size_v5,
+ };
  
- static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
- {
- 	return s5p_mfc_read_info_v6(ctx,
--		(unsigned int) ctx->dev->mfc_regs->d_display_crop_info2);
-+		(__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info2);
- }
+-struct s5p_mfc_buf_align mfc_buf_align_v5 = {
++static struct s5p_mfc_buf_align mfc_buf_align_v5 = {
+ 	.base = MFC_BASE_ALIGN_ORDER,
+ };
  
- static struct s5p_mfc_regs mfc_regs;
+@@ -1357,7 +1357,7 @@ static struct s5p_mfc_variant mfc_drvdata_v5 = {
+ 	.fw_name[0]	= "s5p-mfc.fw",
+ };
+ 
+-struct s5p_mfc_buf_size_v6 mfc_buf_size_v6 = {
++static struct s5p_mfc_buf_size_v6 mfc_buf_size_v6 = {
+ 	.dev_ctx	= MFC_CTX_BUF_SIZE_V6,
+ 	.h264_dec_ctx	= MFC_H264_DEC_CTX_BUF_SIZE_V6,
+ 	.other_dec_ctx	= MFC_OTHER_DEC_CTX_BUF_SIZE_V6,
+@@ -1365,13 +1365,13 @@ struct s5p_mfc_buf_size_v6 mfc_buf_size_v6 = {
+ 	.other_enc_ctx	= MFC_OTHER_ENC_CTX_BUF_SIZE_V6,
+ };
+ 
+-struct s5p_mfc_buf_size buf_size_v6 = {
++static struct s5p_mfc_buf_size buf_size_v6 = {
+ 	.fw	= MAX_FW_SIZE_V6,
+ 	.cpb	= MAX_CPB_SIZE_V6,
+ 	.priv	= &mfc_buf_size_v6,
+ };
+ 
+-struct s5p_mfc_buf_align mfc_buf_align_v6 = {
++static struct s5p_mfc_buf_align mfc_buf_align_v6 = {
+ 	.base = 0,
+ };
+ 
+@@ -1389,7 +1389,7 @@ static struct s5p_mfc_variant mfc_drvdata_v6 = {
+ 	.fw_name[1]     = "s5p-mfc-v6-v2.fw",
+ };
+ 
+-struct s5p_mfc_buf_size_v6 mfc_buf_size_v7 = {
++static struct s5p_mfc_buf_size_v6 mfc_buf_size_v7 = {
+ 	.dev_ctx	= MFC_CTX_BUF_SIZE_V7,
+ 	.h264_dec_ctx	= MFC_H264_DEC_CTX_BUF_SIZE_V7,
+ 	.other_dec_ctx	= MFC_OTHER_DEC_CTX_BUF_SIZE_V7,
+@@ -1397,13 +1397,13 @@ struct s5p_mfc_buf_size_v6 mfc_buf_size_v7 = {
+ 	.other_enc_ctx	= MFC_OTHER_ENC_CTX_BUF_SIZE_V7,
+ };
+ 
+-struct s5p_mfc_buf_size buf_size_v7 = {
++static struct s5p_mfc_buf_size buf_size_v7 = {
+ 	.fw	= MAX_FW_SIZE_V7,
+ 	.cpb	= MAX_CPB_SIZE_V7,
+ 	.priv	= &mfc_buf_size_v7,
+ };
+ 
+-struct s5p_mfc_buf_align mfc_buf_align_v7 = {
++static struct s5p_mfc_buf_align mfc_buf_align_v7 = {
+ 	.base = 0,
+ };
+ 
+@@ -1416,7 +1416,7 @@ static struct s5p_mfc_variant mfc_drvdata_v7 = {
+ 	.fw_name[0]     = "s5p-mfc-v7.fw",
+ };
+ 
+-struct s5p_mfc_buf_size_v6 mfc_buf_size_v8 = {
++static struct s5p_mfc_buf_size_v6 mfc_buf_size_v8 = {
+ 	.dev_ctx	= MFC_CTX_BUF_SIZE_V8,
+ 	.h264_dec_ctx	= MFC_H264_DEC_CTX_BUF_SIZE_V8,
+ 	.other_dec_ctx	= MFC_OTHER_DEC_CTX_BUF_SIZE_V8,
+@@ -1424,13 +1424,13 @@ struct s5p_mfc_buf_size_v6 mfc_buf_size_v8 = {
+ 	.other_enc_ctx	= MFC_OTHER_ENC_CTX_BUF_SIZE_V8,
+ };
+ 
+-struct s5p_mfc_buf_size buf_size_v8 = {
++static struct s5p_mfc_buf_size buf_size_v8 = {
+ 	.fw	= MAX_FW_SIZE_V8,
+ 	.cpb	= MAX_CPB_SIZE_V8,
+ 	.priv	= &mfc_buf_size_v8,
+ };
+ 
+-struct s5p_mfc_buf_align mfc_buf_align_v8 = {
++static struct s5p_mfc_buf_align mfc_buf_align_v8 = {
+ 	.base = 0,
+ };
+ 
 -- 
 1.9.3
