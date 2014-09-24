@@ -1,71 +1,168 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 24 Sep 2014 15:28:28 -0700
-Subject: [PATCH v2 2/3] drivers: dma-coherent: add initialization from
- device tree
-In-Reply-To: <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
-References: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
- <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140924152828.9d4a4836ca25cadbb02a2f93@linux-foundation.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Thu, 25 Sep 2014 04:12:06 +0530
+Subject: [PATCH/RFC 1/2] serial: samsung: Add support for of_earlycon
+In-Reply-To: <1411391655-6291-2-git-send-email-m.szyprowski@samsung.com>
+References: <1411391655-6291-1-git-send-email-m.szyprowski@samsung.com>
+ <1411391655-6291-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAGOxZ50Hr-pSqBDmoGBTC4i4H8h8L_2TkU=3c27JtJ8QZr+CcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Sep 2014 13:22:40 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+Hi Marek
 
-> Initialization procedure of dma coherent pool has been split into two
-> parts, so memory pool can now be initialized without assigning to
-> particular struct device. Then initialized region can be assigned to
-> more than one struct device. To protect from concurent allocations from
-> different devices, a spinlock has been added to dma_coherent_mem
-> structure. The last part of this patch adds support for handling
-> 'shared-dma-pool' reserved-memory device tree nodes.
-> 
-> ...
+On Mon, Sep 22, 2014 at 6:44 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> From: Tomasz Figa <t.figa@samsung.com>
 >
-> +static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+> This patch adds support for early console initialized from device tree
+> to all variants of Samsung serial driver.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/tty/serial/Kconfig   |  1 +
+>  drivers/tty/serial/samsung.c | 97 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 98 insertions(+)
+>
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 26cec64dadd7..e87a2dfd9080 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -222,6 +222,7 @@ config SERIAL_SAMSUNG
+>         tristate "Samsung SoC serial support"
+>         depends on PLAT_SAMSUNG
+>         select SERIAL_CORE
+> +       select SERIAL_EARLYCON
+Ideally this should be selected by SERIAL_SAMSUNG_CONSOLE.
+But this is also fine.
+>         help
+>           Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
+>           providing /dev/ttySAC0, 1 and 2 (note, some machines may not
+> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> index c78f43a481ce..71829ce2410d 100644
+> --- a/drivers/tty/serial/samsung.c
+> +++ b/drivers/tty/serial/samsung.c
+> @@ -1856,6 +1856,103 @@ static struct platform_driver samsung_serial_driver = {
+>
+>  module_platform_driver(samsung_serial_driver);
+>
+> +/*
+> + * Early console.
+> + */
+> +
+> +struct samsung_early_console_data {
+> +       u32 txfull_mask;
+> +};
+> +
+> +static void samsung_early_busyuart(struct uart_port *port)
 > +{
-> +	struct dma_coherent_mem *mem = rmem->priv;
-> +	if (!mem &&
-> +	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-> +				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-> +				     &mem) != DMA_MEMORY_MAP) {
-> +		pr_info("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
-> +			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-
-pr_info() seems inappropriate here.  It's an error, so pr_err()?
-
-> +		return -ENODEV;
-> +	}
-> +	rmem->priv = mem;
-> +	dma_assign_coherent_memory(dev, mem);
-> +	return 0;
+> +       while (!(readl(port->membase + S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXFE))
+> +               ;
 > +}
->
-> ...
->
-> +static int __init rmem_dma_setup(struct reserved_mem *rmem)
+> +
+> +static void samsung_early_busyuart_fifo(struct uart_port *port)
 > +{
-> +	unsigned long node = rmem->fdt_node;
+> +       struct samsung_early_console_data *data = port->private_data;
 > +
-> +	if (of_get_flat_dt_prop(node, "reusable", NULL))
-> +		return -EINVAL;
-> +
-> +#ifdef CONFIG_ARM
-> +	if (!of_get_flat_dt_prop(node, "no-map", NULL)) {
-> +		pr_info("Reserved memory: regions without no-map are not yet supported\n");
-
-Same here.
-
-> +		return -EINVAL;
-> +	}
-> +#endif
-> +
-> +	rmem->ops = &rmem_dma_ops;
-> +	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
-> +		&rmem->base, (unsigned long)rmem->size / SZ_1M);
-
-This *is* an appropriate use of pr_info().
-
-> +	return 0;
+> +       while (readl(port->membase + S3C2410_UFSTAT) & data->txfull_mask)
+> +               ;
 > +}
-> +RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
-> +#endif
+> +
+> +static void samsung_early_putc(struct uart_port *port, int c)
+> +{
+> +       if (readl(port->membase + S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE)
+> +               samsung_early_busyuart_fifo(port);
+> +       else
+> +               samsung_early_busyuart(port);
+> +
+> +       writeb(c, port->membase + S3C2410_UTXH);
+> +}
+> +
+> +static void samsung_early_write(struct console *con, const char *s, unsigned n)
+> +{
+> +       struct earlycon_device *dev = con->data;
+> +
+> +       uart_console_write(&dev->port, s, n, samsung_early_putc);
+> +}
+> +
+> +static int __init samsung_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       if (!device->port.membase)
+> +               return -ENODEV;
+> +
+> +       device->con->write = samsung_early_write;
+> +       return 0;
+> +}
+> +
+> +/* S3C2410, S3C2412 */
+Probably you should move S3C2412 below along with S3C64xx, see your
+OF_EARLYCON_DECLARE below.
+> +static struct samsung_early_console_data s3c2410_early_console_data = {
+> +       .txfull_mask = S3C2410_UFSTAT_TXFULL,
+> +};
+> +
+> +static int __init s3c2410_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       device->port.private_data = &s3c2410_early_console_data;
+> +       return samsung_early_console_setup(device, opt);
+> +}
+> +OF_EARLYCON_DECLARE(s3c2410, "samsung,s3c2410-uart",
+> +                       s3c2410_early_console_setup);
+> +
+> +/* S3C2440, S3C64xx */
+> +static struct samsung_early_console_data s3c2440_early_console_data = {
+> +       .txfull_mask = S3C2440_UFSTAT_TXFULL,
+> +};
+> +
+> +static int __init s3c2440_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       device->port.private_data = &s3c2440_early_console_data;
+> +       return samsung_early_console_setup(device, opt);
+> +}
+> +OF_EARLYCON_DECLARE(s3c2412, "samsung,s3c2412-uart",
+> +                       s3c2440_early_console_setup);
+> +OF_EARLYCON_DECLARE(s3c2440, "samsung,s3c2440-uart",
+> +                       s3c2440_early_console_setup);
+> +OF_EARLYCON_DECLARE(s3c6400, "samsung,s3c6400-uart",
+> +                       s3c2440_early_console_setup);
+> +
+> +/* S5PV210, EXYNOS */
+> +static struct samsung_early_console_data s5pv210_early_console_data = {
+> +       .txfull_mask = S5PV210_UFSTAT_TXFULL,
+> +};
+> +
+> +static int __init s5pv210_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       device->port.private_data = &s5pv210_early_console_data;
+> +       return samsung_early_console_setup(device, opt);
+> +}
+> +OF_EARLYCON_DECLARE(s5pv210, "samsung,s5pv210-uart",
+> +                       s5pv210_early_console_setup);
+> +OF_EARLYCON_DECLARE(exynos4210, "samsung,exynos4210-uart",
+> +                       s5pv210_early_console_setup);
+Please support command line earlycon support also for all type.
+You just need EARLYCON_DECLARE(exynos4210,
+s5pv210_early_console_setup); for exynos4210.
+
+> +
+>  MODULE_ALIAS("platform:samsung-uart");
+>  MODULE_DESCRIPTION("Samsung SoC Serial port driver");
+>  MODULE_AUTHOR("Ben Dooks <ben@simtec.co.uk>");
+> --
+> 1.9.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Regards,
+Alim
