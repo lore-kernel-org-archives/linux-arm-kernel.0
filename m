@@ -1,52 +1,51 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Sep 2014 17:59:32 +0200
-Subject: [RESEND PATCH] misc: atmel-ssc: prepare clock only when request
-In-Reply-To: <1411551235-16502-1-git-send-email-voice.shen@atmel.com>
-References: <1411551235-16502-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <5422EA64.1070907@atmel.com>
+Date: Wed, 24 Sep 2014 18:03:03 +0200
+Subject: [RESEND PATCH] ARM: at91/PMC: don't forget to write PMC_PCDR
+ register to disable clocks
+In-Reply-To: <1411393893-12291-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1411393893-12291-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <5422EB37.2060402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/2014 11:33, Bo Shen :
-> Prepare SSC clock only when request SSC channel, the clock will be
-> enabled when initialize the SSC.
+On 22/09/2014 15:51, Ludovic Desroches :
+> When introducing support for sama5d3, the write to PMC_PCDR register has
+> been accidentally removed.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Reported-by: Nathalie Cyrille <nathalie.cyrille@atmel.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: <stable@vger.kernel.org> # 3.10.x and later
 
-okay: it is the driver that uses the ssc that would enable the clock as
-it is done in sound/soc/atmel/atmel_ssc_dai.c
+Absolutely: thanks for the fix!
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Bye,
+I queue it in at91-3.18-fixes-non-critical branch and it may show-up in
+3.18 or 3.19.
+
+Best regards,
+
 
 > ---
-> Send this patch to driver/misc maintainer as Mark Brown suggested.
 > 
->  drivers/misc/atmel-ssc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Sorry for the noise, typo in the cc list!
 > 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index 60843a2..f9807a7 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -57,7 +57,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
->  	ssc->user++;
->  	spin_unlock(&user_lock);
+> Ludovic
+> 
+>  arch/arm/mach-at91/clock.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> index 034529d..d66f102 100644
+> --- a/arch/arm/mach-at91/clock.c
+> +++ b/arch/arm/mach-at91/clock.c
+> @@ -962,6 +962,7 @@ static int __init at91_clock_reset(void)
+>  	}
 >  
-> -	clk_prepare_enable(ssc->clk);
-> +	clk_prepare(ssc->clk);
->  
->  	return ssc;
->  }
-> @@ -77,7 +77,7 @@ void ssc_free(struct ssc_device *ssc)
->  	spin_unlock(&user_lock);
->  
->  	if (disable_clk)
-> -		clk_disable_unprepare(ssc->clk);
-> +		clk_unprepare(ssc->clk);
->  }
->  EXPORT_SYMBOL(ssc_free);
+>  	at91_pmc_write(AT91_PMC_SCDR, scdr);
+> +	at91_pmc_write(AT91_PMC_PCDR, pcdr);
+>  	if (cpu_is_sama5d3())
+>  		at91_pmc_write(AT91_PMC_PCDR1, pcdr1);
 >  
 > 
 
