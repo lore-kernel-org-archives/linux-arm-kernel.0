@@ -1,73 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Sep 2014 14:46:23 -0700
-Subject: [PATCH v6 2/5] arm: dts: qcom: Add SPM device bindings for 8974
-In-Reply-To: <20140924172345.GE422@ilina-mac>
-References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
- <1411516281-58328-3-git-send-email-lina.iyer@linaro.org>
- <5422621E.2050509@smartplayin.com> <20140924134939.GA422@ilina-mac>
- <5422FD8D.8080307@codeaurora.org> <20140924172345.GE422@ilina-mac>
-Message-ID: <54233BAF.5080100@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 Sep 2014 18:47:46 -0300
+Subject: ARM: mx28: cpufreq-cpu0 support?
+In-Reply-To: <54232D9C.5070404@lategoodbye.de>
+References: <53F9B4BF.2050802@lategoodbye.de> <20140825080123.GA12289@dragon>
+ <53FB1041.5010208@lategoodbye.de>
+ <CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>
+ <CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>
+ <540412A9.4090806@lategoodbye.de>
+ <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
+ <542093C0.1040004@lategoodbye.de>
+ <CAOMZO5A0of3_arOx2z0_t7xN37jQjJ5uU4gwcsgCuSdpBJJVzw@mail.gmail.com>
+ <54232D9C.5070404@lategoodbye.de>
+Message-ID: <CAOMZO5BN8APenWCsy7uHbYNQ4q0-QxorAdGPKBHOHPcUzp2PYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/14 10:23, Lina Iyer wrote:
-> On Wed, Sep 24 2014 at 11:21 -0600, Stephen Boyd wrote:
->> On 09/24/14 06:49, Lina Iyer wrote:
->>> On Wed, Sep 24 2014 at 00:14 -0600, Pramod Gurav wrote:
->>>> Hi Lina,
->>>>
->>>> On Wednesday 24 September 2014 05:21 AM, Lina Iyer wrote:
->>>>> Add SPM device bindings for QCOM 8974 based cpus. SPM is the
->>>>> sub-system
->>>>> power manager and controls the logic around the cores (cpu and L2).
->>>>>
->>>>> Each core has an instance of SPM and controls only that core. Each
->>>>> cpu
->>>>> SPM is configured to support WFI and SPC (standalone-power collapse).
->>>>>
->>>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>>>> ---
->>>>>  arch/arm/boot/dts/qcom-msm8974-pm.dtsi | 69
->>>>> ++++++++++++++++++++++++++++++++++
->>>>>  arch/arm/boot/dts/qcom-msm8974.dtsi    | 10 +++--
->>>>>  2 files changed, 75 insertions(+), 4 deletions(-)
->>>>>  create mode 100644 arch/arm/boot/dts/qcom-msm8974-pm.dtsi
->>>>
->>>> <snip>
->>>>
->>>>> +};
->>>>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
->>>>> b/arch/arm/boot/dts/qcom-msm8974.dtsi
->>>>> index 69dca2a..0580bc2 100644
->>>>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
->>>>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->>>>> @@ -14,7 +14,7 @@
->>>>>          #size-cells = <0>;
->>>>>          interrupts = <1 9 0xf04>;
->>>>>
->>>>> -        cpu at 0 {
->>>>> +        CPU0: cpu at 0 {
->>>> Lina, Stephen boyd has sent some DT change for krait-cpufreq which
->>>> also
->>>> renames this node to "cpu0: cpu at 0". If you both could sync up and
->>>> agree
->>>> on a common naming('cpu0' with caps or not caps) for this node.
->>>>
->>> Sure. Will work with Stephen on that.
->>>
->>
->> This doesn't seem like a big deal. I imagine Kumar can resolve the
->> conflict if the two patches merge at the same time.
->>
-> I can use the lower case names, if thats common. I see that being used
-> for referring to <&acc> in that file, but ofcourse <&L2> exists as well.
-> Any preference?
+On Wed, Sep 24, 2014 at 5:46 PM, Stefan Wahren <info@lategoodbye.de> wrote:
+
+> thanks, registering cpufreq-cpu0 and adding missing properties reg & clocks
+> did the trick.
 >
+> Now the sys interface of cpufreq is available and the mxs-regulator seems to
+> handle frequency change. But the frequency selection do not work as
+> expected. If i set cpu frequency to 454736, 392727 or 261818 kHz, the
 
-No preference. Uppercase at least matches L2 and that matches what's in
-the ePAPR so that seems nice.
+Why 454736 instead of 454MHz? Same for the other values.
 
+> cpufreq driver change it silently to 240000 kHz.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+24MHz is the osc clock. It seems you did not turn on the PLL0.
+
+Check the POWER bit of HW_CLKCTRL_PLL0CTRL0 register.
