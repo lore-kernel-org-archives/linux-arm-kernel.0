@@ -1,93 +1,117 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed, 24 Sep 2014 09:57:43 +0200
-Subject: [PATCH 1/3 v4] ARM: dts: exynos: Explicitly set dr_mode on peach-pit
- and peach-pi
-In-Reply-To: <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <542199F4.3090601@samsung.com>
- <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1411545465-12930-2-git-send-email-sjoerd.simons@collabora.co.uk>
+From: isimatu.yasuaki@jp.fujitsu.com (Yasuaki Ishimatsu)
+Date: Wed, 24 Sep 2014 16:59:12 +0900
+Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <542279D0.1040603@jp.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the optional dr_mode property isn't set in the dwc3 nodes the
-the controller will go into OTG mode iff both USB host and USB gadget
-functionality are enabled in the kernel configuration. Unfortunately this
-results in USB not working on exynos5420-peach-pit and
-exynos5800-peach-pi with such a kernel configuration unless manually
-change the mode. To resolve that explicitly configure the dual role
-mode as host
+(2014/09/11 23:03), Jiang Liu wrote:
+> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
+> that is to build irqdomains for CPU vector, interrupt remapping unit,
+> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
+> Each irqdomain manages corresponding interrupt controller and talks to
+> parent interrupt controller through public irqdomain interfaces. We also
+> support stacked irq_chip based on hierarchy irqdomain. It will make the
+> x86 interrupt architecture much more clear and more easy to maintain
+> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
+> interrupt management architecture too.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
----
-Changes in v2: alphabetically sort the dts entries
-Changes in v3: Fix typo in commit message
-Changes in v4: Rebased on linux-samsung for-next
+Do you have a documentation which more detailed information is written?
+I'm interested in this feature. And I want to know more detailed information.
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 8 ++++++++
- arch/arm/boot/dts/exynos5420.dtsi          | 4 ++--
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 8 ++++++++
- 3 files changed, 18 insertions(+), 2 deletions(-)
+I cannot imagine why the feature makes x86 irq architecture much more clear
+and more easy to maintain in this description. Of course, I have read the
+following threads:
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 17dae508..9a050e1 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -841,6 +841,14 @@
- 	status = "okay";
- };
- 
-+&usbdrd_dwc3_0 {
-+	dr_mode = "host";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "host";
-+};
-+
- &usbdrd_phy0 {
- 	vbus-supply = <&usb300_vbus_reg>;
- };
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index bfe056d..8617a03 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -815,7 +815,7 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		dwc3 {
-+		usbdrd_dwc3_0: dwc3 {
- 			compatible = "snps,dwc3";
- 			reg = <0x12000000 0x10000>;
- 			interrupts = <0 72 0>;
-@@ -841,7 +841,7 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		dwc3 {
-+		usbdrd_dwc3_1: dwc3 {
- 			compatible = "snps,dwc3";
- 			reg = <0x12400000 0x10000>;
- 			interrupts = <0 73 0>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 4d1492e..e8fdda8 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -829,6 +829,14 @@
- 	status = "okay";
- };
- 
-+&usbdrd_dwc3_0 {
-+	dr_mode = "host";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	dr_mode = "host";
-+};
-+
- &usbdrd_phy0 {
- 	vbus-supply = <&usb300_vbus_reg>;
- };
--- 
-2.1.0
+https://lkml.org/lkml/2014/9/11/101
+
+Thanks,
+Yasuaki Ishimatsu
+
+> 
+> This is the second patch set to enable support of hierarchy irqdomain
+> on x86 platforms. It depends on the first part at:
+> https://lkml.org/lkml/2014/9/11/101
+> And you may access it at:
+> https://github.com/jiangliu/linux.git irqdomain/p2v1
+> 
+> And there will be a third patch set to convert IOAPIC driver to support
+> hierarchy irqdomain and clean up code.
+> 
+> The first patch extends irqdomain interfaces to support hierarchy
+> irqdomain. Hope this interface could be used by other architectures too,
+> such as ARM/ARM64.
+> The second patch introduces two helper functions to support stacked
+> irq_chip.
+> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
+> it's the root irqdomain for x86 platforms.
+> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
+> support hierarchy irqdomain.
+> Patch 14-17 converts HPET, MSI and HT_IRQ drivers to support hierarchy
+> irqdomain.
+> Patch 18-21 cleans up unsued code in x86 arch and interrupt remapping
+> drivers.
+> 
+> We have tested this patchset on Intel 32-bit and 64-bit systems. But we
+> have only done compilation tests for HT_IRQ and AMD interrupt remapping
+> drivers due to hardware resource limitation. Tests on AMD platforms are
+> warmly welcomed!
+> 
+> Jiang Liu (21):
+>    irqdomain: Introduce new interfaces to support hierarchy irqdomains
+>    genirq: Introduce helper functions to support stacked irq_chip
+>    x86, irq: Save destination CPU ID in irq_cfg
+>    x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
+>    x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
+>    x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
+>    x86, uv: Use new irqdomain interfaces to allocate/free IRQ
+>    x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
+>    x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
+>    x86: irq_remapping: Introduce new interfaces to support hierarchy
+>      irqdomain
+>    iommu/vt-d: Change prototypes to prepare for enabling hierarchy
+>      irqdomain
+>    iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
+>    iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
+>    x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
+>    x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
+>    x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
+>    x86, htirq: Use hierarchy irqdomain to manage Hypertransport
+>      interrupts
+>    iommu/vt-d: Clean up unused MSI related code
+>    iommu/amd: Clean up unused MSI related code
+>    x86: irq_remapping: Clean up unused MSI related code
+>    x86, irq: Clean up unused MSI related code and interfaces
+> 
+>   arch/x86/Kconfig                     |    3 +-
+>   arch/x86/include/asm/hpet.h          |   16 +-
+>   arch/x86/include/asm/hw_irq.h        |   64 +++++
+>   arch/x86/include/asm/irq_remapping.h |   66 +++--
+>   arch/x86/include/asm/pci.h           |    5 -
+>   arch/x86/include/asm/x86_init.h      |    4 -
+>   arch/x86/kernel/apic/htirq.c         |  179 +++++++++----
+>   arch/x86/kernel/apic/io_apic.c       |    3 -
+>   arch/x86/kernel/apic/msi.c           |  430 +++++++++++++++++++++++--------
+>   arch/x86/kernel/apic/vector.c        |  158 +++++++++++-
+>   arch/x86/kernel/hpet.c               |   57 ++---
+>   arch/x86/kernel/x86_init.c           |    2 -
+>   arch/x86/platform/uv/uv_irq.c        |   27 +-
+>   drivers/iommu/amd_iommu.c            |  385 ++++++++++++++++++++++------
+>   drivers/iommu/amd_iommu_init.c       |    4 +
+>   drivers/iommu/amd_iommu_proto.h      |    9 +
+>   drivers/iommu/amd_iommu_types.h      |    5 +
+>   drivers/iommu/intel_irq_remapping.c  |  468 +++++++++++++++++++++++-----------
+>   drivers/iommu/irq_remapping.c        |  221 ++++++----------
+>   drivers/iommu/irq_remapping.h        |   22 +-
+>   drivers/pci/htirq.c                  |   48 +---
+>   include/linux/htirq.h                |   22 +-
+>   include/linux/intel-iommu.h          |    4 +
+>   include/linux/irq.h                  |    8 +
+>   include/linux/irqdomain.h            |   60 +++++
+>   kernel/irq/Kconfig                   |    3 +
+>   kernel/irq/chip.c                    |   21 ++
+>   kernel/irq/irqdomain.c               |  349 ++++++++++++++++++++++++-
+>   28 files changed, 1934 insertions(+), 709 deletions(-)
+> 
