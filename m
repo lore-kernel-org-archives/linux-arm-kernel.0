@@ -1,47 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Sep 2014 14:23:38 +0200
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140924112902.GA23331@peterchendt>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <2923729.dtX0WmHSV0@wuerfel> <20140924112902.GA23331@peterchendt>
-Message-ID: <2786668.t3YLqX5enD@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 24 Sep 2014 14:24:26 +0200
+Subject: [PATCH 3/3] ARM: shmobile: Initial Alt board device tree
+In-Reply-To: <a742795be9ceae2853ca71f216193f29da151da8.1410396013.git.horms+renesas@verge.net.au>
+References: <cover.1410396013.git.horms+renesas@verge.net.au>
+ <a742795be9ceae2853ca71f216193f29da151da8.1410396013.git.horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXx7OmH0WC_MxsYB0X4=yomLtf+HoE8YUBo0aTPHT2zNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 September 2014 19:29:05 Peter Chen wrote:
-> 
-> So, it is IP CORE LIB (you suggest) vs IP CORE Platform Driver
-> (dwc3, musb, chipidea) you are talking about, right? Except for
-> creating another platform driver as well as related DT node (optional),
-> are there any advantages compared to current IP core driver structure?
+On Thu, Sep 11, 2014 at 2:57 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
 
-Having a library module usually requires less code, and is more consistent
-with other drivers, which helps new developers understand what the
-driver is doing.
+> +/ {
+> +       model = "Alt";
+> +       compatible = "renesas,alt", "renesas,r8a7794";
+> +
+> +       aliases {
+> +               serial0 = &scif2;
 
-The most important aspect though is the DT binding: once the structure
-with separate kernel drivers leaks out into the DT format, you can't
-easily change the driver any more, e.g. to make a property that was
-introduced for one glue driver more general so it can get handled by
-the common part. Having a single node lets us convert to the library
-model later, so that would be a strong reason to keep the DT binding
-simple, without child nodes.
+Is this correct, i.e. does "scif2" match "ttySC0" below?
 
-Following that logic, it turns into another reason for using the library
-model to start with, because otherwise the child device does not have
-any DT properties itself and has to rely on the parent device properties,
-which somewhat complicates the driver structure.
+> +       };
+> +
+> +       chosen {
+> +               bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+> +       };
 
-> In this thread, we are talking about creating common platform driver for glue
-> layer, its design purpose (adapt it for as many as platforms) should be the
-> same, no matter the IP core part is a LIB or platform driver, am I missing
-> something?
+Gr{oetje,eeting}s,
 
-No, you are absolutely right with that, introducing the generic glue
-driver is orthogonal to the structure of the core driver in principle.
+                        Geert
 
-I mainly brought it up because I noticed how this patch could be done
-in a simpler way by combining the new generic glue with the move to
-a library driver model.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-	Arnd
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
