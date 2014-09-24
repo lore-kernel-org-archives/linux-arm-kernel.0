@@ -1,28 +1,86 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 23 Sep 2014 18:40:51 -0700
-Subject: [PATCH v2 2/2] watchdog: dw_wdt: add restart handler support
-In-Reply-To: <20140924091101.60e065cd@xhacker>
-References: <1411458132-5410-1-git-send-email-jszhang@marvell.com>	<1411458132-5410-3-git-send-email-jszhang@marvell.com>	<20140923183159.GB24930@roeck-us.net>
- <20140924091101.60e065cd@xhacker>
-Message-ID: <54222123.2050703@roeck-us.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 23 Sep 2014 19:41:35 -0600
+Subject: [PATCH v12 10/12] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
+In-Reply-To: <20140924011851.GD32643@bart.dudau.co.uk>
+References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411498874-9864-11-git-send-email-Liviu.Dudau@arm.com>
+ <20140924011851.GD32643@bart.dudau.co.uk>
+Message-ID: <CAErSpo5DR+TPYXBWGKRj9SRPjsbJ6kjZmAH1AXT12txEjGdZGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 06:11 PM, Jisheng Zhang wrote:
-[ ... ]
->>> +	dw_wdt.restart_handler.notifier_call = dw_wdt_restart_handle;
->>> +	dw_wdt.restart_handler.priority = 128;
->>> +	ret = register_restart_handler(&dw_wdt.restart_handler);
->>> +	if (ret)
->>> +		pr_warn("cannot register restart handler\n");
+On Tue, Sep 23, 2014 at 7:18 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> On Tue, Sep 23, 2014 at 08:01:12PM +0100, Liviu Dudau wrote:
+>> If the firmware has not assigned all the bus resources and
+>> we are not just probing the PCIe busses, it makes sense to
+>> assign the unassigned resources in pci_scan_root_bus().
 >>
->> Please use dev_warn(&pdev->dev, ...).
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> ---
+>>  drivers/pci/probe.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index ef891d2..508cf61 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1953,6 +1953,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+>>       if (!found)
+>>               pci_bus_update_busn_res_end(b, max);
+>>
+>> +     if (!pci_has_flag(PCI_PROBE_ONLY))
+>> +             pci_assign_unassigned_bus_resources(b);
+>> +
+>>       pci_bus_add_devices(b);
+>>       return b;
+>>  }
+>> --
+>> 2.1.0
+>>
 >
-> Yep, that's what I thought when patching the code. But the original source is
-> using pr_*(), so I use pr_warn() to keep unification. Is there any better
-> solution?
+> Bjorn,
 >
+> If you are OK with this patch, can you let me know how do you feel about
+> making pci_scan_root_bus() set up the bus->msi pointer as well?
 
-Good point. Makes sense, then, to leave that as cleanup.
+I'm not opposed to it, but I have the same question as for setting up
+the domain: how does pci_scan_root_bus() learn what to assign to
+bus->msi?  It currently only gets a "void *sysdata" so there's no
+obvious place to put it there.  You could add a pcibios interface to
+retrieve it, I suppose, but I'm starting to get uncomfortable with
+adding more of those because we have such a mess of them already.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Bjorn
+
+> Side note: I don't know exactly how to do it now, but setting bus->msi is
+> needed by platforms that are based on my patches and want to use MSI,
+> otherwise they have to open code pci_scan_root_bus() to set it. I haven't
+> made any attempts to do it in this series as the GICv2m patches are not
+> ready yet, but I can see the need arriving soon.
+>
+> Best regards,
+> Liviu
+>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
+> --
+> -------------------
+>    .oooO
+>    (   )
+>     \ (  Oooo.
+>      \_) (   )
+>           ) /
+>          (_/
+>
+>  One small step
+>    for me ...
+>
