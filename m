@@ -1,140 +1,108 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 24 Sep 2014 13:55:16 +0800
-Subject: [Patch] irqdomain: Introduce new interfaces to support hierarchy
- irqdomains
-In-Reply-To: <1411465402.8922.126.camel@mtksdaap41>
-References: <alpine.DEB.2.10.1409160859080.4247@nanos>	
- <1411373856-9669-1-git-send-email-jiang.liu@linux.intel.com>
- <1411465402.8922.126.camel@mtksdaap41>
-Message-ID: <54225CC4.2000403@linux.intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 24 Sep 2014 08:04:21 +0200
+Subject: [PATCH v4 0/8] asm-generic/io.h overhaul
+In-Reply-To: <20140825112630.GA4163@ulmo.nvidia.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+ <20140825112630.GA4163@ulmo.nvidia.com>
+Message-ID: <20140924060419.GA20253@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2014/9/23 17:43, Joe.C wrote:
-> On Mon, 2014-09-22 at 16:17 +0800, Jiang Liu wrote:
->> @@ -388,7 +389,6 @@ EXPORT_SYMBOL_GPL(irq_create_direct_mapping);
->>  unsigned int irq_create_mapping(struct irq_domain *domain,
->>  				irq_hw_number_t hwirq)
->>  {
->> -	unsigned int hint;
->>  	int virq;
->>  
->>  	pr_debug("irq_create_mapping(0x%p, 0x%lx)\n", domain, hwirq);
->> @@ -410,12 +410,8 @@ unsigned int irq_create_mapping(struct irq_domain *domain,
->>  	}
->>  
->>  	/* Allocate a virtual interrupt number */
->> -	hint = hwirq % nr_irqs;
->> -	if (hint == 0)
->> -		hint++;
->> -	virq = irq_alloc_desc_from(hint, of_node_to_nid(domain->of_node));
->> -	if (virq <= 0)
->> -		virq = irq_alloc_desc_from(1, of_node_to_nid(domain->of_node));
->> +	virq = irq_domain_alloc_descs(-1, 1, hwirq,
->> +				      of_node_to_nid(domain->of_node));
+On Mon, Aug 25, 2014 at 01:26:33PM +0200, Thierry Reding wrote:
+> On Wed, Aug 13, 2014 at 12:28:50PM +0200, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Hi,
+> > 
+> > Here is the fourth version of a series that started out as an attempt to
+> > provide string versions of the read*() and write*() accessors to more
+> > architectures so that drivers can use them portably. The series has
+> > since evolved into a more general cleanup of asm-generic/io.h and the
+> > functions defined therein.
+> > 
+> > Patch 1 is trivial and removes a redundant redefinition of PCI_IOBASE
+> > from the asm/io.h header on ARC. Patches 2 and 3 remove unnecessary
+> > volatile keywoards from some functions, which is a prerequisite to clean
+> > up some of the functions in subsequent patches.
+> > 
+> > The xlate_dev_{kmem,mem}_ptr() functions are used to map memory when the
+> > /dev/mem device is accessed. Patches 4 and 5 use more consistent data
+> > types for these functions, which will get a "standard" prototype in the
+> > asm-generic/io.h header in a subsequent patch.
+> > 
+> > Patch 6 is the bulk of this series. It implements the string variants of
+> > the read*() and write*() accessors and cleans up various other parts of
+> > the asm-generic/io.h header file. Macros are converted to static inline
+> > functions for better type checking. Overriding generic implementations
+> > in architectures is handled more consistently.
+> > 
+> > Patches 7 and 8, finally, make use of the asm-generic/io.h header on the
+> > 32-bit and 64-bit ARM architectures.
+> > 
+> > This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+> > tested on IA64, Microblaze, s390, SPARC, x86 and Xtensa. For ARC,
+> > Blackfin, Metag, OpenRISC, Score and Unicore32 which also use
+> > asm-generic/io.h I couldn't find or build a cross-compiler that would
+> > run on my system. But by code inspection they shouldn't break with this
+> > patch.
+> > 
+> > To ensure bisectability I built multi_v7_defconfig on 32-bit ARM and the
+> > defconfig for 64-bit ARM, IA64, Microblaze, s390, SPARC, x86 and Xtensa
+> > after each commit and verified that the series does not introduce any
+> > build errors or warnings.
+> > 
+> > Provided there are no objections to the patches there's still the matter
+> > of how to merge them. Patch 6 depends on patches 1-5 to avoid warnings
+> > and/or errors during the build. Patches 7 and 8 depend on patch 6. In my
+> > opinion it doesn't make much sense to split them up, so I guess we'll
+> > need a volunteer to take them all into one tree. Ideally that tree would
+> > feed into linux-next so that we can get as much build and test-coverage
+> > as possible during the 3.17 release cycle so that these patches can go
+> > into 3.18.
+> > 
+> > Arnd, I'm opportunistically sending this To: you in the hopes that you
+> > can take it into your asm-generic tree which seems like the best fit for
+> > this.
+> > 
+> > Thierry
+> > 
+> > Thierry Reding (8):
+> >   ARC: Remove redundant PCI_IOBASE declaration
+> >   serial: sunzilog: Remove unnecessary volatile keyword
+> >   sparc: Remove unnecessary volatile usage
+> >   [IA64] Change xlate_dev_{kmem,mem}_ptr() prototypes
+> >   /dev/mem: Use more consistent data types
+> >   asm-generic/io.h: Implement generic {read,write}s*()
+> >   ARM: Use include/asm-generic/io.h
+> >   arm64: Use include/asm-generic/io.h
+> > 
+> >  arch/arc/include/asm/io.h       |   2 -
+> >  arch/arm/include/asm/io.h       |  75 ++---
+> >  arch/arm/include/asm/memory.h   |   2 +
+> >  arch/arm64/Kconfig              |   1 -
+> >  arch/arm64/include/asm/io.h     | 122 ++-----
+> >  arch/arm64/include/asm/memory.h |   2 +
+> >  arch/ia64/include/asm/uaccess.h |  16 +-
+> >  arch/s390/include/asm/io.h      |   5 +-
+> >  arch/s390/mm/maccess.c          |   4 +-
+> >  arch/sparc/include/asm/io_32.h  |  18 +-
+> >  arch/x86/include/asm/io.h       |   4 +-
+> >  arch/x86/mm/ioremap.c           |   4 +-
+> >  drivers/char/mem.c              |  13 +-
+> >  drivers/tty/serial/sunzilog.h   |   8 +-
+> >  include/asm-generic/io.h        | 683 ++++++++++++++++++++++++++++++++--------
+> >  15 files changed, 647 insertions(+), 312 deletions(-)
 > 
-> If I read this correct, the resulting virq is different after your
-> change.
-It should have the same effect. We just factored out original code as
-a function, so it could be reused.
+> Arnd, do you think this looks good to take for test-driving in
+> linux-next?
 
-> 
->>  	if (virq <= 0) {
->>  		pr_debug("-> virq allocation failed\n");
->>  		return 0;
->> @@ -490,7 +486,10 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->>  	}
->>  
->>  	/* Create mapping */
->> -	virq = irq_create_mapping(domain, hwirq);
->> +	if (irq_domain_is_hierarchy(domain))
->> +		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
->> +	else
->> +		virq = irq_create_mapping(domain, hwirq);
->>  	if (!virq)
->>  		return virq;
-> 
-> hwirq returned from xlat above is lost. Without hwirq or virq, how do we
-> know which irq are we working for?
-> Also, if the irq_desc/irq_data was already created, this will create
-> another one. Should we do irq_find_mapping just like irq_create_mapping?
-When irq_create_of_mapping is called, IRQ desc/irq_data haven't been
-allocated yet. The parameter irq_data is type of struct of_phandle_args
-instead of struct irq_data:)
+Ping?
 
-We pass irq_data to irq_domain_alloc_irqs(), the we could reconstruct
-hwirq from irq_data if needed.
-
-To make the code clearer, I plan to change code as below:
-unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
-{
-        struct irq_domain *domain;
-        irq_hw_number_t hwirq;
-        unsigned int type = IRQ_TYPE_NONE;
-        unsigned int virq;
-
-        domain = irq_data->np ? irq_find_host(irq_data->np) :
-irq_default_domain;
-        if (!domain) {
-                pr_warn("no irq domain found for %s !\n",
-                        of_node_full_name(irq_data->np));
-                return 0;
-        }
-
-+        if (irq_domain_is_hierarchy(domain))
-+                return irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE,
-irq_data);
-+
-        /* If domain has no translation, then we assume interrupt line */
-        if (domain->ops->xlate == NULL)
-                hwirq = irq_data->args[0];
-        else {
-                if (domain->ops->xlate(domain, irq_data->np, irq_data->args,
-                                        irq_data->args_count, &hwirq,
-&type))
-                        return 0;
-        }
-
-        /* Create mapping */
-        virq = irq_create_mapping(domain, hwirq);
-        if (!virq)
-                return virq;
-
-        /* Set type if specified and different than the current one */
-        if (type != IRQ_TYPE_NONE &&
-            type != irq_get_trigger_type(virq))
-                irq_set_irq_type(virq, type);
-        return virq;
-}
-EXPORT_SYMBOL_GPL(irq_create_of_mapping);
-
->> +int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
->> +			    unsigned int nr_irqs, int node, void *arg,
->> +			    bool realloc)
->> +{
->> +	int i, ret, virq;
->> +
->> +	if (domain == NULL) {
->> +		domain = irq_default_domain;
->> +		if (WARN(!domain, "domain is NULL; cannot allocate IRQ\n"))
->> +			return -EINVAL;
->> +	}
->> +
->> +	if (!domain->ops->alloc) {
->> +		pr_debug("domain->ops->alloc() is NULL\n");
->> +		return -ENOSYS;
->> +	}
->> +
->> +	if (realloc && irq_base >= 0) {
->> +		virq =  irq_base;
->                          ^
-> extra space here.
-Will fix it in next version.
-Thanks, Joe!
-Gerry
-> 
-> Joe.C
-> 
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/df30e9fe/attachment.sig>
