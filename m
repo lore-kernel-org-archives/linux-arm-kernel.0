@@ -1,97 +1,71 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 19:27:13 -0300
-Subject: [PATCH 13/18] [media] s5p_mfc_opr_v5: Fix lots of warnings on x86_64
-In-Reply-To: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
-References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
-Message-ID: <5824d4d8b177c3778cea8ef5e345d126e6c46767.1411597610.git.mchehab@osg.samsung.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 24 Sep 2014 15:28:28 -0700
+Subject: [PATCH v2 2/3] drivers: dma-coherent: add initialization from
+ device tree
+In-Reply-To: <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
+References: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
+ <1410434561-9294-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140924152828.9d4a4836ca25cadbb02a2f93@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiled on x86_64, several warnings popup:
+On Thu, 11 Sep 2014 13:22:40 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:476:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:480:3: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:485:4: warning: format ?%x? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:493:2: warning: format ?%u? expects argument of type ?unsigned int?, but argument 4 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:570:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:570:2: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:609:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:609:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:640:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:640:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:666:3: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-drivers/media//platform/s5p-mfc/s5p_mfc_opr_v5.c:666:3: warning: format ?%d? expects argument of type ?int?, but argument 5 has type ?size_t? [-Wformat=]
+> Initialization procedure of dma coherent pool has been split into two
+> parts, so memory pool can now be initialized without assigning to
+> particular struct device. Then initialized region can be assigned to
+> more than one struct device. To protect from concurent allocations from
+> different devices, a spinlock has been added to dma_coherent_mem
+> structure. The last part of this patch adds support for handling
+> 'shared-dma-pool' reserved-memory device tree nodes.
+> 
+> ...
+>
+> +static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+> +{
+> +	struct dma_coherent_mem *mem = rmem->priv;
+> +	if (!mem &&
+> +	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+> +				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+> +				     &mem) != DMA_MEMORY_MAP) {
+> +		pr_info("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+> +			&rmem->base, (unsigned long)rmem->size / SZ_1M);
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+pr_info() seems inappropriate here.  It's an error, so pr_err()?
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-index 6234e4d70596..90e3d61c1b59 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-@@ -473,16 +473,16 @@ static int s5p_mfc_set_dec_frame_buffer_v5(struct s5p_mfc_ctx *ctx)
- 								frame_size_mv);
- 	for (i = 0; i < ctx->total_dpb_count; i++) {
- 		/* Bank2 */
--		mfc_debug(2, "Luma %d: %x\n", i,
-+		mfc_debug(2, "Luma %d: %zx\n", i,
- 					ctx->dst_bufs[i].cookie.raw.luma);
- 		mfc_write(dev, OFFSETB(ctx->dst_bufs[i].cookie.raw.luma),
- 						S5P_FIMV_DEC_LUMA_ADR + i * 4);
--		mfc_debug(2, "\tChroma %d: %x\n", i,
-+		mfc_debug(2, "\tChroma %d: %zx\n", i,
- 					ctx->dst_bufs[i].cookie.raw.chroma);
- 		mfc_write(dev, OFFSETA(ctx->dst_bufs[i].cookie.raw.chroma),
- 					       S5P_FIMV_DEC_CHROMA_ADR + i * 4);
- 		if (ctx->codec_mode == S5P_MFC_CODEC_H264_DEC) {
--			mfc_debug(2, "\tBuf2: %x, size: %d\n",
-+			mfc_debug(2, "\tBuf2: %zx, size: %d\n",
- 							buf_addr2, buf_size2);
- 			mfc_write(dev, OFFSETB(buf_addr2),
- 						S5P_FIMV_H264_MV_ADR + i * 4);
-@@ -490,7 +490,7 @@ static int s5p_mfc_set_dec_frame_buffer_v5(struct s5p_mfc_ctx *ctx)
- 			buf_size2 -= frame_size_mv;
- 		}
- 	}
--	mfc_debug(2, "Buf1: %u, buf_size1: %d\n", buf_addr1, buf_size1);
-+	mfc_debug(2, "Buf1: %zu, buf_size1: %d\n", buf_addr1, buf_size1);
- 	mfc_debug(2, "Buf 1/2 size after: %d/%d (frames %d)\n",
- 			buf_size1,  buf_size2, ctx->total_dpb_count);
- 	if (buf_size1 < 0 || buf_size2 < 0) {
-@@ -567,7 +567,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
- 		enc_ref_c_size = ALIGN(guard_width * guard_height,
- 				       S5P_FIMV_NV12MT_SALIGN);
- 	}
--	mfc_debug(2, "buf_size1: %d, buf_size2: %d\n", buf_size1, buf_size2);
-+	mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n", buf_size1, buf_size2);
- 	switch (ctx->codec_mode) {
- 	case S5P_MFC_CODEC_H264_ENC:
- 		for (i = 0; i < 2; i++) {
-@@ -606,7 +606,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
- 					S5P_FIMV_H264_NBOR_INFO_ADR);
- 		buf_addr1 += S5P_FIMV_ENC_NBORINFO_SIZE;
- 		buf_size1 -= S5P_FIMV_ENC_NBORINFO_SIZE;
--		mfc_debug(2, "buf_size1: %d, buf_size2: %d\n",
-+		mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n",
- 			buf_size1, buf_size2);
- 		break;
- 	case S5P_MFC_CODEC_MPEG4_ENC:
-@@ -637,7 +637,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
- 						S5P_FIMV_MPEG4_ACDC_COEF_ADR);
- 		buf_addr1 += S5P_FIMV_ENC_ACDCCOEF_SIZE;
- 		buf_size1 -= S5P_FIMV_ENC_ACDCCOEF_SIZE;
--		mfc_debug(2, "buf_size1: %d, buf_size2: %d\n",
-+		mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n",
- 			buf_size1, buf_size2);
- 		break;
- 	case S5P_MFC_CODEC_H263_ENC:
-@@ -663,7 +663,7 @@ static int s5p_mfc_set_enc_ref_buffer_v5(struct s5p_mfc_ctx *ctx)
- 		mfc_write(dev, OFFSETA(buf_addr1), S5P_FIMV_H263_ACDC_COEF_ADR);
- 		buf_addr1 += S5P_FIMV_ENC_ACDCCOEF_SIZE;
- 		buf_size1 -= S5P_FIMV_ENC_ACDCCOEF_SIZE;
--		mfc_debug(2, "buf_size1: %d, buf_size2: %d\n",
-+		mfc_debug(2, "buf_size1: %zd, buf_size2: %zd\n",
- 			buf_size1, buf_size2);
- 		break;
- 	default:
--- 
-1.9.3
+> +		return -ENODEV;
+> +	}
+> +	rmem->priv = mem;
+> +	dma_assign_coherent_memory(dev, mem);
+> +	return 0;
+> +}
+>
+> ...
+>
+> +static int __init rmem_dma_setup(struct reserved_mem *rmem)
+> +{
+> +	unsigned long node = rmem->fdt_node;
+> +
+> +	if (of_get_flat_dt_prop(node, "reusable", NULL))
+> +		return -EINVAL;
+> +
+> +#ifdef CONFIG_ARM
+> +	if (!of_get_flat_dt_prop(node, "no-map", NULL)) {
+> +		pr_info("Reserved memory: regions without no-map are not yet supported\n");
+
+Same here.
+
+> +		return -EINVAL;
+> +	}
+> +#endif
+> +
+> +	rmem->ops = &rmem_dma_ops;
+> +	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
+> +		&rmem->base, (unsigned long)rmem->size / SZ_1M);
+
+This *is* an appropriate use of pr_info().
+
+> +	return 0;
+> +}
+> +RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
+> +#endif
