@@ -1,79 +1,132 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 24 Sep 2014 16:08:28 +0800
-Subject: [GIT PULL][for 3.18]pull request for hisilicon hip04 soc and
- D01 board updates
-In-Reply-To: <20140924052425.GD30340@localhost>
-References: <5412A169.5020308@hisilicon.com> <20140924052425.GD30340@localhost>
-Message-ID: <54227BFC.4040007@hisilicon.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 24 Sep 2014 16:10:38 +0800
+Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <542279D0.1040603@jp.fujitsu.com>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+ <542279D0.1040603@jp.fujitsu.com>
+Message-ID: <54227C7E.6060506@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2014/9/24 13:24, Olof Johansson wrote:
-> On Fri, Sep 12, 2014 at 03:31:53PM +0800, xuwei wrote:
->> Hi Olof, Hi Kevin, Hi Arnd,
->>
->> Please help to merge pull request for hisilicon hip04 soc and D01 board updates for 3.18. 
->> Thanks!
->>
->> Best Regards,
->> Wei
->>
->>
->> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
->>
->>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
->>
->> are available in the git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/D01-for-3.18
->>
->> for you to fetch changes up to c9a1df48a97ac9141540f177e4293a9966348f8c:
->>
->>   ARM: debug: add HiP04 debug uart (2014-09-03 14:10:46 +0100)
->>
->> ----------------------------------------------------------------
->> ARM: mach-hisi: Hisilicon hip04 soc and D01 board updates for 3.18
->>
->> - Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number from 2 to 4
->> - Enable MCPM on HiP04 SoC
->> - Enable 16 cores on HiP04 SoC
->> - Add platform & Fabric controller devicetree binding document for HiP04 SoC
->> - Add hip04.dtsi & hip04-d01.dts for hip04 SoC platform and D01 board
->> - Enable HiP04 SoC in both hi3xxx_defconfig & multi_v7_defconfig
->> - Add the support of Hisilicon HiP04 debug uart
+On 2014/9/24 15:59, Yasuaki Ishimatsu wrote:
+> (2014/09/11 23:03), Jiang Liu wrote:
+>> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
+>> that is to build irqdomains for CPU vector, interrupt remapping unit,
+>> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
+>> Each irqdomain manages corresponding interrupt controller and talks to
+>> parent interrupt controller through public irqdomain interfaces. We also
+>> support stacked irq_chip based on hierarchy irqdomain. It will make the
+>> x86 interrupt architecture much more clear and more easy to maintain
+>> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
+>> interrupt management architecture too.
 > 
-> Hi,
+> Do you have a documentation which more detailed information is written?
+> I'm interested in this feature. And I want to know more detailed information.
 > 
-
-Hi Olof,
-
-> Merged this into next/soc. Two minor comments:
+> I cannot imagine why the feature makes x86 irq architecture much more clear
+> and more easy to maintain in this description. Of course, I have read the
+> following threads:
 > 
-> 1) I applied a patch on top to fix sort order of the debug uart config entries,
-> HIP04 was added before HIGHBANK. But the previous hisi config there was also added
-> out of order.
-> 
+> https://lkml.org/lkml/2014/9/11/101
+Hi Yasuaki,
 
-Thanks!
-I will take care of it.
+Do these help?
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg729924.html
+https://lkml.org/lkml/2014/8/1/67
 
-> 2) Would you mind configuring your mailer to use your name as name? Right
-> now it says "xuwei" instead of "Wei Xu" on your email address. It's correct on the git
-> config, so it's probably just your mail config.
-
-Sorry for the confusion.
-I have adjusted my mail configure.
-
-Best Regards,
-Wei
+Regards!
+Gerry
 
 > 
-> Thanks!
+> Thanks,
+> Yasuaki Ishimatsu
 > 
+>>
+>> This is the second patch set to enable support of hierarchy irqdomain
+>> on x86 platforms. It depends on the first part at:
+>> https://lkml.org/lkml/2014/9/11/101
+>> And you may access it at:
+>> https://github.com/jiangliu/linux.git irqdomain/p2v1
+>>
+>> And there will be a third patch set to convert IOAPIC driver to support
+>> hierarchy irqdomain and clean up code.
+>>
+>> The first patch extends irqdomain interfaces to support hierarchy
+>> irqdomain. Hope this interface could be used by other architectures too,
+>> such as ARM/ARM64.
+>> The second patch introduces two helper functions to support stacked
+>> irq_chip.
+>> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
+>> it's the root irqdomain for x86 platforms.
+>> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
+>> support hierarchy irqdomain.
+>> Patch 14-17 converts HPET, MSI and HT_IRQ drivers to support hierarchy
+>> irqdomain.
+>> Patch 18-21 cleans up unsued code in x86 arch and interrupt remapping
+>> drivers.
+>>
+>> We have tested this patchset on Intel 32-bit and 64-bit systems. But we
+>> have only done compilation tests for HT_IRQ and AMD interrupt remapping
+>> drivers due to hardware resource limitation. Tests on AMD platforms are
+>> warmly welcomed!
+>>
+>> Jiang Liu (21):
+>>    irqdomain: Introduce new interfaces to support hierarchy irqdomains
+>>    genirq: Introduce helper functions to support stacked irq_chip
+>>    x86, irq: Save destination CPU ID in irq_cfg
+>>    x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
+>>    x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
+>>    x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
+>>    x86, uv: Use new irqdomain interfaces to allocate/free IRQ
+>>    x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
+>>    x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
+>>    x86: irq_remapping: Introduce new interfaces to support hierarchy
+>>      irqdomain
+>>    iommu/vt-d: Change prototypes to prepare for enabling hierarchy
+>>      irqdomain
+>>    iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
+>>    iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
+>>    x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
+>>    x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
+>>    x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
+>>    x86, htirq: Use hierarchy irqdomain to manage Hypertransport
+>>      interrupts
+>>    iommu/vt-d: Clean up unused MSI related code
+>>    iommu/amd: Clean up unused MSI related code
+>>    x86: irq_remapping: Clean up unused MSI related code
+>>    x86, irq: Clean up unused MSI related code and interfaces
+>>
+>>   arch/x86/Kconfig                     |    3 +-
+>>   arch/x86/include/asm/hpet.h          |   16 +-
+>>   arch/x86/include/asm/hw_irq.h        |   64 +++++
+>>   arch/x86/include/asm/irq_remapping.h |   66 +++--
+>>   arch/x86/include/asm/pci.h           |    5 -
+>>   arch/x86/include/asm/x86_init.h      |    4 -
+>>   arch/x86/kernel/apic/htirq.c         |  179 +++++++++----
+>>   arch/x86/kernel/apic/io_apic.c       |    3 -
+>>   arch/x86/kernel/apic/msi.c           |  430 +++++++++++++++++++++++--------
+>>   arch/x86/kernel/apic/vector.c        |  158 +++++++++++-
+>>   arch/x86/kernel/hpet.c               |   57 ++---
+>>   arch/x86/kernel/x86_init.c           |    2 -
+>>   arch/x86/platform/uv/uv_irq.c        |   27 +-
+>>   drivers/iommu/amd_iommu.c            |  385 ++++++++++++++++++++++------
+>>   drivers/iommu/amd_iommu_init.c       |    4 +
+>>   drivers/iommu/amd_iommu_proto.h      |    9 +
+>>   drivers/iommu/amd_iommu_types.h      |    5 +
+>>   drivers/iommu/intel_irq_remapping.c  |  468 +++++++++++++++++++++++-----------
+>>   drivers/iommu/irq_remapping.c        |  221 ++++++----------
+>>   drivers/iommu/irq_remapping.h        |   22 +-
+>>   drivers/pci/htirq.c                  |   48 +---
+>>   include/linux/htirq.h                |   22 +-
+>>   include/linux/intel-iommu.h          |    4 +
+>>   include/linux/irq.h                  |    8 +
+>>   include/linux/irqdomain.h            |   60 +++++
+>>   kernel/irq/Kconfig                   |    3 +
+>>   kernel/irq/chip.c                    |   21 ++
+>>   kernel/irq/irqdomain.c               |  349 ++++++++++++++++++++++++-
+>>   28 files changed, 1934 insertions(+), 709 deletions(-)
+>>
 > 
-> -Olof
-> 
-> .
 > 
