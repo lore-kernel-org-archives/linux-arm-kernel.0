@@ -1,63 +1,144 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Sep 2014 11:14:52 +0100
-Subject: [PATCH] mfd: inherit coherent_dma_mask from parent device
-In-Reply-To: <1411414675-19010-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411414675-19010-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140924101452.GF19999@lee--X1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Sep 2014 11:15:45 +0100
+Subject: [PATCH v2 3/8] add alphascale,asm9260.h binding
+In-Reply-To: <1411325151-15107-2-git-send-email-linux@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-2-git-send-email-linux@rempel-privat.de>
+Message-ID: <20140924101545.GC5729@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Sep 2014, Boris BREZILLON wrote:
+On Sun, Sep 21, 2014 at 07:45:46PM +0100, Oleksij Rempel wrote:
+> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
 
-> dma_mask and dma_parms are already inherited from the parent device but
-> dma_coherent_mask was left uninitialized (set to zero thanks to kzalloc).
-> Set sub-device coherent_dma_mask to its parent value to simplify
-> sub-drivers making use of dma coherent helper functions (those drivers
-> currently have to explicitly set the dma coherent mask using
-> dma_set_coherent_mask function).
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Applied with Arnd's Ack.
+This is a set of constants, which alone does not consistute a binding.
+Please write a document desciribing the binding. There are plenty of
+example in Documentation/devicetree/bindings/clock/
+
+Additionally, please have a more comprehensive commit message (e.g. what
+an "alphascale,asm9260" is).
 
 > ---
+>  include/dt-bindings/clock/alphascale,asm9260.h | 97 ++++++++++++++++++++++++++
+>  1 file changed, 97 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/alphascale,asm9260.h
 > 
-> Hi,
-> 
-> This patch is follow-up of a discussion we had on a KMS driver thread [1].
-> This patch is only copying the parent device coherent_dma_mask to avoid
-> calling specific dma_set_coherent_mask in case the coherent mask is the
-> default one.
-> 
-> I'm a bit surprised this hasn't been done earlier while other dma fields
-> (mask and parms) are already inherited from the parent device, so please
-> tell me if there already was an attempt to do the same, and if so, what
-> was the reson for rejecting it :-).
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> [1]https://lkml.org/lkml/2014/9/22/392
-> 
->  drivers/mfd/mfd-core.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
-> index 892d343..5d0fbe1 100644
-> --- a/drivers/mfd/mfd-core.c
-> +++ b/drivers/mfd/mfd-core.c
-> @@ -101,6 +101,7 @@ static int mfd_add_device(struct device *parent, int id,
->  	pdev->dev.type = &mfd_dev_type;
->  	pdev->dev.dma_mask = parent->dma_mask;
->  	pdev->dev.dma_parms = parent->dma_parms;
-> +	pdev->dev.coherent_dma_mask = parent->coherent_dma_mask;
->  
->  	ret = regulator_bulk_register_supply_alias(
->  			&pdev->dev, cell->parent_supplies,
+> diff --git a/include/dt-bindings/clock/alphascale,asm9260.h b/include/dt-bindings/clock/alphascale,asm9260.h
+> new file mode 100644
+> index 0000000..04e8db2
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/alphascale,asm9260.h
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Copyright 2014 Oleksij Rempel <linux@rempel-privat.de>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_ASM9260_H
+> +#define _DT_BINDINGS_CLK_ASM9260_H
+> +
+> +/* ahb gate */
+> +#define CLKID_AHB_ROM		0
+> +#define CLKID_AHB_RAM		1
+> +#define CLKID_AHB_GPIO		2
+> +#define CLKID_AHB_MAC		3
+> +#define CLKID_AHB_EMI		4
+> +#define CLKID_AHB_USB0		5
+> +#define CLKID_AHB_USB1		6
+> +#define CLKID_AHB_DMA0		7
+> +#define CLKID_AHB_DMA1		8
+> +#define CLKID_AHB_UART0		9
+> +#define CLKID_AHB_UART1		10
+> +#define CLKID_AHB_UART2		11
+> +#define CLKID_AHB_UART3		12
+> +#define CLKID_AHB_UART4		13
+> +#define CLKID_AHB_UART5		14
+> +#define CLKID_AHB_UART6		15
+> +#define CLKID_AHB_UART7		16
+> +#define CLKID_AHB_UART8		17
+> +#define CLKID_AHB_UART9		18
+> +#define CLKID_AHB_I2S0		19
+> +#define CLKID_AHB_I2C0		20
+> +#define CLKID_AHB_I2C1		21
+> +#define CLKID_AHB_SSP0		22
+> +#define CLKID_AHB_IOCONFIG	23
+> +#define CLKID_AHB_WDT		24
+> +#define CLKID_AHB_CAN0		25
+> +#define CLKID_AHB_CAN1		26
+> +#define CLKID_AHB_MPWM		27
+> +#define CLKID_AHB_SPI0		28
+> +#define CLKID_AHB_SPI1		29
+> +#define CLKID_AHB_QEI		30
+> +#define CLKID_AHB_QUADSPI0	31
+> +#define CLKID_AHB_CAMIF		32
+> +#define CLKID_AHB_LCDIF		33
+> +#define CLKID_AHB_TIMER0	34
+> +#define CLKID_AHB_TIMER1	35
+> +#define CLKID_AHB_TIMER2	36
+> +#define CLKID_AHB_TIMER3	37
+> +#define CLKID_AHB_IRQ		38
+> +#define CLKID_AHB_RTC		39
+> +#define CLKID_AHB_NAND		40
+> +#define CLKID_AHB_ADC0		41
+> +#define CLKID_AHB_LED		42
+> +#define CLKID_AHB_DAC0		43
+> +#define CLKID_AHB_LCD		44
+> +#define CLKID_AHB_I2S1		45
+> +#define CLKID_AHB_MAC1		46
+> +
+> +/* devider */
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+s/devider/divider/ presumably?
+
+Mark.
+
+> +#define CLKID_SYS_CPU		47
+> +#define CLKID_SYS_AHB		48
+> +#define CLKID_SYS_I2S0M		49
+> +#define CLKID_SYS_I2S0S		50
+> +#define CLKID_SYS_I2S1M		51
+> +#define CLKID_SYS_I2S1S		52
+> +#define CLKID_SYS_UART0		53
+> +#define CLKID_SYS_UART1		54
+> +#define CLKID_SYS_UART2		55
+> +#define CLKID_SYS_UART3		56
+> +#define CLKID_SYS_UART4		56
+> +#define CLKID_SYS_UART5		57
+> +#define CLKID_SYS_UART6		58
+> +#define CLKID_SYS_UART7		59
+> +#define CLKID_SYS_UART8		60
+> +#define CLKID_SYS_UART9		61
+> +#define CLKID_SYS_SPI0		62
+> +#define CLKID_SYS_SPI1		63
+> +#define CLKID_SYS_QUADSPI	64
+> +#define CLKID_SYS_SSP0		65
+> +#define CLKID_SYS_NAND		66
+> +#define CLKID_SYS_TRACE		67
+> +#define CLKID_SYS_CAMM		68
+> +#define CLKID_SYS_WDT		69
+> +#define CLKID_SYS_CLKOUT	70
+> +#define CLKID_SYS_MAC		71
+> +#define CLKID_SYS_LCD		72
+> +#define CLKID_SYS_ADCANA	73
+> +
+> +#define MAX_CLKS		74
+> +#endif
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
