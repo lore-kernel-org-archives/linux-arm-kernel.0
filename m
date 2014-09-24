@@ -1,89 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 13:03:38 +0100
-Subject: [PATCHv3] dmaengine: fsl-edma: fixup reg offset and hw S/G
- support in big-endian model
-In-Reply-To: <20140924130510.62d78440@ipc1.ka-ro>
-References: <1411550642-12577-1-git-send-email-jingchang.lu@freescale.com>
- <20140924130510.62d78440@ipc1.ka-ro>
-Message-ID: <20140924120338.GW5182@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Sep 2014 13:10:51 +0100
+Subject: [PATCH v5 4/7] ARM: l2c: Add support for overriding prefetch
+ settings
+In-Reply-To: <5422A8D1.1000507@gmail.com>
+References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
+ <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
+ <20140924111446.GE5729@leverpostej> <5422A8D1.1000507@gmail.com>
+Message-ID: <20140924121051.GF5729@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 01:05:10PM +0200, Lothar Wa?mann wrote:
-> Hi,
+On Wed, Sep 24, 2014 at 12:19:45PM +0100, Tomasz Figa wrote:
+> On 24.09.2014 13:14, Mark Rutland wrote:
+> > On Wed, Sep 24, 2014 at 12:05:38PM +0100, Marek Szyprowski wrote:
+> >> From: Tomasz Figa <t.figa@samsung.com>
+> >>
+> >> Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+> >> settings configured in registers leading to crashes if L2C is enabled
+> >> without overriding them. This patch introduces bindings to enable
+> >> prefetch settings to be specified from DT and necessary support in the
+> >> driver.
+> >>
+> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/arm/l2cc.txt | 10 +++++++
+> >>  arch/arm/mm/cache-l2x0.c                       | 39 ++++++++++++++++++++++++++
+> >>  2 files changed, 49 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> >> index af527ee111c2..3443d2d76788 100644
+> >> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> >> @@ -47,6 +47,16 @@ Optional properties:
+> >>  - cache-id-part: cache id part number to be used if it is not present
+> >>    on hardware
+> >>  - wt-override: If present then L2 is forced to Write through mode
+> >> +- arm,double-linefill : Override double linefill enable setting. Enable if
+> >> +  non-zero, disable if zero.
+> >> +- arm,double-linefill-incr : Override double linefill on INCR read. Enable
+> >> +  if non-zero, disable if zero.
+> >> +- arm,double-linefill-wrap : Override double linefill on WRAP read. Enable
+> >> +  if non-zero, disable if zero.
+> >> +- arm,prefetch-drop : Override prefetch drop enable setting. Enable if non-zero,
+> >> +  disable if zero.
+> > 
+> > I'm not too keen on tristate properties. Is this level of flexibility
+> > really required?
+> > 
+> > What exact overrides do you need for boards you know of? Why do these
+> > cause crashes if not overridden?
 > 
-> Jingchang Lu wrote:
-> > +	 * eDMA hardware SGs requires the TCDs to be auto loaded
-> > +	 * in the little endian whenver the register endian model,
-> "in little endian whatever the register endian model"
+> Well, this is all thanks to broken firmware, which doesn't initialize
+> those values properly on certain systems and they must be overridden. On
+> the other side, there are systems with firmware that does it correctly
+> and for those the boot defaults should be preferred. I don't see any
+> other reasonable option of handling this.
 
-Even that took several reads to work it out.
+With the lack of warnings for present but empty properties, I can forsee
+people placing empty properties (as the names make them sound like
+booleans which enable features).
 
-	eDMA hardware SGs require the TCDs to be stored in little endian
-	format irrespective of the register endian model.
+Surely for enabling/disabling options we should only need to override
+one-way, disabling a feature that causes breakage for some reason?
+Otherwise we can keep the reset value (which might be sub-optimal).
 
-and I think that's all that needs to be said here.
+Perhaps a simple warning is sufficient if the property exists but is
+empty.
 
-However, as I realdy suggested, running this ruddy thing through sparse
-would be a /very/ good idea, because it'll warn with:
+> As for why they cause crashes, I'm not an expert if it is about L2C
+> internals, so I can't really tell, but apparently the cache can work
+> correctly only on certain settings.
 
-+       tcd->daddr = cpu_to_le32(dst);
+Likewise, I'm no expert on the l2x0 family. It would be nice to know if
+this justs masks an issue elsewhere in Linux, is required for some
+reason by the interconnect, etc. I guess we don't have enough
+information to figure that out.
 
-The reason it'll warn on that is because daddr is not declared with
-__le32, etc - the types used in struct fsl_edma_hw_tcd tell sparse that
-the values to be stored there are in _host_ endian format, but they're
-being assigned little endian formatted data.
-
-> > +	 * for fsl_set_tcd_params doing the swap.
-> fsl_set_tcd_params()
-
-That's the wrong function name anyway.  It's fsl_edma_set_tcd_params().
-
-However, let's look at this a little more:
-
-        fsl_edma_set_tcd_params(fsl_chan, tcd->saddr, tcd->daddr, tcd->attr,
-                        tcd->soff, tcd->nbytes, tcd->slast, tcd->citer,
-                        tcd->biter, tcd->doff, tcd->dlast_sga, tcd->csr);
-
-Is it /really/ a good idea to read all that data out of the structure,
-only to then have most of it saved into the stack, which
-fsl_edma_set_tcd_params() then has to read back off the stack again?
-With stuff like this, one has to wonder if there is much clue how to
-write optimal C code in this driver.
-
-This should be passing the tcd structure into fsl_edma_set_tcd_params().
-
-Now, this function contains this comment:
-
-        /*
-         * TCD parameters have been swapped in fill_tcd_params(),
-         * so just write them to registers in the cpu endian here
-         */
-
-Which is almost reasonable, but let's update it:
-
-	TCD parameters are stored in struct fsl_edma_hw_tcd in little
-	endian format.  However, we need to load the registers in
-	<insert appropriate endianness - big|little|cpu> endian.
-
-Now, remember that writel() and friends expect native CPU endian formatted
-data (and yes, sparse checks this too) so that needs to be considered more.
-
-Lastly, the driver seems to be a total mess of accessors.  In some places
-it uses io{read,write}*, in other places, it uses plain {read,write}*.  It
-should use either one set or the other set, and not mix these two.
-
-I just spotted this badly formatted code too:
-
-        for (i = 0; i < fsl_desc->n_tcds; i++)
-                        dma_pool_free(fsl_desc->echan->tcd_pool,
-                                        fsl_desc->tcd[i].vtcd,
-                                        fsl_desc->tcd[i].ptcd);
-...
-                edma_writeb(fsl_chan->edma,
-                                EDMAMUX_CHCFG_ENBL | EDMAMUX_CHCFG_SOURCE(slot),
-                                muxaddr + ch_off);
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Mark.
