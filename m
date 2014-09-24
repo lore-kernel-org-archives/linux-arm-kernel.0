@@ -1,41 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Sep 2014 22:13:09 -0700
-Subject: [GIT PULL 5/5] omap dts changes for v3.18 merge window
-In-Reply-To: <20140918201507.GO14505@atomide.com>
-References: <pull-1410478051-378788> <pull-1410478051-378788-5>
- <20140918201507.GO14505@atomide.com>
-Message-ID: <20140924051309.GB30340@localhost>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 24 Sep 2014 10:40:28 +0530
+Subject: [PATCH 7/7] dmaengine: sun6i: Remove obsolete clk muxing code
+In-Reply-To: <1410000448-9999-8-git-send-email-wens@csie.org>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <1410000448-9999-8-git-send-email-wens@csie.org>
+Message-ID: <20140924051028.GS24663@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 01:15:08PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140911 16:29]:
-> > The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
-> > 
-> >   Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/dt-for-v3.18
-> > 
-> > for you to fetch changes up to d27704d1ec2f9ba06247b402c58a6f2febecef78:
-> > 
-> >   ARM: dts: OMAP2+: Add sub mailboxes device node information (2014-09-11 11:46:30 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > Changes for .dts files for omaps for v3.18 merge window:
-> > 
-> > - Updates for gta04 to add gta04a3 model
-> > - Add support for Tehnexion TAO3530 boards
-> > - Regulator names for beaglebone
-> > - Pinctrl related updates for omap5, dra7 and am437
-> > - Model name fix for sbc-t54
-> > - Enable mailbox for various omaps
+On Sat, Sep 06, 2014 at 06:47:28PM +0800, Chen-Yu Tsai wrote:
+> The sun6i DMA controller requires the AHB1 bus clock to be
+> clocked from PLL6. This was originally done by the dmaengine
+> driver during probe time. The AHB1 clock driver has since been
+> unified, so the original code does not work.
 > 
-> This can cause a minor merge conflict, here's the
-> merge resolution for reference.
+> Remove the clk muxing code, and replace it with DT clk default
+> properties.
 
-Thanks, merged all branches now.
+Applied, thanks
 
-
--Olof
+-- 
+~Vinod
