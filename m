@@ -1,101 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Sep 2014 09:49:11 +0100
-Subject: [PATCH v9 00/10] rtc: at91sam9: add DT support
-In-Reply-To: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1411483725-31532-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140924084911.GI17801@lee--X1>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 24 Sep 2014 16:56:59 +0800
+Subject: [PATCH] misc: atmel-ssc: prepare clock only when request
+Message-ID: <1411549019-12663-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not acceptable.  You have sent a 10 patch patch-set 5 times in
-24hrs.  To make matters worse, the only patch that has any affiliation
-to me has already been accepted.
+Prepare SSC clock only when request SSC channel, the clock will be
+enabled when initialize the SSC.
 
-Send a patch-set to the list and don't do anything until the patch has
-either been accepted or the reviews to stop coming in.  Then re-send
-(only the patches that have not yet been accepted) in a week or so, if
-required.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
 
-If I have to deal with another 55 repeat emails again, you'll find
-yourself as an entry in my spam filter.
+ drivers/misc/atmel-ssc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> This patch series adds DT support to the atmel at91sam9 RTC driver.
-> 
-> It also removes any machine specific inclusions to prepare the migration
-> to multi platform kernel support, and retain the slow clock to prevent
-> the CCF from disabling it at the end of boot.
->   
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v8:
->  - fix DT documentation
->  - add missing '\n' in dev_err messages
-> 
-> Changes since v7:
->  - fix typo
->  - fix sclk_rate test
->  - state that RTC_DRV_AT91SAM9_RTT and RTC_DRV_AT91SAM9_GPBR are no longer
->    used when booting a DT board
-> 
-> Changes since v6:
->  - fix typos
->  - add missing commit messages
->  - rework the Kconfig description
-> 
-> Changes since v5:
->  - replace 'rtc' by 'rtt' where appropriate
->  - fix commit messages
-> 
-> Changes since v4:
->  - add a TODO comment to remember removing non DT board support code
-> 
-> Changes since v3:
->  - add GPBR DT bindings doc
->  - fix a coding style issues
->  - add Alexandre's Acked-by
->  - change RTT DT bindings
-> 
-> Changes since v2:
->  - make use of syscon/regmap to avoid directly requesting/mapping a GPBR
->    memory region in the RTT driver
-> 
-> Changes since v1:
->  - remove non CCF specific case by adding the appropriate clk_lookup
->    entries in arch/arm/mach-at91/<soc-name>.c files
-> 
-> Boris BREZILLON (10):
->   rtc: at91sam9: remove references to mach specific headers
->   rtc: at91sam9: use standard readl/writel functions instead of raw
->     versions
->   rtc: at91sam9: replace devm_ioremap by devm_ioremap_resource
->   rtc: at91sam9: add DT support
->   rtc: at91sam9: make use of syscon/regmap to access GPBR registers
->   rtc: at91sam9: rework the Kconfig description
->   ARM: at91: add clk_lookup entry for RTT devices
->   rtc: at91sam9: use clk API instead of relying on AT91_SLOW_CLOCK
->   rtc: at91sam9: add DT bindings documentation
->   mfd: syscon: add Atmel GPBR DT bindings documention
-> 
->  .../devicetree/bindings/mfd/atmel,gpbr.txt         |  15 +++
->  .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt |  23 ++++
->  arch/arm/mach-at91/at91sam9260.c                   |   2 +
->  arch/arm/mach-at91/at91sam9261.c                   |   2 +
->  arch/arm/mach-at91/at91sam9263.c                   |   4 +
->  arch/arm/mach-at91/at91sam9g45.c                   |   2 +
->  arch/arm/mach-at91/at91sam9rl.c                    |   2 +
->  arch/arm/mach-at91/clock.c                         |   2 +-
->  arch/arm/mach-at91/clock.h                         |   1 +
->  drivers/rtc/Kconfig                                |  24 ++--
->  drivers/rtc/rtc-at91sam9.c                         | 138 ++++++++++++++++-----
->  11 files changed, 177 insertions(+), 38 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel,gpbr.txt
->  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> 
-
+diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+index 60843a2..f9807a7 100644
+--- a/drivers/misc/atmel-ssc.c
++++ b/drivers/misc/atmel-ssc.c
+@@ -57,7 +57,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
+ 	ssc->user++;
+ 	spin_unlock(&user_lock);
+ 
+-	clk_prepare_enable(ssc->clk);
++	clk_prepare(ssc->clk);
+ 
+ 	return ssc;
+ }
+@@ -77,7 +77,7 @@ void ssc_free(struct ssc_device *ssc)
+ 	spin_unlock(&user_lock);
+ 
+ 	if (disable_clk)
+-		clk_disable_unprepare(ssc->clk);
++		clk_unprepare(ssc->clk);
+ }
+ EXPORT_SYMBOL(ssc_free);
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.0.24.g4109c28
