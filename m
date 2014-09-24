@@ -1,41 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 16:08:07 +0100
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
- consolidation
-In-Reply-To: <20140924150408.GK15842@e104818-lin.cambridge.arm.com>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <20140922153919.GQ25809@arm.com>
- <20140922223022.GO5182@n2100.arm.linux.org.uk>
- <20140924144541.GJ15842@e104818-lin.cambridge.arm.com>
- <20140924145257.GY5182@n2100.arm.linux.org.uk>
- <20140924150408.GK15842@e104818-lin.cambridge.arm.com>
-Message-ID: <20140924150806.GZ5182@n2100.arm.linux.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 24 Sep 2014 23:09:09 +0800
+Subject: [PATCH] Documentation: sunxi: Update Allwinner SoC documentation
+ (A31/A31s/A23)
+Message-ID: <1411571349-30867-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 04:04:09PM +0100, Catalin Marinas wrote:
-> On Wed, Sep 24, 2014 at 03:52:57PM +0100, Russell King - ARM Linux wrote:
-> > I'm *not* arguing against having a VDSO to speed up that crap.  What
-> > I'm trying to get to the bottom of - something which has been totally
-> > lost sight of - is what the friggin effect of this stuff is on CPUs
-> > *without* the architected timer.
-> > 
-> > Until I get an answer to what the measured effect is, I'm saying no to
-> > VDSO on ARM, because - as seems to be the norm - the evaluation job is
-> > only half done.
-> 
-> I agree.
-> 
-> If there is an overhead (possibly), I think it can be solved in software
-> maybe by having two VDSO images, one with gettimeofday and one without.
-> If it's only gettimeofday in VDSO (and signal return still via the
-> vectors page), we could just avoid inserting it into the user address
-> space when arch timers aren't present.
+Lately we have received documentation for A31 and A31s, in addition to
+A23 documentation which was received earlier but not added.
 
-The signal handling is no longer in the vectors page (it hasn't been for
-over a year now), it is in a separate page which is mapped randomly.
-These VDSO patches change it to place it along side the VDSO pages.
+Add these to the README, and update to reflect that A31 and A23 are
+supported.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/arm/sunxi/README | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index 7945238..57c4da6 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -37,15 +37,24 @@ SunXi family
+           http://dl.linux-sunxi.org/A20/A20%20User%20Manual%202013-03-22.pdf
+ 
+       - Allwinner A23
+-        + Not Supported
++        + Datasheet
++          http://dl.linux-sunxi.org/A23/A23%20Datasheet%20V1.0%2020130830.pdf
++        + User Manual
++          http://dl.linux-sunxi.org/A23/A23%20User%20Manual%20V1.0%2020130830.pdf
+ 
+     * Quad ARM Cortex-A7 based SoCs
+       - Allwinner A31 (sun6i)
+         + Datasheet
+-          http://dl.linux-sunxi.org/A31/A31%20Datasheet%20-%20v1.00%20(2012-12-24).pdf
++          http://dl.linux-sunxi.org/A31/A3x_release_document/A31/IC/A31%20datasheet%20V1.3%2020131106.pdf
++        + User Manual
++          http://dl.linux-sunxi.org/A31/A3x_release_document/A31/IC/A31%20user%20manual%20V1.1%2020130630.pdf
+ 
+       - Allwinner A31s (sun6i)
+         + Not Supported
++        + Datasheet
++          http://dl.linux-sunxi.org/A31/A3x_release_document/A31s/IC/A31s%20datasheet%20V1.3%2020131106.pdf
++        + User Manual
++          http://dl.linux-sunxi.org/A31/A3x_release_document/A31s/IC/A31s%20User%20Manual%20%20V1.0%2020130322.pdf
+ 
+     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+       - Allwinner A80
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
