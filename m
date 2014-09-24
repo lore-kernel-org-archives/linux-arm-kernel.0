@@ -1,66 +1,104 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Wed, 24 Sep 2014 11:00:34 +0000
-Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
-In-Reply-To: <4264466.HtkUxyxBW8@wuerfel>
-References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
- <3321146.kBfn28qbNM@wuerfel>
- <a83d5601a26b4e45be5e5016de287287@BL2PR03MB467.namprd03.prod.outlook.com>
- <4264466.HtkUxyxBW8@wuerfel>
-Message-ID: <bb122a232a1c40559e84a058f3d003b4@BL2PR03MB467.namprd03.prod.outlook.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 24 Sep 2014 13:05:38 +0200
+Subject: [PATCH v5 4/7] ARM: l2c: Add support for overriding prefetch settings
+In-Reply-To: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
+References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Tomasz Figa <t.figa@samsung.com>
 
+Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
+settings configured in registers leading to crashes if L2C is enabled
+without overriding them. This patch introduces bindings to enable
+prefetch settings to be specified from DT and necessary support in the
+driver.
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->Sent: Wednesday, September 24, 2014 5:36 PM
->To: Lu Jingchang-B35083
->Cc: Guo Shawn-R65073; mark.rutland at arm.com; linux-arm-
->kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Chen-B46807; Fu
->Chao-B44548
->Subject: Re: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts
->support
->
->On Wednesday 24 September 2014 05:47:53 Jingchang Lu wrote:
->>
->> The ethernet device nodes already have the phy-handle properties to
->their mdio nodes.
->>
->> The alias for PHY nodes here is:
->>   The ethernet has two kind of PHY interface, one is SGMII, and the
->> other is RGMII, The selection is done by the reset configuration
->> word(RCW), so Phy-handle properties should be change properly to
->> reflecting the PHY interface selection. This is done by fixing up dtb
->> in u-boot before booting the kernel. Thus the alias for PHY nodes is
->added here for fdt finding the PHY nodes easily.
->
->Ok, I see. I thought that this was what the labels in the dtb were
->supposed to be used for. Can't you do the same thing in u-boot by using a
->label as opposed to the alias?
->
->IIRC you should be able to add an additional label like
->
->+&mdio0 {
->+       enet1_sgmii_phy: sgmii_phy0: ethernet-phy at 0 {
->+               reg = <0x0>;
->+       };
->
->and then use libfdt to find the node through that, rather than through the
->alias. I don't know how things are handled on other platforms, but I think
->that was how it was initially thought up when we introduced the fdt format
->on PowerPC.
->
->	Arnd
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ Documentation/devicetree/bindings/arm/l2cc.txt | 10 +++++++
+ arch/arm/mm/cache-l2x0.c                       | 39 ++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-We also do the phy-handle fixup on our PowerPC platform based on the aliases,
-and so I adopt the same way to make these fixup consistent between SoCs.
-And the u-boot fdt fixup code base on the aliases has been upstreamed, so may
-we keep this aliases unchanged?
-
-BTW, find a node by alias is easily, could you give me some clue on finding a node
-by a label directly, Thanks.
-
-
-Best Regards,
-Jingchang
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index af527ee111c2..3443d2d76788 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -47,6 +47,16 @@ Optional properties:
+ - cache-id-part: cache id part number to be used if it is not present
+   on hardware
+ - wt-override: If present then L2 is forced to Write through mode
++- arm,double-linefill : Override double linefill enable setting. Enable if
++  non-zero, disable if zero.
++- arm,double-linefill-incr : Override double linefill on INCR read. Enable
++  if non-zero, disable if zero.
++- arm,double-linefill-wrap : Override double linefill on WRAP read. Enable
++  if non-zero, disable if zero.
++- arm,prefetch-drop : Override prefetch drop enable setting. Enable if non-zero,
++  disable if zero.
++- arm,prefetch-offset : Override prefetch offset value. Valid values are
++  0-7, 15, 23, and 31.
+ 
+ Example:
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 84c6c55ab896..af90a6ff6b49 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1059,6 +1059,8 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 	u32 data[3] = { 0, 0, 0 };
+ 	u32 tag[3] = { 0, 0, 0 };
+ 	u32 filter[2] = { 0, 0 };
++	u32 prefetch;
++	u32 val;
+ 
+ 	of_property_read_u32_array(np, "arm,tag-latency", tag, ARRAY_SIZE(tag));
+ 	if (tag[0] && tag[1] && tag[2])
+@@ -1083,6 +1085,43 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		l2x0_saved_regs.filter_start = (filter[0] & ~(SZ_1M - 1))
+ 					| L310_ADDR_FILTER_EN;
+ 	}
++
++	prefetch = l2x0_saved_regs.prefetch_ctrl;
++
++	if (!of_property_read_u32(np, "arm,double-linefill", &val)) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL;
++	}
++
++	if (!of_property_read_u32(np, "arm,double-linefill-incr", &val)) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_INCR;
++	}
++
++	if (!of_property_read_u32(np, "arm,double-linefill-wrap", &val)) {
++		if (!val)
++			prefetch |= L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DBL_LINEFILL_WRAP;
++	}
++
++	if (!of_property_read_u32(np, "arm,prefetch-drop", &val)) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_PREFETCH_DROP;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_PREFETCH_DROP;
++	}
++
++	if (!of_property_read_u32(np, "arm,prefetch-offset", &val)) {
++		prefetch &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
++		prefetch |= val & L310_PREFETCH_CTRL_OFFSET_MASK;
++	}
++
++	l2x0_saved_regs.prefetch_ctrl = prefetch;
+ }
+ 
+ static const struct l2c_init_data of_l2c310_data __initconst = {
+-- 
+1.9.2
