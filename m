@@ -1,281 +1,40 @@
-From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Wed, 24 Sep 2014 09:27:55 +0530
-Subject: [PATCH v10 3/6] ARM: dts: Exynos: add CPU OPP and regulator supply
- property
-In-Reply-To: <1411531078-10671-3-git-send-email-thomas.ab@samsung.com>
-References: <1411531078-10671-1-git-send-email-thomas.ab@samsung.com>
- <1411531078-10671-2-git-send-email-thomas.ab@samsung.com>
- <1411531078-10671-3-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1411531078-10671-4-git-send-email-thomas.ab@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 24 Sep 2014 11:52:08 +0800
+Subject: [PATCH v1 00/21] Use MSI chip to configure MSI/MSI-X in all
+ platforms
+In-Reply-To: <20140923210936.GC27117@google.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+ <20140923210936.GC27117@google.com>
+Message-ID: <54223FE8.4070101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Exynos 4210/5250/5420 based platforms, add CPU operating points and CPU
-regulator supply properties for migrating from Exynos specific cpufreq driver
-to using generic cpufreq drivers.
+On 2014/9/24 5:09, Bjorn Helgaas wrote:
+> On Fri, Sep 05, 2014 at 06:09:45PM +0800, Yijing Wang wrote:
+>> This series is based Bjorn's pci-next branch + Alexander Gordeev's two patches
+>> "Remove arch_msi_check_device()" link: https://lkml.org/lkml/2014/7/12/41
+>>
+>> Currently, there are a lot of weak arch functions in MSI code.
+>> Thierry Reding Introduced MSI chip framework to configure MSI/MSI-X in arm.
+>> This series use MSI chip framework to refactor MSI code across all platforms
+>> to eliminate weak arch functions. It has been tested fine in x86(with or without
+>> irq remap).
+> 
+> I see you plan some updates, so I'll look for a v2 posting after v3.17 releases.
+> It will be great to get rid of some of those weak functions!
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Reviewed-by: Andreas Farber <afaerber@suse.de>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Tested-by: Chander Kashyap <k.chander@samsung.com>
----
- arch/arm/boot/dts/exynos4210-origen.dts         |    4 ++
- arch/arm/boot/dts/exynos4210-trats.dts          |    4 ++
- arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 ++
- arch/arm/boot/dts/exynos4210.dtsi               |   14 ++++++++-
- arch/arm/boot/dts/exynos5250-arndale.dts        |    4 ++
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 ++
- arch/arm/boot/dts/exynos5250-snow.dts           |    4 ++
- arch/arm/boot/dts/exynos5250.dtsi               |   25 ++++++++++++++-
- arch/arm/boot/dts/exynos5420.dtsi               |   38 +++++++++++++++++++++++
- 9 files changed, 99 insertions(+), 2 deletions(-)
+Thanks, I will send out the new version soon.
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index f767c42..887dded 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -334,3 +334,7 @@
- 		};
- 	};
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&buck1_reg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index f516da9..66119dd 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -446,3 +446,7 @@
- 		};
- 	};
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&varm_breg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-index d50eb3a..bf0a39c 100644
---- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -492,3 +492,7 @@
- &mdma1 {
- 	reg = <0x12840000 0x1000>;
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_arm_reg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index bcc9e63..69bac07 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -35,10 +35,22 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 900 {
-+		cpu0: cpu at 900 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0x900>;
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu";
-+			clock-latency = <160000>;
-+
-+			operating-points = <
-+				1200000 1250000
-+				1000000 1150000
-+				800000	1075000
-+				500000	975000
-+				400000	975000
-+				200000	950000
-+			>;
- 		};
- 
- 		cpu at 901 {
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index 3acd97e..da2b3e1 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -563,3 +563,7 @@
- 		};
- 	};
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&buck2_reg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 6a0f4c0..0eedb88 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -406,3 +406,7 @@
- 		};
- 	};
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&buck2_reg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index e51fcef..f954e82 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -624,4 +624,8 @@
- 	num-cs = <1>;
- };
- 
-+&cpu0 {
-+	cpu0-supply = <&buck2_reg>;
-+};
-+
- #include "cros-ec-keyboard.dtsi"
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index f21b9aa..d4b418e 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -58,11 +58,34 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1700000000>;
-+
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu";
-+			clock-latency = <140000>;
-+
-+			operating-points = <
-+				1700000 1300000
-+				1600000 1250000
-+				1500000 1225000
-+				1400000 1200000
-+				1300000 1150000
-+				1200000 1125000
-+				1100000 1100000
-+				1000000 1075000
-+				 900000 1050000
-+				 800000 1025000
-+				 700000 1012500
-+				 600000 1000000
-+				 500000  975000
-+				 400000  950000
-+				 300000  937500
-+				 200000  925000
-+			>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index bfe056d..912deeb 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -59,8 +59,26 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0x0>;
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu-cluster.0";
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			clock-latency = <140000>;
-+
-+			operating-points = <
-+				1800000 1250000
-+				1700000 1212500
-+				1600000 1175000
-+				1500000 1137500
-+				1400000 1112500
-+				1300000 1062500
-+				1200000 1037500
-+				1100000 1012500
-+				1000000 987500
-+				 900000 962500
-+				 800000 937500
-+				 700000 912500
-+			>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -69,6 +87,7 @@
- 			reg = <0x1>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			clock-latency = <140000>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -77,6 +96,7 @@
- 			reg = <0x2>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			clock-latency = <140000>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -85,14 +105,29 @@
- 			reg = <0x3>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			clock-latency = <140000>;
- 		};
- 
- 		cpu4: cpu at 100 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
-+			clocks = <&clock CLK_KFC_CLK>;
-+			clock-names = "cpu-cluster.1";
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			clock-latency = <140000>;
-+
-+			operating-points = <
-+				1300000 1275000
-+				1200000 1212500
-+				1100000 1162500
-+				1000000 1112500
-+				 900000 1062500
-+				 800000 1025000
-+				 700000 975000
-+				 600000 937500
-+			>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -101,6 +136,7 @@
- 			reg = <0x101>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			clock-latency = <140000>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -109,6 +145,7 @@
- 			reg = <0x102>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			clock-latency = <140000>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -117,6 +154,7 @@
- 			reg = <0x103>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			clock-latency = <140000>;
- 		};
- 	};
- 
+Thanks!
+Yijing.
+
+> 
+> Bjorn
+> 
+> .
+> 
+
+
 -- 
-1.6.6.rc2
+Thanks!
+Yijing
