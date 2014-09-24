@@ -1,42 +1,26 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 24 Sep 2014 16:51:37 -0700
-Subject: [GIT PULL] PM / AVS changes for v3.18
-Message-ID: <7hk34sk25y.fsf@deeprootsystems.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 24 Sep 2014 16:58:14 -0700
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1a0ed130-a53d-42df-9f6a-994c5b68755c@BN1BFFO11FD031.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Tue, 2014-09-23 at 12:28PM +0200, Antoine Tenart wrote:
+> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
+> and DMA mask, to support USB2 ChipIdea controllers that don't need
+> specific functions.
+> 
+> Tested on the Marvell Berlin SoCs USB controllers.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-The following changes since commit 0f33be009b89d2268e94194dc4fd01a7851b6d51:
+This driver also works for Zynq. I didn't do extensive testing, but I
+could access a flash drive successfully.
 
-  Linux 3.17-rc6 (2014-09-21 15:43:02 -0700)
+Tested-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git tags/avs-for-3.18
-
-for you to fetch changes up to a99e8f1df57f28d77774d50c94154b4ff1031f27:
-
-  MAINTAINERS: update entry for drivers/power/avs (2014-09-24 16:30:32 -0700)
-
-----------------------------------------------------------------
-PM / AVS changes for v3.18
-
-- Add new driver for Rockchip IO voltage domains
-- update MAINTAINERS to reflect maintenance of drivers/power/avs/*
-
-----------------------------------------------------------------
-Heiko St?bner (1):
-      PM / AVS: rockchip-io: add driver handling Rockchip io domains
-
-Kevin Hilman (1):
-      MAINTAINERS: update entry for drivers/power/avs
-
- Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  83 +++++++++++++++++++
- MAINTAINERS                                                    |   4 +-
- drivers/power/avs/Kconfig                                      |   8 ++
- drivers/power/avs/Makefile                                     |   1 +
- drivers/power/avs/rockchip-io-domain.c                         | 351 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 445 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/rockchip-io-domain.txt
- create mode 100644 drivers/power/avs/rockchip-io-domain.c
+	Thanks,
+	S?ren
