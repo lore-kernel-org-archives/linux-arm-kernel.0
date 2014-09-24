@@ -1,38 +1,37 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 24 Sep 2014 21:50:20 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 24 Sep 2014 20:55:56 +0100
 Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
-In-Reply-To: <201409200452.31999.arnd@arndb.de> (Arnd Bergmann's message of
- "Sat, 20 Sep 2014 04:52:31 +0200")
+In-Reply-To: <201409200452.31999.arnd@arndb.de>
 References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
  <87tx43xswd.fsf@free.fr> <201409200452.31999.arnd@arndb.de>
-Message-ID: <87lhp8re6b.fsf@free.fr>
+Message-ID: <20140924195556.GC5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
+On Sat, Sep 20, 2014 at 04:52:31AM +0200, Arnd Bergmann wrote:
+> On Friday 19 September 2014, Robert Jarzmik wrote:
+> > Hi Arnd,
+> > 
+> > I think I met the necessary number of acks. I amended the patch to reflect this,
+> > attached to this mail.
+> 
 > I disagree. For any other patch I'd be fine with this, but changing
 > maintainership is a delicate issue, and I don't want to remove Russell
 > from the list without having seen a comment from him with either
 > Ack or Nak.
->
-> Let's give Russell a few more days to comment, if we don't here anything from him,
-> I'd suggest to leave him listed as maintainer and just do the other changes.
-> You can reorder the list in any way you see fit.
+> 
+> > > Could you schedule this single patch for your maintainers branch (or for-next by
+> > default) in arm-soc please ?
+> 
+> Let's give Russell a few more days to comment, if we don't here anything
+> from him, I'd suggest to leave him listed as maintainer and just do the
+> other changes. You can reorder the list in any way you see fit.
 
-Okay, I understand. Therefore, I rechange the patch :
- - Russell is kept on the list
- - the order has become alphabetic in the maintainers list
+I don't have much interest in PXA anymore, and I don't think I've reviewed
+any PXA patches for a very long time, so I'm fine with this change.
 
-Cheers.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
---
-Robert
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-MAINTAINERS-update-ARM-pxa-maintainers.patch
-Type: text/x-diff
-Size: 1371 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/1a7d5b01/attachment.bin>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
