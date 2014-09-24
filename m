@@ -1,40 +1,124 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 24 Sep 2014 18:26:31 +0200
-Subject: [PATCH 5/6] arm64, defconfig: Enable PCI
-In-Reply-To: <7901403.qjKNmO519a@wuerfel>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <1411573068-12952-6-git-send-email-rric@kernel.org>
- <7901403.qjKNmO519a@wuerfel>
-Message-ID: <20140924162631.GI31556@rric.localhost>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 24 Sep 2014 11:33:00 -0500
+Subject: [PATCH v6 1/5] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
+References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
+ <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <F743E5F0-28C1-4A9D-A27D-73EA70A01B46@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.09.14 18:14:11, Arnd Bergmann wrote:
-> On Wednesday 24 September 2014 17:37:47 Robert Richter wrote:
-> >  config PCI
-> >         bool "PCI support"
-> > +       default y
-> >         help
-> >           This feature enables support for PCIe bus system. If you say Y
-> >           here, the kernel will include drivers and infrastructure code
-> >           to support PCIe bus devices.
-> >  
-> > +config PCI_MSI
-> > +       def_bool PCI
-> > +
-> >  config PCI_DOMAINS
-> >         def_bool PCI
+
+On Sep 23, 2014, at 6:51 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+
+> Based on work by many authors, available at codeaurora.org
 > 
-> There is already a PCI_MSI symbol in drivers/pci/Kconfig. Just select that
-> from the PCI symbol above rather than defining a second one.
+> SPM is a hardware block that controls the peripheral logic surrounding
+> the application cores (cpu/l$). When the core executes WFI instruction,
+> the SPM takes over the putting the core in low power state as
+> configured. The wake up for the SPM is an interrupt at the GIC, which
+> then completes the rest of low power mode sequence and brings the core
+> out of low power mode.
+> 
+> The SPM has a set of control registers that configure the SPMs
+> individually based on the type of the core and the runtime conditions.
+> SPM is a finite state machine block to which a sequence is provided and
+> it interprets the bytes  and executes them in sequence. Each low power
+> mode that the core can enter into is provided to the SPM as a sequence.
+> 
+> Configure the SPM to set the core (cpu or L2) into its low power mode,
+> the index of the first command in the sequence is set in the SPM_CTL
+> register. When the core executes ARM wfi instruction, it triggers the
+> SPM state machine to start executing from that index. The SPM state
+> machine waits until the interrupt occurs and starts executing the rest
+> of the sequence until it hits the end of the sequence. The end of the
+> sequence jumps the core out of its low power mode.
+> 
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> [lina: simplify the driver for initial submission, clean up and update
+> commit text]
+> ---
+> Documentation/devicetree/bindings/arm/msm/spm.txt |  43 +++
+> drivers/soc/qcom/Kconfig                          |   8 +
+> drivers/soc/qcom/Makefile                         |   1 +
+> drivers/soc/qcom/spm.c                            | 388 ++++++++++++++++++++++
+> include/soc/qcom/spm.h                            |  38 +++
+> 5 files changed, 478 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/arm/msm/spm.txt
+> create mode 100644 drivers/soc/qcom/spm.c
+> create mode 100644 include/soc/qcom/spm.h
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/msm/spm.txt b/Documentation/devicetree/bindings/arm/msm/spm.txt
+> new file mode 100644
+> index 0000000..2ff2454
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/msm/spm.txt
+> @@ -0,0 +1,43 @@
+> +* Subsystem Power Manager (SPM)
+> +
+> +Qualcomm Snapdragons have SPM hardware blocks to control the Application
+> +Processor Sub-System power. These SPM blocks run individual state machine
+> +to determine what the core (L2 or Krait/Scorpion) would do when the WFI
+> +instruction is executed by the core.
+> +
+> +The devicetree representation of the SPM block should be:
+> +
+> +Required properties
+> +
+> +- compatible: Must be -
+> +		 "qcom,spm-v2.1"
+> +- reg: The physical address and the size of the SPM's memory mapped registers
+> +- qcom,cpu: phandle for the CPU that the SPM block is attached to.
+> +	This field is required on only for SPMs that control the CPU.
 
-The intention is not to have a second definition, instead this should
-enable the default value just for arm64. Thus I put it to
-arch/arm64/Kconfig. Otherwise it would be enabled per default on all
-archs.
+Let?s make this just cpu-handle instead of qcom,cpu.  The concept of a handle to a cpu is pretty generic.
 
-We could have used select in config ARM64, but I tried to avoid using
-select due to the dependency issue and instead implement this with
-default-y/depends-on. Doing so it can be manually disabled too.
+> +- qcom,saw2-clk-div: SAW2 configuration register to program the SPM runtime
+> +	clocks. The register for this property is MSM_SPM_REG_SAW2_CFG.
 
--Robert
+(add details on how this is used to compute timer tick.  Is it timer tick = saw_clk/saw2-clk-div?  What is valid range of values)
+
+> +- qcom,saw2-delays: The SPM delay values that SPM sequences would refer to.
+> +	The register for this property is MSM_SPM_REG_SAW2_SPM_DLY.
+
+Didn?t Stephen asked about splitting this up? Or at least treating it as an array of 3 values?
+
+> +- qcom,saw2-enable: The SPM control register to enable/disable the sleep state
+> +	machine. The register for this property is MSM_SPM_REG_SAW2_SPM_CTL.
+
+Can this just be a boolean (exist or not), if so, probably change it to qcom,saw2-disable (so lack of property means enable)?
+
+> +
+> +Optional properties
+> +
+> +- qcom,saw2-spm-cmd-wfi: The WFI command sequence
+
+probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
+
+> +- qcom,saw2-spm-cmd-spc: The Standalone PC command sequence
+
+probably add something like: ?array of bytes ?? (want to convey the data type somehow, is there a max length?)
+
+> +
+> +Example:
+> +	spm at f9089000 {
+> +		compatible = "qcom,spm-v2.1";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0xf9089000 0x1000>;
+> +		qcom,cpu = <&CPU0>;
+> +		qcom,saw2-clk-div = <0x1>;
+> +		qcom,saw2-delays = <0x20000400>;
+> +		qcom,saw2-enable = <0x1>;
+> +		qcom,saw2-spm-cmd-wfi = [03 0b 0f];
+> +		qcom,saw2-spm-cmd-spc = [00 20 50 80 60 70 10 92
+> +				a0 b0 03 68 70 3b 92 a0 b0
+> +				82 2b 50 10 30 02 22 30 0f];
+> +	};
+
+- k
+
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
