@@ -1,36 +1,24 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 24 Sep 2014 15:51:20 -0700
-Subject: [PATCH] clk: rockchip: add missing rk3288 npll rate table
-In-Reply-To: <1631893.xHvKLXVMyM@phil>
-References: <1631893.xHvKLXVMyM@phil>
-Message-ID: <CAD=FV=WCZt5cQ3Z4wWHyqgOh32X-Hztnyzs3-fpXh2nj7ROyfQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 24 Sep 2014 20:02:19 -0300
+Subject: [PATCH 15/18] [media] s5p_mfc_opr: Fix warnings
+In-Reply-To: <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
+References: <c8634fac0c56cfaa9bdad29d541e95b17c049c0a.1411597610.git.mchehab@osg.samsung.com>
+ <ed21f64844bd63573466c2667fd035f9e650a5f9.1411597610.git.mchehab@osg.samsung.com>
+Message-ID: <CAOMZO5CoaX05r50p+Ug++napxZEoL_+CR8-T7tN6wtiSRfT1pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi Mauro,
 
-On Wed, Sep 24, 2014 at 2:41 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> The npll on rk3288 is exactly the same pll type as the other 4. Yet it
-> was missing the link to the rate table, making rate changes impossible.
-> Change that by setting the table.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/clk/rockchip/clk-rk3288.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> index 8ea885b..938d30b 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -143,7 +143,7 @@ static struct rockchip_pll_clock rk3288_pll_clks[] __initdata = {
->         [gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK3288_PLL_CON(12),
->                      RK3288_MODE_CON, 12, 8, rk3288_pll_rates),
->         [npll] = PLL(pll_rk3066, PLL_NPLL, "npll",  mux_pll_p, 0, RK3288_PLL_CON(16),
-> -                    RK3288_MODE_CON, 14, 9, NULL),
-> +                    RK3288_MODE_CON, 14, 9, rk3288_pll_rates),
->  };
+On Wed, Sep 24, 2014 at 7:27 PM, Mauro Carvalho Chehab
+<mchehab@osg.samsung.com> wrote:
 
-Works for me.  Any reason not to add it to dpll, too?
 
--Doug
+> drivers/media//platform/s5p-mfc/s5p_mfc_opr.c:44:2: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+
+...
+
+> -       mfc_debug(3, "Allocating priv: %d\n", b->size);
+> +       mfc_debug(3, "Allocating priv: %zd\n", b->size);
+
+This should be %zu instead.
