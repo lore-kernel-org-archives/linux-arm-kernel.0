@@ -1,38 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Sep 2014 17:09:14 +0200
-Subject: [RFC PATCH] ARM: at91: remove no-MMU at91x40 support
-In-Reply-To: <5422DD2F.4090308@atmel.com>
-References: <1411568281-3924-1-git-send-email-nicolas.ferre@atmel.com>
- <3700375.DRR5iB2NGi@wuerfel> <5422DD2F.4090308@atmel.com>
-Message-ID: <3874734.x93Q9kHIES@wuerfel>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 24 Sep 2014 23:10:01 +0800
+Subject: [PATCH] rc: fix hix5hd2 build issue in 0-DAY kernel build
+Message-ID: <1411571401-30664-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 September 2014 17:03:11 Nicolas Ferre wrote:
-> > I think these can be simplified further: AT91_SAM9G45_RESET and
-> > AT91_SAM9_ALT_RESET can just go away and the files put into
-> > obj-y.
-> 
-> Yes, I had the same idea before realizing that these two directives will
-> move away in a patch already sent for 3.18. So, as this material is
-> probably 3.19-ish, I kept them as they are and keep in mind to remove
-> them when I merge them with 3.18-rc1...
+Add dependence of ARCH_HIX5HD2 to solve build error in arch like ia64
+error: implicit declaration of function 'readl_relaxed' & 'writel_relaxed'
 
-Ok.
+Change CONFIG_PM to CONFIG_PM_SLEEP to solve
+warning: 'hix5hd2_ir_suspend' & 'hix5hd2_ir_resume' defined but not used
 
-> > OLD_CLK_AT91 is the same as AT91_USE_OLD_CLK, so you could
-> > just use that instead. I suspect the 'USE_OF' dependency for
-> > COMMON_CLK_AT91 can also go away, since all platforms are
-> > either board file based and select AT91_USE_OLD_CLK, or they
-> > are DT based and don't.
-> 
-> Here also, I didn't want to touch more because we need to remove the
-> arch/arm/mach-at91/Kconfig.non_dt file very soon (3.19) and I don't want
-> to change this file (or all the SoC files) before the chunks related to
-> these directives simply go away.
-> 
-> Tell me if it makes sense.
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ drivers/media/rc/Kconfig      |    2 +-
+ drivers/media/rc/ir-hix5hd2.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Yes, I agree your approach is better then.
-
-	Arnd
+diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+index 01e5f7a..ff5a625 100644
+--- a/drivers/media/rc/Kconfig
++++ b/drivers/media/rc/Kconfig
+@@ -166,7 +166,7 @@ config IR_ENE
+ 
+ config IR_HIX5HD2
+ 	tristate "Hisilicon hix5hd2 IR remote control"
+-	depends on RC_CORE
++	depends on RC_CORE && ARCH_HIX5HD2
+ 	help
+ 	 Say Y here if you want to use hisilicon hix5hd2 remote control.
+ 	 To compile this driver as a module, choose M here: the module will be
+diff --git a/drivers/media/rc/ir-hix5hd2.c b/drivers/media/rc/ir-hix5hd2.c
+index 64f8257..c1d8527 100644
+--- a/drivers/media/rc/ir-hix5hd2.c
++++ b/drivers/media/rc/ir-hix5hd2.c
+@@ -289,7 +289,7 @@ static int hix5hd2_ir_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ static int hix5hd2_ir_suspend(struct device *dev)
+ {
+ 	struct hix5hd2_ir_priv *priv = dev_get_drvdata(dev);
+-- 
+1.7.9.5
