@@ -1,71 +1,32 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 24 Sep 2014 10:27:19 +0200
-Subject: [PATCH v13 0/9] Per-user clock constraints
-In-Reply-To: <5421DF46.2010107@codeaurora.org>
-References: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
- <5421DF46.2010107@codeaurora.org>
-Message-ID: <54228067.3090600@collabora.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 24 Sep 2014 09:27:26 +0100
+Subject: regulator node names and unit-addresses? (Re: [PATCH v2 1/5]
+ ARM: shmobile: kzm9d: Remove spurious regulator base addresses)
+In-Reply-To: <CAMuHMdWQfSLwqMMigLOZuGFJqQO03Qyw+ZHE1YAgd6mNDGmrEg@mail.gmail.com>
+References: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
+ <20140924081455.GU4015@sirena.org.uk>
+ <CAMuHMdWQfSLwqMMigLOZuGFJqQO03Qyw+ZHE1YAgd6mNDGmrEg@mail.gmail.com>
+Message-ID: <20140924082726.GX4015@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 10:59 PM, Stephen Boyd wrote:
-> On 09/23/14 11:40, Tomeu Vizoso wrote:
->> Hello,
->>
->> this version of the patchset addresses some issues that Russell pointed out
->> yesterday:
->>
->> * Refactor the changes to clkdev.c to reduce the amount of ifdefs.
->>
->> * Properly release clocks when there isn't enough memory to create the per-user
->> wrapper.
->>
->> * Add clk_provider_put(struct clk_core*) for clock implementations to call
->> instead of clk_put(struct clk*) (instead of exposing __clk_put).
->>
->> As the previous versions, this is based on top of 3.17-rc4 and Mike's patch at
->> [0].
-> 
-> Any thoughts on my comments on patch set #10[1]? It seems like we can
-> avoid having a flag day to support this.
+On Wed, Sep 24, 2014 at 10:21:12AM +0200, Geert Uytterhoeven wrote:
+> On Wed, Sep 24, 2014 at 10:14 AM, Mark Brown <broonie@kernel.org> wrote:
 
-I cannot say that I fully understand your proposal, but IMO the most
-valuable thing in this patchset is precisely the API split (and thus,
-the flag day is inherent to it).
+> > As far as the regulator API is concerned the node name is completly
+> > immaterial and all this stuff is just verbiage we're forced to include.
+> > As far as I can tell the requirement that node names be in the form
+> > "regulator" or whatever is just another thing that wasn't terribly well
+> > thought through in ePAPR, they were trying to do classes I think.
 
-I see a lot of value in clk consumers to use a defined set of functions
-that all take and/or return struct clk, and for providers to use the
-functions that take and/or return struct clk_core. Makes the API clearer
-and allows it to have a more scalable growth in the future.
+> So perhaps we should just keep "regulator at 0" and "regulator at 1"?
 
-A less important feature of the patchset are per-user clocks, which (if
-I understand correctly) your proposal would address without requiring a
-flag day.
-
-And then we have clock constraints, which is probably the least
-important feature in the grand scheme of things, but it's actually what
-I personally care about.
-
-If we wanted to add a way for clk users to specify clock constraints
-without any refactoring, we could easily do so by reusing the request
-pattern that pm_qos uses:
-
-void clk_add_constraint(struct clk_request *req,
-                        int constraint_type,
-                        unsigned long value);
-
-void clk_update_constraint(struct clk_request *req,
-                           unsigned long new_value);
-
-void clk_remove_constraint(struct clk_request *req);
-
-It wouldn't be that bad IMO, but the API refactoring was something that
-was long desired and this was seen as a good opportunity to tackle it
-before it gets worst.
-
-Cheers,
-
-Tomeu
-
-> [1] https://lkml.org/lkml/2014/9/9/960
-> 
+I don't care what they're called so long as things work; the DT people
+are the ones to ask though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/e49d3b74/attachment.sig>
