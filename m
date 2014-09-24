@@ -1,40 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Sep 2014 11:18:08 -0700
-Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Soc Updates for
- v3.18
-In-Reply-To: <cover.1410832584.git.horms+renesas@verge.net.au>
-References: <cover.1410832584.git.horms+renesas@verge.net.au>
-Message-ID: <20140924181808.GG19284@localhost>
+Date: Wed, 24 Sep 2014 11:21:30 -0700
+Subject: [GIT PULL 1/3] ARM: imx: cleanup for 3.18
+In-Reply-To: <20140916044540.GA25583@dragon>
+References: <20140916044540.GA25583@dragon>
+Message-ID: <20140924182130.GH19284@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 16, 2014 at 10:57:50AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Tue, Sep 16, 2014 at 12:45:41PM +0800, Shawn Guo wrote:
+> The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
 > 
-> Please consider these fourth round of Renesas ARM based SoC soc updates for
-> v3.18.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc3-for-v3.18,
-> which you have pulled.
-> 
-> 
-> The following changes since commit 5923abb205e05773e0bb16c7ca4c0b41dbeec40e:
-> 
->   ARM: shmobile: Initial r8a7794 SoC support (2014-09-05 17:23:49 +0900)
+>   Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc4-for-v3.18
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-3.18
 > 
-> for you to fetch changes up to 1370078db37de2aa5e906ae2b5dbbb6ba289adb4:
+> for you to fetch changes up to 64d14a31d5410ea34641c41795e0ba222bda740c:
 > 
->   ARM: shmobile: r8a7794: Remove unnecessary #ifdef CONFIG_USE_OF (2014-09-11 09:51:16 +0900)
+>   ARM: imx: Remove mach-mxt_td60 board file (2014-09-10 11:17:44 +0800)
 > 
 > ----------------------------------------------------------------
-> Fourth Round of Renesas ARM Based SoC Soc Updates for v3.18
-> 
-> * r8a7794: Remove unnecessary #ifdef CONFIG_USE_OF
+> The i.MX cleanup for 3.18:
+>  - Reomve a few i.MX27 and i.MX1 board files
+>  - Remove imx_scu_standby_enable() since core code handles scu
+>    standby now
+>  - Remove unnecessary iomux declaration
+>  - Remove useless sound card property from vf610-twr dts
 
 Merged, thanks.
 
