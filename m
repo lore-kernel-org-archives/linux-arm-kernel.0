@@ -1,42 +1,50 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 24 Sep 2014 23:42:36 +0200
-Subject: [PATCH 1/2] ARM: dts: Fix chip select GPIO on smdk5250
-Message-ID: <1411594957-10681-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 24 Sep 2014 23:42:37 +0200
+Subject: [PATCH 2/2] ARM: dts: Remove display timings node from exynos5250-snow
+In-Reply-To: <1411594957-10681-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1411594957-10681-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1411594957-10681-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 65bbe3f ("ARM: dts: Clean up exynos5250-smdk5250") improved
-the smdk5250 DTS but the patch was rebased due conflicting changes
-and the merge resolution added a regression of the bug fixed in commit
-e138d43 ("ARM: dts: fix the chip select gpios definition in the SPI nodes").
+Commit a3d72ca ("ARM: dts: Clean up exynos5250-snow") improved
+the Snow DTS but the patch was rebased due conflicting changes
+and the merge resolution added a device node removed by commit
+a98c3c2 ("ARM: dts: update display related nodes for exynos5250-snow").
 
-This patch fixes the issue by removing the old cs-gpio and using
-the generic cs-gpios property.
+This patch removes the node again to keep the DTS as before.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5250-smdk5250.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5250-snow.dts | 16 ----------------
+ 1 file changed, 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index e17c02c..bc27cc2 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -385,6 +385,7 @@
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index e562459..f9bc04b 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -241,22 +241,6 @@
+ 	samsung,lane-count = <2>;
+ 	samsung,hpd-gpio = <&gpx0 7 GPIO_ACTIVE_HIGH>;
+ 	bridge = <&ptn3460>;
+-
+-	display-timings {
+-		native-mode = <&timing1>;
+-
+-		timing1: timing at 1 {
+-			clock-frequency = <70589280>;
+-			hactive = <1366>;
+-			vactive = <768>;
+-			hfront-porch = <40>;
+-			hback-porch = <40>;
+-			hsync-len = <32>;
+-			vback-porch = <10>;
+-			vfront-porch = <12>;
+-			vsync-len = <6>;
+-		};
+-	};
+ };
  
- &spi_1 {
- 	status = "okay";
-+	cs-gpios = <&gpa2 5 GPIO_ACTIVE_HIGH>;
- 
- 	w25q80bw at 0 {
- 		#address-cells = <1>;
-@@ -394,7 +395,6 @@
- 		spi-max-frequency = <1000000>;
- 
- 		controller-data {
--			cs-gpio = <&gpa2 5 GPIO_ACTIVE_HIGH>;
- 			samsung,spi-feedback-delay = <0>;
- 		};
- 
+ &ehci {
 -- 
 2.1.0
