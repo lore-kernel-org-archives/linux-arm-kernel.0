@@ -1,65 +1,49 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 24 Sep 2014 12:06:19 +0200
-Subject: [PATCH 5/9] gpio: vf610: Extend with wakeup support
-In-Reply-To: <704b6bb97147b3d0ee1557b43d85ab9376c28666.1411404079.git.stefan@agner.ch>
-References: <cover.1411404079.git.stefan@agner.ch>
- <704b6bb97147b3d0ee1557b43d85ab9376c28666.1411404079.git.stefan@agner.ch>
-Message-ID: <1411553179.2735.4.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 24 Sep 2014 11:11:16 +0100
+Subject: [PATCH v2 4/8] ARM: dts: add DT for Alphascale ASM9260 SoC
+In-Reply-To: <1411325151-15107-3-git-send-email-linux@rempel-privat.de>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-1-git-send-email-linux@rempel-privat.de>
+ <1411325151-15107-3-git-send-email-linux@rempel-privat.de>
+Message-ID: <20140924101116.GA5729@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+[...]
 
-Am Montag, den 22.09.2014, 19:09 +0200 schrieb Stefan Agner:
-> Support Vybrid GPIO's as wakeup source by requesting the parent
-> IRQ as wakeup IRQ.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/gpio/gpio-vf610.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-> index 5f59424..50326af 100644
-> --- a/drivers/gpio/gpio-vf610.c
-> +++ b/drivers/gpio/gpio-vf610.c
-> @@ -196,12 +196,28 @@ static void vf610_gpio_irq_unmask(struct irq_data *d)
->  			  pcr_base);
->  }
->  
-> +static int vf610_gpio_irq_set_wake(struct irq_data *d, u32 enable)
-> +{
-> +	struct vf610_gpio_port *port = irq_data_get_irq_chip_data(d);
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 > +
-> +	if (enable)
-> +		enable_irq_wake(port->irq);
-> +	else
-> +		disable_irq_wake(port->irq);
+> +		osc24m: oscillator {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
+> +			clock-accuracy = <30000>;
+> +		};
 > +
-> +	return 0;
-> +}
+> +		i2s0_mclk {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
+> +			clock-accuracy = <30000>;
+> +		};
 > +
-> +
->  static struct irq_chip vf610_gpio_irq_chip = {
->  	.name		= "gpio-vf610",
->  	.irq_ack	= vf610_gpio_irq_ack,
->  	.irq_mask	= vf610_gpio_irq_mask,
->  	.irq_unmask	= vf610_gpio_irq_unmask,
->  	.irq_set_type	= vf610_gpio_irq_set_type,
-> +#ifdef CONFIG_PM_SLEEP
-> +	.irq_set_wake	= vf610_gpio_irq_set_wake,
-> +#endif
+> +		i2s1_mclk {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
+> +			clock-accuracy = <30000>;
+> +		};
+> +	};
 
-Either you need to get rid of this #ifdef and always assign this
-function or you need to wrap the function itself into the same #ifdef.
-Otherwise you provoke a unused function warning with !CONFIG_PM_SLEEP.
+Please just get rid of the clocks node and put these clocks either under
+the soc node (if they are part of the SoC) or directly under the root
+node.
 
-Given that this function isn't really that big I would argue to just
-drop the #ifdef.
+There is nothing special about a clocks node and its arguably an abuse
+of Linux implementaiton details w.r.t. clock probing. The
+#address-cells and #size-cells are meaningless (as no children have reg
+entries, there's no ranges, and this isn't a simple-bus).
 
-Regards,
-Lucas 
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Mark.
