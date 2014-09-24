@@ -1,46 +1,45 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 24 Sep 2014 18:10:48 +0100
-Subject: [PATCH 5/6] arm64, defconfig: Enable PCI
-In-Reply-To: <20140924162631.GI31556@rric.localhost>
+Date: Wed, 24 Sep 2014 18:12:50 +0100
+Subject: [PATCH 6/6] pci, thunder: Enable Cavium Thunder PCIe host
+ controller
+In-Reply-To: <1411573068-12952-7-git-send-email-rric@kernel.org>
 References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <1411573068-12952-6-git-send-email-rric@kernel.org>
- <7901403.qjKNmO519a@wuerfel>
- <20140924162631.GI31556@rric.localhost>
-Message-ID: <20140924171047.GO15842@e104818-lin.cambridge.arm.com>
+ <1411573068-12952-7-git-send-email-rric@kernel.org>
+Message-ID: <20140924171249.GP15842@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 05:26:31PM +0100, Robert Richter wrote:
-> On 24.09.14 18:14:11, Arnd Bergmann wrote:
-> > On Wednesday 24 September 2014 17:37:47 Robert Richter wrote:
-> > >  config PCI
-> > >         bool "PCI support"
-> > > +       default y
-> > >         help
-> > >           This feature enables support for PCIe bus system. If you say Y
-> > >           here, the kernel will include drivers and infrastructure code
-> > >           to support PCIe bus devices.
-> > >  
-> > > +config PCI_MSI
-> > > +       def_bool PCI
-> > > +
-> > >  config PCI_DOMAINS
-> > >         def_bool PCI
-> > 
-> > There is already a PCI_MSI symbol in drivers/pci/Kconfig. Just select that
-> > from the PCI symbol above rather than defining a second one.
+On Wed, Sep 24, 2014 at 04:37:48PM +0100, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
 > 
-> The intention is not to have a second definition, instead this should
-> enable the default value just for arm64. Thus I put it to
-> arch/arm64/Kconfig. Otherwise it would be enabled per default on all
-> archs.
+> Enable Cavium Thunder PCIe host controller driver.
 > 
-> We could have used select in config ARM64, but I tried to avoid using
-> select due to the dependency issue and instead implement this with
-> default-y/depends-on. Doing so it can be manually disabled too.
+> IOV is enabled per default if drivers with IOV support are
+> enabled. IOV can be disabled.
+> 
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm64/Kconfig | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 97777e1ef5a7..bd9724e5c8a1 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -172,6 +172,14 @@ config PCI
+>  config PCI_MSI
+>  	def_bool PCI
+>  
+> +config NO_PCI_IOV
+> +	def_bool PCI
+> +	depends on !PCI_THUNDER
+> +
+> +config PCI_IOV
+> +	def_bool PCI
+> +	depends on !NO_PCI_IOV
 
-It may be better to simply set PCI and PCI_MSI as defaults in defconfig
-rather than "default y" and an additional config PCI_MSI entry.
+Does this work with single image where drivers may have different
+PCI_IOV needs?
 
 -- 
 Catalin
