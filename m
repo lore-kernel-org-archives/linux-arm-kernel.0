@@ -1,40 +1,60 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Sep 2014 22:15:42 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Clk Updates for
- v3.18
-In-Reply-To: <cover.1410484748.git.horms+renesas@verge.net.au>
-References: <cover.1410484748.git.horms+renesas@verge.net.au>
-Message-ID: <20140924051542.GC30340@localhost>
+Date: Tue, 23 Sep 2014 22:24:25 -0700
+Subject: [GIT PULL][for 3.18]pull request for hisilicon hip04 soc and D01
+ board updates
+In-Reply-To: <5412A169.5020308@hisilicon.com>
+References: <5412A169.5020308@hisilicon.com>
+Message-ID: <20140924052425.GD30340@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 10:23:47AM +0900, Simon Horman wrote:
+On Fri, Sep 12, 2014 at 03:31:53PM +0800, xuwei wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these second round of Renesas ARM based SoC clk updates for v3.18.
+> Please help to merge pull request for hisilicon hip04 soc and D01 board updates for 3.18. 
+> Thanks!
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-clk-for-v3.18,
-> which you have already pulled.
-> 
-> I am taking this change through my tree with Mike's Ack
-> as it seems to be a smooth way to handle things.
+> Best Regards,
+> Wei
 > 
 > 
-> The following changes since commit 8de078f189da45453d2ed2a04288e329cc169731:
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 > 
->   clk: shmobile: Add r8a7794 support (2014-08-27 08:40:54 +0900)
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clk2-for-v3.18
+>   git://github.com/hisilicon/linux-hisi.git tags/D01-for-3.18
 > 
-> for you to fetch changes up to b32c44b93af31e9163514df0f3ac2791972eb124:
+> for you to fetch changes up to c9a1df48a97ac9141540f177e4293a9966348f8c:
 > 
->   clk: shmobile: Add r8a7740, sh73a0 SoCs to MSTP bindings (2014-09-10 09:08:10 +0900)
+>   ARM: debug: add HiP04 debug uart (2014-09-03 14:10:46 +0100)
 > 
+> ----------------------------------------------------------------
+> ARM: mach-hisi: Hisilicon hip04 soc and D01 board updates for 3.18
+> 
+> - Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number from 2 to 4
+> - Enable MCPM on HiP04 SoC
+> - Enable 16 cores on HiP04 SoC
+> - Add platform & Fabric controller devicetree binding document for HiP04 SoC
+> - Add hip04.dtsi & hip04-d01.dts for hip04 SoC platform and D01 board
+> - Enable HiP04 SoC in both hi3xxx_defconfig & multi_v7_defconfig
+> - Add the support of Hisilicon HiP04 debug uart
 
-Merged, thanks.
+Hi,
+
+Merged this into next/soc. Two minor comments:
+
+1) I applied a patch on top to fix sort order of the debug uart config entries,
+HIP04 was added before HIGHBANK. But the previous hisi config there was also added
+out of order.
+
+2) Would you mind configuring your mailer to use your name as name? Right
+now it says "xuwei" instead of "Wei Xu" on your email address. It's correct on the git
+config, so it's probably just your mail config.
+
+
+Thanks!
 
 
 -Olof
