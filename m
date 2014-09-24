@@ -1,60 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Sep 2014 22:24:25 -0700
-Subject: [GIT PULL][for 3.18]pull request for hisilicon hip04 soc and D01
- board updates
-In-Reply-To: <5412A169.5020308@hisilicon.com>
-References: <5412A169.5020308@hisilicon.com>
-Message-ID: <20140924052425.GD30340@localhost>
+Date: Tue, 23 Sep 2014 22:26:59 -0700
+Subject: [GIT PULL] qcom DT changes for v3.18-2
+In-Reply-To: <C891343A-AC78-4CF0-8A6A-9BF741CDA58A@codeaurora.org>
+References: <13536005-9FFF-4362-8B87-5F0DC9930D29@codeaurora.org>
+ <C891343A-AC78-4CF0-8A6A-9BF741CDA58A@codeaurora.org>
+Message-ID: <20140924052659.GF30340@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 03:31:53PM +0800, xuwei wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please help to merge pull request for hisilicon hip04 soc and D01 board updates for 3.18. 
-> Thanks!
-> 
-> Best Regards,
-> Wei
-> 
-> 
+On Mon, Sep 22, 2014 at 03:15:47PM -0500, Kumar Gala wrote:
 > The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 > 
 >   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/D01-for-3.18
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.18-2
 > 
-> for you to fetch changes up to c9a1df48a97ac9141540f177e4293a9966348f8c:
+> for you to fetch changes up to aabff7bfe55afd01d71a5f11d4a84bd873c20f5e:
 > 
->   ARM: debug: add HiP04 debug uart (2014-09-03 14:10:46 +0100)
+>   ARM: DT: msm8960: Add sdcc nodes (2014-09-22 13:49:43 -0500)
 > 
 > ----------------------------------------------------------------
-> ARM: mach-hisi: Hisilicon hip04 soc and D01 board updates for 3.18
+> Qualcomm ARM Based Device Tree Updates for v3.18-2
 > 
-> - Add the CONFIG_MCPM_QUAD_CLUSTER configuration to enlarge cluster number from 2 to 4
-> - Enable MCPM on HiP04 SoC
-> - Enable 16 cores on HiP04 SoC
-> - Add platform & Fabric controller devicetree binding document for HiP04 SoC
-> - Add hip04.dtsi & hip04-d01.dts for hip04 SoC platform and D01 board
-> - Enable HiP04 SoC in both hi3xxx_defconfig & multi_v7_defconfig
-> - Add the support of Hisilicon HiP04 debug uart
+> * Added SDCC nodes on MSM8960/CDP and MSM8660/SURF
+> * Added I2C and SDCC4/WLAN on APQ8064/IFC6410
+> * Added I2C on MSM8984/DB8074
 
-Hi,
-
-Merged this into next/soc. Two minor comments:
-
-1) I applied a patch on top to fix sort order of the debug uart config entries,
-HIP04 was added before HIGHBANK. But the previous hisi config there was also added
-out of order.
-
-2) Would you mind configuring your mailer to use your name as name? Right
-now it says "xuwei" instead of "Wei Xu" on your email address. It's correct on the git
-config, so it's probably just your mail config.
-
-
-Thanks!
-
+Merged, thanks!
 
 -Olof
