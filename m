@@ -1,57 +1,56 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Sep 2014 14:40:44 +0200
-Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
-In-Reply-To: <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
-References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
- <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
-Message-ID: <20140924124044.GC4992@pengutronix.de>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 24 Sep 2014 09:41:42 -0300
+Subject: [PATCH 4/4] [media] s5p_mfc_opr_v6: remove address space removal
+ warnings
+In-Reply-To: <cover.1411562226.git.mchehab@osg.samsung.com>
+References: <cover.1411562226.git.mchehab@osg.samsung.com>
+Message-ID: <1c554a0b25c8802e2d58bdc711548ebad52af28d.1411562226.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Smatch still has 3 warnings for s5p_mfc_opr_v6:
 
-On Wed, Sep 24, 2014 at 01:23:09PM +0200, Linus Walleij wrote:
-> On Tue, Sep 23, 2014 at 5:39 AM, Hongzhou.Yang
-> <srv_hongzhou.yang@mediatek.com> wrote:
-> 
-> > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> >
-> > Add pinctrl node to mt8135.dtsi.
-> >
-> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> (...)
-> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_GPIO0 (MT_PIN_NO(0) | 0)
-> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_MSDC0_DAT7 (MT_PIN_NO(0) | 1)
-> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_EINT49 (MT_PIN_NO(0) | 2)
-> > +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_I2SOUT_DAT (MT_PIN_NO(0) | 3)
-> 
-> I haven't got to reviewing the driver, but this looks just wrong.
-> 
-> Have the magic numbers in the driver.
-> 
-> Use strings to describe functions, not integers.
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2028:18: warning: cast removes address space of expression
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2034:18: warning: cast removes address space of expression
+drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c:2040:18: warning: cast removes address space of expression
 
-Interrupts, clocks, gpios, dma channels, nearly everything in the device tree is
-arbitrarily numbered. Instead of "irq-i2c0" we have <0 36 IRQ_TYPE_LEVEL_HIGH>
-in the device tree. These numbers can be resolved efficiently in the
-driver by shifting them to get a bitmask or by adding them as offset to
-a register base.
-Why do you want to make pinctrl different? Thanks to the recently
-introduced defines in the device trees these numbers are not magic at
-all anymore.
+Remove them.
 
-> 
-> We need to move toward standardized device tree bindings
-> for this stuff, and that means using strings, not magic
-> numbers.
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Agreed for standardized device tree bindings, but not for using strings.
-
-Sascha
-
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index ed3d20f12184..e38d78f21726 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -2019,25 +2019,25 @@ static int s5p_mfc_get_mvc_view_id_v6(struct s5p_mfc_dev *dev)
+ static unsigned int s5p_mfc_get_pic_type_top_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_top);
++		(__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_top);
+ }
+ 
+ static unsigned int s5p_mfc_get_pic_type_bot_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
++		(__force unsigned int) ctx->dev->mfc_regs->d_ret_picture_tag_bot);
+ }
+ 
+ static unsigned int s5p_mfc_get_crop_info_h_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(unsigned int) ctx->dev->mfc_regs->d_display_crop_info1);
++		(__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info1);
+ }
+ 
+ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	return s5p_mfc_read_info_v6(ctx,
+-		(unsigned int) ctx->dev->mfc_regs->d_display_crop_info2);
++		(__force unsigned int) ctx->dev->mfc_regs->d_display_crop_info2);
+ }
+ 
+ static struct s5p_mfc_regs mfc_regs;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.9.3
