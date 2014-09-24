@@ -1,39 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 23 Sep 2014 22:07:40 -0700
-Subject: [GIT PULL 2/5] omap soc changes for v3.18 merge window
-In-Reply-To: <5412304a.04a8440a.56eb.ffff9329SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <pull-1410478051-378788>
- <5412304a.04a8440a.56eb.ffff9329SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20140924050740.GA30340@localhost>
+Date: Tue, 23 Sep 2014 22:01:04 -0700
+Subject: [PATCH] ARM: make arrays containing machine compatible strings
+ const
+In-Reply-To: <1410470353-2685-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1410470353-2685-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20140924050104.GD24803@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 04:28:55PM -0700, Tony Lindgren wrote:
-> The following changes since commit d7eb67f7fef9c046f27a975118da2324de65a90c:
+On Thu, Sep 11, 2014 at 11:19:13PM +0200, Uwe Kleine-K??nig wrote:
+> The definition
 > 
->   Merge branch 'pull/v3.18/powerdomain-fixes' of https://github.com/nmenon/linux-2.6-playground into omap-for-v3.18/fixes-not-urgent (2014-09-08 15:04:24 -0700)
+> 	static const char *axxia_dt_match[] __initconst = {
+> 		...
 > 
-> are available in the git repository at:
+> defines a changable array of constant strings. That is you must not do:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/soc-for-v3.18
+> 	*axxia_dt_match[0] = 'k';
 > 
-> for you to fetch changes up to 377fb3f5d9a34b2913939e0620c1c585b5913bab:
+> but
 > 
->   ARM: OMAP5+: Reuse OMAP4 PM code for OMAP5 and DRA7 (2014-09-09 19:13:41 -0700)
+> 	axxia_dt_match[0] = "different string";
 > 
-> ----------------------------------------------------------------
-> SoC related changes for omaps for v3.18 merge window:
+> is fine. So the annotation __initconst is wrong and yields a compiler
+> error when other really const variables are added with __initconst.
 > 
-> - PM changes to make the code easier to use on newer SoCs
-> - PM changes for newer SoCs suspend and resume and wake-up events
-> - Minor clean-up to remove dead Kconfig options
+> As the struct machine_desc member dt_compat is declared as
 > 
-> Note that these have a dependency to the fixes-v3.18-not-urgent
-> tag and is based on a commit in that series.
+> 	const char *const *dt_compat;
+> 
+> making the arrays const is the better alternative over changing all
+> annotations to __initdata.
+> 
+> Signed-off-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> this is similar to the fix I sent earlier today which only fixed omap2.
+> Does it make sense to split this patch per platform?
 
-Merged. Note that this also has a fresh conflict with the latest fixes,
-so please check that I resolved it correctly.
 
+We should be fine applying it as-is. Applied to next/cleanup.
 
 
 -Olof
