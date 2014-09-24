@@ -1,64 +1,36 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 24 Sep 2014 13:19:45 +0200
-Subject: [PATCH v5 4/7] ARM: l2c: Add support for overriding prefetch
- settings
-In-Reply-To: <20140924111446.GE5729@leverpostej>
-References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
- <1411556741-5810-5-git-send-email-m.szyprowski@samsung.com>
- <20140924111446.GE5729@leverpostej>
-Message-ID: <5422A8D1.1000507@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Sep 2014 13:23:09 +0200
+Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
+In-Reply-To: <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
+References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.09.2014 13:14, Mark Rutland wrote:
-> On Wed, Sep 24, 2014 at 12:05:38PM +0100, Marek Szyprowski wrote:
->> From: Tomasz Figa <t.figa@samsung.com>
->>
->> Firmware on certain boards (e.g. ODROID-U3) can leave incorrect L2C prefetch
->> settings configured in registers leading to crashes if L2C is enabled
->> without overriding them. This patch introduces bindings to enable
->> prefetch settings to be specified from DT and necessary support in the
->> driver.
->>
->> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  Documentation/devicetree/bindings/arm/l2cc.txt | 10 +++++++
->>  arch/arm/mm/cache-l2x0.c                       | 39 ++++++++++++++++++++++++++
->>  2 files changed, 49 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->> index af527ee111c2..3443d2d76788 100644
->> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->> @@ -47,6 +47,16 @@ Optional properties:
->>  - cache-id-part: cache id part number to be used if it is not present
->>    on hardware
->>  - wt-override: If present then L2 is forced to Write through mode
->> +- arm,double-linefill : Override double linefill enable setting. Enable if
->> +  non-zero, disable if zero.
->> +- arm,double-linefill-incr : Override double linefill on INCR read. Enable
->> +  if non-zero, disable if zero.
->> +- arm,double-linefill-wrap : Override double linefill on WRAP read. Enable
->> +  if non-zero, disable if zero.
->> +- arm,prefetch-drop : Override prefetch drop enable setting. Enable if non-zero,
->> +  disable if zero.
-> 
-> I'm not too keen on tristate properties. Is this level of flexibility
-> really required?
-> 
-> What exact overrides do you need for boards you know of? Why do these
-> cause crashes if not overridden?
+On Tue, Sep 23, 2014 at 5:39 AM, Hongzhou.Yang
+<srv_hongzhou.yang@mediatek.com> wrote:
 
-Well, this is all thanks to broken firmware, which doesn't initialize
-those values properly on certain systems and they must be overridden. On
-the other side, there are systems with firmware that does it correctly
-and for those the boot defaults should be preferred. I don't see any
-other reasonable option of handling this.
+> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>
+> Add pinctrl node to mt8135.dtsi.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+(...)
+> +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_GPIO0 (MT_PIN_NO(0) | 0)
+> +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_MSDC0_DAT7 (MT_PIN_NO(0) | 1)
+> +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_EINT49 (MT_PIN_NO(0) | 2)
+> +#define MT8135_PIN_0_MSDC0_DAT7__FUNC_I2SOUT_DAT (MT_PIN_NO(0) | 3)
 
-As for why they cause crashes, I'm not an expert if it is about L2C
-internals, so I can't really tell, but apparently the cache can work
-correctly only on certain settings.
+I haven't got to reviewing the driver, but this looks just wrong.
 
-Best regards,
-Tomasz
+Have the magic numbers in the driver.
+
+Use strings to describe functions, not integers.
+
+We need to move toward standardized device tree bindings
+for this stuff, and that means using strings, not magic
+numbers.
+
+Yours,
+Linus Walleij
