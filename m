@@ -1,81 +1,24 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 24 Sep 2014 14:32:06 -0400
-Subject: [PATCH v5 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
-In-Reply-To: <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
-References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
- <1408616242-21009-4-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140924183204.GE27076@developer>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 24 Sep 2014 11:34:02 -0700
+Subject: [PATCH] ARM: qcom: Update SoC compatibles we support
+In-Reply-To: <1411582838-24159-1-git-send-email-galak@codeaurora.org>
+References: <1411582838-24159-1-git-send-email-galak@codeaurora.org>
+Message-ID: <54230E9A.7020109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mikko,
-
-On Thu, Aug 21, 2014 at 01:17:21PM +0300, Mikko Perttunen wrote:
-> This adds critical trip points to the Jetson TK1 device tree.
-> The device will do a controlled shutdown when either the CPU, GPU
-> or MEM thermal zone reaches 101 degrees Celsius.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+On 09/24/14 11:20, Kumar Gala wrote:
+> Move to just using the SoC name in the compatible list so we don't need
+> to update this for every board going forward.  Also added "qcom,msm8974"
+> to the list as we support "qcom,apq8074" already (the modemless version
+> of "qcom,msm8974").
+>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 > ---
-> v5: added cooling-maps nodes
-> 
 
-OK. But no cooling map entry in it. What was the reason again you don't
-need/want to add the maps?
+Or just remove the file entirely. Things work without having to add
+anything here anyway.
 
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 41 +++++++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> index 0cdb5cf..bcdab7f 100644
-> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> @@ -1876,4 +1876,45 @@
->  			 <&tegra_car TEGRA124_CLK_EXTERN1>;
->  		clock-names = "pll_a", "pll_a_out0", "mclk";
->  	};
-> +
-> +	thermal-zones {
-> +		cpu {
-> +			trips {
-> +				trip at 0 {
-> +					temperature = <101000>;
-> +					hysteresis = <0>;
-> +					type = "critical";
-> +				};
-> +			};
-> +
-> +			cooling-maps {
-> +			};
-> +		};
-> +
-> +		mem {
-> +			trips {
-> +				trip at 0 {
-> +					temperature = <101000>;
-> +					hysteresis = <0>;
-> +					type = "critical";
-> +				};
-> +			};
-> +
-> +			cooling-maps {
-> +			};
-> +		};
-> +
-> +		gpu {
-> +			trips {
-> +				trip at 0 {
-> +					temperature = <101000>;
-> +					hysteresis = <0>;
-> +					type = "critical";
-> +				};
-> +			};
-> +
-> +			cooling-maps {
-> +			};
-> +		};
-> +	};
->  };
-> -- 
-> 1.8.1.5
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
