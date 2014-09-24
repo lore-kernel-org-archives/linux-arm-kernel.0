@@ -1,32 +1,52 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 24 Sep 2014 22:48:59 +0800
-Subject: [PATCH v2 5/7] devicetree: bindings: Add vendor prefix for Merrii
- Technology Co., Ltd.
+Date: Wed, 24 Sep 2014 22:48:55 +0800
+Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
 In-Reply-To: <1411570141-29960-1-git-send-email-wens@csie.org>
 References: <1411570141-29960-1-git-send-email-wens@csie.org>
-Message-ID: <1411570141-29960-6-git-send-email-wens@csie.org>
+Message-ID: <1411570141-29960-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merrii Technology Co., Ltd. is a Chinese ARM integration developer that
-specializes in Allwinner SoC based designs.
+The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
+While it's processor cores and interconnecting bus are new, it
+re-uses many peripherals found in earlier Allwinner SoCs.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-sunxi/Kconfig | 5 +++++
+ arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index ac7269f..d3a96ac 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -81,6 +81,7 @@ lltc	Linear Technology Corporation
- marvell	Marvell Technology Group Ltd.
- maxim	Maxim Integrated Products
- mediatek	MediaTek Inc.
-+merrii	Merrii Technology Co., Ltd.
- micrel	Micrel Inc.
- microchip	Microchip Technology Inc.
- mosaixtech	Mosaix Technologies, Inc.
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 1aaa1e1..72f222b 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -42,4 +42,9 @@ config MACH_SUN8I
+ 	select MFD_SUN6I_PRCM
+ 	select RESET_CONTROLLER
+ 
++config MACH_SUN9I
++	bool "Allwinner A80 (sun9i) SoCs support"
++	default ARCH_SUNXI
++	select ARM_GIC
++
+ endif
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 42d4753..4bd2117 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -139,3 +139,12 @@ static const char * const sun8i_board_dt_compat[] = {
+ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
+ MACHINE_END
++
++static const char * const sun9i_board_dt_compat[] = {
++	"allwinner,sun9i-a80",
++	NULL,
++};
++
++DT_MACHINE_START(SUN9I_DT, "Allwinner sun9i (A80) Family")
++	.dt_compat	= sun9i_board_dt_compat,
++MACHINE_END
 -- 
 2.1.0
