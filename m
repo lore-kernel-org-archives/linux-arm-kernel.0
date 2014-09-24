@@ -1,59 +1,40 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 24 Sep 2014 18:20:10 +0200
-Subject: [PATCH v2 3/3] ARM: vf610: Add ARM Global Timer clocksource option
+Date: Wed, 24 Sep 2014 18:20:08 +0200
+Subject: [PATCH v2 1/3] clocksource: vf_pit_timer: Support shutdown mode
 In-Reply-To: <1411575610-20895-1-git-send-email-stefan@agner.ch>
 References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
-Message-ID: <1411575610-20895-4-git-send-email-stefan@agner.ch>
+Message-ID: <1411575610-20895-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ARM Global Timer as clocksource/scheduler clock option and
-use it as default scheduler clock. This leaves the PIT timer for
-other users e.g. the secondary Cortex-M4 core. Also, the Global Timer
-has double the precission (running at pheripheral clock compared to
-IPG clock) and a 64-bit incrementing counter register. We still keep
-the PIT timer as an secondary option in case the ARM Global Timer is
-not available.
+In order to avoid waking up the system in a low power mode, the
+clocksource should not generate interrupts anymore. Disable the PIT
+timer interrupt when changing into the CLOCK_EVT_MODE_SHUTDOWN mode.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mach-imx/Kconfig | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ drivers/clocksource/vf_pit_timer.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 11b2957..9482f58 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -633,12 +633,29 @@ config SOC_VF610
- 	bool "Vybrid Family VF610 support"
- 	select ARM_GIC
- 	select PINCTRL_VF610
--	select VF_PIT_TIMER
- 	select PL310_ERRATA_769419 if CACHE_L2X0
- 
- 	help
- 	  This enable support for Freescale Vybrid VF610 processor.
- 
-+choice
-+	prompt "Clocksource for scheduler clock"
-+	depends on SOC_VF610
-+	default ARM_GLOBAL_TIMER
+diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+index a918bc4..eb354b4 100644
+--- a/drivers/clocksource/vf_pit_timer.c
++++ b/drivers/clocksource/vf_pit_timer.c
+@@ -89,10 +89,15 @@ static int pit_set_next_event(unsigned long delta,
+ static void pit_set_mode(enum clock_event_mode mode,
+ 				struct clock_event_device *evt)
+ {
 +
-+	config ARM_GLOBAL_TIMER
-+		bool "Use ARM Global Timer"
-+		select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-+		help
-+		  Use the ARM Global Timer as clocksource
-+
-+	config VF_PIT_TIMER
-+		bool "Use PIT timer"
-+		help
-+		  Use SoC Periodic Interrupt Timer (PIT) as clocksource
-+
-+endchoice
-+
- endif
- 
- source "arch/arm/mach-imx/devices/Kconfig"
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+ 		pit_set_next_event(cycle_per_jiffy, evt);
+ 		break;
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++		pit_timer_disable();
++		break;
+ 	default:
+ 		break;
+ 	}
 -- 
 2.1.0
