@@ -1,65 +1,136 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 24 Sep 2014 10:23:20 -0500
-Subject: [GIT PULL 2/5] omap soc changes for v3.18 merge window
-In-Reply-To: <20140924050740.GA30340@localhost>
-References: <pull-1410478051-378788>
- <5412304a.04a8440a.56eb.ffff9329SMTPIN_ADDED_BROKEN@mx.google.com>
- <20140924050740.GA30340@localhost>
-Message-ID: <20140924152320.GA26581@kahuna>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Wed, 24 Sep 2014 11:26:19 -0400
+Subject: [PATCH 1/2] ARM: dts: vf610: Add ARM Global Timer
+In-Reply-To: <1dc8267dcf1a4990ba32569b65a1dcf4@agner.ch> (Stefan Agner's
+ message of "Wed, 24 Sep 2014 09:55:44 +0200")
+References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
+ <87mw9qmix9.fsf@nbsps.com> <1dc8267dcf1a4990ba32569b65a1dcf4@agner.ch>
+Message-ID: <8738bhm44k.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:07-20140923, Olof Johansson wrote:
-> On Thu, Sep 11, 2014 at 04:28:55PM -0700, Tony Lindgren wrote:
-> > The following changes since commit d7eb67f7fef9c046f27a975118da2324de65a90c:
-> > 
-> >   Merge branch 'pull/v3.18/powerdomain-fixes' of https://github.com/nmenon/linux-2.6-playground into omap-for-v3.18/fixes-not-urgent (2014-09-08 15:04:24 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/soc-for-v3.18
-> > 
-> > for you to fetch changes up to 377fb3f5d9a34b2913939e0620c1c585b5913bab:
-> > 
-> >   ARM: OMAP5+: Reuse OMAP4 PM code for OMAP5 and DRA7 (2014-09-09 19:13:41 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > SoC related changes for omaps for v3.18 merge window:
-> > 
-> > - PM changes to make the code easier to use on newer SoCs
-> > - PM changes for newer SoCs suspend and resume and wake-up events
-> > - Minor clean-up to remove dead Kconfig options
-> > 
-> > Note that these have a dependency to the fixes-v3.18-not-urgent
-> > tag and is based on a commit in that series.
-> 
-> Merged. Note that this also has a fresh conflict with the latest fixes,
-> so please check that I resolved it correctly.
-> 
+On 24 Sep 2014, stefan at agner.ch wrote:
 
-Looks fine to me.. also, Used a couple of out of tree patches for
-testing and all looks good from test perspective:
+> Am 2014-09-23 17:54, schrieb Bill Pringlemeir:
+>> On 11 Sep 2014, stefan at agner.ch wrote:
+>>
+>>> Add Global Timer support which is part of the Snoop Control Unit
+>>> of the Cortex-A5 processor. This Global Timer is compatible with the
+>>> Cortex-A9 implementation. It's a 64-bit timer and is clocked by the
+>>> peripheral clock, which is typically 133 or 166MHz on Vybrid.
+>>
+>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>> ---
+>>> arch/arm/boot/dts/vf610.dtsi | 8 ++++++++
+>>> 1 file changed, 8 insertions(+)
+>>
+>> As per the GPC and SRC series, adding these peripherals to the
+>> 'vf610.dtsi' may make some configuration no longer boot.  I have an
+>> Cortex-A5 MQX in the secure world and it uses the Global timer for
+>> the OS tick.  Maybe that is just my problem and I need to have
+>> several trees.  However, It would be nice if the system timer choice
+>> was made in a '.config' and the machine DT and not the generic Vybrid
+>> one.
 
-am335x-evm:  Boot PASS: http://slexy.org/raw/s21ul7EaiK
-am335x-sk:  Boot PASS: http://slexy.org/raw/s2xxG7b5t7
-am3517-evm:  Boot PASS: http://slexy.org/raw/s21we13Ebk
-am37x-evm:  Boot PASS: http://slexy.org/raw/s209iOnepY
-am43xx-epos:  Boot PASS: http://slexy.org/raw/s28GrriVvz
-am5728-evm:  Boot PASS: http://slexy.org/raw/s2wRllyrn2
-BeagleBoard-XM:  Boot PASS: http://slexy.org/raw/s2JPCJPebZ
-beagleboard-vanilla:  Boot PASS: http://slexy.org/raw/s2n4Pum58s
-beaglebone-black:  Boot PASS: http://slexy.org/raw/s20yDlR4eu
-craneboard:  Boot PASS: http://slexy.org/raw/s21DECJfEs
-dra72x-evm:  Boot PASS: http://slexy.org/raw/s2WgDuVxXj
-dra7xx-evm:  Boot PASS: http://slexy.org/raw/s2wOi9Okyk
-OMAP3430-Labrador(LDP):  Boot PASS: http://slexy.org/raw/s20qOiwY38
-n900:  Boot PASS: http://slexy.org/raw/s2j6hBxA2b
-omap5-evm:  Boot PASS: http://slexy.org/raw/s20Of1TCt4
-pandaboard-es:  Boot PASS: http://slexy.org/raw/s20P0IWXJX
-pandaboard-vanilla:  Boot PASS: http://slexy.org/raw/s20QWs7BP9
-sdp2430:  Boot PASS: http://slexy.org/raw/s2fXgpekEa
-sdp3430:  Boot PASS: http://slexy.org/raw/s21GW1utPn
+> So MQX is running "beneath" Linux and steals CPU from it? And this
+> works with an unmodified Linux kernel? Did not know that this is
+> possible and implemented for Vybrid.
 
--- 
-Regards,
-Nishanth Menon
+Yes, this was working well.  The only patch is,
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 076172b..4c560e7 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1514,6 +1514,10 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 
+        data = of_match_node(l2x0_ids, np)->data;
+ 
++       /* Call monitor to turn on L2 cache. */
++       if(of_property_read_bool(np,"trustzone"))
++               asm(" .arch_extension sec\n smc #5\n");
++
+        if (of_device_is_compatible(np, "arm,pl310-cache") &&
+            of_property_read_bool(np, "arm,io-coherent"))
+                data = &of_l2c310_coherent_data;
+
+Ie, the 'normal' world Linux doesn't have permission to access the L2.
+I think this may not be an issue if you don't use a 'bzImage'.  It seems
+the compressed loader expect cache disabled, but then enables it.  Also,
+the 'cache-l2x0.c' will see it exists and then try to enable it, if not
+already enabled.  So, the compress boot needs it disabled, but the
+'cache-l2x0.c' needs it enabled.
+
+MQX needs more significant modifications.  Especially, the DMA support
+needs to be disabled.   Probably the same for M4-MQX/A5-Linux.
+
+> I just thought that it would be nice to have the PIT timer free for
+> the M4, and hence use the Cortex-A5 private ARM Global Timer.
+
+> But if there are reasons to not use the Global Timer but opt for the
+> PIT timer, I guess we could create a configuration here.
+
+Other use cases are the M4 is 'secure' and the A5 runs in normal world
+without any secure TZ A5 accesses.  People may wish to do this to 'lock
+down' an A5 Linux; Ie, restrict bus peripherals.  Here, whatever boot
+loader could give permission for the Normal world to use the ARM global
+timer.  I just think it should be an option as opposed to a default.
+
+There is a stronger case to make this the default for the A5.  Only a
+trustzone version would care about this on the Vybrid.  The M4 can not
+access the global timer.
+
+>> Also, the timer is listed in the same bank as the snoop control unit,
+>> but it is part of several banks of registers,
+>>
+>> 0x40002000 AIPS slot 2, CA5-SCU+GIC CPU Interface registers 1
+>>
+>> 0x000-0x054 SCU 
+>> 0x100-0x1fc GIC local registers
+>> 0x200-0x218 Global Timer
+>> 0x600-0x634 Local timer/watchdog timer
+>>
+>> I think that the 'reg' mapping will be limited to 4k MMU pages and so
+>> we will have a bunch of aliases.  At least the GIC registers are
+>> already mapped.  Is there some way in the DT to provide several sets
+>> of registers under one mapping and then use the different offsets in
+>> the driver/device instance?
+>
+> You can define multiple address/size tuples in one reg property, as
+> its done for the GIC:
+>
+> intc: interrupt-controller at 40002000 {
+> 	compatible = "arm,cortex-a9-gic";
+> 	#interrupt-cells = <3>;
+> 	interrupt-controller;
+> 	reg = <0x40003000 0x1000>,
+> 	      <0x40002100 0x100>;
+> };
+
+> The device tree should describe the hardware, and when it comes to GIC
+> and Global Timer it quite accurate: For the Global Timer, I only map
+> those 0x20 registers (actually its one 32-bit register too many, but I
+> don't think this is used for anything). The GIC mapping is only
+> mapping 0x100-0x1ff of the snoop contorl unit bank.
+
+> Both, the GIC driver as well as the ARM Global Timer use of_iomap on
+> those registers. It apparently works.
+
+Yes, it works.  I just mean that we will have the same memory mapped
+twice.  of_iomap() will be limited to 4k regions by the ARM hardware.
+Both the 'interrupt-controller' and the 'global-timer' will have virtual
+mappings to the same 4k physical page.
+
+There seems to be no way for two drivers to share the same virtual
+mapping; maybe Linux will reference count this and just provide an
+offset to an existing mapping.  Sorry, I think that side tracked me.
+
+Mainly the commit message is a little wrong,
+
+> Add Global Timer support which is part of the Snoop Control Unit
+> of the Cortex-A5 processor.
+
+Maybe,
+
+> Add Global Timer support which is part of the private peripherals
+> of the Cortex-A5 processor.
