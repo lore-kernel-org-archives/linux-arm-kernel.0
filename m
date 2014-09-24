@@ -1,75 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Sep 2014 12:33:14 +0200
-Subject: [PATCH v2 1/8] ARM: add mach-asm9260
-In-Reply-To: <20140924102542.GV5182@n2100.arm.linux.org.uk>
-References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
- <54229533.8050607@rempel-privat.de>
- <20140924102542.GV5182@n2100.arm.linux.org.uk>
-Message-ID: <2748904.3BsN75JAH1@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 24 Sep 2014 18:40:42 +0800
+Subject: [PATCH 0/6] ARM: sunxi: Add basic support for Allwinner A80 SoC
+In-Reply-To: <20140924064124.GS15315@lukather>
+References: <1411311493-24344-1-git-send-email-wens@csie.org>
+ <20140924064124.GS15315@lukather>
+Message-ID: <CAGb2v659fps1WAqkdnbnTtHxAdCZQy+rYXDC90Y44pPtcxnsFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 September 2014 11:25:42 Russell King - ARM Linux wrote:
-> On Wed, Sep 24, 2014 at 11:56:03AM +0200, Oleksij Rempel wrote:
-> > Am 24.09.2014 um 11:43 schrieb Russell King - ARM Linux:
-> > > The "why" is in the text from your oops dump.  That's precisely /why/ we
-> > > print that text - so that we know /why/ the fault happened.
-> > 
-> > Here is oops message:
-> > http://pastebin.com/qYWeAyfV
-> > 
-> > i can avoid this oops by setting size at least 0x2000 per register
-> > range. Do it mean my TLB supports only 8 KiB pages?
-> 
-> No, it has nothing to do with the TLB.
-> 
-> Unable to handle kernel paging request at virtual address c2802174
-> pgd = c0004000
-> [c2802174] *pgd=21805811, *pte=00000000, *ppte=00000000
-> Internal error: Oops: 7 [#1] PREEMPT ARM
-> 
-> The number after the Oops: is the FSR value, which means "page translation
-> fault", and sure enough, the pgd/pte values show that there is no page
-> table entry at the faulting address.
-> 
-> That's odd, because ioremap() aligns the size of the requested mapping up
-> to a multiple of the page size, and inserts page table entries according
-> to the rounded size.
-> 
-> Where are you calling ioremap(), iounmap() etc?  IOW, please show your
-> code for this.
+Hi,
 
-It's the clock driver from patch 5. It starts out with an ioremap of
-the clock controller node:
+On Wed, Sep 24, 2014 at 2:41 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On Sun, Sep 21, 2014 at 10:58:07PM +0800, Chen-Yu Tsai wrote:
+>> Hi everyone,
+>>
+>> This patch series adds very basic support for Allwinner's A80 SoC,
+>> a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
+>>
+>> Development is done on the A80 Optimus Board, the defacto development
+>> board for the A80, with the accompanying SDK as a reference.
+>>
+>> So far I've been unable to get the board to boot from MMC, or
+>> using Android fastboot. I'm using Allwinner's FEL mode to load
+>> the bootloader and kernel+dtb image over USB. Notes on my attempts
+>> can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
+>
+> It looks very nice, thanks a lot. You'll find a minor comments inline.
+>
+> One thing I forgot to ask you about when doing the A23, and that would
+> nice to do is to update the documentation we have in
+> Documentation/arm/sunxi/README with the A23 and A80 infos you've been
+> able to gather.
 
-+               acc: clock-controller at 80040000 {
-+                       compatible = "alphascale,asm9260-clock-controller";
-+                       #clock-cells = <1>;
-+                       clocks = <&osc24m>;
-+                       reg = <0x80040000 0x500>;
-+               };
+I'll add the A80 datasheet in v2, and do a separate series for A23, A31,
+and A31s docs.
 
-Oh, and there is the bug:
 
-+       /* check for errors on leaf clocks */
-+       for (n = 0; n < MAX_CLKS; n++) {
-+               if (!IS_ERR(clks[n]))
-+                       continue;
-+
-+               pr_err("%s: Unable to register leaf clock %d\n",
-+                               np->full_name, n);
-+               goto fail;
-+       }
-+
-+       /* register clk-provider */
-+       clk_data.clks = clks;
-+       clk_data.clk_num = MAX_CLKS;
-+       of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+fail:
-+       iounmap(base);
-+}
-
-There should be a 'return' in front of the 'fail:', otherwise it
-get unmapped unconditionally.
-
-	Arnd
+Thanks
+ChenYu
