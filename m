@@ -1,125 +1,211 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 24 Sep 2014 10:23:23 +0200
-Subject: [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
-In-Reply-To: <54227893.7020808@samsung.com>
-References: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
- <5415D4A8.4010304@gmail.com> <0d2401cfd07b$0e21e190$2a65a4b0$@kernel.org>
- <54227893.7020808@samsung.com>
-Message-ID: <54227F7B.80702@samsung.com>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Wed, 24 Sep 2014 16:23:47 +0800
+Subject: [PATCH] i2c: rk3x: adjust the LOW divison based on characteristics
+ of SCL
+In-Reply-To: <CAD=FV=WiHR+KcTWHnma6TdPQcc3oc4wqAofj5kF=Sgec_5kGAQ@mail.gmail.com>
+References: <1411523743-3444-1-git-send-email-addy.ke@rock-chips.com>
+ <CAD=FV=WiHR+KcTWHnma6TdPQcc3oc4wqAofj5kF=Sgec_5kGAQ@mail.gmail.com>
+Message-ID: <54227F93.7000507@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
 
-On 2014-09-24 09:53, Kukjin Kim wrote:
->
-> On 09/15/14 09:21, Kukjin Kim wrote:
+
+On 2014/9/24 12:10, Doug Anderson wrote:
+> Addy,
+> 
+> On Tue, Sep 23, 2014 at 6:55 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+>> As show in I2C specification:
+>> - Standard-mode:
+>>   the minimum HIGH period of the scl clock is 4.0us
+>>   the minimum LOW period of the scl clock is 4.7us
+>> - Fast-mode:
+>>   the minimum HIGH period of the scl clock is 0.6us
+>>   the minimum LOW period of the scl clock is 1.3us
+>> - Fast-mode plus:
+>>   the minimum HIGH period of the scl clock is 0.26us
+>>   the minimum LOW period of the scl clock is 0.5us
+>> - HS-mode(<1.7MHz):
+>>   the minimum HIGH period of the scl clock is 0.12us
+>>   the minimum LOW period of the scl clock is 0.32us
+>> - HS-mode(<3.4MHz):
+>>   the minimum HIGH period of the scl clock is 0.06us
+>>   the minimum LOW period of the scl clock is 0.16us
 >>
->>> On 26.08.2014 16:10, Tomasz Figa wrote:
->>>> On Exynos-based boards running secure firmware the sequence of low 
->>>> level
->>>> operations to enter and leave system-wide sleep mode is different than
->>>> on those without the firmware. Namely:
->>>>   - CP15 power control and diagnostic registers cannot be written 
->>>> directly,
->>>>   - the way of setting boot address and boot flag is different,
->>>>   - different resume handler needs to be used,
->>>>   - dedicated SMC call needs to be performed instead of letting the 
->>>> CPU enter
->>>>     WFI.
->>>>
->>>> This series introduces .suspend() and .resume() firmware operations to
->>>> perform low level firmware-specific suspend and resume and then 
->>>> leverages
->>>> them to provide suspend-resume path meeting the above requirements. 
->>>> Three
->>>> additional patches extend device tree sources of Trats2 board with 
->>>> necessary
->>>> setup to enable suspend/resume support.
->>>>
->>>> This series has been tested on Exynos4412-based Trats2 board, 
->>>> without any
->>>> additional patches. Unfortunately v3.17-rc1 regressed ODROID 
->>>> support and
->>>> suspend stopped working on those boards, due to unknown reasons 
->>>> still being
->>>> investigated. It does not seem to be related to anything in this 
->>>> series,
->>>> though, so I would not consider this as a stopper.
->>>>
->>>> Changes since v2:
->>>> (https://lkml.org/lkml/2014/7/17/431)
->>>>   - added board-specific fixes for device tree sources of Trats2 
->>>> board,
->>>>   - rebased on next-20140826 of linux-next tree.
->>>>
->>>> Changes since v1:
->>>>   - dropped outer_resume() - will be handled in assembly in further 
->>>> patches,
->>>>     as support for L2C in non-secure mode gets added,
->>>>   - moved CP15 resume to assembly as it needs to be done before MMU 
->>>> is enabled,
->>>>   - surrounded CP15 save with a check for cpuid part, because it is 
->>>> valid only
->>>>     on Cortex A9,
->>>>   - rebased on next-20140717 tag of linux-next tree.
->>>>
->>>> Tomasz Figa (5):
->>>>    ARM: firmware: Introduce suspend and resume operations
->>>>    ARM: EXYNOS: Add support for firmware-assisted suspend/resume
->>>>    ARM: dts: exynos4412-trats2: Keep eMMC regulators soft-disabled
->>>>    ARM: dts: exynos4x12: Add utility macro to define pin sleep states
->>>>    ARM: dts: exynos4412-trats2: Add sleep mode pin configuration
->>>>
->>>>   Documentation/arm/firmware.txt            |  28 +--
->>>>   arch/arm/boot/dts/exynos4412-trats2.dts   | 320 
->>>> +++++++++++++++++++++++++++++-
->>>>   arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |  16 ++
->>>>   arch/arm/include/asm/firmware.h           |   8 +
->>>>   arch/arm/mach-exynos/Makefile             |   1 +
->>>>   arch/arm/mach-exynos/common.h             |   4 +
->>>>   arch/arm/mach-exynos/firmware.c           |  45 +++++
->>>>   arch/arm/mach-exynos/pm.c                 |  16 +-
->>>>   arch/arm/mach-exynos/sleep.S              |  28 +++
->>>>   arch/arm/mach-exynos/smc.h                |   4 +
->>>>   10 files changed, 438 insertions(+), 32 deletions(-)
->>>>
->>>
->>> Would you consider applying this series? It has been waiting on the ML
->>> long enough (note no changes in core patches since last revision, just
->>> few more board specific patches). Thanks in advance.
->>>
->> Sure, I will. Thanks for your gentle reminder.
+>> I have measured i2c SCL waveforms in fast-mode by oscilloscope
+>> on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
+>> It is so critical that we must adjust LOW division to increase
+>> the LOW period of the scl clock.
 >>
-> I've reverted this series because of following.
->
-> In file included from arch/arm/mach-tegra/cpuidle-tegra114.c:17:0:
-> arch/arm/mach-tegra/cpuidle-tegra114.c: In function 
-> 'tegra114_idle_power_down':
-> arch/arm/include/asm/firmware.h:64:24: error: too few arguments to 
-> function 'firmware_ops->do_idle'
->   ((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : (-ENOSYS))
->                         ^
-> arch/arm/mach-tegra/cpuidle-tegra114.c:52:6: note: in expansion of 
-> macro 'call_firmware_op'
->   if (call_firmware_op(do_idle) == -ENOSYS)
->       ^
->
-> Caused by commit f5217f3b9332 ("ARM: EXYNOS: add AFTR mode support to
-> firmware do_idle method").
->
-> Need to fix...
+>> Thanks Doug for the suggestion about division formula.
+>>
+>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>> ---
+>>  drivers/i2c/busses/i2c-rk3x.c | 79 +++++++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 72 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+>> index 93cfc83..49d67b7 100644
+>> --- a/drivers/i2c/busses/i2c-rk3x.c
+>> +++ b/drivers/i2c/busses/i2c-rk3x.c
+>> @@ -428,18 +428,83 @@ out:
+>>         return IRQ_HANDLED;
+>>  }
+>>
+>> +static void rk3x_i2c_get_ratios(unsigned long scl_rate,
+>> +                               unsigned long *high_ratio,
+>> +                               unsigned long *low_ratio)
+>> +{
+>> +       /* As show in I2C specification:
+>> +        * - Standard-mode:
+>> +        *   the minimum HIGH period of the scl clock is 4.0us
+>> +        *   the minimum LOW period of the scl clock is 4.7us
+>> +        * - Fast-mode:
+>> +        *   the minimum HIGH period of the scl clock is 0.6us
+>> +        *   the minimum LOW period of the scl clock is 1.3us
+>> +        * - Fast-mode plus:
+>> +        *   the minimum HIGH period of the scl clock is 0.26us
+>> +        *   the minimum LOW period of the scl clock is 0.5us
+>> +        * - HS-mode(<1.7MHz):
+>> +        *   the minimum HIGH period of the scl clock is 0.12us
+>> +        *   the minimum LOW period of the scl clock is 0.32us
+>> +        * - HS-mode(<3.4MHz):
+>> +        *   the minimum HIGH period of the scl clock is 0.06us
+>> +        *   the minimum LOW period of the scl clock is 0.16us
+> 
+> Is the rest of the driver ready for Fast-mode plus or HS mode?  If not
+> then maybe leave those off?  If nothing else the commit message should
+> indicate that this is just being forward thinking.
+> 
+>> +        */
+>> +       if (scl_rate <= 100000) {
+>> +               *high_ratio = 40;
+>> +               *low_ratio = 47;
+>> +       } else if (scl_rate <= 400000) {
+>> +               *high_ratio = 6;
+>> +               *low_ratio = 13;
+>> +       } else if (scl_rate <= 1000000) {
+>> +               *high_ratio = 26;
+>> +               *low_ratio = 50;
+>> +       } else if (scl_rate <= 1700000) {
+>> +               *high_ratio = 12;
+>> +               *low_ratio = 32;
+>> +       } else {
+>> +               *high_ratio = 6;
+>> +               *low_ratio = 16;
+> 
+> Since it's only the ratio of high to low that matters, you can combine
+> the last two.  12 : 32 == 6 : 16
+> 
+>> +       }
+>> +}
+>> +
+>> +static void rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
+>> +                              unsigned long *divh, unsigned long *divl)
+>> +{
+>> +       unsigned long high_ratio, low_ratio;
+>> +       unsigned long ratio_sum;
+>> +
+>> +       rk3x_i2c_get_ratios(scl_rate, &high_ratio, &low_ratio);
+>> +       ratio_sum = high_ratio + low_ratio;
+>> +
+>> +       /* T_high = T_clk * (divh + 1) * 8
+>> +        * T_low = T_clk * (divl + 1) * 8
+>> +        * T_scl = T_high + T_low
+>> +        * T_scl = 1 / scl_rate
+>> +        * T_clk = 1 / i2c_rate
+>> +        * T_high : T_low = high_ratio : low_ratio
+>> +        * ratio_sum = high_ratio + low_ratio
+>> +        *
+>> +        * so:
+>> +        * divh = (i2c_rate * high_ratio) / (scl_rate * ratio_sum * 8) - 1
+>> +        * divl = (i2c_rate * low_ratio) / (scl_rate * ratio_sum * 8) - 1
+>> +        */
+>> +       *divh = DIV_ROUND_UP(i2c_rate * high_ratio, scl_rate * ratio_sum * 8);
+>> +       if (*divh)
+>> +               *divh = *divh - 1;
+>> +
+>> +       *divl = DIV_ROUND_UP(i2c_rate * low_ratio, scl_rate * ratio_sum * 8);
+>> +       if (*divl)
+>> +               *divl = *divl - 1;
+> 
+> When I sent you the sample formulas I purposely did it differently
+> than this.  Any reason you changed from my formulas?
+> 
+>   div_low = DIV_ROUND_UP(clk_rate * low_ratio, scl_rate * 8 * ratio_sum)
+>   div_high = DIV_ROUND_UP(clk_rate, scl_rate * 8) - div_low
+> 
+>   div_low -= 1
+>   if div_high:
+>     div_high -= 1
+> 
+> Why did I do it that way?
+> 
+> * Assuming i2c_rate and the ratio is non-zero then you can assume that
+> DIV_ROUND_UP gives a value that is >= 1.  No need to test the result
+> against 0.
+> 
+> * (I think) you'll get a more accurate clock rate by subtracting.
+> 
+> Try running your formula vs. my formula with a ratio of 13 : 6, an i2c
+> rate of 12800000, and an scl rate of 400000
+> 
+> Mine will get:
+>   Req = 400000, act = 400000, 1.88 us low, 0.62 us high, low/high = 3.00
+> 
+> Yours will get:
+>   Req = 400000, act = 320000, 1.88 us low, 1.25 us high, low/high = 1.50
+> 
+yes, you are right. yours is closer to the scl clock what we want to set.
 
-I don't get why you have reverted the main feature of "Firmware-assisted 
-suspend/resume
-of Exynos SoCs" because of an issue on the completely independent 
-patchset which adds
-AFTR idle mode support. Could you please keep the "ARM: firmware: 
-Introduce suspend
-and resume operations" and "ARM: EXYNOS: Add support for firmware-assisted
-suspend/resume" patches?
+But if (clk_rate * low_ratio) can not be divisible by (scl_rate * 8 * ratio_sum),
+div_low will be round up, and div _high will be round down.
+The gap between div_low and div_high is increased.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+so maybe we can set:
+div_high = DIV_ROUND_UP(clk_rate * high_ratio, scl_rate * 8 * ratio_sum)
+div_low = DIV_ROUND_UP(clk_rate, scl_rate * 8) - div_low
+
+i2c rate is 128Mhz:
+1) calculate div_high first:
+div_high = DIV_ROUND_UP(clk_rate * high_ratio, scl_rate * 8 * ratio_sum)
+div_low = DIV_ROUND_UP(clk_rate, scl_rate * 8) - div_low
+
+req = 400000, act = 400000, div_high = 13, div_low = 27
+
+2) calculate div_low first:
+div_low = DIV_ROUND_UP(clk_rate * low_ratio, scl_rate * 8 * ratio_sum)
+div_high = DIV_ROUND_UP(clk_rate, scl_rate * 8) - div_low
+
+req = 400000, act = 400000, div_high = 12, div_high = 28
+
+I think that the first is more appropriate.
+
+> 
+>> +}
+>> +
+>>  static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+>>  {
+>>         unsigned long i2c_rate = clk_get_rate(i2c->clk);
+>> -       unsigned int div;
+>> +       unsigned long divh, divl;
+>>
+>> -       /* set DIV = DIVH = DIVL
+>> -        * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
+>> -        *          = (clk rate) / (16 * (DIV + 1))
+>> -        */
+>> -       div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
+>> +       rk3x_i2c_calc_divs(i2c_rate, scl_rate, &divh, &divl);
+>>
+>> -       i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
+>> +       i2c_writel(i2c, (divh << 16) | (divl & 0xffff), REG_CLKDIV);
+>>  }
+>>
+>>  /**
+>> --
+>> 1.8.3.2
+>>
+>>
+> 
+> 
+> 
