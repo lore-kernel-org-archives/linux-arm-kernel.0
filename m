@@ -1,10 +1,10 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 24 Sep 2014 21:44:52 +0530
-Subject: [PATCH 02/27] dmaengine: ste_dma: use
+Date: Wed, 24 Sep 2014 21:45:01 +0530
+Subject: [PATCH 11/27] mfd: ab8500-gpadc: use
  pm_runtime_last_busy_and_autosuspend helper
 In-Reply-To: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
 References: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
-Message-ID: <1411575342-31048-3-git-send-email-vinod.koul@intel.com>
+Message-ID: <1411575342-31048-12-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,90 +13,32 @@ coding the same code
 
 Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 ---
- drivers/dma/ste_dma40.c |   30 ++++++++++--------------------
- 1 files changed, 10 insertions(+), 20 deletions(-)
+ drivers/mfd/ab8500-gpadc.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 5fe5933..621b941 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -1442,8 +1442,7 @@ static int d40_pause(struct d40_chan *d40c)
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index 36000f9..46bea3a 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -571,8 +571,7 @@ int ab8500_gpadc_double_read_raw(struct ab8500_gpadc *gpadc, u8 channel,
+ 	}
  
- 	res = d40_channel_execute_command(d40c, D40_DMA_SUSPEND_REQ);
+ 	/* Disable VTVout LDO this is required for GPADC */
+-	pm_runtime_mark_last_busy(gpadc->dev);
+-	pm_runtime_put_autosuspend(gpadc->dev);
++	pm_runtime_last_busy_and_autosuspend(gpadc->dev);
  
--	pm_runtime_mark_last_busy(d40c->base->dev);
--	pm_runtime_put_autosuspend(d40c->base->dev);
-+	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 	spin_unlock_irqrestore(&d40c->lock, flags);
- 	return res;
- }
-@@ -1463,8 +1462,7 @@ static int d40_resume(struct d40_chan *d40c)
- 	if (d40_residue(d40c) || d40_tx_is_linked(d40c))
- 		res = d40_channel_execute_command(d40c, D40_DMA_RUN);
+ 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
  
--	pm_runtime_mark_last_busy(d40c->base->dev);
--	pm_runtime_put_autosuspend(d40c->base->dev);
-+	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 	spin_unlock_irqrestore(&d40c->lock, flags);
- 	return res;
- }
-@@ -1565,8 +1563,7 @@ static void dma_tc_handle(struct d40_chan *d40c)
- 		if (d40_queue_start(d40c) == NULL) {
- 			d40c->busy = false;
+@@ -910,8 +909,7 @@ static int ab8500_gpadc_resume(struct device *dev)
+ 	if (ret)
+ 		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
  
--			pm_runtime_mark_last_busy(d40c->base->dev);
--			pm_runtime_put_autosuspend(d40c->base->dev);
-+			pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 		}
+-	pm_runtime_mark_last_busy(gpadc->dev);
+-	pm_runtime_put_autosuspend(gpadc->dev);
++	pm_runtime_last_busy_and_autosuspend(gpadc->dev);
  
- 		d40_desc_remove(d40d);
-@@ -2045,18 +2042,15 @@ static int d40_free_dma(struct d40_chan *d40c)
- 	else
- 		d40c->base->lookup_phy_chans[phy->num] = NULL;
- 
--	if (d40c->busy) {
--		pm_runtime_mark_last_busy(d40c->base->dev);
--		pm_runtime_put_autosuspend(d40c->base->dev);
--	}
-+	if (d40c->busy)
-+		pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 
- 	d40c->busy = false;
- 	d40c->phy_chan = NULL;
- 	d40c->configured = false;
- out:
- 
--	pm_runtime_mark_last_busy(d40c->base->dev);
--	pm_runtime_put_autosuspend(d40c->base->dev);
-+	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 	return res;
- }
- 
-@@ -2457,8 +2451,7 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
- 	if (is_free_phy)
- 		d40_config_write(d40c);
- fail:
--	pm_runtime_mark_last_busy(d40c->base->dev);
--	pm_runtime_put_autosuspend(d40c->base->dev);
-+	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 	spin_unlock_irqrestore(&d40c->lock, flags);
- 	return err;
- }
-@@ -2618,12 +2611,9 @@ static void d40_terminate_all(struct dma_chan *chan)
- 		chan_err(d40c, "Failed to stop channel\n");
- 
- 	d40_term_all(d40c);
--	pm_runtime_mark_last_busy(d40c->base->dev);
--	pm_runtime_put_autosuspend(d40c->base->dev);
--	if (d40c->busy) {
--		pm_runtime_mark_last_busy(d40c->base->dev);
--		pm_runtime_put_autosuspend(d40c->base->dev);
--	}
-+	pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
-+	if (d40c->busy)
-+		pm_runtime_last_busy_and_autosuspend(d40c->base->dev);
- 	d40c->busy = false;
- 
- 	spin_unlock_irqrestore(&d40c->lock, flags);
+ 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
+ 	return ret;
 -- 
 1.7.0.4
