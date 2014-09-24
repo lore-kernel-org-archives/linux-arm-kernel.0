@@ -1,49 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 24 Sep 2014 22:27:17 +0200
-Subject: [PATCH] clk: rockchip: add initcall to set clk defaults after
- syscons are available
-In-Reply-To: <CAD=FV=V5ZBAVEV=-BK7MEWO2KLUqQ4L6ZXrxkGA=AsKxY3mq9w@mail.gmail.com>
-References: <1566610.B4NH8lpaoI@diego>
- <CAD=FV=V5ZBAVEV=-BK7MEWO2KLUqQ4L6ZXrxkGA=AsKxY3mq9w@mail.gmail.com>
-Message-ID: <1913186.v9VZxj5m8a@phil>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 24 Sep 2014 22:27:28 +0200
+Subject: [PATCH] ASoC: samsung: Remove goni or aquila with the WM8994
+In-Reply-To: <20140923010418.GI7960@sirena.org.uk>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
+ <201409041802.36466.arnd@arndb.de> <1411033409.2017.15.camel@x220>
+ <20140918175752.GC7960@sirena.org.uk> <1411077427.2012.6.camel@x41>
+ <20140923010418.GI7960@sirena.org.uk>
+Message-ID: <1411590448.19525.42.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 24. September 2014, 13:21:57 schrieb Doug Anderson:
-> Hi,
+On Mon, 2014-09-22 at 18:04 -0700, Mark Brown wrote:
+> On Thu, Sep 18, 2014 at 11:57:07PM +0200, Paul Bolle wrote:
+> > Mark Brown schreef op do 18-09-2014 om 10:57 [-0700]:
+> > > Please follow the patch submission process in SubmittingPatches.
 > 
-> On Thu, Aug 7, 2014 at 5:57 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > PLLs on Rockchip platforms report their locking state in an external
-> > register situated in the "General Register Files" which is provided
-> > through a syscon device.
-> > 
-> > When the initial clk init runs, this syscon is of course not yet
-> > available, making it impossible to set PLLs to other frequencies
-> > through the assigned-rate property of the clock-controller node.
-> > 
-> > Syscon devices are initialized through a postcore initcall, so add an
-> > arch_initcall to rerun the rockchip specific clock initalization when
-> > the GRF is available.
-> > 
-> > As the clock init already runs two times (through of_clk_add_provider
-> > and of_clk_init), a third time shouldn't hurt to much and in the best
-> > case wouldn't change any settings at all.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  drivers/clk/rockchip/clk.c | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
+> > Could you please be more specific? What part of SubmittingPatches have I
+> > skipped?
 > 
-> My current understanding is that this patch is on hold pending
-> <https://patchwork.kernel.org/patch/4945531/> (AKA mfd: syscon:
-> Decouple syscon interface from platform devices).  If that patch lands
-> then we can drop this one.
+> > Is it the perhaps the use of scissors? Or the superfluous From: line?
+> > "git am -c" appears to handle this message (and the very similar message
+> > I also sent today) just fine.
+> 
+> It's the fact that you've included the patch in the middle of the reply
+> to another mail in the middle of a thread after some other stuff; you
+> can tell this isn't the normal process by observing that your mail
+> doesn't look visually close to a normal patch submission - if that's the
+> case then people aren't likely to sit around and try to figure out some
+> magic set of git options needed, manually edit or otherwise special case
+> to special case it unless it's *really* important.
 
-correct.
+I see. I hope to resend shortly.
 
-I've tested v5 this evening and apart from the debugfs issue I reported there, 
-the whole assigned-clocks init worked really nice.
+Thanks!
 
 
-Heiko
+Paul Bolle
