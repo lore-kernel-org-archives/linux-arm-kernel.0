@@ -1,40 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Sep 2014 08:55:35 +0100
-Subject: [PATCH v7 0/3] Qualcomm Resource Power Manager driver
-In-Reply-To: <20140924042737.GQ10179@sonymobile.com>
-References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
- <54212CA0.4030700@linaro.org>
- <20140924042737.GQ10179@sonymobile.com>
-Message-ID: <20140924075535.GD17801@lee--X1>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 24 Sep 2014 09:55:44 +0200
+Subject: [PATCH 1/2] ARM: dts: vf610: Add ARM Global Timer
+In-Reply-To: <87mw9qmix9.fsf@nbsps.com>
+References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
+ <87mw9qmix9.fsf@nbsps.com>
+Message-ID: <1dc8267dcf1a4990ba32569b65a1dcf4@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Sep 2014, Bjorn Andersson wrote:
+Hi Bill,
 
-> On Tue 23 Sep 01:17 PDT 2014, Srinivas Kandagatla wrote:
+Am 2014-09-23 17:54, schrieb Bill Pringlemeir:
+> On 11 Sep 2014, stefan at agner.ch wrote:
 > 
-> > Hi Bjorn,
-> > 
-> > Thankyou for the new patchset.
-> > 
-> > I got few device-tree patches for apq8064 usb, sata, phy and hdmi which 
-> > depend on rpm header file. It will be nice to get this functionality 
-> > into 3.18.
-> > 
+>> Add Global Timer support which is part of the Snoop Control Unit
+>> of the Cortex-A5 processor. This Global Timer is compatible with the
+>> Cortex-A9 implementation. It's a 64-bit timer and is clocked by the
+>> peripheral clock, which is typically 133 or 166MHz on Vybrid.
 > 
-> We should be able to send out the dts patches separate of these.
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>> arch/arm/boot/dts/vf610.dtsi | 8 ++++++++
+>> 1 file changed, 8 insertions(+)
 > 
-> > Do you think we should take these patches via arm-soc tree?
-> > 
-> 
-> Both Lee and Mark indicated that they will pull the parts individually. However
-> both of the patches depend on the header file created in patch 1, someone needs
-> to take both for it to work out?
+> As per the GPC and SRC series, adding these peripherals to the
+> 'vf610.dtsi' may make some configuration no longer boot.  I have an
+> Cortex-A5 MQX in the secure world and it uses the Global timer for the
+> OS tick.  Maybe that is just my problem and I need to have several
+> trees.  However, It would be nice if the system timer choice was made in
+> a '.config' and the machine DT and not the generic Vybrid one.
 
-Once reviewed I can take the whole set with Mark's Ack.
+So MQX is running "beneath" Linux and steals CPU from it? And this works
+with an unmodified Linux kernel? Did not know that this is possible and
+implemented for Vybrid.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I just thought that it would be nice to have the PIT timer free for the
+M4, and hence use the Cortex-A5 private ARM Global Timer.
+
+But if there are reasons to not use the Global Timer but opt for the PIT
+timer, I guess we could create a configuration here.
+
+
+> Also, the timer is listed in the same bank as the snoop control unit,
+> but it is part of several banks of registers,
+> 
+>  0x40002000 AIPS slot 2, CA5-SCU+GIC CPU Interface registers 1
+> 
+>  0x000-0x054 SCU 
+>  0x100-0x1fc GIC local registers
+>  0x200-0x218 Global Timer
+>  0x600-0x634 Local timer/watchdog timer
+> 
+> I think that the 'reg' mapping will be limited to 4k MMU pages and so we
+> will have a bunch of aliases.  At least the GIC registers are already
+> mapped.  Is there some way in the DT to provide several sets of
+> registers under one mapping and then use the different offsets in the
+> driver/device instance?
+
+You can define multiple address/size tuples in one reg property, as its
+done for the GIC:
+
+intc: interrupt-controller at 40002000 {
+	compatible = "arm,cortex-a9-gic";
+	#interrupt-cells = <3>;
+	interrupt-controller;
+	reg = <0x40003000 0x1000>,
+	      <0x40002100 0x100>;
+};
+
+The device tree should describe the hardware, and when it comes to GIC
+and Global Timer it quite accurate: For the Global Timer, I only map
+those 0x20 registers (actually its one 32-bit register too many, but I
+don't think this is used for anything). The GIC mapping is only mapping
+0x100-0x1ff of the snoop contorl unit bank.
+
+Both, the GIC driver as well as the ARM Global Timer use of_iomap on
+those registers. It apparently works.
+
+--
+Stefan
