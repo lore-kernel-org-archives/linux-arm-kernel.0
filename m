@@ -1,117 +1,118 @@
-From: isimatu.yasuaki@jp.fujitsu.com (Yasuaki Ishimatsu)
-Date: Wed, 24 Sep 2014 16:59:12 +0900
-Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <542279D0.1040603@jp.fujitsu.com>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Wed, 24 Sep 2014 10:00:48 +0200
+Subject: [PATCH v2 1/8] ARM: add mach-asm9260
+In-Reply-To: <6072405.iL4RqHeZrt@wuerfel>
+References: <1411324904-14881-1-git-send-email-linux@rempel-privat.de>
+ <71905861.S3QD6rl7jU@wuerfel> <542136B0.3020305@rempel-privat.de>
+ <6072405.iL4RqHeZrt@wuerfel>
+Message-ID: <54227A30.7010805@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2014/09/11 23:03), Jiang Liu wrote:
-> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
-> that is to build irqdomains for CPU vector, interrupt remapping unit,
-> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
-> Each irqdomain manages corresponding interrupt controller and talks to
-> parent interrupt controller through public irqdomain interfaces. We also
-> support stacked irq_chip based on hierarchy irqdomain. It will make the
-> x86 interrupt architecture much more clear and more easy to maintain
-> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
-> interrupt management architecture too.
+Am 23.09.2014 um 12:19 schrieb Arnd Bergmann:
+> On Tuesday 23 September 2014 11:00:32 Oleksij Rempel wrote:
+>> Am 22.09.2014 um 17:08 schrieb Arnd Bergmann:
+>>> On Sunday 21 September 2014 20:41:37 Oleksij Rempel wrote:
+>>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>>>> index 5918d40..1a71feb 100644
+>>>> --- a/arch/arm/Kconfig
+>>>> +++ b/arch/arm/Kconfig
+>>>> @@ -379,6 +379,20 @@ config ARCH_AT91
+>>>>  	  This enables support for systems based on Atmel
+>>>>  	  AT91RM9200 and AT91SAM9* processors.
+>>>>  
+>>>> +config MACH_ASM9260
+>>>> +	bool "Alphascale ASM9260"
+>>>> +	select ARCH_REQUIRE_GPIOLIB
+>>>> +	select COMMON_CLK
+>>>> +	select IRQ_DOMAIN
+>>>> +	select SPARSE_IRQ
+>>>> +	select MULTI_IRQ_HANDLER
+>>>> +	select GENERIC_IRQ_CHIP
+>>>> +	select GENERIC_CLOCKEVENTS
+>>>> +	select CLKSRC_MMIO
+>>>> +	select CPU_ARM926T
+>>>> +	help
+>>>> +	  Support for Alpascale ASM9260 based platform.
+>>>
+>>> To enable multiplatform support, please move this to its own
+>>> arch/arm/mach-asm9260/Kconfig file and make it depend on ARCH_MULTI_V5,
+>>> then remove all 'select' statements that are implicitly enabled there
+>>> already (most of the above).
+>>
+>> Should they be only in defconfig or selected by driver?
+> 
+> The dependencies should match whatever the platform requires. Anything
+> that is optional and user-selectable better goes into the defconfig.
+> 
+>>>> +static struct map_desc asm9260_io_desc[] __initdata = {
+>>>> +	{	/* IO space */
+>>>> +		.virtual	= (unsigned long)0xf0000000,
+>>>> +		.pfn		= __phys_to_pfn(0x80000000),
+>>>> +		.length		= 0x00800000,
+>>>> +		.type		= MT_DEVICE
+>>>> +	},
+>>>> +	{	/* LCD IO space	*/
+>>>> +		.virtual	= (unsigned long)0xf0a00000,
+>>>> +		.pfn		= __phys_to_pfn(0x80800000),
+>>>> +		.length		= 0x00009000,
+>>>> +		.type		= MT_DEVICE
+>>>> +	},
+>>>> +	{	/* GPIO IO space */
+>>>> +		.virtual	= (unsigned long)0xf0800000,
+>>>> +		.pfn		= __phys_to_pfn(0x50000000),
+>>>> +		.length		= 0x00100000,
+>>>> +		.type		= MT_DEVICE
+>>>> +	},
+>>>> +	{	/* SRAM space Cacheable */
+>>>> +		.virtual	= (unsigned long)0xd0000000,
+>>>> +		.pfn		= __phys_to_pfn(0x40000000),
+>>>> +		.length		= 0x00100000,
+>>>> +#ifdef CONFIG_SRAM_MEM_CACHED
+>>>> +		.type		= MT_MEMORY
+>>>> +#else
+>>>> +		.type		= MT_DEVICE
+>>>> +#endif
+>>>> +	},
+>>>> +};
+>>>
+>>> This should not be necessary, as all drivers are supposed to
+>>> ioremap their own device registers. For large register ranges
+>>> that are used a lot, you could use these as an optimization to
+>>> get 1 MB sections mapped using a large TLB entry, but usually
+>>> the benefit is very small.
+>>
+>> Do you mean only "SRAM space Cacheable" section?
+> 
+> No, all of them.
 
-Do you have a documentation which more detailed information is written?
-I'm interested in this feature. And I want to know more detailed information.
+By removing it i triggered one error which i don't really understand. It
+will be great if you can help me.
 
-I cannot imagine why the feature makes x86 irq architecture much more clear
-and more easy to maintain in this description. Of course, I have read the
-following threads:
+By defaul kernel will do fallowing remapping, which will trigger:
+"Unable to handle kernel paging request at virtual address c2802174"
 
-https://lkml.org/lkml/2014/9/11/101
+phys addr     ioremap        range size
+=======================================
+0x80054000 -> c2800000 size: 0x200
+0x80040000 -> c2802000 size: 0x204
+0x80088000 -> c2808000 size: 0x4000
 
-Thanks,
-Yasuaki Ishimatsu
 
-> 
-> This is the second patch set to enable support of hierarchy irqdomain
-> on x86 platforms. It depends on the first part at:
-> https://lkml.org/lkml/2014/9/11/101
-> And you may access it at:
-> https://github.com/jiangliu/linux.git irqdomain/p2v1
-> 
-> And there will be a third patch set to convert IOAPIC driver to support
-> hierarchy irqdomain and clean up code.
-> 
-> The first patch extends irqdomain interfaces to support hierarchy
-> irqdomain. Hope this interface could be used by other architectures too,
-> such as ARM/ARM64.
-> The second patch introduces two helper functions to support stacked
-> irq_chip.
-> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
-> it's the root irqdomain for x86 platforms.
-> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
-> support hierarchy irqdomain.
-> Patch 14-17 converts HPET, MSI and HT_IRQ drivers to support hierarchy
-> irqdomain.
-> Patch 18-21 cleans up unsued code in x86 arch and interrupt remapping
-> drivers.
-> 
-> We have tested this patchset on Intel 32-bit and 64-bit systems. But we
-> have only done compilation tests for HT_IRQ and AMD interrupt remapping
-> drivers due to hardware resource limitation. Tests on AMD platforms are
-> warmly welcomed!
-> 
-> Jiang Liu (21):
->    irqdomain: Introduce new interfaces to support hierarchy irqdomains
->    genirq: Introduce helper functions to support stacked irq_chip
->    x86, irq: Save destination CPU ID in irq_cfg
->    x86, irq: Use hierarchy irqdomain to manage CPU interrupt vectors
->    x86, hpet: Use new irqdomain interfaces to allocate/free IRQ
->    x86, MSI: Use new irqdomain interfaces to allocate/free IRQ
->    x86, uv: Use new irqdomain interfaces to allocate/free IRQ
->    x86, htirq: Use new irqdomain interfaces to allocate/free IRQ
->    x86, dmar: Use new irqdomain interfaces to allocate/free IRQ
->    x86: irq_remapping: Introduce new interfaces to support hierarchy
->      irqdomain
->    iommu/vt-d: Change prototypes to prepare for enabling hierarchy
->      irqdomain
->    iommu/vt-d: Enhance Intel IR driver to suppport hierarchy irqdomain
->    iommu/amd: Enhance AMD IR driver to suppport hierarchy irqdomain
->    x86, hpet: Enhance HPET IRQ to support hierarchy irqdomain
->    x86, MSI: Use hierarchy irqdomain to manage MSI interrupts
->    x86, irq: Directly call native_compose_msi_msg() for DMAR IRQ
->    x86, htirq: Use hierarchy irqdomain to manage Hypertransport
->      interrupts
->    iommu/vt-d: Clean up unused MSI related code
->    iommu/amd: Clean up unused MSI related code
->    x86: irq_remapping: Clean up unused MSI related code
->    x86, irq: Clean up unused MSI related code and interfaces
-> 
->   arch/x86/Kconfig                     |    3 +-
->   arch/x86/include/asm/hpet.h          |   16 +-
->   arch/x86/include/asm/hw_irq.h        |   64 +++++
->   arch/x86/include/asm/irq_remapping.h |   66 +++--
->   arch/x86/include/asm/pci.h           |    5 -
->   arch/x86/include/asm/x86_init.h      |    4 -
->   arch/x86/kernel/apic/htirq.c         |  179 +++++++++----
->   arch/x86/kernel/apic/io_apic.c       |    3 -
->   arch/x86/kernel/apic/msi.c           |  430 +++++++++++++++++++++++--------
->   arch/x86/kernel/apic/vector.c        |  158 +++++++++++-
->   arch/x86/kernel/hpet.c               |   57 ++---
->   arch/x86/kernel/x86_init.c           |    2 -
->   arch/x86/platform/uv/uv_irq.c        |   27 +-
->   drivers/iommu/amd_iommu.c            |  385 ++++++++++++++++++++++------
->   drivers/iommu/amd_iommu_init.c       |    4 +
->   drivers/iommu/amd_iommu_proto.h      |    9 +
->   drivers/iommu/amd_iommu_types.h      |    5 +
->   drivers/iommu/intel_irq_remapping.c  |  468 +++++++++++++++++++++++-----------
->   drivers/iommu/irq_remapping.c        |  221 ++++++----------
->   drivers/iommu/irq_remapping.h        |   22 +-
->   drivers/pci/htirq.c                  |   48 +---
->   include/linux/htirq.h                |   22 +-
->   include/linux/intel-iommu.h          |    4 +
->   include/linux/irq.h                  |    8 +
->   include/linux/irqdomain.h            |   60 +++++
->   kernel/irq/Kconfig                   |    3 +
->   kernel/irq/chip.c                    |   21 ++
->   kernel/irq/irqdomain.c               |  349 ++++++++++++++++++++++++-
->   28 files changed, 1934 insertions(+), 709 deletions(-)
-> 
+But if change second range from 0x204 to 0x4000, then it works fine.
+0x80054000 -> c2800000 size: 0x200
+0x80040000 -> c2808000 size: 0x4000
+0x80088000 -> c2810000 size: 0x4000
+
+Why?
+-- 
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/94c5ab2e/attachment-0001.sig>
