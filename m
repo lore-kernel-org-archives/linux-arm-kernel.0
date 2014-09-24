@@ -1,47 +1,72 @@
 From: thomas.ab@samsung.com (Thomas Abraham)
-Date: Wed, 24 Sep 2014 09:27:52 +0530
-Subject: [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos
- platforms
-Message-ID: <1411531078-10671-1-git-send-email-thomas.ab@samsung.com>
+Date: Wed, 24 Sep 2014 09:27:56 +0530
+Subject: [PATCH v10 4/6] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4210/5250/5420
+In-Reply-To: <1411531078-10671-4-git-send-email-thomas.ab@samsung.com>
+References: <1411531078-10671-1-git-send-email-thomas.ab@samsung.com>
+ <1411531078-10671-2-git-send-email-thomas.ab@samsung.com>
+ <1411531078-10671-3-git-send-email-thomas.ab@samsung.com>
+ <1411531078-10671-4-git-send-email-thomas.ab@samsung.com>
+Message-ID: <1411531078-10671-5-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series removes the use of Exynos4210 and Exynos5250 specific cpufreq
-drivers and enables the use of cpufreq-cpu0 driver for these platforms. This
-series also enables cpufreq support for Exynos5420 using arm_big_little cpufreq
-driver.
+The new CPU clock type allows the use of generic CPUfreq drivers. So for
+Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
+which did not have CPUfreq driver support, enable the use of generic
+CPUfreq driver.
 
-This patch series is dependent on two other patches
-1. ARM: dts: add CPU nodes for Exynos4 SoCs
-   - https://lkml.org/lkml/2014/7/21/315
-2. clk: exynos4: remove duplicate div_core2 divider clock instantiation
-   - http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34859.html
+Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Tested-by: Chander Kashyap <k.chander@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c |   24 +++++++++++++++++++++++-
+ 1 files changed, 23 insertions(+), 1 deletions(-)
 
-Thomas Abraham (6):
-  clk: samsung: add infrastructure to register cpu clocks
-  clk: samsung: add cpu clock configuration data and instantiate cpu clock
-  ARM: dts: Exynos: add CPU OPP and regulator supply property
-  ARM: Exynos: switch to using generic cpufreq driver for Exynos4210/5250/5420
-  cpufreq: exynos: remove exynos4210/5250 specific cpufreq driver support
-  clk: samsung: remove unused clock aliases and update clock flags
-
- arch/arm/boot/dts/exynos4210-origen.dts         |    4 +
- arch/arm/boot/dts/exynos4210-trats.dts          |    4 +
- arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 +
- arch/arm/boot/dts/exynos4210.dtsi               |   14 +-
- arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +
- arch/arm/boot/dts/exynos5250-snow.dts           |    4 +
- arch/arm/boot/dts/exynos5250.dtsi               |   25 ++-
- arch/arm/boot/dts/exynos5420.dtsi               |   38 +++
- arch/arm/mach-exynos/exynos.c                   |   24 ++-
- drivers/clk/samsung/Makefile                    |    2 +-
- drivers/clk/samsung/clk-cpu.c                   |  335 +++++++++++++++++++++++
- drivers/clk/samsung/clk-cpu.h                   |   91 ++++++
- drivers/clk/samsung/clk-exynos4.c               |   63 +++--
- drivers/clk/samsung/clk-exynos5250.c            |   44 +++-
- drivers/clk/samsung/clk-exynos5420.c            |   72 +++++-
- drivers/cpufreq/Kconfig.arm                     |   22 --
- drivers/cpufreq/Makefile                        |    2 -
- include/dt-bindings/clock/exynos5250.h          |    1 +
- include/dt-bindings/clock/exynos5420.h          |    2 +
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index b89e5f3..c3b6b5d 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -280,6 +280,28 @@ static void __init exynos_init_irq(void)
+ 	exynos_map_pmu();
+ }
+ 
++static const struct of_device_id exynos_cpufreq_matches[] = {
++	{ .compatible = "samsung,exynos5420", .data = "arm-bL-cpufreq-dt" },
++	{ .compatible = "samsung,exynos5250", .data = "cpufreq-cpu0" },
++	{ .compatible = "samsung,exynos4210", .data = "cpufreq-cpu0" },
++	{ .compatible = "samsung,exynos5440", .data = "exynos5440-cpufreq" },
++	{ /* sentinel */ }
++};
++
++static void __init exynos_cpufreq_init(void)
++{
++	struct device_node *root = of_find_node_by_path("/");
++	const struct of_device_id *match;
++
++	match = of_match_node(exynos_cpufreq_matches, root);
++	if (!match) {
++		platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
++		return;
++	}
++
++	platform_device_register_simple(match->data, -1, NULL, 0);
++}
++
+ static void __init exynos_dt_machine_init(void)
+ {
+ 	struct device_node *i2c_np;
+@@ -319,7 +341,7 @@ static void __init exynos_dt_machine_init(void)
+ 			of_machine_is_compatible("samsung,exynos5250"))
+ 		platform_device_register(&exynos_cpuidle);
+ 
+-	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
++	exynos_cpufreq_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+-- 
+1.6.6.rc2
