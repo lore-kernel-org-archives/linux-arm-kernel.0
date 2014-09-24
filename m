@@ -1,58 +1,74 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 24 Sep 2014 14:00:07 +0900
-Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
- based lookup
-In-Reply-To: <2186657.jhIisq7Fok@amdc1032>
-References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
- <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
- <2186657.jhIisq7Fok@amdc1032>
-Message-ID: <01ef01cfd7b4$696d7560$3c486020$@kernel.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 24 Sep 2014 10:07:55 +0530
+Subject: [PATCH 1/2] dmaengine: Add QCOM ADM DMA driver
+In-Reply-To: <20140923221002.GC5975@qualcomm.com>
+References: <1410401933-20621-1-git-send-email-agross@codeaurora.org>
+ <1410401933-20621-2-git-send-email-agross@codeaurora.org>
+ <20140923102850.GI24663@intel.com>
+ <20140923221002.GC5975@qualcomm.com>
+Message-ID: <20140924043755.GQ24663@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
+On Tue, Sep 23, 2014 at 05:10:02PM -0500, Andy Gross wrote:
+> <snip>
 > 
-> Hi,
+> > > +			break;
+> > > +		default:
+> > > +			achan->slave.src_maxburst = 0;
+> > > +			achan->slave.dst_maxburst = 0;
+> > Why clear these for error cases
 > 
-Hi,
+> With the return I shouldn't need to.  I'll fix this.
+> 
+> > > +			ret = -EINVAL;
+> > > +			break;
+> > > +		}
+> > > +
+> > > +		if (!ret)
+> > > +			writel(achan->blk_size,
+> > > +				adev->regs + HI_CRCI_CTL(achan->id, adev->ee));
+> > and why do we write to HW on this. Shouldn't this be done when you program
+> > the descriptor?
+> 
+> It could be deferred to later.  The main point is that I don't see the
+> slave_config happening every transaction.  I was only modifying it now instead
+> of making a register write for every transaction.
+Well wouldn't it cause a problem if you write to hardware and a transaction
+is already in progress.
+So it makese sense to write every time at transaction start with latest
+value programmed.
 
-> On Tuesday, August 19, 2014 01:26:49 PM Vikas Sajjan wrote:
-> > Hi Kukjin,
-> >
-> > On Tue, Aug 19, 2014 at 12:22 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> > > Refactoring the pm.c to avoid using "soc_is_exynos" checks,
-> > > instead use the DT based lookup.
-> > >
-> > > While at it, consolidate the common code across SoCs
-> > > and create static helper functions.
-> > >
-> > > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> >
-> > Can you pick this series...
+> > 
+> > > +static enum dma_status adm_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+> > > +	struct dma_tx_state *txstate)
+> > > +{
+> > > +	struct adm_chan *achan = to_adm_chan(chan);
+> > > +	struct virt_dma_desc *vd;
+> > > +	enum dma_status ret;
+> > > +	unsigned long flags;
+> > > +	size_t residue = 0;
+> > > +
+> > > +	ret = dma_cookie_status(chan, cookie, txstate);
+> > > +
+> > Last arg can be null to this, so before you do residue calcluation and block
+> > interrupts would make sense to return from here if arg is NULL
 > 
-> I think that my PM_SLEEP=n build fixes should go in before this cleanup
-> series:
+> Good catch.  Will fix.
 > 
->   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
+> > 
+> > > +	spin_lock_irqsave(&achan->vc.lock, flags);
+> > > +
+> > > +	vd = vchan_find_desc(&achan->vc, cookie);
+> > > +	if (vd)
+> > > +		residue = container_of(vd, struct adm_async_desc, vd)->length;
+> > > +	else if (achan->curr_txd && achan->curr_txd->vd.tx.cookie == cookie)
+> > > +		residue = achan->curr_txd->length;
+> > so this is current cookie, so you need to read from HW on current position
 > 
+> There is no way to get current position unfortunately without relying on
+> unreliable debug registers.
+In that case would it make sense to return complete txn length?
 
-Bart, your patch has a problem due to dependency, Firmware-assisted suspend/
-resume patch from Tomasz as I emailed today morning in my time. So I will
-apply this series firstly. Please respin the fixes once the build breakage
-resolved. If you have any idea, please let me know.
-
-Thanks,
-Kukjin
-
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
-> > > ---
-> > >  arch/arm/mach-exynos/pm.c       |  167 +++++++++++++++++++++++++++++----------
-> > >  arch/arm/mach-exynos/regs-pmu.h |    1 +
-> > >  2 files changed, 126 insertions(+), 42 deletions(-)
+-- 
+~Vinod
