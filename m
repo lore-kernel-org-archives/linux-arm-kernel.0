@@ -1,30 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 10:39:27 +0100
-Subject: [PATCHv2] dmaengine: fsl-edma: fixup reg offset and hw S/G
- support in big-endian model
-In-Reply-To: <1411542727-11026-1-git-send-email-jingchang.lu@freescale.com>
-References: <1411542727-11026-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140924093926.GT5182@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 24 Sep 2014 11:39:46 +0200
+Subject: [PATCH] ARM: zynq: DT: Remove 222 MHz OPP
+In-Reply-To: <1411498520-8117-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1411498520-8117-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <b5cd2f8d-f37d-4e19-a891-bd234849096d@BL2FFO11FD054.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 03:12:07PM +0800, Jingchang Lu wrote:
->  static void edma_writeb(struct fsl_edma_engine *edma, u8 val, void __iomem *addr)
->  {
-> -	iowrite8(val, addr);
-> +	/* swap the reg offset for these in big-endian mode */
-> +	if (edma->big_endian)
-> +		iowrite8(val, (void __iomem *)((u32)addr ^ 0x3));
+On 09/23/2014 08:55 PM, Soren Brinkmann wrote:
+> Due to dependencies between timer and CPU frequency, only changes by
+> powers of two are allowed. The clocksource driver prevents other
+> changes, but with cpufreq and its governors it can result in being
+> spammed with error messages constantly. Hence, remove the 222 MHz OPP.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 6cc83d4c6c76..a0ed01d68328 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -30,7 +30,6 @@
+>  				/* kHz    uV */
+>  				666667  1000000
+>  				333334  1000000
+> -				222223  1000000
+>  			>;
+>  		};
+>  
+> 
 
-NAK.  /Not/ u32.  unsigned long.  Run this through sparse, and sparse
-will complain with u32 here.  Just because the driver is currently used
-on a 32-bit arch is no reason to be sloppy about this.
+Applied.
 
-In fact, running this through sparse (make ... C=1) or even C=2 might
-well be a good idea to check whether there's any other silly mistakes.
-
-Note that Documentation/SubmitChecklist calls for checks with sparse.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Michal
