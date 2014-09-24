@@ -1,92 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 24 Sep 2014 13:05:40 +0200
-Subject: [PATCH v5 6/7] ARM: EXYNOS: Add support for non-secure L2X0 resume
-In-Reply-To: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
-References: <1411556741-5810-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1411556741-5810-7-git-send-email-m.szyprowski@samsung.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 24 Sep 2014 13:05:10 +0200
+Subject: [PATCHv3] dmaengine: fsl-edma: fixup reg offset and hw S/G
+ support in big-endian model
+In-Reply-To: <1411550642-12577-1-git-send-email-jingchang.lu@freescale.com>
+References: <1411550642-12577-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20140924130510.62d78440@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+Hi,
 
-On Exynos SoCs it is necessary to resume operation of L2C early in
-assembly code, because otherwise certain systems will crash. This patch
-adds necessary code to non-secure resume handler.
+Jingchang Lu wrote:
+> The offset of all 8-/16-bit register in big-endian eDMA model are
+s/register/registers/
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-[rewrote the code accessing l2x0_saved_regs]
-Sigend-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mach-exynos/sleep.S | 46 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+> swapped in a 32-bit size opposite those in the little-endian model.
+> 
+> The hardware Scatter/Gather requires the subsequent TCDs in memory
+> to be auto loaded should retain little endian independent of the
+> register endian model, the dma engine will do the swap if need.
+> 
+> This patch also use regular assignment for tcd variables r/w
+> instead of with io function previously that may not always be true.
+> 
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+> changes in v3:
+>  use unsigned long instead of u32 in reg offset swap cast to avoid warning.
+> 
+> changes in v2:
+>  simplify register offset swap calculation.
+>  use regular assignment for tcd variables r/w instead of io function.
+> 
+>  drivers/dma/fsl-edma.c | 106 ++++++++++++++++++++++++++-----------------------
+>  1 file changed, 57 insertions(+), 49 deletions(-)
+> 
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+> index 3c5711d..9ca55ee 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -177,16 +177,10 @@ struct fsl_edma_engine {
+>  /*
+>   * R/W functions for big- or little-endian registers
+>   * the eDMA controller's endian is independent of the CPU core's endian.
+> + * for the big-endian IP module, the offset for 8-bit or 16-bit register
+s/for/For/
 
-diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
-index e3c373082bbe..31d25834b9c4 100644
---- a/arch/arm/mach-exynos/sleep.S
-+++ b/arch/arm/mach-exynos/sleep.S
-@@ -16,6 +16,8 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include "smc.h"
- 
- #define CPU_MASK	0xff0ffff0
-@@ -74,6 +76,45 @@ ENTRY(exynos_cpu_resume_ns)
- 	mov	r0, #SMC_CMD_C15RESUME
- 	dsb
- 	smc	#0
-+#ifdef CONFIG_CACHE_L2X0
-+	adr	r0, 1f
-+	ldr	r2, [r0]
-+	add	r0, r2, r0
-+
-+	/* Check that the address has been initialised. */
-+	ldr	r1, [r0, #L2X0_R_PHY_BASE]
-+	teq	r1, #0
-+	beq	skip_l2x0
-+
-+	/* Check if controller has been enabled. */
-+	ldr	r2, [r1, #L2X0_CTRL]
-+	tst	r2, #0x1
-+	bne	skip_l2x0
-+
-+	ldr	r1, [r0, #L2X0_R_TAG_LATENCY]
-+	ldr	r2, [r0, #L2X0_R_DATA_LATENCY]
-+	ldr	r3, [r0, #L2X0_R_PREFETCH_CTRL]
-+	mov	r0, #SMC_CMD_L2X0SETUP1
-+	smc	#0
-+
-+	/* Reload saved regs pointer because smc corrupts registers. */
-+	adr	r0, 1f
-+	ldr	r2, [r0]
-+	add	r0, r2, r0
-+
-+	ldr	r1, [r0, #L2X0_R_PWR_CTRL]
-+	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
-+	mov	r0, #SMC_CMD_L2X0SETUP2
-+	smc	#0
-+
-+	mov	r0, #SMC_CMD_L2X0INVALL
-+	smc	#0
-+
-+	mov	r1, #1
-+	mov	r0, #SMC_CMD_L2X0CTRL
-+	smc	#0
-+skip_l2x0:
-+#endif /* CONFIG_CACHE_L2X0 */
- skip_cp15:
- 	b	cpu_resume
- ENDPROC(exynos_cpu_resume_ns)
-@@ -83,3 +124,8 @@ cp15_save_diag:
- 	.globl cp15_save_power
- cp15_save_power:
- 	.long	0	@ cp15 power control
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	.align
-+1:	.long	l2x0_saved_regs - .
-+#endif /* CONFIG_CACHE_L2X0 */
+> + * should also be swapped oposite to that in little-endian IP.
+s/oposite/opposite/
+
+[...]
+> @@ -459,20 +460,27 @@ static void fill_tcd_params(struct fsl_edma_engine *edma,
+>  	u16 csr = 0;
+>  
+>  	/*
+> -	 * eDMA hardware SGs require the TCD parameters stored in memory
+> -	 * the same endian as the eDMA module so that they can be loaded
+> -	 * automatically by the engine
+> +	 * eDMA hardware SGs requires the TCDs to be auto loaded
+> +	 * in the little endian whenver the register endian model,
+"in little endian whatever the register endian model"
+
+> +	 * So we put the value in little endian in memory, waitting
+s/waitting/waiting/
+
+> +	 * for fsl_set_tcd_params doing the swap.
+fsl_set_tcd_params()
+
+
+
+Lothar Wa?mann
 -- 
-1.9.2
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
