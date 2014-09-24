@@ -1,23 +1,39 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 24 Sep 2014 17:34:36 +0800
-Subject: [PATCH] misc: atmel-ssc: prepare clock only when request
-In-Reply-To: <20140924090736.GC16977@sirena.org.uk>
-References: <1411549019-12663-1-git-send-email-voice.shen@atmel.com>
- <20140924090736.GC16977@sirena.org.uk>
-Message-ID: <5422902C.4020005@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Sep 2014 11:36:16 +0200
+Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
+In-Reply-To: <a83d5601a26b4e45be5e5016de287287@BL2PR03MB467.namprd03.prod.outlook.com>
+References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
+ <3321146.kBfn28qbNM@wuerfel>
+ <a83d5601a26b4e45be5e5016de287287@BL2PR03MB467.namprd03.prod.outlook.com>
+Message-ID: <4264466.HtkUxyxBW8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wednesday 24 September 2014 05:47:53 Jingchang Lu wrote:
+> 
+> The ethernet device nodes already have the phy-handle properties to their mdio nodes.
+> 
+> The alias for PHY nodes here is:
+>   The ethernet has two kind of PHY interface, one is SGMII, and the other is RGMII,
+> The selection is done by the reset configuration word(RCW), so Phy-handle properties
+> should be change properly to reflecting the PHY interface selection. This is done
+> by fixing up dtb in u-boot before booting the kernel. Thus the alias for PHY nodes
+> is added here for fdt finding the PHY nodes easily.
 
-On 09/24/2014 05:07 PM, Mark Brown wrote:
-> On Wed, Sep 24, 2014 at 04:56:59PM +0800, Bo Shen wrote:
->> Prepare SSC clock only when request SSC channel, the clock will be
->> enabled when initialize the SSC.
->
-> You should send this to the drivers/misc maintainer.
+Ok, I see. I thought that this was what the labels in the dtb were supposed
+to be used for. Can't you do the same thing in u-boot by using a label
+as opposed to the alias?
 
-Thanks, it has been done.
+IIRC you should be able to add an additional label like
 
-Best Regards,
-Bo Shen
++&mdio0 {
++       enet1_sgmii_phy: sgmii_phy0: ethernet-phy at 0 {
++               reg = <0x0>;
++       };
+
+and then use libfdt to find the node through that, rather than through
+the alias. I don't know how things are handled on other platforms, but
+I think that was how it was initially thought up when we introduced
+the fdt format on PowerPC.
+
+	Arnd
