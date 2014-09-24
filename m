@@ -1,52 +1,75 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 24 Sep 2014 22:48:55 +0800
-Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
-In-Reply-To: <1411570141-29960-1-git-send-email-wens@csie.org>
-References: <1411570141-29960-1-git-send-email-wens@csie.org>
-Message-ID: <1411570141-29960-2-git-send-email-wens@csie.org>
+Date: Wed, 24 Sep 2014 22:48:54 +0800
+Subject: [PATCH v2 0/7] ARM: sunxi: Add basic support for Allwinner A80 SoC
+Message-ID: <1411570141-29960-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
-While it's processor cores and interconnecting bus are new, it
-re-uses many peripherals found in earlier Allwinner SoCs.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/mach-sunxi/Kconfig | 5 +++++
- arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
- 2 files changed, 14 insertions(+)
+This is v2 of the initial Allwinner A80 support series.
+This patch series adds very basic support for Allwinner's A80 SoC,
+a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 1aaa1e1..72f222b 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -42,4 +42,9 @@ config MACH_SUN8I
- 	select MFD_SUN6I_PRCM
- 	select RESET_CONTROLLER
- 
-+config MACH_SUN9I
-+	bool "Allwinner A80 (sun9i) SoCs support"
-+	default ARCH_SUNXI
-+	select ARM_GIC
-+
- endif
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 42d4753..4bd2117 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -139,3 +139,12 @@ static const char * const sun8i_board_dt_compat[] = {
- DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
- 	.dt_compat	= sun8i_board_dt_compat,
- MACHINE_END
-+
-+static const char * const sun9i_board_dt_compat[] = {
-+	"allwinner,sun9i-a80",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(SUN9I_DT, "Allwinner sun9i (A80) Family")
-+	.dt_compat	= sun9i_board_dt_compat,
-+MACHINE_END
+Development is done on the A80 Optimus Board, the defacto development
+board for the A80, with the accompanying SDK as a reference. 
+
+So far I've been unable to get the board to boot from MMC, or
+using Android fastboot. I'm using Allwinner's FEL mode to load
+the bootloader and kernel+dtb image over USB. Notes on my attempts
+can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
+
+
+Patch 1 introduces the compatible string for the A80.
+
+Patch 2 adds options to use UART0 on the A80 as the debug port for
+earlyprintk.
+
+Patch 3 adds a barebone dtsi with just the cpu, memory and uart nodes.
+
+Patch 4 adds a barebone dts for the A80 Optimus Board.
+
+Patch 5 documents the vendor prefix for Merrii Technology Co., Ltd,
+the designer and vendor of the A80 Optimus Board.
+
+Patch 6 documents all the Allwinner SoCs we currently support.
+
+Patch 7 updates the sunxi README with a link to the A80's datasheet.
+
+
+Changes since v1:
+
+  - Use skeleton64.dtsi as basis to support maximum of 8GB DRAM
+  - Dropped dependency on ARCH_SUNXI for DEBUG_SUN9I_UART0
+  - Added empty lines separating cores in the DT cpu-map node
+  - Added patch 7 to update sunxi README
+
+Cheers
+ChenYu
+
+Chen-Yu Tsai (7):
+  ARM: sunxi: Introduce Allwinner A80 support
+  ARM: sunxi: Add debug uart used by sun9i (Allwinner A80)
+  ARM: dts: sunxi: Add Allwinner A80 dtsi
+  ARM: dts: sun9i: Add A80 Optimus Board support
+  devicetree: bindings: Add vendor prefix for Merrii Technology Co.,
+    Ltd.
+  devicetree: bindings: Document supported Allwinner sunxi SoCs
+  Documentation: sunxi: Add A80 datasheet link
+
+ Documentation/arm/sunxi/README                     |   3 +-
+ Documentation/devicetree/bindings/arm/sunxi.txt    |  12 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/Kconfig.debug                             |  10 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            |  66 +++++
+ arch/arm/boot/dts/sun9i-a80.dtsi                   | 287 +++++++++++++++++++++
+ arch/arm/mach-sunxi/Kconfig                        |   5 +
+ arch/arm/mach-sunxi/sunxi.c                        |   9 +
+ 9 files changed, 394 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/sunxi.txt
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+ create mode 100644 arch/arm/boot/dts/sun9i-a80.dtsi
+
 -- 
 2.1.0
