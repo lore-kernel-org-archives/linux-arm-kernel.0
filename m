@@ -1,100 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Sep 2014 16:53:55 +0900
-Subject: [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
-In-Reply-To: <0d2401cfd07b$0e21e190$2a65a4b0$@kernel.org>
-References: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
- <5415D4A8.4010304@gmail.com> <0d2401cfd07b$0e21e190$2a65a4b0$@kernel.org>
-Message-ID: <54227893.7020808@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Sep 2014 08:55:35 +0100
+Subject: [PATCH v7 0/3] Qualcomm Resource Power Manager driver
+In-Reply-To: <20140924042737.GQ10179@sonymobile.com>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <54212CA0.4030700@linaro.org>
+ <20140924042737.GQ10179@sonymobile.com>
+Message-ID: <20140924075535.GD17801@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 23 Sep 2014, Bjorn Andersson wrote:
 
+> On Tue 23 Sep 01:17 PDT 2014, Srinivas Kandagatla wrote:
+> 
+> > Hi Bjorn,
+> > 
+> > Thankyou for the new patchset.
+> > 
+> > I got few device-tree patches for apq8064 usb, sata, phy and hdmi which 
+> > depend on rpm header file. It will be nice to get this functionality 
+> > into 3.18.
+> > 
+> 
+> We should be able to send out the dts patches separate of these.
+> 
+> > Do you think we should take these patches via arm-soc tree?
+> > 
+> 
+> Both Lee and Mark indicated that they will pull the parts individually. However
+> both of the patches depend on the header file created in patch 1, someone needs
+> to take both for it to work out?
 
-On 09/15/14 09:21, Kukjin Kim wrote:
-> Tomasz Figa wrote:
->>
->> Hi Kukjin,
->>
-> Hi,
->
->> On 26.08.2014 16:10, Tomasz Figa wrote:
->>> On Exynos-based boards running secure firmware the sequence of low level
->>> operations to enter and leave system-wide sleep mode is different than
->>> on those without the firmware. Namely:
->>>   - CP15 power control and diagnostic registers cannot be written directly,
->>>   - the way of setting boot address and boot flag is different,
->>>   - different resume handler needs to be used,
->>>   - dedicated SMC call needs to be performed instead of letting the CPU enter
->>>     WFI.
->>>
->>> This series introduces .suspend() and .resume() firmware operations to
->>> perform low level firmware-specific suspend and resume and then leverages
->>> them to provide suspend-resume path meeting the above requirements. Three
->>> additional patches extend device tree sources of Trats2 board with necessary
->>> setup to enable suspend/resume support.
->>>
->>> This series has been tested on Exynos4412-based Trats2 board, without any
->>> additional patches. Unfortunately v3.17-rc1 regressed ODROID support and
->>> suspend stopped working on those boards, due to unknown reasons still being
->>> investigated. It does not seem to be related to anything in this series,
->>> though, so I would not consider this as a stopper.
->>>
->>> Changes since v2:
->>> (https://lkml.org/lkml/2014/7/17/431)
->>>   - added board-specific fixes for device tree sources of Trats2 board,
->>>   - rebased on next-20140826 of linux-next tree.
->>>
->>> Changes since v1:
->>>   - dropped outer_resume() - will be handled in assembly in further patches,
->>>     as support for L2C in non-secure mode gets added,
->>>   - moved CP15 resume to assembly as it needs to be done before MMU is enabled,
->>>   - surrounded CP15 save with a check for cpuid part, because it is valid only
->>>     on Cortex A9,
->>>   - rebased on next-20140717 tag of linux-next tree.
->>>
->>> Tomasz Figa (5):
->>>    ARM: firmware: Introduce suspend and resume operations
->>>    ARM: EXYNOS: Add support for firmware-assisted suspend/resume
->>>    ARM: dts: exynos4412-trats2: Keep eMMC regulators soft-disabled
->>>    ARM: dts: exynos4x12: Add utility macro to define pin sleep states
->>>    ARM: dts: exynos4412-trats2: Add sleep mode pin configuration
->>>
->>>   Documentation/arm/firmware.txt            |  28 +--
->>>   arch/arm/boot/dts/exynos4412-trats2.dts   | 320 +++++++++++++++++++++++++++++-
->>>   arch/arm/boot/dts/exynos4x12-pinctrl.dtsi |  16 ++
->>>   arch/arm/include/asm/firmware.h           |   8 +
->>>   arch/arm/mach-exynos/Makefile             |   1 +
->>>   arch/arm/mach-exynos/common.h             |   4 +
->>>   arch/arm/mach-exynos/firmware.c           |  45 +++++
->>>   arch/arm/mach-exynos/pm.c                 |  16 +-
->>>   arch/arm/mach-exynos/sleep.S              |  28 +++
->>>   arch/arm/mach-exynos/smc.h                |   4 +
->>>   10 files changed, 438 insertions(+), 32 deletions(-)
->>>
->>
->> Would you consider applying this series? It has been waiting on the ML
->> long enough (note no changes in core patches since last revision, just
->> few more board specific patches). Thanks in advance.
->>
-> Sure, I will. Thanks for your gentle reminder.
->
-I've reverted this series because of following.
+Once reviewed I can take the whole set with Mark's Ack.
 
-In file included from arch/arm/mach-tegra/cpuidle-tegra114.c:17:0:
-arch/arm/mach-tegra/cpuidle-tegra114.c: In function 
-'tegra114_idle_power_down':
-arch/arm/include/asm/firmware.h:64:24: error: too few arguments to 
-function 'firmware_ops->do_idle'
-   ((firmware_ops->op) ? firmware_ops->op(__VA_ARGS__) : (-ENOSYS))
-                         ^
-arch/arm/mach-tegra/cpuidle-tegra114.c:52:6: note: in expansion of macro 
-'call_firmware_op'
-   if (call_firmware_op(do_idle) == -ENOSYS)
-       ^
-
-Caused by commit f5217f3b9332 ("ARM: EXYNOS: add AFTR mode support to
-firmware do_idle method").
-
-Need to fix...
-
-- Kukjin
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
