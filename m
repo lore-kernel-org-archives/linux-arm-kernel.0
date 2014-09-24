@@ -1,64 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 24 Sep 2014 15:45:41 +0100
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
- consolidation
-In-Reply-To: <20140922223022.GO5182@n2100.arm.linux.org.uk>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <20140922153919.GQ25809@arm.com>
- <20140922223022.GO5182@n2100.arm.linux.org.uk>
-Message-ID: <20140924144541.GJ15842@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Sep 2014 16:47:47 +0200
+Subject: [RFC PATCH] ARM: at91: remove no-MMU at91x40 support
+In-Reply-To: <1411568281-3924-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1411568281-3924-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <3700375.DRR5iB2NGi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 11:30:23PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 22, 2014 at 04:39:19PM +0100, Will Deacon wrote:
-> > On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
-> > > This series contains the necessary changes to allow architected timer
-> > > access from user-space on 32-bit ARM.  This allows the VDSO to support
-> > > high resolution timestamps for clock_gettime and gettimeofday.  This
-> > > also merges substantially similar code from arm and arm64 into the
-> > > core arm_arch_timer driver.
-> > > 
-> > > The functional changes are:
-> > > - When available, CNTVCT is made readable by user space on arm, as it
-> > >   is on arm64.
-> > > - The clocksource name becomes "arch_mem_counter" if CP15 access to
-> > >   the counter is not available.
-> > > 
-> > > These changes have been carried as part of the ARM VDSO patch set over
-> > > the last several months, but I am splitting them out here as I assume
-> > > they should go through the clocksource maintainers.
-> > 
-> > For the series:
-> > 
-> >   Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > I'm not sure which tree the arch-timer stuff usually goes through, but
-> > the arm/arm64 bits look fine so I'm happy for them to merged together.
+On Wednesday 24 September 2014 16:18:01 Nicolas Ferre wrote:
+> As there is currently no-one to take care of this old !MMU target and as its
+> support in recent kernels is a bit rotten, remove this at91x40 support and the
+> board file associated with it (at91eb01).
+> There are modern ARM !MMU in Mainline now so this target is not interesting for
+> building tests anymore. It would be better to start from these modern ARM !MMU
+> platforms to reintroduce at91x40 support if needed.
 > 
-> I raised a while back with Will whether there's much point to having
-> this on ARM.  While it's useful for virtualisation, the majority of
-> 32-bit ARM doesn't run virtualised.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This has nothing to do with virtualisation. The main reason we use
-CNTVCT is to not require kernel binary differences when running the OS
-as host or guest. But it does _not_ mean that it is only used when
-running as a guest.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-> So there's little point in having the VDSO on the majority of
-> platforms - it will just add additional unnecessary cycles slowing
-> down the system calls that the VDSO is designed to try to speed up.
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 807b22dadcb6..f3bd8abd25c0 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -18,26 +18,22 @@ config HAVE_AT91_DBGU2
+>  config AT91_USE_OLD_CLK
+>  	bool
+>  
+> -config AT91_PMC_UNIT
+> -	bool
+> -	default !ARCH_AT91X40
+> -
+>  config COMMON_CLK_AT91
+>  	bool
+> -	default AT91_PMC_UNIT && USE_OF && !AT91_USE_OLD_CLK
+> +	default USE_OF && !AT91_USE_OLD_CLK
+>  	select COMMON_CLK
+>  
+>  config OLD_CLK_AT91
+>  	bool
+> -	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
+> +	default AT91_USE_OLD_CLK
+>  
+>  config AT91_SAM9_ALT_RESET
+>  	bool
+> -	default !ARCH_AT91X40
+> +	default y
+>  
+>  config AT91_SAM9G45_RESET
+>  	bool
+> -	default !ARCH_AT91X40
+> +	default y
+>  
+>  config AT91_SAM9_TIME
+>  	bool
 
-A good reason for VDSO is to avoid a system call for gettimeofday when
-you can read the clocks source from user space. That's a significant
-improvement on CPUs like A7, A15.
+I think these can be simplified further: AT91_SAM9G45_RESET and
+AT91_SAM9_ALT_RESET can just go away and the files put into
+obj-y.
 
-Now, I understand there will be a few cycles lost with the syscall
-indirection via VDSO when the architected timers are not available. If
-you are concerned about this, maybe the VDSO (or the corresponding
-gettimeofday) function should be disabled at boot time. IIRC, the VDSO
-gettimeofday function would override the glibc one at dynamic loading
-time but if the VDSO isn't present, glibc would still work as usual.
+OLD_CLK_AT91 is the same as AT91_USE_OLD_CLK, so you could
+just use that instead. I suspect the 'USE_OF' dependency for
+COMMON_CLK_AT91 can also go away, since all platforms are
+either board file based and select AT91_USE_OLD_CLK, or they
+are DT based and don't.
 
--- 
-Catalin
+	Arnd
