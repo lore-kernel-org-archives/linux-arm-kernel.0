@@ -1,72 +1,80 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 24 Sep 2014 17:14:49 +0200
-Subject: [PATCH 3/4] gpio: vf610: add gpiolib/IRQ chip driver for Vybird
-In-Reply-To: <CACRpkdbJePuG0g=AFGqjDS4=yW0CXnkpf1Yr_1P4e9Kkpu9n-g@mail.gmail.com>
-References: <cover.1410020458.git.stefan@agner.ch>
- <ff236f6dab7f3408551f8f4b0345e62b37fd99c5.1410020459.git.stefan@agner.ch>
- <CACRpkdaNbTj+hXtNFZ6DqosHPfHg2G+X2Cb_S_15mULpdebgrQ@mail.gmail.com>
- <a7c933339713dc1783770faf1eceb734@agner.ch>
- <CACRpkdbJePuG0g=AFGqjDS4=yW0CXnkpf1Yr_1P4e9Kkpu9n-g@mail.gmail.com>
-Message-ID: <2543d19c268e9ef1609759e98f3818d9@agner.ch>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 24 Sep 2014 16:16:47 +0100
+Subject: [PATCH v2] clocksource: arm_arch_timer: discard unavailable timers
+ correctly
+In-Reply-To: <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
+References: <1410911445-19067-1-git-send-email-sudeep.holla@arm.com>
+ <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5422E05F.4070405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-24 13:10, schrieb Linus Walleij:
-> On Tue, Sep 23, 2014 at 1:51 PM, Stefan Agner <stefan@agner.ch> wrote:
->> [Me]
->>> postcore again. I don't like this, can you get rid of it?
->>
->> I guess we could load this driver easily a bit later. IMHO, since lots
->> of other driver use GPIO's, we should it load before all the drivers
->> gets loaded (before device_initcall).
-> 
-> Nope. We use deferred probing to control that today. Ideally
-> all drivers should be device_initcall() and deferred probe be used
-> to order things, not by playing around with initcalls.
-> 
+Hi Mark,
 
-You can not "nope" my humble opinion, this is not possible, its write
-protected! :-)
+On 17/09/14 20:39, Sudeep Holla wrote:
+> Currently we wait until both cp15 and mem timers are probed if we
+> have both timer device nodes present in the device tree without
+> checking if the device is actually available. If one of the timer
+> device node present is disabled, the system locks up on the boot
+> as no timer gets registered.
+>
+> This patch adds the check for the availablity of the timer device
+> so that we unavailable timers are discarded correctly. It also adds
+> the missing of_node_put.
+>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-I fully understand the deferred probe approach, and I also think its
-really a good approach for almost all drivers. The system by itself
-makes sure the drivers are loaded in correct order. But if all drivers
-use pinctrl, and the pinctrl happens to be the last initialized driver,
-I first get 30 messages with probe deferred before the pinctrl driver
-finally gets initialized. IMHO, this is a waste of resources... Giving
-the system some hint what we need early (e.g. pinctrl or even GPIO
-drivers) is just sensible. But maybe I miss something here...
+If your are fine with this, can I ask Daniel you pick this up ?
 
-Fact is, currently, without touching GPIO infrastructure code, the GPIO
-driver can not be deferred when the pinctrl driver is missing. The
-of_gpiochip_add_pin_range function does not handle the missing pinctrl
-driver. Hence as of now, the pinctrl still needs an earlier initcall.
-But anyway, currently the pinctrl driver is already using arch_initcall,
-this patch set is no longer touching that.
+Regards,
+Sudeep
 
->> Most GPIO driver do this, some statistic again:
->> $ grep -h -o ".*_initcall" drivers/gpio/*.c | sort | uniq -c | sort -n
->> -r
->>      33 subsys_initcall
->>      14 postcore_initcall
->>       2 device_initcall
->>       2 arch_initcall
->>       1 late_initcall
->>       1 core_initcall
-> 
-> Yeah old legacy. There are patch attacks to get rid of this.
-> 
-> The reason we can't just change them is because sometimes
-> dependent drivers do not handle the errorpath very well can can't
-> defer cleanly.
-> 
-> With a new driver I expect deferred probe to be used.
-> 
-
-Actually, the esdhc driver gets the cd-gpio directly and does not handle
-EPROBE_DEFER properly, hence Vybrid would be affected too. But I
-understand that we need to start somewhere. I will change the GPIO
-driver to device_initcall and going to fix esdhc driver.
-
---
-Stefan
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>   drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++----
+>   1 file changed, 16 insertions(+), 4 deletions(-)
+>
+> Changes v1->v2:
+> 	- Added missing of_node_put in the original code
+> 	- Updated the commit log as suggested
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec13429d..7e267e3990ab 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -616,17 +616,29 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+>   	{},
+>   };
+>
+> +static bool __init
+> +arch_timer_probed(int type, const struct of_device_id *matches)
+> +{
+> +	struct device_node *dn;
+> +	bool probed = false;
+> +
+> +	dn = of_find_matching_node(NULL, matches);
+> +	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
+> +		probed = true;
+> +	of_node_put(dn);
+> +
+> +	return probed;
+> +}
+> +
+>   static void __init arch_timer_common_init(void)
+>   {
+>   	unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
+>
+>   	/* Wait until both nodes are probed if we have two timers */
+>   	if ((arch_timers_present & mask) != mask) {
+> -		if (of_find_matching_node(NULL, arch_timer_mem_of_match) &&
+> -				!(arch_timers_present & ARCH_MEM_TIMER))
+> +		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
+>   			return;
+> -		if (of_find_matching_node(NULL, arch_timer_of_match) &&
+> -				!(arch_timers_present & ARCH_CP15_TIMER))
+> +		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
+>   			return;
+>   	}
+>
+>
