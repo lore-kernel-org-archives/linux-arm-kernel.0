@@ -1,507 +1,116 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 24 Sep 2014 13:26:07 +0800
-Subject: [Patch] irqdomain: Introduce new interfaces to support hierarchy
- irqdomains
-In-Reply-To: <54205C9C.4070101@infradead.org>
-References: <alpine.DEB.2.10.1409160859080.4247@nanos>
- <1411373856-9669-1-git-send-email-jiang.liu@linux.intel.com>
- <54205C9C.4070101@infradead.org>
-Message-ID: <542255EF.6080001@linux.intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 24 Sep 2014 07:36:51 +0200
+Subject: [PATCH v3] arm64: dmi: Add SMBIOS/DMI support
+In-Reply-To: <1411507260.25340.66.camel@deneb.redhat.com>
+References: <1411167781-18571-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140922100912.GG30085@e104818-lin.cambridge.arm.com>
+ <20140922170231.GM30085@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8=iSd+o09KAfHxWeXEkXGUZR1BeCuAvjAEem--s6U3zA@mail.gmail.com>
+ <CAKv+Gu_F9QSJ-ruZndi=0+wQvXNS8F-LnBXOrNNVps+Rkb6n2g@mail.gmail.com>
+ <1411507260.25340.66.camel@deneb.redhat.com>
+Message-ID: <CAKv+Gu-H20XYu8vVuUFz=EWDCir1G2b6AxmMsxJ-dBqZ90v=OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Randy! I will fix these issues in next version.
-Regards!
-Gerry
+On 23 September 2014 23:21, Mark Salter <msalter@redhat.com> wrote:
+> On Tue, 2014-09-23 at 10:23 +0200, Ard Biesheuvel wrote:
+>> On 22 September 2014 21:44, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > On 22 September 2014 19:02, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> On Mon, Sep 22, 2014 at 11:09:12AM +0100, Catalin Marinas wrote:
+>> >>> On Sat, Sep 20, 2014 at 12:03:01AM +0100, Ard Biesheuvel wrote:
+>> >>> > From: Yi Li <yi.li@linaro.org>
+>> >>> >
+>> >>> > SMBIOS is important for server hardware vendors. It implements a spec for
+>> >>> > providing descriptive information about the platform. Things like serial
+>> >>> > numbers, physical layout of the ports, build configuration data, and the like.
+>> >>> >
+>> >>> > This has been tested by dmidecode and lshw tools.
+>> >>> >
+>> >>> > This patch adds the call to dmi_scan_machine() to arm64_enter_virtual_mode(),
+>> >>> > as that is the point where the EFI Configuration Tables are registered as
+>> >>> > being available. It needs to be in an early_initcall anyway as dmi_id_init(),
+>> >>> > which is an arch_initcall itself, depends on dmi_scan_machine() having been
+>> >>> > called already.
+>> >>> >
+>> >>> > Signed-off-by: Yi Li <yi.li@linaro.org>
+>> >>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >>>
+>> >>> Merged (until the next revert ;)). Thanks.
+>> >>
+>> >> And I'm about to revert it now. If Linux doesn't boot as an EFI
+>> >> application, with this patch applied I get lots of:
+>> >>
+>> >
+>> > And I guess each warning is for a different driver?
+>> > That is another x86-ism we hadn't spotted that we need to get rid of:
+>> > DMI is used for quirks handling on x86, and apparently it gets nervous
+>> > if CONFIG_DMI is enabled but DMI never gets initialized. Can I assume
+>> > that quirks handling based on the DMI system name is something you
+>> > would prefer to steer clear of on arm64?
+>> >
+>> > This is non-trivial to fix in any case, so reverting it is the only
+>> > option. If nobody else picks this up in the mean time, I will revisit
+>> > this after my vacation (in the hope your patience hasn't run out yet)
+>> >
+>>
+>> As it turns out, this particular issue is caused by how I moved the
+>> call to dmi_scan_machine() into arm64_enter_virtual_mode(), so it is
+>> not present in Yi's original patch. When CONFIG_DMI is enabled,
+>> dmi_scan_machine() needs to be called unconditionally, even if we are
+>> running without EFI config tables (or any EFI for that matter)
+>>
+>> @Yi: could you rework the patch so dmi_scan_machine() is called from a
+>> separate function again? But this time, please add it to
+>> arch/arm64/kernel/efi.c and invoke it using core_initcall not
+>> arch_initcall. core_initcalls are dispatched before arch_initcall but
+>> after early_initcall so that should be the right moment to get DMI
+>> initialized.
+>>
+>> Could you also test it with and without EFI?
+>
+> efi.c is only compiled when CONFIG_EFI is defined, so you'd have to
+> put it somewhere else.
+>
+> Does dmi make any sense for arm64 in the absence of EFI? Why not make
+> CONFIG_DMI depend on EFI. You still want to use a core_initcall in case
+> runtime is disabled, but you could put it in efi.c in that case.
+>
 
-On 2014/9/23 1:30, Randy Dunlap wrote:
-> On 09/22/14 01:17, Jiang Liu wrote:
->> ---
->>  Documentation/IRQ-domain.txt |   71 +++++++++
->>  include/linux/irq.h          |    3 +
->>  include/linux/irqdomain.h    |   86 ++++++++++
->>  kernel/irq/Kconfig           |    3 +
->>  kernel/irq/chip.c            |    3 +
->>  kernel/irq/irqdomain.c       |  360 ++++++++++++++++++++++++++++++++++++++++--
->>  6 files changed, 510 insertions(+), 16 deletions(-)
+CONFIG_DMI already depends on CONFIG_EFI, so putting the core_initcall
+in efi.c makes perfect sense.
+The problem Catalin hit was a CONFIG_EFI/CONFIG_DMI capable kernel
+booted through another bootloader.
+
+-- 
+Ard.
+
+
+
+>> >> WARNING: CPU: 4 PID: 1 at
+>> >> /work/Linux/linux-2.6-aarch64/drivers/firmware/dmi_scan.c:591
+>> >> dmi_matches+0x10c/0x110()
+>> >> dmi check: not initialized yet.
+>> >> Modules linked in:
+>> >> CPU: 4 PID: 1 Comm: swapper/0 Not tainted 3.17.0-rc4+ #606
+>> >> Call trace:
+>> >> [<ffffffc000087fb0>] dump_backtrace+0x0/0x124
+>> >> [<ffffffc0000880e4>] show_stack+0x10/0x1c
+>> >> [<ffffffc0004d58f8>] dump_stack+0x74/0xb8
+>> >> [<ffffffc0000ab640>] warn_slowpath_common+0x8c/0xb4
+>> >> [<ffffffc0000ab6b4>] warn_slowpath_fmt+0x4c/0x58
+>> >> [<ffffffc0003f2d7c>] dmi_matches+0x108/0x110
+>> >> [<ffffffc0003f2da8>] dmi_check_system+0x24/0x68
+>> >> [<ffffffc0006974c4>] atkbd_init+0x10/0x34
+>> >> [<ffffffc0000814ac>] do_one_initcall+0x88/0x1a0
+>> >> [<ffffffc00067aab4>] kernel_init_freeable+0x148/0x1e8
+>> >> [<ffffffc0004d2c64>] kernel_init+0x10/0xd4
+>> >>
+>> >> --
+>> >> Catalin
 >>
->> diff --git a/Documentation/IRQ-domain.txt b/Documentation/IRQ-domain.txt
->> index 8a8b82c9ca53..062f6b6088b4 100644
->> --- a/Documentation/IRQ-domain.txt
->> +++ b/Documentation/IRQ-domain.txt
->> @@ -151,3 +151,74 @@ used and no descriptor gets allocated it is very important to make sure
->>  that the driver using the simple domain call irq_create_mapping()
->>  before any irq_find_mapping() since the latter will actually work
->>  for the static IRQ assignment case.
->> +
->> +==== Hierarchy IRQ domain ====
->> +On some architectures, there may be multiple interrupt controllers
->> +involved in delivering an interrupt from the device to the target CPU.
->> +Let's look at a typical interrupt delivering path on x86 platforms:
->> +
->> +Device --> IOAPIC -> Interrupt remapping Controller -> Local APIC -> CPU
->> +
->> +There are three interrupt controllers involved:
->> +1) IOAPIC controller
->> +2) Interrupt remapping controller
->> +3) Local APIC controller
->> +
->> +To support such a hardware topology and make software architecture match
->> +hardware architecture, an irq_domain data structure is built for each
->> +interrupt controller and those irq_domains are organized into hierarchy.
->> +When building irq_domain hierarchy, the irq_domain near to the device is
->> +child and the irq_domain near to CPU is parent. So a hierarchy structure
->> +as below will be built for the example above.
->> +	CPU Vector irq_domain (root irq_domain to manage CPU vectors)
->> +		^
->> +		|
->> +	Interrupt Remapping irq_domain (manage irq_remapping entries)
->> +		^
->> +		|
->> +	IOAPIC irq_domain (manage IOAPIC delivery entries/pins)
->> +
->> +There are four major interfaces to use hierarchy irq_domain:
->> +1) irq_domain_alloc_irqs(): allocate IRQ descriptors and interrupt
->> +   controller related resources to deliver these interrupts.
->> +2) irq_domain_free_irqs(): free IRQ descriptors and interrupt controler
-> 
->                                                                  controller
-> 
->> +   related resources associated with these interrupts.
->> +3) irq_domain_activate_irq(): activate interrupt controller hardware to
->> +   deliver the interrupt.
->> +3) irq_domain_deactivate_irq(): deactivate interrupt controller hardware
->> +   to stopping delivering the interrupt.
-> 
->       to stop
-> 
->> +
->> +Following changes are needed to support hierarchy irq_domain.
->> +1) a new field 'parent' is added to struct irq_domain, it's used to
-> 
->                                               irq_domain;
-> 
->> +   maintain irq_domain hierarchy information.
->> +2) a new field 'parent_data' is added to struct irq_data, it's used to
-> 
->                                                    irq_data;
-> 
->> +   build hierarchy irq_data to match hierarchy irq_domains. The irq_data
->> +   is used to store irq_domain pointer and hardware irq number.
->> +3) new callbacks are added to struct irq_domain_ops to support hierarchy
->> +   irq_domain operations.
->> +
->> +With support of hierarchy irq_domain and hierarchy irq_data ready, an
->> +irq_domain structure is built for each interrupt controller, and an
->> +irq_data structure is allocated for each irq_domain associated with an
->> +IRQ. Now we could go one step further to support stacked(hierarchy)
->> +irq_chip. That is, an irq_chip is associated with each irq_data along
->> +the hierarchy. A child irq_chip may implement a required action by
->> +itself or by cooperating with its parent irq_chip.
->> +
->> +With stacked irq_chip, interrupt controller driver only needs to deal
->> +with the hardware managed by itself and may ask for services from its
->> +parent irq_chip when needed. So we could achieve a much more cleaner
-> 
->                                                     a much cleaner
-> 
->> +software architecture.
->> +
->> +For an interrupt controller driver to support hierarchy irq_domain, it
->> +needs to:
->> +1) Implement irq_domain_ops.alloc and irq_domain_ops.free
->> +2) Optionally implement irq_domain_ops.activate and
->> +   irq_domain_ops.deactivate.
->> +3) Optionally implement an irq_chip to manage the interrupt controller
->> +   hardware.
->> +4) No need to implement irq_domain_ops.map and irq_domain_ops.unmap,
->> +   they are unused with hierarchy irq_domain.
->> +
->> +Hierarchy irq_domain may also be used to support other architectures,
->> +such as ARM, ARM64 etc.
-> 
->> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->> index b0f9d16e48f6..46e047c414bc 100644
->> --- a/include/linux/irqdomain.h
->> +++ b/include/linux/irqdomain.h
->> @@ -77,6 +89,7 @@ struct irq_domain_chip_generic;
->>   * @ops: pointer to irq_domain methods
->>   * @host_data: private data pointer for use by owner.  Not touched by irq_domain
->>   *             core code.
->> + * @flags: host per irqdomain flags
-> 
->                        irq_domain ?
-> 
->>   *
->>   * Optional elements
->>   * @of_node: Pointer to device tree nodes associated with the irq_domain. Used
->> @@ -84,6 +97,7 @@ struct irq_domain_chip_generic;
->>   * @gc: Pointer to a list of generic chips. There is a helper function for
->>   *      setting up one or more generic chips for interrupt controllers
->>   *      drivers using the generic chip library which uses this pointer.
->> + * @parent: Pointer to parent irqdomain to support hierarchy irqdomains
-> 
->                                  irq_domain ?                   irq_domains ?
-> 
->>   *
->>   * Revmap data, used internally by irq_domain
->>   * @revmap_direct_max_irq: The largest hwirq that can be set for controllers that
-> 
->> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->> index 6534ff6ce02e..26628239088c 100644
->> --- a/kernel/irq/irqdomain.c
->> +++ b/kernel/irq/irqdomain.c
->> @@ -709,3 +708,332 @@ const struct irq_domain_ops irq_domain_simple_ops = {
->>  	.xlate = irq_domain_xlate_onetwocell,
->>  };
->>  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
->> +
->> +static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->> +				  irq_hw_number_t hwirq, int node)
->> +{
->> +	unsigned int hint;
->> +
->> +	if (virq >= 0) {
->> +		virq = irq_alloc_descs(virq, virq, nr_irqs, node);
->> +	} else {
->> +		hint = hwirq % nr_irqs;
->> +		if (hint == 0)
->> +			hint++;
->> +		virq = irq_alloc_descs_from(hint, nr_irqs, node);
->> +		if (virq <= 0 && hint > 1)
->> +			virq = irq_alloc_descs_from(1, nr_irqs, node);
->> +	}
->> +
->> +	return virq;
->> +}
->> +
->> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
->> +static void irq_domain_free_descs(unsigned int virq, unsigned int nr_irqs)
->> +{
->> +	unsigned int i;
->> +
->> +	for (i = 0; i < nr_irqs; i++)
->> +		irq_free_desc(virq + i);
->> +}
->> +
->> +static void irq_domain_insert_irq(int virq)
->> +{
->> +	struct irq_data *data;
->> +
->> +	for (data = irq_get_irq_data(virq); data; data = data->parent_data) {
->> +		struct irq_domain *domain = data->domain;
->> +		irq_hw_number_t hwirq = data->hwirq;
->> +
->> +		if (hwirq < domain->revmap_size) {
->> +			domain->linear_revmap[hwirq] = virq;
->> +		} else {
->> +			mutex_lock(&revmap_trees_mutex);
->> +			radix_tree_insert(&domain->revmap_tree, hwirq, data);
->> +			mutex_unlock(&revmap_trees_mutex);
->> +		}
->> +
->> +		/* If not already assigned, give the domain the chip's name */
->> +		if (!domain->name && data->chip)
->> +			domain->name = data->chip->name;
->> +	}
->> +
->> +	irq_clear_status_flags(virq, IRQ_NOREQUEST);
->> +}
->> +
->> +static void irq_domain_remove_irq(int virq)
->> +{
->> +	struct irq_data *data;
->> +
->> +	irq_set_status_flags(virq, IRQ_NOREQUEST);
->> +	irq_set_chip_and_handler(virq, NULL, NULL);
->> +	synchronize_irq(virq);
->> +	smp_mb();
->> +
->> +	for (data = irq_get_irq_data(virq); data; data = data->parent_data) {
->> +		struct irq_domain *domain = data->domain;
->> +		irq_hw_number_t hwirq = data->hwirq;
->> +
->> +		if (hwirq < domain->revmap_size) {
->> +			domain->linear_revmap[hwirq] = 0;
->> +		} else {
->> +			mutex_lock(&revmap_trees_mutex);
->> +			radix_tree_delete(&domain->revmap_tree, hwirq);
->> +			mutex_unlock(&revmap_trees_mutex);
->> +		}
->> +	}
->> +}
->> +
->> +static struct irq_data *irq_domain_insert_irq_data(struct irq_domain *domain,
->> +						   struct irq_data *child)
->> +{
->> +	struct irq_data *irq_data;
->> +
->> +	irq_data = kzalloc_node(sizeof(*irq_data), GFP_KERNEL, child->node);
->> +	if (irq_data) {
->> +		child->parent_data = irq_data;
->> +		irq_data->irq = child->irq;
->> +		irq_data->node = child->node;
->> +		irq_data->domain = domain;
->> +	}
->> +
->> +	return irq_data;
->> +}
->> +
->> +static void irq_domain_free_irq_data(unsigned int virq, unsigned int nr_irqs)
->> +{
->> +	int i;
->> +	struct irq_data *irq_data, *tmp;
->> +
->> +	for (i = 0; i < nr_irqs; i++) {
->> +		irq_data = irq_get_irq_data(virq + i);
->> +		tmp = irq_data->parent_data;
->> +		irq_data->parent_data = NULL;
->> +		irq_data->domain = NULL;
->> +
->> +		while (tmp) {
->> +			irq_data = tmp;
->> +			tmp = tmp->parent_data;
->> +			kfree(irq_data);
->> +		}
->> +	}
->> +}
->> +
->> +static int irq_domain_alloc_irq_data(struct irq_domain *domain,
->> +				     unsigned int virq, unsigned int nr_irqs)
->> +{
->> +	int i;
->> +	struct irq_data *irq_data;
->> +	struct irq_domain *parent;
->> +
->> +	/* The outmost irq_data is embedded in struct irq_desc */
-> 
-> 	       outermost
-> 
->> +	for (i = 0; i < nr_irqs; i++) {
->> +		irq_data = irq_get_irq_data(virq + i);
->> +		irq_data->domain = domain;
->> +
->> +		for (parent = domain->parent; parent; parent = parent->parent) {
->> +			irq_data = irq_domain_insert_irq_data(parent, irq_data);
->> +			if (!irq_data) {
->> +				irq_domain_free_irq_data(virq, i + 1);
->> +				return -ENOMEM;
->> +			}
->> +		}
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +/**
->> + * irq_domain_get_irq_data - Get irq_data assoicated with @virq and @domain
-> 
->                                              associated
-> 
->> + * @domain: domain to match
->> + * @virq: IRQ number to get irq_data
->> + */
->> +struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
->> +					 unsigned int virq)
->> +{
->> +	struct irq_data *irq_data;
->> +
->> +	for (irq_data = irq_get_irq_data(virq); irq_data;
->> +	     irq_data = irq_data->parent_data)
->> +		if (irq_data->domain == domain)
->> +			return irq_data;
->> +
->> +	return NULL;
->> +}
->> +
->> +int irq_domain_set_hwirq_and_chip(struct irq_domain *domain, unsigned int virq,
->> +				  irq_hw_number_t hwirq, struct irq_chip *chip,
->> +				  void *chip_data)
->> +{
->> +	struct irq_data *irq_data = irq_domain_get_irq_data(domain, virq);
->> +
->> +	if (!irq_data)
->> +		return -ENOENT;
->> +
->> +	irq_data->hwirq = hwirq;
->> +	irq_data->chip = chip;
->> +	irq_data->chip_data = chip_data;
->> +
->> +	return 0;
->> +}
->> +
->> +void irq_domain_reset_irq_data(struct irq_data *irq_data)
->> +{
->> +	irq_data->hwirq = 0;
->> +	irq_data->chip = NULL;
->> +	irq_data->chip_data = NULL;
->> +}
->> +
->> +/**
->> + * __irq_domain_alloc_irqs - Allocate IRQs from domain
->> + * @domain: domain to allocate from
->> + * @irq_base: allocate specified IRQ nubmer if irq_base >= 0
->> + * @nr_irqs: number of IRQs to allocate
->> + * @node: NUMA node id for memory allocation
->> + * @arg: domain specific argument
->> + * @realloc: IRQ descriptors have already been allocated if true
->> + *
->> + * Allocate IRQ numbers and initialized all data structures to support
->> + * hiearchy IRQ domains.
->> + * Parameter @realloc is mainly to support legacy IRQs.
->> + * Returns error code or allocated IRQ number
->> + */
->> +int __irq_domain_alloc_irqs(struct irq_domain *domain, int irq_base,
->> +			    unsigned int nr_irqs, int node, void *arg,
->> +			    bool realloc)
->> +{
->> +	int i, ret, virq;
->> +
->> +	if (domain == NULL) {
->> +		domain = irq_default_domain;
->> +		if (WARN(!domain, "domain is NULL; cannot allocate IRQ\n"))
->> +			return -EINVAL;
->> +	}
->> +
->> +	if (!domain->ops->alloc) {
->> +		pr_debug("domain->ops->alloc() is NULL\n");
->> +		return -ENOSYS;
->> +	}
->> +
->> +	if (realloc && irq_base >= 0) {
->> +		virq =  irq_base;
->> +	} else {
->> +		virq = irq_domain_alloc_descs(irq_base, nr_irqs, 0, node);
->> +		if (virq < 0) {
->> +			pr_debug("cannot allocate IRQ(base %d, count %d)\n",
->> +				 irq_base, nr_irqs);
->> +			return virq;
->> +		}
->> +	}
->> +
->> +	if (irq_domain_alloc_irq_data(domain, virq, nr_irqs)) {
->> +		pr_debug("cannot allocate memory for IRQ%d\n", virq);
->> +		ret = -ENOMEM;
->> +		goto out_free_desc;
->> +	}
->> +
->> +	mutex_lock(&irq_domain_mutex);
->> +	ret = domain->ops->alloc(domain, virq, nr_irqs, arg);
->> +	if (ret < 0) {
->> +		mutex_unlock(&irq_domain_mutex);
->> +		goto out_free_irq_data;
->> +	}
->> +	for (i = 0; i < nr_irqs; i++)
->> +		irq_domain_insert_irq(virq + i);
->> +	mutex_unlock(&irq_domain_mutex);
->> +
->> +	return virq;
->> +
->> +out_free_irq_data:
->> +	irq_domain_free_irq_data(virq, nr_irqs);
->> +out_free_desc:
->> +	irq_domain_free_descs(virq, nr_irqs);
->> +	return ret;
->> +}
->> +
->> +/**
->> + * irq_domain_free_irqs - Free IRQ number and assoicated data structures
-> 
->                                                  associated
-> 
->> + * @virq: base IRQ number
->> + * @nr_irqs: number of IRQs to free
->> + */
->> +void irq_domain_free_irqs(unsigned int virq, unsigned int nr_irqs)
->> +{
->> +	int i;
->> +	struct irq_data *data = irq_get_irq_data(virq);
->> +
->> +	if (WARN(!data || !data->domain || !data->domain->ops->free,
->> +		 "NULL pointer, cannot free irq\n"))
->> +		return;
->> +
->> +	mutex_lock(&irq_domain_mutex);
->> +	for (i = 0; i < nr_irqs; i++)
->> +		irq_domain_remove_irq(virq + i);
->> +	data->domain->ops->free(data->domain, virq, nr_irqs);
->> +	mutex_unlock(&irq_domain_mutex);
->> +
->> +	irq_domain_free_irq_data(virq, nr_irqs);
->> +	irq_domain_free_descs(virq, nr_irqs);
->> +}
->> +
->> +/**
->> + * irq_domain_activate_irq - Call domain_ops->activate recursively to activate
->> + *			     interrupt
->> + * @irq_data: out most irq_data associated with interrupt
-> 
->                  outermost
-> 
->> + *
->> + * It calls domain_ops->activate to program interrupt controllers, so the
->> + * interrupt could actually delivered.
->> + */
->> +int irq_domain_activate_irq(struct irq_data *irq_data)
->> +{
->> +	int ret = 0;
->> +
->> +	if (irq_data && irq_data->domain) {
->> +		struct irq_domain *domain = irq_data->domain;
->> +
->> +		if (irq_data->parent_data)
->> +			ret = irq_domain_activate_irq(irq_data->parent_data);
->> +		if (ret == 0 && domain->ops->activate)
->> +			ret = domain->ops->activate(domain, irq_data);
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->> +/**
->> + * irq_domain_deactivate_irq - Call domain_ops->deactivate recursively to
->> + *			       deactivate interrupt
->> + * @irq_data: out most irq_data associated with interrupt
-> 
->                  outermost
-> 
->> + *
->> + * It calls domain_ops->deactivate to program interrupt controllers to disable
->> + * interrupt delivery.
->> + */
->> +int irq_domain_deactivate_irq(struct irq_data *irq_data)
->> +{
->> +	int ret = 0;
->> +
->> +	if (irq_data && irq_data->domain) {
->> +		struct irq_domain *domain = irq_data->domain;
->> +
->> +		if (domain->ops->deactivate)
->> +			ret = domain->ops->deactivate(domain, irq_data);
->> +		if (ret == 0 && irq_data->parent_data)
->> +			ret = irq_domain_deactivate_irq(irq_data->parent_data);
->> +	}
->> +
->> +	return ret;
->> +}
->> +#else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->> +/**
->> + * irq_domain_get_irq_data - Get irq_data assoicated with @virq and @domain
-> 
->                                              associated
-> 
->> + * @domain: domain to match
->> + * @virq: IRQ number to get irq_data
->> + */
->> +struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
->> +					 unsigned int virq)
->> +{
->> +	struct irq_data *irq_data = irq_get_irq_data(virq);
->> +
->> +	return (irq_data && irq_data->domain == domain) ? irq_data : NULL;
->> +}
->> +
->> +#endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->>
-> 
-> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
