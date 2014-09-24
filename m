@@ -1,40 +1,89 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 24 Sep 2014 12:06:29 -0700
-Subject: [PATCH] drivers/soc: ti: fix build break with modules
-In-Reply-To: <5422CDB1.9060505@ti.com>
-References: <5422CDB1.9060505@ti.com>
-Message-ID: <1411585589-6108-1-git-send-email-olof@lixom.net>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 25 Sep 2014 00:37:00 +0530
+Subject: [PATCH 3/6] pci,
+ thunder: Add PCIe host controller devicetree bindings
+In-Reply-To: <3414852.SWQ9rRcUDx@wuerfel>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <3082935.e3X4GsVUDn@wuerfel>
+ <CA+sq2Ce8sb=YGma05qEk_992Mc9M92TxCk+RWsyi6tY-FVOCXw@mail.gmail.com>
+ <3414852.SWQ9rRcUDx@wuerfel>
+Message-ID: <CA+sq2CcXCVrk=fxH79n88ZJj5fBQmbyhnzj08qHNO8EmpZT1Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes below build break by not switching to stubs when the driver is a module:
+On Thu, Sep 25, 2014 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 24 September 2014 23:34:04 Sunil Kovvuri wrote:
+>> On Wed, Sep 24, 2014 at 9:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday 24 September 2014 17:37:45 Robert Richter wrote:
+>> >> +               compatible = "cavium,thunder-pcie";
+>> >> +               device_type = "pci";
+>> >> +               msi-parent = <&its>;
+>> >> +               bus-range = <0 255>;
+>> >> +               #size-cells = <2>;
+>> >> +               #address-cells = <3>;
+>> >> +               reg = <0x8480 0x00000000 0 0x10000000>;  /* Configuration space */
+>> >> +               ranges = <0x03000000 0x8010 0x00000000 0x8010 0x00000000 0x70 0x00000000>, /* mem ranges */
+>> >> +                       <0x03000000 0x8300 0x00000000 0x8300 0x00000000 0x80 0x00000000>,
+>> >> +                       <0x03000000 0x87e0 0x00000000 0x87e0 0x00000000 0x01 0x00000000>;
+>> >> +        };
+>> >
+>> > If you claim the entire 0-255 bus range, I think you should also
+>> > specify a domain, otherwise it's not predictable which domain you
+>> > get.
+>> >
+>> > The interrupt-map and interrupt-map-mask properties are required for PCI,
+>> > otherwise you can't do LSI interrupts.
+>>
+>> This PCI controller supports only MSIx interrupts which are edge triggered.
+>
+> Interesting, so it's not PCI compliant then? I assume this will be fixed
+> in the production version of the silicon, right?
+>
+> Having no support for interrupts mean that the majority of PCI device drivers
+> will fail.
 
-drivers/soc/ti/knav_dma.c:418:7: error: redefinition of 'knav_dma_open_channel'
- void *knav_dma_open_channel(struct device *dev, const char *name,
-       ^
-In file included from drivers/soc/ti/knav_dma.c:26:0:
-include/linux/soc/ti/knav_dma.h:165:21: note: previous definition of 'knav_dma_open_channel' was here
- static inline void *knav_dma_open_channel(struct device *dev, const char *name,
-                     ^
+This controller is for on-board PCI devices and all of them do support
+MSIx interrupts.
 
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- include/linux/soc/ti/knav_dma.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+>> > If your hardware can support it, you should also list I/O space and prefetchable
+>> > memory spaces. Can you explain why you have multiple non-prefetchable ranges?
+>>
+>> Our hardware is an ECAM based host controller and doesn't support I/O
+>> and prefetchable memory spaces.
+>> All on-board PCI devices connected to this PCI controller have fixed resources
+>> and doesn't have to be allocated/reassigned. Some of these devices are
+>> SRIOV based.
+>
+> I think you need to mark the ones that are nonrelocatable with flag
+> 0x80000000, otherwise the PCI core might decide to reassign them.
 
-diff --git a/include/linux/soc/ti/knav_dma.h b/include/linux/soc/ti/knav_dma.h
-index e864a3e..dad035c 100644
---- a/include/linux/soc/ti/knav_dma.h
-+++ b/include/linux/soc/ti/knav_dma.h
-@@ -157,7 +157,7 @@ struct knav_dma_desc {
- 	u32	pad[4];
- } ____cacheline_aligned;
- 
--#ifdef CONFIG_KEYSTONE_NAVIGATOR_DMA
-+#if IS_ENABLED(CONFIG_KEYSTONE_NAVIGATOR_DMA)
- void *knav_dma_open_channel(struct device *dev, const char *name,
- 				struct knav_dma_cfg *config);
- void knav_dma_close_channel(void *channel);
--- 
-1.7.10.4
+Is this flag part of DT pci node properties ?
+I am using IORESOURCE_PCI_FIXED flag. Its there in other patches of
+the same series.
+
+>
+>> Kernel's SRIOV (pci/iov.c) is expecting 'resource->parent' hierarchy
+>> to be set, otherwise doesn't
+>> enable SRIOV device. So, here multiple non-prefetchable ranges of root bus
+>> aid in resource claiming and setting res->parent hierarchy.
+>
+> I don't understand. Isn't that just a bug in the code that you are working
+> around with the DT. Have you tried fixing the code instead?
+
+I tried but wasn't sure if its going to impact existing SRIOV devices.
+Will have a deeper look again .
+
+>
+>> We do call "pci_claim_resource" in controller driver code.
+>> "[PATCH 1/6] pci, thunder: Add support for Thunder PCIe host controller."
+>
+> My guess is that you are using the wrong interface here. Isn't the normal
+> request_resource() in the host driver enough?
+
+Isn't that host driver calls "request_resource" only for resources of root port.
+i.e requesting from iomem_resource/ioport_resource. Here i am referring
+to SRIOV devices enumerated upon scan of root port.
+
+>
+>         Arnd
