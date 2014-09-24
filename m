@@ -1,44 +1,57 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 24 Sep 2014 21:45:01 +0530
-Subject: [PATCH 11/27] mfd: ab8500-gpadc: use
- pm_runtime_last_busy_and_autosuspend helper
-In-Reply-To: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
-References: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
-Message-ID: <1411575342-31048-12-git-send-email-vinod.koul@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Sep 2014 17:49:46 +0100
+Subject: [PATCH 1/6] pci, thunder: Add support for Thunder PCIe host
+ controller
+In-Reply-To: <27476217.5ToIFGoMDz@wuerfel>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-2-git-send-email-rric@kernel.org>
+ <27476217.5ToIFGoMDz@wuerfel>
+Message-ID: <20140924164946.GI16244@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new pm_runtime_last_busy_and_autosuspend helper instead of open
-coding the same code
+On Wed, Sep 24, 2014 at 05:12:26PM +0100, Arnd Bergmann wrote:
+> On Wednesday 24 September 2014 17:37:43 Robert Richter wrote:
+> > From: Sunil Goutham <sgoutham@cavium.com>
+> > 
+> > This patch adds support for PCI host controller of Cavium Thunder
+> > SoCs.
+> 
+> I had expected this hardware to be SBSA compliant. Why do you need
+> a hardware specific driver, is this a workaround for buggy hardware
+> or just noncompliant?
 
-Signed-off-by: Vinod Koul <vinod.koul@intel.com>
----
- drivers/mfd/ab8500-gpadc.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
+Patches welcome to pci-host-generic.c :) Lorenzo already has code to port
+it to Liviu's new API, so do shout if it's not suitable for your needs.
 
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index 36000f9..46bea3a 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -571,8 +571,7 @@ int ab8500_gpadc_double_read_raw(struct ab8500_gpadc *gpadc, u8 channel,
- 	}
- 
- 	/* Disable VTVout LDO this is required for GPADC */
--	pm_runtime_mark_last_busy(gpadc->dev);
--	pm_runtime_put_autosuspend(gpadc->dev);
-+	pm_runtime_last_busy_and_autosuspend(gpadc->dev);
- 
- 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
- 
-@@ -910,8 +909,7 @@ static int ab8500_gpadc_resume(struct device *dev)
- 	if (ret)
- 		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
- 
--	pm_runtime_mark_last_busy(gpadc->dev);
--	pm_runtime_put_autosuspend(gpadc->dev);
-+	pm_runtime_last_busy_and_autosuspend(gpadc->dev);
- 
- 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
- 	return ret;
--- 
-1.7.0.4
+> > +static int thunder_pcie_msi_enable(struct thunder_pcie *pcie,
+> > +					struct pci_bus *bus)
+> > +{
+> > +	struct device_node *msi_node;
+> > +
+> > +	msi_node = of_parse_phandle(pcie->node, "msi-parent", 0);
+> > +	if (!msi_node)
+> > +		return -ENODEV;
+> > +
+> > +	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
+> > +	if (!pcie->msi)
+> > +		return -ENODEV;
+> > +
+> > +	pcie->msi->dev = pcie->dev;
+> > +	bus->msi = pcie->msi;
+> > +
+> > +	return 0;
+> > +}
+> 
+> This is probably something we should add to the generic host driver as well,
+> so it can work with SBSA compliant implementations that come with an MSI
+> controller. Maybe move it into common code so it can be shared with that
+> driver.
+
+Agreed. I've been carrying something similar [1] (based on a hacked-up version
+of bios32, so not bothered to post it) whilst I've been waiting for the
+arm64 core PCI code to get merged.
+
+Will
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/drivers/pci/host/pci-host-generic.c?h=iommu/pci&id=b719acf062ceccfbd79ee7b1ae0b7904ea4da27e
