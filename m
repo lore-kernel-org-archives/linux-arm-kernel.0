@@ -1,61 +1,58 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 24 Sep 2014 07:27:02 -0600
-Subject: [PATCH v3 1/3] PCI: designware: Rename get_msi_data to
- get_msi_addr
-In-Reply-To: <1411482540-31297-3-git-send-email-Minghuan.Lian@freescale.com>
-References: <1411482540-31297-1-git-send-email-Minghuan.Lian@freescale.com>
- <1411482540-31297-3-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <20140924132702.GC13850@google.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 Sep 2014 15:28:23 +0200
+Subject: [PATCH 0/6] ARM: sunxi: Add basic support for Allwinner A80 SoC
+In-Reply-To: <CAGb2v659fps1WAqkdnbnTtHxAdCZQy+rYXDC90Y44pPtcxnsFg@mail.gmail.com>
+References: <1411311493-24344-1-git-send-email-wens@csie.org>
+ <20140924064124.GS15315@lukather>
+ <CAGb2v659fps1WAqkdnbnTtHxAdCZQy+rYXDC90Y44pPtcxnsFg@mail.gmail.com>
+Message-ID: <20140924132823.GV15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 10:28:58PM +0800, Minghuan Lian wrote:
-> The function get_msi_data is used to return MSI message address.
-> In order to accurately express function purpose the patch rename
-> it to get_msi_addr.
+On Wed, Sep 24, 2014 at 06:40:42PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> On Wed, Sep 24, 2014 at 2:41 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Chen-Yu,
+> >
+> > On Sun, Sep 21, 2014 at 10:58:07PM +0800, Chen-Yu Tsai wrote:
+> >> Hi everyone,
+> >>
+> >> This patch series adds very basic support for Allwinner's A80 SoC,
+> >> a big.LITTLE architecture with 4 Cortex-A7s and 4 Cortex-A15s.
+> >>
+> >> Development is done on the A80 Optimus Board, the defacto development
+> >> board for the A80, with the accompanying SDK as a reference.
+> >>
+> >> So far I've been unable to get the board to boot from MMC, or
+> >> using Android fastboot. I'm using Allwinner's FEL mode to load
+> >> the bootloader and kernel+dtb image over USB. Notes on my attempts
+> >> can be found here: http://linux-sunxi.org/User:Wens#A80_Optimus
+> >
+> > It looks very nice, thanks a lot. You'll find a minor comments inline.
+> >
+> > One thing I forgot to ask you about when doing the A23, and that would
+> > nice to do is to update the documentation we have in
+> > Documentation/arm/sunxi/README with the A23 and A80 infos you've been
+> > able to gather.
+> 
+> I'll add the A80 datasheet in v2, and do a separate series for A23, A31,
+> and A31s docs.
 
-Applied patches 1 and 2 to pci/host-designware with Mohit's ack for v3.18,
-thanks!
+Ah, yes, the A31 and A31s didn't have links to the user manuals...
 
-> ---
-> Change log:
-> v3: no change
-> v2: no change just derived from v1
-> 
->  drivers/pci/host/pcie-designware.c | 4 ++--
->  drivers/pci/host/pcie-designware.h | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 5d720c2..1c09f814 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -361,8 +361,8 @@ static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
->  	 */
->  	desc->msi_attrib.multiple = msgvec;
->  
-> -	if (pp->ops->get_msi_data)
-> -		msg.address_lo = pp->ops->get_msi_data(pp);
-> +	if (pp->ops->get_msi_addr)
-> +		msg.address_lo = pp->ops->get_msi_addr(pp);
->  	else
->  		msg.address_lo = virt_to_phys((void *)pp->msi_data);
->  	msg.address_hi = 0x0;
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index 48f8670..904e40a 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -70,7 +70,7 @@ struct pcie_host_ops {
->  	void (*host_init)(struct pcie_port *pp);
->  	void (*msi_set_irq)(struct pcie_port *pp, int irq);
->  	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
-> -	u32 (*get_msi_data)(struct pcie_port *pp);
-> +	u32 (*get_msi_addr)(struct pcie_port *pp);
->  	void (*scan_bus)(struct pcie_port *pp);
->  	int (*msi_host_init)(struct pcie_port *pp, struct msi_chip *chip);
->  };
-> -- 
-> 1.9.1
-> 
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140924/de1a392d/attachment.sig>
