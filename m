@@ -1,44 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Sep 2014 15:52:57 +0100
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation, code
- consolidation
-In-Reply-To: <20140924144541.GJ15842@e104818-lin.cambridge.arm.com>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <20140922153919.GQ25809@arm.com>
- <20140922223022.GO5182@n2100.arm.linux.org.uk>
- <20140924144541.GJ15842@e104818-lin.cambridge.arm.com>
-Message-ID: <20140924145257.GY5182@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 24 Sep 2014 17:03:11 +0200
+Subject: [RFC PATCH] ARM: at91: remove no-MMU at91x40 support
+In-Reply-To: <3700375.DRR5iB2NGi@wuerfel>
+References: <1411568281-3924-1-git-send-email-nicolas.ferre@atmel.com>
+ <3700375.DRR5iB2NGi@wuerfel>
+Message-ID: <5422DD2F.4090308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 03:45:41PM +0100, Catalin Marinas wrote:
-> On Mon, Sep 22, 2014 at 11:30:23PM +0100, Russell King - ARM Linux wrote:
-> > I raised a while back with Will whether there's much point to having
-> > this on ARM.  While it's useful for virtualisation, the majority of
-> > 32-bit ARM doesn't run virtualised.
+On 24/09/2014 16:47, Arnd Bergmann :
+> On Wednesday 24 September 2014 16:18:01 Nicolas Ferre wrote:
+>> As there is currently no-one to take care of this old !MMU target and as its
+>> support in recent kernels is a bit rotten, remove this at91x40 support and the
+>> board file associated with it (at91eb01).
+>> There are modern ARM !MMU in Mainline now so this target is not interesting for
+>> building tests anymore. It would be better to start from these modern ARM !MMU
+>> platforms to reintroduce at91x40 support if needed.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> This has nothing to do with virtualisation. The main reason we use
-> CNTVCT is to not require kernel binary differences when running the OS
-> as host or guest. But it does _not_ mean that it is only used when
-> running as a guest.
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> > So there's little point in having the VDSO on the majority of
-> > platforms - it will just add additional unnecessary cycles slowing
-> > down the system calls that the VDSO is designed to try to speed up.
+>> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+>> index 807b22dadcb6..f3bd8abd25c0 100644
+>> --- a/arch/arm/mach-at91/Kconfig
+>> +++ b/arch/arm/mach-at91/Kconfig
+>> @@ -18,26 +18,22 @@ config HAVE_AT91_DBGU2
+>>  config AT91_USE_OLD_CLK
+>>  	bool
+>>  
+>> -config AT91_PMC_UNIT
+>> -	bool
+>> -	default !ARCH_AT91X40
+>> -
+>>  config COMMON_CLK_AT91
+>>  	bool
+>> -	default AT91_PMC_UNIT && USE_OF && !AT91_USE_OLD_CLK
+>> +	default USE_OF && !AT91_USE_OLD_CLK
+>>  	select COMMON_CLK
+>>  
+>>  config OLD_CLK_AT91
+>>  	bool
+>> -	default AT91_PMC_UNIT && AT91_USE_OLD_CLK
+>> +	default AT91_USE_OLD_CLK
+>>  
+>>  config AT91_SAM9_ALT_RESET
+>>  	bool
+>> -	default !ARCH_AT91X40
+>> +	default y
+>>  
+>>  config AT91_SAM9G45_RESET
+>>  	bool
+>> -	default !ARCH_AT91X40
+>> +	default y
+>>  
+>>  config AT91_SAM9_TIME
+>>  	bool
 > 
-> A good reason for VDSO is to avoid a system call for gettimeofday when
-> you can read the clocks source from user space. That's a significant
-> improvement on CPUs like A7, A15.
+> I think these can be simplified further: AT91_SAM9G45_RESET and
+> AT91_SAM9_ALT_RESET can just go away and the files put into
+> obj-y.
 
-I'm *not* arguing against having a VDSO to speed up that crap.  What
-I'm trying to get to the bottom of - something which has been totally
-lost sight of - is what the friggin effect of this stuff is on CPUs
-*without* the architected timer.
+Yes, I had the same idea before realizing that these two directives will
+move away in a patch already sent for 3.18. So, as this material is
+probably 3.19-ish, I kept them as they are and keep in mind to remove
+them when I merge them with 3.18-rc1...
 
-Until I get an answer to what the measured effect is, I'm saying no to
-VDSO on ARM, because - as seems to be the norm - the evaluation job is
-only half done.
+> OLD_CLK_AT91 is the same as AT91_USE_OLD_CLK, so you could
+> just use that instead. I suspect the 'USE_OF' dependency for
+> COMMON_CLK_AT91 can also go away, since all platforms are
+> either board file based and select AT91_USE_OLD_CLK, or they
+> are DT based and don't.
 
+Here also, I didn't want to touch more because we need to remove the
+arch/arm/mach-at91/Kconfig.non_dt file very soon (3.19) and I don't want
+to change this file (or all the SoC files) before the chunks related to
+these directives simply go away.
+
+Tell me if it makes sense.
+
+Bye,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
