@@ -1,45 +1,46 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 24 Sep 2014 10:09:09 -0700
-Subject: [PATCH 1/2] ARM: zynq: DT: Add missing reference for ADC
-In-Reply-To: <f6b47676-f664-4b01-8c70-a526eb8d1931@BY2FFO11FD011.protection.gbl>
-References: <fced9e56dc4ef8df9ead34f6444c010cc31c7a61.1411567289.git.michal.simek@xilinx.com>
- <20140924161814.GG13679@xsjandreislx>
- <f6b47676-f664-4b01-8c70-a526eb8d1931@BY2FFO11FD011.protection.gbl>
-Message-ID: <6c7fde5f-aff1-41c1-8cde-b01b976aa9f3@BY2FFO11FD036.protection.gbl>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 24 Sep 2014 18:10:48 +0100
+Subject: [PATCH 5/6] arm64, defconfig: Enable PCI
+In-Reply-To: <20140924162631.GI31556@rric.localhost>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-6-git-send-email-rric@kernel.org>
+ <7901403.qjKNmO519a@wuerfel>
+ <20140924162631.GI31556@rric.localhost>
+Message-ID: <20140924171047.GO15842@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-09-24 at 07:06PM +0200, Michal Simek wrote:
-> On 09/24/2014 06:18 PM, S?ren Brinkmann wrote:
-> > On Wed, 2014-09-24 at 04:01PM +0200, Michal Simek wrote:
-> >> Add missing reference for ADC node.
-> >>
-> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >> ---
-> >>
-> >>  arch/arm/boot/dts/zynq-7000.dtsi | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> index 772381fe07bb..fc90f47f9c03 100644
-> >> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> >> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> >> @@ -64,7 +64,7 @@
-> >>  		interrupt-parent = <&intc>;
-> >>  		ranges;
-> >>
-> >> -		adc at f8007100 {
-> >> +		adc: adc at f8007100 {
-> > I think we enumerated all labels. I.e. 'adc0' is probably better.
+On Wed, Sep 24, 2014 at 05:26:31PM +0100, Robert Richter wrote:
+> On 24.09.14 18:14:11, Arnd Bergmann wrote:
+> > On Wednesday 24 September 2014 17:37:47 Robert Richter wrote:
+> > >  config PCI
+> > >         bool "PCI support"
+> > > +       default y
+> > >         help
+> > >           This feature enables support for PCIe bus system. If you say Y
+> > >           here, the kernel will include drivers and infrastructure code
+> > >           to support PCIe bus devices.
+> > >  
+> > > +config PCI_MSI
+> > > +       def_bool PCI
+> > > +
+> > >  config PCI_DOMAINS
+> > >         def_bool PCI
+> > 
+> > There is already a PCI_MSI symbol in drivers/pci/Kconfig. Just select that
+> > from the PCI symbol above rather than defining a second one.
 > 
-> I was thinking about it and the reason I didn't use that adc0 was
-> that it is unique and it is just one in PS. Maybe there could be another adc in PL
-> but it will be probably automated not to use adc key world.
-> For PL part names was depending on user description.
+> The intention is not to have a second definition, instead this should
+> enable the default value just for arm64. Thus I put it to
+> arch/arm64/Kconfig. Otherwise it would be enabled per default on all
+> archs.
 > 
-> Anyway logic was not to use enumerated label for unique IPs.
-As you said yourself, due to having/being an FPGA and also the
-extensibility of the platform via buses (including PCIe), I
-would not consider any IP to be unique.
+> We could have used select in config ARM64, but I tried to avoid using
+> select due to the dependency issue and instead implement this with
+> default-y/depends-on. Doing so it can be manually disabled too.
 
-	S?ren
+It may be better to simply set PCI and PCI_MSI as defaults in defconfig
+rather than "default y" and an additional config PCI_MSI entry.
+
+-- 
+Catalin
