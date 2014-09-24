@@ -1,78 +1,115 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 24 Sep 2014 09:32:54 -0500
-Subject: [PATCH v2 0/3] arm_arch_timer: VDSO preparation,
- code consolidation
-In-Reply-To: <5422D138.8000002@codeaurora.org>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <20140922153919.GQ25809@arm.com>
- <20140922223022.GO5182@n2100.arm.linux.org.uk> <5420BE92.7050504@mentor.com>
- <5422D138.8000002@codeaurora.org>
-Message-ID: <5422D616.7060807@mentor.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 24 Sep 2014 17:37:24 +0300
+Subject: [RESEND PATCH v2] dt/documentation: add specification of dma bus
+ information
+Message-ID: <1411569444-7567-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2014 09:12 AM, Christopher Covington wrote:
-> Hi Nathan,
-> 
-> On 09/22/2014 08:28 PM, Nathan Lynch wrote:
->> On 09/22/2014 05:30 PM, Russell King - ARM Linux wrote:
->>> On Mon, Sep 22, 2014 at 04:39:19PM +0100, Will Deacon wrote:
->>>> On Thu, Sep 18, 2014 at 03:59:32PM +0100, Nathan Lynch wrote:
->>>>> This series contains the necessary changes to allow architected timer
->>>>> access from user-space on 32-bit ARM.  This allows the VDSO to support
->>>>> high resolution timestamps for clock_gettime and gettimeofday.  This
->>>>> also merges substantially similar code from arm and arm64 into the
->>>>> core arm_arch_timer driver.
->>>>>
->>>>> The functional changes are:
->>>>> - When available, CNTVCT is made readable by user space on arm, as it
->>>>>   is on arm64.
->>>>> - The clocksource name becomes "arch_mem_counter" if CP15 access to
->>>>>   the counter is not available.
->>>>>
->>>>> These changes have been carried as part of the ARM VDSO patch set over
->>>>> the last several months, but I am splitting them out here as I assume
->>>>> they should go through the clocksource maintainers.
->>>>
->>>> For the series:
->>>>
->>>>   Acked-by: Will Deacon <will.deacon@arm.com>
->>>>
->>>> I'm not sure which tree the arch-timer stuff usually goes through, but
->>>> the arm/arm64 bits look fine so I'm happy for them to merged together.
->>>
->>> I raised a while back with Will whether there's much point to having
->>> this on ARM.  While it's useful for virtualisation, the majority of
->>> 32-bit ARM doesn't run virtualised.  So there's little point in having
->>> the VDSO on the majority of platforms - it will just add additional
->>> unnecessary cycles slowing down the system calls that the VDSO is
->>> designed to try to speed up.
->>
->> Hmm, this patch set is merely exposing the hardware counter when it is
->> present for the VDSO's use; I take it you have no objection to that?
->>
->> While the 32-bit ARM VDSO I've posted (in a different thread) exploits a
->> facility that is required by the virtualization option in the
->> architecture, its utility is not limited to guest operating systems.
-> 
-> Just to clarify, were the performance improvements you measured from a
-> virtualized guest or native?
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Yeah I should have been explicit about this.  My tests and measurements
-(and all test results I've received from others, I believe) have been on
-native/host kernels, not guests.
+Recently we introduced the generic device tree infrastructure
+for couple of DMA bus parameter, dma-ranges and dma-coherent.
+Update the documentation so that its useful for future users.
 
+The "dma-ranges" property is intended to be used for describing the
+configuration of DMA bus RAM addresses and its offset w.r.t CPU addresses.
 
->>> So, my view is that this VDSO will only be of very limited use for
->>> 32-bit ARM, and should not be exposed to userspace unless there is
->>> a reason for it to be exposed (iow, the hardware necessary to support
->>> it is present.)
->>
->> My thinking is that it should prove useful in a growing subset of v7
->> CPUs.  It is useful today on Cortex-A15 and -A7, and I believe -A12 and
->> -A17 implement the generic timer facility as well.
-> 
-> I count 18 dts* files that have "arm,armv7-timer", including platforms with
-> Krait, Exynos, and Tegra processors.
+The "dma-coherent" property is intended to be used for identifying devices
+supported coherent DMA operations.
 
-Yup.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+Hi Rob,
+
+Seems, this patch has not been merged accidentally, so
+I've rebased it on top of Linux 3.17-rc5.
+
+Link on v1:
+ https://lkml.org/lkml/2014/6/5/558
+
+ Documentation/devicetree/booting-without-of.txt | 53 +++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+
+diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
+index 1f013bd..7768518 100644
+--- a/Documentation/devicetree/booting-without-of.txt
++++ b/Documentation/devicetree/booting-without-of.txt
+@@ -51,6 +51,8 @@ Table of Contents
+ 
+   VIII - Specifying device power management information (sleep property)
+ 
++  IX - Specifying dma bus information
++
+   Appendix A - Sample SOC node for MPC8540
+ 
+ 
+@@ -1332,6 +1334,57 @@ reasonably grouped in this manner, then create a virtual sleep controller
+ (similar to an interrupt nexus, except that defining a standardized
+ sleep-map should wait until its necessity is demonstrated).
+ 
++IX - Specifying dma bus information
++
++Some devices may have DMA memory range shifted relatively to the beginning of
++RAM, or even placed outside of kernel RAM. For example, the Keystone 2 SoC
++worked in LPAE mode with 4G memory has:
++- RAM range: [0x8 0000 0000, 0x8 FFFF FFFF]
++- DMA range: [  0x8000 0000,   0xFFFF FFFF]
++and DMA range is aliased into first 2G of RAM in HW.
++
++In such cases, DMA addresses translation should be performed between CPU phys
++and DMA addresses. The "dma-ranges" property is intended to be used
++for describing the configuration of such system in DT.
++
++In addition, each DMA master device on the DMA bus may or may not support
++coherent DMA operations. The "dma-coherent" property is intended to be used
++for identifying devices supported coherent DMA operations in DT.
++
++* DMA Bus master
++Optional property:
++- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
++	(child-bus-address, parent-bus-address, length). Each triplet specified
++	describes a contiguous DMA address range.
++	The dma-ranges property is used to describe the direct memory access (DMA)
++	structure of a memory-mapped bus whose device tree parent can be accessed
++	from DMA operations originating from the bus. It provides a means of
++	defining a mapping or translation between the physical address space of
++	the bus and the physical address space of the parent of the bus.
++	(for more information see ePAPR specification)
++
++* DMA Bus child
++Optional property:
++- dma-ranges: <empty> value. if present - It means that DMA addresses
++	translation has to be enabled for this device.
++- dma-coherent: Present if dma operations are coherent
++
++Example:
++soc {
++		compatible = "ti,keystone","simple-bus";
++		ranges = <0x0 0x0 0x0 0xc0000000>;
++		dma-ranges = <0x80000000 0x8 0x00000000 0x80000000>;
++
++		[...]
++
++		usb: usb at 2680000 {
++			compatible = "ti,keystone-dwc3";
++
++			[...]
++			dma-coherent;
++		};
++};
++
+ Appendix A - Sample SOC node for MPC8540
+ ========================================
+ 
+-- 
+1.9.1
