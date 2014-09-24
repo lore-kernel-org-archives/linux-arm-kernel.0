@@ -1,82 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 24 Sep 2014 17:23:03 +0100
-Subject: [PATCH v3] clocksource: arm_arch_timer: discard unavailable timers
- correctly
-In-Reply-To: <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
-References: <1410982774-4724-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1411575783-2960-1-git-send-email-sudeep.holla@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Sep 2014 17:27:26 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: add support for access-protected
+ mappings
+In-Reply-To: <vnkwtx3zb885.fsf@mitchelh-linux.qualcomm.com>
+References: <1410984969-2340-1-git-send-email-mitchelh@codeaurora.org>
+ <1410984969-2340-3-git-send-email-mitchelh@codeaurora.org>
+ <20140919220535.GM20773@arm.com>
+ <vnkwtx3zb885.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20140924162726.GE16244@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we wait until both cp15 and mem timers are probed if we
-have both timer device nodes present in the device tree without
-checking if the device is actually available. If one of the timer
-device node present is disabled, the system locks up on the boot
-as no timer gets registered.
+On Mon, Sep 22, 2014 at 11:28:42PM +0100, Mitchel Humpherys wrote:
+> On Fri, Sep 19 2014 at 03:05:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Sep 17, 2014 at 09:16:09PM +0100, Mitchel Humpherys wrote:
+> >> ARM SMMUs support memory access control via some bits in the translation
+> >> table descriptor memory attributes. Currently we assume all translations
+> >> are "unprivileged". Add support for privileged mappings, controlled by
+> >> the IOMMU_PRIV prot flag.
+> >> 
+> >> Also sneak in a whitespace change for consistency with nearby code.
+> >> 
+> >> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> >> ---
+> >>  drivers/iommu/arm-smmu.c | 5 +++--
+> >>  1 file changed, 3 insertions(+), 2 deletions(-)
+> >> 
+> >> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> >> index ca18d6d42a..93999ec22c 100644
+> >> --- a/drivers/iommu/arm-smmu.c
+> >> +++ b/drivers/iommu/arm-smmu.c
+> >> @@ -1256,10 +1256,11 @@ static int arm_smmu_alloc_init_pte(struct arm_smmu_device *smmu, pmd_t *pmd,
+> >>  	}
+> >>  
+> >>  	if (stage == 1) {
+> >> -		pteval |= ARM_SMMU_PTE_AP_UNPRIV | ARM_SMMU_PTE_nG;
+> >> +		pteval |= ARM_SMMU_PTE_nG;
+> >> +		if (!(prot & IOMMU_PRIV))
+> >> +			pteval |= ARM_SMMU_PTE_AP_UNPRIV;
+> >
+> > I think this actually makes more sense if we invert the logic, i.e. have
+> > IOMMU_USER as a flag which sets the UNPRIV bit in the pte.
+> 
+> I'm fine either way but the common case seems to be unprivileged
+> mappings (at least in our system).  We have one user of this flag out of
+> a dozen or so users.
 
-This patch adds the check for the availability of the timer device
-so that unavailable timers are discarded correctly. It also adds
-the missing of_node_put.
+Well, I think the common case in reality (ie. in upstream) is that we don't
+care, since there's no page table sharing with the CPU. Given that our DMA
+buffers are privilege on the kernel side, it's consistent to copy that as
+the default.
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
- drivers/clocksource/arm_arch_timer.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+> >
+> > I don't have the spec to hand, but I guess you can't enforce this at
+> > stage-2? If so, do we also need a new IOMMU capability so people don't try
+> > to use this for stage-2 only SMMUs?
+> 
+> Hmm, actually we do have S2AP although it doesn't make a distinction
+> between accesses from EL0 and EL1.  But maybe it would make sense to
+> make the `IOMMU_PRIV' mean `no access from EL0 or EL1' for stage 2
+> mappings?  Something like:
 
-Hi Daniel,
+Hmm, that really doesn't match up with what KVM is doing on the CPU side and
+would probably break DMA on stage-2 only SMMUs.
 
-Can you pick up this fix for v3.18 ?
+A better bet is to add a capability bit to the SMMU, which only advertises
+support for IOMMU_USER mappings if stage-1 is supported.
 
-Regards,
-Sudeep
-
-Changes v2->v3:
-	- Minor nit in the commit message
-	- Added acks/review tags
-
-Changes v1->v2:
-	- Added missing of_node_put in the original code
-	- Updated the commit log as suggested
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5163ec13429d..7e267e3990ab 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -616,17 +616,29 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
- 	{},
- };
- 
-+static bool __init
-+arch_timer_probed(int type, const struct of_device_id *matches)
-+{
-+	struct device_node *dn;
-+	bool probed = false;
-+
-+	dn = of_find_matching_node(NULL, matches);
-+	if (dn && of_device_is_available(dn) && (arch_timers_present & type))
-+		probed = true;
-+	of_node_put(dn);
-+
-+	return probed;
-+}
-+
- static void __init arch_timer_common_init(void)
- {
- 	unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
- 
- 	/* Wait until both nodes are probed if we have two timers */
- 	if ((arch_timers_present & mask) != mask) {
--		if (of_find_matching_node(NULL, arch_timer_mem_of_match) &&
--				!(arch_timers_present & ARCH_MEM_TIMER))
-+		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
- 			return;
--		if (of_find_matching_node(NULL, arch_timer_of_match) &&
--				!(arch_timers_present & ARCH_CP15_TIMER))
-+		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
- 			return;
- 	}
- 
--- 
-1.9.1
+Will
