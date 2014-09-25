@@ -1,46 +1,59 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 25 Sep 2014 18:56:12 -0300
-Subject: [PATCH 0/2] Marvell Armada 375/38x MPIC/MSI fixes
-In-Reply-To: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
-References: <1411643839-64925-1-git-send-email-jaz@semihalf.com>
-Message-ID: <20140925215612.GA3846@arch.cereza>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Sep 2014 23:58:32 +0200
+Subject: [GIT PULL 1/4] part 2 of omap intc changes for v3.18 merge window
+In-Reply-To: <pull-1411070912-460910>
+References: <pull-1411070912-460910>
+Message-ID: <201409252358.33038.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
-
-On 25 Sep 01:17 PM, Grzegorz Jaszczyk wrote:
-> This patchset contains a set of fixes for issues found while doing some test
-> with different interrupts configuration on Armada 375 and Armada 38x Marvell
-> SoCs. The patches were tested and apply on v3.17-rc6.
+On Thursday 18 September 2014, Tony Lindgren wrote:
+> The following changes since commit 55601c9f24670ba926ebdd4d712ac3b177232330:
 > 
-> Any feedback is welcome.
+>   arm: omap: intc: switch over to linear irq domain (2014-09-11 13:05:50 -0700)
 > 
-> Grzegorz Jaszczyk (2):
->   irqchip: armada-370-xp: fix MSI interrupt handling
->   irqchip: armada-370-xp: fix MPIC interrupt handling
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/intc-part2-for-v3.18
+> 
+> for you to fetch changes up to 64d5947b9ee1284b38b8e212e7c94024452b2bb4:
+> 
+>   irqchip: omap-intc: remove unnecessary comments (2014-09-16 14:45:01 -0700)
+> 
+> ----------------------------------------------------------------
+> Second part of omap intc interrupt controller changes to
+> move it to drivers.
+> 
+> ----------------------------------------------------------------
+> Felipe Balbi (10):
+>       arm: omap2: n8x0: move i2c devices to DT
+>       irqchip: add irq-omap-intc.h header
+>       arm: omap: irq: move irq.c to drivers/irqchip/
+>       irqchip: omap-intc: minor improvement to omap_irq_pending()
+>       irqchip: omap-intc: comment style cleanup
+>       irqchip: omap-intc: remove unnecesary of_address_to_resource() call
+>       irqchip: omap-intc: enable IP protection
+>       irqchip: omap-intc: enable TURBO idle mode
+>       irqchip: omap-intc: correct maximum number or MIR registers
+>       irqchip: omap-intc: remove unnecessary comments
+> 
+>  arch/arm/boot/dts/omap2420-n810.dts                |  7 +++
+>  arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  6 ++
+>  arch/arm/mach-omap2/Kconfig                        |  1 +
+>  arch/arm/mach-omap2/Makefile                       |  3 +-
+>  arch/arm/mach-omap2/board-n8x0.c                   | 26 +--------
+>  arch/arm/mach-omap2/common-board-devices.h         |  5 ++
+>  arch/arm/mach-omap2/common.h                       | 10 +---
+>  arch/arm/mach-omap2/pdata-quirks.c                 |  2 +
+>  drivers/irqchip/Kconfig                            |  5 ++
+>  drivers/irqchip/Makefile                           |  1 +
+>  .../irq.c => drivers/irqchip/irq-omap-intc.c       | 64 +++++++++++++---------
+>  include/linux/irqchip/irq-omap-intc.h              | 32 +++++++++++
+>  12 files changed, 101 insertions(+), 61 deletions(-)
+>  rename arch/arm/mach-omap2/irq.c => drivers/irqchip/irq-omap-intc.c (89%)
+>  create mode 100644 include/linux/irqchip/irq-omap-intc.h
+> 
 
-The second patch fixes an unhandled IRQ storm triggered by the mvpp2
-ethernet driver, when the kernel is built with CONFIG_SMP=n.
+Pulled into next/drivers, thanks!
 
-When any network activity is attempted the kernel is interrupted by a per-cpu 
-IRQ (which is not the one the driver expects). The interrupt is not mapped 
-into Linux's virtual IRQ space, so the result is:
-
-  irq 0, desc: ee004000, depth: 1, count: 0, unhandled: 0
-  ->handle_irq():  c00466e8, handle_bad_irq+0x0/0x260
-  ->irq_data.chip(): c1181460, 0xc1181460
-  ->action():   (null)
-     IRQ_NOPROBE set
-   IRQ_NOREQUEST set
-
-For both patches:
-
-Fixes: bc69b8adfe22 ("irqchip: armada-370-xp: Setup a chained handler for the MPIC")
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+	Arnd
