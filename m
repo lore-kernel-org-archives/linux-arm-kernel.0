@@ -1,55 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Sep 2014 15:36:09 +0200
-Subject: [PATCH v2 6/7] devicetree: bindings: Document supported
- Allwinner sunxi SoCs
-In-Reply-To: <1411570141-29960-7-git-send-email-wens@csie.org>
-References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-7-git-send-email-wens@csie.org>
-Message-ID: <20140925133609.GK15315@lukather>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 25 Sep 2014 09:43:41 -0400
+Subject: [PATCH v3 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <20140924.164306.431516399400992046.davem@davemloft.net>
+References: <20140915.123755.1868053059646672094.davem@davemloft.net>	<54183EDB.20801@ti.com>	<542320B3.9020902@ti.com>
+ <20140924.164306.431516399400992046.davem@davemloft.net>
+Message-ID: <54241C0D.9020301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 10:49:00PM +0800, Chen-Yu Tsai wrote:
-> This adds a list of supported Allwinner SoC bindings.
+On Wednesday 24 September 2014 04:43 PM, David Miller wrote:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Wed, 24 Sep 2014 15:51:15 -0400
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/sunxi.txt
+>> Here is an updated version with above fixed. Not posting the entire
+>> series again since its just small update on the patch.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> new file mode 100644
-> index 0000000..d7d1039
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -0,0 +1,12 @@
-> +Allwinner sunXi Platforms Device Tree Bindings
-> +
-> +Each device tree must specify which Allwinner SoC it uses,
-> +using one of the following compatible stirngs:
-                                         ^ strings
+> That's not how this works.
+> 
+> If you want your changes re-reviewed and considered for real inclusion,
+> you must repost the entire patch series from scratch, with a proper
+> list of what changes between the previous submission and the new one.
 
-> +
-> +  allwinner,sun4i-a10
-> +  allwinner,sun5i-a10s
-> +  allwinner,sun5i-a13
-> +  allwinner,sun6i-a31
-> +  allwinner,sun7i-a20
-> +  allwinner,sun8i-a23
-> +  allwinner,sun9i-a80
+Sure. Sending v4 right a way. Thanks
 
-Maybe you can just add this info to the already existing README?
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/dc50cf99/attachment.sig>
+Regards,
+Santosh
