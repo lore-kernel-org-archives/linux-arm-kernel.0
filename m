@@ -1,68 +1,74 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 25 Sep 2014 17:46:55 +0900
-Subject: [PATCH v3 0/1] ARM: EXYNOS: Fix builds with PM_SLEEP=n
-In-Reply-To: <1411568402-24561-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1411568402-24561-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5423D67F.5050203@samsung.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 25 Sep 2014 09:54:32 +0100
+Subject: [PATCH v12 09/12] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140924180119.GN16244@arm.com>
+References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411498874-9864-10-git-send-email-Liviu.Dudau@arm.com>
+ <20140924164304.GF1994@e106497-lin.cambridge.arm.com>
+ <20140924173109.GA20416@google.com>
+ <20140924175330.GI1994@e106497-lin.cambridge.arm.com>
+ <20140924180119.GN16244@arm.com>
+Message-ID: <20140925085432.GL1994@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/14 23:20, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
->
-> This patch fixes builds with CONFIG_PM_SLEEP config option disabled.
-> It has been runtime tested on Exynos4210 based Origen board.
->
-> Depends on:
-> - for-next branch of linux-samsung.git kernel tree
-> - [PATCH v7 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with secure
->    firmware enabled
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37073.html)
->
-OK, I'll queue this fixup once the AFTR related changes get ack from 
-tegra guy, tegra changes are just trivial though....
+On Wed, Sep 24, 2014 at 07:01:19PM +0100, Will Deacon wrote:
+> On Wed, Sep 24, 2014 at 06:53:31PM +0100, Liviu Dudau wrote:
+> > On Wed, Sep 24, 2014 at 06:31:09PM +0100, Bjorn Helgaas wrote:
+> > > On Wed, Sep 24, 2014 at 05:43:04PM +0100, Liviu Dudau wrote:
+> > > > Provide a function to parse the PCI DT ranges that can be used to
+> > > > create a pci_host_bridge structure together with its associated
+> > > > bus.
+> > > > 
+> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > > Cc: Grant Likely <grant.likely@linaro.org>
+> > > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > > [make io_base parameter optional]
+> > > > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > > > ---
+> > > > Hi Bjorn,
+> > > > 
+> > > > I have fixed the compilation error that this patch was triggering. I
+> > > > have validated that the patch applies to your pci/host-generic branch
+> > > > as well as to my series.
+> > > 
+> > > I applied this to pci/host-generic along with the following patches and
+> > > pushed the branch, thanks!
+> > 
+> > Thanks again and sorry for lack of thorough testing. I still haven't managed
+> > to get a cross compiler for sparc and as I don't run Ubuntu or debian the
+> > make.cross script doesn't work for me.
+> 
+>   https://www.kernel.org/pub/tools/crosstool/
+> 
+> No libc, but good enough for building the kernel. I've asked for an aarch64
+> compiler there for a while, but it didn't materialise for some reason.
 
-Thanks,
-Kukjin
-
-> Changes since v2:
-> (http://www.mail-archive.com/linux-samsung-soc%40vger.kernel.org/msg35430.html)
-> - rebased on top of for-next branch of linux-samsung.git kernel tree +
->    [PATCH v7 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with secure
->    firmware enabled
->    (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37073.html)
->
-> Changes since v1:
-> (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34079.html)
-> - rebased on top of next-20140811
-> - fixed OOPS on the first try to enter cpuidle AFTR mode
->    (config with CONFIG_PM_SLEEP=n and CONFIG_ARM_EXYNOS_CPUIDLE=y)
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
->
-> Bartlomiej Zolnierkiewicz (1):
->    ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
->
->   arch/arm/mach-exynos/Kconfig   |   5 +
->   arch/arm/mach-exynos/Makefile  |   5 +-
->   arch/arm/mach-exynos/common.h  |   4 +
->   arch/arm/mach-exynos/pm.c      | 338 +-------------------------------------
->   arch/arm/mach-exynos/suspend.c | 356 +++++++++++++++++++++++++++++++++++++++++
->   arch/arm/plat-samsung/Makefile |   1 +
->   6 files changed, 374 insertions(+), 335 deletions(-)
->   create mode 100644 arch/arm/mach-exynos/suspend.c
->
-
--- 
-Thanks.
+I'm familiar with crosstool and busybox uses a variant of crosstool-ng, but
+it currently fails with "configure: error: cannot compute suffix of object files: cannot compile"
+on the stage2 of the compilation.
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Liviu
+
+> 
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
