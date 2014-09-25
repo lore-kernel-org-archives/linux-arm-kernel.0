@@ -1,34 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 19:55:46 +0200
-Subject: [GIT PULL 1/3] ARM: tegra: core SoC code changes for 3.18
-In-Reply-To: <5424458E.7020603@wwwdotorg.org>
-References: <1411062692-22338-1-git-send-email-swarren@wwwdotorg.org>
- <201409251801.18466.arnd@arndb.de> <5424458E.7020603@wwwdotorg.org>
-Message-ID: <5666206.hBBQzilaqm@wuerfel>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 25 Sep 2014 13:56:35 -0400
+Subject: [PATCH] firmware: add Keystone QMSS PDSP accumulator firmware blob
+In-Reply-To: <54244B12.4010700@ti.com>
+References: <1411654423-29480-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140925151551.GA18530@kroah.com> <54244B12.4010700@ti.com>
+Message-ID: <54245753.1040900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014 10:40:46 Stephen Warren wrote:
+On Thursday 25 September 2014 01:04 PM, Santosh Shilimkar wrote:
+> On Thursday 25 September 2014 11:15 AM, Greg Kroah-Hartman wrote:
+>> On Thu, Sep 25, 2014 at 10:13:43AM -0400, Santosh Shilimkar wrote:
+>>> From: Sandeep Nair <sandeep_n@ti.com>
+
+[..]
+
+>> Did you submit this to the linux-firmware tree?
+>>
+> ./scripts/get_maintainer.pl didn't give me other list. Which list am
+> suppose to submit it to get it to linux-firmware.
 > 
-> I don't recall the exact commits, but I ended up needing to base one of 
-> the branches on -rc2. So, I then based all the branches on the same 
-> commit. When I create Tegra's for-next, I start with that baseline 
-> branch and merge in each Tegra topic branch. That way, the merges only 
-> bring in exactly what's in that branch, and it's easy to validate the 
-> final result in gitk/similar.
+Found the procedure in "firmware/README.AddingFirmware"
+Thanks 
 
-I see. For us it's actually more helpful if every single topic branch
-is on the oldest possible state.
-
-> I suppose it'd work fine if I start with 
-> the newest base of any branch and then merged the topic branches in; 
-> that would at least restrict the merges to only the contents of the 
-> branch, although it'd create a far more difficult to validate history, 
-> since the different topic branches would be based in different places.
-
-Yes, I fear there is no perfect solution to this. Someone also suggested
-switching around the parent commits during a merge that updates one of
-our branches to a newer base. That would solve the backmerge problem but
-in turn break 'git log --first-parent'.
-
-	Arnd
+Regards,
+Santosh
