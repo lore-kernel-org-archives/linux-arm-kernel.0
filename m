@@ -1,56 +1,43 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:18 +0800
-Subject: [PATCH v2 08/22] x86/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Thu, 25 Sep 2014 11:14:13 +0800
+Subject: [PATCH v2 03/22] MSI: Remove the redundant irq_set_chip_data()
 In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
 References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-9-git-send-email-wangyijing@huawei.com>
+Message-ID: <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Currently, pcie-designware, pcie-rcar, pci-tegra drivers
+use irq chip_data to save the msi_chip pointer. They
+already call irq_set_chip_data() in their own MSI irq map
+functions. So irq_set_chip_data() in arch_setup_msi_irq()
+is useless.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/x86/include/asm/pci.h     |    1 +
- arch/x86/kernel/apic/io_apic.c |   12 ++++++++++++
- 2 files changed, 13 insertions(+), 0 deletions(-)
+ drivers/pci/msi.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 0892ea0..878a06d 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -101,6 +101,7 @@ void native_teardown_msi_irq(unsigned int irq);
- void native_restore_msi_irqs(struct pci_dev *dev);
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 		  unsigned int irq_base, unsigned int irq_offset);
-+extern struct msi_chip *x86_msi_chip;
- #else
- #define native_setup_msi_irqs		NULL
- #define native_teardown_msi_irq		NULL
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index 2a2ec28..882b95e 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -3337,6 +3337,18 @@ int default_setup_hpet_msi(unsigned int irq, unsigned int id)
- }
- #endif
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 51d7e62..50f67a3 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -41,14 +41,13 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	if (err < 0)
+ 		return err;
  
-+struct msi_chip apic_msi_chip = {
-+	.setup_irqs = native_setup_msi_irqs,
-+	.teardown_irq = native_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-+{
-+	return x86_msi_chip;
-+}
-+
-+struct msi_chip *x86_msi_chip = &apic_msi_chip;
-+
- #endif /* CONFIG_PCI_MSI */
- /*
-  * Hypertransport interrupt support
+-	irq_set_chip_data(desc->irq, chip);
+-
+ 	return 0;
+ }
+ 
+ void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
+-	struct msi_chip *chip = irq_get_chip_data(irq);
++	struct msi_desc *entry = irq_get_msi_desc(irq);
++	struct msi_chip *chip = entry->dev->bus->msi;
+ 
+ 	if (!chip || !chip->teardown_irq)
+ 		return;
 -- 
 1.7.1
