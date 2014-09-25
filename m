@@ -1,35 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 19:04:51 +0200
-Subject: [GIT PULL] Allwinner drivers additions for 3.18
-In-Reply-To: <20140925163103.GN15315@lukather>
-References: <20140920202855.GA20329@lukather>
- <201409251820.38087.arnd@arndb.de> <20140925163103.GN15315@lukather>
-Message-ID: <8538307.ga4F1S684D@wuerfel>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 25 Sep 2014 19:04:56 +0200
+Subject: [GIT PULL] meson: basic support for MesonX SoCs
+In-Reply-To: <3795274.gkYSyS04CD@wuerfel>
+References: <20140923195221.GA30267@nuc>
+ <3795274.gkYSyS04CD@wuerfel>
+Message-ID: <20140925170456.GA886@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014 18:31:03 Maxime Ripard wrote:
-> On Thu, Sep 25, 2014 at 06:20:37PM +0200, Arnd Bergmann wrote:
-> > On Saturday 20 September 2014, Maxime Ripard wrote:
-> > > Hi,
-> > > 
-> > > Please pull the following changes for the next merge window.
-> > > 
+On gio, set 25, 2014 at 05:38:36 +0200, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014 21:52:21 Carlo Caione wrote:
+> > Hi Arnd and Olof,
 > > 
-> > Pulled into next/drivers. The patches look good, but please note that the RTC
-> > subsystem does have a maintainer and mailing list. You should really keep
-> > them in the loop for the reviews *and* the submission.
+> > Here the pull request to introduce preliminary support for MesonX SoCs.
+> > It is based on the patchset at:
+> > 
+> > http://www.spinics.net/lists/arm-kernel/msg362521.html
+> > 
+> > and it is based on the master of arm-soc tree.
+> > 
 > 
-> They were. And have been ping'd multiple time, without any answer.
+> Hi Carlo,
 
-Ok.
+Hi Arnd,
 
-> Plus, this thread from last december
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220778.html,
-> clearly showed that it's nothing new, and that Alessandro doesn't
-> maintain any tree, hence why I ended up merging it.
+> I ended up cherry-picking the individual changes into next/fixes-non-critical,
+> next/defconfig, next/dt and next/soc to fit our process better.
+> 
+> In general, please split up pull requests according to the next/* topic
+> branches we have in the arm-soc tree, as documented in 
+> arch/arm/arm-soc-for-next-contents.txt (only in the for-next branch).
+> 
+> More importantly, please base all changes on the most recent -rc1 release,
+> or possibly a later -rc if you get conflicts otherwise.
+> 
+> I know the process takes a little time to get used to ;-)
 
-Yes, and that's why I merged it, too. Still you should have him on Cc
-for the actual pull request.
+Thank you for cherry-picking and for the pointers, next time will be
+better ;)
 
-	Arnd
+-- 
+Carlo Caione
