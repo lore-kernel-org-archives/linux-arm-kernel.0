@@ -1,53 +1,182 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Thu, 25 Sep 2014 08:06:27 +0000
-Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
-In-Reply-To: <3598074.CpE7Waa9La@wuerfel>
-References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
- <4264466.HtkUxyxBW8@wuerfel>
- <bb122a232a1c40559e84a058f3d003b4@BL2PR03MB467.namprd03.prod.outlook.com>
- <3598074.CpE7Waa9La@wuerfel>
-Message-ID: <1b72af7d8c90492ba91115ef958bbda7@BLUPR03MB472.namprd03.prod.outlook.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 25 Sep 2014 10:10:31 +0200
+Subject: [PATCH v2 3/5] gpio: vf610: add gpiolib/IRQ chip driver for Vybrid
+In-Reply-To: <20140925055446.GC6405@dragon>
+References: <cover.1411492954.git.stefan@agner.ch>
+ <81b47949f0806a335f380be916ec88f07b31290a.1411492954.git.stefan@agner.ch>
+ <20140925055446.GC6405@dragon>
+Message-ID: <fc26fd2a2b95b010d43ec653b6724d7d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Arnd Bergmann [mailto:arnd at arndb.de]
->Sent: Wednesday, September 24, 2014 11:55 PM
->To: Lu Jingchang-B35083
->Cc: Guo Shawn-R65073; mark.rutland at arm.com; linux-arm-
->kernel at lists.infradead.org; devicetree at vger.kernel.org; Lu Chen-B46807; Fu
->Chao-B44548
->Subject: Re: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts
->support
->
->On Wednesday 24 September 2014 11:00:34 Jingchang Lu wrote:
+Am 2014-09-25 07:55, schrieb Shawn Guo:
+> On Tue, Sep 23, 2014 at 07:37:55PM +0200, Stefan Agner wrote:
+>> diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+>> new file mode 100644
+>> index 0000000..6649a13
+>> --- /dev/null
+>> +++ b/drivers/gpio/gpio-vf610.c
+>> @@ -0,0 +1,284 @@
+>> +/*
+>> + * vf610 GPIO support through PORT and GPIO module
+>> + *
+>> + * Copyright (c) 2014 Toradex AG.
+>> + *
+>> + * Author: Stefan Agner <stefan@agner.ch>.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License
+>> + * as published by the Free Software Foundation; either version 2
+>> + * of the License, or (at your option) any later version.
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/err.h>
+>> +#include <linux/init.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/io.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/bitops.h>
+>> +#include <linux/gpio.h>
+> 
+> You might want to have the headers sort alphabetically.
+> 
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/module.h>
+>> +#include <asm-generic/bug.h>
+> 
+> Why do we need this header?
+> 
+>> +
+>> +
+> 
+> One new line is enough.
+> 
+>> +#define VF610_GPIO_PER_PORT		32
+>> +
+>> +struct vf610_gpio_port {
+>> +	struct gpio_chip gc;
+>> +	void __iomem *base;
+>> +	void __iomem *gpio_base;
+>> +	u8 irqc[VF610_GPIO_PER_PORT];
+>> +};
+>> +
+>> +#define GPIO_PDOR		0x00
+>> +#define GPIO_PSOR		0x04
+>> +#define GPIO_PCOR		0x08
+>> +#define GPIO_PTOR		0x0c
+>> +#define GPIO_PDIR		0x10
+>> +
+>> +#define PORT_PCR(n)		(n * 0x4)
+> 
+> s/n/(n)
+> 
+> ...
+> 
+>> +static int vf610_gpio_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct device_node *np = dev->of_node;
+>> +	struct vf610_gpio_port *port;
+>> +	struct resource *iores;
+>> +	struct gpio_chip *gc;
+>> +	int irq, ret;
+>> +
+>> +	port = devm_kzalloc(&pdev->dev, sizeof(*port), GFP_KERNEL);
+>> +	if (!port)
+>> +		return -ENOMEM;
+>> +
+>> +	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	port->base = devm_ioremap_resource(dev, iores);
+>> +	if (IS_ERR(port->base))
+>> +		return PTR_ERR(port->base);
+>> +
+>> +	iores = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>> +	port->gpio_base = devm_ioremap_resource(dev, iores);
+>> +	if (IS_ERR(port->gpio_base))
+>> +		return PTR_ERR(port->gpio_base);
+>> +
+>> +	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> 
+> Why not platform_get_irq()?
+
+I thought we need that mapping, but this is done dynamically when using
+gpiochip_irqchip_add.
+
+> 
+>> +	if (irq == NO_IRQ)
+>> +		return -ENODEV;
+> 
+> Instead of using NO_IRQ, we should check if irq is a negative value and
+> propagate the value as the return, something like:
+> 
+> 	if (irq < 0)
+> 		return irq;
+> 
+
+Agreed on everything, will fix that.
+
+> 
+>> +
+>> +	gc = &port->gc;
+>> +	gc->of_node = np;
+>> +	gc->dev = dev;
+>> +	gc->label = "vf610-gpio",
+>> +	gc->ngpio = VF610_GPIO_PER_PORT,
+>> +	gc->base = of_alias_get_id(np, "gpio") * VF610_GPIO_PER_PORT;
+>> +
+>> +	gc->request = vf610_gpio_request,
+>> +	gc->free = vf610_gpio_free,
+>> +	gc->direction_input = vf610_gpio_direction_input,
+>> +	gc->get = vf610_gpio_get,
+>> +	gc->direction_output = vf610_gpio_direction_output,
+>> +	gc->set = vf610_gpio_set,
+>> +
+>> +	ret = gpiochip_add(gc);
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>> +	/* Clear the interrupt status register for all GPIO's */
+>> +	vf610_gpio_writel(~0, port->base + PORT_ISFR);
+>> +
+>> +	ret = gpiochip_irqchip_add(gc, &vf610_gpio_irq_chip, 0,
+>> +				   handle_simple_irq, IRQ_TYPE_NONE);
+>> +	if (ret) {
+>> +		dev_err(dev, "failed to add irqchip\n");
+>> +		gpiochip_remove(gc);
+>> +		return ret;
+>> +	}
+>> +	gpiochip_set_chained_irqchip(gc, &vf610_gpio_irq_chip, irq,
+>> +				     vf610_gpio_irq_handler);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct platform_driver vf610_gpio_driver = {
+>> +	.driver		= {
+>> +		.name	= "gpio-vf610",
+>> +		.owner	= THIS_MODULE,
+>> +		.of_match_table = vf610_gpio_dt_ids,
+>> +	},
+>> +	.probe		= vf610_gpio_probe,
+>> +};
+>> +
+>> +static int __init gpio_vf610_init(void)
+>> +{
+>> +	return platform_driver_register(&vf610_gpio_driver);
+>> +}
+>> +subsys_initcall(gpio_vf610_init);
+>> +
+>> +MODULE_AUTHOR("Stefan Agner <stefan@agner.ch>");
+>> +MODULE_DESCRIPTION("Freescale VF610 GPIO");
+>> +MODULE_LICENSE("GPL v2");
+>> --
+>> 2.1.0
 >>
->> We also do the phy-handle fixup on our PowerPC platform based on the
->> aliases, and so I adopt the same way to make these fixup consistent
->between SoCs.
->> And the u-boot fdt fixup code base on the aliases has been upstreamed,
->> so may we keep this aliases unchanged?
->
->I don't see a strong reason to change it, it just seemed strange to me.
->
->> BTW, find a node by alias is easily, could you give me some clue on
->> finding a node by a label directly, Thanks.
->
->I haven't used libfdt in this way myself, so I don't know how it would be
->done. However, the idea is that the labels in dts files end up as ELF
->symbols in the dtb, so you can look them up by following the ELF headers.
->
->	Arnd
-
-Libfdt doesn't provide way to find a node by label. Label is just a shortcut to
-a full absolute path, it's useful in device tree source reference, but is hard
-to find a label after build to dtb. Aliases just provide the way to save a
-full absolute path in properties like label, but they can be find in dtb after
-build so that fixup on dtb can find a node efficiently. So I think the aliases
-for the phy nodes is also reasonable. Many others boards also use labels for
-various dts nodes.
-Thanks.
-
-Best Regards,
-Jingchang
- 
