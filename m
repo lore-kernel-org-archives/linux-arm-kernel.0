@@ -1,29 +1,32 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 25 Sep 2014 09:49:24 +0200
-Subject: [PATCH 0/5] pinctrl: samsung: Data structure clean-up
-In-Reply-To: <CACRpkdZCMD4x+wrvTOrrWK-Dy4_rg6bD2xUAA4jtTGTbT1uDag@mail.gmail.com>
-References: <1411499141-26551-1-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdZCMD4x+wrvTOrrWK-Dy4_rg6bD2xUAA4jtTGTbT1uDag@mail.gmail.com>
-Message-ID: <5423C904.60708@gmail.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 25 Sep 2014 15:48:44 +0800
+Subject: [PATCH v3 0/3] Add clock binding id for rk3288
+Message-ID: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.09.2014 09:47, Linus Walleij wrote:
-> On Tue, Sep 23, 2014 at 9:05 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> 
->> This series intends to clean up data structures used by pinctrl-samsung driver.
->> More specifically, it separates initial compile time constants from data used
->> at runtime, allowing unused variant data to be dropped and selected structures
->> constified to improve safety.
-> 
-> I like the patch set, tried to apply it but patch 3/5 failed to apply to the
-> devel branch for pinctrl.
-> 
-> Can you rebase this on my "devel" branch, include Marek's Tested-by
-> tag and resend, and I'll take it for v3.18.
+This patch add some clock binding id for different modules
+that under development and going to send upstream.
 
-Sure. Will do that today evening. Probably clashed with some other
-changes queued in the meantime.
+This patch also add the clock node in PD_VIDEO.
 
-Best regards,
-Tomasz
+Changes in v3:
+- add a fix factor
+- introduce a virtual node to implement the clock struct
+
+Changes in v2:
+- split into two patches of add clock node in PD_VIDEO and
+  use new defined clock ID
+- split out the patch
+
+Kever Yang (3):
+  clk: rockchip: add some needed clock binding id for rk3288
+  clk: rockchip: use the clock id for nodes init
+  clk: rockchip: add clock node in PD_VIDEO
+
+ drivers/clk/rockchip/clk-rk3288.c      | 88 +++++++++++++++++++++-------------
+ include/dt-bindings/clock/rk3288-cru.h | 38 ++++++++++++++-
+ 2 files changed, 91 insertions(+), 35 deletions(-)
+
+-- 
+1.9.1
