@@ -1,30 +1,82 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 25 Sep 2014 10:24:14 +0900
-Subject: regulator node names and unit-addresses? (Re: [PATCH v2 1/5]
- ARM: shmobile: kzm9d: Remove spurious regulator base addresses)
-In-Reply-To: <20140924082726.GX4015@sirena.org.uk>
-References: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
- <20140924081455.GU4015@sirena.org.uk>
- <CAMuHMdWQfSLwqMMigLOZuGFJqQO03Qyw+ZHE1YAgd6mNDGmrEg@mail.gmail.com>
- <20140924082726.GX4015@sirena.org.uk>
-Message-ID: <20140925012414.GE20466@verge.net.au>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 25 Sep 2014 09:28:14 +0800
+Subject: [PATCH v2 3/3] clk: rockchip: add clock node in PD_VIDEO
+In-Reply-To: <CAD=FV=UqB26_GzP14ueHHpmjgJqX7sPpR0T+SR60e=i_YbWitQ@mail.gmail.com>
+References: <1411572802-22042-1-git-send-email-kever.yang@rock-chips.com>
+ <1411572802-22042-4-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=UqB26_GzP14ueHHpmjgJqX7sPpR0T+SR60e=i_YbWitQ@mail.gmail.com>
+Message-ID: <54236FAE.5090903@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 09:27:26AM +0100, Mark Brown wrote:
-> On Wed, Sep 24, 2014 at 10:21:12AM +0200, Geert Uytterhoeven wrote:
-> > On Wed, Sep 24, 2014 at 10:14 AM, Mark Brown <broonie@kernel.org> wrote:
-> 
-> > > As far as the regulator API is concerned the node name is completly
-> > > immaterial and all this stuff is just verbiage we're forced to include.
-> > > As far as I can tell the requirement that node names be in the form
-> > > "regulator" or whatever is just another thing that wasn't terribly well
-> > > thought through in ePAPR, they were trying to do classes I think.
-> 
-> > So perhaps we should just keep "regulator at 0" and "regulator at 1"?
-> 
-> I don't care what they're called so long as things work; the DT people
-> are the ones to ask though.
+Hi Doug,
 
-Ok, lets just leave them as "regulator at 0" and "regulator at 1".
-If better names emerge then we can use them.
+On 09/25/2014 03:48 AM, Doug Anderson wrote:
+> Kever,
+>
+> On Wed, Sep 24, 2014 at 8:33 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+>> This patch add the clock node in PD_VIDEO
+>>
+>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>>
+>> Changes in v2:
+>> - split out the patch
+>>
+>>   drivers/clk/rockchip/clk-rk3288.c | 11 +++++++++++
+>>   1 file changed, 11 insertions(+)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+>> index d691a56..2cfcfb6 100644
+>> --- a/drivers/clk/rockchip/clk-rk3288.c
+>> +++ b/drivers/clk/rockchip/clk-rk3288.c
+>> @@ -296,6 +296,17 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+>>          COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
+>>                          RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
+>>                          RK3288_CLKGATE_CON(3), 11, GFLAGS),
+>> +       /*
+>> +        * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
+>> +        * so we ignore the mux and make clocks nodes as following,
+> I guess we can't add the mux for now because it's in the GRF and not
+> in the clock area and the current clock tables don't have support for
+> that.  I guess that OK for now, but eventually we should probably add
+> it in.
+The mux setting moved to GRF because it switch the clock source and some 
+other
+controller logic.
+The VCODEC can be used as encoder or decoder, we use it as decoder by 
+default,
+so I guess we can ignore the decoder part before the clock module can 
+handle this.
+>
+>
+>> +        * NOTE THAT hclk_vcodec is fix div by 4 from aclk_vcodec_pre.
+> Typo: from "aclk_vcodec_pre" or from "hclk_vcodec_pre"?
+hclk_vcodec_pre is /4 from aclk_vcodec_pre, and hclk_vcodec has a gate 
+from hclk_vcodec_pre.
+I should fix this.
+>
+>> +        */
+>> +       GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
+>> +               RK3288_CLKGATE_CON(9), 0, GFLAGS),
+>> +       GATE(0, "hclk_vcodec_pre", "aclk_vdpu", 0,
+>> +               RK3288_CLKGATE_CON(3), 10, GFLAGS),
+>> +       GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
+>> +               RK3288_CLKGATE_CON(9), 1, GFLAGS),
+> Shouldn't there be a fixed "/ 4" clock somewhere in here?  That way
+> the clock rate will be reported correctly?
+>
+> I guess the cleanest would be to add support to rockchip/clk.c to call
+> clk_register_fixed_factor() somehow.  I guess I'll leave it to you and
+> Heiko to decide what you want to do here.
+There is a fixed "/4" that not add to this tree, which makes we get a 4 
+times
+of real rate when we get the HCLK_VCODEC, that is why I write a commend
+with "NOTE THAT" before.
+
+I know there is a clk_register_fixed_factor(), but I'm not sure how to use
+it here, this is a table.
+I'll try to add the clk_register_fixed_factor() today.
+
+-Kever
