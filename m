@@ -1,139 +1,84 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:22 +0800
-Subject: [PATCH v2 12/22] MIPS/Octeon/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-13-git-send-email-wangyijing@huawei.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 25 Sep 2014 11:04:37 +0800
+Subject: [PATCH] [RFC] Using hierarchy irqdomian to implement MTK intpol.
+In-Reply-To: <1411611417.21763.56.camel@mtksdaap41>
+References: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1411611417.21763.56.camel@mtksdaap41>
+Message-ID: <54238645.8090502@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Hi Joe,
+	Thanks, I will merge them into my next version.
+Regards!
+Gerry
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/mips/pci/msi-octeon.c |   35 ++++++++++++++++++++++-------------
- 1 files changed, 22 insertions(+), 13 deletions(-)
-
-diff --git a/arch/mips/pci/msi-octeon.c b/arch/mips/pci/msi-octeon.c
-index 63bbe07..14f2d16 100644
---- a/arch/mips/pci/msi-octeon.c
-+++ b/arch/mips/pci/msi-octeon.c
-@@ -57,7 +57,7 @@ static int msi_irq_size;
-  *
-  * Returns 0 on success.
-  */
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+static int octeon_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
- 	struct msi_msg msg;
- 	u16 control;
-@@ -132,12 +132,12 @@ msi_irq_allocated:
- 	/* Make sure the search for available interrupts didn't fail */
- 	if (irq >= 64) {
- 		if (request_private_bits) {
--			pr_err("arch_setup_msi_irq: Unable to find %d free interrupts, trying just one",
-+			pr_err("octeon_setup_msi_irq: Unable to find %d free interrupts, trying just one",
- 			       1 << request_private_bits);
- 			request_private_bits = 0;
- 			goto try_only_one;
- 		} else
--			panic("arch_setup_msi_irq: Unable to find a free MSI interrupt");
-+			panic("octeon_setup_msi_irq: Unable to find a free MSI interrupt");
- 	}
- 
- 	/* MSI interrupts start@logical IRQ OCTEON_IRQ_MSI_BIT0 */
-@@ -168,7 +168,7 @@ msi_irq_allocated:
- 		msg.address_hi = (0 + CVMX_SLI_PCIE_MSI_RCV) >> 32;
- 		break;
- 	default:
--		panic("arch_setup_msi_irq: Invalid octeon_dma_bar_type");
-+		panic("octeon_setup_msi_irq: Invalid octeon_dma_bar_type");
- 	}
- 	msg.data = irq - OCTEON_IRQ_MSI_BIT0;
- 
-@@ -182,7 +182,7 @@ msi_irq_allocated:
- 	return 0;
- }
- 
--int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+static int octeon_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- {
- 	struct msi_desc *entry;
- 	int ret;
-@@ -201,7 +201,7 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 		return 1;
- 
- 	list_for_each_entry(entry, &dev->msi_list, list) {
--		ret = arch_setup_msi_irq(dev, entry);
-+		ret = octeon_setup_msi_irq(dev, entry);
- 		if (ret < 0)
- 			return ret;
- 		if (ret > 0)
-@@ -210,14 +210,13 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 
- 	return 0;
- }
--
- /**
-  * Called when a device no longer needs its MSI interrupts. All
-  * MSI interrupts for the device are freed.
-  *
-  * @irq:    The devices first irq number. There may be multple in sequence.
-  */
--void arch_teardown_msi_irq(unsigned int irq)
-+static void octeon_teardown_msi_irq(unsigned int irq)
- {
- 	int number_irqs;
- 	u64 bitmask;
-@@ -226,8 +225,8 @@ void arch_teardown_msi_irq(unsigned int irq)
- 
- 	if ((irq < OCTEON_IRQ_MSI_BIT0)
- 		|| (irq > msi_irq_size + OCTEON_IRQ_MSI_BIT0))
--		panic("arch_teardown_msi_irq: Attempted to teardown illegal "
--		      "MSI interrupt (%d)", irq);
-+		panic("octeon_teardown_msi_irq: Attempted to teardown illegal "
-+			"MSI interrupt (%d)", irq);
- 
- 	irq -= OCTEON_IRQ_MSI_BIT0;
- 	index = irq / 64;
-@@ -240,7 +239,7 @@ void arch_teardown_msi_irq(unsigned int irq)
- 	 */
- 	number_irqs = 0;
- 	while ((irq0 + number_irqs < 64) &&
--	       (msi_multiple_irq_bitmask[index]
-+		(msi_multiple_irq_bitmask[index]
- 		& (1ull << (irq0 + number_irqs))))
- 		number_irqs++;
- 	number_irqs++;
-@@ -249,8 +248,8 @@ void arch_teardown_msi_irq(unsigned int irq)
- 	/* Shift the mask to the correct bit location */
- 	bitmask <<= irq0;
- 	if ((msi_free_irq_bitmask[index] & bitmask) != bitmask)
--		panic("arch_teardown_msi_irq: Attempted to teardown MSI "
--		      "interrupt (%d) not in use", irq);
-+		panic("octeon_teardown_msi_irq: Attempted to teardown MSI "
-+			"interrupt (%d) not in use", irq);
- 
- 	/* Checks are done, update the in use bitmask */
- 	spin_lock(&msi_free_irq_bitmask_lock);
-@@ -259,6 +258,16 @@ void arch_teardown_msi_irq(unsigned int irq)
- 	spin_unlock(&msi_free_irq_bitmask_lock);
- }
- 
-+static struct msi_chip octeon_msi_chip = {
-+	.setup_irqs = octeon_setup_msi_irqs,
-+	.teardown_irq = octeon_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-+{
-+	return &octeon_msi_chip;
-+}
-+
- static DEFINE_RAW_SPINLOCK(octeon_irq_msi_lock);
- 
- static u64 msi_rcv_reg[4];
--- 
-1.7.1
+On 2014/9/25 10:16, Joe.C wrote:
+> 
+> Jiang,
+> 
+> Please consider merge the following 2 changes into your next round.
+> 
+> On Thu, 2014-09-25 at 00:04 +0800, Joe.C wrote:
+>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>> index e285f3a..01e852b 100644
+>> --- a/kernel/irq/irqdomain.c
+>> +++ b/kernel/irq/irqdomain.c
+>> @@ -467,7 +467,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>>  	struct irq_domain *domain;
+>>  	irq_hw_number_t hwirq;
+>>  	unsigned int type = IRQ_TYPE_NONE;
+>> -	unsigned int virq;
+>> +	int virq;
+>>  
+>>  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
+>>  	if (!domain) {
+>> @@ -493,8 +493,8 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>>  	else
+>>  #endif
+>>  		virq = irq_create_mapping(domain, hwirq);
+>> -	if (!virq)
+>> -		return virq;
+>> +	if (virq <= 0)
+>> +		return 0;
+>>  
+>>  	/* Set type if specified and different than the current one */
+>>  	if (type != IRQ_TYPE_NONE &&
+> 
+> irq_of_parse_and_map()/of_irq_to_resource() expect
+> irq_create_of_mapping() to return 0 when fail. Return error code will
+> cause of_irq_to_resource crash.
+> 
+> 
+>> @@ -716,20 +716,20 @@ const struct irq_domain_ops irq_domain_simple_ops = {
+>>  };
+>>  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
+>>  
+>> -static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>> +static int irq_domain_alloc_descs(int virq, unsigned int cnt,
+>>  				  irq_hw_number_t hwirq, int node)
+>>  {
+>>  	unsigned int hint;
+>>  
+>>  	if (virq >= 0) {
+>> -		virq = irq_alloc_descs(virq, virq, nr_irqs, node);
+>> +		virq = irq_alloc_descs(virq, virq, cnt, node);
+>>  	} else {
+>>  		hint = hwirq % nr_irqs;
+>>  		if (hint == 0)
+>>  			hint++;
+>> -		virq = irq_alloc_descs_from(hint, nr_irqs, node);
+>> +		virq = irq_alloc_descs_from(hint, cnt, node);
+>>  		if (virq <= 0 && hint > 1)
+>> -			virq = irq_alloc_descs_from(1, nr_irqs, node);
+>> +			virq = irq_alloc_descs_from(1, cnt, node);
+>>  	}
+>>  
+>>  	return virq;
+> 
+> This come from irq_create_mapping(), the original code is using global
+> nr_irqs. Change to match original behavior.
+> 
+> Joe.C
+> 
+> 
