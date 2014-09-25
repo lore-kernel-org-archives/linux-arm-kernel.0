@@ -1,43 +1,64 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 25 Sep 2014 12:42:08 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140924075346.GB19565@linutronix.de>
-References: <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
- <54129F6C.7040508@linutronix.de>
- <20140912094010.GE28458@ci00147.xsens-tech.local>
- <5412C21A.8020203@linutronix.de>
- <20140912102816.GF28458@ci00147.xsens-tech.local>
- <541716DC.9020904@linutronix.de>
- <20140917102812.GA20438@ci00147.xsens-tech.local>
- <20140921204100.GA10111@linutronix.de>
- <5421A7F7.3070109@hurleysoftware.com>
- <20140924075346.GB19565@linutronix.de>
-Message-ID: <20140925104208.GE19396@linutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 25 Sep 2014 12:43:35 +0200
+Subject: [PATCH v2 01/18] arm: dma-mapping: arm_iommu_attach_device:
+ automatically set max_seg_size
+In-Reply-To: <20140924170627.GK16244@arm.com>
+References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+ <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
+ <20140924170627.GK16244@arm.com>
+Message-ID: <5423F1D7.3060400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior | 2014-09-24 09:53:46 [+0200]:
+Hello,
 
->* Peter Hurley | 2014-09-23 13:03:51 [-0400]:
+On 2014-09-24 19:06, Will Deacon wrote:
+> Hi Marek,
 >
->>But DMA is cheating if the UART driver's tx_empty() method is saying the
->>transmitter is empty while TX DMA is still running.
->This shouldn't be the case. But I will check this once I able to.
+> On Tue, Sep 16, 2014 at 12:54:28PM +0100, Marek Szyprowski wrote:
+>> If device has no max_seg_size set, we assume that there is no limit and
+>> force it to DMA_BIT_MASK(32) to always use contiguous mappings in DMA
+>> address space.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   arch/arm/mm/dma-mapping.c | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index bcd5f836f27e..84705e24571b 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -2050,6 +2050,22 @@ int arm_iommu_attach_device(struct device *dev,
+>>   {
+>>   	int err;
+>>   
+>> +	/*
+>> +	 * if device has no max_seg_size set, we assume that there is no limit
+>> +	 * and force it to DMA_BIT_MASK(32) to always use contiguous mappings
+>> +	 * in DMA address space
+>> +	 */
+>> +	if (!dev->dma_parms) {
+>> +		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
+>> +		if (!dev->dma_parms)
+>> +			return -ENOMEM;
+>> +	}
+>> +	if (!dev->dma_parms->max_segment_size) {
+>> +		err = dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+> Would it make more sense to base this default value off the dma_mask?
+> In my IOMMU series, of_dma_configure passes back a size parameter to
+> arch_setup_dma_ops which is calculated from the dma-ranges property or the
+> coherent dma mask if the ranges property is absent, so maybe we should set
+> this there too?
 
-I added 
+Right, good idea. This patch predates your arch_setup_dma_ops changes, so I
+had to use something. The value taken from dma_mask is much better than 
+hardcoded
+DMA_BIT_MASK(32). Do you want to include an updated patch in next 
+version of your
+arch_setup_dma_ops patchset?
 
-|#define BOTH_EMPTY      (UART_LSR_TEMT | UART_LSR_THRE)
-|    trace_printk("delay <%d>\n", (lsr & BOTH_EMPTY) == BOTH_EMPTY ? 1 : 0);
-
-in my set_termios() and the trace shows
-|              vi-949   [000] d...    70.477002: omap8250_restore_regs: delay <0>
-
-so no, it does not wait until TX FIFO is empty. It looks like it uses
-TCSANOW instead of TCSADRAIN. And since this looks "legal" I will delay
-it until TX-DMA is complete because it is known to stall the DMA operation.
-
->>Regards,
->>Peter Hurley
-
-Sebastian
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
