@@ -1,9 +1,9 @@
 From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Thu, 25 Sep 2014 14:33:59 +0530
+Date: Thu, 25 Sep 2014 14:34:00 +0530
 Subject: [RFC PATCH 4/4] arm64:numa: adding numa support for arm64 platforms.
 In-Reply-To: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
 References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
-Message-ID: <1411635840-24038-5-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <1411635840-24038-6-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -158,9 +158,9 @@ index 0000000..46d53fd
 +void numa_add_cpu(int cpu);
 +void numa_remove_cpu(int cpu);
 +#else	/* CONFIG_NUMA */
-+static inline void arm64_numa_init(void);
-+static inline void numa_store_cpu_info(int cpu)	{ }
-+static inline void arm64_numa_init()			{ }
++static inline void arm64_numa_init(void );
++static inline void numa_store_cpu_info(int cpu)		{ }
++static inline void arm64_numa_init( )			{ }
 +#endif	/* CONFIG_NUMA */
 +#endif	/* _ASM_ARM64_NUMA_H */
 diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
@@ -305,7 +305,7 @@ new file mode 100644
 index 0000000..a5f4555
 --- /dev/null
 +++ b/arch/arm64/mm/numa.c
-@@ -0,0 +1,469 @@
+@@ -0,0 +1,471 @@
 +/*
 + * NUMA support, based on the x86 implementation.
 + *
@@ -367,13 +367,15 @@ index 0000000..a5f4555
 +const struct cpumask *cpumask_of_node(int node)
 +{
 +	if (node >= nr_node_ids) {
-+		pr_warn("cpumask_of_node(%d): node > nr_node_ids(%d)\n",
++		printk(KERN_WARNING
++			"cpumask_of_node(%d): node > nr_node_ids(%d)\n",
 +			node, nr_node_ids);
 +		dump_stack();
 +		return cpu_none_mask;
 +	}
 +	if (node_to_cpumask_map[node] == NULL) {
-+		pr_warn("cpumask_of_node(%d): no node_to_cpumask_map!\n",
++		printk(KERN_WARNING
++			"cpumask_of_node(%d): no node_to_cpumask_map!\n",
 +			node);
 +		dump_stack();
 +		return cpu_online_mask;
