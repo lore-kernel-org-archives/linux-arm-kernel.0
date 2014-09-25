@@ -1,248 +1,45 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 25 Sep 2014 18:05:35 +0300
-Subject: [RFC PATCH 2/4] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
-References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1411657537-25238-3-git-send-email-grygorii.strashko@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 25 Sep 2014 23:10:14 +0800
+Subject: [PATCH 2/2] ARM: vf610: Use ARM Global Timer as clocksource
+In-Reply-To: <7006ad6e519c2ce3eeded54d35c87183@agner.ch>
+References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
+ <1410437175-6636-2-git-send-email-stefan@agner.ch>
+ <20140925075013.GD6405@dragon>
+ <7006ad6e519c2ce3eeded54d35c87183@agner.ch>
+Message-ID: <20140925151012.GI6405@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch switches Keystone 2 PM code to use Generic PM domains
-instead of PM  clock domains because of the lack of DT support
-for the last.
+On Thu, Sep 25, 2014 at 10:25:13AM +0200, Stefan Agner wrote:
+> Am 2014-09-25 09:50, schrieb Shawn Guo:
+> > On Thu, Sep 11, 2014 at 02:06:15PM +0200, Stefan Agner wrote:
+> >> Use ARM Global Timer as clocksource instead of the PIT timer. This
+> >> leaves the PIT timer for other users e.g. the secondary Cortex-M4
+> >> core. Also, the Global Timer has double the precission (running at
+> >> pheripheral clock compared to IPG clock) and a 64-bit incrementing
+> >> counter register.
+> > 
+> > I just think of one thing.  Will this change cause a problem of the low
+> > power idle support in case we want to power down ARM core in there?
+> > 
+> 
+> I'm not sure what really happend to the Global Timer when we power down
+> the ARM core. We use a clocksoure of different power domain now, so it
+> might make a difference in low power modes, but I think it will improve
+> things: The PIT timer's clock currently have been clock gated even in
+> STOP mode, which does not power down the ARM core. And it would be shut
+> down completely in LP-Mode 1-3 which since PIT is part of the big power
+> domain 1. 
+> 
+> But AFAIK, its not required that the clocksource is running while in low
+> power modes. The time should just not jump, and if the timers registers
+> are lost during suspend, a proper suspend/resume support need to be
+> implemented. 
 
-Keystone 2 PM domain should be specified per device for which
-Runtime PM has to be enabled and handles the list of functional clocks
-to enable/disable device.
+Sorry, I should be more specific in the first place.  What I'm concerned
+is more about clockevent than clocksource.  If some day we have a
+cpuidle driver for vf610, which powers off ARM core in a deep C-state,
+the clockevent device will be gone as long as system enters the C-state,
+and no timer interrupt can wake up the core from idle state.
 
-Example:
- qmss_domain: qmss_pm_controller {
-	compatible = "ti,keystone-pm-controller";
-	clocks = <&chipclk13>;
-	#power-domain-cells = <0>;
- };
-
- qmss: qmss at 2a40000 {
-	compatible = "ti,keystone-navigator-qmss";
-	...
-	power-domains = <&qmss_domain>;
-
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- .../devicetree/bindings/power/ti,keystone-gpc.txt  |  37 +++++++
- arch/arm/mach-keystone/Kconfig                     |   1 +
- arch/arm/mach-keystone/pm_domain.c                 | 123 ++++++++++++++++++++-
- 3 files changed, 158 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
-
-diff --git a/Documentation/devicetree/bindings/power/ti,keystone-gpc.txt b/Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
-new file mode 100644
-index 0000000..adf63fb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
-@@ -0,0 +1,37 @@
-+* TI Keystone 2 Generic PM Controller
-+
-+The TI Keystone 2 Generic PM Controller is responsible for Clock gating
-+for each controlled IP module.
-+
-+Required properties:
-+- compatible: Should be "ti,keystone-gpc"
-+- clocks: Clock's phandles to devices in the power domain that need
-+	to be enabled during domain power-up/down.
-+- #power-domain-cells: Should be 0, see below:
-+
-+The gpc node is a power-controller as documented by the generic power domain
-+bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-+
-+The IP module is allowed to reuse clocks controlled by its power domain
-+controller for internal proposes (get current clock rate for example).
-+
-+Example:
-+
-+	netcp_domain: netcp_pm_controller {
-+		compatible = "ti,keystone-pm-controller";
-+		clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
-+		#power-domain-cells = <0>;
-+	};
-+
-+	netcp: netcp at 2090000 {
-+		reg = <0x2620110 0x8>;
-+		reg-names = "efuse";
-+		...
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		power-domains = <&netcp_domain>;
-+
-+		clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
-+		dma-coherent;
-+	}
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index e571084..0132bde 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_KEYSTONE
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
-diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-index ca79dda..3cf6696 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -12,14 +12,17 @@
-  * version 2, as published by the Free Software Foundation.
-  */
- 
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/init.h>
- #include <linux/pm_runtime.h>
- #include <linux/pm_clock.h>
-+#include <linux/pm_domain.h>
- #include <linux/platform_device.h>
--#include <linux/clk-provider.h>
- #include <linux/of.h>
- 
- #ifdef CONFIG_PM_RUNTIME
-+
- static int keystone_pm_runtime_suspend(struct device *dev)
- {
- 	int ret;
-@@ -66,6 +69,118 @@ static struct of_device_id of_keystone_table[] = {
- 	{ /* end of list */ },
- };
- 
-+#ifdef CONFIG_PM_GENERIC_DOMAINS
-+
-+struct keystone_domain {
-+	struct generic_pm_domain base;
-+	struct device	*dev;
-+};
-+
-+static int keystone_pm_domain_power_off(struct generic_pm_domain *genpd)
-+{
-+	int ret;
-+	struct keystone_domain *dm = container_of(genpd,
-+						  struct keystone_domain,
-+						  base);
-+
-+	/* Enable reset clocks for all devices in the PU domain */
-+	ret = pm_clk_suspend(dm->dev);
-+	if (ret)
-+		dev_err(dm->dev, "can't turn off clocks %d\n", ret);
-+
-+	return ret;
-+}
-+
-+static int keystone_pm_domain_power_on(struct generic_pm_domain *genpd)
-+{
-+	int ret;
-+	struct keystone_domain *dm = container_of(genpd,
-+						  struct keystone_domain,
-+						  base);
-+
-+	/* Disable reset clocks for all devices in the PU domain */
-+	ret = pm_clk_resume(dm->dev);
-+	if (ret)
-+		dev_err(dm->dev, "can't turn on clocks %d\n", ret);
-+
-+	return ret;
-+}
-+
-+static const struct keystone_domain keystone_domain = {
-+	.base = {
-+		.name = "keystone",
-+		.power_off = keystone_pm_domain_power_off,
-+		.power_on = keystone_pm_domain_power_on,
-+		.power_off_latency_ns = 25000,
-+		.power_on_latency_ns = 2000000,
-+	},
-+};
-+
-+static int keystone_pm_domain_probe(struct platform_device *pdev)
-+{
-+	struct clk *clk;
-+	bool is_off;
-+	int i = 0;
-+	struct keystone_domain *domain;
-+	int ret = 0;
-+
-+	domain = devm_kzalloc(&pdev->dev,
-+			      sizeof(struct keystone_domain), GFP_KERNEL);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	domain->base = keystone_domain.base;
-+	domain->base.of_node = pdev->dev.of_node;
-+	domain->dev = &pdev->dev;
-+
-+	ret = pm_clk_create(&pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "pm_clk_create failed %d\n", ret);
-+		return ret;
-+	};
-+
-+	while ((clk = of_clk_get(pdev->dev.of_node, i++)) && !IS_ERR(clk)) {
-+		ret = pm_clk_add_clk(&pdev->dev, clk);
-+		if (ret) {
-+			dev_err(&pdev->dev, "pm_clk_add_clk failed %d\n", ret);
-+			goto clk_err;
-+		};
-+	}
-+
-+	is_off = IS_ENABLED(CONFIG_PM_RUNTIME);
-+	if (is_off)
-+		keystone_pm_domain_power_off(&domain->base);
-+
-+	pm_genpd_init(&domain->base, NULL, is_off);
-+	return of_genpd_add_provider_simple(pdev->dev.of_node, &domain->base);
-+
-+clk_err:
-+	pm_clk_destroy(&pdev->dev);
-+	return ret;
-+}
-+
-+static struct of_device_id keystone_pm_domain_dt_ids[] = {
-+	{ .compatible = "ti,keystone-gpc" },
-+	{ }
-+};
-+
-+static struct platform_driver keystone_pm_domain_driver = {
-+	.driver = {
-+		.name = "ti,keystone-gpc",
-+		.owner = THIS_MODULE,
-+		.of_match_table = keystone_pm_domain_dt_ids,
-+	},
-+	.probe = keystone_pm_domain_probe,
-+};
-+
-+static int __init keystone_pm_domain_init(void)
-+{
-+	return platform_driver_register(&keystone_pm_domain_driver);
-+}
-+#else
-+static int __init keystone_pm_domain_init(void) { return 0; }
-+#endif /* CONFIG_PM_GENERIC_DOMAINS */
-+
- int __init keystone_pm_runtime_init(void)
- {
- 	struct device_node *np;
-@@ -74,7 +189,9 @@ int __init keystone_pm_runtime_init(void)
- 	if (!np)
- 		return 0;
- 
--	pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
-+	/* TODO: remove clock_ops code
-+	 * pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
-+	 */
- 
--	return 0;
-+	return keystone_pm_domain_init();
- }
--- 
-1.9.1
+Shawn
