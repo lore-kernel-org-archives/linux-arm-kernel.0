@@ -1,47 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 25 Sep 2014 17:34:18 +0900
-Subject: [PATCH 0/3 v4] Fix Exynos USB on kernels with USB Gadget support
-In-Reply-To: <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <542199F4.3090601@samsung.com>
- <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <5423D38A.5080609@samsung.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 25 Sep 2014 10:35:03 +0200
+Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
+In-Reply-To: <542303DF.8010606@arm.com>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
+ <542303DF.8010606@arm.com>
+Message-ID: <CAKfTPtB3-M+pXaurDeWkWGNJ3_mU-FN+EnshGE-eg_r41Hppag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/14 16:57, Sjoerd Simons wrote:
-> Same patches as v3 but rebased on
-> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+On 24 September 2014 19:48, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> On 23/09/14 17:08, Vincent Guittot wrote:
 >
-Thanks, applied.
 
-- Kukjin
+[snip]
 
-> When building a kernel with support for both USB host and USB Gadget support on
-> the dwc3 controller on the Exynos5 soc will go into USB OTG mode unless
-> otherwise specified in the dtb, which is unhelpful for boards hooked up to run
-> as USB host.
 >
-> First patch in this set explicitely set the dual-role mode for the dwc3
-> controller on Peach pi and Peach pit boards to host mode. Second patch adds
-> similar updates for Arndale Octa as reported by Andreas F?rber. Last patch
-> enables gadget mode in the default exynos config to more easily catch/trigger
-> issues like these.
+> This review (by PeterZ) during v5 of your patch-set recommended some
+> renaming (e.g. s/group_has_free_capacity/group_has_capacity and
+> s/group_out_of_capacity/group_no_capacity as well as reordering of the
+> parameters which I agree with:
 >
-> I suspect the Samsung SMDK5420 DTS might need similar changes, so it would be
-> great if users of those board could verify this.
+> https://lkml.org/lkml/2014/9/11/706
+
+Ah... you're right, these changes have passed through my seance of renaming
+
 >
-> Changes in v2: alphabetically sort the dts entries
-> Changes in v3: Add DTS updates for arndale octa
-> Changes in v4: Rebased on todays linux-samsungs for-next branch
+>>
+>> -/*
+
+[snip]
+
+>> -       if (sgs->group_capacity_factor > sgs->sum_nr_running)
+>> -               sgs->group_has_free_capacity = 1;
+>> +       sgs->group_type = group_classify(group, sgs, env);
+>> +
+>> +       sgs->group_out_of_capacity = group_is_overloaded(sgs, env);
 >
-> Sjoerd Simons (3):
->    ARM: dts: exynos: Explicitly set dr_mode on peach-pit and peach-pi
->    ARM: dts: exynos: Explicitly set dr_mode on arndale-octa
->    ARM: exynos_defconfig: enable USB gadget support
+> In case sgs->group_type is group_overloaded you could set
+> sgs->group_out_of_capacity to 1 without calling group_is_overloaded again.
+
+I prefer to keep sgs->group_out_of_capacity = group_is_overloaded(sgs,
+env) and use it in group_classify in case of future changes in the
+classification order
+
+Regards,
+Vincent
 >
->   arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
->   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 8 ++++++++
->   arch/arm/boot/dts/exynos5420.dtsi             | 4 ++--
->   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 8 ++++++++
->   arch/arm/configs/exynos_defconfig             | 1 +
->   5 files changed, 23 insertions(+), 2 deletions(-)
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 7cdf271e8e52..52d441c92a4f 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -6037,7 +6037,8 @@ static inline void update_sg_lb_stats(struct
+> lb_env *env,
+>
+>         sgs->group_type = group_classify(group, sgs, env);
+>
+> -       sgs->group_out_of_capacity = group_is_overloaded(sgs, env);
+> +       if (sgs->group_type == group_overloaded)
+> +               sgs->group_out_of_capacity = 1;
+>  }
+>
+>>  }
+>>
+>>  /**
+>> @@ -6198,17 +6163,21 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+>
+> [...]
+>
