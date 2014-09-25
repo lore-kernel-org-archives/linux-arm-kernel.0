@@ -1,75 +1,95 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 25 Sep 2014 14:58:31 +0900
-Subject: [PATCH v2] ARM: cacheflush: Fix v7_exit_coherency_flush exynos
- build breakage on ARMv6
-In-Reply-To: <alpine.LFD.2.11.1409240954220.8647@knanqh.ubzr>
-References: <1411547222-677-1-git-send-email-k.kozlowski@samsung.com>
- <alpine.LFD.2.11.1409240954220.8647@knanqh.ubzr>
-Message-ID: <018f01cfd885$bc677320$35365960$@kernel.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 25 Sep 2014 07:59:55 +0200
+Subject: [PATCH v5 4/4] thermal: Add Tegra SOCTHERM thermal management
+ driver
+In-Reply-To: <54231C3D.6040900@kapsi.fi>
+References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
+ <1408616242-21009-5-git-send-email-mperttunen@nvidia.com>
+ <20140924191829.GA16529@developer> <54231C3D.6040900@kapsi.fi>
+Message-ID: <20140925055953.GA12423@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> 
-> On Wed, 24 Sep 2014, Krzysztof Kozlowski wrote:
-> 
-> > This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
-> > time options (e.g. by building allmodconfig):
+On Wed, Sep 24, 2014 at 10:32:13PM +0300, Mikko Perttunen wrote:
+> On 09/24/2014 10:18 PM, Eduardo Valentin wrote:
 > >
-> > $ make allmodconfig
-> > $ make
-> >   CC      arch/arm/mach-exynos/platsmp.o
-> > /tmp/ccdQM0Eg.s: Assembler messages:
-> > /tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode `isb '
-> > /tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode `isb '
-> > /tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode `dsb '
-> > make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
+> >Mikko,
 > >
-> > The error was introduced in commit "ARM: EXYNOS: Move code from
-> > hotplug.c to platsmp.c".  Previously code using
-> > v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
-> > this flag dissapeared during the movement.
+> >On Thu, Aug 21, 2014 at 01:17:22PM +0300, Mikko Perttunen wrote:
+> >>...
+> >>+
+> >>+static int enable_tsensor(struct tegra_soctherm *tegra,
+> >>+			  const struct tegra_tsensor *sensor,
+> >>+			  struct tsensor_shared_calibration shared)
+> >>+{
+> >>+	void * __iomem base = tegra->regs + sensor->base;
 > >
-> > Fix this by annotating the v7_exit_coherency_flush() asm code with
-> > armv7-a architecture.
+> >I get sparse complaining about this declaration. For the sake of keeping
+> >a clean static checks, can you please:
+> >-       void * __iomem base = tegra->regs + sensor->base;
+> >+       void __iomem * base = tegra->regs + sensor->base;
 > >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Reported-by: Mark Brown <broonie@kernel.org>
-> > Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
 > 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Sure.
 > 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >Can you also please check the remaining sparse errors?
+> >   CHECK   drivers/thermal/tegra_soctherm.c
+> >   drivers/thermal/tegra_soctherm.c:260:43: warning: incorrect type in
+> >   initializer (different address spaces)
+> >   drivers/thermal/tegra_soctherm.c:260:43:    expected void *[noderef]
+> >   <asn:2>base
+> >   drivers/thermal/tegra_soctherm.c:260:43:    got void [noderef]
+> >   <asn:2>*
+> >   drivers/thermal/tegra_soctherm.c:271:9: warning: incorrect type in
+> >   argument 2 (different address spaces)
+> >   drivers/thermal/tegra_soctherm.c:271:9:    expected void volatile
+> >   [noderef] <asn:2>*addr
+> >   drivers/thermal/tegra_soctherm.c:271:9:    got void *
+> >   drivers/thermal/tegra_soctherm.c:279:9: warning: incorrect type in
+> >   argument 2 (different address spaces)
+> >   drivers/thermal/tegra_soctherm.c:279:9:    expected void volatile
+> >   [noderef] <asn:2>*addr
+> >   drivers/thermal/tegra_soctherm.c:279:9:    got void *
+> >   drivers/thermal/tegra_soctherm.c:281:9: warning: incorrect type in
+> >   argument 2 (different address spaces)
+> >   drivers/thermal/tegra_soctherm.c:281:9:    expected void volatile
+> >   [noderef] <asn:2>*addr
+> >   drivers/thermal/tegra_soctherm.c:281:9:    got void *
+> >   drivers/thermal/tegra_soctherm.c:347:25: warning: incorrect type in
+> >   argument 1 (different address spaces)
+> >   drivers/thermal/tegra_soctherm.c:347:25:    expected void const *ptr
+> >   drivers/thermal/tegra_soctherm.c:347:25:    got void [noderef]
+> >   <asn:2>*regs
+> >   drivers/thermal/tegra_soctherm.c:349:37: warning: incorrect type in
+> >   argument 1 (different address spaces)
+> >   drivers/thermal/tegra_soctherm.c:349:37:    expected void const *ptr
+> >   drivers/thermal/tegra_soctherm.c:349:37:    got void [noderef]
+> >   <asn:2>*regs
+> >   drivers/thermal/tegra_soctherm.c:271:9: warning: dereference of
+> >   noderef expression
+> >   drivers/thermal/tegra_soctherm.c:279:9: warning: dereference of
+> >   noderef expression
+> >   drivers/thermal/tegra_soctherm.c:281:9: warning: dereference of
+> >   noderef expression
+> >
+> 
+> Most of these seem to be caused by the above-mentioned swapping of __iomem
+> and *. The ones on lines 347 and 349 are more peculiar, though. Apparently
+> sparse doesn't like using IS_ERR and PTR_ERR on the void __iomem * pointer
+> returned by devm_ioremap_resource. Looks like this has been discussed before
+> (https://lkml.org/lkml/2013/6/17/216) and sparse should have been patched to
+> ignore this situation, so I'm not sure why it's complaining about it.
+> Anyway, there shouldn't be any issue here.
 
-For building allmodconfig, this patch fixes the problem.
+If I apply the change suggested by Eduardo above then all of the above
+warnings go away for me. That's with sparse 0.5.0. According to the
+email thread above a patch for this was applied in 0.4.5.
 
-Hi Russell,
-Can you please take this?
-
-- Kukjin
-
-> 
-> >
-> > ---
-> >
-> > Changes since v1:
-> > 1. Use armv7-a arch annotation instead replacing isb/dsb with macros.
-> >    Suggsted by Nicolas Pitre.
-> > ---
-> >  arch/arm/include/asm/cacheflush.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> > index 79ecb4f34ffb..10e78d00a0bb 100644
-> > --- a/arch/arm/include/asm/cacheflush.h
-> > +++ b/arch/arm/include/asm/cacheflush.h
-> > @@ -466,6 +466,7 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
-> >   */
-> >  #define v7_exit_coherency_flush(level) \
-> >  	asm volatile( \
-> > +	".arch	armv7-a \n\t" \
-> >  	"stmfd	sp!, {fp, ip} \n\t" \
-> >  	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
-> >  	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
-> > --
-> > 1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/fd150641/attachment.sig>
