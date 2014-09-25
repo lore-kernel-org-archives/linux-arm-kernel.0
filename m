@@ -1,10 +1,10 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:27 +0800
-Subject: [PATCH v2 17/22] s390/MSI: Use MSI chip framework to configure
+Date: Thu, 25 Sep 2014 11:14:29 +0800
+Subject: [PATCH v2 19/22] IA64/MSI: Use MSI chip framework to configure
  MSI/MSI-X irq
 In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
 References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-18-git-send-email-wangyijing@huawei.com>
+Message-ID: <1411614872-4009-20-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,49 +12,50 @@ Use MSI chip framework instead of arch MSI functions to configure
 MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
 ---
- arch/s390/pci/pci.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+ arch/ia64/kernel/msi_ia64.c |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
-index 552b990..da5316e 100644
---- a/arch/s390/pci/pci.c
-+++ b/arch/s390/pci/pci.c
-@@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
- 	}
- }
+diff --git a/arch/ia64/kernel/msi_ia64.c b/arch/ia64/kernel/msi_ia64.c
+index 4efe748..55ac859 100644
+--- a/arch/ia64/kernel/msi_ia64.c
++++ b/arch/ia64/kernel/msi_ia64.c
+@@ -112,15 +112,15 @@ static struct irq_chip ia64_msi_chip = {
+ };
  
--int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
-+int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+ 
+-int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++static int arch_ia64_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
  {
- 	struct zpci_dev *zdev = get_zdev(pdev);
- 	unsigned int hwirq, msi_vecs;
-@@ -434,7 +434,7 @@ out:
- 	return rc;
+ 	if (platform_setup_msi_irq)
+-		return platform_setup_msi_irq(pdev, desc);
++		return platform_setup_msi_irq(dev, desc);
+ 
+-	return ia64_setup_msi_irq(pdev, desc);
++	return ia64_setup_msi_irq(dev, desc);
  }
  
--void arch_teardown_msi_irqs(struct pci_dev *pdev)
-+static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
+-void arch_teardown_msi_irq(unsigned int irq)
++static void arch_ia64_teardown_msi_irq(unsigned int irq)
  {
- 	struct zpci_dev *zdev = get_zdev(pdev);
- 	struct msi_desc *msi;
-@@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
- 	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+ 	if (platform_teardown_msi_irq)
+ 		return platform_teardown_msi_irq(irq);
+@@ -128,6 +128,16 @@ void arch_teardown_msi_irq(unsigned int irq)
+ 	return ia64_teardown_msi_irq(irq);
  }
  
-+static struct msi_chip zpci_msi_chip = {
-+	.setup_irqs = zpci_setup_msi_irqs,
-+	.teardown_irqs = zpci_teardown_msi_irqs,
++static struct msi_chip chip = {
++	.setup_irq = arch_ia64_setup_msi_irq,
++	.teardown_irq = arch_ia64_teardown_msi_irq,
 +};
 +
 +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
 +{
-+	return &zpci_msi_chip;
++	return &chip;
 +}
 +
- static void zpci_map_resources(struct zpci_dev *zdev)
- {
- 	struct pci_dev *pdev = zdev->pdev;
+ #ifdef CONFIG_INTEL_IOMMU
+ #ifdef CONFIG_SMP
+ static int dmar_msi_set_affinity(struct irq_data *data,
 -- 
 1.7.1
