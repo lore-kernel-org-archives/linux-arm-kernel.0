@@ -1,87 +1,53 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu, 25 Sep 2014 20:05:53 +0100
-Subject: [PATCH v6 4/6] sched: get CPU's usage statistic
-In-Reply-To: <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <54246791.9050101@arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 25 Sep 2014 12:05:42 -0700
+Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
+Message-ID: <7ha95nikqh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/14 17:08, Vincent Guittot wrote:
-> Monitor the usage level of each group of each sched_domain level. The usage is
-> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
-> We use the utilization_load_avg to evaluate the usage level of each group.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/fair.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index 2cf153d..4097e3f 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -4523,6 +4523,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
->  	return target;
->  }
->  
-> +static int get_cpu_usage(int cpu)
-> +{
-> +	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
-> +	unsigned long capacity = capacity_orig_of(cpu);
-> +
-> +	if (usage >= SCHED_LOAD_SCALE)
-> +		return capacity + 1;
+Hi Rafael,
 
-Why you are returning rq->cpu_capacity_orig + 1 (1025) in case
-utilization_load_avg is greater or equal than 1024 and not usage or
-(usage * capacity) >> SCHED_LOAD_SHIFT too?
+The first pull request was missing a dependency on a feature that went
+in through Mark Brown's regulator tree, so it wouldn't actually compile
+properly by itself.  This version pulls in that topic branch from Marks
+tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
 
-In case the weight of a sched group is greater than 1, you might loose
-the information that the whole sched group is over-utilized too.
+Kevin
 
-You add up the individual cpu usage values for a group by
-sgs->group_usage += get_cpu_usage(i) in update_sg_lb_stats and later use
-sgs->group_usage in group_is_overloaded to compare it against
-sgs->group_capacity (taking imbalance_pct into consideration).
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-> +
-> +	return (usage * capacity) >> SCHED_LOAD_SHIFT;
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-Nit-pick: Since you're multiplying by a capacity value
-(rq->cpu_capacity_orig) you should shift by SCHED_CAPACITY_SHIFT.
+are available in the git repository at:
 
-Just to make sure: You do this scaling of usage by cpu_capacity_orig
-here only to cater for the fact that cpu_capacity_orig might be uarch
-scaled (by arch_scale_cpu_capacity, !SMT) in update_cpu_capacity while
-utilization_load_avg is currently not.
-We don't even uArch scale on ARM TC2 big.LITTLE platform in mainline
-today due to the missing clock-frequency property in the device tree.
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git tags/avs-for-3.18
 
-I think it's hard for people to grasp that your patch-set takes uArch
-scaling of capacity into consideration but not frequency scaling of
-capacity (via arch_scale_freq_capacity, not used at the moment).
+for you to fetch changes up to cd8caa18deff6d2d87a4e3161b4dd8c6da3c4f38:
 
-> +}
-> +
->  /*
->   * select_task_rq_fair: Select target runqueue for the waking task in domains
->   * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
-> @@ -5663,6 +5674,7 @@ struct sg_lb_stats {
->  	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
->  	unsigned long load_per_task;
->  	unsigned long group_capacity;
-> +	unsigned long group_usage; /* Total usage of the group */
->  	unsigned int sum_nr_running; /* Nr tasks running in the group */
->  	unsigned int group_capacity_factor;
->  	unsigned int idle_cpus;
-> @@ -6037,6 +6049,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
->  			load = source_load(i, load_idx);
->  
->  		sgs->group_load += load;
-> +		sgs->group_usage += get_cpu_usage(i);
->  		sgs->sum_nr_running += rq->cfs.h_nr_running;
->  
->  		if (rq->nr_running > 1)
-> 
+  Merge branch 'topic/voltage-ev' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator into avs-next (2014-09-25 09:57:57 -0700)
+
+----------------------------------------------------------------
+PM / AVS changes for v3.18
+
+- Add new driver for Rockchip IO voltage domains
+- update MAINTAINERS to reflect maintenance of drivers/power/avs/*
+
+----------------------------------------------------------------
+Heiko St?bner (2):
+      regulator: core: Add REGULATOR_EVENT_PRE_VOLTAGE_CHANGE (and ABORT)
+      PM / AVS: rockchip-io: add driver handling Rockchip io domains
+
+Kevin Hilman (2):
+      MAINTAINERS: update entry for drivers/power/avs
+      Merge branch 'topic/voltage-ev' of git://git.kernel.org/.../broonie/regulator into avs-next
+
+ Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  83 +++++++++++++++++++
+ MAINTAINERS                                                    |   4 +-
+ drivers/power/avs/Kconfig                                      |   8 ++
+ drivers/power/avs/Makefile                                     |   1 +
+ drivers/power/avs/rockchip-io-domain.c                         | 351 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/regulator/core.c                                       |  63 +++++++++++++--
+ include/linux/regulator/consumer.h                             |  20 +++++
+ 7 files changed, 521 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+ create mode 100644 drivers/power/avs/rockchip-io-domain.c
