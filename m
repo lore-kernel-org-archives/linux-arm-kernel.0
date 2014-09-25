@@ -1,82 +1,44 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 25 Sep 2014 09:28:14 +0800
-Subject: [PATCH v2 3/3] clk: rockchip: add clock node in PD_VIDEO
-In-Reply-To: <CAD=FV=UqB26_GzP14ueHHpmjgJqX7sPpR0T+SR60e=i_YbWitQ@mail.gmail.com>
-References: <1411572802-22042-1-git-send-email-kever.yang@rock-chips.com>
- <1411572802-22042-4-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=UqB26_GzP14ueHHpmjgJqX7sPpR0T+SR60e=i_YbWitQ@mail.gmail.com>
-Message-ID: <54236FAE.5090903@rock-chips.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 25 Sep 2014 10:32:10 +0900
+Subject: [PATCH v3 0/4] ARM: shmobile: various DT files sorted by address
+Message-ID: <1411608734-1349-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Hi,
 
-On 09/25/2014 03:48 AM, Doug Anderson wrote:
-> Kever,
->
-> On Wed, Sep 24, 2014 at 8:33 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
->> This patch add the clock node in PD_VIDEO
->>
->> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
->> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->>
->> Changes in v2:
->> - split out the patch
->>
->>   drivers/clk/rockchip/clk-rk3288.c | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
->> index d691a56..2cfcfb6 100644
->> --- a/drivers/clk/rockchip/clk-rk3288.c
->> +++ b/drivers/clk/rockchip/clk-rk3288.c
->> @@ -296,6 +296,17 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
->>          COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
->>                          RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
->>                          RK3288_CLKGATE_CON(3), 11, GFLAGS),
->> +       /*
->> +        * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
->> +        * so we ignore the mux and make clocks nodes as following,
-> I guess we can't add the mux for now because it's in the GRF and not
-> in the clock area and the current clock tables don't have support for
-> that.  I guess that OK for now, but eventually we should probably add
-> it in.
-The mux setting moved to GRF because it switch the clock source and some 
-other
-controller logic.
-The VCODEC can be used as encoder or decoder, we use it as decoder by 
-default,
-so I guess we can ignore the decoder part before the clock module can 
-handle this.
->
->
->> +        * NOTE THAT hclk_vcodec is fix div by 4 from aclk_vcodec_pre.
-> Typo: from "aclk_vcodec_pre" or from "hclk_vcodec_pre"?
-hclk_vcodec_pre is /4 from aclk_vcodec_pre, and hclk_vcodec has a gate 
-from hclk_vcodec_pre.
-I should fix this.
->
->> +        */
->> +       GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
->> +               RK3288_CLKGATE_CON(9), 0, GFLAGS),
->> +       GATE(0, "hclk_vcodec_pre", "aclk_vdpu", 0,
->> +               RK3288_CLKGATE_CON(3), 10, GFLAGS),
->> +       GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
->> +               RK3288_CLKGATE_CON(9), 1, GFLAGS),
-> Shouldn't there be a fixed "/ 4" clock somewhere in here?  That way
-> the clock rate will be reported correctly?
->
-> I guess the cleanest would be to add support to rockchip/clk.c to call
-> clk_register_fixed_factor() somehow.  I guess I'll leave it to you and
-> Heiko to decide what you want to do here.
-There is a fixed "/4" that not add to this tree, which makes we get a 4 
-times
-of real rate when we get the HCLK_VCODEC, that is why I write a commend
-with "NOTE THAT" before.
+this is an update of a series posted by Ulrich,
+"ARM: shmobile: various DT files sorted by address",
+the purpose of which is to sort DT nodes by their address.
 
-I know there is a clk_register_fixed_factor(), but I'm not sure how to use
-it here, this is a table.
-I'll try to add the clk_register_fixed_factor() today.
+Changes since v1.
+* Drop patch reo remove spurious regulator base address as it
+  gave two nodes the same name. Until better names be found just
+  use the existing scheme (this series don't add the names it just
+  moves the nodes).
 
--Kever
+Changes since v1.
+* Some patches from the v1 series have been queued up and thus are not
+  present in v2.
+* Two new patches have been added to remove spurious regulator base
+  addresses, as suggested by Geert Uytterhoeven. These correct incorrect
+  lines before subsequent patches, rebased since v1, move them.
+
+Based on renesas-next-20140918-v3.17-rc2
+Targeted for inclusion in v3.19.
+
+Simon Horman (1):
+  ARM: shmobile: r8a73a4: Remove spurious dma-multiplexer base addresses
+
+Ulrich Hecht (3):
+  ARM: shmobile: r7s72100: sort dtsi file by address
+  ARM: shmobile: kzm9d: sort dts file by address
+  ARM: shmobile: r8a73a4: sort dtsi file by address
+
+ arch/arm/boot/dts/emev2-kzm9d.dts |  62 +++++-----
+ arch/arm/boot/dts/r7s72100.dtsi   | 202 ++++++++++++++++-----------------
+ arch/arm/boot/dts/r8a73a4.dtsi    | 232 +++++++++++++++++++-------------------
+ 3 files changed, 248 insertions(+), 248 deletions(-)
+
+-- 
+2.0.1
