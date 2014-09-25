@@ -1,256 +1,127 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:32 +0800
-Subject: [PATCH v2 22/22] PCI/MSI: Clean up unused MSI arch functions
-In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-23-git-send-email-wangyijing@huawei.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 25 Sep 2014 12:58:57 +1000
+Subject: linux-next: manual merge of the net-next tree with the arm-soc tree
+Message-ID: <20140925125857.0516ceab@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we use struct msi_chip in all platforms to configure
-MSI/MSI-X. We can clean up the unused arch functions.
+Hi all,
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/iommu/irq_remapping.c |    2 +-
- drivers/pci/msi.c             |  100 +++++++++++++++-------------------------
- include/linux/msi.h           |   14 ------
- 3 files changed, 39 insertions(+), 77 deletions(-)
+Today's linux-next merge of the net-next tree got conflicts in
+arch/arm/boot/dts/rk3188.dtsi and arch/arm/boot/dts/rk3xxx.dtsi between
+commits fd14e6f9b461 ("ARM: dts: rockchip: add dwc2 controllers for
+rk3066 and rk3188") and 4ff4ae1258a9 ("ARM: dts: rockchip: add emmc
+nodes for rk3066 and rk3188") from the arm-soc tree and commit
+18ec91e1947f ("ARM: dts: Add emac nodes to the rk3188 device tree")
+from the net-next tree.
 
-diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
-index 99b1c0f..6e645f0 100644
---- a/drivers/iommu/irq_remapping.c
-+++ b/drivers/iommu/irq_remapping.c
-@@ -92,7 +92,7 @@ error:
- 
- 	/*
- 	 * Restore altered MSI descriptor fields and prevent just destroyed
--	 * IRQs from tearing down again in default_teardown_msi_irqs()
-+	 * IRQs from tearing down again in teardown_msi_irqs()
- 	 */
- 	msidesc->irq = 0;
- 	msidesc->nvec_used = 0;
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index d10edee..9fe427f 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -34,51 +34,31 @@ struct msi_chip * __weak arch_find_msi_chip(struct pci_dev *dev)
- 	return dev->bus->msi;
- }
- 
--int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
--{
--	struct msi_chip *chip = arch_find_msi_chip(dev);
--	int err;
--
--	if (!chip || !chip->setup_irq)
--		return -EINVAL;
--
--	err = chip->setup_irq(dev, desc);
--	if (err < 0)
--		return err;
--
--	return 0;
--}
--
--void __weak arch_teardown_msi_irq(unsigned int irq)
--{
--	struct msi_desc *entry = irq_get_msi_desc(irq);
--	struct msi_chip *chip = entry->dev->bus->msi;
--
--	if (!chip || !chip->teardown_irq)
--		return;
--
--	chip->teardown_irq(irq);
--}
--
--int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+int setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- {
- 	struct msi_desc *entry;
- 	int ret;
- 	struct msi_chip *chip;
- 
- 	chip = arch_find_msi_chip(dev);
--	if (chip && chip->setup_irqs)
-+	if (!chip)
-+		return -EINVAL;
-+
-+	if (chip->setup_irqs)
- 		return chip->setup_irqs(dev, nvec, type);
- 
- 	/*
- 	 * If an architecture wants to support multiple MSI, it needs to
--	 * override arch_setup_msi_irqs()
-+	 * implement chip->setup_irqs().
- 	 */
- 	if (type == PCI_CAP_ID_MSI && nvec > 1)
- 		return 1;
- 
-+	if (!chip->setup_irq)
-+		return -EINVAL;
-+
- 	list_for_each_entry(entry, &dev->msi_list, list) {
--		ret = arch_setup_msi_irq(dev, entry);
-+		ret = chip->setup_irq(dev, entry);
- 		if (ret < 0)
- 			return ret;
- 		if (ret > 0)
-@@ -88,13 +68,20 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 	return 0;
- }
- 
--/*
-- * We have a default implementation available as a separate non-weak
-- * function, as it is used by the Xen x86 PCI code
-- */
--void default_teardown_msi_irqs(struct pci_dev *dev)
-+static void teardown_msi_irqs(struct pci_dev *dev)
- {
- 	struct msi_desc *entry;
-+	struct msi_chip *chip;
-+
-+	chip = arch_find_msi_chip(dev);
-+	if (!chip)
-+		return;
-+
-+	if (chip->teardown_irqs)
-+		return chip->teardown_irqs(dev);
-+
-+	if (!chip->teardown_irq)
-+		return;
- 
- 	list_for_each_entry(entry, &dev->msi_list, list) {
- 		int i, nvec;
-@@ -105,20 +92,10 @@ void default_teardown_msi_irqs(struct pci_dev *dev)
- 		else
- 			nvec = 1 << entry->msi_attrib.multiple;
- 		for (i = 0; i < nvec; i++)
--			arch_teardown_msi_irq(entry->irq + i);
-+			chip->teardown_irq(entry->irq + i);
- 	}
- }
- 
--void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
--{
--	struct msi_chip *chip = arch_find_msi_chip(dev);
--
--	if (chip && chip->teardown_irqs)
--		return chip->teardown_irqs(dev);
--
--	return default_teardown_msi_irqs(dev);
--}
--
- static void default_restore_msi_irq(struct pci_dev *dev, int irq)
- {
- 	struct msi_desc *entry;
-@@ -137,10 +114,18 @@ static void default_restore_msi_irq(struct pci_dev *dev, int irq)
- 		write_msi_msg(irq, &entry->msg);
- }
- 
--void __weak arch_restore_msi_irqs(struct pci_dev *dev)
-+static void default_restore_msi_irqs(struct pci_dev *dev)
- {
--	struct msi_chip *chip = arch_find_msi_chip(dev);
-+	struct msi_desc *entry = NULL;
-+
-+	list_for_each_entry(entry, &dev->msi_list, list) {
-+		default_restore_msi_irq(dev, entry->irq);
-+	}
-+}
- 
-+static void restore_msi_irqs(struct pci_dev *dev)
-+{
-+	struct msi_chip *chip = arch_find_msi_chip(dev);
- 	if (chip && chip->restore_irqs)
- 		return chip->restore_irqs(dev);
- 
-@@ -249,15 +234,6 @@ void unmask_msi_irq(struct irq_data *data)
- 	msi_set_mask_bit(data, 0);
- }
- 
--void default_restore_msi_irqs(struct pci_dev *dev)
--{
--	struct msi_desc *entry;
--
--	list_for_each_entry(entry, &dev->msi_list, list) {
--		default_restore_msi_irq(dev, entry->irq);
--	}
--}
--
- void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
- {
- 	BUG_ON(entry->dev->current_state != PCI_D0);
-@@ -361,7 +337,7 @@ static void free_msi_irqs(struct pci_dev *dev)
- 			BUG_ON(irq_has_action(entry->irq + i));
- 	}
- 
--	arch_teardown_msi_irqs(dev);
-+	teardown_msi_irqs(dev);
- 
- 	list_for_each_entry_safe(entry, tmp, &dev->msi_list, list) {
- 		if (entry->msi_attrib.is_msix) {
-@@ -420,7 +396,7 @@ static void __pci_restore_msi_state(struct pci_dev *dev)
- 
- 	pci_intx_for_msi(dev, 0);
- 	msi_set_enable(dev, 0);
--	arch_restore_msi_irqs(dev);
-+	restore_msi_irqs(dev);
- 
- 	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &control);
- 	msi_mask_irq(entry, msi_mask(entry->msi_attrib.multi_cap),
-@@ -443,7 +419,7 @@ static void __pci_restore_msix_state(struct pci_dev *dev)
- 	msix_clear_and_set_ctrl(dev, 0,
- 				PCI_MSIX_FLAGS_ENABLE | PCI_MSIX_FLAGS_MASKALL);
- 
--	arch_restore_msi_irqs(dev);
-+	restore_msi_irqs(dev);
- 	list_for_each_entry(entry, &dev->msi_list, list) {
- 		msix_mask_irq(entry, entry->masked);
- 	}
-@@ -613,7 +589,7 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
- 	list_add_tail(&entry->list, &dev->msi_list);
- 
- 	/* Configure MSI capability structure */
--	ret = arch_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
-+	ret = setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSI);
- 	if (ret) {
- 		msi_mask_irq(entry, mask, ~mask);
- 		free_msi_irqs(dev);
-@@ -728,7 +704,7 @@ static int msix_capability_init(struct pci_dev *dev,
- 	if (ret)
- 		return ret;
- 
--	ret = arch_setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
-+	ret = setup_msi_irqs(dev, nvec, PCI_CAP_ID_MSIX);
- 	if (ret)
- 		goto out_avail;
- 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 4cf1f31..920ad52 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -48,20 +48,6 @@ struct msi_desc {
- 	struct msi_msg msg;
- };
- 
--/*
-- * The arch hooks to setup up msi irqs. Those functions are
-- * implemented as weak symbols so that they /can/ be overriden by
-- * architecture specific code if needed.
-- */
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc);
--void arch_teardown_msi_irq(unsigned int irq);
--int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
--void arch_teardown_msi_irqs(struct pci_dev *dev);
--void arch_restore_msi_irqs(struct pci_dev *dev);
--
--void default_teardown_msi_irqs(struct pci_dev *dev);
--void default_restore_msi_irqs(struct pci_dev *dev);
--
- struct msi_chip {
- 	struct module *owner;
- 	struct device *dev;
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
 -- 
-1.7.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/boot/dts/rk3188.dtsi
+index 82732f5249b2,7f25bc51f2ee..000000000000
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@@ -147,27 -147,24 +147,45 @@@
+  			bias-disable;
+  		};
+  
+ +		emmc {
+ +			emmc_clk: emmc-clk {
+ +				rockchip,pins = <RK_GPIO0 24 RK_FUNC_2 &pcfg_pull_none>;
+ +			};
+ +
+ +			emmc_cmd: emmc-cmd {
+ +				rockchip,pins = <RK_GPIO0 26 RK_FUNC_2 &pcfg_pull_up>;
+ +			};
+ +
+ +			emmc_rst: emmc-rst {
+ +				rockchip,pins = <RK_GPIO0 27 RK_FUNC_2 &pcfg_pull_none>;
+ +			};
+ +
+ +			/*
+ +			 * The data pins are shared between nandc and emmc and
+ +			 * not accessible through pinctrl. Also they should've
+ +			 * been already set correctly by firmware, as
+ +			 * flash/emmc is the boot-device.
+ +			 */
+ +		};
+ +
++ 		emac {
++ 			emac_xfer: emac-xfer {
++ 				rockchip,pins = <RK_GPIO3 16 RK_FUNC_2 &pcfg_pull_none>, /* tx_en */
++ 						<RK_GPIO3 17 RK_FUNC_2 &pcfg_pull_none>, /* txd1 */
++ 						<RK_GPIO3 18 RK_FUNC_2 &pcfg_pull_none>, /* txd0 */
++ 						<RK_GPIO3 19 RK_FUNC_2 &pcfg_pull_none>, /* rxd0 */
++ 						<RK_GPIO3 20 RK_FUNC_2 &pcfg_pull_none>, /* rxd1 */
++ 						<RK_GPIO3 21 RK_FUNC_2 &pcfg_pull_none>, /* mac_clk */
++ 						<RK_GPIO3 22 RK_FUNC_2 &pcfg_pull_none>, /* rx_err */
++ 						<RK_GPIO3 23 RK_FUNC_2 &pcfg_pull_none>; /* crs_dvalid */
++ 			};
++ 
++ 			emac_mdio: emac-mdio {
++ 				rockchip,pins = <RK_GPIO3 24 RK_FUNC_2 &pcfg_pull_none>,
++ 						<RK_GPIO3 25 RK_FUNC_2 &pcfg_pull_none>;
++ 			};
++ 		};
++ 
+  		i2c0 {
+  			i2c0_xfer: i2c0-xfer {
+  				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_none>,
+diff --cc arch/arm/boot/dts/rk3xxx.dtsi
+index 7332d12eb565,208b1df6bcb0..000000000000
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@@ -134,24 -91,23 +134,41 @@@
+  		status = "disabled";
+  	};
+  
+ +	usb_otg: usb at 10180000 {
+ +		compatible = "rockchip,rk3066-usb", "snps,dwc2";
+ +		reg = <0x10180000 0x40000>;
+ +		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ +		clocks = <&cru HCLK_OTG0>;
+ +		clock-names = "otg";
+ +		status = "disabled";
+ +	};
+ +
+ +	usb_host: usb at 101c0000 {
+ +		compatible = "snps,dwc2";
+ +		reg = <0x101c0000 0x40000>;
+ +		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ +		clocks = <&cru HCLK_OTG1>;
+ +		clock-names = "otg";
+ +		status = "disabled";
+ +	};
+ +
++ 	emac: ethernet at 10204000 {
++ 		compatible = "snps,arc-emac";
++ 		reg = <0x10204000 0x3c>;
++ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++ 		#address-cells = <1>;
++ 		#size-cells = <0>;
++ 
++ 		rockchip,grf = <&grf>;
++ 
++ 		clocks = <&cru HCLK_EMAC>, <&cru SCLK_MAC>;
++ 		clock-names = "hclk", "macref";
++ 		max-speed = <100>;
++ 		phy-mode = "rmii";
++ 
++ 		status = "disabled";
++ 	};
++ 
+  	mmc0: dwmmc at 10214000 {
+  		compatible = "rockchip,rk2928-dw-mshc";
+  		reg = <0x10214000 0x1000>;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/0c27d643/attachment.sig>
