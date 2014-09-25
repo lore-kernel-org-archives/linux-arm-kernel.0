@@ -1,36 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Sep 2014 10:04:06 +0100
-Subject: [PATCH v12 09/12] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140925085432.GL1994@e106497-lin.cambridge.arm.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-10-git-send-email-Liviu.Dudau@arm.com>
- <20140924164304.GF1994@e106497-lin.cambridge.arm.com>
- <20140924173109.GA20416@google.com>
- <20140924175330.GI1994@e106497-lin.cambridge.arm.com>
- <20140924180119.GN16244@arm.com>
- <20140925085432.GL1994@e106497-lin.cambridge.arm.com>
-Message-ID: <20140925090406.GD20043@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 25 Sep 2014 18:16:03 +0900
+Subject: [PATCH v7 2/5] ARM: add AFTR mode support to firmware do_idle
+ method
+In-Reply-To: <20140925090310.GA12046@ulmo>
+References: <1411561488-1739-1-git-send-email-b.zolnierkie@samsung.com>
+ <1411561488-1739-3-git-send-email-b.zolnierkie@samsung.com>
+ <5423D104.4050809@samsung.com> <20140925090310.GA12046@ulmo>
+Message-ID: <5423DD53.3030805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 09:54:32AM +0100, Liviu Dudau wrote:
-> On Wed, Sep 24, 2014 at 07:01:19PM +0100, Will Deacon wrote:
-> > On Wed, Sep 24, 2014 at 06:53:31PM +0100, Liviu Dudau wrote:
-> > > Thanks again and sorry for lack of thorough testing. I still haven't managed
-> > > to get a cross compiler for sparc and as I don't run Ubuntu or debian the
-> > > make.cross script doesn't work for me.
-> > 
-> >   https://www.kernel.org/pub/tools/crosstool/
-> > 
-> > No libc, but good enough for building the kernel. I've asked for an aarch64
-> > compiler there for a while, but it didn't materialise for some reason.
-> 
-> I'm familiar with crosstool and busybox uses a variant of crosstool-ng, but
-> it currently fails with "configure: error: cannot compute suffix of object files: cannot compile"
-> on the stage2 of the compilation.
+On 09/25/14 18:03, Thierry Reding wrote:
+> On Thu, Sep 25, 2014 at 05:23:32PM +0900, Kukjin Kim wrote:
+>> On 09/24/14 21:24, Bartlomiej Zolnierkiewicz wrote:
+>>> On some platforms (i.e. EXYNOS ones) more than one idle mode is
+>>> available and we need to distinguish them in firmware do_idle method.
+>>>
+>>> Add mode parameter to do_idle firmware method and AFTR mode support
+>>> to EXYNOS do_idle implementation.
+>>>
+>>> This change is a preparation for adding secure firmware support to
+>>> EXYNOS cpuidle driver.
+>>>
+>>> This patch shouldn't cause any functionality changes.
+>>>
+>>> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+>>> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
+>>> ---
+>>> v7:
+>>> - fixed build on Tegra
+>>> - updated summary line
+>>>
+>>>   arch/arm/include/asm/firmware.h        |  2 +-
+>>>   arch/arm/mach-exynos/common.h          |  5 +++++
+>>>   arch/arm/mach-exynos/firmware.c        | 10 ++++++++--
+>>>   arch/arm/mach-tegra/cpuidle-tegra114.c |  2 +-
+>>>   4 files changed, 15 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+>>> index 5904f59..89aefe1 100644
+>>> --- a/arch/arm/include/asm/firmware.h
+>>> +++ b/arch/arm/include/asm/firmware.h
+>>> @@ -28,7 +28,7 @@ struct firmware_ops {
+>>>   	/*
+>>>   	 * Enters CPU idle mode
+>>>   	 */
+>>> -	int (*do_idle)(void);
+>>> +	int (*do_idle)(unsigned long mode);
+>>>   	/*
+>>>   	 * Sets boot address of specified physical CPU
+>>>   	 */
+>>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+>>> index c218200..2d830df 100644
+>>> --- a/arch/arm/mach-exynos/common.h
+>>> +++ b/arch/arm/mach-exynos/common.h
+>>> @@ -119,6 +119,11 @@ extern void __iomem *sysram_base_addr;
+>>>   extern void __iomem *pmu_base_addr;
+>>>   void exynos_sysram_init(void);
+>>>
+>>> +enum {
+>>> +	FW_DO_IDLE_SLEEP,
+>>> +	FW_DO_IDLE_AFTR,
+>>> +};
+>>> +
+>>>   void exynos_firmware_init(void);
+>>>
+>>>   extern u32 exynos_get_eint_wake_mask(void);
+>>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+>>> index f5e626d..e57b7c3 100644
+>>> --- a/arch/arm/mach-exynos/firmware.c
+>>> +++ b/arch/arm/mach-exynos/firmware.c
+>>> @@ -28,9 +28,15 @@
+>>>   #define EXYNOS_BOOT_ADDR	0x8
+>>>   #define EXYNOS_BOOT_FLAG	0xc
+>>>
+>>> -static int exynos_do_idle(void)
+>>> +static int exynos_do_idle(unsigned long mode)
+>>>   {
+>>> -	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+>>> +	switch (mode) {
+>>> +	case FW_DO_IDLE_AFTR:
+>>> +		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+>>> +		break;
+>>> +	case FW_DO_IDLE_SLEEP:
+>>> +		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+>>> +	}
+>>>   	return 0;
+>>>   }
+>>>
+>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+>>> index e3ebdce..425b6c8 100644
+>>> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+>>> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+>>> @@ -49,7 +49,7 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>>>   	call_firmware_op(prepare_idle);
+>>>
+>>>   	/* Do suspend by ourselves if the firmware does not implement it */
+>>> -	if (call_firmware_op(do_idle) == -ENOSYS)
+>>> +	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+>>>   		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+>>>
+>>>   	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,&dev->cpu);
+>>
+>> + Thierry(using nvidia.com e-mail address)
+>>
+>> Hi Thierry,
+>>
+>> For supporting AFTR mode in call_firmware_op(do_idle), need to modify tegra
+>> stuff as you can see. The functionality will be same with before. Is it OK
+>> to you? If you have no objection, I'd like to take this series into samsung
+>> tree.
+>
+> I'm only aware of any devices using TrustedFirmware on Tegra, which is
+> what the above code handles. The implementation for TrustedFirmware does
+> not implement do_idle() (yet?) so I don't think this patch would cause
+> any damage.
+>
+> Acked-by: Thierry Reding<treding@nvidia.com>
+>
+Thanks, I've applied this whole series.
 
-Did you even follow the link? There are binary toolchains hosted there --
-you don't have to build anything yourself if you don't want to.
-
-Will
+- Kukjin
