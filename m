@@ -1,42 +1,56 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 25 Sep 2014 10:16:36 -0600
-Subject: [PATCH 3/6] pci,
- thunder: Add PCIe host controller devicetree bindings
-In-Reply-To: <8057985.kyfsioKAVy@wuerfel>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <3414852.SWQ9rRcUDx@wuerfel>
- <CA+sq2CcXCVrk=fxH79n88ZJj5fBQmbyhnzj08qHNO8EmpZT1Yg@mail.gmail.com>
- <8057985.kyfsioKAVy@wuerfel>
-Message-ID: <CAErSpo4oFLKbtddzVoXBN-1dXZn5C4pmzY_QiFMwV+RWtmtjiQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Sep 2014 18:20:37 +0200
+Subject: [GIT PULL] Allwinner drivers additions for 3.18
+In-Reply-To: <20140920202855.GA20329@lukather>
+References: <20140920202855.GA20329@lukather>
+Message-ID: <201409251820.38087.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 1:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 25 September 2014 00:37:00 Sunil Kovvuri wrote:
->> On Thu, Sep 25, 2014 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Wednesday 24 September 2014 23:34:04 Sunil Kovvuri wrote:
+On Saturday 20 September 2014, Maxime Ripard wrote:
+> Hi,
+> 
+> Please pull the following changes for the next merge window.
+> 
 
->> >> All on-board PCI devices connected to this PCI controller have fixed resources
->> >> and doesn't have to be allocated/reassigned. Some of these devices are
->> >> SRIOV based.
->> >
->> > I think you need to mark the ones that are nonrelocatable with flag
->> > 0x80000000, otherwise the PCI core might decide to reassign them.
->>
->> Is this flag part of DT pci node properties ?
->> I am using IORESOURCE_PCI_FIXED flag. Its there in other patches of
->> the same series.
->
-> Ah, right. I checked the source code again and it seems that we don't handle
-> this right at the moment. I think a range that has the nonrelocatable
-> flag set should be used for IORESOURCE_PCI_FIXED mappings without any
-> host specific code, but that needs to be implemented in common code.
+Pulled into next/drivers. The patches look good, but please note that the RTC
+subsystem does have a maintainer and mailing list. You should really keep
+them in the loop for the reviews *and* the submission.
 
-What connection do you envision between nonrelocatable ranges and
-IORESOURCE_PCI_FIXED?  I don't know what a nonrelocatable range is,
-but for IORESOURCE_PCI_FIXED, all I intend is that the PCI core should
-not try to assign a different address, e.g., because the BAR is
-read-only or because it's a legacy IDE/VGA/etc. range for which there
-is no BAR at all.
+	Arnd
 
-Bjorn
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-3.18
+> 
+> for you to fetch changes up to 64a1925c00706253aa887431fc45f96db48aa727:
+> 
+>   rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc (2014-09-19 12:39:30 +0200)
+> 
+> ----------------------------------------------------------------
+> Allwinner drivers additions for 3.18
+> 
+> Nothing major, just handling the RTC driver changes needed for the A31/A23.
+> 
+> ----------------------------------------------------------------
+> Chen-Yu Tsai (2):
+>       rtc: sun6i: Add sun6i RTC driver
+>       rtc: sunxi: Depend on platforms sun4i/sun7i that actually have the rtc
+> 
+>  .../devicetree/bindings/rtc/sun6i-rtc.txt          |  17 +
+>  drivers/rtc/Kconfig                                |   9 +-
+>  drivers/rtc/Makefile                               |   1 +
+>  drivers/rtc/rtc-sun6i.c                            | 447 +++++++++++++++++++++
+>  4 files changed, 473 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+>  create mode 100644 drivers/rtc/rtc-sun6i.c
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> 
