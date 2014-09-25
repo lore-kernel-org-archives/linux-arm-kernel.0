@@ -1,64 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 25 Sep 2014 16:29:41 +0800
-Subject: [PATCH v2] ARM: ls1021a: add gating clocks to IP blocks.
-In-Reply-To: <e7a0fe3cbe4c4ed0bcc489853a392f35@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <1411366160-42685-1-git-send-email-Li.Xiubo@freescale.com>
- <20140922070037.GR3755@pengutronix.de>
- <e7a0fe3cbe4c4ed0bcc489853a392f35@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <20140925082940.GF6405@dragon>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 25 Sep 2014 17:34:18 +0900
+Subject: [PATCH 0/3 v4] Fix Exynos USB on kernels with USB Gadget support
+In-Reply-To: <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <542199F4.3090601@samsung.com>
+ <1411545465-12930-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <5423D38A.5080609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 03:55:14PM +0800, Xiubo Li-B47053 wrote:
-> > > +static void __init ls1021a_clocks_init(struct device_node *np)
-> > > +{
-> > > +	void __iomem *dcfg_base;
-> > > +
-> > > +#define DCFG_CCSR_DEVDISR1	(dcfg_base + 0x70)
-> > > +#define DCFG_CCSR_DEVDISR2	(dcfg_base + 0x74)
-> > > +#define DCFG_CCSR_DEVDISR3	(dcfg_base + 0x78)
-> > > +#define DCFG_CCSR_DEVDISR4	(dcfg_base + 0x7c)
-> > > +#define DCFG_CCSR_DEVDISR5	(dcfg_base + 0x80)
-> > > +
-> > > +	dcfg_base = of_iomap(np, 0);
-> > > +
-> > > +	BUG_ON(!dcfg_base);
-> > Is this worth a BUG? 
-> Yes, I do think so.
-> 
-> There is one story about my platform:
-> We are using the imx2_wdt watchdog device, which cannot stop or suspend
-> once it has started.
-> And our platform will also support the Power Management, if the gating
-> Clock initialized failed, so when the system enters sleep mode, we cannot
-> Stop the imx2_wdt IP block, so it will reset the board after 180 seconds at
-> most.
-> 
-> So using this gating clock, the watchdog IP block's clock could be disabled
-> When the system enter sleep mode.
-> 
-> So I think BUG_ON here is make sense.
->  
-> Doesn't it ?
-> 
-> > Or is it enough to do
-> > 	if (!dcfg_base) {
-> > 		pr_warn("failed to map fsl,ls1021a-gate device\n");
-> > 		return
-> > 	}
-> > 
-> > > +
-> > > +	clk[LS1021A_CLK_PBL_EN] = ls1021a_clk_gate("pbl_en", "dummy",
-> > > +						DCFG_CCSR_DEVDISR1, 0, true);
-> > If the machine's device tree contains two (or more) nodes that are
-> > compatible to "fsl,ls1021a-gate", you overwrite your static clk array. Is
-> > it worth to add another check here?:
-> > 
-> On LS1021A SoC, I can make sure that there will only be one gate node. But for
-> More compatibly using one dynamic clk array will be better.
+On 09/24/14 16:57, Sjoerd Simons wrote:
+> Same patches as v3 but rebased on
+> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+>
+Thanks, applied.
 
-I do not think it's really necessary to use dynamic allocation.  Making
-dcfg_base a static variable and check if it's null at the beginning of
-the function is probably enough.
+- Kukjin
 
-Shawn
+> When building a kernel with support for both USB host and USB Gadget support on
+> the dwc3 controller on the Exynos5 soc will go into USB OTG mode unless
+> otherwise specified in the dtb, which is unhelpful for boards hooked up to run
+> as USB host.
+>
+> First patch in this set explicitely set the dual-role mode for the dwc3
+> controller on Peach pi and Peach pit boards to host mode. Second patch adds
+> similar updates for Arndale Octa as reported by Andreas F?rber. Last patch
+> enables gadget mode in the default exynos config to more easily catch/trigger
+> issues like these.
+>
+> I suspect the Samsung SMDK5420 DTS might need similar changes, so it would be
+> great if users of those board could verify this.
+>
+> Changes in v2: alphabetically sort the dts entries
+> Changes in v3: Add DTS updates for arndale octa
+> Changes in v4: Rebased on todays linux-samsungs for-next branch
+>
+> Sjoerd Simons (3):
+>    ARM: dts: exynos: Explicitly set dr_mode on peach-pit and peach-pi
+>    ARM: dts: exynos: Explicitly set dr_mode on arndale-octa
+>    ARM: exynos_defconfig: enable USB gadget support
+>
+>   arch/arm/boot/dts/exynos5420-arndale-octa.dts | 4 ++++
+>   arch/arm/boot/dts/exynos5420-peach-pit.dts    | 8 ++++++++
+>   arch/arm/boot/dts/exynos5420.dtsi             | 4 ++--
+>   arch/arm/boot/dts/exynos5800-peach-pi.dts     | 8 ++++++++
+>   arch/arm/configs/exynos_defconfig             | 1 +
+>   5 files changed, 23 insertions(+), 2 deletions(-)
