@@ -1,95 +1,62 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 25 Sep 2014 20:32:19 +0200
-Subject: [PATCH] arm/arm64: KVM: Fix VTTBR_BADDR_MASK and pgd alloc
-Message-ID: <1411669939-24648-1-git-send-email-christoffer.dall@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Sep 2014 19:34:47 +0100
+Subject: [PATCH v2 01/18] arm: dma-mapping: arm_iommu_attach_device:
+ automatically set max_seg_size
+In-Reply-To: <5423F1D7.3060400@samsung.com>
+References: <1410868485-4143-1-git-send-email-m.szyprowski@samsung.com>
+ <1410868485-4143-2-git-send-email-m.szyprowski@samsung.com>
+ <20140924170627.GK16244@arm.com> <5423F1D7.3060400@samsung.com>
+Message-ID: <20140925183447.GB26346@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joel Schopp <joel.schopp@amd.com>
+On Thu, Sep 25, 2014 at 11:43:35AM +0100, Marek Szyprowski wrote:
+> On 2014-09-24 19:06, Will Deacon wrote:
+> > On Tue, Sep 16, 2014 at 12:54:28PM +0100, Marek Szyprowski wrote:
+> >> If device has no max_seg_size set, we assume that there is no limit and
+> >> force it to DMA_BIT_MASK(32) to always use contiguous mappings in DMA
+> >> address space.
+> >>
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >>   arch/arm/mm/dma-mapping.c | 16 ++++++++++++++++
+> >>   1 file changed, 16 insertions(+)
+> >>
+> >> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> >> index bcd5f836f27e..84705e24571b 100644
+> >> --- a/arch/arm/mm/dma-mapping.c
+> >> +++ b/arch/arm/mm/dma-mapping.c
+> >> @@ -2050,6 +2050,22 @@ int arm_iommu_attach_device(struct device *dev,
+> >>   {
+> >>   	int err;
+> >>   
+> >> +	/*
+> >> +	 * if device has no max_seg_size set, we assume that there is no limit
+> >> +	 * and force it to DMA_BIT_MASK(32) to always use contiguous mappings
+> >> +	 * in DMA address space
+> >> +	 */
+> >> +	if (!dev->dma_parms) {
+> >> +		dev->dma_parms = kzalloc(sizeof(*dev->dma_parms), GFP_KERNEL);
+> >> +		if (!dev->dma_parms)
+> >> +			return -ENOMEM;
+> >> +	}
+> >> +	if (!dev->dma_parms->max_segment_size) {
+> >> +		err = dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+> > Would it make more sense to base this default value off the dma_mask?
+> > In my IOMMU series, of_dma_configure passes back a size parameter to
+> > arch_setup_dma_ops which is calculated from the dma-ranges property or the
+> > coherent dma mask if the ranges property is absent, so maybe we should set
+> > this there too?
+> 
+> Right, good idea. This patch predates your arch_setup_dma_ops changes, so I
+> had to use something. The value taken from dma_mask is much better than 
+> hardcoded
+> DMA_BIT_MASK(32). Do you want to include an updated patch in next 
+> version of your
+> arch_setup_dma_ops patchset?
 
-The current aarch64 calculation for VTTBR_BADDR_MASK masks only 39 bits
-and not all the bits in the PA range. This is clearly a bug that
-manifests itself on systems that allocate memory in the higher address
-space range.
+Sure, I'll have a go at rolling that in.
 
- [ Modified from Joel's original patch to be based on PHYS_MASK_SHIFT
-   instead of a hard-coded value and to move the alignment check of the
-   allocation to mmu.c.  Also added a comment explaining why we hardcode
-   the IPA range and changed the stage-2 pgd allocation to be based on
-   the 40 bit IPA range instead of the maximum possible 48 bit PA range.
-   - Christoffer ]
+Cheers,
 
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c               |  4 ++--
- arch/arm64/include/asm/kvm_arm.h | 13 ++++++++++++-
- arch/arm64/include/asm/kvm_mmu.h |  5 ++---
- 3 files changed, 16 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 40bc3df..7796051 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -410,9 +410,9 @@ static void update_vttbr(struct kvm *kvm)
- 
- 	/* update vttbr to be used with the new vmid */
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
-+	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
--	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
--	kvm->arch.vttbr |= vmid;
-+	kvm->arch.vttbr = pgd_phys | vmid;
- 
- 	spin_unlock(&kvm_vmid_lock);
- }
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index cc83520..7fd3e27 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -122,6 +122,17 @@
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ_40B	24
- 
-+/*
-+ * We configure the Stage-2 page tables to always restrict the IPA space to be
-+ * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
-+ * not known to exist and will break with this configuration.
-+ *
-+ * Note that when using 4K pages, we concatenate two first level page tables
-+ * together.
-+ *
-+ * The magic numbers used for VTTBR_X in this patch can be found in Tables
-+ * D4-23 and D4-25 in ARM DDI 0487A.b.
-+ */
- #ifdef CONFIG_ARM64_64K_PAGES
- /*
-  * Stage2 translation configuration:
-@@ -149,7 +160,7 @@
- #endif
- 
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
--#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#define VTTBR_BADDR_MASK  (((1LLU << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
- #define VTTBR_VMID_SHIFT  (48LLU)
- #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 737da74..a030d16 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -59,10 +59,9 @@
- #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
- 
- /*
-- * Align KVM with the kernel's view of physical memory. Should be
-- * 40bit IPA, with PGD being 8kB aligned in the 4KB page configuration.
-+ * We currently only support a 40bit IPA.
-  */
--#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
-+#define KVM_PHYS_SHIFT	(40)
- #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
- #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
- 
--- 
-2.0.0
+Will
