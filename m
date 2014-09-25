@@ -1,46 +1,50 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 25 Sep 2014 17:15:51 +0200
-Subject: [PATCH] firmware: add Keystone QMSS PDSP accumulator firmware blob
-In-Reply-To: <1411654423-29480-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1411654423-29480-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140925151551.GA18530@kroah.com>
+From: fransklaver@gmail.com (Frans Klaver)
+Date: Thu, 25 Sep 2014 17:18:15 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140925151403.GH19396@linutronix.de>
+References: <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140917102812.GA20438@ci00147.xsens-tech.local>
+ <20140921204100.GA10111@linutronix.de>
+ <20140922092853.GH20438@ci00147.xsens-tech.local>
+ <20140925151403.GH19396@linutronix.de>
+Message-ID: <f4e9604d-6de0-4b56-8565-3a532686e745@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 10:13:43AM -0400, Santosh Shilimkar wrote:
-> From: Sandeep Nair <sandeep_n@ti.com>
-> 
-> QMSS(Queue Manager Sub System) uses PDSPs to implement various
-> QM related functions like packet accumulation, QoS or event
-> management.
-> 
-> Patch adds firmware blob for the QMSS accumulator
-> functionality.
-> 
-> Cc: Michal Marek <mmarek@suse.cz>
-> Cc: Sam Ravnborg <sam@ravnborg.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sandeep Nair <sandeep_n@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> I know we are not adding firmware to kernel and the idea is to get them
-> loaded via rootfs. But this firmware is for an infrastructure component
-> which is needed for Keystone.
+On 25 September 2014 17:14:03 CEST, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+>* Frans Klaver | 2014-09-22 11:28:54 [+0200]:
+>
+>>I guess then we'd still have to answer the question why the yocto
+>build
+>>calls set_termios() so often, but that's not on you then. Did you
+>notice
+>>it even changing settings? We might want to fix this even if the
+>kernel
+>>should be able to cope.
+>
+>could you please test uart_v10_pre3? I dropped a few register sets and
+>delayed the register update until TX-DMA is complete. I am traveling
+>currently and have only my boneblack and it passes my limited testing.
+>If it solves your problems, too then I would address Heikki's latest
+>comments and prepare the final v10 (and I hope I didn't break beagle
+>board in between).
 
-What does "infrastructure component" mean?
+That'll be Monday earliest for me. 
 
-What is "Keystone"?
-
-> The respective drivers got into the queue
-> and the firmware was dropped from the series to follow the firmware tree.
-
-Did you submit this to the linux-firmware tree?
-
-Did the driver that needs this get merged into Linus's tree yet?
-
-thanks,
-
-greg k-h
+>
+>>Thanks again,
+>>Frans
+>
+>Sebastian
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
