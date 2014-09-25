@@ -1,105 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 13:34:04 +0200
-Subject: [PATCH v5 2/2] bcma: get IRQ numbers from dt
-In-Reply-To: <1411597048-25470-2-git-send-email-hauke@hauke-m.de>
-References: <1411597048-25470-1-git-send-email-hauke@hauke-m.de>
- <1411597048-25470-2-git-send-email-hauke@hauke-m.de>
-Message-ID: <2791240.uYg7Zkz6J1@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 25 Sep 2014 14:10:51 +0200
+Subject: [PATCH] ARM: efm32: drop selecting NO_DMA
+In-Reply-To: <1411640056.7866.5.camel@x220>
+References: <1411585151.19525.29.camel@x220>
+ <1411640056.7866.5.camel@x220>
+Message-ID: <20140925121051.GM3755@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014 00:17:28 Hauke Mehrtens wrote:
-> It is not possible to auto detect the irq numbers used by the cores on
-> an arm SoC. If bcma was registered with device tree it will search for
-> some device tree nodes with the irq number and add it to the core
-> configuration.
-> 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+Hello Paul,
 
-Some more explanation for how this can be improved according to my earlier
-reply:
+On Thu, Sep 25, 2014 at 12:14:16PM +0200, Paul Bolle wrote:
+> On Wed, 2014-09-24 at 20:59 +0200, Paul Bolle wrote:
+> > Actually, the only difference I found in the .config file was that after
+> > this patch the .config file contained
+> >     CONFIG_ARCH_EFM32=y
+> > 
+> > I have no idea why. Did I botch my test?
+Looking at the patch that introduced the NO_DMA select I think I just
+copied it from somewhere[1] without questioning it. It seems the symbol
+already didn't exist when efm32 hit mainline in
+6d85e2b0b6bed6ae7070426d5e43174c593e075c.
 
->  
-> @@ -17,4 +21,24 @@ Example:
->  		ranges = <0x00000000 0x18000000 0x00100000>;
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> +
-> +		#interrupt-cells = <0>;
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-	<1>
+Best regards
+Uwe
 
-> +		interrupt-map-mask = <0x000fffff>;
-> +		interrupt-map =
-> +			/* Ethernet Controller 0 */
-> +			<0x00024000 &gic GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-> +
-> +			/* Ethernet Controller 1 */
-> +			<0x00025000 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+[1] probably Catalin's 2.6.33 that introduced v7-M support initially.
 
-Add 0 here after the address for the first interrupt of a device,
-or a consecutive number for additional interrupts.
-
-But check first if the register that is used on MIPS to access the
-interrupts has any function. If it does, put the bit position in here
-instead.
-
-> +		pcie at 12000 {
-> +			interrupt-parent = <&gic>;
-> +			reg = <0x00012000 0x1000>;
-> +			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-
-so this can go away.
-
-> +static int bcma_of_irq_parse(struct platform_device *parent,
-> +			     struct bcma_device *core,
-> +			     struct of_phandle_args *out_irq)
-> +{
-> +	__be32 laddr[1];
-> +	int rc;
-> +
-> +	if (core->dev.of_node) {
-> +		rc = of_irq_parse_one(core->dev.of_node, 0, out_irq);
-> +		if (!rc)
-> +			return rc;
-> +	}
-> +
-> +	out_irq->np = parent->dev.of_node;
-> +	out_irq->args_count = 0;
-> +
-> +	laddr[0] = cpu_to_be32(core->addr);
-> +	return of_irq_parse_raw(laddr, out_irq);
-> +}
-
-You probably don't need a separate function here, just move the code into
-bcma_of_get_irq.
-
-> +static int bcma_of_get_irq(struct platform_device *parent,
-> +			   struct bcma_device *core)
-
-Make this function take the interrupt number as an argument
-
-> +
->  static void bcma_of_fill_device(struct platform_device *parent,
->  				struct bcma_device *core)
->  {
-> @@ -161,6 +201,8 @@ static void bcma_of_fill_device(struct platform_device *parent,
->  	node = bcma_of_find_child_device(parent, core);
->  	if (node)
->  		core->dev.of_node = node;
-> +
-> +	core->irq = bcma_of_get_irq(parent, core);
->  }
-
-It's probably a good idea to still put the first interrupt number in here,
-but drivers should not rely on the interrupt numbers being consecutive.
-If a driver needs more than one irq, it should call bcma_of_get_irq() or
-another API function that calls it internally and that also works on MIPS.
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
