@@ -1,80 +1,57 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 25 Sep 2014 15:24:22 -0700
-Subject: [PATCH v3 3/3] clk: rockchip: add clock node in PD_VIDEO
-In-Reply-To: <1411631328-14973-4-git-send-email-kever.yang@rock-chips.com>
-References: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
- <1411631328-14973-4-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <CAD=FV=UwV6xqubaBnOyT+QsAzOqe-0Cc43sy1Q5aLbWjxZ_B0Q@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 25 Sep 2014 15:27:30 -0700
+Subject: [RFC PATCH 4/4] ARM: dts: k2hk-evm: add pm domains for net,
+ qmss and knav_dmas
+In-Reply-To: <1411657537-25238-5-git-send-email-grygorii.strashko@ti.com>
+ (Grygorii Strashko's message of "Thu, 25 Sep 2014 18:05:37 +0300")
+References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
+ <1411657537-25238-5-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <7hd2aj9vzh.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kever,
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-On Thu, Sep 25, 2014 at 12:48 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> This patch add the clock node in PD_VIDEO
+> Add Keystone PM domains nodes for NetCP, NetCPx, QMSS, KNAV-DMA
+> devices.
 >
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 > ---
+>  arch/arm/boot/dts/k2hk-evm.dts | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
 >
-> Changes in v3:
-> - add a fix factor
-> - introduce a virtual node to implement the clock struct
->
-> Changes in v2:
-> - split out the patch
->
->  drivers/clk/rockchip/clk-rk3288.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> index dd204cb..d466814 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -296,6 +296,20 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
->         COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
->                         RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
->                         RK3288_CLKGATE_CON(3), 11, GFLAGS),
-> +       /*
-> +        * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
-> +        * so we ignore the mux and make clocks nodes as following,
-> +        */
-> +       GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
-> +               RK3288_CLKGATE_CON(9), 0, GFLAGS),
-> +       /*
-> +        * We introduce a virtul node of hclk_vodec_pre_v to split one clock
-> +        * sturct with a gate and a fix divider into two node in software.
-
-nit: s/sturct/struct
-
-...I think Mike will fix this up when applying.
-
-> +        */
-> +       GATE(0, "hclk_vcodec_pre_v", "aclk_vdpu", 0,
-> +               RK3288_CLKGATE_CON(3), 10, GFLAGS),
-> +       GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
-> +               RK3288_CLKGATE_CON(9), 1, GFLAGS),
->
->         COMPOSITE(0, "aclk_vio0", mux_pll_src_cpll_gpll_usb480m_p, 0,
->                         RK3288_CLKSEL_CON(31), 6, 2, MFLAGS, 0, 5, DFLAGS,
-> @@ -711,6 +725,12 @@ static void __init rk3288_clk_init(struct device_node *np)
->                 pr_warn("%s: could not register clock usb480m: %ld\n",
->                         __func__, PTR_ERR(clk));
->
-> +       clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
-> +                                       "hclk_vcodec_pre_v", 0, 1, 4);
-> +       if (IS_ERR(clk))
-> +               pr_warn("%s: could not register clock hclk_vcodec_pre: %ld\n",
-> +                       __func__, PTR_ERR(clk));
+> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+> index 91371f7..a7b468c 100644
+> --- a/arch/arm/boot/dts/k2hk-evm.dts
+> +++ b/arch/arm/boot/dts/k2hk-evm.dts
+> @@ -58,6 +58,13 @@
+>  				clock-output-names = "refclk-ddr3b";
+>  			};
+>  		};
 > +
->         rockchip_clk_register_plls(rk3288_pll_clks,
->                                    ARRAY_SIZE(rk3288_pll_clks),
->                                    RK3288_GRF_SOC_STATUS);
+> +		qmss_domain: qmss_pm_controller {
+> +			compatible = "ti,keystone-gpc";
+> +			clocks = <&chipclk13>;
+> +			#power-domain-cells = <0>;
+> +		};
 
-Looks reasonable.
+Hmm, I'm still a bit confused by what you're attempting to do here.
+Unless I'm missing someting, clocks are properties of the device, not
+the pm-domain...
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+>  		qmss: qmss at 2a40000 {
+>  			compatible = "ti,keystone-navigator-qmss";
+>  			dma-coherent;
+> @@ -65,6 +72,8 @@
+>  			#size-cells = <1>;
+>  			clocks = <&chipclk13>;
+>  			ranges;
+> +			power-domains = <&qmss_domain>;
 
-I've booted this up and the new clocks show up and have the right parents.
+...  Also, each of the pm domains is duplicating the list of clocks from
+the device node, so I'm not sure what this is accomplishing.
 
-Tested-by: Doug Anderson <dianders@chromium.org>
+Why not just have a single, more generic power domain that gets the list
+of clocks from the device node.
+
+Kevin
