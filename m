@@ -1,107 +1,67 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 25 Sep 2014 15:02:09 +0530
-Subject: [PATCH v2 4/4] rtc: omap: Support regulator supply for RTC
-In-Reply-To: <1411637529-18289-1-git-send-email-lokeshvutla@ti.com>
-References: <1411637529-18289-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1411637529-18289-5-git-send-email-lokeshvutla@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Sep 2014 10:35:45 +0100
+Subject: [PATCH 5/6] arm64, defconfig: Enable PCI
+In-Reply-To: <3120493.DIoQFCi5Am@wuerfel>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <20140924162631.GI31556@rric.localhost>
+ <20140924171047.GO15842@e104818-lin.cambridge.arm.com>
+ <3120493.DIoQFCi5Am@wuerfel>
+Message-ID: <20140925093545.GE10390@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Soc's RTC is powered by an external power regulator.
-e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
-power regulator.
+On Wed, Sep 24, 2014 at 07:40:18PM +0100, Arnd Bergmann wrote:
+> On Wednesday 24 September 2014 18:10:48 Catalin Marinas wrote:
+> > On Wed, Sep 24, 2014 at 05:26:31PM +0100, Robert Richter wrote:
+> > > On 24.09.14 18:14:11, Arnd Bergmann wrote:
+> > > > On Wednesday 24 September 2014 17:37:47 Robert Richter wrote:
+> > > > >  config PCI
+> > > > >         bool "PCI support"
+> > > > > +       default y
+> > > > >         help
+> > > > >           This feature enables support for PCIe bus system. If you say Y
+> > > > >           here, the kernel will include drivers and infrastructure code
+> > > > >           to support PCIe bus devices.
+> > > > >  
+> > > > > +config PCI_MSI
+> > > > > +       def_bool PCI
+> > > > > +
+> > > > >  config PCI_DOMAINS
+> > > > >         def_bool PCI
+> > > > 
+> > > > There is already a PCI_MSI symbol in drivers/pci/Kconfig. Just select that
+> > > > from the PCI symbol above rather than defining a second one.
+> > > 
+> > > The intention is not to have a second definition, instead this should
+> > > enable the default value just for arm64. Thus I put it to
+> > > arch/arm64/Kconfig. Otherwise it would be enabled per default on all
+> > > archs.
+> 
+> I don't think other architectures actually see the PCI symbol that is
+> defined in the arm64 Kconfig file, but I might be wrong.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Changes since v1:
-	- Separated probe deferral supporting into a new patch.
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
- drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+Other archs wouldn't see the symbols in arch/arm64/Kconfig.
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-index 5a0f02d..c67a775 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-@@ -10,6 +10,9 @@ Required properties:
- - interrupts: rtc timer, alarm interrupts in order
- - interrupt-parent: phandle for the interrupt controller
- 
-+Optional Properties:
-+- rtc-supply : phandle to the regulator device tree node if needed
-+
- Example:
- 
- rtc at 1c23000 {
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index f28f1fd..8a8df2b 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -24,6 +24,7 @@
- #include <linux/of_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/io.h>
-+#include <linux/regulator/consumer.h>
- 
- /* The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-  * with century-range alarm matching, driven by the 32kHz clock.
-@@ -124,6 +125,7 @@
-  * @device:		Device Pointer.
-  * pdata :		Copy of saved platform data.
-  * rtc_base :		Base address of memory-mapped IO registers.
-+ * rtc_reg :		Pointer to RTC power regulator.
-  * rtc_alarm :		RTC alarm interrupt number.
-  * rtc_timer :		RTC timer interrupt number.
-  * irq_stat :		Copy of Interrupt status register.
-@@ -133,6 +135,7 @@ struct rtc_omap_dev {
- 	struct device		*dev;
- 	unsigned long		pdata;
- 	void __iomem		*rtc_base;
-+	struct regulator	*rtc_reg;
- 	u32			rtc_alarm;
- 	u32			rtc_timer;
- 	u8			irqstat;
-@@ -402,6 +405,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
- 	struct resource		*res;
- 	struct rtc_omap_dev	*rtc_omap;
- 	u8			reg, new_ctrl;
-+	int			ret;
- 	const struct platform_device_id *id_entry;
- 	const struct of_device_id *of_id;
- 
-@@ -440,6 +444,23 @@ static int omap_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(rtc_omap->rtc_base))
- 		return PTR_ERR(rtc_omap->rtc_base);
- 
-+	rtc_omap->rtc_reg =  devm_regulator_get_optional(&pdev->dev, "rtc");
-+	if (IS_ERR(rtc_omap->rtc_reg)) {
-+		if (PTR_ERR(rtc_omap->rtc_reg) == -EPROBE_DEFER) {
-+			dev_err(&pdev->dev, "regulator not ready, retry\n");
-+			return -EPROBE_DEFER;
-+		}
-+		rtc_omap->rtc_reg = NULL;
-+	}
-+
-+	if (rtc_omap->rtc_reg) {
-+		ret = regulator_enable(rtc_omap->rtc_reg);
-+		if (ret) {
-+			dev_dbg(&pdev->dev, "regulator enable failed\n");
-+			return ret;
-+		}
-+	}
-+
- 	/* Enable the clock/module so that we can access the registers */
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
-@@ -549,6 +570,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
- 	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
-+	if (rtc_omap->rtc_reg)
-+		regulator_disable(rtc_omap->rtc_reg);
-+
- 	return 0;
- }
- 
+> > > We could have used select in config ARM64, but I tried to avoid using
+> > > select due to the dependency issue and instead implement this with
+> > > default-y/depends-on. Doing so it can be manually disabled too.
+> 
+> How about adding a new symbol like
+> 
+> config ARM64_PCI
+> 	def_bool PCI
+> 	select PCI_MSI
+
+How is this different from just selecting PCI_MSI in config PCI in
+arch/arm64/Kconfig? I don't see what another symbol brings.
+
+> > It may be better to simply set PCI and PCI_MSI as defaults in defconfig
+> > rather than "default y" and an additional config PCI_MSI entry.
+> 
+> Selecting PCI_MSI unconditionally seems fine to me. We won't have any
+> ARM64 systems that only do classic PCI, and MSI is mandatory for PCIe.
+
+OK then, we can go with a select.
+
 -- 
-1.9.1
+Catalin
