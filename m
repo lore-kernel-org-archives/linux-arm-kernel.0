@@ -1,28 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 25 Sep 2014 13:06:26 -0400
-Subject: [PATCH v4 2/3] net: Add Keystone NetCP ethernet driver
-In-Reply-To: <1411655363.4026.13.camel@joe-AO725>
-References: <1411653805-29257-1-git-send-email-santosh.shilimkar@ti.com>	
- <1411653805-29257-3-git-send-email-santosh.shilimkar@ti.com>
- <1411655363.4026.13.camel@joe-AO725>
-Message-ID: <54244B92.4020004@ti.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 25 Sep 2014 19:15:25 +0200
+Subject: [PATCH v7 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <CAGm_ybh-R1GsHF-BRhRYQKkCpQFQSE6Mem=A3kz=H3Bemor9xA@mail.gmail.com>
+References: <1408625982-3267-1-git-send-email-vikas.sajjan@samsung.com>
+ <CAGm_ybh-R1GsHF-BRhRYQKkCpQFQSE6Mem=A3kz=H3Bemor9xA@mail.gmail.com>
+Message-ID: <CABxcv=kHwCCYhit20qO1q=Nn3KVj8U=8cpCu=DQRuy+R86N0kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014 10:29 AM, Joe Perches wrote:
-> On Thu, 2014-09-25 at 10:03 -0400, Santosh Shilimkar wrote:
->> From: Sandeep Nair <sandeep_n@ti.com>
->>
->> The network coprocessor (NetCP) is a hardware accelerator that processes
->> Ethernet packets. NetCP has a gigabit Ethernet (GbE) subsystem with a ethernet
->> switch sub-module to send and receive packets. NetCP also includes a packet
->> accelerator (PA) module to perform packet classification operations such as
->> header matching, and packet modification operations such as checksum
->> generation. NetCP can also optionally include a Security Accelerator(SA)
->> capable of performing IPSec operations on ingress/egress packets.
-> 
-> Some checkpatch trivia you might consider:
-Sure. I fold that in. Thanks !!
+[adding Pankaj Dubey to cc list]
 
-regards,
-Santosh
+Hello Vikas,
+
+On Sun, Sep 14, 2014 at 4:57 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> Hi All,
+>
+>
+> On Thu, Aug 21, 2014 at 6:29 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>> Rebased on
+>> 1] Kukjin Kim's tree, master branch
+>> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/
+>> 2] Pankaj Dubey's v7 PMU patchset
+>> https://lkml.org/lkml/2014/7/9/2
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/270655.html
+
+The mentioned patches from the PMU series depend on the patch to
+decouple the syscon interface from syscon drivers. The latest version
+of that patch is Pankaj's "[PATCH v5] mfd: syscon: Decouple syscon
+interface from platform devices" [0].
+
+There is still an ongoing discussion about the implementation details
+since errors were reported (debugfs regmap dir failing to be created
+due a NULL device name) so this won't be a definite version.
+
+But I tested that patch on an Exynos5420 Peach Pit and it works so
+maybe Pankaj can re-spin his PMU series on top of his latest syscon
+patch so at least the dependencies for your series are sorted and
+people can try it?
+
+Best regards,
+Javier
+
+[0]: https://patchwork.kernel.org/patch/4945481/
