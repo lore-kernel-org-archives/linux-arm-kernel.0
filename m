@@ -1,35 +1,23 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 25 Sep 2014 15:08:59 +0200
-Subject: [PATCH 1/9] ARM: dts: vf610: Add system reset controller (SRC)
-In-Reply-To: <45f7af8b2dbe11967bb2ad87826b934c@agner.ch>
-References: <cover.1411404079.git.stefan@agner.ch>
- <2ca1cf3732a00512fa19b6118f9fb30aba014deb.1411404079.git.stefan@agner.ch>
- <CACRpkdbryJVW9e9N5+f3rWEGZ2YvLPJsvBtNSa9nPJpLVXhm0g@mail.gmail.com>
- <45f7af8b2dbe11967bb2ad87826b934c@agner.ch>
-Message-ID: <1411650539.5671.4.camel@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 25 Sep 2014 14:08:47 +0100
+Subject: [PATCH] spi/rockchip: fix bug that cause the failture to read
+ data in DMA mode
+In-Reply-To: <1411628381-4029-1-git-send-email-addy.ke@rock-chips.com>
+References: <1411628381-4029-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20140925130847.GQ27755@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Thu, Sep 25, 2014 at 02:59:41PM +0800, Addy Ke wrote:
+> In my test on RK3288-pinky board, if spi is enabled, it will begin to
+> read data from slave regardless of whether the DMA is ready. So we
+> need prepare DMA before spi is enable.
 
-Am Mittwoch, den 24.09.2014, 18:41 +0200 schrieb Stefan Agner:
-> Am 2014-09-24 11:16, schrieb Linus Walleij:
-> > On Mon, Sep 22, 2014 at 7:09 PM, Stefan Agner <stefan@agner.ch> wrote:
-> > 
-> >> Add device tree property for system reset controller.
-> >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > 
-> > Are there already device tree bindings for SRC and GRC?
-> 
-> Yes there are used in the i.MX6 world for instance, see imx6qdl.dtsi.
-> The SRC also has quite generic documentation, however, the GPC module
-> currently lacks documentation...
-
-A patch that adds GPC binding documentation is part of this i.MX6 power
-domain series:
-
-http://www.spinics.net/lists/devicetree/msg48454.html
-
-regards
-Philipp
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/6592f5b3/attachment.sig>
