@@ -1,63 +1,67 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 25 Sep 2014 14:10:33 -0600
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Sep 2014 22:22:23 +0200
 Subject: [PATCH 3/6] pci,
  thunder: Add PCIe host controller devicetree bindings
-In-Reply-To: <201409252126.38945.arnd@arndb.de>
+In-Reply-To: <CAErSpo5rhL7pLha-yWt7sZUBmAnwA6FkacL+sWXBKkSzsuC7Sg@mail.gmail.com>
 References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <8057985.kyfsioKAVy@wuerfel>
- <CAErSpo4oFLKbtddzVoXBN-1dXZn5C4pmzY_QiFMwV+RWtmtjiQ@mail.gmail.com>
  <201409252126.38945.arnd@arndb.de>
-Message-ID: <CAErSpo5rhL7pLha-yWt7sZUBmAnwA6FkacL+sWXBKkSzsuC7Sg@mail.gmail.com>
+ <CAErSpo5rhL7pLha-yWt7sZUBmAnwA6FkacL+sWXBKkSzsuC7Sg@mail.gmail.com>
+Message-ID: <201409252222.23825.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 1:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 25 September 2014, Bjorn Helgaas wrote:
->> On Thu, Sep 25, 2014 at 1:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Thursday 25 September 2014 00:37:00 Sunil Kovvuri wrote:
->> >> On Thu, Sep 25, 2014 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> > On Wednesday 24 September 2014 23:34:04 Sunil Kovvuri wrote:
->>
->> >> >> All on-board PCI devices connected to this PCI controller have fixed resources
->> >> >> and doesn't have to be allocated/reassigned. Some of these devices are
->> >> >> SRIOV based.
->> >> >
->> >> > I think you need to mark the ones that are nonrelocatable with flag
->> >> > 0x80000000, otherwise the PCI core might decide to reassign them.
->> >>
->> >> Is this flag part of DT pci node properties ?
->> >> I am using IORESOURCE_PCI_FIXED flag. Its there in other patches of
->> >> the same series.
->> >
->> > Ah, right. I checked the source code again and it seems that we don't handle
->> > this right at the moment. I think a range that has the nonrelocatable
->> > flag set should be used for IORESOURCE_PCI_FIXED mappings without any
->> > host specific code, but that needs to be implemented in common code.
->>
->> What connection do you envision between nonrelocatable ranges and
->> IORESOURCE_PCI_FIXED?  I don't know what a nonrelocatable range is,
->> but for IORESOURCE_PCI_FIXED, all I intend is that the PCI core should
->> not try to assign a different address, e.g., because the BAR is
->> read-only or because it's a legacy IDE/VGA/etc. range for which there
->> is no BAR at all.
->
-> I think that is exactly the definition of the nonrelocatable flag
-> in http://www.openfirmware.org/1275/bindings/pci/pci2_1.pdf
->
-> The example given in section 11.1.2 is for a VGA device that has some
-> relocatable BARs and some nonrelocatable BARs.
+On Thursday 25 September 2014, Bjorn Helgaas wrote:
+> OK.  You said "a range that has the nonrelocatable flag set should be
+> used for IORESOURCE_PCI_FIXED mappings."  I thought you meant that the
+> range was a bridge window, and somehow PCI_FIXED BARs should be put in
+> that window.
+> 
+> But maybe you meant that nonrelocatable ranges should have the
+> IORESOURCE_PCI_FIXED bit set in their struct resources.  That would
+> mean we couldn't move the window, but we could put relocatable BARs
+> inside the window.
+> 
+> What needs to be implemented?  Just the code that would set
+> IORESOURCE_PCI_FIXED for nonrelocatable ranges?
 
-OK.  You said "a range that has the nonrelocatable flag set should be
-used for IORESOURCE_PCI_FIXED mappings."  I thought you meant that the
-range was a bridge window, and somehow PCI_FIXED BARs should be put in
-that window.
+It might be more complex than I thought. Let's see what the original
+hack does:
 
-But maybe you meant that nonrelocatable ranges should have the
-IORESOURCE_PCI_FIXED bit set in their struct resources.  That would
-mean we couldn't move the window, but we could put relocatable BARs
-inside the window.
++/*
++ * All PCIe devices in Thunder have fixed resources, shouldn't be reassigned.
++ * Also claim the device's valid resources to set 'res->parent' hierarchy.
++ */
++static void pci_dev_resource_fixup(struct pci_dev *dev)
++{
++       struct resource *res;
++       int resno;
++
++       for (resno = 0; resno < PCI_NUM_RESOURCES; resno++)
++               dev->resource[resno].flags |= IORESOURCE_PCI_FIXED;
++
++       for (resno = 0; resno < PCI_BRIDGE_RESOURCES; resno++) {
++               res = &dev->resource[resno];
++               if (res->parent || !(res->flags & IORESOURCE_MEM))
++                       continue;
++               pci_claim_resource(dev, resno);
++       }
++}
++DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, PCI_ANY_ID,
++                       pci_dev_resource_fixup);
 
-What needs to be implemented?  Just the code that would set
-IORESOURCE_PCI_FIXED for nonrelocatable ranges?
+This actually looks harmful, because it means that any kernel that contains
+the thunder host controller driver will do the above for any device made
+by Cavium, whether it's connected to this bridge or not.
 
-Bjorn
+What I think we want instead is to mark any resource whose parent
+resource is IORESOURCE_PCI_FIXED to have the same flag, and mark
+the PCI host controller resources IORESOURCE_PCI_FIXED when the
+nonrelocatable flag is set, and that should all be done in core
+code, not in a driver fixup.
+
+The part that still looks weird is the pci_claim_resource() that
+Sunil mentioned. This is currently done for resources that do not
+have a parent, but AFAICT all PCI device resources should have a
+parent that connects it to the upstream bridge.
+
+	Arnd
