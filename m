@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 18:11:28 +0200
-Subject: [GIT PULL] Fifth Round of Renesas ARM Based SoC Soc Updates for
- v3.18
-In-Reply-To: <cover.1411100007.git.horms+renesas@verge.net.au>
-References: <cover.1411100007.git.horms+renesas@verge.net.au>
-Message-ID: <201409251811.28596.arnd@arndb.de>
+Date: Thu, 25 Sep 2014 18:13:15 +0200
+Subject: [GIT PULL] Allwinner defconfig additions for 3.18
+In-Reply-To: <20140920201414.GA17237@lukather>
+References: <20140920201414.GA17237@lukather>
+Message-ID: <201409251813.15648.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 September 2014, Simon Horman wrote:
-> Fifth Round of Renesas ARM Based SoC Soc Updates for v3.18
+On Saturday 20 September 2014, Maxime Ripard wrote:
+> ----------------------------------------------------------------
+> Allwinner defconfig additions for 3.18
 > 
-> * r8a7740: Fix documentation error coppied from elsewhere
-> * r8a7794: Reserve memory for CMA in a manner consistent to
->            other R-Car Gen2 SoCs
+> Nothing major, just a few drivers additions and misc options
+> 
 
-Pulled into next/soc, thanks!
+Pulled into next/defconfig, thanks!
 
 	Arnd
