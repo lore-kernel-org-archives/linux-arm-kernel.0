@@ -1,114 +1,68 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 25 Sep 2014 11:37:55 +0800
-Subject: [PATCH] [RFC] Using hierarchy irqdomian to implement MTK intpol.
-In-Reply-To: <20140925031711.GV23926@titan.lakedaemon.net>
-References: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1411611417.21763.56.camel@mtksdaap41> <54238645.8090502@linux.intel.com>
- <20140925031711.GV23926@titan.lakedaemon.net>
-Message-ID: <54238E13.8040407@linux.intel.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 24 Sep 2014 20:56:57 -0700
+Subject: [PATCH] clk: rockchip: add missing rk3288 npll rate table
+In-Reply-To: <54237162.5030601@rock-chips.com>
+References: <1631893.xHvKLXVMyM@phil>
+ <CAD=FV=WCZt5cQ3Z4wWHyqgOh32X-Hztnyzs3-fpXh2nj7ROyfQ@mail.gmail.com>
+ <54237162.5030601@rock-chips.com>
+Message-ID: <CAD=FV=UAzvT2W1RzOthyBnBTOjO5G6m3vHS26CKk2h6y2Cf48A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Kever,
 
-
-On 2014/9/25 11:17, Jason Cooper wrote:
-> On Thu, Sep 25, 2014 at 11:04:37AM +0800, Jiang Liu wrote:
->> Hi Joe,
->> 	Thanks, I will merge them into my next version.
->> Regards!
->> Gerry
+On Wed, Sep 24, 2014 at 6:35 PM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> Doug,
+>
+>
+> On 09/25/2014 06:51 AM, Doug Anderson wrote:
 >>
->> On 2014/9/25 10:16, Joe.C wrote:
+>> Heiko,
+>>
+>> On Wed, Sep 24, 2014 at 2:41 PM, Heiko St?bner <heiko@sntech.de> wrote:
 >>>
->>> Jiang,
+>>> The npll on rk3288 is exactly the same pll type as the other 4. Yet it
+>>> was missing the link to the rate table, making rate changes impossible.
+>>> Change that by setting the table.
 >>>
->>> Please consider merge the following 2 changes into your next round.
-> 
-> ummm.  I'm confused.  I'll admit I'm a bit liquored up atm, but it looks
-> like "Joe C." posted a patch 'From: Joe C.', and 'Signed-off-by: Joe C.'.
-> _Then_, Joe C. replied to himself and asked someone *else* to merge the
-> below changes into the originally posted patch.  The real kicker is that
-> someone responded and said they would do it. (?!)
-> 
-> Please tell me the scotch is making this look more fucked up than it
-> really is...
-> 
-> Also, if Joe.C could please fix his mailer and git config to produce a
-> complete, correct name, that would be appreciated.
-Hi Jason,
-	Sorry for the confusion:)
-	We are trying to extend irqdomain to support hierarchy
-irqdomain. The code was originally developed on x86 only, and it's
-still in RFC stage. When Joe trying to use hierarchy irqdomain
-interfaces on ARM, he found some bugs, so hope that I could take
-those bugfixes in next version.
-Regards!
-Gerry
-> 
-> thx,
-> 
-> Jason.
-> 
->>> On Thu, 2014-09-25 at 00:04 +0800, Joe.C wrote:
->>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>>> index e285f3a..01e852b 100644
->>>> --- a/kernel/irq/irqdomain.c
->>>> +++ b/kernel/irq/irqdomain.c
->>>> @@ -467,7 +467,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->>>>  	struct irq_domain *domain;
->>>>  	irq_hw_number_t hwirq;
->>>>  	unsigned int type = IRQ_TYPE_NONE;
->>>> -	unsigned int virq;
->>>> +	int virq;
->>>>  
->>>>  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
->>>>  	if (!domain) {
->>>> @@ -493,8 +493,8 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->>>>  	else
->>>>  #endif
->>>>  		virq = irq_create_mapping(domain, hwirq);
->>>> -	if (!virq)
->>>> -		return virq;
->>>> +	if (virq <= 0)
->>>> +		return 0;
->>>>  
->>>>  	/* Set type if specified and different than the current one */
->>>>  	if (type != IRQ_TYPE_NONE &&
+>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>>> ---
+>>>   drivers/clk/rockchip/clk-rk3288.c | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>>
->>> irq_of_parse_and_map()/of_irq_to_resource() expect
->>> irq_create_of_mapping() to return 0 when fail. Return error code will
->>> cause of_irq_to_resource crash.
->>>
->>>
->>>> @@ -716,20 +716,20 @@ const struct irq_domain_ops irq_domain_simple_ops = {
->>>>  };
->>>>  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
->>>>  
->>>> -static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
->>>> +static int irq_domain_alloc_descs(int virq, unsigned int cnt,
->>>>  				  irq_hw_number_t hwirq, int node)
->>>>  {
->>>>  	unsigned int hint;
->>>>  
->>>>  	if (virq >= 0) {
->>>> -		virq = irq_alloc_descs(virq, virq, nr_irqs, node);
->>>> +		virq = irq_alloc_descs(virq, virq, cnt, node);
->>>>  	} else {
->>>>  		hint = hwirq % nr_irqs;
->>>>  		if (hint == 0)
->>>>  			hint++;
->>>> -		virq = irq_alloc_descs_from(hint, nr_irqs, node);
->>>> +		virq = irq_alloc_descs_from(hint, cnt, node);
->>>>  		if (virq <= 0 && hint > 1)
->>>> -			virq = irq_alloc_descs_from(1, nr_irqs, node);
->>>> +			virq = irq_alloc_descs_from(1, cnt, node);
->>>>  	}
->>>>  
->>>>  	return virq;
->>>
->>> This come from irq_create_mapping(), the original code is using global
->>> nr_irqs. Change to match original behavior.
->>>
->>> Joe.C
->>>
->>>
+>>> diff --git a/drivers/clk/rockchip/clk-rk3288.c
+>>> b/drivers/clk/rockchip/clk-rk3288.c
+>>> index 8ea885b..938d30b 100644
+>>> --- a/drivers/clk/rockchip/clk-rk3288.c
+>>> +++ b/drivers/clk/rockchip/clk-rk3288.c
+>>> @@ -143,7 +143,7 @@ static struct rockchip_pll_clock rk3288_pll_clks[]
+>>> __initdata = {
+>>>          [gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0,
+>>> RK3288_PLL_CON(12),
+>>>                       RK3288_MODE_CON, 12, 8, rk3288_pll_rates),
+>>>          [npll] = PLL(pll_rk3066, PLL_NPLL, "npll",  mux_pll_p, 0,
+>>> RK3288_PLL_CON(16),
+>>> -                    RK3288_MODE_CON, 14, 9, NULL),
+>>> +                    RK3288_MODE_CON, 14, 9, rk3288_pll_rates),
+>>>   };
+>>
+>> Works for me.  Any reason not to add it to dpll, too?
+>
+> dpll is used for DDR controller only, I'm not sure memory scaling driver
+> will use
+> the clock module API, because the code for memory scaling must moved to
+> intmem
+> (dram is not available at that time), which need to be small enough, and
+> it's not
+> possible to use the API from clock module.
+>
+> So, I think it is no need to add the rate table to dpll.
+
+Sure.  It seems to me like it wouldn't hurt to have it listed, but
+you're right that it's probably impossible that it would ever be used
+so I won't push for it.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+
+-Doug
