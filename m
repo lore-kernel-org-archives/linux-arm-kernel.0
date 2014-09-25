@@ -1,65 +1,71 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 25 Sep 2014 10:25:13 +0200
-Subject: [PATCH 2/2] ARM: vf610: Use ARM Global Timer as clocksource
-In-Reply-To: <20140925075013.GD6405@dragon>
-References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
- <1410437175-6636-2-git-send-email-stefan@agner.ch>
- <20140925075013.GD6405@dragon>
-Message-ID: <7006ad6e519c2ce3eeded54d35c87183@agner.ch>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 25 Sep 2014 17:26:03 +0900
+Subject: [PATCH v3] ARM: dts: add CPU nodes for Exynos4 SoCs
+In-Reply-To: <20140925081704.GA20841@e102568-lin.cambridge.arm.com>
+References: <5230569.XLlNbB5NvF@amdc1032>
+ <018e01cfd885$770dd940$65298bc0$@kernel.org>
+ <20140925081704.GA20841@e102568-lin.cambridge.arm.com>
+Message-ID: <5423D19B.1040203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-25 09:50, schrieb Shawn Guo:
-> On Thu, Sep 11, 2014 at 02:06:15PM +0200, Stefan Agner wrote:
->> Use ARM Global Timer as clocksource instead of the PIT timer. This
->> leaves the PIT timer for other users e.g. the secondary Cortex-M4
->> core. Also, the Global Timer has double the precission (running at
->> pheripheral clock compared to IPG clock) and a 64-bit incrementing
->> counter register.
-> 
-> I just think of one thing.  Will this change cause a problem of the low
-> power idle support in case we want to power down ARM core in there?
-> 
+On 09/25/14 17:17, Lorenzo Pieralisi wrote:
+> [CC'ed Daniel to make him aware this patch goes through your tree]
+>
+Thanks and just note the branch  which is including this change actually 
+v4 is just rebased not v3 will be sent out to arm-soc last tonight or 
+tomorrow.
 
-I'm not sure what really happend to the Global Timer when we power down
-the ARM core. We use a clocksoure of different power domain now, so it
-might make a difference in low power modes, but I think it will improve
-things: The PIT timer's clock currently have been clock gated even in
-STOP mode, which does not power down the ARM core. And it would be shut
-down completely in LP-Mode 1-3 which since PIT is part of the big power
-domain 1. 
+- Kukjin
 
-But AFAIK, its not required that the clocksource is running while in low
-power modes. The time should just not jump, and if the timers registers
-are lost during suspend, a proper suspend/resume support need to be
-implemented. 
+> On Thu, Sep 25, 2014 at 06:56:33AM +0100, Kukjin Kim wrote:
+>> Bartlomiej Zolnierkiewicz wrote:
+>>>
+>>> Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
+>>> when topology is read from DT") fixed GIC driver to filter cluster ID
+>>> from values returned by cpu_logical_map() for SoCs having registers
+>>> mapped without per-CPU banking making it is possible to add CPU nodes
+>>> for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
+>>> required by future changes adding initialization of cpuidle states in
+>>> Exynos cpuidle driver through DT.
+>>>
+>>> Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
+>>>
+>>> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+>>> ---
+>>> Based on for-next branch of linux-samsung.git tree.
+>>>
+>>> v3:
+>>> - refreshed on top of Kukjin's tree
+>>>
+>>> v2:
+>>> - match the unit-address with the reg
+>>>
+>>>   arch/arm/boot/dts/exynos4210.dtsi |   17 +++++++++++++++++
+>>>   arch/arm/boot/dts/exynos4212.dtsi |   17 +++++++++++++++++
+>>>   arch/arm/boot/dts/exynos4412.dtsi |   29 +++++++++++++++++++++++++++++
+>>>   3 files changed, 63 insertions(+)
+>>
+>> Thanks for re-spin and looks good to me.
+>>
+>> Applied.
+>
+> That's great, now my Exynos CPUidle DT patch should be rebased on top
+> of this patch so that thanks to the testing carried out by Bart it can be
+> merged too.
+>
+> Lorenzo
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
+-- 
+Thanks.
 
-> 
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> Theoretically we could remove the PIT driver now. But we could also
->> enable both drivers, but is having two clock source useful for the
->> Kernel at all?
->>
->>  arch/arm/mach-imx/Kconfig | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> index 64161aa..adc77180 100644
->> --- a/arch/arm/mach-imx/Kconfig
->> +++ b/arch/arm/mach-imx/Kconfig
->> @@ -656,7 +656,8 @@ config SOC_VF610
->>  	bool "Vybrid Family VF610 support"
->>  	select ARM_GIC
->>  	select PINCTRL_VF610
->> -	select VF_PIT_TIMER
->> +	select ARM_GLOBAL_TIMER
->> +	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->>  	select PL310_ERRATA_769419 if CACHE_L2X0
->>
->>  	help
->> --
->> 2.1.0
->>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
