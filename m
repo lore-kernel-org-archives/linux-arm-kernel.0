@@ -1,80 +1,402 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 25 Sep 2014 18:28:28 +0200
-Subject: [PATCH v3 01/13] PM / Domains: Add genpd attach/detach callbacks
+Date: Thu, 25 Sep 2014 18:28:40 +0200
+Subject: [PATCH v3 13/13] ARM: shmobile: r8a7740 dtsi: Add preliminary PM QoS
+ device latencies
 In-Reply-To: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
 References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1411662520-22795-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1411662520-22795-14-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While a PM domain can enable PM runtime management of its devices' module
-clocks by setting
-
-	genpd->dev_ops.stop = pm_clk_suspend;
-	genpd->dev_ops.start = pm_clk_resume;
-
-this also requires registering the clocks with the pm_clk subsystem.
-In the legacy case, this is handled by the platform code, after
-attaching the device to its PM domain.
-
-When the devices are instantiated from DT, devices are attached to their
-PM domains by generic code, leaving no method for the platform-specific
-PM domain code to register their clocks.
-
-Add two callbacks, allowing a PM domain to perform platform-specific
-tasks when a device is attached to or detached from a PM domain.
+For now use 250 ?s, just like the legacy platform code does.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 v3:
-  - Add Reviewed-by (Ulf: are you still OK with the changes in v3?)
-  - Move calling of the callbacks to a point where dev->pm_domain is
-    valid, so the domain parameter is no longer needed,
-  - Make callbacks return void.
+  - No changes
 v2:
   - New
 
- drivers/base/power/domain.c | 6 ++++++
- include/linux/pm_domain.h   | 2 ++
- 2 files changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 136 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 136 insertions(+)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index cd400575ee0ee89c..6e36bb09e7d9c144 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1436,6 +1436,9 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index ed0adeb61a1ad8ec..713170442b7bd4b2 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -26,6 +26,10 @@
+ 			reg = <0x0>;
+ 			clock-frequency = <800000000>;
+ 			power-domains = <&pd_a3sm>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 		};
+ 	};
  
- 	spin_unlock_irq(&dev->power.lock);
+@@ -49,6 +53,10 @@
+ 		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
+ 		clock-names = "fck";
+ 		power-domains = <&pd_c5>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
  
-+	if (genpd->attach_dev)
-+		genpd->attach_dev(dev);
-+
- 	mutex_lock(&gpd_data->lock);
- 	gpd_data->base.dev = dev;
- 	list_add_tail(&gpd_data->base.list_node, &genpd->dev_list);
-@@ -1528,6 +1531,9 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 	genpd->device_count--;
- 	genpd->max_off_time_changed = true;
+ 		renesas,channels-mask = <0x3f>;
  
-+	if (genpd->detach_dev)
-+		genpd->detach_dev(dev);
-+
- 	spin_lock_irq(&dev->power.lock);
+@@ -75,6 +83,10 @@
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 	};
  
- 	dev->pm_domain = NULL;
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 292079d8da6b8a78..9a93e622bdea3f79 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -73,6 +73,8 @@ struct generic_pm_domain {
- 	bool cached_power_down_ok;
- 	struct device_node *of_node; /* Node in device tree */
- 	struct gpd_cpu_data *cpu_data;
-+	void (*attach_dev)(struct device *dev);
-+	void (*detach_dev)(struct device *dev);
- };
+ 	/* irqpin1: IRQ8 - IRQ15 */
+@@ -97,6 +109,10 @@
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 	};
  
- static inline struct generic_pm_domain *pd_to_genpd(struct dev_pm_domain *pd)
+ 	/* irqpin2: IRQ16 - IRQ23 */
+@@ -119,6 +135,10 @@
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 	};
+ 
+ 	/* irqpin3: IRQ24 - IRQ31 */
+@@ -141,6 +161,10 @@
+ 			      0 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7740_CLK_INTCA>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 	};
+ 
+ 	ether: ethernet at e9a00000 {
+@@ -150,6 +174,10 @@
+ 		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_GETHER>;
+ 		power-domains = <&pd_a4s>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		phy-mode = "mii";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -167,6 +195,10 @@
+ 			      0 204 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7740_CLK_IIC0>;
+ 		power-domains = <&pd_a4r>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -181,6 +213,10 @@
+ 			      0 73 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_IIC1>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -191,6 +227,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA0>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -201,6 +241,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA1>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -211,6 +255,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA0>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -221,6 +269,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA3>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -231,6 +283,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA4>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -241,6 +297,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA5>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -251,6 +311,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA6>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -261,6 +325,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFA7>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -271,6 +339,10 @@
+ 		clocks = <&mstp2_clks R8A7740_CLK_SCIFB>;
+ 		clock-names = "sci_ick";
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -290,6 +362,10 @@
+ 			<&irqpin3 0 0>, <&irqpin3 1 0>, <&irqpin3 2 0>, <&irqpin3 3 0>,
+ 			<&irqpin3 4 0>, <&irqpin3 5 0>, <&irqpin3 6 0>, <&irqpin3 7 0>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 	};
+ 
+ 	tpu: pwm at e6600000 {
+@@ -297,6 +373,10 @@
+ 		reg = <0xe6600000 0x100>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_TPU0>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 		#pwm-cells = <3>;
+ 	};
+@@ -308,6 +388,10 @@
+ 			      0 57 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_MMC>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -319,6 +403,10 @@
+ 			      0 119 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_SDHI0>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+ 		status = "disabled";
+@@ -332,6 +420,10 @@
+ 			      0 123 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_SDHI1>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+ 		status = "disabled";
+@@ -345,6 +437,10 @@
+ 			      0 127 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A7740_CLK_SDHI2>;
+ 		power-domains = <&pd_a3sp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		cap-sd-highspeed;
+ 		cap-sdio-irq;
+ 		status = "disabled";
+@@ -357,6 +453,10 @@
+ 		interrupts = <0 9 0x4>;
+ 		clocks = <&mstp3_clks R8A7740_CLK_FSI>;
+ 		power-domains = <&pd_a4mp>;
++		stop-latency = <250000>;
++		start-latency = <250000>;
++		save-state-latency = <250000>;
++		restore-state-latency = <250000>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -409,6 +509,10 @@
+ 			reg = <0xe6150000 0x10000>;
+ 			clocks = <&extal1_clk>, <&extalr_clk>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <1>;
+ 			clock-output-names = "system", "pllc0", "pllc1",
+ 					     "pllc2", "r",
+@@ -424,6 +528,10 @@
+ 			reg = <0xe6150080 4>;
+ 			clocks = <&pllc1_div2_clk>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <0>;
+ 			clock-output-names = "sub";
+ 		};
+@@ -433,6 +541,10 @@
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7740_CLK_PLLC1>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+@@ -442,6 +554,10 @@
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&extal1_clk>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+@@ -454,6 +570,10 @@
+ 			reg = <0xe6150080 4>;
+ 			clocks = <&sub_clk>, <&sub_clk>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7740_CLK_SUBCK R8A7740_CLK_SUBCK2
+@@ -470,6 +590,10 @@
+ 				 <&sub_clk>, <&sub_clk>,
+ 				 <&cpg_clocks R8A7740_CLK_B>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7740_CLK_CEU21 R8A7740_CLK_CEU20 R8A7740_CLK_TMU0
+@@ -492,6 +616,10 @@
+ 				 <&sub_clk>, <&sub_clk>, <&sub_clk>,
+ 				 <&sub_clk>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7740_CLK_SCIFA6 R8A7740_CLK_INTCA
+@@ -522,6 +650,10 @@
+ 				 <&cpg_clocks R8A7740_CLK_HP>,
+ 				 <&cpg_clocks R8A7740_CLK_HP>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7740_CLK_CMT1 R8A7740_CLK_FSI R8A7740_CLK_IIC1
+@@ -540,6 +672,10 @@
+ 				 <&cpg_clocks R8A7740_CLK_HP>,
+ 				 <&cpg_clocks R8A7740_CLK_HP>;
+ 			power-domains = <&pd_c5>;
++			stop-latency = <250000>;
++			start-latency = <250000>;
++			save-state-latency = <250000>;
++			restore-state-latency = <250000>;
+ 			#clock-cells = <1>;
+ 			renesas,clock-indices = <
+ 				R8A7740_CLK_USBH R8A7740_CLK_SDHI2
 -- 
 1.9.1
