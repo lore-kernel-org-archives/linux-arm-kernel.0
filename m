@@ -1,31 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 23:29:02 +0200
-Subject: [PATCH] ARM: bcm2835: enable USB_DWC2_HOST in defconfig
-In-Reply-To: <1410918724-22752-1-git-send-email-swarren@wwwdotorg.org>
-References: <1410918724-22752-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <201409252329.02619.arnd@arndb.de>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 25 Sep 2014 14:31:40 -0700
+Subject: [PATCH/RFC v2 02/12] PM / Domains: Add DT bindings for PM QoS
+ device latencies
+In-Reply-To: <1410893339-6361-3-git-send-email-geert+renesas@glider.be> (Geert
+ Uytterhoeven's message of "Tue, 16 Sep 2014 20:48:49 +0200")
+References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
+ <1410893339-6361-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <7heguzbd4z.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 September 2014, Stephen Warren wrote:
-> From: Lubomir Rintel <lkundrak@v3.sk>
-> 
-> It broke when host was moved into a separate module, in 47a1685 ("usb:
-> dwc2/s3c-hsotg: move s3c-hsotg into dwc2 directory"),
-> 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+Geert Uytterhoeven <geert+renesas@glider.be> writes:
+
+> PM QoS device start/stop and save/restore state latencies are more or
+> less properties of the hardware.
+> In legacy code, they're specified from platform code.
+> On DT platforms, their values should come from DT.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-> These two patches are all I expect to have for RPi for 3.18, so I figure
-> it's easiest to just forward them on to you rather than sending tiny pull
-> requests.
-> 
+> Should these properties be called "linux,*-latency"?
 
-Applied to next/defconfig.
+Hmm, the start/stop latencies are clearly properties of the hardware,
+but the save/restore latencies seem to be a function of the driver.
+e.g., some drivers may keep a shadow copy of their registers in memory
+so the save time is minimized.
 
-BTW, I wonder if we should add a multi_v6_defconfig that has this and other
-platforms enabled, or possibly a multi_v6plus_defconfig that is also a superset
-of multi_v7_defconfig. Nothing to worry about on your end, but it seems
-weird to have it for v7 and v5 but not v6.
+I don't have too strong of an opinion on this, but probably the drivers
+should just add their own values to the start/stop latencies to add the
+linux specific overhead.
 
-	Arnd
+Kevin
