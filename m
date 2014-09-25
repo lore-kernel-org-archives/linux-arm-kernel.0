@@ -1,71 +1,85 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 24 Sep 2014 17:24:15 -0700
-Subject: [PATCH 07/13] arm64: Add new routine local_disable
-In-Reply-To: <20140915185625.GB14191@leverpostej>
+Date: Wed, 24 Sep 2014 17:24:30 -0700
+Subject: [PATCH 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <20140915181101.GE13789@leverpostej>
 References: <cover.1410302383.git.geoff@infradead.org>
- <8db284c1443918ca692a5c2e30a0c7f13b37428f.1410302383.git.geoff@infradead.org>
- <20140915185625.GB14191@leverpostej>
-Message-ID: <1411604655.6001.176.camel@smoke>
+ <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+ <20140915181101.GE13789@leverpostej>
+Message-ID: <1411604670.6001.177.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Mark,
 
-On Mon, 2014-09-15 at 19:56 +0100, Mark Rutland wrote:
-> Hi Geoff,
-> 
+On Mon, 2014-09-15 at 19:11 +0100, Mark Rutland wrote:
 > On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> > Add the new arm64 routine local_disable() to allow the masking of several DAIF
-> > flags in one operation.  Currently, we only have routines to mask individual
-> > flags, and to mask several flags multiple calls to daifset are required.
-> >
+> > Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+> > During CPU reset the CPU must be brought to the exception level it had on
+> > entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+> > needed for this exception level switch.
+> > 
 > > Signed-off-by: Geoff Levand <geoff@infradead.org>
 > > ---
-> >  arch/arm64/include/asm/irqflags.h | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
+> >  arch/arm64/include/asm/virt.h | 11 +++++++++++
+> >  arch/arm64/kernel/hyp-stub.S  | 10 ++++++++++
+> >  2 files changed, 21 insertions(+)
 > > 
-> > diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-> > index 11cc941..28521d4 100644
-> > --- a/arch/arm64/include/asm/irqflags.h
-> > +++ b/arch/arm64/include/asm/irqflags.h
-> > @@ -113,5 +113,18 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
-> >  #define local_dbg_enable()	asm("msr	daifclr, #8" : : : "memory")
-> >  #define local_dbg_disable()	asm("msr	daifset, #8" : : : "memory")
+> > diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> > index 894fe53..b217fbc 100644
+> > --- a/arch/arm64/include/asm/virt.h
+> > +++ b/arch/arm64/include/asm/virt.h
+> > @@ -41,6 +41,17 @@
 > >  
-> > +enum daif_flag {
-> 
-> Is there any reason for this to be an enum rather than a set of
-> #defines?
-> 
-> It would be nice to be able to use these in asm.
-> 
-> > +	DAIF_FIQ   = (1UL << 6),
-> > +	DAIF_IRQ   = (1UL << 7),
-> > +	DAIF_ASYNC = (1UL << 8),
-> > +	DAIF_DBG   = (1UL << 9),
-> > +	DAIF_ALL   = (0xffUL << 6),
-> 
-> Not 0xf?
-> 
-> It would be nicer to OR the other flags.
-> 
-> > +};
+> >  #define HVC_KVM_CALL_HYP 3
+> >  
+> > +/*
+> > + * HVC_CALL_FUNC - Execute a function at EL2.
+> > + *
+> > + * @x0: Physical address of the funtion to be executed.
+> > + * @x1: Passed as the first argument to @fn.
+> > + * @x2: Passed as the second argument to @fn.
+> > + * @x3: Passed as the third argument to @fn.
+> > + */
 > > +
-> > +static inline void local_disable(unsigned long daif_flags)
-> > +{
-> > +	arch_local_irq_restore(daif_flags | arch_local_save_flags());
+> > +#define HVC_CALL_FUNC 4
+> > +
 > 
-> If we knew the value was a constant (which we could check with
-> __builting_constant_p) we could use daifset here, rather than having a
-> RMW sequence.
-> 
-> With that, the other local_*_{enable,disable} calls could be rewritten
-> in terms of this, without affecting the generated code. That would
-> require some shifting to account for the difference between pstate and
-> daif{clr,set} layout, but for constants that shouldn't be a problem.
+> Can't we use the HVC_KVM_CALL_HYP for this as well? I thought we already
+> added the code to the stub to do that in the last patch.
 
-Since kexec just needs to mask all the DAIF exceptions before the main
-CPU is reset I'll just do that inline, and put this rework of the
-exception mask routines on my todo list.
+The last patch (arm64: Convert hcalls to use ISS field) only added
+function call support to the kvm vector.
+
+> Is there a difference between the two that I'm missing?
+
+The kvm and stub el1_sync vectors are different in that the kvm vector
+expects a stack to be set up whereas the stub vector does not.  We have
+plenty of hcall numbers, so I thought it better to have two different
+numbers so improper usage would be easier to detect.  
+
+> >  #ifndef __ASSEMBLY__
+> >  
+> >  /*
+> > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> > index 9ab5f70..a21cf51 100644
+> > --- a/arch/arm64/kernel/hyp-stub.S
+> > +++ b/arch/arm64/kernel/hyp-stub.S
+> > @@ -75,7 +75,17 @@ el1_sync:
+> >  1:	cmp	x10, #HVC_SET_VECTORS
+> >  	b.ne	1f
+> >  	msr	vbar_el2, x0
+> > +	b	2f
+> >  
+> > +1:	cmp	x10, #HVC_CALL_FUNC
+> > +	b.ne    1f
+> > +	mov	x29, lr
+> 
+> What's the contract for functions we call through the stub?
+
+My thinking was that this is just a mechanism to do the call.
+The caller and callee would need to set the conditions of the
+call.  The only restriction is that the called function would
+need to preserve the register that lr is saved in (x29 here,
+but x18 in the current implementation).
 
 -Geoff
