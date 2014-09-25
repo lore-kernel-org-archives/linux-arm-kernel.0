@@ -1,46 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Sep 2014 15:25:27 +0200
-Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
-In-Reply-To: <1411570141-29960-2-git-send-email-wens@csie.org>
-References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-2-git-send-email-wens@csie.org>
-Message-ID: <20140925132527.GF15315@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 25 Sep 2014 15:35:31 +0200
+Subject: [PATCH v4 0/8] arm/arm64: KVM: dynamic VGIC sizing
+In-Reply-To: <54240E20.8060505@huawei.com>
+References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
+ <54240E20.8060505@huawei.com>
+Message-ID: <20140925133531.GA15736@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 10:48:55PM +0800, Chen-Yu Tsai wrote:
-> The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
-> While it's processor cores and interconnecting bus are new, it
-> re-uses many peripherals found in earlier Allwinner SoCs.
+On Thu, Sep 25, 2014 at 08:44:16PM +0800, Shannon Zhao wrote:
+> Hi all,
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/mach-sunxi/Kconfig | 5 +++++
->  arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
->  2 files changed, 14 insertions(+)
+> I have a problem that I want to ask for your advice.
+> Before I send this mail to Marc and Christoffer. But it seems that they are busy or not online recently.
 > 
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index 1aaa1e1..72f222b 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -42,4 +42,9 @@ config MACH_SUN8I
->  	select MFD_SUN6I_PRCM
->  	select RESET_CONTROLLER
->  
-> +config MACH_SUN9I
-> +	bool "Allwinner A80 (sun9i) SoCs support"
+> I git clone Marc's "kvmtool-vgic-dyn" branch and run it on Fastmodel Cortex-A57*4 with qemu 2.1.0.
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> 
+> I want to do repeated lifecycle test. The test is that start 2 VMs, sleep 10 and do pkill qemu.
+> Test script is following:
+> #!/bin/sh
+> while true
+> do
+> 	qemu-system-aarch64 \
+>     		-enable-kvm -smp 4 \
+>     		-kernel Image \
+>     		-m 512 -machine virt,kernel_irqchip=on \
+>     		-initrd guestfs.cpio.gz \
+>     		-cpu host \
+>     		-chardev pty,id=pty0,mux=on -monitor chardev:pty0 \
+>     		-serial chardev:pty0 -daemonize \
+>     		-vnc 0.0.0.0:0 \
+>     		-append "rdinit=/sbin/init console=ttyAMA0 mem=512M root=/dev/ram earlyprintk=pl011,0x9000000 rw" &
+> 
+> 	qemu-system-aarch64 \
+>     		-enable-kvm -smp 4 \
+>     		-kernel Image \
+>     		-m 512 -machine virt,kernel_irqchip=on \
+>     		-initrd guestfs.cpio.gz \
+>     		-cpu host \
+>     		-chardev pty,id=pty0,mux=on -monitor chardev:pty0 \
+>    		-serial chardev:pty0 -daemonize \
+>     		-vnc 0.0.0.0:1 \
+>     		-append "rdinit=/sbin/init console=ttyAMA0 mem=512M root=/dev/ram earlyprintk=pl011,0x9000000 rw" &
+>     	sleep 10
+> 	pkill qemu
+> done
+> 
+> After repeating sometimes there is something wrong happened as followed.
+> Look forward for your reply.
+> Thanks,
+> Shannon
+> 
+Hi Shannon,
 
-With the new naming scheme, I wonder wether it makes sense to have the
-A80 displayed here and in the machine definition.
+This appears to be related to a bug in vgic_set_attr() which messes up
+the bitmap initialization, I'm working on a patch.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/5ce42236/attachment-0001.sig>
+-Christoffer
