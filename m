@@ -1,71 +1,65 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 25 Sep 2014 22:42:37 +0200
-Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
-In-Reply-To: <7ha95nikqh.fsf@linaro.org>
-References: <7ha95nikqh.fsf@linaro.org>
-Message-ID: <38173516.KG4f94aNi3@vostro.rjw.lan>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 25 Sep 2014 13:35:24 -0700
+Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
+ affinity notification
+In-Reply-To: <alpine.DEB.2.10.1409022109050.3333@nanos> (Thomas Gleixner's
+ message of "Tue, 2 Sep 2014 22:56:17 +0200 (CEST)")
+References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
+ <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+ <alpine.DEB.2.10.1408272239190.3323@nanos>
+ <20140902184305.GB91995@ilina-mac.local>
+ <alpine.DEB.2.10.1409022109050.3333@nanos>
+Message-ID: <7htx3vbfqr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 25, 2014 12:05:42 PM Kevin Hilman wrote:
-> Hi Rafael,
-> 
-> The first pull request was missing a dependency on a feature that went
-> in through Mark Brown's regulator tree, so it wouldn't actually compile
-> properly by itself.  This version pulls in that topic branch from Marks
-> tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
+Hi Thomas,
 
-Pulled, thanks!
+Thomas Gleixner <tglx@linutronix.de> writes:
 
-I'll push it to Linus after the Mark's material has been merged to avoid
-git log confusion.
+[...]
 
-Rafael
+> All I can see from your postings so far is:
+>
+>     1) You want to use the notification for PM QoS
+>
+>     2) You run into conflicts with the existing notifiers
+>
+>     3) You want to solve that conflict
+>
+> What you are not telling is:
+>
+>     1) In which way is PM QoS going to use that notifier
+>
+>     2) How does that conflict with the existing users. And we only
+>        have two of them:
+>
+>        - InfiniPath 7322 chip driver
+>
+>        - cpu_rmap driver, which is used by
+>        	- solarflare NIC driver
+> 		- mellanox mlx4 driver
+>	 	- cisco enic driver
+>
+> 	So how is that conflicting with your ARM centric PM QoS work?
+>
+> 	Please provide proper debug info about such a conflict, if it
+> 	exists at all.
 
+Ignoring any new users of the affinity notifiers for now, aren't the
+existing users you list above conflicting with each other already?
 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git tags/avs-for-3.18
-> 
-> for you to fetch changes up to cd8caa18deff6d2d87a4e3161b4dd8c6da3c4f38:
-> 
->   Merge branch 'topic/voltage-ev' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator into avs-next (2014-09-25 09:57:57 -0700)
-> 
-> ----------------------------------------------------------------
-> PM / AVS changes for v3.18
-> 
-> - Add new driver for Rockchip IO voltage domains
-> - update MAINTAINERS to reflect maintenance of drivers/power/avs/*
-> 
-> ----------------------------------------------------------------
-> Heiko St?bner (2):
->       regulator: core: Add REGULATOR_EVENT_PRE_VOLTAGE_CHANGE (and ABORT)
->       PM / AVS: rockchip-io: add driver handling Rockchip io domains
-> 
-> Kevin Hilman (2):
->       MAINTAINERS: update entry for drivers/power/avs
->       Merge branch 'topic/voltage-ev' of git://git.kernel.org/.../broonie/regulator into avs-next
-> 
->  Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  83 +++++++++++++++++++
->  MAINTAINERS                                                    |   4 +-
->  drivers/power/avs/Kconfig                                      |   8 ++
->  drivers/power/avs/Makefile                                     |   1 +
->  drivers/power/avs/rockchip-io-domain.c                         | 351 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/regulator/core.c                                       |  63 +++++++++++++--
->  include/linux/regulator/consumer.h                             |  20 +++++
->  7 files changed, 521 insertions(+), 9 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/rockchip-io-domain.txt
->  create mode 100644 drivers/power/avs/rockchip-io-domain.c
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Maybe I'm missing something, or maybe we're just lucky and nobody uses
+them together, but irq_set_affinity_notifier() only allows a single
+notifier to be registered at any given time.  So if you had a system
+with the inifinipath driver and a cpu_rmap user, only the one who's
+lucky enough to be the last to call irq_set_affinity_notifier() will
+ever be notified.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+So I think the main question for Lina is: assuming we need more than one
+co-existing driver/subsystem to get IRQ affinity notifiers (and we
+already seem to have them, but are lucky they don't currently co-exist),
+how should the IRQ core be changed to support that?  Is the list
+approach proposed in $SUBJECT path reasonable?
+
+Kevin
