@@ -1,37 +1,50 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 25 Sep 2014 16:05:03 +0900
-Subject: [PATCHv3 0/4] cpufreq: Use cpufreq-cpu0 driver for Exynos3250
-Message-ID: <1411628707-8496-1-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 25 Sep 2014 16:05:07 +0900
+Subject: [PATCHv3 4/4] ARM: dts: Add CPU OPP and regulator supply property for
+ Exynos3250
+In-Reply-To: <1411628707-8496-1-git-send-email-cw00.choi@samsung.com>
+References: <1411628707-8496-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1411628707-8496-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset use cpufreq-cpu0 driver to support Exynos3250 cpufreq. So, this
-patchset is based on following patchset[1] by Thomas Abraham.
-[1] [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
-    - http://www.spinics.net/lists/arm-kernel/msg364790.html
+This patch add CPU operating points which include CPU frequency and regulator
+voltage to use generic cpufreq drivers.
 
-Changes from v2:
-- Rebased on new patchset[1] by Thomas Abraham
-  and for-next branch of samsunc-clk.git of Tomasz Figa
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/boot/dts/exynos3250.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-Changes from v1:
-- Rebased on new patchset[1] by Thomas Abraham
-- Modify clk-cpu.c to support Exynos3250
-- Drop documentation patch on previous patchset[2]
- [2] http://www.spinics.net/lists/cpufreq/msg10265.html
-- Add only operating-points for Exynos3250 without armclk-divider-table
-
-Chanwoo Choi (4):
-  clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
-  clk: samsung: exynos3250: Update clock flags related to CPU to use cpu-clock type
-  ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
-  ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
-
- arch/arm/boot/dts/exynos3250.dtsi    | 15 +++++++++++
- arch/arm/mach-exynos/exynos.c        |  1 +
- drivers/clk/samsung/clk-cpu.h        |  4 +++
- drivers/clk/samsung/clk-exynos3250.c | 49 ++++++++++++++++++++++++++++--------
- 4 files changed, 59 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 72bf1b5..081ade1 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -52,6 +52,21 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0>;
+ 			clock-frequency = <1000000000>;
++			clocks = <&cmu CLK_DIV_CORE2>;
++			clock-names = "cpu";
++
++			operating-points = <
++				1000000 1150000
++				900000  1112500
++				800000  1075000
++				700000  1037500
++				600000  1000000
++				500000  962500
++				400000  925000
++				300000  887500
++				200000  850000
++				100000  850000
++			>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
 -- 
 1.8.0
