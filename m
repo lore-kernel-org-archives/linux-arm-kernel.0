@@ -1,60 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 Sep 2014 14:33:32 -0700
-Subject: [GIT PULL #2] ARM: BCM: Broadcom BCM63138 support
-In-Reply-To: <1410977394-27987-1-git-send-email-f.fainelli@gmail.com>
-References: <1410977394-27987-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <54248A2C.9000203@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 25 Sep 2014 14:33:55 -0700
+Subject: [PATCH/RFC v2 04/12] PM / Domains: Add genpd attach/detach
+ callbacks
+In-Reply-To: <1410893339-6361-5-git-send-email-geert+renesas@glider.be> (Geert
+ Uytterhoeven's message of "Tue, 16 Sep 2014 20:48:51 +0200")
+References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
+ <1410893339-6361-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <7h61gbbd18.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2014 11:09 AM, Florian Fainelli wrote:
-> Changes in v2:
-> - rebased against v3.17-rc1
-> - added Arnd's Acked-by
-> - added a proper tag to pull from
-> 
-> Thank you!
-> 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/brcm/linux.git tags/bcm63138-v4
-> 
-> for you to fetch changes up to e076e96227ef6b5b66cfdd79e75401bd2f6d532f:
-> 
->   MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs (2014-09-17 10:56:08 -0700)
+Geert Uytterhoeven <geert+renesas@glider.be> writes:
 
-Now that we have hopefully cleared out the mach-bcm situation, is there
-anything blocking this pull request?
+> While a PM domain can enable PM runtime management of its devices' module
+> clocks by setting
+>
+> 	genpd->dev_ops.stop = pm_clk_suspend;
+> 	genpd->dev_ops.start = pm_clk_resume;
+>
+> this also requires registering the clocks with the pm_clk subsystem.
+> In the legacy case, this is handled by the platform code, after
+> attaching the device to its PM domain.
+>
+> When the devices are instantiated from DT, devices are attached to their
+> PM domains by generic code, leaving no method for the platform-specific
+> PM domain code to register their clocks.
+>
+> Add two callbacks, allowing a PM domain to perform platform-specific
+> tasks when a device is attached to or detached from a PM domain.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks!
+Nice, I like this approach!
 
-> 
-> ----------------------------------------------------------------
-> Florian Fainelli (5):
->       ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
->       ARM: BCM63XX: add low-level UART debug support
->       ARM: BCM63XX: add BCM63138 minimal Device Tree
->       ARM: BCM63XX: add BCM963138DVT Reference platform DTS
->       MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
-> 
->  .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
->  MAINTAINERS                                        |   8 ++
->  arch/arm/Kconfig.debug                             |  18 ++-
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/bcm63138.dtsi                    | 134 +++++++++++++++++++++
->  arch/arm/boot/dts/bcm963138dvt.dts                 |  30 +++++
->  arch/arm/include/debug/bcm63xx.S                   |  33 +++++
->  arch/arm/mach-bcm/Kconfig                          |  17 +++
->  arch/arm/mach-bcm/Makefile                         |   3 +
->  arch/arm/mach-bcm/bcm63xx.c                        |  27 +++++
->  10 files changed, 278 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
->  create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
->  create mode 100644 arch/arm/boot/dts/bcm963138dvt.dts
->  create mode 100644 arch/arm/include/debug/bcm63xx.S
->  create mode 100644 arch/arm/mach-bcm/bcm63xx.c
-> 
+Acked-by: Kevin Hilman <khilman@linaro.org>
+
+Kevin
