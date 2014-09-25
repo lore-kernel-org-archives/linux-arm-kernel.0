@@ -1,43 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Sep 2014 00:17:01 +0200
-Subject: [GIT PULL] at91: soc for 3.18 #2
-In-Reply-To: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201409260017.01469.arnd@arndb.de>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 25 Sep 2014 15:23:10 -0700
+Subject: [RFC PATCH 2/4] ARM: keystone: pm: switch to use generic pm
+ domains
+In-Reply-To: <1411657537-25238-3-git-send-email-grygorii.strashko@ti.com>
+ (Grygorii Strashko's message of "Thu, 25 Sep 2014 18:05:35 +0300")
+References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
+ <1411657537-25238-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <7hlhp79w6p.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 September 2014, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
-> 
-> This is the second SoC pull-request for AT91 and it's dedicated to the addition
-> of our new SAMA5D4: C-A5+neon+L2CC+vdec (in sort). The AT91 SoC support is now
-> pretty simple in relation with the enhancements done recently.
-> The patches go on top of the previous tag at91-soc and has no dependency.
-> 
-> The merge with other AT91 branches can lead to little conflicts that I resolved
-> for you in the at91-3.18-resolved2 branch that you can take as an example.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit 5db722eeba0051c68e638114f6720e715b03cd2c:
-> 
->   ARM: at91: Remove the support for the RSI EWS board (2014-09-19 13:13:23 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-soc2
-> 
-> for you to fetch changes up to 02037a9719fa89b7e5dc25cb22afc06c4eae406e:
-> 
->   ARM: at91: document Atmel SMART compatibles (2014-09-22 14:42:40 +0200)
-> 
-> ----------------------------------------------------------------
-> Second SoC batch for 3.18:
-> - introduction of the new SAMA5D4 SoC and associated Evaluation Kit
-> - low level soc detection and early printk code
-> - taking advantage of this, documentation of all AT91 SoC DT strings
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-Pulled into next/soc, thanks!
+> This patch switches Keystone 2 PM code to use Generic PM domains
+> instead of PM  clock domains because of the lack of DT support
+> for the last.
+>
+> Keystone 2 PM domain should be specified per device for which
+> Runtime PM has to be enabled and handles the list of functional clocks
+> to enable/disable device.
+>
+> Example:
+>  qmss_domain: qmss_pm_controller {
+> 	compatible = "ti,keystone-pm-controller";
+> 	clocks = <&chipclk13>;
+> 	#power-domain-cells = <0>;
+>  };
+>
+>  qmss: qmss at 2a40000 {
+> 	compatible = "ti,keystone-navigator-qmss";
+> 	...
+> 	power-domains = <&qmss_domain>;
+>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-	Arnd
+[...]
+
+> +static int keystone_pm_domain_power_off(struct generic_pm_domain *genpd)
+> +{
+> +	int ret;
+> +	struct keystone_domain *dm = container_of(genpd,
+> +						  struct keystone_domain,
+> +						  base);
+> +
+> +	/* Enable reset clocks for all devices in the PU domain */
+
+This says enable clocks...
+
+> +	ret = pm_clk_suspend(dm->dev);
+
+...but this calls clk_disable().
+
+> +	if (ret)
+> +		dev_err(dm->dev, "can't turn off clocks %d\n", ret);
+> +
+> +	return ret;
+> +}
+> +
+> +static int keystone_pm_domain_power_on(struct generic_pm_domain *genpd)
+> +{
+> +	int ret;
+> +	struct keystone_domain *dm = container_of(genpd,
+> +						  struct keystone_domain,
+> +						  base);
+> +
+> +	/* Disable reset clocks for all devices in the PU domain */
+
+And this says disable clocks...
+
+> +	ret = pm_clk_resume(dm->dev);
+
+...but this calls clk_enable().
+
+-ECONFUSED.
+
+Kevin
