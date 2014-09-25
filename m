@@ -1,44 +1,45 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Thu, 25 Sep 2014 16:11:29 +0800
-Subject: [PATCH v8 2/2] Documentation:add DMA support for freescale i2c driver
-In-Reply-To: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
-References: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1411632689-31531-3-git-send-email-yao.yuan@freescale.com>
+From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Thu, 25 Sep 2014 14:33:55 +0530
+Subject: [RFC PATCH 0/4] arm64:numa: Add numa support for arm64 platforms.
+Message-ID: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i2c dts node properties for eDMA support, them depend on the eDMA driver.
+This is initial patch set to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) simulator.
+Tried all test-cases present in numactl-2.0.9 package.
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- Documentation/devicetree/bindings/i2c/i2c-imx.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+In this patchset, defined dt bindings for numa mapping for memory
+nodes. The cpu to node mapping is derived from the existing cpu-map
+mapping as defined in topology binding.
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-imx.txt b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-index 4a8513e..52d37fd 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-imx.txt
-@@ -11,6 +11,8 @@ Required properties:
- Optional properties:
- - clock-frequency : Constains desired I2C/HS-I2C bus clock frequency in Hz.
-   The absence of the propoerty indicates the default frequency 100 kHz.
-+- dmas: A list of two dma specifiers, one for each entry in dma-names.
-+- dma-names: should contain "tx" and "rx".
- 
- Examples:
- 
-@@ -26,3 +28,12 @@ i2c at 70038000 { /* HS-I2C on i.MX51 */
- 	interrupts = <64>;
- 	clock-frequency = <400000>;
- };
-+
-+i2c0: i2c at 40066000 { /* i2c0 on vf610 */
-+	compatible = "fsl,vf610-i2c";
-+	reg = <0x40066000 0x1000>;
-+	interrupts =<0 71 0x04>;
-+	dmas = <&edma0 0 50>,
-+		<&edma0 0 51>;
-+	dma-names = "rx","tx";
-+};
+thanks,
+Ganapat
+
+Ganapatrao Kulkarni (4):
+  arm64: defconfig: increase NR_CPUS range to 2-128
+  arm/arm64:dt:numa: adding numa node mapping for memory nodes.
+  arm64:thunder: Add initial dts for Cavium Thunder SoC in 2 Node topology.
+  arm64:numa: adding numa support for arm64 platforms.
+
+ Documentation/devicetree/bindings/arm/numa.txt |  60 ++
+ arch/arm64/Kconfig                             |  37 +-
+ arch/arm64/boot/dts/thunder-88xx-2n.dts        |  76 ++
+ arch/arm64/boot/dts/thunder-88xx-2n.dtsi       | 990 +++++++++++++++++++++++++
+ arch/arm64/include/asm/mmzone.h                |  32 +
+ arch/arm64/include/asm/numa.h                  |  41 +
+ arch/arm64/kernel/setup.c                      |   8 +
+ arch/arm64/kernel/smp.c                        |   2 +
+ arch/arm64/mm/Makefile                         |   1 +
+ arch/arm64/mm/init.c                           |  33 +-
+ arch/arm64/mm/numa.c                           | 471 ++++++++++++
+ 11 files changed, 1745 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dts
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dtsi
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/mm/numa.c
+
 -- 
-1.8.4
+1.8.1.4
