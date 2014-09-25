@@ -1,81 +1,172 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 25 Sep 2014 09:58:59 +0000
-Subject: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <6a2c63ad3a60461a830a00281c9d0b3c@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
- <1411632689-31531-2-git-send-email-yao.yuan@freescale.com>
- <6a2c63ad3a60461a830a00281c9d0b3c@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <0f491b0c56264ee09a09f94b718536f4@BL2PR03MB338.namprd03.prod.outlook.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 25 Sep 2014 11:54:51 +0200
+Subject: [PATCH v2 1/2] serial: samsung: Add support for early console
+In-Reply-To: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
+References: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1411638892-13702-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Duan Fugang-B38611
-> Sent: Thursday, September 25, 2014 5:25 PM
-> To: Yuan Yao-B46683; wsa at the-dreams.de; marex at denx.de
-> Cc: LW at KARO-electronics.de; mark.rutland at arm.com; shawn.guo at linaro.org;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-i2c at vger.kernel.org
-> Subject: RE: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c
-> driver
-> 
-> From: Yuan Yao <yao.yuan@freescale.com> Sent: Thursday, September 25,
-> 2014 4:11 PM
-> >To: wsa at the-dreams.de; marex at denx.de
-> >Cc: LW at KARO-electronics.de; mark.rutland at arm.com; Duan Fugang-B38611;
-> >shawn.guo at linaro.org; linux-kernel at vger.kernel.org; linux-arm-
-> >kernel at lists.infradead.org; linux-i2c at vger.kernel.org
-> >Subject: [PATCH v8 1/2] i2c: imx: add DMA support for freescale i2c
-> >driver
-> >
-> >Add dma support for i2c. This function depend on DMA driver.
-> >You can turn on it by write both the dmas and dma-name properties in
-> >dts node.
-> >DMA is optional, even DMA request unsuccessfully, i2c can also work well.
-> >
-> >Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> >---
-> > drivers/i2c/busses/i2c-imx.c | 352
-> >+++++++++++++++++++++++++++++++++++++++++--
-> > 1 file changed, 342 insertions(+), 10 deletions(-)
-> >
-> >diff --git a/drivers/i2c/busses/i2c-imx.c
-> >b/drivers/i2c/busses/i2c-imx.c index 613069b..c643756 100644
-> >--- a/drivers/i2c/busses/i2c-imx.c
-> >+++ b/drivers/i2c/busses/i2c-imx.c
-> >@@ -37,22 +37,27 @@
-> >+	 */
-> >+	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> >+	reinit_completion(&i2c_imx->dma->cmd_complete);
-> >+	result = wait_for_completion_interruptible_timeout(
-> >+				&i2c_imx->dma->cmd_complete,
-> >+				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> >+	if (result <= 0) {
-> >+		dmaengine_terminate_all(dma->chan_using);
-> >+		if (result)
-> >+			return result;
-> >+		else
-> >+			return -ETIMEDOUT;
-> >+	}
-> >+
-> >+	/* Waiting for Transfer complete. */
-> >+	while (1) {
-> >+		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> >+		if (temp & I2SR_ICF)
-> Why not wait for IIF ?
+From: Tomasz Figa <t.figa@samsung.com>
 
-[Yuan Yao] 
-IIF is often used. But IIF cannot indicate transfer completely in DMA mode. 
-So TCF(I2SR_ICF) is the only choice.
+This patch adds support for early console initialized from device tree
+and kernel command line to all variants of Samsung serial driver.
 
-> >+			break;
-> >+		if (time_after(jiffies, orig_jiffies +
-> >+				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT))) {
-> >+			dev_dbg(dev, "<%s> Timeout\n", __func__);
-> >+			return -ETIMEDOUT;
-> >+		}
-> >+		schedule();
-> >+	}
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+[added support for command line based initialization, fixed comment]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ Documentation/kernel-parameters.txt |  10 ++++
+ drivers/tty/serial/Kconfig          |   1 +
+ drivers/tty/serial/samsung.c        | 103 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 114 insertions(+)
 
-Thanks & Best regards,
-Yuan Yao
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 10d51c2f10d7..12e73c5fc90b 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -938,6 +938,16 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 
+ 		smh	Use ARM semihosting calls for early console.
+ 
++		s3c2410,<addr>[,options]
++		s3c2412,<addr>[,options]
++		s3c2440,<addr>[,options]
++		s3c6400,<addr>[,options]
++		s5pv210,<addr>[,options]
++		exynos4210,<addr>[,options]
++			Use early console provided by serial driver available
++			on Samsung SoCs, requires selecting proper type and
++			a correct base address of the selected UART port.
++
+ 	earlyprintk=	[X86,SH,BLACKFIN,ARM,M68k]
+ 			earlyprintk=vga
+ 			earlyprintk=efi
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 26cec64dadd7..e87a2dfd9080 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -222,6 +222,7 @@ config SERIAL_SAMSUNG
+ 	tristate "Samsung SoC serial support"
+ 	depends on PLAT_SAMSUNG
+ 	select SERIAL_CORE
++	select SERIAL_EARLYCON
+ 	help
+ 	  Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
+ 	  providing /dev/ttySAC0, 1 and 2 (note, some machines may not
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index c78f43a481ce..8ad453a5d845 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -1856,6 +1856,109 @@ static struct platform_driver samsung_serial_driver = {
+ 
+ module_platform_driver(samsung_serial_driver);
+ 
++/*
++ * Early console.
++ */
++
++struct samsung_early_console_data {
++	u32 txfull_mask;
++};
++
++static void samsung_early_busyuart(struct uart_port *port)
++{
++	while (!(readl(port->membase + S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXFE))
++		;
++}
++
++static void samsung_early_busyuart_fifo(struct uart_port *port)
++{
++	struct samsung_early_console_data *data = port->private_data;
++
++	while (readl(port->membase + S3C2410_UFSTAT) & data->txfull_mask)
++		;
++}
++
++static void samsung_early_putc(struct uart_port *port, int c)
++{
++	if (readl(port->membase + S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE)
++		samsung_early_busyuart_fifo(port);
++	else
++		samsung_early_busyuart(port);
++
++	writeb(c, port->membase + S3C2410_UTXH);
++}
++
++static void samsung_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	uart_console_write(&dev->port, s, n, samsung_early_putc);
++}
++
++static int __init samsung_early_console_setup(struct earlycon_device *device,
++					      const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = samsung_early_write;
++	return 0;
++}
++
++/* S3C2410 */
++static struct samsung_early_console_data s3c2410_early_console_data = {
++	.txfull_mask = S3C2410_UFSTAT_TXFULL,
++};
++
++static int __init s3c2410_early_console_setup(struct earlycon_device *device,
++					      const char *opt)
++{
++	device->port.private_data = &s3c2410_early_console_data;
++	return samsung_early_console_setup(device, opt);
++}
++OF_EARLYCON_DECLARE(s3c2410, "samsung,s3c2410-uart",
++			s3c2410_early_console_setup);
++EARLYCON_DECLARE(s3c2410, s3c2410_early_console_setup);
++
++/* S3C2412, S3C2440, S3C64xx */
++static struct samsung_early_console_data s3c2440_early_console_data = {
++	.txfull_mask = S3C2440_UFSTAT_TXFULL,
++};
++
++static int __init s3c2440_early_console_setup(struct earlycon_device *device,
++					      const char *opt)
++{
++	device->port.private_data = &s3c2440_early_console_data;
++	return samsung_early_console_setup(device, opt);
++}
++OF_EARLYCON_DECLARE(s3c2412, "samsung,s3c2412-uart",
++			s3c2440_early_console_setup);
++OF_EARLYCON_DECLARE(s3c2440, "samsung,s3c2440-uart",
++			s3c2440_early_console_setup);
++OF_EARLYCON_DECLARE(s3c6400, "samsung,s3c6400-uart",
++			s3c2440_early_console_setup);
++EARLYCON_DECLARE(s3c2412, s3c2440_early_console_setup);
++EARLYCON_DECLARE(s3c2440, s3c2440_early_console_setup);
++EARLYCON_DECLARE(s3c6400, s3c2440_early_console_setup);
++
++/* S5PV210, EXYNOS */
++static struct samsung_early_console_data s5pv210_early_console_data = {
++	.txfull_mask = S5PV210_UFSTAT_TXFULL,
++};
++
++static int __init s5pv210_early_console_setup(struct earlycon_device *device,
++					      const char *opt)
++{
++	device->port.private_data = &s5pv210_early_console_data;
++	return samsung_early_console_setup(device, opt);
++}
++OF_EARLYCON_DECLARE(s5pv210, "samsung,s5pv210-uart",
++			s5pv210_early_console_setup);
++OF_EARLYCON_DECLARE(exynos4210, "samsung,exynos4210-uart",
++			s5pv210_early_console_setup);
++EARLYCON_DECLARE(s5pv210, s5pv210_early_console_setup);
++EARLYCON_DECLARE(exynos4210, s5pv210_early_console_setup);
++
+ MODULE_ALIAS("platform:samsung-uart");
+ MODULE_DESCRIPTION("Samsung SoC Serial port driver");
+ MODULE_AUTHOR("Ben Dooks <ben@simtec.co.uk>");
+-- 
+1.9.2
