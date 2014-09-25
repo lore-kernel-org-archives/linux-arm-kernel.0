@@ -1,52 +1,71 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 25 Sep 2014 18:56:32 +0200
-Subject: [RFC] ARM: edma: unconditionally ack the error interrupt
-In-Reply-To: <541CA01D.1000006@ti.com>
-References: <1410377960-26921-1-git-send-email-bigeasy@linutronix.de>
- <541AA900.4080506@ti.com> <20140918161225.GA10232@linutronix.de>
- <541CA01D.1000006@ti.com>
-Message-ID: <20140925165632.GA5906@linutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 26 Sep 2014 01:57:23 +0900
+Subject: [GIT PULL 3/3] 3rd Round of Exynos-PM-2 Updates for v3.18
+Message-ID: <54244973.7090204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi | 2014-09-20 00:29:01 [+0300]:
+The following changes since commit c3294253713cbc96df59a7cc6a9a3fc0c4ae5ba7:
 
->mask 8000000 means URXEVT0 (UART0 rx), 4000000 is UTXEVT0 (UART0 tx) events.
->But it is clear that my theory was not even close to what's going on.
->Do you have some tool which can be used to reproduce this issue?
+   ARM: EXYNOS: Refactor the pm code to use DT based lookup (2014-09-24 
+16:45:14 +0900)
 
-The latest uart patch set is at
-    git://git.breakpoint.cc/bigeasy/linux.git uart_v10_pre3
+are available in the git repository at:
 
-and the latest one I tested and saw the issue was uart_v9.
-The test case is, boot, login via serial, do "less file" and press space
-for a while to get less to scroll the file.
-The error counter increment after a while.
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/exynos-pm-2
 
->> Fun fact: If I remove the write access to EDMA_EMCR register (the write
->> access after the read out) then I haven't seen [1] a single error interrupt
->> beeing "unhandled" out of 9. The former has three out of eight.
->
->Hrm, this is interesting. Am I interpret it right:
->if you clear the event missed register's bit for the event, you will receive
->the interrupt, but there if you read the EMR bits, they are all 0.
-usually yes. Sometimes the EMR bits are set.
+for you to fetch changes up to cd925eee6acf7c742a896e0d43ad4f4088bb691c:
 
->if you do not clear the bit in the event missed register (even if it is not
->set) you will not receive the error interrupt. Right?
-no, the error interrupt comes but the EMR is always non-zero.
+   ARM: EXYNOS: SWRESET is needed to boot secondary CPU on exynos3250 
+(2014-09-25 18:15:13 +0900)
 
->I think this can be due to the fact how edma (if I read the TRM right) works:
->the error irq will be asserted if there is a transition from 0 to 1 in one of
->the error registers. If you had error and you did not cleared the error bit,
->the next error will not going to cause another transition so no interrupt will
->be triggered. Having said that, there should be at least one error interrupt
->coming since at some point we should have had 0 -> 1 transition...
->
->Can you print out also the EDMA_EMR at places you were printing EDMA_EMCR?
+----------------------------------------------------------------
+Exynos 2nd PM related updates for v3.18
 
-So I had a "bug" where I changed the baud + DMA bits in the UART while
-there was a DMA-TX in progress. Now I dropped this in v10_pre3 and it
-seems not to trigger anymore.
+- Firmware supporting suspend and resume to excute of low
+   level operations to enter and leave power mode for exynos
+   : introduce suspend() and resume() firmware operations
 
-Sebastian
+- Fix AFTR mode on boards with secure firmware enabled and
+   allows exynos cpuidle driver usage on exynos4x12 SoCs
+
+- Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
+
+- SWRESET is needed to boot secondary CPU on exynos3250
+
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (6):
+       ARM: EXYNOS: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+       ARM: firmware: add AFTR mode support to firmware do_idle method
+       ARM: EXYNOS: add secure firmware support to AFTR mode code
+       ARM: EXYNOS: fix register setup for AFTR mode code
+       ARM: EXYNOS: allow driver usage on Exynos4x12 SoCs
+       ARM: EXYNOS: Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
+
+Krzysztof Kozlowski (1):
+       ARM: EXYNOS: SWRESET is needed to boot secondary CPU on exynos3250
+
+Tomasz Figa (2):
+       ARM: firmware: Introduce suspend and resume operations
+       ARM: EXYNOS: Add support for firmware-assisted suspend/resume
+
+  Documentation/arm/firmware.txt         |  28 +--
+  arch/arm/include/asm/firmware.h        |  10 +-
+  arch/arm/mach-exynos/Kconfig           |   5 +
+  arch/arm/mach-exynos/Makefile          |   6 +-
+  arch/arm/mach-exynos/common.h          |  13 ++
+  arch/arm/mach-exynos/exynos.c          |   5 +-
+  arch/arm/mach-exynos/firmware.c        |  65 +++++-
+  arch/arm/mach-exynos/platsmp.c         |  23 ++
+  arch/arm/mach-exynos/pm.c              | 388 
+++++-----------------------------
+  arch/arm/mach-exynos/regs-pmu.h        |   2 +
+  arch/arm/mach-exynos/sleep.S           |  28 +++
+  arch/arm/mach-exynos/smc.h             |   4 +
+  arch/arm/mach-exynos/suspend.c         | 356 
+++++++++++++++++++++++++++++++
+  arch/arm/mach-tegra/cpuidle-tegra114.c |   2 +-
+  arch/arm/plat-samsung/Makefile         |   1 +
+  15 files changed, 557 insertions(+), 379 deletions(-)
+  create mode 100644 arch/arm/mach-exynos/suspend.c
