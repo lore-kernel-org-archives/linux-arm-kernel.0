@@ -1,70 +1,93 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 25 Sep 2014 18:05:33 +0300
-Subject: [RFC PATCH 0/4]  ARM: keystone: pm: switch to use generic pm domains
-Message-ID: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
+Date: Thu, 25 Sep 2014 18:05:36 +0300
+Subject: [RFC PATCH 3/4] ARM: keystone: pm: remove unused clk pm domain code
+In-Reply-To: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
+References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1411657537-25238-4-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh, Kevin,
+Remove unused CLK PM domain code, since Keystone 2 PM
+has been switched to use Generic PM domain framework.
 
-This serie is just another try to enable Runtime PM for Keystone 2.
-It switches Keystone 2 PM code to use Generic PM domains
-instead of PM  clock domains because of the lack of DT support
-for the last.
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/mach-keystone/pm_domain.c | 57 --------------------------------------
+ 1 file changed, 57 deletions(-)
 
-
-Keystone 2 PM domain should be specified per device for which
-Runtime PM has to be enabled and handles the list of functional clocks
-to enable/disable device.
-
-Example:
- qmss_domain: qmss_pm_controller {
-	compatible = "ti,keystone-pm-controller";
-	clocks = <&chipclk13>;
-	#power-domain-cells = <0>;
- };
-
- qmss: qmss at 2a40000 {
-	compatible = "ti,keystone-navigator-qmss";
-	...
-	power-domains = <&qmss_domain>;
-
-Thanks for your comments!
-
-PS: patch 1 was reused from [1].
-Patch 4 is added to illustrate Keystone 2 PM doamins configuration in DT.
-
-Based on:
-- "[PATCH v5 00/11] PM / Domains: Generic OF-based support"
-  http://www.spinics.net/lists/devicetree/msg49962.html
-
-Links on related discussion:
-[1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
-  https://lkml.org/lkml/2014/4/24/1118
-
-[2] "[RFC PATCH 0/2] use named clocks list to register clocks for PM clock domain"
-  https://lkml.org/lkml/2014/6/12/436
-
-[3] "[RFC PATCH 0/3] PM / clock_ops: allow to specify custom pm_clk_notifier callback"
-  https://lkml.org/lkml/2014/7/25/630
-
-
-Geert Uytterhoeven (1):
-  PM / clock_ops: Add pm_clk_add_clk()
-
-Grygorii Strashko (3):
-  ARM: keystone: pm: switch to use generic pm domains
-  ARM: keystone: pm: remove unused clk pm domain code
-  ARM: dts: k2hk-evm: add pm domains for net, qmss and knav_dmas
-
- .../devicetree/bindings/power/ti,keystone-gpc.txt  |  37 ++++++
- arch/arm/boot/dts/k2hk-evm.dts                     |  31 +++++
- arch/arm/mach-keystone/Kconfig                     |   1 +
- arch/arm/mach-keystone/pm_domain.c                 | 136 +++++++++++++++------
- drivers/base/power/clock_ops.c                     |  41 +++++--
- include/linux/pm_clock.h                           |   8 ++
- 6 files changed, 206 insertions(+), 48 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
-
+diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
+index 3cf6696..8a70caa 100644
+--- a/arch/arm/mach-keystone/pm_domain.c
++++ b/arch/arm/mach-keystone/pm_domain.c
+@@ -21,53 +21,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ 
+-#ifdef CONFIG_PM_RUNTIME
+-
+-static int keystone_pm_runtime_suspend(struct device *dev)
+-{
+-	int ret;
+-
+-	dev_dbg(dev, "%s\n", __func__);
+-
+-	ret = pm_generic_runtime_suspend(dev);
+-	if (ret)
+-		return ret;
+-
+-	ret = pm_clk_suspend(dev);
+-	if (ret) {
+-		pm_generic_runtime_resume(dev);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-
+-static int keystone_pm_runtime_resume(struct device *dev)
+-{
+-	dev_dbg(dev, "%s\n", __func__);
+-
+-	pm_clk_resume(dev);
+-
+-	return pm_generic_runtime_resume(dev);
+-}
+-#endif
+-
+-static struct dev_pm_domain keystone_pm_domain = {
+-	.ops = {
+-		SET_RUNTIME_PM_OPS(keystone_pm_runtime_suspend,
+-				   keystone_pm_runtime_resume, NULL)
+-		USE_PLATFORM_PM_SLEEP_OPS
+-	},
+-};
+-
+-static struct pm_clk_notifier_block platform_domain_notifier = {
+-	.pm_domain = &keystone_pm_domain,
+-};
+-
+-static struct of_device_id of_keystone_table[] = {
+-	{.compatible = "ti,keystone"},
+-	{ /* end of list */ },
+-};
+ 
+ #ifdef CONFIG_PM_GENERIC_DOMAINS
+ 
+@@ -183,15 +136,5 @@ static int __init keystone_pm_domain_init(void) { return 0; }
+ 
+ int __init keystone_pm_runtime_init(void)
+ {
+-	struct device_node *np;
+-
+-	np = of_find_matching_node(NULL, of_keystone_table);
+-	if (!np)
+-		return 0;
+-
+-	/* TODO: remove clock_ops code
+-	 * pm_clk_add_notifier(&platform_bus_type, &platform_domain_notifier);
+-	 */
+-
+ 	return keystone_pm_domain_init();
+ }
 -- 
 1.9.1
