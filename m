@@ -1,102 +1,91 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 24 Sep 2014 23:17:11 -0400
-Subject: [PATCH] [RFC] Using hierarchy irqdomian to implement MTK intpol.
-In-Reply-To: <54238645.8090502@linux.intel.com>
-References: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1411611417.21763.56.camel@mtksdaap41>
- <54238645.8090502@linux.intel.com>
-Message-ID: <20140925031711.GV23926@titan.lakedaemon.net>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 25 Sep 2014 10:13:53 +0800
+Subject: [PATCH v1] rtc: snvs: add poweroff function
+Message-ID: <1411611233-29919-1-git-send-email-b38343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 11:04:37AM +0800, Jiang Liu wrote:
-> Hi Joe,
-> 	Thanks, I will merge them into my next version.
-> Regards!
-> Gerry
-> 
-> On 2014/9/25 10:16, Joe.C wrote:
-> > 
-> > Jiang,
-> > 
-> > Please consider merge the following 2 changes into your next round.
+On i.mx6 chips, PMIC_ON_REQ can be pulled by snvs LPCR. That can be
+used poweroff system if PMIC_ON_REQ connected with external PMIC or
+power control circuit.Power up again if PMIC_ON_REQ pulled high.
 
-ummm.  I'm confused.  I'll admit I'm a bit liquored up atm, but it looks
-like "Joe C." posted a patch 'From: Joe C.', and 'Signed-off-by: Joe C.'.
-_Then_, Joe C. replied to himself and asked someone *else* to merge the
-below changes into the originally posted patch.  The real kicker is that
-someone responded and said they would do it. (?!)
+Signed-off-by: Robin Gong <b38343@freescale.com>
+---
+ Documentation/devicetree/bindings/crypto/fsl-sec4.txt |  4 ++++
+ drivers/rtc/rtc-snvs.c                                | 18 ++++++++++++++++++
+ 2 files changed, 22 insertions(+)
 
-Please tell me the scotch is making this look more fucked up than it
-really is...
-
-Also, if Joe.C could please fix his mailer and git config to produce a
-complete, correct name, that would be appreciated.
-
-thx,
-
-Jason.
-
-> > On Thu, 2014-09-25 at 00:04 +0800, Joe.C wrote:
-> >> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> >> index e285f3a..01e852b 100644
-> >> --- a/kernel/irq/irqdomain.c
-> >> +++ b/kernel/irq/irqdomain.c
-> >> @@ -467,7 +467,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
-> >>  	struct irq_domain *domain;
-> >>  	irq_hw_number_t hwirq;
-> >>  	unsigned int type = IRQ_TYPE_NONE;
-> >> -	unsigned int virq;
-> >> +	int virq;
-> >>  
-> >>  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
-> >>  	if (!domain) {
-> >> @@ -493,8 +493,8 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
-> >>  	else
-> >>  #endif
-> >>  		virq = irq_create_mapping(domain, hwirq);
-> >> -	if (!virq)
-> >> -		return virq;
-> >> +	if (virq <= 0)
-> >> +		return 0;
-> >>  
-> >>  	/* Set type if specified and different than the current one */
-> >>  	if (type != IRQ_TYPE_NONE &&
-> > 
-> > irq_of_parse_and_map()/of_irq_to_resource() expect
-> > irq_create_of_mapping() to return 0 when fail. Return error code will
-> > cause of_irq_to_resource crash.
-> > 
-> > 
-> >> @@ -716,20 +716,20 @@ const struct irq_domain_ops irq_domain_simple_ops = {
-> >>  };
-> >>  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
-> >>  
-> >> -static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
-> >> +static int irq_domain_alloc_descs(int virq, unsigned int cnt,
-> >>  				  irq_hw_number_t hwirq, int node)
-> >>  {
-> >>  	unsigned int hint;
-> >>  
-> >>  	if (virq >= 0) {
-> >> -		virq = irq_alloc_descs(virq, virq, nr_irqs, node);
-> >> +		virq = irq_alloc_descs(virq, virq, cnt, node);
-> >>  	} else {
-> >>  		hint = hwirq % nr_irqs;
-> >>  		if (hint == 0)
-> >>  			hint++;
-> >> -		virq = irq_alloc_descs_from(hint, nr_irqs, node);
-> >> +		virq = irq_alloc_descs_from(hint, cnt, node);
-> >>  		if (virq <= 0 && hint > 1)
-> >> -			virq = irq_alloc_descs_from(1, nr_irqs, node);
-> >> +			virq = irq_alloc_descs_from(1, cnt, node);
-> >>  	}
-> >>  
-> >>  	return virq;
-> > 
-> > This come from irq_create_mapping(), the original code is using global
-> > nr_irqs. Change to match original behavior.
-> > 
-> > Joe.C
-> > 
-> > 
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+index e402277..00d67f2 100644
+--- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
++++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+@@ -363,11 +363,15 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
+       Value type: <prop-encoded-array>
+       Definition: A standard property.  Specifies the physical
+           address and length of the SNVS LP configuration registers.
++  - fsl,poweroff
++      Usage: opertional, recommend if PMIC_ON_REQ connected with external
++	PMIC or power control circuit.
+ 
+ EXAMPLE
+ 	sec_mon_rtc_lp at 314000 {
+ 		compatible = "fsl,sec-v4.0-mon-rtc-lp";
+ 		reg = <0x34 0x58>;
++		fsl,poweroff;
+ 	};
+ 
+ =====================================================================
+diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+index fa384fe..ef32541 100644
+--- a/drivers/rtc/rtc-snvs.c
++++ b/drivers/rtc/rtc-snvs.c
+@@ -29,6 +29,8 @@
+ #define SNVS_LPCR_SRTC_ENV	(1 << 0)
+ #define SNVS_LPCR_LPTA_EN	(1 << 1)
+ #define SNVS_LPCR_LPWUI_EN	(1 << 3)
++#define SNVS_LPCR_DP		(1 << 5)
++#define SNVS_LPCR_TOP		(1 << 6)
+ #define SNVS_LPSR_LPTA		(1 << 0)
+ 
+ #define SNVS_LPPGDR_INIT	0x41736166
+@@ -41,6 +43,8 @@ struct snvs_rtc_data {
+ 	spinlock_t lock;
+ };
+ 
++static void __iomem *snvs_base;
++
+ static u32 rtc_read_lp_counter(void __iomem *ioaddr)
+ {
+ 	u64 read1, read2;
+@@ -241,8 +245,17 @@ static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
+ 	return events ? IRQ_HANDLED : IRQ_NONE;
+ }
+ 
++static void snvs_poweroff(void)
++{
++	u32 value;
++
++	value = readl(snvs_base + SNVS_LPCR);
++	writel(value | SNVS_LPCR_DP | SNVS_LPCR_TOP, snvs_base + SNVS_LPCR);
++}
++
+ static int snvs_rtc_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	struct snvs_rtc_data *data;
+ 	struct resource *res;
+ 	int ret;
+@@ -260,6 +273,11 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+ 	if (data->irq < 0)
+ 		return data->irq;
+ 
++	if (np && of_get_property(np, "fsl,poweroff", NULL)) {
++		snvs_base = data->ioaddr;
++		pm_power_off = snvs_poweroff;
++	}
++
+ 	platform_set_drvdata(pdev, data);
+ 
+ 	spin_lock_init(&data->lock);
+-- 
+1.9.1
