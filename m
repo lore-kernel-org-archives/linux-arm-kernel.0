@@ -1,64 +1,107 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 25 Sep 2014 15:02:08 +0530
-Subject: [PATCH v2 3/4] rtc: omap: Update Kconfig for OMAP RTC
+Date: Thu, 25 Sep 2014 15:02:09 +0530
+Subject: [PATCH v2 4/4] rtc: omap: Support regulator supply for RTC
 In-Reply-To: <1411637529-18289-1-git-send-email-lokeshvutla@ti.com>
 References: <1411637529-18289-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1411637529-18289-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1411637529-18289-5-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <t-kristo@ti.com>
-
-RTC is present in AM43xx and DRA7xx also. Updating the
-same in Kconfig.
+On some Soc's RTC is powered by an external power regulator.
+e.g. RTC on DRA7 SoC. Make the OMAP RTC driver support a
+power regulator.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
 Changes since v1:
-	- New patch
- drivers/rtc/Kconfig    | 6 +++---
- drivers/rtc/rtc-omap.c | 4 ++--
- 2 files changed, 5 insertions(+), 5 deletions(-)
+	- Separated probe deferral supporting into a new patch.
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |  3 +++
+ drivers/rtc/rtc-omap.c                             | 24 ++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index a168e96..b092e2f 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -971,11 +971,11 @@ config RTC_DRV_IMXDI
- 	   will be called "rtc-imxdi".
+diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+index 5a0f02d..c67a775 100644
+--- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
++++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+@@ -10,6 +10,9 @@ Required properties:
+ - interrupts: rtc timer, alarm interrupts in order
+ - interrupt-parent: phandle for the interrupt controller
  
- config RTC_DRV_OMAP
--	tristate "TI OMAP1"
--	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
-+	tristate "TI OMAP Real Time Clock"
-+	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX || SOC_DRA7XX || SOC_AM43XX
- 	help
- 	  Say "yes" here to support the on chip real time clock
--	  present on TI OMAP1, AM33xx and DA8xx/OMAP-L13x.
-+	  present on TI OMAP1, AM33xx, DA8xx/OMAP-L13x, AM43xx and DRA7xx.
++Optional Properties:
++- rtc-supply : phandle to the regulator device tree node if needed
++
+ Example:
  
- 	  This driver can also be built as a module, if so, module
- 	  will be called rtc-omap.
+ rtc at 1c23000 {
 diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index 93c5424..f28f1fd 100644
+index f28f1fd..8a8df2b 100644
 --- a/drivers/rtc/rtc-omap.c
 +++ b/drivers/rtc/rtc-omap.c
-@@ -1,5 +1,5 @@
- /*
-- * TI OMAP1 Real Time Clock interface for Linux
-+ * TI OMAP Real Time Clock interface for Linux
-  *
-  * Copyright (C) 2003 MontaVista Software, Inc.
-  * Author: George G. Davis <gdavis@mvista.com> or <source@mvista.com>
-@@ -25,7 +25,7 @@
+@@ -24,6 +24,7 @@
+ #include <linux/of_device.h>
  #include <linux/pm_runtime.h>
  #include <linux/io.h>
++#include <linux/regulator/consumer.h>
  
--/* The OMAP1 RTC is a year/month/day/hours/minutes/seconds BCD clock
-+/* The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
+ /* The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
   * with century-range alarm matching, driven by the 32kHz clock.
-  *
-  * The main user-visible ways it differs from PC RTCs are by omitting
+@@ -124,6 +125,7 @@
+  * @device:		Device Pointer.
+  * pdata :		Copy of saved platform data.
+  * rtc_base :		Base address of memory-mapped IO registers.
++ * rtc_reg :		Pointer to RTC power regulator.
+  * rtc_alarm :		RTC alarm interrupt number.
+  * rtc_timer :		RTC timer interrupt number.
+  * irq_stat :		Copy of Interrupt status register.
+@@ -133,6 +135,7 @@ struct rtc_omap_dev {
+ 	struct device		*dev;
+ 	unsigned long		pdata;
+ 	void __iomem		*rtc_base;
++	struct regulator	*rtc_reg;
+ 	u32			rtc_alarm;
+ 	u32			rtc_timer;
+ 	u8			irqstat;
+@@ -402,6 +405,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
+ 	struct resource		*res;
+ 	struct rtc_omap_dev	*rtc_omap;
+ 	u8			reg, new_ctrl;
++	int			ret;
+ 	const struct platform_device_id *id_entry;
+ 	const struct of_device_id *of_id;
+ 
+@@ -440,6 +444,23 @@ static int omap_rtc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(rtc_omap->rtc_base))
+ 		return PTR_ERR(rtc_omap->rtc_base);
+ 
++	rtc_omap->rtc_reg =  devm_regulator_get_optional(&pdev->dev, "rtc");
++	if (IS_ERR(rtc_omap->rtc_reg)) {
++		if (PTR_ERR(rtc_omap->rtc_reg) == -EPROBE_DEFER) {
++			dev_err(&pdev->dev, "regulator not ready, retry\n");
++			return -EPROBE_DEFER;
++		}
++		rtc_omap->rtc_reg = NULL;
++	}
++
++	if (rtc_omap->rtc_reg) {
++		ret = regulator_enable(rtc_omap->rtc_reg);
++		if (ret) {
++			dev_dbg(&pdev->dev, "regulator enable failed\n");
++			return ret;
++		}
++	}
++
+ 	/* Enable the clock/module so that we can access the registers */
+ 	pm_runtime_enable(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+@@ -549,6 +570,9 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
+ 	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
++	if (rtc_omap->rtc_reg)
++		regulator_disable(rtc_omap->rtc_reg);
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
