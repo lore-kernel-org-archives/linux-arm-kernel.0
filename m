@@ -1,114 +1,81 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:19 +0800
-Subject: [PATCH v2 09/22] x86/xen/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-10-git-send-email-wangyijing@huawei.com>
+Date: Thu, 25 Sep 2014 11:14:10 +0800
+Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X in all
+ platforms
+Message-ID: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+This series is based Bjorn's pci/msi branch
+git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/msi
 
-Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Acked-by: David Vrabel <david.vrabel@citrix.com>
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
----
- arch/x86/pci/xen.c |   46 ++++++++++++++++++++++++++++++----------------
- 1 files changed, 30 insertions(+), 16 deletions(-)
+Currently, there are a lot of weak arch functions in MSI code.
+Thierry Reding Introduced MSI chip framework to configure MSI/MSI-X in arm.
+This series use MSI chip framework to refactor MSI code across all platforms
+to eliminate weak arch functions. Then all MSI irqs will be managed in a 
+unified framework. Because this series changed a lot of ARCH MSI code,
+so tests in the platforms which MSI code modified are warmly welcomed!
 
-diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
-index 84c2fce..e669ee4 100644
---- a/arch/x86/pci/xen.c
-+++ b/arch/x86/pci/xen.c
-@@ -376,6 +376,11 @@ static void xen_initdom_restore_msi_irqs(struct pci_dev *dev)
- }
- #endif
- 
-+static void xen_teardown_msi_irq(unsigned int irq)
-+{
-+	xen_destroy_irq(irq);
-+}
-+
- static void xen_teardown_msi_irqs(struct pci_dev *dev)
- {
- 	struct msi_desc *msidesc;
-@@ -385,19 +390,26 @@ static void xen_teardown_msi_irqs(struct pci_dev *dev)
- 		xen_pci_frontend_disable_msix(dev);
- 	else
- 		xen_pci_frontend_disable_msi(dev);
--
--	/* Free the IRQ's and the msidesc using the generic code. */
--	default_teardown_msi_irqs(dev);
--}
--
--static void xen_teardown_msi_irq(unsigned int irq)
--{
--	xen_destroy_irq(irq);
-+	
-+	list_for_each_entry(msidesc, &dev->msi_list, list) {
-+		int i, nvec;
-+		if (msidesc->irq == 0)
-+			continue;
-+		if (msidesc->nvec_used)
-+			nvec = msidesc->nvec_used;
-+		else
-+			nvec = 1 << msidesc->msi_attrib.multiple;
-+		for (i = 0; i < nvec; i++)
-+			xen_teardown_msi_irq(msidesc->irq + i);
-+	}
- }
- 
- void xen_nop_msi_mask(struct irq_data *data)
- {
- }
-+
-+struct msi_chip xen_msi_chip;
-+
- #endif
- 
- int __init pci_xen_init(void)
-@@ -418,9 +430,9 @@ int __init pci_xen_init(void)
- #endif
- 
- #ifdef CONFIG_PCI_MSI
--	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
--	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
--	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
-+	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
-+	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
-+	x86_msi_chip = &xen_msi_chip;
- 	msi_chip.irq_mask = xen_nop_msi_mask;
- 	msi_chip.irq_unmask = xen_nop_msi_mask;
- #endif
-@@ -441,8 +453,9 @@ int __init pci_xen_hvm_init(void)
- #endif
- 
- #ifdef CONFIG_PCI_MSI
--	x86_msi.setup_msi_irqs = xen_hvm_setup_msi_irqs;
--	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
-+	xen_msi_chip.setup_irqs = xen_hvm_setup_msi_irqs;
-+	xen_msi_chip.teardown_irq = xen_teardown_msi_irq;
-+	x86_msi_chip = &xen_msi_chip;
- #endif
- 	return 0;
- }
-@@ -499,9 +512,10 @@ int __init pci_xen_initial_domain(void)
- 	int irq;
- 
- #ifdef CONFIG_PCI_MSI
--	x86_msi.setup_msi_irqs = xen_initdom_setup_msi_irqs;
--	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
--	x86_msi.restore_msi_irqs = xen_initdom_restore_msi_irqs;
-+	xen_msi_chip.setup_irqs = xen_initdom_setup_msi_irqs;
-+	xen_msi_chip.teardown_irq = xen_teardown_msi_irq;
-+	xen_msi_chip.restore_irqs = xen_initdom_restore_msi_irqs;
-+	x86_msi_chip = &xen_msi_chip;
- 	msi_chip.irq_mask = xen_nop_msi_mask;
- 	msi_chip.irq_unmask = xen_nop_msi_mask;
- #endif
--- 
-1.7.1
+v1->v2:
+Add a patch to make s390 MSI code build happy between patch "x86/xen/MSI: E.."
+and "s390/MSI: Use MSI..". Fix several typo problems found by Lucas.
+
+RFC->v1: 
+Updated "[patch 4/21] x86/xen/MSI: Eliminate...", export msi_chip instead
+of #ifdef to fix MSI bug in xen running in x86. 
+Rename arch_get_match_msi_chip() to arch_find_msi_chip().
+Drop use struct device as the msi_chip argument, we will do that
+later in another patchset.
+
+Yijing Wang (22):
+  PCI/MSI: Clean up struct msi_chip argument
+  PCI/MSI: Remove useless bus->msi assignment
+  MSI: Remove the redundant irq_set_chip_data()
+  x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()
+  s390/MSI: Use __msi_mask_irq() instead of default_msi_mask_irq()
+  PCI/MSI: Introduce weak arch_find_msi_chip() to find MSI chip
+  PCI/MSI: Refactor struct msi_chip to make it become more common
+  x86/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  x86/xen/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  Irq_remapping/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  x86/MSI: Remove unused MSI weak arch functions
+  MIPS/Octeon/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  MIPS/Xlp: Remove the dead function destroy_irq() to fix build error
+  MIPS/Xlp/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  MIPS/Xlr/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  Powerpc/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  s390/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  arm/iop13xx/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  IA64/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  Sparc/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  tile/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  PCI/MSI: Clean up unused MSI arch functions
+
+ arch/arm/mach-iop13xx/include/mach/pci.h |    2 +
+ arch/arm/mach-iop13xx/iq81340mc.c        |    1 +
+ arch/arm/mach-iop13xx/iq81340sc.c        |    1 +
+ arch/arm/mach-iop13xx/msi.c              |    9 ++-
+ arch/arm/mach-iop13xx/pci.c              |    6 ++
+ arch/ia64/kernel/msi_ia64.c              |   18 ++++-
+ arch/mips/pci/msi-octeon.c               |   35 ++++++----
+ arch/mips/pci/msi-xlp.c                  |   18 ++++--
+ arch/mips/pci/pci-xlr.c                  |   15 ++++-
+ arch/powerpc/kernel/msi.c                |   14 +++-
+ arch/s390/pci/pci.c                      |   18 ++++-
+ arch/sparc/kernel/pci.c                  |   14 +++-
+ arch/tile/kernel/pci_gx.c                |   14 +++-
+ arch/x86/include/asm/apic.h              |    4 +
+ arch/x86/include/asm/pci.h               |    4 +-
+ arch/x86/include/asm/x86_init.h          |    7 --
+ arch/x86/kernel/apic/io_apic.c           |   16 ++++-
+ arch/x86/kernel/x86_init.c               |   34 ---------
+ arch/x86/pci/xen.c                       |   60 +++++++++-------
+ drivers/iommu/irq_remapping.c            |    9 ++-
+ drivers/irqchip/irq-armada-370-xp.c      |    8 +--
+ drivers/pci/host/pci-tegra.c             |    8 ++-
+ drivers/pci/host/pcie-designware.c       |    4 +-
+ drivers/pci/host/pcie-rcar.c             |    8 ++-
+ drivers/pci/msi.c                        |  114 ++++++++++++++----------------
+ drivers/pci/probe.c                      |    1 -
+ include/linux/msi.h                      |   26 ++-----
+ 27 files changed, 266 insertions(+), 202 deletions(-)
