@@ -1,108 +1,70 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 25 Sep 2014 18:05:37 +0300
-Subject: [RFC PATCH 4/4] ARM: dts: k2hk-evm: add pm domains for net,
- qmss and knav_dmas
-In-Reply-To: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
-References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1411657537-25238-5-git-send-email-grygorii.strashko@ti.com>
+Date: Thu, 25 Sep 2014 18:05:33 +0300
+Subject: [RFC PATCH 0/4]  ARM: keystone: pm: switch to use generic pm domains
+Message-ID: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Keystone PM domains nodes for NetCP, NetCPx, QMSS, KNAV-DMA
-devices.
+Hi Santosh, Kevin,
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2hk-evm.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+This serie is just another try to enable Runtime PM for Keystone 2.
+It switches Keystone 2 PM code to use Generic PM domains
+instead of PM  clock domains because of the lack of DT support
+for the last.
 
-diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-index 91371f7..a7b468c 100644
---- a/arch/arm/boot/dts/k2hk-evm.dts
-+++ b/arch/arm/boot/dts/k2hk-evm.dts
-@@ -58,6 +58,13 @@
- 				clock-output-names = "refclk-ddr3b";
- 			};
- 		};
-+
-+		qmss_domain: qmss_pm_controller {
-+			compatible = "ti,keystone-gpc";
-+			clocks = <&chipclk13>;
-+			#power-domain-cells = <0>;
-+		};
-+
- 		qmss: qmss at 2a40000 {
- 			compatible = "ti,keystone-navigator-qmss";
- 			dma-coherent;
-@@ -65,6 +72,8 @@
- 			#size-cells = <1>;
- 			clocks = <&chipclk13>;
- 			ranges;
-+			power-domains = <&qmss_domain>;
-+
- 			queue-range	= <0 0x4000>;
- 			linkram0	= <0x100000 0x8000>;
- 			linkram1	= <0x0 0x10000>;
-@@ -192,12 +201,20 @@
- 			};
- 		}; /* qmss */
- 
-+		knav_dmas_domain: knav_dmas_pm_controller {
-+			compatible = "ti,keystone-gpc";
-+			clocks = <&clkpa>, <&clkxge>;
-+			#power-domain-cells = <0>;
-+		};
-+
- 		knav_dmas: knav_dmas at 0 {
- 			compatible = "ti,keystone-navigator-dma";
- 			clocks = <&clkpa>, <&clkxge>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			power-domains = <&knav_dmas_domain>;
-+
- 			ti,navigator-cloud-address = <0x23a80000 0x23a90000
- 						   0x23aa0000 0x23ab0000>;
- 
-@@ -222,6 +239,12 @@
- 			};
- 		};
- 
-+		netcp_domain: netcp_pm_controller {
-+			compatible = "ti,keystone-gpc";
-+			clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
-+			#power-domain-cells = <0>;
-+		};
-+
- 		netcp: netcp at 2090000 {
- 			reg = <0x2620110 0x8>;
- 			reg-names = "efuse";
-@@ -229,6 +252,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			power-domains = <&netcp_domain>;
- 
- 			clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
- 			dma-coherent;
-@@ -302,11 +326,18 @@
- 			};
- 		};
- 
-+		netcpx_domain: netcpx_pm_controller {
-+			compatible = "ti,keystone-gpc";
-+			clocks = <&clkxge>;
-+			#power-domain-cells = <0>;
-+		};
-+
- 		netcpx: netcpx at 2f00000 {
- 			compatible = "ti,netcp-1.0";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			power-domains = <&netcpx_domain>;
- 
- 			clocks = <&clkxge>;
- 			clock-names = "clk_xge";
+
+Keystone 2 PM domain should be specified per device for which
+Runtime PM has to be enabled and handles the list of functional clocks
+to enable/disable device.
+
+Example:
+ qmss_domain: qmss_pm_controller {
+	compatible = "ti,keystone-pm-controller";
+	clocks = <&chipclk13>;
+	#power-domain-cells = <0>;
+ };
+
+ qmss: qmss at 2a40000 {
+	compatible = "ti,keystone-navigator-qmss";
+	...
+	power-domains = <&qmss_domain>;
+
+Thanks for your comments!
+
+PS: patch 1 was reused from [1].
+Patch 4 is added to illustrate Keystone 2 PM doamins configuration in DT.
+
+Based on:
+- "[PATCH v5 00/11] PM / Domains: Generic OF-based support"
+  http://www.spinics.net/lists/devicetree/msg49962.html
+
+Links on related discussion:
+[1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+  https://lkml.org/lkml/2014/4/24/1118
+
+[2] "[RFC PATCH 0/2] use named clocks list to register clocks for PM clock domain"
+  https://lkml.org/lkml/2014/6/12/436
+
+[3] "[RFC PATCH 0/3] PM / clock_ops: allow to specify custom pm_clk_notifier callback"
+  https://lkml.org/lkml/2014/7/25/630
+
+
+Geert Uytterhoeven (1):
+  PM / clock_ops: Add pm_clk_add_clk()
+
+Grygorii Strashko (3):
+  ARM: keystone: pm: switch to use generic pm domains
+  ARM: keystone: pm: remove unused clk pm domain code
+  ARM: dts: k2hk-evm: add pm domains for net, qmss and knav_dmas
+
+ .../devicetree/bindings/power/ti,keystone-gpc.txt  |  37 ++++++
+ arch/arm/boot/dts/k2hk-evm.dts                     |  31 +++++
+ arch/arm/mach-keystone/Kconfig                     |   1 +
+ arch/arm/mach-keystone/pm_domain.c                 | 136 +++++++++++++++------
+ drivers/base/power/clock_ops.c                     |  41 +++++--
+ include/linux/pm_clock.h                           |   8 ++
+ 6 files changed, 206 insertions(+), 48 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
+
 -- 
 1.9.1
