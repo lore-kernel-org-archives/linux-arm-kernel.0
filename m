@@ -1,49 +1,65 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 25 Sep 2014 15:50:15 +0800
-Subject: [PATCH 2/2] ARM: vf610: Use ARM Global Timer as clocksource
-In-Reply-To: <1410437175-6636-2-git-send-email-stefan@agner.ch>
-References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
- <1410437175-6636-2-git-send-email-stefan@agner.ch>
-Message-ID: <20140925075013.GD6405@dragon>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 25 Sep 2014 15:48:47 +0800
+Subject: [PATCH v3 3/3] clk: rockchip: add clock node in PD_VIDEO
+In-Reply-To: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
+References: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1411631328-14973-4-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 02:06:15PM +0200, Stefan Agner wrote:
-> Use ARM Global Timer as clocksource instead of the PIT timer. This
-> leaves the PIT timer for other users e.g. the secondary Cortex-M4
-> core. Also, the Global Timer has double the precission (running at
-> pheripheral clock compared to IPG clock) and a 64-bit incrementing
-> counter register.
+This patch add the clock node in PD_VIDEO
 
-I just think of one thing.  Will this change cause a problem of the low
-power idle support in case we want to power down ARM core in there?
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
 
-Shawn
+Changes in v3:
+- add a fix factor
+- introduce a virtual node to implement the clock struct
 
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Theoretically we could remove the PIT driver now. But we could also
-> enable both drivers, but is having two clock source useful for the
-> Kernel at all?
-> 
->  arch/arm/mach-imx/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 64161aa..adc77180 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -656,7 +656,8 @@ config SOC_VF610
->  	bool "Vybrid Family VF610 support"
->  	select ARM_GIC
->  	select PINCTRL_VF610
-> -	select VF_PIT_TIMER
-> +	select ARM_GLOBAL_TIMER
-> +	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->  	select PL310_ERRATA_769419 if CACHE_L2X0
->  
->  	help
-> -- 
-> 2.1.0
-> 
+Changes in v2:
+- split out the patch
+
+ drivers/clk/rockchip/clk-rk3288.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index dd204cb..d466814 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -296,6 +296,20 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
+ 			RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 11, GFLAGS),
++	/*
++	 * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
++	 * so we ignore the mux and make clocks nodes as following,
++	 */
++	GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
++		RK3288_CLKGATE_CON(9), 0, GFLAGS),
++	/*
++	 * We introduce a virtul node of hclk_vodec_pre_v to split one clock
++	 * sturct with a gate and a fix divider into two node in software.
++	 */
++	GATE(0, "hclk_vcodec_pre_v", "aclk_vdpu", 0,
++		RK3288_CLKGATE_CON(3), 10, GFLAGS),
++	GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
++		RK3288_CLKGATE_CON(9), 1, GFLAGS),
+ 
+ 	COMPOSITE(0, "aclk_vio0", mux_pll_src_cpll_gpll_usb480m_p, 0,
+ 			RK3288_CLKSEL_CON(31), 6, 2, MFLAGS, 0, 5, DFLAGS,
+@@ -711,6 +725,12 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 		pr_warn("%s: could not register clock usb480m: %ld\n",
+ 			__func__, PTR_ERR(clk));
+ 
++	clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
++					"hclk_vcodec_pre_v", 0, 1, 4);
++	if (IS_ERR(clk))
++		pr_warn("%s: could not register clock hclk_vcodec_pre: %ld\n",
++			__func__, PTR_ERR(clk));
++
+ 	rockchip_clk_register_plls(rk3288_pll_clks,
+ 				   ARRAY_SIZE(rk3288_pll_clks),
+ 				   RK3288_GRF_SOC_STATUS);
+-- 
+1.9.1
