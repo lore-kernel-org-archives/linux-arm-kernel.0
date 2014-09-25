@@ -1,73 +1,53 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 25 Sep 2014 18:37:08 +0200
-Subject: [PATCH v3 4/5] ARM: dts: vf610: use new GPIO support
-In-Reply-To: <cover.1411662961.git.stefan@agner.ch>
-References: <cover.1411662961.git.stefan@agner.ch>
-Message-ID: <590a5fbc4f8b552355a93c1002041765352cd1c3.1411662961.git.stefan@agner.ch>
+Date: Thu, 25 Sep 2014 18:37:04 +0200
+Subject: [PATCH v3 0/5] vf610: Add GPIO support
+Message-ID: <cover.1411662961.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use GPIO support by adding SD card detection configuration and
-GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
-pins to the iomuxc node to get the GPIO pin settings applied.
+This 3rd version of the GPIO support for Vybrid now also includes
+the wakeup support which was part of the suspend/resume patchset
+I sent earlier this week.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf610-colibri.dtsi | 9 +++++++++
- arch/arm/boot/dts/vf610-twr.dts      | 1 +
- arch/arm/boot/dts/vf610.dtsi         | 1 +
- 3 files changed, 11 insertions(+)
+Changes in v3:
+- Configure the pin completely on imx_pmx_gpio_request_enable
+- Drop the GPIO_CONTROL flag in favor of using the existing
+  SHARE_MUX_CONF_REG flag
+- Extend GPIO driver to also include wakeup support
+- Cleanup includes in GPIO driver file
+- Add brackets in PORT_PCR define
+- Use platform_get_irq in favor of irq_of_parse_and_map
+- Use device_initcall instead of subsys_initicall
 
-diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-index 0cd8343..efd4322 100644
---- a/arch/arm/boot/dts/vf610-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-@@ -31,6 +31,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
-+	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
- };
- 
- &fec1 {
-@@ -71,6 +72,14 @@
- 
- &iomuxc {
- 	vf610-colibri {
-+		pinctrl_gpio_ext: gpio_ext {
-+			fsl,pins = <
-+				VF610_PAD_PTD10__GPIO_89	0x22ed /* EXT_IO_0 */
-+				VF610_PAD_PTD9__GPIO_88		0x22ed /* EXT_IO_1 */
-+				VF610_PAD_PTD26__GPIO_68	0x22ed /* EXT_IO_2 */
-+			>;
-+		};
-+
- 		pinctrl_esdhc1: esdhc1grp {
- 			fsl,pins = <
- 				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 189b697..3fe8a8f 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -116,6 +116,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_esdhc1>;
- 	bus-width = <4>;
-+	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 4d2ec32..467c97e 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -11,6 +11,7 @@
- #include "vf610-pinfunc.h"
- #include <dt-bindings/clock/vf610-clock.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	aliases {
+Changes in v2:
+- Use bit operations in GPIO driver
+- Use VF610_ prefix for GPIOS_PER_PORT define
+- Drop irq in drivers struct
+- Use arch/subsys_initicall for GPIO/pinctrl driver
+- Fix log message title
+- Add documentation for GPIO/PORT module bindings
+- Extended GPIO device tree bindings for Colibri VF61
+
+Stefan Agner (5):
+  pinctrl: imx: detect uninitialized pins
+  pinctrl: imx: add gpio pinmux support for vf610
+  gpio: vf610: add gpiolib/IRQ chip driver for Vybrid
+  ARM: dts: vf610: use new GPIO support
+  Documentation: dts: add bindings for Vybrid GPIO/PORT module
+
+ .../devicetree/bindings/gpio/gpio-vf610.txt        |  56 ++++
+ arch/arm/boot/dts/vf610-colibri.dtsi               |   9 +
+ arch/arm/boot/dts/vf610-twr.dts                    |   1 +
+ arch/arm/boot/dts/vf610.dtsi                       |   1 +
+ drivers/gpio/Kconfig                               |   7 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-vf610.c                          | 295 +++++++++++++++++++++
+ drivers/pinctrl/pinctrl-imx.c                      |  81 +++++-
+ drivers/pinctrl/pinctrl-imx.h                      |   7 +-
+ drivers/pinctrl/pinctrl-vf610.c                    |   2 +-
+ 10 files changed, 451 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+ create mode 100644 drivers/gpio/gpio-vf610.c
+
 -- 
 2.1.0
