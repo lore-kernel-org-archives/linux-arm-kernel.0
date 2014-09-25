@@ -1,44 +1,65 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 25 Sep 2014 19:15:25 +0200
-Subject: [PATCH v7 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <CAGm_ybh-R1GsHF-BRhRYQKkCpQFQSE6Mem=A3kz=H3Bemor9xA@mail.gmail.com>
-References: <1408625982-3267-1-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybh-R1GsHF-BRhRYQKkCpQFQSE6Mem=A3kz=H3Bemor9xA@mail.gmail.com>
-Message-ID: <CABxcv=kHwCCYhit20qO1q=Nn3KVj8U=8cpCu=DQRuy+R86N0kQ@mail.gmail.com>
+From: atull@opensource.altera.com (atull)
+Date: Thu, 25 Sep 2014 12:10:34 -0500
+Subject: [PATCH 2/2] socfpga: support suspend to ram
+In-Reply-To: <20140925082506.GC26991@pengutronix.de>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
+ <20140925082506.GC26991@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1409251200490.693@atx-linux-37>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Pankaj Dubey to cc list]
+Hi Steffen,
 
-Hello Vikas,
+On Thu, 25 Sep 2014, Steffen Trumtrar wrote:
 
-On Sun, Sep 14, 2014 at 4:57 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Hi All,
->
->
-> On Thu, Aug 21, 2014 at 6:29 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->> Rebased on
->> 1] Kukjin Kim's tree, master branch
->> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/
->> 2] Pankaj Dubey's v7 PMU patchset
->> https://lkml.org/lkml/2014/7/9/2
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/270655.html
+> Hi!
+> 
+> On Wed, Sep 24, 2014 at 03:27:29PM -0500, atull at opensource.altera.com wrote:
+> > From: Alan Tull <atull@opensource.altera.com>
+> > 
+> > Add code that requests that the sdr controller go into
+> > self-refresh mode.  This code is run from ocram.
+> > 
+> > This patch assumes that u-boot has already configured sdr:
+> >   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+> >   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+> >   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
+> > 
+> > How to suspend to ram:
+> >  $ echo enabled > \
+> > /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+> > 
+> >  $ echo -n mem > /sys/power/state
+> > 
+> 
+> (...)
+> 
+> Never looked into that, so maybe a stupid question:
+> What happens if the bootloader (u-boot or other) didn't configure the sdr?
+> Will it "just" not wake up again?
 
-The mentioned patches from the PMU series depend on the patch to
-decouple the syscon interface from syscon drivers. The latest version
-of that patch is Pankaj's "[PATCH v5] mfd: syscon: Decouple syscon
-interface from platform devices" [0].
+Waking up won't be the problem.  Linux won't boot.
 
-There is still an ongoing discussion about the implementation details
-since errors were reported (debugfs regmap dir failing to be created
-due a NULL device name) so this won't be a definite version.
+Alternatively, if this Linux kernel is paired with a version of the
+bootloader that does most of the initializion, but not the settings
+that we want here, I expect there could be issues.
 
-But I tested that patch on an Exynos5420 Peach Pit and it works so
-maybe Pankaj can re-spin his PMU series on top of his latest syscon
-patch so at least the dependencies for your series are sorted and
-people can try it?
+I don't want to duplicate the u-boot sdr configuration code, instead
+I document my assumptions here here.  For future generations who take
+this patch.  If they have a problem with s2r, they will look through
+the git logs and find this helpful note of what their bootloader
+was supposed to do.
 
-Best regards,
-Javier
+Alan
 
-[0]: https://patchwork.kernel.org/patch/4945481/
+> 
+> Regards,
+> Steffen
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
