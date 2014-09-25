@@ -1,25 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 17:29:50 +0200
-Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
-In-Reply-To: <8738bgrac4.fsf@free.fr>
-References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
- <20140924195556.GC5182@n2100.arm.linux.org.uk> <8738bgrac4.fsf@free.fr>
-Message-ID: <5404118.ZHaUHPZhhR@wuerfel>
+Date: Thu, 25 Sep 2014 17:38:36 +0200
+Subject: [GIT PULL] meson: basic support for MesonX SoCs
+In-Reply-To: <20140923195221.GA30267@nuc>
+References: <20140923195221.GA30267@nuc>
+Message-ID: <3795274.gkYSyS04CD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 September 2014 23:13:15 Robert Jarzmik wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > I don't have much interest in PXA anymore, and I don't think I've reviewed
-> > any PXA patches for a very long time, so I'm fine with this change.
-> >
-> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Tuesday 23 September 2014 21:52:21 Carlo Caione wrote:
+> Hi Arnd and Olof,
 > 
-> Thanks Russell.
+> Here the pull request to introduce preliminary support for MesonX SoCs.
+> It is based on the patchset at:
 > 
-> Arnd, I have my quorum of acks now. My earlier v2 patch was premature, therefore
-> I enclose here the v3, which should be my last.
+> http://www.spinics.net/lists/arm-kernel/msg362521.html
+> 
+> and it is based on the master of arm-soc tree.
+> 
 
-Applied to next/fixes-non-critical, thanks!
+Hi Carlo,
+
+I ended up cherry-picking the individual changes into next/fixes-non-critical,
+next/defconfig, next/dt and next/soc to fit our process better.
+
+In general, please split up pull requests according to the next/* topic
+branches we have in the arm-soc tree, as documented in 
+arch/arm/arm-soc-for-next-contents.txt (only in the for-next branch).
+
+More importantly, please base all changes on the most recent -rc1 release,
+or possibly a later -rc if you get conflicts otherwise.
+
+I know the process takes a little time to get used to ;-)
 
 	Arnd
