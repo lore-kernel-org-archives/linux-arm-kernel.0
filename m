@@ -1,65 +1,34 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 25 Sep 2014 15:48:47 +0800
-Subject: [PATCH v3 3/3] clk: rockchip: add clock node in PD_VIDEO
-In-Reply-To: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
-References: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1411631328-14973-4-git-send-email-kever.yang@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Sep 2014 09:51:35 +0200
+Subject: [PATCH] gpio: only enable kona driver on BCM_MOBILE or for
+ compile testing
+In-Reply-To: <20140924080625.GE3755@pengutronix.de>
+References: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CACRpkdZg5uoP5LurL5vOPCaKQu2B=neybuo=gwM_JT7UAhRkjg@mail.gmail.com>
+ <530FB808.5050802@broadcom.com>
+ <20140924080625.GE3755@pengutronix.de>
+Message-ID: <CACRpkdarku3XYSJ+-cUmd-FdK8sqd6=XBC6NJ9RL4V4hHh0vmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the clock node in PD_VIDEO
+On Wed, Sep 24, 2014 at 10:06 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Thu, Feb 27, 2014 at 02:11:20PM -0800, Markus Mayer wrote:
+>> On 14-02-27 01:16 AM, Linus Walleij wrote:
+>> >On Fri, Feb 21, 2014 at 2:42 PM, Uwe Kleine-K?nig
+>> ><u.kleine-koenig@pengutronix.de> wrote:
+>> >
+>> >>This change makes it easier to configure a kernel for a real machine by
+>> >>not showing the option to enable it at all if COMPILE_TEST is off.
+>> >>
+>> >>Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> >
+>> >Markus: can you ACK this patch?
+>>
+>> Acked-by: Markus Mayer <mmayer@broadcom.com>
+> ping!
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
+Patch applied with Markus' ACK!
 
-Changes in v3:
-- add a fix factor
-- introduce a virtual node to implement the clock struct
-
-Changes in v2:
-- split out the patch
-
- drivers/clk/rockchip/clk-rk3288.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index dd204cb..d466814 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -296,6 +296,20 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
- 			RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
- 			RK3288_CLKGATE_CON(3), 11, GFLAGS),
-+	/*
-+	 * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
-+	 * so we ignore the mux and make clocks nodes as following,
-+	 */
-+	GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
-+		RK3288_CLKGATE_CON(9), 0, GFLAGS),
-+	/*
-+	 * We introduce a virtul node of hclk_vodec_pre_v to split one clock
-+	 * sturct with a gate and a fix divider into two node in software.
-+	 */
-+	GATE(0, "hclk_vcodec_pre_v", "aclk_vdpu", 0,
-+		RK3288_CLKGATE_CON(3), 10, GFLAGS),
-+	GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
-+		RK3288_CLKGATE_CON(9), 1, GFLAGS),
- 
- 	COMPOSITE(0, "aclk_vio0", mux_pll_src_cpll_gpll_usb480m_p, 0,
- 			RK3288_CLKSEL_CON(31), 6, 2, MFLAGS, 0, 5, DFLAGS,
-@@ -711,6 +725,12 @@ static void __init rk3288_clk_init(struct device_node *np)
- 		pr_warn("%s: could not register clock usb480m: %ld\n",
- 			__func__, PTR_ERR(clk));
- 
-+	clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
-+					"hclk_vcodec_pre_v", 0, 1, 4);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock hclk_vcodec_pre: %ld\n",
-+			__func__, PTR_ERR(clk));
-+
- 	rockchip_clk_register_plls(rk3288_pll_clks,
- 				   ARRAY_SIZE(rk3288_pll_clks),
- 				   RK3288_GRF_SOC_STATUS);
--- 
-1.9.1
+Yours,
+Linus Walleij
