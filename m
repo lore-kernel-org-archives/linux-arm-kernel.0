@@ -1,29 +1,95 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 25 Sep 2014 14:01:35 -0500
-Subject: [PATCH v3 2/3] watchdog: qcom: document device tree bindings
-In-Reply-To: <20140925184314.GC12340@roeck-us.net>
-References: <cover.1411667144.git.joshc@codeaurora.org>
- <f49033de078aff9112fb8fa6fa4331e16998edf2.1411667144.git.joshc@codeaurora.org>
- <20140925184314.GC12340@roeck-us.net>
-Message-ID: <20140925190135.GK868@joshc.qualcomm.com>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Thu, 25 Sep 2014 15:08:42 -0400
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <1411671771.6001.208.camel@smoke>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140925182810.GB6303@redhat.com>
+ <1411671771.6001.208.camel@smoke>
+Message-ID: <20140925190842.GC5162@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 11:43:14AM -0700, Guenter Roeck wrote:
-> On Thu, Sep 25, 2014 at 12:48:52PM -0500, Josh Cartwright wrote:
-[..]
-> > +- timeout-sec : shall contain the default watchdog timeout in seconds,
-> > +                if unset, the default timeout is 30 seconds
+On Thu, Sep 25, 2014 at 12:02:51PM -0700, Geoff Levand wrote:
+> Hi Vivek,
 > 
-> Hi Josh,
+> On Thu, 2014-09-25 at 14:28 -0400, Vivek Goyal wrote:
+> > On Thu, Sep 25, 2014 at 12:23:27AM +0000, Geoff Levand wrote:
+> > [..]
+> > > +void machine_kexec(struct kimage *image)
+> > > +{
+> > > +	phys_addr_t reboot_code_buffer_phys;
+> > > +	void *reboot_code_buffer;
+> > > +
+> > > +	BUG_ON(num_online_cpus() > 1);
+> > > +
+> > > +	kexec_kimage_head = image->head;
+> > > +
+> > > +	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
+> > > +	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+> > > +
+> > > +	/*
+> > > +	 * Copy relocate_new_kernel to the reboot_code_buffer for use
+> > > +	 * after the kernel is shut down.
+> > > +	 */
+> > > +
+> > > +	memcpy(reboot_code_buffer, relocate_new_kernel,
+> > > +		relocate_new_kernel_size);
+> > > +
+> > > +	/* Flush the reboot_code_buffer in preparation for its execution. */
+> > > +
+> > > +	__flush_dcache_area(reboot_code_buffer, relocate_new_kernel_size);
+> > > +
+> > > +	/* Flush the kimage list. */
+> > > +
+> > > +	kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
+> > > +
+> > > +	pr_info("Bye!\n");
+> > > +
+> > > +	/* Disable all DAIF exceptions. */
+> > > +	
+> > > +	asm volatile ("msr daifset, #0xf" : : : "memory");
+> > > +
+> > > +	soft_restart(reboot_code_buffer_phys);
+> > 
+> > So what is soft_restart() functionality in arm64?
 > 
-> timeout-sec is optional, not mandatory.
+> soft_restart() basically turns off the MMU and data caches, then jumps
+> to the address passed to it, reboot_code_buffer_phys here.
+>  
+> > Looks like it switches to identity mapped page tables and that seems
+> > to be the reason that you are not preparing identity mapped page
+> > tables in kexec code. I am wondering I how do you make sure that once
+> > kexec is swapping pages (putting new kernel's pages to its destination)
+> > at that time these identity page will not be overwritten?
+> > 
+> > I am assuming that you are jumping to purgatory with paging enabled
+> > and whole of the memory identity mapped.
+> 
+> The identity map is just used to turn off the MMU.  soft_restart() is in
+> that identity mapping, and once it shuts off the MMU it jumps to the
+> physical address of relocate_kernel, which uses physical addressing to
+> do the copy.
 
-Indeed, I made this change in v2, but didn't reflect it in the document.
-Good catch. Will fix.
+Hi Geoff,
 
-  Josh
+Ok, thanks. I think it would be nice if this explanation appears in code
+somewhere as a comment.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Being able to turn off MMU, seems to have simplified things.
+
+> 
+> > I am also curious to know what are different entry points arm64
+> > kernel image supports and which one are you using by default.
+> 
+> The arm64 kernel as a single entry, the start of the image.  See
+> Documentation/arm64/booting.txt.
+
+I will go through it.
+
+Thanks
+Vivek
+
+> 
+> -Geoff
+> 
