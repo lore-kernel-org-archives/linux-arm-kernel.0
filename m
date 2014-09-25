@@ -1,114 +1,112 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 25 Sep 2014 10:17:48 +0200
-Subject: [RFC] pinctrl driver for Zynq
-In-Reply-To: <c2b9a1c1-d3b9-48c5-9c14-a4c3a95965fa@BN1AFFO11FD046.protection.gbl>
-References: <c2b9a1c1-d3b9-48c5-9c14-a4c3a95965fa@BN1AFFO11FD046.protection.gbl>
-Message-ID: <20140925081748.GB26991@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 25 Sep 2014 17:23:32 +0900
+Subject: [PATCH v7 2/5] ARM: add AFTR mode support to firmware do_idle
+ method
+In-Reply-To: <1411561488-1739-3-git-send-email-b.zolnierkie@samsung.com>
+References: <1411561488-1739-1-git-send-email-b.zolnierkie@samsung.com>
+ <1411561488-1739-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <5423D104.4050809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Wed, Sep 24, 2014 at 02:09:14PM -0700, S?ren Brinkmann wrote:
-> Hi,
-> 
-> I think I have pinctrl driver that is covering the pinmux options of
-> Zynq and I also figured out how the DT bindings work.
-> 
-> But there are a couple of things that probably could be done better.
-> 
-> One thing making the DT bindings explode, seems to be all those single
-> pin functions that can be muxed to every pin.
-> Next to GPIO, this applies to SD card and write protect - which are even
-> present twice since Zynq has two SDIO cores. Just these functions
-> account for a couple of hundred nodes in the DT and a bunch of lines in
-> the driver. Is there a better way to do this?
-> 
-> In particular for GPIO there seemed to be a better solution with
-> implementing gpio_request_enable(), but that seemed to allow GPIO in
-> parallel to request and mux the pin which does not work on Zynq. IOW: I
-> expected the core would reject a call of gpio_request_enable for a pin
-> that is already muxed to some other function, but that was not the case
-> in my testing. Am I missing something here?
-> 
-> And finally, for SD card detect and write protect, we actually have to
-> disable the muxing. The problem with those functions is, that they have
-> a dedicated mux for that function which is in parallel to the "normal"
-> pinmuxes. So, muxing a "normal" function to a pin would not void the
-> muxing of the SD signals. I thought this would be easily resolved by
-> implementing the 'disable' op, but after I did that, I noticed that
-> there is only a stale documentation comment of this member of struct
-> pinmux_ops left, the actual function pointer is gone.
-> 
-> 	Thanks,
-> 	S?ren
-> 
-> ------------8<-----------------8<-------------------8<--------------8<----------
-> Date: Mon, 15 Sep 2014 17:24:35 -0700
-> Subject: [PATCH RFC] pinctrl: Add driver for Zynq
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+On 09/24/14 21:24, Bartlomiej Zolnierkiewicz wrote:
+> On some platforms (i.e. EXYNOS ones) more than one idle mode is
+> available and we need to distinguish them in firmware do_idle method.
+>
+> Add mode parameter to do_idle firmware method and AFTR mode support
+> to EXYNOS do_idle implementation.
+>
+> This change is a preparation for adding secure firmware support to
+> EXYNOS cpuidle driver.
+>
+> This patch shouldn't cause any functionality changes.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/zynq-7000.dtsi | 3039 +++++++++++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/zynq-zc706.dts |   13 +
->  arch/arm/mach-zynq/Kconfig       |    1 +
->  drivers/pinctrl/Kconfig          |    8 +
->  drivers/pinctrl/Makefile         |    1 +
->  drivers/pinctrl/pinctrl-zynq.c   |  927 ++++++++++++
->  6 files changed, 3988 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/pinctrl/pinctrl-zynq.c
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 6cc83d4c6c76..814873da0392 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -229,7 +229,7 @@
->  		slcr: slcr at f8000000 {
->  			#address-cells = <1>;
->  			#size-cells = <1>;
-> -			compatible = "xlnx,zynq-slcr", "syscon";
-> +			compatible = "xlnx,zynq-slcr", "syscon", "simple-bus";
->  			reg = <0xF8000000 0x1000>;
->  			ranges;
->  			clkc: clkc at 100 {
-> @@ -250,6 +250,3043 @@
->  						"dbg_trc", "dbg_apb";
->  				reg = <0x100 0x100>;
->  			};
+> v7:
+> - fixed build on Tegra
+> - updated summary line
+>
+>   arch/arm/include/asm/firmware.h        |  2 +-
+>   arch/arm/mach-exynos/common.h          |  5 +++++
+>   arch/arm/mach-exynos/firmware.c        | 10 ++++++++--
+>   arch/arm/mach-tegra/cpuidle-tegra114.c |  2 +-
+>   4 files changed, 15 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+> index 5904f59..89aefe1 100644
+> --- a/arch/arm/include/asm/firmware.h
+> +++ b/arch/arm/include/asm/firmware.h
+> @@ -28,7 +28,7 @@ struct firmware_ops {
+>   	/*
+>   	 * Enters CPU idle mode
+>   	 */
+> -	int (*do_idle)(void);
+> +	int (*do_idle)(unsigned long mode);
+>   	/*
+>   	 * Sets boot address of specified physical CPU
+>   	 */
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index c218200..2d830df 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -119,6 +119,11 @@ extern void __iomem *sysram_base_addr;
+>   extern void __iomem *pmu_base_addr;
+>   void exynos_sysram_init(void);
+>
+> +enum {
+> +	FW_DO_IDLE_SLEEP,
+> +	FW_DO_IDLE_AFTR,
+> +};
 > +
-> +			pinctrl0: pinctrl at 700 {
-> +				compatible = "xlnx,pinctrl-zynq";
-> +				reg = <0x700 0x200>;
-> +
-> +				pinctrl_i2c0_0: pinctrl-i2c0 at 0 {
-> +					i2c0-mux {
-> +						function = "i2c0";
-> +						pins = "i2c0_0_grp";
-> +					};
-> +				};
-> +
+>   void exynos_firmware_init(void);
+>
+>   extern u32 exynos_get_eint_wake_mask(void);
+> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+> index f5e626d..e57b7c3 100644
+> --- a/arch/arm/mach-exynos/firmware.c
+> +++ b/arch/arm/mach-exynos/firmware.c
+> @@ -28,9 +28,15 @@
+>   #define EXYNOS_BOOT_ADDR	0x8
+>   #define EXYNOS_BOOT_FLAG	0xc
+>
+> -static int exynos_do_idle(void)
+> +static int exynos_do_idle(unsigned long mode)
+>   {
+> -	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> +	switch (mode) {
+> +	case FW_DO_IDLE_AFTR:
+> +		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+> +		break;
+> +	case FW_DO_IDLE_SLEEP:
+> +		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> +	}
+>   	return 0;
+>   }
+>
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> index e3ebdce..425b6c8 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> @@ -49,7 +49,7 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>   	call_firmware_op(prepare_idle);
+>
+>   	/* Do suspend by ourselves if the firmware does not implement it */
+> -	if (call_firmware_op(do_idle) == -ENOSYS)
+> +	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+>   		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+>
+>   	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,&dev->cpu);
 
-(...)
++ Thierry(using nvidia.com e-mail address)
 
-> +				pinctrl_sdio1_cd_54: pinctrl-sdio1_cd at 54 {
-> +					sdio1_cd-mux {
-> +						function = "sdio1_cd";
-> +						pins = "sdio1_emio_cd_grp";
-> +					};
-> +				};
-> +			};
->  		};
->  
+Hi Thierry,
 
-Wouldn't this reaaally bloat the dtb?
-I know that imx decided to remove all the pinctrls from the dtsis, because
-the dtbs got to big.
+For supporting AFTR mode in call_firmware_op(do_idle), need to modify 
+tegra stuff as you can see. The functionality will be same with before. 
+Is it OK to you? If you have no objection, I'd like to take this series 
+into samsung tree.
 
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Kukjin
