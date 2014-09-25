@@ -1,31 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 23:43:52 +0200
-Subject: [PATCH 0/3] Fixes for CNS3xxx platform
-In-Reply-To: <m3d2av3lgt.fsf@t19.piap.pl>
-References: <m3d2av3lgt.fsf@t19.piap.pl>
-Message-ID: <201409252343.52997.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 25 Sep 2014 14:49:34 -0700
+Subject: [PATCH] clk: rockchip: add missing rk3288 npll rate table
+In-Reply-To: <1631893.xHvKLXVMyM@phil>
+References: <1631893.xHvKLXVMyM@phil>
+Message-ID: <20140925214934.19023.9817@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 September 2014, Krzysztof Ha?asa wrote:
-> All of this stuff has been tested on Gateworks Laguna platform,
-> masqueraded as the CNS3xxx devel board, with v3.17-rc5. I guess this is
-> v3.17 material, though it doesn't make much sense for "stable" branches.
+Quoting Heiko St?bner (2014-09-24 14:41:54)
+> The npll on rk3288 is exactly the same pll type as the other 4. Yet it
+> was missing the link to the rate table, making rate changes impossible.
+> Change that by setting the table.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Thanks a lot for your bug fixes!
+Applied.
 
-Sorry for the delay, but as both Olof and I were attending Linaro Connect
-last week, we had built up a large backlog to look at.
+Thanks,
+Mike
 
-I ended up putting your patches into the next/fixes-non-critical branch,
-which we will submit for 3.18, not 3.17, because by now it is very late
-in the cycle and we mainly want to fix regressions against 3.16. Let us
-know if there is a strong reason to have them in 3.17 after all.
-
-On a related note, Anton Vorontsov mentioned that he can no longer maintain
-cns3xxx upstream, would you mind becoming the official contact? If that's
-ok with you, please send an update for the MAINTAINERS file listing yourself
-and any co-maintainers (Felix?) as well as the level of support you can give
-("Maintained" or "Odd Fixes" I guess).
-
-	Arnd
+> ---
+>  drivers/clk/rockchip/clk-rk3288.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index 8ea885b..938d30b 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -143,7 +143,7 @@ static struct rockchip_pll_clock rk3288_pll_clks[] __initdata = {
+>         [gpll] = PLL(pll_rk3066, PLL_GPLL, "gpll", mux_pll_p, 0, RK3288_PLL_CON(12),
+>                      RK3288_MODE_CON, 12, 8, rk3288_pll_rates),
+>         [npll] = PLL(pll_rk3066, PLL_NPLL, "npll",  mux_pll_p, 0, RK3288_PLL_CON(16),
+> -                    RK3288_MODE_CON, 14, 9, NULL),
+> +                    RK3288_MODE_CON, 14, 9, rk3288_pll_rates),
+>  };
+>  
+>  static struct clk_div_table div_hclk_cpu_t[] = {
+> -- 
+> 2.1.0
+> 
+> 
