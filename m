@@ -1,171 +1,63 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 25 Sep 2014 15:08:00 -0500
-Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
- CLK_OF_DECLARE support
-In-Reply-To: <d4a375f40b544cf1ae78ac82dc20569c@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1411454806-8214-1-git-send-email-jingchang.lu@freescale.com>
- <d4a375f40b544cf1ae78ac82dc20569c@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <1411675680.13320.201.camel@snotra.buserror.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 25 Sep 2014 14:10:33 -0600
+Subject: [PATCH 3/6] pci,
+ thunder: Add PCIe host controller devicetree bindings
+In-Reply-To: <201409252126.38945.arnd@arndb.de>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <8057985.kyfsioKAVy@wuerfel>
+ <CAErSpo4oFLKbtddzVoXBN-1dXZn5C4pmzY_QiFMwV+RWtmtjiQ@mail.gmail.com>
+ <201409252126.38945.arnd@arndb.de>
+Message-ID: <CAErSpo5rhL7pLha-yWt7sZUBmAnwA6FkacL+sWXBKkSzsuC7Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, like I said, I'd rather see the CLK_OF_DECLARE stuff be made to
-work on PPC rather than have the driver carry around two binding
-methods.
+On Thu, Sep 25, 2014 at 1:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 25 September 2014, Bjorn Helgaas wrote:
+>> On Thu, Sep 25, 2014 at 1:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Thursday 25 September 2014 00:37:00 Sunil Kovvuri wrote:
+>> >> On Thu, Sep 25, 2014 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > On Wednesday 24 September 2014 23:34:04 Sunil Kovvuri wrote:
+>>
+>> >> >> All on-board PCI devices connected to this PCI controller have fixed resources
+>> >> >> and doesn't have to be allocated/reassigned. Some of these devices are
+>> >> >> SRIOV based.
+>> >> >
+>> >> > I think you need to mark the ones that are nonrelocatable with flag
+>> >> > 0x80000000, otherwise the PCI core might decide to reassign them.
+>> >>
+>> >> Is this flag part of DT pci node properties ?
+>> >> I am using IORESOURCE_PCI_FIXED flag. Its there in other patches of
+>> >> the same series.
+>> >
+>> > Ah, right. I checked the source code again and it seems that we don't handle
+>> > this right at the moment. I think a range that has the nonrelocatable
+>> > flag set should be used for IORESOURCE_PCI_FIXED mappings without any
+>> > host specific code, but that needs to be implemented in common code.
+>>
+>> What connection do you envision between nonrelocatable ranges and
+>> IORESOURCE_PCI_FIXED?  I don't know what a nonrelocatable range is,
+>> but for IORESOURCE_PCI_FIXED, all I intend is that the PCI core should
+>> not try to assign a different address, e.g., because the BAR is
+>> read-only or because it's a legacy IDE/VGA/etc. range for which there
+>> is no BAR at all.
+>
+> I think that is exactly the definition of the nonrelocatable flag
+> in http://www.openfirmware.org/1275/bindings/pci/pci2_1.pdf
+>
+> The example given in section 11.1.2 is for a VGA device that has some
+> relocatable BARs and some nonrelocatable BARs.
 
--Scott
+OK.  You said "a range that has the nonrelocatable flag set should be
+used for IORESOURCE_PCI_FIXED mappings."  I thought you meant that the
+range was a bridge window, and somehow PCI_FIXED BARs should be put in
+that window.
 
-On Thu, 2014-09-25 at 04:47 -0500, Lu Jingchang-B35083 wrote:
-> Hi, Scott and Mike,
->   
->   Could you please help review this patch and give an ACK if ok. Thanks.
-> 
-> Best Regards,
-> Jingchang
-> 
-> >-----Original Message-----
-> >From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
-> >Sent: Tuesday, September 23, 2014 2:47 PM
-> >To: mturquette at linaro.org
-> >Cc: Wood Scott-B07421; linuxppc-dev at lists.ozlabs.org; linux-
-> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Lu
-> >Jingchang-B35083
-> >Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
-> >CLK_OF_DECLARE support
-> >
-> >The IP is shared by PPC and ARM, this renames it to qoriq for better
-> >represention, and this also adds the CLK_OF_DECLARE support for being
-> >initialized by of_clk_init() on ARM.
-> >
-> >Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> >---
-> >changes in v4:
-> > remove "corenet" literals omitted in v3 remove.
-> >
-> >changes in v3:
-> > generate the patch with -M -C option
-> >
-> >changes in v2:
-> > rename the driver name to ppc-qoriq.c for shared on PPC and ARM.
-> >
-> > drivers/clk/Kconfig                            |  9 +++++----
-> > drivers/clk/Makefile                           |  2 +-
-> > drivers/clk/{clk-ppc-corenet.c => clk-qoriq.c} | 27 +++++++++++++++------
-> >-----
-> > 3 files changed, 22 insertions(+), 16 deletions(-)  rename
-> >drivers/clk/{clk-ppc-corenet.c => clk-qoriq.c} (89%)
-> >
-> >diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig index
-> >85131ae..f5f76cb 100644
-> >--- a/drivers/clk/Kconfig
-> >+++ b/drivers/clk/Kconfig
-> >@@ -92,12 +92,13 @@ config COMMON_CLK_AXI_CLKGEN
-> > 	  Support for the Analog Devices axi-clkgen pcore clock generator
-> >for Xilinx
-> > 	  FPGAs. It is commonly used in Analog Devices' reference designs.
-> >
-> >-config CLK_PPC_CORENET
-> >-	bool "Clock driver for PowerPC corenet platforms"
-> >-	depends on PPC_E500MC && OF
-> >+config CLK_QORIQ
-> >+	bool "Clock driver for PowerPC corenet and compatible ARM-based
-> >platforms"
-> >+	depends on (PPC_E500MC || ARM) && OF
-> > 	---help---
-> > 	  This adds the clock driver support for Freescale PowerPC corenet
-> >-	  platforms using common clock framework.
-> >+	  platforms and compatible Freescale ARM based platforms using
-> >common
-> >+	  clock framework.
-> >
-> > config COMMON_CLK_XGENE
-> > 	bool "Clock driver for APM XGene SoC"
-> >diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile index
-> >27c542b..20f42e9 100644
-> >--- a/drivers/clk/Makefile
-> >+++ b/drivers/clk/Makefile
-> >@@ -29,7 +29,7 @@ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
-> > obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
-> > obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
-> > obj-$(CONFIG_COMMON_CLK_PALMAS)		+= clk-palmas.o
-> >-obj-$(CONFIG_CLK_PPC_CORENET)		+= clk-ppc-corenet.o
-> >+obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
-> > obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
-> > obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
-> > obj-$(CONFIG_COMMON_CLK_SI570)		+= clk-si570.o
-> >diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-qoriq.c
-> >similarity index 89% rename from drivers/clk/clk-ppc-corenet.c rename to
-> >drivers/clk/clk-qoriq.c index 8e58edf..cba8abe 100644
-> >--- a/drivers/clk/clk-ppc-corenet.c
-> >+++ b/drivers/clk/clk-qoriq.c
-> >@@ -155,7 +155,7 @@ static void __init core_pll_init(struct device_node
-> >*np)
-> >
-> > 	base = of_iomap(np, 0);
-> > 	if (!base) {
-> >-		pr_err("clk-ppc: iomap error\n");
-> >+		pr_err("clk-qoriq: iomap error\n");
-> > 		return;
-> > 	}
-> >
-> >@@ -252,7 +252,7 @@ static void __init sysclk_init(struct device_node
-> >*node)
-> > 	u32 rate;
-> >
-> > 	if (!np) {
-> >-		pr_err("ppc-clk: could not get parent node\n");
-> >+		pr_err("qoriq-clk: could not get parent node\n");
-> > 		return;
-> > 	}
-> >
-> >@@ -278,30 +278,35 @@ static const struct of_device_id clk_match[]
-> >__initconst = {
-> > 	{}
-> > };
-> >
-> >-static int __init ppc_corenet_clk_probe(struct platform_device *pdev)
-> >+static int __init qoriq_clk_probe(struct platform_device *pdev)
-> > {
-> > 	of_clk_init(clk_match);
-> >
-> > 	return 0;
-> > }
-> >
-> >-static const struct of_device_id ppc_clk_ids[] __initconst = {
-> >+static const struct of_device_id qoriq_clk_ids[] __initconst = {
-> > 	{ .compatible = "fsl,qoriq-clockgen-1.0", },
-> > 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
-> > 	{}
-> > };
-> >
-> >-static struct platform_driver ppc_corenet_clk_driver __initdata = {
-> >+static struct platform_driver qoriq_clk_driver __initdata = {
-> > 	.driver = {
-> >-		.name = "ppc_corenet_clock",
-> >+		.name = "qoriq_clock",
-> > 		.owner = THIS_MODULE,
-> >-		.of_match_table = ppc_clk_ids,
-> >+		.of_match_table = qoriq_clk_ids,
-> > 	},
-> >-	.probe = ppc_corenet_clk_probe,
-> >+	.probe = qoriq_clk_probe,
-> > };
-> >
-> >-static int __init ppc_corenet_clk_init(void)
-> >+static int __init qoriq_clk_init(void)
-> > {
-> >-	return platform_driver_register(&ppc_corenet_clk_driver);
-> >+	return platform_driver_register(&qoriq_clk_driver);
-> > }
-> >-subsys_initcall(ppc_corenet_clk_init);
-> >+subsys_initcall(qoriq_clk_init);
-> >+
-> >+CLK_OF_DECLARE(qoriq_core_pll_v1, "fsl,qoriq-core-pll-1.0",
-> >+core_pll_init); CLK_OF_DECLARE(qoriq_core_pll_v2,
-> >+"fsl,qoriq-core-pll-2.0", core_pll_init);
-> >+CLK_OF_DECLARE(qoriq_core_mux_v1, "fsl,qoriq-core-mux-1.0",
-> >+core_mux_init); CLK_OF_DECLARE(qoriq_core_mux_v2,
-> >+"fsl,qoriq-core-mux-2.0", core_mux_init);
-> >--
-> >1.8.0
-> 
+But maybe you meant that nonrelocatable ranges should have the
+IORESOURCE_PCI_FIXED bit set in their struct resources.  That would
+mean we couldn't move the window, but we could put relocatable BARs
+inside the window.
+
+What needs to be implemented?  Just the code that would set
+IORESOURCE_PCI_FIXED for nonrelocatable ranges?
+
+Bjorn
