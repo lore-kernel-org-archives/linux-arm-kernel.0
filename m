@@ -1,78 +1,87 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 25 Sep 2014 12:02:51 -0700
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <20140925182810.GB6303@redhat.com>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140925182810.GB6303@redhat.com>
-Message-ID: <1411671771.6001.208.camel@smoke>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 25 Sep 2014 20:05:53 +0100
+Subject: [PATCH v6 4/6] sched: get CPU's usage statistic
+In-Reply-To: <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <54246791.9050101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
-
-On Thu, 2014-09-25 at 14:28 -0400, Vivek Goyal wrote:
-> On Thu, Sep 25, 2014 at 12:23:27AM +0000, Geoff Levand wrote:
-> [..]
-> > +void machine_kexec(struct kimage *image)
-> > +{
-> > +	phys_addr_t reboot_code_buffer_phys;
-> > +	void *reboot_code_buffer;
-> > +
-> > +	BUG_ON(num_online_cpus() > 1);
-> > +
-> > +	kexec_kimage_head = image->head;
-> > +
-> > +	reboot_code_buffer_phys = page_to_phys(image->control_code_page);
-> > +	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-> > +
-> > +	/*
-> > +	 * Copy relocate_new_kernel to the reboot_code_buffer for use
-> > +	 * after the kernel is shut down.
-> > +	 */
-> > +
-> > +	memcpy(reboot_code_buffer, relocate_new_kernel,
-> > +		relocate_new_kernel_size);
-> > +
-> > +	/* Flush the reboot_code_buffer in preparation for its execution. */
-> > +
-> > +	__flush_dcache_area(reboot_code_buffer, relocate_new_kernel_size);
-> > +
-> > +	/* Flush the kimage list. */
-> > +
-> > +	kexec_list_walk(NULL, image->head, kexec_list_flush_cb);
-> > +
-> > +	pr_info("Bye!\n");
-> > +
-> > +	/* Disable all DAIF exceptions. */
-> > +	
-> > +	asm volatile ("msr daifset, #0xf" : : : "memory");
-> > +
-> > +	soft_restart(reboot_code_buffer_phys);
+On 23/09/14 17:08, Vincent Guittot wrote:
+> Monitor the usage level of each group of each sched_domain level. The usage is
+> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
+> We use the utilization_load_avg to evaluate the usage level of each group.
 > 
-> So what is soft_restart() functionality in arm64?
-
-soft_restart() basically turns off the MMU and data caches, then jumps
-to the address passed to it, reboot_code_buffer_phys here.
- 
-> Looks like it switches to identity mapped page tables and that seems
-> to be the reason that you are not preparing identity mapped page
-> tables in kexec code. I am wondering I how do you make sure that once
-> kexec is swapping pages (putting new kernel's pages to its destination)
-> at that time these identity page will not be overwritten?
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> I am assuming that you are jumping to purgatory with paging enabled
-> and whole of the memory identity mapped.
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 2cf153d..4097e3f 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -4523,6 +4523,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
+>  	return target;
+>  }
+>  
+> +static int get_cpu_usage(int cpu)
+> +{
+> +	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
+> +	unsigned long capacity = capacity_orig_of(cpu);
+> +
+> +	if (usage >= SCHED_LOAD_SCALE)
+> +		return capacity + 1;
 
-The identity map is just used to turn off the MMU.  soft_restart() is in
-that identity mapping, and once it shuts off the MMU it jumps to the
-physical address of relocate_kernel, which uses physical addressing to
-do the copy.
+Why you are returning rq->cpu_capacity_orig + 1 (1025) in case
+utilization_load_avg is greater or equal than 1024 and not usage or
+(usage * capacity) >> SCHED_LOAD_SHIFT too?
 
-> I am also curious to know what are different entry points arm64
-> kernel image supports and which one are you using by default.
+In case the weight of a sched group is greater than 1, you might loose
+the information that the whole sched group is over-utilized too.
 
-The arm64 kernel as a single entry, the start of the image.  See
-Documentation/arm64/booting.txt.
+You add up the individual cpu usage values for a group by
+sgs->group_usage += get_cpu_usage(i) in update_sg_lb_stats and later use
+sgs->group_usage in group_is_overloaded to compare it against
+sgs->group_capacity (taking imbalance_pct into consideration).
 
--Geoff
+> +
+> +	return (usage * capacity) >> SCHED_LOAD_SHIFT;
+
+Nit-pick: Since you're multiplying by a capacity value
+(rq->cpu_capacity_orig) you should shift by SCHED_CAPACITY_SHIFT.
+
+Just to make sure: You do this scaling of usage by cpu_capacity_orig
+here only to cater for the fact that cpu_capacity_orig might be uarch
+scaled (by arch_scale_cpu_capacity, !SMT) in update_cpu_capacity while
+utilization_load_avg is currently not.
+We don't even uArch scale on ARM TC2 big.LITTLE platform in mainline
+today due to the missing clock-frequency property in the device tree.
+
+I think it's hard for people to grasp that your patch-set takes uArch
+scaling of capacity into consideration but not frequency scaling of
+capacity (via arch_scale_freq_capacity, not used at the moment).
+
+> +}
+> +
+>  /*
+>   * select_task_rq_fair: Select target runqueue for the waking task in domains
+>   * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
+> @@ -5663,6 +5674,7 @@ struct sg_lb_stats {
+>  	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+>  	unsigned long load_per_task;
+>  	unsigned long group_capacity;
+> +	unsigned long group_usage; /* Total usage of the group */
+>  	unsigned int sum_nr_running; /* Nr tasks running in the group */
+>  	unsigned int group_capacity_factor;
+>  	unsigned int idle_cpus;
+> @@ -6037,6 +6049,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+>  			load = source_load(i, load_idx);
+>  
+>  		sgs->group_load += load;
+> +		sgs->group_usage += get_cpu_usage(i);
+>  		sgs->sum_nr_running += rq->cfs.h_nr_running;
+>  
+>  		if (rq->nr_running > 1)
+> 
