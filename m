@@ -1,32 +1,34 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Thu, 25 Sep 2014 18:34:47 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: Add Support for QCOM APQ8074 reset
-Message-ID: <1411650287-15947-1-git-send-email-pramod.gurav@smartplayin.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Sep 2014 15:00:12 +0200
+Subject: [PATCH] Documentation: sunxi: Update Allwinner SoC documentation
+ (A31/A31s/A23)
+In-Reply-To: <1411571349-30867-1-git-send-email-wens@csie.org>
+References: <1411571349-30867-1-git-send-email-wens@csie.org>
+Message-ID: <20140925130012.GD15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change adds support for reset driver for apq8074 based platform.
-With this we should be able to reboot the board from command prompt.
+On Wed, Sep 24, 2014 at 11:09:09PM +0800, Chen-Yu Tsai wrote:
+> Lately we have received documentation for A31 and A31s, in addition to
+> A23 documentation which was received earlier but not added.
+> 
+> Add these to the README, and update to reflect that A31 and A23 are
+> supported.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-arm-msm at vger.kernel.org
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
----
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Queued for 3.19, thanks!
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 1bf198b..4f78491 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -230,6 +230,7 @@ CONFIG_CHARGER_TPS65090=y
- CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_SUN6I=y
-+CONFIG_POWER_RESET_MSM=y
- CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_THERMAL=y
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/8496977e/attachment.sig>
