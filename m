@@ -1,46 +1,36 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 25 Sep 2014 18:15:37 +0200
-Subject: [PATCH v2 06/11] ARM: shmobile: r8a7740: Add A3SG pm domain support
+Date: Thu, 25 Sep 2014 18:15:35 +0200
+Subject: [PATCH v2 04/11] ARM: shmobile: armadillo800eva legacy: Add missing
+ A4S pm domain devices
 In-Reply-To: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
 References: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1411661742-4767-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1411661742-4767-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the A3SG power domain, and hook it up as a subdomain of
-A4S.
-This domain contains the SGX540 hardware block, which is currently not
-used by any driver.
+Commit 8459293c27bcd13a ("ARM: shmobile: r8a7740: add A4S pm domain
+support") added the A4S power domain, but forgot to hook up the GbEther
+hardware block.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
   - No changes
 
- arch/arm/mach-shmobile/pm-r8a7740.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 1d916038660d4b8a..932c2a621e81ac26 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -51,6 +51,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 		.gov		= &pm_domain_always_on_gov,
- 		.no_debug	= true,
- 		.suspend	= r8a7740_pd_a3sp_suspend,
-+	}, {
-+		.genpd.name	= "A3SG",
-+		.bit_shift	= 13,
- 	},
- };
- 
-@@ -58,6 +61,7 @@ void __init r8a7740_init_pm_domains(void)
- {
- 	rmobile_init_domains(r8a7740_pm_domains, ARRAY_SIZE(r8a7740_pm_domains));
- 	pm_genpd_add_subdomain_names("A4S", "A3SP");
-+	pm_genpd_add_subdomain_names("A4S", "A3SG");
- }
- #endif /* CONFIG_PM && !CONFIG_ARCH_MULTIPLATFORM */
- 
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 64a68450c28a072c..735036038951868d 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1234,6 +1234,7 @@ static void __init eva_init(void)
+ 	static struct pm_domain_device domain_devices[] __initdata = {
+ 		{ "A4LC", &lcdc0_device },
+ 		{ "A4LC", &hdmi_lcdc_device },
++		{ "A4S",  &sh_eth_device },
+ 		{ "A3SP", &pwm_device },
+ 		{ "A3SP", &sdhi0_device },
+ 		{ "A3SP", &sh_mmcif_device },
 -- 
 1.9.1
