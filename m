@@ -1,33 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 25 Sep 2014 12:05:28 +0100
-Subject: [PATCH RESEND] arm: don't break misaligned NEON load/store
-In-Reply-To: <15fc86b0d2b4984377d7116113b0f2f9498bd088.1411392970.git.robin.murphy@arm.com>
-References: <15fc86b0d2b4984377d7116113b0f2f9498bd088.1411392970.git.robin.murphy@arm.com>
-Message-ID: <5423F6F8.2060902@arm.com>
+From: b44548@freescale.com (Chao Fu)
+Date: Thu, 25 Sep 2014 18:24:24 +0800
+Subject: [PATCH 2/3] arm:dts:vf-610:add vybrid DSPI TCF transfer support
+In-Reply-To: <1411640665-20671-1-git-send-email-b44548@freescale.com>
+References: <1411640665-20671-1-git-send-email-b44548@freescale.com>
+Message-ID: <1411640665-20671-2-git-send-email-b44548@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/14 14:48, Robin Murphy wrote:
-> The alignment fixup incorrectly decodes faulting ARM VLDn/VSTn
-> instructions (where the optional alignment hint is given but incorrect)
-> as LDR/STR, leading to register corruption. Detect these and correctly
-> treat them as unhandled, so that userspace gets the fault it expects.
->
-> Reported-by: Simon Hosie <simon.hosie@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> Cc: <stable@vger.kernel.org>
-> ---
->
-> Hi all,
->
-> This was met with a resounding silence a while back[1], but the bug is
-> still causing annoyance - apparently Clang intrinsics can be a little
-> over-eager with alignment hints. Regardless of whose fault that is,
-> the kernel shouldn't be silently mangling registers unexpectedly.
->
-> Any objections to me dropping this into the patch system?
->
+From: Chao Fu <B44548@freescale.com>
 
-Since nobody's voiced any complaints, I've submitted this as 8165/1.
+DSPI can transfer data in EOQ mode or TCF mode.
+Add the bool value as the ajudgement of using which method
+will be read from dtb.
 
-Robin.
+Signed-off-by: Chao Fu      <b44548@freescale.com>
+---
+ arch/arm/boot/dts/vf610.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 4d2ec32..4339a19 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -174,6 +174,7 @@
+ 				clocks = <&clks VF610_CLK_DSPI0>;
+ 				clock-names = "dspi";
+ 				spi-num-chipselects = <5>;
++				tcfq-mode;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.8.4
