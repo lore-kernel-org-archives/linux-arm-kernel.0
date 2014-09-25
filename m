@@ -1,63 +1,23 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 25 Sep 2014 16:03:40 -0700
-Subject: [PATCH 3/7] clk: sunxi: unify sun6i AHB1 clock with proper PLL6
- pre-divider
-In-Reply-To: <20140913102603.GZ31276@lukather>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <1410000448-9999-4-git-send-email-wens@csie.org>
- <20140911210211.GM31276@lukather>
- <CAGb2v66L36nsoucSgLY8pV8f=wjKTvtjJby43Z=Ct+NiRonptQ@mail.gmail.com>
- <20140913102603.GZ31276@lukather>
-Message-ID: <20140925230340.19023.22674@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Sep 2014 01:26:59 +0200
+Subject: [PATCH] arm, vt8500,
+ LLVMLlinux: Use mcr instead of mcr% for mach-vt8500
+In-Reply-To: <54230C1A.30801@prisktech.co.nz>
+References: <1411530284-28807-1-git-send-email-behanw@converseincode.com>
+ <7810937.UX61PvX9nB@wuerfel> <54230C1A.30801@prisktech.co.nz>
+Message-ID: <201409260127.00032.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-09-13 03:26:03)
-> On Fri, Sep 12, 2014 at 11:16:26AM +0800, Chen-Yu Tsai wrote:
-> > Hi,
-> > 
-> > On Fri, Sep 12, 2014 at 5:02 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > Hi,
-> > >
-> > > On Sat, Sep 06, 2014 at 06:47:24PM +0800, Chen-Yu Tsai wrote:
-> > >> This patch unifies the sun6i AHB1 clock, originally supported
-> > >> with separate mux and divider clks. It also adds support for
-> > >> the pre-divider on the PLL6 input, thus allowing the clock to
-> > >> be muxed to PLL6 with proper clock rate calculation.
-> > >>
-> > >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > >
-> > > It looks fine, but I'd rather see this in a separate file, especially
-> > > since we don't seem to have any order dependency.
-> > 
-> > Sorry, just to be clear, separate file under clk/sunxi?
+On Wednesday 24 September 2014, Tony Prisk wrote:
+> > Tony, would you like to pick this one up and send it in a pull request
+> > to arm-soc, or should we apply it to fixes-non-critical directly?
+> >
+> >       Arnd
+> Arnd,
 > 
-> Yes
-> 
-> > This cannot be in a separate file, as it shares a spinlock with apb1
-> > divider. They share the same register.
-> > 
-> > We could move apb1 out though. But i would prefer to do that when
-> > we split out all the clocks into individual OF_CLK_DECLAREs.
-> 
-> Ah right, my bad :)
-> 
-> My plan on the long term is to kill clk-sunxi as a place where all the
-> clocks are defined, and only leave the "policy" there, for example the
-> clock protection code (even if that should probably be removed too,
-> together with clkdev), the various rates / parenting enforcements,
-> etc.
+> You can apply it directly to fixes-non-critical if that's ok.
 
-Interesting! Where are you planning to store the clock data?
+Applied, thanks!
 
-Regards,
-Mike
-
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+	Arnd
