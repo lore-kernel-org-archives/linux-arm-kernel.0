@@ -1,75 +1,143 @@
-From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Thu, 25 Sep 2014 10:16:57 +0800
-Subject: [PATCH] [RFC] Using hierarchy irqdomian to implement MTK intpol.
-In-Reply-To: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1411611417.21763.56.camel@mtksdaap41>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 25 Sep 2014 10:47:13 +0800
+Subject: [PATCH v2 2/5] pinctrl: imx: add gpio pinmux support for vf610
+In-Reply-To: <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
+References: <cover.1411492954.git.stefan@agner.ch>
+ <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
+Message-ID: <20140925024712.GB6405@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Jiang,
-
-Please consider merge the following 2 changes into your next round.
-
-On Thu, 2014-09-25 at 00:04 +0800, Joe.C wrote:
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index e285f3a..01e852b 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -467,7 +467,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->  	struct irq_domain *domain;
->  	irq_hw_number_t hwirq;
->  	unsigned int type = IRQ_TYPE_NONE;
-> -	unsigned int virq;
-> +	int virq;
+On Tue, Sep 23, 2014 at 07:37:54PM +0200, Stefan Agner wrote:
+> Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
+> This is needed since direction configuration is not part of the
+> GPIO module in Vybrid.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/pinctrl/pinctrl-imx.c   | 54 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-imx.h   |  1 +
+>  drivers/pinctrl/pinctrl-vf610.c |  2 +-
+>  3 files changed, 56 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+> index 0d4558b..64d1b59 100644
+> --- a/drivers/pinctrl/pinctrl-imx.c
+> +++ b/drivers/pinctrl/pinctrl-imx.c
+> @@ -294,10 +294,59 @@ static int imx_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
+>  	return 0;
+>  }
 >  
->  	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
->  	if (!domain) {
-> @@ -493,8 +493,8 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->  	else
->  #endif
->  		virq = irq_create_mapping(domain, hwirq);
-> -	if (!virq)
-> -		return virq;
-> +	if (virq <= 0)
-> +		return 0;
->  
->  	/* Set type if specified and different than the current one */
->  	if (type != IRQ_TYPE_NONE &&
+> +static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
+> +			struct pinctrl_gpio_range *range, unsigned offset)
+> +{
+> +	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
+> +	const struct imx_pinctrl_soc_info *info = ipctl->info;
+> +	const struct imx_pin_reg *pin_reg;
+> +	u32 reg;
+> +
+> +	if (!(info->flags & GPIO_CONTROL))
+> +		return -EINVAL;
+> +
+> +	pin_reg = &info->pin_regs[offset];
+> +	if (pin_reg->mux_reg == -1)
+> +		return -EINVAL;
+> +
+> +	reg = readl(ipctl->base + pin_reg->mux_reg);
+> +	reg &= ~(0x7 << 20);
+> +	writel(reg, ipctl->base + pin_reg->mux_reg);
 
-irq_of_parse_and_map()/of_irq_to_resource() expect
-irq_create_of_mapping() to return 0 when fail. Return error code will
-cause of_irq_to_resource crash.
+Isn't this setup redundant at all, since imx_pmx_enable() already takes
+care of setting mux register including GPIO mode?
 
+> +
+> +	return 0;
+> +}
+> +
+> +static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+> +	   struct pinctrl_gpio_range *range, unsigned offset, bool input)
+> +{
+> +	struct imx_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
+> +	const struct imx_pinctrl_soc_info *info = ipctl->info;
+> +	const struct imx_pin_reg *pin_reg;
+> +	u32 reg;
+> +
+> +	if (!(info->flags & GPIO_CONTROL))
+> +		return -EINVAL;
+> +
+> +	pin_reg = &info->pin_regs[offset];
+> +	if (pin_reg->mux_reg == -1)
+> +		return -EINVAL;
+> +
+> +	reg = readl(ipctl->base + pin_reg->mux_reg);
+> +	if (input)
+> +		reg &= ~0x2;
+> +	else
+> +		reg |= 0x2;
 
-> @@ -716,20 +716,20 @@ const struct irq_domain_ops irq_domain_simple_ops = {
+This is all about Output Buffer Enable (OBE) bit.  What about Input
+Buffer Enable (IBE) bit?  Don't we need to set or clear it as per GPIO
+direction as well?
+
+> +	writel(reg, ipctl->base + pin_reg->mux_reg);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct pinmux_ops imx_pmx_ops = {
+>  	.get_functions_count = imx_pmx_get_funcs_count,
+>  	.get_function_name = imx_pmx_get_func_name,
+>  	.get_function_groups = imx_pmx_get_groups,
+> +	.gpio_request_enable = imx_pmx_gpio_request_enable,
+> +	.gpio_set_direction = imx_pmx_gpio_set_direction,
+>  	.enable = imx_pmx_enable,
 >  };
->  EXPORT_SYMBOL_GPL(irq_domain_simple_ops);
 >  
-> -static int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
-> +static int irq_domain_alloc_descs(int virq, unsigned int cnt,
->  				  irq_hw_number_t hwirq, int node)
->  {
->  	unsigned int hint;
->  
->  	if (virq >= 0) {
-> -		virq = irq_alloc_descs(virq, virq, nr_irqs, node);
-> +		virq = irq_alloc_descs(virq, virq, cnt, node);
->  	} else {
->  		hint = hwirq % nr_irqs;
->  		if (hint == 0)
->  			hint++;
-> -		virq = irq_alloc_descs_from(hint, nr_irqs, node);
-> +		virq = irq_alloc_descs_from(hint, cnt, node);
->  		if (virq <= 0 && hint > 1)
-> -			virq = irq_alloc_descs_from(1, nr_irqs, node);
-> +			virq = irq_alloc_descs_from(1, cnt, node);
+> @@ -579,6 +628,11 @@ int imx_pinctrl_probe(struct platform_device *pdev,
+>  		dev_err(&pdev->dev, "wrong pinctrl info\n");
+>  		return -EINVAL;
 >  	}
+> +
+> +	/* GPIO control functions only intended for shared mux/conf register */
+> +	if (info->flags & GPIO_CONTROL)
+> +		BUG_ON(!(info->flags & SHARE_MUX_CONF_REG));
+> +
+
+If this is always true, why don't we just use flag SHARE_MUX_CONF_REG
+and save GPIO_CONTROL?  This check doesn't make too much sense to me if
+we choose to have a new flag for GPIO setup.  IMO, we should probably
+either drop the GPIO_CONTROL flag or the check.
+
+Shawn
+
+>  	info->dev = &pdev->dev;
 >  
->  	return virq;
-
-This come from irq_create_mapping(), the original code is using global
-nr_irqs. Change to match original behavior.
-
-Joe.C
+>  	/* Create state holders etc for this driver */
+> diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
+> index 49e55d3..8f37ca4 100644
+> --- a/drivers/pinctrl/pinctrl-imx.h
+> +++ b/drivers/pinctrl/pinctrl-imx.h
+> @@ -84,6 +84,7 @@ struct imx_pinctrl_soc_info {
+>  };
+>  
+>  #define SHARE_MUX_CONF_REG	0x1
+> +#define GPIO_CONTROL		0x2
+>  
+>  #define NO_MUX		0x0
+>  #define NO_PAD		0x0
+> diff --git a/drivers/pinctrl/pinctrl-vf610.c b/drivers/pinctrl/pinctrl-vf610.c
+> index b788e15..fdf5661 100644
+> --- a/drivers/pinctrl/pinctrl-vf610.c
+> +++ b/drivers/pinctrl/pinctrl-vf610.c
+> @@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
+>  static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
+>  	.pins = vf610_pinctrl_pads,
+>  	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
+> -	.flags = SHARE_MUX_CONF_REG,
+> +	.flags = SHARE_MUX_CONF_REG | GPIO_CONTROL,
+>  };
+>  
+>  static struct of_device_id vf610_pinctrl_of_match[] = {
+> -- 
+> 2.1.0
+> 
