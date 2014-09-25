@@ -1,95 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 25 Sep 2014 07:59:55 +0200
-Subject: [PATCH v5 4/4] thermal: Add Tegra SOCTHERM thermal management
- driver
-In-Reply-To: <54231C3D.6040900@kapsi.fi>
-References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
- <1408616242-21009-5-git-send-email-mperttunen@nvidia.com>
- <20140924191829.GA16529@developer> <54231C3D.6040900@kapsi.fi>
-Message-ID: <20140925055953.GA12423@ulmo>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 25 Sep 2014 08:26:48 +0200
+Subject: [RFC PATCH] ARM: at91: remove no-MMU at91x40 support
+In-Reply-To: <1411568281-3924-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1411568281-3924-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140925062648.GJ3755@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 10:32:13PM +0300, Mikko Perttunen wrote:
-> On 09/24/2014 10:18 PM, Eduardo Valentin wrote:
-> >
-> >Mikko,
-> >
-> >On Thu, Aug 21, 2014 at 01:17:22PM +0300, Mikko Perttunen wrote:
-> >>...
-> >>+
-> >>+static int enable_tsensor(struct tegra_soctherm *tegra,
-> >>+			  const struct tegra_tsensor *sensor,
-> >>+			  struct tsensor_shared_calibration shared)
-> >>+{
-> >>+	void * __iomem base = tegra->regs + sensor->base;
-> >
-> >I get sparse complaining about this declaration. For the sake of keeping
-> >a clean static checks, can you please:
-> >-       void * __iomem base = tegra->regs + sensor->base;
-> >+       void __iomem * base = tegra->regs + sensor->base;
-> >
-> 
-> Sure.
-> 
-> >Can you also please check the remaining sparse errors?
-> >   CHECK   drivers/thermal/tegra_soctherm.c
-> >   drivers/thermal/tegra_soctherm.c:260:43: warning: incorrect type in
-> >   initializer (different address spaces)
-> >   drivers/thermal/tegra_soctherm.c:260:43:    expected void *[noderef]
-> >   <asn:2>base
-> >   drivers/thermal/tegra_soctherm.c:260:43:    got void [noderef]
-> >   <asn:2>*
-> >   drivers/thermal/tegra_soctherm.c:271:9: warning: incorrect type in
-> >   argument 2 (different address spaces)
-> >   drivers/thermal/tegra_soctherm.c:271:9:    expected void volatile
-> >   [noderef] <asn:2>*addr
-> >   drivers/thermal/tegra_soctherm.c:271:9:    got void *
-> >   drivers/thermal/tegra_soctherm.c:279:9: warning: incorrect type in
-> >   argument 2 (different address spaces)
-> >   drivers/thermal/tegra_soctherm.c:279:9:    expected void volatile
-> >   [noderef] <asn:2>*addr
-> >   drivers/thermal/tegra_soctherm.c:279:9:    got void *
-> >   drivers/thermal/tegra_soctherm.c:281:9: warning: incorrect type in
-> >   argument 2 (different address spaces)
-> >   drivers/thermal/tegra_soctherm.c:281:9:    expected void volatile
-> >   [noderef] <asn:2>*addr
-> >   drivers/thermal/tegra_soctherm.c:281:9:    got void *
-> >   drivers/thermal/tegra_soctherm.c:347:25: warning: incorrect type in
-> >   argument 1 (different address spaces)
-> >   drivers/thermal/tegra_soctherm.c:347:25:    expected void const *ptr
-> >   drivers/thermal/tegra_soctherm.c:347:25:    got void [noderef]
-> >   <asn:2>*regs
-> >   drivers/thermal/tegra_soctherm.c:349:37: warning: incorrect type in
-> >   argument 1 (different address spaces)
-> >   drivers/thermal/tegra_soctherm.c:349:37:    expected void const *ptr
-> >   drivers/thermal/tegra_soctherm.c:349:37:    got void [noderef]
-> >   <asn:2>*regs
-> >   drivers/thermal/tegra_soctherm.c:271:9: warning: dereference of
-> >   noderef expression
-> >   drivers/thermal/tegra_soctherm.c:279:9: warning: dereference of
-> >   noderef expression
-> >   drivers/thermal/tegra_soctherm.c:281:9: warning: dereference of
-> >   noderef expression
-> >
-> 
-> Most of these seem to be caused by the above-mentioned swapping of __iomem
-> and *. The ones on lines 347 and 349 are more peculiar, though. Apparently
-> sparse doesn't like using IS_ERR and PTR_ERR on the void __iomem * pointer
-> returned by devm_ioremap_resource. Looks like this has been discussed before
-> (https://lkml.org/lkml/2013/6/17/216) and sparse should have been patched to
-> ignore this situation, so I'm not sure why it's complaining about it.
-> Anyway, there shouldn't be any issue here.
+Hello Nicolas,
 
-If I apply the change suggested by Eduardo above then all of the above
-warnings go away for me. That's with sparse 0.5.0. According to the
-email thread above a patch for this was applied in 0.4.5.
+On Wed, Sep 24, 2014 at 04:18:01PM +0200, Nicolas Ferre wrote:
+> As there is currently no-one to take care of this old !MMU target and as its
+> support in recent kernels is a bit rotten, remove this at91x40 support and the
+> board file associated with it (at91eb01).
+> There are modern ARM !MMU in Mainline now so this target is not interesting for
+s/Mainline/mainline/
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/fd150641/attachment.sig>
+> building tests anymore. It would be better to start from these modern ARM !MMU
+> platforms to reintroduce at91x40 support if needed.
+This last sentence doesn't sound convincing. at91x40 is an ARM7TDMI
+while the "modern ARM !MMU" targets base on Cortex-M.
+
+Anyhow, the change is fine, so:
+
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
