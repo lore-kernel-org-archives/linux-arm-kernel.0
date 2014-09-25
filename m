@@ -1,34 +1,34 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Thu, 25 Sep 2014 13:44:30 -0600
-Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
-In-Reply-To: <5424597A.7040904@samsung.com>
-References: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
- <CAD8Lp45F_rgN0JZ2n77VXSqN4C6K_hkqu6vsPqha-UbsVf4bow@mail.gmail.com>
- <5424597A.7040904@samsung.com>
-Message-ID: <CAD8Lp46tzgtEaUMS2+QSKoObW+kedWvAqJXMU5uKqnHp_LumGw@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 25 Sep 2014 21:54:54 +0200
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <201409252112.07513.arnd@arndb.de>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+ <201409252112.07513.arnd@arndb.de>
+Message-ID: <20140925195454.GA6074@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 12:05 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
->> Just curious about the Exynos4x12 situation here.
->> You set the FIMC clocks as 176MHz, child of MPLL, which works for
->> ODROID with a divider:
->>
->> 880MHz MPLL / 5 = 176MHz
->>
->> However, talking of recommended frequencies... Is 880MHz really the
->> standard there?
->> Isn't 800MHz the more common one?
->
-> AFAIK 880 MHz is recommended MPLL frequency for Exynos4412 EVT2.0, which
-> is revision of the Exynos4412 SoC the Odroid U3 boards are populated with.
-> You can read the main/sub revision information from the chip ID register
-> (at 0x10000000).
+Arnd,
 
-Thanks for the information. Might be worth a quick comment in
-exynos4x12.dtsi then, saying that the defaults here are for Exynos4412
-EVT2.0 and might want to be overridden for other versions of the SoC.
+On Thu, Sep 25, 2014 at 09:12:07PM +0200, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014, Antoine Tenart wrote:
+> > +static int ci_hdrc_usb2_dt_probe(struct device *dev,
+> > +                                struct ci_hdrc_platform_data *ci_pdata)
+> > +{
+> > +       ci_pdata->phy = of_phy_get(dev->of_node, 0);
+> 
+> FWIW, I accidentally built a kernel with this driver enabled and got a warning
+> for this code. The problem is that ci_pdata->phy is a 'struct usb_phy' pointer,
+> while of_phy_get() returns a generic 'struct phy'. While the two have similar
+> behavior, they are not the same thing and this can't work.
 
-Thanks
-Daniel
+That's because this series applies on top of:
+https://lkml.org/lkml/2014/9/15/141
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
