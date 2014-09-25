@@ -1,34 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Sep 2014 15:00:12 +0200
-Subject: [PATCH] Documentation: sunxi: Update Allwinner SoC documentation
- (A31/A31s/A23)
-In-Reply-To: <1411571349-30867-1-git-send-email-wens@csie.org>
-References: <1411571349-30867-1-git-send-email-wens@csie.org>
-Message-ID: <20140925130012.GD15315@lukather>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 25 Sep 2014 15:08:59 +0200
+Subject: [PATCH 1/9] ARM: dts: vf610: Add system reset controller (SRC)
+In-Reply-To: <45f7af8b2dbe11967bb2ad87826b934c@agner.ch>
+References: <cover.1411404079.git.stefan@agner.ch>
+ <2ca1cf3732a00512fa19b6118f9fb30aba014deb.1411404079.git.stefan@agner.ch>
+ <CACRpkdbryJVW9e9N5+f3rWEGZ2YvLPJsvBtNSa9nPJpLVXhm0g@mail.gmail.com>
+ <45f7af8b2dbe11967bb2ad87826b934c@agner.ch>
+Message-ID: <1411650539.5671.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 11:09:09PM +0800, Chen-Yu Tsai wrote:
-> Lately we have received documentation for A31 and A31s, in addition to
-> A23 documentation which was received earlier but not added.
+Hi Stefan,
+
+Am Mittwoch, den 24.09.2014, 18:41 +0200 schrieb Stefan Agner:
+> Am 2014-09-24 11:16, schrieb Linus Walleij:
+> > On Mon, Sep 22, 2014 at 7:09 PM, Stefan Agner <stefan@agner.ch> wrote:
+> > 
+> >> Add device tree property for system reset controller.
+> >>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > 
+> > Are there already device tree bindings for SRC and GRC?
 > 
-> Add these to the README, and update to reflect that A31 and A23 are
-> supported.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Yes there are used in the i.MX6 world for instance, see imx6qdl.dtsi.
+> The SRC also has quite generic documentation, however, the GPC module
+> currently lacks documentation...
 
-Queued for 3.19, thanks!
+A patch that adds GPC binding documentation is part of this i.MX6 power
+domain series:
 
-Maxime
+http://www.spinics.net/lists/devicetree/msg48454.html
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/8496977e/attachment.sig>
+regards
+Philipp
