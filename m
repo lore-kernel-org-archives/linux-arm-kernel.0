@@ -1,43 +1,28 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 25 Sep 2014 19:04:56 +0200
-Subject: [GIT PULL] meson: basic support for MesonX SoCs
-In-Reply-To: <3795274.gkYSyS04CD@wuerfel>
-References: <20140923195221.GA30267@nuc>
- <3795274.gkYSyS04CD@wuerfel>
-Message-ID: <20140925170456.GA886@nuc>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 25 Sep 2014 13:06:26 -0400
+Subject: [PATCH v4 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <1411655363.4026.13.camel@joe-AO725>
+References: <1411653805-29257-1-git-send-email-santosh.shilimkar@ti.com>	
+ <1411653805-29257-3-git-send-email-santosh.shilimkar@ti.com>
+ <1411655363.4026.13.camel@joe-AO725>
+Message-ID: <54244B92.4020004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On gio, set 25, 2014 at 05:38:36 +0200, Arnd Bergmann wrote:
-> On Tuesday 23 September 2014 21:52:21 Carlo Caione wrote:
-> > Hi Arnd and Olof,
-> > 
-> > Here the pull request to introduce preliminary support for MesonX SoCs.
-> > It is based on the patchset at:
-> > 
-> > http://www.spinics.net/lists/arm-kernel/msg362521.html
-> > 
-> > and it is based on the master of arm-soc tree.
-> > 
+On Thursday 25 September 2014 10:29 AM, Joe Perches wrote:
+> On Thu, 2014-09-25 at 10:03 -0400, Santosh Shilimkar wrote:
+>> From: Sandeep Nair <sandeep_n@ti.com>
+>>
+>> The network coprocessor (NetCP) is a hardware accelerator that processes
+>> Ethernet packets. NetCP has a gigabit Ethernet (GbE) subsystem with a ethernet
+>> switch sub-module to send and receive packets. NetCP also includes a packet
+>> accelerator (PA) module to perform packet classification operations such as
+>> header matching, and packet modification operations such as checksum
+>> generation. NetCP can also optionally include a Security Accelerator(SA)
+>> capable of performing IPSec operations on ingress/egress packets.
 > 
-> Hi Carlo,
+> Some checkpatch trivia you might consider:
+Sure. I fold that in. Thanks !!
 
-Hi Arnd,
-
-> I ended up cherry-picking the individual changes into next/fixes-non-critical,
-> next/defconfig, next/dt and next/soc to fit our process better.
-> 
-> In general, please split up pull requests according to the next/* topic
-> branches we have in the arm-soc tree, as documented in 
-> arch/arm/arm-soc-for-next-contents.txt (only in the for-next branch).
-> 
-> More importantly, please base all changes on the most recent -rc1 release,
-> or possibly a later -rc if you get conflicts otherwise.
-> 
-> I know the process takes a little time to get used to ;-)
-
-Thank you for cherry-picking and for the pointers, next time will be
-better ;)
-
--- 
-Carlo Caione
+regards,
+Santosh
