@@ -1,86 +1,91 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 25 Sep 2014 18:37:09 +0200
-Subject: [PATCH v3 5/5] Documentation: dts: add bindings for Vybrid GPIO/PORT
- module
-In-Reply-To: <cover.1411662961.git.stefan@agner.ch>
-References: <cover.1411662961.git.stefan@agner.ch>
-Message-ID: <845a1d0d44dae1f3715b1731ec22f96045c43386.1411662961.git.stefan@agner.ch>
+From: bpringlemeir@nbsps.com (Bill Pringlemeir)
+Date: Thu, 25 Sep 2014 12:43:04 -0400
+Subject: [PATCH v2 2/5] pinctrl: imx: add gpio pinmux support for vf610
+In-Reply-To: <26008fa68a3eaf5f806a7dc4df48f77e@agner.ch> (Stefan Agner's
+ message of "Thu, 25 Sep 2014 11:36:48 +0200")
+References: <cover.1411492954.git.stefan@agner.ch>
+ <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
+ <20140925024712.GB6405@dragon>
+ <1d3735aff5e0961c43d349d673a1c2b2@agner.ch>
+ <20140925090714.GH6405@dragon>
+ <26008fa68a3eaf5f806a7dc4df48f77e@agner.ch>
+Message-ID: <877g0rlkh3.fsf@nbsps.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Vybrid SoC device tree (vf610.dtsi) used this bindings since
-its initial commit in May 2013. However, a proper gpiolib driver
-was missing so far. With the addition of the gpiolib driver,
-the bindings proved to be useful and complete, hence a good time
-to add the documentation.
+On 25 Sep 2014, stefan at agner.ch wrote:
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../devicetree/bindings/gpio/gpio-vf610.txt        | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+> Am 2014-09-25 11:07, schrieb Shawn Guo:
+>> On Thu, Sep 25, 2014 at 09:00:41AM +0200, Stefan Agner wrote:
+>>> Am 2014-09-25 04:47, schrieb Shawn Guo:
+>>>> On Tue, Sep 23, 2014 at 07:37:54PM +0200, Stefan Agner wrote:
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-vf610.txt b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-new file mode 100644
-index 0000000..da84121
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-vf610.txt
-@@ -0,0 +1,56 @@
-+* Freescale VF610 PORT/GPIO module
-+
-+The Freescale PORT/GPIO modules are two adjacent modules providing GPIO
-+functionality. Each pair serves 32 GPIOs. The VF610 has 5 instances of
-+each, and each PORT module has its own interrupt.
-+
-+Required properties for GPIO node:
-+- compatible : Should be "fsl,<soc>-gpio", currently "fsl,vf610-gpio"
-+- reg : The first reg tuple represents the PORT module, the second tuple
-+  the GPIO module.
-+- interrupts : Should be the port interrupt shared by all 32 pins.
-+- gpio-controller : Marks the device node as a gpio controller.
-+- #gpio-cells : Should be two. The first cell is the pin number and
-+  the second cell is used to specify the gpio polarity:
-+      0 = active high
-+      1 = active low
-+- interrupt-controller: Marks the device node as an interrupt controller.
-+- #interrupt-cells : Should be 2.  The first cell is the GPIO number.
-+  The second cell bits[3:0] is used to specify trigger type and level flags:
-+      1 = low-to-high edge triggered.
-+      2 = high-to-low edge triggered.
-+      4 = active high level-sensitive.
-+      8 = active low level-sensitive.
-+
-+Note: Each GPIO port should have an alias correctly numbered in "aliases"
-+node.
-+
-+Examples:
-+
-+aliases {
-+	gpio0 = &gpio1;
-+	gpio1 = &gpio2;
-+};
-+
-+gpio1: gpio at 40049000 {
-+	compatible = "fsl,vf610-gpio";
-+	reg = <0x40049000 0x1000 0x400ff000 0x40>;
-+	interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	gpio-ranges = <&iomuxc 0 0 32>;
-+};
-+
-+gpio2: gpio at 4004a000 {
-+	compatible = "fsl,vf610-gpio";
-+	reg = <0x4004a000 0x1000 0x400ff040 0x40>;
-+	interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	gpio-ranges = <&iomuxc 0 32 32>;
-+};
-+
--- 
-2.1.0
+>>>>> Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
+>>>>> This is needed since direction configuration is not part of the
+>>>>> GPIO module in Vybrid.
+>>>>>
+>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>>> ---
+
+[snip]
+
+>>>>> +	reg = readl(ipctl->base + pin_reg->mux_reg);
+>>>>> +	reg &= ~(0x7 << 20);
+>>>>> +	writel(reg, ipctl->base + pin_reg->mux_reg);
+
+>>>> Isn't this setup redundant at all, since imx_pmx_enable() already
+>>>> takes care of setting mux register including GPIO mode?
+
+>>> Yes currently this is redundant, when a pinmux is actually
+>>> applied. What is the expected behaviour? Is a explicit pinmux
+>>> necessary before we can use GPIO? If not, maybe it would make more
+>>> sense to use imx_pmx_enable here to write all pinctrl settings?
+
+>> Okay, as per Documentation/pinctrl.txt, it's required that GPIO and
+>> PINCTRL can be used as orthogonal.  That said, your code does the
+>> right thing.  Sorry for the noisy comment.
+
+> I'm happy you came up with this, since its the thing which I'm must
+> unsure whether this is right.
+
+> Right now, if you just export a random pin (which has no pinmux
+> configured in dt), you get an error since this function fails (mux_reg
+> == -1). But I guess we can't avoid it, we need the pinctrl framework
+> to have a valid setting before we fiddle around with the pad.
+
+> But now, if there is a pinmux configuration in dt, but its not applied
+> (using pinctrl-0 = ...), the export will succeed, however the GPIO
+> will not really be usable since no sane pad configuration is not
+> applied (input/output buffer disabled, no drive-strength)... So we
+> might well just don't change the mux here too.
+
+> IMHO, fully orthogonal is not possible, since on Vybrid those two
+> depend on each other. But in order to make it "more orthogonal", we
+> maybe should force applying the full configuration in
+> imx_pmx_gpio_request_enable (e.g. drive strenght etc), rather then
+> only mux the pad to to GPIO...
+
+> What do you think?
+
+The muxing must have been done, that is correct.  However, this could be
+by a boot loader, by some other API, etc.  People maybe concerned about
+Linux affecting 'CAN' (or some 'mission critical' pins) muxing for
+instance, but want the A5 to handle GPIO.
+
+If somewhere, somehow the pin was muxed properly and the GPIO code still
+works, I believe this is a win.  I see that this flexibility makes it
+more difficult to get something that just works.  I think the device
+trees take care of this for normal users.  It might be appropriate to
+add a DT node that sets 'GPIO_CONTROL' and put a note in the DT-GPIO
+document, that pinctrl is needed for a normal case or if some external
+muxing is used or not needed, then 'control=false' can be set (or
+whatever good DT terminology)?  Then the 'GPIO_CONTROL' check would be
+in the 'vf610_gpio_direction_input()' functions.  The 'pinctrl'
+functions are currently compiled to stubs if that is configured out.
+
+Then there is 'multi-machine' support with DT and compile time selects
+with CONFIG_PINCTRL and I don't think there is a lot of additional code
+or confusion?
+
+Fwiw,
+Bill Pringlemeir.
