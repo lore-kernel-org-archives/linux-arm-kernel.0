@@ -1,134 +1,171 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 25 Sep 2014 13:59:26 -0600
-Subject: [PATCH v12 06/12] PCI: Create pci_host_bridge before its
- associated bus in pci_create_root_bus.
-In-Reply-To: <CAE9FiQXuJZnj74dwTbKJCQNJ+OdEbjSB0fpwqh92+WZ_XGnrxQ@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-7-git-send-email-Liviu.Dudau@arm.com>
- <CAE9FiQXuJZnj74dwTbKJCQNJ+OdEbjSB0fpwqh92+WZ_XGnrxQ@mail.gmail.com>
-Message-ID: <CAErSpo6eUEV81n1rFjjvRcFVmsFkeUxhdL6JauTmx_Et6XdBuQ@mail.gmail.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Thu, 25 Sep 2014 15:08:00 -0500
+Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
+ CLK_OF_DECLARE support
+In-Reply-To: <d4a375f40b544cf1ae78ac82dc20569c@BL2PR03MB467.namprd03.prod.outlook.com>
+References: <1411454806-8214-1-git-send-email-jingchang.lu@freescale.com>
+ <d4a375f40b544cf1ae78ac82dc20569c@BL2PR03MB467.namprd03.prod.outlook.com>
+Message-ID: <1411675680.13320.201.camel@snotra.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 12:15 PM, Yinghai Lu <yinghai@kernel.org> wrote:
-> On Tue, Sep 23, 2014 at 12:01 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
->> As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
->> the creation order has been changed for no good reason. Revert the order of
->> creation as we are going to depend on the pci_host_bridge structure to retrieve the
->> domain number of the root bus.
->>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->> Acked-by: Grant Likely <grant.likely@linaro.org>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
->> ---
->>  drivers/pci/probe.c | 32 +++++++++++++++++---------------
->>  1 file changed, 17 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index e3cf8a2..5ff72ec 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -515,7 +515,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
->>         kfree(bridge);
->>  }
->>
->> -static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
->> +static struct pci_host_bridge *pci_alloc_host_bridge(void)
->>  {
->>         struct pci_host_bridge *bridge;
->>
->> @@ -524,7 +524,8 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
->>                 return NULL;
->>
->>         INIT_LIST_HEAD(&bridge->windows);
->> -       bridge->bus = b;
->> +       bridge->dev.release = pci_release_host_bridge_dev;
->> +
->>         return bridge;
->>  }
->>
->> @@ -1761,9 +1762,15 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->>         char bus_addr[64];
->>         char *fmt;
->>
->> +       bridge = pci_alloc_host_bridge();
->> +       if (!bridge)
->> +               return NULL;
->> +
->> +       bridge->dev.parent = parent;
->> +
->>         b = pci_alloc_bus();
->>         if (!b)
->> -               return NULL;
->> +               goto err_out;
->>
->>         b->sysdata = sysdata;
->>         b->ops = ops;
->> @@ -1772,26 +1779,19 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->>         if (b2) {
->>                 /* If we already got to this bus through a different bridge, ignore it */
->>                 dev_dbg(&b2->dev, "bus already known\n");
->> -               goto err_out;
->> +               goto err_bus_out;
->>         }
->>
->> -       bridge = pci_alloc_host_bridge(b);
->> -       if (!bridge)
->> -               goto err_out;
->> -
->> -       bridge->dev.parent = parent;
->> -       bridge->dev.release = pci_release_host_bridge_dev;
->> +       bridge->bus = b;
->>         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
->>         error = pcibios_root_bridge_prepare(bridge);
->> -       if (error) {
->> -               kfree(bridge);
->> +       if (error)
->>                 goto err_out;
->> -       }
->>
->>         error = device_register(&bridge->dev);
->>         if (error) {
->>                 put_device(&bridge->dev);
->> -               goto err_out;
->> +               goto err_bus_out;
->>         }
->>         b->bridge = get_device(&bridge->dev);
->>         device_enable_async_suspend(b->bridge);
->> @@ -1848,8 +1848,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->>  class_dev_reg_err:
->>         put_device(&bridge->dev);
->>         device_unregister(&bridge->dev);
->> -err_out:
->> +err_bus_out:
->>         kfree(b);
->> +err_out:
->> +       kfree(bridge);
->>         return NULL;
->>  }
->
-> Hi Bjorn,
->
-> Noticed that you put this one into pci/next.
->
-> This patch has problem for the class_dev_reg_err path.
-> as device_unregister(&bridge->dev) will trigger pci_release_host_bridge_dev.
-> So will have double free for bridge or else.
->
-> Please drop this patch from pci/next.
->
-> Also looks strange that the patch have long CC list, but just omit me
-> and Jiang Liu that
-> touched those code before.
+Well, like I said, I'd rather see the CLK_OF_DECLARE stuff be made to
+work on PPC rather than have the driver carry around two binding
+methods.
 
-Thanks for noticing that.  I was concerned, but couldn't remember the details.
+-Scott
 
-I dropped this patch and the subsequent ones from pci/host and rebased
-my "next" branch.
-
-Sorry I didn't notice you weren't on the CC list.
-
-Bjorn
+On Thu, 2014-09-25 at 04:47 -0500, Lu Jingchang-B35083 wrote:
+> Hi, Scott and Mike,
+>   
+>   Could you please help review this patch and give an ACK if ok. Thanks.
+> 
+> Best Regards,
+> Jingchang
+> 
+> >-----Original Message-----
+> >From: Jingchang Lu [mailto:jingchang.lu at freescale.com]
+> >Sent: Tuesday, September 23, 2014 2:47 PM
+> >To: mturquette at linaro.org
+> >Cc: Wood Scott-B07421; linuxppc-dev at lists.ozlabs.org; linux-
+> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Lu
+> >Jingchang-B35083
+> >Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
+> >CLK_OF_DECLARE support
+> >
+> >The IP is shared by PPC and ARM, this renames it to qoriq for better
+> >represention, and this also adds the CLK_OF_DECLARE support for being
+> >initialized by of_clk_init() on ARM.
+> >
+> >Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> >---
+> >changes in v4:
+> > remove "corenet" literals omitted in v3 remove.
+> >
+> >changes in v3:
+> > generate the patch with -M -C option
+> >
+> >changes in v2:
+> > rename the driver name to ppc-qoriq.c for shared on PPC and ARM.
+> >
+> > drivers/clk/Kconfig                            |  9 +++++----
+> > drivers/clk/Makefile                           |  2 +-
+> > drivers/clk/{clk-ppc-corenet.c => clk-qoriq.c} | 27 +++++++++++++++------
+> >-----
+> > 3 files changed, 22 insertions(+), 16 deletions(-)  rename
+> >drivers/clk/{clk-ppc-corenet.c => clk-qoriq.c} (89%)
+> >
+> >diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig index
+> >85131ae..f5f76cb 100644
+> >--- a/drivers/clk/Kconfig
+> >+++ b/drivers/clk/Kconfig
+> >@@ -92,12 +92,13 @@ config COMMON_CLK_AXI_CLKGEN
+> > 	  Support for the Analog Devices axi-clkgen pcore clock generator
+> >for Xilinx
+> > 	  FPGAs. It is commonly used in Analog Devices' reference designs.
+> >
+> >-config CLK_PPC_CORENET
+> >-	bool "Clock driver for PowerPC corenet platforms"
+> >-	depends on PPC_E500MC && OF
+> >+config CLK_QORIQ
+> >+	bool "Clock driver for PowerPC corenet and compatible ARM-based
+> >platforms"
+> >+	depends on (PPC_E500MC || ARM) && OF
+> > 	---help---
+> > 	  This adds the clock driver support for Freescale PowerPC corenet
+> >-	  platforms using common clock framework.
+> >+	  platforms and compatible Freescale ARM based platforms using
+> >common
+> >+	  clock framework.
+> >
+> > config COMMON_CLK_XGENE
+> > 	bool "Clock driver for APM XGene SoC"
+> >diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile index
+> >27c542b..20f42e9 100644
+> >--- a/drivers/clk/Makefile
+> >+++ b/drivers/clk/Makefile
+> >@@ -29,7 +29,7 @@ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
+> > obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+> > obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
+> > obj-$(CONFIG_COMMON_CLK_PALMAS)		+= clk-palmas.o
+> >-obj-$(CONFIG_CLK_PPC_CORENET)		+= clk-ppc-corenet.o
+> >+obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
+> > obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
+> > obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
+> > obj-$(CONFIG_COMMON_CLK_SI570)		+= clk-si570.o
+> >diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-qoriq.c
+> >similarity index 89% rename from drivers/clk/clk-ppc-corenet.c rename to
+> >drivers/clk/clk-qoriq.c index 8e58edf..cba8abe 100644
+> >--- a/drivers/clk/clk-ppc-corenet.c
+> >+++ b/drivers/clk/clk-qoriq.c
+> >@@ -155,7 +155,7 @@ static void __init core_pll_init(struct device_node
+> >*np)
+> >
+> > 	base = of_iomap(np, 0);
+> > 	if (!base) {
+> >-		pr_err("clk-ppc: iomap error\n");
+> >+		pr_err("clk-qoriq: iomap error\n");
+> > 		return;
+> > 	}
+> >
+> >@@ -252,7 +252,7 @@ static void __init sysclk_init(struct device_node
+> >*node)
+> > 	u32 rate;
+> >
+> > 	if (!np) {
+> >-		pr_err("ppc-clk: could not get parent node\n");
+> >+		pr_err("qoriq-clk: could not get parent node\n");
+> > 		return;
+> > 	}
+> >
+> >@@ -278,30 +278,35 @@ static const struct of_device_id clk_match[]
+> >__initconst = {
+> > 	{}
+> > };
+> >
+> >-static int __init ppc_corenet_clk_probe(struct platform_device *pdev)
+> >+static int __init qoriq_clk_probe(struct platform_device *pdev)
+> > {
+> > 	of_clk_init(clk_match);
+> >
+> > 	return 0;
+> > }
+> >
+> >-static const struct of_device_id ppc_clk_ids[] __initconst = {
+> >+static const struct of_device_id qoriq_clk_ids[] __initconst = {
+> > 	{ .compatible = "fsl,qoriq-clockgen-1.0", },
+> > 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
+> > 	{}
+> > };
+> >
+> >-static struct platform_driver ppc_corenet_clk_driver __initdata = {
+> >+static struct platform_driver qoriq_clk_driver __initdata = {
+> > 	.driver = {
+> >-		.name = "ppc_corenet_clock",
+> >+		.name = "qoriq_clock",
+> > 		.owner = THIS_MODULE,
+> >-		.of_match_table = ppc_clk_ids,
+> >+		.of_match_table = qoriq_clk_ids,
+> > 	},
+> >-	.probe = ppc_corenet_clk_probe,
+> >+	.probe = qoriq_clk_probe,
+> > };
+> >
+> >-static int __init ppc_corenet_clk_init(void)
+> >+static int __init qoriq_clk_init(void)
+> > {
+> >-	return platform_driver_register(&ppc_corenet_clk_driver);
+> >+	return platform_driver_register(&qoriq_clk_driver);
+> > }
+> >-subsys_initcall(ppc_corenet_clk_init);
+> >+subsys_initcall(qoriq_clk_init);
+> >+
+> >+CLK_OF_DECLARE(qoriq_core_pll_v1, "fsl,qoriq-core-pll-1.0",
+> >+core_pll_init); CLK_OF_DECLARE(qoriq_core_pll_v2,
+> >+"fsl,qoriq-core-pll-2.0", core_pll_init);
+> >+CLK_OF_DECLARE(qoriq_core_mux_v1, "fsl,qoriq-core-mux-1.0",
+> >+core_mux_init); CLK_OF_DECLARE(qoriq_core_mux_v2,
+> >+"fsl,qoriq-core-mux-2.0", core_mux_init);
+> >--
+> >1.8.0
+> 
