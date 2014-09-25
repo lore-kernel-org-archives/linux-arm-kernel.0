@@ -1,109 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 25 Sep 2014 11:38:24 -0600
-Subject: [PATCH] ARM: multi_v7_defconfig: add missing Tegra options
-Message-ID: <1411666704-7153-1-git-send-email-swarren@wwwdotorg.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 25 Sep 2014 19:46:15 +0200
+Subject: [PATCH 0/2] ARM: meson: add clocksource support
+In-Reply-To: <20140925171720.GB886@nuc>
+References: <1410786691-30302-1-git-send-email-carlo@caione.org>
+ <54175400.6000504@linaro.org> <20140925171720.GB886@nuc>
+Message-ID: <542454E7.8070405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 09/25/2014 07:17 PM, Carlo Caione wrote:
+> On lun, set 15, 2014 at 02:02:56 -0700, Daniel Lezcano wrote:
+>> On 09/15/2014 06:11 AM, Carlo Caione wrote:
+>>> Two patches taken from patchset http://www.spinics.net/lists/devicetree/msg48979.html
+>>> adding support for clocksource and clockevents driver.
+>>>
+>>> Daniel and Thomas,
+>>> if it's fine with you, could you please take these patches in the clocksource
+>>> tree?
+>>
+>> Hi Carlo,
+>>
+>> just a head up to tell you I saw your patchset. I am right now
+>> traveling so I will review the patches and pick them up as soon as I
+>> come back.
+>
+> Hi Daniel,
+> have you had any chance to look at this?
 
-Add all HW-support options from tegra_defconfig that are missing from
-multi_v7_defconfig.
+I am on it.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-I validated that this applies and builds OK on top of:
-arm-soc/for-next b161d35992ed ("Merge branches 'next/defconfig', ...")
-next-20140925
----
- arch/arm/configs/multi_v7_defconfig | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+   -- Daniel
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 8b489446aa1a..387d8e638468 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -77,6 +77,7 @@ CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PCI_TEGRA=y
-+CONFIG_PCIEPORTBUS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=8
- CONFIG_HIGHPTE=y
-@@ -124,7 +125,10 @@ CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
-+CONFIG_AD525X_DPOT=y
-+CONFIG_AD525X_DPOT_I2C=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
-@@ -134,9 +138,11 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_SCSI_MULTI_LUN=y
- CONFIG_ATA=y
-+CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
- CONFIG_AHCI_ST=y
- CONFIG_AHCI_SUNXI=y
-+CONFIG_AHCI_TEGRA=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-@@ -162,6 +168,7 @@ CONFIG_USB_NET_SMSC95XX=y
- CONFIG_BRCMFMAC=m
- CONFIG_RT2X00=m
- CONFIG_RT2800USB=m
-+CONFIG_INPUT_JOYDEV=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
-@@ -170,6 +177,7 @@ CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ATMEL_MXT=y
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
-@@ -294,6 +302,7 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-@@ -346,7 +355,18 @@ CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_PWM=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_ONESHOT=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_LEDS_TRIGGER_TRANSIENT=y
-+CONFIG_LEDS_TRIGGER_CAMERA=y
- CONFIG_EDAC=y
- CONFIG_EDAC_MM_EDAC=y
- CONFIG_EDAC_HIGHBANK_MC=y
-@@ -386,6 +406,7 @@ CONFIG_MFD_NVEC=y
- CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
-+CONFIG_NVEC_PAZ00=y
- CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8660=y
+
 -- 
-1.9.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
