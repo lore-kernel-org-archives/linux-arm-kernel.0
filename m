@@ -1,42 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 21:20:24 +0200
-Subject: [PATCH] [RFC] Using hierarchy irqdomian to implement MTK intpol.
-In-Reply-To: <alpine.DEB.2.10.1409251609500.4604@nanos>
-References: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <alpine.DEB.2.10.1409251609500.4604@nanos>
-Message-ID: <201409252120.24570.arnd@arndb.de>
+Date: Thu, 25 Sep 2014 21:26:38 +0200
+Subject: [PATCH 3/6] pci,
+ thunder: Add PCIe host controller devicetree bindings
+In-Reply-To: <CAErSpo4oFLKbtddzVoXBN-1dXZn5C4pmzY_QiFMwV+RWtmtjiQ@mail.gmail.com>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <8057985.kyfsioKAVy@wuerfel>
+ <CAErSpo4oFLKbtddzVoXBN-1dXZn5C4pmzY_QiFMwV+RWtmtjiQ@mail.gmail.com>
+Message-ID: <201409252126.38945.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014, Thomas Gleixner wrote:
-> On Thu, 25 Sep 2014, Joe.C wrote:
-> > From: "Joe.C" <yingjoe.chen@mediatek.com>
-> > 
-> > Here's the first draft of using hierarchy irqdomain to implement MTK intpol
-> > support. I have tested it and intpol works fine. Before continue, I'd like
-> > to get your comments. This is based on Jiang's hierarchy irqdomian [1] and
-> > my mediatek SoC basic support [2].
-> > 
-> > Simplified block diagram for interrupt:
-> > 
-> >     ---------      ---------
-> >  ---| CIRQ  |------|ARM GIC|
-> >  ---|       |------|       |
-> >  ---|       |------|       |
-> >  ---|       |------|       |
-> >  ---|       |------|       |
-> >     ---------      ---------
-> >  
-> > In device tree, interrupt-parent for other devices is cirq, child of gic.
-> > This describe HW better and allow device to specify polarity as it is sent
-> > by the device. I'm using interrupt-parent to specify irq domain parent in
-> > cirq now. Maybe adding another name like 'interrupt-domain-parent' will be
-> > better.
+On Thursday 25 September 2014, Bjorn Helgaas wrote:
+> On Thu, Sep 25, 2014 at 1:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 25 September 2014 00:37:00 Sunil Kovvuri wrote:
+> >> On Thu, Sep 25, 2014 at 12:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Wednesday 24 September 2014 23:34:04 Sunil Kovvuri wrote:
 > 
-> I leave that to the DT folks.
+> >> >> All on-board PCI devices connected to this PCI controller have fixed resources
+> >> >> and doesn't have to be allocated/reassigned. Some of these devices are
+> >> >> SRIOV based.
+> >> >
+> >> > I think you need to mark the ones that are nonrelocatable with flag
+> >> > 0x80000000, otherwise the PCI core might decide to reassign them.
+> >>
+> >> Is this flag part of DT pci node properties ?
+> >> I am using IORESOURCE_PCI_FIXED flag. Its there in other patches of
+> >> the same series.
+> >
+> > Ah, right. I checked the source code again and it seems that we don't handle
+> > this right at the moment. I think a range that has the nonrelocatable
+> > flag set should be used for IORESOURCE_PCI_FIXED mappings without any
+> > host specific code, but that needs to be implemented in common code.
+> 
+> What connection do you envision between nonrelocatable ranges and
+> IORESOURCE_PCI_FIXED?  I don't know what a nonrelocatable range is,
+> but for IORESOURCE_PCI_FIXED, all I intend is that the PCI core should
+> not try to assign a different address, e.g., because the BAR is
+> read-only or because it's a legacy IDE/VGA/etc. range for which there
+> is no BAR at all.
 
-interrupt-parent really defines a domain already, I think using this is
-perfectly fine.
+I think that is exactly the definition of the nonrelocatable flag
+in http://www.openfirmware.org/1275/bindings/pci/pci2_1.pdf
 
+The example given in section 11.1.2 is for a VGA device that has some
+relocatable BARs and some nonrelocatable BARs.
 
 	Arnd
