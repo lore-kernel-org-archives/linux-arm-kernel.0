@@ -1,90 +1,72 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 25 Sep 2014 15:48:16 -0700
-Subject: [PATCH v3 3/3] clk: rockchip: add clock node in PD_VIDEO
-In-Reply-To: <CAD=FV=UwV6xqubaBnOyT+QsAzOqe-0Cc43sy1Q5aLbWjxZ_B0Q@mail.gmail.com>
-References: <1411631328-14973-1-git-send-email-kever.yang@rock-chips.com>
- <1411631328-14973-4-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=UwV6xqubaBnOyT+QsAzOqe-0Cc43sy1Q5aLbWjxZ_B0Q@mail.gmail.com>
-Message-ID: <20140925224816.19023.29712@quantum>
+Date: Thu, 25 Sep 2014 15:50:20 -0700
+Subject: [PATCH v3 1/8] clk: rockchip: change pll rate without a
+ clk-notifier
+In-Reply-To: <1802092.5yu3PTGUzO@diego>
+References: <1410991974-12235-1-git-send-email-heiko@sntech.de>
+ <1410991974-12235-2-git-send-email-heiko@sntech.de>
+ <CAD=FV=VjU7E4TpPHv5Md=zLEig=zCTG8twx8L9+5hdLuERDUAw@mail.gmail.com>
+ <1802092.5yu3PTGUzO@diego>
+Message-ID: <20140925225020.19023.20029@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Doug Anderson (2014-09-25 15:24:22)
-> Kever,
+Quoting Heiko St?bner (2014-09-17 16:13:42)
+> Am Mittwoch, 17. September 2014, 15:46:08 schrieb Doug Anderson:
+> > Heiko,
+> > 
+> > On Wed, Sep 17, 2014 at 3:12 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > > From: Doug Anderson <dianders@chromium.org>
+> > > 
+> > > The Rockchip PLL code switches into slow mode (AKA bypass more AKA
+> > > 24MHz mode) before actually changing the PLL.  This keeps anyone from
+> > > using the PLL while it's changing.  However, in all known Rockchip
+> > > SoCs nobody should ever see the 24MHz when changing the PLL supplying
+> > > the armclk because we should reparent children to an alternate
+> > > (faster than 24MHz) PLL.
+> > > 
+> > > One problem is that the code to switch to an alternate parent was
+> > > running in PRE_RATE_CHANGE.  ...and the code to switch to slow mode
+> > > was _also_ running in PRE_RATE_CHANGE.  That meant there was no real
+> > > guarantee that we would switch to an alternate parent before switching
+> > > to 24MHz mode.
+> > > 
+> > > Let's move the switch to "slow mode" straight into
+> > > rockchip_rk3066_pll_set_rate().  That means we're guaranteed that the
+> > > 24MHz is really a last-resort.
+> > > 
+> > > Note that without this change on real systems we were the code to
+> > > switch to an alternate parent at 24MHz.  In some older versions of
+> > > that code we'd appy a (temporary) / 5 to the 24MHz causing us to run
+> > > at 4.8MHz.  That wasn't enough to service USB interrupts in some cases
+> > > and could lead to a system hang.
+> > > 
+> > > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > > 
+> > >  drivers/clk/rockchip/clk-pll.c | 63
+> > >  +++++++++--------------------------------- 1 file changed, 13
+> > >  insertions(+), 50 deletions(-)
+> > 
+> > Thanks for adding my patch to your series (with the proper commit
+> > message)!  I think you need your SoB on the patch too.  Andrew Morton
+> > pointed to the docs in another patch I was involved in.  Specifically,
+> > you were "on the patch delivery".  See Documentation/SubmittingPatches
+> > section 12 (and 13).
 > 
-> On Thu, Sep 25, 2014 at 12:48 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> > This patch add the clock node in PD_VIDEO
-> >
-> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >
-> > Changes in v3:
-> > - add a fix factor
-> > - introduce a virtual node to implement the clock struct
-> >
-> > Changes in v2:
-> > - split out the patch
-> >
-> >  drivers/clk/rockchip/clk-rk3288.c | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >
-> > diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> > index dd204cb..d466814 100644
-> > --- a/drivers/clk/rockchip/clk-rk3288.c
-> > +++ b/drivers/clk/rockchip/clk-rk3288.c
-> > @@ -296,6 +296,20 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
-> >         COMPOSITE(0, "aclk_vdpu", mux_pll_src_cpll_gpll_usb480m_p, 0,
-> >                         RK3288_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
-> >                         RK3288_CLKGATE_CON(3), 11, GFLAGS),
-> > +       /*
-> > +        * We use aclk_vdpu by default GRF_SOC_CON0[7] setting in system,
-> > +        * so we ignore the mux and make clocks nodes as following,
-> > +        */
-> > +       GATE(ACLK_VCODEC, "aclk_vcodec", "aclk_vdpu", 0,
-> > +               RK3288_CLKGATE_CON(9), 0, GFLAGS),
-> > +       /*
-> > +        * We introduce a virtul node of hclk_vodec_pre_v to split one clock
-> > +        * sturct with a gate and a fix divider into two node in software.
+> ok ... Mike can you add the
 > 
-> nit: s/sturct/struct
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> ...I think Mike will fix this up when applying.
+> to the patch, or do you want a respin [if no other issue appears]
 
-Fixed locally.
+I can add it, but do you plan to spin another version of this series
+with the changes to the comments?
 
-> 
-> > +        */
-> > +       GATE(0, "hclk_vcodec_pre_v", "aclk_vdpu", 0,
-> > +               RK3288_CLKGATE_CON(3), 10, GFLAGS),
-> > +       GATE(HCLK_VCODEC, "hclk_vcodec", "hclk_vcodec_pre", 0,
-> > +               RK3288_CLKGATE_CON(9), 1, GFLAGS),
-> >
-> >         COMPOSITE(0, "aclk_vio0", mux_pll_src_cpll_gpll_usb480m_p, 0,
-> >                         RK3288_CLKSEL_CON(31), 6, 2, MFLAGS, 0, 5, DFLAGS,
-> > @@ -711,6 +725,12 @@ static void __init rk3288_clk_init(struct device_node *np)
-> >                 pr_warn("%s: could not register clock usb480m: %ld\n",
-> >                         __func__, PTR_ERR(clk));
-> >
-> > +       clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
-> > +                                       "hclk_vcodec_pre_v", 0, 1, 4);
-> > +       if (IS_ERR(clk))
-> > +               pr_warn("%s: could not register clock hclk_vcodec_pre: %ld\n",
-> > +                       __func__, PTR_ERR(clk));
-> > +
-> >         rockchip_clk_register_plls(rk3288_pll_clks,
-> >                                    ARRAY_SIZE(rk3288_pll_clks),
-> >                                    RK3288_GRF_SOC_STATUS);
-> 
-> Looks reasonable.
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> 
-> I've booted this up and the new clocks show up and have the right parents.
-> 
-> Tested-by: Doug Anderson <dianders@chromium.org>
-
-Applied to clk-next.
-
-Thanks,
+Regards,
 Mike
+
+> 
+> 
+> Heiko
