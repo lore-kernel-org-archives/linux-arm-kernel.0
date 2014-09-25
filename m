@@ -1,23 +1,32 @@
-From: b10716@freescale.com (Laurentiu Tudor)
-Date: Thu, 25 Sep 2014 15:55:47 +0300
-Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
- CLK_OF_DECLARE support
-In-Reply-To: <1411454806-8214-1-git-send-email-jingchang.lu@freescale.com>
-References: <1411454806-8214-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <542410D3.2060507@freescale.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Thu, 25 Sep 2014 18:34:47 +0530
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Support for QCOM APQ8074 reset
+Message-ID: <1411650287-15947-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingchang,
+This change adds support for reset driver for apq8074 based platform.
+With this we should be able to reboot the board from command prompt.
 
-On 09/23/2014 09:46 AM, Jingchang Lu wrote:
-> The IP is shared by PPC and ARM, this renames it to qoriq for better
-> represention, and this also adds the CLK_OF_DECLARE support for being
-> initialized by of_clk_init() on ARM.
-> 
-
-I think you need to also update drivers/cpufreq/Kconfig.powerpc
-to use the renamed config option.
-
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
 ---
-Best Regards, Laurentiu
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 1bf198b..4f78491 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -230,6 +230,7 @@ CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_SUN6I=y
++CONFIG_POWER_RESET_MSM=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_LM95245=y
+ CONFIG_THERMAL=y
+-- 
+1.7.9.5
