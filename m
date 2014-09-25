@@ -1,45 +1,86 @@
 From: ganapatrao.kulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Thu, 25 Sep 2014 14:33:55 +0530
-Subject: [RFC PATCH 0/4] arm64:numa: Add numa support for arm64 platforms.
-Message-ID: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Date: Thu, 25 Sep 2014 14:33:57 +0530
+Subject: [RFC PATCH 2/4] arm/arm64:dt:numa: adding numa node mapping for
+ memory nodes.
+In-Reply-To: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+References: <1411635840-24038-1-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
+Message-ID: <1411635840-24038-3-git-send-email-ganapatrao.kulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is initial patch set to support numa on arm64 based platforms.
-Tested these patches on cavium's multinode(2 node topology) simulator.
-Tried all test-cases present in numactl-2.0.9 package.
+Adding Documentation for dt binding for memory to numa node mapping.
 
-In this patchset, defined dt bindings for numa mapping for memory
-nodes. The cpu to node mapping is derived from the existing cpu-map
-mapping as defined in topology binding.
-
-thanks,
-Ganapat
-
-Ganapatrao Kulkarni (4):
-  arm64: defconfig: increase NR_CPUS range to 2-128
-  arm/arm64:dt:numa: adding numa node mapping for memory nodes.
-  arm64:thunder: Add initial dts for Cavium Thunder SoC in 2 Node topology.
-  arm64:numa: adding numa support for arm64 platforms.
-
- Documentation/devicetree/bindings/arm/numa.txt |  60 ++
- arch/arm64/Kconfig                             |  37 +-
- arch/arm64/boot/dts/thunder-88xx-2n.dts        |  76 ++
- arch/arm64/boot/dts/thunder-88xx-2n.dtsi       | 990 +++++++++++++++++++++++++
- arch/arm64/include/asm/mmzone.h                |  32 +
- arch/arm64/include/asm/numa.h                  |  41 +
- arch/arm64/kernel/setup.c                      |   8 +
- arch/arm64/kernel/smp.c                        |   2 +
- arch/arm64/mm/Makefile                         |   1 +
- arch/arm64/mm/init.c                           |  33 +-
- arch/arm64/mm/numa.c                           | 471 ++++++++++++
- 11 files changed, 1745 insertions(+), 6 deletions(-)
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@caviumnetworks.com>
+---
+ Documentation/devicetree/bindings/arm/numa.txt | 60 ++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
- create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dts
- create mode 100644 arch/arm64/boot/dts/thunder-88xx-2n.dtsi
- create mode 100644 arch/arm64/include/asm/mmzone.h
- create mode 100644 arch/arm64/include/asm/numa.h
- create mode 100644 arch/arm64/mm/numa.c
 
+diff --git a/Documentation/devicetree/bindings/arm/numa.txt b/Documentation/devicetree/bindings/arm/numa.txt
+new file mode 100644
+index 0000000..1cdc6d3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/numa.txt
+@@ -0,0 +1,60 @@
++========================================================
++ARM numa id binding description
++========================================================
++
++========================================================
++1 - Introduction
++========================================================
++
++The device node  property nid (numa node id) can be added
++to memory device node to map the range of memory addresses
++as defined in property reg. The property nid maps the memory
++range to the numa node id, which is used to find the local
++and remote pages on numa aware systems.
++
++========================================================
++2 - nid property
++========================================================
++nid is required property of memory device node for
++numa enabled platforms.
++
++|------------------------------------------------------|
++|Property Type  | Usage | Value Type | Definition      |
++|------------------------------------------------------|
++|  nid          |  R    |    <u32>   | Numa Node id    |
++|               |       |            | for this memory |
++|------------------------------------------------------|
++
++========================================================
++4 - Example memory nodes with numa information
++========================================================
++
++Example 1 (2 memory nodes, each mapped to a numa node.):
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x00000000 0x0 0x80000000>;
++		nid = <0x0>;
++	};
++
++	memory at 10000000000 {
++		device_type = "memory";
++		reg = <0x100 0x00000000 0x0 0x80000000>;
++		nid = <0x1>;
++	};
++
++Example 2 (multiple memory ranges in each memory node and mapped to numa node):
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x00000000 0x0 0x80000000>,
++		      <0x1 0x00000000 0x0 0x80000000>;
++		nid = <0x0>;
++	};
++
++	memory at 10000000000 {
++		device_type = "memory";
++		reg = <0x100 0x00000000 0x0 0x80000000>;
++		reg = <0x100 0x80000000 0x0 0x80000000>;
++		nid = <0x1>;
++	};
 -- 
 1.8.1.4
