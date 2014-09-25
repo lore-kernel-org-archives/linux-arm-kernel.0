@@ -1,130 +1,30 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 24 Sep 2014 22:24:04 -0300
-Subject: [PATCH] [media] exynos4-is: fix some warnings when compiling on arm64
-Message-ID: <416b6af26812eb995333c5bd5a9263775b8c4699.1411607687.git.mchehab@osg.samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 25 Sep 2014 10:24:14 +0900
+Subject: regulator node names and unit-addresses? (Re: [PATCH v2 1/5]
+ ARM: shmobile: kzm9d: Remove spurious regulator base addresses)
+In-Reply-To: <20140924082726.GX4015@sirena.org.uk>
+References: <CAMuHMdVC2h4_Q+4BpV5iLbhfviimzrnfZ3+c6dqnegTAxBHw_g@mail.gmail.com>
+ <20140924081455.GU4015@sirena.org.uk>
+ <CAMuHMdWQfSLwqMMigLOZuGFJqQO03Qyw+ZHE1YAgd6mNDGmrEg@mail.gmail.com>
+ <20140924082726.GX4015@sirena.org.uk>
+Message-ID: <20140925012414.GE20466@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Got those warnings when compiling with gcc 4.9.1 for arm64:
+On Wed, Sep 24, 2014 at 09:27:26AM +0100, Mark Brown wrote:
+> On Wed, Sep 24, 2014 at 10:21:12AM +0200, Geert Uytterhoeven wrote:
+> > On Wed, Sep 24, 2014 at 10:14 AM, Mark Brown <broonie@kernel.org> wrote:
+> 
+> > > As far as the regulator API is concerned the node name is completly
+> > > immaterial and all this stuff is just verbiage we're forced to include.
+> > > As far as I can tell the requirement that node names be in the form
+> > > "regulator" or whatever is just another thing that wasn't terribly well
+> > > thought through in ePAPR, they were trying to do classes I think.
+> 
+> > So perhaps we should just keep "regulator at 0" and "regulator at 1"?
+> 
+> I don't care what they're called so long as things work; the DT people
+> are the ones to ask though.
 
-drivers/media/platform/exynos4-is/fimc-isp-video.c: In function ?isp_video_capture_buffer_queue?:
-drivers/media/platform/exynos4-is/fimc-isp-video.c:221:4: warning: format ?%x? expects argument of type ?unsigned int?, but argument 7 has type ?dma_addr_t? [-Wformat=]
-    isp_dbg(2, &video->ve.vdev,
-    ^
-drivers/media/platform/exynos4-is/fimc-is.c: In function ?fimc_is_load_firmware?:
-drivers/media/platform/exynos4-is/fimc-is.c:391:3: warning: format ?%d? expects argument of type ?int?, but argument 3 has type ?size_t? [-Wformat=]
-   dev_err(dev, "wrong firmware size: %d\n", fw->size);
-   ^
-In file included from include/linux/printk.h:260:0,
-                 from include/linux/kernel.h:13,
-                 from include/linux/kernfs.h:10,
-                 from include/linux/sysfs.h:15,
-                 from include/linux/kobject.h:21,
-                 from include/linux/device.h:17,
-                 from drivers/media/platform/exynos4-is/fimc-is.c:15:
-include/linux/dynamic_debug.h:64:16: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
-  static struct _ddebug  __aligned(8)   \
-                ^
-include/linux/dynamic_debug.h:84:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
-  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
-  ^
-include/linux/device.h:1106:2: note: in expansion of macro ?dynamic_dev_dbg?
-  dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
-  ^
-drivers/media/platform/exynos4-is/fimc-is.c:419:2: note: in expansion of macro ?dev_dbg?
-  dev_dbg(dev, "FW size: %d, paddr: %#x\n", fw->size, is->memory.paddr);
-  ^
-include/linux/dynamic_debug.h:64:16: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
-  static struct _ddebug  __aligned(8)   \
-                ^
-include/linux/dynamic_debug.h:84:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
-  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
-  ^
-include/linux/device.h:1106:2: note: in expansion of macro ?dynamic_dev_dbg?
-  dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
-  ^
-drivers/media/platform/exynos4-is/fimc-is.c:419:2: note: in expansion of macro ?dev_dbg?
-  dev_dbg(dev, "FW size: %d, paddr: %#x\n", fw->size, is->memory.paddr);
-  ^
-drivers/media/platform/exynos4-is/fimc-is.c: In function ?fimc_is_hw_initialize?:
-include/linux/dynamic_debug.h:64:16: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
-  static struct _ddebug  __aligned(8)   \
-                ^
-include/linux/dynamic_debug.h:76:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
-  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
-  ^
-include/linux/printk.h:266:2: note: in expansion of macro ?dynamic_pr_debug?
-  dynamic_pr_debug(fmt, ##__VA_ARGS__)
-  ^
-drivers/media/platform/exynos4-is/fimc-is.c:696:2: note: in expansion of macro ?pr_debug?
-  pr_debug("shared region: %#x, parameter region: %#x\n",
-  ^
-include/linux/dynamic_debug.h:64:16: warning: format ?%x? expects argument of type ?unsigned int?, but argument 6 has type ?dma_addr_t? [-Wformat=]
-  static struct _ddebug  __aligned(8)   \
-                ^
-include/linux/dynamic_debug.h:76:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
-  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
-  ^
-include/linux/printk.h:266:2: note: in expansion of macro ?dynamic_pr_debug?
-  dynamic_pr_debug(fmt, ##__VA_ARGS__)
-  ^
-drivers/media/platform/exynos4-is/fimc-is.c:696:2: note: in expansion of macro ?pr_debug?
-  pr_debug("shared region: %#x, parameter region: %#x\n",
-  ^
-
-Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-
-diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
-index 5476dce3ad29..22162b2567da 100644
---- a/drivers/media/platform/exynos4-is/fimc-is.c
-+++ b/drivers/media/platform/exynos4-is/fimc-is.c
-@@ -388,7 +388,7 @@ static void fimc_is_load_firmware(const struct firmware *fw, void *context)
- 	mutex_lock(&is->lock);
- 
- 	if (fw->size < FIMC_IS_FW_SIZE_MIN || fw->size > FIMC_IS_FW_SIZE_MAX) {
--		dev_err(dev, "wrong firmware size: %d\n", fw->size);
-+		dev_err(dev, "wrong firmware size: %zu\n", fw->size);
- 		goto done;
- 	}
- 
-@@ -416,7 +416,7 @@ static void fimc_is_load_firmware(const struct firmware *fw, void *context)
- 
- 	dev_info(dev, "loaded firmware: %s, rev. %s\n",
- 		 is->fw.info, is->fw.version);
--	dev_dbg(dev, "FW size: %d, paddr: %#x\n", fw->size, is->memory.paddr);
-+	dev_dbg(dev, "FW size: %zu, paddr: %pad\n", fw->size, &is->memory.paddr);
- 
- 	is->is_shared_region->chip_id = 0xe4412;
- 	is->is_shared_region->chip_rev_no = 1;
-@@ -693,9 +693,9 @@ int fimc_is_hw_initialize(struct fimc_is *is)
- 		return -EIO;
- 	}
- 
--	pr_debug("shared region: %#x, parameter region: %#x\n",
--		 is->memory.paddr + FIMC_IS_SHARED_REGION_OFFSET,
--		 is->is_dma_p_region);
-+	pr_debug("shared region: %pad, parameter region: %pad\n",
-+		 &is->memory.paddr + FIMC_IS_SHARED_REGION_OFFSET,
-+		 &is->is_dma_p_region);
- 
- 	is->setfile.sub_index = 0;
- 
-diff --git a/drivers/media/platform/exynos4-is/fimc-isp-video.c b/drivers/media/platform/exynos4-is/fimc-isp-video.c
-index 9d8d885558e5..76b6b4d14616 100644
---- a/drivers/media/platform/exynos4-is/fimc-isp-video.c
-+++ b/drivers/media/platform/exynos4-is/fimc-isp-video.c
-@@ -219,9 +219,9 @@ static void isp_video_capture_buffer_queue(struct vb2_buffer *vb)
- 							ivb->dma_addr[i];
- 
- 			isp_dbg(2, &video->ve.vdev,
--				"dma_buf %d (%d/%d/%d) addr: %#x\n",
--				buf_index, ivb->index, i, vb->v4l2_buf.index,
--				ivb->dma_addr[i]);
-+				"dma_buf %pad (%d/%d/%d) addr: %pad\n",
-+				&buf_index, ivb->index, i, vb->v4l2_buf.index,
-+				&ivb->dma_addr[i]);
- 		}
- 
- 		if (++video->buf_count < video->reqbufs_count)
--- 
-1.9.3
+Ok, lets just leave them as "regulator at 0" and "regulator at 1".
+If better names emerge then we can use them.
