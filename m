@@ -1,66 +1,43 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 25 Sep 2014 18:28:34 +0200
-Subject: [PATCH v3 07/13] ARM: shmobile: R-Mobile: Use
- generic_pm_domain.attach_dev() for pm_clk setup
-In-Reply-To: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
-References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1411662520-22795-8-git-send-email-geert+renesas@glider.be>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Sep 2014 18:31:03 +0200
+Subject: [GIT PULL] Allwinner drivers additions for 3.18
+In-Reply-To: <201409251820.38087.arnd@arndb.de>
+References: <20140920202855.GA20329@lukather>
+ <201409251820.38087.arnd@arndb.de>
+Message-ID: <20140925163103.GN15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the just introduced genpd attach/detach callbacks to register the
-devices' module clocks, instead of doing it directly, to make it
-DT-proof.
+Hi,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v3:
-  - Update for callback signature changes,
-v2:
-  - New
+On Thu, Sep 25, 2014 at 06:20:37PM +0200, Arnd Bergmann wrote:
+> On Saturday 20 September 2014, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > Please pull the following changes for the next merge window.
+> > 
+> 
+> Pulled into next/drivers. The patches look good, but please note that the RTC
+> subsystem does have a maintainer and mailing list. You should really keep
+> them in the loop for the reviews *and* the submission.
 
- arch/arm/mach-shmobile/pm-rmobile.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+They were. And have been ping'd multiple time, without any answer.
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 717e6413d29cb998..ae846dfcd69293f7 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -101,6 +101,17 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
- 	return true;
- }
- 
-+static void rmobile_pd_attach_dev(struct device *dev)
-+{
-+	if (pm_clk_no_clocks(dev))
-+		pm_clk_add(dev, NULL);
-+}
-+
-+static void rmobile_pd_detach_dev(struct device *dev)
-+{
-+	pm_clk_remove(dev, NULL);
-+}
-+
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- {
- 	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
-@@ -112,6 +123,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
-+	genpd->attach_dev		= rmobile_pd_attach_dev;
-+	genpd->detach_dev		= rmobile_pd_detach_dev;
- 	__rmobile_pd_power_up(rmobile_pd, false);
- }
- 
-@@ -130,8 +143,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
- 	struct device *dev = &pdev->dev;
- 
- 	__pm_genpd_name_add_device(domain_name, dev, td);
--	if (pm_clk_no_clocks(dev))
--		pm_clk_add(dev, NULL);
- }
- 
- void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+Plus, this thread from last december
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220778.html,
+clearly showed that it's nothing new, and that Alessandro doesn't
+maintain any tree, hence why I ended up merging it.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/9ae68e8b/attachment.sig>
