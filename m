@@ -1,59 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 23:58:32 +0200
-Subject: [GIT PULL 1/4] part 2 of omap intc changes for v3.18 merge window
-In-Reply-To: <pull-1411070912-460910>
-References: <pull-1411070912-460910>
-Message-ID: <201409252358.33038.arnd@arndb.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 25 Sep 2014 23:58:37 +0200
+Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
+In-Reply-To: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
+References: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <5424900D.2070709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 September 2014, Tony Lindgren wrote:
-> The following changes since commit 55601c9f24670ba926ebdd4d712ac3b177232330:
-> 
->   arm: omap: intc: switch over to linear irq domain (2014-09-11 13:05:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/intc-part2-for-v3.18
-> 
-> for you to fetch changes up to 64d5947b9ee1284b38b8e212e7c94024452b2bb4:
-> 
->   irqchip: omap-intc: remove unnecessary comments (2014-09-16 14:45:01 -0700)
-> 
-> ----------------------------------------------------------------
-> Second part of omap intc interrupt controller changes to
-> move it to drivers.
-> 
-> ----------------------------------------------------------------
-> Felipe Balbi (10):
->       arm: omap2: n8x0: move i2c devices to DT
->       irqchip: add irq-omap-intc.h header
->       arm: omap: irq: move irq.c to drivers/irqchip/
->       irqchip: omap-intc: minor improvement to omap_irq_pending()
->       irqchip: omap-intc: comment style cleanup
->       irqchip: omap-intc: remove unnecesary of_address_to_resource() call
->       irqchip: omap-intc: enable IP protection
->       irqchip: omap-intc: enable TURBO idle mode
->       irqchip: omap-intc: correct maximum number or MIR registers
->       irqchip: omap-intc: remove unnecessary comments
-> 
->  arch/arm/boot/dts/omap2420-n810.dts                |  7 +++
->  arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  6 ++
->  arch/arm/mach-omap2/Kconfig                        |  1 +
->  arch/arm/mach-omap2/Makefile                       |  3 +-
->  arch/arm/mach-omap2/board-n8x0.c                   | 26 +--------
->  arch/arm/mach-omap2/common-board-devices.h         |  5 ++
->  arch/arm/mach-omap2/common.h                       | 10 +---
->  arch/arm/mach-omap2/pdata-quirks.c                 |  2 +
->  drivers/irqchip/Kconfig                            |  5 ++
->  drivers/irqchip/Makefile                           |  1 +
->  .../irq.c => drivers/irqchip/irq-omap-intc.c       | 64 +++++++++++++---------
->  include/linux/irqchip/irq-omap-intc.h              | 32 +++++++++++
->  12 files changed, 101 insertions(+), 61 deletions(-)
->  rename arch/arm/mach-omap2/irq.c => drivers/irqchip/irq-omap-intc.c (89%)
->  create mode 100644 include/linux/irqchip/irq-omap-intc.h
-> 
+Hi Sylwester,
 
-Pulled into next/drivers, thanks!
+On 10.09.2014 18:37, Sylwester Nawrocki wrote:
+> The default mux and divider clocks are specified in device tree
+> so that the FIMC devices in Exynos4210 and Exynos4x12 SoCs are
+> clocked from recommended clock source and with maximum supported
+> frequency. If needed these settings could be overrode in board
+> specific dts files, however they are in practice optimal in most
+> cases.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210.dtsi |   16 ++++++++++++++++
+>  arch/arm/boot/dts/exynos4x12.dtsi |   16 ++++++++++++++++
+>  2 files changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index 807bb5b..0969d2e 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -154,18 +154,30 @@
+>  			samsung,pix-limits = <4224 8192 1920 4224>;
+>  			samsung,mainscaler-ext;
+>  			samsung,cam-if;
+> +			assigned-clocks = <&clock CLK_MOUT_FIMC0>,
+> +					<&clock CLK_SCLK_FIMC0>;
+> +			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
+> +			assigned-clock-rates = <0>, <160000000>;
 
-	Arnd
+I wonder whether such settings shouldn't really be set up on a per-board
+basis.
+
+As Daniel already pointed, we have cases when MPLL frequency differs
+across boards, but we might also have boards that differ in power budget
+and so having different desired operating frequencies for various IP blocks.
+
+What do you think?
+
+Best regards,
+Tomasz
