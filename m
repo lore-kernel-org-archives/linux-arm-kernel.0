@@ -1,49 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 25 Sep 2014 09:17:04 +0100
-Subject: [PATCH v3] ARM: dts: add CPU nodes for Exynos4 SoCs
-In-Reply-To: <018e01cfd885$770dd940$65298bc0$@kernel.org>
-References: <5230569.XLlNbB5NvF@amdc1032>
- <018e01cfd885$770dd940$65298bc0$@kernel.org>
-Message-ID: <20140925081704.GA20841@e102568-lin.cambridge.arm.com>
+From: isimatu.yasuaki@jp.fujitsu.com (Yasuaki Ishimatsu)
+Date: Thu, 25 Sep 2014 17:15:55 +0900
+Subject: [RFC Part2 v1 00/21] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <alpine.DEB.2.10.1409242122380.4604@nanos>
+References: <1410444228-3134-1-git-send-email-jiang.liu@linux.intel.com>
+ <542279D0.1040603@jp.fujitsu.com> <alpine.DEB.2.10.1409242122380.4604@nanos>
+Message-ID: <5423CF3B.4050107@jp.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC'ed Daniel to make him aware this patch goes through your tree]
+(2014/09/25 4:25), Thomas Gleixner wrote:
+> On Wed, 24 Sep 2014, Yasuaki Ishimatsu wrote:
+>> I cannot imagine why the feature makes x86 irq architecture much more clear
+>> and more easy to maintain in this description. Of course, I have read the
+>> following threads:
+>>
+>> https://lkml.org/lkml/2014/9/11/101
+>
 
-On Thu, Sep 25, 2014 at 06:56:33AM +0100, Kukjin Kim wrote:
-> Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Recent patch by Tomasz Figa ("irqchip: gic: Fix core ID calculation
-> > when topology is read from DT") fixed GIC driver to filter cluster ID
-> > from values returned by cpu_logical_map() for SoCs having registers
-> > mapped without per-CPU banking making it is possible to add CPU nodes
-> > for Exynos4 SoCs.  In case of Exynos SoCs these CPU nodes are also
-> > required by future changes adding initialization of cpuidle states in
-> > Exynos cpuidle driver through DT.
-> > 
-> > Tested on Origen board (Exynos4210 SoC) and Trats2 (Exynos4412 SoC).
-> > 
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> > Based on for-next branch of linux-samsung.git tree.
-> > 
-> > v3:
-> > - refreshed on top of Kukjin's tree
-> > 
-> > v2:
-> > - match the unit-address with the reg
-> > 
-> >  arch/arm/boot/dts/exynos4210.dtsi |   17 +++++++++++++++++
-> >  arch/arm/boot/dts/exynos4212.dtsi |   17 +++++++++++++++++
-> >  arch/arm/boot/dts/exynos4412.dtsi |   29 +++++++++++++++++++++++++++++
-> >  3 files changed, 63 insertions(+)
-> 
-> Thanks for re-spin and looks good to me.
-> 
-> Applied.
+> Here is the long version of the idea:
+>
+>       https://lkml.org/lkml/2014/8/26/707
 
-That's great, now my Exynos CPUidle DT patch should be rebased on top
-of this patch so that thanks to the testing carried out by Bart it can be
-merged too.
+This is very helpful for the understanding of this feature.
 
-Lorenzo
+Thanks,
+Yasuaki Ishimatsu
+
+>
+> Short version is:
+>
+> Separate the irq handling entities in a clear layered way instead of
+> having vector/[io]apic specific knowledge/data in places like msi,
+> remap etc.
+>
+> Thanks,
+>
+> 	tglx
+>
