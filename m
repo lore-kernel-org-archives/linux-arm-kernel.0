@@ -1,43 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Sep 2014 18:31:03 +0200
-Subject: [GIT PULL] Allwinner drivers additions for 3.18
-In-Reply-To: <201409251820.38087.arnd@arndb.de>
-References: <20140920202855.GA20329@lukather>
- <201409251820.38087.arnd@arndb.de>
-Message-ID: <20140925163103.GN15315@lukather>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 25 Sep 2014 18:37:08 +0200
+Subject: [PATCH v3 4/5] ARM: dts: vf610: use new GPIO support
+In-Reply-To: <cover.1411662961.git.stefan@agner.ch>
+References: <cover.1411662961.git.stefan@agner.ch>
+Message-ID: <590a5fbc4f8b552355a93c1002041765352cd1c3.1411662961.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use GPIO support by adding SD card detection configuration and
+GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
+pins to the iomuxc node to get the GPIO pin settings applied.
 
-On Thu, Sep 25, 2014 at 06:20:37PM +0200, Arnd Bergmann wrote:
-> On Saturday 20 September 2014, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > Please pull the following changes for the next merge window.
-> > 
-> 
-> Pulled into next/drivers. The patches look good, but please note that the RTC
-> subsystem does have a maintainer and mailing list. You should really keep
-> them in the loop for the reviews *and* the submission.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf610-colibri.dtsi | 9 +++++++++
+ arch/arm/boot/dts/vf610-twr.dts      | 1 +
+ arch/arm/boot/dts/vf610.dtsi         | 1 +
+ 3 files changed, 11 insertions(+)
 
-They were. And have been ping'd multiple time, without any answer.
-
-Plus, this thread from last december
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220778.html,
-clearly showed that it's nothing new, and that Alessandro doesn't
-maintain any tree, hence why I ended up merging it.
-
-Maxime
-
+diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+index 0cd8343..efd4322 100644
+--- a/arch/arm/boot/dts/vf610-colibri.dtsi
++++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+@@ -31,6 +31,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+ };
+ 
+ &fec1 {
+@@ -71,6 +72,14 @@
+ 
+ &iomuxc {
+ 	vf610-colibri {
++		pinctrl_gpio_ext: gpio_ext {
++			fsl,pins = <
++				VF610_PAD_PTD10__GPIO_89	0x22ed /* EXT_IO_0 */
++				VF610_PAD_PTD9__GPIO_88		0x22ed /* EXT_IO_1 */
++				VF610_PAD_PTD26__GPIO_68	0x22ed /* EXT_IO_2 */
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index 189b697..3fe8a8f 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -116,6 +116,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 4d2ec32..467c97e 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -11,6 +11,7 @@
+ #include "vf610-pinfunc.h"
+ #include <dt-bindings/clock/vf610-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	aliases {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/9ae68e8b/attachment.sig>
+2.1.0
