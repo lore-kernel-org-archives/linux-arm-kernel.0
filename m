@@ -1,29 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 12:57:29 +0200
-Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
-In-Reply-To: <1b72af7d8c90492ba91115ef958bbda7@BLUPR03MB472.namprd03.prod.outlook.com>
-References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
- <3598074.CpE7Waa9La@wuerfel>
- <1b72af7d8c90492ba91115ef958bbda7@BLUPR03MB472.namprd03.prod.outlook.com>
-Message-ID: <8538195.h7lPfgcOv3@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 25 Sep 2014 12:05:28 +0100
+Subject: [PATCH RESEND] arm: don't break misaligned NEON load/store
+In-Reply-To: <15fc86b0d2b4984377d7116113b0f2f9498bd088.1411392970.git.robin.murphy@arm.com>
+References: <15fc86b0d2b4984377d7116113b0f2f9498bd088.1411392970.git.robin.murphy@arm.com>
+Message-ID: <5423F6F8.2060902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014 08:06:27 Jingchang Lu wrote:
-> 
-> Libfdt doesn't provide way to find a node by label. Label is just a shortcut to
-> a full absolute path, it's useful in device tree source reference, but is hard
-> to find a label after build to dtb. Aliases just provide the way to save a
-> full absolute path in properties like label, but they can be find in dtb after
-> build so that fixup on dtb can find a node efficiently. So I think the aliases
-> for the phy nodes is also reasonable. Many others boards also use labels for
-> various dts nodes.
+On 22/09/14 14:48, Robin Murphy wrote:
+> The alignment fixup incorrectly decodes faulting ARM VLDn/VSTn
+> instructions (where the optional alignment hint is given but incorrect)
+> as LDR/STR, leading to register corruption. Detect these and correctly
+> treat them as unhandled, so that userspace gets the fault it expects.
+>
+> Reported-by: Simon Hosie <simon.hosie@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Cc: <stable@vger.kernel.org>
+> ---
+>
+> Hi all,
+>
+> This was met with a resounding silence a while back[1], but the bug is
+> still causing annoyance - apparently Clang intrinsics can be a little
+> over-eager with alignment hints. Regardless of whose fault that is,
+> the kernel shouldn't be silently mangling registers unexpectedly.
+>
+> Any objections to me dropping this into the patch system?
+>
 
-Ok, fair enough.
+Since nobody's voiced any complaints, I've submitted this as 8165/1.
 
-I still think it would be a good idea in general to let all boot loaders
-find nodes and properties by label, which in theory should be simpler
-than finding them by aliases, but if they don't do that today it should
-not stop your file from getting merged.
-
-	Arnd
+Robin.
