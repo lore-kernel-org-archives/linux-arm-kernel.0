@@ -1,61 +1,42 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Thu, 25 Sep 2014 20:19:42 +0100
-Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
-In-Reply-To: <CAKfTPtB3-M+pXaurDeWkWGNJ3_mU-FN+EnshGE-eg_r41Hppag@mail.gmail.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
- <542303DF.8010606@arm.com>
- <CAKfTPtB3-M+pXaurDeWkWGNJ3_mU-FN+EnshGE-eg_r41Hppag@mail.gmail.com>
-Message-ID: <54246ACE.1080502@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Sep 2014 21:20:24 +0200
+Subject: [PATCH] [RFC] Using hierarchy irqdomian to implement MTK intpol.
+In-Reply-To: <alpine.DEB.2.10.1409251609500.4604@nanos>
+References: <1411574696-1881-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <alpine.DEB.2.10.1409251609500.4604@nanos>
+Message-ID: <201409252120.24570.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/14 09:35, Vincent Guittot wrote:
-> On 24 September 2014 19:48, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
->> On 23/09/14 17:08, Vincent Guittot wrote:
->>
+On Thursday 25 September 2014, Thomas Gleixner wrote:
+> On Thu, 25 Sep 2014, Joe.C wrote:
+> > From: "Joe.C" <yingjoe.chen@mediatek.com>
+> > 
+> > Here's the first draft of using hierarchy irqdomain to implement MTK intpol
+> > support. I have tested it and intpol works fine. Before continue, I'd like
+> > to get your comments. This is based on Jiang's hierarchy irqdomian [1] and
+> > my mediatek SoC basic support [2].
+> > 
+> > Simplified block diagram for interrupt:
+> > 
+> >     ---------      ---------
+> >  ---| CIRQ  |------|ARM GIC|
+> >  ---|       |------|       |
+> >  ---|       |------|       |
+> >  ---|       |------|       |
+> >  ---|       |------|       |
+> >     ---------      ---------
+> >  
+> > In device tree, interrupt-parent for other devices is cirq, child of gic.
+> > This describe HW better and allow device to specify polarity as it is sent
+> > by the device. I'm using interrupt-parent to specify irq domain parent in
+> > cirq now. Maybe adding another name like 'interrupt-domain-parent' will be
+> > better.
 > 
-> [snip]
-> 
->>
->> This review (by PeterZ) during v5 of your patch-set recommended some
->> renaming (e.g. s/group_has_free_capacity/group_has_capacity and
->> s/group_out_of_capacity/group_no_capacity as well as reordering of the
->> parameters which I agree with:
->>
->> https://lkml.org/lkml/2014/9/11/706
-> 
-> Ah... you're right, these changes have passed through my seance of renaming
+> I leave that to the DT folks.
 
-What about the ordering of the function parameters in
-group_has_capacity, group_is_overloaded and group_type group_classify?
+interrupt-parent really defines a domain already, I think using this is
+perfectly fine.
 
-All the existing *load balance* related functions in fair.c seem to
-follow this (struct lb_env *env, struct sd_lb_stats *sds, struct
-sched_group *group, struct sg_lb_stats *sgs) order.
 
-> 
->>
->>>
->>> -/*
-> 
-> [snip]
-> 
->>> -       if (sgs->group_capacity_factor > sgs->sum_nr_running)
->>> -               sgs->group_has_free_capacity = 1;
->>> +       sgs->group_type = group_classify(group, sgs, env);
->>> +
->>> +       sgs->group_out_of_capacity = group_is_overloaded(sgs, env);
->>
->> In case sgs->group_type is group_overloaded you could set
->> sgs->group_out_of_capacity to 1 without calling group_is_overloaded again.
-> 
-> I prefer to keep sgs->group_out_of_capacity = group_is_overloaded(sgs,
-> env) and use it in group_classify in case of future changes in the
-> classification order
-
-Ok, but than group_is_overloaded is called twice at the end of
-update_sg_lb_stats with exactly the same result. Looks weird in my traces.
-
-> 
-[...]
+	Arnd
