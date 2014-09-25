@@ -1,198 +1,130 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 25 Sep 2014 09:16:48 +0800
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20140925011647.GB3716@peterchendt>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 24 Sep 2014 22:24:04 -0300
+Subject: [PATCH] [media] exynos4-is: fix some warnings when compiling on arm64
+Message-ID: <416b6af26812eb995333c5bd5a9263775b8c4699.1411607687.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 12:28:03PM +0200, Antoine Tenart wrote:
-> Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
-> and DMA mask, to support USB2 ChipIdea controllers that don't need
-> specific functions.
-> 
-> Tested on the Marvell Berlin SoCs USB controllers.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/usb/chipidea/Makefile       |   1 +
->  drivers/usb/chipidea/ci_hdrc_usb2.c | 138 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 139 insertions(+)
->  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
-> 
-> diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> index 2f099c7df7b5..1fc86a2ca22d 100644
-> --- a/drivers/usb/chipidea/Makefile
-> +++ b/drivers/usb/chipidea/Makefile
-> @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
->  
->  # Glue/Bridge layers go here
->  
-> +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
->  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
->  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
->  
-> diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
-> new file mode 100644
-> index 000000000000..6eae1de587f2
-> --- /dev/null
-> +++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
-> @@ -0,0 +1,138 @@
-> +/*
-> + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> + *
-> + * Antoine Tenart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/usb/chipidea.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/usb/ulpi.h>
-> +
-> +#include "ci.h"
-> +
-> +struct ci_hdrc_usb2_priv {
-> +	struct platform_device	*ci_pdev;
-> +	struct clk		*clk;
-> +};
-> +
-> +static int ci_hdrc_usb2_dt_probe(struct device *dev,
-> +				 struct ci_hdrc_platform_data *ci_pdata)
-> +{
-> +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
-> +	if (IS_ERR(ci_pdata->phy)) {
-> +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +
-> +		/* PHY is optional */
-> +		ci_pdata->phy = NULL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct ci_hdrc_platform_data ci_default_pdata = {
-> +	.capoffset	= DEF_CAPOFFSET,
-> +	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
-> +			  CI_HDRC_DISABLE_STREAMING,
-> +};
-> +
-> +static int ci_hdrc_usb2_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct ci_hdrc_usb2_priv *priv;
-> +	struct ci_hdrc_platform_data *ci_pdata = dev_get_platdata(&pdev->dev);
-> +	int ret;
-> +
-> +	if (!ci_pdata)
-> +		ci_pdata = &ci_default_pdata;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->clk = devm_clk_get(dev, NULL);
-> +	if (!IS_ERR(priv->clk)) {
-> +		ret = clk_prepare_enable(priv->clk);
-> +		if (ret) {
-> +			dev_err(dev, "failed to enable the clock: %d\n", ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	if (dev->of_node) {
-> +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-> +		if (ret)
-> +			goto clk_err;
-> +	} else {
-> +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> +		if (ret)
-> +			goto clk_err;
-> +	}
+Got those warnings when compiling with gcc 4.9.1 for arm64:
 
-Hi Antoine, the above code may not be needed, since get phy and set dma
-mask are common operation, we can do it at core code, the only thing you
-need to do is something like: dev->dma_mask = DMA_BIT_MASK(32).
+drivers/media/platform/exynos4-is/fimc-isp-video.c: In function ?isp_video_capture_buffer_queue?:
+drivers/media/platform/exynos4-is/fimc-isp-video.c:221:4: warning: format ?%x? expects argument of type ?unsigned int?, but argument 7 has type ?dma_addr_t? [-Wformat=]
+    isp_dbg(2, &video->ve.vdev,
+    ^
+drivers/media/platform/exynos4-is/fimc-is.c: In function ?fimc_is_load_firmware?:
+drivers/media/platform/exynos4-is/fimc-is.c:391:3: warning: format ?%d? expects argument of type ?int?, but argument 3 has type ?size_t? [-Wformat=]
+   dev_err(dev, "wrong firmware size: %d\n", fw->size);
+   ^
+In file included from include/linux/printk.h:260:0,
+                 from include/linux/kernel.h:13,
+                 from include/linux/kernfs.h:10,
+                 from include/linux/sysfs.h:15,
+                 from include/linux/kobject.h:21,
+                 from include/linux/device.h:17,
+                 from drivers/media/platform/exynos4-is/fimc-is.c:15:
+include/linux/dynamic_debug.h:64:16: warning: format ?%d? expects argument of type ?int?, but argument 4 has type ?size_t? [-Wformat=]
+  static struct _ddebug  __aligned(8)   \
+                ^
+include/linux/dynamic_debug.h:84:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
+  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
+  ^
+include/linux/device.h:1106:2: note: in expansion of macro ?dynamic_dev_dbg?
+  dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
+  ^
+drivers/media/platform/exynos4-is/fimc-is.c:419:2: note: in expansion of macro ?dev_dbg?
+  dev_dbg(dev, "FW size: %d, paddr: %#x\n", fw->size, is->memory.paddr);
+  ^
+include/linux/dynamic_debug.h:64:16: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
+  static struct _ddebug  __aligned(8)   \
+                ^
+include/linux/dynamic_debug.h:84:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
+  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
+  ^
+include/linux/device.h:1106:2: note: in expansion of macro ?dynamic_dev_dbg?
+  dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
+  ^
+drivers/media/platform/exynos4-is/fimc-is.c:419:2: note: in expansion of macro ?dev_dbg?
+  dev_dbg(dev, "FW size: %d, paddr: %#x\n", fw->size, is->memory.paddr);
+  ^
+drivers/media/platform/exynos4-is/fimc-is.c: In function ?fimc_is_hw_initialize?:
+include/linux/dynamic_debug.h:64:16: warning: format ?%x? expects argument of type ?unsigned int?, but argument 5 has type ?dma_addr_t? [-Wformat=]
+  static struct _ddebug  __aligned(8)   \
+                ^
+include/linux/dynamic_debug.h:76:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
+  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
+  ^
+include/linux/printk.h:266:2: note: in expansion of macro ?dynamic_pr_debug?
+  dynamic_pr_debug(fmt, ##__VA_ARGS__)
+  ^
+drivers/media/platform/exynos4-is/fimc-is.c:696:2: note: in expansion of macro ?pr_debug?
+  pr_debug("shared region: %#x, parameter region: %#x\n",
+  ^
+include/linux/dynamic_debug.h:64:16: warning: format ?%x? expects argument of type ?unsigned int?, but argument 6 has type ?dma_addr_t? [-Wformat=]
+  static struct _ddebug  __aligned(8)   \
+                ^
+include/linux/dynamic_debug.h:76:2: note: in expansion of macro ?DEFINE_DYNAMIC_DEBUG_METADATA?
+  DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
+  ^
+include/linux/printk.h:266:2: note: in expansion of macro ?dynamic_pr_debug?
+  dynamic_pr_debug(fmt, ##__VA_ARGS__)
+  ^
+drivers/media/platform/exynos4-is/fimc-is.c:696:2: note: in expansion of macro ?pr_debug?
+  pr_debug("shared region: %#x, parameter region: %#x\n",
+  ^
 
-I will check your generic phy support for chipidea driver later, if it is
-ok to apply, you can have a patchset to move get phy operation to common
-code prior to this one (If you have no time, I can do it).
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-Peter
-
-> +
-> +	ci_pdata->name = dev_name(&pdev->dev);
-> +
-> +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> +					   pdev->num_resources, ci_pdata);
-> +	if (IS_ERR(priv->ci_pdev)) {
-> +		ret = PTR_ERR(priv->ci_pdev);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(dev,
-> +				"failed to register ci_hdrc platform device: %d\n",
-> +				ret);
-> +		goto clk_err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	pm_runtime_no_callbacks(dev);
-> +	pm_runtime_enable(dev);
-> +
-> +	return 0;
-> +
-> +clk_err:
-> +	if (!IS_ERR(priv->clk))
-> +		clk_disable_unprepare(priv->clk);
-> +	return ret;
-> +}
-> +
-> +static int ci_hdrc_usb2_remove(struct platform_device *pdev)
-> +{
-> +	struct ci_hdrc_usb2_priv *priv = platform_get_drvdata(pdev);
-> +
-> +	pm_runtime_disable(&pdev->dev);
-> +	ci_hdrc_remove_device(priv->ci_pdev);
-> +	clk_disable_unprepare(priv->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ci_hdrc_usb2_of_match[] = {
-> +	{ .compatible = "chipidea,usb2" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
-> +
-> +static struct platform_driver ci_hdrc_usb2_driver = {
-> +	.probe	= ci_hdrc_usb2_probe,
-> +	.remove	= ci_hdrc_usb2_remove,
-> +	.driver	= {
-> +		.name		= "chipidea-usb2",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
-> +	},
-> +};
-> +module_platform_driver(ci_hdrc_usb2_driver);
-> +
-> +MODULE_DESCRIPTION("ChipIdea HDRC USB2 binding for ci13xxx");
-> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 1.9.1
-> 
-
+diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
+index 5476dce3ad29..22162b2567da 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is.c
++++ b/drivers/media/platform/exynos4-is/fimc-is.c
+@@ -388,7 +388,7 @@ static void fimc_is_load_firmware(const struct firmware *fw, void *context)
+ 	mutex_lock(&is->lock);
+ 
+ 	if (fw->size < FIMC_IS_FW_SIZE_MIN || fw->size > FIMC_IS_FW_SIZE_MAX) {
+-		dev_err(dev, "wrong firmware size: %d\n", fw->size);
++		dev_err(dev, "wrong firmware size: %zu\n", fw->size);
+ 		goto done;
+ 	}
+ 
+@@ -416,7 +416,7 @@ static void fimc_is_load_firmware(const struct firmware *fw, void *context)
+ 
+ 	dev_info(dev, "loaded firmware: %s, rev. %s\n",
+ 		 is->fw.info, is->fw.version);
+-	dev_dbg(dev, "FW size: %d, paddr: %#x\n", fw->size, is->memory.paddr);
++	dev_dbg(dev, "FW size: %zu, paddr: %pad\n", fw->size, &is->memory.paddr);
+ 
+ 	is->is_shared_region->chip_id = 0xe4412;
+ 	is->is_shared_region->chip_rev_no = 1;
+@@ -693,9 +693,9 @@ int fimc_is_hw_initialize(struct fimc_is *is)
+ 		return -EIO;
+ 	}
+ 
+-	pr_debug("shared region: %#x, parameter region: %#x\n",
+-		 is->memory.paddr + FIMC_IS_SHARED_REGION_OFFSET,
+-		 is->is_dma_p_region);
++	pr_debug("shared region: %pad, parameter region: %pad\n",
++		 &is->memory.paddr + FIMC_IS_SHARED_REGION_OFFSET,
++		 &is->is_dma_p_region);
+ 
+ 	is->setfile.sub_index = 0;
+ 
+diff --git a/drivers/media/platform/exynos4-is/fimc-isp-video.c b/drivers/media/platform/exynos4-is/fimc-isp-video.c
+index 9d8d885558e5..76b6b4d14616 100644
+--- a/drivers/media/platform/exynos4-is/fimc-isp-video.c
++++ b/drivers/media/platform/exynos4-is/fimc-isp-video.c
+@@ -219,9 +219,9 @@ static void isp_video_capture_buffer_queue(struct vb2_buffer *vb)
+ 							ivb->dma_addr[i];
+ 
+ 			isp_dbg(2, &video->ve.vdev,
+-				"dma_buf %d (%d/%d/%d) addr: %#x\n",
+-				buf_index, ivb->index, i, vb->v4l2_buf.index,
+-				ivb->dma_addr[i]);
++				"dma_buf %pad (%d/%d/%d) addr: %pad\n",
++				&buf_index, ivb->index, i, vb->v4l2_buf.index,
++				&ivb->dma_addr[i]);
+ 		}
+ 
+ 		if (++video->buf_count < video->reqbufs_count)
 -- 
-Best Regards,
-Peter Chen
+1.9.3
