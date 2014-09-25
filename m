@@ -1,33 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Sep 2014 12:05:37 +0200
-Subject: [PATCH 3/3] ARM: sun7i: cubieboard2: Enable the AXP209
-In-Reply-To: <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1411243596-15117-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411243596-15117-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140925100537.GB15315@lukather>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 25 Sep 2014 12:14:16 +0200
+Subject: [PATCH] ARM: efm32: drop selecting NO_DMA
+In-Reply-To: <1411585151.19525.29.camel@x220>
+References: <1411585151.19525.29.camel@x220>
+Message-ID: <1411640056.7866.5.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 20, 2014 at 10:06:36PM +0200, Maxime Ripard wrote:
-> Add the AXP209 PMIC with the regulators in use on the cubie2.
+On Wed, 2014-09-24 at 20:59 +0200, Paul Bolle wrote:
+> Actually, the only difference I found in the .config file was that after
+> this patch the .config file contained
+>     CONFIG_ARCH_EFM32=y
 > 
-> The RTC regulator can be disabled, but since the RTC driver doesn't grab the
-> regulator for now, the driver wouldn't work anymore.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> I have no idea why. Did I botch my test?
 
-Queued this one for 3.19.
+Apparently I did. I retested this patch using next-20140925. Now the
+generated .config before and after applying this patch are identical. So
+all's good: this select really is a nop.
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/d58f5c39/attachment.sig>
+Paul Bolle
