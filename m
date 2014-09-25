@@ -1,25 +1,29 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 25 Sep 2014 12:23:54 +0200
-Subject: [PATCH v8 0/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
-References: <1411632689-31531-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <201409251223.54218.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Sep 2014 12:57:29 +0200
+Subject: [PATCHv4 3/6] ARM: dts: Add initial LS1021A TWR board dts support
+In-Reply-To: <1b72af7d8c90492ba91115ef958bbda7@BLUPR03MB472.namprd03.prod.outlook.com>
+References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
+ <3598074.CpE7Waa9La@wuerfel>
+ <1b72af7d8c90492ba91115ef958bbda7@BLUPR03MB472.namprd03.prod.outlook.com>
+Message-ID: <8538195.h7lPfgcOv3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 25, 2014 at 10:11:27 AM, Yuan Yao wrote:
-> Changed in v8:
-> - some minor fixes for coding style.
-> - unsetting I2CR_DMAEN immediatelly when failed in DMA mode.
+On Thursday 25 September 2014 08:06:27 Jingchang Lu wrote:
+> 
+> Libfdt doesn't provide way to find a node by label. Label is just a shortcut to
+> a full absolute path, it's useful in device tree source reference, but is hard
+> to find a label after build to dtb. Aliases just provide the way to save a
+> full absolute path in properties like label, but they can be find in dtb after
+> build so that fixup on dtb can find a node efficiently. So I think the aliases
+> for the phy nodes is also reasonable. Many others boards also use labels for
+> various dts nodes.
 
-Brief skim over the patch doesn't show any dangling problems.
+Ok, fair enough.
 
-Reviewed-by: Marek Vasut <marex@denx.de>
+I still think it would be a good idea in general to let all boot loaders
+find nodes and properties by label, which in theory should be simpler
+than finding them by aliases, but if they don't do that today it should
+not stop your file from getting merged.
 
-btw. the U-Boot output is completely irrelevant, it only points out you use 
-outdated version, so please keep only the relevant output. Also, I would 
-recommend you to trim the responses to patches with [...] so one doesn't have to 
-scroll through a wall of old text, but can easily find the relevant portions.
-
-Best regards,
-Marek Vasut
+	Arnd
