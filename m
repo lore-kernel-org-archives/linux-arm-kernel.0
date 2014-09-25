@@ -1,81 +1,56 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:17 +0800
-Subject: [PATCH v2 07/22] PCI/MSI: Refactor struct msi_chip to make it become
- more common
+Date: Thu, 25 Sep 2014 11:14:25 +0800
+Subject: [PATCH v2 15/22] MIPS/Xlr/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
 In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
 References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-8-git-send-email-wangyijing@huawei.com>
+Message-ID: <1411614872-4009-16-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now there are a lot of __weak arch functions in MSI code.
-These functions make MSI driver complex. Thierry Reding Introduced
-a new MSI chip framework to configure MSI/MSI-X irq in ARM. Use
-the new MSI chip framework to refactor all other platform MSI
-arch code to eliminate weak arch MSI functions. This patch add
-.restore_irq() and .setup_irqs() to make it become more common.
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/pci/msi.c   |   15 +++++++++++++++
- include/linux/msi.h |    3 +++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+ arch/mips/pci/pci-xlr.c |   15 +++++++++++++--
+ 1 files changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 3acbe65..d10edee 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -64,6 +64,11 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- {
- 	struct msi_desc *entry;
- 	int ret;
-+	struct msi_chip *chip;
-+
-+	chip = arch_find_msi_chip(dev);
-+	if (chip && chip->setup_irqs)
-+		return chip->setup_irqs(dev, nvec, type);
- 
- 	/*
- 	 * If an architecture wants to support multiple MSI, it needs to
-@@ -106,6 +111,11 @@ void default_teardown_msi_irqs(struct pci_dev *dev)
- 
- void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
- {
-+	struct msi_chip *chip = arch_find_msi_chip(dev);
-+
-+	if (chip && chip->teardown_irqs)
-+		return chip->teardown_irqs(dev);
-+
- 	return default_teardown_msi_irqs(dev);
+diff --git a/arch/mips/pci/pci-xlr.c b/arch/mips/pci/pci-xlr.c
+index 0dde803..7bd91cc 100644
+--- a/arch/mips/pci/pci-xlr.c
++++ b/arch/mips/pci/pci-xlr.c
+@@ -214,11 +214,11 @@ static int get_irq_vector(const struct pci_dev *dev)
  }
  
-@@ -129,6 +139,11 @@ static void default_restore_msi_irq(struct pci_dev *dev, int irq)
- 
- void __weak arch_restore_msi_irqs(struct pci_dev *dev)
+ #ifdef CONFIG_PCI_MSI
+-void arch_teardown_msi_irq(unsigned int irq)
++void xlr_teardown_msi_irq(unsigned int irq)
  {
-+	struct msi_chip *chip = arch_find_msi_chip(dev);
-+
-+	if (chip && chip->restore_irqs)
-+		return chip->restore_irqs(dev);
-+
- 	return default_restore_msi_irqs(dev);
  }
  
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 6fdc5c6..4cf1f31 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -69,7 +69,10 @@ struct msi_chip {
- 	struct list_head list;
+-int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
++int xlr_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ {
+ 	struct msi_msg msg;
+ 	struct pci_dev *lnk;
+@@ -263,6 +263,17 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	write_msi_msg(irq, &msg);
+ 	return 0;
+ }
++
++static struct msi_chip xlr_msi_chip = {
++	.setup_irq = xlr_setup_msi_irq,
++	.teardown_irq = xlr_teardown_msi_irq,
++};
++
++struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++{
++	return &xlr_msi_chip;
++}
++
+ #endif
  
- 	int (*setup_irq)(struct pci_dev *dev, struct msi_desc *desc);
-+	int (*setup_irqs)(struct pci_dev *dev, int nvec, int type);
- 	void (*teardown_irq)(unsigned int irq);
-+	void (*teardown_irqs)(struct pci_dev *dev);
-+	void (*restore_irqs)(struct pci_dev *dev);
- };
- 
- #endif /* LINUX_MSI_H */
+ /* Extra ACK needed for XLR on chip PCI controller */
 -- 
 1.7.1
