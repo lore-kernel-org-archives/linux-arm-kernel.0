@@ -1,24 +1,32 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 25 Sep 2014 14:36:01 -0700
-Subject: [PATCH/RFC v2 05/12] PM / Domains: Add helper variable np =
- dev->of_node
-In-Reply-To: <1410893339-6361-6-git-send-email-geert+renesas@glider.be> (Geert
- Uytterhoeven's message of "Tue, 16 Sep 2014 20:48:52 +0200")
-References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
- <1410893339-6361-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <7hwq8r9yda.fsf@deeprootsystems.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 25 Sep 2014 17:38:50 -0400
+Subject: [PATCH 7/7] efi_rtc: probe function error out in case no efi
+ runtime enabled
+In-Reply-To: <20140925211855.GS18635@console-pimps.org>
+References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+ <1408007953-15151-1-git-send-email-dyoung@redhat.com>
+ <1411403609.25340.55.camel@deneb.redhat.com>
+ <20140925211855.GS18635@console-pimps.org>
+Message-ID: <1411681130.25340.101.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert+renesas@glider.be> writes:
+On Thu, 2014-09-25 at 22:18 +0100, Matt Fleming wrote:
+> On Mon, 22 Sep, at 12:33:29PM, Mark Salter wrote:
+> > 
+> > Is this still needed after commit da167ad7638759:
+> > 
+> >   rtc: ia64: allow other architectures to use EFI RTC
+> 
+> Umm... we should really look at disabling this for x86, since the EFI
+> time functions don't work on a bunch of machines I've got here.
+> 
+> And it looks like someone enabled this driver and triggered an oops on
+> their 32-bit EFI tablet,
+> 
+>   https://bugzilla.kernel.org/show_bug.cgi?id=84241#c21
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Maybe a short changelog answering "why?" (just a cleanup), and saying
-there are no functional changes.
-
-Otherwise,
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
-
-Kevin
+Previously, it depended on IA64. If it's not worth the trouble for
+x86 then I'd say have it depend on !X86 also. Newer EFI-supporting
+architectures are unlikely to have the same legacy issues as x86
+so I don't think it'll end up being an ever growing list.
