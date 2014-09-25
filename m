@@ -1,67 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 22:22:23 +0200
-Subject: [PATCH 3/6] pci,
- thunder: Add PCIe host controller devicetree bindings
-In-Reply-To: <CAErSpo5rhL7pLha-yWt7sZUBmAnwA6FkacL+sWXBKkSzsuC7Sg@mail.gmail.com>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <201409252126.38945.arnd@arndb.de>
- <CAErSpo5rhL7pLha-yWt7sZUBmAnwA6FkacL+sWXBKkSzsuC7Sg@mail.gmail.com>
-Message-ID: <201409252222.23825.arnd@arndb.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 25 Sep 2014 22:42:37 +0200
+Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
+In-Reply-To: <7ha95nikqh.fsf@linaro.org>
+References: <7ha95nikqh.fsf@linaro.org>
+Message-ID: <38173516.KG4f94aNi3@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014, Bjorn Helgaas wrote:
-> OK.  You said "a range that has the nonrelocatable flag set should be
-> used for IORESOURCE_PCI_FIXED mappings."  I thought you meant that the
-> range was a bridge window, and somehow PCI_FIXED BARs should be put in
-> that window.
+On Thursday, September 25, 2014 12:05:42 PM Kevin Hilman wrote:
+> Hi Rafael,
 > 
-> But maybe you meant that nonrelocatable ranges should have the
-> IORESOURCE_PCI_FIXED bit set in their struct resources.  That would
-> mean we couldn't move the window, but we could put relocatable BARs
-> inside the window.
+> The first pull request was missing a dependency on a feature that went
+> in through Mark Brown's regulator tree, so it wouldn't actually compile
+> properly by itself.  This version pulls in that topic branch from Marks
+> tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
+
+Pulled, thanks!
+
+I'll push it to Linus after the Mark's material has been merged to avoid
+git log confusion.
+
+Rafael
+
+
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 > 
-> What needs to be implemented?  Just the code that would set
-> IORESOURCE_PCI_FIXED for nonrelocatable ranges?
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git tags/avs-for-3.18
+> 
+> for you to fetch changes up to cd8caa18deff6d2d87a4e3161b4dd8c6da3c4f38:
+> 
+>   Merge branch 'topic/voltage-ev' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator into avs-next (2014-09-25 09:57:57 -0700)
+> 
+> ----------------------------------------------------------------
+> PM / AVS changes for v3.18
+> 
+> - Add new driver for Rockchip IO voltage domains
+> - update MAINTAINERS to reflect maintenance of drivers/power/avs/*
+> 
+> ----------------------------------------------------------------
+> Heiko St?bner (2):
+>       regulator: core: Add REGULATOR_EVENT_PRE_VOLTAGE_CHANGE (and ABORT)
+>       PM / AVS: rockchip-io: add driver handling Rockchip io domains
+> 
+> Kevin Hilman (2):
+>       MAINTAINERS: update entry for drivers/power/avs
+>       Merge branch 'topic/voltage-ev' of git://git.kernel.org/.../broonie/regulator into avs-next
+> 
+>  Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  83 +++++++++++++++++++
+>  MAINTAINERS                                                    |   4 +-
+>  drivers/power/avs/Kconfig                                      |   8 ++
+>  drivers/power/avs/Makefile                                     |   1 +
+>  drivers/power/avs/rockchip-io-domain.c                         | 351 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/regulator/core.c                                       |  63 +++++++++++++--
+>  include/linux/regulator/consumer.h                             |  20 +++++
+>  7 files changed, 521 insertions(+), 9 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+>  create mode 100644 drivers/power/avs/rockchip-io-domain.c
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-It might be more complex than I thought. Let's see what the original
-hack does:
-
-+/*
-+ * All PCIe devices in Thunder have fixed resources, shouldn't be reassigned.
-+ * Also claim the device's valid resources to set 'res->parent' hierarchy.
-+ */
-+static void pci_dev_resource_fixup(struct pci_dev *dev)
-+{
-+       struct resource *res;
-+       int resno;
-+
-+       for (resno = 0; resno < PCI_NUM_RESOURCES; resno++)
-+               dev->resource[resno].flags |= IORESOURCE_PCI_FIXED;
-+
-+       for (resno = 0; resno < PCI_BRIDGE_RESOURCES; resno++) {
-+               res = &dev->resource[resno];
-+               if (res->parent || !(res->flags & IORESOURCE_MEM))
-+                       continue;
-+               pci_claim_resource(dev, resno);
-+       }
-+}
-+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, PCI_ANY_ID,
-+                       pci_dev_resource_fixup);
-
-This actually looks harmful, because it means that any kernel that contains
-the thunder host controller driver will do the above for any device made
-by Cavium, whether it's connected to this bridge or not.
-
-What I think we want instead is to mark any resource whose parent
-resource is IORESOURCE_PCI_FIXED to have the same flag, and mark
-the PCI host controller resources IORESOURCE_PCI_FIXED when the
-nonrelocatable flag is set, and that should all be done in core
-code, not in a driver fixup.
-
-The part that still looks weird is the pci_claim_resource() that
-Sunil mentioned. This is currently done for resources that do not
-have a parent, but AFAICT all PCI device resources should have a
-parent that connects it to the upstream bridge.
-
-	Arnd
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
