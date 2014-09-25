@@ -1,59 +1,114 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:24 +0800
-Subject: [PATCH v2 14/22] MIPS/Xlp/MSI: Use MSI chip framework to configure
+Date: Thu, 25 Sep 2014 11:14:19 +0800
+Subject: [PATCH v2 09/22] x86/xen/MSI: Use MSI chip framework to configure
  MSI/MSI-X irq
 In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
 References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-15-git-send-email-wangyijing@huawei.com>
+Message-ID: <1411614872-4009-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use MSI chip framework instead of arch MSI functions to configure
 MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
+Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+Acked-by: David Vrabel <david.vrabel@citrix.com>
+Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 ---
- arch/mips/pci/msi-xlp.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+ arch/x86/pci/xen.c |   46 ++++++++++++++++++++++++++++++----------------
+ 1 files changed, 30 insertions(+), 16 deletions(-)
 
-diff --git a/arch/mips/pci/msi-xlp.c b/arch/mips/pci/msi-xlp.c
-index e469dc7..6b791ef 100644
---- a/arch/mips/pci/msi-xlp.c
-+++ b/arch/mips/pci/msi-xlp.c
-@@ -245,7 +245,7 @@ static struct irq_chip xlp_msix_chip = {
- 	.irq_unmask	= unmask_msi_irq,
- };
- 
--void arch_teardown_msi_irq(unsigned int irq)
-+void xlp_teardown_msi_irq(unsigned int irq)
- {
+diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
+index 84c2fce..e669ee4 100644
+--- a/arch/x86/pci/xen.c
++++ b/arch/x86/pci/xen.c
+@@ -376,6 +376,11 @@ static void xen_initdom_restore_msi_irqs(struct pci_dev *dev)
  }
+ #endif
  
-@@ -450,7 +450,7 @@ static int xlp_setup_msix(uint64_t lnkbase, int node, int link,
- 	return 0;
- }
- 
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+static int xlp_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
- 	struct pci_dev *lnkdev;
- 	uint64_t lnkbase;
-@@ -472,6 +472,16 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 		return xlp_setup_msi(lnkbase, node, link, desc);
- }
- 
-+static struct msi_chip xlp_chip = {
-+	.setup_irq = xlp_setup_msi_irq,
-+	.teardown_irq = xlp_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++static void xen_teardown_msi_irq(unsigned int irq)
 +{
-+	return &xlp_chip;
++	xen_destroy_irq(irq);
 +}
 +
- void __init xlp_init_node_msi_irqs(int node, int link)
+ static void xen_teardown_msi_irqs(struct pci_dev *dev)
  {
- 	struct nlm_soc_info *nodep;
+ 	struct msi_desc *msidesc;
+@@ -385,19 +390,26 @@ static void xen_teardown_msi_irqs(struct pci_dev *dev)
+ 		xen_pci_frontend_disable_msix(dev);
+ 	else
+ 		xen_pci_frontend_disable_msi(dev);
+-
+-	/* Free the IRQ's and the msidesc using the generic code. */
+-	default_teardown_msi_irqs(dev);
+-}
+-
+-static void xen_teardown_msi_irq(unsigned int irq)
+-{
+-	xen_destroy_irq(irq);
++	
++	list_for_each_entry(msidesc, &dev->msi_list, list) {
++		int i, nvec;
++		if (msidesc->irq == 0)
++			continue;
++		if (msidesc->nvec_used)
++			nvec = msidesc->nvec_used;
++		else
++			nvec = 1 << msidesc->msi_attrib.multiple;
++		for (i = 0; i < nvec; i++)
++			xen_teardown_msi_irq(msidesc->irq + i);
++	}
+ }
+ 
+ void xen_nop_msi_mask(struct irq_data *data)
+ {
+ }
++
++struct msi_chip xen_msi_chip;
++
+ #endif
+ 
+ int __init pci_xen_init(void)
+@@ -418,9 +430,9 @@ int __init pci_xen_init(void)
+ #endif
+ 
+ #ifdef CONFIG_PCI_MSI
+-	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
+-	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+-	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
++	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
++	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
++	x86_msi_chip = &xen_msi_chip;
+ 	msi_chip.irq_mask = xen_nop_msi_mask;
+ 	msi_chip.irq_unmask = xen_nop_msi_mask;
+ #endif
+@@ -441,8 +453,9 @@ int __init pci_xen_hvm_init(void)
+ #endif
+ 
+ #ifdef CONFIG_PCI_MSI
+-	x86_msi.setup_msi_irqs = xen_hvm_setup_msi_irqs;
+-	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
++	xen_msi_chip.setup_irqs = xen_hvm_setup_msi_irqs;
++	xen_msi_chip.teardown_irq = xen_teardown_msi_irq;
++	x86_msi_chip = &xen_msi_chip;
+ #endif
+ 	return 0;
+ }
+@@ -499,9 +512,10 @@ int __init pci_xen_initial_domain(void)
+ 	int irq;
+ 
+ #ifdef CONFIG_PCI_MSI
+-	x86_msi.setup_msi_irqs = xen_initdom_setup_msi_irqs;
+-	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+-	x86_msi.restore_msi_irqs = xen_initdom_restore_msi_irqs;
++	xen_msi_chip.setup_irqs = xen_initdom_setup_msi_irqs;
++	xen_msi_chip.teardown_irq = xen_teardown_msi_irq;
++	xen_msi_chip.restore_irqs = xen_initdom_restore_msi_irqs;
++	x86_msi_chip = &xen_msi_chip;
+ 	msi_chip.irq_mask = xen_nop_msi_mask;
+ 	msi_chip.irq_unmask = xen_nop_msi_mask;
+ #endif
 -- 
 1.7.1
