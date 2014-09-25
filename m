@@ -1,38 +1,125 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Sep 2014 11:02:05 +0200
-Subject: [PATCH v3] ARM: dts: add CPU nodes for Exynos4 SoCs
-In-Reply-To: <20140925081704.GA20841@e102568-lin.cambridge.arm.com>
-References: <5230569.XLlNbB5NvF@amdc1032>
- <018e01cfd885$770dd940$65298bc0$@kernel.org>
- <20140925081704.GA20841@e102568-lin.cambridge.arm.com>
-Message-ID: <5423DA0D.9030100@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 25 Sep 2014 11:03:11 +0200
+Subject: [PATCH v7 2/5] ARM: add AFTR mode support to firmware do_idle
+ method
+In-Reply-To: <5423D104.4050809@samsung.com>
+References: <1411561488-1739-1-git-send-email-b.zolnierkie@samsung.com>
+ <1411561488-1739-3-git-send-email-b.zolnierkie@samsung.com>
+ <5423D104.4050809@samsung.com>
+Message-ID: <20140925090310.GA12046@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2014 10:17 AM, Lorenzo Pieralisi wrote:
-> [CC'ed Daniel to make him aware this patch goes through your tree]
+On Thu, Sep 25, 2014 at 05:23:32PM +0900, Kukjin Kim wrote:
+> On 09/24/14 21:24, Bartlomiej Zolnierkiewicz wrote:
+> >On some platforms (i.e. EXYNOS ones) more than one idle mode is
+> >available and we need to distinguish them in firmware do_idle method.
+> >
+> >Add mode parameter to do_idle firmware method and AFTR mode support
+> >to EXYNOS do_idle implementation.
+> >
+> >This change is a preparation for adding secure firmware support to
+> >EXYNOS cpuidle driver.
+> >
+> >This patch shouldn't cause any functionality changes.
+> >
+> >Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+> >Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
+> >---
+> >v7:
+> >- fixed build on Tegra
+> >- updated summary line
+> >
+> >  arch/arm/include/asm/firmware.h        |  2 +-
+> >  arch/arm/mach-exynos/common.h          |  5 +++++
+> >  arch/arm/mach-exynos/firmware.c        | 10 ++++++++--
+> >  arch/arm/mach-tegra/cpuidle-tegra114.c |  2 +-
+> >  4 files changed, 15 insertions(+), 4 deletions(-)
+> >
+> >diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+> >index 5904f59..89aefe1 100644
+> >--- a/arch/arm/include/asm/firmware.h
+> >+++ b/arch/arm/include/asm/firmware.h
+> >@@ -28,7 +28,7 @@ struct firmware_ops {
+> >  	/*
+> >  	 * Enters CPU idle mode
+> >  	 */
+> >-	int (*do_idle)(void);
+> >+	int (*do_idle)(unsigned long mode);
+> >  	/*
+> >  	 * Sets boot address of specified physical CPU
+> >  	 */
+> >diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> >index c218200..2d830df 100644
+> >--- a/arch/arm/mach-exynos/common.h
+> >+++ b/arch/arm/mach-exynos/common.h
+> >@@ -119,6 +119,11 @@ extern void __iomem *sysram_base_addr;
+> >  extern void __iomem *pmu_base_addr;
+> >  void exynos_sysram_init(void);
+> >
+> >+enum {
+> >+	FW_DO_IDLE_SLEEP,
+> >+	FW_DO_IDLE_AFTR,
+> >+};
+> >+
+> >  void exynos_firmware_init(void);
+> >
+> >  extern u32 exynos_get_eint_wake_mask(void);
+> >diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+> >index f5e626d..e57b7c3 100644
+> >--- a/arch/arm/mach-exynos/firmware.c
+> >+++ b/arch/arm/mach-exynos/firmware.c
+> >@@ -28,9 +28,15 @@
+> >  #define EXYNOS_BOOT_ADDR	0x8
+> >  #define EXYNOS_BOOT_FLAG	0xc
+> >
+> >-static int exynos_do_idle(void)
+> >+static int exynos_do_idle(unsigned long mode)
+> >  {
+> >-	exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> >+	switch (mode) {
+> >+	case FW_DO_IDLE_AFTR:
+> >+		exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+> >+		break;
+> >+	case FW_DO_IDLE_SLEEP:
+> >+		exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> >+	}
+> >  	return 0;
+> >  }
+> >
+> >diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> >index e3ebdce..425b6c8 100644
+> >--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+> >+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> >@@ -49,7 +49,7 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+> >  	call_firmware_op(prepare_idle);
+> >
+> >  	/* Do suspend by ourselves if the firmware does not implement it */
+> >-	if (call_firmware_op(do_idle) == -ENOSYS)
+> >+	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+> >  		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+> >
+> >  	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT,&dev->cpu);
+> 
+> + Thierry(using nvidia.com e-mail address)
+> 
+> Hi Thierry,
+> 
+> For supporting AFTR mode in call_firmware_op(do_idle), need to modify tegra
+> stuff as you can see. The functionality will be same with before. Is it OK
+> to you? If you have no objection, I'd like to take this series into samsung
+> tree.
 
-Thanks for the head up. I was about to send the PR to Rafael.
+I'm only aware of any devices using TrustedFirmware on Tegra, which is
+what the above code handles. The implementation for TrustedFirmware does
+not implement do_idle() (yet?) so I don't think this patch would cause
+any damage.
 
-[ ... ]
-
-> That's great, now my Exynos CPUidle DT patch should be rebased on top
-> of this patch so that thanks to the testing carried out by Bart it can be
-> merged too.
-
-Ok, I am getting confused. How can I rebase the latest patch of your 
-series with a patch no yet available in my tree ?
-
-I propose just to drop the last patch and wait for the next merge to 
-reintegrate it into the cpuidle tree. Does it make sense ?
-
-Thanks
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/f98f8b08/attachment.sig>
