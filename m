@@ -1,67 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Sep 2014 07:55:56 +0200
-Subject: [PATCH v4 1/2] bcma: register bcma as device tree driver
-In-Reply-To: <54233550.60600@hauke-m.de>
-References: <1411339108-22307-1-git-send-email-hauke@hauke-m.de>
- <3856565.LYF1mvpGOq@wuerfel> <54233550.60600@hauke-m.de>
-Message-ID: <3098264.dzR8BlVP6B@wuerfel>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 25 Sep 2014 14:58:31 +0900
+Subject: [PATCH v2] ARM: cacheflush: Fix v7_exit_coherency_flush exynos
+ build breakage on ARMv6
+In-Reply-To: <alpine.LFD.2.11.1409240954220.8647@knanqh.ubzr>
+References: <1411547222-677-1-git-send-email-k.kozlowski@samsung.com>
+ <alpine.LFD.2.11.1409240954220.8647@knanqh.ubzr>
+Message-ID: <018f01cfd885$bc677320$35365960$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 September 2014 23:19:12 Hauke Mehrtens wrote:
-> On 09/24/2014 11:48 AM, Arnd Bergmann wrote:
-> > On Wednesday 24 September 2014 00:04:18 Hauke Mehrtens wrote:
-> >> I assume this should then look somehow like this:
-> >>
-> >> axi at 18000000 {
-> >>         compatible = "brcm,bus-axi";
-> >>         reg = <0x18000000 0x1000>;
-> >>         ranges = <0x00000000 0x18000000 0x00100000>;
-> >>         #address-cells = <1>;
-> >>         #size-cells = <1>;
-> >>
-> >>         #interrupt-cells = <1>;
-> >>         interrupt-map = <
-> >>                 /* ChipCommon */
-> >>                 0x00000000 0 &gic  GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH
-> >>
-> >>                 /* PCIe Controller 0 */
-> >>                 0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH
-> >>                 0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH
-> >>                 0x00012000 2 &gic GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH
-> >>                 0x00012000 3 &gic GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH
-> >>                 0x00012000 4 &gic GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH
-> >>                 0x00012000 5 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH
-> >>
-> >>                 /* USB 2.0 Controller */
-> >>                 0x00021000 0 &gic GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH
-> >>                 >;
-> >>         };
-> > 
-> > Right, although I would add a few more '<', '>' and ',' for readability,
-> > separating each line with a comma.
-> > 
-> > You are also missing an 'interrupt-map-mask' property that lists which
-> > bits of the address are significant.
-> > 
-> > Are the interrupt numbers you have in the example (0, 0, 1, 2, ... 5, 0)
-> > the actual numbers that are present in the hw registers?
+Nicolas Pitre wrote:
 > 
-> Some cores do have more than one IRQ. The NAND core uses 8 IRQs and the
-> PCIe controller uses 5 (the vendor code just uses the last one which
-> gets triggered always). How can I handle this cases where one device has
-> more than one IRQ? There is no hardware register these IRQ get mapped
-> to. As far as I know the driver just knows that this device needs more
-> IRQs. Should I just add a special device node entry for such devices?
+> On Wed, 24 Sep 2014, Krzysztof Kozlowski wrote:
+> 
+> > This fixes build breakage of platsmp.c if ARMv6 was chosen for compile
+> > time options (e.g. by building allmodconfig):
+> >
+> > $ make allmodconfig
+> > $ make
+> >   CC      arch/arm/mach-exynos/platsmp.o
+> > /tmp/ccdQM0Eg.s: Assembler messages:
+> > /tmp/ccdQM0Eg.s:432: Error: selected processor does not support ARM mode `isb '
+> > /tmp/ccdQM0Eg.s:437: Error: selected processor does not support ARM mode `isb '
+> > /tmp/ccdQM0Eg.s:438: Error: selected processor does not support ARM mode `dsb '
+> > make[1]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
+> >
+> > The error was introduced in commit "ARM: EXYNOS: Move code from
+> > hotplug.c to platsmp.c".  Previously code using
+> > v7_exit_coherency_flush() macro was built with '-march=armv7-a' flag but
+> > this flag dissapeared during the movement.
+> >
+> > Fix this by annotating the v7_exit_coherency_flush() asm code with
+> > armv7-a architecture.
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Reported-by: Mark Brown <broonie@kernel.org>
+> > Link: http://www.spinics.net/lists/linux-samsung-soc/msg36790.html
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> 
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
+For building allmodconfig, this patch fixes the problem.
 
-You create your own local irq domain (in the DT sense, not the Linux sense)
-by using #interrrupt-cells = <1> or more, and then use whatever input data
-you have available.
+Hi Russell,
+Can you please take this?
 
-Ideally there would be registers that you can use to look up a token
-you use (like the BCMA_MIPS_MIPS74K_INTMASK), if you don't have them
-here, just use the local index, and pass that down to bcma_core_irq(),
-from where you put it into the of_phandle_args.
+- Kukjin
 
-	Arnd
+> 
+> >
+> > ---
+> >
+> > Changes since v1:
+> > 1. Use armv7-a arch annotation instead replacing isb/dsb with macros.
+> >    Suggsted by Nicolas Pitre.
+> > ---
+> >  arch/arm/include/asm/cacheflush.h | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+> > index 79ecb4f34ffb..10e78d00a0bb 100644
+> > --- a/arch/arm/include/asm/cacheflush.h
+> > +++ b/arch/arm/include/asm/cacheflush.h
+> > @@ -466,6 +466,7 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
+> >   */
+> >  #define v7_exit_coherency_flush(level) \
+> >  	asm volatile( \
+> > +	".arch	armv7-a \n\t" \
+> >  	"stmfd	sp!, {fp, ip} \n\t" \
+> >  	"mrc	p15, 0, r0, c1, c0, 0	@ get SCTLR \n\t" \
+> >  	"bic	r0, r0, #"__stringify(CR_C)" \n\t" \
+> > --
+> > 1.9.1
