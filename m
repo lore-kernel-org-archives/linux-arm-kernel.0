@@ -1,43 +1,60 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 25 Sep 2014 11:14:13 +0800
-Subject: [PATCH v2 03/22] MSI: Remove the redundant irq_set_chip_data()
+Date: Thu, 25 Sep 2014 11:14:27 +0800
+Subject: [PATCH v2 17/22] s390/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
 In-Reply-To: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
 References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
+Message-ID: <1411614872-4009-18-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, pcie-designware, pcie-rcar, pci-tegra drivers
-use irq chip_data to save the msi_chip pointer. They
-already call irq_set_chip_data() in their own MSI irq map
-functions. So irq_set_chip_data() in arch_setup_msi_irq()
-is useless.
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+Acked-by: Sebastian Ott <sebott@linux.vnet.ibm.com>
 ---
- drivers/pci/msi.c |    5 ++---
- 1 files changed, 2 insertions(+), 3 deletions(-)
+ arch/s390/pci/pci.c |   14 ++++++++++++--
+ 1 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 51d7e62..50f67a3 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -41,14 +41,13 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 	if (err < 0)
- 		return err;
- 
--	irq_set_chip_data(desc->irq, chip);
--
- 	return 0;
+diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+index 552b990..da5316e 100644
+--- a/arch/s390/pci/pci.c
++++ b/arch/s390/pci/pci.c
+@@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
+ 	}
  }
  
- void __weak arch_teardown_msi_irq(unsigned int irq)
+-int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
++int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
  {
--	struct msi_chip *chip = irq_get_chip_data(irq);
-+	struct msi_desc *entry = irq_get_msi_desc(irq);
-+	struct msi_chip *chip = entry->dev->bus->msi;
+ 	struct zpci_dev *zdev = get_zdev(pdev);
+ 	unsigned int hwirq, msi_vecs;
+@@ -434,7 +434,7 @@ out:
+ 	return rc;
+ }
  
- 	if (!chip || !chip->teardown_irq)
- 		return;
+-void arch_teardown_msi_irqs(struct pci_dev *pdev)
++static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
+ {
+ 	struct zpci_dev *zdev = get_zdev(pdev);
+ 	struct msi_desc *msi;
+@@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+ 	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+ }
+ 
++static struct msi_chip zpci_msi_chip = {
++	.setup_irqs = zpci_setup_msi_irqs,
++	.teardown_irqs = zpci_teardown_msi_irqs,
++};
++
++struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++{
++	return &zpci_msi_chip;
++}
++
+ static void zpci_map_resources(struct zpci_dev *zdev)
+ {
+ 	struct pci_dev *pdev = zdev->pdev;
 -- 
 1.7.1
