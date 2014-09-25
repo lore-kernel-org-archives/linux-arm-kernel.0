@@ -1,33 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Sep 2014 11:14:17 +0100
-Subject: [PATCH] aarch64: filter $x from kallsyms
-In-Reply-To: <87r3z9o91q.fsf@rustcorp.com.au>
-References: <20140916213718.GR22012@redacted.bos.redhat.com>
- <87r3z9o91q.fsf@rustcorp.com.au>
-Message-ID: <20140925101417.GG10390@e104818-lin.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 25 Sep 2014 12:20:20 +0200 (CEST)
+Subject: [PATCH v2 01/22] PCI/MSI: Clean up struct msi_chip argument
+In-Reply-To: <20140925071536.GG12423@ulmo>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <1411614872-4009-2-git-send-email-wangyijing@huawei.com>
+ <20140925071536.GG12423@ulmo>
+Message-ID: <alpine.DEB.2.10.1409251208420.4604@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 05:18:57AM +0100, Rusty Russell wrote:
-> Kyle McMartin <kyle@redhat.com> writes:
-> > Similar to ARM, AArch64 is generating $x and $d syms... which isn't
-> > terribly helpful when looking at %pF output and the like. Filter those
-> > out in kallsyms, modpost and when looking at module symbols.
-> >
-> > Seems simplest since none of these check EM_ARM anyway, to just add it
-> > to the strchr used, rather than trying to make things overly
-> > complicated.
-> >
-> > initcall_debug improves:
-> > dmesg_before.txt: initcall $x+0x0/0x154 [sg] returned 0 after 26331 usecs
-> > dmesg_after.txt: initcall init_sg+0x0/0x154 [sg] returned 0 after 15461 usecs
-> >
-> > Signed-off-by: Kyle McMartin <kyle@redhat.com>
+On Thu, 25 Sep 2014, Thierry Reding wrote:
+
+> On Thu, Sep 25, 2014 at 11:14:11AM +0800, Yijing Wang wrote:
+> > Msi_chip functions setup_irq/teardown_irq rarely use msi_chip
+> > argument.
 > 
-> Acked-by: Rusty Russell <rusty@rustcorp.com.au>
+> That's not true. Out of the four drivers that you modify two use the
+> parameter. And the two that don't probably should be using it too.
+> 
+> 50% is not "rarely". =)
+> 
+> >           We can look up msi_chip pointer by the device pointer
+> > or irq number, so clean up msi_chip argument.
+> 
+> I don't like this particular change. The idea was to keep the API object
+> oriented so that drivers wouldn't have to know where to get the MSI chip
+> from. It also makes it more resilient against code reorganizations since
+> the core code is the only place that needs to know where to get the chip
+> from.
 
-Thanks. Shall I understand that you are ok for me to take it via the
-arm64 tree (or you'd prefer to merge it via your tree)?
+Right. We have the same thing in the irq_chip callbacks. All of them
+take "struct irq_data", because it's already available in the core
+code and it gives easy access to all information (chip, chipdata ...)
+which is necessary for the callback implementations.
 
--- 
-Catalin
+Thanks,
+
+	tglx
