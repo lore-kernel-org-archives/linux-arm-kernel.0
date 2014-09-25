@@ -1,64 +1,37 @@
-From: atull@opensource.altera.com (atull)
-Date: Thu, 25 Sep 2014 10:06:10 -0500
-Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
-In-Reply-To: <20140924212803.GD5182@n2100.arm.linux.org.uk>
-References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
- <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
- <20140924212803.GD5182@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1409251002090.693@atx-linux-37>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 25 Sep 2014 17:14:03 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140922092853.GH20438@ci00147.xsens-tech.local>
+References: <5411C810.7070906@linutronix.de>
+ <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
+ <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140917102812.GA20438@ci00147.xsens-tech.local>
+ <20140921204100.GA10111@linutronix.de>
+ <20140922092853.GH20438@ci00147.xsens-tech.local>
+Message-ID: <20140925151403.GH19396@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Sep 2014, Russell King - ARM Linux wrote:
+* Frans Klaver | 2014-09-22 11:28:54 [+0200]:
 
-Hi Russell,
+>I guess then we'd still have to answer the question why the yocto build
+>calls set_termios() so often, but that's not on you then. Did you notice
+>it even changing settings? We might want to fix this even if the kernel
+>should be able to cope.
 
-> On Wed, Sep 24, 2014 at 03:27:28PM -0500, atull at opensource.altera.com wrote:
-> > diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-> > index 5356a72..1d5f8ad 100644
-> > --- a/arch/arm/mach-socfpga/platsmp.c
-> > +++ b/arch/arm/mach-socfpga/platsmp.c
-> > @@ -34,6 +34,10 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> >  	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-> >  
-> >  	if (cpu1start_addr) {
-> > +		/* This will put CPU #1 into reset.*/
-> > +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
-> > +			     rst_manager_base_addr + 0x10);
-> 
-> If you can place CPU1 into reset, then why not place it into reset during
-> hot unplug?
+could you please test uart_v10_pre3? I dropped a few register sets and
+delayed the register update until TX-DMA is complete. I am traveling
+currently and have only my boneblack and it passes my limited testing.
+If it solves your problems, too then I would address Heikki's latest
+comments and prepare the final v10 (and I hope I didn't break beagle
+board in between).
 
-It's a chip weirdness.  We can reset CPU1 briefly, but if we leave it in
-reset, it results in power consumption going up.
+>Thanks again,
+>Frans
 
-> 
-> > @@ -86,10 +90,12 @@ static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
-> >   */
-> >  static void socfpga_cpu_die(unsigned int cpu)
-> >  {
-> > -	cpu_do_idle();
-> > +	/* Flush the L1 data cache. */
-> > +	flush_cache_all();
-> 
-> Why do you think that's necessary?
-> 
-> This potentially flushes *all* levels of the cache, including L2, which
-> is not a nice thing to do if you have another CPU running.  Secondly,
-> the core code has already called flush_cache_louis() _twice_ for you
-> immediately prior to calling your cpu_die() function explicitly to
-> remove any L1 data.
-> 
-> The only data which should remain are speculative prefetches and stack
-> data specific to _this_ CPU (which could include dirty cache lines
-> associated with the stack frame to enter your cpu_die function.)
-> None of these cache lines are of any interest to other CPUs in the
-> system, so there's no need for them to be written back prior to the
-> CPU being reset or powered down for hot unplug.
-> 
-
-Then it's clear we don't need that.  I'll take it out in v2.
-
-Thanks for the review!
-
-Alan
+Sebastian
