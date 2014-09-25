@@ -1,39 +1,71 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 24 Sep 2014 17:23:58 -0700
-Subject: [PATCH 06/13] arm64: Add new routine read_cpu_properties
-In-Reply-To: <20140915184217.GA14191@leverpostej>
+Date: Wed, 24 Sep 2014 17:24:15 -0700
+Subject: [PATCH 07/13] arm64: Add new routine local_disable
+In-Reply-To: <20140915185625.GB14191@leverpostej>
 References: <cover.1410302383.git.geoff@infradead.org>
- <b68073fb2e816f97311b9a3547e3656164ae85d0.1410302383.git.geoff@infradead.org>
- <20140915184217.GA14191@leverpostej>
-Message-ID: <1411604638.6001.175.camel@smoke>
+ <8db284c1443918ca692a5c2e30a0c7f13b37428f.1410302383.git.geoff@infradead.org>
+ <20140915185625.GB14191@leverpostej>
+Message-ID: <1411604655.6001.176.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Mark,
 
-On Mon, 2014-09-15 at 19:42 +0100, Mark Rutland wrote:
+On Mon, 2014-09-15 at 19:56 +0100, Mark Rutland wrote:
 > Hi Geoff,
 > 
 > On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> > The kexec re-boot support that will be added in a subsequent patch in this
-> > series will need to read the device tree CPU properties, and it is expected
-> > that a rework of the SMP spin table code to handle cpu_die will also need this
-> > functionality, so add two new common arm64 files cpu-properties.h and
-> > cpu-properties.c that define a new structure cpu_properties that hold the
-> > various CPU properties from a device tree, and the new routine
-> > read_cpu_properties() that fills the structure from a device tree CPU node.
+> > Add the new arm64 routine local_disable() to allow the masking of several DAIF
+> > flags in one operation.  Currently, we only have routines to mask individual
+> > flags, and to mask several flags multiple calls to daifset are required.
+> >
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > ---
+> >  arch/arm64/include/asm/irqflags.h | 13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> > index 11cc941..28521d4 100644
+> > --- a/arch/arm64/include/asm/irqflags.h
+> > +++ b/arch/arm64/include/asm/irqflags.h
+> > @@ -113,5 +113,18 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+> >  #define local_dbg_enable()	asm("msr	daifclr, #8" : : : "memory")
+> >  #define local_dbg_disable()	asm("msr	daifset, #8" : : : "memory")
+> >  
+> > +enum daif_flag {
 > 
-> I'm very much not keen on placing all this information in a single
-> structure -- that adds a new tight coupling that we didn't have before,
-> and it looks like it's going to be painful to maintain.
+> Is there any reason for this to be an enum rather than a set of
+> #defines?
 > 
-> If kexec uses the existing high-level hotplug infrastructure, it has no
-> reason to go anywhere near this information.
+> It would be nice to be able to use these in asm.
 > 
-> So I really don't like this patch.
+> > +	DAIF_FIQ   = (1UL << 6),
+> > +	DAIF_IRQ   = (1UL << 7),
+> > +	DAIF_ASYNC = (1UL << 8),
+> > +	DAIF_DBG   = (1UL << 9),
+> > +	DAIF_ALL   = (0xffUL << 6),
+> 
+> Not 0xf?
+> 
+> It would be nicer to OR the other flags.
+> 
+> > +};
+> > +
+> > +static inline void local_disable(unsigned long daif_flags)
+> > +{
+> > +	arch_local_irq_restore(daif_flags | arch_local_save_flags());
+> 
+> If we knew the value was a constant (which we could check with
+> __builting_constant_p) we could use daifset here, rather than having a
+> RMW sequence.
+> 
+> With that, the other local_*_{enable,disable} calls could be rewritten
+> in terms of this, without affecting the generated code. That would
+> require some shifting to account for the difference between pstate and
+> daif{clr,set} layout, but for constants that shouldn't be a problem.
 
-I decided to just strip all the checking out of the kernel with the
-expectation that the user space program will set things up correctly,
-so this patch is no longer needed.
+Since kexec just needs to mask all the DAIF exceptions before the main
+CPU is reset I'll just do that inline, and put this rework of the
+exception mask routines on my todo list.
 
 -Geoff
