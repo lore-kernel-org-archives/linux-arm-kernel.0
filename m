@@ -1,51 +1,32 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 26 Sep 2014 19:08:45 +0200
-Subject: [PATCH v3 4/4] arm: pxa: add non device-tree timer link to
- clocksource
-In-Reply-To: <54251B27.909@linaro.org> (Daniel Lezcano's message of "Fri, 26
- Sep 2014 09:52:07 +0200")
-References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
- <1405356724-32207-4-git-send-email-robert.jarzmik@free.fr>
- <53CD25A4.7030606@linaro.org> <87oawivarv.fsf@free.fr>
- <54251B27.909@linaro.org>
-Message-ID: <87lhp6paw2.fsf@free.fr>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 26 Sep 2014 18:19:04 +0100
+Subject: [PATCH] perf tools: fix build breakage on arm and arm64 targets
+In-Reply-To: <1411750918-25220-1-git-send-email-will.deacon@arm.com>
+References: <1411750918-25220-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5425A008.2030901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-> On 07/21/2014 08:15 PM, Robert Jarzmik wrote:
->> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
->>
->>> On 07/14/2014 06:52 PM, Robert Jarzmik wrote:
->>>> As clocksource pxa_timer was moved to clocksource framework, the
->>>> pxa_timer initialization needs to be a bit amended, to pass the
->>>> necessary informations to clocksource, ie :
->>>>    - the timer interrupt (mach specific)
->>>>    - the timer registers base (ditto)
->>>>    - the timer clockrate
->>>>
->>>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->>>>
->>>> ---
->>>> Since V2: Arnd's comment : moved extern declaration into .h file
->>>> ---
->>>
-
-> Hi,
+On 26/09/14 18:01, Will Deacon wrote:
+> Attempting to build the perf tool on arm or arm64 targets results in the
+> following failure:
 >
-> May be I missed it but I don't see the Haojian's ack.
+> arch/arm/util/unwind-libunwind.c: In function ?libunwind__arch_reg_id?:
+> arch/arm/util/unwind-libunwind.c:43:3: error: implicit declaration of function ?pr_err? [-Werror=implicit-function-declaration]
+>     pr_err("unwind: invalid reg id %d\n", regnum);
+>     ^
+> This is due to commit 84f5d36f4866 ("perf tools: Move pr_* debug macros
+> into debug object") moving the pr_* macros into a new header file, but
+> failing to update architectures other than x86.
 >
-> Thanks
->   -- Daniel
+> This patch adds the missing includes, and fixes the build again.
+>
 
-You're right, I scanned through my mail and didn't find the ack.
-Haojian, would you review this one please ?
+For ARM64, we also need the patch[1] "perf tools: Fix arm64 build error" 
+which is already queued in linux-next.
 
-It's here :
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272311.html
+Regards,
+Sudeep
 
-Cheers.
-
--- 
-Robert
+[1] https://lkml.org/lkml/2014/6/24/1024
