@@ -1,94 +1,84 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 25 Sep 2014 22:58:05 -0700
-Subject: [PATCH v6 0/8] arm: support CONFIG_RODATA
-In-Reply-To: <1411067949-10913-1-git-send-email-keescook@chromium.org>
-References: <1411067949-10913-1-git-send-email-keescook@chromium.org>
-Message-ID: <CAGXu5j+v075p9j6tME5N1fN9WsX1YiBO-vYtP8MLM=eo5UsqHg@mail.gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 26 Sep 2014 13:57:46 +0800
+Subject: [PATCH] arm/arm64: KVM: Fix set_clear_sgi_pend_reg offset
+In-Reply-To: <1411667347-2989-1-git-send-email-christoffer.dall@linaro.org>
+References: <1411667347-2989-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5425005A.6070709@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 18, 2014 at 12:19 PM, Kees Cook <keescook@chromium.org> wrote:
-> This is a series of patches to support CONFIG_RODATA on ARM, so that
-> the kernel text is RO, and non-text sections default to NX. To support
-> on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
-> support has been finalized based on several versions of various patches
-> that are floating around on the mailing list. This series attempts to
-> include the least intrusive version, so that others can build on it for
-> future fixmap work.
->
-> The series has been heavily tested, and appears to be working correctly:
->
-> With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
-> /sys/kernel/debug/kernel_page_tables.
->
-> Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
-> for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
->         EXEC_DATA
->         WRITE_RO
->         WRITE_KERN
->
-> ftrace works:
->         CONFIG_FTRACE_STARTUP_TEST passes
->         Enabling tracing works:
->                 echo function > /sys/kernel/debug/tracing/current_tracer
-> kprobes works:
->         CONFIG_ARM_KPROBES_TEST passes
->
-> kexec works:
->         kexec will load and start a new kernel
->
-> Built with and without CONFIG_HIGHMEM, CONFIG_HIGHMEM_DEBUG, and
-> CONFIG_NR_CPUS=32.
->
-> Thanks to everyone who has been testing this series and working on its
-> various pieces!
->
-> Hopefully this should address Will's last concerns. :)
->
-> Thanks!
->
-> -Kees
->
-> v6:
-> - always run patch_text under stop_machine (will.deacon)
-> - document set_fixmap's TLB flushing situation (will.deacon)
 
-Hi Will,
+On 2014/9/26 1:49, Christoffer Dall wrote:
+> The sgi values calculated in read_set_clear_sgi_pend_reg() and
+> write_set_clear_sgi_pend_reg() were horribly incorrectly multiplied by 4
+> with catastrophic results in that subfunctions ended up overwriting
+> memory not allocated for the expected purpose.
+> 
+> This showed up as bugs in kfree() and the kernel complaining a lot of
+> you turn on memory debugging.
+> 
+> This addresses: http://marc.info/?l=kvm&m=141164910007868&w=2
+> 
+> Reported-by: Shannon Zhao <zhaoshenglong@huawei.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index b6fab0f..8629678 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -816,7 +816,7 @@ static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+>  {
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	int sgi;
+> -	int min_sgi = (offset & ~0x3) * 4;
+> +	int min_sgi = (offset & ~0x3);
+>  	int max_sgi = min_sgi + 3;
+>  	int vcpu_id = vcpu->vcpu_id;
+>  	u32 reg = 0;
+> @@ -837,7 +837,7 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+>  {
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	int sgi;
+> -	int min_sgi = (offset & ~0x3) * 4;
+> +	int min_sgi = (offset & ~0x3);
+>  	int max_sgi = min_sgi + 3;
+>  	int vcpu_id = vcpu->vcpu_id;
+>  	u32 reg;
+> 
+Hi Christoffer,
 
-Does this version look good to you? Should I turn it into a pull request?
+I have test this patch for a few hours. The kfree() bug doesn't appear again.
+But I come to another problem as followed.
+The test is that start 2 VMs, sleep 10 and do pkill qemu.
 
-Thanks!
+qemu-system-aar[1207]: unhandled level 1 permission fault (11) at 0xffffc01ed6c200, esr 0x9200000d
+pgd = ffffffc012986000
+[ffffc01ed6c200] *pgd=0000000000000000, *pud=0000000000000000
 
--Kees
-
->
-> v5:
-> - clean up #includes in mmu.c (will.deacon)
-> - optimize get_cr() test (will.deacon)
-> - created free_tcmmem to avoid excessive #ifdefs (will.deacon)
-> - explicitly test irqs_disabled in set_fixmap (will.deacon)
->
-> v4:
-> - expanded fixmap to 3MB to support 32 CPUs (robh)
-> - corrected pmd-finding via vaddr instead of FIXMAP_START (robh)
-> - switched structure size test to BUILD_BUG_ON (sboyd)
-> - added locking annotations to keep sparse happy (sboyd)
-> - adding missing "static" declarations noticed by sparse
-> - reorganized fixmap portion of patches
->
-> v3:
-> - more cleanups in switch to generic fixmap (lauraa, robh)
-> - fixed kexec merge hunk glitch (will.deacon)
-> - added tested-by tags where appropriate from v2 testing
->
-> v2:
-> - fix typo in kexec merge (buildbot)
-> - flip index order for highmem pte access (lauraa)
-> - added kgdb updates (dianders)
->
-
-
+CPU: 1 PID: 1207 Comm: qemu-system-aar Not tainted 3.17.0-rc4+ #1
+task: ffffffc87b072900 ti: ffffffc0129e0000 task.ti: ffffffc0129e0000
+PC is at 0x4181a0
+LR is at 0x41826c
+pc : [<00000000004181a0>] lr : [<000000000041826c>] pstate: 80000000
+sp : 0000007fcd38ace0
+x29: 0000007fcd38ace0 x28: 0000000000000000
+x27: 0000000000000000 x26: 0000000000000000
+x25: 0000000000000000 x24: 0000000000000000
+x23: 0000000000000000 x22: 0000000000000000
+x21: 0000000000000000 x20: 0000000000000000
+x19: 0000007fcd38b070 x18: 0000007fcd38ab10
+x17: 0000007f9bb14480 x16: 00000000009f2370
+x15: ffffffffffffffff x14: 0000000000000000
+x13: 0000000000000000 x12: 0000000000000268
+x11: 00000000115e5520 x10: 0101010101010101
+x9 : 0000000000000004 x8 : 0000000000ac7a78
+x7 : 0000000000000000 x6 : 000000000000003f
+x5 : 0000000000000040 x4 : 0000000000000000
+x3 : 0000000000000030 x2 : 0000000000000001
+x1 : ffffffc01ed6c200 x0 : ffffffc01ed6c200
 
 -- 
-Kees Cook
-Chrome OS Security
+Shannon
