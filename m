@@ -1,45 +1,62 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 26 Sep 2014 15:02:22 +0200
-Subject: [GIT PULL] at91: soc for 3.18 #2
-In-Reply-To: <201409261250.02565.arnd@arndb.de>
-References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
- <201409261250.02565.arnd@arndb.de>
-Message-ID: <20140926130222.GA4408@piout.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 14:03:11 +0100
+Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
+In-Reply-To: <20140926124614.GD7422@leverpostej>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
+ <20140926122003.GP5182@n2100.arm.linux.org.uk>
+ <20140926124614.GD7422@leverpostej>
+Message-ID: <20140926130311.GQ5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 26, 2014 at 01:46:14PM +0100, Mark Rutland wrote:
+> On Fri, Sep 26, 2014 at 01:20:04PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Sep 26, 2014 at 07:25:01PM +0800, Chenhui Zhao wrote:
+> > > +static inline void ls1_do_lowpower(unsigned int cpu, int *spurious)
+> > > +{
+> > > +	/*
+> > > +	 * there is no power-control hardware on this platform, so all
+> > > +	 * we can do is put the core into WFI; this is safe as the calling
+> > > +	 * code will have already disabled interrupts
+> > > +	 */
+> > > +	for (;;) {
+> > > +		wfi();
+> > > +
+> > > +		if (pen_release == cpu_logical_map(cpu)) {
+> > > +			/*OK, proper wakeup, we're done*/
+> > > +			break;
+> > > +		}
+> > > +
+> > > +		/*
+> > > +		 * Getting here, means that we have come out of WFI without
+> > > +		 * having been woken up - this shouldn't happen
+> > > +		 *
+> > > +		 * Just note it happening - when we're woken, we can report
+> > > +		 * its occurrence.
+> > > +		 */
+> > > +		(*spurious)++;
+> > > +	}
+> > > +}
+> > 
+> > This is pretty much unacceptable - this breaks kexec(), and suspend
+> > support because your secondary CPUs aren't really sleeping, they're
+> > sitting in a loop doing nothing.
+> 
+> Agreed.
+> 
+> This looks to be a carbon copy of the vexpress pseudo-hotplug in
+> arch/arm/mach-vexpress/hotplug.c, which is obviously broken in the way
+> you describe above. Perhaps we should go about ripping that out?
 
-On 26/09/2014 at 12:50:02 +0200, Arnd Bergmann wrote :
-> On Monday 22 September 2014, Nicolas Ferre wrote:
-> 
-> > Nicolas Ferre (4):
-> >       ARM: at91: introduce basic SAMA5D4 support
-> >       ARM: at91: SAMA5D4 SoC detection code and low level routines
-> 
-> This resulted in build failures both in at91x40_defconfig and some
-> randconfigs with MMU disabled. I've applied the patch below on top
-> to fix it.
-> 
-> I'm not exactly happy about the soc detection code anyway after I
-> had to look at that. Why do you even hardcode the physical register
-> location rather than getting it from DT?
-> 
-> Also, why do you care about which SoC version you have for the
-> modern SAMA5 chips? All I see is a sama5d4_map_io() callback
-> that maps a lot of completely unused registers along with
-> the uart that you normally get from the implicit debug_ll_io_init,
-> and the SRAM that should probably be turned into a normal driver.
-> 
+The Versatile Express does not support suspend so the only problem case
+is kexec.  However, isn't this support needed for big.LITTLE, and as
+the Versatile Express is the platform which these features get developed
+on, having working CPU hotplug seems rather fundamental for ARM kernel
+feature development.
 
-Yeah, there are upcoming patches that add more differences between
-sama5d3 and sama5d4. Also, a huge cleanup is planned after all the
-boards files have been removed and all the boards have been either
-migrated to DT and CCF or dropped.
-
-I'll owe you the drink of your choice if that is not done by 3.20 ;)
+In that regard, Versatile Express is something of a special case.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
