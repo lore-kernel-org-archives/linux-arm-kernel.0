@@ -1,89 +1,170 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Fri, 26 Sep 2014 06:41:09 -0700
-Subject: [PATCH 1/2] ARM: DT: apq8064: create
- qcom-apq8064-board-common.dtsi
-In-Reply-To: <1411718851-17436-2-git-send-email-mike.rapoport@gmail.com>
-References: <1411718851-17436-1-git-send-email-mike.rapoport@gmail.com>
- <1411718851-17436-2-git-send-email-mike.rapoport@gmail.com>
-Message-ID: <CAJAp7Ohdi2+M0LC+a3BT6++17b2DST8RgjJddKNEVwL9Ltqrdg@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 26 Sep 2014 15:41:01 +0200
+Subject: [PATCH v2 3/6] clk: imx: add CPU clock type
+In-Reply-To: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1411738864-26549-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 1:07 AM, Mike Rapoport <mike.rapoport@gmail.com> wrote:
+This implements a virtual clock used to abstract away
+all the steps needed in order to change the ARM clock,
+so we don't have to push all this clock handling into
+the cpufreq driver.
 
-Cool to see the addition of dt for additional devices. I do however
-not think it is correct to put all these things in common...
+While it will be used for i.MX53 at first it is generic
+enough to be used on i.MX6 later on.
 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-board-common.dtsi b/arch/arm/boot/dts/qcom-apq8064-board-common.dtsi
-> new file mode 100644
-> index 0000000..c92d3e9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-apq8064-board-common.dtsi
-> @@ -0,0 +1,57 @@
-> +#include "qcom-apq8064-v2.0.dtsi"
-> +
-> +/ {
-> +
-> +       soc {
-> +               pinctrl at 800000 {
-> +                       i2c1_pins: i2c1 {
-> +                               mux {
-> +                                       pins = "gpio20", "gpio21";
-> +                                       function = "gsbi1";
-> +                               };
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2:
+- split clk into multiple line
+- fix my email address
+---
+ arch/arm/mach-imx/Makefile  |   2 +-
+ arch/arm/mach-imx/clk-cpu.c | 107 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk.h     |   4 ++
+ 3 files changed, 112 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-cpu.c
 
-The muxing is common, but you probably want to be able to set drive
-strength and bias as well and handle active vs sleep mode and then I'm
-not sure if it is common anymore...
-
-> +                       };
-> +               };
-> +
-> +               gsbi at 12440000 {
-> +                       status = "okay";
-> +                       qcom,mode = <GSBI_PROT_I2C>;
-> +
-> +                       i2c at 12460000 {
-> +                               status = "okay";
-> +                               clock-frequency = <200000>;
-> +                               pinctrl-0 = <&i2c1_pins>;
-> +                               pinctrl-names = "default";
-> +
-> +                               eeprom: eeprom at 52 {
-> +                                       compatible = "atmel,24c128";
-> +                                       reg = <0x52>;
-> +                                       pagesize = <32>;
-> +                               };
-
-Not all apq8064 boards have this eeprom.
-
-> +                       };
-> +               };
-> +
-> +               gsbi at 16600000 {
-> +                       status = "ok";
-> +                       qcom,mode = <GSBI_PROT_I2C_UART>;
-> +                       serial at 16640000 {
-> +                               status = "ok";
-> +                       };
-> +               };
-> +
-> +               amba {
-> +                       /* eMMC */
-> +                       sdcc1: sdcc at 12400000 {
-> +                               status = "okay";
-> +                       };
-> +
-> +                       /* External micro SD card */
-> +                       sdcc3: sdcc at 12180000 {
-> +                               status = "okay";
-> +                       };
-> +                       /* WLAN */
-> +                       sdcc4: sdcc at 121c0000 {
-> +                               status = "okay";
-> +                       };
-
-I'm not sure if all boards are using sdcc4 for WiFi.
-
-Regards,
-Bjorn
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 23c02932bf84..0e708a9d607d 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
+ obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
+ 
+ imx5-pm-$(CONFIG_PM) += pm-imx5.o
+-obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
++obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o clk-cpu.o $(imx5-pm-y)
+ 
+ obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+ 			    clk-pfd.o clk-busy.o clk.o \
+diff --git a/arch/arm/mach-imx/clk-cpu.c b/arch/arm/mach-imx/clk-cpu.c
+new file mode 100644
+index 000000000000..aa1c345e2a19
+--- /dev/null
++++ b/arch/arm/mach-imx/clk-cpu.c
+@@ -0,0 +1,107 @@
++/*
++ * Copyright (c) 2014 Lucas Stach <l.stach@pengutronix.de>, Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++
++struct clk_cpu {
++	struct clk_hw	hw;
++	struct clk	*div;
++	struct clk	*mux;
++	struct clk	*pll;
++	struct clk	*step;
++};
++
++static inline struct clk_cpu *to_clk_cpu(struct clk_hw *hw)
++{
++	return container_of(hw, struct clk_cpu, hw);
++}
++
++static unsigned long clk_cpu_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_cpu *cpu = to_clk_cpu(hw);
++
++	return clk_get_rate(cpu->div);
++}
++
++static long clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	struct clk_cpu *cpu = to_clk_cpu(hw);
++
++	return clk_round_rate(cpu->pll, rate);
++}
++
++static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_cpu *cpu = to_clk_cpu(hw);
++	int ret;
++
++	/* switch to PLL bypass clock */
++	ret = clk_set_parent(cpu->mux, cpu->step);
++	if (ret)
++		return ret;
++
++	/* reprogram PLL */
++	ret = clk_set_rate(cpu->pll, rate);
++	if (ret) {
++		clk_set_parent(cpu->mux, cpu->pll);
++		return ret;
++	}
++	/* switch back to PLL clock */
++	clk_set_parent(cpu->mux, cpu->pll);
++
++	/* Ensure the divider is what we expect */
++	clk_set_rate(cpu->div, rate);
++
++	return 0;
++}
++
++static const struct clk_ops clk_cpu_ops = {
++	.recalc_rate	= clk_cpu_recalc_rate,
++	.round_rate	= clk_cpu_round_rate,
++	.set_rate	= clk_cpu_set_rate,
++};
++
++struct clk *imx_clk_cpu(const char *name, const char *parent_name,
++		struct clk *div, struct clk *mux, struct clk *pll,
++		struct clk *step)
++{
++	struct clk_cpu *cpu;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	cpu = kzalloc(sizeof(*cpu), GFP_KERNEL);
++	if (!cpu)
++		return ERR_PTR(-ENOMEM);
++
++	cpu->div = div;
++	cpu->mux = mux;
++	cpu->pll = pll;
++	cpu->step = step;
++
++	init.name = name;
++	init.ops = &clk_cpu_ops;
++	init.flags = 0;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	cpu->hw.init = &init;
++
++	clk = clk_register(NULL, &cpu->hw);
++	if (IS_ERR(clk))
++		kfree(cpu);
++
++	return clk;
++}
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index d5ba76fee115..5de8b53ec208 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -128,4 +128,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
+ 			CLK_SET_RATE_PARENT, mult, div);
+ }
+ 
++struct clk *imx_clk_cpu(const char *name, const char *parent_name,
++		struct clk *div, struct clk *mux, struct clk *pll,
++		struct clk *step);
++
+ #endif
+-- 
+2.1.0
