@@ -1,43 +1,63 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 26 Sep 2014 12:30:40 -0700
-Subject: [PATCH v6 1/5] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <20140926191253.GH390@ilina-mac.local> (Lina Iyer's message of
- "Fri, 26 Sep 2014 13:12:53 -0600")
-References: <1411516281-58328-1-git-send-email-lina.iyer@linaro.org>
- <1411516281-58328-2-git-send-email-lina.iyer@linaro.org>
- <1F7E5951-7704-4ADE-A1D1-2E380FF2540A@codeaurora.org>
- <20140924184750.GA1004@ilina-mac.local>
- <7hwq8q2og3.fsf@deeprootsystems.com>
- <20140926191253.GH390@ilina-mac.local>
-Message-ID: <7hr3yy2n8f.fsf@deeprootsystems.com>
+Date: Fri, 26 Sep 2014 12:45:32 -0700
+Subject: [PATCH] sched/nohz: add debugfs control over sched_tick_max_deferment
+Message-ID: <1411760732-14102-1-git-send-email-khilman@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+From: Kevin Hilman <khilman@linaro.org>
 
-> On Fri, Sep 26 2014 at 13:04 -0600, Kevin Hilman wrote:
->>Lina Iyer <lina.iyer@linaro.org> writes:
->>
->>> On Wed, Sep 24 2014 at 12:07 -0600, Kumar Gala wrote:
+Allow debugfs override of sched_tick_max_deferment in order to ease
+finding/fixing the remaining issues with full nohz.
 
-[...]
+The value to be written is in jiffies, and -1 means the max deferment
+is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
 
->>>>
->>>>General comment, lets use qcom instead of msm for various things.
->>>>
->>>>[snip]
->>>>
->>> OK, Done. I renamed all msm_ functions to qcom_ functions as well.
->>>
->>
->>Does that apply to the other parts of this series too?  like the msm-pm
->>and cpuidle layers?
->>
-> Yes, there are no more msm's anymore :)
->
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ kernel/sched/core.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-<can of worms>
-
-What about Documentation/devicetree/bindings/arm/msm?
-
-</can of worms>
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index bc1638b33449..dee044a5d447 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -2514,6 +2514,8 @@ void scheduler_tick(void)
+ }
+ 
+ #ifdef CONFIG_NO_HZ_FULL
++static u32 sched_tick_max_deferment = HZ;
++
+ /**
+  * scheduler_tick_max_deferment
+  *
+@@ -2532,13 +2534,25 @@ u64 scheduler_tick_max_deferment(void)
+ 	struct rq *rq = this_rq();
+ 	unsigned long next, now = ACCESS_ONCE(jiffies);
+ 
+-	next = rq->last_sched_tick + HZ;
++	if (sched_tick_max_deferment == -1)
++		return KTIME_MAX;
++
++	next = rq->last_sched_tick + sched_tick_max_deferment;
+ 
+ 	if (time_before_eq(next, now))
+ 		return 0;
+ 
+ 	return jiffies_to_nsecs(next - now);
+ }
++
++static __init int sched_nohz_full_init_debug(void)
++{
++	debugfs_create_u32("sched_tick_max_deferment", 0644, NULL,
++			   &sched_tick_max_deferment);
++
++	return 0;
++}
++late_initcall(sched_nohz_full_init_debug);
+ #endif
+ 
+ notrace unsigned long get_parent_ip(unsigned long addr)
+-- 
+2.1.0
