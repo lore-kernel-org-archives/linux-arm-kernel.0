@@ -1,39 +1,69 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 26 Sep 2014 08:42:38 -0700
-Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
-In-Reply-To: <7hmw9m795y.fsf@deeprootsystems.com>
-References: <7ha95nikqh.fsf@linaro.org> <20140926081534.GA27755@sirena.org.uk>
- <7hmw9m795y.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa9E-HY8tbMU3y8EHv0XhCHynTopSMupDHF4R2wBvLEOSg@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 26 Sep 2014 10:43:06 -0500
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <3346642.tZaefcZubX@wuerfel>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140926003750.GA12770@saruman> <20140926003934.GD12770@saruman>
+ <3346642.tZaefcZubX@wuerfel>
+Message-ID: <20140926154306.GE26227@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 7:23 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Mark Brown <broonie@kernel.org> writes:
->
->> On Thu, Sep 25, 2014 at 12:05:42PM -0700, Kevin Hilman wrote:
->>
->>> The first pull request was missing a dependency on a feature that went
->>> in through Mark Brown's regulator tree, so it wouldn't actually compile
->>> properly by itself.  This version pulls in that topic branch from Marks
->>> tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
->>
->> Please in future don't pull anything in from my tree without a signed
->> tag (speak to me if there isn't one).
->
-> Sorry about that.
->
-> Had there been more than one patch in this topic branch, or it wasn't
-> based directly on an -rc tag, I would've waited for confirmation about
-> it being stable, but since it was a single patch, based directly on an
-> -rc tag, I assumed it was stable.
->
-> In the future, I'll be sure to request a signed tag.
+Hi,
 
-Hmm, turns out there actually was a signed tag[1] (I thought I
-remembered you saying it was stable), but I still made the mistake of
-pulling the branch and not the tag.
+On Fri, Sep 26, 2014 at 09:20:54AM +0200, Arnd Bergmann wrote:
+> On Thursday 25 September 2014 19:39:34 Felipe Balbi wrote:
+> > > 
+> > > why would a glue layer need to access registers from the core ? That
+> > > sounds very odd. I haven't seen that and will, definitely, NACK such a
+> > > patch 
+> > > 
+> > > can you further describe why you think a glue layer might need to access
+> > > core IP's registers ?
+> > 
+> > I just realised we're talking about chipidea here... in any case, it's
+> > still valid to ask why would glue need to fiddle with core IP's
+> > registers.
+> 
+> Generally, the glue driver wouldn't access the registers, but I don't
+> think it's important to prevent it from doing that. In some cases, 
 
-Kevin
+sure it is. Have already gone through debugging sessions just because
+someone fiddled with registers they shouldn't. Also RMK's L2 rework
+patchset is another example of why it's important to prevent other
+layers from messing with registers they don't really own.
 
-[1] https://lkml.org/lkml/2014/8/29/182
+> a glue driver needs to override a function of the core driver, e.g.
+> to work around an errata. We have a lot of those quirks in ATA drivers,
+
+pass a quirk flag and let core driver handle it.
+
+> one example from ahci_mvebu.c is
+> 
+> static void ahci_mvebu_regret_option(struct ahci_host_priv *hpriv)
+> {
+>         /*
+>          * Enable the regret bit to allow the SATA unit to regret a
+>          * request that didn't receive an acknowlegde and avoid a
+>          * deadlock
+>          */
+>         writel(0x4, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_ADDR);
+>         writel(0x80, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
+
+I would rather see:
+
+	if (this_is_one_of_the_broken_mvebu_versions(hpriv))
+		quirks |= AHCI_NEEDS_REGRET_BIT;
+
+then let core handle the rest. If other glue has the same bug and needs
+the workaround, we don't duplicate code.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/7952a3e1/attachment.sig>
