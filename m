@@ -1,74 +1,81 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 14:18:52 +0800
-Subject: [PATCHv4 4/6] dt-bindings: arm: add Freescale LS1021A SoC device
- tree binding
-In-Reply-To: <1411371952-5618-5-git-send-email-jingchang.lu@freescale.com>
-References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
- <1411371952-5618-5-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140926061851.GE31948@dragon>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 26 Sep 2014 14:20:35 +0800
+Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
+ in all platforms
+In-Reply-To: <20140925171612.GC31157@bart.dudau.co.uk>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <20140925074235.GN12423@ulmo> <20140925144855.GB31157@bart.dudau.co.uk>
+ <20140925164937.GB30382@ulmo> <20140925171612.GC31157@bart.dudau.co.uk>
+Message-ID: <542505B3.7040208@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 03:45:50PM +0800, Jingchang Lu wrote:
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt | 38 +++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+>> The PCI core can already deal with that. An MSI chip can be set per bus
+>> and the weak pcibios_add_bus() can be used to set that. Often it might
+>> not even be necessary to do it via pcibios_add_bus() if you create the
+>> root bus directly, since you can attach the MSI chip at that time.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index e935d7d..2e0ba09 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -74,3 +74,41 @@ Required root node properties:
->  i.MX6q generic board
->  Required root node properties:
->      - compatible = "fsl,imx6q";
-> +
-> +
-> +Freescale LS1021A Platform Device Tree Bindings
-> +------------------------------------------------
-> +
-> +Required root node compatible properties:
-> +  - compatible = "fsl,ls1021a";
-> +
-> +Freescale LS1021A SoC-specific Device Tree Bindings
-> +-------------------------------------------
-> +
-> +Freescale SCFG
-> +  scfg is the supplemental configuration unit, that provides SoC specific
+> But I'm thinking that we need to move away from pcibios_add_bus() interface to do
+> something that should be generic. You don't need to be called for every bus when all
+> you want is just the root bus in order to add the MSI chip. Also, from looking at
+> the current patchset, a lot of architectures would set the MSI chip to a global
+> variable, which means you don't have an option to choose the MSI chip based on the
+> bus.
 
-s/scfg/SCFG
+I also agree to remove the pcibios_add_bus() in arm which call .add_bus() to associate msi_chip
+and PCI bus.
 
-> +configuration and status registers for the chip. Such as getting PEX port
-> +status.
-> +  Required properties:
-> +  - compatible: should be "fsl,ls1021a-scfg"
-> +  - reg: should contain base address and length of SCFG memory-mapped registers
-> +
-> +Example:
-> +	scfg: scfg at 1570000 {
-> +		compatible = "fsl,ls1021a-scfg";
-> +		reg = <0x0 0x1570000 0x0 0x10000>;
-> +	};
-> +
-> +Freescale DCFG
-> +  dcfg is the device configuration unit, that provides general purpose
+In my opinions, all PCI devices under the same PCI hostbridge must share same msi chip, right ?
+So if we can associate msi chip and PCI hostbridge, every PCI device can find correct msi chip.
+PCI hostbridge private attributes can be saved in PCI sysdata, and this data will be propagate to
+PCI root bus and its child buses.
 
-s/dcfg/DCFG
-
-Shawn
-
-> +configuration and status for the device. Such as setting the secondary
-> +core start address and release the secondary core from holdoff and startup.
-> +  Required properties:
-> +  - compatible: should be "fsl,ls1021a-dcfg"
-> +  - reg : should contain base address and length of DCFG memory-mapped registers
-> +
-> +Example:
-> +	dcfg: dcfg at 1ee0000 {
-> +		compatible = "fsl,ls1021a-dcfg";
-> +		reg = <0x0 0x1ee0000 0x0 0x10000>;
-> +	};
-> -- 
-> 1.8.0
 > 
+>>
+>>> What I would like to see is a way of creating the pci_host_bridge structure outside
+>>> the pci_create_root_bus(). That would then allow us to pass this sort of platform
+>>> details like associated msi_chip into the host bridge and the child busses will
+>>> have an easy way of finding the information needed by finding the root bus and then
+>>> the host bridge structure. Then the generic pci_scan_root_bus() can be used by (mostly)
+>>> everyone and the drivers can remove their kludges that try to work around the
+>>> current limitations.
+>>
+>> I think both issues are orthogonal. Last time I checked a lot of work
+>> was still necessary to unify host bridges enough so that it could be
+>> shared across architectures. But perhaps some of that work has
+>> happened in the meantime.
+> 
+> Breaking out the host bridge creation from root bus creation is not difficult, just not
+> agree upon. That would be the first step in making the generic host brige structure
+> useful for sharing, specially if used as a sort of "parent" structure that you can
+> wrap with your actual host bridge structure.
+
+Breaking out the host bridge creation is a good idea, but there need a lot of changes, we can
+do it in another series. And if we save msi chip in pci sysdata now, it will be easy to
+move it to generic pci host bridge. We can also move the pci domain number and other common info to it.
+
+Thanks!
+Yijing.
+
+> 
+>>
+>> But like I said, when you create the root bus, you can easily attach the
+>> MSI chip to it.
+> 
+> Not if you want to use the generic pci_scan_root_bus() function. One needs to copy the code
+> and add their own needed modifications. Which makes it hard to fix bugs and prevents code
+> reuse.
+> 
+> Best regards,
+> Liviu
+> 
+>>
+>> Thierry
+> 
+> 
+> 
+
+
+-- 
+Thanks!
+Yijing
