@@ -1,60 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Sep 2014 08:55:07 +0200
-Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
-In-Reply-To: <20140926004218.19023.88602@quantum>
-References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140922113133.GF15315@lukather>
- <20140926004218.19023.88602@quantum>
-Message-ID: <20140926065507.GO15315@lukather>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 26 Sep 2014 09:01:09 +0200
+Subject: [PATCH v2 0/3] ARM: vf610: Fix/add clocksource
+In-Reply-To: <1411575610-20895-1-git-send-email-stefan@agner.ch>
+References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
+Message-ID: <54250F35.8060306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On 09/24/2014 06:20 PM, Stefan Agner wrote:
+> This patchset came out of need for a clocksource which supports shutdown.
+> In the first version I proposed to just replace the current clocksource
+> with the ARM Global Timer and even proposed to remove the PIT clocksource
+> driver. But Bill Pringlemeir brought up a reasonable point why we should
+> keep the PIT clocksource.
+>
+> Since we need shutdown support for suspend/resume, I added another patch
+> which fixes shutdown functionality for the PIT driver. Now it's possible
+> to use suspend/resume functionality with each of the two clocksources.
+>
+> Changes in v2:
+> - Added shutdown support for PIT clocksource (and hence clocksource
+>    maintainers as receipient).
+> - Create Kconfig entries which allow to choose between the two
+>    clocksources
+> - Clarified commit message
+> - Renamed device tree node to "timer"
+>
 
-On Thu, Sep 25, 2014 at 05:42:18PM -0700, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-09-22 04:31:33)
-> > Mike,
-> > 
-> > On Thu, Sep 11, 2014 at 10:18:14PM +0200, Maxime Ripard wrote:
-> > > Hi everyone,
-> > > 
-> > > Here is an attempt at improving the MMC clock support in the Allwinner
-> > > SoCs.
-> > > 
-> > > Until now, the MMC clocks were having a custom phase function that was
-> > > directly setting an obscure value in the right register, because we
-> > > were not really having any idea of what these values were.
-> > > 
-> > > Now that we have more informations, we can introduce a common function
-> > > call to get and set the phase of a particular clock, and use this in
-> > > both our provider and our client.
-> > 
-> > It would be great that we have that custom phase API out of the kernel
-> > for 3.18, and you were one of the greatest supporters to that idea,
-> > could we please have your view on this?
-> 
-> Patches all look good to me. Did you want the whole series to go through
-> the clk tree?
+Hi Stefan,
 
-I guess it would be where it most make sense yes.
+I will take the patch 1/3 and let the other patches to be acked-by or 
+picked in another tree.
 
-> If so we'll need an Ack for the MMC patch and for the ARM DTS
-> patches as well.
+Thanks
+   -- Daniel
 
-We already have an Ack from Ulf on the MMC patch, and I'm the
-maintainer of the DTS involved, so we should be ok :)
+> Stefan Agner (3):
+>    clocksource: vf_pit_timer: Support shutdown mode
+>    ARM: dts: vf610: Add ARM Global Timer
+>    ARM: vf610: Add ARM Global Timer clocksource option
+>
+>   arch/arm/boot/dts/vf610.dtsi       |  8 ++++++++
+>   arch/arm/mach-imx/Kconfig          | 19 ++++++++++++++++++-
+>   drivers/clocksource/vf_pit_timer.c |  5 +++++
+>   3 files changed, 31 insertions(+), 1 deletion(-)
+>
 
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/c3dd532a/attachment.sig>
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
