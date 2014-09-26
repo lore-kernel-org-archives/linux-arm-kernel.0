@@ -1,25 +1,131 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Sep 2014 09:15:34 +0100
-Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
-In-Reply-To: <7ha95nikqh.fsf@linaro.org>
-References: <7ha95nikqh.fsf@linaro.org>
-Message-ID: <20140926081534.GA27755@sirena.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Sep 2014 10:16:48 +0200
+Subject: [PATCH v3 13/13] ARM: shmobile: r8a7740 dtsi: Add preliminary PM
+ QoS device latencies
+In-Reply-To: <1411662520-22795-14-git-send-email-geert+renesas@glider.be>
+References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
+ <1411662520-22795-14-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdWa_TDz6EyeXGDo-WGJyr15mhA4fH6r45hz8joNdkBbeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 12:05:42PM -0700, Kevin Hilman wrote:
+On Thu, Sep 25, 2014 at 6:28 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+> index ed0adeb61a1ad8ec..713170442b7bd4b2 100644
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
 
-> The first pull request was missing a dependency on a feature that went
-> in through Mark Brown's regulator tree, so it wouldn't actually compile
-> properly by itself.  This version pulls in that topic branch from Marks
-> tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
+> @@ -409,6 +509,10 @@
+>                         reg = <0xe6150000 0x10000>;
+>                         clocks = <&extal1_clk>, <&extalr_clk>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <1>;
+>                         clock-output-names = "system", "pllc0", "pllc1",
+>                                              "pllc2", "r",
+> @@ -424,6 +528,10 @@
+>                         reg = <0xe6150080 4>;
+>                         clocks = <&pllc1_div2_clk>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <0>;
+>                         clock-output-names = "sub";
+>                 };
+> @@ -433,6 +541,10 @@
+>                         compatible = "fixed-factor-clock";
+>                         clocks = <&cpg_clocks R8A7740_CLK_PLLC1>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <0>;
+>                         clock-div = <2>;
+>                         clock-mult = <1>;
+> @@ -442,6 +554,10 @@
+>                         compatible = "fixed-factor-clock";
+>                         clocks = <&extal1_clk>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <0>;
+>                         clock-div = <2>;
+>                         clock-mult = <1>;
+> @@ -454,6 +570,10 @@
+>                         reg = <0xe6150080 4>;
+>                         clocks = <&sub_clk>, <&sub_clk>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_SUBCK R8A7740_CLK_SUBCK2
+> @@ -470,6 +590,10 @@
+>                                  <&sub_clk>, <&sub_clk>,
+>                                  <&cpg_clocks R8A7740_CLK_B>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_CEU21 R8A7740_CLK_CEU20 R8A7740_CLK_TMU0
+> @@ -492,6 +616,10 @@
+>                                  <&sub_clk>, <&sub_clk>, <&sub_clk>,
+>                                  <&sub_clk>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_SCIFA6 R8A7740_CLK_INTCA
+> @@ -522,6 +650,10 @@
+>                                  <&cpg_clocks R8A7740_CLK_HP>,
+>                                  <&cpg_clocks R8A7740_CLK_HP>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_CMT1 R8A7740_CLK_FSI R8A7740_CLK_IIC1
+> @@ -540,6 +672,10 @@
+>                                  <&cpg_clocks R8A7740_CLK_HP>,
+>                                  <&cpg_clocks R8A7740_CLK_HP>;
+>                         power-domains = <&pd_c5>;
+> +                       stop-latency = <250000>;
+> +                       start-latency = <250000>;
+> +                       save-state-latency = <250000>;
+> +                       restore-state-latency = <250000>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_USBH R8A7740_CLK_SDHI2
 
-Please in future don't pull anything in from my tree without a signed
-tag (speak to me if there isn't one).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/d59ebf4c/attachment.sig>
+Same here, as there should be no power-domains properties in the clocks
+nodes, there should be no latencies specified neither.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
