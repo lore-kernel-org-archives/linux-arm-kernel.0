@@ -1,39 +1,31 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 26 Sep 2014 08:47:34 -0700
-Subject: [PATCH v3 01/13] PM / Domains: Add genpd attach/detach callbacks
-In-Reply-To: <1411662520-22795-2-git-send-email-geert+renesas@glider.be>
- (Geert Uytterhoeven's message of "Thu, 25 Sep 2014 18:28:28 +0200")
-References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
- <1411662520-22795-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <7heguy4c4p.fsf@deeprootsystems.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Fri, 26 Sep 2014 17:56:39 +0200
+Subject: [PATCH 1/5] power: reset: Add restart functionality for STiH41x
+ platforms
+In-Reply-To: <20140926095628.GE4097@lee--X1>
+References: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
+ <1406040752-25229-2-git-send-email-lee.jones@linaro.org>
+ <20140926095628.GE4097@lee--X1>
+Message-ID: <20140926155638.GB21641@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert+renesas@glider.be> writes:
+Hi Lee,
 
-> While a PM domain can enable PM runtime management of its devices' module
-> clocks by setting
->
-> 	genpd->dev_ops.stop = pm_clk_suspend;
-> 	genpd->dev_ops.start = pm_clk_resume;
->
-> this also requires registering the clocks with the pm_clk subsystem.
-> In the legacy case, this is handled by the platform code, after
-> attaching the device to its PM domain.
->
-> When the devices are instantiated from DT, devices are attached to their
-> PM domains by generic code, leaving no method for the platform-specific
-> PM domain code to register their clocks.
->
-> Add two callbacks, allowing a PM domain to perform platform-specific
-> tasks when a device is attached to or detached from a PM domain.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Sep 26, 2014 at 10:56:28AM +0100, Lee Jones wrote:
+> Dmitry,
+> 
+> This patch-set has been on the list for some time (2 months) now.
+> 
+> How would you like me to proceed?
 
-I replied to the previous RFC, but just to be thorough (and because I
-like this approach):
+http://git.infradead.org/battery-2.6.git/commit/f0745f3696e88b4055c6229e1306a78fbe503066
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-
-Kevin
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/f0be5e59/attachment.sig>
