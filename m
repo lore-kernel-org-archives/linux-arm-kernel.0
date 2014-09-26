@@ -1,43 +1,62 @@
-From: mike.rapoport@gmail.com (Mike Rapoport)
-Date: Fri, 26 Sep 2014 11:07:31 +0300
-Subject: [PATCH 2/2] ARM: DT: apq8064: add CM-QS600 board
-In-Reply-To: <1411718851-17436-1-git-send-email-mike.rapoport@gmail.com>
-References: <1411718851-17436-1-git-send-email-mike.rapoport@gmail.com>
-Message-ID: <1411718851-17436-3-git-send-email-mike.rapoport@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 26 Sep 2014 10:09:22 +0200
+Subject: [PATCH v2 03/22] MSI: Remove the redundant irq_set_chip_data()
+In-Reply-To: <5424C9BD.3040506@huawei.com>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
+ <20140925071919.GH12423@ulmo> <5424C9BD.3040506@huawei.com>
+Message-ID: <20140926080921.GE31106@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mike Rapoport <mike.rapoport@gmail.com>
----
- arch/arm/boot/dts/Makefile                  | 1 +
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 7 +++++++
- 2 files changed, 8 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+On Fri, Sep 26, 2014 at 10:04:45AM +0800, Yijing Wang wrote:
+> On 2014/9/25 15:19, Thierry Reding wrote:
+> > On Thu, Sep 25, 2014 at 11:14:13AM +0800, Yijing Wang wrote:
+> >> Currently, pcie-designware, pcie-rcar, pci-tegra drivers
+> >> use irq chip_data to save the msi_chip pointer. They
+> >> already call irq_set_chip_data() in their own MSI irq map
+> >> functions. So irq_set_chip_data() in arch_setup_msi_irq()
+> >> is useless.
+> > 
+> > Again, I think this should be the other way around. If drivers do
+> > something that's already handled by the core, then the duplicate code
+> > should be dropped from the drivers.
+> 
+> Hi Thierry, this is different thing, because chip_data is specific to IRQ
+> controller, and in other platform, like in x86, chip_data is used to save irq_cfg.
+> So we can not call irq_set_chip_data() in core code.
+> 
+> x86 irq piece code
+> 
+> int arch_setup_hwirq(unsigned int irq, int node)
+> {
+> 	struct irq_cfg *cfg;
+> 	unsigned long flags;
+> 	int ret;
+> 
+> 	cfg = alloc_irq_cfg(irq, node);
+> 	if (!cfg)
+> 		return -ENOMEM;
+> 
+> 	raw_spin_lock_irqsave(&vector_lock, flags);
+> 	ret = __assign_irq_vector(irq, cfg, apic->target_cpus());
+> 	raw_spin_unlock_irqrestore(&vector_lock, flags);
+> 
+> 	if (!ret)
+> 		irq_set_chip_data(irq, cfg);  ------------->Save irq_cfg
+> 	else
+> 		free_irq_cfg(irq, cfg);
+> 	return ret;
+> }
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index aaa1a68..71d2ade 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -340,6 +340,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8064-ifc6410.dtb \
-+	qcom-apq8064-cm-qs600.dtb \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-new file mode 100644
-index 0000000..ec577e1
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -0,0 +1,7 @@
-+#include "qcom-apq8064-board-common.dtsi"
-+
-+/ {
-+	model = "CompuLab CM-QS600";
-+	compatible = "qcom,apq8064-cm-qs600", "qcom,apq8064";
-+
-+};
--- 
-1.9.1
+Okay, makes sense to keep irq_set_chip_data() for driver-specific data
+then.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/6c7d2b86/attachment.sig>
