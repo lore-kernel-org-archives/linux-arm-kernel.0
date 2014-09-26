@@ -1,36 +1,32 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 26 Sep 2014 17:22:37 +0300
-Subject: [PATCH] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
-In-Reply-To: <20140926100832.GE27755@sirena.org.uk>
-References: <1411752349-31490-1-git-send-email-alvin.chen@intel.com>
- <1411752349-31490-2-git-send-email-alvin.chen@intel.com>
- <20140926100832.GE27755@sirena.org.uk>
-Message-ID: <1411741357.22717.4.camel@linux.intel.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 26 Sep 2014 07:23:21 -0700
+Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
+In-Reply-To: <20140926081534.GA27755@sirena.org.uk> (Mark Brown's message of
+ "Fri, 26 Sep 2014 09:15:34 +0100")
+References: <7ha95nikqh.fsf@linaro.org> <20140926081534.GA27755@sirena.org.uk>
+Message-ID: <7hmw9m795y.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-26 at 11:08 +0100, Mark Brown wrote:
-> On Fri, Sep 26, 2014 at 10:25:49AM -0700, Weike Chen wrote:
+Mark Brown <broonie@kernel.org> writes:
 
-[]
+> On Thu, Sep 25, 2014 at 12:05:42PM -0700, Kevin Hilman wrote:
+>
+>> The first pull request was missing a dependency on a feature that went
+>> in through Mark Brown's regulator tree, so it wouldn't actually compile
+>> properly by itself.  This version pulls in that topic branch from Marks
+>> tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
+>
+> Please in future don't pull anything in from my tree without a signed
+> tag (speak to me if there isn't one).
 
->   It might also be helpful for review to have two
-> patches, one splitting things out into the functions and another adding
-> the Quark support.
+Sorry about that.
 
-I also suggest to go this way.
+Had there been more than one patch in this topic branch, or it wasn't
+based directly on an -rc tag, I would've waited for confirmation about
+it being stable, but since it was a single patch, based directly on an
+-rc tag, I assumed it was stable.
 
-> 
-> > +/*  see Quark SPI data sheet for implementation rationale */
-> > +static u32 quark_x1000_set_clk_regvals(u32 rate, u32 *dds, u32 *clk_div)
-> > +{
-> 
-> Please document this in the driver - I don't know if this datasheet is
-> public but even if it is it may not stay that way.
+In the future, I'll be sure to request a signed tag.
 
-Datasheet is public.
-I'm just wondering if we can use just a formula instead of table.
-
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+Kevin
