@@ -1,46 +1,104 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Sep 2014 08:25:26 +0200
-Subject: [PATCH/RFC v2 02/12] PM / Domains: Add DT bindings for PM QoS
- device latencies
-In-Reply-To: <7heguzbd4z.fsf@deeprootsystems.com>
-References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
- <1410893339-6361-3-git-send-email-geert+renesas@glider.be>
- <7heguzbd4z.fsf@deeprootsystems.com>
-Message-ID: <CAMuHMdVp6MiPb8Dhph=eyTgsnBbQSzEHbA9TOjCDi=7BM8GgTg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 26 Sep 2014 14:30:39 +0800
+Subject: [PATCHv4 5/6] ARM: imx: Add initial support for Freescale LS1021A
+In-Reply-To: <1411371952-5618-6-git-send-email-jingchang.lu@freescale.com>
+References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
+ <1411371952-5618-6-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <20140926063037.GF31948@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Mon, Sep 22, 2014 at 03:45:51PM +0800, Jingchang Lu wrote:
+> From: Jingchang Lu <b35083@freescale.com>
+> 
+> The LS1021A SoC is a dual-core Cortex-A7 based processor,
+> this add the initial support for it.
+> 
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig        | 14 ++++++++++++++
+>  arch/arm/mach-imx/Makefile       |  2 ++
+>  arch/arm/mach-imx/mach-ls1021a.c | 21 +++++++++++++++++++++
+>  3 files changed, 37 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 11b2957..2cc64a3 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -639,6 +639,20 @@ config SOC_VF610
+>  	help
+>  	  This enable support for Freescale Vybrid VF610 processor.
+>  
+> +config SOC_LS1021A
+> +	bool "Freescale LS1021A support"
+> +	select CPU_V7
 
-On Thu, Sep 25, 2014 at 11:31 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Geert Uytterhoeven <geert+renesas@glider.be> writes:
->> PM QoS device start/stop and save/restore state latencies are more or
->> less properties of the hardware.
->> In legacy code, they're specified from platform code.
->> On DT platforms, their values should come from DT.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> Should these properties be called "linux,*-latency"?
->
-> Hmm, the start/stop latencies are clearly properties of the hardware,
-> but the save/restore latencies seem to be a function of the driver.
-> e.g., some drivers may keep a shadow copy of their registers in memory
-> so the save time is minimized.
->
-> I don't have too strong of an opinion on this, but probably the drivers
-> should just add their own values to the start/stop latencies to add the
-> linux specific overhead.
+Has been selected by ARCH_MULTI_V7.
 
-Thanks. I agree with you on this, so I'll remove the save/restore latencies.
+> +	select ARM_GIC
+> +	select CLKSRC_OF
 
-Gr{oetje,eeting}s,
+Has been selected by ARCH_MULTIPLATFORM.
 
-                        Geert
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select HAVE_SMP
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Has been selected by ARCH_MULTI_V7.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	select MIGHT_HAVE_PCI
+
+Has been selected by ARCH_MULTIPLATFORM.
+
+Shawn
+
+> +	select PCI_DOMAINS if PCI
+> +	select ZONE_DMA if ARM_LPAE
+> +
+> +	help
+> +	  This enable support for Freescale LS1021A processor.
+> +
+>  endif
+>  
+>  source "arch/arm/mach-imx/devices/Kconfig"
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index 6e4fcd8..ce137bc 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -110,4 +110,6 @@ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+>  
+>  obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
+>  
+> +obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
+> +
+>  obj-y += devices/
+> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+> new file mode 100644
+> index 0000000..9d2034b
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/mach-ls1021a.c
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <asm/mach/arch.h>
+> +
+> +#include "common.h"
+> +
+> +static const char * const ls1021a_dt_compat[] __initconst = {
+> +	"fsl,ls1021a",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+> +	.dt_compat	= ls1021a_dt_compat,
+> +MACHINE_END
+> -- 
+> 1.8.0
+> 
