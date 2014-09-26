@@ -1,17 +1,17 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Sep 2014 16:09:59 -0700
-Subject: pull request for Tegra clock updates for 3.18
-In-Reply-To: <20140919123020.GA12341@tbergstrom-lnx.Nvidia.com>
-References: <20140919123020.GA12341@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140926230959.19023.44549@quantum>
+Date: Fri, 26 Sep 2014 16:15:04 -0700
+Subject: [GIT PULL] qcom clocks changes for 3.18
+In-Reply-To: <20140923230616.GI10233@codeaurora.org>
+References: <20140923230616.GI10233@codeaurora.org>
+Message-ID: <20140926231504.19023.856@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2014-09-19 05:30:20)
+Quoting Stephen Boyd (2014-09-23 16:06:16)
 > Hi Mike,
 > 
-> A few fixes to enable PLL_M scaling for Tegra124 and improved error handling
-> for clock initialization.
+> A smallish pull request for 3.18. The next batch of stuff is
+> going to require more review from your side (cpufreq, nss, etc.)
 
 Pulled!
 
@@ -19,25 +19,44 @@ Thanks,
 Mike
 
 > 
-> Thanks,
+> The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
 > 
-> Peter.
-> 
-> The following changes since commit 9e82bf014195d6f0054982c463575cdce24292be:
-> 
->   Linux 3.17-rc5 (2014-09-14 17:50:12 -0700)
+>   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
 > 
 > are available in the git repository at:
->   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git tegra-clk-3.18
 > 
-> Mikko Perttunen (2):
->       ARM: tegra: Add PLL_M_UD and PLL_C_UD to tegra124-car binding header
->       clk: tegra124: Add PLL_M_UD and PLL_C_UD clocks
+>   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-clocks-for-3.18
 > 
-> Tomeu Vizoso (1):
->       clk: tegra: Make clock initialization more robust
+> for you to fetch changes up to 229fd4a505553c3a475b90e9aa8e452f5d78eb3b:
 > 
->  drivers/clk/tegra/clk-tegra124.c         |    8 ++++++++
->  drivers/clk/tegra/clk.c                  |    9 +++++++--
->  include/dt-bindings/clock/tegra124-car.h |    6 +++++-
->  3 files changed, 20 insertions(+), 3 deletions(-)
+>   clk: qcom: Add support for banked MD RCGs (2014-09-22 15:16:54 -0700)
+> 
+> ----------------------------------------------------------------
+> qcom clock changes for 3.18
+> 
+> Some fixes for the IPQ driver and some code consolidation
+> and refactoring.
+> 
+> ----------------------------------------------------------------
+> Andy Gross (1):
+>       clk: qcom: Add IPQ8064 PLL required for USB
+> 
+> Stephen Boyd (3):
+>       clk: qcom: Consolidate frequency finding logic
+>       clk: qcom: Add support for setting rates on PLLs
+>       clk: qcom: Add support for banked MD RCGs
+> 
+>  drivers/clk/qcom/clk-pll.c      |  68 +++++++++++++++++++++++-
+>  drivers/clk/qcom/clk-pll.h      |  20 +++++++
+>  drivers/clk/qcom/clk-rcg.c      | 115 +++++++++++++++++++---------------------
+>  drivers/clk/qcom/clk-rcg.h      |   6 ++-
+>  drivers/clk/qcom/clk-rcg2.c     |  19 ++-----
+>  drivers/clk/qcom/common.c       |  16 ++++++
+>  drivers/clk/qcom/common.h       |   4 ++
+>  drivers/clk/qcom/gcc-ipq806x.c  |  31 ++++++++++-
+>  drivers/clk/qcom/mmcc-msm8960.c |  28 +++++++---
+>  9 files changed, 219 insertions(+), 88 deletions(-)
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
