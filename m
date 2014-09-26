@@ -1,259 +1,195 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 25 Sep 2014 21:01:57 -0700
-Subject: [PATCH 1/6] watchdog: watchdog_dev: WATCHDOG_KEEP_ON feature
-In-Reply-To: <1411419350-1297-1-git-send-email-j.uzycki@elproma.com.pl>
-References: <1411419350-1297-1-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <5424E535.7060009@roeck-us.net>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 26 Sep 2014 10:26:35 +0530
+Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <4389453.TP96FZcCbx@phil>
+References: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
+ <CAGhQ9VzZ8LadDT5RWUSX89q0WP3fGiQ8f=bWbRVfEz5Vy_zZKw@mail.gmail.com>
+ <13449286.k3JCbR2ABy@phil> <4389453.TP96FZcCbx@phil>
+Message-ID: <000d01cfd946$521304f0$f6390ed0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2014 01:55 PM, Janusz Uzycki wrote:
-> Some applications require to start watchdog before userspace software.
-> This patch enables such feature. Only the flag is necessary
-> to enable it.
-> Moreover kernel's ping is re-enabled when userspace software closed
-> watchdog using the magic character. The features improves kernel's
-> reliability if hardware watchdog is available.
->
-> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+Hi Heiko and Joachim,
 
-Hi Janusz,
+> -----Original Message-----
+> From: Heiko St?bner [mailto:heiko at sntech.de]
+> Sent: Thursday, September 25, 2014 5:52 PM
+> To: Pankaj Dubey
+> Cc: Joachim Eastwood; linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; linux-kernel at vger.kernel.org; kgene.kim at samsung.com;
+> Russell King - ARM Linux; Arnd Bergmann; naushad at samsung.com;
+> b29396 at freescale.com; tomasz.figa at gmail.com; joshi at samsung.com;
+> thomas.ab at samsung.com; Li.Xiubo at freescale.com; vikas.sajjan at samsung.com;
+> chow.kim at samsung.com; lee.jones at linaro.org; dianders at chromium.org
+> Subject: Re: [PATCH v5] mfd: syscon: Decouple syscon interface from
+platform
+> devices
+> 
+> Am Mittwoch, 24. September 2014, 20:35:10 schrieb Heiko St?bner:
+> > Hi Pankaj, Joachim,
+> >
+> > Am Dienstag, 23. September 2014, 20:12:50 schrieb Joachim Eastwood:
+> > > On 22 September 2014 06:40, Pankaj Dubey <pankaj.dubey@samsung.com>
+> wrote:
+> > > > Currently a syscon entity can be only registered directly through
+> > > > a platform device that binds to a dedicated syscon driver. However
+> > > > in certain use cases it is desirable to make a device used with
+> > > > another driver a syscon interface provider.
+> > > >
+> > > > For example, certain SoCs (e.g. Exynos) contain system controller
+> > > > blocks which perform various functions such as power domain
+> > > > control, CPU power management, low power mode control, but in
+> > > > addition contain certain IP integration glue, such as various
+> > > > signal masks, coprocessor power control, etc. In such case, there
+> > > > is a need to have a dedicated driver for such system controller
+> > > > but also share registers with other drivers. The latter is where the
+syscon
+> interface is helpful.
+> > > >
+> > > > In case of DT based platforms, this patch decouples syscon object
+> > > > from syscon platform driver, and allows to create syscon objects
+> > > > first time when it is required by calling of
+> > > > syscon_regmap_lookup_by APIs and keep a list of such syscon
+> > > > objects along with syscon provider device_nodes and regmap handles.
+> > > >
+> > > > For non-DT based platforms, this patch keeps syscon platform
+> > > > driver structure where is can be probed and such non-DT based
+> > > > drivers can use syscon_regmap_lookup_by_pdev API and get access to
+> regmap handles.
+> > > > Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT
+> > > > based, we can completly remove platform driver of syscon, and keep
+> > > > only helper functions to get regmap handles.
+> > > >
+> > > > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > > > Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > > > Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+> > > > Tested-by: Javier Martinez Canillas
+> > > > <javier.martinez@collabora.co.uk>
+> > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > >
+> > > I wrote a clk driver using syscon and your patch. clk driver uses
+> > > CLK_OF_DECLARE, btw.
+> > >
+> > > It works but I get a '(null): Failed to create debugfs directory'
+> > > message in the boot log.
+> > >
+> > > Tested-by: Joachim Eastwood <manabian@gmail.com>
+> >
+> > on Rockchip platforms this syscon support also helps quite a bit, as
+> > the pll lock-status is sitting in an external syscon register, so
+> > setting target pll-rates through assigned-clocks is not easily doable
+without it.
+> > Therefore I'm very much looking forward to this.
+> >
+> >
+> > Similar to Joachim I get an error about debugfs from regmap, which
+> > seems to be caused by
+> > 	name = dev_name(map->dev);
+> > returning NULL in regmap_debugfs_init in regmap-debugfs.c for such an
+> > "early" syscon.
+> 
+> It looks like of_device_make_bus_id would be able to do the necessary
+steps to
+> populate the dev_name seemingly correctly.
+> 
+> With the diff below I now get a syscon that can init clocks and also a
+sane regmap
+> debugfs init:
+> 
+> /debug/regmap # ls -la
+> total 0
+> drwxr-xr-x    5 0        0                0 Jan  1  1970 .
+> drwx------   19 0        0                0 Jan  1  1970 ..
+> drwxr-xr-x    2 0        0                0 Jan  1  1970 0-001b
+> drwxr-xr-x    2 0        0                0 Jan  1  1970
+ff730000.power-management
+> drwxr-xr-x    2 0        0                0 Jan  1  1970 ff770000.syscon
+> 
+> 
+> But of course I don't know enough about device-internals to determine if
+this is an
+> insane solution or not :-)
+> 
 
-This patch set is trying to solve four problems at once:
+Thanks Heiko for figuring out issue and proposed solution.
 
-1) Auto-start watchdog when its driver registers
-2) Keep watchdog running when its driver registers until userspace opens it
-3) Handle watchdogs which can not be stopped after being started
-4) Keep watchdog running with kernel timer after it has been closed,
-    even if it can be stopped.
+As you and Joachim pointed out that current patch failed to create regmap
+debugfs entry,
+I also investigated and found that it fails to create regmap debugfs entry
+either you call it
+early (from init_irq or clk_init function) or you call it in later stage
+before actual device is
+populated (from init_machine before of_platform_populate_device).
 
-The next time adds 'boot time protection', which is really another term
-for an initial timeout, and case 5).
+One point is regmap debugfs code should have handled it gracefully instead
+of kernel panic,
+so looks like it needs some fix in that part of code.
 
-That is a bit too much for a single patch and, even more so, a single flag.
-Let's look at one case after another.
+I tried Heiko's suggested solution of calling "of_device_make_bus_id" after
+platform_device_alloc
+and it worked well and I tested it from init_irq as well as clk_init, which
+happens at very early stage.
+Maybe Joachim can also try if it's working for him.
 
-Auto-start watchdog when its driver registers - this makes sense as a
-feature just by itself. A good name for its flag might be something like
-WDT_AUTOSTART. A matching module parameter might also make sense.
+Only concerns for this approach: Is it proper way of doing this?
 
-autostart:
-	Set to 0 to disable, -1 to enable with unlimited timeout,
-	or <n> for an initial timeout of <n> seconds.
+In my opinion it could be, if we are not getting any other approach of
+handling early syscon.
 
-This could be accompanied by a variable in watchdog_device:
-	int init_timeout;	/* initial timeout in seconds */
+I also tried to get any other solution for handling debugfs entry, and found
+one more solution.
+But it will work only for late users of syscon: 
 
-An API function such as watchdog_set_autostart() with the initial timeout
-as parameter would also be helpful. This function could then be used to
-implement 2).
+pdev = platform_device_alloc("dummy-syscon", -1);
+ret = platform_device_add(pdev);
 
-	if (autostart || (keep_running && this_watchdog_is_running())
-		watchdog_set_autostart(&wdd, autostart ? : keep_running);
+It can solve issue of regmap debugfs for late users, i.e. if we try to use
+syscon_lookup_by APIs not before
+init_machine. But this will not work for early users of syscon, as I can see
+that "platform_device_add"
+fails (kernel panic) if we call it from init_irq or clk_init.
 
-keep_running could then be a another module parameter with the same meaning
-as autostart.
+Meanwhile I have posted a fix [1] for this so that if someone calls
+platform_device_add at very early
+stage at least it should not panic and kernel should handle it gracefully. 
 
-Together this would also solve problem 5) while at the same time keeping
-the use cases separate.
+[1]: https://lkml.org/lkml/2014/9/24/348
 
-For 3) we really need another flag. Actually, it might be sufficient to have
-watchdog drivers with this condition simply not provide a 'stop' function.
-If we use a flag, something like WDOG_HW_NO_WAY_OUT with matching
-WATCHDOG_HW_NOWAYOUT might make sense. Its functionality is slightly
-different to the other conditions: It would not auto-start a watchdog,
-but keep it running with the internal timer when the watchdog file is closed.
+Also as I mentioned earlier, providing feature of early syscon availability
+was not the main objective of this
+patch, so just to make sure that this should not be a blocking factor for
+current patch I would like to split
+patch in two steps to address to different issues:
 
-As for 4), I don't really know if it makes sense to have this functionality.
+1: First patch will cover existing users and allow any such users to create
+actual platform device and register
+their own platform driver, instead of syscon getting probed first.
+I will make sure that it should not break existing users or any existing
+functionality (including debugfs).
 
-Does this all make sense ?
-
-Some more comments below.
+2: Second on top of this patch we can have discussion how to go for early
+syscon users.
 
 Thanks,
-Guenter
-
-> ---
->   drivers/watchdog/watchdog_dev.c | 58 ++++++++++++++++++++++++++-
->   include/linux/watchdog.h        |  5 +++
->   2 files changed, 61 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-> index 6aaefba..51a65f6 100644
-> --- a/drivers/watchdog/watchdog_dev.c
-> +++ b/drivers/watchdog/watchdog_dev.c
-> @@ -41,6 +41,7 @@
->   #include <linux/miscdevice.h>	/* For handling misc devices */
->   #include <linux/init.h>		/* For __init/__exit/... */
->   #include <linux/uaccess.h>	/* For copy_to_user/put_user/... */
-> +#include <linux/jiffies.h>	/* for ping timer */
->
->   #include "watchdog_core.h"
->
-> @@ -277,6 +278,27 @@ out_ioctl:
->   	return err;
->   }
->
-> +/* 'keep on' feature */
-> +static void watchdog_ping_timer_cb(unsigned long data)
-> +{
-> +	struct watchdog_device *wdd = (struct watchdog_device *)data;
-> +	watchdog_ping(wdd);
-> +	/* call next ping half the timeout value */
-> +	mod_timer(&wdd->ping_timer,
-> +			jiffies + msecs_to_jiffies(wdd->timeout * 500));
-> +}
-> +
-> +static void watchdog_keepon_start(struct watchdog_device *wdd)
-
-This name reflects the intended use case, but not the functionality.
-Something like "watchdog_timer_start" might make more sense here.
-
-> +{
-> +	watchdog_start(wdd);
-
-This should probably be handled by the caller, to let us separate
-cases where the watchdog is already running (for example on close).
-
-> +	watchdog_ping_timer_cb((unsigned long)wdd);
-> +}
-> +
-> +static void watchdog_keepon_stop(struct watchdog_device *wdd)
-
-Same name comment as above. keepon -> timer.
-
-> +{
-> +	del_timer_sync(&wdd->ping_timer);
-> +}
-> +
->   /*
->    *	watchdog_write: writes to the watchdog.
->    *	@file: file from VFS
-> @@ -430,6 +452,9 @@ static int watchdog_open(struct inode *inode, struct file *file)
->   	if (!try_module_get(wdd->ops->owner))
->   		goto out;
->
-> +	if (test_bit(WDOG_KEEP_ON, &wdd->status))
-> +		watchdog_keepon_stop(wdd);
-> +
->   	err = watchdog_start(wdd);
->   	if (err < 0)
->   		goto out_mod;
-> @@ -472,8 +497,13 @@ static int watchdog_release(struct inode *inode, struct file *file)
->   	if (!test_bit(WDOG_ACTIVE, &wdd->status))
->   		err = 0;
->   	else if (test_and_clear_bit(WDOG_ALLOW_RELEASE, &wdd->status) ||
-> -		 !(wdd->info->options & WDIOF_MAGICCLOSE))
-> -		err = watchdog_stop(wdd);
-> +		 !(wdd->info->options & WDIOF_MAGICCLOSE)) {
-> +		if (test_bit(WDOG_KEEP_ON, &wdd->status)) {
-> +			watchdog_keepon_start(wdd);
-> +			err = 0;
-> +		} else
-> +			err = watchdog_stop(wdd);
-> +	}
-
-I think this all should probably go into some helper function.
-The conditions here are getting a bit complicated.
-
->
->   	/* If the watchdog was not stopped, send a keepalive ping */
->   	if (err < 0) {
-> @@ -524,6 +554,14 @@ int watchdog_dev_register(struct watchdog_device *watchdog)
->   {
->   	int err, devno;
->
-> +	if (test_bit(WDOG_KEEP_ON, &watchdog->status)) {
-> +		if (!try_module_get(watchdog->ops->owner))
-> +			return -ENODEV;
-> +		setup_timer(&watchdog->ping_timer, watchdog_ping_timer_cb,
-> +				(unsigned long)watchdog);
-> +		watchdog_keepon_start(watchdog);
-> +	}
-> +
-This should be the last action in the probe function.
-Reason is that we might have a watchdog which can not be stopped after
-it was started once. If one of the error cases below happens, we would
-be stuck with a running watchdog and no means to stop it or to keep
-it alive.
-
->   	if (watchdog->id == 0) {
->   		old_wdd = watchdog;
->   		watchdog_miscdev.parent = watchdog->parent;
-> @@ -535,6 +573,11 @@ int watchdog_dev_register(struct watchdog_device *watchdog)
->   				pr_err("%s: a legacy watchdog module is probably present.\n",
->   					watchdog->info->identity);
->   			old_wdd = NULL;
-> +			if (test_bit(WDOG_KEEP_ON, &watchdog->status)) {
-> +				watchdog_keepon_stop(watchdog);
-> +				watchdog_stop(watchdog);
-> +				module_put(watchdog->ops->owner);
-> +			}
-
-Won't apply after moving above functions, but in general
-complex error cleanup like this should be handled with a goto
-to an error handler at the end of the function.
-
->   			return err;
->   		}
->   	}
-> @@ -553,6 +596,11 @@ int watchdog_dev_register(struct watchdog_device *watchdog)
->   			misc_deregister(&watchdog_miscdev);
->   			old_wdd = NULL;
->   		}
-> +		if (test_bit(WDOG_KEEP_ON, &watchdog->status)) {
-> +			watchdog_keepon_stop(watchdog);
-> +			watchdog_stop(watchdog);
-> +			module_put(watchdog->ops->owner);
-> +		}
-
-... to avoid situations with duplicated error handling code like this,
-but also to make code easier to read. See CodingStyle.
-
->   	}
->   	return err;
->   }
-> @@ -575,6 +623,12 @@ int watchdog_dev_unregister(struct watchdog_device *watchdog)
->   		misc_deregister(&watchdog_miscdev);
->   		old_wdd = NULL;
->   	}
-> +
-> +	if (test_bit(WDOG_KEEP_ON, &watchdog->status)) {
-> +		watchdog_keepon_stop(watchdog);
-> +		watchdog_stop(watchdog);
-> +		module_put(watchdog->ops->owner);
-> +	}
->   	return 0;
->   }
->
-> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
-> index 2a3038e..650e0d5 100644
-> --- a/include/linux/watchdog.h
-> +++ b/include/linux/watchdog.h
-> @@ -12,6 +12,7 @@
->   #include <linux/bitops.h>
->   #include <linux/device.h>
->   #include <linux/cdev.h>
-> +#include <linux/timer.h>		/* for ping timer */
->   #include <uapi/linux/watchdog.h>
->
->   struct watchdog_ops;
-> @@ -95,6 +96,8 @@ struct watchdog_device {
->   #define WDOG_ALLOW_RELEASE	2	/* Did we receive the magic char ? */
->   #define WDOG_NO_WAY_OUT		3	/* Is 'nowayout' feature set ? */
->   #define WDOG_UNREGISTERED	4	/* Has the device been unregistered */
-> +#define WDOG_KEEP_ON		5	/* Is 'keep on' feature set? */
-> +	struct timer_list ping_timer;	/* timer to keep on hardware ping */
->   };
->
->   #ifdef CONFIG_WATCHDOG_NOWAYOUT
-> @@ -104,6 +107,8 @@ struct watchdog_device {
->   #define WATCHDOG_NOWAYOUT		0
->   #define WATCHDOG_NOWAYOUT_INIT_STATUS	0
->   #endif
-> +/* other proposal: WATCHDOG_ALWAYS_ACTIVE */
-> +#define WATCHDOG_KEEP_ON		(1 << WDOG_KEEP_ON)
->
->   /* Use the following function to check whether or not the watchdog is active */
->   static inline bool watchdog_active(struct watchdog_device *wdd)
->
+Pankaj Dubey
+> 
+> Heiko
+> 
+> 
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c index
+8ebc1c6..3734434
+> 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -73,6 +73,7 @@ static struct syscon *of_syscon_register(struct
+device_node
+> *np)
+>                         goto err_pdev;
+>                 }
+>                 pdev->dev.of_node = of_node_get(np);
+> +               of_device_make_bus_id(&pdev->dev);
+>         }
+> 
+>         regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> &syscon_regmap_config);
