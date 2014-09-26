@@ -1,85 +1,97 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 26 Sep 2014 10:54:16 +0200
-Subject: [PATCH v3 7/8] phy: miphy28lp: Tune tx impedance across Soc cuts
+Date: Fri, 26 Sep 2014 10:54:14 +0200
+Subject: [PATCH v3 5/8] phy: miphy28lp: Add SSC support for SATA
 In-Reply-To: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1411721657-9924-8-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1411721657-9924-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch to compensate tx impedance (Sata, PCIe)
-depending on Soc cuts the kernel is built for.
+This patch to tune on/off the ssc on miphy sata setup.
+User can now enable ssc via dt blob, it is useful to reduce
+effects of EMI.
 
 Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- Documentation/devicetree/bindings/phy/phy-miphy28lp.txt |  1 +
- drivers/phy/phy-miphy28lp.c                             | 16 ++++++++++++++++
- 2 files changed, 17 insertions(+)
+ .../devicetree/bindings/phy/phy-miphy28lp.txt      |  1 +
+ drivers/phy/phy-miphy28lp.c                        | 34 ++++++++++++++++++++++
+ 2 files changed, 35 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-index daa8310..17f7eec 100644
+index 1ad4433..daa8310 100644
 --- a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
 +++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-@@ -40,6 +40,7 @@ Optional properties (port (child) node):
+@@ -39,6 +39,7 @@ Optional properties (port (child) node):
+ 			  register.
  - st,px_rx_pol_inv	: to invert polarity of RXn/RXp (respectively negative line and positive
  			  line).
- - st,scc-on		: enable ssc to reduce effects of EMI (only for sata or PCIe).
-+- st,tx-impedance-comp	: to compensate tx impedance avoiding out of range values.
++- st,scc-on		: enable ssc to reduce effects of EMI (only for sata or PCIe).
  
  example:
  
 diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
-index b6574e8..ac3fdf9 100644
+index 1a468d1..7285543 100644
 --- a/drivers/phy/phy-miphy28lp.c
 +++ b/drivers/phy/phy-miphy28lp.c
-@@ -201,6 +201,7 @@ struct miphy28lp_phy {
+@@ -200,6 +200,7 @@ struct miphy28lp_phy {
+ 	bool osc_force_ext;
  	bool osc_rdy;
  	bool px_rx_pol_inv;
- 	bool ssc;
-+	bool tx_impedance;
++	bool ssc;
  
  	struct reset_control *miphy_rst;
  
-@@ -608,6 +609,12 @@ static void miphy_pcie_tune_ssc(struct miphy28lp_phy *miphy_phy)
- 	}
+@@ -550,6 +551,34 @@ static inline void miphy28_usb3_miphy_reset(struct miphy28lp_phy *miphy_phy)
+ 	writeb_relaxed(0x00, base + MIPHY_CONF);
  }
  
-+static inline void miphy_tune_tx_impedance(struct miphy28lp_phy *miphy_phy)
++static void miphy_sata_tune_ssc(struct miphy28lp_phy *miphy_phy)
 +{
++	u8 val;
++
 +	/* Compensate Tx impedance to avoid out of range values */
-+	writeb_relaxed(0x02, miphy_phy->base + MIPHY_COMP_POSTP);
++	/*
++	 * Enable the SSC on PLL for all banks
++	 * SSC Modulation @ 31 KHz and 4000 ppm modulation amp
++	 */
++	val = readb_relaxed(miphy_phy->base + MIPHY_BOUNDARY_2);
++	val |= SSC_EN_SW;
++	writeb_relaxed(val, miphy_phy->base + MIPHY_BOUNDARY_2);
++
++	val = readb_relaxed(miphy_phy->base + MIPHY_BOUNDARY_SEL);
++	val |= SSC_SEL;
++	writeb_relaxed(val, miphy_phy->base + MIPHY_BOUNDARY_SEL);
++
++	for (val = 0; val < 3; val++) {
++		writeb_relaxed(val, miphy_phy->base + MIPHY_CONF);
++		writeb_relaxed(0x3c, miphy_phy->base + MIPHY_PLL_SBR_2);
++		writeb_relaxed(0x6c, miphy_phy->base + MIPHY_PLL_SBR_3);
++		writeb_relaxed(0x81, miphy_phy->base + MIPHY_PLL_SBR_4);
++		writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
++		writeb_relaxed(0x02, miphy_phy->base + MIPHY_PLL_SBR_1);
++		writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
++	}
 +}
 +
  static inline int miphy28lp_configure_sata(struct miphy28lp_phy *miphy_phy)
  {
  	void __iomem *base = miphy_phy->base;
-@@ -646,6 +653,9 @@ static inline int miphy28lp_configure_sata(struct miphy28lp_phy *miphy_phy)
- 	if (miphy_phy->ssc)
- 		miphy_sata_tune_ssc(miphy_phy);
+@@ -585,6 +614,9 @@ static inline int miphy28lp_configure_sata(struct miphy28lp_phy *miphy_phy)
+ 		writeb_relaxed(val, miphy_phy->base + MIPHY_CONTROL);
+ 	}
  
-+	if (miphy_phy->tx_impedance)
-+		miphy_tune_tx_impedance(miphy_phy);
++	if (miphy_phy->ssc)
++		miphy_sata_tune_ssc(miphy_phy);
 +
  	return 0;
  }
  
-@@ -679,6 +689,9 @@ static inline int miphy28lp_configure_pcie(struct miphy28lp_phy *miphy_phy)
- 	if (miphy_phy->ssc)
- 		miphy_pcie_tune_ssc(miphy_phy);
+@@ -1051,6 +1083,8 @@ static int miphy28lp_of_probe(struct device_node *np,
+ 	miphy_phy->px_rx_pol_inv =
+ 		of_property_read_bool(np, "st,px_rx_pol_inv");
  
-+	if (miphy_phy->tx_impedance)
-+		miphy_tune_tx_impedance(miphy_phy);
-+
- 	return 0;
- }
- 
-@@ -1117,6 +1130,9 @@ static int miphy28lp_of_probe(struct device_node *np,
- 
- 	miphy_phy->ssc = of_property_read_bool(np, "st,ssc-on");
- 
-+	miphy_phy->tx_impedance =
-+		of_property_read_bool(np, "st,tx-impedance-comp");
++	miphy_phy->ssc = of_property_read_bool(np, "st,ssc-on");
 +
  	of_property_read_u32(np, "st,sata-gen", &miphy_phy->sata_gen);
  	if (!miphy_phy->sata_gen)
