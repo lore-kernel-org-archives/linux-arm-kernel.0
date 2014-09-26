@@ -1,53 +1,55 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 25 Sep 2014 22:59:31 -0700
-Subject: [PATCH 1/2] regulator: anatop: allow LDO bypass to be set from
- device-tree
-In-Reply-To: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
-References: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1411711172-16498-2-git-send-email-tharvey@gateworks.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 26 Sep 2014 08:03:13 +0200
+Subject: [GIT PULL] Xilinx Zynq changes for v3.18
+In-Reply-To: <201409251746.14540.arnd@arndb.de>
+References: <541819FD.5000301@monstr.eu> <201409251746.14540.arnd@arndb.de>
+Message-ID: <542501A1.8020807@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core regulators provided by the Anatop regulator (reg_core, reg_soc,
-reg_pu) should be set in bypass mode if an extern PMIC regulator is used.
-This allows configuring this from device-tree.
+Hi,
 
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Mark Brown <broonie@linaro.org>
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- Documentation/devicetree/bindings/regulator/anatop-regulator.txt | 1 +
- drivers/regulator/anatop-regulator.c                             | 4 +++-
- 2 files changed, 4 insertions(+), 1 deletion(-)
+On 09/25/2014 05:46 PM, Arnd Bergmann wrote:
+> On Tuesday 16 September 2014, Michal Simek wrote:
+>>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.18
+>>
+>> for you to fetch changes up to 8097171e19bb69f3e2226827440b71ececa5d74f:
+>>
+>>   ARM: zynq: Remove useless L2C AUX setting (2014-09-16 12:55:12 +0200)
+>>
+>> ----------------------------------------------------------------
+>> arm: Xilinx Zynq cleanup patches for v3.18
+>>
+>> - PM support
+>> - Fix L2 useless setting
+> 
+> I don't see why this counts as cleanup when you add so much more code
+> than you remove, but the individual changes all make sense, so I've
+> pulled it into next/soc.
 
-diff --git a/Documentation/devicetree/bindings/regulator/anatop-regulator.txt b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-index 758eae2..e958c60 100644
---- a/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/anatop-regulator.txt
-@@ -13,6 +13,7 @@ Optional properties:
- - anatop-delay-reg-offset: Anatop MFD step time register offset
- - anatop-delay-bit-shift: Bit shift for the step time register
- - anatop-delay-bit-width: Number of bits used in the step time register
-+- anatop-ldo-bypass: Enable LDO bypass mode (for core regulators)
- 
- Any property defined as part of the core regulator
- binding, defined in regulator.txt, can also be used.
-diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-index 4f730af..0a22d3a 100644
---- a/drivers/regulator/anatop-regulator.c
-+++ b/drivers/regulator/anatop-regulator.c
-@@ -279,8 +279,10 @@ static int anatop_regulator_probe(struct platform_device *pdev)
- 		}
- 
- 		sreg->sel = (val & rdesc->vsel_mask) >> sreg->vol_bit_shift;
--		if (sreg->sel == LDO_FET_FULL_ON) {
-+		if (sreg->sel == LDO_FET_FULL_ON ||
-+		    of_property_read_bool(np, "anatop-ldo-bypass")) {
- 			sreg->sel = 0;
-+			dev_info(dev, "LDO bypass mode\n");
- 			sreg->bypass = true;
- 		}
- 	} else {
+What's the branch name for adding new stuff? I see people are using soc.
+
+> 
+> Sorry for the delay.
+
+No problem.
+
+Thanks,
+Michal
+
+
 -- 
-1.8.3.2
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/2d10ab74/attachment.sig>
