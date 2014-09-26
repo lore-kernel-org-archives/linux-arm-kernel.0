@@ -1,535 +1,252 @@
 From: chenhui.zhao@freescale.com (Chenhui Zhao)
-Date: Fri, 26 Sep 2014 19:25:03 +0800
-Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
+Date: Fri, 26 Sep 2014 19:25:01 +0800
+Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
 In-Reply-To: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
 References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
-Message-ID: <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
+Message-ID: <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1 supports deep sleep feature that can switch off most parts of
-the SoC when it is in deep sleep state.
+From: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
 
-The DDR controller will also be powered off in deep sleep. Therefore,
-copy the last stage code to enter deep sleep to SRAM and run it
-with disabling MMU and caches.
+This implements CPU hotplug for ls1. When cpu is down, it will be put
+in WFI state. When cpu is up, it will be waked by a IPI interrupt and
+reinitialized.
 
+Signed-off-by: Zhang Zhuoyu <Zhuoyu.Zhang@freescale.com>
 Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
 ---
- arch/arm/mach-imx/Kconfig     |    1 +
- arch/arm/mach-imx/Makefile    |    1 +
- arch/arm/mach-imx/pm-ls1.c    |  329 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/sleep-ls1.S |  142 ++++++++++++++++++
- 4 files changed, 473 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/pm-ls1.c
- create mode 100644 arch/arm/mach-imx/sleep-ls1.S
+ arch/arm/mach-imx/common.h  |    4 ++
+ arch/arm/mach-imx/hotplug.c |   90 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/platsmp.c |   22 ++++++++--
+ arch/arm/mach-imx/src.c     |   21 ++++++++++
+ 4 files changed, 132 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index b85534c..716bb1b 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -866,6 +866,7 @@ config SOC_LS1021A
- 	select HAVE_SMP
- 	select ARCH_LAYERSCAPE
- 	select ZONE_DMA if ARM_LPAE
-+	select FSL_SLEEP_FSM if PM
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 203ee73..2ca32fe 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -115,6 +115,7 @@ void tzic_handle_irq(struct pt_regs *);
+ extern void imx_enable_cpu(int cpu, bool enable);
+ extern void imx_set_cpu_jump(int cpu, void *jump_addr);
+ extern u32 imx_get_cpu_arg(int cpu);
++extern u32 ls1_get_cpu_arg(int cpu);
+ extern void imx_set_cpu_arg(int cpu, u32 arg);
+ extern void v7_cpu_resume(void);
+ #ifdef CONFIG_SMP
+@@ -145,6 +146,9 @@ extern void imx6q_set_chicken_bit(void);
+ extern void imx_cpu_die(unsigned int cpu);
+ extern int imx_cpu_kill(unsigned int cpu);
  
- 	help
- 	  This enable support for Freescale Layerscape LS1021A  processor.
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 41b8044..9931528 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -102,6 +102,7 @@ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
++extern void ls1021a_cpu_die(unsigned int cpu);
++extern int ls1021a_cpu_kill(unsigned int cpu);
++
+ #ifdef CONFIG_PM
+ extern void imx6q_pm_init(void);
+ extern void imx5_pm_init(void);
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 3daf1ed..646034f 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -14,6 +14,9 @@
+ #include <linux/jiffies.h>
+ #include <asm/cp15.h>
+ #include <asm/proc-fns.h>
++#include<asm/smp.h>
++#include<asm/smp_plat.h>
++#include<asm/cacheflush.h>
  
- ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
-+obj-$(CONFIG_SOC_LS1021A) += pm-ls1.o sleep-ls1.o
- endif
+ #include "common.h"
  
- # i.MX5 based machines
-diff --git a/arch/arm/mach-imx/pm-ls1.c b/arch/arm/mach-imx/pm-ls1.c
-new file mode 100644
-index 0000000..621fdb4
---- /dev/null
-+++ b/arch/arm/mach-imx/pm-ls1.c
-@@ -0,0 +1,329 @@
+@@ -38,6 +41,22 @@ static inline void cpu_enter_lowpower(void)
+ 	  : "cc");
+ }
+ 
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"	mrc     p15, 0, %0, c1, c0, 0\n"
++	"       orr     %0, %0, %1\n"
++	"       mcr     p15, 0, %0, c1, c0, 0\n"
++	"       mrc     p15, 0, %0, c1, c0, 1\n"
++	"       orr     %0, %0, %2\n"
++	"       mcr     p15, 0, %0, c1, c0, 1\n"
++	: "=&r" (v)
++	: "Ir" (CR_C), "Ir" (0x40)
++	: "cc");
++}
++
+ /*
+  * platform-specific code to shutdown a CPU
+  *
+@@ -66,3 +85,74 @@ int imx_cpu_kill(unsigned int cpu)
+ 	imx_set_cpu_arg(cpu, 0);
+ 	return 1;
+ }
++
++static inline void ls1_do_lowpower(unsigned int cpu, int *spurious)
++{
++	/*
++	 * there is no power-control hardware on this platform, so all
++	 * we can do is put the core into WFI; this is safe as the calling
++	 * code will have already disabled interrupts
++	 */
++	for (;;) {
++		wfi();
++
++		if (pen_release == cpu_logical_map(cpu)) {
++			/*OK, proper wakeup, we're done*/
++			break;
++		}
++
++		/*
++		 * Getting here, means that we have come out of WFI without
++		 * having been woken up - this shouldn't happen
++		 *
++		 * Just note it happening - when we're woken, we can report
++		 * its occurrence.
++		 */
++		(*spurious)++;
++	}
++}
++
 +/*
-+ * Support deep sleep feature for LS1
++ * platform-specific code to shutdown a CPU
 + *
-+ * Copyright 2014 Freescale Semiconductor Inc.
-+ *
-+ * This program is free software; you can redistribute	it and/or modify it
-+ * under  the terms of	the GNU General	 Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
++ * Called with IRQs disabled
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/io.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/cpu_pm.h>
-+#include <asm/suspend.h>
-+#include <asm/delay.h>
-+#include <asm/cacheflush.h>
-+
-+#define FSL_SLEEP		0x1
-+#define FSL_DEEP_SLEEP		0x2
-+
-+#define DCSR_EPU_EPECR0		0x300
-+#define DCSR_RCPM_CG1CR0	0x31c
-+#define DCSR_RCPM_CSTTACR0	0xb00
-+
-+/* in SCFG registers except for SPARECR registers, reverse bits in each byte */
-+#define CCSR_SCFG_DPSLPCR	0
-+#define CCSR_SCFG_DPSLPCR_VAL	0x00000080
-+#define CCSR_SCFG_SPARECR2	0x504
-+#define CCSR_SCFG_SPARECR3	0x508
-+
-+#define CCSR_DCFG_CRSTSR	0x400
-+#define CCSR_DCFG_CRSTSR_VAL	0x00000008
-+
-+#define CCSR_RCPM_POWMGTCSR		0x130
-+#define CCSR_RCPM_POWMGTCSR_LPM20_REQ	0x00100000
-+#define CCSR_RCPM_POWMGTCSR_LPM20_ST	0x00000200
-+#define CCSR_RCPM_POWMGTCSR_P_LPM20_ST	0x00000100
-+#define CCSR_RCPM_CLPCL10SETR		0x1c4
-+#define CCSR_RCPM_CLPCL10SETR_C0	0x1
-+
-+#define QIXIS_CTL_SYS			0x5
-+#define QIXIS_CTL_SYS_EVTSW_MASK	0x0c
-+#define QIXIS_CTL_SYS_EVTSW_IRQ		0x04
-+
-+#define QIXIS_PWR_CTL2		0x21
-+#define QIXIS_PWR_CTL2_PCTL	0x2
-+
-+#define OCRAM_BASE	0x10000000
-+#define OCRAM_SIZE	0x10000		/* 64K */
-+/* use the last page of SRAM */
-+#define SRAM_CODE_BASE_PHY	(OCRAM_BASE + OCRAM_SIZE - PAGE_SIZE)
-+
-+struct ls1_pm_baseaddr {
-+	void __iomem *epu;
-+	void __iomem *dcsr_rcpm1;
-+	void __iomem *dcsr_rcpm2;
-+	void __iomem *rcpm;
-+	void __iomem *scfg;
-+	void __iomem *dcfg;
-+	void __iomem *fpga;
-+	void __iomem *sram;
-+};
-+
-+/* 128 bytes buffer for restoring data broke by DDR training initialization */
-+#define DDR_BUF_SIZE	128
-+static u8 ddr_buff[DDR_BUF_SIZE] __aligned(64);
-+static struct ls1_pm_baseaddr ls1_pm_base;
-+/* supported sleep modes by the present platform */
-+static unsigned int sleep_modes;
-+
-+extern void ls1_do_deepsleep(unsigned long addr);
-+extern void ls1_start_fsm(void);
-+extern void ls1_deepsleep_resume(void);
-+extern void ls1021a_set_secondary_entry(void);
-+extern int ls1_sram_code_size;
-+extern void fsl_epu_setup_default(void __iomem *epu_base);
-+
-+static void ls1_pm_iomap(void)
++void __ref ls1021a_cpu_die(unsigned int cpu)
 +{
-+	struct device_node *np;
-+	void *base;
++	int spurious = 0;
 +
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcsr-epu");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.epu = base;
++	v7_exit_coherency_flush(louis);
 +
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcsr-rcpm");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.dcsr_rcpm1 = base;
-+	base = of_iomap(np, 1);
-+	BUG_ON(!base);
-+	ls1_pm_base.dcsr_rcpm2 = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-scfg");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.scfg = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.dcfg = base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021aqds-fpga");
-+	base = of_iomap(np, 0);
-+	BUG_ON(!base);
-+	ls1_pm_base.fpga = base;
-+
-+	base = ioremap(SRAM_CODE_BASE_PHY, PAGE_SIZE);
-+	BUG_ON(!base);
-+	ls1_pm_base.sram = base;
-+}
-+
-+static void ls1_pm_uniomap(void)
-+{
-+	iounmap(ls1_pm_base.epu);
-+	iounmap(ls1_pm_base.dcsr_rcpm1);
-+	iounmap(ls1_pm_base.dcsr_rcpm2);
-+	iounmap(ls1_pm_base.scfg);
-+	iounmap(ls1_pm_base.dcfg);
-+	iounmap(ls1_pm_base.fpga);
-+	iounmap(ls1_pm_base.sram);
-+}
-+
-+static void ls1_save_ddr(void *base)
-+{
-+	u32 ddr_buff_addr;
++	/*we're ready for shutdown now, so do it*/
++	ls1_do_lowpower(cpu, &spurious);
 +
 +	/*
-+	 * DDR training initialization will break 128 bytes at the beginning
-+	 * of DDR, therefore, save them so that the bootloader will restore
-+	 * them. Assume that DDR is mapped to the address space started with
-+	 * CONFIG_PAGE_OFFSET.
++	 * bring this CPU back into the world of cache
++	 * coherency, and then restore interrupts
 +	 */
-+	memcpy(ddr_buff, (void *)CONFIG_PAGE_OFFSET, DDR_BUF_SIZE);
++	cpu_leave_lowpower();
 +
-+	ddr_buff_addr = (u32)__pa(ddr_buff);
++	if (spurious)
++		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
 +
 +	/*
-+	 * the bootloader will restore the first 128 bytes of DDR from
-+	 * the location indicated by the register SPARECR3
++	 * Do not return to the idle loop - jump back to the secondary
++	 * cpu initialisation.  There's some initialisation which needs
++	 * to be repeated to undo the effects of taking the CPU offline.
 +	 */
-+	writel_relaxed(ddr_buff_addr, base + CCSR_SCFG_SPARECR3);
++	__asm__("mov    sp, %0\n"
++	"       mov     fp, #0\n"
++	"       b       ls1021a_secondary_startup"
++	:
++	: "r" (task_stack_page(current) + THREAD_SIZE - 8));
 +}
 +
-+static void ls1_set_resume_entry(void *base)
++int ls1021a_cpu_kill(unsigned int cpu)
 +{
-+	u32 resume_addr;
++	unsigned long timeout = jiffies + msecs_to_jiffies(50);
 +
-+	/* the bootloader will finally jump to this address to resume kernel */
-+	resume_addr = (u32)(__pa(ls1_deepsleep_resume));
++	while (ls1_get_cpu_arg(cpu))
++		if (time_after(jiffies, timeout))
++			return 0;
++	return 1;
++}
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 5225b69..d262b32 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -29,6 +29,7 @@
+ 
+ u32 g_diag_reg;
+ static void __iomem *scu_base;
++void __iomem *dcfg_base;
+ 
+ static struct map_desc scu_io_desc __initdata = {
+ 	/* .virtual and .pfn are run-time assigned */
+@@ -196,19 +197,26 @@ static void __init ls1021a_smp_init_cpus(void)
+ 		set_cpu_possible(i, false);
+ }
+ 
++void ls1021a_set_secondary_entry(void)
++{
++	unsigned long paddr;
 +
-+	/* use the register SPARECR2 to save the return entry */
-+	writel_relaxed(resume_addr, base + CCSR_SCFG_SPARECR2);
++	if (dcfg_base) {
++		paddr = virt_to_phys(ls1021a_secondary_startup);
++		writel_relaxed(cpu_to_be32(paddr),
++				dcfg_base + DCFG_CCSR_SCRATCHRW1);
++	}
 +}
 +
-+static void ls1_copy_sram_code(void)
-+{
-+	memcpy(ls1_pm_base.sram, ls1_start_fsm, ls1_sram_code_size);
-+}
-+
-+static int ls1_start_deepsleep(unsigned long addr)
-+{
-+	ls1_do_deepsleep(addr);
-+
-+	return 0;
-+}
-+
-+void ls1_fsm_setup(void)
-+{
-+	iowrite32be(0x00001001, ls1_pm_base.dcsr_rcpm1 + DCSR_RCPM_CSTTACR0);
-+	iowrite32be(0x00000001, ls1_pm_base.dcsr_rcpm1 + DCSR_RCPM_CG1CR0);
-+
-+	fsl_epu_setup_default(ls1_pm_base.epu);
-+
-+	/*
-+	 * pull the MCKE signal(EVT4_B pin) low before enabling
-+	 * deep sleep signals by FPGA
-+	 */
-+	iowrite32be(0x5, ls1_pm_base.epu + DCSR_EPU_EPECR0);
-+}
-+
-+static inline void ls1_clrsetbits_le32(void __iomem *addr, u32 clear, u32 set)
-+{
-+	u32 tmp;
-+
-+	tmp = ioread32(addr);
-+	tmp = (tmp & ~clear) | set;
-+	iowrite32(tmp, addr);
-+}
-+
-+static void ls1_enter_deepsleep(void)
-+{
-+	u32 tmp;
-+
-+	/* save DDR data */
-+	ls1_save_ddr(ls1_pm_base.scfg);
-+
-+	/* save kernel resume entry */
-+	ls1_set_resume_entry(ls1_pm_base.scfg);
-+
-+	/* Request to put cluster 0 in PCL10 state */
-+	iowrite32be(CCSR_RCPM_CLPCL10SETR_C0,
-+		ls1_pm_base.rcpm + CCSR_RCPM_CLPCL10SETR);
-+
-+	/* setup the registers of the EPU FSM for deep sleep */
-+	ls1_fsm_setup();
-+
-+	/* enable deep sleep signals in FPGA */
-+	tmp = ioread8(ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+	iowrite8(tmp | QIXIS_PWR_CTL2_PCTL, ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+
-+	/* enable Warm Device Reset */
-+	ls1_clrsetbits_le32(ls1_pm_base.scfg + CCSR_SCFG_DPSLPCR,
-+			    CCSR_SCFG_DPSLPCR_VAL, CCSR_SCFG_DPSLPCR_VAL);
-+
-+	ls1_clrsetbits_le32(ls1_pm_base.dcfg + CCSR_DCFG_CRSTSR,
-+			    CCSR_DCFG_CRSTSR_VAL, CCSR_DCFG_CRSTSR_VAL);
-+
-+	/* copy the last stage code to sram */
-+	ls1_copy_sram_code();
-+
-+	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
-+
-+	/* disable Warm Device Reset */
-+	ls1_clrsetbits_le32(ls1_pm_base.scfg + CCSR_SCFG_DPSLPCR,
-+			    CCSR_SCFG_DPSLPCR_VAL, 0);
-+
-+	/* disable deep sleep signals in FPGA */
-+	tmp = ioread8(ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+	iowrite8(tmp & ~QIXIS_PWR_CTL2_PCTL, ls1_pm_base.fpga + QIXIS_PWR_CTL2);
-+
-+	/* call smp_prepare_cpus */
+ static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	struct device_node *np;
+-	void __iomem *dcfg_base;
+-	unsigned long paddr;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
+ 	dcfg_base = of_iomap(np, 0);
+ 	WARN_ON(!dcfg_base);
+ 
+-	paddr = virt_to_phys(ls1021a_secondary_startup);
+-	writel_relaxed(cpu_to_be32(paddr), dcfg_base + DCFG_CCSR_SCRATCHRW1);
+-
 +	ls1021a_set_secondary_entry();
-+}
+ }
+ 
+ struct smp_operations  ls1021a_smp_ops __initdata = {
+@@ -216,4 +224,8 @@ struct smp_operations  ls1021a_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
+ 	.smp_boot_secondary	= ls1021a_boot_secondary,
+ 	.smp_secondary_init	= ls1021a_secondary_init,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die                = ls1021a_cpu_die,
++	.cpu_kill               = ls1021a_cpu_kill,
++#endif
+ };
+diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+index 10a6b1a..49508d6 100644
+--- a/arch/arm/mach-imx/src.c
++++ b/arch/arm/mach-imx/src.c
+@@ -30,6 +30,8 @@
+ #define BP_SRC_SCR_CORE1_RST		14
+ #define BP_SRC_SCR_CORE1_ENABLE		22
+ 
++#define CCSR_TWAITSR0         0x04C
 +
-+static int ls1_suspend_enter(suspend_state_t state)
+ static void __iomem *src_base;
+ static DEFINE_SPINLOCK(scr_lock);
+ 
+@@ -114,6 +116,25 @@ void imx_set_cpu_arg(int cpu, u32 arg)
+ 	writel_relaxed(arg, src_base + SRC_GPR1 + cpu * 8 + 4);
+ }
+ 
++u32 ls1_get_cpu_arg(int cpu)
 +{
-+	int ret = 0;
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		flush_cache_louis();
-+		ls1_clrsetbits_le32(ls1_pm_base.rcpm + CCSR_RCPM_POWMGTCSR,
-+				    CCSR_RCPM_POWMGTCSR_LPM20_REQ,
-+				    CCSR_RCPM_POWMGTCSR_LPM20_REQ);
-+
-+		cpu_do_idle();
-+		break;
-+
-+	case PM_SUSPEND_MEM:
-+		ls1_enter_deepsleep();
-+		break;
-+
-+	default:
-+		ret = -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+static int ls1_suspend_valid(suspend_state_t state)
-+{
-+	if (state == PM_SUSPEND_STANDBY && (sleep_modes & FSL_SLEEP))
-+		return 1;
-+
-+	if (state == PM_SUSPEND_MEM && (sleep_modes & FSL_DEEP_SLEEP))
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static int ls1_suspend_begin(suspend_state_t state)
-+{
-+	ls1_pm_iomap();
-+
-+	return 0;
-+}
-+
-+static void ls1_suspend_end(void)
-+{
-+	ls1_pm_uniomap();
-+}
-+
-+static const struct platform_suspend_ops ls1_suspend_ops = {
-+	.valid = ls1_suspend_valid,
-+	.enter = ls1_suspend_enter,
-+	.begin = ls1_suspend_begin,
-+	.end = ls1_suspend_end,
-+};
-+
-+
-+static const struct of_device_id rcpm_matches[] = {
-+	{
-+		.compatible = "fsl,ls1021a-rcpm",
-+		.data = (void *)(FSL_SLEEP | FSL_DEEP_SLEEP),
-+	},
-+	{}
-+};
-+
-+static int __init ls1_pm_init(void)
-+{
-+	const struct of_device_id *match;
 +	struct device_node *np;
-+	void *base;
++	void __iomem *ls1_rcpm_base;
 +
-+	np = of_find_matching_node_and_match(NULL, rcpm_matches, &match);
++	np = of_find_compatible_node(NULL, NULL, "fsl,qoriq-rcpm-2.1");
 +	if (!np) {
-+		pr_err("%s: can't find the rcpm node.\n", __func__);
-+		return -EINVAL;
++		pr_err("%s(): Can not find the RCPM node.\n", __func__);
++		return -ENODEV;
 +	}
 +
-+	base = of_iomap(np, 0);
++	ls1_rcpm_base = of_iomap(np, 0);
 +	of_node_put(np);
-+	if (!base)
-+		return -ENOMEM;
++	WARN_ON(!ls1_rcpm_base);
 +
-+	sleep_modes = (unsigned int)match->data;
-+	ls1_pm_base.rcpm = base;
-+	suspend_set_ops(&ls1_suspend_ops);
-+	return 0;
++	cpu = cpu_logical_map(cpu);
++	return readl_relaxed(ls1_rcpm_base + CCSR_TWAITSR0) & (1 << cpu);
 +}
-+arch_initcall(ls1_pm_init);
-diff --git a/arch/arm/mach-imx/sleep-ls1.S b/arch/arm/mach-imx/sleep-ls1.S
-new file mode 100644
-index 0000000..1cdcbfe
---- /dev/null
-+++ b/arch/arm/mach-imx/sleep-ls1.S
-@@ -0,0 +1,142 @@
-+/*
-+ * Support deep sleep feature for LS1
-+ *
-+ * Copyright 2014 Freescale Semiconductor Inc.
-+ *
-+ * This program is free software; you can redistribute	it and/or modify it
-+ * under  the terms of	the GNU General	 Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/cache.h>
-+
-+#define CCSR_DDR_BASE			0x01080000
-+#define CCSR_DDR_SDRAM_CFG_2		0x114
-+
-+#define CCSR_SCFG_BASE			0x01570000
-+#define CCSR_SCFG_HRSTCR		0x1a8
-+
-+#define DCSR_EPU_BASE			0x20000000
-+#define	DCSR_EPU_EPGCR			0x0
-+#define DCSR_EPU_EPECR0			0x300
-+#define DCSR_EPU_EPECR15		0x33c
-+
-+/* for big endian registers */
-+.macro ls1_set_bits, addr, value
-+	ldr	r4, \addr
-+	ldr	r5, [r4]
-+	ldr	r6, \value
-+	rev	r6, r6
-+	orr	r5, r5, r6
-+	str	r5, [r4]
-+.endm
-+
-+/* 1000 loops per round */
-+.macro ls1_delay, count
-+	mov	r0, \count
-+11:	mov	r8, #1000
-+12:	subs	r8, r8, #1
-+	bne	12b
-+	subs	r0, r0, #1
-+	bne	11b
-+.endm
-+
-+/*
-+ * r0: the physical entry address of SRAM code
-+ *
-+ */
-+ENTRY(ls1_do_deepsleep)
-+	mov	r13, r0
-+
-+	/* flush cache */
-+	bl	v7_flush_dcache_all
-+
-+	/* disable cache, C bit in SCTLR */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #(1 << 2)
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	/* disable coherency, SMP bit in ACTLR */
-+	mrc	p15, 0, r0, c1, c0, 1
-+	bic	r0, r0, #(1 << 6)
-+	mcr	p15, 0, r0, c1, c0, 1
-+	isb
-+	dsb
-+
-+	/* disable MMU, M bit in SCTLR */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #1
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	/* jump to sram code using physical address */
-+	bx	r13
-+ENDPROC(ls1_do_deepsleep)
-+
-+/*
-+ * The code will be copied to SRAM.
-+ */
-+	.align L1_CACHE_SHIFT
-+ENTRY(ls1_start_fsm)
-+	/* set HRSTCR */
-+	ls1_set_bits	ls1_ccsr_scfg_hrstcr_addr, ls1_ccsr_scfg_hrstcr_val
-+
-+	/* Place DDR controller in self refresh mode */
-+	ls1_set_bits	ls1_ddr_cfg2_addr, ls1_ddr_cfg2_val
-+
-+	ls1_delay	#2000
-+
-+	/* Set EVT4_B to lock the signal MCKE down */
-+	ldr	r4, ls1_dcsr_epu_epecr0
-+	ldr	r5, ls1_dcsr_epu_epecr0_val
-+	rev	r5, r5
-+	str	r5, [r4]
-+
-+	ls1_delay	#2000
-+
-+	/* Enable all EPU Counters */
-+	ls1_set_bits	ls1_dcsr_epu_epgcr_addr, ls1_dcsr_epu_epgcr_val
-+
-+	/* Enable SCU15 */
-+	ls1_set_bits	ls1_dcsr_epu_epecr15, ls1_dcsr_epu_epecr15_val
-+
-+	/* Enter WFI mode, and EPU FSM will start */
-+20:	wfi
-+	b	20b
-+
-+ls1_ccsr_scfg_hrstcr_addr:
-+	.word	CCSR_SCFG_BASE + CCSR_SCFG_HRSTCR
-+ls1_ccsr_scfg_hrstcr_val:
-+	.word	0x01000000
-+
-+ls1_ddr_cfg2_addr:
-+	.word	CCSR_DDR_BASE + CCSR_DDR_SDRAM_CFG_2
-+ls1_ddr_cfg2_val:
-+	.word	(1 << 31)
-+
-+ls1_dcsr_epu_epgcr_addr:
-+	.word	DCSR_EPU_BASE + DCSR_EPU_EPGCR
-+ls1_dcsr_epu_epgcr_val:
-+	.word	0x80000000
-+
-+ls1_dcsr_epu_epecr0:
-+	.word	DCSR_EPU_BASE + DCSR_EPU_EPECR0
-+ls1_dcsr_epu_epecr0_val:
-+	.word	0
-+
-+ls1_dcsr_epu_epecr15:
-+	.word	DCSR_EPU_BASE + DCSR_EPU_EPECR15
-+ls1_dcsr_epu_epecr15_val:
-+	.word	0x90000004
-+
-+ENTRY(ls1_sram_code_size)
-+	.word	. - ls1_start_fsm
-+
-+/* the bootloader will jump to here after wakeup from deep sleep  */
-+	.align L1_CACHE_SHIFT
-+ENTRY(ls1_deepsleep_resume)
-+	b cpu_resume
+ void imx_src_prepare_restart(void)
+ {
+ 	u32 val;
 -- 
 1.7.3
