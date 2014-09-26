@@ -1,53 +1,21 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 26 Sep 2014 13:34:06 +0200
-Subject: [PATCH v2 1/3] clocksource: arm_arch_timer: change clocksource
- name if CP15 unavailable
-In-Reply-To: <20140926092604.GC22293@arm.com>
-References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
- <1411052390-27238-2-git-send-email-nathan_lynch@mentor.com>
- <54250FFE.2050605@linaro.org> <20140926092604.GC22293@arm.com>
-Message-ID: <54254F2E.2050804@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Sep 2014 13:38:07 +0200
+Subject: [PATCH resend] MAINTAINERS: Add maintainers entry for Mediatek
+ SoCs
+In-Reply-To: <1411724755-9866-1-git-send-email-matthias.bgg@gmail.com>
+References: <1411724755-9866-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <6044213.mJvYVgTvMl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 11:26 AM, Will Deacon wrote:
-> On Fri, Sep 26, 2014 at 08:04:30AM +0100, Daniel Lezcano wrote:
->> On 09/18/2014 04:59 PM, Nathan Lynch wrote:
->>> The arm and arm64 VDSOs need CP15 access to the architected counter.
->>> If this is unavailable (which is allowed by ARM v7), indicate this by
->>> changing the clocksource name to "arch_mem_counter" before registering
->>> the clocksource.
->>>
->>> Suggested by Stephen Boyd.
->>>
->>> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
->>> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
->>
->> Hi Nathan,
->>
->> is it possible to have the acked-by of the different maintainers for the
->> other patches ?
->
-> FWIW: I acked the series:
->
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/289143.html
->
-> There's ongoing debate about whether or not we should have a vdso, but this
-> series still makes sense in isolation.
+On Friday 26 September 2014 11:45:55 Matthias Brugger wrote:
+> I plan to stay with the Mediatek SoCs for the next future
+> and hope to expand its support along the way with the help
+> of a whole bunch of people.
+> 
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> 
 
-Ok. Thanks for the clarification.
+Applied to next/fixes-non-critical, thanks!
 
-
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
