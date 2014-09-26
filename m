@@ -1,91 +1,62 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Fri, 26 Sep 2014 14:59:18 +0200
-Subject: [PATCH 1/4] serial: mxs-auart: use mctrl_gpio helpers for handling
- modem signals (v2.2c)
-In-Reply-To: <1411150399-30902-1-git-send-email-j.uzycki@elproma.com.pl>
-References: <1411150399-30902-1-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <54256326.3080202@elproma.com.pl>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Fri, 26 Sep 2014 20:57:30 +0800
+Subject: [PATCH] [media] rc: fix hix5hd2 compile-test issue
+In-Reply-To: <1411571401-30664-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1411571401-30664-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1411736250-29252-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add dependence to solve build error in arch like ia64
+error: implicit declaration of function 'readl_relaxed' & 'writel_relaxed'
 
-W dniu 2014-09-25 17:29, Richard Genoud pisze:
-> 2014-09-20 10:08 GMT+02:00 Janusz U?ycki <j.uzycki@elproma.com.pl>:
-> Hi,
-Hi Richard,
+Change CONFIG_PM to CONFIG_PM_SLEEP to solve
+warning: 'hix5hd2_ir_suspend' & 'hix5hd2_ir_resume' defined but not used
 
-first, thanks for the very useful answers.
+Reported-by: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ drivers/media/rc/Kconfig      |    2 +-
+ drivers/media/rc/ir-hix5hd2.c |    7 +------
+ 2 files changed, 2 insertions(+), 7 deletions(-)
 
->> Could you look on my patch series [1...4]
->> serial: mxs-auart:
->> use mctrl_gpio helpers for handling modem signals (v2.2c)
->> at http://news.gmane.org/gmane.linux.serial ?
-> If you resend them, put me in the CC list.
-> That will be easier for me to have a look at them.
-
-sure
-
->> I added some comments in patch's code.
->> In atmel_serial mctrl_gpio_free() is ommited,
->> is it useless?
-> If you take a look at mctrl_gpio_init(), you'll see that all the
-> allocations are done with devm_* functions.
-> So that they are automatically deallocated when the module unloads.
-> I still wrote mctrl_gpio_free() for some cases where we want to free
-> memory without unloading the module.
->
-> So you don't have to call mctrl_gpio_free() at the end of
-> mxs_auart_probe() and mxs_auart_remove()
-> (cf Documentation/serial/driver )
-
-It is clear now, thanks.
-
->> Atmel_serial also does not parse modem
->> line status in mxs_auart_get_mctrl(),
->> 8250 driver does it. Which solution is ok?
-> Well, in atmel_get_mctrl(), we have to retrieve the line status from
-> the uart controller :
-> that's done with :
-> status = UART_GET_CSR(port);
-> Then, for the lines controlled via GPIO, we are calling
-> mctrl_gpio_get() that updates the mctrl flags with gpios states.
->
-> It doesn't seems different from 8250.
-
-But serial8250_get_mctrl() in 8250_core.c calls serial8250_modem_status()
-which calls eg. uart_handle_cts_change() even if enable_ms() wasn't called.
-This is the difference.
-The serial8250_modem_status() is also called in the interrupt
-and, what I don't understand, in serial8250_console_write().
-
->> Do you happen to know if tty layer
->> modifies mctrl between mxs_auart_get_mctrl(),
->> mxs_auart_set_mctrl() and mxs_auart_get_mctrl() again?
-> I don't quite understand what you mean.
-> The only way for the kernel to get line status (DCD, CTS,DSR,RI) is
-> via get_mctrl.
-> And the only way for the kernel to set line status
-> (RTS,DTR,out1,out2,loop) is via set_mctrl.
-
-Yes, but:
-* mxs_auart_set_mctrl() in the mxs-auart stores the lastest mctrl
-    in private ctrl field
-* the stored value is used to supply initial returned value
-    by mxs_auart_get_mctrl()
-* uart_update_mctrl() in serial_core.c modifies only selected bits
-    in port->mctrl field - OK, input bits stay untouched
-* uart_port_startup() in serial_code.c sets RTS and DTR
-    and zeroes others (also input bits)
-* uart_set_termios() in serial_core.c modifies the bits too
-* uart_suspend_port() in serial_core.c sets all mctrl bits to 0
-
-It looks that mxs_auart_set_mctrl() doesn't have to store mctrl at all
-because uart_tiocmget() in serial_core.c restores the output bits
-from port->mctrl field. So the code is duplicated.
-Do you agree?
-P.S. It was even implemented in serial_core.c in 2.6.12.
-
-best regards
-Janusz
-> best regards,
-> Richard.
+diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
+index 8ce08107a69d..28fb2cb34e8d 100644
+--- a/drivers/media/rc/Kconfig
++++ b/drivers/media/rc/Kconfig
+@@ -166,7 +166,7 @@ config IR_ENE
+ 
+ config IR_HIX5HD2
+ 	tristate "Hisilicon hix5hd2 IR remote control"
+-	depends on RC_CORE
++	depends on RC_CORE && ARM
+ 	help
+ 	 Say Y here if you want to use hisilicon hix5hd2 remote control.
+ 	 To compile this driver as a module, choose M here: the module will be
+diff --git a/drivers/media/rc/ir-hix5hd2.c b/drivers/media/rc/ir-hix5hd2.c
+index 94967d0e0478..c1d8527ace92 100644
+--- a/drivers/media/rc/ir-hix5hd2.c
++++ b/drivers/media/rc/ir-hix5hd2.c
+@@ -16,11 +16,6 @@
+ #include <linux/regmap.h>
+ #include <media/rc-core.h>
+ 
+-/* Allow the driver to compile on all architectures */
+-#ifndef writel_relaxed
+-# define writel_relaxed writel
+-#endif
+-
+ #define IR_ENABLE		0x00
+ #define IR_CONFIG		0x04
+ #define CNT_LEADS		0x08
+@@ -294,7 +289,7 @@ static int hix5hd2_ir_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ static int hix5hd2_ir_suspend(struct device *dev)
+ {
+ 	struct hix5hd2_ir_priv *priv = dev_get_drvdata(dev);
+-- 
+1.7.9.5
