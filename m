@@ -1,76 +1,161 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Sep 2014 10:28:14 +0200
-Subject: [PATCH 3/7] clk: sunxi: unify sun6i AHB1 clock with proper PLL6
- pre-divider
-In-Reply-To: <20140925230340.19023.22674@quantum>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <1410000448-9999-4-git-send-email-wens@csie.org>
- <20140911210211.GM31276@lukather>
- <CAGb2v66L36nsoucSgLY8pV8f=wjKTvtjJby43Z=Ct+NiRonptQ@mail.gmail.com>
- <20140913102603.GZ31276@lukather>
- <20140925230340.19023.22674@quantum>
-Message-ID: <20140926082814.GP15315@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 26 Sep 2014 10:32:43 +0200
+Subject: [PATCH v3 04/13] PM / Domains: Add DT bindings for the R-Mobile
+ System Controller
+In-Reply-To: <1411662520-22795-5-git-send-email-geert+renesas@glider.be>
+References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
+ <1411662520-22795-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAPDyKFo7QruMXivxXoxkZD8DkFdcZCacH=g0rxH=TEH_nJtJpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 04:03:40PM -0700, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-09-13 03:26:03)
-> > On Fri, Sep 12, 2014 at 11:16:26AM +0800, Chen-Yu Tsai wrote:
-> > > Hi,
-> > > 
-> > > On Fri, Sep 12, 2014 at 5:02 AM, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> wrote:
-> > > > Hi,
-> > > >
-> > > > On Sat, Sep 06, 2014 at 06:47:24PM +0800, Chen-Yu Tsai wrote:
-> > > >> This patch unifies the sun6i AHB1 clock, originally supported
-> > > >> with separate mux and divider clks. It also adds support for
-> > > >> the pre-divider on the PLL6 input, thus allowing the clock to
-> > > >> be muxed to PLL6 with proper clock rate calculation.
-> > > >>
-> > > >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > >
-> > > > It looks fine, but I'd rather see this in a separate file, especially
-> > > > since we don't seem to have any order dependency.
-> > > 
-> > > Sorry, just to be clear, separate file under clk/sunxi?
-> > 
-> > Yes
-> > 
-> > > This cannot be in a separate file, as it shares a spinlock with apb1
-> > > divider. They share the same register.
-> > > 
-> > > We could move apb1 out though. But i would prefer to do that when
-> > > we split out all the clocks into individual OF_CLK_DECLAREs.
-> > 
-> > Ah right, my bad :)
-> > 
-> > My plan on the long term is to kill clk-sunxi as a place where all the
-> > clocks are defined, and only leave the "policy" there, for example the
-> > clock protection code (even if that should probably be removed too,
-> > together with clkdev), the various rates / parenting enforcements,
-> > etc.
-> 
-> Interesting! Where are you planning to store the clock data?
+On 25 September 2014 18:28, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+> The Renesas R-Mobile System Controller provides a.o. power management
+> support, following the generic PM domain bindings in
+> Documentation/devicetree/bindings/power/power_domain.txt.
+>
+> For now this supports the R-Mobile A1 (r8a7740) only, but it should be
+> sufficiently generic to handle other members of the SH-Mobile/R-Mobile
+> family in the future.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v3:
+>   - Reword,
+> v2:
+>   - Fix copy-and-paste s/#address-cells/#size-cells/,
+>   - Add optional PM QoS device latencies.
+>
+>  .../bindings/power/renesas,sysc-rmobile.txt        | 111 +++++++++++++++++++++
+>  1 file changed, 111 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
+>
+> diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
+> new file mode 100644
+> index 0000000000000000..0b1e56d6ed1ab9a2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
+> @@ -0,0 +1,111 @@
+> +DT bindings for the Renesas R-Mobile System Controller
+> +
+> +== System Controller Node ==
+> +
+> +The R-Mobile System Controller provides the following functions:
+> +  - Boot mode management,
+> +  - Reset generation,
+> +  - Power management.
+> +
+> +Required properties:
+> +- compatible: Should be "renesas,sysc-<soctype>", "renesas,sysc-rmobile" as
+> +             fallback.
+> +             Examples with soctypes are:
+> +               - "renesas,sysc-r8a7740" (R-Mobile A1)
+> +- reg: Two address start and address range blocks for the device:
+> +         - The first block refers to the normally accessible registers,
+> +         - the second block refers to the registers protected by the HPB
+> +          semaphore.
+> +
+> +Optional nodes:
+> +- pm-domains: This node contains a hierarchy of PM domain nodes, which should
+> +  match the Power Area Hierarchy in the Power Domain Specifications section of
+> +  the device's datasheet.
+> +
+> +
+> +== PM Domain Nodes ==
+> +
+> +Each of the PM domain nodes represents a PM domain, as documented by the
+> +generic PM domain bindings in
+> +Documentation/devicetree/bindings/power/power_domain.txt.
+> +
+> +The nodes should be named by the real power area names, and thus their names
+> +should be unique.
+> +
+> +Required properties:
+> +  - #power-domain-cells: Must be 0.
+> +
+> +Optional properties:
+> +- reg: If the PM domain is not always-on, this property must contain the bit
+> +       index number for the corresponding power area in the various Power
+> +       Control and Status Registers. The parent's node must contain the
+> +       following two properties:
+> +        - #address-cells: Must be 1,
+> +        - #size-cells: Must be 0.
+> +       If the PM domain is always-on, this property must be omitted.
+> +- power-on-latency: Power-on latency of the PM domain, in ns,
+> +- power-off-latency: Power-off latency of the PM domain, in ns.
+> +
+> +
+> +Example:
+> +
+> +This shows a subset of the r8a7740 PM domain hierarchy, containing the
+> +C5 "always-on" domain, 2 of its subdomains (A4S and A4SU), and the A3SP domain,
+> +which is a subdomain of A4S.
+> +
+> +       sysc: system-controller at e6180000 {
+> +               compatible = "renesas,sysc-r8a7740", "renesas,sysc-rmobile";
+> +               reg = <0xe6180000 8000>, <0xe6188000 8000>;
+> +
+> +               pm-domains {
+> +                       pd_c5: c5 {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                               #power-domain-cells = <0>;
+> +
+> +                               pd_a4s: a4s at 10 {
+> +                                       reg = <10>;
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+> +                                       #power-domain-cells = <0>;
+> +                                       power-on-latency = <250000>;
+> +                                       power-off-latency = <250000>;
+> +
+> +                                       pd_a3sp: a3sp at 11 {
+> +                                               reg = <11>;
+> +                                               #power-domain-cells = <0>;
+> +                                               power-on-latency = <250000>;
+> +                                               power-off-latency = <250000>;
+> +                                       };
+> +                               };
+> +
+> +                               pd_a4su: a4su at 20 {
+> +                                       reg = <20>;
+> +                                       #power-domain-cells = <0>;
+> +                                       power-on-latency = <250000>;
+> +                                       power-off-latency = <250000>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +
+> +== PM Domain Consumers ==
+> +
+> +Hardware blocks belonging to a PM domain should contain a "power-domains"
+> +property that is a phandle pointing to the corresponding PM domain node,
+> +and optional PM QoS device latencies:
+> +
+> +Example:
+> +
+> +       tpu: pwm at e6600000 {
+> +               compatible = "renesas,tpu-r8a7740", "renesas,tpu";
+> +               reg = <0xe6600000 0x100>;
+> +               clocks = <&mstp3_clks R8A7740_CLK_TPU0>;
+> +               power-domains = <&pd_a3sp>;
+> +               stop-latency = <250000>;
+> +               start-latency = <250000>;
+> +               save-state-latency = <250000>;
+> +               restore-state-latency = <250000>;
 
-Which data? 
+As per comment for the previous patch, I think you should remove these
+latencies.
 
-I guess, for the rate boundaries, the DT would be the right place,
-wether a clock should be protected can be derived from its
-compatible. And for the rate to enforce, maybe a clock-frequency
-property in the DT too, or directly in the driver, I haven't really
-thought about that part at the moment to be honest :)
+> +               #pwm-cells = <3>;
+> +       };
+> --
+> 1.9.1
+>
 
-Maxime
+When you fixed the above you may add my reviewed by tag for this patch.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/11e68a61/attachment.sig>
+Kind regards
+Uffe
