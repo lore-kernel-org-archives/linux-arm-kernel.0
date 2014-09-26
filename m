@@ -1,37 +1,51 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 26 Sep 2014 11:05:38 +0200
-Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
- in all platforms
-In-Reply-To: <20140926085430.GG31106@ulmo>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <20140925074235.GN12423@ulmo>
- <20140925144855.GB31157@bart.dudau.co.uk>
- <20140925164937.GB30382@ulmo>
- <20140925171612.GC31157@bart.dudau.co.uk>
- <542505B3.7040208@huawei.com> <20140926085430.GG31106@ulmo>
-Message-ID: <20140926090537.GH31106@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Sep 2014 11:14:30 +0200
+Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <CAGhQ9VwAe7d7fX1Lw22ocxDSXjOZbvXdmG1u6_d5v7ptmYMYeg@mail.gmail.com>
+References: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
+ <2553182.6YgvmDLuEA@wuerfel>
+ <CAGhQ9VwAe7d7fX1Lw22ocxDSXjOZbvXdmG1u6_d5v7ptmYMYeg@mail.gmail.com>
+Message-ID: <3291391.H71MjevFsA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 10:54:32AM +0200, Thierry Reding wrote:
-[...]
-> At least for Tegra it's trivial to just hook it up in tegra_pcie_scan_bus()
-> directly (patch attached).
+On Friday 26 September 2014 09:48:24 Joachim Eastwood wrote:
+> On 26 September 2014 09:16, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 26 September 2014 07:34:12 Joachim Eastwood wrote:
+> >> I am working on Cortex-M4 no-MMU platform that isn't upstream yet, btw.
+> >>
+> >
+> > Sorry for drifting off-topic, but this is very interesting to me. Can you
+> > say which one you are working on and what your timeline is for submitting
+> > it upstream?
+> 
+> It's NXP LPC18xx/43xx which is Cortex-M3/M4.
+> 
+> 3.19 or 3.20 might be target.
 
-Really attached this time.
+Ah, very nice!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-PCI-tegra-Remove-.add_bus-callback.patch
-Type: text/x-diff
-Size: 1887 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/f14452d9/attachment.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/f14452d9/attachment.sig>
+> Right now everything is in a github repository here:
+> https://github.com/manabian/linux-lpc
+> 
+> Most stuff are working now and I am in the process of clean it up and
+> adding documentation.
+
+Ok, looks like you are making good progress. I noticed three high-level
+issues that you may want to address:
+
+- the watchdog driver should use the generic watchdog framework rather
+  than registering a misc device.
+- the ehci glue can probably go away if you make very small changes
+  to the generic ehci platform driver
+- I don't like the way that the stmmac glue drivers are added, I thought
+  we had fixed this before but I think I need to dig up old emails.
+  The driver should really be a loadable module that hooks calls into
+  the common code rather than being linked into one module.
+
+I also have a plan for doing multiplatform builds of nommu kernels, 
+for build testing mostly, I wouldn't expect you to run that configuration.
+No need for you to address that yourself though, we'll get there.
+
+	Arnd
