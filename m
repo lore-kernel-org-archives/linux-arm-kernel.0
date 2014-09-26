@@ -1,54 +1,119 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:39 +0200
-Subject: [PATCH 06/27] KVM: ARM/arm64: return -EFAULT if copy_from_user fails
- in set_timer_reg
+Date: Fri, 26 Sep 2014 15:16:42 +0200
+Subject: [PATCH 09/27] ARM/arm64: KVM: fix use of WnR bit in
+ kvm_is_write_fault()
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-10-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-We currently return the number of bytes not copied if set_timer_reg
-fails, which is almost certainly not what userspace would like.
+The ISS encoding for an exception from a Data Abort has a WnR
+bit[6] that indicates whether the Data Abort was caused by a
+read or a write instruction. While there are several fields
+in the encoding that are only valid if the ISV bit[24] is set,
+WnR is not one of them, so we can read it unconditionally.
 
-This patch returns -EFAULT instead.
+Instead of fixing both implementations of kvm_is_write_fault()
+in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
+which already does the right thing with respect to the WnR bit.
+Also fix up the callers to pass 'vcpu'
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Laszlo Ersek <lersek@redhat.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/guest.c   | 2 +-
- arch/arm64/kvm/guest.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 11 -----------
+ arch/arm/kvm/mmu.c               | 12 ++++++++++--
+ arch/arm64/include/asm/kvm_mmu.h | 13 -------------
+ 3 files changed, 10 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 813e492..cc0b787 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -163,7 +163,7 @@ static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 
- 	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
- 	if (ret != 0)
--		return ret;
-+		return -EFAULT;
- 
- 	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 5cc0b0f..3f688b4 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -78,17 +78,6 @@ static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
+ 	flush_pmd_entry(pte);
  }
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 8d1ec28..7679469 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -174,7 +174,7 @@ static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
  
- 	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
- 	if (ret != 0)
--		return ret;
-+		return -EFAULT;
- 
- 	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
+-static inline bool kvm_is_write_fault(unsigned long hsr)
+-{
+-	unsigned long hsr_ec = hsr >> HSR_EC_SHIFT;
+-	if (hsr_ec == HSR_EC_IABT)
+-		return false;
+-	else if ((hsr & HSR_ISV) && !(hsr & HSR_WNR))
+-		return false;
+-	else
+-		return true;
+-}
+-
+ static inline void kvm_clean_pgd(pgd_t *pgd)
+ {
+ 	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 62f5642..bb06f76 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -746,6 +746,14 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+ 	return false;
  }
+ 
++static bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
++{
++	if (kvm_vcpu_trap_is_iabt(vcpu))
++		return false;
++
++	return kvm_vcpu_dabt_iswrite(vcpu);
++}
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -760,7 +768,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	pfn_t pfn;
+ 	pgprot_t mem_type = PAGE_S2;
+ 
+-	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
++	write_fault = kvm_is_write_fault(vcpu);
+ 	if (fault_status == FSC_PERM && !write_fault) {
+ 		kvm_err("Unexpected L2 read permission error\n");
+ 		return -EFAULT;
+@@ -886,7 +894,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	gfn = fault_ipa >> PAGE_SHIFT;
+ 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+ 	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+-	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
++	write_fault = kvm_is_write_fault(vcpu);
+ 	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
+ 		if (is_iabt) {
+ 			/* Prefetch Abort on I/O address */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 8e138c7..737da74 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -93,19 +93,6 @@ void kvm_clear_hyp_idmap(void);
+ #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
+ #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+ 
+-static inline bool kvm_is_write_fault(unsigned long esr)
+-{
+-	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
+-
+-	if (esr_ec == ESR_EL2_EC_IABT)
+-		return false;
+-
+-	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
+-		return false;
+-
+-	return true;
+-}
+-
+ static inline void kvm_clean_pgd(pgd_t *pgd) {}
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+ static inline void kvm_clean_pte(pte_t *pte) {}
 -- 
 2.0.0
