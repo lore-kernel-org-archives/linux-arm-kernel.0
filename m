@@ -1,73 +1,55 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 26 Sep 2014 13:22:52 +0300
-Subject: [PATCH v6 0/4] Tegra124 soctherm driver
-In-Reply-To: <20140926101918.GM31106@ulmo>
-References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
- <20140926101918.GM31106@ulmo>
-Message-ID: <54253E7C.9080704@kapsi.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Sep 2014 11:24:30 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
+ ATS1PR
+In-Reply-To: <vnkw38bgkbal.fsf@mitchelh-linux.qualcomm.com>
+References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
+ <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
+ <20140922152614.GP25809@arm.com>
+ <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
+ <20140924163712.GG16244@arm.com>
+ <vnkw38bgkbal.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20140926102430.GF22293@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 01:19 PM, Thierry Reding wrote:
-> On Fri, Sep 26, 2014 at 12:43:09PM +0300, Mikko Perttunen wrote:
->> Hi,
->>
->> this series adds support for the thermal monitoring features of the
->> soctherm unit on the Tegra124 SoC.
->>
->> The branch is also available in my github repo,
->>    git://github.com/cyndis/linux.git soctherm-v6
->>
->> Thanks,
->> Mikko
->>
->> Mikko Perttunen (4):
->>    of: Add bindings for nvidia,tegra124-soctherm
->>    ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
->>    ARM: tegra: Add thermal trip points for Jetson TK1
->>    thermal: Add Tegra SOCTHERM thermal management driver
->>
->>   .../devicetree/bindings/thermal/tegra-soctherm.txt |  53 +++
->>   arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  44 ++
->>   arch/arm/boot/dts/tegra124.dtsi                    |  47 ++
->>   drivers/thermal/Kconfig                            |  10 +
->>   drivers/thermal/Makefile                           |   1 +
->>   drivers/thermal/tegra_soctherm.c                   | 471 +++++++++++++++++++++
->>   include/dt-bindings/thermal/tegra124-soctherm.h    |  13 +
->>   7 files changed, 639 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
->>   create mode 100644 drivers/thermal/tegra_soctherm.c
->>   create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
->
-> One thing that I've wanted to start doing for a while now is request
-> patch submissions like this to come accompanied with a way on how to
-> test them. Ideally this would be in a scripted way that can test for
-> success programatically, but it doesn't necessarily have to be if it
-> turns out too difficult or impractical to do.
+On Wed, Sep 24, 2014 at 09:34:26PM +0100, Mitchel Humpherys wrote:
+> On Wed, Sep 24 2014 at 09:37:12 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Sep 24, 2014 at 02:12:00AM +0100, Mitchel Humpherys wrote:
+> >> On Mon, Sep 22 2014 at 08:26:14 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
+> >> >> +		return arm_smmu_iova_to_phys_soft(domain, iova);
+> >> >> +	}
+> >> >> +
+> >> >> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
+> >> >> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
+> >> >> +
+> >> >> +	if (phys & CB_PAR_F) {
+> >> >> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
+> >> >> +		dev_err(dev, "PAR = 0x%llx\n", phys);
+> >> >> +	}
+> >> >> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
+> >> >
+> >> > How does this work for 64k pages?
+> >> 
+> >> So at the moment we're always assuming that we're using v7/v8 long
+> >> descriptor format, right?  All I see in the spec (14.5.15 SMMU_CBn_PAR)
+> >> is that bits[47:12]=>PA[47:12]...  Or am I missing something completely?
+> >
+> > I think you've got 64k pages confused with the short-descriptor format.
+> >
+> > When we use 64k pages with long descriptors, you're masked off bits 15-12 of
+> > the iova above, so you'll have a hole in the physical address afaict.
+> 
+> Even with long descriptors the spec says bits 15-12 should come from
+> CB_PAR...  It makes no mention of reinterpreting those bits depending on
+> the programmed page granule.  The only thing I can conclude from the
+> spec is that hardware should be smart enough to do the right thing with
+> bits 15-12 when the page granule is 64k.  Although even if hardware is
+> smart enough I guess CB_PAR[15:12] should be the same as iova[15:12] for
+> the 64k case?
 
-Indeed, that would be very useful.
+Yeah, fair enough, the code you have should work correctly then.
+Unfortunately, I don't have any suitable hardware on which to test it.
 
->
-> The goal is to eventually come up with a test suite that can run the
-> majority of test cases automatically to make it easy to test for any
-> regressions. And even if tests can't be run automatically it'd still
-> be an advantage to have them all collected in some repository, since
-> it saves a lot of typing and time to run tests, and it will give us
-> a standard set of tests that everybody can verify changes against.
->
-> I realize that it's somewhat unfair to start requesting this from you
-> now, but we've got to start somewhere. Could you give a short summary
-> of how you test this? What are the interfaces that the kernel exposes
-> for these thermal drivers?
-
-You need to enable the driver in Device Drivers -> Generic Thermal sysfs 
-driver -> Tegra SOCTHERM thermal management. Then, you should see 
-directories appear in /sys/class/thermal. You can also use the `tmon' 
-tool included in the kernel tree to quickly see values; that's what I 
-use for testing.
-
->
-> Thierry
->
-
-Mikko
+Will
