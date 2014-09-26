@@ -1,33 +1,104 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Sep 2014 10:40:03 +0100
-Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
- affinity notification
-In-Reply-To: <alpine.DEB.2.11.1409261129220.4567@nanos>
-References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
- <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
- <alpine.DEB.2.10.1408272239190.3323@nanos>
- <20140902184305.GB91995@ilina-mac.local>
- <alpine.DEB.2.10.1409022109050.3333@nanos>
- <7htx3vbfqr.fsf@deeprootsystems.com>
- <alpine.DEB.2.11.1409261129220.4567@nanos>
-Message-ID: <20140926094003.GL5182@n2100.arm.linux.org.uk>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Fri, 26 Sep 2014 12:43:10 +0300
+Subject: [PATCH v6 1/4] of: Add bindings for nvidia,tegra124-soctherm
+In-Reply-To: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
+References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
+Message-ID: <1411724593-4037-2-git-send-email-cyndis@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 11:29:56AM +0200, Thomas Gleixner wrote:
-> On Thu, 25 Sep 2014, Kevin Hilman wrote:
-> > Maybe I'm missing something, or maybe we're just lucky and nobody uses
-> > them together, but irq_set_affinity_notifier() only allows a single
-> > notifier to be registered at any given time.  So if you had a system
-> 
-> A single notifier per irq .....
+From: Mikko Perttunen <mperttunen@nvidia.com>
 
-So what about two drivers wanting to use this notifier, but sharing an
-interrupt?
+This adds binding documentation and headers for the Tegra124
+SOCTHERM device tree node.
 
-It sounds to me like this notifier was misdesigned from the very start,
-and it should always have supported multiple notifiers.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+---
+ .../devicetree/bindings/thermal/tegra-soctherm.txt | 53 ++++++++++++++++++++++
+ include/dt-bindings/thermal/tegra124-soctherm.h    | 13 ++++++
+ 2 files changed, 66 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+ create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
 
+diff --git a/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+new file mode 100644
+index 0000000..ecf3ed7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+@@ -0,0 +1,53 @@
++Tegra124 SOCTHERM thermal management system
++
++The SOCTHERM IP block contains thermal sensors, support for polled
++or interrupt-based thermal monitoring, CPU and GPU throttling based
++on temperature trip points, and handling external overcurrent
++notifications. It is also used to manage emergency shutdown in an
++overheating situation.
++
++Required properties :
++- compatible : "nvidia,tegra124-soctherm".
++- reg : Should contain 1 entry:
++  - SOCTHERM register set
++- interrupts : Defines the interrupt used by SOCTHERM
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++- clock-names : Must include the following entries:
++  - tsensor
++  - soctherm
++- resets : Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names : Must include the following entries:
++  - soctherm
++- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description
++    of this property. See <dt-bindings/thermal/tegra124-soctherm.h> for a
++    list of valid values when referring to thermal sensors.
++
++
++Example :
++
++	soctherm at 0,700e2000 {
++		compatible = "nvidia,tegra124-soctherm";
++		reg = <0x0 0x700e2000 0x0 0x1000>;
++		interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&tegra_car TEGRA124_CLK_TSENSOR>,
++			<&tegra_car TEGRA124_CLK_SOC_THERM>;
++		clock-names = "tsensor", "soctherm";
++		resets = <&tegra_car 78>;
++		reset-names = "soctherm";
++
++		#thermal-sensor-cells = <1>;
++	};
++
++Example: referring to thermal sensors :
++
++       thermal-zones {
++                cpu {
++                        polling-delay-passive = <1000>;
++                        polling-delay = <1000>;
++
++                        thermal-sensors =
++                                <&soctherm TEGRA124_SOCTHERM_SENSOR_CPU>;
++                };
++	};
+diff --git a/include/dt-bindings/thermal/tegra124-soctherm.h b/include/dt-bindings/thermal/tegra124-soctherm.h
+new file mode 100644
+index 0000000..85aaf66
+--- /dev/null
++++ b/include/dt-bindings/thermal/tegra124-soctherm.h
+@@ -0,0 +1,13 @@
++/*
++ * This header provides constants for binding nvidia,tegra124-soctherm.
++ */
++
++#ifndef _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
++#define _DT_BINDINGS_THERMAL_TEGRA124_SOCTHERM_H
++
++#define TEGRA124_SOCTHERM_SENSOR_CPU 0
++#define TEGRA124_SOCTHERM_SENSOR_MEM 1
++#define TEGRA124_SOCTHERM_SENSOR_GPU 2
++#define TEGRA124_SOCTHERM_SENSOR_PLLX 3
++
++#endif
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
