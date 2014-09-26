@@ -1,78 +1,189 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 25 Sep 2014 22:59:30 -0700
-Subject: [PATCH RFC 0/2] ARM: imx: ventana: enable LDO-bypass mode
-Message-ID: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
+Date: Thu, 25 Sep 2014 22:59:32 -0700
+Subject: [PATCH 2/2] ARM: imx: ventana: enable LDO bypass mode for GW54xx
+In-Reply-To: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
+References: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <1411711172-16498-3-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IMX6 has some internal LDO regulators provided by the anatop regulator
-block that can regulate the arm, soc, gpu/vpu core supplies. Alternatively a
-design can supply vdd_arm and vdd_soc externally via a PMIC to provide a lower
-power draw (switches are more efficient that ldo's).
+The GW54xx baseboard has a PFUZE100 PMIC capable of regulating the
+core voltages (VDD_ARM, VDD_SOC) externally such that the internal IMX6
+anatop LDO regulators are not needed. This provides a power reduction
+(as the PMIC is more efficient than the LDO's) as well as moves some
+of the power/thermal burden from the IMX to the PMIC.
 
-The first patch allows a device-tree property to put the anatop core regulators
-in bypass mode so that an external PMIC regulator can be used. It is
-important that the anatop regulators be put in bypass mode because otherwise
-the external inputs need to be 125mV above what the datasheets specify for
-the various CPU frequency operating points defined in the imx6q.dtsi and
-imx6dl.dtsi.
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 63 ++++++++++++++++++++++++++---------
+ 1 file changed, 47 insertions(+), 16 deletions(-)
 
-I would like some feedback as to how best to specify or determine if the
-anatop regulators should be placed in bypass mode and I see the following
-options:
- 1) use a device-tree node on the core regulators to put them in bypass mode
-    (what I've done for this patchset).
- 2) depend on the bootloader to put the LDO's in bypass mode (by setting them
-    to fully on) which the anatop-regulator driver will recognized and
-    keep them in bypass mode (per Phillip's commit d38018f). The downside of
-    this is that it creates a horrible dependence between the kernel and the
-    bootloader.
- 3) have the imx6q-cpufreq driver (the sole consumer of the arm, soc, gpu/vpu
-    regulators) determine that the arm and soc regulators are 'not' the
-    anatop regulators and if so set the anatop core regulators in bypass mode
-    as this can only mean an external PMIC is being used. I'm not exactly
-    sure 'how' to do this (how can a regulator consumer determine the provider 
-    of a regulator?) and I'm also not quite sure if this assumption is always
-    true. What if external regulators are used on a design but one or both need
-    further regulation?
-
-I have tested this patchset with the Gateworks Ventana GW5400 board and
-verified the following:
-  a) at the various CPU setpoints supported by the CPU on this board
-     (Automative IMX6Q at 1GHz) VDD_ARM and VDD_SOC (both the inputs to the
-     IMX6 and the outputs of the bypassed LDO) are at the voltage setpoint
-     requested for the CPU frequency.
-  b) the PMU_REG_CORE REG0/REG1/REG2 get set to full scale (bypassed) and stay
-     that way.
-
-Another possible concern with LDO-bypass mode is that in the case of a 1.2GHz
-CPU, the datasheet specifies that the internal LDO's must be used at the 1.2GHz
-frequency setpoint as they produce less noise as an external switcher. This
-means that the imx6q-cpufreq driver would need to be the one making the
-decision to enable bypass mode and would do so per operating setpoint.
-
-Note that the only imx6 boards I know of in mainline that appear to have a PMIC
-(based on their devicetree) are:
- - dmo-edmqmx6 (pfuze100)
- - imx6sl-evk (pfuze100)
- - gw54xx (pfuze100)
- - gw53xx/gw52xx/gw51xx/gw552x (ltc3676)
- - phytec-pfla02 (da9063)
- - riotboard (pfuze100)
- - sabreauto (pfuze100)
- - sabresd (pfuze100)
-
-I've cc'd the authors of the original commits of the above device-trees as
-they likely have an interest in LDO-bypass mode.
-
-Tim Harvey (2):
-  regulator: anatop: allow LDO bypass to be set from device-tree
-  ARM: imx: ventana: enable LDO bypass mode for GW54xx
-
- .../bindings/regulator/anatop-regulator.txt        |  1 +
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              | 63 ++++++++++++++++------
- drivers/regulator/anatop-regulator.c               |  4 +-
- 3 files changed, 51 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 7b8bd61..e31356d 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -142,6 +142,11 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++        arm-supply = <&reg_sw1a>;
++        soc-supply = <&reg_sw1c>;
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+@@ -215,7 +220,8 @@
+ 		reg = <0x08>;
+ 
+ 		regulators {
+-			sw1a_reg: sw1ab {
++			/* VDD_ARM */
++			reg_sw1a: sw1ab {
+ 				regulator-min-microvolt = <300000>;
+ 				regulator-max-microvolt = <1875000>;
+ 				regulator-boot-on;
+@@ -223,7 +229,8 @@
+ 				regulator-ramp-delay = <6250>;
+ 			};
+ 
+-			sw1c_reg: sw1c {
++			/* VDD_SOC */
++			reg_sw1c: sw1c {
+ 				regulator-min-microvolt = <300000>;
+ 				regulator-max-microvolt = <1875000>;
+ 				regulator-boot-on;
+@@ -231,77 +238,89 @@
+ 				regulator-ramp-delay = <6250>;
+ 			};
+ 
+-			sw2_reg: sw2 {
++			/* VDD_HIGH */
++			reg_sw2: sw2 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3950000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			sw3a_reg: sw3a {
++			/* VDD_DDR */
++			reg_sw3a: sw3a {
+ 				regulator-min-microvolt = <400000>;
+ 				regulator-max-microvolt = <1975000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			sw3b_reg: sw3b {
++			/* VDD_DDR */
++			reg_sw3b: sw3b {
+ 				regulator-min-microvolt = <400000>;
+ 				regulator-max-microvolt = <1975000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			sw4_reg: sw4 {
++			/* VDD_1P8 */
++			reg_sw4: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 			};
+ 
+-			swbst_reg: swbst {
++			/* VDD_5P0 */
++			reg_swbst: swbst {
+ 				regulator-min-microvolt = <5000000>;
+ 				regulator-max-microvolt = <5150000>;
+ 			};
+ 
+-			snvs_reg: vsnvs {
++			reg_snvs: vsnvs {
+ 				regulator-min-microvolt = <1000000>;
+ 				regulator-max-microvolt = <3000000>;
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			vref_reg: vrefddr {
++			/* VDD_VREF */
++			reg_vref: vrefddr {
+ 				regulator-boot-on;
+ 				regulator-always-on;
+ 			};
+ 
+-			vgen1_reg: vgen1 {
++			/* VDD_PCIE-A_1P5 */
++			reg_vgen1: vgen1 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <1550000>;
+ 			};
+ 
+-			vgen2_reg: vgen2 {
++			/* VDD_PCIE-B_1P5 */
++			reg_vgen2: vgen2 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <1550000>;
+ 			};
+ 
+-			vgen3_reg: vgen3 {
++			/* unused */
++			reg_vgen3: vgen3 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 			};
+ 
+-			vgen4_reg: vgen4 {
++			/* VDD_AUD_1P8 */
++			reg_vgen4: vgen4 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
+ 
+-			vgen5_reg: vgen5 {
++			/* VDD_2P5 */
++			reg_vgen5: vgen5 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
+ 
+-			vgen6_reg: vgen6 {
++			/* unused */
++			reg_vgen6: vgen6 {
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+@@ -325,7 +344,7 @@
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+ 		clocks = <&clks 201>;
+-		VDDA-supply = <&sw4_reg>;
++		VDDA-supply = <&reg_sw4>;
+ 		VDDIO-supply = <&reg_3p3v>;
+ 	};
+ 
+@@ -380,6 +399,18 @@
+ 	status = "okay";
+ };
+ 
++&reg_arm {
++        anatop-ldo-bypass;
++};
++
++&reg_soc {
++        anatop-ldo-bypass;
++};
++
++&reg_pu {
++        anatop-ldo-bypass;
++};
++
+ &ssi1 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
 -- 
 1.8.3.2
