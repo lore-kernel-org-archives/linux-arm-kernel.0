@@ -1,58 +1,93 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 26 Sep 2014 09:24:03 +0200
-Subject: [PATCH v2 0/3] ARM: vf610: Fix/add clocksource
-In-Reply-To: <54250F35.8060306@linaro.org>
-References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
- <54250F35.8060306@linaro.org>
-Message-ID: <5f84a10302bfb9bc5fed68e789fd1764@agner.ch>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 26 Sep 2014 09:31:27 +0200
+Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
+In-Reply-To: <7hppej8glk.fsf@deeprootsystems.com>
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+ <20140925112122.GA22753@ulmo> <7hppej8glk.fsf@deeprootsystems.com>
+Message-ID: <20140926073125.GB31106@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-26 09:01, schrieb Daniel Lezcano:
-> On 09/24/2014 06:20 PM, Stefan Agner wrote:
->> This patchset came out of need for a clocksource which supports shutdown.
->> In the first version I proposed to just replace the current clocksource
->> with the ARM Global Timer and even proposed to remove the PIT clocksource
->> driver. But Bill Pringlemeir brought up a reasonable point why we should
->> keep the PIT clocksource.
->>
->> Since we need shutdown support for suspend/resume, I added another patch
->> which fixes shutdown functionality for the PIT driver. Now it's possible
->> to use suspend/resume functionality with each of the two clocksources.
->>
->> Changes in v2:
->> - Added shutdown support for PIT clocksource (and hence clocksource
->>    maintainers as receipient).
->> - Create Kconfig entries which allow to choose between the two
->>    clocksources
->> - Clarified commit message
->> - Renamed device tree node to "timer"
->>
+On Thu, Sep 25, 2014 at 03:45:11PM -0700, Kevin Hilman wrote:
+> Thierry Reding <thierry.reding@gmail.com> writes:
 > 
-> Hi Stefan,
+> > I just noticed these patches because they conflicted with some of the
+> > local patches I had to add a very similar framework. One of the reasons
+> > why I hadn't posted these publicly yet is because the platform where I
+> > want to use this (Tegra) is somewhat quirky when it comes to power
+> > domains.
+> >
+> > On Tegra these domains are called power gates and they currently have
+> > their own API. We've been looking at migrating things over to some
+> > generic framework for some time and PM domains do seem like a good fit.
+> > However one of the quirks regarding these domains on Tegra is that a
+> > fixed sequence exists that needs to be respected when enabling or
+> > disabling a power partition. The exact sequence can be found in the
+> > drivers/soc/tegra/pmc.c driver's tegra_powergate_sequence_power_up()
+> > function. Essentially we need to call into the clock and reset drivers
+> > at very specific moments during the operations that the PMC does.
+> >
+> > One solution to this would be to make the needed clocks and resets
+> > available to the power domain driver via DT, but then we have the
+> > problem that two drivers would be controlling the same resources. For
+> > example drivers could still want to disable the clock for more fine-
+> > grained power management. 
 > 
-> I will take the patch 1/3 and let the other patches to be acked-by or
-> picked in another tree.
+> I think you're on the right path here.  You can get rid of this conflict
+> by removing the direct/manual clock management from the drivers, and
+> using runtime PM instead: s/clk_enable/pm_runtime_get_sync/,
+> s/clk_disable/pm_runtime_put_sync/.  When using runtime PM, those calls
+> trickle down through the power domain driver, which can manage the
+> device clocks, as well as any additional clocks and resets needed for
+> power gating.
+
+Okay. The DT part of it is going to be pretty nasty (as usual) because
+we currently have the clocks and resets within the device's device tree
+node (which I think is where they really belong).
+
+So one possibility would be to move the clocks and resets to the power
+domain controller's node, like so:
+
+	pmc at ... {
+		power-domains {
+			...
+
+			sata at ... {
+				clocks = <&tegra_car 124>;
+				resets = <&tegra_car 124>;
+			};
+		};
+	};
+
+An alternative would be to make the power-domain controller look up the
+clock within the user's device tree node. That could be problematic,
+because while the module clock is always the first clock in current
+device trees, there aren't ordering guarantees, so we'd have to rely on
+the clock name.
+
+> > Furthermore for some devices it may turn out that turning the domain
+> > off and on introduces too much latency to be useful.
 > 
-> Thanks
->   -- Daniel
+> In these cases, you should use the per-device PM QoS framework to set
+> per-device latencies.  Then your power-domain can look up these
+> latencies and decide whether or not to actually power gate or not.
 
-Hi Daniel, 
+Does this allow fine-grained control over what parts of the "power
+domain" get disabled? For example some drivers may want to only turn off
+the clock under some circumstances, which would keep the hardware state,
+whereas in other situations or drivers it might be fine to completely
+turn off the power partition and reset the hardware block (loosing all
+hardware state).
 
-Great thx. If not already to late, can you drop that superfluous empty
-line mentioned by Sergei?
+Keeping a reference to the clock in the power domain will prevent that
+from working since the driver itself won't be able to disable the
+hardware clock.
 
---
-Stefan
-
-> 
->> Stefan Agner (3):
->>    clocksource: vf_pit_timer: Support shutdown mode
->>    ARM: dts: vf610: Add ARM Global Timer
->>    ARM: vf610: Add ARM Global Timer clocksource option
->>
->>   arch/arm/boot/dts/vf610.dtsi       |  8 ++++++++
->>   arch/arm/mach-imx/Kconfig          | 19 ++++++++++++++++++-
->>   drivers/clocksource/vf_pit_timer.c |  5 +++++
->>   3 files changed, 31 insertions(+), 1 deletion(-)
->>
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/a664e87a/attachment.sig>
