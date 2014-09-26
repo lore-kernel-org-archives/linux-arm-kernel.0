@@ -1,31 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Sep 2014 09:01:49 +0200
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140926002339.GB3026@peterchendt>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <3696520.MDUrkdjfGZ@wuerfel> <20140926002339.GB3026@peterchendt>
-Message-ID: <202048167.dt5r3yRThs@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 26 Sep 2014 09:04:30 +0200
+Subject: [PATCH v2 1/3] clocksource: arm_arch_timer: change clocksource
+ name if CP15 unavailable
+In-Reply-To: <1411052390-27238-2-git-send-email-nathan_lynch@mentor.com>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+ <1411052390-27238-2-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <54250FFE.2050605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 September 2014 08:23:40 Peter Chen wrote:
-> In current chipidea structure, the parent (glue layer) driver will not be
-> used for dma, udc/host driver uses dma mask from child (core layer), at core
-> layer we will do:
-> 
-> 
->         pdev->dev.dma_mask = dev->dma_mask; /* this device is parent */
->         dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
-> 
-> Would you suggestion us a suitable way? Or it is ok we use just Antoine's way that
-> call dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32)) at parent
-> driver no matter dt or non-dt? Thanks.
+On 09/18/2014 04:59 PM, Nathan Lynch wrote:
+> The arm and arm64 VDSOs need CP15 access to the architected counter.
+> If this is unavailable (which is allowed by ARM v7), indicate this by
+> changing the clocksource name to "arch_mem_counter" before registering
+> the clocksource.
+>
+> Suggested by Stephen Boyd.
+>
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-dma_coerce_mask_and_coherent is not ok, it will force a dma mask that is
-unrelated to the actual requirements of the hardware.
+Hi Nathan,
 
-I think the best way would be to never use the child device pointer for
-DMA operations, just use a pointer to the parent device and make the
-child dev->dma_mask pointer NULL to ensure all DMA operations fail.
+is it possible to have the acked-by of the different maintainers for the 
+other patches ?
 
-	Arnd
+Are these patches targeted to be merged for 3.18 ?
+
+Thanks
+   -- Daniel
+
+> ---
+>   drivers/clocksource/arm_arch_timer.c | 12 ++++++++++--
+>   1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec13429d..c99afdf12e98 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -429,11 +429,19 @@ static void __init arch_counter_register(unsigned type)
+>   	u64 start_count;
+>
+>   	/* Register the CP15 based counter if we have one */
+> -	if (type & ARCH_CP15_TIMER)
+> +	if (type & ARCH_CP15_TIMER) {
+>   		arch_timer_read_counter = arch_counter_get_cntvct;
+> -	else
+> +	} else {
+>   		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+>
+> +		/* If the clocksource name is "arch_sys_counter" the
+> +		 * VDSO will attempt to read the CP15-based counter.
+> +		 * Ensure this does not happen when CP15-based
+> +		 * counter is not available.
+> +		 */
+> +		clocksource_counter.name = "arch_mem_counter";
+> +	}
+> +
+>   	start_count = arch_timer_read_counter();
+>   	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+>   	cyclecounter.mult = clocksource_counter.mult;
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
