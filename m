@@ -1,66 +1,52 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 26 Sep 2014 10:20:39 -0700
-Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
- ATS1PR
-In-Reply-To: <20140926102430.GF22293@arm.com> (Will Deacon's message of "Fri,
- 26 Sep 2014 11:24:30 +0100")
-References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
- <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
- <20140922152614.GP25809@arm.com>
- <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
- <20140924163712.GG16244@arm.com>
- <vnkw38bgkbal.fsf@mitchelh-linux.qualcomm.com>
- <20140926102430.GF22293@arm.com>
-Message-ID: <vnkwa95mb8ns.fsf@mitchelh-linux.qualcomm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 26 Sep 2014 21:25:12 +0400
+Subject: [PATCH v5 09/10] ARM: dts: berlin: add the Ethernet node
+In-Reply-To: <1411742036-23520-10-git-send-email-antoine.tenart@free-electrons.com>
+References: <1411742036-23520-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1411742036-23520-10-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5425A178.4050501@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26 2014 at 03:24:30 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 24, 2014 at 09:34:26PM +0100, Mitchel Humpherys wrote:
->> On Wed, Sep 24 2014 at 09:37:12 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Wed, Sep 24, 2014 at 02:12:00AM +0100, Mitchel Humpherys wrote:
->> >> On Mon, Sep 22 2014 at 08:26:14 AM, Will Deacon <will.deacon@arm.com> wrote:
->> >> > On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
->> >> >> +		return arm_smmu_iova_to_phys_soft(domain, iova);
->> >> >> +	}
->> >> >> +
->> >> >> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
->> >> >> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
->> >> >> +
->> >> >> +	if (phys & CB_PAR_F) {
->> >> >> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
->> >> >> +		dev_err(dev, "PAR = 0x%llx\n", phys);
->> >> >> +	}
->> >> >> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
->> >> >
->> >> > How does this work for 64k pages?
->> >> 
->> >> So at the moment we're always assuming that we're using v7/v8 long
->> >> descriptor format, right?  All I see in the spec (14.5.15 SMMU_CBn_PAR)
->> >> is that bits[47:12]=>PA[47:12]...  Or am I missing something completely?
->> >
->> > I think you've got 64k pages confused with the short-descriptor format.
->> >
->> > When we use 64k pages with long descriptors, you're masked off bits 15-12 of
->> > the iova above, so you'll have a hole in the physical address afaict.
->> 
->> Even with long descriptors the spec says bits 15-12 should come from
->> CB_PAR...  It makes no mention of reinterpreting those bits depending on
->> the programmed page granule.  The only thing I can conclude from the
->> spec is that hardware should be smart enough to do the right thing with
->> bits 15-12 when the page granule is 64k.  Although even if hardware is
->> smart enough I guess CB_PAR[15:12] should be the same as iova[15:12] for
->> the 64k case?
+Hello.
+
+On 09/26/2014 06:33 PM, Antoine Tenart wrote:
+
+> This patch adds the Ethernet node, enabling the network unit on Berlin
+> BG2Q SoCs.
+
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   arch/arm/boot/dts/berlin2q.dtsi | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 902eddb19cd8..d442b22fd1ea 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -114,6 +114,23 @@
+>   			#interrupt-cells = <3>;
+>   		};
 >
-> Yeah, fair enough, the code you have should work correctly then.
-> Unfortunately, I don't have any suitable hardware on which to test it.
+> +		eth0: ethernet at b90000 {
+> +			compatible = "marvell,pxa168-eth";
+> +			reg = <0xb90000 0x10000>;
+> +			clocks = <&chip CLKID_GETH0>;
+> +			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+> +			/* set by bootloader */
+> +			local-mac-address = [00 00 00 00 00 00];
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			phy-handle = <&ethphy0>;
+> +			status = "disabled";
+> +
+> +			ethphy0: ethernet-phy at 0 {
+> +				reg = <0>;
+> +			};
+> +		};
+> +
 
-FWIW, I have tested this on a few platforms here.  I'll send out a v2
-for the series then with the changes you suggested on the iopoll patch.
+    Hm, is the PHY internal to the Ethernet controller?
 
-
--Mitch
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+WBR, Sergei
