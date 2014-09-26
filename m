@@ -1,122 +1,190 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 26 Sep 2014 23:47:52 +0100
-Subject: [PATCH v12 08/12] PCI: OF: Introduce helper function for
- retrieving PCI domain numbers
-In-Reply-To: <CAL_JsqKJ6bfPuOofo4grVm3qW_WOpUzcS1juZvHxZdFyyF_19A@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-9-git-send-email-Liviu.Dudau@arm.com>
- <CAL_Jsq+j40Xf208wCf4as3H=cDU=htJ-JWinB0DjpcORjatNXQ@mail.gmail.com>
- <20140926212052.GA6030@borg.dudau.co.uk>
- <CAL_JsqKJ6bfPuOofo4grVm3qW_WOpUzcS1juZvHxZdFyyF_19A@mail.gmail.com>
-Message-ID: <20140926224752.GB22030@e106497-lin.cambridge.arm.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Sat, 27 Sep 2014 04:38:09 +0530
+Subject: [PATCH v2 1/2] serial: samsung: Add support for early console
+In-Reply-To: <1411638892-13702-2-git-send-email-m.szyprowski@samsung.com>
+References: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
+ <1411638892-13702-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAGOxZ52jYGxoKzx9ckwrsNMvRLRXz8qBV9QYezZ-RykEfyLc4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 10:53:26PM +0100, Rob Herring wrote:
-> On Fri, Sep 26, 2014 at 4:20 PM,  <liviu@dudau.co.uk> wrote:
-> > On Fri, Sep 26, 2014 at 01:20:39PM -0500, Rob Herring wrote:
-> >> On Tue, Sep 23, 2014 at 2:01 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> >> > Add pci_get_new_domain_nr() to allocate a new domain number
-> >> > and of_get_pci_domain_nr() to retrieve the PCI domain number
-> >> > of a given device from DT. Host bridge drivers or architecture
-> >> > specific code can choose to implement their PCI domain number
-> >> > policy using these two functions.
-> >> >
-> >> > Using of_get_pci_domain_nr() guarantees a stable PCI domain
-> >> > number on every boot provided that all host bridge controllers
-> >> > are assigned a number in the device tree using "linux,pci-domain"
-> >> > property. Mix use of pci_get_new_domain_nr() and of_get_pci_domain_nr()
-> >> > is not recommended as it can lead to potentially conflicting
-> >> > domain numbers being assigned to root busses behind different
-> >> > host bridges.
-> >> >
-> >> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> > Cc: Arnd Bergmann <arnd@arndb.de>
-> >> > Cc: Grant Likely <grant.likely@linaro.org>
-> >> > Cc: Rob Herring <robh+dt@kernel.org>
-> >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> >>
-> >> Looks pretty good, but a couple of comments that can be addressed as
-> >> follow-up patches.
-> >>
-> >> > ---
-> >> >  drivers/of/of_pci.c    | 25 +++++++++++++++++++++++++
-> >> >  drivers/pci/pci.c      |  9 +++++++++
-> >> >  include/linux/of_pci.h |  7 +++++++
-> >> >  include/linux/pci.h    |  3 +++
-> >> >  4 files changed, 44 insertions(+)
-> >> >
-> >> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> >> > index 8481996..82d172f 100644
-> >> > --- a/drivers/of/of_pci.c
-> >> > +++ b/drivers/of/of_pci.c
-> >> > @@ -89,6 +89,31 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> >> >  }
-> >> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-> >> >
-> >> > +/**
-> >> > + * This function will try to obtain the host bridge domain number by
-> >> > + * finding a property called "linux,pci-domain" of the given device node.
-> >> > + *
-> >> > + * @node: device tree node with the domain information
-> >> > + *
-> >> > + * Returns the associated domain number from DT in the range [0-0xffff], or
-> >> > + * a negative value if the required property is not found.
-> >> > + */
-> >> > +int of_get_pci_domain_nr(struct device_node *node)
-> >> > +{
-> >> > +       const __be32 *value;
-> >> > +       int len;
-> >> > +       u16 domain;
-> >> > +
-> >> > +       value = of_get_property(node, "linux,pci-domain", &len);
-> >>
-> >> This needs to be documented.
-> >
-> > I would say needs agreed on *and* documented.
-> 
-> I thought Bjorn already applied the series. Who's agreement are you
-> waiting for specifically.
+Hi Marek,
 
-Looks like he only applied about 60% of the series.
+On Thu, Sep 25, 2014 at 3:24 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> From: Tomasz Figa <t.figa@samsung.com>
+>
+> This patch adds support for early console initialized from device tree
+> and kernel command line to all variants of Samsung serial driver.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> [added support for command line based initialization, fixed comment]
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  Documentation/kernel-parameters.txt |  10 ++++
+>  drivers/tty/serial/Kconfig          |   1 +
+>  drivers/tty/serial/samsung.c        | 103 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 114 insertions(+)
+>
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 10d51c2f10d7..12e73c5fc90b 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -938,6 +938,16 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>
+>                 smh     Use ARM semihosting calls for early console.
+>
+> +               s3c2410,<addr>[,options]
+> +               s3c2412,<addr>[,options]
+> +               s3c2440,<addr>[,options]
+> +               s3c6400,<addr>[,options]
+> +               s5pv210,<addr>[,options]
+> +               exynos4210,<addr>[,options]
+Which options are supported? If nothing is supported, probably you can
+just remove _options_ fields above.
+> +                       Use early console provided by serial driver available
+> +                       on Samsung SoCs, requires selecting proper type and
+> +                       a correct base address of the selected UART port.
+> +
+>         earlyprintk=    [X86,SH,BLACKFIN,ARM,M68k]
+>                         earlyprintk=vga
+>                         earlyprintk=efi
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 26cec64dadd7..e87a2dfd9080 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -222,6 +222,7 @@ config SERIAL_SAMSUNG
+>         tristate "Samsung SoC serial support"
+>         depends on PLAT_SAMSUNG
+>         select SERIAL_CORE
+> +       select SERIAL_EARLYCON
+>         help
+>           Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
+>           providing /dev/ttySAC0, 1 and 2 (note, some machines may not
+> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> index c78f43a481ce..8ad453a5d845 100644
+> --- a/drivers/tty/serial/samsung.c
+> +++ b/drivers/tty/serial/samsung.c
+> @@ -1856,6 +1856,109 @@ static struct platform_driver samsung_serial_driver = {
+>
+>  module_platform_driver(samsung_serial_driver);
+>
+> +/*
+> + * Early console.
+> + */
+> +
+> +struct samsung_early_console_data {
+> +       u32 txfull_mask;
+> +};
+> +
+> +static void samsung_early_busyuart(struct uart_port *port)
+> +{
+> +       while (!(readl(port->membase + S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXFE))
+> +               ;
+> +}
+> +
+> +static void samsung_early_busyuart_fifo(struct uart_port *port)
+> +{
+> +       struct samsung_early_console_data *data = port->private_data;
+> +
+> +       while (readl(port->membase + S3C2410_UFSTAT) & data->txfull_mask)
+> +               ;
+> +}
+> +
+> +static void samsung_early_putc(struct uart_port *port, int c)
+> +{
+> +       if (readl(port->membase + S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE)
+> +               samsung_early_busyuart_fifo(port);
+> +       else
+> +               samsung_early_busyuart(port);
+> +
+> +       writeb(c, port->membase + S3C2410_UTXH);
+> +}
+> +
+> +static void samsung_early_write(struct console *con, const char *s, unsigned n)
+> +{
+> +       struct earlycon_device *dev = con->data;
+> +
+> +       uart_console_write(&dev->port, s, n, samsung_early_putc);
+> +}
+> +
+> +static int __init samsung_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       if (!device->port.membase)
+> +               return -ENODEV;
+> +
+> +       device->con->write = samsung_early_write;
+> +       return 0;
+> +}
+> +
+> +/* S3C2410 */
+> +static struct samsung_early_console_data s3c2410_early_console_data = {
+> +       .txfull_mask = S3C2410_UFSTAT_TXFULL,
+> +};
+> +
+> +static int __init s3c2410_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       device->port.private_data = &s3c2410_early_console_data;
+> +       return samsung_early_console_setup(device, opt);
+> +}
+> +OF_EARLYCON_DECLARE(s3c2410, "samsung,s3c2410-uart",
+> +                       s3c2410_early_console_setup);
+> +EARLYCON_DECLARE(s3c2410, s3c2410_early_console_setup);
+> +
+> +/* S3C2412, S3C2440, S3C64xx */
+> +static struct samsung_early_console_data s3c2440_early_console_data = {
+> +       .txfull_mask = S3C2440_UFSTAT_TXFULL,
+> +};
+> +
+> +static int __init s3c2440_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       device->port.private_data = &s3c2440_early_console_data;
+> +       return samsung_early_console_setup(device, opt);
+> +}
+> +OF_EARLYCON_DECLARE(s3c2412, "samsung,s3c2412-uart",
+> +                       s3c2440_early_console_setup);
+> +OF_EARLYCON_DECLARE(s3c2440, "samsung,s3c2440-uart",
+> +                       s3c2440_early_console_setup);
+> +OF_EARLYCON_DECLARE(s3c6400, "samsung,s3c6400-uart",
+> +                       s3c2440_early_console_setup);
+> +EARLYCON_DECLARE(s3c2412, s3c2440_early_console_setup);
+> +EARLYCON_DECLARE(s3c2440, s3c2440_early_console_setup);
+> +EARLYCON_DECLARE(s3c6400, s3c2440_early_console_setup);
+> +
+> +/* S5PV210, EXYNOS */
+> +static struct samsung_early_console_data s5pv210_early_console_data = {
+> +       .txfull_mask = S5PV210_UFSTAT_TXFULL,
+> +};
+> +
+> +static int __init s5pv210_early_console_setup(struct earlycon_device *device,
+> +                                             const char *opt)
+> +{
+> +       device->port.private_data = &s5pv210_early_console_data;
+> +       return samsung_early_console_setup(device, opt);
+> +}
+> +OF_EARLYCON_DECLARE(s5pv210, "samsung,s5pv210-uart",
+> +                       s5pv210_early_console_setup);
+> +OF_EARLYCON_DECLARE(exynos4210, "samsung,exynos4210-uart",
+> +                       s5pv210_early_console_setup);
+> +EARLYCON_DECLARE(s5pv210, s5pv210_early_console_setup);
+> +EARLYCON_DECLARE(exynos4210, s5pv210_early_console_setup);
+> +
+>  MODULE_ALIAS("platform:samsung-uart");
+>  MODULE_DESCRIPTION("Samsung SoC Serial port driver");
+>  MODULE_AUTHOR("Ben Dooks <ben@simtec.co.uk>");
+> --
+> 1.9.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-I'm not waiting on anyones specifig agreement, just general agreement.
-Jason Gunthrope have initially suggested using pci-domain alias which
-you don't like, now I'm using "linux,pci-domain" property which you've
-ACKed, I wonder if I need to give people more time to catch up to the
-fact?
 
-> 
-> >>
-> >> > +       if (!value || len < sizeof(*value))
-> >> > +               return -EINVAL;
-> >> > +
-> >> > +       domain = (u16)be32_to_cpup(value);
-> >>
-> >> of_property_read_u32 would not work here?
-> >
-> > It should, I guess, but I want to limit the domain number range to 16 bits.
-> 
-> Okay, but it would still be fewer lines to use of_property_read_u32
-> and then cast it. You could use the u16 variant and make the property
-> be defined to be 16-bit in the documentation.
-
-True. Will do.
-
-Best regards,
-Liviu
-
-> 
-> Rob
-> 
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Regards,
+Alim
