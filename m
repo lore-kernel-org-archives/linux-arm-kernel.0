@@ -1,101 +1,77 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 09:24:11 +0800
-Subject: [PATCH v1] rtc: snvs: add poweroff function
-In-Reply-To: <1411611233-29919-1-git-send-email-b38343@freescale.com>
-References: <1411611233-29919-1-git-send-email-b38343@freescale.com>
-Message-ID: <20140926012410.GD21077@dragon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Sep 2014 18:29:38 -0700
+Subject: [PATCH v13 0/9] Per-user clock constraints
+In-Reply-To: <54228067.3090600@collabora.com>
+References: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
+ <5421DF46.2010107@codeaurora.org> <54228067.3090600@collabora.com>
+Message-ID: <5424C182.5000906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 10:13:53AM +0800, Robin Gong wrote:
-> On i.mx6 chips, PMIC_ON_REQ can be pulled by snvs LPCR. That can be
-> used poweroff system if PMIC_ON_REQ connected with external PMIC or
-> power control circuit.Power up again if PMIC_ON_REQ pulled high.
-> 
-> Signed-off-by: Robin Gong <b38343@freescale.com>
+On 09/24/14 01:27, Tomeu Vizoso wrote:
+> On 09/23/2014 10:59 PM, Stephen Boyd wrote:
+>>
+>> Any thoughts on my comments on patch set #10[1]? It seems like we can
+>> avoid having a flag day to support this.
+> I cannot say that I fully understand your proposal, but IMO the most
+> valuable thing in this patchset is precisely the API split (and thus,
+> the flag day is inherent to it).
+>
+> I see a lot of value in clk consumers to use a defined set of functions
+> that all take and/or return struct clk, and for providers to use the
+> functions that take and/or return struct clk_core. Makes the API clearer
+> and allows it to have a more scalable growth in the future.
 
-I'm not sure it's a good idea to plug poweroff support into RTC driver.
-If RTC driver is built out, poweroff function is gone too.
+I see a lot of non-value. It's hugely invasive needing every driver to
+change. Invariably we're going to break something. Back porting things
+across this is a real pain (good luck stable trees!). Reviewing the
+patches aren't feasible given their size. There's a reason why we don't
+do flag days. They suck.
 
-Shawn
+We already have the consumer/provider split in the struct clk_hw and
+struct clk separation. Why don't we just use struct clk_hw throughout
+the provider APIs? The only op that isn't doing this is determine_rate()
+which might be able to accept a flag day. Otherwise we rename it to
+something else and migrate everyone over to a different named function
+that doesn't take a struct clk **. Then we introduce new APIs for the
+providers to use that are struct clk_hw focused instead of struct clk
+focused and migrate them too. The benefit being that we get proper
+review of this stuff because the patches are small. We can let
+coccinelle do it too.
 
-> ---
->  Documentation/devicetree/bindings/crypto/fsl-sec4.txt |  4 ++++
->  drivers/rtc/rtc-snvs.c                                | 18 ++++++++++++++++++
->  2 files changed, 22 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> index e402277..00d67f2 100644
-> --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> @@ -363,11 +363,15 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
->        Value type: <prop-encoded-array>
->        Definition: A standard property.  Specifies the physical
->            address and length of the SNVS LP configuration registers.
-> +  - fsl,poweroff
-> +      Usage: opertional, recommend if PMIC_ON_REQ connected with external
-> +	PMIC or power control circuit.
->  
->  EXAMPLE
->  	sec_mon_rtc_lp at 314000 {
->  		compatible = "fsl,sec-v4.0-mon-rtc-lp";
->  		reg = <0x34 0x58>;
-> +		fsl,poweroff;
->  	};
->  
->  =====================================================================
-> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-> index fa384fe..ef32541 100644
-> --- a/drivers/rtc/rtc-snvs.c
-> +++ b/drivers/rtc/rtc-snvs.c
-> @@ -29,6 +29,8 @@
->  #define SNVS_LPCR_SRTC_ENV	(1 << 0)
->  #define SNVS_LPCR_LPTA_EN	(1 << 1)
->  #define SNVS_LPCR_LPWUI_EN	(1 << 3)
-> +#define SNVS_LPCR_DP		(1 << 5)
-> +#define SNVS_LPCR_TOP		(1 << 6)
->  #define SNVS_LPSR_LPTA		(1 << 0)
->  
->  #define SNVS_LPPGDR_INIT	0x41736166
-> @@ -41,6 +43,8 @@ struct snvs_rtc_data {
->  	spinlock_t lock;
->  };
->  
-> +static void __iomem *snvs_base;
-> +
->  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
->  {
->  	u64 read1, read2;
-> @@ -241,8 +245,17 @@ static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
->  	return events ? IRQ_HANDLED : IRQ_NONE;
->  }
->  
-> +static void snvs_poweroff(void)
-> +{
-> +	u32 value;
-> +
-> +	value = readl(snvs_base + SNVS_LPCR);
-> +	writel(value | SNVS_LPCR_DP | SNVS_LPCR_TOP, snvs_base + SNVS_LPCR);
-> +}
-> +
->  static int snvs_rtc_probe(struct platform_device *pdev)
->  {
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct snvs_rtc_data *data;
->  	struct resource *res;
->  	int ret;
-> @@ -260,6 +273,11 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->  	if (data->irq < 0)
->  		return data->irq;
->  
-> +	if (np && of_get_property(np, "fsl,poweroff", NULL)) {
-> +		snvs_base = data->ioaddr;
-> +		pm_power_off = snvs_poweroff;
-> +	}
-> +
->  	platform_set_drvdata(pdev, data);
->  
->  	spin_lock_init(&data->lock);
-> -- 
-> 1.9.1
-> 
+>
+> A less important feature of the patchset are per-user clocks, which (if
+> I understand correctly) your proposal would address without requiring a
+> flag day.
+
+The subject of this thread seems to imply that it's the most important
+part. I'm confused.
+
+>
+> And then we have clock constraints, which is probably the least
+> important feature in the grand scheme of things, but it's actually what
+> I personally care about.
+>
+> If we wanted to add a way for clk users to specify clock constraints
+> without any refactoring, we could easily do so by reusing the request
+> pattern that pm_qos uses:
+>
+> void clk_add_constraint(struct clk_request *req,
+>                         int constraint_type,
+>                         unsigned long value);
+>
+> void clk_update_constraint(struct clk_request *req,
+>                            unsigned long new_value);
+>
+> void clk_remove_constraint(struct clk_request *req);
+>
+> It wouldn't be that bad IMO, but the API refactoring was something that
+> was long desired and this was seen as a good opportunity to tackle it
+> before it gets worst.
+>
+
+Sure. Maybe we should just do that so we don't break things.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
