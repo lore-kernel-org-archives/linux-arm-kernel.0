@@ -1,33 +1,45 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 26 Sep 2014 18:43:58 +0530
-Subject: [PATCH 0/3] Add SNVS clock gating and clock support to rtc-snvs driver
-Message-ID: <cover.1411736171.git.maitysanchayan@gmail.com>
+Date: Fri, 26 Sep 2014 18:43:59 +0530
+Subject: [PATCH 1/3] ARM: imx: clk-vf610: Add SNVS clock
+In-Reply-To: <cover.1411736171.git.maitysanchayan@gmail.com>
+References: <cover.1411736171.git.maitysanchayan@gmail.com>
+Message-ID: <75fd6d21e5ebfbe918c9beeb15f361ca4e59f29b.1411736171.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series of patches:
-(1) Enable clock gating for the SNVS peripheral
-(2) Adds SNVS devicetree node for the VF610 platform
-(3) Add clock enable and disable support for the 
-SNVS peripheral which is required by RTC. 
+This patch adds the SNVS clock gating which is
+required by the SNVS peripheral.
 
-I would like to ask whether the solution i am
-opting for in these set of patches is ok? Is there
-another more appropriate solution? I couldn't find
-any other piece of code which was enabling the clock
-gating for the SNVS peripheral explicitly. Is this 
-expected to be taken care of by uboot?
-
-Sanchayan Maity (3):
-  ARM: imx: clk-vf610: Add SNVS clock
-  ARM: dts: vf610: Add SNVS node
-  drivers/rtc/rtc-snvs: Add clock support
-
- arch/arm/boot/dts/vf610.dtsi            |   15 ++++++++++
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
  arch/arm/mach-imx/clk-vf610.c           |    1 +
- drivers/rtc/rtc-snvs.c                  |   48 +++++++++++++++++++++++++------
- include/dt-bindings/clock/vf610-clock.h |    3 +-
- 4 files changed, 57 insertions(+), 10 deletions(-)
+ include/dt-bindings/clock/vf610-clock.h |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
+index a178184..2a3a759f 100644
+--- a/arch/arm/mach-imx/clk-vf610.c
++++ b/arch/arm/mach-imx/clk-vf610.c
+@@ -318,6 +318,7 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_DMAMUX1] = imx_clk_gate2("dmamux1", "platform_bus", CCM_CCGR0, CCM_CCGRx_CGn(5));
+ 	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
+ 	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
++	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
+ 
+ 	imx_check_clocks(clk, ARRAY_SIZE(clk));
+ 
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index d6b56b2..358eab9 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -169,6 +169,7 @@
+ #define VF610_CLK_PLL7_MAIN		156
+ #define VF610_CLK_USBPHY0		157
+ #define VF610_CLK_USBPHY1		158
+-#define VF610_CLK_END			159
++#define VF610_CLK_SNVS			159
++#define VF610_CLK_END			160
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 1.7.9.5
