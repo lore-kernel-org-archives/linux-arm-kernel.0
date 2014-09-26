@@ -1,47 +1,39 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Fri, 26 Sep 2014 05:30:40 +0000
-Subject: [PATCH] ARM: Kconfig: Open force maximum zone order for all SoCs
-In-Reply-To: <1409546541-4129-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1409546541-4129-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <9dc024498c904d48b3a25430f8d31f29@BY2PR0301MB0613.namprd03.prod.outlook.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 26 Sep 2014 07:32:55 +0200
+Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
+In-Reply-To: <20140924124044.GC4992@pengutronix.de>
+References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
+ <20140924124044.GC4992@pengutronix.de>
+Message-ID: <20140926053255.GL4992@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Linus,
 
-I'd like to know the status of this patch.
-
-Our Platforms depend on it.
-
-Thanks,
-
-BRs
-Xiubo
-
-> -----Original Message-----
-> From: Xiubo Li [mailto:Li.Xiubo at freescale.com]
-> Sent: Monday, September 01, 2014 12:42 PM
-> To: linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org; Xiubo Li-B47053
-> Subject: [PATCH] ARM: Kconfig: Open force maximum zone order for all SoCs
+On Wed, Sep 24, 2014 at 02:40:44PM +0200, Sascha Hauer wrote:
+> > I haven't got to reviewing the driver, but this looks just wrong.
+> > 
+> > Have the magic numbers in the driver.
+> > 
+> > Use strings to describe functions, not integers.
 > 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  arch/arm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index c49a775..bf8445c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1687,7 +1687,7 @@ config ARCH_WANT_GENERAL_HUGETLB
->  source "mm/Kconfig"
-> 
->  config FORCE_MAX_ZONEORDER
-> -	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
-> +	int "Maximum zone order"
->  	range 11 64 if ARCH_SHMOBILE_LEGACY
->  	default "12" if SOC_AM33XX
->  	default "9" if SA1111 || ARCH_EFM32
-> --
-> 1.8.4
+> Interrupts, clocks, gpios, dma channels, nearly everything in the device tree is
+> arbitrarily numbered. Instead of "irq-i2c0" we have <0 36 IRQ_TYPE_LEVEL_HIGH>
+> in the device tree. These numbers can be resolved efficiently in the
+> driver by shifting them to get a bitmask or by adding them as offset to
+> a register base.
+> Why do you want to make pinctrl different? Thanks to the recently
+> introduced defines in the device trees these numbers are not magic at
+> all anymore.
+
+Any opinions on this?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
