@@ -1,114 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 14:33:43 +0800
-Subject: [PATCHv4 6/6] ARM: imx: Add Freescale LS1021A SMP support
-In-Reply-To: <1411371952-5618-7-git-send-email-jingchang.lu@freescale.com>
-References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
- <1411371952-5618-7-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <20140926063342.GG31948@dragon>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 26 Sep 2014 08:44:25 +0200
+Subject: [PATCH v2 1/3] drivers: of: add return value to
+ of_reserved_mem_device_init (fixup)
+In-Reply-To: <1410434561-9294-2-git-send-email-m.szyprowski@samsung.com>
+References: <1410434561-9294-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1411713865-26192-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 03:45:52PM +0800, Jingchang Lu wrote:
-> From: Jingchang Lu <b35083@freescale.com>
-> 
-> Freescale LS1021A SoCs deploy two cortex-A7 processors,
-> this adds bring-up support for the secondary core.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> ---
->  arch/arm/mach-imx/Makefile       |  2 +-
->  arch/arm/mach-imx/common.h       |  1 +
->  arch/arm/mach-imx/mach-ls1021a.c |  1 +
->  arch/arm/mach-imx/platsmp.c      | 32 ++++++++++++++++++++++++++++++++
->  4 files changed, 35 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index ce137bc..38d75e2 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -89,7 +89,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
->  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
->  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
->  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-> -ifdef CONFIG_SOC_IMX6
-> +ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
->  AFLAGS_headsmp.o :=-Wa,-march=armv7-a
->  obj-$(CONFIG_SMP) += headsmp.o platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 1dabf43..c473ca5 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -157,5 +157,6 @@ static inline void imx_init_l2cache(void) {}
->  #endif
->  
->  extern struct smp_operations imx_smp_ops;
-> +extern struct smp_operations ls1021a_smp_ops;
->  
->  #endif
-> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-> index 9d2034b..b89c858 100644
-> --- a/arch/arm/mach-imx/mach-ls1021a.c
-> +++ b/arch/arm/mach-imx/mach-ls1021a.c
-> @@ -17,5 +17,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
->  };
->  
->  DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-> +	.smp		= smp_ops(ls1021a_smp_ops),
->  	.dt_compat	= ls1021a_dt_compat,
->  MACHINE_END
-> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-> index 771bd25..62376f0 100644
-> --- a/arch/arm/mach-imx/platsmp.c
-> +++ b/arch/arm/mach-imx/platsmp.c
-> @@ -16,6 +16,8 @@
->  #include <asm/page.h>
->  #include <asm/smp_scu.h>
->  #include <asm/mach/map.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
+This patch adds missing return value to error paths.
 
-Move them above to the <linux/*> group of headers.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/of/of_reserved_mem.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Shawn
-
->  
->  #include "common.h"
->  #include "hardware.h"
-> @@ -94,3 +96,33 @@ struct smp_operations  imx_smp_ops __initdata = {
->  	.cpu_kill		= imx_cpu_kill,
->  #endif
->  };
-> +
-> +#define DCFG_CCSR_SCRATCHRW1	0x200
-> +
-> +static int ls1021a_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init ls1021a_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	struct device_node *np;
-> +	void __iomem *dcfg_base;
-> +	unsigned long paddr;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,ls1021a-dcfg");
-> +	dcfg_base = of_iomap(np, 0);
-> +	BUG_ON(!dcfg_base);
-> +
-> +	paddr = virt_to_phys(secondary_startup);
-> +	writel_relaxed(cpu_to_be32(paddr), dcfg_base + DCFG_CCSR_SCRATCHRW1);
-> +
-> +	iounmap(dcfg_base);
-> +}
-> +
-> +struct smp_operations  ls1021a_smp_ops __initdata = {
-> +	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
-> +	.smp_boot_secondary	= ls1021a_boot_secondary,
-> +};
-> -- 
-> 1.8.0
-> 
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 7e7de03..e975156 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -250,13 +250,13 @@ int of_reserved_mem_device_init(struct device *dev)
+ 
+ 	np = of_parse_phandle(dev->of_node, "memory-region", 0);
+ 	if (!np)
+-		return;
++		return -ENODEV;
+ 
+ 	rmem = __find_rmem(np);
+ 	of_node_put(np);
+ 
+ 	if (!rmem || !rmem->ops || !rmem->ops->device_init)
+-		return;
++		return -ENIVAL;
+ 
+ 	rmem->ops->device_init(rmem, dev);
+ 	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+-- 
+1.9.2
