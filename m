@@ -1,49 +1,98 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:58 +0200
-Subject: [PATCH 25/27] arm/arm64: KVM: Fix set_clear_sgi_pend_reg offset
+Date: Fri, 26 Sep 2014 15:16:59 +0200
+Subject: [PATCH 26/27] arm/arm64: KVM: Fix VTTBR_BADDR_MASK and pgd alloc
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-26-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-27-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sgi values calculated in read_set_clear_sgi_pend_reg() and
-write_set_clear_sgi_pend_reg() were horribly incorrectly multiplied by 4
-with catastrophic results in that subfunctions ended up overwriting
-memory not allocated for the expected purpose.
+From: Joel Schopp <joel.schopp@amd.com>
 
-This showed up as bugs in kfree() and the kernel complaining a lot of
-you turn on memory debugging.
+The current aarch64 calculation for VTTBR_BADDR_MASK masks only 39 bits
+and not all the bits in the PA range. This is clearly a bug that
+manifests itself on systems that allocate memory in the higher address
+space range.
 
-This addresses: http://marc.info/?l=kvm&m=141164910007868&w=2
+ [ Modified from Joel's original patch to be based on PHYS_MASK_SHIFT
+   instead of a hard-coded value and to move the alignment check of the
+   allocation to mmu.c.  Also added a comment explaining why we hardcode
+   the IPA range and changed the stage-2 pgd allocation to be based on
+   the 40 bit IPA range instead of the maximum possible 48 bit PA range.
+   - Christoffer ]
 
-Reported-by: Shannon Zhao <zhaoshenglong@huawei.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Joel Schopp <joel.schopp@amd.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kvm/arm.c               |  4 ++--
+ arch/arm64/include/asm/kvm_arm.h | 13 ++++++++++++-
+ arch/arm64/include/asm/kvm_mmu.h |  5 ++---
+ 3 files changed, 16 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index b6fab0f..8629678 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -816,7 +816,7 @@ static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int sgi;
--	int min_sgi = (offset & ~0x3) * 4;
-+	int min_sgi = (offset & ~0x3);
- 	int max_sgi = min_sgi + 3;
- 	int vcpu_id = vcpu->vcpu_id;
- 	u32 reg = 0;
-@@ -837,7 +837,7 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int sgi;
--	int min_sgi = (offset & ~0x3) * 4;
-+	int min_sgi = (offset & ~0x3);
- 	int max_sgi = min_sgi + 3;
- 	int vcpu_id = vcpu->vcpu_id;
- 	u32 reg;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 40bc3df..7796051 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -410,9 +410,9 @@ static void update_vttbr(struct kvm *kvm)
+ 
+ 	/* update vttbr to be used with the new vmid */
+ 	pgd_phys = virt_to_phys(kvm->arch.pgd);
++	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
+-	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
+-	kvm->arch.vttbr |= vmid;
++	kvm->arch.vttbr = pgd_phys | vmid;
+ 
+ 	spin_unlock(&kvm_vmid_lock);
+ }
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index cc83520..7fd3e27 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -122,6 +122,17 @@
+ #define VTCR_EL2_T0SZ_MASK	0x3f
+ #define VTCR_EL2_T0SZ_40B	24
+ 
++/*
++ * We configure the Stage-2 page tables to always restrict the IPA space to be
++ * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
++ * not known to exist and will break with this configuration.
++ *
++ * Note that when using 4K pages, we concatenate two first level page tables
++ * together.
++ *
++ * The magic numbers used for VTTBR_X in this patch can be found in Tables
++ * D4-23 and D4-25 in ARM DDI 0487A.b.
++ */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ /*
+  * Stage2 translation configuration:
+@@ -149,7 +160,7 @@
+ #endif
+ 
+ #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+-#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
++#define VTTBR_BADDR_MASK  (((1LLU << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+ #define VTTBR_VMID_SHIFT  (48LLU)
+ #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 737da74..a030d16 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -59,10 +59,9 @@
+ #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
+ 
+ /*
+- * Align KVM with the kernel's view of physical memory. Should be
+- * 40bit IPA, with PGD being 8kB aligned in the 4KB page configuration.
++ * We currently only support a 40bit IPA.
+  */
+-#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
++#define KVM_PHYS_SHIFT	(40)
+ #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
+ #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
+ 
 -- 
 2.0.0
