@@ -1,79 +1,77 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 26 Sep 2014 08:55:27 +0800
-Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
-In-Reply-To: <20140926002544.19023.39287@quantum>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <20140911203623.GJ31276@lukather> <20140926002544.19023.39287@quantum>
-Message-ID: <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 26 Sep 2014 09:14:37 +0800
+Subject: [GIT PULL][for 3.18]pull request for hisilicon hix5hd2 soc dt
+ updates
+In-Reply-To: <CAOesGMiPVg0aZsvXePyoQ49JPa+zPjz+SDwYSt6uDdHdPHsNcg@mail.gmail.com>
+References: <5417D73E.8080309@hisilicon.com>
+ <CAOesGMiPVg0aZsvXePyoQ49JPa+zPjz+SDwYSt6uDdHdPHsNcg@mail.gmail.com>
+Message-ID: <5424BDFD.8000900@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 8:25 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Maxime Ripard (2014-09-11 13:36:23)
->> Hi Chen-Yu,
+
+
+On 2014/9/26 8:46, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Sep 15, 2014 at 11:22 PM, xuwei <xuwei5@hisilicon.com> wrote:
+>> Hi Olof, Hi Kevin, Hi Arnd,
 >>
->> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
->> > Hi everyone,
->> >
->> > This series unifies the mux and divider parts of the AHB1 clock found
->> > on sun6i and sun8i, while also adding support for the pre-divider on
->> > the PLL6 input.
->> >
->> > The rate calculation logic must factor in which parent it is using to
->> > calculate the rate, to decide whether to use the pre-divider or not.
->> > This is beyond the original factors clk design in sunxi. To avoid
->> > feature bloat, this is implemented as a seperate composite clk.
->> >
->> > The new clock driver is registered with a separate OF_CLK_DECLARE.
->> > This is done so that assigned-clocks* properties on the clk provider
->> > node can actually work. The clock framework arranges the clock setup
->> > order by checking whether all clock parents are available, by checking
->> > the node matching OF_CLK_DECLARE.
->> >
->> > However, the sunxi clk driver is based on the root node compatible,
->> > has no defined dependencies (parents), and is setup before the fixed-rate
->> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
->> > There is no way to calculate the required clock factors to set a default
->> > clock rate under these circumstances. This happens when we set the
->> > defaults in the clock node (provider), rather than a clock consumer.
->> >
->> > I can think of 2 ways to solve the dependency issue, but neither is
->> > pretty. One would be to move the root fixed-rate clocks into the sunxi
->> > clk driver. The other would be separating all the clocks into individual
->> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
+>> Please help to merge pull request for hisilicon hix5hd2 soc dt updates for 3.18.
+>> Thanks!
 >>
->> I don't know what Mike thinks of this, but I'd prefer the second.
->
-> I do not fully understand the problem. Ideally the clock driver should
-> have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
-> registered. Those fixed-rate parents are enumerated in your dts, right?
-> Why isn't this enough?
+>> Best Regards,
+>> Wei
+>>
+>>
+>> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+>>
+>>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-dt-for-3.18
+>>
+>> for you to fetch changes up to 610bd8722ef40b649b51f01045c5d1903f41b583:
+>>
+>>   ARM: dts: hix5hd2: add wdg node (2014-09-16 11:00:43 +0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM: DT:  Hisilicon terminal SoC HiX5HD2 DT updates for 3.18
+>>
+>> - Add watchdog, gpio, sata, usb, mmc and gmac nodes in HiX5HD2 SoC DT
+>> - Enable sata and gmac in HiX5HD2 dkb board DT
+>>
+>> ----------------------------------------------------------------
+>> Zhangfei Gao (6):
+>>       ARM: dts: hix5hd2: add gmac node
+>>       ARM: dts: hix5hd2: add mmc node
+>>       ARM: dts: hix5hd2: add usb node
+>>       ARM: dts: hix5hd2: add sata node
+>>       ARM: dts: hix5hd2: add gpio node
+>>       ARM: dts: hix5hd2: add wdg node
 
-This is due to the way the sunxi clock driver is setup. The clock driver's
-OF_CLK_DECLARE matches against the "soc" node, not the individual clock
-nodes. When the setup function is called, it just registers all the
-supported clocks. There are no dependencies listed.
+Hi Olof,
 
-Unfortunately, the fixed-factor clock is in the middle of the whole clock
-tree. The sunxi clock driver provides its parents _and_ its children.
-Naturally the clock framework then probes the fixed-factor clock after
-the sunxi ones. Any attempts to change the state of clocks under the
-unavailable fixed-factor clock, such as done by of_clk_set_defaults(),
-would get an incomplete clock, likely with no parents and parent_rate = 0.
-That is until of_clk_init() finishes and all clocks are properly hooked
-up.
+> The watchdog commit causes build failures because:
+> 
+> Error: arch/arm/boot/dts/hisi-x5hd2.dtsi:374.22-23 syntax error
+> 
+> This is because HIX5HD2_WDG0_RST is not defined anywhere in the include files.
+> 
+> You _really_ need to build test branches before you send them to us.
 
-Anyway, this problem only occurred when I added clk-assigned-* defaults
-to the clock provider node, which is not the case anymore.
+Sorry, I will make sure it will not happen next time.
 
-The second method i proposed is to have OF_CLK_DECLAREs for each individual
-clock. An example can be found here:
+> I've reverted that particular patch now.
 
-  https://github.com/wens/linux/commit/1276898da02a93da4af163ed5bdc88cdead565dc
+Thanks!
 
-This does add a lot of boilerplate code. Not really happy about it. But
-it seems the proper way to split up the driver.
+Best Regards,
+Wei
 
-
-Cheers
-ChenYu
+> 
+> -Olof
+> 
+> .
+> 
