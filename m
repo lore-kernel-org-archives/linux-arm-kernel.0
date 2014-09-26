@@ -1,56 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Sep 2014 14:52:10 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <54253195.5040003@linaro.org>
-References: <20140926112344.3ee87d2f@canb.auug.org.au>
- <20140926081804.GH5182@n2100.arm.linux.org.uk> <54253195.5040003@linaro.org>
-Message-ID: <20140926135210.GU5182@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 26 Sep 2014 08:53:12 -0500
+Subject: [PATCH 1/2] ARM: DT: apq8064: create
+ qcom-apq8064-board-common.dtsi
+In-Reply-To: <CAJAp7Ohdi2+M0LC+a3BT6++17b2DST8RgjJddKNEVwL9Ltqrdg@mail.gmail.com>
+References: <1411718851-17436-1-git-send-email-mike.rapoport@gmail.com>
+ <1411718851-17436-2-git-send-email-mike.rapoport@gmail.com>
+ <CAJAp7Ohdi2+M0LC+a3BT6++17b2DST8RgjJddKNEVwL9Ltqrdg@mail.gmail.com>
+Message-ID: <9BBA060F-07F6-44E8-B404-BFB553FBDE15@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 10:27:49AM +0100, Daniel Thompson wrote:
-> On 26/09/14 09:18, Russell King - ARM Linux wrote:
-> > On Fri, Sep 26, 2014 at 11:23:44AM +1000, Stephen Rothwell wrote:
-> >> Hi all,
-> >>
-> >> Today's linux-next merge of the arm-soc tree got a conflict in
-> >> arch/arm/Kconfig.debug between commits 0889a9e35bd3 ("ARM: 8142/1:
-> >> ks8695: Migrate debug_ll macros to shared directory"), e38c399ca584
-> >> ("ARM: 8144/2: netx: Migrate DEBUG_LL macros to shared directory"),
-> >> 6741cacfa3f1 ("ARM: 8145/1: sa1100: Migrate DEBUG_LL macros to shared
-> >> directory") and debf843bf7ee ("ARM: 8146/1: Seperate DEBUG_UART_PHYS
-> >> from DEBUG_LL on EP93XX") from the arm tree and commits d8a00916b303
-> >> ("ARM: meson: debug: add debug UART for earlyprintk support"),
-> >> b125170a39ea ("CNS3xxx: Fix debug UART") and b51312bebfa4 ("ARM:
-> >> BCM63XX: add low-level UART debug support") from the arm-soc tree.
-> >>
-> >> I fixed it up (hopefully - see below) and can carry the fix as
-> >> necessary (no action is required).
-> >>
-> >> You may be able to clean some of this up by using intermediate config
-> >> symbols that are selected by the low level symbols and depended upon by
-> >> the higher level config symbols.
-> > 
-> > Actually, I'll drop the patch set I have.  I didn't spot this earlier,
-> > but people seem to have a hard time sorting stuff numerically:
-> > 
-> >         default 0xffd82340 if ARCH_IOP13XX
-> > +       default 0xfffb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
-> > +       default 0xfffb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
-> > +       default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
-> >         default 0xfff36000 if DEBUG_HIGHBANK_UART
+
+On Sep 26, 2014, at 8:41 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
+
+> On Fri, Sep 26, 2014 at 1:07 AM, Mike Rapoport <mike.rapoport@gmail.com> wrote:
 > 
-> Oops. This is disappointing from my point-of-view but there's no one to
-> blame but me.
-> 
-> I have fixed this in my tree and will requeue for 3.19.
+> Cool to see the addition of dt for additional devices. I do however
+> not think it is correct to put all these things in common?
 
-Okay, I've dropped 8141/1 onwards, so the only patches I have from your
-series are:
+I?m with Bjorn, just duplicate the settings for the cm-qs600 board in its .dts file.
 
-ep93xx: Enable DEBUG_LL_UART_PL01X
-versatile: Enable DEBUG_LL_UART_PL01X
-
+- k
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
