@@ -1,29 +1,52 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 26 Sep 2014 19:39:45 +0800
-Subject: [RFC] should we remove soc subnode in all berlin SoC's dts if
- SOC_BUS is selected
-Message-ID: <20140926193945.3bb94276@xhacker>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 12:42:39 +0100
+Subject: [PATCH v6 7/8] ARM: mm: allow non-text sections to be
+ non-executable
+In-Reply-To: <1411067949-10913-8-git-send-email-keescook@chromium.org>
+References: <1411067949-10913-1-git-send-email-keescook@chromium.org>
+ <1411067949-10913-8-git-send-email-keescook@chromium.org>
+Message-ID: <20140926114239.GM5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Sep 18, 2014 at 12:19:08PM -0700, Kees Cook wrote:
+> @@ -1373,13 +1373,24 @@ static void __init map_lowmem(void)
+>  		if (start >= end)
+>  			break;
+>  
+> -		if (end < kernel_x_start || start >= kernel_x_end) {
+> +		if (end < kernel_x_start) {
+>  			map.pfn = __phys_to_pfn(start);
+>  			map.virtual = __phys_to_virt(start);
+>  			map.length = end - start;
+>  			map.type = MT_MEMORY_RWX;
+>  
+>  			create_mapping(&map);
+> +		} else if (start >= kernel_x_end) {
+> +			map.pfn = __phys_to_pfn(start);
+> +			map.virtual = __phys_to_virt(start);
+> +			map.length = end - start;
+> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+> +			map.type = MT_MEMORY_RW;
+> +#else
+> +			map.type = MT_MEMORY_RWX;
+> +#endif
+> +
+> +			create_mapping(&map);
 
-We want to export machine name, soc family, chip revision and chipid to
-userspace via. the SOC BUS interface, i.e call soc_device_register()
 
-It works perfectly, but there's one side effect: every device nodes will have
-an additional level. For example:
+I'm looking at this, and wondering two things.  Firstly, why isn't it
+MT_MEMORY_RW in the first place.  Secondly, why do you need to make
+this depend on CONFIG_ARM_KERNMEM_PERMS at all?
 
-/sys/devices/soc.0/xxx.sdhci will be changed to
+I think the first is an oversight by me (and is a case which never came
+up in my testing, because most of my platforms don't have segmented
+memory layouts.)
 
-/sys/devices/soc0/soc.0/xxx.sdhci
+The second I think is not necessary - the memory region being considered
+is not part of the kernel at all, and so should not be executable in any
+shape or form.
 
-This seems a bit ugly. I have one solution: remove "soc" subnodes in all berlin's
-dts, then we will have 
-
-/sys/devices/soc0/xxx.sdhci
-
-Is there any better solution? 
-
-Thanks in advance,
-Jisheng
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
