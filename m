@@ -1,77 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Sep 2014 12:50:02 +0200
-Subject: [GIT PULL] at91: soc for 3.18 #2
-In-Reply-To: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201409261250.02565.arnd@arndb.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 26 Sep 2014 12:50:00 +0200
+Subject: [PATCH v2 2/5] pinctrl: imx: add gpio pinmux support for vf610
+In-Reply-To: <877g0rlkh3.fsf@nbsps.com>
+References: <cover.1411492954.git.stefan@agner.ch>
+ <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
+ <20140925024712.GB6405@dragon> <1d3735aff5e0961c43d349d673a1c2b2@agner.ch>
+ <20140925090714.GH6405@dragon> <26008fa68a3eaf5f806a7dc4df48f77e@agner.ch>
+ <877g0rlkh3.fsf@nbsps.com>
+Message-ID: <e9ddcd256056187ffea0b05b7b31c1a6@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 September 2014, Nicolas Ferre wrote:
+Am 2014-09-25 18:43, schrieb Bill Pringlemeir:
+> On 25 Sep 2014, stefan at agner.ch wrote:
+> 
+>> Am 2014-09-25 11:07, schrieb Shawn Guo:
+>>> On Thu, Sep 25, 2014 at 09:00:41AM +0200, Stefan Agner wrote:
+>>>> Am 2014-09-25 04:47, schrieb Shawn Guo:
+>>>>> On Tue, Sep 23, 2014 at 07:37:54PM +0200, Stefan Agner wrote:
+> 
+>>>>>> Add pinmux support for GPIO for Vybrid (vf610) IOMUX controller.
+>>>>>> This is needed since direction configuration is not part of the
+>>>>>> GPIO module in Vybrid.
+>>>>>>
+>>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>>>> ---
+> 
+> [snip]
+> 
+>>>>>> +	reg = readl(ipctl->base + pin_reg->mux_reg);
+>>>>>> +	reg &= ~(0x7 << 20);
+>>>>>> +	writel(reg, ipctl->base + pin_reg->mux_reg);
+> 
+>>>>> Isn't this setup redundant at all, since imx_pmx_enable() already
+>>>>> takes care of setting mux register including GPIO mode?
+> 
+>>>> Yes currently this is redundant, when a pinmux is actually
+>>>> applied. What is the expected behaviour? Is a explicit pinmux
+>>>> necessary before we can use GPIO? If not, maybe it would make more
+>>>> sense to use imx_pmx_enable here to write all pinctrl settings?
+> 
+>>> Okay, as per Documentation/pinctrl.txt, it's required that GPIO and
+>>> PINCTRL can be used as orthogonal.  That said, your code does the
+>>> right thing.  Sorry for the noisy comment.
+> 
+>> I'm happy you came up with this, since its the thing which I'm must
+>> unsure whether this is right.
+> 
+>> Right now, if you just export a random pin (which has no pinmux
+>> configured in dt), you get an error since this function fails (mux_reg
+>> == -1). But I guess we can't avoid it, we need the pinctrl framework
+>> to have a valid setting before we fiddle around with the pad.
+> 
+>> But now, if there is a pinmux configuration in dt, but its not applied
+>> (using pinctrl-0 = ...), the export will succeed, however the GPIO
+>> will not really be usable since no sane pad configuration is not
+>> applied (input/output buffer disabled, no drive-strength)... So we
+>> might well just don't change the mux here too.
+> 
+>> IMHO, fully orthogonal is not possible, since on Vybrid those two
+>> depend on each other. But in order to make it "more orthogonal", we
+>> maybe should force applying the full configuration in
+>> imx_pmx_gpio_request_enable (e.g. drive strenght etc), rather then
+>> only mux the pad to to GPIO...
+> 
+>> What do you think?
+> 
+> The muxing must have been done, that is correct.  However, this could be
+> by a boot loader, by some other API, etc.  People maybe concerned about
+> Linux affecting 'CAN' (or some 'mission critical' pins) muxing for
+> instance, but want the A5 to handle GPIO.
+> 
+> If somewhere, somehow the pin was muxed properly and the GPIO code still
+> works, I believe this is a win.  I see that this flexibility makes it
+> more difficult to get something that just works.  I think the device
+> trees take care of this for normal users.  It might be appropriate to
+> add a DT node that sets 'GPIO_CONTROL' and put a note in the DT-GPIO
+> document, that pinctrl is needed for a normal case or if some external
+> muxing is used or not needed, then 'control=false' can be set (or
+> whatever good DT terminology)?  Then the 'GPIO_CONTROL' check would be
+> in the 'vf610_gpio_direction_input()' functions.  The 'pinctrl'
+> functions are currently compiled to stubs if that is configured out.
 
-> Nicolas Ferre (4):
->       ARM: at91: introduce basic SAMA5D4 support
->       ARM: at91: SAMA5D4 SoC detection code and low level routines
+Currently pinctrl is not optional for Vybrid (Kconfig mandates pinctrl
+by "select PINCTRL_VF610").
 
-This resulted in build failures both in at91x40_defconfig and some
-randconfigs with MMU disabled. I've applied the patch below on top
-to fix it.
+IMHO there is no real value having a way to mark a pin as "muxed
+externally" (control=false). If we use a pin, we should configure and
+mux that properly in Linux, and if we don't have valid configuration/mux
+information, we should not touch that pin. 
 
-I'm not exactly happy about the soc detection code anyway after I
-had to look at that. Why do you even hardcode the physical register
-location rather than getting it from DT?
+In v2 of this patchset, the GPIO code only worked when there _is_ a
+pinctrl entry for that GPIO pin in the DT. This is because I need the
+register offset, which is provided by the entry itself. But the pad
+configuration is another point, which I did not consider in v2. But in
+v3, the GPIO code also writes the pad control.
 
-Also, why do you care about which SoC version you have for the
-modern SAMA5 chips? All I see is a sama5d4_map_io() callback
-that maps a lot of completely unused registers along with
-the uart that you normally get from the implicit debug_ll_io_init,
-and the SRAM that should probably be turned into a normal driver.
+So it was never possible to just use the GPIO driver for any pin, even
+that pin was correctly muxed and configured externally. And, especially
+on Vybrid, I think this is a good thing, since the pin could be used by
+the M4 core. One has to have at least a proper entry in the device tree.
+And in v3, I also check that this entry represents a valid GPIO mux
+(VF610_PAD_*GPIO*).
 
-	Arnd
-8<-------
->From 45aeea29c360551519edd8e041b36d8a4d5f6a23 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 26 Sep 2014 12:27:00 +0200
-Subject: [PATCH] ARM: at91: fix nommu build regression
+IMHO with v3 we have a quite good and safe solution:
+- Using pins as GPIO needs a valid DT entry
+- Using that pin only requires exporting the pin, all
+configuration/muxing get applied by imx_pmx_gpio_request_enable
 
-The newly introduced support for SAMA5D4 added access to the
-'AT91_ALT_BASE_SYS' register area, but failed to define the
-symbols in the case when CONFIG_MMU is disabled.
 
-We really should not hardwire addresses like this any more,
-but as a small fixup, this patch just adds the missing
-definitions for the nommu case, which gets at91x40_defconfig
-and any configuration of sam9 and sama5 with MMU disabled
-back to work.
+> Then there is 'multi-machine' support with DT and compile time selects
+> with CONFIG_PINCTRL and I don't think there is a lot of additional code
+> or confusion?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 726d32bf79ef4 ("ARM: at91: SAMA5D4 SoC detection code and low ...")
+I don't understand that.
 
-diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-index d84776f6b8ac..c13797352688 100644
---- a/arch/arm/mach-at91/include/mach/hardware.h
-+++ b/arch/arm/mach-at91/include/mach/hardware.h
-@@ -51,11 +51,12 @@
-  */
- #define AT91_BASE_SYS	0xffffc000
- 
-+#endif
-+
- /*
-  * On sama5d4 there is no system controller, we map some needed peripherals
-  */
- #define AT91_ALT_BASE_SYS	0xfc069000
--#endif
- 
- /*
-  * On all at91 have the Advanced Interrupt Controller starts at address
-@@ -90,6 +91,9 @@
-  */
- #define AT91_IO_PHYS_BASE	AT91_BASE_SYS
- #define AT91_IO_VIRT_BASE	IOMEM(AT91_IO_PHYS_BASE)
-+
-+#define AT91_ALT_IO_PHYS_BASE	AT91_ALT_BASE_SYS
-+#define AT91_ALT_IO_VIRT_BASE	IOMEM(AT91_ALT_BASE_SYS)
- #endif
- 
- #define AT91_IO_SIZE		(0xFFFFFFFF - AT91_IO_PHYS_BASE + 1)
+--
+Stefan
