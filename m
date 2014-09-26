@@ -1,22 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 09:45:14 +0800
-Subject: [PATCH v2 3/3] ARM: vf610: Add ARM Global Timer clocksource option
-In-Reply-To: <1411575610-20895-4-git-send-email-stefan@agner.ch>
-References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
- <1411575610-20895-4-git-send-email-stefan@agner.ch>
-Message-ID: <20140926014513.GF21077@dragon>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 26 Sep 2014 09:48:55 +0800
+Subject: [GIT PULL][for 3.18]pull request for hisilicon hix5hd2 soc dt
+ updates
+In-Reply-To: <CAOesGMiPVg0aZsvXePyoQ49JPa+zPjz+SDwYSt6uDdHdPHsNcg@mail.gmail.com>
+References: <5417D73E.8080309@hisilicon.com>
+ <CAOesGMiPVg0aZsvXePyoQ49JPa+zPjz+SDwYSt6uDdHdPHsNcg@mail.gmail.com>
+Message-ID: <5424C607.8060206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 06:20:10PM +0200, Stefan Agner wrote:
-> Add the ARM Global Timer as clocksource/scheduler clock option and
-> use it as default scheduler clock. This leaves the PIT timer for
-> other users e.g. the secondary Cortex-M4 core. Also, the Global Timer
-> has double the precission (running at pheripheral clock compared to
-> IPG clock) and a 64-bit incrementing counter register. We still keep
-> the PIT timer as an secondary option in case the ARM Global Timer is
-> not available.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Applied, thanks.
+
+On 09/26/2014 08:46 AM, Olof Johansson wrote:
+
+>>        ARM: dts: hix5hd2: add wdg node
+>
+> The watchdog commit causes build failures because:
+>
+> Error: arch/arm/boot/dts/hisi-x5hd2.dtsi:374.22-23 syntax error
+>
+> This is because HIX5HD2_WDG0_RST is not defined anywhere in the include files.
+>
+> You _really_ need to build test branches before you send them to us.
+>
+> I've reverted that particular patch now.
+>
+
+Sorry, it's my fault.
+The watchdog patch is send out and go through Mike's tree.
+Will resend this patch after clock patch has been merged.
+
+Thanks
+Zhangfei
