@@ -1,53 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Sep 2014 19:52:29 +0200
-Subject: [PATCH v3 02/13] PM / Domains: Add DT bindings for power-on/off
- latencies
-In-Reply-To: <20140926152835.GK10233@codeaurora.org>
-References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
- <1411662520-22795-3-git-send-email-geert+renesas@glider.be>
- <CAPDyKFrAv9oyBzX764+CWkOxfN1kN_MddB3ks1q69+TnmnHXuQ@mail.gmail.com>
- <20140926152835.GK10233@codeaurora.org>
-Message-ID: <CAMuHMdU+4MX-XYe9rHmyPN3=-VQRg+CrnxWEaU2M_Jg+1Psw8A@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Sep 2014 10:52:44 -0700
+Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
+In-Reply-To: <20140926065507.GO15315@lukather>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140922113133.GF15315@lukather> <20140926004218.19023.88602@quantum>
+ <20140926065507.GO15315@lukather>
+Message-ID: <20140926175244.19023.49065@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Quoting Maxime Ripard (2014-09-25 23:55:07)
+> Hi Mike,
+> 
+> On Thu, Sep 25, 2014 at 05:42:18PM -0700, Mike Turquette wrote:
+> > Quoting Maxime Ripard (2014-09-22 04:31:33)
+> > > Mike,
+> > > 
+> > > On Thu, Sep 11, 2014 at 10:18:14PM +0200, Maxime Ripard wrote:
+> > > > Hi everyone,
+> > > > 
+> > > > Here is an attempt at improving the MMC clock support in the Allwinner
+> > > > SoCs.
+> > > > 
+> > > > Until now, the MMC clocks were having a custom phase function that was
+> > > > directly setting an obscure value in the right register, because we
+> > > > were not really having any idea of what these values were.
+> > > > 
+> > > > Now that we have more informations, we can introduce a common function
+> > > > call to get and set the phase of a particular clock, and use this in
+> > > > both our provider and our client.
+> > > 
+> > > It would be great that we have that custom phase API out of the kernel
+> > > for 3.18, and you were one of the greatest supporters to that idea,
+> > > could we please have your view on this?
+> > 
+> > Patches all look good to me. Did you want the whole series to go through
+> > the clk tree?
+> 
+> I guess it would be where it most make sense yes.
+> 
+> > If so we'll need an Ack for the MMC patch and for the ARM DTS
+> > patches as well.
+> 
+> We already have an Ack from Ulf on the MMC patch, and I'm the
+> maintainer of the DTS involved, so we should be ok :)
 
-On Fri, Sep 26, 2014 at 5:28 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 25 September 2014 18:28, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
->> > +Optional properties:
->> > + - power-on-latency: Power-on latency of the PM domain, in ns,
->> > + - power-off-latency: Power-off latency of the PM domain, in ns.
->> > +
->> >  Example:
->> >
->> >         power: power-controller at 12340000 {
->> >                 compatible = "foo,power-controller";
->> >                 reg = <0x12340000 0x1000>;
->> >                 #power-domain-cells = <1>;
->> > +               power-on-latency = <250000>;
->> > +               power-off-latency = <250000>;
->
-> This assumes every power domain within a power controller has the
-> same latencies? That isn't always true. This should be an array
-> of values corresponding to the number of power domains if
-> #power-domain-cells is 1, or just one value if the cell count is
-> 0.
+Oops, I didn't notice Ulf's Ack. Will either your or Emilio be sending a
+pull request for the sunxi clock changes?
 
-Thanks, you're right. Will update.
+Regards,
+Mike
 
-However, I'd still like to allow just one value in the #power-domain-cells = <1>
-case if the latencies are the same. Is that OK for you?
-
-Thanks again.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
