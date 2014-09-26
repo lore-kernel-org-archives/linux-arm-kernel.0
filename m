@@ -1,41 +1,21 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 27 Sep 2014 01:01:35 +0400
-Subject: [PATCH v4 2/2] ARM: shmobile: lager: enable USB PHY
-In-Reply-To: <4420279.PiYV5HPFxp@wasted.cogentembedded.com>
-References: <4420279.PiYV5HPFxp@wasted.cogentembedded.com>
-Message-ID: <1862889.19pI7tAsvN@wasted.cogentembedded.com>
+Date: Sat, 27 Sep 2014 01:05:41 +0400
+Subject: [PATCH v4 0/3] Add USB PHY device tree support for
+ R8A7791/Koelsch/Henninger board
+Message-ID: <3383603.zZsCVpCDbD@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable USB PHY device for the Lager board. 
+Hello.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+   Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20140924-v3.17-rc6' tag. Here we add the USB PHY device tree
+support on the R8A7791/Koelsch/Henninger boards. The patchset requires the USB
+PHY driver already merged by Kishon and Greg in order to work, so can be
+applied at last...
 
----
-Changes in version 4:
-- refreshed the patch.
+[1/3] ARM: shmobile: r8a7791: add USB PHY DT support
+[2/3] ARM: shmobile: koelsch: enable USB PHY
+[3/3] ARM: shmobile: henninger: enable USB PHY
 
-Changes in version 3:
-- refreshed the patch.
-
-Changes in version 2:
-- refreshed the patch.
-
- arch/arm/boot/dts/r8a7790-lager.dts |    4 ++++
- 1 file changed, 4 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
-+++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -424,6 +424,10 @@
- 	pinctrl-names = "default";
- };
- 
-+&usbphy {
-+	status = "okay";
-+};
-+
- /* composite video input */
- &vin1 {
- 	pinctrl-0 = <&vin1_pins>;
+WBR, Sergei
