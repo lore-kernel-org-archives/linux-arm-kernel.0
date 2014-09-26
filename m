@@ -1,69 +1,64 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Fri, 26 Sep 2014 16:28:53 +0200
-Subject: [PATCH] bcma: use device from DT (brcm,bus-gpio) for SoC GPIO chip
-Message-ID: <1411741733-13888-1-git-send-email-zajec5@gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 26 Sep 2014 16:29:31 +0200
+Subject: [RFT Part2 v2 00/24] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20140926142931.GA10066@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow us to define GPIO-attached devices (LEDs, buttons) in
-the the device tree.
+On Fri, Sep 26, 2014 at 10:02:01PM +0800, Jiang Liu wrote:
+> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
+> that is to build irqdomains for CPU vector, interrupt remapping unit,
+> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
+> Each irqdomain manages corresponding interrupt controller and talks to
+> parent interrupt controller through public irqdomain interfaces. We also
+> support stacked irq_chip based on hierarchy irqdomain. It will make the
+> x86 interrupt architecture much more clear and more easy to maintain
+> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
+> interrupt management architecture too.
+> 
+> This is the second patch set to enable support of hierarchy irqdomain
+> on x86 platforms. It depends on the first part at:
+> https://lkml.org/lkml/2014/9/26/501
+> And you may access it at:
+> https://github.com/jiangliu/linux.git irqdomain/p2v2
+> 
+> And there will be a third patch set to convert IOAPIC driver to support
+> hierarchy irqdomain and clean up code.
+> 
+> The first patch extends irqdomain interfaces to support hierarchy
+> irqdomain. Hope this interface could be used by other architectures too,
+> such as ARM/ARM64.
+> The second patch introduces two helper functions to support stacked
+> irq_chip.
+> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
+> it's the root irqdomain for x86 platforms.
+> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
+> support hierarchy irqdomain.
+> Patch 14-16 converts HPET and MSI to support hierarchy irqdomain.
+> Patch 17-20 cleans up unsued code in x86 arch and interrupt remapping
+> drivers.
+> Patch 21-24 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
+> 
+> We have tested this patchset on Intel 32-bit and 64-bit systems. And it
+> also passes Fengguang's 0day tests. But helps are need for testing:
+> 1) AMD interrupt remapping 
+> 2) AMD HT_IRQ
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-This is based on top of
-[PATCH v6] bcma: register bcma as device tree driver
-that I hope will reach wireless-next git tree.
----
- Documentation/devicetree/bindings/bus/bcma.txt | 15 +++++++++++++++
- drivers/bcma/driver_gpio.c                     |  5 +++++
- 2 files changed, 20 insertions(+)
+Adding Aravind.
 
-diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
-index e9070c1..f1b381e 100644
---- a/Documentation/devicetree/bindings/bus/bcma.txt
-+++ b/Documentation/devicetree/bindings/bus/bcma.txt
-@@ -6,6 +6,15 @@ Required properties:
- 
- - reg : iomem address range of chipcommon core
- 
-+The top-level axi bus may contain following children:
-+
-+- gpio: GPIO chip on the SoC
-+
-+  Required properties:
-+  - compatible: "brcm,bus-gpio"
-+  - gpio-controller : makes the node a GPIO controller
-+  - #gpio-cells : size of the GPIO specifier, must be 2
-+
- The cores on the AXI bus are automatically detected by bcma with the
- memory ranges they are using and they get registered afterwards.
- 
-@@ -17,4 +26,10 @@ Example:
- 		ranges = <0x00000000 0x18000000 0x00100000>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+
-+		gpio at 0 {
-+			compatible = "brcm,bus-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
- 	};
-diff --git a/drivers/bcma/driver_gpio.c b/drivers/bcma/driver_gpio.c
-index 8ea497c..7ae39a8 100644
---- a/drivers/bcma/driver_gpio.c
-+++ b/drivers/bcma/driver_gpio.c
-@@ -218,6 +218,11 @@ int bcma_gpio_init(struct bcma_drv_cc *cc)
- #if IS_BUILTIN(CONFIG_BCM47XX)
- 	chip->to_irq		= bcma_gpio_to_irq;
- #endif
-+#if IS_BUILTIN(CONFIG_OF)
-+	if (cc->core->bus->hosttype == BCMA_HOSTTYPE_SOC)
-+		chip->of_node	= of_find_compatible_node(NULL, NULL,
-+							  "brcm,bus-gpio");
-+#endif
- 	switch (cc->core->bus->chipinfo.id) {
- 	case BCMA_CHIP_ID_BCM5357:
- 	case BCMA_CHIP_ID_BCM53572:
+@Aravind: you might want to give that patchset a run just in case, to
+make sure it doesn't break anything on AMD. You'll need the previous
+patchset to go before too, though:
+
+https://lkml.kernel.org/r/1411738196-29958-1-git-send-email-jiang.liu at linux.intel.com
+
+I'm sure Jiang will help you if you have more questions.
+
+Thanks.
+
 -- 
-1.8.4.5
+Regards/Gruss,
+    Boris.
+--
