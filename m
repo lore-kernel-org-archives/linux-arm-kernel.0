@@ -1,55 +1,55 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:37 +0200
-Subject: [PATCH 04/27] KVM: ARM/arm64: fix broken __percpu annotation
+Date: Fri, 26 Sep 2014 15:16:38 +0200
+Subject: [PATCH 05/27] KVM: ARM/arm64: avoid returning negative error code as
+ bool
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-6-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-Running sparse results in a bunch of noisy address space mismatches
-thanks to the broken __percpu annotation on kvm_get_running_vcpus.
+is_valid_cache returns true if the specified cache is valid.
+Unfortunately, if the parameter passed it out of range, we return
+-ENOENT, which ends up as true leading to potential hilarity.
 
-This function returns a pcpu pointer to a pointer, not a pointer to a
-pcpu pointer. This patch fixes the annotation, which kills the warnings
-from sparse.
+This patch returns false on the failure path instead.
 
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c                | 2 +-
- arch/arm64/include/asm/kvm_host.h | 2 +-
+ arch/arm/kvm/coproc.c     | 2 +-
+ arch/arm64/kvm/sys_regs.c | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index ac306b4..53ee31b 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -82,7 +82,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
- /**
-  * kvm_arm_get_running_vcpus - get the per-CPU array of currently running vcpus.
-  */
--struct kvm_vcpu __percpu **kvm_get_running_vcpus(void)
-+struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
- {
- 	return &kvm_arm_running_vcpu;
- }
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 44094e5..50431d3 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -193,7 +193,7 @@ static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
- }
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 37a0fe1..7928dbd 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -791,7 +791,7 @@ static bool is_valid_cache(u32 val)
+ 	u32 level, ctype;
  
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
--struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-+struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+ 	if (val >= CSSELR_MAX)
+-		return -ENOENT;
++		return false;
  
- u64 kvm_call_hyp(void *hypfn, ...);
+ 	/* Bottom bit is Instruction or Data bit.  Next 3 bits are level. */
+         level = (val >> 1);
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 5805e7c..4cc3b71 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1218,7 +1218,7 @@ static bool is_valid_cache(u32 val)
+ 	u32 level, ctype;
  
+ 	if (val >= CSSELR_MAX)
+-		return -ENOENT;
++		return false;
+ 
+ 	/* Bottom bit is Instruction or Data bit.  Next 3 bits are level. */
+ 	level = (val >> 1);
 -- 
 2.0.0
