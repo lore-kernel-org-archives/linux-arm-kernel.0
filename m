@@ -1,34 +1,56 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 26 Sep 2014 15:45:09 +0200
-Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
-In-Reply-To: <5425690A.6080102@gmail.com>
-References: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
- <5424900D.2070709@gmail.com> <54254776.7070803@samsung.com>
- <5425690A.6080102@gmail.com>
-Message-ID: <54256DE5.5050203@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 14:52:10 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+In-Reply-To: <54253195.5040003@linaro.org>
+References: <20140926112344.3ee87d2f@canb.auug.org.au>
+ <20140926081804.GH5182@n2100.arm.linux.org.uk> <54253195.5040003@linaro.org>
+Message-ID: <20140926135210.GU5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/14 15:24, Tomasz Figa wrote:
-> I'm not concerned specifically with Exynos4210, but with placing such
-> kind of data in common dtsi files.
+On Fri, Sep 26, 2014 at 10:27:49AM +0100, Daniel Thompson wrote:
+> On 26/09/14 09:18, Russell King - ARM Linux wrote:
+> > On Fri, Sep 26, 2014 at 11:23:44AM +1000, Stephen Rothwell wrote:
+> >> Hi all,
+> >>
+> >> Today's linux-next merge of the arm-soc tree got a conflict in
+> >> arch/arm/Kconfig.debug between commits 0889a9e35bd3 ("ARM: 8142/1:
+> >> ks8695: Migrate debug_ll macros to shared directory"), e38c399ca584
+> >> ("ARM: 8144/2: netx: Migrate DEBUG_LL macros to shared directory"),
+> >> 6741cacfa3f1 ("ARM: 8145/1: sa1100: Migrate DEBUG_LL macros to shared
+> >> directory") and debf843bf7ee ("ARM: 8146/1: Seperate DEBUG_UART_PHYS
+> >> from DEBUG_LL on EP93XX") from the arm tree and commits d8a00916b303
+> >> ("ARM: meson: debug: add debug UART for earlyprintk support"),
+> >> b125170a39ea ("CNS3xxx: Fix debug UART") and b51312bebfa4 ("ARM:
+> >> BCM63XX: add low-level UART debug support") from the arm-soc tree.
+> >>
+> >> I fixed it up (hopefully - see below) and can carry the fix as
+> >> necessary (no action is required).
+> >>
+> >> You may be able to clean some of this up by using intermediate config
+> >> symbols that are selected by the low level symbols and depended upon by
+> >> the higher level config symbols.
+> > 
+> > Actually, I'll drop the patch set I have.  I didn't spot this earlier,
+> > but people seem to have a hard time sorting stuff numerically:
+> > 
+> >         default 0xffd82340 if ARCH_IOP13XX
+> > +       default 0xfffb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
+> > +       default 0xfffb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
+> > +       default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
+> >         default 0xfff36000 if DEBUG_HIGHBANK_UART
 > 
-> Notice that even on boards which have correct initialization done by
-> firmware, this will cause the settings to be overwritten, even if the
-> firmware sets correct, but different values, regardless of them being
-> clock parents or rates.
+> Oops. This is disappointing from my point-of-view but there's no one to
+> blame but me.
 > 
-> To me, even if this would mean duplicating some data, making this per
-> board and present only in dts files of boards that actually need this
-> (i.e. are known to have broken firmware) sounds more reasonable.
+> I have fixed this in my tree and will requeue for 3.19.
 
-OTOH by having those settings in device tree would ensure the clock
-tree is set correctly, regardless of the firmware. There is only one
-correct clock parent for these devices, so the kernel couldn't do any
-harm. I'd say it never worked in practice to rely on the bootloader
-to configure these things, and one could say the firmware has been
-broken in general with regards to this issue.
+Okay, I've dropped 8141/1 onwards, so the only patches I have from your
+series are:
 
---
-Regards,
-Sylwester
+ep93xx: Enable DEBUG_LL_UART_PL01X
+versatile: Enable DEBUG_LL_UART_PL01X
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
