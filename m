@@ -1,64 +1,37 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 26 Sep 2014 16:29:31 +0200
-Subject: [RFT Part2 v2 00/24] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20140926142931.GA10066@nazgul.tnic>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Fri, 26 Sep 2014 16:27:10 +0200
+Subject: [PATCH v3 11/12] mmc: sunxi: Convert MMC driver to the standard
+ clock phase API
+In-Reply-To: <1410466706-27386-12-git-send-email-maxime.ripard@free-electrons.com>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1410466706-27386-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <3992138.y6J8TjIuMq@pagira.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 10:02:01PM +0800, Jiang Liu wrote:
-> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
-> that is to build irqdomains for CPU vector, interrupt remapping unit,
-> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
-> Each irqdomain manages corresponding interrupt controller and talks to
-> parent interrupt controller through public irqdomain interfaces. We also
-> support stacked irq_chip based on hierarchy irqdomain. It will make the
-> x86 interrupt architecture much more clear and more easy to maintain
-> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
-> interrupt management architecture too.
-> 
-> This is the second patch set to enable support of hierarchy irqdomain
-> on x86 platforms. It depends on the first part at:
-> https://lkml.org/lkml/2014/9/26/501
-> And you may access it at:
-> https://github.com/jiangliu/linux.git irqdomain/p2v2
-> 
-> And there will be a third patch set to convert IOAPIC driver to support
-> hierarchy irqdomain and clean up code.
-> 
-> The first patch extends irqdomain interfaces to support hierarchy
-> irqdomain. Hope this interface could be used by other architectures too,
-> such as ARM/ARM64.
-> The second patch introduces two helper functions to support stacked
-> irq_chip.
-> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
-> it's the root irqdomain for x86 platforms.
-> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
-> support hierarchy irqdomain.
-> Patch 14-16 converts HPET and MSI to support hierarchy irqdomain.
-> Patch 17-20 cleans up unsued code in x86 arch and interrupt remapping
-> drivers.
-> Patch 21-24 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
-> 
-> We have tested this patchset on Intel 32-bit and 64-bit systems. And it
-> also passes Fengguang's 0day tests. But helps are need for testing:
-> 1) AMD interrupt remapping 
-> 2) AMD HT_IRQ
+Hello
+> Now that we have proper support to use the generic phase API in our clock
+> driver, switch the MMC driver to use it.
+> [...]
+>  	/* determine delays */
+>  	if (rate <= 400000) {
+> -		oclk_dly = 0;
+> -		sclk_dly = 7;
+> +		oclk_dly = 180;
+> +		sclk_dly = 42;
+> [...]
+How did you calculate the actual phase values from the original parameters?
 
-Adding Aravind.
-
-@Aravind: you might want to give that patchset a run just in case, to
-make sure it doesn't break anything on AMD. You'll need the previous
-patchset to go before too, though:
-
-https://lkml.kernel.org/r/1411738196-29958-1-git-send-email-jiang.liu at linux.intel.com
-
-I'm sure Jiang will help you if you have more questions.
-
-Thanks.
-
+greatings
 -- 
-Regards/Gruss,
-    Boris.
---
+David Lanzend?rfer
+OpenSourceSupport GmbH
+System engineer and supporter
+http://www.o2s.ch/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/8bc39436/attachment.sig>
