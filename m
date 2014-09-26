@@ -1,87 +1,63 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Sep 2014 16:36:08 -0700
-Subject: [PATCH v4 0/8] ARM: rockchip: add cpuclk handling - clock-tree
- part
-In-Reply-To: <1411757591-16142-1-git-send-email-heiko@sntech.de>
-References: <1411757591-16142-1-git-send-email-heiko@sntech.de>
-Message-ID: <20140926233608.19023.74522@quantum>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Fri, 26 Sep 2014 18:46:48 -0500
+Subject: [PATCH] ARM: fix set_tls for !CONFIG_KUSER_HELPERS
+Message-ID: <1411775208-14280-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko Stuebner (2014-09-26 11:53:03)
-> This series implements cpu frequency-scaling for Rockchip SoCs.
-> The whole handling of the armclk frequency changes and therefore
-> the implementention is very similar to the recent series for
-> Samsung SoCs from Thomas Abraham.
-> 
-> Tested on a
-> - rk3066 Marsboard
-> - rk3188 Radxa Rock
-> - rk3288 Evaluation board
-> 
-> This is the part that would go through the clock tree and the patches
-> are build against current clk-next.
-> 
-> -------
-> On the arm-soc side we would need the ARMCLK id in an exported branch
-> from the clk tree so that the devicetree changes can use this new id.
-> But as 3.17 is supposed to be released this weekend, the devicetree
-> parts will maybe have to wait for 3.18-rc1 in any case.
-> -------
+Joachim Eastwood reports that commit fbfb872f5f41 "ARM: 8148/1: flush
+TLS and thumbee register state during exec" causes a boot-time crash
+on a Cortex-M4 nommu system:
 
-Series looks good to me. It seems like more rockchip clk patches are
-starting to flow in so it would be nice to set up pull requests for
-those. Heiko is listed as the maintainer, so I guess he will send them?
+Freeing unused kernel memory: 68K (281e5000 - 281f6000)
+Unhandled exception: IPSR = 00000005 LR = fffffff1
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
+task: 29834000 ti: 29832000 task.ti: 29832000
+PC is at flush_thread+0x2e/0x40
+LR is at flush_thread+0x21/0x40
+pc : [<2800954a>] lr : [<2800953d>] psr: 4100000b
+sp : 29833d60 ip : 00000000 fp : 00000001
+r10: 00003cf8 r9 : 29b1f000 r8 : 00000000
+r7 : 29b0bc00 r6 : 29834000 r5 : 29832000 r4 : 29832000
+r3 : ffff0ff0 r2 : 29832000 r1 : 00000000 r0 : 282121f0
+xPSR: 4100000b
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
+[<2800afa5>] (unwind_backtrace) from [<2800a327>] (show_stack+0xb/0xc)
+[<2800a327>] (show_stack) from [<2800a963>] (__invalid_entry+0x4b/0x4c)
 
-Thanks!
-Mike
+The problem is that set_tls is attempting to clear the TLS location in
+the kernel-user helper page, which isn't set up on V7M.
 
-> 
-> The series also is split, as clk-next and the arm-soc parts have diverged
-> so much, that it's not possible to create one series against one tree
-> and stay sane.
-> 
-> changes since v3:
-> - address more comments from Doug Anderson:
->   main change setting the dividers in the post_rate callback
-> - use __initdata for the rate tables
->   While it could use __initconst the current code causes a section
->   type conflict with something else, so this could possibly be
->   solved at a later time
-> changes since v2:
-> - add patch removing the pll clk-notifier
-> - in cpuclk do parent change and alt_div setting in one go
-> changes since v1:
-> - address comments received concerning smaller issues
-> - split series into two, one for clk-next and one for arm-soc
-> 
-> 
-> Doug Anderson (1):
->   clk: rockchip: change pll rate without a clk-notifier
-> 
-> Heiko Stuebner (6):
->   clk: rockchip: fix rk3066 pll status register location
->   clk: rockchip: reparent aclk_cpu_pre to the gpll
->   clk: rockchip: make tightly bound armclk child-clocks read-only
->   clk: rockchip: add new clock-type for the cpuclk
->   clk: rockchip: add binding id for ARMCLK
->   clk: rockchip: switch to using the new cpuclk type for armclk
-> 
-> Jianqun (1):
->   clk: rockchip: fix rk3288 pll status register location
-> 
->  drivers/clk/rockchip/Makefile                 |   1 +
->  drivers/clk/rockchip/clk-cpu.c                | 329 ++++++++++++++++++++++++++
->  drivers/clk/rockchip/clk-pll.c                |  63 +----
->  drivers/clk/rockchip/clk-rk3188.c             | 161 +++++++++++--
->  drivers/clk/rockchip/clk-rk3288.c             |  93 +++++++-
->  drivers/clk/rockchip/clk.c                    |  20 ++
->  drivers/clk/rockchip/clk.h                    |  36 +++
->  include/dt-bindings/clock/rk3188-cru-common.h |   1 +
->  include/dt-bindings/clock/rk3288-cru.h        |   1 +
->  9 files changed, 627 insertions(+), 78 deletions(-)
->  create mode 100644 drivers/clk/rockchip/clk-cpu.c
-> 
-> -- 
-> 2.1.0
-> 
+Fix this by guarding the write to the kuser helper page with
+a CONFIG_KUSER_HELPERS ifdef.
+
+Reported-by: Joachim Eastwood <manabian@gmail.com>
+Fixes: fbfb872f5f41 ARM: 8148/1: flush TLS and thumbee register state during exec
+Cc: stable at vger.kernel.org
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/include/asm/tls.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 36172adda9d0..5f833f7adba1 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -81,6 +81,7 @@ static inline void set_tls(unsigned long val)
+ 			asm("mcr p15, 0, %0, c13, c0, 3"
+ 			    : : "r" (val));
+ 		} else {
++#ifdef CONFIG_KUSER_HELPERS
+ 			/*
+ 			 * User space must never try to access this
+ 			 * directly.  Expect your app to break
+@@ -89,6 +90,7 @@ static inline void set_tls(unsigned long val)
+ 			 * entry-armv.S for details)
+ 			 */
+ 			*((unsigned int *)0xffff0ff0) = val;
++#endif
+ 		}
+ 
+ 	}
+-- 
+1.9.3
