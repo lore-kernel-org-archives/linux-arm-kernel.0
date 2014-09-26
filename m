@@ -1,104 +1,56 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 26 Sep 2014 10:09:20 +0200
-Subject: [PATCH v13 0/9] Per-user clock constraints
-In-Reply-To: <5424C182.5000906@codeaurora.org>
-References: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
- <5421DF46.2010107@codeaurora.org> <54228067.3090600@collabora.com>
- <5424C182.5000906@codeaurora.org>
-Message-ID: <54251F30.8080303@collabora.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 26 Sep 2014 10:09:49 +0200
+Subject: [PATCH v2 03/22] MSI: Remove the redundant irq_set_chip_data()
+In-Reply-To: <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
+Message-ID: <20140926080949.GF31106@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 03:29 AM, Stephen Boyd wrote:
-> On 09/24/14 01:27, Tomeu Vizoso wrote:
->> On 09/23/2014 10:59 PM, Stephen Boyd wrote:
->>>
->>> Any thoughts on my comments on patch set #10[1]? It seems like we can
->>> avoid having a flag day to support this.
->> I cannot say that I fully understand your proposal, but IMO the most
->> valuable thing in this patchset is precisely the API split (and thus,
->> the flag day is inherent to it).
->>
->> I see a lot of value in clk consumers to use a defined set of functions
->> that all take and/or return struct clk, and for providers to use the
->> functions that take and/or return struct clk_core. Makes the API clearer
->> and allows it to have a more scalable growth in the future.
+On Thu, Sep 25, 2014 at 11:14:13AM +0800, Yijing Wang wrote:
+> Currently, pcie-designware, pcie-rcar, pci-tegra drivers
+> use irq chip_data to save the msi_chip pointer. They
+> already call irq_set_chip_data() in their own MSI irq map
+> functions. So irq_set_chip_data() in arch_setup_msi_irq()
+> is useless.
 > 
-> I see a lot of non-value. It's hugely invasive needing every driver to
-> change.
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  drivers/pci/msi.c |    5 ++---
+>  1 files changed, 2 insertions(+), 3 deletions(-)
 
-There's obviously a trade-off to be made by the maintainer, and I don't
-think that Mike has taken this lightly. He has already stated what his
-opinion is and I have acted accordingly.
+Reviewed-by: Thierry Reding <treding@nvidia.com>
 
-> Invariably we're going to break something.
-
-Given all the build tests that these series have passed and the nature
-of the changes (you can also check the script that does the
-refactoring), I don't expect that much breakage.
-
-> Back porting things
-> across this is a real pain (good luck stable trees!). Reviewing the
-> patches aren't feasible given their size. There's a reason why we don't
-> do flag days. They suck.
-
-Flag days are sometimes needed and is up to each maintainer to decide
-what is better for the subsystem since they are the ones dealing with
-the issues that may arise anyway.
-
-> We already have the consumer/provider split in the struct clk_hw and
-> struct clk separation. Why don't we just use struct clk_hw throughout
-> the provider APIs? The only op that isn't doing this is determine_rate()
-> which might be able to accept a flag day. Otherwise we rename it to
-> something else and migrate everyone over to a different named function
-> that doesn't take a struct clk **. Then we introduce new APIs for the
-> providers to use that are struct clk_hw focused instead of struct clk
-> focused and migrate them too. The benefit being that we get proper
-> review of this stuff because the patches are small. We can let
-> coccinelle do it too.
-
-Really, the bulk of it is just a plain function rename that is in its
-own commit. And we have a simple script that can be reviewed. And it has
-passed the kbuild tests. Given that, and if we don't focus on just the
-line count of that patch, I don't see your proposal as being
-significantly better.
-
->> A less important feature of the patchset are per-user clocks, which (if
->> I understand correctly) your proposal would address without requiring a
->> flag day.
 > 
-> The subject of this thread seems to imply that it's the most important
-> part. I'm confused.
-
-Sorry about that, I agree that it could be improved.
-
->> And then we have clock constraints, which is probably the least
->> important feature in the grand scheme of things, but it's actually what
->> I personally care about.
->>
->> If we wanted to add a way for clk users to specify clock constraints
->> without any refactoring, we could easily do so by reusing the request
->> pattern that pm_qos uses:
->>
->> void clk_add_constraint(struct clk_request *req,
->>                         int constraint_type,
->>                         unsigned long value);
->>
->> void clk_update_constraint(struct clk_request *req,
->>                            unsigned long new_value);
->>
->> void clk_remove_constraint(struct clk_request *req);
->>
->> It wouldn't be that bad IMO, but the API refactoring was something that
->> was long desired and this was seen as a good opportunity to tackle it
->> before it gets worst.
->>
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 51d7e62..50f67a3 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -41,14 +41,13 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+>  	if (err < 0)
+>  		return err;
+>  
+> -	irq_set_chip_data(desc->irq, chip);
+> -
+>  	return 0;
+>  }
+>  
+>  void __weak arch_teardown_msi_irq(unsigned int irq)
+>  {
+> -	struct msi_chip *chip = irq_get_chip_data(irq);
+> +	struct msi_desc *entry = irq_get_msi_desc(irq);
+> +	struct msi_chip *chip = entry->dev->bus->msi;
+>  
+>  	if (!chip || !chip->teardown_irq)
+>  		return;
+> -- 
+> 1.7.1
 > 
-> Sure. Maybe we should just do that so we don't break things.
-
-That hasn't been what Mike has stated in the past, but I actually have
-such a patch somewhere that I can dust off and send for review.
-
-Cheers,
-
-Tomeu
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/3837e85c/attachment.sig>
