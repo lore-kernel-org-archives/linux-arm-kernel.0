@@ -1,56 +1,113 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 26 Sep 2014 10:09:49 +0200
-Subject: [PATCH v2 03/22] MSI: Remove the redundant irq_set_chip_data()
-In-Reply-To: <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <1411614872-4009-4-git-send-email-wangyijing@huawei.com>
-Message-ID: <20140926080949.GF31106@ulmo>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Sep 2014 10:13:06 +0200
+Subject: [PATCH v3 10/13] ARM: shmobile: r8a7740 dtsi: Add PM domain
+ support
+In-Reply-To: <1411662520-22795-11-git-send-email-geert+renesas@glider.be>
+References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
+ <1411662520-22795-11-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdWfyL3eju+GF1M_h9gvTLsO=3NniFjhP6SRgiQ_-H2gyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 11:14:13AM +0800, Yijing Wang wrote:
-> Currently, pcie-designware, pcie-rcar, pci-tegra drivers
-> use irq chip_data to save the msi_chip pointer. They
-> already call irq_set_chip_data() in their own MSI irq map
-> functions. So irq_set_chip_data() in arch_setup_msi_irq()
-> is useless.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->  drivers/pci/msi.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
+On Thu, Sep 25, 2014 at 6:28 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Add a device node for the System Controller, with subnodes that
+> represent the hardware power area hierarchy.
+> Hook up all devices to their respective PM domains.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
+> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+> index 502483f4dccb2f45..4fead480a405bebe 100644
+> --- a/arch/arm/boot/dts/r8a7740.dtsi
+> +++ b/arch/arm/boot/dts/r8a7740.dtsi
 
-> 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 51d7e62..50f67a3 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -41,14 +41,13 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->  	if (err < 0)
->  		return err;
->  
-> -	irq_set_chip_data(desc->irq, chip);
-> -
->  	return 0;
->  }
->  
->  void __weak arch_teardown_msi_irq(unsigned int irq)
->  {
-> -	struct msi_chip *chip = irq_get_chip_data(irq);
-> +	struct msi_desc *entry = irq_get_msi_desc(irq);
-> +	struct msi_chip *chip = entry->dev->bus->msi;
->  
->  	if (!chip || !chip->teardown_irq)
->  		return;
-> -- 
-> 1.7.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/3837e85c/attachment.sig>
+> @@ -383,6 +408,7 @@
+>                         compatible = "renesas,r8a7740-cpg-clocks";
+>                         reg = <0xe6150000 0x10000>;
+>                         clocks = <&extal1_clk>, <&extalr_clk>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <1>;
+>                         clock-output-names = "system", "pllc0", "pllc1",
+>                                              "pllc2", "r",
+> @@ -397,6 +423,7 @@
+>                         compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
+>                         reg = <0xe6150080 4>;
+>                         clocks = <&pllc1_div2_clk>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <0>;
+>                         clock-output-names = "sub";
+>                 };
+> @@ -405,6 +432,7 @@
+>                 pllc1_div2_clk: pllc1_div2_clk {
+>                         compatible = "fixed-factor-clock";
+>                         clocks = <&cpg_clocks R8A7740_CLK_PLLC1>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <0>;
+>                         clock-div = <2>;
+>                         clock-mult = <1>;
+> @@ -413,6 +441,7 @@
+>                 extal1_div2_clk: extal1_div2_clk {
+>                         compatible = "fixed-factor-clock";
+>                         clocks = <&extal1_clk>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <0>;
+>                         clock-div = <2>;
+>                         clock-mult = <1>;
+> @@ -424,6 +453,7 @@
+>                         compatible = "renesas,r8a7740-mstp-clocks", "renesas,cpg-mstp-clocks";
+>                         reg = <0xe6150080 4>;
+>                         clocks = <&sub_clk>, <&sub_clk>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_SUBCK R8A7740_CLK_SUBCK2
+> @@ -439,6 +469,7 @@
+>                                  <&cpg_clocks R8A7740_CLK_B>,
+>                                  <&sub_clk>, <&sub_clk>,
+>                                  <&cpg_clocks R8A7740_CLK_B>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_CEU21 R8A7740_CLK_CEU20 R8A7740_CLK_TMU0
+> @@ -460,6 +491,7 @@
+>                                  <&sub_clk>, <&sub_clk>, <&sub_clk>,
+>                                  <&sub_clk>, <&sub_clk>, <&sub_clk>,
+>                                  <&sub_clk>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_SCIFA6 R8A7740_CLK_INTCA
+> @@ -489,6 +521,7 @@
+>                                  <&cpg_clocks R8A7740_CLK_HP>,
+>                                  <&cpg_clocks R8A7740_CLK_HP>,
+>                                  <&cpg_clocks R8A7740_CLK_HP>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_CMT1 R8A7740_CLK_FSI R8A7740_CLK_IIC1
+> @@ -506,6 +539,7 @@
+>                                  <&cpg_clocks R8A7740_CLK_HP>,
+>                                  <&cpg_clocks R8A7740_CLK_HP>,
+>                                  <&cpg_clocks R8A7740_CLK_HP>;
+> +                       power-domains = <&pd_c5>;
+>                         #clock-cells = <1>;
+>                         renesas,clock-indices = <
+>                                 R8A7740_CLK_USBH R8A7740_CLK_SDHI2
+
+Woosh, looks like I've been too eager adding links to the pd_c5 "always on"
+PM domain to any node that has a clocks property. This must not be done for
+the clocks. They are not instantiated as platform devices.
+
+Thanks to Grygorii for questioning me.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
