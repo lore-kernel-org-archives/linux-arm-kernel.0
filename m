@@ -1,41 +1,82 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 26 Sep 2014 13:47:03 +0200
-Subject: [PATCHv3 2/7] ARM: at91: introduce basic SAMA5D4 support
-In-Reply-To: <1410797759-18675-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410797759-18675-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1411732023.7866.15.camel@x220>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 26 Sep 2014 13:48:53 +0200
+Subject: [PATCH v6 0/4] Tegra124 soctherm driver
+In-Reply-To: <54253E7C.9080704@kapsi.fi>
+References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
+ <20140926101918.GM31106@ulmo> <54253E7C.9080704@kapsi.fi>
+Message-ID: <20140926114852.GO31106@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-15 at 18:15 +0200, Alexandre Belloni wrote:
-> From: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Fri, Sep 26, 2014 at 01:22:52PM +0300, Mikko Perttunen wrote:
+> On 09/26/2014 01:19 PM, Thierry Reding wrote:
+> >On Fri, Sep 26, 2014 at 12:43:09PM +0300, Mikko Perttunen wrote:
+> >>Hi,
+> >>
+> >>this series adds support for the thermal monitoring features of the
+> >>soctherm unit on the Tegra124 SoC.
+> >>
+> >>The branch is also available in my github repo,
+> >>   git://github.com/cyndis/linux.git soctherm-v6
+> >>
+> >>Thanks,
+> >>Mikko
+> >>
+> >>Mikko Perttunen (4):
+> >>   of: Add bindings for nvidia,tegra124-soctherm
+> >>   ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
+> >>   ARM: tegra: Add thermal trip points for Jetson TK1
+> >>   thermal: Add Tegra SOCTHERM thermal management driver
+> >>
+> >>  .../devicetree/bindings/thermal/tegra-soctherm.txt |  53 +++
+> >>  arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  44 ++
+> >>  arch/arm/boot/dts/tegra124.dtsi                    |  47 ++
+> >>  drivers/thermal/Kconfig                            |  10 +
+> >>  drivers/thermal/Makefile                           |   1 +
+> >>  drivers/thermal/tegra_soctherm.c                   | 471 +++++++++++++++++++++
+> >>  include/dt-bindings/thermal/tegra124-soctherm.h    |  13 +
+> >>  7 files changed, 639 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+> >>  create mode 100644 drivers/thermal/tegra_soctherm.c
+> >>  create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
+> >
+> >One thing that I've wanted to start doing for a while now is request
+> >patch submissions like this to come accompanied with a way on how to
+> >test them. Ideally this would be in a scripted way that can test for
+> >success programatically, but it doesn't necessarily have to be if it
+> >turns out too difficult or impractical to do.
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Indeed, that would be very useful.
+> 
+> >
+> >The goal is to eventually come up with a test suite that can run the
+> >majority of test cases automatically to make it easy to test for any
+> >regressions. And even if tests can't be run automatically it'd still
+> >be an advantage to have them all collected in some repository, since
+> >it saves a lot of typing and time to run tests, and it will give us
+> >a standard set of tests that everybody can verify changes against.
+> >
+> >I realize that it's somewhat unfair to start requesting this from you
+> >now, but we've got to start somewhere. Could you give a short summary
+> >of how you test this? What are the interfaces that the kernel exposes
+> >for these thermal drivers?
+> 
+> You need to enable the driver in Device Drivers -> Generic Thermal sysfs
+> driver -> Tegra SOCTHERM thermal management. Then, you should see
+> directories appear in /sys/class/thermal. You can also use the `tmon' tool
+> included in the kernel tree to quickly see values; that's what I use for
+> testing.
 
-This landed in next-20140926, as commit 2dc850b62e5b ("ARM: at91:
-introduce basic SAMA5D4 support").
+Okay. So what are expected values for these temperatures? It's going to
+be pretty much impossible to say what the correct value is on a given
+board at any time, but perhaps a "test" could consist of checking that
+all temperatures are within a reasonable range.
 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index b11ad54f8d17..7b44db208f10 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -101,6 +101,10 @@ choice
->  		bool "Kernel low-level debugging on 9263 and 9g45"
->  		depends on HAVE_AT91_DBGU1
->  
-> +	config AT91_DEBUG_LL_DBGU2
-> +		bool "Kernel low-level debugging on sama5d4"
-> +		depends on HAVE_AT91_DBGU2
-> +
-
-Why is this Kconfig symbol needed? Nothing in next-20140926 uses it. Are
-future users perhaps queued somewhere (say, in commits that didn't
-survive today's rather lively linux-next merges)?
-
->  	config DEBUG_BCM2835
->  		bool "Kernel low-level debugging on BCM2835 PL011 UART"
->  		depends on ARCH_BCM2835
-
-
-Paul Bolle
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/1acaaeef/attachment.sig>
