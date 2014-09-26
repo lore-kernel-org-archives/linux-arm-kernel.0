@@ -1,161 +1,22 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 26 Sep 2014 10:32:43 +0200
-Subject: [PATCH v3 04/13] PM / Domains: Add DT bindings for the R-Mobile
- System Controller
-In-Reply-To: <1411662520-22795-5-git-send-email-geert+renesas@glider.be>
-References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
- <1411662520-22795-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAPDyKFo7QruMXivxXoxkZD8DkFdcZCacH=g0rxH=TEH_nJtJpw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Sep 2014 10:38:38 +0200
+Subject: [PATCH 11/27] mfd: ab8500-gpadc: use
+ pm_runtime_last_busy_and_autosuspend helper
+In-Reply-To: <1411575342-31048-12-git-send-email-vinod.koul@intel.com>
+References: <1411575342-31048-1-git-send-email-vinod.koul@intel.com>
+ <1411575342-31048-12-git-send-email-vinod.koul@intel.com>
+Message-ID: <CACRpkdZdEJndkE5mpkoUMN-do=LU8fMpkyjJb0RQnOjJYGRQqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2014 18:28, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
-> The Renesas R-Mobile System Controller provides a.o. power management
-> support, following the generic PM domain bindings in
-> Documentation/devicetree/bindings/power/power_domain.txt.
->
-> For now this supports the R-Mobile A1 (r8a7740) only, but it should be
-> sufficiently generic to handle other members of the SH-Mobile/R-Mobile
-> family in the future.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v3:
->   - Reword,
-> v2:
->   - Fix copy-and-paste s/#address-cells/#size-cells/,
->   - Add optional PM QoS device latencies.
->
->  .../bindings/power/renesas,sysc-rmobile.txt        | 111 +++++++++++++++++++++
->  1 file changed, 111 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-> new file mode 100644
-> index 0000000000000000..0b1e56d6ed1ab9a2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-> @@ -0,0 +1,111 @@
-> +DT bindings for the Renesas R-Mobile System Controller
-> +
-> +== System Controller Node ==
-> +
-> +The R-Mobile System Controller provides the following functions:
-> +  - Boot mode management,
-> +  - Reset generation,
-> +  - Power management.
-> +
-> +Required properties:
-> +- compatible: Should be "renesas,sysc-<soctype>", "renesas,sysc-rmobile" as
-> +             fallback.
-> +             Examples with soctypes are:
-> +               - "renesas,sysc-r8a7740" (R-Mobile A1)
-> +- reg: Two address start and address range blocks for the device:
-> +         - The first block refers to the normally accessible registers,
-> +         - the second block refers to the registers protected by the HPB
-> +          semaphore.
-> +
-> +Optional nodes:
-> +- pm-domains: This node contains a hierarchy of PM domain nodes, which should
-> +  match the Power Area Hierarchy in the Power Domain Specifications section of
-> +  the device's datasheet.
-> +
-> +
-> +== PM Domain Nodes ==
-> +
-> +Each of the PM domain nodes represents a PM domain, as documented by the
-> +generic PM domain bindings in
-> +Documentation/devicetree/bindings/power/power_domain.txt.
-> +
-> +The nodes should be named by the real power area names, and thus their names
-> +should be unique.
-> +
-> +Required properties:
-> +  - #power-domain-cells: Must be 0.
-> +
-> +Optional properties:
-> +- reg: If the PM domain is not always-on, this property must contain the bit
-> +       index number for the corresponding power area in the various Power
-> +       Control and Status Registers. The parent's node must contain the
-> +       following two properties:
-> +        - #address-cells: Must be 1,
-> +        - #size-cells: Must be 0.
-> +       If the PM domain is always-on, this property must be omitted.
-> +- power-on-latency: Power-on latency of the PM domain, in ns,
-> +- power-off-latency: Power-off latency of the PM domain, in ns.
-> +
-> +
-> +Example:
-> +
-> +This shows a subset of the r8a7740 PM domain hierarchy, containing the
-> +C5 "always-on" domain, 2 of its subdomains (A4S and A4SU), and the A3SP domain,
-> +which is a subdomain of A4S.
-> +
-> +       sysc: system-controller at e6180000 {
-> +               compatible = "renesas,sysc-r8a7740", "renesas,sysc-rmobile";
-> +               reg = <0xe6180000 8000>, <0xe6188000 8000>;
-> +
-> +               pm-domains {
-> +                       pd_c5: c5 {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +                               #power-domain-cells = <0>;
-> +
-> +                               pd_a4s: a4s at 10 {
-> +                                       reg = <10>;
-> +                                       #address-cells = <1>;
-> +                                       #size-cells = <0>;
-> +                                       #power-domain-cells = <0>;
-> +                                       power-on-latency = <250000>;
-> +                                       power-off-latency = <250000>;
-> +
-> +                                       pd_a3sp: a3sp at 11 {
-> +                                               reg = <11>;
-> +                                               #power-domain-cells = <0>;
-> +                                               power-on-latency = <250000>;
-> +                                               power-off-latency = <250000>;
-> +                                       };
-> +                               };
-> +
-> +                               pd_a4su: a4su at 20 {
-> +                                       reg = <20>;
-> +                                       #power-domain-cells = <0>;
-> +                                       power-on-latency = <250000>;
-> +                                       power-off-latency = <250000>;
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
-> +
-> +== PM Domain Consumers ==
-> +
-> +Hardware blocks belonging to a PM domain should contain a "power-domains"
-> +property that is a phandle pointing to the corresponding PM domain node,
-> +and optional PM QoS device latencies:
-> +
-> +Example:
-> +
-> +       tpu: pwm at e6600000 {
-> +               compatible = "renesas,tpu-r8a7740", "renesas,tpu";
-> +               reg = <0xe6600000 0x100>;
-> +               clocks = <&mstp3_clks R8A7740_CLK_TPU0>;
-> +               power-domains = <&pd_a3sp>;
-> +               stop-latency = <250000>;
-> +               start-latency = <250000>;
-> +               save-state-latency = <250000>;
-> +               restore-state-latency = <250000>;
+On Wed, Sep 24, 2014 at 6:15 PM, Vinod Koul <vinod.koul@intel.com> wrote:
 
-As per comment for the previous patch, I think you should remove these
-latencies.
-
-> +               #pwm-cells = <3>;
-> +       };
-> --
-> 1.9.1
+> Use the new pm_runtime_last_busy_and_autosuspend helper instead of open
+> coding the same code
 >
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 
-When you fixed the above you may add my reviewed by tag for this patch.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Kind regards
-Uffe
+Yours,
+Linus Walleij
