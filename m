@@ -1,65 +1,53 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 26 Sep 2014 10:39:16 -0700
-Subject: [09/14] watchdog: s3c2410_wdt: Add support for Watchdog device
- on Exynos7
-In-Reply-To: <1409132831-2032-1-git-send-email-ch.naveen@samsung.com>
-References: <1409132831-2032-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140926173915.GA834@roeck-us.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Sep 2014 19:52:29 +0200
+Subject: [PATCH v3 02/13] PM / Domains: Add DT bindings for power-on/off
+ latencies
+In-Reply-To: <20140926152835.GK10233@codeaurora.org>
+References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
+ <1411662520-22795-3-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFrAv9oyBzX764+CWkOxfN1kN_MddB3ks1q69+TnmnHXuQ@mail.gmail.com>
+ <20140926152835.GK10233@codeaurora.org>
+Message-ID: <CAMuHMdU+4MX-XYe9rHmyPN3=-VQRg+CrnxWEaU2M_Jg+1Psw8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 03:17:11PM +0530, Naveen Krishna Chatradhi wrote:
-> Exynos7 SoC has a Watchdog for Atlas (A57) cores
-> This patch adds support for the Atlas watchdog.
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Wim Van Sebroeck <wim@iguana.be>
+Hi Stephen,
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+On Fri, Sep 26, 2014 at 5:28 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> On 25 September 2014 18:28, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+>> > +Optional properties:
+>> > + - power-on-latency: Power-on latency of the PM domain, in ns,
+>> > + - power-off-latency: Power-off latency of the PM domain, in ns.
+>> > +
+>> >  Example:
+>> >
+>> >         power: power-controller at 12340000 {
+>> >                 compatible = "foo,power-controller";
+>> >                 reg = <0x12340000 0x1000>;
+>> >                 #power-domain-cells = <1>;
+>> > +               power-on-latency = <250000>;
+>> > +               power-off-latency = <250000>;
+>
+> This assumes every power domain within a power controller has the
+> same latencies? That isn't always true. This should be an array
+> of values corresponding to the number of power domains if
+> #power-domain-cells is 1, or just one value if the cell count is
+> 0.
 
-> ---
->  .../devicetree/bindings/watchdog/samsung-wdt.txt   |    1 +
->  drivers/watchdog/s3c2410_wdt.c                     |   11 +++++++++++
->  2 files changed, 12 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
-> index cfff375..8f3d96a 100644
-> --- a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
-> @@ -9,6 +9,7 @@ Required properties:
->  	(a) "samsung,s3c2410-wdt" for Exynos4 and previous SoCs
->  	(b) "samsung,exynos5250-wdt" for Exynos5250
->  	(c) "samsung,exynos5420-wdt" for Exynos5420
-> +	(c) "samsung,exynos7-wdt" for Exynos7
->  
->  - reg : base physical address of the controller and length of memory mapped
->  	region.
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index 7c6ccd0..015256e 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -155,6 +155,15 @@ static const struct s3c2410_wdt_variant drv_data_exynos5420 = {
->  	.quirks = QUIRK_HAS_PMU_CONFIG | QUIRK_HAS_RST_STAT,
->  };
->  
-> +static const struct s3c2410_wdt_variant drv_data_exynos7 = {
-> +	.disable_reg = EXYNOS5_WDT_DISABLE_REG_OFFSET,
-> +	.mask_reset_reg = EXYNOS5_WDT_MASK_RESET_REG_OFFSET,
-> +	.mask_bit = 0,
-> +	.rst_stat_reg = EXYNOS5_RST_STAT_REG_OFFSET,
-> +	.rst_stat_bit = 23,	/* A57 WDTRESET */
-> +	.quirks = QUIRK_HAS_PMU_CONFIG | QUIRK_HAS_RST_STAT,
-> +};
-> +
->  static const struct of_device_id s3c2410_wdt_match[] = {
->  	{ .compatible = "samsung,s3c2410-wdt",
->  	  .data = &drv_data_s3c2410 },
-> @@ -162,6 +171,8 @@ static const struct of_device_id s3c2410_wdt_match[] = {
->  	  .data = &drv_data_exynos5250 },
->  	{ .compatible = "samsung,exynos5420-wdt",
->  	  .data = &drv_data_exynos5420 },
-> +	{ .compatible = "samsung,exynos7-wdt",
-> +	  .data = &drv_data_exynos7 },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, s3c2410_wdt_match);
+Thanks, you're right. Will update.
+
+However, I'd still like to allow just one value in the #power-domain-cells = <1>
+case if the latencies are the same. Is that OK for you?
+
+Thanks again.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
