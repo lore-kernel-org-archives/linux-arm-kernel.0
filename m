@@ -1,75 +1,73 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Sep 2014 20:04:55 +0200
-Subject: [PATCH v3 07/13] ARM: shmobile: R-Mobile: Use
- generic_pm_domain.attach_dev() for pm_clk setup
-In-Reply-To: <1411662520-22795-8-git-send-email-geert+renesas@glider.be>
-References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
- <1411662520-22795-8-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdVZmhpKcRO0rnXFMu7RJ4zFNPdvzuW=TBpvE5B4JviAZA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 26 Sep 2014 11:16:43 -0700
+Subject: [PULL] ARM ro-nx tree (3.18)
+Message-ID: <20140926181643.GA25494@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 6:28 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-> index 717e6413d29cb998..ae846dfcd69293f7 100644
-> --- a/arch/arm/mach-shmobile/pm-rmobile.c
-> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
-> @@ -101,6 +101,17 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
->         return true;
->  }
->
-> +static void rmobile_pd_attach_dev(struct device *dev)
-> +{
-> +       if (pm_clk_no_clocks(dev))
-> +               pm_clk_add(dev, NULL);
+Hi,
 
-With !CONFIG_PM_RUNTIME, this doesn't work well in the DT case,
-as the clocks are no longer enabled by runtime PM
-(some clocks may have been enabled by boot loader/reset state though).
+Please pull this series for ro-nx support on ARM for 3.18.
 
-In the legacy case, this works more or less, as genpd takes over after
-the pm_clk domain has been initialized, which implies enabling the clocks
-if !CONFIG_PM_RUNTIME.
+Thanks!
 
-Will fix...
+-Kees
 
-> +}
-> +
-> +static void rmobile_pd_detach_dev(struct device *dev)
-> +{
-> +       pm_clk_remove(dev, NULL);
-> +}
-> +
->  static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
->  {
->         struct generic_pm_domain *genpd = &rmobile_pd->genpd;
-> @@ -112,6 +123,8 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
->         genpd->dev_ops.active_wakeup    = rmobile_pd_active_wakeup;
->         genpd->power_off                = rmobile_pd_power_down;
->         genpd->power_on                 = rmobile_pd_power_up;
-> +       genpd->attach_dev               = rmobile_pd_attach_dev;
-> +       genpd->detach_dev               = rmobile_pd_detach_dev;
->         __rmobile_pd_power_up(rmobile_pd, false);
->  }
->
-> @@ -130,8 +143,6 @@ void rmobile_add_device_to_domain_td(const char *domain_name,
->         struct device *dev = &pdev->dev;
->
->         __pm_genpd_name_add_device(domain_name, dev, td);
-> -       if (pm_clk_no_clocks(dev))
-> -               pm_clk_add(dev, NULL);
->  }
->
->  void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+The following changes since commit cc31d8f887953e9824c4d9333b15c335ee7d1b65:
 
-Gr{oetje,eeting}s,
+  Merge branches 'fiq' (early part), 'fixes' and 'misc' into for-next (2014-09-26 14:40:19 +0100)
 
-                        Geert
+are available in the git repository at:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git tags/ronx-3.18
+
+for you to fetch changes up to 9ad61652b33dba3a4630c1dad401a19b2508179b:
+
+  ARM: mm: allow text and rodata sections to be read-only (2014-09-26 11:11:00 -0700)
+
+----------------------------------------------------------------
+ARM support for CONFIG_DEBUG_RODATA
+generic fixmaps
+
+----------------------------------------------------------------
+Doug Anderson (1):
+      arm: kgdb: Handle read-only text / modules
+
+Kees Cook (3):
+      arm: fixmap: implement __set_fixmap()
+      ARM: mm: allow non-text sections to be non-executable
+      ARM: mm: allow text and rodata sections to be read-only
+
+Mark Salter (1):
+      arm: use generic fixmap.h
+
+Nikolay Borisov (1):
+      ARM: kexec: Make .text R/W in machine_kexec
+
+Rabin Vincent (1):
+      arm: use fixmap for text patching when text is RO
+
+Rob Herring (1):
+      ARM: expand fixmap region to 3MB
+
+ Documentation/arm/memory.txt      |   2 +-
+ arch/arm/include/asm/cacheflush.h |  10 +++
+ arch/arm/include/asm/fixmap.h     |  31 ++++----
+ arch/arm/kernel/Makefile          |   2 +-
+ arch/arm/kernel/ftrace.c          |  19 +++++
+ arch/arm/kernel/jump_label.c      |   2 +-
+ arch/arm/kernel/kgdb.c            |  29 ++++++++
+ arch/arm/kernel/machine_kexec.c   |   9 ++-
+ arch/arm/kernel/patch.c           |  92 ++++++++++++++++++-----
+ arch/arm/kernel/patch.h           |  12 ++-
+ arch/arm/kernel/vmlinux.lds.S     |  20 +++++
+ arch/arm/mm/Kconfig               |  21 ++++++
+ arch/arm/mm/highmem.c             |  15 ++--
+ arch/arm/mm/init.c                | 149 +++++++++++++++++++++++++++++++++++++-
+ arch/arm/mm/mmu.c                 |  39 +++++++++-
+ 15 files changed, 395 insertions(+), 57 deletions(-)
+
+-- 
+Kees Cook
+Chrome OS Security
