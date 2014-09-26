@@ -1,73 +1,108 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 26 Sep 2014 10:57:23 +0100
-Subject: Kprobes build failure
-In-Reply-To: <20140925233720.GG5182@n2100.arm.linux.org.uk>
-References: <20140925233720.GG5182@n2100.arm.linux.org.uk>
-Message-ID: <1411725443.1529.10.camel@linaro1.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Sep 2014 11:00:25 +0100
+Subject: [PATCH v3] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <1410454801-14231-1-git-send-email-dianders@chromium.org>
+References: <1410454801-14231-1-git-send-email-dianders@chromium.org>
+Message-ID: <20140926100025.GC4476@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-26 at 00:37 +0100, Russell King - ARM Linux wrote:
-> So, Olof's kbuild found this while building my rc5 based for-next tree:
+On Thu, Sep 11, 2014 at 06:00:01PM +0100, Doug Anderson wrote:
+> Some 32-bit (ARMv7) systems are architected like this:
 > 
->         arm.allmodconfig:
-> /tmp/ccoT403o.s:21439: Error: bad immediate value for offset (4168)
-> /tmp/ccoT403o.s:21440: Error: bad immediate value for offset (4176)
-> /tmp/ccoT403o.s:21475: Error: bad immediate value for offset (4260)
-> /tmp/ccoT403o.s:21476: Error: bad immediate value for offset (4260)
-> /tmp/ccoT403o.s:23566: Error: bad immediate value for offset (4132)
-> /tmp/ccoT403o.s:23567: Error: bad immediate value for offset (4148)
-> /tmp/ccoT403o.s:23606: Error: bad immediate value for offset (4236)
-> /tmp/ccoT403o.s:23607: Error: bad immediate value for offset (4248)
+> * The firmware doesn't know and doesn't care about hypervisor mode and
+>   we don't want to add the complexity of hypervisor there.
 > 
-> which, when looking at the logs, appears to be:
+> * The firmware isn't involved in SMP bringup or resume.
 > 
-> /tmp/ccoT403o.s:47583: Error: bad immediate value for offset (5464)
-> make[3]: *** [arch/arm/kernel/kprobes-test-arm.o] Error 1
-> make[3]: Target `__build' not remade because of errors.
-> make[2]: *** [arch/arm/kernel] Error 2
+> * The ARCH timer come up with an uninitialized offset between the
+>   virtual and physical counters.  Each core gets a different random
+>   offset.
 > 
-> Any ideas?
+> * The device boots in "Secure SVC" mode.
+> 
+> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+>   CNTHCTL.PL1PCTEN (both default to 1 at reset)
+> 
+> On systems like the above, it doesn't make sense to use the virtual
+> counter.  There's nobody managing the offset and each time a core goes
+> down and comes back up it will get reinitialized to some other random
+> value.
+> 
+> Let's add a property to the device tree to say that we shouldn't use
+> the virtual timer.  Firmware could potentially remove this property
+> before passing the device tree to the kernel if it really wants the
+> kernel to use a virtual timer.
+> 
+> Note that it's been said that ARM64 (ARMv8) systems the firmware and
+> kernel really can't be architected as described above.  That means
+> using the physical timer like this really only makes sense for ARMv7
+> systems.
+> 
+> In order for this patch to do anything useful, we also need Sonny's
+> patch at <https://patchwork.kernel.org/patch/4790921/>
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> ---
+> Changes in v3:
+> - Wording changes to bindings and patch desc as per Will Deacon
+> 
+> Changes in v2:
+> - Add "#ifdef CONFIG_ARM" as per Will Deacon
+> 
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>  drivers/clocksource/arm_arch_timer.c                 | 5 +++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index 37b2caf..e28fced 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
+>  - always-on : a boolean property. If present, the timer is powered through an
+>    always-on power domain, therefore it never loses context.
+>  
+> +** Optional properties:
+> +
+> +- arm,use-physical-timer : Don't ever use the virtual timer, just use the
+> +  physical one.  Only supported for ARM (not ARM64).
 
-Sounds vaguely familiar as a problem I hit before. Google finds someone
-else hitting similar problem [1] and the symptoms and cause match my
-memories of the old kprobe issue.
+I'm still not keen on telling the kernel what to do rather than
+describing the actual state of affairs and having the kernel decide what
+to do. Perhaps what we actually need is:
 
-Where can I find a clue of to the config and compiler used in Olof's
-build, so I can have a go at reproducing and debugging?
+- cntvoff-not-fw-configured: Firmware does not configure CNTVOFF, which
+  may reset to (different) arbitrary values on each CPU.
 
-[1] https://lkml.org/lkml/2012/9/24/223
+This also doesn't describe that CNTHCTL.PL1PC(T)EN must both be 1. While
+that is the reset state, it still feels dodbgy to me to rely on that.
 
-The relevant explanation of the above post copied below...
+Mark.
 
-------------------------------------------------------------------------
-
-The compiler uses a pretty dumb heuristic to guess the size of asms:
-4 * (number of ; or \n in the string)
-
-Directives that the compiler can't predict the size of are not safe if
-they output into any segment that the compiler uses.  .fill/.skip are
-obvious candidates, but macro expansions, .rept, .irp etc. can cause
-these problems too.
-
-For example:
-
-	void g(int);
-	void f(void)
-	{
-		g(0xd00dfeed);
-		asm(".skip 0x1000");
-	}
-If you try building this with gcc -marm -Os for example:
-
-/tmp/ccXYm1uP.s: Assembler messages:
-/tmp/ccXYm1uP.s:21: Error: bad immediate value for offset (4100)
-
-...because the assembler assumes that it can dump a literal at the end
-of the function and reference it from the g() callsite.
-
-------------------------------------------------------------------------
-
-
--- 
-Tixy
+> +
+> +
+>  Example:
+>  
+>  	timer {
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec1..e7aa256 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -649,6 +649,11 @@ static void __init arch_timer_init(struct device_node *np)
+>  		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>  	arch_timer_detect_rate(NULL, np);
+>  
+> +#ifdef CONFIG_ARM
+> +	if (of_property_read_bool(np, "arm,use-physical-timer"))
+> +		arch_timer_use_virtual = false;
+> +#endif
+> +
+>  	/*
+>  	 * If HYP mode is available, we know that the physical timer
+>  	 * has been configured to be accessible from PL1. Use it, so
+> -- 
+> 2.1.0.rc2.206.gedb03e5
+> 
+> 
