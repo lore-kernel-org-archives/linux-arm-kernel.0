@@ -1,38 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 Sep 2014 14:20:38 +0100
-Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
-In-Reply-To: <20140926130311.GQ5182@n2100.arm.linux.org.uk>
-References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
- <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
- <20140926122003.GP5182@n2100.arm.linux.org.uk>
- <20140926124614.GD7422@leverpostej>
- <20140926130311.GQ5182@n2100.arm.linux.org.uk>
-Message-ID: <20140926132038.GF7422@leverpostej>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 26 Sep 2014 15:40:55 +0200
+Subject: [GIT PULL] PM / AVS changes for v3.18 - v2
+In-Reply-To: <20140926081534.GA27755@sirena.org.uk>
+References: <7ha95nikqh.fsf@linaro.org> <20140926081534.GA27755@sirena.org.uk>
+Message-ID: <3441765.RqZP2CZNTR@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > This looks to be a carbon copy of the vexpress pseudo-hotplug in
-> > arch/arm/mach-vexpress/hotplug.c, which is obviously broken in the way
-> > you describe above. Perhaps we should go about ripping that out?
+On Friday, September 26, 2014 09:15:34 AM Mark Brown wrote:
 > 
-> The Versatile Express does not support suspend so the only problem case
-> is kexec.  However, isn't this support needed for big.LITTLE, and as
-> the Versatile Express is the platform which these features get developed
-> on, having working CPU hotplug seems rather fundamental for ARM kernel
-> feature development.
+> --gBii9oQw/U9UOygZ
+> Content-Type: text/plain; charset=us-ascii
+> Content-Disposition: inline
 > 
-> In that regard, Versatile Express is something of a special case.
+> On Thu, Sep 25, 2014 at 12:05:42PM -0700, Kevin Hilman wrote:
+> 
+> > The first pull request was missing a dependency on a feature that went
+> > in through Mark Brown's regulator tree, so it wouldn't actually compile
+> > properly by itself.  This version pulls in that topic branch from Marks
+> > tree (topic/voltage-ev branch, already part of -next), and now compiles fine.
+> 
+> Please in future don't pull anything in from my tree without a signed
+> tag (speak to me if there isn't one).
 
-It is admittedly helpful during development to perform pseudo-hotplug on
-Versatile Express. I have a local patch adding vexpress_cpu_disable so I
-can test for bugs that only trigger if CPU0 is hotplugged.
+I was assuming that this was discussed with you in advance.
 
-Given that, perhaps we should make it clearer that Versatile Express is
-not a reference implementation for CPU hotplug; add some Kconfig (e.g.
-VEXPRESS_PSEUDO_HOTPLUG) that depends on !KEXEC && !SUSPEND, and putting
-a note in hotplug.c stating it's not suitable as a reference
-implementation.
+Should I drop the branch?
 
-...but perhaps that's overkill.
-
-Mark.
+Rafael
