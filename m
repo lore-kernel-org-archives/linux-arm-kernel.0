@@ -1,43 +1,69 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Fri, 26 Sep 2014 15:23:59 +0200
-Subject: [PATCH 1/4] serial: mxs-auart: use mctrl_gpio helpers for handling
- modem signals (v2.2c)
-In-Reply-To: <20140926131117.GR5182@n2100.arm.linux.org.uk>
-References: <1411150399-30902-1-git-send-email-j.uzycki@elproma.com.pl>
- <54256326.3080202@elproma.com.pl>
- <20140926131117.GR5182@n2100.arm.linux.org.uk>
-Message-ID: <542568EF.1040103@elproma.com.pl>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 26 Sep 2014 15:24:26 +0200
+Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
+In-Reply-To: <54254776.7070803@samsung.com>
+References: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
+ <5424900D.2070709@gmail.com> <54254776.7070803@samsung.com>
+Message-ID: <5425690A.6080102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26.09.2014 13:01, Sylwester Nawrocki wrote:
+> Hi Tomasz,
+> 
+> On 25/09/14 23:58, Tomasz Figa wrote:
+>> On 10.09.2014 18:37, Sylwester Nawrocki wrote:
+>>>> The default mux and divider clocks are specified in device tree
+>>>> so that the FIMC devices in Exynos4210 and Exynos4x12 SoCs are
+>>>> clocked from recommended clock source and with maximum supported
+>>>> frequency. If needed these settings could be overrode in board
+>>>> specific dts files, however they are in practice optimal in most
+>>>> cases.
+>>>>
+>>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos4210.dtsi |   16 ++++++++++++++++
+>>>>  arch/arm/boot/dts/exynos4x12.dtsi |   16 ++++++++++++++++
+>>>>  2 files changed, 32 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+>>>> index 807bb5b..0969d2e 100644
+>>>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>>>> @@ -154,18 +154,30 @@
+>>>>  			samsung,pix-limits = <4224 8192 1920 4224>;
+>>>>  			samsung,mainscaler-ext;
+>>>>  			samsung,cam-if;
+>>>> +			assigned-clocks = <&clock CLK_MOUT_FIMC0>,
+>>>> +					<&clock CLK_SCLK_FIMC0>;
+>>>> +			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
+>>>> +			assigned-clock-rates = <0>, <160000000>;
+>>
+>> I wonder whether such settings shouldn't really be set up on a per-board
+>> basis.
+>>
+>> As Daniel already pointed, we have cases when MPLL frequency differs
+>> across boards, but we might also have boards that differ in power budget
+>> and so having different desired operating frequencies for various IP blocks.
+>>
+>> What do you think?
+> 
+> This patch provides sane default values for Exynos4210, MPLL is recommended
+> clock source for FIMC devices. If any other clock frequency is needed for 
+> selected boards the clocks setup could be simply overwritten in board dts 
+> file. Otherwise similar changes would have to be done in each board dts.
 
-W dniu 2014-09-26 15:11, Russell King - ARM Linux pisze:
-> On Fri, Sep 26, 2014 at 02:59:18PM +0200, Janusz U?ycki wrote:
->> But serial8250_get_mctrl() in 8250_core.c calls serial8250_modem_status()
->> which calls eg. uart_handle_cts_change() even if enable_ms() wasn't called.
->> This is the difference.
->> The serial8250_modem_status() is also called in the interrupt
->> and, what I don't understand, in serial8250_console_write().
-> Reading the MSR register clears the interrupts.  So, whenever MSR is read,
-> you have to deal with any state changes which _would_ have been passed
-> to the interrupt function.
->
-> Plus, it's not quite as you make out above.
->
-> If enable_ms() is not called, then UART_IER_MSI will not be set in up->ier.
-> Hence, uart_handle_cts_change() will not be called.
+I'm not concerned specifically with Exynos4210, but with placing such
+kind of data in common dtsi files.
 
-Oh, now I understand the condition "up->ier & UART_IER_MSI"
-in serial8250_modem_status().
-So in case of gpio modem lines interrupt is the only right place like in 
-atmel_serial.c.
+Notice that even on boards which have correct initialization done by
+firmware, this will cause the settings to be overwritten, even if the
+firmware sets correct, but different values, regardless of them being
+clock parents or rates.
 
-> The reason for the call in the console function is to account for the
-> state changes during console write with CTS flow control - this again
-> needs the MSR register to be read, and we have to account for MSR state
-> changes after the console write has completed.
-It means that gpio modem lines does not support flow control for console
-on the moment, right Richard?
+To me, even if this would mean duplicating some data, making this per
+board and present only in dts files of boards that actually need this
+(i.e. are known to have broken firmware) sounds more reasonable.
 
-best regards
-Janusz
+Best regards,
+Tomasz
