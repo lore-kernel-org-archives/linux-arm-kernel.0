@@ -1,81 +1,43 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 26 Sep 2014 14:20:35 +0800
-Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
- in all platforms
-In-Reply-To: <20140925171612.GC31157@bart.dudau.co.uk>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <20140925074235.GN12423@ulmo> <20140925144855.GB31157@bart.dudau.co.uk>
- <20140925164937.GB30382@ulmo> <20140925171612.GC31157@bart.dudau.co.uk>
-Message-ID: <542505B3.7040208@huawei.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 26 Sep 2014 16:25:12 +1000
+Subject: linux-next: manual merge of the tip tree with the arm-soc tree
+Message-ID: <20140926162512.07ef4957@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> The PCI core can already deal with that. An MSI chip can be set per bus
->> and the weak pcibios_add_bus() can be used to set that. Often it might
->> not even be necessary to do it via pcibios_add_bus() if you create the
->> root bus directly, since you can attach the MSI chip at that time.
-> 
-> But I'm thinking that we need to move away from pcibios_add_bus() interface to do
-> something that should be generic. You don't need to be called for every bus when all
-> you want is just the root bus in order to add the MSI chip. Also, from looking at
-> the current patchset, a lot of architectures would set the MSI chip to a global
-> variable, which means you don't have an option to choose the MSI chip based on the
-> bus.
+Hi all,
 
-I also agree to remove the pcibios_add_bus() in arm which call .add_bus() to associate msi_chip
-and PCI bus.
+Today's linux-next merge of the tip tree got a conflict in
+arch/arm/mach-omap2/irq.c between commit 8598066cddd1 ("arm: omap: irq:
+move irq.c to drivers/irqchip/") from the arm-soc tree and commit
+f978999f6096 ("Use the new handle_domain_irq method to handle
+interrupts") from the tip tree.
 
-In my opinions, all PCI devices under the same PCI hostbridge must share same msi chip, right ?
-So if we can associate msi chip and PCI hostbridge, every PCI device can find correct msi chip.
-PCI hostbridge private attributes can be saved in PCI sysdata, and this data will be propagate to
-PCI root bus and its child buses.
+I fixed it up (I applied the latter patch to the moved file - see
+below) and can carry the fix as necessary (no action is required).
 
-> 
->>
->>> What I would like to see is a way of creating the pci_host_bridge structure outside
->>> the pci_create_root_bus(). That would then allow us to pass this sort of platform
->>> details like associated msi_chip into the host bridge and the child busses will
->>> have an easy way of finding the information needed by finding the root bus and then
->>> the host bridge structure. Then the generic pci_scan_root_bus() can be used by (mostly)
->>> everyone and the drivers can remove their kludges that try to work around the
->>> current limitations.
->>
->> I think both issues are orthogonal. Last time I checked a lot of work
->> was still necessary to unify host bridges enough so that it could be
->> shared across architectures. But perhaps some of that work has
->> happened in the meantime.
-> 
-> Breaking out the host bridge creation from root bus creation is not difficult, just not
-> agree upon. That would be the first step in making the generic host brige structure
-> useful for sharing, specially if used as a sort of "parent" structure that you can
-> wrap with your actual host bridge structure.
-
-Breaking out the host bridge creation is a good idea, but there need a lot of changes, we can
-do it in another series. And if we save msi chip in pci sysdata now, it will be easy to
-move it to generic pci host bridge. We can also move the pci domain number and other common info to it.
-
-Thanks!
-Yijing.
-
-> 
->>
->> But like I said, when you create the root bus, you can easily attach the
->> MSI chip to it.
-> 
-> Not if you want to use the generic pci_scan_root_bus() function. One needs to copy the code
-> and add their own needed modifications. Which makes it hard to fix bugs and prevents code
-> reuse.
-> 
-> Best regards,
-> Liviu
-> 
->>
->> Thierry
-> 
-> 
-> 
-
+diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+index f3814e79192d..28718d3e8281 100644
+--- a/drivers/irqchip/irq-omap-intc.c
++++ b/drivers/irqchip/irq-omap-intc.c
+@@ -334,8 +334,7 @@ out:
+ 		irqnr &= ACTIVEIRQ_MASK;
+ 
+ 		if (irqnr) {
+-			irqnr = irq_find_mapping(domain, irqnr);
+-			handle_IRQ(irqnr, regs);
++			handle_domain_irq(domain, irqnr, regs);
+ 			handled_irq = 1;
+ 		}
+ 	} while (irqnr);
 
 -- 
-Thanks!
-Yijing
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/b76d145a/attachment.sig>
