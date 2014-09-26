@@ -1,131 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Sep 2014 10:16:48 +0200
-Subject: [PATCH v3 13/13] ARM: shmobile: r8a7740 dtsi: Add preliminary PM
- QoS device latencies
-In-Reply-To: <1411662520-22795-14-git-send-email-geert+renesas@glider.be>
-References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
- <1411662520-22795-14-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdWa_TDz6EyeXGDo-WGJyr15mhA4fH6r45hz8joNdkBbeQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 09:18:04 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+In-Reply-To: <20140926112344.3ee87d2f@canb.auug.org.au>
+References: <20140926112344.3ee87d2f@canb.auug.org.au>
+Message-ID: <20140926081804.GH5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 6:28 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index ed0adeb61a1ad8ec..713170442b7bd4b2 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+On Fri, Sep 26, 2014 at 11:23:44AM +1000, Stephen Rothwell wrote:
+> Hi all,
+> 
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/Kconfig.debug between commits 0889a9e35bd3 ("ARM: 8142/1:
+> ks8695: Migrate debug_ll macros to shared directory"), e38c399ca584
+> ("ARM: 8144/2: netx: Migrate DEBUG_LL macros to shared directory"),
+> 6741cacfa3f1 ("ARM: 8145/1: sa1100: Migrate DEBUG_LL macros to shared
+> directory") and debf843bf7ee ("ARM: 8146/1: Seperate DEBUG_UART_PHYS
+> from DEBUG_LL on EP93XX") from the arm tree and commits d8a00916b303
+> ("ARM: meson: debug: add debug UART for earlyprintk support"),
+> b125170a39ea ("CNS3xxx: Fix debug UART") and b51312bebfa4 ("ARM:
+> BCM63XX: add low-level UART debug support") from the arm-soc tree.
+> 
+> I fixed it up (hopefully - see below) and can carry the fix as
+> necessary (no action is required).
+> 
+> You may be able to clean some of this up by using intermediate config
+> symbols that are selected by the low level symbols and depended upon by
+> the higher level config symbols.
 
-> @@ -409,6 +509,10 @@
->                         reg = <0xe6150000 0x10000>;
->                         clocks = <&extal1_clk>, <&extalr_clk>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <1>;
->                         clock-output-names = "system", "pllc0", "pllc1",
->                                              "pllc2", "r",
-> @@ -424,6 +528,10 @@
->                         reg = <0xe6150080 4>;
->                         clocks = <&pllc1_div2_clk>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <0>;
->                         clock-output-names = "sub";
->                 };
-> @@ -433,6 +541,10 @@
->                         compatible = "fixed-factor-clock";
->                         clocks = <&cpg_clocks R8A7740_CLK_PLLC1>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <0>;
->                         clock-div = <2>;
->                         clock-mult = <1>;
-> @@ -442,6 +554,10 @@
->                         compatible = "fixed-factor-clock";
->                         clocks = <&extal1_clk>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <0>;
->                         clock-div = <2>;
->                         clock-mult = <1>;
-> @@ -454,6 +570,10 @@
->                         reg = <0xe6150080 4>;
->                         clocks = <&sub_clk>, <&sub_clk>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <1>;
->                         renesas,clock-indices = <
->                                 R8A7740_CLK_SUBCK R8A7740_CLK_SUBCK2
-> @@ -470,6 +590,10 @@
->                                  <&sub_clk>, <&sub_clk>,
->                                  <&cpg_clocks R8A7740_CLK_B>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <1>;
->                         renesas,clock-indices = <
->                                 R8A7740_CLK_CEU21 R8A7740_CLK_CEU20 R8A7740_CLK_TMU0
-> @@ -492,6 +616,10 @@
->                                  <&sub_clk>, <&sub_clk>, <&sub_clk>,
->                                  <&sub_clk>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <1>;
->                         renesas,clock-indices = <
->                                 R8A7740_CLK_SCIFA6 R8A7740_CLK_INTCA
-> @@ -522,6 +650,10 @@
->                                  <&cpg_clocks R8A7740_CLK_HP>,
->                                  <&cpg_clocks R8A7740_CLK_HP>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <1>;
->                         renesas,clock-indices = <
->                                 R8A7740_CLK_CMT1 R8A7740_CLK_FSI R8A7740_CLK_IIC1
-> @@ -540,6 +672,10 @@
->                                  <&cpg_clocks R8A7740_CLK_HP>,
->                                  <&cpg_clocks R8A7740_CLK_HP>;
->                         power-domains = <&pd_c5>;
-> +                       stop-latency = <250000>;
-> +                       start-latency = <250000>;
-> +                       save-state-latency = <250000>;
-> +                       restore-state-latency = <250000>;
->                         #clock-cells = <1>;
->                         renesas,clock-indices = <
->                                 R8A7740_CLK_USBH R8A7740_CLK_SDHI2
+Actually, I'll drop the patch set I have.  I didn't spot this earlier,
+but people seem to have a hard time sorting stuff numerically:
 
-Same here, as there should be no power-domains properties in the clocks
-nodes, there should be no latencies specified neither.
+        default 0xffd82340 if ARCH_IOP13XX
++       default 0xfffb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
++       default 0xfffb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
++       default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
+        default 0xfff36000 if DEBUG_HIGHBANK_UART
 
-Gr{oetje,eeting}s,
+It also looks like the same is true for arm-soc:
 
-                        Geert
+> @@@ -1174,9 -1133,7 +1213,10 @@@
+>   	default 0x50008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
+>   				DEBUG_S3C2410_UART2)
+>   	default 0x7c0003f8 if FOOTBRIDGE
+>  +	default 0x80010000 if DEBUG_SA1100_UART1
+>  +	default 0x80030000 if DEBUG_SA1100_UART2
+>  +	default 0x80050000 if DEBUG_SA1100_UART3
+> + 	default 0x78000000 if DEBUG_CNS3XXX
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Last time I checked, 0x78000000 comes before 0x7c0003f8.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
