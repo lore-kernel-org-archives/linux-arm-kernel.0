@@ -1,33 +1,88 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 26 Sep 2014 18:39:35 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-In-Reply-To: <CAOQ7t2Z8SgjMMM_QgUuAgezMXDBYyJM4kez-3WzGE4jgutjX6g@mail.gmail.com>
-References: <20140926112344.3ee87d2f@canb.auug.org.au>
- <CAOQ7t2Z8SgjMMM_QgUuAgezMXDBYyJM4kez-3WzGE4jgutjX6g@mail.gmail.com>
-Message-ID: <20140926183935.4a4eec89@canb.auug.org.au>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 26 Sep 2014 10:43:22 +0200
+Subject: [PATCH v3 05/13] PM / Domains: Add helper variable np =
+ dev->of_node
+In-Reply-To: <1411662520-22795-6-git-send-email-geert+renesas@glider.be>
+References: <1411662520-22795-1-git-send-email-geert+renesas@glider.be>
+ <1411662520-22795-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAPDyKFpiTBKEJHTF9cK20GTqEgx=4UNt52sKi0dQ7NsZNhfFOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
+On 25 September 2014 18:28, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
 
-On Fri, 26 Sep 2014 10:19:43 +0200 Carlo Caione <carlo@caione.org> wrote:
+Why?
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Normally I think this kind of cleanup patches is a bit unnecessary,
+but I don't have strong opinions.
+
+Kind regards
+Uffe
+
+> ---
+> v3:
+>   - No changes
+> v2:
+>   - New
 >
-> Am I going blind or these two lines are missing from d8a00916b303
-> 
-> +       default 0xc81004c0 if DEBUG_MESON_UARTAO
-> ...
-> +       default 0xf31004c0 if DEBUG_MESON_UARTAO
-
-They are in the final version of arch/arm/Kconfig.debug, just not shown
-in the conflict resolution above.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/0fd803aa/attachment.sig>
+>  drivers/base/power/domain.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 6e36bb09e7d9c144..0ebc6bb31c9c227f 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2171,17 +2171,18 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
+>   */
+>  int genpd_dev_pm_attach(struct device *dev)
+>  {
+> +       struct device_node *np = dev->of_node;
+>         struct of_phandle_args pd_args;
+>         struct generic_pm_domain *pd;
+>         int ret;
+>
+> -       if (!dev->of_node)
+> +       if (!np)
+>                 return -ENODEV;
+>
+>         if (dev->pm_domain)
+>                 return -EEXIST;
+>
+> -       ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+> +       ret = of_parse_phandle_with_args(np, "power-domains",
+>                                         "#power-domain-cells", 0, &pd_args);
+>         if (ret < 0) {
+>                 if (ret != -ENOENT)
+> @@ -2192,8 +2193,7 @@ int genpd_dev_pm_attach(struct device *dev)
+>                  * (for backwards compatibility of DT ABI)
+>                  */
+>                 pd_args.args_count = 0;
+> -               pd_args.np = of_parse_phandle(dev->of_node,
+> -                                               "samsung,power-domain", 0);
+> +               pd_args.np = of_parse_phandle(np, "samsung,power-domain", 0);
+>                 if (!pd_args.np)
+>                         return -ENOENT;
+>         }
+> @@ -2202,7 +2202,7 @@ int genpd_dev_pm_attach(struct device *dev)
+>         if (IS_ERR(pd)) {
+>                 dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
+>                         __func__, PTR_ERR(pd));
+> -               of_node_put(dev->of_node);
+> +               of_node_put(np);
+>                 return PTR_ERR(pd);
+>         }
+>
+> @@ -2218,7 +2218,7 @@ int genpd_dev_pm_attach(struct device *dev)
+>         if (ret < 0) {
+>                 dev_err(dev, "failed to add to PM domain %s: %d",
+>                         pd->name, ret);
+> -               of_node_put(dev->of_node);
+> +               of_node_put(np);
+>                 return ret;
+>         }
+>
+> --
+> 1.9.1
+>
