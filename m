@@ -1,44 +1,31 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 26 Sep 2014 10:13:21 +0800
-Subject: [PATCH v2 14/22] MIPS/Xlp/MSI: Use MSI chip framework to configure
+Date: Fri, 26 Sep 2014 10:14:09 +0800
+Subject: [PATCH v2 17/22] s390/MSI: Use MSI chip framework to configure
  MSI/MSI-X irq
-In-Reply-To: <20140925073608.GK12423@ulmo>
+In-Reply-To: <20140925073800.GM12423@ulmo>
 References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <1411614872-4009-15-git-send-email-wangyijing@huawei.com>
- <20140925073608.GK12423@ulmo>
-Message-ID: <5424CBC1.8080702@huawei.com>
+ <1411614872-4009-18-git-send-email-wangyijing@huawei.com>
+ <20140925073800.GM12423@ulmo>
+Message-ID: <5424CBF1.4000000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/25 15:36, Thierry Reding wrote:
-> On Thu, Sep 25, 2014 at 11:14:24AM +0800, Yijing Wang wrote:
->> Use MSI chip framework instead of arch MSI functions to configure
->> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
-> 
-> Nit: s/irq/IRQ/ in the above.
-> 
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  arch/mips/pci/msi-xlp.c |   14 ++++++++++++--
->>  1 files changed, 12 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/mips/pci/msi-xlp.c b/arch/mips/pci/msi-xlp.c
->> index e469dc7..6b791ef 100644
->> --- a/arch/mips/pci/msi-xlp.c
->> +++ b/arch/mips/pci/msi-xlp.c
->> @@ -245,7 +245,7 @@ static struct irq_chip xlp_msix_chip = {
->>  	.irq_unmask	= unmask_msi_irq,
->>  };
+On 2014/9/25 15:38, Thierry Reding wrote:
+> On Thu, Sep 25, 2014 at 11:14:27AM +0800, Yijing Wang wrote:
+> [...]
+>> diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+> [...]
+>> @@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
+>>  	}
+>>  }
 >>  
->> -void arch_teardown_msi_irq(unsigned int irq)
->> +void xlp_teardown_msi_irq(unsigned int irq)
+>> -int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+>> +int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
 > 
-> Should this not be static now as well?
+> static?
 
 Yes, Will update.
 
-> 
-> Thierry
 > 
 
 
