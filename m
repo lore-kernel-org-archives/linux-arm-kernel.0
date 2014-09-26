@@ -1,79 +1,74 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:17:00 +0200
-Subject: [PATCH 27/27] arm/arm64: KVM: Report correct FSC for unsupported
- fault types
+Date: Fri, 26 Sep 2014 15:16:53 +0200
+Subject: [PATCH 20/27] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-28-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-21-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we catch something that's not a permission fault or a translation
-fault, we log the unsupported FSC in the kernel log, but we were masking
-off the bottom bits of the FSC which was not very helpful.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Also correctly report the FSC for data and instruction faults rather
-than telling people it was a DFCS, which doesn't exist in the ARM ARM.
+We now have the information about the number of CPU interfaces in
+the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
+rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
 
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h   | 5 +++++
- arch/arm/kvm/mmu.c                   | 8 +++++---
- arch/arm64/include/asm/kvm_emulate.h | 5 +++++
- 3 files changed, 15 insertions(+), 3 deletions(-)
+ include/kvm/arm_vgic.h | 3 +--
+ virt/kvm/arm/vgic.c    | 6 +++---
+ 2 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 69b7469..b9db269 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -149,6 +149,11 @@ static inline bool kvm_vcpu_trap_is_iabt(struct kvm_vcpu *vcpu)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index b2f9936..3b73d78 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -29,13 +29,12 @@
+ #define VGIC_NR_SGIS		16
+ #define VGIC_NR_PPIS		16
+ #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+-#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
  
- static inline u8 kvm_vcpu_trap_get_fault(struct kvm_vcpu *vcpu)
- {
-+	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC;
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
-+{
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC_TYPE;
- }
+ #define VGIC_V2_MAX_LRS		(1 << 6)
+ #define VGIC_V3_MAX_LRS		16
  
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index bb06f76..eea0306 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -882,10 +882,12 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+ /* Sanity checks... */
+-#if (VGIC_MAX_CPUS > 8)
++#if (KVM_MAX_VCPUS > 8)
+ #error	Invalid number of CPU interfaces
+ #endif
  
- 	/* Check the stage-2 fault is trans. fault or write fault */
--	fault_status = kvm_vcpu_trap_get_fault(vcpu);
-+	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
- 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM) {
--		kvm_err("Unsupported fault status: EC=%#x DFCS=%#lx\n",
--			kvm_vcpu_trap_get_class(vcpu), fault_status);
-+		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-+			kvm_vcpu_trap_get_class(vcpu),
-+			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-+			(unsigned long)kvm_vcpu_get_hsr(vcpu));
- 		return -EFAULT;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 7d64dc2..599ad17 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1297,7 +1297,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ 
+ 	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
+ 
+-	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
++	for_each_set_bit(c, &sources, dist->nr_cpus) {
+ 		if (vgic_queue_irq(vcpu, c, irq))
+ 			clear_bit(c, &sources);
  	}
+@@ -1700,7 +1700,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int i;
  
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index fdc3e21..5674a55 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -174,6 +174,11 @@ static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
+-	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
++	if (vcpu->vcpu_id >= dist->nr_cpus)
+ 		return -EBUSY;
  
- static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
- {
-+	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC;
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
-+{
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
- }
+ 	for (i = 0; i < VGIC_NR_IRQS; i++) {
+@@ -1767,7 +1767,7 @@ static int vgic_init_maps(struct kvm *kvm)
+ 	int nr_cpus, nr_irqs;
+ 	int ret, i;
  
+-	nr_cpus = dist->nr_cpus = VGIC_MAX_CPUS;
++	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
+ 	nr_irqs = dist->nr_irqs = VGIC_NR_IRQS;
+ 
+ 	ret  = vgic_init_bitmap(&dist->irq_enabled, nr_cpus, nr_irqs);
 -- 
 2.0.0
