@@ -1,66 +1,100 @@
-From: aravind.gopalakrishnan@amd.com (Aravind Gopalakrishnan)
-Date: Fri, 26 Sep 2014 11:30:30 -0500
-Subject: [RFT Part2 v2 00/24] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <20140926142931.GA10066@nazgul.tnic>
-References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
- <20140926142931.GA10066@nazgul.tnic>
-Message-ID: <542594A6.4040504@amd.com>
+From: mike.rapoport@gmail.com (Mike Rapoport)
+Date: Fri, 26 Sep 2014 19:32:07 +0300
+Subject: [PATCH v3] ARM: DT: apq8064: add CM-QS600 board
+Message-ID: <1411749127-12746-1-git-send-email-mike.rapoport@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/26/2014 9:29 AM, Borislav Petkov wrote:
-> On Fri, Sep 26, 2014 at 10:02:01PM +0800, Jiang Liu wrote:
->> We plan to restructure x86 interrupt code based on hierarchy irqdomain,
->> that is to build irqdomains for CPU vector, interrupt remapping unit,
->> IOAPIC, MSI and HPET etc and organize those irqdomains in hierarchy mode.
->> Each irqdomain manages corresponding interrupt controller and talks to
->> parent interrupt controller through public irqdomain interfaces. We also
->> support stacked irq_chip based on hierarchy irqdomain. It will make the
->> x86 interrupt architecture much more clear and more easy to maintain
->> with hierarchy irqdomain and stacked irq_chip. It may also help ARM
->> interrupt management architecture too.
->>
->> This is the second patch set to enable support of hierarchy irqdomain
->> on x86 platforms. It depends on the first part at:
->> https://lkml.org/lkml/2014/9/26/501
->> And you may access it at:
->> https://github.com/jiangliu/linux.git irqdomain/p2v2
->>
->> And there will be a third patch set to convert IOAPIC driver to support
->> hierarchy irqdomain and clean up code.
->>
->> The first patch extends irqdomain interfaces to support hierarchy
->> irqdomain. Hope this interface could be used by other architectures too,
->> such as ARM/ARM64.
->> The second patch introduces two helper functions to support stacked
->> irq_chip.
->> Patch 3-9 implements an irqdomain to manange CPU interrupt vectors, and
->> it's the root irqdomain for x86 platforms.
->> Patch 10-13 converts Intel and AMD interrupt remapping drivers to
->> support hierarchy irqdomain.
->> Patch 14-16 converts HPET and MSI to support hierarchy irqdomain.
->> Patch 17-20 cleans up unsued code in x86 arch and interrupt remapping
->> drivers.
->> Patch 21-24 converts DMAR, HTIRQ and UV to support hierarchy irqdomain.
->>
->> We have tested this patchset on Intel 32-bit and 64-bit systems. And it
->> also passes Fengguang's 0day tests. But helps are need for testing:
->> 1) AMD interrupt remapping
->> 2) AMD HT_IRQ
-> Adding Aravind.
->
-> @Aravind: you might want to give that patchset a run just in case, to
-> make sure it doesn't break anything on AMD. You'll need the previous
-> patchset to go before too, though:
->
-> https://lkml.kernel.org/r/1411738196-29958-1-git-send-email-jiang.liu at linux.intel.com
+CM-QS600 is a APQ8064 based computer on module.
+The details are available at
+http://compulab.co.il/products/computer-on-modules/cm-qs600/
 
-Sure, Will help testing these.
+Signed-off-by: Mike Rapoport <mike.rapoport@gmail.com>
+---
+v2 changes: duplicate the settings for the cm-qs600 board in its .dts file as Kumar suggested
+v3 changes: add board details and keep dts Makefile sorted alphabetically
 
-> I'm sure Jiang will help you if you have more questions.
->
->
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 59 +++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
 
-Okay, I shall start looking into the patches and RFH as needed.
-
--Aravind.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index aaa1a68..3243722 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -339,6 +339,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
+ 	orion5x-rd88f5182-nas.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
++	qcom-apq8064-cm-qs600.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+ 	qcom-apq8074-dragonboard.dtb \
+ 	qcom-apq8084-ifc6540.dtb \aaaaaa
+diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+new file mode 100644
+index 0000000..db7cf03
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+@@ -0,0 +1,59 @@
++#include "qcom-apq8064-v2.0.dtsi"
++
++/ {
++	model = "CompuLab CM-QS600";
++	compatible = "qcom,apq8064-cm-qs600", "qcom,apq8064";
++
++	soc {
++		pinctrl at 800000 {
++			i2c1_pins: i2c1 {
++				mux {
++					pins = "gpio20", "gpio21";
++					function = "gsbi1";
++				};
++			};
++		};
++
++		gsbi at 12440000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C>;
++
++			i2c at 12460000 {
++				status = "okay";
++				clock-frequency = <200000>;
++				pinctrl-0 = <&i2c1_pins>;
++				pinctrl-names = "default";
++
++				eeprom: eeprom at 52 {
++					compatible = "atmel,24c128";
++					reg = <0x52>;
++					pagesize = <32>;
++				};
++			};
++		};
++
++		gsbi at 16600000 {
++			status = "ok";
++			qcom,mode = <GSBI_PROT_I2C_UART>;
++			serial at 16640000 {
++				status = "ok";
++			};
++		};
++
++		amba {
++			/* eMMC */
++			sdcc1: sdcc at 12400000 {
++				status = "okay";
++			};
++
++			/* External micro SD card */
++			sdcc3: sdcc at 12180000 {
++				status = "okay";
++			};
++			/* WLAN */
++			sdcc4: sdcc at 121c0000 {
++				status = "okay";
++			};
++		};
++	};
++};
+-- 
+1.9.1
