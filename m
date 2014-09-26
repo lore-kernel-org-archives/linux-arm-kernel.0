@@ -1,77 +1,37 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Sat, 27 Sep 2014 04:58:05 +0530
-Subject: [PATCH v2 0/2] serial: samsung: add support for early console
-In-Reply-To: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
-References: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAGOxZ509Sfd77FQFSKPgp7piDFa-o2zdFuHy9EzfXULkpJHGrg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Sep 2014 16:29:00 -0700
+Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
+ CLK_OF_DECLARE support
+In-Reply-To: <1411685780.13320.209.camel@snotra.buserror.net>
+References: <1411454806-8214-1-git-send-email-jingchang.lu@freescale.com>
+ <d4a375f40b544cf1ae78ac82dc20569c@BL2PR03MB467.namprd03.prod.outlook.com>
+ <1411675680.13320.201.camel@snotra.buserror.net>
+ <20140925225406.19023.25065@quantum>
+ <1411685780.13320.209.camel@snotra.buserror.net>
+Message-ID: <20140926232900.19023.35854@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Marek,
+Quoting Scott Wood (2014-09-25 15:56:20)
+> On Thu, 2014-09-25 at 15:54 -0700, Mike Turquette wrote:
+> > Quoting Scott Wood (2014-09-25 13:08:00)
+> > > Well, like I said, I'd rather see the CLK_OF_DECLARE stuff be made to
+> > > work on PPC rather than have the driver carry around two binding
+> > > methods.
+> > 
+> > I guess that is an existing problem, and not related directly to this
+> > patch? This patch is essentially just renames (though the V1.0/V2.0
+> > stuff seems weird).
+> 
+> This patch is adding CLK_OF_DECLARE.
 
-On Thu, Sep 25, 2014 at 3:24 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> This patchset adds support for early console defined in device tree. As
-> an example, DTS files for all Exynos4 based machines are updated with
-> the correct value for common chosen/sdtout property.
->
-> To get it fully functional on ARM architecture, additional improvements
-> (support for early_ioremap) are needed in early console code.
->
-> Best regards
-> Marek Szyprowski
-> Samsung R&D Institute Poland
->
-> Change log:
->
-> v2:
-> - added support for command line based initialization
->
-> v1: http://www.spinics.net/lists/linux-samsung-soc/msg37094.html
-> - initial version
->
->
-> Patch summary:
->
-> Tomasz Figa (2):
->   serial: samsung: Add support for early console
->   ARM: dts: exynos4: Add stdout-path properties
->
->  Documentation/kernel-parameters.txt             |  10 +++
->  arch/arm/boot/dts/exynos4210-origen.dts         |   1 +
->  arch/arm/boot/dts/exynos4210-smdkv310.dts       |   1 +
->  arch/arm/boot/dts/exynos4210-trats.dts          |   1 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts |   1 +
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
->  arch/arm/boot/dts/exynos4412-origen.dts         |   1 +
->  arch/arm/boot/dts/exynos4412-smdk4412.dts       |   1 +
->  arch/arm/boot/dts/exynos4412-tiny4412.dts       |   4 +
->  arch/arm/boot/dts/exynos4412-trats2.dts         |   1 +
->  drivers/tty/serial/Kconfig                      |   1 +
->  drivers/tty/serial/samsung.c                    | 103 ++++++++++++++++++++++++
->  12 files changed, 129 insertions(+)
+I'm fine taking this patch but your comments are still unresolved. What
+do you think needs to be done to fix the problems that you see?
 
-Tested this on ARM64 based exynos7 platform, both command line and DT
-ways. Both works well.
-Compile tested on ARM.
-Not sure if my ACK matters here, but you certainly have my
-
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
-
-I think this is good to go in with a minor comment addressed on 1st patch.
-Thanks!
->
-> --
-> 1.9.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
 Regards,
-Alim
+Mike
+
+> 
+> -Scott
+> 
+> 
