@@ -1,134 +1,49 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:57 +0200
-Subject: [PATCH 24/27] arm/arm64: KVM: vgic: make number of irqs a
- configurable attribute
+Date: Fri, 26 Sep 2014 15:16:58 +0200
+Subject: [PATCH 25/27] arm/arm64: KVM: Fix set_clear_sgi_pend_reg offset
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-25-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-26-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+The sgi values calculated in read_set_clear_sgi_pend_reg() and
+write_set_clear_sgi_pend_reg() were horribly incorrectly multiplied by 4
+with catastrophic results in that subfunctions ended up overwriting
+memory not allocated for the expected purpose.
 
-In order to make the number of interrupts configurable, use the new
-fancy device management API to add KVM_DEV_ARM_VGIC_GRP_NR_IRQS as
-a VGIC configurable attribute.
+This showed up as bugs in kfree() and the kernel complaining a lot of
+you turn on memory debugging.
 
-Userspace can now specify the exact size of the GIC (by increments
-of 32 interrupts).
+This addresses: http://marc.info/?l=kvm&m=141164910007868&w=2
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reported-by: Shannon Zhao <zhaoshenglong@huawei.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/virtual/kvm/devices/arm-vgic.txt | 10 +++++++
- arch/arm/include/uapi/asm/kvm.h                |  1 +
- arch/arm64/include/uapi/asm/kvm.h              |  1 +
- virt/kvm/arm/vgic.c                            | 37 ++++++++++++++++++++++++++
- 4 files changed, 49 insertions(+)
+ virt/kvm/arm/vgic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index 7f4e91b..df8b0c7 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -71,3 +71,13 @@ Groups:
-   Errors:
-     -ENODEV: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
-+
-+  KVM_DEV_ARM_VGIC_GRP_NR_IRQS
-+  Attributes:
-+    A value describing the number of interrupts (SGI, PPI and SPI) for
-+    this GIC instance, ranging from 64 to 1024, in increments of 32.
-+
-+  Errors:
-+    -EINVAL: Value set is out of the expected range
-+    -EBUSY: Value has already be set, or GIC has already been initialized
-+            with default values.
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 51257fd..09ee408 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -174,6 +174,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
- #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
- #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index f4ec5a6..8e38878 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -160,6 +160,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
- #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
- #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-+#define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index ac2b44d..b6fab0f 100644
+index b6fab0f..8629678 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -2253,6 +2253,36 @@ static int vgic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 
- 		return vgic_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 val;
-+		int ret = 0;
-+
-+		if (get_user(val, uaddr))
-+			return -EFAULT;
-+
-+		/*
-+		 * We require:
-+		 * - at least 32 SPIs on top of the 16 SGIs and 16 PPIs
-+		 * - at most 1024 interrupts
-+		 * - a multiple of 32 interrupts
-+		 */
-+		if (val < (VGIC_NR_PRIVATE_IRQS + 32) ||
-+		    val > VGIC_MAX_IRQS ||
-+		    (val & 31))
-+			return -EINVAL;
-+
-+		mutex_lock(&dev->kvm->lock);
-+
-+		if (vgic_initialized(dev->kvm) || dev->kvm->arch.vgic.nr_irqs)
-+			ret = -EBUSY;
-+		else
-+			dev->kvm->arch.vgic.nr_irqs = val;
-+
-+		mutex_unlock(&dev->kvm->lock);
-+
-+		return ret;
-+	}
- 
- 	}
- 
-@@ -2289,6 +2319,11 @@ static int vgic_get_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		r = put_user(reg, uaddr);
- 		break;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		r = put_user(dev->kvm->arch.vgic.nr_irqs, uaddr);
-+		break;
-+	}
- 
- 	}
- 
-@@ -2325,6 +2360,8 @@ static int vgic_has_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
- 		offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
- 		return vgic_has_attr_regs(vgic_cpu_ranges, offset);
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
- 	}
- 	return -ENXIO;
- }
+@@ -816,7 +816,7 @@ static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int sgi;
+-	int min_sgi = (offset & ~0x3) * 4;
++	int min_sgi = (offset & ~0x3);
+ 	int max_sgi = min_sgi + 3;
+ 	int vcpu_id = vcpu->vcpu_id;
+ 	u32 reg = 0;
+@@ -837,7 +837,7 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	int sgi;
+-	int min_sgi = (offset & ~0x3) * 4;
++	int min_sgi = (offset & ~0x3);
+ 	int max_sgi = min_sgi + 3;
+ 	int vcpu_id = vcpu->vcpu_id;
+ 	u32 reg;
 -- 
 2.0.0
