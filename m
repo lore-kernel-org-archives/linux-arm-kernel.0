@@ -1,38 +1,69 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 26 Sep 2014 10:40:54 +0800
-Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
- page aligned
-In-Reply-To: <20140925154403.GL10390@e104818-lin.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
- <20140919095959.GA2295@e104818-lin.cambridge.arm.com>
- <20140925143142.GF5182@n2100.arm.linux.org.uk>
- <20140925154403.GL10390@e104818-lin.cambridge.arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D103D6DB49163B@CNBJMBX05.corpusers.net>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Fri, 26 Sep 2014 10:40:41 +0800
+Subject: [PATCH] i2c: rk3x: adjust the LOW divison based on characteristics
+ of SCL
+In-Reply-To: <CAD=FV=WhBhmCO=GamNr7yyXvLmOFDro8zWVwrj1zQVYogzeyVA@mail.gmail.com>
+References: <1411523743-3444-1-git-send-email-addy.ke@rock-chips.com>	<CAD=FV=WiHR+KcTWHnma6TdPQcc3oc4wqAofj5kF=Sgec_5kGAQ@mail.gmail.com>	<54227F93.7000507@rock-chips.com>	<CAD=FV=Uq9AteUcpMvcU5tmyGZbVYWM6PNmevZXSVCkYB8rqSsQ@mail.gmail.com>	<5423765B.8000706@rock-chips.com>	<CAD=FV=Uuk1zBYn4NgcpDSHVfKeyw3MONO7roUNVSPSDDEyD=8Q@mail.gmail.com>	<CAD=FV=UkAcR8b+T_Dvoy9STDfzyC8QVSawihoHLYyHFJ6bfXxQ@mail.gmail.com>	<5424C41F.8030508@rock-chips.com>
+ <CAD=FV=WhBhmCO=GamNr7yyXvLmOFDro8zWVwrj1zQVYogzeyVA@mail.gmail.com>
+Message-ID: <5424D229.8040709@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> They were so close ;)
-> 
-> I can see three patches but none of them exactly right:
-> 
-> 8157/1 - wrong diff format
-> 8159/1 - correct format, does not have my ack (you can take this one if
-> 	 you want)
-> 8162/1 - got my ack this time but with the wrong diff format again
-> 
-> Maybe a pull request is a better idea.
-> 
-I am really confused, 
-I read this web:
-http://www.arm.linux.org.uk/developer/patches/info.php
-it said use diff -urN to generate patch like this:
 
-diff -Nru linux.orig/lib/string.c linux/lib/string.c
 
-but I see other developers use git format-patch to generate patch and
-submit to the patch system.
-Git format-patch format can also be accepted by the patch system correctly ?
-If yes, I think this web should update,
-Use git format-patch to generate patch is more convenient than use diff -urN 
+On 2014/9/26 10:08, Doug Anderson wrote:
+> Addy,
+> 
+> On Thu, Sep 25, 2014 at 6:40 PM, addy ke <addy.ke@rock-chips.com> wrote:
+>> Hi, Doug
+>>
+>> On 2014/9/26 5:52, Doug Anderson wrote:
+>>> Addy,
+>>>
+>>> On Wed, Sep 24, 2014 at 9:36 PM, Doug Anderson <dianders@chromium.org> wrote:
+>>>> Addy,
+>>>>
+>>>> On Wed, Sep 24, 2014 at 6:56 PM, addy ke <addy.ke@rock-chips.com> wrote:
+>>>>> In my measurement,all paramter but "Data hold time" are match the characteristics of SCL bus line.
+>>>>> the measured value is 0.928us("data hold time on RK3X"  ~=  "the low period / 2")
+>>>>> but the maximum value described in table is 0.9us
+>>>>>
+>>>>> About "Data hold time", there are described in I2C specification:
+>>>>> - for CBUS compatible masters for I2C-bus deivices
+>>>>> - the maximum data hold time has only be met if the device does not stretch the LOW period of the SCL signal.
+>>>>>
+>>>>> I have tested on RK3288-Pinky board, there are no error.
+>>>>> But I don't known whether this paramter will affect i2c communications.
+>>>>
+>>>> I'll have to spend more time tomorrow to really understand this, but
+>>>> if changing the code to bias towards slightly longer "high" times
+>>>> instead of "low" times helps fix it then that's fine with me.
+>>>
+>>> So what you're saying is that you're seeing a case where the clock
+>>> goes low and the data is not valid until .928us.  Is this data that is
+>>> being driven by the master or data that is being driven by the slave?
+>>>
+>> It is driven by the master and will be release at half of LOW period in our IC design.
+> 
+> Ah, I didn't know this.  Is that in the TRM somewhere?
+> 
+No, it was my test and confirmed by IC engineer.
+You can find that there is a pulse at half of LOW period of the ninth SCL clock each bytes.
 
-Thanks
+> ...so does it work to just replace:
+> 
+>     ideal_low_div = DIV_ROUND_UP(clk_rate * min_low_ns,
+>                                  scl_rate * 8 * min_total_ns)
+> 
+> ...with:
+> 
+>     ideal_low_div = min_low_div
+> 
+> 
+> That will assign all "extra" time to the "high" part.
+> 
+I Think it is more reasonable.
+> -Doug
+> 
+> 
+> 
