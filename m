@@ -1,69 +1,45 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Fri, 26 Sep 2014 22:02:07 +0800
-Subject: [RFT v2 06/24] x86,
- MSI: Use new irqdomain interfaces to allocate/free IRQ
-In-Reply-To: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1411740145-30626-7-git-send-email-jiang.liu@linux.intel.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Fri, 26 Sep 2014 15:00:24 +0100
+Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
+In-Reply-To: <CAKfTPtAHP_U=C4s6MO-zcJkaEwJB_0VuZ=D6JnTYTeEt_EtBXQ@mail.gmail.com>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
+ <542303DF.8010606@arm.com>
+ <CAKfTPtB3-M+pXaurDeWkWGNJ3_mU-FN+EnshGE-eg_r41Hppag@mail.gmail.com>
+ <54246ACE.1080502@arm.com>
+ <CAKfTPtAHP_U=C4s6MO-zcJkaEwJB_0VuZ=D6JnTYTeEt_EtBXQ@mail.gmail.com>
+Message-ID: <54257178.8010900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use new irqdomain interfaces to allocate/free IRQ for MSI, so we could
-kill GENERIC_IRQ_LEGACY_ALLOC_HWIRQ later.
+On 26/09/14 13:39, Vincent Guittot wrote:
+> On 25 September 2014 21:19, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+>> On 25/09/14 09:35, Vincent Guittot wrote:
+> 
+> [snip]
+> 
+>>>>
+>>>> In case sgs->group_type is group_overloaded you could set
+>>>> sgs->group_out_of_capacity to 1 without calling group_is_overloaded again.
+>>>
+>>> I prefer to keep sgs->group_out_of_capacity = group_is_overloaded(sgs,
+>>> env) and use it in group_classify in case of future changes in the
+>>> classification order
+>>
+>> Ok, but than group_is_overloaded is called twice at the end of
+>> update_sg_lb_stats with exactly the same result. Looks weird in my traces.
+> 
+> sorry i don't catch your point.
+> group_is_overloaded() is called once for group_out_of_capacity which
+> is then used in group_classify so it should be called only once
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/x86/kernel/apic/msi.c |   14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+You're right, I made a mistake in my local setup while replacing this
+patch with the new version. Problem doesn't exist any more.
 
-diff --git a/arch/x86/kernel/apic/msi.c b/arch/x86/kernel/apic/msi.c
-index fb45663395ca..64561ffa51a9 100644
---- a/arch/x86/kernel/apic/msi.c
-+++ b/arch/x86/kernel/apic/msi.c
-@@ -14,6 +14,7 @@
- #include <linux/dmar.h>
- #include <linux/hpet.h>
- #include <linux/msi.h>
-+#include <linux/irqdomain.h>
- #include <asm/msidef.h>
- #include <asm/hpet.h>
- #include <asm/hw_irq.h>
-@@ -145,23 +146,20 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- {
- 	struct msi_desc *msidesc;
--	unsigned int irq;
--	int node, ret;
-+	int irq, ret;
- 
- 	/* Multiple MSI vectors only supported with interrupt remapping */
- 	if (type == PCI_CAP_ID_MSI && nvec > 1)
- 		return 1;
- 
--	node = dev_to_node(&dev->dev);
--
- 	list_for_each_entry(msidesc, &dev->msi_list, list) {
--		irq = irq_alloc_hwirq(node);
--		if (!irq)
-+		irq = irq_domain_alloc_irqs(NULL, 1, NUMA_NO_NODE, NULL);
-+		if (irq <= 0)
- 			return -ENOSPC;
- 
- 		ret = setup_msi_irq(dev, msidesc, irq, 0);
- 		if (ret < 0) {
--			irq_free_hwirq(irq);
-+			irq_domain_free_irqs(irq, 1);
- 			return ret;
- 		}
- 
-@@ -171,7 +169,7 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 
- void native_teardown_msi_irq(unsigned int irq)
- {
--	irq_free_hwirq(irq);
-+	irq_domain_free_irqs(irq, 1);
- }
- 
- #ifdef CONFIG_DMAR_TABLE
--- 
-1.7.10.4
+> 
+>>
+>>>
+>> [...]
+>>
+>>
+> 
