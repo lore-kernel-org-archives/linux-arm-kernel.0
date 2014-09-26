@@ -1,38 +1,50 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 26 Sep 2014 14:39:41 +0200
-Subject: [PATCH v6 5/6] sched: replace capacity_factor by usage
-In-Reply-To: <54246ACE.1080502@arm.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-6-git-send-email-vincent.guittot@linaro.org>
- <542303DF.8010606@arm.com>
- <CAKfTPtB3-M+pXaurDeWkWGNJ3_mU-FN+EnshGE-eg_r41Hppag@mail.gmail.com>
- <54246ACE.1080502@arm.com>
-Message-ID: <CAKfTPtAHP_U=C4s6MO-zcJkaEwJB_0VuZ=D6JnTYTeEt_EtBXQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Sep 2014 13:46:14 +0100
+Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
+In-Reply-To: <20140926122003.GP5182@n2100.arm.linux.org.uk>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
+ <20140926122003.GP5182@n2100.arm.linux.org.uk>
+Message-ID: <20140926124614.GD7422@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2014 21:19, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 25/09/14 09:35, Vincent Guittot wrote:
+On Fri, Sep 26, 2014 at 01:20:04PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 26, 2014 at 07:25:01PM +0800, Chenhui Zhao wrote:
+> > +static inline void ls1_do_lowpower(unsigned int cpu, int *spurious)
+> > +{
+> > +	/*
+> > +	 * there is no power-control hardware on this platform, so all
+> > +	 * we can do is put the core into WFI; this is safe as the calling
+> > +	 * code will have already disabled interrupts
+> > +	 */
+> > +	for (;;) {
+> > +		wfi();
+> > +
+> > +		if (pen_release == cpu_logical_map(cpu)) {
+> > +			/*OK, proper wakeup, we're done*/
+> > +			break;
+> > +		}
+> > +
+> > +		/*
+> > +		 * Getting here, means that we have come out of WFI without
+> > +		 * having been woken up - this shouldn't happen
+> > +		 *
+> > +		 * Just note it happening - when we're woken, we can report
+> > +		 * its occurrence.
+> > +		 */
+> > +		(*spurious)++;
+> > +	}
+> > +}
+> 
+> This is pretty much unacceptable - this breaks kexec(), and suspend
+> support because your secondary CPUs aren't really sleeping, they're
+> sitting in a loop doing nothing.
 
-[snip]
+Agreed.
 
->>>
->>> In case sgs->group_type is group_overloaded you could set
->>> sgs->group_out_of_capacity to 1 without calling group_is_overloaded again.
->>
->> I prefer to keep sgs->group_out_of_capacity = group_is_overloaded(sgs,
->> env) and use it in group_classify in case of future changes in the
->> classification order
->
-> Ok, but than group_is_overloaded is called twice at the end of
-> update_sg_lb_stats with exactly the same result. Looks weird in my traces.
+This looks to be a carbon copy of the vexpress pseudo-hotplug in
+arch/arm/mach-vexpress/hotplug.c, which is obviously broken in the way
+you describe above. Perhaps we should go about ripping that out?
 
-sorry i don't catch your point.
-group_is_overloaded() is called once for group_out_of_capacity which
-is then used in group_classify so it should be called only once
-
->
->>
-> [...]
->
->
+Mark.
