@@ -1,92 +1,60 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 26 Sep 2014 16:33:52 +0200
-Subject: [PATCH v5 06/10] net: pxa168_eth: rework the MAC address setup
-In-Reply-To: <1411742036-23520-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1411742036-23520-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1411742036-23520-7-git-send-email-antoine.tenart@free-electrons.com>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Fri, 26 Sep 2014 22:33:09 +0800
+Subject: [PATCH v6 0/3] Rockchip soc thermal driver
+Message-ID: <1411741992-18890-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rework the way the MAC address is retrieved. The MAC address
-can now, in addition to being random, be set in the device tree or
-retrieved from the Ethernet controller MAC address registers. The
-probing function will try to get a MAC address in the following order:
-- From the device tree.
-- From the Ethernet controller MAC address registers.
-- Generate a random one.
+Changes in v6:
+        * address comments from Tomeu Vizoso.
+        - use thermal's generic framework.
 
-This patch also adds a function to read the MAC address from the
-Ethernet Controller registers.
+Changes in v5:
+        * address comments from Eduardo Valentin,rui.zhang and Heiko Stubner:
+        - with BIT() macro
+        - manage clocks in suspend/resume.
+	- license is fixed as GPLv2 .
+	- #include "thermal_core.h"->#include <linux/thermal.h>
+	- use the generic trip-points.the hw-shut-temp isn't generic trip-points.
+	- The method of binding and unbinding be fixed.
+	- The pin-name tsadc->otp_out
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/marvell/pxa168_eth.c | 32 +++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+Changes in v4:
+        * address comments from Jonathan Cameron,huangtao and zhaoyifeng:
+        - this series thermal driver still be put in driver/thermal/
+        - modify the thermal driver description.
 
-diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
-index 34f17dde1cb0..3da8c5af15de 100644
---- a/drivers/net/ethernet/marvell/pxa168_eth.c
-+++ b/drivers/net/ethernet/marvell/pxa168_eth.c
-@@ -35,6 +35,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_net.h>
- #include <linux/phy.h>
- #include <linux/platform_device.h>
- #include <linux/pxa168_eth.h>
-@@ -606,6 +607,21 @@ static void pxa168_eth_set_rx_mode(struct net_device *dev)
- 		update_hash_table_mac_address(pep, NULL, ha->addr);
- }
- 
-+static void pxa168_eth_get_mac_address(struct net_device *dev,
-+				       unsigned char *addr)
-+{
-+	struct pxa168_eth_private *pep = netdev_priv(dev);
-+	unsigned int mac_h = rdl(pep, MAC_ADDR_HIGH);
-+	unsigned int mac_l = rdl(pep, MAC_ADDR_LOW);
-+
-+	addr[0] = (mac_h >> 24) & 0xff;
-+	addr[1] = (mac_h >> 16) & 0xff;
-+	addr[2] = (mac_h >> 8) & 0xff;
-+	addr[3] = mac_h & 0xff;
-+	addr[4] = (mac_l >> 8) & 0xff;
-+	addr[5] = mac_l & 0xff;
-+}
-+
- static int pxa168_eth_set_mac_address(struct net_device *dev, void *addr)
- {
- 	struct sockaddr *sa = addr;
-@@ -1467,6 +1483,7 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct clk *clk;
- 	struct device_node *np;
-+	const unsigned char *mac_addr = NULL;
- 	int err;
- 
- 	printk(KERN_NOTICE "PXA168 10/100 Ethernet Driver\n");
-@@ -1508,8 +1525,19 @@ static int pxa168_eth_probe(struct platform_device *pdev)
- 
- 	INIT_WORK(&pep->tx_timeout_task, pxa168_eth_tx_timeout_task);
- 
--	dev_info(&pdev->dev, "Using random mac address\n");
--	eth_hw_addr_random(dev);
-+	if (pdev->dev.of_node)
-+		mac_addr = of_get_mac_address(pdev->dev.of_node);
-+
-+	if (mac_addr && is_valid_ether_addr(mac_addr)) {
-+		ether_addr_copy(dev->dev_addr, mac_addr);
-+	} else {
-+		/* try reading the mac address, if set by the bootloader */
-+		pxa168_eth_get_mac_address(dev, dev->dev_addr);
-+		if (!is_valid_ether_addr(dev->dev_addr)) {
-+			dev_info(&pdev->dev, "Using random mac address\n");
-+			eth_hw_addr_random(dev);
-+		}
-+	}
- 
- 	pep->rx_ring_size = NUM_RX_DESCS;
- 	pep->tx_ring_size = NUM_TX_DESCS;
+Changes in v3:(add dts configure)
+        * address comments from Dmitry Torokhov and Arnd Bergmann:
+        - fix clock-names in rockchip-thermal.txt
+        - remove rockchip_thermal_control() in rockchip_set_mode()
+        - fix some code style.
+        - add dts configure.
+
+Changes in v2:
+        * address comments from Heiko Stubner:
+        - fix dt-bindings in rockchip-thermal.txt
+        - remove Author mark
+        - rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
+        - fix a identation
+        - remove clk_set_rate(),it's no necessary.
+        - fix the SIMPLE_DEV_PM_OPS() function  style.
+
+Tested on rk3288 SDK board and pinky-v1 board.
+
+Caesar Wang (3):
+  thermal: rockchip: add driver for Thermal
+  dt-bindings: document Rockchip thermal
+  ARM: dts: add main Thermal info to rk3288
+
+ .../bindings/thermal/rockchip-thermal.txt          |  32 ++
+ arch/arm/boot/dts/rk3288.dtsi                      |  44 ++
+ drivers/thermal/Kconfig                            |  10 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/rockchip_thermal.c                 | 605 +++++++++++++++++++++
+ 5 files changed, 692 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+ create mode 100644 drivers/thermal/rockchip_thermal.c
+
 -- 
 1.9.1
