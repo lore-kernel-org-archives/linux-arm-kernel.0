@@ -1,55 +1,49 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Fri, 26 Sep 2014 20:42:37 +0200
-Subject: perf tool failing to build for ARM
-In-Reply-To: <20140926162530.GB11361@arm.com>
-References: <20140926162530.GB11361@arm.com>
-Message-ID: <CAFrcx1nPuJ6TKtBC-eH-hq4bLk4-JPKNGH6ON0ZUB78v4tSh7g@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 26 Sep 2014 20:53:06 +0200
+Subject: [PATCH v4 3/8] clk: rockchip: fix rk3288 pll status register location
+In-Reply-To: <1411757591-16142-1-git-send-email-heiko@sntech.de>
+References: <1411757591-16142-1-git-send-email-heiko@sntech.de>
+Message-ID: <1411757591-16142-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: Jianqun <jay.xu@rock-chips.com>
 
-On 26 September 2014 18:25, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Jean,
->
-> I'm getting the following error trying to build perf tool for ARM with
-> a 3.17-rc6 kernel:
->
->
-> arch/arm/util/unwind-libunwind.c: In function ?libunwind__arch_reg_id?:
-> arch/arm/util/unwind-libunwind.c:43:3: error: implicit declaration of function ?pr_err? [-Werror=implicit-function-declaration]
->    pr_err("unwind: invalid reg id %d\n", regnum);
->    ^
-> arch/arm/util/unwind-libunwind.c:43:3: error: nested extern declaration of ?pr_err? [-Werror=nested-externs]
->   CC       arch/arm/tests/regs_load.o
->   CC       arch/arm/tests/dwarf-unwind.o
-> cc1: all warnings being treated as errors
-> Makefile.perf:655: recipe for target 'arch/arm/util/unwind-libunwind.o' failed
-> make[1]: *** [arch/arm/util/unwind-libunwind.o] Error 1
-> make[1]: *** Waiting for unfinished jobs....
->   CC       util/probe-finder.o
-> arch/arm/tests/dwarf-unwind.c: In function ?sample_ustack?:
-> arch/arm/tests/dwarf-unwind.c:20:3: error: implicit declaration of function ?pr_debug? [-Werror=implicit-function-declaration]
->    pr_debug("failed to allocate sample uregs data\n");
->    ^
-> arch/arm/tests/dwarf-unwind.c:20:3: error: nested extern declaration of ?pr_debug? [-Werror=nested-externs]
-> cc1: all warnings being treated as errors
-> Makefile.perf:655: recipe for target 'arch/arm/tests/dwarf-unwind.o' failed
-> make[1]: *** [arch/arm/tests/dwarf-unwind.o] Error 1
-> Makefile:68: recipe for target 'all' failed
-> make: *** [all] Error 2
->
->
-> Can you take a look please?
+In RK3288, APLL lock status bit is in GRF_SOC_STATUS1,
+but in RK3188, is GRFSOC_STATUS0.
 
-The fix for that error is already in the tip tree at
-http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=29a3ce31c38c8f73f4e076b7ffc0876b4f5dd6c3.
+Signed-off-by: Jianqun <jay.xu@rock-chips.com>
 
-Please confirm if this fixes it for you.
+Also name the constant accordingly as GRF_SOC_STATUS1
+to prevent confusion.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Cheers,
-Jean
-
->
->
-> Will
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 978ab24..ddca0a0 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -20,7 +20,7 @@
+ #include "clk.h"
+ 
+ #define RK3288_GRF_SOC_CON(x)	(0x244 + x * 4)
+-#define RK3288_GRF_SOC_STATUS	0x280
++#define RK3288_GRF_SOC_STATUS1	0x284
+ 
+ enum rk3288_plls {
+ 	apll, dpll, cpll, gpll, npll,
+@@ -733,7 +733,7 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 
+ 	rockchip_clk_register_plls(rk3288_pll_clks,
+ 				   ARRAY_SIZE(rk3288_pll_clks),
+-				   RK3288_GRF_SOC_STATUS);
++				   RK3288_GRF_SOC_STATUS1);
+ 	rockchip_clk_register_branches(rk3288_clk_branches,
+ 				  ARRAY_SIZE(rk3288_clk_branches));
+ 	rockchip_clk_protect_critical(rk3288_critical_clocks,
+-- 
+2.1.0
