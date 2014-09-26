@@ -1,30 +1,29 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 26 Sep 2014 13:03:26 -0700
-Subject: [PATCH] sched/nohz: add debugfs control over
- sched_tick_max_deferment
-In-Reply-To: <1411760732-14102-1-git-send-email-khilman@kernel.org>
-References: <1411760732-14102-1-git-send-email-khilman@kernel.org>
-Message-ID: <CAMAWPa-WMkb_rJZ_XBCd3+pTtu5-SwN7F-0pNs3SrsokDDH5sA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Sep 2014 22:13:31 +0200
+Subject: [PATCH v2 1/3] drivers: of: add return value to
+ of_reserved_mem_device_init
+In-Reply-To: <1410434561-9294-2-git-send-email-m.szyprowski@samsung.com>
+References: <1410434561-9294-1-git-send-email-m.szyprowski@samsung.com>
+ <1410434561-9294-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201409262213.31848.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frederic,
+On Thursday 11 September 2014, Marek Szyprowski wrote:
+> -void of_reserved_mem_device_init(struct device *dev)
+> +int of_reserved_mem_device_init(struct device *dev)
+>  {
+>         struct reserved_mem *rmem;
+>         struct device_node *np;
+> @@ -260,6 +260,7 @@ void of_reserved_mem_device_init(struct device *dev)
+>  
+>         rmem->ops->device_init(rmem, dev);
+>         dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+> +       return 0;
+>  }
 
-On Fri, Sep 26, 2014 at 12:45 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> From: Kevin Hilman <khilman@linaro.org>
->
-> Allow debugfs override of sched_tick_max_deferment in order to ease
-> finding/fixing the remaining issues with full nohz.
->
-> The value to be written is in jiffies, and -1 means the max deferment
-> is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
->
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+This function has two other 'return' statements that now are missing 
+a return value for the error case and cause undefined behavior
+in the caller.
 
-This is just an attempt to revive and hopefully finalize the
-discussion started a while back[1].
-
-Kevin
-
-[1] https://lkml.org/lkml/2014/1/14/914
+	Arnd
