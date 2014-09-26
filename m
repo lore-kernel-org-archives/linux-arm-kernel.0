@@ -1,114 +1,46 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Sep 2014 19:39:34 -0500
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140926003750.GA12770@saruman>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <2923729.dtX0WmHSV0@wuerfel> <20140924112902.GA23331@peterchendt>
- <2786668.t3YLqX5enD@wuerfel> <20140925141553.GC28045@saruman>
- <20140925233932.GA3026@peterchendt>
- <20140926003750.GA12770@saruman>
-Message-ID: <20140926003934.GD12770@saruman>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 25 Sep 2014 17:42:18 -0700
+Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
+In-Reply-To: <20140922113133.GF15315@lukather>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140922113133.GF15315@lukather>
+Message-ID: <20140926004218.19023.88602@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
-
-On Thu, Sep 25, 2014 at 07:37:50PM -0500, Felipe Balbi wrote:
-> On Fri, Sep 26, 2014 at 07:39:34AM +0800, Peter Chen wrote:
-> > On Thu, Sep 25, 2014 at 09:15:53AM -0500, Felipe Balbi wrote:
-> > > On Wed, Sep 24, 2014 at 02:23:38PM +0200, Arnd Bergmann wrote:
-> > > > On Wednesday 24 September 2014 19:29:05 Peter Chen wrote:
-> > > > > 
-> > > > > So, it is IP CORE LIB (you suggest) vs IP CORE Platform Driver
-> > > > > (dwc3, musb, chipidea) you are talking about, right? Except for
-> > > > > creating another platform driver as well as related DT node (optional),
-> > > > > are there any advantages compared to current IP core driver structure?
-> > > > 
-> > > > Having a library module usually requires less code, and is more
-> > > > consistent with other drivers, which helps new developers understand
-> > > > what the driver is doing.
-> > > 
-> > > I beg to differ. You end-up having to pass function pointers through
-> > > platform_data to handle differences which could be handled by the core
-> > > IP.
-> > > 
-> > > > The most important aspect though is the DT binding: once the structure
-> > > > with separate kernel drivers leaks out into the DT format, you can't
-> > > > easily change the driver any more, e.g. to make a property that was
-> > > > introduced for one glue driver more general so it can get handled by
-> > > > the common part. Having a single node lets us convert to the library
-> > > > model later, so that would be a strong reason to keep the DT binding
-> > > > simple, without child nodes.
-> > > > 
-> > > > Following that logic, it turns into another reason for using the library
-> > > > model to start with, because otherwise the child device does not have
-> > > > any DT properties itself and has to rely on the parent device properties,
-> > > > which somewhat complicates the driver structure.
-> > > 
-> > > this is bullcrap. Take a look at
-> > > Documentation/devicetree/bindings/usb/dwc3.txt:
-> > > 
-> > > synopsys DWC3 CORE
-> > > 
-> > > DWC3- USB3 CONTROLLER
-> > > 
-> > > Required properties:
-> > >  - compatible: must be "snps,dwc3"
-> > >  - reg : Address and length of the register set for the device
-> > >  - interrupts: Interrupts used by the dwc3 controller.
-> > > 
-> > > Optional properties:
-> > >  - usb-phy : array of phandle for the PHY device.  The first element
-> > >    in the array is expected to be a handle to the USB2/HS PHY and
-> > >    the second element is expected to be a handle to the USB3/SS PHY
-> > >  - phys: from the *Generic PHY* bindings
-> > >  - phy-names: from the *Generic PHY* bindings
-> > >  - tx-fifo-resize: determines if the FIFO *has* to be reallocated.
-> > > 
-> > > This is usually a subnode to DWC3 glue to which it is connected.
-> > > 
-> > > dwc3 at 4a030000 {
-> > > 	compatible = "snps,dwc3";
-> > > 	reg = <0x4a030000 0xcfff>;
-> > > 	interrupts = <0 92 4>
-> > > 	usb-phy = <&usb2_phy>, <&usb3,phy>;
-> > > 	tx-fifo-resize;
-> > > };
-> > > 
-> > > This contains all the attributes it needs to work. In fact, this could
-> > > be used without any glue.
-> > > 
+Quoting Maxime Ripard (2014-09-22 04:31:33)
+> Mike,
+> 
+> On Thu, Sep 11, 2014 at 10:18:14PM +0200, Maxime Ripard wrote:
+> > Hi everyone,
 > > 
-> > If you want to add "vbus-supply" core node to support ID switch, what's
-> > the plan for that?
+> > Here is an attempt at improving the MMC clock support in the Allwinner
+> > SoCs.
+> > 
+> > Until now, the MMC clocks were having a custom phase function that was
+> > directly setting an obscure value in the right register, because we
+> > were not really having any idea of what these values were.
+> > 
+> > Now that we have more informations, we can introduce a common function
+> > call to get and set the phase of a particular clock, and use this in
+> > both our provider and our client.
 > 
-> send a patch ? Just make sure it's optional because not everybody needs
-> a vbus-supply. Also, DRD will still take a few merge windows to become a
-> reality. I don't want to merge something before considering it carefuly,
-> otherwise we will having which is broken and doesn't work for everybody
-> ;-)
-> 
-> > Is it possible that the glue layer needs to access core register
-> > (eg, portsc.phcd during suspend)? The wrapper IP may wait some signals
-> > at core IP to change.
-> 
-> why would a glue layer need to access registers from the core ? That
-> sounds very odd. I haven't seen that and will, definitely, NACK such a
-> patch :-)
-> 
-> can you further describe why you think a glue layer might need to access
-> core IP's registers ?
+> It would be great that we have that custom phase API out of the kernel
+> for 3.18, and you were one of the greatest supporters to that idea,
+> could we please have your view on this?
 
-I just realised we're talking about chipidea here... in any case, it's
-still valid to ask why would glue need to fiddle with core IP's
-registers.
+Patches all look good to me. Did you want the whole series to go through
+the clk tree? If so we'll need an Ack for the MMC patch and for the ARM
+DTS patches as well.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140925/7d792144/attachment.sig>
+Regards,
+Mike
+
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
