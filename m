@@ -1,91 +1,59 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Sep 2014 11:53:34 -0700
-Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
-In-Reply-To: <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <20140911203623.GJ31276@lukather> <20140926002544.19023.39287@quantum>
- <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
-Message-ID: <20140926185334.19023.12876@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Sep 2014 20:55:34 +0200
+Subject: [GIT PULL] at91: soc for 3.18 #2
+In-Reply-To: <54257C70.50008@atmel.com>
+References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
+ <201409261250.02565.arnd@arndb.de> <54257C70.50008@atmel.com>
+Message-ID: <2546543.KtIvf3hIpW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chen-Yu Tsai (2014-09-25 17:55:27)
-> On Fri, Sep 26, 2014 at 8:25 AM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Maxime Ripard (2014-09-11 13:36:23)
-> >> Hi Chen-Yu,
-> >>
-> >> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
-> >> > Hi everyone,
-> >> >
-> >> > This series unifies the mux and divider parts of the AHB1 clock found
-> >> > on sun6i and sun8i, while also adding support for the pre-divider on
-> >> > the PLL6 input.
-> >> >
-> >> > The rate calculation logic must factor in which parent it is using to
-> >> > calculate the rate, to decide whether to use the pre-divider or not.
-> >> > This is beyond the original factors clk design in sunxi. To avoid
-> >> > feature bloat, this is implemented as a seperate composite clk.
-> >> >
-> >> > The new clock driver is registered with a separate OF_CLK_DECLARE.
-> >> > This is done so that assigned-clocks* properties on the clk provider
-> >> > node can actually work. The clock framework arranges the clock setup
-> >> > order by checking whether all clock parents are available, by checking
-> >> > the node matching OF_CLK_DECLARE.
-> >> >
-> >> > However, the sunxi clk driver is based on the root node compatible,
-> >> > has no defined dependencies (parents), and is setup before the fixed-rate
-> >> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
-> >> > There is no way to calculate the required clock factors to set a default
-> >> > clock rate under these circumstances. This happens when we set the
-> >> > defaults in the clock node (provider), rather than a clock consumer.
-> >> >
-> >> > I can think of 2 ways to solve the dependency issue, but neither is
-> >> > pretty. One would be to move the root fixed-rate clocks into the sunxi
-> >> > clk driver. The other would be separating all the clocks into individual
-> >> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
-> >>
-> >> I don't know what Mike thinks of this, but I'd prefer the second.
+On Friday 26 September 2014 16:47:12 Nicolas Ferre wrote:
+> On 26/09/2014 12:50, Arnd Bergmann :
+> > On Monday 22 September 2014, Nicolas Ferre wrote:
+> > 
+> >> Nicolas Ferre (4):
+> >>       ARM: at91: introduce basic SAMA5D4 support
+> >>       ARM: at91: SAMA5D4 SoC detection code and low level routines
+> > 
+> > This resulted in build failures both in at91x40_defconfig and some
+> > randconfigs with MMU disabled. I've applied the patch below on top
+> > to fix it.
+> 
+> Ok, I see: sorry for the inconvenience.
+> What about taking the patch that I sent about removing completely the
+> at91x40 as it is "Acked" by everybody now? The would prevent from adding
+> these unneeded values.
+
+I thought about that, but it would still be broken in randconfig builds
+that turn off the MMU on any of the other at91 variants, as I wrote above.
+
+at91 is actually one of the platforms that I'd assume would even work in
+that configuration. We should at one point in the future discuss more
+widely whether we try to fix more of the bugs one hits with this or
+we just outright prevent users from turning off the MMU on platforms
+that have one.
+
+> > I'm not exactly happy about the soc detection code anyway after I
+> > had to look at that. Why do you even hardcode the physical register
+> > location rather than getting it from DT?
 > >
-> > I do not fully understand the problem. Ideally the clock driver should
-> > have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
-> > registered. Those fixed-rate parents are enumerated in your dts, right?
-> > Why isn't this enough?
+> > Also, why do you care about which SoC version you have for the
+> > modern SAMA5 chips? All I see is a sama5d4_map_io() callback
+> > that maps a lot of completely unused registers along with
+> > the uart that you normally get from the implicit debug_ll_io_init,
+> > and the SRAM that should probably be turned into a normal driver.
 > 
-> This is due to the way the sunxi clock driver is setup. The clock driver's
-> OF_CLK_DECLARE matches against the "soc" node, not the individual clock
-> nodes. When the setup function is called, it just registers all the
-> supported clocks. There are no dependencies listed.
-> 
-> Unfortunately, the fixed-factor clock is in the middle of the whole clock
-> tree. The sunxi clock driver provides its parents _and_ its children.
-> Naturally the clock framework then probes the fixed-factor clock after
-> the sunxi ones. Any attempts to change the state of clocks under the
-> unavailable fixed-factor clock, such as done by of_clk_set_defaults(),
-> would get an incomplete clock, likely with no parents and parent_rate = 0.
-> That is until of_clk_init() finishes and all clocks are properly hooked
-> up.
-> 
-> Anyway, this problem only occurred when I added clk-assigned-* defaults
-> to the clock provider node, which is not the case anymore.
+> Yes, as said by Alexandre, we are aware of the flaws of AT91 SoC
+> initialization, but last time I tried, our code was called too early.
+> Now with the work from Maxime with the timer (in 3.18) it might be
+> possible to reorder all this.
+> But please, I would really like to remove all !DT *and* !CCF material
+> before starting this work, otherwise we will again have a double path
+> for sam9's and I'd like to avoid this.
 
-Makes sense. I guess you could ignore the problem until you need to use
-the assigned defaults.
+I'm not complaining about the use of the early registers on sam9, I know
+you are working hard on cleaning that up. I still don't see why you
+duplicate it for sama5, but it's ok as long as you have a plan.
 
-> 
-> The second method i proposed is to have OF_CLK_DECLAREs for each individual
-> clock. An example can be found here:
-> 
->   https://github.com/wens/linux/commit/1276898da02a93da4af163ed5bdc88cdead565dc
-> 
-> This does add a lot of boilerplate code. Not really happy about it. But
-> it seems the proper way to split up the driver.
-
-Yeah, this is OK. Ugly, but OK.
-
-Regards,
-Mike
-
-> 
-> 
-> Cheers
-> ChenYu
+	Arnd
