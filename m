@@ -1,61 +1,91 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 26 Sep 2014 20:53:07 +0200
-Subject: [PATCH v4 4/8] clk: rockchip: reparent aclk_cpu_pre to the gpll
-In-Reply-To: <1411757591-16142-1-git-send-email-heiko@sntech.de>
-References: <1411757591-16142-1-git-send-email-heiko@sntech.de>
-Message-ID: <1411757591-16142-5-git-send-email-heiko@sntech.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Sep 2014 11:53:34 -0700
+Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
+In-Reply-To: <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <20140911203623.GJ31276@lukather> <20140926002544.19023.39287@quantum>
+ <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
+Message-ID: <20140926185334.19023.12876@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-aclk_cpu_pre on the rk3188 can either be sourced from the armclk or the gpll.
-To reduce complexity on apll changes caused by cpufreq, reparent it always
-to the gpll source.
+Quoting Chen-Yu Tsai (2014-09-25 17:55:27)
+> On Fri, Sep 26, 2014 at 8:25 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Maxime Ripard (2014-09-11 13:36:23)
+> >> Hi Chen-Yu,
+> >>
+> >> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
+> >> > Hi everyone,
+> >> >
+> >> > This series unifies the mux and divider parts of the AHB1 clock found
+> >> > on sun6i and sun8i, while also adding support for the pre-divider on
+> >> > the PLL6 input.
+> >> >
+> >> > The rate calculation logic must factor in which parent it is using to
+> >> > calculate the rate, to decide whether to use the pre-divider or not.
+> >> > This is beyond the original factors clk design in sunxi. To avoid
+> >> > feature bloat, this is implemented as a seperate composite clk.
+> >> >
+> >> > The new clock driver is registered with a separate OF_CLK_DECLARE.
+> >> > This is done so that assigned-clocks* properties on the clk provider
+> >> > node can actually work. The clock framework arranges the clock setup
+> >> > order by checking whether all clock parents are available, by checking
+> >> > the node matching OF_CLK_DECLARE.
+> >> >
+> >> > However, the sunxi clk driver is based on the root node compatible,
+> >> > has no defined dependencies (parents), and is setup before the fixed-rate
+> >> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
+> >> > There is no way to calculate the required clock factors to set a default
+> >> > clock rate under these circumstances. This happens when we set the
+> >> > defaults in the clock node (provider), rather than a clock consumer.
+> >> >
+> >> > I can think of 2 ways to solve the dependency issue, but neither is
+> >> > pretty. One would be to move the root fixed-rate clocks into the sunxi
+> >> > clk driver. The other would be separating all the clocks into individual
+> >> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
+> >>
+> >> I don't know what Mike thinks of this, but I'd prefer the second.
+> >
+> > I do not fully understand the problem. Ideally the clock driver should
+> > have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
+> > registered. Those fixed-rate parents are enumerated in your dts, right?
+> > Why isn't this enough?
+> 
+> This is due to the way the sunxi clock driver is setup. The clock driver's
+> OF_CLK_DECLARE matches against the "soc" node, not the individual clock
+> nodes. When the setup function is called, it just registers all the
+> supported clocks. There are no dependencies listed.
+> 
+> Unfortunately, the fixed-factor clock is in the middle of the whole clock
+> tree. The sunxi clock driver provides its parents _and_ its children.
+> Naturally the clock framework then probes the fixed-factor clock after
+> the sunxi ones. Any attempts to change the state of clocks under the
+> unavailable fixed-factor clock, such as done by of_clk_set_defaults(),
+> would get an incomplete clock, likely with no parents and parent_rate = 0.
+> That is until of_clk_init() finishes and all clocks are properly hooked
+> up.
+> 
+> Anyway, this problem only occurred when I added clk-assigned-* defaults
+> to the clock provider node, which is not the case anymore.
 
-If really necessary it could be reparented back on a per board level using
-the assigned-clocks mechanism.
+Makes sense. I guess you could ignore the problem until you need to use
+the assigned defaults.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3188.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+> 
+> The second method i proposed is to have OF_CLK_DECLAREs for each individual
+> clock. An example can be found here:
+> 
+>   https://github.com/wens/linux/commit/1276898da02a93da4af163ed5bdc88cdead565dc
+> 
+> This does add a lot of boilerplate code. Not really happy about it. But
+> it seems the proper way to split up the driver.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 1c5e644..6a81bc9 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -652,12 +652,33 @@ CLK_OF_DECLARE(rk3066a_cru, "rockchip,rk3066a-cru", rk3066a_clk_init);
- 
- static void __init rk3188a_clk_init(struct device_node *np)
- {
-+	struct clk *clk1, *clk2;
-+	unsigned long rate;
-+	int ret;
-+
- 	rk3188_common_clk_init(np);
- 	rockchip_clk_register_plls(rk3188_pll_clks,
- 				   ARRAY_SIZE(rk3188_pll_clks),
- 				   RK3188_GRF_SOC_STATUS);
- 	rockchip_clk_register_branches(rk3188_clk_branches,
- 				  ARRAY_SIZE(rk3188_clk_branches));
-+
-+	/* reparent aclk_cpu_pre from apll */
-+	clk1 = __clk_lookup("aclk_cpu_pre");
-+	clk2 = __clk_lookup("gpll");
-+	if (clk1 && clk2) {
-+		rate = clk_get_rate(clk1);
-+
-+		ret = clk_set_parent(clk1, clk2);
-+		if (ret < 0)
-+			pr_warn("%s: could not reparent aclk_cpu_pre to gpll\n",
-+				__func__);
-+
-+		clk_set_rate(clk1, rate);
-+	} else {
-+		pr_warn("%s: missing clocks to reparent aclk_cpu_pre to gpll\n",
-+			__func__);
-+	}
- }
- CLK_OF_DECLARE(rk3188a_cru, "rockchip,rk3188a-cru", rk3188a_clk_init);
- 
--- 
-2.1.0
+Yeah, this is OK. Ugly, but OK.
+
+Regards,
+Mike
+
+> 
+> 
+> Cheers
+> ChenYu
