@@ -1,131 +1,55 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:35 +0200
-Subject: [PATCH 02/27] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+Date: Fri, 26 Sep 2014 15:16:37 +0200
+Subject: [PATCH 04/27] KVM: ARM/arm64: fix broken __percpu annotation
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userspace loads code and data in a read-only memory regions, KVM
-needs to be able to handle this on arm and arm64.  Specifically this is
-used when running code directly from a read-only flash device; the
-common scenario is a UEFI blob loaded with the -bios option in QEMU.
+From: Will Deacon <will.deacon@arm.com>
 
-Note that the MMIO exit on writes to a read-only memory is ABI and can
-be used to emulate block-erase style flash devices.
+Running sparse results in a bunch of noisy address space mismatches
+thanks to the broken __percpu annotation on kvm_get_running_vcpus.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+This function returns a pcpu pointer to a pointer, not a pointer to a
+pcpu pointer. This patch fixes the annotation, which kills the warnings
+from sparse.
+
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm/kvm/arm.c                |  1 +
- arch/arm/kvm/mmu.c                | 22 ++++++++--------------
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- 4 files changed, 11 insertions(+), 14 deletions(-)
+ arch/arm/kvm/arm.c                | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..51257fd 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -25,6 +25,7 @@
- 
- #define __KVM_HAVE_GUEST_DEBUG
- #define __KVM_HAVE_IRQ_LINE
-+#define __KVM_HAVE_READONLY_MEM
- 
- #define KVM_REG_SIZE(id)						\
- 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9f788eb..ac306b4 100644
+index ac306b4..53ee31b 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -188,6 +188,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ONE_REG:
- 	case KVM_CAP_ARM_PSCI:
- 	case KVM_CAP_ARM_PSCI_0_2:
-+	case KVM_CAP_READONLY_MEM:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16e7994..62f5642 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -747,14 +747,13 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+@@ -82,7 +82,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
+ /**
+  * kvm_arm_get_running_vcpus - get the per-CPU array of currently running vcpus.
+  */
+-struct kvm_vcpu __percpu **kvm_get_running_vcpus(void)
++struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
+ {
+ 	return &kvm_arm_running_vcpu;
+ }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 44094e5..50431d3 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -193,7 +193,7 @@ static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
  }
  
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
--			  struct kvm_memory_slot *memslot,
-+			  struct kvm_memory_slot *memslot, unsigned long hva,
- 			  unsigned long fault_status)
- {
- 	int ret;
- 	bool write_fault, writable, hugetlb = false, force_pte = false;
- 	unsigned long mmu_seq;
- 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
--	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
- 	struct kvm *kvm = vcpu->kvm;
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
-@@ -863,7 +862,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	unsigned long fault_status;
- 	phys_addr_t fault_ipa;
- 	struct kvm_memory_slot *memslot;
--	bool is_iabt;
-+	unsigned long hva;
-+	bool is_iabt, write_fault, writable;
- 	gfn_t gfn;
- 	int ret, idx;
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+-struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
  
-@@ -884,7 +884,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	idx = srcu_read_lock(&vcpu->kvm->srcu);
+ u64 kvm_call_hyp(void *hypfn, ...);
  
- 	gfn = fault_ipa >> PAGE_SHIFT;
--	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
-+	memslot = gfn_to_memslot(vcpu->kvm, gfn);
-+	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
-+	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
-+	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
- 		if (is_iabt) {
- 			/* Prefetch Abort on I/O address */
- 			kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-@@ -892,13 +895,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			goto out_unlock;
- 		}
- 
--		if (fault_status != FSC_FAULT) {
--			kvm_err("Unsupported fault status on io memory: %#lx\n",
--				fault_status);
--			ret = -EFAULT;
--			goto out_unlock;
--		}
--
- 		/*
- 		 * The IPA is reported as [MAX:12], so we need to
- 		 * complement it with the bottom 12 bits from the
-@@ -910,9 +906,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		goto out_unlock;
- 	}
- 
--	memslot = gfn_to_memslot(vcpu->kvm, gfn);
--
--	ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
-+	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
- 	if (ret == 0)
- 		ret = 1;
- out_unlock:
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index e633ff8..f4ec5a6 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -37,6 +37,7 @@
- 
- #define __KVM_HAVE_GUEST_DEBUG
- #define __KVM_HAVE_IRQ_LINE
-+#define __KVM_HAVE_READONLY_MEM
- 
- #define KVM_REG_SIZE(id)						\
- 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
 -- 
 2.0.0
