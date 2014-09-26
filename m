@@ -1,32 +1,53 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 26 Sep 2014 22:06:30 +0800
-Subject: [PATCH] [media] rc: fix hix5hd2 compile-test issue
-In-Reply-To: <20140926131229.GS5182@n2100.arm.linux.org.uk>
-References: <1411571401-30664-1-git-send-email-zhangfei.gao@linaro.org>
- <1411736250-29252-1-git-send-email-zhangfei.gao@linaro.org>
- <20140926131229.GS5182@n2100.arm.linux.org.uk>
-Message-ID: <542572E6.70803@linaro.org>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Fri, 26 Sep 2014 23:08:29 +0900
+Subject: [PATCH 1/2] arm64: KVM: Implement 48 VA support for KVM EL2 and
+ Stage-2
+In-Reply-To: <1411674174-30672-2-git-send-email-christoffer.dall@linaro.org>
+References: <1411674174-30672-1-git-send-email-christoffer.dall@linaro.org>
+ <1411674174-30672-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <83040F34-A8F4-4C4E-8FF8-F2846029A577@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sep 26, 2014, at 4:42 AM, Christoffer Dall wrote:
 
+Hi, Christoffer
 
-On 09/26/2014 09:12 PM, Russell King - ARM Linux wrote:
-> On Fri, Sep 26, 2014 at 08:57:30PM +0800, Zhangfei Gao wrote:
->> Add dependence to solve build error in arch like ia64
->> error: implicit declaration of function 'readl_relaxed' & 'writel_relaxed'
->>
->> Change CONFIG_PM to CONFIG_PM_SLEEP to solve
->> warning: 'hix5hd2_ir_suspend' & 'hix5hd2_ir_resume' defined but not used
->
-> There is work currently in progress (in linux-next) to provide
-> asm-generic accessors for the above.
+> This patch adds the necessary support for all host kernel PGSIZE and
+> VA_SPACE configuration options for both EL2 and the Stage-2 page tables.
+> 
+> However, for 40bit and 42bit PARange systems, the architecture mandates
+> that VTCR_EL2.SL0 is maximum 1, resulting in fewer levels of stage-2
+> pagge tables than levels of host kernel page tables.  At the same time,
+> systems with a PARange > 42bit, we limit the IPA range by always setting
+> VTCR_EL2.T0SZ to 24.
+> 
+> To solve the situation with different levels of page tables for Stage-2
+> translation than the host kernel page tables, we allocate a dummy PGD
+> with pointers to our actual inital level Stage-2 page table, in order
+> for us to reuse the kernel pgtable manipulation primitives.  Reproducing
+> all these in KVM does not look pretty and unnecessarily complicates the
+> 32-bit side.
 
-Thanks Russell for the info.
+This is a very similar idea suggested by Steve Capper to deal with swapper
+table when I worked on 4 level solution. I believe that dummy PGD approach
+can handle all combinations described in ARMv8 architecture. 
 
-Have found the patch set about "asm-generic: io: implement relaxed 
-accessor macros as conditional wrappers".
+> Systems with a PARange < 40bits are not yet supported.
+> 
+> [ I have reworked this patch from its original form submitted by
+>   Jungseok to take the architecture constraints into consideration.
+>   There were too many changes from the original patch for me to
+>   preserve the authorship.  Thanks to Catalin Marinas for his help in
+>   figuring out a good solution to this challenge.  I have also fixed
+>   various bugs and missing error code handling from the original
+>   patch. - Christoffer ]
 
-That's great.
+No doubt. This is yours :)
+I really thank you for picking up the patch and writing this graceful solution.
 
-Thanks
+At first glance, it looks good except some unnecessary newlines.
+I will leave comments after reading the patches carefully.
+
+Best Regards
+Jungseok Lee
