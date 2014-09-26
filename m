@@ -1,74 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:53 +0200
-Subject: [PATCH 20/27] arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
-In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-21-git-send-email-christoffer.dall@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Sep 2014 14:20:38 +0100
+Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
+In-Reply-To: <20140926130311.GQ5182@n2100.arm.linux.org.uk>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
+ <20140926122003.GP5182@n2100.arm.linux.org.uk>
+ <20140926124614.GD7422@leverpostej>
+ <20140926130311.GQ5182@n2100.arm.linux.org.uk>
+Message-ID: <20140926132038.GF7422@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+> > This looks to be a carbon copy of the vexpress pseudo-hotplug in
+> > arch/arm/mach-vexpress/hotplug.c, which is obviously broken in the way
+> > you describe above. Perhaps we should go about ripping that out?
+> 
+> The Versatile Express does not support suspend so the only problem case
+> is kexec.  However, isn't this support needed for big.LITTLE, and as
+> the Versatile Express is the platform which these features get developed
+> on, having working CPU hotplug seems rather fundamental for ARM kernel
+> feature development.
+> 
+> In that regard, Versatile Express is something of a special case.
 
-We now have the information about the number of CPU interfaces in
-the distributor itself. Let's get rid of VGIC_MAX_CPUS, and just
-rely on KVM_MAX_VCPUS where we don't have the choice. Yet.
+It is admittedly helpful during development to perform pseudo-hotplug on
+Versatile Express. I have a local patch adding vexpress_cpu_disable so I
+can test for bugs that only trigger if CPU0 is hotplugged.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h | 3 +--
- virt/kvm/arm/vgic.c    | 6 +++---
- 2 files changed, 4 insertions(+), 5 deletions(-)
+Given that, perhaps we should make it clearer that Versatile Express is
+not a reference implementation for CPU hotplug; add some Kconfig (e.g.
+VEXPRESS_PSEUDO_HOTPLUG) that depends on !KEXEC && !SUSPEND, and putting
+a note in hotplug.c stating it's not suitable as a reference
+implementation.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b2f9936..3b73d78 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -29,13 +29,12 @@
- #define VGIC_NR_SGIS		16
- #define VGIC_NR_PPIS		16
- #define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
--#define VGIC_MAX_CPUS		KVM_MAX_VCPUS
- 
- #define VGIC_V2_MAX_LRS		(1 << 6)
- #define VGIC_V3_MAX_LRS		16
- 
- /* Sanity checks... */
--#if (VGIC_MAX_CPUS > 8)
-+#if (KVM_MAX_VCPUS > 8)
- #error	Invalid number of CPU interfaces
- #endif
- 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7d64dc2..599ad17 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1297,7 +1297,7 @@ static bool vgic_queue_sgi(struct kvm_vcpu *vcpu, int irq)
- 
- 	sources = *vgic_get_sgi_sources(dist, vcpu_id, irq);
- 
--	for_each_set_bit(c, &sources, VGIC_MAX_CPUS) {
-+	for_each_set_bit(c, &sources, dist->nr_cpus) {
- 		if (vgic_queue_irq(vcpu, c, irq))
- 			clear_bit(c, &sources);
- 	}
-@@ -1700,7 +1700,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	int i;
- 
--	if (vcpu->vcpu_id >= VGIC_MAX_CPUS)
-+	if (vcpu->vcpu_id >= dist->nr_cpus)
- 		return -EBUSY;
- 
- 	for (i = 0; i < VGIC_NR_IRQS; i++) {
-@@ -1767,7 +1767,7 @@ static int vgic_init_maps(struct kvm *kvm)
- 	int nr_cpus, nr_irqs;
- 	int ret, i;
- 
--	nr_cpus = dist->nr_cpus = VGIC_MAX_CPUS;
-+	nr_cpus = dist->nr_cpus = KVM_MAX_VCPUS;
- 	nr_irqs = dist->nr_irqs = VGIC_NR_IRQS;
- 
- 	ret  = vgic_init_bitmap(&dist->irq_enabled, nr_cpus, nr_irqs);
--- 
-2.0.0
+...but perhaps that's overkill.
+
+Mark.
