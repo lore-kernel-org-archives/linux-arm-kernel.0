@@ -1,98 +1,79 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:59 +0200
-Subject: [PATCH 26/27] arm/arm64: KVM: Fix VTTBR_BADDR_MASK and pgd alloc
+Date: Fri, 26 Sep 2014 15:17:00 +0200
+Subject: [PATCH 27/27] arm/arm64: KVM: Report correct FSC for unsupported
+ fault types
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-27-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-28-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joel Schopp <joel.schopp@amd.com>
+When we catch something that's not a permission fault or a translation
+fault, we log the unsupported FSC in the kernel log, but we were masking
+off the bottom bits of the FSC which was not very helpful.
 
-The current aarch64 calculation for VTTBR_BADDR_MASK masks only 39 bits
-and not all the bits in the PA range. This is clearly a bug that
-manifests itself on systems that allocate memory in the higher address
-space range.
+Also correctly report the FSC for data and instruction faults rather
+than telling people it was a DFCS, which doesn't exist in the ARM ARM.
 
- [ Modified from Joel's original patch to be based on PHYS_MASK_SHIFT
-   instead of a hard-coded value and to move the alignment check of the
-   allocation to mmu.c.  Also added a comment explaining why we hardcode
-   the IPA range and changed the stage-2 pgd allocation to be based on
-   the 40 bit IPA range instead of the maximum possible 48 bit PA range.
-   - Christoffer ]
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c               |  4 ++--
- arch/arm64/include/asm/kvm_arm.h | 13 ++++++++++++-
- arch/arm64/include/asm/kvm_mmu.h |  5 ++---
- 3 files changed, 16 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h   | 5 +++++
+ arch/arm/kvm/mmu.c                   | 8 +++++---
+ arch/arm64/include/asm/kvm_emulate.h | 5 +++++
+ 3 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 40bc3df..7796051 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -410,9 +410,9 @@ static void update_vttbr(struct kvm *kvm)
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 69b7469..b9db269 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -149,6 +149,11 @@ static inline bool kvm_vcpu_trap_is_iabt(struct kvm_vcpu *vcpu)
  
- 	/* update vttbr to be used with the new vmid */
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
-+	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
--	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
--	kvm->arch.vttbr |= vmid;
-+	kvm->arch.vttbr = pgd_phys | vmid;
- 
- 	spin_unlock(&kvm_vmid_lock);
+ static inline u8 kvm_vcpu_trap_get_fault(struct kvm_vcpu *vcpu)
+ {
++	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
++{
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC_TYPE;
  }
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index cc83520..7fd3e27 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -122,6 +122,17 @@
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ_40B	24
  
-+/*
-+ * We configure the Stage-2 page tables to always restrict the IPA space to be
-+ * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
-+ * not known to exist and will break with this configuration.
-+ *
-+ * Note that when using 4K pages, we concatenate two first level page tables
-+ * together.
-+ *
-+ * The magic numbers used for VTTBR_X in this patch can be found in Tables
-+ * D4-23 and D4-25 in ARM DDI 0487A.b.
-+ */
- #ifdef CONFIG_ARM64_64K_PAGES
- /*
-  * Stage2 translation configuration:
-@@ -149,7 +160,7 @@
- #endif
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index bb06f76..eea0306 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -882,10 +882,12 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
  
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
--#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#define VTTBR_BADDR_MASK  (((1LLU << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
- #define VTTBR_VMID_SHIFT  (48LLU)
- #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+ 	/* Check the stage-2 fault is trans. fault or write fault */
+-	fault_status = kvm_vcpu_trap_get_fault(vcpu);
++	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+ 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM) {
+-		kvm_err("Unsupported fault status: EC=%#x DFCS=%#lx\n",
+-			kvm_vcpu_trap_get_class(vcpu), fault_status);
++		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++			kvm_vcpu_trap_get_class(vcpu),
++			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++			(unsigned long)kvm_vcpu_get_hsr(vcpu));
+ 		return -EFAULT;
+ 	}
  
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 737da74..a030d16 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -59,10 +59,9 @@
- #define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index fdc3e21..5674a55 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -174,6 +174,11 @@ static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
  
- /*
-- * Align KVM with the kernel's view of physical memory. Should be
-- * 40bit IPA, with PGD being 8kB aligned in the 4KB page configuration.
-+ * We currently only support a 40bit IPA.
-  */
--#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
-+#define KVM_PHYS_SHIFT	(40)
- #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
- #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
+ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+ {
++	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
++{
+ 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
+ }
  
 -- 
 2.0.0
