@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 Sep 2014 17:29:40 -0700
+Date: Thu, 25 Sep 2014 17:29:49 -0700
 Subject: [GIT PULL] Add initial support for Broadcom Cygnus SoC
-Message-ID: <1411691380-22054-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1411691389-22140-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
