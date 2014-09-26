@@ -1,49 +1,79 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 08:48:40 +0800
-Subject: [PATCH 2/2] ARM: vf610: Use ARM Global Timer as clocksource
-In-Reply-To: <87a95njqnr.fsf@nbsps.com>
-References: <1410437175-6636-1-git-send-email-stefan@agner.ch>
- <1410437175-6636-2-git-send-email-stefan@agner.ch>
- <20140925075013.GD6405@dragon> <7006ad6e519c2ce3eeded54d35c87183@agner.ch>
- <87a95njqnr.fsf@nbsps.com>
-Message-ID: <20140926004839.GA21077@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 26 Sep 2014 08:55:27 +0800
+Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
+In-Reply-To: <20140926002544.19023.39287@quantum>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <20140911203623.GJ31276@lukather> <20140926002544.19023.39287@quantum>
+Message-ID: <CAGb2v67QkjfH2U9YGUVcwisNakNs_=zEEWghiGkaGkm-A8aK=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 06:12:24PM -0400, Bill Pringlemeir wrote:
-> The global timer is based off the 133/166Mhz BUSCLK.  I think the PIT is
-> also and I don't think you can clock the PIT with the 32Khz clock?  The
-> ARM MPCore-A5 has this to say,
-> 
->    2.4.2 Power domains
->    In addition, the SCU provides two more power domains:
-> 
->    ? One for the SCU control logic and peripherals, such as the interrupt
->      controller and timer/watchdog units, V SCU.
-> 
->    The separate SCU power domains can remain active even when all the
->    cores are powered down.
-> 
-> So, it seems that the global timer could remain powered.  However, we
-> need the GPC to have the 'Global timer' as a wakeup source.  I think the
-> PIT can wake the CPU via the PDB.
-> 
-> The Global timer may keep counting even when the Core is in some stop
-> modes as long as the BUSCLK is on.  However, I don't think it can wake
-> the CPU and it definitely can not run from the 32K clock which would be
-> the lowest power mode.  I think only the LPTMR and the FTM support this
-> clock.  The PIT seems to be as fragile as the ARM global timer, except
-> for wakeups.  If the BUSCLK changes due to frequency scaling, then both
-> will be affected.
-> 
-> The ARM global timer seems like it is more efficient to access than the
-> PIT which runs through the AXI bus.  For this reason, I thought it
-> should be the default.  I guess benchmarks would be nice?  At least
-> Stefan's patches give this opportunity.
+On Fri, Sep 26, 2014 at 8:25 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Maxime Ripard (2014-09-11 13:36:23)
+>> Hi Chen-Yu,
+>>
+>> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
+>> > Hi everyone,
+>> >
+>> > This series unifies the mux and divider parts of the AHB1 clock found
+>> > on sun6i and sun8i, while also adding support for the pre-divider on
+>> > the PLL6 input.
+>> >
+>> > The rate calculation logic must factor in which parent it is using to
+>> > calculate the rate, to decide whether to use the pre-divider or not.
+>> > This is beyond the original factors clk design in sunxi. To avoid
+>> > feature bloat, this is implemented as a seperate composite clk.
+>> >
+>> > The new clock driver is registered with a separate OF_CLK_DECLARE.
+>> > This is done so that assigned-clocks* properties on the clk provider
+>> > node can actually work. The clock framework arranges the clock setup
+>> > order by checking whether all clock parents are available, by checking
+>> > the node matching OF_CLK_DECLARE.
+>> >
+>> > However, the sunxi clk driver is based on the root node compatible,
+>> > has no defined dependencies (parents), and is setup before the fixed-rate
+>> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
+>> > There is no way to calculate the required clock factors to set a default
+>> > clock rate under these circumstances. This happens when we set the
+>> > defaults in the clock node (provider), rather than a clock consumer.
+>> >
+>> > I can think of 2 ways to solve the dependency issue, but neither is
+>> > pretty. One would be to move the root fixed-rate clocks into the sunxi
+>> > clk driver. The other would be separating all the clocks into individual
+>> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
+>>
+>> I don't know what Mike thinks of this, but I'd prefer the second.
+>
+> I do not fully understand the problem. Ideally the clock driver should
+> have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
+> registered. Those fixed-rate parents are enumerated in your dts, right?
+> Why isn't this enough?
 
-So it sounds like the global timer will keep counting even when ARM core
-is powered down, and you're saying that ARM global timer doesn't do
-anything worse than PIT and should be the default.  In that case, I'm
-fine with the patch and will apply them shortly.
+This is due to the way the sunxi clock driver is setup. The clock driver's
+OF_CLK_DECLARE matches against the "soc" node, not the individual clock
+nodes. When the setup function is called, it just registers all the
+supported clocks. There are no dependencies listed.
 
-Shawn
+Unfortunately, the fixed-factor clock is in the middle of the whole clock
+tree. The sunxi clock driver provides its parents _and_ its children.
+Naturally the clock framework then probes the fixed-factor clock after
+the sunxi ones. Any attempts to change the state of clocks under the
+unavailable fixed-factor clock, such as done by of_clk_set_defaults(),
+would get an incomplete clock, likely with no parents and parent_rate = 0.
+That is until of_clk_init() finishes and all clocks are properly hooked
+up.
+
+Anyway, this problem only occurred when I added clk-assigned-* defaults
+to the clock provider node, which is not the case anymore.
+
+The second method i proposed is to have OF_CLK_DECLAREs for each individual
+clock. An example can be found here:
+
+  https://github.com/wens/linux/commit/1276898da02a93da4af163ed5bdc88cdead565dc
+
+This does add a lot of boilerplate code. Not really happy about it. But
+it seems the proper way to split up the driver.
+
+
+Cheers
+ChenYu
