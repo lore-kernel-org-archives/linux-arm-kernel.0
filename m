@@ -1,43 +1,46 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 26 Sep 2014 16:25:12 +1000
-Subject: linux-next: manual merge of the tip tree with the arm-soc tree
-Message-ID: <20140926162512.07ef4957@canb.auug.org.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Sep 2014 08:25:26 +0200
+Subject: [PATCH/RFC v2 02/12] PM / Domains: Add DT bindings for PM QoS
+ device latencies
+In-Reply-To: <7heguzbd4z.fsf@deeprootsystems.com>
+References: <1410893339-6361-1-git-send-email-geert+renesas@glider.be>
+ <1410893339-6361-3-git-send-email-geert+renesas@glider.be>
+ <7heguzbd4z.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdVp6MiPb8Dhph=eyTgsnBbQSzEHbA9TOjCDi=7BM8GgTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Kevin,
 
-Today's linux-next merge of the tip tree got a conflict in
-arch/arm/mach-omap2/irq.c between commit 8598066cddd1 ("arm: omap: irq:
-move irq.c to drivers/irqchip/") from the arm-soc tree and commit
-f978999f6096 ("Use the new handle_domain_irq method to handle
-interrupts") from the tip tree.
+On Thu, Sep 25, 2014 at 11:31 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Geert Uytterhoeven <geert+renesas@glider.be> writes:
+>> PM QoS device start/stop and save/restore state latencies are more or
+>> less properties of the hardware.
+>> In legacy code, they're specified from platform code.
+>> On DT platforms, their values should come from DT.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Should these properties be called "linux,*-latency"?
+>
+> Hmm, the start/stop latencies are clearly properties of the hardware,
+> but the save/restore latencies seem to be a function of the driver.
+> e.g., some drivers may keep a shadow copy of their registers in memory
+> so the save time is minimized.
+>
+> I don't have too strong of an opinion on this, but probably the drivers
+> should just add their own values to the start/stop latencies to add the
+> linux specific overhead.
 
-I fixed it up (I applied the latter patch to the moved file - see
-below) and can carry the fix as necessary (no action is required).
+Thanks. I agree with you on this, so I'll remove the save/restore latencies.
 
-diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index f3814e79192d..28718d3e8281 100644
---- a/drivers/irqchip/irq-omap-intc.c
-+++ b/drivers/irqchip/irq-omap-intc.c
-@@ -334,8 +334,7 @@ out:
- 		irqnr &= ACTIVEIRQ_MASK;
- 
- 		if (irqnr) {
--			irqnr = irq_find_mapping(domain, irqnr);
--			handle_IRQ(irqnr, regs);
-+			handle_domain_irq(domain, irqnr, regs);
- 			handled_irq = 1;
- 		}
- 	} while (irqnr);
+Gr{oetje,eeting}s,
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/b76d145a/attachment.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
