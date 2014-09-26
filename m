@@ -1,179 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 Sep 2014 10:47:52 +0100
-Subject: [PATCH v2] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <1410473895-6756-1-git-send-email-sonnyrao@chromium.org>
-References: <1410473895-6756-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <20140926094752.GB4476@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 26 Sep 2014 10:51:55 +0100
+Subject: [PATCH 3/6] irqchip: irq-st: Add documentation for STi based
+ syscfg IRQs
+In-Reply-To: <20140818120545.GQ12769@titan.lakedaemon.net>
+References: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
+ <1406642744-22589-4-git-send-email-lee.jones@linaro.org>
+ <20140818120545.GQ12769@titan.lakedaemon.net>
+Message-ID: <20140926095155.GD4097@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sonny,
+On Mon, 18 Aug 2014, Jason Cooper wrote:
 
-Apologies for the delay in replying, I'd hoped to cover this at Connect,
-but we didn't seem to get the time, and since I've been back in the UK
-it slipped my mind.
+> Hey Lee,
+> 
+> Rob, Grant, question for you below:
+> 
+> On Tue, Jul 29, 2014 at 03:05:41PM +0100, Lee Jones wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../interrupt-controller/st,sti-irq-syscfg.txt     | 35 ++++++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
+> > new file mode 100644
+> > index 0000000..ced6014
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
+> > @@ -0,0 +1,35 @@
+> > +STMicroelectronics STi System Configuration Controlled IRQs
+> > +-----------------------------------------------------------
+> > +
+> > +On STi based systems; External, CTI (Core Sight), PMU (Performance Management),
+> > +and PL310 L2 Cache IRQs are controlled using System Configuration registers.
+> > +This driver is used to unmask them prior to use.
+> 
+> We don't usually refer to the driver in binding docs as they are
+> supposed to be OS-agnostic.
 
-On Thu, Sep 11, 2014 at 11:18:15PM +0100, Sonny Rao wrote:
-> This is a bug fix for using physical arch timers when
-> the arch_timer_use_virtual boolean is false.  It restores the
-> arch_counter_get_cntpct() function after removal in
-> 
-> 0d651e4e "clocksource: arch_timer: use virtual counters"
+I beg to differ:
 
-Given we cannot get firmware involved, I am happy to use the physical
-cp15 counters when we can't guarantee the value of CNTVOFF.
+$ git grep -i driver -- Documentation/devicetree/ | wc -l
+355
 
-> and completes the implementation of memory mapped access for physical
-> timers, so if a system is trying to use physical timers, it will
-> function properly.
+I can understand if I was referencing Linux driver implementation
+specifics, but any of the OS's drivers would also be un/masking IRQs
+in order to provide this functionality.
 
-I don't see why we need to change the MMIO timers. Those are global
-rather than per-cpu, aren't turned off when CPUs go down (or they'd be
-useless), and we only use a single frame, so I don't see why the value
-of the virtual offset should matter.
 
-Additionally, the CP15 and MMIO timers could be configured separately
-w.r.t. timer and counter access, and for the MMIO timers we can
-determine which we can access by reading a register.
+> > +Required properties:
+> > +- compatible	: Should be set to one of:
+> > +			"st,stih415-irq-syscfg"
+> > +			"st,stih416-irq-syscfg"
+> > +			"st,stih407-irq-syscfg"
+> > +			"st,stid127-irq-syscfg"
+> > +- st,syscfg	: Phandle to Cortex-A9 IRQ system config registers
+> > +- st,irq-device	: Array of IRQs to enable - should be 2 in length
+> > +- st,fiq-device	: Array of FIQs to enable - should be 2 in length
+> > +
+> > +Optional properties:
+> > +- st,invert-ext	: External IRQs can be inverted at will.  This property inverts
+> > +		  these IRQs using bitwise logic.  A number of defines have been
+> > +		  provided for convenience:
+> > +			ST_IRQ_SYSCFG_EXT_1_INV
+> > +			ST_IRQ_SYSCFG_EXT_2_INV
+> > +			ST_IRQ_SYSCFG_EXT_3_INV
+> > +Example:
+> 
+> Rob, Grant, should we be mingling implementation details (macros from
+> include files) with the binding documentation?  It just _seems_ wrong
+> too me.  But if we agree that the binding docs, the dts files, and their
+> includes are always kept together, I also don't see the harm...
 
-I do not think the selection of physical/virtual timers should be shared
-by the CP15 and MMIO timers.
+IMHO, we should be able to document anything here which appears in the
+DTS(I) files.
 
-Mark.
+> > +irq-syscfg {
+> > +	compatible    = "st,stih416-irq-syscfg";
+> > +	st,syscfg     = <&syscfg_cpu>;
+> > +	st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
+> > +			<ST_IRQ_SYSCFG_PMU_1>;
+> > +	st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
+> > +			<ST_IRQ_SYSCFG_DISABLED>;
+> > +	st,invert-ext = <(ST_IRQ_SYSCFG_EXT_1_INV | ST_IRQ_SYSCFG_EXT_3_INV)>;
+> > +};
 
-> 
-> We need this on certain ARMv7 systems which are architected like this:
-> 
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->   we don't want to add the complexity of hypervisor there.
-> 
-> * The firmware isn't involved in SMP bringup or resume.
-> 
-> * The ARCH timer come up with an uninitialized offset between the
->   virtual and physical counters.  Each core gets a different random
->   offset.
-> 
-> * The device boots in "Secure SVC" mode.
-> 
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->   CNTHCTL.PL1PCTEN (both default to 1 at reset)
-> 
-> One example of such as system is RK3288 where it is much simpler to
-> use the physical counter since there's nobody managing the offset and
-> each time a core goes down and comes back up it will get reinitialized
-> to some other random value.
-> 
-> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
-> ---
-> v2: Add fixes tag to commit message, cc stable, copy Doug's
->     description of the systems which need this in commit message.
-> ---
->  arch/arm/include/asm/arch_timer.h    |  9 +++++++++
->  arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
->  drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
->  3 files changed, 45 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 0704e0c..e72aa4d 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
->  	return val;
->  }
->  
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-> +	return cval;
-> +}
-> +
->  static inline u64 arch_counter_get_cntvct(void)
->  {
->  	u64 cval;
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 9400596..58657c4 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
->  #endif
->  }
->  
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> +
-> +	return cval;
-> +}
-> +
->  static inline u64 arch_counter_get_cntvct(void)
->  {
->  	u64 cval;
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..ad723cb 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -30,6 +30,8 @@
->  #define CNTTIDR		0x08
->  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
->  
-> +#define CNTPCT_LO	0x00
-> +#define CNTPCT_HI	0x04
->  #define CNTVCT_LO	0x08
->  #define CNTVCT_HI	0x0c
->  #define CNTFRQ		0x10
-> @@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
->  	return ((u64) vct_hi << 32) | vct_lo;
->  }
->  
-> +static u64 arch_counter_get_cntpct_mem(void)
-> +{
-> +	u32 pct_lo, pct_hi, tmp_hi;
-> +
-> +	do {
-> +		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
-> +		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +	} while (pct_hi != tmp_hi);
-> +
-> +	return ((u64) pct_hi << 32) | pct_lo;
-> +}
-> +
->  /*
->   * Default to cp15 based access because arm64 uses this function for
->   * sched_clock() before DT is probed and the cp15 method is guaranteed
-> @@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
->  	u64 start_count;
->  
->  	/* Register the CP15 based counter if we have one */
-> -	if (type & ARCH_CP15_TIMER)
-> -		arch_timer_read_counter = arch_counter_get_cntvct;
-> -	else
-> -		arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +	if (type & ARCH_CP15_TIMER) {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct;
-> +	} else {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct_mem;
-> +	}
->  
->  	start_count = arch_timer_read_counter();
->  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> -- 
-> 1.8.3.2
-> 
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
