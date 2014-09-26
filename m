@@ -1,37 +1,48 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Sep 2014 16:29:00 -0700
-Subject: [PATCHv4] clk: ppc-corenet: rename to ppc-qoriq and add
- CLK_OF_DECLARE support
-In-Reply-To: <1411685780.13320.209.camel@snotra.buserror.net>
-References: <1411454806-8214-1-git-send-email-jingchang.lu@freescale.com>
- <d4a375f40b544cf1ae78ac82dc20569c@BL2PR03MB467.namprd03.prod.outlook.com>
- <1411675680.13320.201.camel@snotra.buserror.net>
- <20140925225406.19023.25065@quantum>
- <1411685780.13320.209.camel@snotra.buserror.net>
-Message-ID: <20140926232900.19023.35854@quantum>
+Date: Fri, 26 Sep 2014 16:32:10 -0700
+Subject: [PATCH v5 0/4] clk: hix5hd2: clocks update
+In-Reply-To: <1411356016-20553-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1411356016-20553-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140926233210.19023.98858@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Scott Wood (2014-09-25 15:56:20)
-> On Thu, 2014-09-25 at 15:54 -0700, Mike Turquette wrote:
-> > Quoting Scott Wood (2014-09-25 13:08:00)
-> > > Well, like I said, I'd rather see the CLK_OF_DECLARE stuff be made to
-> > > work on PPC rather than have the driver carry around two binding
-> > > methods.
-> > 
-> > I guess that is an existing problem, and not related directly to this
-> > patch? This patch is essentially just renames (though the V1.0/V2.0
-> > stuff seems weird).
+Quoting Zhangfei Gao (2014-09-21 20:20:12)
+> v5:
+> 0001:
+> Suggested by Mike, change to clk_ether_prepare since delay required inside
 > 
-> This patch is adding CLK_OF_DECLARE.
+> v4:
+> Drop ir clock, whose register is not in the same region
+> 
+> v3: 
+> Add patches 3, 4, 5 for clocks of watchdog, ir, and i2c
+> Patches 1, 2 are same as v2
 
-I'm fine taking this patch but your comments are still unresolved. What
-do you think needs to be done to fix the problems that you see?
+Patches look OK to me. Will you or Wei be sending me a pull request?
+
+Also in the future please try to have more info in your change logs.
 
 Regards,
 Mike
 
 > 
-> -Scott
+> Guoxiong Yan (1):
+>   clk: hix5hd2: add watchdog0 clocks
 > 
+> Jiancheng Xue (1):
+>   clk: hix5hd2: add sd clk
+> 
+> Wei Yan (1):
+>   clk: hix5hd2: add I2C clocks
+> 
+> Zhangfei Gao (1):
+>   clk: hix5hd2: add complex clk
+> 
+>  drivers/clk/hisilicon/clk-hix5hd2.c       |  236 ++++++++++++++++++++++++++++-
+>  include/dt-bindings/clock/hix5hd2-clock.h |   27 ++++
+>  2 files changed, 257 insertions(+), 6 deletions(-)
+> 
+> -- 
+> 1.7.9.5
 > 
