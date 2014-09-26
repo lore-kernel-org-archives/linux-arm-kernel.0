@@ -1,127 +1,97 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 26 Sep 2014 18:44:01 +0530
-Subject: [PATCH 3/3] drivers/rtc/rtc-snvs: Add clock support
-In-Reply-To: <cover.1411736171.git.maitysanchayan@gmail.com>
-References: <cover.1411736171.git.maitysanchayan@gmail.com>
-Message-ID: <8a1904a59f7b171a7cf1e71b9e80f0cf7b1061c0.1411736171.git.maitysanchayan@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 26 Sep 2014 15:16:33 +0200
+Subject: [PATCH 00/27] Changes for arm/arm64 KVM for 3.18
+Message-ID: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock enable and disable support
-for the SNVS peripheral which is required by the
-SNVS RTC.
+Hi Paolo,
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+The following changes since commit f51770ed465e6eb41da7fa16fd92eb67069600cf:
+
+  kvm: Make init_rmode_identity_map() return 0 on success. (2014-09-17 13:10:12 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.18
+
+for you to fetch changes up to 0496daa5cf99741ce8db82686b4c7446a37feabb:
+
+  arm/arm64: KVM: Report correct FSC for unsupported fault types (2014-09-26 14:39:45 +0200)
+
+This includes a bunch of changes:
+ - Support read-only memory slots on arm/arm64
+ - Various changes to fix Sparse warnings
+ - Correctly detect write vs. read Stage-2 faults
+ - Various VGIC cleanups and fixes
+ - Dynamic VGIC data strcuture sizing
+ - Fix SGI set_clear_pend offset bug
+ - Fix VTTBR_BADDR Mask
+ - Correctly report the FSC on Stage-2 faults
+
+Thanks,
+-Christoffer
+
 ---
- drivers/rtc/rtc-snvs.c |   48 +++++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 39 insertions(+), 9 deletions(-)
+Ard Biesheuvel (1):
+      ARM/arm64: KVM: fix use of WnR bit in kvm_is_write_fault()
 
-diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-index fa384fe..f3e8f05 100644
---- a/drivers/rtc/rtc-snvs.c
-+++ b/drivers/rtc/rtc-snvs.c
-@@ -17,6 +17,7 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/rtc.h>
-+#include <linux/clk.h>
- 
- /* These register offsets are relative to LP (Low Power) range */
- #define SNVS_LPCR		0x04
-@@ -39,6 +40,7 @@ struct snvs_rtc_data {
- 	void __iomem *ioaddr;
- 	int irq;
- 	spinlock_t lock;
-+	struct clk *clk;
- };
- 
- static u32 rtc_read_lp_counter(void __iomem *ioaddr)
-@@ -260,8 +262,31 @@ static int snvs_rtc_probe(struct platform_device *pdev)
- 	if (data->irq < 0)
- 		return data->irq;
- 
-+	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
-+			       IRQF_SHARED, "rtc alarm", &pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
-+			data->irq, ret);
-+		return ret;
-+	}
-+
-+	data->clk = devm_clk_get(&pdev->dev, "snvs");
-+	if (IS_ERR(data->clk)) {
-+		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
-+						PTR_ERR(data->clk));
-+		ret = PTR_ERR(data->clk);
-+		return ret;
-+	}
-+
- 	platform_set_drvdata(pdev, data);
- 
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Could not prepare or enable the snvs clock\n");
-+		return ret;
-+	}
-+
- 	spin_lock_init(&data->lock);
- 
- 	/* Initialize glitch detect */
-@@ -275,23 +300,20 @@ static int snvs_rtc_probe(struct platform_device *pdev)
- 
- 	device_init_wakeup(&pdev->dev, true);
- 
--	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
--			       IRQF_SHARED, "rtc alarm", &pdev->dev);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
--			data->irq, ret);
--		return ret;
--	}
--
- 	data->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
- 					&snvs_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(data->rtc)) {
- 		ret = PTR_ERR(data->rtc);
- 		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
--		return ret;
-+		goto error_rtc_device_register;
- 	}
- 
- 	return 0;
-+
-+error_rtc_device_register:
-+	clk_disable_unprepare(data->clk);
-+
-+	return ret;
- }
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -302,16 +324,24 @@ static int snvs_rtc_suspend(struct device *dev)
- 	if (device_may_wakeup(dev))
- 		enable_irq_wake(data->irq);
- 
-+	clk_disable_unprepare(data->clk);
-+
- 	return 0;
- }
- 
- static int snvs_rtc_resume(struct device *dev)
- {
-+	int ret;
-+
- 	struct snvs_rtc_data *data = dev_get_drvdata(dev);
- 
- 	if (device_may_wakeup(dev))
- 		disable_irq_wake(data->irq);
- 
-+	ret = clk_prepare_enable(data->clk);
-+	if (ret)
-+		return ret;
-+
- 	return 0;
- }
- #endif
--- 
-1.7.9.5
+Christoffer Dall (11):
+      KVM: Introduce gfn_to_hva_memslot_prot
+      arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+      Merge remote-tracking branch 'kvm/next' into queue
+      arm/arm64: KVM: Rename irq_state to irq_pending
+      arm/arm64: KVM: Rename irq_active to irq_queued
+      arm/arm64: KVM: vgic: Clear queued flags on unqueue
+      arm/arm64: KVM: vgic: Improve handling of GICD_I{CS}PENDRn
+      arm/arm64: KVM: vgic: Fix SGI writes to GICD_I{CS}PENDR0
+      arm/arm64: KVM: vgic: Clarify and correct vgic documentation
+      arm/arm64: KVM: Fix set_clear_sgi_pend_reg offset
+      arm/arm64: KVM: Report correct FSC for unsupported fault types
+
+Eric Auger (1):
+      KVM: EVENTFD: remove inclusion of irq.h
+
+Joel Schopp (1):
+      arm/arm64: KVM: Fix VTTBR_BADDR_MASK and pgd alloc
+
+Marc Zyngier (8):
+      KVM: ARM: vgic: plug irq injection race
+      arm/arm64: KVM: vgic: switch to dynamic allocation
+      arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
+      arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
+      arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
+      arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
+      arm/arm64: KVM: vgic: delay vgic allocation until init time
+      arm/arm64: KVM: vgic: make number of irqs a configurable attribute
+
+Will Deacon (6):
+      KVM: ARM/arm64: fix non-const declaration of function returning const
+      KVM: ARM/arm64: fix broken __percpu annotation
+      KVM: ARM/arm64: avoid returning negative error code as bool
+      KVM: ARM/arm64: return -EFAULT if copy_from_user fails in set_timer_reg
+      KVM: vgic: return int instead of bool when checking I/O ranges
+      KVM: vgic: declare probe function pointer as const
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  10 +
+ arch/arm/include/asm/kvm_emulate.h             |   5 +
+ arch/arm/include/asm/kvm_host.h                |   2 +-
+ arch/arm/include/asm/kvm_mmu.h                 |  11 -
+ arch/arm/include/uapi/asm/kvm.h                |   2 +
+ arch/arm/kvm/arm.c                             |  17 +-
+ arch/arm/kvm/coproc.c                          |   2 +-
+ arch/arm/kvm/guest.c                           |   2 +-
+ arch/arm/kvm/mmu.c                             |  40 +-
+ arch/arm64/include/asm/kvm_arm.h               |  13 +-
+ arch/arm64/include/asm/kvm_emulate.h           |   5 +
+ arch/arm64/include/asm/kvm_host.h              |   4 +-
+ arch/arm64/include/asm/kvm_mmu.h               |  18 +-
+ arch/arm64/include/uapi/asm/kvm.h              |   2 +
+ arch/arm64/kvm/guest.c                         |   2 +-
+ arch/arm64/kvm/sys_regs.c                      |   2 +-
+ include/kvm/arm_vgic.h                         | 112 +++--
+ include/linux/kvm_host.h                       |   2 +
+ virt/kvm/arm/vgic.c                            | 631 ++++++++++++++++++++-----
+ virt/kvm/eventfd.c                             |   1 -
+ virt/kvm/kvm_main.c                            |  11 +-
+ 21 files changed, 678 insertions(+), 216 deletions(-)
