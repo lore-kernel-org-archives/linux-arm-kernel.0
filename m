@@ -1,39 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Sep 2014 21:51:53 +0100
-Subject: [PATCH 2/3] pm: add FSM configuration for deep sleep
-In-Reply-To: <20140926120201.GN5182@n2100.arm.linux.org.uk>
-References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
- <1411730703-25836-3-git-send-email-chenhui.zhao@freescale.com>
- <20140926120201.GN5182@n2100.arm.linux.org.uk>
-Message-ID: <20140926205153.GY5182@n2100.arm.linux.org.uk>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 26 Sep 2014 22:57:38 +0200
+Subject: Crash on ARM: 8148/1 flush TLS and thumbee register
+Message-ID: <CAGhQ9VzyK3qW2pr-YOFywUS7=9RLDzrj6wOFFhnvyDkks_2VCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 01:02:01PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 26, 2014 at 07:25:02PM +0800, Chenhui Zhao wrote:
-> > +void fsm_write32(void __iomem *addr, u32 val)
-> > +{
-> > +#ifdef __arm__
-> > +	iowrite32be(val, addr);
-> > +#endif
-> > +
-> > +#ifdef __powerpc__
-> > +	out_be32(addr, val);
-> > +#endif
-> 
-> The idea of iowrite* is that it should be able to address MMIO or IO
-> memory irrespective of the platform.  Why is PowerPC not implementing
-> this accessor, or why can't it be used for PowerPC?
-> 
-> This should just use iowrite32be(), and if it doesn't work on PowerPC,
-> PowerPC needs to be fixed.
+Hi,
 
-BenH tells me that this should be able to use iowrite32be() on PowerPC
-too without problems, there should be no need to use the older out_be32()
-accessors here.  Please can you look into using only iowrite32be() here?
+My Cortex-M4 noMMU platform crashes on 3.17-rc6 with fbfb872f5f417cea4
+"ARM: 8148/1: flush TLS and thumbee register state during exec".
 
-Thanks.
+Revering fbfb872f5f417cea4 makes it good as normal again.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+The platform I am working on is a Thum only Cortex-M4 that is not upstream yet.
+
+Boot log of crash:
+[ 6.100000] clk: Not disabling unused clocks
+[ 6.110000] RAMDISK: gzip image found at block 0
+[ 9.590000] VFS: Mounted root (ext2 filesystem) readonly on device 1:0.
+[ 9.600000] devtmpfs: mounted
+[ 9.610000] Freeing unused kernel memory: 68K (281e5000 - 281f6000)
+[ 9.630000]
+[ 9.630000] Unhandled exception: IPSR = 00000005 LR = fffffff1
+[ 9.630000]
+[ 9.630000] CPU: 0 PID: 1 Comm: swapper Not tainted
+3.17.0-rc6-00313-gd2205fa30aa7 #191
+[ 9.630000] task: 29834000 ti: 29832000 task.ti: 29832000
+[ 9.630000] PC is at flush_thread+0x2e/0x40
+[ 9.630000] LR is at flush_thread+0x21/0x40
+[ 9.630000] pc : [<2800954a>] lr : [<2800953d>] psr: 4100000b
+[ 9.630000] sp : 29833d60 ip : 00000000 fp : 00000001
+[ 9.630000] r10: 00003cf8 r9 : 29b1f000 r8 : 00000000
+[ 9.630000] r7 : 29b0bc00 r6 : 29834000 r5 : 29832000 r4 : 29832000
+[ 9.630000] r3 : ffff0ff0 r2 : 29832000 r1 : 00000000 r0 : 282121f0
+[ 9.630000] xPSR: 4100000b
+[ 9.630000] CPU: 0 PID: 1 Comm: swapper Not tainted
+3.17.0-rc6-00313-gd2205fa30aa7 #191
+[ 9.630000] [<2800afa5>] (unwind_backtrace) from [<2800a327>]
+(show_stack+0xb/0xc)
+[ 9.630000] [<2800a327>] (show_stack) from [<2800a963>]
+(__invalid_entry+0x4b/0x4c)
+
+
+regards,
+Joachim Eastwood
