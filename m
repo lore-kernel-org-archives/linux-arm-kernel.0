@@ -1,52 +1,116 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 Sep 2014 16:54:08 -0700
-Subject: [GIT PULL] ARM: brcmstb: SMP, earlyprintk and Kconfig cleanups
-Message-ID: <1411689248-14074-1-git-send-email-f.fainelli@gmail.com>
+Date: Thu, 25 Sep 2014 17:14:10 -0700
+Subject: [PATCH v2 0/6] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <54248791.9060805@gmail.com>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1411507057-14771-1-git-send-email-jonathar@broadcom.com>
+ <54248344.5030308@broadcom.com> <54248791.9060805@gmail.com>
+Message-ID: <5424AFD2.2070406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Scott, Jonathan,
 
-This pull request contains 3 changes for the brcmstb platform
+On 09/25/2014 02:22 PM, Florian Fainelli wrote:
+> Hi Scott,
+> 
+> On 09/25/2014 02:04 PM, Scott Branden wrote:
+>> Hi Matt/Christian (and others),
+>>
+>> We would like to move forward in getting our base Cygnus support into
+>> the mainline kernel.  From there we will be able to contribute
+>> additional drivers.
+>>
+>> Is somebody willing to accept this pull request to get this patchset
+>> accepted by the open source community?
+> 
+> I am fine with taking the ARM patches and putting them at
+> http://github/brcm/linux.git, with C code in cygnus/board and the Device
+> Tree files in cygnus/dt for instance?
+> 
+> The clock driver patch will have to go through Mike Turquette's tree
+> unless he wants to delegate that one.
 
-- first patch re-introduces SMP support after fixing the problems we had in
-  the initial implementation, for this patch to apply cleanly, I had to advance
-  up to "ARM: brcmstb: revert SMP support"
-
-- second patch is dropping unused Kconfig dependencies
-
-- third patch adds earlyprintk to brcmstb platforms using the existing 8250
-  infrastructure
+Could you resend patch 3 without the clock binding, patch 4 without the
+clocks node, and patch 6 without the drivers/clk changes? Once you do
+that, I can assemble these patches quickly and send a pull request which
+does only contain ARM SoC and DTS changes, and you can get the clock
+driver to be reviewed separately by its maintainer?
 
 Thanks!
 
-The following changes since commit fc3e825fa91636a5d1b992e769b2d8279877bfad:
-
-  ARM: brcmstb: revert SMP support (2014-08-25 18:46:31 -0700)
-
-are available in the git repository at:
-
-  http://github.com/brcm/linux.git tags/brcmstb-smp-uart-for-3.18
-
-for you to fetch changes up to 1a7539e692f8649246d1394fd60275fa36b6820c:
-
-  ARM: brcmstb: Kconfig: drop unneeded symbol selections (2014-09-25 16:50:27 -0700)
-
-----------------------------------------------------------------
-Brian Norris (2):
-      ARM: brcmstb: reintroduce SMP support
-      ARM: brcmstb: Kconfig: drop unneeded symbol selections
-
-Marc Carino (1):
-      ARM: brcmstb: add debug UART for earlyprintk support
-
- arch/arm/Kconfig.debug              |  16 +-
- arch/arm/mach-bcm/Kconfig           |   3 -
- arch/arm/mach-bcm/Makefile          |   2 +
- arch/arm/mach-bcm/brcmstb.h         |  19 +++
- arch/arm/mach-bcm/headsmp-brcmstb.S |  33 ++++
- arch/arm/mach-bcm/platsmp-brcmstb.c | 329 ++++++++++++++++++++++++++++++++++++
- 6 files changed, 398 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-bcm/brcmstb.h
- create mode 100644 arch/arm/mach-bcm/headsmp-brcmstb.S
- create mode 100644 arch/arm/mach-bcm/platsmp-brcmstb.c
+> 
+>>
+>> Regards,
+>>  Scott
+>>
+>>
+>> On 14-09-23 02:17 PM, Jonathan Richardson wrote:
+>>> Hi,
+>>>
+>>> This patchset contains initial support for Broadcom's Cygnus SoC based
+>>> on our
+>>> iProc architecture. Initial support is minimal and includes just the mach
+>>> platform code, clock driver, and a basic device tree configuration.
+>>> Peripheral
+>>> drivers will be submitted soon, as will device tree configurations for
+>>> other
+>>> Cygnus board variants.
+>>>
+>>> Changes from v1:
+>>>   - Address code review comments as per previous responses.
+>>>   - Copyright headers updated to remove Broadcom URL.
+>>>   - mach platform code still contains hard coded adresses. These
+>>> address are
+>>>     the same for all Cygnus variants. Could you please provide
+>>> guidance on where
+>>>     they should go if you would still like them changed.
+>>>
+>>> Thanks,
+>>> Jon
+>>>
+>>> Jonathan Richardson (6):
+>>>    ARM: cygnus: Initial support for Broadcom Cygnus SoC
+>>>    clk: Clock driver support for Broadcom Cygnus SoC
+>>>    dt-bindings: Document Broadcom Cygnus SoC and clock driver
+>>>    ARM: dts: Enable Broadcom Cygnus SoC
+>>>    ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+>>>    MAINTAINERS: Entry for Cygnus/iproc arm architecture and clock
+>>>      drivers
+>>>
+>>>   Documentation/devicetree/bindings/arm/cygnus.txt   |   12 +
+>>>   .../devicetree/bindings/clock/clk-cygnus.txt       |  121 ++
+>>>   .../devicetree/bindings/clock/clk-iproc.txt        |   48 +
+>>>   MAINTAINERS                                        |   21 +
+>>>   arch/arm/boot/dts/Makefile                         |    1 +
+>>>   arch/arm/boot/dts/bcm-cygnus.dtsi                  |  349 ++++++
+>>>   arch/arm/boot/dts/bcm911360_entphn.dts             |   22 +
+>>>   arch/arm/configs/bcm_cygnus_defconfig              |  223 ++++
+>>>   arch/arm/mach-bcm/Kconfig                          |   31 +
+>>>   arch/arm/mach-bcm/Makefile                         |    3 +
+>>>   arch/arm/mach-bcm/bcm_cygnus.c                     |  166 +++
+>>>   drivers/clk/Makefile                               |    1 +
+>>>   drivers/clk/bcm/Makefile                           |    2 +
+>>>   drivers/clk/bcm/clk-cygnus.c                       | 1186
+>>> ++++++++++++++++++++
+>>>   drivers/clk/bcm/clk-iproc.c                        |  451 ++++++++
+>>>   15 files changed, 2637 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/arm/cygnus.txt
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/clock/clk-cygnus.txt
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/clock/clk-iproc.txt
+>>>   create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+>>>   create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+>>>   create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
+>>>   create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+>>>   create mode 100644 drivers/clk/bcm/clk-cygnus.c
+>>>   create mode 100644 drivers/clk/bcm/clk-iproc.c
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
