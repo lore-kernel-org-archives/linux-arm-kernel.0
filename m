@@ -1,80 +1,42 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:48 +0200
-Subject: [PATCH 15/27] arm/arm64: KVM: vgic: Fix SGI writes to GICD_I{CS}PENDR0
+Date: Fri, 26 Sep 2014 15:16:46 +0200
+Subject: [PATCH 13/27] arm/arm64: KVM: vgic: Clear queued flags on unqueue
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-16-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-14-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writes to GICD_ISPENDR0 and GICD_ICPENDR0 ignore all settings of the
-pending state for SGIs.  Make sure the implementation handles this
-correctly.
+If we unqueue a level-triggered interrupt completely, and the LR does
+not stick around in the active state (and will therefore no longer
+generate a maintenance interrupt), then we should clear the queued flag
+so that the vgic can actually queue this level-triggered interrupt at a
+later time and deal with its pending state then.
 
+Note: This should actually be properly fixed to handle the active state
+on the distributor.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 435d8e7..0039ae2 100644
+index ce1a2d1..2026b61 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -454,7 +454,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 					struct kvm_exit_mmio *mmio,
- 					phys_addr_t offset)
- {
--	u32 *reg;
-+	u32 *reg, orig;
- 	u32 level_mask;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 
-@@ -463,6 +463,7 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 
- 	/* Mark both level and edge triggered irqs as pending */
- 	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-+	orig = *reg;
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
- 
-@@ -474,6 +475,12 @@ static bool handle_mmio_set_pending_reg(struct kvm_vcpu *vcpu,
- 				ACCESS_READ_VALUE | ACCESS_WRITE_SETBIT);
- 		*reg &= level_mask;
- 
-+		/* Ignore writes to SGIs */
-+		if (offset < 2) {
-+			*reg &= ~0xffff;
-+			*reg |= orig & 0xffff;
+@@ -667,8 +667,10 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 		 * active), then the LR does not hold any useful info and can
+ 		 * be marked as free for other use.
+ 		 */
+-		if (!(lr.state & LR_STATE_MASK))
++		if (!(lr.state & LR_STATE_MASK)) {
+ 			vgic_retire_lr(i, lr.irq, vcpu);
++			vgic_irq_clear_queued(vcpu, lr.irq);
 +		}
-+
+ 
+ 		/* Finally update the VGIC state. */
  		vgic_update_state(vcpu->kvm);
- 		return true;
- 	}
-@@ -486,10 +493,11 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  phys_addr_t offset)
- {
- 	u32 *level_active;
--	u32 *reg;
-+	u32 *reg, orig;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 
- 	reg = vgic_bitmap_get_reg(&dist->irq_pending, vcpu->vcpu_id, offset);
-+	orig = *reg;
- 	vgic_reg_access(mmio, reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_CLEARBIT);
- 	if (mmio->is_write) {
-@@ -500,6 +508,12 @@ static bool handle_mmio_clear_pending_reg(struct kvm_vcpu *vcpu,
- 					  vcpu->vcpu_id, offset);
- 		*reg |= *level_active;
- 
-+		/* Ignore writes to SGIs */
-+		if (offset < 2) {
-+			*reg &= ~0xffff;
-+			*reg |= orig & 0xffff;
-+		}
-+
- 		/* Clear soft-pending flags */
- 		reg = vgic_bitmap_get_reg(&dist->irq_soft_pend,
- 					  vcpu->vcpu_id, offset);
 -- 
 2.0.0
