@@ -1,36 +1,60 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Fri, 26 Sep 2014 17:29:52 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: Add Support for QCOM SDHCI Controller
-Message-ID: <1411732792-12687-1-git-send-email-pramod.gurav@smartplayin.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 26 Sep 2014 13:57:07 +0200
+Subject: [PATCH v4 0/4] vf610: Add GPIO support
+Message-ID: <cover.1411731755.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change adds support for Qualcomm SDHCI Controller found in
-SOCs such as apq8074. This helps to get Dragonboard 8074 booted
-with File system from emmc.
+Rebased version on top of pinctrl branch. In Shawn's tree the
+Colibri VF61 DT file is already split, hence this v4 would not apply
+cleanly. But I guess patch 3/4 goes anyway through Shawn's branch.
+Shawn, to have that patch applying cleanly, you need to pick the
+patch from v3 patchset.
 
-Tested on Intrynsic Dragonboard APQ8074.
+Since 3rd version of the GPIO support for Vybrid now also includes
+the wakeup support which was part of the suspend/resume patchset
+I sent earlier this week.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-arm-msm at vger.kernel.org
-Cc: Georgi Djakov <gdjakov@mm-sol.com>
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
----
- arch/arm/configs/multi_v7_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Changes in v4:
+- Rebased on pinctrl devel branch (which has one patch already applied
+  hence is not part of this version now)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index bad9d92..cc55117 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -328,6 +328,7 @@ CONFIG_MMC_SDHCI_BCM_KONA=y
- CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
-+CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
+Changes in v3:
+- Configure the pin completely on imx_pmx_gpio_request_enable
+- Drop the GPIO_CONTROL flag in favor of using the existing
+  SHARE_MUX_CONF_REG flag
+- Extend GPIO driver to also include wakeup support
+- Cleanup includes in GPIO driver file
+- Add brackets in PORT_PCR define
+- Use platform_get_irq in favor of irq_of_parse_and_map
+- Use device_initcall instead of subsys_initicall
+
+Changes in v2:
+- Use bit operations in GPIO driver
+- Use VF610_ prefix for GPIOS_PER_PORT define
+- Drop irq in drivers struct
+- Use arch/subsys_initicall for GPIO/pinctrl driver
+- Fix log message title
+- Add documentation for GPIO/PORT module bindings
+- Extended GPIO device tree bindings for Colibri VF61
+
+Stefan Agner (4):
+  pinctrl: imx: add gpio pinmux support for vf610
+  gpio: vf610: add gpiolib/IRQ chip driver for Vybrid
+  ARM: dts: vf610: use new GPIO support
+  Documentation: dts: add bindings for Vybrid GPIO/PORT module
+
+ .../devicetree/bindings/gpio/gpio-vf610.txt        |  56 ++++
+ arch/arm/boot/dts/vf610-colibri.dts                |   9 +
+ arch/arm/boot/dts/vf610-twr.dts                    |   1 +
+ arch/arm/boot/dts/vf610.dtsi                       |   1 +
+ drivers/gpio/Kconfig                               |   7 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-vf610.c                          | 295 +++++++++++++++++++++
+ drivers/pinctrl/freescale/pinctrl-imx.c            |  72 +++++
+ 8 files changed, 442 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-vf610.txt
+ create mode 100644 drivers/gpio/gpio-vf610.c
+
 -- 
-1.7.9.5
+2.1.0
