@@ -1,64 +1,40 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 26 Sep 2014 16:54:53 +0200
-Subject: [PATCHv3 2/7] ARM: at91: introduce basic SAMA5D4 support
-In-Reply-To: <20140926141326.GB4408@piout.net>
-References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1410797759-18675-3-git-send-email-alexandre.belloni@free-electrons.com>
- <1411732023.7866.15.camel@x220> <20140926141326.GB4408@piout.net>
-Message-ID: <1411743293.7866.62.camel@x220>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Fri, 26 Sep 2014 09:55:25 -0500
+Subject: [PATCH v2 1/3] clocksource: arm_arch_timer: change clocksource
+ name if CP15 unavailable
+In-Reply-To: <54250FFE.2050605@linaro.org>
+References: <1411052390-27238-1-git-send-email-nathan_lynch@mentor.com>
+ <1411052390-27238-2-git-send-email-nathan_lynch@mentor.com>
+ <54250FFE.2050605@linaro.org>
+Message-ID: <54257E5D.5060600@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi Daniel,
 
-On Fri, 2014-09-26 at 16:13 +0200, Alexandre Belloni wrote:
-> On 26/09/2014 at 13:47:03 +0200, Paul Bolle wrote :
-> > On Mon, 2014-09-15 at 18:15 +0200, Alexandre Belloni wrote:
-> > > From: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > 
-> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > 
-> > This landed in next-20140926, as commit 2dc850b62e5b ("ARM: at91:
-> > introduce basic SAMA5D4 support").
-> > 
-> > > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > > index b11ad54f8d17..7b44db208f10 100644
-> > > --- a/arch/arm/Kconfig.debug
-> > > +++ b/arch/arm/Kconfig.debug
-> > > @@ -101,6 +101,10 @@ choice
-> > >  		bool "Kernel low-level debugging on 9263 and 9g45"
-> > >  		depends on HAVE_AT91_DBGU1
-> > >  
-> > > +	config AT91_DEBUG_LL_DBGU2
-> > > +		bool "Kernel low-level debugging on sama5d4"
-> > > +		depends on HAVE_AT91_DBGU2
-> > > +
-> > 
-> > Why is this Kconfig symbol needed? Nothing in next-20140926 uses it. Are
-> > future users perhaps queued somewhere (say, in commits that didn't
-> > survive today's rather lively linux-next merges)? 
+On 09/26/2014 02:04 AM, Daniel Lezcano wrote:
+> On 09/18/2014 04:59 PM, Nathan Lynch wrote:
+>> The arm and arm64 VDSOs need CP15 access to the architected counter.
+>> If this is unavailable (which is allowed by ARM v7), indicate this by
+>> changing the clocksource name to "arch_mem_counter" before registering
+>> the clocksource.
+>>
+>> Suggested by Stephen Boyd.
+>>
+>> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+>> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> There is no user because it conflicts with the previous one that is
-> selected by default by the sama5_defconfig. This is for early print and
-> it means that you can get earlyprintk either for sama5d3 or sama5d4.
+> Hi Nathan,
 > 
-> My guess is that it will never be included in any defconfig.
+> is it possible to have the acked-by of the different maintainers for the
+> other patches ?
 
-I missed that this is inside a "choice" (which complicates matters quite
-a bit)!
+As Will said, he acked the series.
 
-There are a number of cases where one of the configs inside the choice
-only serve to _not_ set anything. In those cases the Kconfig symbol is
-used nowhere else. I'll have to think about this particular symbol a bit
-more to see if it actually makes sense to not use it anywhere else.
+> Are these patches targeted to be merged for 3.18 ?
 
-Thinking about the "Kernel low-level debugging port" choice is
-complicated by the fact that it holds about a gazillion "config"
-entries, many of which only show up only if some dependency is met. So
-it might take me some time to say anything sensible about it, if I ever
-manage to do that at all...
+3.18 is preferable, if it's not too late.  But nothing will break if it
+needs to wait.
 
 Thanks,
-
-
-Paul Bolle
+Nathan
