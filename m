@@ -1,55 +1,60 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 26 Sep 2014 08:23:40 +0800
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <3696520.MDUrkdjfGZ@wuerfel>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140925011647.GB3716@peterchendt> <3696520.MDUrkdjfGZ@wuerfel>
-Message-ID: <20140926002339.GB3026@peterchendt>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 25 Sep 2014 17:25:44 -0700
+Subject: [PATCH 0/7] clk: sun6i: Unify AHB1 clock and fix rate calculation
+In-Reply-To: <20140911203623.GJ31276@lukather>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+ <20140911203623.GJ31276@lukather>
+Message-ID: <20140926002544.19023.39287@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 09:11:35AM +0200, Arnd Bergmann wrote:
-> On Thursday 25 September 2014 09:16:48 Peter Chen wrote:
-> > > +     }
-> > > +
-> > > +     if (dev->of_node) {
-> > > +             ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-> > > +             if (ret)
-> > > +                     goto clk_err;
-> > > +     } else {
-> > > +             ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> > > +             if (ret)
-> > > +                     goto clk_err;
-> > > +     }
+Quoting Maxime Ripard (2014-09-11 13:36:23)
+> Hi Chen-Yu,
+> 
+> On Sat, Sep 06, 2014 at 06:47:21PM +0800, Chen-Yu Tsai wrote:
+> > Hi everyone,
 > > 
-> > Hi Antoine, the above code may not be needed, since get phy and set dma
-> > mask are common operation, we can do it at core code, the only thing you
-> > need to do is something like: dev->dma_mask = DMA_BIT_MASK(32).
+> > This series unifies the mux and divider parts of the AHB1 clock found
+> > on sun6i and sun8i, while also adding support for the pre-divider on
+> > the PLL6 input.
 > > 
+> > The rate calculation logic must factor in which parent it is using to
+> > calculate the rate, to decide whether to use the pre-divider or not.
+> > This is beyond the original factors clk design in sunxi. To avoid
+> > feature bloat, this is implemented as a seperate composite clk.
+> > 
+> > The new clock driver is registered with a separate OF_CLK_DECLARE.
+> > This is done so that assigned-clocks* properties on the clk provider
+> > node can actually work. The clock framework arranges the clock setup
+> > order by checking whether all clock parents are available, by checking
+> > the node matching OF_CLK_DECLARE.
+> > 
+> > However, the sunxi clk driver is based on the root node compatible,
+> > has no defined dependencies (parents), and is setup before the fixed-rate
+> > clocks. Thus when the ahb1 clock is added, all parents have rate = 0.
+> > There is no way to calculate the required clock factors to set a default
+> > clock rate under these circumstances. This happens when we set the
+> > defaults in the clock node (provider), rather than a clock consumer.
+> >
+> > I can think of 2 ways to solve the dependency issue, but neither is
+> > pretty. One would be to move the root fixed-rate clocks into the sunxi
+> > clk driver. The other would be separating all the clocks into individual
+> > OF_CLK_DECLARE statements, which adds a lot of boilerplate code.
 > 
-> Certainly not, doing that would be broken for a number of reasons:
+> I don't know what Mike thinks of this, but I'd prefer the second.
+
+I do not fully understand the problem. Ideally the clock driver should
+have some way to fail with EPROBE_DEFER until the fixed-rate clocks are
+registered. Those fixed-rate parents are enumerated in your dts, right?
+Why isn't this enough?
+
+Thanks,
+Mike
+
 > 
-> - dev->dma_mask is a pointer, a driver should not reassign that
-> - the device may have been set up for a bus that requires a smaller mask
->   that is already set, changing the mask would cause data corruption
-> - setting just the dma mask but not coherent mask is wrong
-> - setting the dma mask can fail, e.g. if the mask is smaller than the
->   smallest memory zone, so you have to check the return value.
+> Maxime
 > 
-
-In current chipidea structure, the parent (glue layer) driver will not be
-used for dma, udc/host driver uses dma mask from child (core layer), at core
-layer we will do:
-
-
-	pdev->dev.dma_mask = dev->dma_mask; /* this device is parent */
-	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
-
-Would you suggestion us a suitable way? Or it is ok we use just Antoine's way that
-call dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32)) at parent
-driver no matter dt or non-dt? Thanks.
-
--- 
-Best Regards,
-Peter Chen
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
