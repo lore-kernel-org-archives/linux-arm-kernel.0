@@ -1,78 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 11:02:37 +0800
-Subject: [PATCH 5/5] ARM: imx53: add cpufreq support
-In-Reply-To: <1411143381-10516-6-git-send-email-l.stach@pengutronix.de>
-References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
- <1411143381-10516-6-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140926030236.GB31948@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 26 Sep 2014 11:06:01 +0800
+Subject: [PATCH v2 0/3] ARM: sun8i: Add DMA controller support
+In-Reply-To: <1411010680-4481-1-git-send-email-wens@csie.org>
+References: <1411010680-4481-1-git-send-email-wens@csie.org>
+Message-ID: <CAGb2v65ZkBvqSjwR0bVUu0-=5-pOmydp51K6GeMnxOa4vOtCRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 06:16:21PM +0200, Lucas Stach wrote:
-> Instanciate the platform device for the generic cpufreq-cpu0
-> driver and add all required properties to the DT.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx53.dtsi   | 13 ++++++++++++-
->  arch/arm/mach-imx/mach-imx53.c |  4 ++++
+On Thu, Sep 18, 2014 at 11:24 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi everyone,
+>
+> This is v2 of my sun8i DMA controller support series. This series
+> adds support for the DMA controller found in the Allwinner A23 SoC.
+> It is the same hardware as found in the A31 (sun6i) SoC. In addition
+> to reduced physical channels and endpoints, the controller in the A23
+> requires an undocumented register to be toggled. That seems to allow
+> memory bus access.
+>
+> This series is based on my earlier "clk: sun6i: Unify AHB1 clock and
+> fix rate calculation" series, which removes the clock muxing calls from
+> the sun6i-dma driver. The default PLL6 pre-divider for AHB1 on the A23
+> results in an exceedingly high clock rate for AHB1, and the system hangs.
+> Also, on the A23, the dma controller happily works even when AHB1 is
+> clocked from AXI.
+>
+>
+> Patch 1 changes the channel count macros into runtime data binded to
+> the DT compatible strings. It also gets rid of some hardcoded values
+> in the interrupt handler.
+>
+> Patch 2 adds the channel number data for the A23 (sun8i), as well as
+> the undocumented register quirk.
 
-Please split dts and kernel changes.
+Hi, Vinod,
 
->  2 files changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 64fa27b36be0..bd5226a7ea20 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -46,10 +46,21 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		cpu at 0 {
-> +		cpu0: cpu at 0 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a8";
->  			reg = <0x0>;
-> +			clocks = <&clks IMX5_CLK_ARM>;
-> +			clock-latency = <61036>;
-> +			voltage-tolerance = <5>;
-> +			operating-points = <
-> +				/* kHz */
-> +				 166666  850000
-> +				 400000  900000
-> +				 800000 1050000
-> +				1000000 1200000
-> +				1200000 1300000
-> +			>;
->  		};
->  	};
->  
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index 03dd6ea13acc..4eb6849c52d2 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -38,9 +38,13 @@ static void __init imx53_dt_init(void)
->  	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
->  }
->  
-> +static struct platform_device imx53_cpufreq_pdev = { .name = "cpufreq-cpu0", };
-> +
->  static void __init imx53_init_late(void)
->  {
->  	imx53_pm_init();
-> +
-> +	platform_device_register(&imx53_cpufreq_pdev);
+Any chance we can get patches 1 & 2 merged? You've already merged the
+prerequisite patch "dmaengine: sun6i: Remove obsolete clk muxing code"
+a few days ago, and patch 3 is already in arm-soc.
 
-It should be a bit easier to call the following.
+Thanks!
+ChenYu
 
-	platform_device_register_simple("cpufreq-cpu0", -1, NULL, 0);
-
-Shawn
-
->  }
->  
->  static const char * const imx53_dt_board_compat[] __initconst = {
-> -- 
+> Patch 3 adds the dma controller node, and related dma resources, to the
+> DT.
+>
+> Changes since v1:
+>
+>   - Added Maxime's Acked-by for patch 1
+>   - Added macros for sun8i specific dma gating registers, and updated
+>     comment to reflect its usage.
+>
+>
+> Cheers
+> ChenYu
+>
+>
+> Chen-Yu Tsai (3):
+>   dmaengine: sun6i: support parameterized compatible strings
+>   dmaengine: sun6i: Add support for Allwinner A23 (sun8i) variant
+>   ARM: dts: sun8i: Add DMA controller node
+>
+>  .../devicetree/bindings/dma/sun6i-dma.txt          |   2 +-
+>  arch/arm/boot/dts/sun8i-a23.dtsi                   |  19 ++++
+>  drivers/dma/Kconfig                                |   4 +-
+>  drivers/dma/sun6i-dma.c                            | 123 +++++++++++++++------
+>  4 files changed, 110 insertions(+), 38 deletions(-)
+>
+> --
 > 2.1.0
-> 
+>
