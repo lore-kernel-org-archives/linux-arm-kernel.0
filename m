@@ -1,43 +1,106 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 26 Sep 2014 10:10:23 +0800
-Subject: [PATCH v2 06/22] PCI/MSI: Introduce weak arch_find_msi_chip()
- to find MSI chip
-In-Reply-To: <20140925072619.GI12423@ulmo>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <1411614872-4009-7-git-send-email-wangyijing@huawei.com>
- <20140925072619.GI12423@ulmo>
-Message-ID: <5424CB0F.2030406@huawei.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Fri, 26 Sep 2014 10:21:12 +0800
+Subject: [PATCH v1] rtc: snvs: add poweroff function
+In-Reply-To: <20140926012410.GD21077@dragon>
+References: <1411611233-29919-1-git-send-email-b38343@freescale.com>
+ <20140926012410.GD21077@dragon>
+Message-ID: <20140926022110.GA21831@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/25 15:26, Thierry Reding wrote:
-> On Thu, Sep 25, 2014 at 11:14:16AM +0800, Yijing Wang wrote:
->> Introduce weak arch_find_msi_chip() to find the match msi_chip.
->> Currently, MSI chip associates pci bus to msi_chip. Because in
->> ARM platform, there may be more than one MSI controller in system.
->> Associate pci bus to msi_chip help pci device to find the match
->> msi_chip and setup MSI/MSI-X irq correctly. But in other platform,
->> like in x86. we only need one MSI chip, because all device use
->> the same MSI address/data and irq etc. So it's no need to associate
->> pci bus to MSI chip, just use a arch function, arch_find_msi_chip()
->> to return the MSI chip for simplicity. The default weak
->> arch_find_msi_chip() used in ARM platform, find the MSI chip
->> by pci bus.
+On Fri, Sep 26, 2014 at 09:24:11AM +0800, Shawn Guo wrote:
+> On Thu, Sep 25, 2014 at 10:13:53AM +0800, Robin Gong wrote:
+> > On i.mx6 chips, PMIC_ON_REQ can be pulled by snvs LPCR. That can be
+> > used poweroff system if PMIC_ON_REQ connected with external PMIC or
+> > power control circuit.Power up again if PMIC_ON_REQ pulled high.
+> > 
+> > Signed-off-by: Robin Gong <b38343@freescale.com>
 > 
-> Can't x86 simply set the bus' .msi field anyway? It would seem to be
-> easy to do and unifies the code rather than driving it further apart
-> using even more of the __weak functions.
-
-As mentioned in the first reply, I will rework this one when we find a better solution.
-
-Thanks!
-Yijing.
-
+> I'm not sure it's a good idea to plug poweroff support into RTC driver.
+> If RTC driver is built out, poweroff function is gone too.
 > 
-> Thierry
-> 
-
-
--- 
-Thanks!
-Yijing
+> Shawn
+>
+Yes, that's true since there is no real SNVS driver, only snvs-rtc and
+snvs-caam driver. I'll pick up the patch about the driver which located
+in drivers/power/reset.
+> > ---
+> >  Documentation/devicetree/bindings/crypto/fsl-sec4.txt |  4 ++++
+> >  drivers/rtc/rtc-snvs.c                                | 18 ++++++++++++++++++
+> >  2 files changed, 22 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> > index e402277..00d67f2 100644
+> > --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> > +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> > @@ -363,11 +363,15 @@ Secure Non-Volatile Storage (SNVS) Low Power (LP) RTC Node
+> >        Value type: <prop-encoded-array>
+> >        Definition: A standard property.  Specifies the physical
+> >            address and length of the SNVS LP configuration registers.
+> > +  - fsl,poweroff
+> > +      Usage: opertional, recommend if PMIC_ON_REQ connected with external
+> > +	PMIC or power control circuit.
+> >  
+> >  EXAMPLE
+> >  	sec_mon_rtc_lp at 314000 {
+> >  		compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> >  		reg = <0x34 0x58>;
+> > +		fsl,poweroff;
+> >  	};
+> >  
+> >  =====================================================================
+> > diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+> > index fa384fe..ef32541 100644
+> > --- a/drivers/rtc/rtc-snvs.c
+> > +++ b/drivers/rtc/rtc-snvs.c
+> > @@ -29,6 +29,8 @@
+> >  #define SNVS_LPCR_SRTC_ENV	(1 << 0)
+> >  #define SNVS_LPCR_LPTA_EN	(1 << 1)
+> >  #define SNVS_LPCR_LPWUI_EN	(1 << 3)
+> > +#define SNVS_LPCR_DP		(1 << 5)
+> > +#define SNVS_LPCR_TOP		(1 << 6)
+> >  #define SNVS_LPSR_LPTA		(1 << 0)
+> >  
+> >  #define SNVS_LPPGDR_INIT	0x41736166
+> > @@ -41,6 +43,8 @@ struct snvs_rtc_data {
+> >  	spinlock_t lock;
+> >  };
+> >  
+> > +static void __iomem *snvs_base;
+> > +
+> >  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
+> >  {
+> >  	u64 read1, read2;
+> > @@ -241,8 +245,17 @@ static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
+> >  	return events ? IRQ_HANDLED : IRQ_NONE;
+> >  }
+> >  
+> > +static void snvs_poweroff(void)
+> > +{
+> > +	u32 value;
+> > +
+> > +	value = readl(snvs_base + SNVS_LPCR);
+> > +	writel(value | SNVS_LPCR_DP | SNVS_LPCR_TOP, snvs_base + SNVS_LPCR);
+> > +}
+> > +
+> >  static int snvs_rtc_probe(struct platform_device *pdev)
+> >  {
+> > +	struct device_node *np = pdev->dev.of_node;
+> >  	struct snvs_rtc_data *data;
+> >  	struct resource *res;
+> >  	int ret;
+> > @@ -260,6 +273,11 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+> >  	if (data->irq < 0)
+> >  		return data->irq;
+> >  
+> > +	if (np && of_get_property(np, "fsl,poweroff", NULL)) {
+> > +		snvs_base = data->ioaddr;
+> > +		pm_power_off = snvs_poweroff;
+> > +	}
+> > +
+> >  	platform_set_drvdata(pdev, data);
+> >  
+> >  	spin_lock_init(&data->lock);
+> > -- 
+> > 1.9.1
+> > 
