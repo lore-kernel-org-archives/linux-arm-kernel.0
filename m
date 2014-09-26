@@ -1,76 +1,54 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 12:32:53 +0200
-Subject: [PATCH] arm/arm64: KVM: Report correct FSC for unsupported fault types
-Message-ID: <1411727573-1346-1-git-send-email-christoffer.dall@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 26 Sep 2014 12:38:26 +0200 (CEST)
+Subject: [PATCH v2 06/22] PCI/MSI: Introduce weak arch_find_msi_chip()
+ to find MSI chip
+In-Reply-To: <5424D30A.6040900@huawei.com>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <1411614872-4009-7-git-send-email-wangyijing@huawei.com>
+ <alpine.DEB.2.10.1409251220570.4604@nanos> <5424D30A.6040900@huawei.com>
+Message-ID: <alpine.DEB.2.11.1409261236160.4567@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we catch something that's not a permission fault or a translation
-fault, we log the unsupported FSC in the kernel log, but we were masking
-off the bottom bits of the FSC which was not very helpful.
+On Fri, 26 Sep 2014, Yijing Wang wrote:
+> On 2014/9/25 18:38, Thomas Gleixner wrote:
+> > On Thu, 25 Sep 2014, Yijing Wang wrote:
+> > 
+> >> Introduce weak arch_find_msi_chip() to find the match msi_chip.
+> >> Currently, MSI chip associates pci bus to msi_chip. Because in
+> >> ARM platform, there may be more than one MSI controller in system.
+> >> Associate pci bus to msi_chip help pci device to find the match
+> >> msi_chip and setup MSI/MSI-X irq correctly. But in other platform,
+> >> like in x86. we only need one MSI chip, because all device use
+> >> the same MSI address/data and irq etc. So it's no need to associate
+> >> pci bus to MSI chip, just use a arch function, arch_find_msi_chip()
+> >> to return the MSI chip for simplicity. The default weak
+> >> arch_find_msi_chip() used in ARM platform, find the MSI chip
+> >> by pci bus.
+> > 
+> > This is really backwards. On one hand you try to get rid of the weak
+> > arch functions zoo and then you invent new ones for no good
+> > reason. Why can't x86 store the chip in the pci bus?
+> > 
+> > Looking deeper, I'm questioning the whole notion of different
+> > msi_chips. Are this really different MSI controllers with a different
+> > feature set or are this defacto multiple instances of the same
+> > controller which just need a different data set?
+> 
+> MSI chip in this series is to setup MSI irq, including IRQ allocation, Map,
+> compose MSI msg ..., in different platform, many arch specific MSI irq details in it.
+> It's difficult to extract the common data and code.
+> 
+> I have a plan to rework MSI related irq_chips in kernel, PCI and Non-PCI, currently,
+> HPET, DMAR and PCI have their own irq_chip and MSI related functions, write_msi_msg(),
+> mask_msi_irq(), etc... I want to extract the common data set for that, so we can
+> remove lots of unnecessary MSI code.
 
-Also correctly report the FSC for data and instruction faults rather
-than telling people it was a DFCS, which doesn't exist in the ARM ARM.
+That makes sense. Can you please make sure that this does not conflict
+with the ongoing work Jiang is doing in the x86 irq area with
+hierarchical irqdomains to distangle layered levels like MSI from the
+underlying vector/irqremap mechanics.
 
-Cc: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/asm/kvm_emulate.h   | 5 +++++
- arch/arm/kvm/mmu.c                   | 8 +++++---
- arch/arm64/include/asm/kvm_emulate.h | 5 +++++
- 3 files changed, 15 insertions(+), 3 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 69b7469..b9db269 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -149,6 +149,11 @@ static inline bool kvm_vcpu_trap_is_iabt(struct kvm_vcpu *vcpu)
- 
- static inline u8 kvm_vcpu_trap_get_fault(struct kvm_vcpu *vcpu)
- {
-+	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC;
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
-+{
- 	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC_TYPE;
- }
- 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index bb06f76..eea0306 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -882,10 +882,12 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
- 
- 	/* Check the stage-2 fault is trans. fault or write fault */
--	fault_status = kvm_vcpu_trap_get_fault(vcpu);
-+	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
- 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM) {
--		kvm_err("Unsupported fault status: EC=%#x DFCS=%#lx\n",
--			kvm_vcpu_trap_get_class(vcpu), fault_status);
-+		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-+			kvm_vcpu_trap_get_class(vcpu),
-+			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-+			(unsigned long)kvm_vcpu_get_hsr(vcpu));
- 		return -EFAULT;
- 	}
- 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index fdc3e21..5674a55 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -174,6 +174,11 @@ static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
- 
- static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
- {
-+	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC;
-+}
-+
-+static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
-+{
- 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
- }
- 
--- 
-2.0.0
+	tglx
