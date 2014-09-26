@@ -1,37 +1,42 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Fri, 26 Sep 2014 14:08:27 -0700
-Subject: [PATCH v10 4/4] MAINTAINERS: entry for APM X-Gene PCIe host driver
-In-Reply-To: <1411765707-28822-1-git-send-email-tinamdar@apm.com>
-References: <1411765707-28822-1-git-send-email-tinamdar@apm.com>
-Message-ID: <1411765707-28822-5-git-send-email-tinamdar@apm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 27 Sep 2014 01:09:22 +0400
+Subject: [PATCH v4 2/3] ARM: shmobile: koelsch: enable USB PHY
+In-Reply-To: <3383603.zZsCVpCDbD@wasted.cogentembedded.com>
+References: <3383603.zZsCVpCDbD@wasted.cogentembedded.com>
+Message-ID: <2336627.VWjZqGPynz@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entry for AppliedMicro X-Gene PCIe host driver.
+Enable USB PHY device for the Koelsch board.
 
-Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Changes in version 4:
+- refreshed the patch.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 670b3dc..b18bc49 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6942,6 +6942,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*spear*
+Changes in version 3:
+- refreshed the patch.
+
+Changes in version 2:
+- fixed the wrong board name in the changelog;
+- refreshed the patch.
+
+ arch/arm/boot/dts/r8a7791-koelsch.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -463,6 +463,10 @@
+ 	pinctrl-names = "default";
+ };
  
-+PCI DRIVER FOR APPLIEDMICRO XGENE
-+M:	Tanmay Inamdar <tinamdar@apm.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/pci/xgene-pci.txt
-+F:	drivers/pci/host/pci-xgene.c
++&usbphy {
++	status = "okay";
++};
 +
- PCMCIA SUBSYSTEM
- P:	Linux PCMCIA Team
- L:	linux-pcmcia at lists.infradead.org
--- 
-1.9.1
+ &pcie_bus_clk {
+ 	status = "okay";
+ };
