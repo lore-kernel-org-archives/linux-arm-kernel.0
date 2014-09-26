@@ -1,29 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 26 Sep 2014 13:03:24 -0700
-Subject: [PATCH v4 6/8] clk: rockchip: add new clock-type for the cpuclk
-In-Reply-To: <1411757591-16142-7-git-send-email-heiko@sntech.de>
-References: <1411757591-16142-1-git-send-email-heiko@sntech.de>
- <1411757591-16142-7-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=WNF6F497kY3y4=9ntRLwKFYRQNi3GqBZLTMPQKdCS3QQ@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 26 Sep 2014 13:03:26 -0700
+Subject: [PATCH] sched/nohz: add debugfs control over
+ sched_tick_max_deferment
+In-Reply-To: <1411760732-14102-1-git-send-email-khilman@kernel.org>
+References: <1411760732-14102-1-git-send-email-khilman@kernel.org>
+Message-ID: <CAMAWPa-WMkb_rJZ_XBCd3+pTtu5-SwN7F-0pNs3SrsokDDH5sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi Frederic,
 
-On Fri, Sep 26, 2014 at 11:53 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> +struct clk *rockchip_clk_register_cpuclk(const char *name,
-> +                       const char **parent_names, u8 num_parents,
-> +                       const struct rockchip_cpuclk_reg_data *reg_data,
-> +                       struct rockchip_cpuclk_rate_table *rates, int nrates,
+On Fri, Sep 26, 2014 at 12:45 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> From: Kevin Hilman <khilman@linaro.org>
+>
+> Allow debugfs override of sched_tick_max_deferment in order to ease
+> finding/fixing the remaining issues with full nohz.
+>
+> The value to be written is in jiffies, and -1 means the max deferment
+> is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
+>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 
-It would be nice if this was "const struct rockchip_cpuclk rate_table
-*rates" here and elsewhere.  It's OK if we make it const here even if
-we can't figure out how to make the tables "initconst".
+This is just an attempt to revive and hopefully finalize the
+discussion started a while back[1].
 
-...but it sure seems like that could happen in a followup patch, so:
+Kevin
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-
-On a rk3288-board:
-
-Tested-by: Doug Anderson <dianders@chromium.org>
+[1] https://lkml.org/lkml/2014/1/14/914
