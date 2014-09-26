@@ -1,93 +1,90 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 26 Sep 2014 15:03:49 +0100
-Subject: [PATCH V4 2/6] arm: mm: Introduce special ptes for LPAE
+Date: Fri, 26 Sep 2014 15:03:51 +0100
+Subject: [PATCH V4 4/6] arm: mm: Enable RCU fast_gup
 In-Reply-To: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
 References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1411740233-28038-3-git-send-email-steve.capper@linaro.org>
+Message-ID: <1411740233-28038-5-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a mechanism to tag ptes as being special, this indicates that
-no attempt should be made to access the underlying struct page *
-associated with the pte. This is used by the fast_gup when operating on
-ptes as it has no means to access VMAs (that also contain this
-information) locklessly.
+Activate the RCU fast_gup for ARM. We also need to force THP splits to
+broadcast an IPI s.t. we block in the fast_gup page walker. As THP
+splits are comparatively rare, this should not lead to a noticeable
+performance degradation.
 
-The L_PTE_SPECIAL bit is already allocated for LPAE, this patch modifies
-pte_special and pte_mkspecial to make use of it, and defines
-__HAVE_ARCH_PTE_SPECIAL.
-
-This patch also excludes special ptes from the icache/dcache sync logic.
+Some pre-requisite functions pud_write and pud_page are also added.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/pgtable-2level.h | 2 ++
- arch/arm/include/asm/pgtable-3level.h | 7 +++++++
- arch/arm/include/asm/pgtable.h        | 6 ++----
- 3 files changed, 11 insertions(+), 4 deletions(-)
+ arch/arm/Kconfig                      |  4 ++++
+ arch/arm/include/asm/pgtable-3level.h |  8 ++++++++
+ arch/arm/mm/flush.c                   | 15 +++++++++++++++
+ 3 files changed, 27 insertions(+)
 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 219ac88..f027941 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -182,6 +182,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define pmd_addr_end(addr,end) (end)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index cc740d2..0e5b47f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1645,6 +1645,10 @@ config ARCH_SELECT_MEMORY_MODEL
+ config HAVE_ARCH_PFN_VALID
+ 	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
  
- #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
-+#define pte_special(pte)	(0)
-+static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
- 
- /*
-  * We don't have huge page support for short descriptors, for the moment
++config HAVE_GENERIC_RCU_GUP
++	def_bool y
++	depends on ARM_LPAE
++
+ config HIGHMEM
+ 	bool "High Memory Support"
+ 	depends on MMU
 diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 06e0bc0..16122d4 100644
+index 16122d4..a31ecdad 100644
 --- a/arch/arm/include/asm/pgtable-3level.h
 +++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -213,6 +213,13 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define pmd_isclear(pmd, val)	(!(pmd_val(pmd) & (val)))
- 
- #define pmd_young(pmd)		(pmd_isset((pmd), PMD_SECT_AF))
-+#define pte_special(pte)	(pte_isset((pte), L_PTE_SPECIAL))
-+static inline pte_t pte_mkspecial(pte_t pte)
-+{
-+	pte_val(pte) |= L_PTE_SPECIAL;
-+	return pte;
-+}
-+#define	__HAVE_ARCH_PTE_SPECIAL
- 
+@@ -224,6 +224,8 @@ static inline pte_t pte_mkspecial(pte_t pte)
  #define __HAVE_ARCH_PMD_WRITE
  #define pmd_write(pmd)		(pmd_isclear((pmd), L_PMD_SECT_RDONLY))
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 01baef0..90aa4583 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -226,7 +226,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- #define pte_dirty(pte)		(pte_isset((pte), L_PTE_DIRTY))
- #define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
- #define pte_exec(pte)		(pte_isclear((pte), L_PTE_XN))
--#define pte_special(pte)	(0)
+ #define pmd_dirty(pmd)		(pmd_isset((pmd), L_PMD_SECT_DIRTY))
++#define pud_page(pud)		pmd_page(__pmd(pud_val(pud)))
++#define pud_write(pud)		pmd_write(__pmd(pud_val(pud)))
  
- #define pte_valid_user(pte)	\
- 	(pte_valid(pte) && pte_isset((pte), L_PTE_USER) && pte_young(pte))
-@@ -245,7 +244,8 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 	unsigned long ext = 0;
+ #define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
+ #define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
+@@ -231,6 +233,12 @@ static inline pte_t pte_mkspecial(pte_t pte)
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !pmd_table(pmd))
+ #define pmd_trans_splitting(pmd) (pmd_isset((pmd), L_PMD_SECT_SPLITTING))
++
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++#define __HAVE_ARCH_PMDP_SPLITTING_FLUSH
++void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
++			  pmd_t *pmdp);
++#endif
+ #endif
  
- 	if (addr < TASK_SIZE && pte_valid_user(pteval)) {
--		__sync_icache_dcache(pteval);
-+		if (!pte_special(pteval))
-+			__sync_icache_dcache(pteval);
- 		ext |= PTE_EXT_NG;
- 	}
- 
-@@ -264,8 +264,6 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
- PTE_BIT_FUNC(mkexec,   &= ~L_PTE_XN);
- PTE_BIT_FUNC(mknexec,   |= L_PTE_XN);
- 
--static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
--
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- {
- 	const pteval_t mask = L_PTE_XN | L_PTE_RDONLY | L_PTE_USER |
+ #define PMD_BIT_FUNC(fn,op) \
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 43d54f5..265b836 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -400,3 +400,18 @@ void __flush_anon_page(struct vm_area_struct *vma, struct page *page, unsigned l
+ 	 */
+ 	__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+ }
++
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++#ifdef CONFIG_HAVE_RCU_TABLE_FREE
++void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
++			  pmd_t *pmdp)
++{
++	pmd_t pmd = pmd_mksplitting(*pmdp);
++	VM_BUG_ON(address & ~PMD_MASK);
++	set_pmd_at(vma->vm_mm, address, pmdp, pmd);
++
++	/* dummy IPI to serialise against fast_gup */
++	kick_all_cpus_sync();
++}
++#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
++#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 -- 
 1.9.3
