@@ -1,76 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Sep 2014 11:32:25 -0500
-Subject: [PATCH] dt/documentation: add specification of dma bus information
-In-Reply-To: <541C7609.3000901@ti.com>
-References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
- <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
- <53A46CB7.1030109@ti.com> <4193075.zZSpRTFEYz@wuerfel>
- <53A48553.2080504@ti.com>
- <CAL_JsqLYho6dRA=-ovKqF7H4EGHJcH_aN3ywd+76oXSprfTMbQ@mail.gmail.com>
- <53A73110.60405@ti.com> <541C7609.3000901@ti.com>
-Message-ID: <CAL_Jsq+Lu0D3o0wrFS0tug_7oTtySaAEJCEJWBaOha4RHsoxZg@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 26 Sep 2014 19:39:57 +0300
+Subject: [RFC PATCH 4/4] ARM: dts: k2hk-evm: add pm domains for net, qmss
+ and knav_dmas
+In-Reply-To: <7hd2aj9vzh.fsf@deeprootsystems.com>
+References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>	<1411657537-25238-5-git-send-email-grygorii.strashko@ti.com>
+ <7hd2aj9vzh.fsf@deeprootsystems.com>
+Message-ID: <542596DD.2070003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 1:29 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> Hi Rob,
->
->
-> On 06/22/2014 10:40 PM, Santosh Shilimkar wrote:
+Hi Kevin,
+
+On 09/26/2014 01:27 AM, Kevin Hilman wrote:
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+> 
+>> Add Keystone PM domains nodes for NetCP, NetCPx, QMSS, KNAV-DMA
+>> devices.
 >>
->> On Friday 20 June 2014 03:46 PM, Rob Herring wrote:
->>>
->>> On Fri, Jun 20, 2014 at 2:02 PM, Santosh Shilimkar
->>> <santosh.shilimkar@ti.com> wrote:
->>>>
->>>> On Friday 20 June 2014 02:56 PM, Arnd Bergmann wrote:
->>>>>
->>>>> On Friday 20 June 2014 13:17:43 Santosh Shilimkar wrote:
->>>>>>>>
->>>>>>>> +                       dma-coherent;
->>>>>>>> +                       dma-ranges;
->>>>>>>> +
->>>>>>>> +                       dwc3 at 2690000 {
->>>>>>>> +                               compatible = "synopsys,dwc3";
->>>>>>>> +                               [...]
->>>>>>>> +                       };
->>>>>>>
->>>>>>>
->>>>>>> This example is a bit strange. I don't understand the relationship
->>>>>>> between keystone-dwc3 and synopsys,dwc3, nor do I want to. I'd prefer
->>>>>>> to see a simple example here.
->>>>>
->>>>>
->>>>>
->>>>>>> dma-ranges is a property of the parent which you show, but
->>>>>>> dma-coherent originally was a property of the bus master itself.
->>>>>>> While
->>>>>>> we need to support that, are we changing that? We need to be clear on
->>>>>>> where the property belongs even if the kernel is more lax.
->>>>>>>
->>>>>> I don't think we are changing it fundamentally but may be I missing
->>>>>> your point. The dma-coherent as is now a per-device property.
->>>>>> USB is one of the bus master supports coherency and hence showed
->>>>>> up in above example.
->>>>>
->>>>>
->>>>> I think it's enough if you just drop the "synopsys,dwc3" node and the
->>>>> intermediate dma-ranges property from the example, leaving the
->>>>> dma-coherent property in the "ti,keystone-dwc3" node.
->>>>>
->>>> Thanks Arnd. That should avoid the confusion. Just to see if Rob is
->>>> fine by it, the example will look like below.
->>>
->>>
->>> Yes. Looks fine.
->>>
->> Great. Updated version 2 below.
->
->
-> Seems, this patch has not been merged accidentally :(
-> Is it possible for you to take it, or would you like me to re-send it?
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>>   arch/arm/boot/dts/k2hk-evm.dts | 31 +++++++++++++++++++++++++++++++
+>>   1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+>> index 91371f7..a7b468c 100644
+>> --- a/arch/arm/boot/dts/k2hk-evm.dts
+>> +++ b/arch/arm/boot/dts/k2hk-evm.dts
+>> @@ -58,6 +58,13 @@
+>>   				clock-output-names = "refclk-ddr3b";
+>>   			};
+>>   		};
+>> +
+>> +		qmss_domain: qmss_pm_controller {
+>> +			compatible = "ti,keystone-gpc";
+>> +			clocks = <&chipclk13>;
+>> +			#power-domain-cells = <0>;
+>> +		};
+> 
+> Hmm, I'm still a bit confused by what you're attempting to do here.
+> Unless I'm missing someting, clocks are properties of the device, not
+> the pm-domain...
+> 
+>>   		qmss: qmss at 2a40000 {
+>>   			compatible = "ti,keystone-navigator-qmss";
+>>   			dma-coherent;
+>> @@ -65,6 +72,8 @@
+>>   			#size-cells = <1>;
+>>   			clocks = <&chipclk13>;
+>>   			ranges;
+>> +			power-domains = <&qmss_domain>;
+> 
+> ...  Also, each of the pm domains is duplicating the list of clocks from
+> the device node, so I'm not sure what this is accomplishing.
+> 
+> Why not just have a single, more generic power domain that gets the list
+> of clocks from the device node.
 
-Applied. Sorry for the delay.
+Ok. I've tried it and seems it will work.
 
-Rob
+Used GPD callbacks:
+		.attach_dev = keystone_pm_domain_attach_dev,
+		.detach_dev = keystone_pm_domain_detach_dev,
+		.dev_ops = {
+			.stop = pm_clk_suspend,
+			.start = pm_clk_resume,
+		},
+
+Updated DT structure:
+		k_domain: k_pm_controller {
+			compatible = "ti,keystone-gpc";
+			#power-domain-cells = <0>;
+		};
+
+		qmss: qmss at 2a40000 {
+			compatible = "ti,keystone-navigator-qmss";
+			dma-coherent;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			clocks = <&chipclk13>;
+			ranges;
+			power-domains = <&k_domain>;
+
+Thanks for your comments. 
+I'll update & re-send.
+
+Regards,
+-grygorii
