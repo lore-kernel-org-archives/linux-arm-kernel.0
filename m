@@ -1,169 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 26 Sep 2014 09:15:51 +0200
-Subject: [PATCH v2] clocksource: arch_timer: Fix code to use physical
- timers when requested
-In-Reply-To: <1410473895-6756-1-git-send-email-sonnyrao@chromium.org>
-References: <1410473895-6756-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <542512A7.8040508@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 26 Sep 2014 10:18:55 +0300
+Subject: [PATCH] clk: prevent erronous parsing of children during rate
+ change
+In-Reply-To: <5424C2FA.4000508@codeaurora.org>
+References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
+ <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
+ <5424C2FA.4000508@codeaurora.org>
+Message-ID: <5425135F.2070809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/26/2014 04:35 AM, Stephen Boyd wrote:
+> On 09/23/14 06:38, Tero Kristo wrote:
+>> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
+>>> On 08/21, Tero Kristo wrote:
+>>>>            /* Skip children who will be reparented to another clock */
+>>>>            if (child->new_parent && child->new_parent != clk)
+>>>>                continue;
+>>>
+>>> Are we not hitting the new_parent check here? I don't understand
+>>> how we can be changing parents here unless the check is being
+>>> avoided, in which case I wonder why determine_rate isn't being
+>>> used.
+>>>
+>>
+>> It depends how the clock underneath handles the situation. The error I
+>> am seeing actually happens with a SoC specific compound clock (DPLL)
+>> which integrates set_rate + mux functionality into a single clock
+>> node. A call to the clk_set_rate changes the parent of this clock
+>> (from bypass clock to reference clock), in addition to changing the
+>> rate (tune the mul+div.) I looked at using the determine rate call
+>> with this type but it breaks everything up... the parent gets changed
+>> but not the clock rate, in addition to some other issues.
+>
+> Ok. Is this omap3_noncore_dpll_set_rate()?
 
-Hi Sonny,
+Yes.
 
-is this patch supposed to go through my tree or ARM's tree ?
+ > Can we use determine_rate +
+> clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
+> allow us to do the mult+div and the parent in the same op call, although
+> I don't understand why setting the parent and then setting the rate is
+> not going to work.
 
-Thanks
+Well, setting parent first, then rate later causes problems with the 
+DPLL ending up running with illegal (non-specified) rate, the M+N values 
+are most likely wrong if you just switch from bypass clock to reference 
+clock first without programming the M+N first.
 
-   -- Daniel
+  I'm interested in the other issues that you mentioned
+> too.
 
-On 09/12/2014 12:18 AM, Sonny Rao wrote:
- > This is a bug fix for using physical arch timers when
-> the arch_timer_use_virtual boolean is false.  It restores the
-> arch_counter_get_cntpct() function after removal in
->
-> 0d651e4e "clocksource: arch_timer: use virtual counters"
->
-> and completes the implementation of memory mapped access for physical
-> timers, so if a system is trying to use physical timers, it will
-> function properly.
->
-> We need this on certain ARMv7 systems which are architected like this:
->
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->    we don't want to add the complexity of hypervisor there.
->
-> * The firmware isn't involved in SMP bringup or resume.
->
-> * The ARCH timer come up with an uninitialized offset between the
->    virtual and physical counters.  Each core gets a different random
->    offset.
->
-> * The device boots in "Secure SVC" mode.
->
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->    CNTHCTL.PL1PCTEN (both default to 1 at reset)
->
-> One example of such as system is RK3288 where it is much simpler to
-> use the physical counter since there's nobody managing the offset and
-> each time a core goes down and comes back up it will get reinitialized
-> to some other random value.
->
-> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
-> ---
-> v2: Add fixes tag to commit message, cc stable, copy Doug's
->      description of the systems which need this in commit message.
-> ---
->   arch/arm/include/asm/arch_timer.h    |  9 +++++++++
->   arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
->   drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
->   3 files changed, 45 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 0704e0c..e72aa4d 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
->   	return val;
->   }
->
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-> +	return cval;
-> +}
-> +
->   static inline u64 arch_counter_get_cntvct(void)
->   {
->   	u64 cval;
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 9400596..58657c4 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
->   #endif
->   }
->
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> +
-> +	return cval;
-> +}
-> +
->   static inline u64 arch_counter_get_cntvct(void)
->   {
->   	u64 cval;
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..ad723cb 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -30,6 +30,8 @@
->   #define CNTTIDR		0x08
->   #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
->
-> +#define CNTPCT_LO	0x00
-> +#define CNTPCT_HI	0x04
->   #define CNTVCT_LO	0x08
->   #define CNTVCT_HI	0x0c
->   #define CNTFRQ		0x10
-> @@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
->   	return ((u64) vct_hi << 32) | vct_lo;
->   }
->
-> +static u64 arch_counter_get_cntpct_mem(void)
-> +{
-> +	u32 pct_lo, pct_hi, tmp_hi;
-> +
-> +	do {
-> +		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
-> +		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +	} while (pct_hi != tmp_hi);
-> +
-> +	return ((u64) pct_hi << 32) | pct_lo;
-> +}
-> +
->   /*
->    * Default to cp15 based access because arm64 uses this function for
->    * sched_clock() before DT is probed and the cp15 method is guaranteed
-> @@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
->   	u64 start_count;
->
->   	/* Register the CP15 based counter if we have one */
-> -	if (type & ARCH_CP15_TIMER)
-> -		arch_timer_read_counter = arch_counter_get_cntvct;
-> -	else
-> -		arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +	if (type & ARCH_CP15_TIMER) {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct;
-> +	} else {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct_mem;
-> +	}
->
->   	start_count = arch_timer_read_counter();
->   	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
->
+Mostly these were side-effects from the illegal DPLL setup I guess, like 
+boot hang, failed drivers etc. I didn't really investigate this that 
+much as it is much more simpler just to use safe list iteration here.
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-Tero
