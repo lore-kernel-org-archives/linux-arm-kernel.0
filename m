@@ -1,22 +1,58 @@
-From: jonghwa3.lee@samsung.com (Jonghwa Lee)
-Date: Fri, 26 Sep 2014 16:23:20 +0900
-Subject: [PATCH 0/2] ARM: EXYNOS3250: Add support EXYNOS3250 suspend/resume.
-Message-ID: <1411716202-31644-1-git-send-email-jonghwa3.lee@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 26 Sep 2014 09:24:03 +0200
+Subject: [PATCH v2 0/3] ARM: vf610: Fix/add clocksource
+In-Reply-To: <54250F35.8060306@linaro.org>
+References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
+ <54250F35.8060306@linaro.org>
+Message-ID: <5f84a10302bfb9bc5fed68e789fd1764@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches adds and modifies exynos suspend driver to support exynos3250's
-suspend/resume. To work suspend/resume, it also needs a work at pmu driver.
-It'll be supported after refactoring job on pmu driver is done.
+Am 2014-09-26 09:01, schrieb Daniel Lezcano:
+> On 09/24/2014 06:20 PM, Stefan Agner wrote:
+>> This patchset came out of need for a clocksource which supports shutdown.
+>> In the first version I proposed to just replace the current clocksource
+>> with the ARM Global Timer and even proposed to remove the PIT clocksource
+>> driver. But Bill Pringlemeir brought up a reasonable point why we should
+>> keep the PIT clocksource.
+>>
+>> Since we need shutdown support for suspend/resume, I added another patch
+>> which fixes shutdown functionality for the PIT driver. Now it's possible
+>> to use suspend/resume functionality with each of the two clocksources.
+>>
+>> Changes in v2:
+>> - Added shutdown support for PIT clocksource (and hence clocksource
+>>    maintainers as receipient).
+>> - Create Kconfig entries which allow to choose between the two
+>>    clocksources
+>> - Clarified commit message
+>> - Renamed device tree node to "timer"
+>>
+> 
+> Hi Stefan,
+> 
+> I will take the patch 1/3 and let the other patches to be acked-by or
+> picked in another tree.
+> 
+> Thanks
+>   -- Daniel
 
-Jonghwa Lee (2):
-  ARM: EXYNOS: suspend: Make restoring registers into selectable
-    option.
-  ARM: EXYNOS3250: Add initial support EXYNOS3250 suspend/resume.
+Hi Daniel, 
 
- arch/arm/mach-exynos/regs-pmu.h |    4 +++
- arch/arm/mach-exynos/suspend.c  |   70 +++++++++++++++++++++++++++++----------
- 2 files changed, 56 insertions(+), 18 deletions(-)
+Great thx. If not already to late, can you drop that superfluous empty
+line mentioned by Sergei?
 
--- 
-1.7.9.5
+--
+Stefan
+
+> 
+>> Stefan Agner (3):
+>>    clocksource: vf_pit_timer: Support shutdown mode
+>>    ARM: dts: vf610: Add ARM Global Timer
+>>    ARM: vf610: Add ARM Global Timer clocksource option
+>>
+>>   arch/arm/boot/dts/vf610.dtsi       |  8 ++++++++
+>>   arch/arm/mach-imx/Kconfig          | 19 ++++++++++++++++++-
+>>   drivers/clocksource/vf_pit_timer.c |  5 +++++
+>>   3 files changed, 31 insertions(+), 1 deletion(-)
+>>
