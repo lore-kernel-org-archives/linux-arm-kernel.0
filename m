@@ -1,174 +1,141 @@
-From: liviu@dudau.co.uk (liviu at dudau.co.uk)
-Date: Fri, 26 Sep 2014 22:20:53 +0100
-Subject: [PATCH v12 08/12] PCI: OF: Introduce helper function for
- retrieving PCI domain numbers
-In-Reply-To: <CAL_Jsq+j40Xf208wCf4as3H=cDU=htJ-JWinB0DjpcORjatNXQ@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-9-git-send-email-Liviu.Dudau@arm.com>
- <CAL_Jsq+j40Xf208wCf4as3H=cDU=htJ-JWinB0DjpcORjatNXQ@mail.gmail.com>
-Message-ID: <20140926212052.GA6030@borg.dudau.co.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 26 Sep 2014 23:55:55 +0200
+Subject: [PATCH v2 1/6] cpufreq: dt: disable unsupported OPPs
+In-Reply-To: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <3967829.hlAL1lU4Xl@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 01:20:39PM -0500, Rob Herring wrote:
-> On Tue, Sep 23, 2014 at 2:01 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > Add pci_get_new_domain_nr() to allocate a new domain number
-> > and of_get_pci_domain_nr() to retrieve the PCI domain number
-> > of a given device from DT. Host bridge drivers or architecture
-> > specific code can choose to implement their PCI domain number
-> > policy using these two functions.
-> >
-> > Using of_get_pci_domain_nr() guarantees a stable PCI domain
-> > number on every boot provided that all host bridge controllers
-> > are assigned a number in the device tree using "linux,pci-domain"
-> > property. Mix use of pci_get_new_domain_nr() and of_get_pci_domain_nr()
-> > is not recommended as it can lead to potentially conflicting
-> > domain numbers being assigned to root busses behind different
-> > host bridges.
-> >
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+On Friday, September 26, 2014 03:40:59 PM Lucas Stach wrote:
+> If the regulator connected to the CPU voltage plane doesn't
+> support an OPP specified voltage with the acceptable tolerance
+> it's better to just disable the OPP instead of constantly
+> failing the voltage scaling later on.
 > 
-> Looks pretty good, but a couple of comments that can be addressed as
-> follow-up patches.
-> 
-> > ---
-> >  drivers/of/of_pci.c    | 25 +++++++++++++++++++++++++
-> >  drivers/pci/pci.c      |  9 +++++++++
-> >  include/linux/of_pci.h |  7 +++++++
-> >  include/linux/pci.h    |  3 +++
-> >  4 files changed, 44 insertions(+)
-> >
-> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > index 8481996..82d172f 100644
-> > --- a/drivers/of/of_pci.c
-> > +++ b/drivers/of/of_pci.c
-> > @@ -89,6 +89,31 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-> >
-> > +/**
-> > + * This function will try to obtain the host bridge domain number by
-> > + * finding a property called "linux,pci-domain" of the given device node.
-> > + *
-> > + * @node: device tree node with the domain information
-> > + *
-> > + * Returns the associated domain number from DT in the range [0-0xffff], or
-> > + * a negative value if the required property is not found.
-> > + */
-> > +int of_get_pci_domain_nr(struct device_node *node)
-> > +{
-> > +       const __be32 *value;
-> > +       int len;
-> > +       u16 domain;
-> > +
-> > +       value = of_get_property(node, "linux,pci-domain", &len);
-> 
-> This needs to be documented.
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-I would say needs agreed on *and* documented.
+Why do you need this to be part of the whole series?  Is there any
+hard dependency on it?
 
+> ---
+> v2:
+> - rebase on top of pm/linux-next
+> ---
+>  drivers/cpufreq/cpufreq-dt.c | 66 +++++++++++++++++++++++++++-----------------
+>  1 file changed, 40 insertions(+), 26 deletions(-)
 > 
-> > +       if (!value || len < sizeof(*value))
-> > +               return -EINVAL;
-> > +
-> > +       domain = (u16)be32_to_cpup(value);
+> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> index 6bbb8b913446..4485c8eccdc2 100644
+> --- a/drivers/cpufreq/cpufreq-dt.c
+> +++ b/drivers/cpufreq/cpufreq-dt.c
+> @@ -185,6 +185,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  	struct device *cpu_dev;
+>  	struct regulator *cpu_reg;
+>  	struct clk *cpu_clk;
+> +	unsigned long min_uV = ~0, max_uV = 0;
+>  	unsigned int transition_latency;
+>  	int ret;
+>  
+> @@ -204,16 +205,10 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  	/* OPPs might be populated at runtime, don't check for error here */
+>  	of_init_opp_table(cpu_dev);
+>  
+> -	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+> -	if (ret) {
+> -		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
+> -		goto out_put_node;
+> -	}
+> -
+>  	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+>  	if (!priv) {
+>  		ret = -ENOMEM;
+> -		goto out_free_table;
+> +		goto out_put_node;
+>  	}
+>  
+>  	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
+> @@ -222,30 +217,49 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  		transition_latency = CPUFREQ_ETERNAL;
+>  
+>  	if (!IS_ERR(cpu_reg)) {
+> -		struct dev_pm_opp *opp;
+> -		unsigned long min_uV, max_uV;
+> -		int i;
+> -
+>  		/*
+> -		 * OPP is maintained in order of increasing frequency, and
+> -		 * freq_table initialised from OPP is therefore sorted in the
+> -		 * same order.
+> +		 * Disable any OPPs where the connected regulator isn't able to
+> +		 * provide the specified voltage and record minimum and maximum
+> +		 * voltage levels.
+>  		 */
+> -		for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
+> -			;
+> -		rcu_read_lock();
+> -		opp = dev_pm_opp_find_freq_exact(cpu_dev,
+> -				freq_table[0].frequency * 1000, true);
+> -		min_uV = dev_pm_opp_get_voltage(opp);
+> -		opp = dev_pm_opp_find_freq_exact(cpu_dev,
+> -				freq_table[i-1].frequency * 1000, true);
+> -		max_uV = dev_pm_opp_get_voltage(opp);
+> -		rcu_read_unlock();
+> +		while (1) {
+> +			struct dev_pm_opp *opp;
+> +			unsigned long opp_freq = 0, opp_uV, tol_uV;
+> +
+> +			rcu_read_lock();
+> +			opp = dev_pm_opp_find_freq_ceil(cpu_dev, &opp_freq);
+> +			if (IS_ERR(opp)) {
+> +				rcu_read_unlock();
+> +				break;
+> +			}
+> +			opp_uV = dev_pm_opp_get_voltage(opp);
+> +			rcu_read_unlock();
+> +
+> +			tol_uV = opp_uV * priv->voltage_tolerance / 100;
+> +			if (regulator_is_supported_voltage(cpu_reg, opp_uV,
+> +							   opp_uV + tol_uV)) {
+> +				if (opp_uV < min_uV)
+> +					min_uV = opp_uV;
+> +				if (opp_uV > max_uV)
+> +					max_uV = opp_uV;
+> +			} else {
+> +				dev_pm_opp_disable(cpu_dev, opp_freq);
+> +			}
+> +
+> +			opp_freq++;
+> +		}
+> +
+>  		ret = regulator_set_voltage_time(cpu_reg, min_uV, max_uV);
+>  		if (ret > 0)
+>  			transition_latency += ret * 1000;
+>  	}
+>  
+> +	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+> +	if (ret) {
+> +		pr_err("failed to init cpufreq table: %d\n", ret);
+> +		goto out_free_priv;
+> +	}
+> +
+>  	/*
+>  	 * For now, just loading the cooling device;
+>  	 * thermal DT code takes care of matching them.
+> @@ -275,9 +289,9 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  
+>  out_cooling_unregister:
+>  	cpufreq_cooling_unregister(priv->cdev);
+> -	kfree(priv);
+> -out_free_table:
+>  	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +out_free_priv:
+> +	kfree(priv);
+>  out_put_node:
+>  	of_node_put(np);
+>  out_put_reg_clk:
 > 
-> of_property_read_u32 would not work here?
 
-It should, I guess, but I want to limit the domain number range to 16 bits.
-
-Best regards,
-Liviu
-
-> 
-> > +
-> > +       return domain;
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
-> > +
-> >  #ifdef CONFIG_PCI_MSI
-> >
-> >  static LIST_HEAD(of_pci_msi_chip_list);
-> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > index 2c9ac70..d36f35f 100644
-> > --- a/drivers/pci/pci.c
-> > +++ b/drivers/pci/pci.c
-> > @@ -4406,6 +4406,15 @@ static void pci_no_domains(void)
-> >  #endif
-> >  }
-> >
-> > +#ifdef CONFIG_PCI_DOMAINS
-> > +static atomic_t __domain_nr = ATOMIC_INIT(-1);
-> > +
-> > +int pci_get_new_domain_nr(void)
-> > +{
-> > +       return atomic_inc_return(&__domain_nr);
-> > +}
-> > +#endif
-> > +
-> >  /**
-> >   * pci_ext_cfg_avail - can we access extended PCI config space?
-> >   *
-> > diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> > index dde3a4a..71062e9 100644
-> > --- a/include/linux/of_pci.h
-> > +++ b/include/linux/of_pci.h
-> > @@ -15,6 +15,7 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
-> >  int of_pci_get_devfn(struct device_node *np);
-> >  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
-> >  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-> > +int of_get_pci_domain_nr(struct device_node *node);
-> >  #else
-> >  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
-> >  {
-> > @@ -43,6 +44,12 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-> >  {
-> >         return -EINVAL;
-> >  }
-> > +
-> > +static inline int
-> > +of_get_pci_domain_nr(struct device_node *node)
-> > +{
-> > +       return -1;
-> > +}
-> >  #endif
-> >
-> >  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > index a494e5d..150da2d 100644
-> > --- a/include/linux/pci.h
-> > +++ b/include/linux/pci.h
-> > @@ -1285,10 +1285,12 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
-> >   */
-> >  #ifdef CONFIG_PCI_DOMAINS
-> >  extern int pci_domains_supported;
-> > +int pci_get_new_domain_nr(void);
-> >  #else
-> >  enum { pci_domains_supported = 0 };
-> >  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
-> >  static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
-> > +static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
-> >  #endif /* CONFIG_PCI_DOMAINS */
-> >
-> >  /*
-> > @@ -1417,6 +1419,7 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
-> >
-> >  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
-> >  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
-> > +static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
-> >
-> >  #define dev_is_pci(d) (false)
-> >  #define dev_is_pf(d) (false)
-> > --
-> > 2.1.0
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
