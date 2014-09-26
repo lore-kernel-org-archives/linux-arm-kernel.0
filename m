@@ -1,14 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 27 Sep 2014 01:00:20 +0400
-Subject: [PATCH v4 1/2] ARM: shmobile: r8a7790: add USB PHY DT support
+Date: Sat, 27 Sep 2014 01:01:35 +0400
+Subject: [PATCH v4 2/2] ARM: shmobile: lager: enable USB PHY
 In-Reply-To: <4420279.PiYV5HPFxp@wasted.cogentembedded.com>
 References: <4420279.PiYV5HPFxp@wasted.cogentembedded.com>
-Message-ID: <1527337.LO1rEHY4Sk@wasted.cogentembedded.com>
+Message-ID: <1862889.19pI7tAsvN@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the R8A7790 generic part of the USB PHY device node. It is up to the
-board file to enable the device.
+Enable USB PHY device for the Lager board. 
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
@@ -17,47 +16,26 @@ Changes in version 4:
 - refreshed the patch.
 
 Changes in version 3:
-- changed subnodes of the USB PHY node to be per-channel;
-- changed "renesas,phy-select" property to "reg" in the subnodes, and thus added
-  "#address-cells" and "#size-cells" properties to the parent node;
-- moved "#phy-cells" property from the parent node to the subnodes, changing its
-  value to <1>;
 - refreshed the patch.
 
 Changes in version 2:
-- added subnodes to the USB PHY node;
 - refreshed the patch.
 
- arch/arm/boot/dts/r8a7790.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7790.dtsi
-@@ -600,6 +600,25 @@
- 		status = "disabled";
- 	};
+--- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
++++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -424,6 +424,10 @@
+ 	pinctrl-names = "default";
+ };
  
-+	usbphy: usb-phy at e6590100 {
-+		compatible = "renesas,usb-phy-r8a7790";
-+		reg = <0 0xe6590100 0 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&mstp7_clks R8A7790_CLK_HSUSB>;
-+		clock-names = "usbhs";
-+		status = "disabled";
++&usbphy {
++	status = "okay";
++};
 +
-+		usb0: usb-channel at 0 {
-+			reg = <0>;
-+			#phy-cells = <1>;
-+		};
-+		usb2: usb-channel at 2 {
-+			reg = <2>;
-+			#phy-cells = <1>;
-+		};
-+	};
-+
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
+ /* composite video input */
+ &vin1 {
+ 	pinctrl-0 = <&vin1_pins>;
