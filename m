@@ -1,46 +1,58 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 26 Sep 2014 08:10:04 -0700
-Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
- affinity notification
-In-Reply-To: <20140926094003.GL5182@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 26 Sep 2014 10:40:03 +0100")
-References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
- <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
- <alpine.DEB.2.10.1408272239190.3323@nanos>
- <20140902184305.GB91995@ilina-mac.local>
- <alpine.DEB.2.10.1409022109050.3333@nanos>
- <7htx3vbfqr.fsf@deeprootsystems.com>
- <alpine.DEB.2.11.1409261129220.4567@nanos>
- <20140926094003.GL5182@n2100.arm.linux.org.uk>
-Message-ID: <7hioka4dv7.fsf@deeprootsystems.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 26 Sep 2014 17:16:25 +0200
+Subject: [GIT PULL] Allwinner drivers additions for 3.18
+In-Reply-To: <20140925191800.5855cef6@linux.lan.towertech.it>
+References: <20140920202855.GA20329@lukather>
+ <201409251820.38087.arnd@arndb.de>
+ <20140925163103.GN15315@lukather>
+ <20140925191800.5855cef6@linux.lan.towertech.it>
+Message-ID: <20140926151625.GV15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Thu, Sep 25, 2014 at 07:18:00PM +0200, Alessandro Zummo wrote:
+> On Thu, 25 Sep 2014 18:31:03 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Plus, this thread from last december
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220778.html,
+> > clearly showed that it's nothing new, and that Alessandro doesn't
+> > maintain any tree, hence why I ended up merging it.
+> 
+>  I review the drivers, when appropriate, and Andrew thankfully picks them up.
+>  Important emails will usually get my attention. Even if I do not answer,
+>  is always a good idea to post in the mailing list, as there are a lot
+>  of competent people there.
 
-> On Fri, Sep 26, 2014 at 11:29:56AM +0200, Thomas Gleixner wrote:
->> On Thu, 25 Sep 2014, Kevin Hilman wrote:
->> > Maybe I'm missing something, or maybe we're just lucky and nobody uses
->> > them together, but irq_set_affinity_notifier() only allows a single
->> > notifier to be registered at any given time.  So if you had a system
->> 
->> A single notifier per irq .....
->
-> So what about two drivers wanting to use this notifier, but sharing an
-> interrupt?
->
-> It sounds to me like this notifier was misdesigned from the very start,
-> and it should always have supported multiple notifiers.
+Then may I suggest adding Andrew to the maintainers? Because if you
+follow get_maintainers.pl right now, it only states that you are the
+maintainer. That strongly implies that you should be the one doing
+reviews, and we should at least wait for your Acked-by in order to
+merge any RTC patches. And past experience show that we can wait for a
+while.
 
-I agree.
+Don't get this wrong, but the way you maintain it is rather unusual,
+and your silence about this just makes us wonder what to do with your
+patches, up until completely merging them anyway. For the record, it's
+something I feel rather uncomfortable about, but it seems like it's
+the only way to get something merged anyway.
 
-$SUBJECT patch tries to add that support, and is part of a series
-wanting to use these notifiers in the PM QoS subsystem, while at the
-same time not breaking existing users.
+Not having time to maintain your subsystem is totally fine, and as a
+hobbyist maintainer too, I completely understand it. But if you can't
+cope with the patches anymore, maybe you should find another
+co-maintainer? Especially if you have reliable contributors, like
+you're suggesting.
 
-I suppose this series could be written without $SUBJECT patch, and
-crossing fingers in the hopes that an existing user of the notifiers
-doesn't also need to use the pm_qos constraints, but that seems like
-knowingly leaving an armed landmine laying around.
+Maxime
 
-Kevin
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/a840a172/attachment-0001.sig>
