@@ -1,28 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Sep 2014 12:18:46 +0100
-Subject: [PATCH] arm/arm64: KVM: Fix VTTBR_BADDR_MASK and pgd alloc
-In-Reply-To: <1411669939-24648-1-git-send-email-christoffer.dall@linaro.org>
-References: <1411669939-24648-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20140926111845.GA15654@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Sep 2014 12:21:10 +0100
+Subject: [PATCH v6 0/8] arm: support CONFIG_RODATA
+In-Reply-To: <CAGXu5j+v075p9j6tME5N1fN9WsX1YiBO-vYtP8MLM=eo5UsqHg@mail.gmail.com>
+References: <1411067949-10913-1-git-send-email-keescook@chromium.org>
+ <CAGXu5j+v075p9j6tME5N1fN9WsX1YiBO-vYtP8MLM=eo5UsqHg@mail.gmail.com>
+Message-ID: <20140926112109.GH22293@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 07:32:19PM +0100, Christoffer Dall wrote:
-> From: Joel Schopp <joel.schopp@amd.com>
+On Fri, Sep 26, 2014 at 06:58:05AM +0100, Kees Cook wrote:
+> On Thu, Sep 18, 2014 at 12:19 PM, Kees Cook <keescook@chromium.org> wrote:
+> > This is a series of patches to support CONFIG_RODATA on ARM, so that
+> > the kernel text is RO, and non-text sections default to NX. To support
+> > on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
+> > support has been finalized based on several versions of various patches
+> > that are floating around on the mailing list. This series attempts to
+> > include the least intrusive version, so that others can build on it for
+> > future fixmap work.
+> >
+> > The series has been heavily tested, and appears to be working correctly:
+> >
+> > With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
+> > /sys/kernel/debug/kernel_page_tables.
+> >
+> > Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
+> > for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
+> >         EXEC_DATA
+> >         WRITE_RO
+> >         WRITE_KERN
+> >
+> > ftrace works:
+> >         CONFIG_FTRACE_STARTUP_TEST passes
+> >         Enabling tracing works:
+> >                 echo function > /sys/kernel/debug/tracing/current_tracer
+> > kprobes works:
+> >         CONFIG_ARM_KPROBES_TEST passes
+> >
+> > kexec works:
+> >         kexec will load and start a new kernel
+> >
+> > Built with and without CONFIG_HIGHMEM, CONFIG_HIGHMEM_DEBUG, and
+> > CONFIG_NR_CPUS=32.
+> >
+> > Thanks to everyone who has been testing this series and working on its
+> > various pieces!
+> >
+> > Hopefully this should address Will's last concerns. :)
+> >
+> > Thanks!
+> >
+> > -Kees
+> >
+> > v6:
+> > - always run patch_text under stop_machine (will.deacon)
+> > - document set_fixmap's TLB flushing situation (will.deacon)
 > 
-> The current aarch64 calculation for VTTBR_BADDR_MASK masks only 39 bits
-> and not all the bits in the PA range. This is clearly a bug that
-> manifests itself on systems that allocate memory in the higher address
-> space range.
+> Hi Will,
 > 
->  [ Modified from Joel's original patch to be based on PHYS_MASK_SHIFT
->    instead of a hard-coded value and to move the alignment check of the
->    allocation to mmu.c.  Also added a comment explaining why we hardcode
->    the IPA range and changed the stage-2 pgd allocation to be based on
->    the 40 bit IPA range instead of the maximum possible 48 bit PA range.
->    - Christoffer ]
-> 
-> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Does this version look good to you? Should I turn it into a pull request?
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+The TLB flushing bits look sensible now, but the locking in __set_fixmap is
+still pretty horrible (x86 just uses a mutex, not sure why we need to be
+different). Still, it's Russell's call.
+
+Will
