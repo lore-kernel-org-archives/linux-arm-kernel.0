@@ -1,63 +1,94 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 26 Sep 2014 11:08:32 +0100
-Subject: [PATCH] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
-In-Reply-To: <1411752349-31490-2-git-send-email-alvin.chen@intel.com>
-References: <1411752349-31490-1-git-send-email-alvin.chen@intel.com>
- <1411752349-31490-2-git-send-email-alvin.chen@intel.com>
-Message-ID: <20140926100832.GE27755@sirena.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 26 Sep 2014 12:10:58 +0200
+Subject: [PATCH 3/5] clk: imx: add CPU clock type
+In-Reply-To: <20140926025933.GA31948@dragon>
+References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
+ <1411143381-10516-4-git-send-email-l.stach@pengutronix.de>
+ <20140926025933.GA31948@dragon>
+Message-ID: <1411726258.2761.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 10:25:49AM -0700, Weike Chen wrote:
+Am Freitag, den 26.09.2014, 10:59 +0800 schrieb Shawn Guo:
+> On Fri, Sep 19, 2014 at 06:16:19PM +0200, Lucas Stach wrote:
+> > From: Lucas Stach <dev@lynxeye.de>
+> > 
+> > This implements a virtual clock used to abstract away
+> > all the steps needed in order to change the ARM clock,
+> > so we don't have to push all this clock handling into
+> > the cpufreq driver.
+> > 
+> > While it will be used for i.MX53 at first it is generic
+> > enough to be used on i.MX6 later on.
+> > 
+> > Signed-off-by: Lucas Stach <dev@lynxeye.de>
+> 
+> Is this intentional to use a different email address than your usual
+> one?
 
-> +static u32 pxa2xx_spi_get_ssrc1_change_mask(const struct driver_data *drv_data)
-> +{
-> +	if (!is_quark_x1000_ssp(drv_data))
-> +		return SSCR1_CHANGE_MASK;
-> +
-> +	return QUARK_X1000_SSCR1_CHANGE_MASK;
-> +}
+Urgh no. That's a remnant from starting this code at home without
+setting the proper git environment. Thanks for the hint.
 
-These functions would be much better written as switch statements -
-think how they're going to look when we've got another controller which
-needs custom values.  It might also be helpful for review to have two
-patches, one splitting things out into the functions and another adding
-the Quark support.
+> 
+> > ---
+> >  arch/arm/mach-imx/Makefile  |   2 +-
+> >  arch/arm/mach-imx/clk-cpu.c | 104 ++++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-imx/clk.h     |   4 ++
+> >  3 files changed, 109 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/mach-imx/clk-cpu.c
+> > 
+> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> > index ac88599ca080..4d6071351f4f 100644
+> > --- a/arch/arm/mach-imx/Makefile
+> > +++ b/arch/arm/mach-imx/Makefile
+> > @@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
+> >  obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
+> >  
+> >  imx5-pm-$(CONFIG_PM) += pm-imx5.o
+> > -obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
+> > +obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o clk-cpu.o $(imx5-pm-y)
+> >  
+> >  obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+> >  			    clk-pfd.o clk-busy.o clk.o \
+> > diff --git a/arch/arm/mach-imx/clk-cpu.c b/arch/arm/mach-imx/clk-cpu.c
+> > new file mode 100644
+> > index 000000000000..ffba96228d3b
+> > --- /dev/null
+> > +++ b/arch/arm/mach-imx/clk-cpu.c
+> > @@ -0,0 +1,104 @@
+> > +/*
+> > + * Copyright (c) 2014 Lucas Stach <l.stach@pengutronix.de>, Pengutronix
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/slab.h>
+> > +
+> > +struct clk_cpu {
+> > +	struct clk_hw	hw;
+> > +	struct clk	*div, *mux, *pll, *step;
+> 
+> This is personal taste, so I'm not strong on this.  But I feel having
+> them on multiple lines makes the later addition/removal of struct clk
+> pointers a bit easier.
+> 
+> Other than these trivial comments, the patch looks good to me.
+> 
+> Shawn
+> 
+> > +};
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> +/*  see Quark SPI data sheet for implementation rationale */
-> +static u32 quark_x1000_set_clk_regvals(u32 rate, u32 *dds, u32 *clk_div)
-> +{
-
-Please document this in the driver - I don't know if this datasheet is
-public but even if it is it may not stay that way.
-
-> @@ -613,6 +759,8 @@ static void pump_transfers(unsigned long data)
->  	u32 cr1;
->  	u32 dma_thresh = drv_data->cur_chip->dma_threshold;
->  	u32 dma_burst = drv_data->cur_chip->dma_burst_size;
-> +	u32 change_mask = pxa2xx_spi_get_ssrc1_change_mask(drv_data);
-> +
->  
-
-Extra blank line being added here.
-
-> @@ -145,6 +147,9 @@ static inline int pxa25x_ssp_comp(struct driver_data *drv_data)
->  		return 1;
->  	if (drv_data->ssp_type == CE4100_SSP)
->  		return 1;
-> +	if (drv_data->ssp_type == QUARK_X1000_SSP)
-> +		return 1;
-> +
->  	return 0;
->  }
-
-Things like this should also be refactored into switch statements - in
-general anything that's deciding what to do based on ssp_type probably
-ought to be using switch statements.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/234a5096/attachment.sig>
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
