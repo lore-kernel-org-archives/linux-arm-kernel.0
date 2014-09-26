@@ -1,54 +1,42 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 26 Sep 2014 17:30:16 +0800
-Subject: [PATCH] arm/arm64: KVM: Fix set_clear_sgi_pend_reg offset
-In-Reply-To: <1411667347-2989-1-git-send-email-christoffer.dall@linaro.org>
-References: <1411667347-2989-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <54253228.4060602@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Sep 2014 11:32:35 +0200
+Subject: [GIT PULL] Xilinx Zynq changes for v3.18
+In-Reply-To: <542501A1.8020807@monstr.eu>
+References: <541819FD.5000301@monstr.eu> <201409251746.14540.arnd@arndb.de>
+ <542501A1.8020807@monstr.eu>
+Message-ID: <9601562.uSNV2qlMfC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 26 September 2014 08:03:13 Michal Simek wrote:
+> On 09/25/2014 05:46 PM, Arnd Bergmann wrote:
+> > On Tuesday 16 September 2014, Michal Simek wrote:
+> >>   git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.18
+> >>
+> >> for you to fetch changes up to 8097171e19bb69f3e2226827440b71ececa5d74f:
+> >>
+> >>   ARM: zynq: Remove useless L2C AUX setting (2014-09-16 12:55:12 +0200)
+> >>
+> >> ----------------------------------------------------------------
+> >> arm: Xilinx Zynq cleanup patches for v3.18
+> >>
+> >> - PM support
+> >> - Fix L2 useless setting
+> > 
+> > I don't see why this counts as cleanup when you add so much more code
+> > than you remove, but the individual changes all make sense, so I've
+> > pulled it into next/soc.
+> 
+> What's the branch name for adding new stuff? I see people are using soc.
+> 
+> 
 
+next/soc is usually for code that is shared by an soc family. Some platforms
+also still have board specific files (you dont'), that would go into
+next/board.
 
-On 2014/9/26 1:49, Christoffer Dall wrote:
-> The sgi values calculated in read_set_clear_sgi_pend_reg() and
-> write_set_clear_sgi_pend_reg() were horribly incorrectly multiplied by 4
-> with catastrophic results in that subfunctions ended up overwriting
-> memory not allocated for the expected purpose.
-> 
-> This showed up as bugs in kfree() and the kernel complaining a lot of
-> you turn on memory debugging.
-> 
-> This addresses: http://marc.info/?l=kvm&m=141164910007868&w=2
-> 
-> Reported-by: Shannon Zhao <zhaoshenglong@huawei.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index b6fab0f..8629678 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -816,7 +816,7 @@ static bool read_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	int sgi;
-> -	int min_sgi = (offset & ~0x3) * 4;
-> +	int min_sgi = (offset & ~0x3);
->  	int max_sgi = min_sgi + 3;
->  	int vcpu_id = vcpu->vcpu_id;
->  	u32 reg = 0;
-> @@ -837,7 +837,7 @@ static bool write_set_clear_sgi_pend_reg(struct kvm_vcpu *vcpu,
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	int sgi;
-> -	int min_sgi = (offset & ~0x3) * 4;
-> +	int min_sgi = (offset & ~0x3);
->  	int max_sgi = min_sgi + 3;
->  	int vcpu_id = vcpu->vcpu_id;
->  	u32 reg;
-> 
-Tested-by: Shannon Zhao <zhaoshenglong@huawei.com>
--- 
-Shannon
+Ideally all cleanups should come first and get submitted into next/cleanup,
+while any other changes that interact with the cleanups can be done on
+top of that first branch and merged into the respective topic branches.
+
+	Arnd
