@@ -1,41 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Sep 2014 09:20:54 +0200
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140926003934.GD12770@saruman>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140926003750.GA12770@saruman> <20140926003934.GD12770@saruman>
-Message-ID: <3346642.tZaefcZubX@wuerfel>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 26 Sep 2014 09:20:49 +0200
+Subject: [PATCH RFC 0/2] ARM: imx: ventana: enable LDO-bypass mode
+In-Reply-To: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
+References: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <542513D1.7060806@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014 19:39:34 Felipe Balbi wrote:
-> > 
-> > why would a glue layer need to access registers from the core ? That
-> > sounds very odd. I haven't seen that and will, definitely, NACK such a
-> > patch 
-> > 
-> > can you further describe why you think a glue layer might need to access
-> > core IP's registers ?
-> 
-> I just realised we're talking about chipidea here... in any case, it's
-> still valid to ask why would glue need to fiddle with core IP's
-> registers.
+Hi Tim,
 
-Generally, the glue driver wouldn't access the registers, but I don't
-think it's important to prevent it from doing that. In some cases, 
-a glue driver needs to override a function of the core driver, e.g.
-to work around an errata. We have a lot of those quirks in ATA drivers,
-one example from ahci_mvebu.c is
+Am 26.09.2014 um 07:59 schrieb Tim Harvey:
+> The IMX6 has some internal LDO regulators provided by the anatop regulator
+> block that can regulate the arm, soc, gpu/vpu core supplies. Alternatively a
+> design can supply vdd_arm and vdd_soc externally via a PMIC to provide a lower
+> power draw (switches are more efficient that ldo's).
+>
+> [...]
+>
+> I've cc'd the authors of the original commits of the above device-trees as
+> they likely have an interest in LDO-bypass mode.
 
-static void ahci_mvebu_regret_option(struct ahci_host_priv *hpriv)
-{
-        /*
-         * Enable the regret bit to allow the SATA unit to regret a
-         * request that didn't receive an acknowlegde and avoid a
-         * deadlock
-         */
-        writel(0x4, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_ADDR);
-        writel(0x80, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
-}
+please cc devicetree at vger.kernel.org for your patches.
 
-	Arnd
+>
+> Tim Harvey (2):
+>   regulator: anatop: allow LDO bypass to be set from device-tree
+>   ARM: imx: ventana: enable LDO bypass mode for GW54xx
+>
+>  .../bindings/regulator/anatop-regulator.txt        |  1 +
+>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              | 63 ++++++++++++++++------
+>  drivers/regulator/anatop-regulator.c               |  4 +-
+>  3 files changed, 51 insertions(+), 17 deletions(-)
+>
+
+Best regards
+Stefan
