@@ -1,170 +1,50 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 26 Sep 2014 15:41:01 +0200
-Subject: [PATCH v2 3/6] clk: imx: add CPU clock type
+Date: Fri, 26 Sep 2014 15:41:02 +0200
+Subject: [PATCH v2 4/6] arm: imx53: clk: add ARM clock
 In-Reply-To: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
 References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1411738864-26549-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1411738864-26549-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements a virtual clock used to abstract away
-all the steps needed in order to change the ARM clock,
-so we don't have to push all this clock handling into
-the cpufreq driver.
-
-While it will be used for i.MX53 at first it is generic
-enough to be used on i.MX6 later on.
+The ARM clock is a virtual clock feeding the ARM partition of
+the SoC. It controls multiple other clocks to ensure the right
+sequencing when cpufreq changes the CPU clock rate.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
-v2:
-- split clk into multiple line
-- fix my email address
----
- arch/arm/mach-imx/Makefile  |   2 +-
- arch/arm/mach-imx/clk-cpu.c | 107 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h     |   4 ++
- 3 files changed, 112 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-cpu.c
+ arch/arm/mach-imx/clk-imx51-imx53.c    | 5 +++++
+ include/dt-bindings/clock/imx5-clock.h | 3 ++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 23c02932bf84..0e708a9d607d 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
- obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
+diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
+index aafccf4b47c2..0f7e536147cb 100644
+--- a/arch/arm/mach-imx/clk-imx51-imx53.c
++++ b/arch/arm/mach-imx/clk-imx51-imx53.c
+@@ -541,6 +541,11 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 	clk[IMX5_CLK_CKO2]		= imx_clk_gate2("cko2", "cko2_podf", MXC_CCM_CCOSR, 24);
+ 	clk[IMX5_CLK_SPDIF_XTAL_SEL]	= imx_clk_mux("spdif_xtal_sel", MXC_CCM_CSCMR1, 2, 2,
+ 						mx53_spdif_xtal_sel, ARRAY_SIZE(mx53_spdif_xtal_sel));
++	clk[IMX5_CLK_ARM]		= imx_clk_cpu("arm", "cpu_podf",
++						clk[IMX5_CLK_CPU_PODF],
++						clk[IMX5_CLK_CPU_PODF_SEL],
++						clk[IMX5_CLK_PLL1_SW],
++						clk[IMX5_CLK_STEP_SEL]);
  
- imx5-pm-$(CONFIG_PM) += pm-imx5.o
--obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
-+obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o clk-cpu.o $(imx5-pm-y)
+ 	imx_check_clocks(clk, ARRAY_SIZE(clk));
  
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o clk.o \
-diff --git a/arch/arm/mach-imx/clk-cpu.c b/arch/arm/mach-imx/clk-cpu.c
-new file mode 100644
-index 000000000000..aa1c345e2a19
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-cpu.c
-@@ -0,0 +1,107 @@
-+/*
-+ * Copyright (c) 2014 Lucas Stach <l.stach@pengutronix.de>, Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+
-+struct clk_cpu {
-+	struct clk_hw	hw;
-+	struct clk	*div;
-+	struct clk	*mux;
-+	struct clk	*pll;
-+	struct clk	*step;
-+};
-+
-+static inline struct clk_cpu *to_clk_cpu(struct clk_hw *hw)
-+{
-+	return container_of(hw, struct clk_cpu, hw);
-+}
-+
-+static unsigned long clk_cpu_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
-+{
-+	struct clk_cpu *cpu = to_clk_cpu(hw);
-+
-+	return clk_get_rate(cpu->div);
-+}
-+
-+static long clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long *prate)
-+{
-+	struct clk_cpu *cpu = to_clk_cpu(hw);
-+
-+	return clk_round_rate(cpu->pll, rate);
-+}
-+
-+static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long parent_rate)
-+{
-+	struct clk_cpu *cpu = to_clk_cpu(hw);
-+	int ret;
-+
-+	/* switch to PLL bypass clock */
-+	ret = clk_set_parent(cpu->mux, cpu->step);
-+	if (ret)
-+		return ret;
-+
-+	/* reprogram PLL */
-+	ret = clk_set_rate(cpu->pll, rate);
-+	if (ret) {
-+		clk_set_parent(cpu->mux, cpu->pll);
-+		return ret;
-+	}
-+	/* switch back to PLL clock */
-+	clk_set_parent(cpu->mux, cpu->pll);
-+
-+	/* Ensure the divider is what we expect */
-+	clk_set_rate(cpu->div, rate);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_cpu_ops = {
-+	.recalc_rate	= clk_cpu_recalc_rate,
-+	.round_rate	= clk_cpu_round_rate,
-+	.set_rate	= clk_cpu_set_rate,
-+};
-+
-+struct clk *imx_clk_cpu(const char *name, const char *parent_name,
-+		struct clk *div, struct clk *mux, struct clk *pll,
-+		struct clk *step)
-+{
-+	struct clk_cpu *cpu;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	cpu = kzalloc(sizeof(*cpu), GFP_KERNEL);
-+	if (!cpu)
-+		return ERR_PTR(-ENOMEM);
-+
-+	cpu->div = div;
-+	cpu->mux = mux;
-+	cpu->pll = pll;
-+	cpu->step = step;
-+
-+	init.name = name;
-+	init.ops = &clk_cpu_ops;
-+	init.flags = 0;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	cpu->hw.init = &init;
-+
-+	clk = clk_register(NULL, &cpu->hw);
-+	if (IS_ERR(clk))
-+		kfree(cpu);
-+
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index d5ba76fee115..5de8b53ec208 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -128,4 +128,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
- 			CLK_SET_RATE_PARENT, mult, div);
- }
+diff --git a/include/dt-bindings/clock/imx5-clock.h b/include/dt-bindings/clock/imx5-clock.h
+index 1a36ff4ace1e..f4b7478e23c8 100644
+--- a/include/dt-bindings/clock/imx5-clock.h
++++ b/include/dt-bindings/clock/imx5-clock.h
+@@ -200,6 +200,7 @@
+ #define IMX5_CLK_SATA_REF		188
+ #define IMX5_CLK_STEP_SEL		189
+ #define IMX5_CLK_CPU_PODF_SEL		190
+-#define IMX5_CLK_END			191
++#define IMX5_CLK_ARM			191
++#define IMX5_CLK_END			192
  
-+struct clk *imx_clk_cpu(const char *name, const char *parent_name,
-+		struct clk *div, struct clk *mux, struct clk *pll,
-+		struct clk *step);
-+
- #endif
+ #endif /* __DT_BINDINGS_CLOCK_IMX5_H */
 -- 
 2.1.0
