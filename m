@@ -1,108 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 Sep 2014 11:00:25 +0100
-Subject: [PATCH v3] clocksource: arch_timer: Allow the device tree to
- specify the physical timer
-In-Reply-To: <1410454801-14231-1-git-send-email-dianders@chromium.org>
-References: <1410454801-14231-1-git-send-email-dianders@chromium.org>
-Message-ID: <20140926100025.GC4476@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 26 Sep 2014 12:01:13 +0200
+Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
+In-Reply-To: <20140926095647.GI31106@ulmo>
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+ <20140925112122.GA22753@ulmo> <7hppej8glk.fsf@deeprootsystems.com>
+ <20140926073125.GB31106@ulmo>
+ <CAMuHMdWq9ZySdt8sQpBFq=X7LR5a=vZkowNZoB8NHztTisG+NQ@mail.gmail.com>
+ <20140926095647.GI31106@ulmo>
+Message-ID: <CAMuHMdUqHZWrQGx=y8_yEJ7G9H5C=Y14-qPCMVJC6mxS5Sdb6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 11, 2014 at 06:00:01PM +0100, Doug Anderson wrote:
-> Some 32-bit (ARMv7) systems are architected like this:
-> 
-> * The firmware doesn't know and doesn't care about hypervisor mode and
->   we don't want to add the complexity of hypervisor there.
-> 
-> * The firmware isn't involved in SMP bringup or resume.
-> 
-> * The ARCH timer come up with an uninitialized offset between the
->   virtual and physical counters.  Each core gets a different random
->   offset.
-> 
-> * The device boots in "Secure SVC" mode.
-> 
-> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
->   CNTHCTL.PL1PCTEN (both default to 1 at reset)
-> 
-> On systems like the above, it doesn't make sense to use the virtual
-> counter.  There's nobody managing the offset and each time a core goes
-> down and comes back up it will get reinitialized to some other random
-> value.
-> 
-> Let's add a property to the device tree to say that we shouldn't use
-> the virtual timer.  Firmware could potentially remove this property
-> before passing the device tree to the kernel if it really wants the
-> kernel to use a virtual timer.
-> 
-> Note that it's been said that ARM64 (ARMv8) systems the firmware and
-> kernel really can't be architected as described above.  That means
-> using the physical timer like this really only makes sense for ARMv7
-> systems.
-> 
-> In order for this patch to do anything useful, we also need Sonny's
-> patch at <https://patchwork.kernel.org/patch/4790921/>
-> 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> ---
-> Changes in v3:
-> - Wording changes to bindings and patch desc as per Will Deacon
-> 
-> Changes in v2:
-> - Add "#ifdef CONFIG_ARM" as per Will Deacon
-> 
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
->  drivers/clocksource/arm_arch_timer.c                 | 5 +++++
->  2 files changed, 11 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index 37b2caf..e28fced 100644
-> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
->  - always-on : a boolean property. If present, the timer is powered through an
->    always-on power domain, therefore it never loses context.
->  
-> +** Optional properties:
-> +
-> +- arm,use-physical-timer : Don't ever use the virtual timer, just use the
-> +  physical one.  Only supported for ARM (not ARM64).
+Hi Thierry,
 
-I'm still not keen on telling the kernel what to do rather than
-describing the actual state of affairs and having the kernel decide what
-to do. Perhaps what we actually need is:
+On Fri, Sep 26, 2014 at 11:56 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+>> > An alternative would be to make the power-domain controller look up the
+>> > clock within the user's device tree node. That could be problematic,
+>> > because while the module clock is always the first clock in current
+>> > device trees, there aren't ordering guarantees, so we'd have to rely on
+>> > the clock name.
+>>
+>> Or on some other way.
+>> Do you have a separate hardware block that controls all (and only) the
+>> module clocks?
+>
+> No, the "clock and reset controller" controls all clocks (and resets) on
+> the SoC.
 
-- cntvoff-not-fw-configured: Firmware does not configure CNTVOFF, which
-  may reset to (different) arbitrary values on each CPU.
+Sorry, with "only the module clocks" I meant "not clocks that are not module
+clocks". Having a reset controller function in there is fine.
 
-This also doesn't describe that CNTHCTL.PL1PC(T)EN must both be 1. While
-that is the reset state, it still feels dodbgy to me to rely on that.
+So it seems you do have a clock provider that provides module clocks,
+and can mark them CLK_RUNTIME_PM.
 
-Mark.
+>> On shmobile SoCs, all module clocks are controlled using the MSTP
+>> (Module SToP) clocks.
+>>
+>> In my old RFC series "[PATCH/RFC 0/4] of: Register clocks for Runtime PM
+>> with PM core" (https://lkml.org/lkml/2014/4/24/1118) the MSTP clock driver
+>> advertised using a new CLK_RUNTIME_PM flag that its clocks are module
+>> clocks and thus suitable for runtime PM.
+>>
+>> There were some issues with that series, but the general idea of letting a
+>> clock driver advertise that all its clocks are module clocks could still be
+>> useful. Then the power domain driver knows which clocks to manage.
+>
+> That sounds interesting. Although it would still mean that we need a way
+> to associate a clock with the correct power domain. I guess the driver
+> could do that by iterating over all available clocks in the device's
+> clocks property and grab only those that are marked CLK_RUNTIME_PM.
 
-> +
-> +
->  Example:
->  
->  	timer {
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..e7aa256 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -649,6 +649,11 @@ static void __init arch_timer_init(struct device_node *np)
->  		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
->  	arch_timer_detect_rate(NULL, np);
->  
-> +#ifdef CONFIG_ARM
-> +	if (of_property_read_bool(np, "arm,use-physical-timer"))
-> +		arch_timer_use_virtual = false;
-> +#endif
-> +
->  	/*
->  	 * If HYP mode is available, we know that the physical timer
->  	 * has been configured to be accessible from PL1. Use it, so
-> -- 
-> 2.1.0.rc2.206.gedb03e5
-> 
-> 
+Yes, that's the idea.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
