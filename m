@@ -1,48 +1,60 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 26 Sep 2014 08:55:44 +0200
-Subject: [PATCH resend 2/2] i2c: hix5hd2: add i2c controller driver
-In-Reply-To: <5424DDD5.1020706@linaro.org>
-References: <1409030722-30709-1-git-send-email-zhangfei.gao@linaro.org>
- <1409030722-30709-3-git-send-email-zhangfei.gao@linaro.org>
- <20140919171829.GB2874@katana> <5424DDD5.1020706@linaro.org>
-Message-ID: <20140926065544.GA1284@katana>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 26 Sep 2014 08:55:07 +0200
+Subject: [PATCH v3 00/12] clk: sunxi: Improve MMC clocks support
+In-Reply-To: <20140926004218.19023.88602@quantum>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140922113133.GF15315@lukather>
+ <20140926004218.19023.88602@quantum>
+Message-ID: <20140926065507.GO15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike,
 
-> >>+#include <linux/clk.h>
-> >>+#include <linux/delay.h>
-> >>+#include <linux/i2c.h>
-> >>+#include <linux/io.h>
-> >>+#include <linux/interrupt.h>
-> >>+#include <linux/module.h>
-> >>+#include <linux/platform_device.h>
-> >>+#include <linux/pm_runtime.h>
-> >
-> >I think there should be at least of.h, too.
-> The of.h is already in i2c.h
-> include/linux/i2c.h:33:#include <linux/of.h>
+On Thu, Sep 25, 2014 at 05:42:18PM -0700, Mike Turquette wrote:
+> Quoting Maxime Ripard (2014-09-22 04:31:33)
+> > Mike,
+> > 
+> > On Thu, Sep 11, 2014 at 10:18:14PM +0200, Maxime Ripard wrote:
+> > > Hi everyone,
+> > > 
+> > > Here is an attempt at improving the MMC clock support in the Allwinner
+> > > SoCs.
+> > > 
+> > > Until now, the MMC clocks were having a custom phase function that was
+> > > directly setting an obscure value in the right register, because we
+> > > were not really having any idea of what these values were.
+> > > 
+> > > Now that we have more informations, we can introduce a common function
+> > > call to get and set the phase of a particular clock, and use this in
+> > > both our provider and our client.
+> > 
+> > It would be great that we have that custom phase API out of the kernel
+> > for 3.18, and you were one of the greatest supporters to that idea,
+> > could we please have your view on this?
+> 
+> Patches all look good to me. Did you want the whole series to go through
+> the clk tree?
 
-Please add it nonetheless, because you use e.g. of_property_read_u32()
-directly. That makes you independet of changes to i2c.h.
+I guess it would be where it most make sense yes.
 
-> >>+	rate = i2c->s_clock;
-> >>+	sysclock = clk_get_rate(i2c->clk);
-> >>+	sclh = (sysclock / (rate * 2)) / 2 - 1;
-> >>+	writel_relaxed(sclh, i2c->regs + HIX5I2C_SCL_H);
-> >>+	scll = (sysclock / (rate * 2)) / 2 - 1;
-> >
-> >scll and sclh use the same formula? Have you measured the setup
-> >frequency with a scope?
-> Yes, it is confusing, will use the same vector scl instead.
-> The value is same means sclk high voltage and low voltage keep same time.
+> If so we'll need an Ack for the MMC patch and for the ARM DTS
+> patches as well.
 
-OK.
+We already have an Ack from Ulf on the MMC patch, and I'm the
+maintainer of the DTS involved, so we should be ok :)
 
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/dc5d7872/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/c3dd532a/attachment.sig>
