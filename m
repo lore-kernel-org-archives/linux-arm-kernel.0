@@ -1,116 +1,55 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 25 Sep 2014 17:14:10 -0700
-Subject: [PATCH v2 0/6] Add initial support for Broadcom Cygnus SoC
-In-Reply-To: <54248791.9060805@gmail.com>
-References: <Jonathan Richardson <jonathar@broadcom.com>
- <1411507057-14771-1-git-send-email-jonathar@broadcom.com>
- <54248344.5030308@broadcom.com> <54248791.9060805@gmail.com>
-Message-ID: <5424AFD2.2070406@gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 26 Sep 2014 08:23:40 +0800
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <3696520.MDUrkdjfGZ@wuerfel>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140925011647.GB3716@peterchendt> <3696520.MDUrkdjfGZ@wuerfel>
+Message-ID: <20140926002339.GB3026@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Scott, Jonathan,
+On Thu, Sep 25, 2014 at 09:11:35AM +0200, Arnd Bergmann wrote:
+> On Thursday 25 September 2014 09:16:48 Peter Chen wrote:
+> > > +     }
+> > > +
+> > > +     if (dev->of_node) {
+> > > +             ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> > > +             if (ret)
+> > > +                     goto clk_err;
+> > > +     } else {
+> > > +             ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> > > +             if (ret)
+> > > +                     goto clk_err;
+> > > +     }
+> > 
+> > Hi Antoine, the above code may not be needed, since get phy and set dma
+> > mask are common operation, we can do it at core code, the only thing you
+> > need to do is something like: dev->dma_mask = DMA_BIT_MASK(32).
+> > 
+> 
+> Certainly not, doing that would be broken for a number of reasons:
+> 
+> - dev->dma_mask is a pointer, a driver should not reassign that
+> - the device may have been set up for a bus that requires a smaller mask
+>   that is already set, changing the mask would cause data corruption
+> - setting just the dma mask but not coherent mask is wrong
+> - setting the dma mask can fail, e.g. if the mask is smaller than the
+>   smallest memory zone, so you have to check the return value.
+> 
 
-On 09/25/2014 02:22 PM, Florian Fainelli wrote:
-> Hi Scott,
-> 
-> On 09/25/2014 02:04 PM, Scott Branden wrote:
->> Hi Matt/Christian (and others),
->>
->> We would like to move forward in getting our base Cygnus support into
->> the mainline kernel.  From there we will be able to contribute
->> additional drivers.
->>
->> Is somebody willing to accept this pull request to get this patchset
->> accepted by the open source community?
-> 
-> I am fine with taking the ARM patches and putting them at
-> http://github/brcm/linux.git, with C code in cygnus/board and the Device
-> Tree files in cygnus/dt for instance?
-> 
-> The clock driver patch will have to go through Mike Turquette's tree
-> unless he wants to delegate that one.
+In current chipidea structure, the parent (glue layer) driver will not be
+used for dma, udc/host driver uses dma mask from child (core layer), at core
+layer we will do:
 
-Could you resend patch 3 without the clock binding, patch 4 without the
-clocks node, and patch 6 without the drivers/clk changes? Once you do
-that, I can assemble these patches quickly and send a pull request which
-does only contain ARM SoC and DTS changes, and you can get the clock
-driver to be reviewed separately by its maintainer?
 
-Thanks!
+	pdev->dev.dma_mask = dev->dma_mask; /* this device is parent */
+	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
 
-> 
->>
->> Regards,
->>  Scott
->>
->>
->> On 14-09-23 02:17 PM, Jonathan Richardson wrote:
->>> Hi,
->>>
->>> This patchset contains initial support for Broadcom's Cygnus SoC based
->>> on our
->>> iProc architecture. Initial support is minimal and includes just the mach
->>> platform code, clock driver, and a basic device tree configuration.
->>> Peripheral
->>> drivers will be submitted soon, as will device tree configurations for
->>> other
->>> Cygnus board variants.
->>>
->>> Changes from v1:
->>>   - Address code review comments as per previous responses.
->>>   - Copyright headers updated to remove Broadcom URL.
->>>   - mach platform code still contains hard coded adresses. These
->>> address are
->>>     the same for all Cygnus variants. Could you please provide
->>> guidance on where
->>>     they should go if you would still like them changed.
->>>
->>> Thanks,
->>> Jon
->>>
->>> Jonathan Richardson (6):
->>>    ARM: cygnus: Initial support for Broadcom Cygnus SoC
->>>    clk: Clock driver support for Broadcom Cygnus SoC
->>>    dt-bindings: Document Broadcom Cygnus SoC and clock driver
->>>    ARM: dts: Enable Broadcom Cygnus SoC
->>>    ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
->>>    MAINTAINERS: Entry for Cygnus/iproc arm architecture and clock
->>>      drivers
->>>
->>>   Documentation/devicetree/bindings/arm/cygnus.txt   |   12 +
->>>   .../devicetree/bindings/clock/clk-cygnus.txt       |  121 ++
->>>   .../devicetree/bindings/clock/clk-iproc.txt        |   48 +
->>>   MAINTAINERS                                        |   21 +
->>>   arch/arm/boot/dts/Makefile                         |    1 +
->>>   arch/arm/boot/dts/bcm-cygnus.dtsi                  |  349 ++++++
->>>   arch/arm/boot/dts/bcm911360_entphn.dts             |   22 +
->>>   arch/arm/configs/bcm_cygnus_defconfig              |  223 ++++
->>>   arch/arm/mach-bcm/Kconfig                          |   31 +
->>>   arch/arm/mach-bcm/Makefile                         |    3 +
->>>   arch/arm/mach-bcm/bcm_cygnus.c                     |  166 +++
->>>   drivers/clk/Makefile                               |    1 +
->>>   drivers/clk/bcm/Makefile                           |    2 +
->>>   drivers/clk/bcm/clk-cygnus.c                       | 1186
->>> ++++++++++++++++++++
->>>   drivers/clk/bcm/clk-iproc.c                        |  451 ++++++++
->>>   15 files changed, 2637 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/arm/cygnus.txt
->>>   create mode 100644
->>> Documentation/devicetree/bindings/clock/clk-cygnus.txt
->>>   create mode 100644
->>> Documentation/devicetree/bindings/clock/clk-iproc.txt
->>>   create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
->>>   create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
->>>   create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
->>>   create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
->>>   create mode 100644 drivers/clk/bcm/clk-cygnus.c
->>>   create mode 100644 drivers/clk/bcm/clk-iproc.c
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Would you suggestion us a suitable way? Or it is ok we use just Antoine's way that
+call dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32)) at parent
+driver no matter dt or non-dt? Thanks.
+
+-- 
+Best Regards,
+Peter Chen
