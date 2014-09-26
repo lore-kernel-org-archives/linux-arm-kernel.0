@@ -1,187 +1,101 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 26 Sep 2014 09:56:12 -0500
-Subject: [PATCH 2/2] socfpga: support suspend to ram
-In-Reply-To: <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
-References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
- <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
-Message-ID: <54257E8C.8000102@opensource.altera.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 26 Sep 2014 16:04:24 +0100
+Subject: [PATCH] arm: kprobes-test: Fix compile error "bad immediate value
+ for offset"
+Message-ID: <1411743864.1529.36.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2014 03:27 PM, atull at opensource.altera.com wrote:
-> From: Alan Tull <atull@opensource.altera.com>
-> 
-> Add code that requests that the sdr controller go into
-> self-refresh mode.  This code is run from ocram.
-> 
-> This patch assumes that u-boot has already configured sdr:
->   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
->   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
->   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
-> 
-> How to suspend to ram:
->  $ echo enabled > \
-> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> 
->  $ echo -n mem > /sys/power/state
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> ---
->  arch/arm/mach-socfpga/Makefile       |    1 +
->  arch/arm/mach-socfpga/core.h         |    4 +
->  arch/arm/mach-socfpga/pm.c           |  141 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/self-refresh.S |  148 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/socfpga.c      |   10 +++
->  5 files changed, 304 insertions(+)
->  create mode 100644 arch/arm/mach-socfpga/pm.c
->  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
-> 
-> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-> index 6dd7a93..0591927 100644
-> --- a/arch/arm/mach-socfpga/Makefile
-> +++ b/arch/arm/mach-socfpga/Makefile
-> @@ -4,3 +4,4 @@
->  
->  obj-y					:= socfpga.o
->  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
-> +obj-$(CONFIG_SUSPEND)	+= pm.o self-refresh.o
-> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-> index c4a0929..cc1a2fb 100644
-> --- a/arch/arm/mach-socfpga/core.h
-> +++ b/arch/arm/mach-socfpga/core.h
-> @@ -38,6 +38,7 @@ extern void socfpga_sysmgr_init(void);
->  
->  extern void __iomem *sys_manager_base_addr;
->  extern void __iomem *rst_manager_base_addr;
-> +extern void __iomem *sdr_ctl_base_addr;
->  
->  extern struct smp_operations socfpga_smp_ops;
->  extern char secondary_trampoline, secondary_trampoline_end;
-> @@ -46,4 +47,7 @@ extern unsigned long cpu1start_addr;
->  
->  #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
->  
-> +u32 socfpga_sdram_self_refresh(u32 sdr_base, u32 scu_base);
-> +extern unsigned int socfpga_sdram_self_refresh_sz;
-> +
->  #endif
-> diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
-> new file mode 100644
-> index 0000000..02c3719
-> --- /dev/null
-> +++ b/arch/arm/mach-socfpga/pm.c
-> @@ -0,0 +1,141 @@
-> +/*
-> + *  arch/arm/mach-socfpga/pm.c
-> + *
-> + * Copyright (C) 2014 Altera Corporation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/suspend.h>
-> +#include <asm/suspend.h>
-> +#include <asm/fncpy.h>
-> +#include "core.h"
-> +
-> +/* Pointer to function copied to ocram */
-> +static u32 (*socfpga_sdram_self_refresh_in_ocram)(u32 sdr_base, u32 scu_base);
-> +
-> +/* Round up a pointer address to fix aligment for fncpy() */
-> +static void *fncpy_align(void *ptr)
-> +{
-> +	u32 value = (u32)ptr;
-> +
-> +	if ((value & (FNCPY_ALIGN - 1)) != 0)
-> +		value = ((value & ~(FNCPY_ALIGN - 1)) + FNCPY_ALIGN);
-> +
-> +	return (void *)value;
-> +}
-> +
-> +static void *socfpga_init_ocram_exec(void)
-> +{
-> +	struct device_node *np;
-> +	const __be32 *prop;
-> +	u32 ocram_hwaddr, len;
-> +	void __iomem  *iomem_exec_ocram;
-> +	size_t size;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
-> +	if (!np) {
-> +		pr_err("SOCFPGA: Unable to find mmio-sram in dtb\n");
-> +		return 0;
-> +	}
-> +
-> +	/* Determine the OCRAM address and size */
-> +	prop = of_get_property(np, "reg", &size);
-> +	ocram_hwaddr = be32_to_cpup(prop++);
-> +	len = be32_to_cpup(prop);
-> +
-> +	if (!prop || size < sizeof(*prop)) {
-> +		pr_err("SOCFPGA: Unable to find OCRAM mapping in dtb\n");
-> +		return 0;
-> +	}
-> +
-> +	iomem_exec_ocram = __arm_ioremap_exec(ocram_hwaddr, len, 0);
+When compiling kprobes-test-arm.c the following error has been observed
 
-The call to __arm_ioremap_exec can fail. Also, this doesn't seem right,
-what if a good chunk of OCRAM has been used by some other driver in the
-system? From what I've seen, OCRAM should be using the generic allocator
-framework.
+/tmp/ccoT403o.s:21439: Error: bad immediate value for offset (4168)
 
-> +
-> +	/* Fix alignment to work with fncpy */
-> +	iomem_exec_ocram = fncpy_align(iomem_exec_ocram);
-> +
-> +	return iomem_exec_ocram;
-> +}
-> +
-> +static int socfpga_setup_ocram_self_refresh(void)
-> +{
-> +	void *ocram_addr;
-> +
-> +	/* Configure ocram and make it executable */
-> +	ocram_addr = socfpga_init_ocram_exec();
-> +	WARN(!ocram_addr, "Unable to initialize ocram for pm");
-> +	if (!ocram_addr)
-> +		return -EFAULT;
-> +
-> +	/* Copy the code that puts DDR in self refresh to ocram */
-> +	socfpga_sdram_self_refresh_in_ocram =
-> +		(void *)fncpy((void *)ocram_addr,
-> +		      &socfpga_sdram_self_refresh,
-> +		      socfpga_sdram_self_refresh_sz);
-> +
-> +	WARN(!socfpga_sdram_self_refresh_in_ocram,
-> +	     "could not copy function to ocram");
-> +	if (!socfpga_sdram_self_refresh_in_ocram)
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
-> +static int socfpga_pm_suspend(unsigned long arg)
-> +{
-> +	u32 ret;
-> +
-> +	ret = socfpga_sdram_self_refresh_in_ocram((u32)sdr_ctl_base_addr,
-> +						  (u32)socfpga_scu_base_addr);
+This is caused by the compiler spilling it's literal pool too far away
+from the site which is trying to reference it with a PC relative load.
+This arises because the compiler is underestimating the size of the
+inline assembler code present, which apparently it approximates as 4
+bytes per line or instruction.
 
-What if sdr_ctl_base_addr is not valid?
+We fix this problem by moving the operations which generate more than
+4 bytes out of the text section. Specifically, moving the .ascii
+directives to the .rodata section.
 
-BR,
-Dinh
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+
+Russell, OK to add your 'reported-by' here (or should it be Olof)?
+
+ arch/arm/kernel/kprobes-test.c | 16 +++++++++-------
+ arch/arm/kernel/kprobes-test.h |  5 ++++-
+ 2 files changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+index 08d7312..b206d77 100644
+--- a/arch/arm/kernel/kprobes-test.c
++++ b/arch/arm/kernel/kprobes-test.c
+@@ -110,10 +110,13 @@
+  *
+  *	@ TESTCASE_START
+  *	bl	__kprobes_test_case_start
+- *	@ start of inline data...
++ *	.pushsection .rodata
++ *	"10:
+  *	.ascii "mov r0, r7"	@ text title for test case
+  *	.byte	0
+- *	.align	2, 0
++ *	.popsection
++ *	@ start of inline data...
++ *	.word	10b		@ pointer to title in .rodata section
+  *
+  *	@ TEST_ARG_REG
+  *	.byte	ARG_TYPE_REG
+@@ -971,7 +974,7 @@ void __naked __kprobes_test_case_start(void)
+ 	__asm__ __volatile__ (
+ 		"stmdb	sp!, {r4-r11}				\n\t"
+ 		"sub	sp, sp, #"__stringify(TEST_MEMORY_SIZE)"\n\t"
+-		"bic	r0, lr, #1  @ r0 = inline title string	\n\t"
++		"bic	r0, lr, #1  @ r0 = inline data		\n\t"
+ 		"mov	r1, sp					\n\t"
+ 		"bl	kprobes_test_case_start			\n\t"
+ 		"bx	r0					\n\t"
+@@ -1349,15 +1352,14 @@ static unsigned long next_instruction(unsigned long pc)
+ 	return pc + 4;
+ }
+ 
+-static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
++static uintptr_t __used kprobes_test_case_start(const char **title, void *stack)
+ {
+ 	struct test_arg *args;
+ 	struct test_arg_end *end_arg;
+ 	unsigned long test_code;
+ 
+-	args = (struct test_arg *)PTR_ALIGN(title + strlen(title) + 1, 4);
+-
+-	current_title = title;
++	current_title = *title++;
++	args = (struct test_arg *)title;
+ 	current_args = args;
+ 	current_stack = stack;
+ 
+diff --git a/arch/arm/kernel/kprobes-test.h b/arch/arm/kernel/kprobes-test.h
+index eecc90a..4430990 100644
+--- a/arch/arm/kernel/kprobes-test.h
++++ b/arch/arm/kernel/kprobes-test.h
+@@ -111,11 +111,14 @@ struct test_arg_end {
+ #define TESTCASE_START(title)					\
+ 	__asm__ __volatile__ (					\
+ 	"bl	__kprobes_test_case_start		\n\t"	\
++	".pushsection .rodata				\n\t"	\
++	"10:						\n\t"	\
+ 	/* don't use .asciz here as 'title' may be */		\
+ 	/* multiple strings to be concatenated.  */		\
+ 	".ascii "#title"				\n\t"	\
+ 	".byte	0					\n\t"	\
+-	".align	2, 0					\n\t"
++	".popsection					\n\t"	\
++	".word	10b					\n\t"
+ 
+ #define	TEST_ARG_REG(reg, val)					\
+ 	".byte	"__stringify(ARG_TYPE_REG)"		\n\t"	\
+-- 
+2.1.0
