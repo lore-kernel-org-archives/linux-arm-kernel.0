@@ -1,49 +1,55 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Fri, 26 Sep 2014 17:57:25 +0200
-Subject: [PATCH 2/5] power: reset: st: Provide DT bindings for ST's Power
- Reset driver
-In-Reply-To: <1406040752-25229-3-git-send-email-lee.jones@linaro.org>
-References: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
- <1406040752-25229-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140926155724.GC21641@earth.universe>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Fri, 26 Sep 2014 16:58:03 +0100
+Subject: [PATCH v6 4/6] sched: get CPU's usage statistic
+In-Reply-To: <CAKfTPtCzVRY4q184nqHSL7zFh1CvF009p8q8EPFCZxDFMx9TeQ@mail.gmail.com>
+References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
+ <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
+ <54246791.9050101@arm.com>
+ <CAKfTPtCzVRY4q184nqHSL7zFh1CvF009p8q8EPFCZxDFMx9TeQ@mail.gmail.com>
+Message-ID: <20140926155803.GA23693@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 22, 2014 at 03:52:29PM +0100, Lee Jones wrote:
-> Signed-off-by: Christophe Kerello <christophe.kerello@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/devicetree/bindings/power/reset/st-reset.txt | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/reset/st-reset.txt
+On Fri, Sep 26, 2014 at 01:17:43PM +0100, Vincent Guittot wrote:
+> On 25 September 2014 21:05, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
+> > On 23/09/14 17:08, Vincent Guittot wrote:
+> >> Monitor the usage level of each group of each sched_domain level. The usage is
+> >> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
+> >> We use the utilization_load_avg to evaluate the usage level of each group.
+> >>
+> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> >> ---
+> >>  kernel/sched/fair.c | 13 +++++++++++++
+> >>  1 file changed, 13 insertions(+)
+> >>
+> >> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> >> index 2cf153d..4097e3f 100644
+> >> --- a/kernel/sched/fair.c
+> >> +++ b/kernel/sched/fair.c
+> >> @@ -4523,6 +4523,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
+> >>       return target;
+> >>  }
+> >>
+> >> +static int get_cpu_usage(int cpu)
+> >> +{
+> >> +     unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
+> >> +     unsigned long capacity = capacity_orig_of(cpu);
+> >> +
+> >> +     if (usage >= SCHED_LOAD_SCALE)
+> >> +             return capacity + 1;
+> >
+> > Why you are returning rq->cpu_capacity_orig + 1 (1025) in case
+> > utilization_load_avg is greater or equal than 1024 and not usage or
+> > (usage * capacity) >> SCHED_LOAD_SHIFT too?
 > 
-> diff --git a/Documentation/devicetree/bindings/power/reset/st-reset.txt b/Documentation/devicetree/bindings/power/reset/st-reset.txt
-> new file mode 100644
-> index 0000000..809af54
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/reset/st-reset.txt
-> @@ -0,0 +1,11 @@
-> +*Device-Tree bindings for ST SW reset functionality
-> +
-> +Required properties:
-> +- compatible: should be "st,<chip>-restart".
-> +- st,syscfg: should be a phandle of the syscfg node.
-> +
-> +Example node:
-> +	restart {
-> +		compatible = "st,stih416-restart";
-> +		st,syscfg = <&syscfg_sbc>;
-> +	};
+> The usage can't be higher than the full capacity of the CPU because
+> it's about the running time on this CPU. Nevertheless, usage can be
+> higher than SCHED_LOAD_SCALE because of unfortunate rounding in
+> avg_period and running_load_avg or just after migrating tasks until
+> the average stabilizes with the new running time.
 
-http://git.infradead.org/battery-2.6.git/commit/b08fec2262c8dbb349fe9456586cf0724407e5ee
+I fully agree that the cpu usage should be capped to capacity, but why
+do you return capacity + 1? I would just return capacity, no?
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/57d03813/attachment.sig>
+Now that you have gotten rid of 'usage' everywhere else, shouldn't this
+function be renamed to get_cpu_utilization()?
