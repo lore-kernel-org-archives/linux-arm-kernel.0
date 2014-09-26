@@ -1,188 +1,187 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 26 Sep 2014 15:58:54 +0100
-Subject: [PATCH v12 06/12] PCI: Create pci_host_bridge before its
- associated bus in pci_create_root_bus.
-In-Reply-To: <CAErSpo6eUEV81n1rFjjvRcFVmsFkeUxhdL6JauTmx_Et6XdBuQ@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-7-git-send-email-Liviu.Dudau@arm.com>
- <CAE9FiQXuJZnj74dwTbKJCQNJ+OdEbjSB0fpwqh92+WZ_XGnrxQ@mail.gmail.com>
- <CAErSpo6eUEV81n1rFjjvRcFVmsFkeUxhdL6JauTmx_Et6XdBuQ@mail.gmail.com>
-Message-ID: <20140926145854.GS841@e106497-lin.cambridge.arm.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 26 Sep 2014 09:56:12 -0500
+Subject: [PATCH 2/2] socfpga: support suspend to ram
+In-Reply-To: <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
+Message-ID: <54257E8C.8000102@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 08:59:26PM +0100, Bjorn Helgaas wrote:
-> On Thu, Sep 25, 2014 at 12:15 PM, Yinghai Lu <yinghai@kernel.org> wrote:
-> > On Tue, Sep 23, 2014 at 12:01 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> >> Before commit 7b5436635800 the pci_host_bridge was created before the root bus.
-> >> As that commit has added a needless dependency on the bus for pci_alloc_host_bridge()
-> >> the creation order has been changed for no good reason. Revert the order of
-> >> creation as we are going to depend on the pci_host_bridge structure to retrieve the
-> >> domain number of the root bus.
-> >>
-> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> >> Acked-by: Grant Likely <grant.likely@linaro.org>
-> >> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> Tested-by: Tanmay Inamdar <tinamdar@apm.com>
-> >> ---
-> >>  drivers/pci/probe.c | 32 +++++++++++++++++---------------
-> >>  1 file changed, 17 insertions(+), 15 deletions(-)
-> >>
-> >> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> >> index e3cf8a2..5ff72ec 100644
-> >> --- a/drivers/pci/probe.c
-> >> +++ b/drivers/pci/probe.c
-> >> @@ -515,7 +515,7 @@ static void pci_release_host_bridge_dev(struct device *dev)
-> >>         kfree(bridge);
-> >>  }
-> >>
-> >> -static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-> >> +static struct pci_host_bridge *pci_alloc_host_bridge(void)
-> >>  {
-> >>         struct pci_host_bridge *bridge;
-> >>
-> >> @@ -524,7 +524,8 @@ static struct pci_host_bridge *pci_alloc_host_bridge(struct pci_bus *b)
-> >>                 return NULL;
-> >>
-> >>         INIT_LIST_HEAD(&bridge->windows);
-> >> -       bridge->bus = b;
-> >> +       bridge->dev.release = pci_release_host_bridge_dev;
-> >> +
-> >>         return bridge;
-> >>  }
-> >>
-> >> @@ -1761,9 +1762,15 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >>         char bus_addr[64];
-> >>         char *fmt;
-> >>
-> >> +       bridge = pci_alloc_host_bridge();
-> >> +       if (!bridge)
-> >> +               return NULL;
-> >> +
-> >> +       bridge->dev.parent = parent;
-> >> +
-> >>         b = pci_alloc_bus();
-> >>         if (!b)
-> >> -               return NULL;
-> >> +               goto err_out;
-> >>
-> >>         b->sysdata = sysdata;
-> >>         b->ops = ops;
-> >> @@ -1772,26 +1779,19 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >>         if (b2) {
-> >>                 /* If we already got to this bus through a different bridge, ignore it */
-> >>                 dev_dbg(&b2->dev, "bus already known\n");
-> >> -               goto err_out;
-> >> +               goto err_bus_out;
-> >>         }
-> >>
-> >> -       bridge = pci_alloc_host_bridge(b);
-> >> -       if (!bridge)
-> >> -               goto err_out;
-> >> -
-> >> -       bridge->dev.parent = parent;
-> >> -       bridge->dev.release = pci_release_host_bridge_dev;
-> >> +       bridge->bus = b;
-> >>         dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-> >>         error = pcibios_root_bridge_prepare(bridge);
-> >> -       if (error) {
-> >> -               kfree(bridge);
-> >> +       if (error)
-> >>                 goto err_out;
-> >> -       }
-> >>
-> >>         error = device_register(&bridge->dev);
-> >>         if (error) {
-> >>                 put_device(&bridge->dev);
-> >> -               goto err_out;
-> >> +               goto err_bus_out;
-> >>         }
-> >>         b->bridge = get_device(&bridge->dev);
-> >>         device_enable_async_suspend(b->bridge);
-> >> @@ -1848,8 +1848,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-> >>  class_dev_reg_err:
-> >>         put_device(&bridge->dev);
-> >>         device_unregister(&bridge->dev);
-> >> -err_out:
-> >> +err_bus_out:
-> >>         kfree(b);
-> >> +err_out:
-> >> +       kfree(bridge);
-> >>         return NULL;
-> >>  }
-> >
-> > Hi Bjorn,
-> >
-> > Noticed that you put this one into pci/next.
-> >
-> > This patch has problem for the class_dev_reg_err path.
-> > as device_unregister(&bridge->dev) will trigger pci_release_host_bridge_dev.
-> > So will have double free for bridge or else.
-> >
-> > Please drop this patch from pci/next.
-> >
-> > Also looks strange that the patch have long CC list, but just omit me
-> > and Jiang Liu that
-> > touched those code before.
+On 09/24/2014 03:27 PM, atull at opensource.altera.com wrote:
+> From: Alan Tull <atull@opensource.altera.com>
 > 
-> Thanks for noticing that.  I was concerned, but couldn't remember the details.
+> Add code that requests that the sdr controller go into
+> self-refresh mode.  This code is run from ocram.
 > 
-> I dropped this patch and the subsequent ones from pci/host and rebased
-> my "next" branch.
+> This patch assumes that u-boot has already configured sdr:
+>   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+>   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+>   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
 > 
-> Sorry I didn't notice you weren't on the CC list.
+> How to suspend to ram:
+>  $ echo enabled > \
+> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
 > 
-> Bjorn
+>  $ echo -n mem > /sys/power/state
 > 
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> ---
+>  arch/arm/mach-socfpga/Makefile       |    1 +
+>  arch/arm/mach-socfpga/core.h         |    4 +
+>  arch/arm/mach-socfpga/pm.c           |  141 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/self-refresh.S |  148 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/socfpga.c      |   10 +++
+>  5 files changed, 304 insertions(+)
+>  create mode 100644 arch/arm/mach-socfpga/pm.c
+>  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
+> 
+> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+> index 6dd7a93..0591927 100644
+> --- a/arch/arm/mach-socfpga/Makefile
+> +++ b/arch/arm/mach-socfpga/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-y					:= socfpga.o
+>  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
+> +obj-$(CONFIG_SUSPEND)	+= pm.o self-refresh.o
+> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+> index c4a0929..cc1a2fb 100644
+> --- a/arch/arm/mach-socfpga/core.h
+> +++ b/arch/arm/mach-socfpga/core.h
+> @@ -38,6 +38,7 @@ extern void socfpga_sysmgr_init(void);
+>  
+>  extern void __iomem *sys_manager_base_addr;
+>  extern void __iomem *rst_manager_base_addr;
+> +extern void __iomem *sdr_ctl_base_addr;
+>  
+>  extern struct smp_operations socfpga_smp_ops;
+>  extern char secondary_trampoline, secondary_trampoline_end;
+> @@ -46,4 +47,7 @@ extern unsigned long cpu1start_addr;
+>  
+>  #define SOCFPGA_SCU_VIRT_BASE   0xfffec000
+>  
+> +u32 socfpga_sdram_self_refresh(u32 sdr_base, u32 scu_base);
+> +extern unsigned int socfpga_sdram_self_refresh_sz;
+> +
+>  #endif
+> diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
+> new file mode 100644
+> index 0000000..02c3719
+> --- /dev/null
+> +++ b/arch/arm/mach-socfpga/pm.c
+> @@ -0,0 +1,141 @@
+> +/*
+> + *  arch/arm/mach-socfpga/pm.c
+> + *
+> + * Copyright (C) 2014 Altera Corporation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/suspend.h>
+> +#include <asm/suspend.h>
+> +#include <asm/fncpy.h>
+> +#include "core.h"
+> +
+> +/* Pointer to function copied to ocram */
+> +static u32 (*socfpga_sdram_self_refresh_in_ocram)(u32 sdr_base, u32 scu_base);
+> +
+> +/* Round up a pointer address to fix aligment for fncpy() */
+> +static void *fncpy_align(void *ptr)
+> +{
+> +	u32 value = (u32)ptr;
+> +
+> +	if ((value & (FNCPY_ALIGN - 1)) != 0)
+> +		value = ((value & ~(FNCPY_ALIGN - 1)) + FNCPY_ALIGN);
+> +
+> +	return (void *)value;
+> +}
+> +
+> +static void *socfpga_init_ocram_exec(void)
+> +{
+> +	struct device_node *np;
+> +	const __be32 *prop;
+> +	u32 ocram_hwaddr, len;
+> +	void __iomem  *iomem_exec_ocram;
+> +	size_t size;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
+> +	if (!np) {
+> +		pr_err("SOCFPGA: Unable to find mmio-sram in dtb\n");
+> +		return 0;
+> +	}
+> +
+> +	/* Determine the OCRAM address and size */
+> +	prop = of_get_property(np, "reg", &size);
+> +	ocram_hwaddr = be32_to_cpup(prop++);
+> +	len = be32_to_cpup(prop);
+> +
+> +	if (!prop || size < sizeof(*prop)) {
+> +		pr_err("SOCFPGA: Unable to find OCRAM mapping in dtb\n");
+> +		return 0;
+> +	}
+> +
+> +	iomem_exec_ocram = __arm_ioremap_exec(ocram_hwaddr, len, 0);
 
-Bjorn,
+The call to __arm_ioremap_exec can fail. Also, this doesn't seem right,
+what if a good chunk of OCRAM has been used by some other driver in the
+system? From what I've seen, OCRAM should be using the generic allocator
+framework.
 
-I have refreshed/rebuilt the series from what was on 25th in linux-next and I have
-dropped this patch. I have pushed the series into 
+> +
+> +	/* Fix alignment to work with fncpy */
+> +	iomem_exec_ocram = fncpy_align(iomem_exec_ocram);
+> +
+> +	return iomem_exec_ocram;
+> +}
+> +
+> +static int socfpga_setup_ocram_self_refresh(void)
+> +{
+> +	void *ocram_addr;
+> +
+> +	/* Configure ocram and make it executable */
+> +	ocram_addr = socfpga_init_ocram_exec();
+> +	WARN(!ocram_addr, "Unable to initialize ocram for pm");
+> +	if (!ocram_addr)
+> +		return -EFAULT;
+> +
+> +	/* Copy the code that puts DDR in self refresh to ocram */
+> +	socfpga_sdram_self_refresh_in_ocram =
+> +		(void *)fncpy((void *)ocram_addr,
+> +		      &socfpga_sdram_self_refresh,
+> +		      socfpga_sdram_self_refresh_sz);
+> +
+> +	WARN(!socfpga_sdram_self_refresh_in_ocram,
+> +	     "could not copy function to ocram");
+> +	if (!socfpga_sdram_self_refresh_in_ocram)
+> +		return -EFAULT;
+> +
+> +	return 0;
+> +}
+> +
+> +static int socfpga_pm_suspend(unsigned long arg)
+> +{
+> +	u32 ret;
+> +
+> +	ret = socfpga_sdram_self_refresh_in_ocram((u32)sdr_ctl_base_addr,
+> +						  (u32)socfpga_scu_base_addr);
 
-git://linux-arm.org/linux-ld.git for-upstream/pci-next
+What if sdr_ctl_base_addr is not valid?
 
-I hope that I've carried all your Sign-off-bys correctly, but I would like to ask you
-to double check that I haven't screwed up things.
-
-This patch dates from the times I was trying to add the domain number information
-into the pci_host_bridge structure. Now, with Catalin's patch that adds the data in
-the pci_bus structure, this is not needed, so it is safe to drop. I did try to fix
-the patch but I've realised how intricately linked pci_host_bridge and root bus are,
-which to my opinion is a strong hint that the creation of the two should be split
-into separate functions.
-
-I can send an official v13 patchset to the mailing list if you want, but if not, here
-is the changelog:
-
-- updated "[PATCH 01/12] asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP" to match
-  the patch that Thierry Reding has submitted through the asm-generic branch. If his
-  series lands first upstream this patch will be skipped.
-- updated "[PATCH 03/12] ARM: Define PCI_IOBASE as the base of virtual PCI IO space" to
-  cast the PCI_IOBASE value to (void __iomem *) as is the case with most #defined versions
-- dropped the patch that was changing the order of initialisation between pci_host_bridge
-  and root bus in pci_create_root_bus()
-- fixed "[PATCH 07/12] PCI: Add generic domain handling" to account for the previous patch
-  being removed
-- fixed the title of commit 08/12 to reflect the name of the functions that are actually
-  added (s/of_pci_get_domain_nr/pci_get_new_domain_nr/)
-
-I've compiled tested the series on sparc, microblaze (no)mmu_defconfig, arm omap2plus_defconfig
-and multi_v7_defconfig and arm64. I've also tested the series on my Juno (arm64) board.
-
-Sorry for causing this amount of churn! And to Yinghai Lu and Jiang Liu: appologies for not
-including you in the Cc list, I'm still getting the grip on the whole submission process.
-
-Best regards,
-Liviu
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+BR,
+Dinh
