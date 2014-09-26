@@ -1,100 +1,76 @@
-From: mike.rapoport@gmail.com (Mike Rapoport)
-Date: Fri, 26 Sep 2014 19:32:07 +0300
-Subject: [PATCH v3] ARM: DT: apq8064: add CM-QS600 board
-Message-ID: <1411749127-12746-1-git-send-email-mike.rapoport@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Sep 2014 11:32:25 -0500
+Subject: [PATCH] dt/documentation: add specification of dma bus information
+In-Reply-To: <541C7609.3000901@ti.com>
+References: <1401981720-6946-1-git-send-email-santosh.shilimkar@ti.com>
+ <CAL_JsqJAtWnHKPVpDsdOOzT_X=npc3hroLNTGqULM2SJr=1OEg@mail.gmail.com>
+ <53A46CB7.1030109@ti.com> <4193075.zZSpRTFEYz@wuerfel>
+ <53A48553.2080504@ti.com>
+ <CAL_JsqLYho6dRA=-ovKqF7H4EGHJcH_aN3ywd+76oXSprfTMbQ@mail.gmail.com>
+ <53A73110.60405@ti.com> <541C7609.3000901@ti.com>
+Message-ID: <CAL_Jsq+Lu0D3o0wrFS0tug_7oTtySaAEJCEJWBaOha4RHsoxZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CM-QS600 is a APQ8064 based computer on module.
-The details are available at
-http://compulab.co.il/products/computer-on-modules/cm-qs600/
+On Fri, Sep 19, 2014 at 1:29 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> Hi Rob,
+>
+>
+> On 06/22/2014 10:40 PM, Santosh Shilimkar wrote:
+>>
+>> On Friday 20 June 2014 03:46 PM, Rob Herring wrote:
+>>>
+>>> On Fri, Jun 20, 2014 at 2:02 PM, Santosh Shilimkar
+>>> <santosh.shilimkar@ti.com> wrote:
+>>>>
+>>>> On Friday 20 June 2014 02:56 PM, Arnd Bergmann wrote:
+>>>>>
+>>>>> On Friday 20 June 2014 13:17:43 Santosh Shilimkar wrote:
+>>>>>>>>
+>>>>>>>> +                       dma-coherent;
+>>>>>>>> +                       dma-ranges;
+>>>>>>>> +
+>>>>>>>> +                       dwc3 at 2690000 {
+>>>>>>>> +                               compatible = "synopsys,dwc3";
+>>>>>>>> +                               [...]
+>>>>>>>> +                       };
+>>>>>>>
+>>>>>>>
+>>>>>>> This example is a bit strange. I don't understand the relationship
+>>>>>>> between keystone-dwc3 and synopsys,dwc3, nor do I want to. I'd prefer
+>>>>>>> to see a simple example here.
+>>>>>
+>>>>>
+>>>>>
+>>>>>>> dma-ranges is a property of the parent which you show, but
+>>>>>>> dma-coherent originally was a property of the bus master itself.
+>>>>>>> While
+>>>>>>> we need to support that, are we changing that? We need to be clear on
+>>>>>>> where the property belongs even if the kernel is more lax.
+>>>>>>>
+>>>>>> I don't think we are changing it fundamentally but may be I missing
+>>>>>> your point. The dma-coherent as is now a per-device property.
+>>>>>> USB is one of the bus master supports coherency and hence showed
+>>>>>> up in above example.
+>>>>>
+>>>>>
+>>>>> I think it's enough if you just drop the "synopsys,dwc3" node and the
+>>>>> intermediate dma-ranges property from the example, leaving the
+>>>>> dma-coherent property in the "ti,keystone-dwc3" node.
+>>>>>
+>>>> Thanks Arnd. That should avoid the confusion. Just to see if Rob is
+>>>> fine by it, the example will look like below.
+>>>
+>>>
+>>> Yes. Looks fine.
+>>>
+>> Great. Updated version 2 below.
+>
+>
+> Seems, this patch has not been merged accidentally :(
+> Is it possible for you to take it, or would you like me to re-send it?
 
-Signed-off-by: Mike Rapoport <mike.rapoport@gmail.com>
----
-v2 changes: duplicate the settings for the cm-qs600 board in its .dts file as Kumar suggested
-v3 changes: add board details and keep dts Makefile sorted alphabetically
+Applied. Sorry for the delay.
 
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 59 +++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index aaa1a68..3243722 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -339,6 +339,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
- 	orion5x-rd88f5182-nas.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
-+	qcom-apq8064-cm-qs600.dtb \
- 	qcom-apq8064-ifc6410.dtb \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-apq8084-ifc6540.dtb \aaaaaa
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-new file mode 100644
-index 0000000..db7cf03
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -0,0 +1,59 @@
-+#include "qcom-apq8064-v2.0.dtsi"
-+
-+/ {
-+	model = "CompuLab CM-QS600";
-+	compatible = "qcom,apq8064-cm-qs600", "qcom,apq8064";
-+
-+	soc {
-+		pinctrl at 800000 {
-+			i2c1_pins: i2c1 {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "gsbi1";
-+				};
-+			};
-+		};
-+
-+		gsbi at 12440000 {
-+			status = "okay";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+
-+			i2c at 12460000 {
-+				status = "okay";
-+				clock-frequency = <200000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+
-+				eeprom: eeprom at 52 {
-+					compatible = "atmel,24c128";
-+					reg = <0x52>;
-+					pagesize = <32>;
-+				};
-+			};
-+		};
-+
-+		gsbi at 16600000 {
-+			status = "ok";
-+			qcom,mode = <GSBI_PROT_I2C_UART>;
-+			serial at 16640000 {
-+				status = "ok";
-+			};
-+		};
-+
-+		amba {
-+			/* eMMC */
-+			sdcc1: sdcc at 12400000 {
-+				status = "okay";
-+			};
-+
-+			/* External micro SD card */
-+			sdcc3: sdcc at 12180000 {
-+				status = "okay";
-+			};
-+			/* WLAN */
-+			sdcc4: sdcc at 121c0000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
--- 
-1.9.1
+Rob
