@@ -1,58 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 26 Sep 2014 17:16:25 +0200
-Subject: [GIT PULL] Allwinner drivers additions for 3.18
-In-Reply-To: <20140925191800.5855cef6@linux.lan.towertech.it>
-References: <20140920202855.GA20329@lukather>
- <201409251820.38087.arnd@arndb.de>
- <20140925163103.GN15315@lukather>
- <20140925191800.5855cef6@linux.lan.towertech.it>
-Message-ID: <20140926151625.GV15315@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 16:19:48 +0100
+Subject: [PATCH] arm: kprobes-test: Fix compile error "bad immediate
+ value for offset"
+In-Reply-To: <1411743864.1529.36.camel@linaro1.home>
+References: <1411743864.1529.36.camel@linaro1.home>
+Message-ID: <20140926151947.GV5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 07:18:00PM +0200, Alessandro Zummo wrote:
-> On Thu, 25 Sep 2014 18:31:03 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Fri, Sep 26, 2014 at 04:04:24PM +0100, Jon Medhurst (Tixy) wrote:
+> When compiling kprobes-test-arm.c the following error has been observed
 > 
-> > Plus, this thread from last december
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-December/220778.html,
-> > clearly showed that it's nothing new, and that Alessandro doesn't
-> > maintain any tree, hence why I ended up merging it.
+> /tmp/ccoT403o.s:21439: Error: bad immediate value for offset (4168)
 > 
->  I review the drivers, when appropriate, and Andrew thankfully picks them up.
->  Important emails will usually get my attention. Even if I do not answer,
->  is always a good idea to post in the mailing list, as there are a lot
->  of competent people there.
+> This is caused by the compiler spilling it's literal pool too far away
+> from the site which is trying to reference it with a PC relative load.
+> This arises because the compiler is underestimating the size of the
+> inline assembler code present, which apparently it approximates as 4
+> bytes per line or instruction.
+> 
+> We fix this problem by moving the operations which generate more than
+> 4 bytes out of the text section. Specifically, moving the .ascii
+> directives to the .rodata section.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> ---
+> 
+> Russell, OK to add your 'reported-by' here (or should it be Olof)?
 
-Then may I suggest adding Andrew to the maintainers? Because if you
-follow get_maintainers.pl right now, it only states that you are the
-maintainer. That strongly implies that you should be the one doing
-reviews, and we should at least wait for your Acked-by in order to
-merge any RTC patches. And past experience show that we can wait for a
-while.
-
-Don't get this wrong, but the way you maintain it is rather unusual,
-and your silence about this just makes us wonder what to do with your
-patches, up until completely merging them anyway. For the record, it's
-something I feel rather uncomfortable about, but it seems like it's
-the only way to get something merged anyway.
-
-Not having time to maintain your subsystem is totally fine, and as a
-hobbyist maintainer too, I completely understand it. But if you can't
-cope with the patches anymore, maybe you should find another
-co-maintainer? Especially if you have reliable contributors, like
-you're suggesting.
-
-Maxime
+I suspect it should be Olof - I'm just the middle man, spotting errors
+in Olof's build results... though it did help that it was my for-next
+branch which was being built.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/a840a172/attachment-0001.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
