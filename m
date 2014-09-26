@@ -1,69 +1,89 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 26 Sep 2014 15:24:26 +0200
-Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
-In-Reply-To: <54254776.7070803@samsung.com>
-References: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
- <5424900D.2070709@gmail.com> <54254776.7070803@samsung.com>
-Message-ID: <5425690A.6080102@gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Fri, 26 Sep 2014 06:41:09 -0700
+Subject: [PATCH 1/2] ARM: DT: apq8064: create
+ qcom-apq8064-board-common.dtsi
+In-Reply-To: <1411718851-17436-2-git-send-email-mike.rapoport@gmail.com>
+References: <1411718851-17436-1-git-send-email-mike.rapoport@gmail.com>
+ <1411718851-17436-2-git-send-email-mike.rapoport@gmail.com>
+Message-ID: <CAJAp7Ohdi2+M0LC+a3BT6++17b2DST8RgjJddKNEVwL9Ltqrdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.09.2014 13:01, Sylwester Nawrocki wrote:
-> Hi Tomasz,
-> 
-> On 25/09/14 23:58, Tomasz Figa wrote:
->> On 10.09.2014 18:37, Sylwester Nawrocki wrote:
->>>> The default mux and divider clocks are specified in device tree
->>>> so that the FIMC devices in Exynos4210 and Exynos4x12 SoCs are
->>>> clocked from recommended clock source and with maximum supported
->>>> frequency. If needed these settings could be overrode in board
->>>> specific dts files, however they are in practice optimal in most
->>>> cases.
->>>>
->>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>>> ---
->>>>  arch/arm/boot/dts/exynos4210.dtsi |   16 ++++++++++++++++
->>>>  arch/arm/boot/dts/exynos4x12.dtsi |   16 ++++++++++++++++
->>>>  2 files changed, 32 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->>>> index 807bb5b..0969d2e 100644
->>>> --- a/arch/arm/boot/dts/exynos4210.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->>>> @@ -154,18 +154,30 @@
->>>>  			samsung,pix-limits = <4224 8192 1920 4224>;
->>>>  			samsung,mainscaler-ext;
->>>>  			samsung,cam-if;
->>>> +			assigned-clocks = <&clock CLK_MOUT_FIMC0>,
->>>> +					<&clock CLK_SCLK_FIMC0>;
->>>> +			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
->>>> +			assigned-clock-rates = <0>, <160000000>;
->>
->> I wonder whether such settings shouldn't really be set up on a per-board
->> basis.
->>
->> As Daniel already pointed, we have cases when MPLL frequency differs
->> across boards, but we might also have boards that differ in power budget
->> and so having different desired operating frequencies for various IP blocks.
->>
->> What do you think?
-> 
-> This patch provides sane default values for Exynos4210, MPLL is recommended
-> clock source for FIMC devices. If any other clock frequency is needed for 
-> selected boards the clocks setup could be simply overwritten in board dts 
-> file. Otherwise similar changes would have to be done in each board dts.
+On Fri, Sep 26, 2014 at 1:07 AM, Mike Rapoport <mike.rapoport@gmail.com> wrote:
 
-I'm not concerned specifically with Exynos4210, but with placing such
-kind of data in common dtsi files.
+Cool to see the addition of dt for additional devices. I do however
+not think it is correct to put all these things in common...
 
-Notice that even on boards which have correct initialization done by
-firmware, this will cause the settings to be overwritten, even if the
-firmware sets correct, but different values, regardless of them being
-clock parents or rates.
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-board-common.dtsi b/arch/arm/boot/dts/qcom-apq8064-board-common.dtsi
+> new file mode 100644
+> index 0000000..c92d3e9
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-apq8064-board-common.dtsi
+> @@ -0,0 +1,57 @@
+> +#include "qcom-apq8064-v2.0.dtsi"
+> +
+> +/ {
+> +
+> +       soc {
+> +               pinctrl at 800000 {
+> +                       i2c1_pins: i2c1 {
+> +                               mux {
+> +                                       pins = "gpio20", "gpio21";
+> +                                       function = "gsbi1";
+> +                               };
 
-To me, even if this would mean duplicating some data, making this per
-board and present only in dts files of boards that actually need this
-(i.e. are known to have broken firmware) sounds more reasonable.
+The muxing is common, but you probably want to be able to set drive
+strength and bias as well and handle active vs sleep mode and then I'm
+not sure if it is common anymore...
 
-Best regards,
-Tomasz
+> +                       };
+> +               };
+> +
+> +               gsbi at 12440000 {
+> +                       status = "okay";
+> +                       qcom,mode = <GSBI_PROT_I2C>;
+> +
+> +                       i2c at 12460000 {
+> +                               status = "okay";
+> +                               clock-frequency = <200000>;
+> +                               pinctrl-0 = <&i2c1_pins>;
+> +                               pinctrl-names = "default";
+> +
+> +                               eeprom: eeprom at 52 {
+> +                                       compatible = "atmel,24c128";
+> +                                       reg = <0x52>;
+> +                                       pagesize = <32>;
+> +                               };
+
+Not all apq8064 boards have this eeprom.
+
+> +                       };
+> +               };
+> +
+> +               gsbi at 16600000 {
+> +                       status = "ok";
+> +                       qcom,mode = <GSBI_PROT_I2C_UART>;
+> +                       serial at 16640000 {
+> +                               status = "ok";
+> +                       };
+> +               };
+> +
+> +               amba {
+> +                       /* eMMC */
+> +                       sdcc1: sdcc at 12400000 {
+> +                               status = "okay";
+> +                       };
+> +
+> +                       /* External micro SD card */
+> +                       sdcc3: sdcc at 12180000 {
+> +                               status = "okay";
+> +                       };
+> +                       /* WLAN */
+> +                       sdcc4: sdcc at 121c0000 {
+> +                               status = "okay";
+> +                       };
+
+I'm not sure if all boards are using sdcc4 for WiFi.
+
+Regards,
+Bjorn
