@@ -1,61 +1,39 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 26 Sep 2014 15:14:51 +0530
-Subject: [PATCH v2] ARM: dts: vf610-colibri: Add ADC support
-In-Reply-To: <20140926020745.GH21077@dragon>
-References: <cover.1411122224.git.maitysanchayan@gmail.com>
- <a0ecfce3f97fb6684657ae76b89f38108fcdf68f.1411122224.git.maitysanchayan@gmail.com>
- <20140926020745.GH21077@dragon>
-Message-ID: <54253593.2060508@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 26 Sep 2014 11:45:55 +0200
+Subject: [PATCH resend] MAINTAINERS: Add maintainers entry for Mediatek SoCs
+Message-ID: <1411724755-9866-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I plan to stay with the Mediatek SoCs for the next future
+and hope to expand its support along the way with the help
+of a whole bunch of people.
 
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-On Friday 26 September 2014 07:37 AM, Shawn Guo wrote:
-> On Fri, Sep 19, 2014 at 04:56:13PM +0530, Sanchayan Maity wrote:
->> Enable ADC support for Colibri VF61 modules
->>
->> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> ---
->>  arch/arm/boot/dts/vf610-colibri.dtsi |   10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
->> index 0cd8343..6fd099e 100644
->> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
->> @@ -27,6 +27,16 @@
->>  
->>  };
->>  
->> +&adc0 {
->> +	pinctrl-names = "default";
-> 
-> Sorry for missing it, but I would expect properties pinctrl-names and
-> pinctrl-0 appear as a couple.  Should we drop property pinctrl-names
-> here?
-> 
-> Shawn
-
-We can actually drop this here. Vybrid has dedicated pads for 4 ADC channels.
-Since we are using only these dedicated ADC channels, no pin multiplexing
-is required. So we can drop the pinctrl-names property. Will clean and
-send out a v3 patch. Thanks for pointing this out. 
-
-- Sanchayan
-
-> 
->> +	status = "okay";
->> +};
->> +
->> +&adc1 {
->> +	pinctrl-names = "default";
->> +	status = "okay";
->> +};
->> +
->>  &esdhc1 {
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&pinctrl_esdhc1>;
->> -- 
->> 1.7.9.5
->>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 65fd4db..2e4a030 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1156,6 +1156,16 @@ W:	http://www.digriz.org.uk/ts78xx/kernel
+ S:	Maintained
+ F:	arch/arm/mach-orion5x/ts78xx-*
+ 
++ARM/Mediatek SoC support
++M:	Matthias Brugger <matthias.bgg@gmail.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/boot/dts/mt6*
++F:	arch/arm/boot/dts/mt8*
++F:	arch/arm/mach-mediatek/
++N:	mtk
++K:	mediatek
++
+ ARM/MICREL KS8695 ARCHITECTURE
+ M:	Greg Ungerer <gerg@uclinux.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.9.1
