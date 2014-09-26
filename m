@@ -1,73 +1,84 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 26 Sep 2014 09:15:11 +0800
-Subject: [PATCH v4 0/8] arm/arm64: KVM: dynamic VGIC sizing
-In-Reply-To: <20140925133531.GA15736@cbox>
-References: <1410433755-3612-1-git-send-email-marc.zyngier@arm.com>
- <54240E20.8060505@huawei.com> <20140925133531.GA15736@cbox>
-Message-ID: <5424BE1F.5010801@huawei.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 26 Sep 2014 09:21:27 +0800
+Subject: [PATCH v3 4/5] ARM: dts: vf610: use new GPIO support
+In-Reply-To: <590a5fbc4f8b552355a93c1002041765352cd1c3.1411662961.git.stefan@agner.ch>
+References: <cover.1411662961.git.stefan@agner.ch>
+ <590a5fbc4f8b552355a93c1002041765352cd1c3.1411662961.git.stefan@agner.ch>
+Message-ID: <20140926012126.GC21077@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 25, 2014 at 06:37:08PM +0200, Stefan Agner wrote:
+> Use GPIO support by adding SD card detection configuration and
+> GPIO pinmux for Colibri's standard GPIO pins. Attach the GPIO
+> pins to the iomuxc node to get the GPIO pin settings applied.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/vf610-colibri.dtsi | 9 +++++++++
+>  arch/arm/boot/dts/vf610-twr.dts      | 1 +
+>  arch/arm/boot/dts/vf610.dtsi         | 1 +
+>  3 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+> index 0cd8343..efd4322 100644
+> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+> @@ -31,6 +31,7 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+>  	bus-width = <4>;
+> +	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+>  };
+>  
+>  &fec1 {
+> @@ -71,6 +72,14 @@
+>  
+>  &iomuxc {
+>  	vf610-colibri {
+> +		pinctrl_gpio_ext: gpio_ext {
+> +			fsl,pins = <
+> +				VF610_PAD_PTD10__GPIO_89	0x22ed /* EXT_IO_0 */
+> +				VF610_PAD_PTD9__GPIO_88		0x22ed /* EXT_IO_1 */
+> +				VF610_PAD_PTD26__GPIO_68	0x22ed /* EXT_IO_2 */
+> +			>;
+> +		};
+> +
 
+I'm not sure these GPIOs will be set up at anywhere.  To set them up,
+you need to either have pinctrl_gpio_ext referenced by some client
+device in its pinctrl-* property or put these pins into hog group (see
+example in arch/arm/boot/dts/vf610-twr.dts).
 
-On 2014/9/25 21:35, Christoffer Dall wrote:
-> On Thu, Sep 25, 2014 at 08:44:16PM +0800, Shannon Zhao wrote:
->> Hi all,
->>
->> I have a problem that I want to ask for your advice.
->> Before I send this mail to Marc and Christoffer. But it seems that they are busy or not online recently.
->>
->> I git clone Marc's "kvmtool-vgic-dyn" branch and run it on Fastmodel Cortex-A57*4 with qemu 2.1.0.
->> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->>
->> I want to do repeated lifecycle test. The test is that start 2 VMs, sleep 10 and do pkill qemu.
->> Test script is following:
->> #!/bin/sh
->> while true
->> do
->> 	qemu-system-aarch64 \
->>     		-enable-kvm -smp 4 \
->>     		-kernel Image \
->>     		-m 512 -machine virt,kernel_irqchip=on \
->>     		-initrd guestfs.cpio.gz \
->>     		-cpu host \
->>     		-chardev pty,id=pty0,mux=on -monitor chardev:pty0 \
->>     		-serial chardev:pty0 -daemonize \
->>     		-vnc 0.0.0.0:0 \
->>     		-append "rdinit=/sbin/init console=ttyAMA0 mem=512M root=/dev/ram earlyprintk=pl011,0x9000000 rw" &
->>
->> 	qemu-system-aarch64 \
->>     		-enable-kvm -smp 4 \
->>     		-kernel Image \
->>     		-m 512 -machine virt,kernel_irqchip=on \
->>     		-initrd guestfs.cpio.gz \
->>     		-cpu host \
->>     		-chardev pty,id=pty0,mux=on -monitor chardev:pty0 \
->>    		-serial chardev:pty0 -daemonize \
->>     		-vnc 0.0.0.0:1 \
->>     		-append "rdinit=/sbin/init console=ttyAMA0 mem=512M root=/dev/ram earlyprintk=pl011,0x9000000 rw" &
->>     	sleep 10
->> 	pkill qemu
->> done
->>
->> After repeating sometimes there is something wrong happened as followed.
->> Look forward for your reply.
->> Thanks,
->> Shannon
->>
-> Hi Shannon,
-> 
-> This appears to be related to a bug in vgic_set_attr() which messes up
-> the bitmap initialization, I'm working on a patch.
-> 
-> -Christoffer
-> 
-> .
-> 
-Hi Christoffer,
+Shawn
 
-Thanks for you reply.
-I will test your patch to check whether the bug disappears.
-Thanks,
--- 
-Shannon
+>  		pinctrl_esdhc1: esdhc1grp {
+>  			fsl,pins = <
+>  				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index 189b697..3fe8a8f 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -116,6 +116,7 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+>  	bus-width = <4>;
+> +	cd-gpios = <&gpio5 6 GPIO_ACTIVE_LOW>;
+>  	status = "okay";
+>  };
+>  
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 4d2ec32..467c97e 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -11,6 +11,7 @@
+>  #include "vf610-pinfunc.h"
+>  #include <dt-bindings/clock/vf610-clock.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+>  	aliases {
+> -- 
+> 2.1.0
+> 
