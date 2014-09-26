@@ -1,67 +1,56 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:34 +0200
-Subject: [PATCH 01/27] KVM: Introduce gfn_to_hva_memslot_prot
+Date: Fri, 26 Sep 2014 15:16:36 +0200
+Subject: [PATCH 03/27] KVM: ARM/arm64: fix non-const declaration of function
+ returning const
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support read-only memory regions on arm and arm64, we have a need to
-resolve a gfn to an hva given a pointer to a memslot to avoid looping
-through the memslots twice and to reuse the hva error checking of
-gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot() function and
-refactor gfn_to_hva_prot() to use this function.
+From: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Sparse kicks up about a type mismatch for kvm_target_cpu:
+
+arch/arm64/kvm/guest.c:271:25: error: symbol 'kvm_target_cpu' redeclared with different type (originally declared at ./arch/arm64/include/asm/kvm_host.h:45) - different modifiers
+
+so fix this by adding the missing const attribute to the function
+declaration.
+
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/linux/kvm_host.h |  2 ++
- virt/kvm/kvm_main.c      | 11 +++++++++--
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index ebd7236..6d8a658 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -528,6 +528,8 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn);
- unsigned long gfn_to_hva(struct kvm *kvm, gfn_t gfn);
- unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable);
- unsigned long gfn_to_hva_memslot(struct kvm_memory_slot *slot, gfn_t gfn);
-+unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot, gfn_t gfn,
-+				      bool *writable);
- void kvm_release_page_clean(struct page *page);
- void kvm_release_page_dirty(struct page *page);
- void kvm_set_page_accessed(struct page *page);
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 5a0817e..76c92a7 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -1076,9 +1076,9 @@ EXPORT_SYMBOL_GPL(gfn_to_hva);
-  * If writable is set to false, the hva returned by this function is only
-  * allowed to be read.
-  */
--unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
-+unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot,
-+				      gfn_t gfn, bool *writable)
- {
--	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
- 	unsigned long hva = __gfn_to_hva_many(slot, gfn, NULL, false);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 6dfb404..fcb12a6 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -42,7 +42,7 @@
  
- 	if (!kvm_is_error_hva(hva) && writable)
-@@ -1087,6 +1087,13 @@ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
- 	return hva;
- }
+ struct kvm_vcpu;
+ u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+-int kvm_target_cpu(void);
++int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
  
-+unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
-+{
-+	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
-+
-+	return gfn_to_hva_memslot_prot(slot, gfn, writable);
-+}
-+
- static int kvm_read_hva(void *data, void __user *hva, int len)
- {
- 	return __copy_from_user(data, hva, len);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e10c45a..44094e5 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -42,7 +42,7 @@
+ #define KVM_VCPU_MAX_FEATURES 3
+ 
+ struct kvm_vcpu;
+-int kvm_target_cpu(void);
++int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_dev_ioctl_check_extension(long ext);
+ 
 -- 
 2.0.0
