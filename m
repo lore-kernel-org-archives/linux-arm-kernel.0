@@ -1,81 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Sep 2014 13:14:27 +0100
-Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
-In-Reply-To: <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
-References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
- <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
-Message-ID: <20140926121427.GO5182@n2100.arm.linux.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 26 Sep 2014 14:15:00 +0200
+Subject: ARM: meson: MESON6_TIMER?
+Message-ID: <1411733700.7866.29.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
-> +static int ls1_start_deepsleep(unsigned long addr)
-> +{
-> +	ls1_do_deepsleep(addr);
-> +
-> +	return 0;
-> +}
-...
-> +	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
+Hi Carlo,
 
-What's the point of this function?  Why can't ls1_do_deepsleep() just
-return zero?
+Your commit 3b8f5030ddcf ("ARM: meson: add basic support for MesonX
+SoCs") landed in next-20140926. It adds (among other things) a select
+statement:
+    select MESON6_TIMER
 
-> +/*
-> + * r0: the physical entry address of SRAM code
-> + *
-> + */
-> +ENTRY(ls1_do_deepsleep)
-> +	mov	r13, r0
-> +
-> +	/* flush cache */
-> +	bl	v7_flush_dcache_all
+But there's no Kconfig symbol MESON6_TIMER (in next-20140926). I assume
+that this symbol is queued somewhere. (Probably related is the currently
+orphaned DT string "amlogic,meson6-timer".) Is that correct?
 
-Please explain the purpose of this call via a comment in the code.
 
-The generic code will have saved the CPU state, and will have called
-flush_cache_louis() to flush the caches to the point of unification.
-
-The only data which will have been loaded into the cache between that
-point is the stack for the return from __cpu_suspend_save, and
-speculative prefetches.
-
-So, the only reason I can gather is that you need to flush data from
-lower levels of the cache below the point of unification.
-
-> +
-> +	/* disable cache, C bit in SCTLR */
-> +	mrc	p15, 0, r0, c1, c0, 0
-> +	bic	r0, r0, #(1 << 2)
-> +	mcr	p15, 0, r0, c1, c0, 0
-> +	isb
-> +
-> +	/* disable coherency, SMP bit in ACTLR */
-> +	mrc	p15, 0, r0, c1, c0, 1
-> +	bic	r0, r0, #(1 << 6)
-> +	mcr	p15, 0, r0, c1, c0, 1
-> +	isb
-> +	dsb
-> +
-> +	/* disable MMU, M bit in SCTLR */
-> +	mrc	p15, 0, r0, c1, c0, 0
-> +	bic	r0, r0, #1
-> +	mcr	p15, 0, r0, c1, c0, 0
-> +	isb
-> +
-> +	/* jump to sram code using physical address */
-> +	bx	r13
-
-This looks extremely fragile.  You are running in virtual space, and you
-turn the MMU off.  You are reliant on the MMU still being on for the
-following instructions to already be in the pipeline.  That's not a
-very good assumption to make (we've made it in the past and it breaks
-every so often when things change, eg when the code is no longer laid
-out how we expect.)
-
-You need to disable the MMU safely, which means using the identity map
-page tables and executing code in the identity map region.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Paul Bolle
