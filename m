@@ -1,71 +1,77 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Sep 2014 16:24:53 -0700
-Subject: [PATCH] clk: prevent erronous parsing of children during rate
- change
-In-Reply-To: <5425135F.2070809@ti.com>
-References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
- <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
- <5424C2FA.4000508@codeaurora.org> <5425135F.2070809@ti.com>
-Message-ID: <20140926232453.19023.25483@quantum>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Sat, 27 Sep 2014 04:58:05 +0530
+Subject: [PATCH v2 0/2] serial: samsung: add support for early console
+In-Reply-To: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
+References: <1411638892-13702-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAGOxZ509Sfd77FQFSKPgp7piDFa-o2zdFuHy9EzfXULkpJHGrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2014-09-26 00:18:55)
-> On 09/26/2014 04:35 AM, Stephen Boyd wrote:
-> > On 09/23/14 06:38, Tero Kristo wrote:
-> >> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
-> >>> On 08/21, Tero Kristo wrote:
-> >>>>            /* Skip children who will be reparented to another clock */
-> >>>>            if (child->new_parent && child->new_parent != clk)
-> >>>>                continue;
-> >>>
-> >>> Are we not hitting the new_parent check here? I don't understand
-> >>> how we can be changing parents here unless the check is being
-> >>> avoided, in which case I wonder why determine_rate isn't being
-> >>> used.
-> >>>
-> >>
-> >> It depends how the clock underneath handles the situation. The error I
-> >> am seeing actually happens with a SoC specific compound clock (DPLL)
-> >> which integrates set_rate + mux functionality into a single clock
-> >> node. A call to the clk_set_rate changes the parent of this clock
-> >> (from bypass clock to reference clock), in addition to changing the
-> >> rate (tune the mul+div.) I looked at using the determine rate call
-> >> with this type but it breaks everything up... the parent gets changed
-> >> but not the clock rate, in addition to some other issues.
-> >
-> > Ok. Is this omap3_noncore_dpll_set_rate()?
-> 
-> Yes.
-> 
->  > Can we use determine_rate +
-> > clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
-> > allow us to do the mult+div and the parent in the same op call, although
-> > I don't understand why setting the parent and then setting the rate is
-> > not going to work.
-> 
-> Well, setting parent first, then rate later causes problems with the 
-> DPLL ending up running with illegal (non-specified) rate, the M+N values 
-> are most likely wrong if you just switch from bypass clock to reference 
-> clock first without programming the M+N first.
+HI Marek,
 
-I took a quick look and it still seems to me that the OMAP DPLLs are
-still not modeled properly as mux clocks. Is this correct?
+On Thu, Sep 25, 2014 at 3:24 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> This patchset adds support for early console defined in device tree. As
+> an example, DTS files for all Exynos4 based machines are updated with
+> the correct value for common chosen/sdtout property.
+>
+> To get it fully functional on ARM architecture, additional improvements
+> (support for early_ioremap) are needed in early console code.
+>
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
+>
+> Change log:
+>
+> v2:
+> - added support for command line based initialization
+>
+> v1: http://www.spinics.net/lists/linux-samsung-soc/msg37094.html
+> - initial version
+>
+>
+> Patch summary:
+>
+> Tomasz Figa (2):
+>   serial: samsung: Add support for early console
+>   ARM: dts: exynos4: Add stdout-path properties
+>
+>  Documentation/kernel-parameters.txt             |  10 +++
+>  arch/arm/boot/dts/exynos4210-origen.dts         |   1 +
+>  arch/arm/boot/dts/exynos4210-smdkv310.dts       |   1 +
+>  arch/arm/boot/dts/exynos4210-trats.dts          |   1 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts |   1 +
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   4 +
+>  arch/arm/boot/dts/exynos4412-origen.dts         |   1 +
+>  arch/arm/boot/dts/exynos4412-smdk4412.dts       |   1 +
+>  arch/arm/boot/dts/exynos4412-tiny4412.dts       |   4 +
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |   1 +
+>  drivers/tty/serial/Kconfig                      |   1 +
+>  drivers/tty/serial/samsung.c                    | 103 ++++++++++++++++++++++++
+>  12 files changed, 129 insertions(+)
 
-This issue has been lingering for a long time and we can't use
-determine_rate unless that clock has multiple parents. Simply hacking
-knowledge of the parent bypass clock into the .set_rate callback is not
-enough.
+Tested this on ARM64 based exynos7 platform, both command line and DT
+ways. Both works well.
+Compile tested on ARM.
+Not sure if my ACK matters here, but you certainly have my
 
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+I think this is good to go in with a minor comment addressed on 1st patch.
+Thanks!
+>
+> --
+> 1.9.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
 Regards,
-Mike
-
-> 
->   I'm interested in the other issues that you mentioned
-> > too.
-> 
-> Mostly these were side-effects from the illegal DPLL setup I guess, like 
-> boot hang, failed drivers etc. I didn't really investigate this that 
-> much as it is much more simpler just to use safe list iteration here.
-> 
-> -Tero
+Alim
