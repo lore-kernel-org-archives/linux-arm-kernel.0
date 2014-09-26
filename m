@@ -1,101 +1,114 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 26 Sep 2014 16:47:12 +0200
-Subject: [GIT PULL] at91: soc for 3.18 #2
-In-Reply-To: <201409261250.02565.arnd@arndb.de>
-References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
- <201409261250.02565.arnd@arndb.de>
-Message-ID: <54257C70.50008@atmel.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 26 Sep 2014 07:50:08 -0700
+Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
+In-Reply-To: <20140926073125.GB31106@ulmo> (Thierry Reding's message of "Fri,
+ 26 Sep 2014 09:31:27 +0200")
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+ <20140925112122.GA22753@ulmo> <7hppej8glk.fsf@deeprootsystems.com>
+ <20140926073125.GB31106@ulmo>
+Message-ID: <7hoau25tcv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/2014 12:50, Arnd Bergmann :
-> On Monday 22 September 2014, Nicolas Ferre wrote:
-> 
->> Nicolas Ferre (4):
->>       ARM: at91: introduce basic SAMA5D4 support
->>       ARM: at91: SAMA5D4 SoC detection code and low level routines
-> 
-> This resulted in build failures both in at91x40_defconfig and some
-> randconfigs with MMU disabled. I've applied the patch below on top
-> to fix it.
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-Ok, I see: sorry for the inconvenience.
-What about taking the patch that I sent about removing completely the
-at91x40 as it is "Acked" by everybody now? The would prevent from adding
-these unneeded values.
-
-> I'm not exactly happy about the soc detection code anyway after I
-> had to look at that. Why do you even hardcode the physical register
-> location rather than getting it from DT?
+> On Thu, Sep 25, 2014 at 03:45:11PM -0700, Kevin Hilman wrote:
+>> Thierry Reding <thierry.reding@gmail.com> writes:
+>> 
+>> > I just noticed these patches because they conflicted with some of the
+>> > local patches I had to add a very similar framework. One of the reasons
+>> > why I hadn't posted these publicly yet is because the platform where I
+>> > want to use this (Tegra) is somewhat quirky when it comes to power
+>> > domains.
+>> >
+>> > On Tegra these domains are called power gates and they currently have
+>> > their own API. We've been looking at migrating things over to some
+>> > generic framework for some time and PM domains do seem like a good fit.
+>> > However one of the quirks regarding these domains on Tegra is that a
+>> > fixed sequence exists that needs to be respected when enabling or
+>> > disabling a power partition. The exact sequence can be found in the
+>> > drivers/soc/tegra/pmc.c driver's tegra_powergate_sequence_power_up()
+>> > function. Essentially we need to call into the clock and reset drivers
+>> > at very specific moments during the operations that the PMC does.
+>> >
+>> > One solution to this would be to make the needed clocks and resets
+>> > available to the power domain driver via DT, but then we have the
+>> > problem that two drivers would be controlling the same resources. For
+>> > example drivers could still want to disable the clock for more fine-
+>> > grained power management. 
+>> 
+>> I think you're on the right path here.  You can get rid of this conflict
+>> by removing the direct/manual clock management from the drivers, and
+>> using runtime PM instead: s/clk_enable/pm_runtime_get_sync/,
+>> s/clk_disable/pm_runtime_put_sync/.  When using runtime PM, those calls
+>> trickle down through the power domain driver, which can manage the
+>> device clocks, as well as any additional clocks and resets needed for
+>> power gating.
 >
-> Also, why do you care about which SoC version you have for the
-> modern SAMA5 chips? All I see is a sama5d4_map_io() callback
-> that maps a lot of completely unused registers along with
-> the uart that you normally get from the implicit debug_ll_io_init,
-> and the SRAM that should probably be turned into a normal driver.
+> Okay. The DT part of it is going to be pretty nasty (as usual) because
+> we currently have the clocks and resets within the device's device tree
+> node (which I think is where they really belong).
+>
+> So one possibility would be to move the clocks and resets to the power
+> domain controller's node, like so:
+>
+> 	pmc at ... {
+> 		power-domains {
+> 			...
+>
+> 			sata at ... {
+> 				clocks = <&tegra_car 124>;
+> 				resets = <&tegra_car 124>;
+> 			};
+> 		};
+> 	};
+>
+> An alternative would be to make the power-domain controller look up the
+> clock within the user's device tree node. That could be problematic,
+> because while the module clock is always the first clock in current
+> device trees, there aren't ordering guarantees, so we'd have to rely on
+> the clock name.
+>
+>> > Furthermore for some devices it may turn out that turning the domain
+>> > off and on introduces too much latency to be useful.
+>> 
+>> In these cases, you should use the per-device PM QoS framework to set
+>> per-device latencies.  Then your power-domain can look up these
+>> latencies and decide whether or not to actually power gate or not.
+>
+> Does this allow fine-grained control over what parts of the "power
+> domain" get disabled? 
 
-Yes, as said by Alexandre, we are aware of the flaws of AT91 SoC
-initialization, but last time I tried, our code was called too early.
-Now with the work from Maxime with the timer (in 3.18) it might be
-possible to reorder all this.
-But please, I would really like to remove all !DT *and* !CCF material
-before starting this work, otherwise we will again have a double path
-for sam9's and I'd like to avoid this.
+Sure.  Your power-domain can have control over this, and can make
+decisions based on QoS constraints or other considerations.
 
-Your thoughts?
+> For example some drivers may want to only turn off
+> the clock under some circumstances, which would keep the hardware state,
+> whereas in other situations or drivers it might be fine to completely
+> turn off the power partition and reset the hardware block (loosing all
+> hardware state).
 
-Bye,
+Well, IMO, it shouldn't be the drivers making these decisions, because
+the "circumstances" around these decisions typically are related to QoS
+constraints that affect the whole power domain, not just that device.
 
-> 8<-------
->>From 45aeea29c360551519edd8e041b36d8a4d5f6a23 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Fri, 26 Sep 2014 12:27:00 +0200
-> Subject: [PATCH] ARM: at91: fix nommu build regression
-> 
-> The newly introduced support for SAMA5D4 added access to the
-> 'AT91_ALT_BASE_SYS' register area, but failed to define the
-> symbols in the case when CONFIG_MMU is disabled.
-> 
-> We really should not hardwire addresses like this any more,
-> but as a small fixup, this patch just adds the missing
-> definitions for the nommu case, which gets at91x40_defconfig
-> and any configuration of sam9 and sama5 with MMU disabled
-> back to work.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 726d32bf79ef4 ("ARM: at91: SAMA5D4 SoC detection code and low ...")
-> 
-> diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
-> index d84776f6b8ac..c13797352688 100644
-> --- a/arch/arm/mach-at91/include/mach/hardware.h
-> +++ b/arch/arm/mach-at91/include/mach/hardware.h
-> @@ -51,11 +51,12 @@
->   */
->  #define AT91_BASE_SYS	0xffffc000
->  
-> +#endif
-> +
->  /*
->   * On sama5d4 there is no system controller, we map some needed peripherals
->   */
->  #define AT91_ALT_BASE_SYS	0xfc069000
-> -#endif
->  
->  /*
->   * On all at91 have the Advanced Interrupt Controller starts at address
-> @@ -90,6 +91,9 @@
->   */
->  #define AT91_IO_PHYS_BASE	AT91_BASE_SYS
->  #define AT91_IO_VIRT_BASE	IOMEM(AT91_IO_PHYS_BASE)
-> +
-> +#define AT91_ALT_IO_PHYS_BASE	AT91_ALT_BASE_SYS
-> +#define AT91_ALT_IO_VIRT_BASE	IOMEM(AT91_ALT_BASE_SYS)
->  #endif
->  
->  #define AT91_IO_SIZE		(0xFFFFFFFF - AT91_IO_PHYS_BASE + 1)
-> 
-> 
+Part of the benefit of moving direct clock management out of the
+drivers, and into some pm_domain/genpd logic is that you put them in the
+place that is has enough information to make decision based on the whole
+power domain.  e.g. a specific device driver doesn't know (and shouldn't
+know, IMO) about the what other devices might be in the same power
+domain.  Only the power-domain logic has enough of a "big picture" to
+make the right decisions.  The wakeup latency and the save/restore
+context needs of a device depend on other factors in the power domain,
+like whether that device is the last one to be idle, or whether the
+power domain is going to be power gated due to constraints set by some
+other device. 
 
+> Keeping a reference to the clock in the power domain will prevent that
+> from working since the driver itself won't be able to disable the
+> hardware clock.
 
--- 
-Nicolas Ferre
+IMO, the driver itself shouldn't be disabling the hardware clock in the
+first place.  That should be left up to the domain logic.
+
+Kevin
