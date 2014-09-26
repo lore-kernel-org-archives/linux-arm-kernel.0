@@ -1,71 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Sep 2014 17:59:13 +0100
-Subject: [PATCH v6 7/8] ARM: mm: allow non-text sections to be
- non-executable
-In-Reply-To: <CAGXu5jL+ksQ4nq4pxOk7gM0POmwtTQ7DgmugpVK45arpMLGzvg@mail.gmail.com>
-References: <1411067949-10913-1-git-send-email-keescook@chromium.org>
- <1411067949-10913-8-git-send-email-keescook@chromium.org>
- <20140926114239.GM5182@n2100.arm.linux.org.uk>
- <CAGXu5jL+ksQ4nq4pxOk7gM0POmwtTQ7DgmugpVK45arpMLGzvg@mail.gmail.com>
-Message-ID: <20140926165913.GX5182@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Sep 2014 18:01:58 +0100
+Subject: [PATCH] perf tools: fix build breakage on arm and arm64 targets
+Message-ID: <1411750918-25220-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 09:43:12AM -0700, Kees Cook wrote:
-> On Fri, Sep 26, 2014 at 4:42 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Sep 18, 2014 at 12:19:08PM -0700, Kees Cook wrote:
-> >> @@ -1373,13 +1373,24 @@ static void __init map_lowmem(void)
-> >>               if (start >= end)
-> >>                       break;
-> >>
-> >> -             if (end < kernel_x_start || start >= kernel_x_end) {
-> >> +             if (end < kernel_x_start) {
-> >>                       map.pfn = __phys_to_pfn(start);
-> >>                       map.virtual = __phys_to_virt(start);
-> >>                       map.length = end - start;
-> >>                       map.type = MT_MEMORY_RWX;
-> >>
-> >>                       create_mapping(&map);
-> >> +             } else if (start >= kernel_x_end) {
-> >> +                     map.pfn = __phys_to_pfn(start);
-> >> +                     map.virtual = __phys_to_virt(start);
-> >> +                     map.length = end - start;
-> >> +#ifdef CONFIG_ARM_KERNMEM_PERMS
-> >> +                     map.type = MT_MEMORY_RW;
-> >> +#else
-> >> +                     map.type = MT_MEMORY_RWX;
-> >> +#endif
-> >> +
-> >> +                     create_mapping(&map);
-> >
-> >
-> > I'm looking at this, and wondering two things.  Firstly, why isn't it
-> > MT_MEMORY_RW in the first place.  Secondly, why do you need to make
-> > this depend on CONFIG_ARM_KERNMEM_PERMS at all?
-> >
-> > I think the first is an oversight by me (and is a case which never came
-> > up in my testing, because most of my platforms don't have segmented
-> > memory layouts.)
-> >
-> > The second I think is not necessary - the memory region being considered
-> > is not part of the kernel at all, and so should not be executable in any
-> > shape or form.
-> 
-> I'm happy to change this. My original intent was to make layout for
-> builds without CONFIG_ARM_KERNMEM_PERMS identical to what was there
-> before, so I took this step to make sure.
-> 
-> I will drop the #ifdef and respin. Does the rest look ok? Shall I send
-> a pull request?
+Attempting to build the perf tool on arm or arm64 targets results in the
+following failure:
 
-I think all you need to is change that MT_MEMORY_RWX to be MT_MEMORY_RW.
+arch/arm/util/unwind-libunwind.c: In function ?libunwind__arch_reg_id?:
+arch/arm/util/unwind-libunwind.c:43:3: error: implicit declaration of function ?pr_err? [-Werror=implicit-function-declaration]
+   pr_err("unwind: invalid reg id %d\n", regnum);
+   ^
+This is due to commit 84f5d36f4866 ("perf tools: Move pr_* debug macros
+into debug object") moving the pr_* macros into a new header file, but
+failing to update architectures other than x86.
 
-However, I think I would also like to see the kernel text being read-only
-as soon as possible - so maybe we should also have MT_MEMORY_RX, and
-have map_lowmem() use this for the kernel text when we want this level
-of protection?
+This patch adds the missing includes, and fixes the build again.
 
+Cc: Jiri Olsa <jolsa@kernel.org>
+Cc: Jean Pihet <jean.pihet@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ tools/perf/arch/arm/tests/dwarf-unwind.c      | 1 +
+ tools/perf/arch/arm/util/unwind-libunwind.c   | 1 +
+ tools/perf/arch/arm64/util/unwind-libunwind.c | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/tools/perf/arch/arm/tests/dwarf-unwind.c b/tools/perf/arch/arm/tests/dwarf-unwind.c
+index 9f870d27cb39..62eff847f91c 100644
+--- a/tools/perf/arch/arm/tests/dwarf-unwind.c
++++ b/tools/perf/arch/arm/tests/dwarf-unwind.c
+@@ -3,6 +3,7 @@
+ #include "thread.h"
+ #include "map.h"
+ #include "event.h"
++#include "debug.h"
+ #include "tests/tests.h"
+ 
+ #define STACK_SIZE 8192
+diff --git a/tools/perf/arch/arm/util/unwind-libunwind.c b/tools/perf/arch/arm/util/unwind-libunwind.c
+index 729ed69a6664..62c397ed3d97 100644
+--- a/tools/perf/arch/arm/util/unwind-libunwind.c
++++ b/tools/perf/arch/arm/util/unwind-libunwind.c
+@@ -3,6 +3,7 @@
+ #include <libunwind.h>
+ #include "perf_regs.h"
+ #include "../../util/unwind.h"
++#include "../../util/debug.h"
+ 
+ int libunwind__arch_reg_id(int regnum)
+ {
+diff --git a/tools/perf/arch/arm64/util/unwind-libunwind.c b/tools/perf/arch/arm64/util/unwind-libunwind.c
+index 436ee43859dc..a87afa91a99e 100644
+--- a/tools/perf/arch/arm64/util/unwind-libunwind.c
++++ b/tools/perf/arch/arm64/util/unwind-libunwind.c
+@@ -3,6 +3,7 @@
+ #include <libunwind.h>
+ #include "perf_regs.h"
+ #include "../../util/unwind.h"
++#include "../../util/debug.h"
+ 
+ int libunwind__arch_reg_id(int regnum)
+ {
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
