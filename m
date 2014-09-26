@@ -1,115 +1,53 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 26 Sep 2014 14:17:43 +0200
-Subject: [PATCH v6 4/6] sched: get CPU's usage statistic
-In-Reply-To: <54246791.9050101@arm.com>
-References: <1411488485-10025-1-git-send-email-vincent.guittot@linaro.org>
- <1411488485-10025-5-git-send-email-vincent.guittot@linaro.org>
- <54246791.9050101@arm.com>
-Message-ID: <CAKfTPtCzVRY4q184nqHSL7zFh1CvF009p8q8EPFCZxDFMx9TeQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 13:20:04 +0100
+Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
+In-Reply-To: <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
+Message-ID: <20140926122003.GP5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2014 21:05, Dietmar Eggemann <dietmar.eggemann@arm.com> wrote:
-> On 23/09/14 17:08, Vincent Guittot wrote:
->> Monitor the usage level of each group of each sched_domain level. The usage is
->> the amount of cpu_capacity that is currently used on a CPU or group of CPUs.
->> We use the utilization_load_avg to evaluate the usage level of each group.
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>  kernel/sched/fair.c | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 2cf153d..4097e3f 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -4523,6 +4523,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
->>       return target;
->>  }
->>
->> +static int get_cpu_usage(int cpu)
->> +{
->> +     unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
->> +     unsigned long capacity = capacity_orig_of(cpu);
->> +
->> +     if (usage >= SCHED_LOAD_SCALE)
->> +             return capacity + 1;
->
-> Why you are returning rq->cpu_capacity_orig + 1 (1025) in case
-> utilization_load_avg is greater or equal than 1024 and not usage or
-> (usage * capacity) >> SCHED_LOAD_SHIFT too?
+On Fri, Sep 26, 2014 at 07:25:01PM +0800, Chenhui Zhao wrote:
+> +static inline void ls1_do_lowpower(unsigned int cpu, int *spurious)
+> +{
+> +	/*
+> +	 * there is no power-control hardware on this platform, so all
+> +	 * we can do is put the core into WFI; this is safe as the calling
+> +	 * code will have already disabled interrupts
+> +	 */
+> +	for (;;) {
+> +		wfi();
+> +
+> +		if (pen_release == cpu_logical_map(cpu)) {
+> +			/*OK, proper wakeup, we're done*/
+> +			break;
+> +		}
+> +
+> +		/*
+> +		 * Getting here, means that we have come out of WFI without
+> +		 * having been woken up - this shouldn't happen
+> +		 *
+> +		 * Just note it happening - when we're woken, we can report
+> +		 * its occurrence.
+> +		 */
+> +		(*spurious)++;
+> +	}
+> +}
 
-The usage can't be higher than the full capacity of the CPU because
-it's about the running time on this CPU. Nevertheless, usage can be
-higher than SCHED_LOAD_SCALE because of unfortunate rounding in
-avg_period and running_load_avg or just after migrating tasks until
-the average stabilizes with the new running time.
+This is pretty much unacceptable - this breaks kexec(), and suspend
+support because your secondary CPUs aren't really sleeping, they're
+sitting in a loop doing nothing.
 
->
-> In case the weight of a sched group is greater than 1, you might loose
-> the information that the whole sched group is over-utilized too.
+In the kexec case, the code which the secondary CPU is executing can
+be overwritten, which then means that the CPU ends up executing some
+random code instead.
 
-that's exactly for sched_group with more than 1 CPU that we need to
-cap the usage of a CPU to 100%. Otherwise, the group could be seen as
-overloaded (CPU0 usage at 121% + CPU1 usage at 80%) whereas CPU1 has
-20% of available capacity
+Do you really have no way to properly power down or reset the CPU
+being unplugged?  If you don't, that's a *huge* oversight in this
+modern age, and it means that you're pretty much stuck with having
+these features disabled.
 
->
-> You add up the individual cpu usage values for a group by
-> sgs->group_usage += get_cpu_usage(i) in update_sg_lb_stats and later use
-> sgs->group_usage in group_is_overloaded to compare it against
-> sgs->group_capacity (taking imbalance_pct into consideration).
->
->> +
->> +     return (usage * capacity) >> SCHED_LOAD_SHIFT;
->
-> Nit-pick: Since you're multiplying by a capacity value
-> (rq->cpu_capacity_orig) you should shift by SCHED_CAPACITY_SHIFT.
-
-we want to compare the output of the function with some capacity
-figures so i think that >> SCHED_LOAD_SHIFT is the right operation.
-
->
-> Just to make sure: You do this scaling of usage by cpu_capacity_orig
-> here only to cater for the fact that cpu_capacity_orig might be uarch
-> scaled (by arch_scale_cpu_capacity, !SMT) in update_cpu_capacity while
-
-I do this for any system with CPUs that have an original capacity that
-is different from SCHED_CAPACITY_SCALE so it's for both uArch and SMT.
-
-> utilization_load_avg is currently not.
-> We don't even uArch scale on ARM TC2 big.LITTLE platform in mainline
-> today due to the missing clock-frequency property in the device tree.
-
-sorry i don't catch your point
-
->
-> I think it's hard for people to grasp that your patch-set takes uArch
-> scaling of capacity into consideration but not frequency scaling of
-> capacity (via arch_scale_freq_capacity, not used at the moment).
->
->> +}
->> +
->>  /*
->>   * select_task_rq_fair: Select target runqueue for the waking task in domains
->>   * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
->> @@ -5663,6 +5674,7 @@ struct sg_lb_stats {
->>       unsigned long sum_weighted_load; /* Weighted load of group's tasks */
->>       unsigned long load_per_task;
->>       unsigned long group_capacity;
->> +     unsigned long group_usage; /* Total usage of the group */
->>       unsigned int sum_nr_running; /* Nr tasks running in the group */
->>       unsigned int group_capacity_factor;
->>       unsigned int idle_cpus;
->> @@ -6037,6 +6049,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
->>                       load = source_load(i, load_idx);
->>
->>               sgs->group_load += load;
->> +             sgs->group_usage += get_cpu_usage(i);
->>               sgs->sum_nr_running += rq->cfs.h_nr_running;
->>
->>               if (rq->nr_running > 1)
->>
->
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
