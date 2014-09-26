@@ -1,95 +1,81 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 26 Sep 2014 15:09:08 +0300
-Subject: [PATCH v6 0/4] Tegra124 soctherm driver
-In-Reply-To: <20140926120547.GB26591@ulmo>
-References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
- <20140926101918.GM31106@ulmo> <54253E7C.9080704@kapsi.fi>
- <20140926114852.GO31106@ulmo> <5425554B.7060102@kapsi.fi>
- <20140926120547.GB26591@ulmo>
-Message-ID: <54255764.6060604@kapsi.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Sep 2014 13:14:27 +0100
+Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
+In-Reply-To: <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
+Message-ID: <20140926121427.GO5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 03:05 PM, Thierry Reding wrote:
-> On Fri, Sep 26, 2014 at 03:00:11PM +0300, Mikko Perttunen wrote:
->> On 09/26/2014 02:48 PM, Thierry Reding wrote:
->>> On Fri, Sep 26, 2014 at 01:22:52PM +0300, Mikko Perttunen wrote:
->>>> On 09/26/2014 01:19 PM, Thierry Reding wrote:
->>>>> On Fri, Sep 26, 2014 at 12:43:09PM +0300, Mikko Perttunen wrote:
->>>>>> Hi,
->>>>>>
->>>>>> this series adds support for the thermal monitoring features of the
->>>>>> soctherm unit on the Tegra124 SoC.
->>>>>>
->>>>>> The branch is also available in my github repo,
->>>>>>    git://github.com/cyndis/linux.git soctherm-v6
->>>>>>
->>>>>> Thanks,
->>>>>> Mikko
->>>>>>
->>>>>> Mikko Perttunen (4):
->>>>>>    of: Add bindings for nvidia,tegra124-soctherm
->>>>>>    ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
->>>>>>    ARM: tegra: Add thermal trip points for Jetson TK1
->>>>>>    thermal: Add Tegra SOCTHERM thermal management driver
->>>>>>
->>>>>>   .../devicetree/bindings/thermal/tegra-soctherm.txt |  53 +++
->>>>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  44 ++
->>>>>>   arch/arm/boot/dts/tegra124.dtsi                    |  47 ++
->>>>>>   drivers/thermal/Kconfig                            |  10 +
->>>>>>   drivers/thermal/Makefile                           |   1 +
->>>>>>   drivers/thermal/tegra_soctherm.c                   | 471 +++++++++++++++++++++
->>>>>>   include/dt-bindings/thermal/tegra124-soctherm.h    |  13 +
->>>>>>   7 files changed, 639 insertions(+)
->>>>>>   create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
->>>>>>   create mode 100644 drivers/thermal/tegra_soctherm.c
->>>>>>   create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
->>>>>
->>>>> One thing that I've wanted to start doing for a while now is request
->>>>> patch submissions like this to come accompanied with a way on how to
->>>>> test them. Ideally this would be in a scripted way that can test for
->>>>> success programatically, but it doesn't necessarily have to be if it
->>>>> turns out too difficult or impractical to do.
->>>>
->>>> Indeed, that would be very useful.
->>>>
->>>>>
->>>>> The goal is to eventually come up with a test suite that can run the
->>>>> majority of test cases automatically to make it easy to test for any
->>>>> regressions. And even if tests can't be run automatically it'd still
->>>>> be an advantage to have them all collected in some repository, since
->>>>> it saves a lot of typing and time to run tests, and it will give us
->>>>> a standard set of tests that everybody can verify changes against.
->>>>>
->>>>> I realize that it's somewhat unfair to start requesting this from you
->>>>> now, but we've got to start somewhere. Could you give a short summary
->>>>> of how you test this? What are the interfaces that the kernel exposes
->>>>> for these thermal drivers?
->>>>
->>>> You need to enable the driver in Device Drivers -> Generic Thermal sysfs
->>>> driver -> Tegra SOCTHERM thermal management. Then, you should see
->>>> directories appear in /sys/class/thermal. You can also use the `tmon' tool
->>>> included in the kernel tree to quickly see values; that's what I use for
->>>> testing.
->>>
->>> Okay. So what are expected values for these temperatures? It's going to
->>> be pretty much impossible to say what the correct value is on a given
->>> board at any time, but perhaps a "test" could consist of checking that
->>> all temperatures are within a reasonable range.
->>
->> On Jetson TK1, at least without the CL-DVFS series, I get around 32 Celsius.
->> If you want to account for cpu/gpufreq then I guess something like 25-70
->> would be a good range.
->
-> Okay, thanks. Can you remind me how this relates to the thermal tripping
-> support?
->
-> Thierry
->
+On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
+> +static int ls1_start_deepsleep(unsigned long addr)
+> +{
+> +	ls1_do_deepsleep(addr);
+> +
+> +	return 0;
+> +}
+...
+> +	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
 
-I'm not sure what you mean, but hardware thermal trips are not currently 
-supported (except THERMTRIP, the "master" shutdown thermal trip, which 
-is supported if this series is combined with the other series I have 
-posted. THERMTRIP defaults to shutdown at 105 Celsius.)
+What's the point of this function?  Why can't ls1_do_deepsleep() just
+return zero?
 
-Mikko
+> +/*
+> + * r0: the physical entry address of SRAM code
+> + *
+> + */
+> +ENTRY(ls1_do_deepsleep)
+> +	mov	r13, r0
+> +
+> +	/* flush cache */
+> +	bl	v7_flush_dcache_all
+
+Please explain the purpose of this call via a comment in the code.
+
+The generic code will have saved the CPU state, and will have called
+flush_cache_louis() to flush the caches to the point of unification.
+
+The only data which will have been loaded into the cache between that
+point is the stack for the return from __cpu_suspend_save, and
+speculative prefetches.
+
+So, the only reason I can gather is that you need to flush data from
+lower levels of the cache below the point of unification.
+
+> +
+> +	/* disable cache, C bit in SCTLR */
+> +	mrc	p15, 0, r0, c1, c0, 0
+> +	bic	r0, r0, #(1 << 2)
+> +	mcr	p15, 0, r0, c1, c0, 0
+> +	isb
+> +
+> +	/* disable coherency, SMP bit in ACTLR */
+> +	mrc	p15, 0, r0, c1, c0, 1
+> +	bic	r0, r0, #(1 << 6)
+> +	mcr	p15, 0, r0, c1, c0, 1
+> +	isb
+> +	dsb
+> +
+> +	/* disable MMU, M bit in SCTLR */
+> +	mrc	p15, 0, r0, c1, c0, 0
+> +	bic	r0, r0, #1
+> +	mcr	p15, 0, r0, c1, c0, 0
+> +	isb
+> +
+> +	/* jump to sram code using physical address */
+> +	bx	r13
+
+This looks extremely fragile.  You are running in virtual space, and you
+turn the MMU off.  You are reliant on the MMU still being on for the
+following instructions to already be in the pipeline.  That's not a
+very good assumption to make (we've made it in the past and it breaks
+every so often when things change, eg when the code is no longer laid
+out how we expect.)
+
+You need to disable the MMU safely, which means using the identity map
+page tables and executing code in the identity map region.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
