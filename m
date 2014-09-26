@@ -1,121 +1,71 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 26 Sep 2014 16:20:09 -0700
-Subject: [PATCH v13 0/9] Per-user clock constraints
-In-Reply-To: <54251F30.8080303@collabora.com>
-References: <1411497613-24049-1-git-send-email-tomeu.vizoso@collabora.com>
- <5421DF46.2010107@codeaurora.org> <54228067.3090600@collabora.com>
- <5424C182.5000906@codeaurora.org> <54251F30.8080303@collabora.com>
-Message-ID: <20140926232009.19023.15825@quantum>
+Date: Fri, 26 Sep 2014 16:24:53 -0700
+Subject: [PATCH] clk: prevent erronous parsing of children during rate
+ change
+In-Reply-To: <5425135F.2070809@ti.com>
+References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
+ <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
+ <5424C2FA.4000508@codeaurora.org> <5425135F.2070809@ti.com>
+Message-ID: <20140926232453.19023.25483@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomeu Vizoso (2014-09-26 01:09:20)
-> On 09/26/2014 03:29 AM, Stephen Boyd wrote:
-> > On 09/24/14 01:27, Tomeu Vizoso wrote:
-> >> On 09/23/2014 10:59 PM, Stephen Boyd wrote:
+Quoting Tero Kristo (2014-09-26 00:18:55)
+> On 09/26/2014 04:35 AM, Stephen Boyd wrote:
+> > On 09/23/14 06:38, Tero Kristo wrote:
+> >> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
+> >>> On 08/21, Tero Kristo wrote:
+> >>>>            /* Skip children who will be reparented to another clock */
+> >>>>            if (child->new_parent && child->new_parent != clk)
+> >>>>                continue;
 > >>>
-> >>> Any thoughts on my comments on patch set #10[1]? It seems like we can
-> >>> avoid having a flag day to support this.
-> >> I cannot say that I fully understand your proposal, but IMO the most
-> >> valuable thing in this patchset is precisely the API split (and thus,
-> >> the flag day is inherent to it).
+> >>> Are we not hitting the new_parent check here? I don't understand
+> >>> how we can be changing parents here unless the check is being
+> >>> avoided, in which case I wonder why determine_rate isn't being
+> >>> used.
+> >>>
 > >>
-> >> I see a lot of value in clk consumers to use a defined set of functions
-> >> that all take and/or return struct clk, and for providers to use the
-> >> functions that take and/or return struct clk_core. Makes the API clearer
-> >> and allows it to have a more scalable growth in the future.
-> > 
-> > I see a lot of non-value. It's hugely invasive needing every driver to
-> > change.
+> >> It depends how the clock underneath handles the situation. The error I
+> >> am seeing actually happens with a SoC specific compound clock (DPLL)
+> >> which integrates set_rate + mux functionality into a single clock
+> >> node. A call to the clk_set_rate changes the parent of this clock
+> >> (from bypass clock to reference clock), in addition to changing the
+> >> rate (tune the mul+div.) I looked at using the determine rate call
+> >> with this type but it breaks everything up... the parent gets changed
+> >> but not the clock rate, in addition to some other issues.
+> >
+> > Ok. Is this omap3_noncore_dpll_set_rate()?
 > 
-> There's obviously a trade-off to be made by the maintainer, and I don't
-> think that Mike has taken this lightly. He has already stated what his
-> opinion is and I have acted accordingly.
+> Yes.
+> 
+>  > Can we use determine_rate +
+> > clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
+> > allow us to do the mult+div and the parent in the same op call, although
+> > I don't understand why setting the parent and then setting the rate is
+> > not going to work.
+> 
+> Well, setting parent first, then rate later causes problems with the 
+> DPLL ending up running with illegal (non-specified) rate, the M+N values 
+> are most likely wrong if you just switch from bypass clock to reference 
+> clock first without programming the M+N first.
 
-I respect Stephen's opinion on this. You both have the goal of getting
-clock-based constraints merged in, which is good.
+I took a quick look and it still seems to me that the OMAP DPLLs are
+still not modeled properly as mux clocks. Is this correct?
 
-> 
-> > Invariably we're going to break something.
-> 
-> Given all the build tests that these series have passed and the nature
-> of the changes (you can also check the script that does the
-> refactoring), I don't expect that much breakage.
-> 
-> > Back porting things
-> > across this is a real pain (good luck stable trees!). Reviewing the
-> > patches aren't feasible given their size. There's a reason why we don't
-> > do flag days. They suck.
-> 
-> Flag days are sometimes needed and is up to each maintainer to decide
-> what is better for the subsystem since they are the ones dealing with
-> the issues that may arise anyway.
-> 
-> > We already have the consumer/provider split in the struct clk_hw and
-> > struct clk separation. Why don't we just use struct clk_hw throughout
-> > the provider APIs? The only op that isn't doing this is determine_rate()
-> > which might be able to accept a flag day. Otherwise we rename it to
-> > something else and migrate everyone over to a different named function
-> > that doesn't take a struct clk **. Then we introduce new APIs for the
-> > providers to use that are struct clk_hw focused instead of struct clk
-> > focused and migrate them too. The benefit being that we get proper
-> > review of this stuff because the patches are small. We can let
-> > coccinelle do it too.
-
-I have been opposed to mucking with clk_hw before, but that was because
-the goal was never clear. Now that we know that we're trying to split
-the API then it might be reasonable to use it.
-
-Stephen, does your above proposal still allow for unique struct clk
-cookies for each user of a clock?
+This issue has been lingering for a long time and we can't use
+determine_rate unless that clock has multiple parents. Simply hacking
+knowledge of the parent bypass clock into the .set_rate callback is not
+enough.
 
 Regards,
 Mike
 
 > 
-> Really, the bulk of it is just a plain function rename that is in its
-> own commit. And we have a simple script that can be reviewed. And it has
-> passed the kbuild tests. Given that, and if we don't focus on just the
-> line count of that patch, I don't see your proposal as being
-> significantly better.
+>   I'm interested in the other issues that you mentioned
+> > too.
 > 
-> >> A less important feature of the patchset are per-user clocks, which (if
-> >> I understand correctly) your proposal would address without requiring a
-> >> flag day.
-> > 
-> > The subject of this thread seems to imply that it's the most important
-> > part. I'm confused.
+> Mostly these were side-effects from the illegal DPLL setup I guess, like 
+> boot hang, failed drivers etc. I didn't really investigate this that 
+> much as it is much more simpler just to use safe list iteration here.
 > 
-> Sorry about that, I agree that it could be improved.
-> 
-> >> And then we have clock constraints, which is probably the least
-> >> important feature in the grand scheme of things, but it's actually what
-> >> I personally care about.
-> >>
-> >> If we wanted to add a way for clk users to specify clock constraints
-> >> without any refactoring, we could easily do so by reusing the request
-> >> pattern that pm_qos uses:
-> >>
-> >> void clk_add_constraint(struct clk_request *req,
-> >>                         int constraint_type,
-> >>                         unsigned long value);
-> >>
-> >> void clk_update_constraint(struct clk_request *req,
-> >>                            unsigned long new_value);
-> >>
-> >> void clk_remove_constraint(struct clk_request *req);
-> >>
-> >> It wouldn't be that bad IMO, but the API refactoring was something that
-> >> was long desired and this was seen as a good opportunity to tackle it
-> >> before it gets worst.
-> >>
-> > 
-> > Sure. Maybe we should just do that so we don't break things.
-> 
-> That hasn't been what Mike has stated in the past, but I actually have
-> such a patch somewhere that I can dust off and send for review.
-> 
-> Cheers,
-> 
-> Tomeu
-> 
+> -Tero
