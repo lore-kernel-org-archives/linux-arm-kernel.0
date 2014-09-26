@@ -1,42 +1,39 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:46 +0200
-Subject: [PATCH 13/27] arm/arm64: KVM: vgic: Clear queued flags on unqueue
+Date: Fri, 26 Sep 2014 15:16:41 +0200
+Subject: [PATCH 08/27] KVM: vgic: declare probe function pointer as const
 In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
 References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1411737420-9063-14-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we unqueue a level-triggered interrupt completely, and the LR does
-not stick around in the active state (and will therefore no longer
-generate a maintenance interrupt), then we should clear the queued flag
-so that the vgic can actually queue this level-triggered interrupt at a
-later time and deal with its pending state then.
+From: Will Deacon <will.deacon@arm.com>
 
-Note: This should actually be properly fixed to handle the active state
-on the distributor.
+We extract the vgic probe function from the of_device_id data pointer,
+which is const. Kill the sparse warning by ensuring that the local
+function pointer is also marked as const.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index ce1a2d1..2026b61 100644
+index d1cfe67..efe6eee 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -667,8 +667,10 @@ static void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
- 		 * active), then the LR does not hold any useful info and can
- 		 * be marked as free for other use.
- 		 */
--		if (!(lr.state & LR_STATE_MASK))
-+		if (!(lr.state & LR_STATE_MASK)) {
- 			vgic_retire_lr(i, lr.irq, vcpu);
-+			vgic_irq_clear_queued(vcpu, lr.irq);
-+		}
+@@ -1557,8 +1557,8 @@ static const struct of_device_id vgic_ids[] = {
+ int kvm_vgic_hyp_init(void)
+ {
+ 	const struct of_device_id *matched_id;
+-	int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
+-			  const struct vgic_params **);
++	const int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
++				const struct vgic_params **);
+ 	struct device_node *vgic_node;
+ 	int ret;
  
- 		/* Finally update the VGIC state. */
- 		vgic_update_state(vcpu->kvm);
 -- 
 2.0.0
