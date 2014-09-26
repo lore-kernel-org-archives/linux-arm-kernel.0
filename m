@@ -1,96 +1,49 @@
-From: mike.rapoport@gmail.com (Mike Rapoport)
-Date: Fri, 26 Sep 2014 18:56:30 +0300
-Subject: [PATCH v2] ARM: DT: apq8064: add CM-QS600 board
-Message-ID: <1411746990-12518-1-git-send-email-mike.rapoport@gmail.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Fri, 26 Sep 2014 17:57:25 +0200
+Subject: [PATCH 2/5] power: reset: st: Provide DT bindings for ST's Power
+ Reset driver
+In-Reply-To: <1406040752-25229-3-git-send-email-lee.jones@linaro.org>
+References: <1406040752-25229-1-git-send-email-lee.jones@linaro.org>
+ <1406040752-25229-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140926155724.GC21641@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mike Rapoport <mike.rapoport@gmail.com>
----
-v2 changes: duplicate the settings for the cm-qs600 board in its .dts file as Kumar suggested
+Hi,
 
+On Tue, Jul 22, 2014 at 03:52:29PM +0100, Lee Jones wrote:
+> Signed-off-by: Christophe Kerello <christophe.kerello@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/power/reset/st-reset.txt | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/st-reset.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/reset/st-reset.txt b/Documentation/devicetree/bindings/power/reset/st-reset.txt
+> new file mode 100644
+> index 0000000..809af54
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/reset/st-reset.txt
+> @@ -0,0 +1,11 @@
+> +*Device-Tree bindings for ST SW reset functionality
+> +
+> +Required properties:
+> +- compatible: should be "st,<chip>-restart".
+> +- st,syscfg: should be a phandle of the syscfg node.
+> +
+> +Example node:
+> +	restart {
+> +		compatible = "st,stih416-restart";
+> +		st,syscfg = <&syscfg_sbc>;
+> +	};
 
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 59 +++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+http://git.infradead.org/battery-2.6.git/commit/b08fec2262c8dbb349fe9456586cf0724407e5ee
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index aaa1a68..71d2ade 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -340,6 +340,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8064-ifc6410.dtb \
-+	qcom-apq8064-cm-qs600.dtb \
- 	qcom-apq8074-dragonboard.dtb \
- 	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-new file mode 100644
-index 0000000..db7cf03
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -0,0 +1,59 @@
-+#include "qcom-apq8064-v2.0.dtsi"
-+
-+/ {
-+	model = "CompuLab CM-QS600";
-+	compatible = "qcom,apq8064-cm-qs600", "qcom,apq8064";
-+
-+	soc {
-+		pinctrl at 800000 {
-+			i2c1_pins: i2c1 {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "gsbi1";
-+				};
-+			};
-+		};
-+
-+		gsbi at 12440000 {
-+			status = "okay";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+
-+			i2c at 12460000 {
-+				status = "okay";
-+				clock-frequency = <200000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+
-+				eeprom: eeprom at 52 {
-+					compatible = "atmel,24c128";
-+					reg = <0x52>;
-+					pagesize = <32>;
-+				};
-+			};
-+		};
-+
-+		gsbi at 16600000 {
-+			status = "ok";
-+			qcom,mode = <GSBI_PROT_I2C_UART>;
-+			serial at 16640000 {
-+				status = "ok";
-+			};
-+		};
-+
-+		amba {
-+			/* eMMC */
-+			sdcc1: sdcc at 12400000 {
-+				status = "okay";
-+			};
-+
-+			/* External micro SD card */
-+			sdcc3: sdcc at 12180000 {
-+				status = "okay";
-+			};
-+			/* WLAN */
-+			sdcc4: sdcc at 121c0000 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
--- 
-1.9.1
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140926/57d03813/attachment.sig>
