@@ -1,92 +1,35 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 26 Sep 2014 15:03:52 +0100
-Subject: [PATCH V4 5/6] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1411740233-28038-6-git-send-email-steve.capper@linaro.org>
+From: j.uzycki@elproma.com.pl (Janusz Uzycki)
+Date: Fri, 26 Sep 2014 16:08:06 +0200
+Subject: [PATCH] serial: mxs-auart: add sysrq support
+In-Reply-To: <1411740486-21687-1-git-send-email-j.uzycki@elproma.com.pl>
+References: <1411740486-21687-1-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <1411740486-21687-2-git-send-email-j.uzycki@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to implement fast_get_user_pages we need to ensure that the
-page table walker is protected from page table pages being freed from
-under it.
+When using mxs-auart based console, sometime we need the sysrq function
+to help debugging kernel. The sysrq code is basically there,
+this patch just simply enable it.
 
-This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
-to address spaces with multiple users will be call_rcu_sched freed.
-Meaning that disabling interrupts will block the free and protect the
-fast gup page walker.
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-Tested-by: Dann Frazier <dann.frazier@canonical.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
 ---
- arch/arm64/Kconfig           |  1 +
- arch/arm64/include/asm/tlb.h | 20 +++++++++++++++++---
- 2 files changed, 18 insertions(+), 3 deletions(-)
+ drivers/tty/serial/mxs-auart.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fd4e81a..ce9062b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -54,6 +54,7 @@ config ARM64
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
- 	select HAVE_PERF_USER_STACK_DUMP
-+	select HAVE_RCU_TABLE_FREE
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select IRQ_DOMAIN
- 	select MODULES_USE_ELF_RELA
-diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-index 62731ef..a82c0c5 100644
---- a/arch/arm64/include/asm/tlb.h
-+++ b/arch/arm64/include/asm/tlb.h
-@@ -23,6 +23,20 @@
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index 9381732..4c998a3 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -14,6 +14,10 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
  
- #include <asm-generic/tlb.h>
- 
-+#include <linux/pagemap.h>
-+#include <linux/swap.h>
++#if defined(CONFIG_SERIAL_MXS_AUART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
++#define SUPPORT_SYSRQ
++#endif
 +
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+
-+#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
-+static inline void __tlb_remove_table(void *_table)
-+{
-+	free_page_and_swap_cache((struct page *)_table);
-+}
-+#else
-+#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
-+#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
-+
- /*
-  * There's three ways the TLB shootdown code is used:
-  *  1. Unmapping a range of vmas.  See zap_page_range(), unmap_region().
-@@ -88,7 +102,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- {
- 	pgtable_page_dtor(pte);
- 	tlb_add_flush(tlb, addr);
--	tlb_remove_page(tlb, pte);
-+	tlb_remove_entry(tlb, pte);
- }
- 
- #if CONFIG_ARM64_PGTABLE_LEVELS > 2
-@@ -96,7 +110,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- 				  unsigned long addr)
- {
- 	tlb_add_flush(tlb, addr);
--	tlb_remove_page(tlb, virt_to_page(pmdp));
-+	tlb_remove_entry(tlb, virt_to_page(pmdp));
- }
- #endif
- 
-@@ -105,7 +119,7 @@ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
- 				  unsigned long addr)
- {
- 	tlb_add_flush(tlb, addr);
--	tlb_remove_page(tlb, virt_to_page(pudp));
-+	tlb_remove_entry(tlb, virt_to_page(pudp));
- }
- #endif
- 
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
 -- 
-1.9.3
+1.7.11.3
