@@ -1,94 +1,57 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 26 Sep 2014 12:10:58 +0200
-Subject: [PATCH 3/5] clk: imx: add CPU clock type
-In-Reply-To: <20140926025933.GA31948@dragon>
-References: <1411143381-10516-1-git-send-email-l.stach@pengutronix.de>
- <1411143381-10516-4-git-send-email-l.stach@pengutronix.de>
- <20140926025933.GA31948@dragon>
-Message-ID: <1411726258.2761.1.camel@pengutronix.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 26 Sep 2014 12:11:58 +0200
+Subject: [GIT PULL] arm: mediatek: Add more basic features
+In-Reply-To: <20140924181625.GE19284@localhost>
+References: <CABuKBeJJ5ijy6CXPHbrzrkgJDVz99BmdACx+wRZ-KbVjKx2kLg@mail.gmail.com>
+ <20140924181625.GE19284@localhost>
+Message-ID: <CABuKBeKPmwikra2er4ZMGAPdnbV3zgGSHHi3NsAmij1nkBzHHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 26.09.2014, 10:59 +0800 schrieb Shawn Guo:
-> On Fri, Sep 19, 2014 at 06:16:19PM +0200, Lucas Stach wrote:
-> > From: Lucas Stach <dev@lynxeye.de>
-> > 
-> > This implements a virtual clock used to abstract away
-> > all the steps needed in order to change the ARM clock,
-> > so we don't have to push all this clock handling into
-> > the cpufreq driver.
-> > 
-> > While it will be used for i.MX53 at first it is generic
-> > enough to be used on i.MX6 later on.
-> > 
-> > Signed-off-by: Lucas Stach <dev@lynxeye.de>
-> 
-> Is this intentional to use a different email address than your usual
-> one?
+Hi,
 
-Urgh no. That's a remnant from starting this code at home without
-setting the proper git environment. Thanks for the hint.
+2014-09-24 20:16 GMT+02:00 Olof Johansson <olof@lixom.net>:
+> On Mon, Sep 15, 2014 at 05:59:28PM +0200, Matthias Brugger wrote:
+>> Hi Arnd and Olof,
+>>
+>> Please prepare for the next round of Mediatek patches for the mt6589.
+>> This patch set adds some minor changes to the Mediatek mt6589 support.
+>>
+>> Features are low-level debugging on the mt6589, the addition to the
+>> "make dtbs" and multi_v7_defconfig,as well as some small changes in
+>> the DTS files.
+>
+> Hi Matthias,
+>
+> The contents in this branch look OK to me, but I'd prefer to spread them out
+> across some of our branches (most of it is DT, one is defconfig and one is soc stuff).
 
-> 
-> > ---
-> >  arch/arm/mach-imx/Makefile  |   2 +-
-> >  arch/arm/mach-imx/clk-cpu.c | 104 ++++++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-imx/clk.h     |   4 ++
-> >  3 files changed, 109 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/mach-imx/clk-cpu.c
-> > 
-> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > index ac88599ca080..4d6071351f4f 100644
-> > --- a/arch/arm/mach-imx/Makefile
-> > +++ b/arch/arm/mach-imx/Makefile
-> > @@ -12,7 +12,7 @@ obj-$(CONFIG_SOC_IMX31) += mm-imx3.o cpu-imx31.o clk-imx31.o iomux-imx31.o ehci-
-> >  obj-$(CONFIG_SOC_IMX35) += mm-imx3.o cpu-imx35.o clk-imx35.o ehci-imx35.o pm-imx3.o
-> >  
-> >  imx5-pm-$(CONFIG_PM) += pm-imx5.o
-> > -obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
-> > +obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o clk-cpu.o $(imx5-pm-y)
-> >  
-> >  obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
-> >  			    clk-pfd.o clk-busy.o clk.o \
-> > diff --git a/arch/arm/mach-imx/clk-cpu.c b/arch/arm/mach-imx/clk-cpu.c
-> > new file mode 100644
-> > index 000000000000..ffba96228d3b
-> > --- /dev/null
-> > +++ b/arch/arm/mach-imx/clk-cpu.c
-> > @@ -0,0 +1,104 @@
-> > +/*
-> > + * Copyright (c) 2014 Lucas Stach <l.stach@pengutronix.de>, Pengutronix
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/slab.h>
-> > +
-> > +struct clk_cpu {
-> > +	struct clk_hw	hw;
-> > +	struct clk	*div, *mux, *pll, *step;
-> 
-> This is personal taste, so I'm not strong on this.  But I feel having
-> them on multiple lines makes the later addition/removal of struct clk
-> pointers a bit easier.
-> 
-> Other than these trivial comments, the patch looks good to me.
-> 
-> Shawn
-> 
-> > +};
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Do you want me to fix the other pull request I send [0]?
+As far as I can see, there are three patches for next/soc and the
+remaining four for next/dt.
+
+You want me to resend the pull request and split it in two?
+
+[0] http://www.spinics.net/lists/arm-kernel/msg364271.html
+
+>
+> Because of this, I've ended up applying patches manually (cherry-picking them out of this branch).
+>
+> In other words: Code is merged, but branch is not. Thanks!
+>
+> (Also, we tend to use a capital ARM: as prefix on patch subjects, I fixed that up).
+
+Ok, thanks for the info. If you want me to resend the aforementioned
+pull request, I fix that too.
+
+Thanks,
+Matthias
+
+>
+>
+> -Olof
+
+
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+motzblog.wordpress.com
