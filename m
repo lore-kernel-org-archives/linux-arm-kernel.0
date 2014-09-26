@@ -1,62 +1,45 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri, 26 Sep 2014 20:57:30 +0800
-Subject: [PATCH] [media] rc: fix hix5hd2 compile-test issue
-In-Reply-To: <1411571401-30664-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1411571401-30664-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1411736250-29252-1-git-send-email-zhangfei.gao@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 26 Sep 2014 15:02:22 +0200
+Subject: [GIT PULL] at91: soc for 3.18 #2
+In-Reply-To: <201409261250.02565.arnd@arndb.de>
+References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
+ <201409261250.02565.arnd@arndb.de>
+Message-ID: <20140926130222.GA4408@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dependence to solve build error in arch like ia64
-error: implicit declaration of function 'readl_relaxed' & 'writel_relaxed'
+Hi,
 
-Change CONFIG_PM to CONFIG_PM_SLEEP to solve
-warning: 'hix5hd2_ir_suspend' & 'hix5hd2_ir_resume' defined but not used
+On 26/09/2014 at 12:50:02 +0200, Arnd Bergmann wrote :
+> On Monday 22 September 2014, Nicolas Ferre wrote:
+> 
+> > Nicolas Ferre (4):
+> >       ARM: at91: introduce basic SAMA5D4 support
+> >       ARM: at91: SAMA5D4 SoC detection code and low level routines
+> 
+> This resulted in build failures both in at91x40_defconfig and some
+> randconfigs with MMU disabled. I've applied the patch below on top
+> to fix it.
+> 
+> I'm not exactly happy about the soc detection code anyway after I
+> had to look at that. Why do you even hardcode the physical register
+> location rather than getting it from DT?
+> 
+> Also, why do you care about which SoC version you have for the
+> modern SAMA5 chips? All I see is a sama5d4_map_io() callback
+> that maps a lot of completely unused registers along with
+> the uart that you normally get from the implicit debug_ll_io_init,
+> and the SRAM that should probably be turned into a normal driver.
+> 
 
-Reported-by: Fengguang Wu <fengguang.wu@intel.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/media/rc/Kconfig      |    2 +-
- drivers/media/rc/ir-hix5hd2.c |    7 +------
- 2 files changed, 2 insertions(+), 7 deletions(-)
+Yeah, there are upcoming patches that add more differences between
+sama5d3 and sama5d4. Also, a huge cleanup is planned after all the
+boards files have been removed and all the boards have been either
+migrated to DT and CCF or dropped.
 
-diff --git a/drivers/media/rc/Kconfig b/drivers/media/rc/Kconfig
-index 8ce08107a69d..28fb2cb34e8d 100644
---- a/drivers/media/rc/Kconfig
-+++ b/drivers/media/rc/Kconfig
-@@ -166,7 +166,7 @@ config IR_ENE
- 
- config IR_HIX5HD2
- 	tristate "Hisilicon hix5hd2 IR remote control"
--	depends on RC_CORE
-+	depends on RC_CORE && ARM
- 	help
- 	 Say Y here if you want to use hisilicon hix5hd2 remote control.
- 	 To compile this driver as a module, choose M here: the module will be
-diff --git a/drivers/media/rc/ir-hix5hd2.c b/drivers/media/rc/ir-hix5hd2.c
-index 94967d0e0478..c1d8527ace92 100644
---- a/drivers/media/rc/ir-hix5hd2.c
-+++ b/drivers/media/rc/ir-hix5hd2.c
-@@ -16,11 +16,6 @@
- #include <linux/regmap.h>
- #include <media/rc-core.h>
- 
--/* Allow the driver to compile on all architectures */
--#ifndef writel_relaxed
--# define writel_relaxed writel
--#endif
--
- #define IR_ENABLE		0x00
- #define IR_CONFIG		0x04
- #define CNT_LEADS		0x08
-@@ -294,7 +289,7 @@ static int hix5hd2_ir_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- static int hix5hd2_ir_suspend(struct device *dev)
- {
- 	struct hix5hd2_ir_priv *priv = dev_get_drvdata(dev);
+I'll owe you the drink of your choice if that is not done by 3.20 ;)
+
 -- 
-1.7.9.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
