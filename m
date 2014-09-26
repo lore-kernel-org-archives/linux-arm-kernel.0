@@ -1,158 +1,30 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Sep 2014 13:20:39 -0500
-Subject: [PATCH v12 08/12] PCI: OF: Introduce helper function for
- retrieving PCI domain numbers
-In-Reply-To: <1411498874-9864-9-git-send-email-Liviu.Dudau@arm.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-9-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CAL_Jsq+j40Xf208wCf4as3H=cDU=htJ-JWinB0DjpcORjatNXQ@mail.gmail.com>
+Date: Fri, 26 Sep 2014 13:26:09 -0500
+Subject: [PATCH 3/6] pci,
+ thunder: Add PCIe host controller devicetree bindings
+In-Reply-To: <3082935.e3X4GsVUDn@wuerfel>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-4-git-send-email-rric@kernel.org>
+ <3082935.e3X4GsVUDn@wuerfel>
+Message-ID: <CAL_JsqK2bqsbjEf2OngL2=Xr8t0AUobb_bd43BV4t9iXY-n6KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 2:01 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> Add pci_get_new_domain_nr() to allocate a new domain number
-> and of_get_pci_domain_nr() to retrieve the PCI domain number
-> of a given device from DT. Host bridge drivers or architecture
-> specific code can choose to implement their PCI domain number
-> policy using these two functions.
+On Wed, Sep 24, 2014 at 11:06 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 24 September 2014 17:37:45 Robert Richter wrote:
+>>
+>> +       pcie0 at 0x8480,00000000 {
 >
-> Using of_get_pci_domain_nr() guarantees a stable PCI domain
-> number on every boot provided that all host bridge controllers
-> are assigned a number in the device tree using "linux,pci-domain"
-> property. Mix use of pci_get_new_domain_nr() and of_get_pci_domain_nr()
-> is not recommended as it can lead to potentially conflicting
-> domain numbers being assigned to root busses behind different
-> host bridges.
->
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> The name should be pci, not pci0.
 
-Looks pretty good, but a couple of comments that can be addressed as
-follow-up patches.
+And the address should be "@848000000000". There was some confusion
+about when the comma should be used and it is only if you have things
+like PCI bus, device, function for the addressing.
 
-> ---
->  drivers/of/of_pci.c    | 25 +++++++++++++++++++++++++
->  drivers/pci/pci.c      |  9 +++++++++
->  include/linux/of_pci.h |  7 +++++++
->  include/linux/pci.h    |  3 +++
->  4 files changed, 44 insertions(+)
->
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 8481996..82d172f 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -89,6 +89,31 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  }
->  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
->
-> +/**
-> + * This function will try to obtain the host bridge domain number by
-> + * finding a property called "linux,pci-domain" of the given device node.
-> + *
-> + * @node: device tree node with the domain information
-> + *
-> + * Returns the associated domain number from DT in the range [0-0xffff], or
-> + * a negative value if the required property is not found.
-> + */
-> +int of_get_pci_domain_nr(struct device_node *node)
-> +{
-> +       const __be32 *value;
-> +       int len;
-> +       u16 domain;
-> +
-> +       value = of_get_property(node, "linux,pci-domain", &len);
 
-This needs to be documented.
+>
+>> +               compatible = "cavium,thunder-pcie";
 
-> +       if (!value || len < sizeof(*value))
-> +               return -EINVAL;
-> +
-> +       domain = (u16)be32_to_cpup(value);
+A bit too generic as many of the Cavium bindings have been.
 
-of_property_read_u32 would not work here?
-
-> +
-> +       return domain;
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
-> +
->  #ifdef CONFIG_PCI_MSI
->
->  static LIST_HEAD(of_pci_msi_chip_list);
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 2c9ac70..d36f35f 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4406,6 +4406,15 @@ static void pci_no_domains(void)
->  #endif
->  }
->
-> +#ifdef CONFIG_PCI_DOMAINS
-> +static atomic_t __domain_nr = ATOMIC_INIT(-1);
-> +
-> +int pci_get_new_domain_nr(void)
-> +{
-> +       return atomic_inc_return(&__domain_nr);
-> +}
-> +#endif
-> +
->  /**
->   * pci_ext_cfg_avail - can we access extended PCI config space?
->   *
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-> index dde3a4a..71062e9 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -15,6 +15,7 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
->  int of_pci_get_devfn(struct device_node *np);
->  int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
->  int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-> +int of_get_pci_domain_nr(struct device_node *node);
->  #else
->  static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
->  {
-> @@ -43,6 +44,12 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  {
->         return -EINVAL;
->  }
-> +
-> +static inline int
-> +of_get_pci_domain_nr(struct device_node *node)
-> +{
-> +       return -1;
-> +}
->  #endif
->
->  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index a494e5d..150da2d 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1285,10 +1285,12 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
->   */
->  #ifdef CONFIG_PCI_DOMAINS
->  extern int pci_domains_supported;
-> +int pci_get_new_domain_nr(void);
->  #else
->  enum { pci_domains_supported = 0 };
->  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->  static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
-> +static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
->  #endif /* CONFIG_PCI_DOMAINS */
->
->  /*
-> @@ -1417,6 +1419,7 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
->
->  static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
->  static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
-> +static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
->
->  #define dev_is_pci(d) (false)
->  #define dev_is_pf(d) (false)
-> --
-> 2.1.0
->
+Rob
