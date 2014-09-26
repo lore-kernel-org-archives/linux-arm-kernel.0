@@ -1,72 +1,150 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 25 Sep 2014 22:08:03 -0700
-Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
-In-Reply-To: <20140926002757.GJ10233@codeaurora.org> (Stephen Boyd's message
- of "Thu, 25 Sep 2014 17:27:57 -0700")
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <20140925112122.GA22753@ulmo>
- <CAPDyKFp8oK6KAujU44NEwT2vL2_BBPSMuGPkyppHdonPfOmUrQ@mail.gmail.com>
- <20140925165625.GC30382@ulmo> <20140926002757.GJ10233@codeaurora.org>
-Message-ID: <7hvbob6kb0.fsf@deeprootsystems.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 26 Sep 2014 10:58:33 +0530
+Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <5439567.VeRyeUcp1j@wuerfel>
+References: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140922091925.GA19778@shlinux1.ap.freescale.net>
+ <000001cfd719$51e7e560$f5b7b020$@samsung.com> <5439567.VeRyeUcp1j@wuerfel>
+Message-ID: <000e01cfd94a$c5c60510$51520f30$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+On Thursday, September 25, 2014 6:12 PM, Arnd Bergmann wrote,
+> Subject: Re: [PATCH v5] mfd: syscon: Decouple syscon interface from
+platform
+> devices
+> 
+> On Tuesday 23 September 2014 15:59:43 Pankaj Dubey wrote:
+> > > > -static int syscon_match_node(struct device *dev, void *data)
+> > > > +static struct syscon *of_syscon_register(struct device_node *np)
+> > > >  {
+> > > > -   struct device_node *dn = data;
+> > > > +   struct platform_device *pdev = NULL;
+> > > > +   struct syscon *syscon;
+> > > > +   struct regmap *regmap;
+> > > > +   void __iomem *base;
+> > > > +   int ret;
+> > > > +
+> > > > +   if (!of_device_is_compatible(np, "syscon"))
+> > > > +           return ERR_PTR(-EINVAL);
+> > > > +
+> > > > +   syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
+> > > > +   if (!syscon)
+> > > > +           return ERR_PTR(-ENOMEM);
+> > > > +
+> > > > +   base = of_iomap(np, 0);
+> > > > +   if (!base) {
+> > > > +           ret = -ENOMEM;
+> > > > +           goto err_map;
+> > > > +   }
+> > > > +
+> > > > +   /* if device is already populated and available then use it */
+> > > > +   pdev = of_find_device_by_node(np);
+> > > > +   if (!pdev) {
+> > > > +           /* for early users create dummy syscon device and use it
+*/
+> > > > +           pdev = platform_device_alloc("dummy-syscon", -1);
+> > >
+> > > Can we create specific devices for each syscon device?
+> > > That looks more reasonable to me.
+> > > Then we can dump registers in regmap debugfs more clearly, just like
+> > > other
+> > devices.
+> > > And i think it's better to follow device tree way to generate
+> > > devices from
+> > node.
+> > > If DT core find a device is already created, it can ignore that
+> > > device to
+> > avoid creating
+> > > duplicated device during of_platform_populate.
+> > >
+> >
+> > If you are referring to use "of_platform_device_create", then I am
+> > afraid that it can't be used in very early stage. For example, current
+> > patch I tested by calling syscon_lookup_by_phandle from "init_irq"
+> > hook of machine_desc, and it worked well, but If I use
+> > "of_platform_device_create"
+> > instead of dummy device, it fails to create pdev and this I verified
+> > on Exynos platform. The reason I selected "init_irq" is because this
+> > comes just before smp init and where once we tried to get regmap
+> > handle, but could not do so.
+> 
+> I don't remember noticing the of_find_device_by_node or
+platform_device_alloc in
+> earlier versions of this patch, but that could just be me failing to read
+it right.
+> 
+Yes, till v2 of this patch set we do not used this and while calling
+regmap_init_mmio, I used
+NULL pointer while creating regmap handle.  But as you may be remember Dong
+Aisheng reported crash
+on latest Linus tree after applying this patch, and it caused because of
+some recent changes in
+regmap which has already landed in main tree, which makes passing of dev
+pointer compulsory
+while calling regmap_init_mmio. Please check following commits in current
+tree
 
-> On 09/25, Thierry Reding wrote:
+1) d647c19 regmap: add DT endianness binding support.
+2) ba1b53f regmap: Fix DT endianess parsing logic.
+3) 45e1a27 regmap: of_regmap_get_endian() cleanup
 
-[...]
+and following patch [1] for changing syscon binding from Xiubo Li
 
->> The critical part is that we need to enable the clock after the
->> partition has been powered, but before the clamps are removed.
->> Implementing this with runtime PM support in drivers won't work
->> because the power domain driver has to do both the powering up
->> and removing the clamps, so there's no place to inject the call
->> to enable the clock.
->
-> FWIW, Qualcomm platforms have pretty much the same design. Our
-> power domain controls live in the same register space as the
-> clocks and resets. Is Tegra the same way? To power on/off a
-> domain we need to go and forcefully turn a clock on and assert a
-> reset or perhaps we need the clock to be off and assert a reset.
-> It depends on the domain.
->
+[1] [PATCH] mfd: syscon: binding: Add syscon endianness support
+https://lkml.org/lkml/2014/9/18/67
 
-> Historically we've supported this by requiring all drivers to
-> disable their clocks and deassert any resets before calling into
-> this code (we put this behind the regulator API). Then we're free
-> to do whatever is necessary to power on/off, eventally leaving
-> the clocks off if they were forced on and finally giving control
-> to the drivers so they can manage their own clocks and resets. It
-> would be better for us to take ownership of the clocks and resets
-> in the domain so we don't have this prerequisite of clocks being
-> off before calling into the domain code. I plan to do pretty much
-> Kevin outlined and use runtime PM, power domains, and per-device
-> pm QoS to figure out if we should gate clocks (clk_disable), or
-> if we go to a lower power mode where we unprepare clocks
-> (clk_unprepare), or if we go to the lowest power mode where we
-> apply clamps, etc. (called power collapse for us). Then the
-> drivers just interact with runtime PM and QoS and they aren't
-> aware of all this SoC glue.
+So we discussed [2] and decided to use either actual device if it's
+populated and available for use or
+create either actual device or dummy device for using it during
+regmap_init_mmio calls.
 
-Excellent!  I'm glad you're heading in that direction.  One other
-important point here is that keeping drivers "simple" like this makes it
-much easier for them to stay portable across SoCs.
+[2]: https://lkml.org/lkml/2014/9/18/35
 
-Also, neither tegra or qcom are unique here.
+So what I understood from these changes from Xiubo Li, they wanted to pass
+endianness of regmap
+handle to be passed from DT. 
 
-FWIW, OMAP has similar ordering requirements, and quite a bit of "stuff"
-to properly get a device and powerdomain to actually power down (and
-power up) properly.  The OMAP implementation pre-dates runtime PM, power
-domains etc. so we hid all of this behind the omap_hwmod abstraction and
-the omap_device API where all clocks, resets, and various other magic is
-handled, and so that device drivers didn't have to care about the details.
+So I am not sure if we can really make regmap code work without a device
+pointer. 
 
-These days, those APIs are now used by the OMAP pm_domain implementation
-(which pre-dates genpd), so drivers (still) don't have to care about the
-details only have to care about runtime PM and QoS.  After genpd came
-along, the goal was to convert OMAP to it, but well, other circumstances
-have changed things such that those working in that area are, um...,
-somewhat less focused on OMAP. ;)
+> I think this should get removed: it would be much better to ensure that
+the regmap
+> code can work without a device pointer, which I thought it did. We should
+probably
+> also skip the creation of the debugfs directory in that case.
+> 
+> > Also if it was just a matter of creating platform_device at early
+> > stage then early initialization of syscon could have been solved till
+> > now.
 
-Kevin
+As far as debugfs of regmap is concerned it can be solved as I replied to
+Heiko in this thread [3]
+if we are using device pointer while creating regmap handle. 
+If we are not using device pointer while creating regmap handle it won't
+cause any problem and 
+there won't be any debugfs entry.
+
+[3]: https://lkml.org/lkml/2014/9/26/20
+
+> >
+> > So I would suggest if we really want this patch to cover early
+> > initialization of syscon (which is not it's main purpose) current
+> > patch is sufficient.
+> >
+> > @Arnd, since I have addressed crash issue as reported by Dong Aisheng,
+> > I would like to take your ack, but since there are some more code
+> > changes other than what you suggested I request you to check this and
+> > if you are ok, then I would like to your ack so that I can request to
+> > maintainer for taking this patch.
+> 
+> I think we first need to resolve the question of the platform device.
+> 
+
+OK.
+
+Thanks,
+Pankaj Dubey
+
+> 	Arnd
