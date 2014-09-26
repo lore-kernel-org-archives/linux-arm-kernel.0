@@ -1,41 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Sep 2014 17:25:31 +0100
-Subject: perf tool failing to build for ARM
-Message-ID: <20140926162530.GB11361@arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 26 Sep 2014 11:25:48 -0500
+Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAJAp7Oj-3ZxvN8o=rg8YeTiXYWyQ1iowgisdU1R5UcZeh4VmOQ@mail.gmail.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>	<1389658764-39199-5-git-send-email-s-anna@ti.com>
+ <CAJAp7Oj-3ZxvN8o=rg8YeTiXYWyQ1iowgisdU1R5UcZeh4VmOQ@mail.gmail.com>
+Message-ID: <5425938C.6070007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hi Bjorn,
 
-I'm getting the following error trying to build perf tool for ARM with
-a 3.17-rc6 kernel:
+On 09/26/2014 09:40 AM, Bjorn Andersson wrote:
+> On Mon, Jan 13, 2014 at 4:19 PM, Suman Anna <s-anna@ti.com> wrote:
+>> This patch adds three new OF helper functions to use/request
+>> locks from a hwspinlock device instantiated through a
+>> device-tree blob.
+>>
+> 
+> Hi Ohad, Suman
+> 
+> I'm about to send out some patches that depends on this functionality,
+> how do we move forward?
+> 
+> I still think it's wrong to not return -EPROBE_DEFER, but I much
+> rather have the code returning NULL than not having it in the tree (we
+> can always argue about it later...).
+> 
+> @Suman, do you remember if there was any other comments on the patch?
 
+I have posted two further revisions of this series, the latest is v6
+[1]. I added additional patches in v5 that added the concept of reserved
+locks, and I have posted them as a separate RFC [2] for v6 so as to not
+block the core DT support.
 
-arch/arm/util/unwind-libunwind.c: In function ?libunwind__arch_reg_id?:
-arch/arm/util/unwind-libunwind.c:43:3: error: implicit declaration of function ?pr_err? [-Werror=implicit-function-declaration]
-   pr_err("unwind: invalid reg id %d\n", regnum);
-   ^
-arch/arm/util/unwind-libunwind.c:43:3: error: nested extern declaration of ?pr_err? [-Werror=nested-externs]
-  CC       arch/arm/tests/regs_load.o
-  CC       arch/arm/tests/dwarf-unwind.o
-cc1: all warnings being treated as errors
-Makefile.perf:655: recipe for target 'arch/arm/util/unwind-libunwind.o' failed
-make[1]: *** [arch/arm/util/unwind-libunwind.o] Error 1
-make[1]: *** Waiting for unfinished jobs....
-  CC       util/probe-finder.o
-arch/arm/tests/dwarf-unwind.c: In function ?sample_ustack?:
-arch/arm/tests/dwarf-unwind.c:20:3: error: implicit declaration of function ?pr_debug? [-Werror=implicit-function-declaration]
-   pr_debug("failed to allocate sample uregs data\n");
-   ^
-arch/arm/tests/dwarf-unwind.c:20:3: error: nested extern declaration of ?pr_debug? [-Werror=nested-externs]
-cc1: all warnings being treated as errors
-Makefile.perf:655: recipe for target 'arch/arm/tests/dwarf-unwind.o' failed
-make[1]: *** [arch/arm/tests/dwarf-unwind.o] Error 1
-Makefile:68: recipe for target 'all' failed
-make: *** [all] Error 2
+In anycase, the latest v6 version does not define the
+of_hwspin_lock_request_specific() function anymore, and it is replaced
+with of_hwspin_lock_get_id() function, based on Ohad's review comments
+on v5, and I did add the support for -EPROBE_DEFER in this API, without
+changing any of the existing return code conventions.
 
+I am yet to receive any comments on v6, but that series should address
+both your need for a probe deferral and Ohad's request to not change any
+return types. Please give it a try and let me know if you have any comments.
 
-Can you take a look please?
+regards
+Suman
 
+[1] http://marc.info/?l=linux-arm-kernel&m=141055365513902&w=2
+[2] http://marc.info/?l=linux-arm-kernel&m=141055554214657&w=2
 
-Will
+> 
+> @Ohad, do you object merging Suman's patch in it's current form? I
+> think it should still apply cleanly.
+> 
+> Regards,
+> Bjorn
+> 
