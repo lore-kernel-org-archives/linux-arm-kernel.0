@@ -1,58 +1,70 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 26 Sep 2014 09:57:14 +0800
-Subject: [PATCH v3] ARM: ls1021a: add gating clocks to IP blocks.
-In-Reply-To: <e44a1930e8de43ec8beb6e60fa9c1e9e@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <1411476275-9164-1-git-send-email-Li.Xiubo@freescale.com>
- <20140925085403.GG6405@dragon>
- <e44a1930e8de43ec8beb6e60fa9c1e9e@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <20140926015713.GG21077@dragon>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 26 Sep 2014 09:55:07 +0800
+Subject: [PATCH v2 02/22] PCI/MSI: Remove useless bus->msi assignment
+In-Reply-To: <20140925070601.GF12423@ulmo>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <1411614872-4009-3-git-send-email-wangyijing@huawei.com>
+ <20140925070601.GF12423@ulmo>
+Message-ID: <5424C77B.2060807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 05:22:29PM +0800, Xiubo Li-B47053 wrote:
-...
-> > > +	clks[LS1021A_CLK_FLEXTIMER1_EN] = ls1021a_clk_gate("flextimer1_en",
-> > > +						"dummy", DCFG_CCSR_DEVDISR5,
-> > > +						ls1021a_clk_shift(31));
-> > 
-> > So "dummy" and ls1021a_clk_shift() are two common things for every
-> > single call of ls1021a_clk_gate().  Can we handle them in
-> > ls1021a_clk_gate() wrapper, so that we can make these calls a bit
-> > shorter?
-> > 
+On 2014/9/25 15:06, Thierry Reding wrote:
+> On Thu, Sep 25, 2014 at 11:14:12AM +0800, Yijing Wang wrote:
+>> Currently, PCI drivers will initialize bus->msi in
+>> pcibios_add_bus(). pcibios_add_bus() will be called
+>> in every pci bus initialization. So the bus->msi
+>> assignment in pci_alloc_child_bus() is useless.
 > 
-> There one gate has one parent.
-
-Ah, yes.  I missed that.
-
-> If the 'big-endian' will as default, I think ls1021a_clk_gate() could be handled
-> In ls1021a_clk_gate() wrapper to simplify the code.
-
-Yes, that's what I meant.
-
-...
-
-> > > +static inline struct clk *ls1021a_clk_gate(const char *name, const char
-> > *parent,
-> > > +		void __iomem *reg, u8 shift)
-> > > +{
-> > > +	return clk_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT |
-> > 
-> > As the parent of the clocks registered by this function is "dummy" from
-> > what I see, what is the point of setting flag CLK_SET_RATE_PARENT then?
-> > 
-> > > +			CLK_IGNORE_UNUSED, reg,	shift,
-> > 
-> > Why flag CLK_IGNORE_UNUSED?
-> > 
+> I think this should be the other way around. The default should be to
+> inherit bus->msi from the parent. That way drivers don't typically have
+> to do it, yet they can still opt to override it if they need to.
 > 
-> As the SoC reference manual all the IP blocks will be enabled when powered up.
-> But the Linux OS will disable all the IP blocks' clocks as default without this.
+> For Tegra for example I think it would work if we assigned the MSI chip
+> to the root bus (in tegra_pcie_scan_bus()) and then have it propagated
+> to child busses in pci_alloc_child_bus() so that tegra_pcie_add_bus()
+> can be removed altogether.
+
+Hi Thierry, thanks very much for your review and comments!
+
+Because pcibios_add_bus() and "child->msi = parent->msi;" in pci_alloc_child_bus()
+do the same thing. So I think we should use one and remove another. I like
+the latter.
+
+In addition, I consider several solutions to associate msi chip and PCI device.
+
+1. Add a msi_chip member in PCI arch sysdata to store the msi_chip pointer. Because
+all PCI devices under a PCI hostbridge always share the same msi chip, so every PCI device
+can find the msi chip by pci_bus->sysdata, but in this solution, we also need to add
+ARCH specific functions to extract msi chip from PCI arch sysdata, like pci_domain_nr().
+Then we can remove .add_bus() like tegra_pcie_add_bus() and the msi assignment in  pci_alloc_child_bus().
+
+2. Remove .add_bus() functions, associate PCI root bus and msi chip after PCI root bus created,
+as you mentioned above. In this solution we need to associate PCI root bus and msi chip in all PCI
+hostbridge drivers, like in tegra_pcie_scan_bus().
+
+
+3. Introduce a global msi chip list, currently, only in arm, there maybe more than one type MSI chip,
+but in arm, we can find msi chip by PCI hostbridge platform device's of_node, Eg. use "msi-parent" property
+to find it. Or msi chip is integrated into PCI hostbridge, we can find msi chip by compare msi_chip->dev and
+PCI hostbridge's platform device's struct device *dev pointer. And because PCI hostbridge platform device pass
+to pci_create_root_bus() as the parent device, so every PCI devices can first find the platform device, then
+to find the msi chip, this solution looks a bit ugly, but we only associate pci hostbridge and msi chip, PCI child
+buses and devices do not have to know the msi chip details.
+
+4. Last, in this series, introduced weak arch function arch_find_msi_chip(), it's the simplest one, because all platforms
+except arm, only one msi chip will exist in system.
+
+What do you think about this ?
+
+Thanks!
+Yijing.
+
 > 
-> For now, this gate driver will only used for PM support of some IP blocks. For the
-> Others needed to be enabled as default.
+> Thierry
+> 
 
-Ok, got it. I'm fine with the flag then, and we can remove it after all
-those client devices manage their clocks well.
 
-Shawn
+-- 
+Thanks!
+Yijing
