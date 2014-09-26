@@ -1,40 +1,96 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 26 Sep 2014 10:13:42 +0800
-Subject: [PATCH v2 15/22] MIPS/Xlr/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <20140925073700.GL12423@ulmo>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <1411614872-4009-16-git-send-email-wangyijing@huawei.com>
- <20140925073700.GL12423@ulmo>
-Message-ID: <5424CBD6.1010807@huawei.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 26 Sep 2014 10:22:34 +0800
+Subject: [PATCH v3 1/2] ARM: dts: vf610-colibri: Add PWM support
+In-Reply-To: <d508a6ad39e07d5489c4b5110784902ab0241c44.1411378369.git.bhuvanchandra.dv@toradex.com>
+References: <cover.1411378369.git.bhuvanchandra.dv@toradex.com>
+ <d508a6ad39e07d5489c4b5110784902ab0241c44.1411378369.git.bhuvanchandra.dv@toradex.com>
+Message-ID: <20140926022232.GI21077@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/25 15:37, Thierry Reding wrote:
-> On Thu, Sep 25, 2014 at 11:14:25AM +0800, Yijing Wang wrote:
-> [...]
->> diff --git a/arch/mips/pci/pci-xlr.c b/arch/mips/pci/pci-xlr.c
-> [...]
->> @@ -214,11 +214,11 @@ static int get_irq_vector(const struct pci_dev *dev)
->>  }
->>  
->>  #ifdef CONFIG_PCI_MSI
->> -void arch_teardown_msi_irq(unsigned int irq)
->> +void xlr_teardown_msi_irq(unsigned int irq)
->>  {
->>  }
->>  
->> -int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->> +int xlr_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+On Mon, Sep 22, 2014 at 03:38:11PM +0530, Bhuvanchandra DV wrote:
+> The Colibri standard defines four pins as PWM outputs, two of them (PWM
+> A and C) are routed to FTM instance 0 and the other two (PWM B and D)
+> are routed to FTM instance 1. Hence enable both FTM instances for the
+> Colibri module and mux the four pins accordingly.
 > 
-> Can both of these now be static?
-Yes, Will update.
+> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
 
+You should add Stefan's ACK tag.
+
+> ---
+>  arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    8 ++++++++
+>  arch/arm/boot/dts/vf610-colibri.dtsi        |   24 ++++++++++++++++++++++++
+>  2 files changed, 32 insertions(+)
 > 
-> Thierry
+> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> index 7fb3066..00f63d9 100644
+> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
+> @@ -33,6 +33,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&pwm0 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm1 {
+> +	status = "okay";
+> +};
+> +
+
+I was trying to apply the patches, but found pwm1 is not available in
+vf610.dtsi at all.  What tree is your patch generated against?  Or did I
+miss any prerequisite patches?
+
+Shawn
+
+>  &uart0 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+> index 0cd8343..1f73c1c 100644
+> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+> @@ -44,6 +44,16 @@
+>  	arm,tag-latency = <3 2 3>;
+>  };
+>  
+> +&pwm0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm0>;
+> +};
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +};
+> +
+>  &uart0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart0>;
+> @@ -97,6 +107,20 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_pwm0: pwm0grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTB0__FTM0_CH0		0x1182
+> +				VF610_PAD_PTB1__FTM0_CH1		0x1182
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				VF610_PAD_PTB8__FTM1_CH0		0x1182
+> +				VF610_PAD_PTB9__FTM1_CH1		0x1182
+> +			>;
+> +		};
+> +
+>  		pinctrl_uart0: uart0grp {
+>  			fsl,pins = <
+>  				VF610_PAD_PTB10__UART0_TX		0x21a2
+> -- 
+> 1.7.9.5
 > 
-
-
--- 
-Thanks!
-Yijing
