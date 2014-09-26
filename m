@@ -1,55 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Sep 2014 11:24:30 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu: add support for iova_to_phys through
- ATS1PR
-In-Reply-To: <vnkw38bgkbal.fsf@mitchelh-linux.qualcomm.com>
-References: <1410460244-18943-1-git-send-email-mitchelh@codeaurora.org>
- <1410460244-18943-3-git-send-email-mitchelh@codeaurora.org>
- <20140922152614.GP25809@arm.com>
- <vnkwiokdx1nj.fsf@mitchelh-linux.qualcomm.com>
- <20140924163712.GG16244@arm.com>
- <vnkw38bgkbal.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20140926102430.GF22293@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 26 Sep 2014 12:32:53 +0200
+Subject: [PATCH] arm/arm64: KVM: Report correct FSC for unsupported fault types
+Message-ID: <1411727573-1346-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 09:34:26PM +0100, Mitchel Humpherys wrote:
-> On Wed, Sep 24 2014 at 09:37:12 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Sep 24, 2014 at 02:12:00AM +0100, Mitchel Humpherys wrote:
-> >> On Mon, Sep 22 2014 at 08:26:14 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Thu, Sep 11, 2014 at 07:30:44PM +0100, Mitchel Humpherys wrote:
-> >> >> +		return arm_smmu_iova_to_phys_soft(domain, iova);
-> >> >> +	}
-> >> >> +
-> >> >> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
-> >> >> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
-> >> >> +
-> >> >> +	if (phys & CB_PAR_F) {
-> >> >> +		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
-> >> >> +		dev_err(dev, "PAR = 0x%llx\n", phys);
-> >> >> +	}
-> >> >> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
-> >> >
-> >> > How does this work for 64k pages?
-> >> 
-> >> So at the moment we're always assuming that we're using v7/v8 long
-> >> descriptor format, right?  All I see in the spec (14.5.15 SMMU_CBn_PAR)
-> >> is that bits[47:12]=>PA[47:12]...  Or am I missing something completely?
-> >
-> > I think you've got 64k pages confused with the short-descriptor format.
-> >
-> > When we use 64k pages with long descriptors, you're masked off bits 15-12 of
-> > the iova above, so you'll have a hole in the physical address afaict.
-> 
-> Even with long descriptors the spec says bits 15-12 should come from
-> CB_PAR...  It makes no mention of reinterpreting those bits depending on
-> the programmed page granule.  The only thing I can conclude from the
-> spec is that hardware should be smart enough to do the right thing with
-> bits 15-12 when the page granule is 64k.  Although even if hardware is
-> smart enough I guess CB_PAR[15:12] should be the same as iova[15:12] for
-> the 64k case?
+When we catch something that's not a permission fault or a translation
+fault, we log the unsupported FSC in the kernel log, but we were masking
+off the bottom bits of the FSC which was not very helpful.
 
-Yeah, fair enough, the code you have should work correctly then.
-Unfortunately, I don't have any suitable hardware on which to test it.
+Also correctly report the FSC for data and instruction faults rather
+than telling people it was a DFCS, which doesn't exist in the ARM ARM.
 
-Will
+Cc: Peter Maydell <peter.maydell@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/include/asm/kvm_emulate.h   | 5 +++++
+ arch/arm/kvm/mmu.c                   | 8 +++++---
+ arch/arm64/include/asm/kvm_emulate.h | 5 +++++
+ 3 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 69b7469..b9db269 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -149,6 +149,11 @@ static inline bool kvm_vcpu_trap_is_iabt(struct kvm_vcpu *vcpu)
+ 
+ static inline u8 kvm_vcpu_trap_get_fault(struct kvm_vcpu *vcpu)
+ {
++	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
++{
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_FSC_TYPE;
+ }
+ 
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index bb06f76..eea0306 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -882,10 +882,12 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+ 
+ 	/* Check the stage-2 fault is trans. fault or write fault */
+-	fault_status = kvm_vcpu_trap_get_fault(vcpu);
++	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+ 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM) {
+-		kvm_err("Unsupported fault status: EC=%#x DFCS=%#lx\n",
+-			kvm_vcpu_trap_get_class(vcpu), fault_status);
++		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++			kvm_vcpu_trap_get_class(vcpu),
++			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++			(unsigned long)kvm_vcpu_get_hsr(vcpu));
+ 		return -EFAULT;
+ 	}
+ 
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index fdc3e21..5674a55 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -174,6 +174,11 @@ static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
+ 
+ static inline u8 kvm_vcpu_trap_get_fault(const struct kvm_vcpu *vcpu)
+ {
++	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC;
++}
++
++static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
++{
+ 	return kvm_vcpu_get_hsr(vcpu) & ESR_EL2_FSC_TYPE;
+ }
+ 
+-- 
+2.0.0
