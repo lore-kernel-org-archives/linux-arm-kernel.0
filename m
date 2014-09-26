@@ -1,97 +1,67 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 26 Sep 2014 15:16:33 +0200
-Subject: [PATCH 00/27] Changes for arm/arm64 KVM for 3.18
-Message-ID: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
+Date: Fri, 26 Sep 2014 15:16:34 +0200
+Subject: [PATCH 01/27] KVM: Introduce gfn_to_hva_memslot_prot
+In-Reply-To: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
+References: <1411737420-9063-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1411737420-9063-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+To support read-only memory regions on arm and arm64, we have a need to
+resolve a gfn to an hva given a pointer to a memslot to avoid looping
+through the memslots twice and to reuse the hva error checking of
+gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot() function and
+refactor gfn_to_hva_prot() to use this function.
 
-The following changes since commit f51770ed465e6eb41da7fa16fd92eb67069600cf:
-
-  kvm: Make init_rmode_identity_map() return 0 on success. (2014-09-17 13:10:12 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-3.18
-
-for you to fetch changes up to 0496daa5cf99741ce8db82686b4c7446a37feabb:
-
-  arm/arm64: KVM: Report correct FSC for unsupported fault types (2014-09-26 14:39:45 +0200)
-
-This includes a bunch of changes:
- - Support read-only memory slots on arm/arm64
- - Various changes to fix Sparse warnings
- - Correctly detect write vs. read Stage-2 faults
- - Various VGIC cleanups and fixes
- - Dynamic VGIC data strcuture sizing
- - Fix SGI set_clear_pend offset bug
- - Fix VTTBR_BADDR Mask
- - Correctly report the FSC on Stage-2 faults
-
-Thanks,
--Christoffer
-
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Ard Biesheuvel (1):
-      ARM/arm64: KVM: fix use of WnR bit in kvm_is_write_fault()
+ include/linux/kvm_host.h |  2 ++
+ virt/kvm/kvm_main.c      | 11 +++++++++--
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-Christoffer Dall (11):
-      KVM: Introduce gfn_to_hva_memslot_prot
-      arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
-      Merge remote-tracking branch 'kvm/next' into queue
-      arm/arm64: KVM: Rename irq_state to irq_pending
-      arm/arm64: KVM: Rename irq_active to irq_queued
-      arm/arm64: KVM: vgic: Clear queued flags on unqueue
-      arm/arm64: KVM: vgic: Improve handling of GICD_I{CS}PENDRn
-      arm/arm64: KVM: vgic: Fix SGI writes to GICD_I{CS}PENDR0
-      arm/arm64: KVM: vgic: Clarify and correct vgic documentation
-      arm/arm64: KVM: Fix set_clear_sgi_pend_reg offset
-      arm/arm64: KVM: Report correct FSC for unsupported fault types
-
-Eric Auger (1):
-      KVM: EVENTFD: remove inclusion of irq.h
-
-Joel Schopp (1):
-      arm/arm64: KVM: Fix VTTBR_BADDR_MASK and pgd alloc
-
-Marc Zyngier (8):
-      KVM: ARM: vgic: plug irq injection race
-      arm/arm64: KVM: vgic: switch to dynamic allocation
-      arm/arm64: KVM: vgic: Parametrize VGIC_NR_SHARED_IRQS
-      arm/arm64: KVM: vgic: kill VGIC_MAX_CPUS
-      arm/arm64: KVM: vgic: handle out-of-range MMIO accesses
-      arm/arm64: KVM: vgic: kill VGIC_NR_IRQS
-      arm/arm64: KVM: vgic: delay vgic allocation until init time
-      arm/arm64: KVM: vgic: make number of irqs a configurable attribute
-
-Will Deacon (6):
-      KVM: ARM/arm64: fix non-const declaration of function returning const
-      KVM: ARM/arm64: fix broken __percpu annotation
-      KVM: ARM/arm64: avoid returning negative error code as bool
-      KVM: ARM/arm64: return -EFAULT if copy_from_user fails in set_timer_reg
-      KVM: vgic: return int instead of bool when checking I/O ranges
-      KVM: vgic: declare probe function pointer as const
-
- Documentation/virtual/kvm/devices/arm-vgic.txt |  10 +
- arch/arm/include/asm/kvm_emulate.h             |   5 +
- arch/arm/include/asm/kvm_host.h                |   2 +-
- arch/arm/include/asm/kvm_mmu.h                 |  11 -
- arch/arm/include/uapi/asm/kvm.h                |   2 +
- arch/arm/kvm/arm.c                             |  17 +-
- arch/arm/kvm/coproc.c                          |   2 +-
- arch/arm/kvm/guest.c                           |   2 +-
- arch/arm/kvm/mmu.c                             |  40 +-
- arch/arm64/include/asm/kvm_arm.h               |  13 +-
- arch/arm64/include/asm/kvm_emulate.h           |   5 +
- arch/arm64/include/asm/kvm_host.h              |   4 +-
- arch/arm64/include/asm/kvm_mmu.h               |  18 +-
- arch/arm64/include/uapi/asm/kvm.h              |   2 +
- arch/arm64/kvm/guest.c                         |   2 +-
- arch/arm64/kvm/sys_regs.c                      |   2 +-
- include/kvm/arm_vgic.h                         | 112 +++--
- include/linux/kvm_host.h                       |   2 +
- virt/kvm/arm/vgic.c                            | 631 ++++++++++++++++++++-----
- virt/kvm/eventfd.c                             |   1 -
- virt/kvm/kvm_main.c                            |  11 +-
- 21 files changed, 678 insertions(+), 216 deletions(-)
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index ebd7236..6d8a658 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -528,6 +528,8 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn);
+ unsigned long gfn_to_hva(struct kvm *kvm, gfn_t gfn);
+ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable);
+ unsigned long gfn_to_hva_memslot(struct kvm_memory_slot *slot, gfn_t gfn);
++unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot, gfn_t gfn,
++				      bool *writable);
+ void kvm_release_page_clean(struct page *page);
+ void kvm_release_page_dirty(struct page *page);
+ void kvm_set_page_accessed(struct page *page);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 5a0817e..76c92a7 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -1076,9 +1076,9 @@ EXPORT_SYMBOL_GPL(gfn_to_hva);
+  * If writable is set to false, the hva returned by this function is only
+  * allowed to be read.
+  */
+-unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
++unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot,
++				      gfn_t gfn, bool *writable)
+ {
+-	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
+ 	unsigned long hva = __gfn_to_hva_many(slot, gfn, NULL, false);
+ 
+ 	if (!kvm_is_error_hva(hva) && writable)
+@@ -1087,6 +1087,13 @@ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
+ 	return hva;
+ }
+ 
++unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
++{
++	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
++
++	return gfn_to_hva_memslot_prot(slot, gfn, writable);
++}
++
+ static int kvm_read_hva(void *data, void __user *hva, int len)
+ {
+ 	return __copy_from_user(data, hva, len);
+-- 
+2.0.0
