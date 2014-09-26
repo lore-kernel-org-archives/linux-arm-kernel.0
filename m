@@ -1,83 +1,66 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 26 Sep 2014 19:40:40 +0300
-Subject: [RFC PATCH 2/4] ARM: keystone: pm: switch to use generic pm
- domains
-In-Reply-To: <7hlhp79w6p.fsf@deeprootsystems.com>
-References: <1411657537-25238-1-git-send-email-grygorii.strashko@ti.com>	<1411657537-25238-3-git-send-email-grygorii.strashko@ti.com>
- <7hlhp79w6p.fsf@deeprootsystems.com>
-Message-ID: <54259708.1030801@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 26 Sep 2014 09:43:12 -0700
+Subject: [PATCH v6 7/8] ARM: mm: allow non-text sections to be
+ non-executable
+In-Reply-To: <20140926114239.GM5182@n2100.arm.linux.org.uk>
+References: <1411067949-10913-1-git-send-email-keescook@chromium.org>
+ <1411067949-10913-8-git-send-email-keescook@chromium.org>
+ <20140926114239.GM5182@n2100.arm.linux.org.uk>
+Message-ID: <CAGXu5jL+ksQ4nq4pxOk7gM0POmwtTQ7DgmugpVK45arpMLGzvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 01:23 AM, Kevin Hilman wrote:
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->
->> This patch switches Keystone 2 PM code to use Generic PM domains
->> instead of PM  clock domains because of the lack of DT support
->> for the last.
+On Fri, Sep 26, 2014 at 4:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Sep 18, 2014 at 12:19:08PM -0700, Kees Cook wrote:
+>> @@ -1373,13 +1373,24 @@ static void __init map_lowmem(void)
+>>               if (start >= end)
+>>                       break;
 >>
->> Keystone 2 PM domain should be specified per device for which
->> Runtime PM has to be enabled and handles the list of functional clocks
->> to enable/disable device.
+>> -             if (end < kernel_x_start || start >= kernel_x_end) {
+>> +             if (end < kernel_x_start) {
+>>                       map.pfn = __phys_to_pfn(start);
+>>                       map.virtual = __phys_to_virt(start);
+>>                       map.length = end - start;
+>>                       map.type = MT_MEMORY_RWX;
 >>
->> Example:
->>   qmss_domain: qmss_pm_controller {
->> 	compatible = "ti,keystone-pm-controller";
->> 	clocks = <&chipclk13>;
->> 	#power-domain-cells = <0>;
->>   };
->>
->>   qmss: qmss at 2a40000 {
->> 	compatible = "ti,keystone-navigator-qmss";
->> 	...
->> 	power-domains = <&qmss_domain>;
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->
-> [...]
->
->> +static int keystone_pm_domain_power_off(struct generic_pm_domain *genpd)
->> +{
->> +	int ret;
->> +	struct keystone_domain *dm = container_of(genpd,
->> +						  struct keystone_domain,
->> +						  base);
+>>                       create_mapping(&map);
+>> +             } else if (start >= kernel_x_end) {
+>> +                     map.pfn = __phys_to_pfn(start);
+>> +                     map.virtual = __phys_to_virt(start);
+>> +                     map.length = end - start;
+>> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+>> +                     map.type = MT_MEMORY_RW;
+>> +#else
+>> +                     map.type = MT_MEMORY_RWX;
+>> +#endif
 >> +
->> +	/* Enable reset clocks for all devices in the PU domain */
+>> +                     create_mapping(&map);
 >
-> This says enable clocks...
 >
->> +	ret = pm_clk_suspend(dm->dev);
+> I'm looking at this, and wondering two things.  Firstly, why isn't it
+> MT_MEMORY_RW in the first place.  Secondly, why do you need to make
+> this depend on CONFIG_ARM_KERNMEM_PERMS at all?
 >
-> ...but this calls clk_disable().
+> I think the first is an oversight by me (and is a case which never came
+> up in my testing, because most of my platforms don't have segmented
+> memory layouts.)
 >
->> +	if (ret)
->> +		dev_err(dm->dev, "can't turn off clocks %d\n", ret);
->> +
->> +	return ret;
->> +}
->> +
->> +static int keystone_pm_domain_power_on(struct generic_pm_domain *genpd)
->> +{
->> +	int ret;
->> +	struct keystone_domain *dm = container_of(genpd,
->> +						  struct keystone_domain,
->> +						  base);
->> +
->> +	/* Disable reset clocks for all devices in the PU domain */
->
-> And this says disable clocks...
->
->> +	ret = pm_clk_resume(dm->dev);
->
-> ...but this calls clk_enable().
->
-> -ECONFUSED.
->
+> The second I think is not necessary - the memory region being considered
+> is not part of the kernel at all, and so should not be executable in any
+> shape or form.
 
-Will update.
+I'm happy to change this. My original intent was to make layout for
+builds without CONFIG_ARM_KERNMEM_PERMS identical to what was there
+before, so I took this step to make sure.
 
-Thanks you for comments.
+I will drop the #ifdef and respin. Does the rest look ok? Shall I send
+a pull request?
 
-Regards,
--grygorii
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
