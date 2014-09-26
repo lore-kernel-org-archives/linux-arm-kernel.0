@@ -1,39 +1,43 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 26 Sep 2014 09:48:24 +0200
-Subject: [PATCH v5] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <2553182.6YgvmDLuEA@wuerfel>
-References: <1411360807-7750-1-git-send-email-pankaj.dubey@samsung.com>
- <000d01cfd946$521304f0$f6390ed0$@samsung.com>
- <CAGhQ9VxwTS9=biwp0nCKu2bVU2aNe679aKR=HU5rd_Uaw99sUw@mail.gmail.com>
- <2553182.6YgvmDLuEA@wuerfel>
-Message-ID: <CAGhQ9VwAe7d7fX1Lw22ocxDSXjOZbvXdmG1u6_d5v7ptmYMYeg@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Fri, 26 Sep 2014 07:51:15 +0000
+Subject: [PATCHv4 2/6] ARM: dts: Add initial LS1021A QDS board dts support
+In-Reply-To: <20140926061354.GD31948@dragon>
+References: <1411371952-5618-1-git-send-email-jingchang.lu@freescale.com>
+ <1411371952-5618-3-git-send-email-jingchang.lu@freescale.com>
+ <20140926061354.GD31948@dragon>
+Message-ID: <8afdf8783f3c47558f35b7e88e2cde3c@BY2PR0301MB0613.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 September 2014 09:16, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 26 September 2014 07:34:12 Joachim Eastwood wrote:
->> I am working on Cortex-M4 no-MMU platform that isn't upstream yet, btw.
->>
->
-> Sorry for drifting off-topic, but this is very interesting to me. Can you
-> say which one you are working on and what your timeline is for submitting
-> it upstream?
+Hi,
 
-It's NXP LPC18xx/43xx which is Cortex-M3/M4.
+[...]
+> > +
+> > +	soc {
+> > +		leds {
+> 
+> I think leds are board level devices and do not have to be under node
+> "soc"?
+> 
+@Shawn,
+Yes, it is.
 
-3.19 or 3.20 might be target.
+@Jingchang,
+For now we could just remove the led nodes here. There hasn't any real leds
+On QDS(and for now we have to test their output pulse).
 
-Right now everything is in a github repository here:
-https://github.com/manabian/linux-lpc
+So this could be added later when need.
 
-Most stuff are working now and I am in the process of clean it up and
-adding documentation.
+> > +			compatible = "pwm-leds";
+> 
+> Please have a new line between property list and device node ...
+> 
+This and the following issues about led will be fixed when adding this node separately
+In the future.
 
-> I generally like to know about new platforms early, and sometimes we get
-> multiple people working on the same one.
+[...]
 
-I see.
+Thanks,
 
-regards,
-Joachim Eastwood
+BRs
+Xiubo
