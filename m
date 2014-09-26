@@ -1,125 +1,127 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Sep 2014 17:27:57 -0700
-Subject: [PATCH v5 00/11] PM / Domains: Generic OF-based support
-In-Reply-To: <20140925165625.GC30382@ulmo>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <20140925112122.GA22753@ulmo>
- <CAPDyKFp8oK6KAujU44NEwT2vL2_BBPSMuGPkyppHdonPfOmUrQ@mail.gmail.com>
- <20140925165625.GC30382@ulmo>
-Message-ID: <20140926002757.GJ10233@codeaurora.org>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Thu, 25 Sep 2014 17:28:37 -0700
+Subject: [PATCH v2 0/6] Add initial support for Broadcom Cygnus SoC
+In-Reply-To: <5424AFD2.2070406@gmail.com>
+References: <Jonathan Richardson <jonathar@broadcom.com>
+ <1411507057-14771-1-git-send-email-jonathar@broadcom.com>
+ <54248344.5030308@broadcom.com> <54248791.9060805@gmail.com>
+ <5424AFD2.2070406@gmail.com>
+Message-ID: <5424B335.6000602@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25, Thierry Reding wrote:
-> On Thu, Sep 25, 2014 at 05:29:10PM +0200, Ulf Hansson wrote:
-> > On 25 September 2014 13:21, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > I just noticed these patches because they conflicted with some of the
-> > > local patches I had to add a very similar framework. One of the reasons
-> > > why I hadn't posted these publicly yet is because the platform where I
-> > > want to use this (Tegra) is somewhat quirky when it comes to power
-> > > domains.
-> > 
-> > It's great that more things goes on in this area. :-)
-> > 
-> > >
-> > > On Tegra these domains are called power gates and they currently have
-> > > their own API. We've been looking at migrating things over to some
-> > > generic framework for some time and PM domains do seem like a good fit.
-> > > However one of the quirks regarding these domains on Tegra is that a
-> > > fixed sequence exists that needs to be respected when enabling or
-> > > disabling a power partition. The exact sequence can be found in the
-> > > drivers/soc/tegra/pmc.c driver's tegra_powergate_sequence_power_up()
-> > > function. Essentially we need to call into the clock and reset drivers
-> > > at very specific moments during the operations that the PMC does.
-> > 
-> > I am not sure I fully understand how the power gating actually
-> > happens. How is it triggered?
+On 14-09-25 05:14 PM, Florian Fainelli wrote:
+> Scott, Jonathan,
 > 
-> Drivers explicitly call the custom API. So all drivers that need to turn
-> on power partitions have a call to tegra_powergate_sequence_power_up()
-> in .probe() and tegra_powergate_power_off() in .remove().
+> On 09/25/2014 02:22 PM, Florian Fainelli wrote:
+>> Hi Scott,
+>>
+>> On 09/25/2014 02:04 PM, Scott Branden wrote:
+>>> Hi Matt/Christian (and others),
+>>>
+>>> We would like to move forward in getting our base Cygnus support into
+>>> the mainline kernel.  From there we will be able to contribute
+>>> additional drivers.
+>>>
+>>> Is somebody willing to accept this pull request to get this patchset
+>>> accepted by the open source community?
+>>
+>> I am fine with taking the ARM patches and putting them at
+>> http://github/brcm/linux.git, with C code in cygnus/board and the Device
+>> Tree files in cygnus/dt for instance?
+>>
+>> The clock driver patch will have to go through Mike Turquette's tree
+>> unless he wants to delegate that one.
 > 
-> > > One solution to this would be to make the needed clocks and resets
-> > > available to the power domain driver via DT, but then we have the
-> > > problem that two drivers would be controlling the same resources. For
-> > > example drivers could still want to disable the clock for more fine-
-> > > grained power management.
-> > 
-> > Sorry, but I think I need a better understanding to be able to comment.
-> > 
-> > But maybe, drivers could implement runtime PM support and define
-> > runtime PM callbacks. From the callbacks those will handle clocks and
-> > resets, is not that enough? What more is needed from a PM domain point
-> > of view?
-> 
-> Let me quote the actual power up sequence code:
-> 
-> 	int tegra_powergate_sequence_power_up(int id, struct clk *clk,
-> 					      struct reset_control *rst)
-> 	{
-> 		int ret;
-> 
-> 		reset_control_assert(rst);
-> 
-> 		ret = tegra_powergate_power_on(id);
-> 		if (ret)
-> 			goto err_power;
-> 
-> 		ret = clk_prepare_enable(clk);
-> 		if (ret)
-> 			goto err_clk;
-> 
-> 		usleep_range(10, 20);
-> 
-> 		ret = tegra_powergate_remove_clamping(id);
-> 		if (ret)
-> 			goto err_clamp;
-> 
-> 		usleep_range(10, 20);
-> 		reset_control_deassert(rst);
-> 
-> 		return 0;
-> 
-> 	err_clamp:
-> 		clk_disable_unprepare(clk);
-> 	err_clk:
-> 		tegra_powergate_power_off(id);
-> 	err_power:
-> 		return ret;
-> 	}
-> 	EXPORT_SYMBOL(tegra_powergate_sequence_power_up);
-> 
-> The critical part is that we need to enable the clock after the
-> partition has been powered, but before the clamps are removed.
-> Implementing this with runtime PM support in drivers won't work
-> because the power domain driver has to do both the powering up
-> and removing the clamps, so there's no place to inject the call
-> to enable the clock.
+> Could you resend patch 3 without the clock binding, patch 4 without the
+> clocks node, and patch 6 without the drivers/clk changes? Once you do
+> that, I can assemble these patches quickly and send a pull request which
+> does only contain ARM SoC and DTS changes, and you can get the clock
+> driver to be reviewed separately by its maintainer?
 
-FWIW, Qualcomm platforms have pretty much the same design. Our
-power domain controls live in the same register space as the
-clocks and resets. Is Tegra the same way? To power on/off a
-domain we need to go and forcefully turn a clock on and assert a
-reset or perhaps we need the clock to be off and assert a reset.
-It depends on the domain.
+The serial driver needs a clock so probably better not to pull out the
+clock nodes. It's part of the core functionality we'd like in the
+initial Cygnus support. I didn't hear from Mike (cc'd), though Mark
+reviewed it.
 
-Historically we've supported this by requiring all drivers to
-disable their clocks and deassert any resets before calling into
-this code (we put this behind the regulator API). Then we're free
-to do whatever is necessary to power on/off, eventally leaving
-the clocks off if they were forced on and finally giving control
-to the drivers so they can manage their own clocks and resets. It
-would be better for us to take ownership of the clocks and resets
-in the domain so we don't have this prerequisite of clocks being
-off before calling into the domain code. I plan to do pretty much
-Kevin outlined and use runtime PM, power domains, and per-device
-pm QoS to figure out if we should gate clocks (clk_disable), or
-if we go to a lower power mode where we unprepare clocks
-(clk_unprepare), or if we go to the lowest power mode where we
-apply clamps, etc. (called power collapse for us). Then the
-drivers just interact with runtime PM and QoS and they aren't
-aware of all this SoC glue.
+Thanks.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Thanks!
+> 
+>>
+>>>
+>>> Regards,
+>>>  Scott
+>>>
+>>>
+>>> On 14-09-23 02:17 PM, Jonathan Richardson wrote:
+>>>> Hi,
+>>>>
+>>>> This patchset contains initial support for Broadcom's Cygnus SoC based
+>>>> on our
+>>>> iProc architecture. Initial support is minimal and includes just the mach
+>>>> platform code, clock driver, and a basic device tree configuration.
+>>>> Peripheral
+>>>> drivers will be submitted soon, as will device tree configurations for
+>>>> other
+>>>> Cygnus board variants.
+>>>>
+>>>> Changes from v1:
+>>>>   - Address code review comments as per previous responses.
+>>>>   - Copyright headers updated to remove Broadcom URL.
+>>>>   - mach platform code still contains hard coded adresses. These
+>>>> address are
+>>>>     the same for all Cygnus variants. Could you please provide
+>>>> guidance on where
+>>>>     they should go if you would still like them changed.
+>>>>
+>>>> Thanks,
+>>>> Jon
+>>>>
+>>>> Jonathan Richardson (6):
+>>>>    ARM: cygnus: Initial support for Broadcom Cygnus SoC
+>>>>    clk: Clock driver support for Broadcom Cygnus SoC
+>>>>    dt-bindings: Document Broadcom Cygnus SoC and clock driver
+>>>>    ARM: dts: Enable Broadcom Cygnus SoC
+>>>>    ARM: cygnus defconfig : Initial defconfig for Broadcom Cygnus SoC
+>>>>    MAINTAINERS: Entry for Cygnus/iproc arm architecture and clock
+>>>>      drivers
+>>>>
+>>>>   Documentation/devicetree/bindings/arm/cygnus.txt   |   12 +
+>>>>   .../devicetree/bindings/clock/clk-cygnus.txt       |  121 ++
+>>>>   .../devicetree/bindings/clock/clk-iproc.txt        |   48 +
+>>>>   MAINTAINERS                                        |   21 +
+>>>>   arch/arm/boot/dts/Makefile                         |    1 +
+>>>>   arch/arm/boot/dts/bcm-cygnus.dtsi                  |  349 ++++++
+>>>>   arch/arm/boot/dts/bcm911360_entphn.dts             |   22 +
+>>>>   arch/arm/configs/bcm_cygnus_defconfig              |  223 ++++
+>>>>   arch/arm/mach-bcm/Kconfig                          |   31 +
+>>>>   arch/arm/mach-bcm/Makefile                         |    3 +
+>>>>   arch/arm/mach-bcm/bcm_cygnus.c                     |  166 +++
+>>>>   drivers/clk/Makefile                               |    1 +
+>>>>   drivers/clk/bcm/Makefile                           |    2 +
+>>>>   drivers/clk/bcm/clk-cygnus.c                       | 1186
+>>>> ++++++++++++++++++++
+>>>>   drivers/clk/bcm/clk-iproc.c                        |  451 ++++++++
+>>>>   15 files changed, 2637 insertions(+)
+>>>>   create mode 100644 Documentation/devicetree/bindings/arm/cygnus.txt
+>>>>   create mode 100644
+>>>> Documentation/devicetree/bindings/clock/clk-cygnus.txt
+>>>>   create mode 100644
+>>>> Documentation/devicetree/bindings/clock/clk-iproc.txt
+>>>>   create mode 100644 arch/arm/boot/dts/bcm-cygnus.dtsi
+>>>>   create mode 100644 arch/arm/boot/dts/bcm911360_entphn.dts
+>>>>   create mode 100644 arch/arm/configs/bcm_cygnus_defconfig
+>>>>   create mode 100644 arch/arm/mach-bcm/bcm_cygnus.c
+>>>>   create mode 100644 drivers/clk/bcm/clk-cygnus.c
+>>>>   create mode 100644 drivers/clk/bcm/clk-iproc.c
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
