@@ -1,45 +1,152 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 27 Sep 2014 16:49:53 +0800
-Subject: [PATCH v2 5/7] ARM: dts: sun6i: Unify ahb1 clock nodes
-In-Reply-To: <1411807795-6575-1-git-send-email-wens@csie.org>
-References: <1411807795-6575-1-git-send-email-wens@csie.org>
-Message-ID: <1411807795-6575-6-git-send-email-wens@csie.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 27 Sep 2014 10:54:37 +0200
+Subject: [PATCH 1/9] dmaengine: Make the destination abbreviation coherent
+In-Reply-To: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1411808085-27792-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock driver has unified support for the ahb1 clock.
-Unify the clock nodes so it works.
+The dmaengine header abbreviates destination as at least two different strings.
+Make a coherent use of a single one.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ drivers/dma/bcm2835-dma.c |  2 +-
+ drivers/dma/edma.c        |  2 +-
+ drivers/dma/fsl-edma.c    |  2 +-
+ drivers/dma/omap-dma.c    |  2 +-
+ drivers/dma/pl330.c       |  2 +-
+ drivers/dma/sirf-dma.c    |  2 +-
+ include/linux/dmaengine.h | 12 ++++++------
+ 7 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 9ac1dd3..caf879d 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -162,19 +162,11 @@
- 			clock-output-names = "axi";
- 		};
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 68007974961a..8a6a9c27fe83 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -571,7 +571,7 @@ static int bcm2835_dma_device_slave_caps(struct dma_chan *dchan,
+ 	struct dma_slave_caps *caps)
+ {
+ 	caps->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+-	caps->dstn_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	caps->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = false;
+ 	caps->cmd_terminate = true;
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 7b65633f495e..b3d641881d9d 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -998,7 +998,7 @@ static int edma_dma_device_slave_caps(struct dma_chan *dchan,
+ 				      struct dma_slave_caps *caps)
+ {
+ 	caps->src_addr_widths = EDMA_DMA_BUSWIDTHS;
+-	caps->dstn_addr_widths = EDMA_DMA_BUSWIDTHS;
++	caps->dst_addr_widths = EDMA_DMA_BUSWIDTHS;
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = true;
+ 	caps->cmd_terminate = true;
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 3c5711d5fe97..13df85a16438 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -781,7 +781,7 @@ static int fsl_dma_device_slave_caps(struct dma_chan *dchan,
+ 		struct dma_slave_caps *caps)
+ {
+ 	caps->src_addr_widths = FSL_EDMA_BUSWIDTHS;
+-	caps->dstn_addr_widths = FSL_EDMA_BUSWIDTHS;
++	caps->dst_addr_widths = FSL_EDMA_BUSWIDTHS;
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = true;
+ 	caps->cmd_terminate = true;
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 4cf7d9a950d7..51dee6636a37 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -1095,7 +1095,7 @@ static int omap_dma_device_slave_caps(struct dma_chan *dchan,
+ 				      struct dma_slave_caps *caps)
+ {
+ 	caps->src_addr_widths = OMAP_DMA_BUSWIDTHS;
+-	caps->dstn_addr_widths = OMAP_DMA_BUSWIDTHS;
++	caps->dst_addr_widths = OMAP_DMA_BUSWIDTHS;
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = true;
+ 	caps->cmd_terminate = true;
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index d5149aacd2fe..8904891ed5d5 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -2583,7 +2583,7 @@ static int pl330_dma_device_slave_caps(struct dma_chan *dchan,
+ 	struct dma_slave_caps *caps)
+ {
+ 	caps->src_addr_widths = PL330_DMA_BUSWIDTHS;
+-	caps->dstn_addr_widths = PL330_DMA_BUSWIDTHS;
++	caps->dst_addr_widths = PL330_DMA_BUSWIDTHS;
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = false;
+ 	caps->cmd_terminate = true;
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index aac03ab10c54..149d7fddfa75 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -652,7 +652,7 @@ static int sirfsoc_dma_device_slave_caps(struct dma_chan *dchan,
+ 	struct dma_slave_caps *caps)
+ {
+ 	caps->src_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+-	caps->dstn_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
++	caps->dst_addr_widths = SIRFSOC_DMA_BUSWIDTHS;
+ 	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	caps->cmd_pause = true;
+ 	caps->cmd_terminate = true;
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 1f9e642c66ad..f4b71ce1a0a6 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -388,7 +388,7 @@ enum dma_residue_granularity {
+ /* struct dma_slave_caps - expose capabilities of a slave channel only
+  *
+  * @src_addr_widths: bit mask of src addr widths the channel supports
+- * @dstn_addr_widths: bit mask of dstn addr widths the channel supports
++ * @dst_addr_widths: bit mask of dstn addr widths the channel supports
+  * @directions: bit mask of slave direction the channel supported
+  * 	since the enum dma_transfer_direction is not defined as bits for each
+  * 	type of direction, the dma controller should fill (1 << <TYPE>) and same
+@@ -399,7 +399,7 @@ enum dma_residue_granularity {
+  */
+ struct dma_slave_caps {
+ 	u32 src_addr_widths;
+-	u32 dstn_addr_widths;
++	u32 dst_addr_widths;
+ 	u32 directions;
+ 	bool cmd_pause;
+ 	bool cmd_terminate;
+@@ -639,10 +639,10 @@ struct dma_device {
+ 	void (*device_free_chan_resources)(struct dma_chan *chan);
  
--		ahb1_mux: ahb1_mux at 01c20054 {
--			#clock-cells = <0>;
--			compatible = "allwinner,sun6i-a31-ahb1-mux-clk";
--			reg = <0x01c20054 0x4>;
--			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
--			clock-output-names = "ahb1_mux";
--		};
--
- 		ahb1: ahb1 at 01c20054 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-a10-ahb-clk";
-+			compatible = "allwinner,sun6i-a31-ahb1-clk";
- 			reg = <0x01c20054 0x4>;
--			clocks = <&ahb1_mux>;
-+			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
- 			clock-output-names = "ahb1";
- 		};
+ 	struct dma_async_tx_descriptor *(*device_prep_dma_memcpy)(
+-		struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
++		struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
+ 		size_t len, unsigned long flags);
+ 	struct dma_async_tx_descriptor *(*device_prep_dma_xor)(
+-		struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
++		struct dma_chan *chan, dma_addr_t dst, dma_addr_t *src,
+ 		unsigned int src_cnt, size_t len, unsigned long flags);
+ 	struct dma_async_tx_descriptor *(*device_prep_dma_xor_val)(
+ 		struct dma_chan *chan, dma_addr_t *src,	unsigned int src_cnt,
+@@ -935,11 +935,11 @@ async_dma_find_channel(enum dma_transaction_type type)
+ #endif /* CONFIG_ASYNC_TX_DMA */
  
+ dma_cookie_t dma_async_memcpy_buf_to_buf(struct dma_chan *chan,
+-	void *dest, void *src, size_t len);
++	void *dst, void *src, size_t len);
+ dma_cookie_t dma_async_memcpy_buf_to_pg(struct dma_chan *chan,
+ 	struct page *page, unsigned int offset, void *kdata, size_t len);
+ dma_cookie_t dma_async_memcpy_pg_to_pg(struct dma_chan *chan,
+-	struct page *dest_pg, unsigned int dest_off, struct page *src_pg,
++	struct page *dst_pg, unsigned int dst_off, struct page *src_pg,
+ 	unsigned int src_off, size_t len);
+ void dma_async_tx_descriptor_init(struct dma_async_tx_descriptor *tx,
+ 	struct dma_chan *chan);
 -- 
-2.1.1
+2.1.0
