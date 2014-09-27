@@ -1,52 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Sep 2014 11:07:38 +0100
-Subject: [PATCH 2/4] serial: mxs-auart: use mctrl_gpio helpers for
- handling modem signals
-In-Reply-To: <1411811197-12638-3-git-send-email-j.uzycki@elproma.com.pl>
-References: <1411811197-12638-1-git-send-email-j.uzycki@elproma.com.pl>
- <1411811197-12638-3-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <20140927100737.GC5182@n2100.arm.linux.org.uk>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 27 Sep 2014 12:30:26 +0200
+Subject: [PATCH] ARM: fix set_tls for !CONFIG_KUSER_HELPERS
+In-Reply-To: <1411775208-14280-1-git-send-email-nathan_lynch@mentor.com>
+References: <1411775208-14280-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <CAGhQ9VzRRAj76VU19DoBZNP4HAKrEoTNmXEswkUtL00gjSyqCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 11:46:35AM +0200, Janusz Uzycki wrote:
-> @@ -635,7 +645,12 @@ static void mxs_auart_settermios(struct uart_port *u,
->  		ctrl |= AUART_LINECTRL_STP2;
->  
->  	/* figure out the hardware flow control settings */
-> -	if (cflag & CRTSCTS) {
-> +	/* FIXME: Likely DMA could be enabled not only for HW flow control */
-> +	if (cflag & CRTSCTS &&
-> +			(IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios,
-> +					 UART_GPIO_RTS)) ||
-> +			 IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios,
-> +					 UART_GPIO_CTS)))) {
+On 27 September 2014 01:46, Nathan Lynch <nathan_lynch@mentor.com> wrote:
+> Joachim Eastwood reports that commit fbfb872f5f41 "ARM: 8148/1: flush
+> TLS and thumbee register state during exec" causes a boot-time crash
+> on a Cortex-M4 nommu system:
+>
+> Freeing unused kernel memory: 68K (281e5000 - 281f6000)
+> Unhandled exception: IPSR = 00000005 LR = fffffff1
+> CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
+> task: 29834000 ti: 29832000 task.ti: 29832000
+> PC is at flush_thread+0x2e/0x40
+> LR is at flush_thread+0x21/0x40
+> pc : [<2800954a>] lr : [<2800953d>] psr: 4100000b
+> sp : 29833d60 ip : 00000000 fp : 00000001
+> r10: 00003cf8 r9 : 29b1f000 r8 : 00000000
+> r7 : 29b0bc00 r6 : 29834000 r5 : 29832000 r4 : 29832000
+> r3 : ffff0ff0 r2 : 29832000 r1 : 00000000 r0 : 282121f0
+> xPSR: 4100000b
+> CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
+> [<2800afa5>] (unwind_backtrace) from [<2800a327>] (show_stack+0xb/0xc)
+> [<2800a327>] (show_stack) from [<2800a963>] (__invalid_entry+0x4b/0x4c)
+>
+> The problem is that set_tls is attempting to clear the TLS location in
+> the kernel-user helper page, which isn't set up on V7M.
+>
+> Fix this by guarding the write to the kuser helper page with
+> a CONFIG_KUSER_HELPERS ifdef.
+>
+> Reported-by: Joachim Eastwood <manabian@gmail.com>
+> Fixes: fbfb872f5f41 ARM: 8148/1: flush TLS and thumbee register state during exec
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> ---
 
-There has to be a better way to do this.
+Works for me.
 
-> +static int mxs_auart_init_gpios(struct mxs_auart_port *s, struct device *dev)
-> +{
-> +	s->gpios = mctrl_gpio_init(dev, 0);
-> +	if (IS_ERR_OR_NULL(s->gpios))
-> +		return -1;
-> +	return 0;
+Tested-by: Joachim Eastwood <manabian@gmail.com>
 
-I personally hate the practise of returning -1 - it ends up getting returned
-to userspace as an error code, and it means EPERM.  If you want to indicate
-success/failure, use the bool return type, and return true/false.
+Thanks!
 
-> @@ -1074,6 +1100,11 @@ static int mxs_auart_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, s);
->  
-> +	ret = mxs_auart_init_gpios(s, &pdev->dev);
-> +	if (ret < 0)
-> +		dev_err(&pdev->dev, "%s",
-> +			"Failed to initialize GPIOs. The serial port may not work as expected");
-
-Does the "%s" do anything for this message?  More importantly though, it's
-lacking a newline.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+regards,
+Joachim Eastwood
