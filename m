@@ -1,66 +1,78 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 27 Sep 2014 10:39:14 +0200
-Subject: [PATCH v5 RESEND 1/3] ARM: EXYNOS: Move code from hotplug.c to
- platsmp.c
-In-Reply-To: <201409262313.26272.arnd@arndb.de>
-References: <1409920495-16533-1-git-send-email-k.kozlowski@samsung.com>
- <201409262313.26272.arnd@arndb.de>
-Message-ID: <542677B2.70506@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 27 Sep 2014 16:49:49 +0800
+Subject: [PATCH v2 1/7] clk: sunxi: Specify number of child clocks for divs
+ clocks
+In-Reply-To: <1411807795-6575-1-git-send-email-wens@csie.org>
+References: <1411807795-6575-1-git-send-email-wens@csie.org>
+Message-ID: <1411807795-6575-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 26.09.2014 o 23:13, Arnd Bergmann pisze:
-> On Friday 05 September 2014, Krzysztof Kozlowski wrote:
->> The commit only moves code around with one additional observable change:
->> the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
->> CFLAGS are not necessary any more.
->
-> This turns out to be wrong, and your change broke 'allmodconfig' builds
-> in linux-next. Please apply this patch on top.
+Currently sunxi_divs_clk_setup assumes the number of child clocks
+to be the same as the number of clock-output-names, and a maximum
+of SUNXI_DIVS_MAX_QTY child clocks.
 
-My patch definitely needed more testing.
-I posted a fix here:
-https://lkml.org/lkml/2014/9/24/163
-However it seems that it wasn't picked up by anyone yet.
+On sun6i, PLL6 only has 1 child clock, but the parent would be used
+as well, thereby also having it's own clock-output-names entry. This
+results in an extra bogus clock being registered.
 
-Russell, could you pick up the patch (with acks from Nicolas and Kukjin)?
+This patch adds an entry for the number of child clocks alongside
+the data structures for them.
 
-Best regards,
-Krzysztof
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-
->
-> 	Arnd
->
-> 8<----------
->  From 4ba6bf8806caec386e35930314dbad071284c837 Mon Sep 17 00:00:00 2001
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Fri, 26 Sep 2014 23:09:38 +0200
-> Subject: [PATCH] ARM: EXYNOS: fix build error in platsmp.c
->
-> /tmp/ccYeWL3V.s: Assembler messages:
-> /tmp/ccYeWL3V.s:659: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccYeWL3V.s:664: Error: selected processor does not support ARM mode `isb '
-> /tmp/ccYeWL3V.s:665: Error: selected processor does not support ARM mode `dsb '
-> make[3]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 17342534e1d932 ("ARM: EXYNOS: Move code from hotplug.c to platsmp.c")
->
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index 4e49d4efb264..64324bf5edb4 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -21,6 +21,7 @@ obj-$(CONFIG_PM_SLEEP)		+= suspend.o
->   obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
->
->   obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-> +CFLAGS_platsmp.o		:= -march=armv7-a
->
->   plus_sec := $(call as-instr,.arch_extension sec,+sec)
->   AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 2cf6581..05d9329 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -1037,6 +1037,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 
+ struct divs_data {
+ 	const struct factors_data *factors; /* data for the factor clock */
++	int ndivs; /* number of children */
+ 	struct {
+ 		u8 fixed; /* is it a fixed divisor? if not... */
+ 		struct clk_div_table *table; /* is it a table based divisor? */
+@@ -1056,6 +1057,7 @@ static struct clk_div_table pll6_sata_tbl[] = {
+ 
+ static const struct divs_data pll5_divs_data __initconst = {
+ 	.factors = &sun4i_pll5_data,
++	.ndivs = 2,
+ 	.div = {
+ 		{ .shift = 0, .pow = 0, }, /* M, DDR */
+ 		{ .shift = 16, .pow = 1, }, /* P, other */
+@@ -1064,6 +1066,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+ 
+ static const struct divs_data pll6_divs_data __initconst = {
+ 	.factors = &sun4i_pll6_data,
++	.ndivs = 2,
+ 	.div = {
+ 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+ 		{ .fixed = 2 }, /* P, other */
+@@ -1094,7 +1097,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	struct clk_fixed_factor *fix_factor;
+ 	struct clk_divider *divider;
+ 	void __iomem *reg;
+-	int i = 0;
++	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+ 	int flags, clkflags;
+ 
+ 	/* Set up factor clock that we will be dividing */
+@@ -1117,7 +1120,11 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	 * our RAM clock! */
+ 	clkflags = !strcmp("pll5", parent) ? 0 : CLK_SET_RATE_PARENT;
+ 
+-	for (i = 0; i < SUNXI_DIVS_MAX_QTY; i++) {
++	/* if number of children known, use it */
++	if (data->ndivs)
++		ndivs = data->ndivs;
++
++	for (i = 0; i < ndivs; i++) {
+ 		if (of_property_read_string_index(node, "clock-output-names",
+ 						  i, &clk_name) != 0)
+ 			break;
+-- 
+2.1.1
