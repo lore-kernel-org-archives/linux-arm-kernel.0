@@ -1,45 +1,66 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 27 Sep 2014 10:33:37 +0200
-Subject: [PATCH] bcma: use device from DT (brcm,bus-gpio) for SoC GPIO chip
-In-Reply-To: <CACna6rwwfJOdnxhmnW7MUuUC1YBPx8bmDbiaSy1+G39hF4p7OA@mail.gmail.com>
-References: <1411741733-13888-1-git-send-email-zajec5@gmail.com>	<2539898.4te2VKk57a@wuerfel>
- <CACna6rwwfJOdnxhmnW7MUuUC1YBPx8bmDbiaSy1+G39hF4p7OA@mail.gmail.com>
-Message-ID: <54267661.5000401@hauke-m.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 27 Sep 2014 10:39:14 +0200
+Subject: [PATCH v5 RESEND 1/3] ARM: EXYNOS: Move code from hotplug.c to
+ platsmp.c
+In-Reply-To: <201409262313.26272.arnd@arndb.de>
+References: <1409920495-16533-1-git-send-email-k.kozlowski@samsung.com>
+ <201409262313.26272.arnd@arndb.de>
+Message-ID: <542677B2.70506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2014 10:05 AM, Rafa? Mi?ecki wrote:
-> On 27 September 2014 00:03, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Friday 26 September 2014 16:28:53 Rafa? Mi?ecki wrote:
->>> +The top-level axi bus may contain following children:
->>> +
->>> +- gpio: GPIO chip on the SoC
->>> +
->>> +  Required properties:
->>> +  - compatible: "brcm,bus-gpio"
->>> +  - gpio-controller : makes the node a GPIO controller
->>> +  - #gpio-cells : size of the GPIO specifier, must be 2
->>> +
->>>
->>
->> I wonder if it would be better to avoid the subnode here and just
->> make the parent itself the gpio controller.
->>
->> Is the gpio controller part of the bus itself in reality, or is it
->> a device that gets probed on the bus?
-> 
-> I'm not sure how to treat this chip.
-> We control GPIOs using ChipCommon regs (and ChipCommon is one of
-> cores/devices on the bus), so you could also consider GPIO chip a
-> sub-device of ChipCommon.
-> I believe every Broadcom bus has a GPIO chip. In the ancient (MIPS)
-> times, even if we didn't have ChipCommon, there was an EXTIF core that
-> used to provide access to the GPIO chip.
-> 
-> What do you think? Should I make it separated device, even it if
-> depends on the SoC and its ChipCommon core (device)?
-> 
-I would make GPIO a subdevive of chipcommon. The chipcommon core has an
-own IRQ which is also used for GPIO.
+W dniu 26.09.2014 o 23:13, Arnd Bergmann pisze:
+> On Friday 05 September 2014, Krzysztof Kozlowski wrote:
+>> The commit only moves code around with one additional observable change:
+>> the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
+>> CFLAGS are not necessary any more.
+>
+> This turns out to be wrong, and your change broke 'allmodconfig' builds
+> in linux-next. Please apply this patch on top.
 
-Hauke
+My patch definitely needed more testing.
+I posted a fix here:
+https://lkml.org/lkml/2014/9/24/163
+However it seems that it wasn't picked up by anyone yet.
+
+Russell, could you pick up the patch (with acks from Nicolas and Kukjin)?
+
+Best regards,
+Krzysztof
+
+
+>
+> 	Arnd
+>
+> 8<----------
+>  From 4ba6bf8806caec386e35930314dbad071284c837 Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Fri, 26 Sep 2014 23:09:38 +0200
+> Subject: [PATCH] ARM: EXYNOS: fix build error in platsmp.c
+>
+> /tmp/ccYeWL3V.s: Assembler messages:
+> /tmp/ccYeWL3V.s:659: Error: selected processor does not support ARM mode `isb '
+> /tmp/ccYeWL3V.s:664: Error: selected processor does not support ARM mode `isb '
+> /tmp/ccYeWL3V.s:665: Error: selected processor does not support ARM mode `dsb '
+> make[3]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 17342534e1d932 ("ARM: EXYNOS: Move code from hotplug.c to platsmp.c")
+>
+> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> index 4e49d4efb264..64324bf5edb4 100644
+> --- a/arch/arm/mach-exynos/Makefile
+> +++ b/arch/arm/mach-exynos/Makefile
+> @@ -21,6 +21,7 @@ obj-$(CONFIG_PM_SLEEP)		+= suspend.o
+>   obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+>
+>   obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+> +CFLAGS_platsmp.o		:= -march=armv7-a
+>
+>   plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>   AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
