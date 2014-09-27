@@ -1,55 +1,22 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sat, 27 Sep 2014 11:19:13 +0800
-Subject: [RFC] should we remove soc subnode in all berlin SoC's dts if
- SOC_BUS is selected
-In-Reply-To: <1821058.sf1gKKFj8T@wuerfel>
-References: <20140926193945.3bb94276@xhacker>
-	<1821058.sf1gKKFj8T@wuerfel>
-Message-ID: <20140927111913.26a69d4b@xhacker>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Sat, 27 Sep 2014 10:28:46 +0530
+Subject: [PATCH 0/2] Exynos3250: add DT node and clock for UART2 and UART3
+Message-ID: <1411793928-32692-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Sep 2014 05:32:29 -0700
-Arnd Bergmann <arnd@arndb.de> wrote:
+This patch series adds device tree node and missing clock support of UART2
+and UART3 for Exynos3250. DT patch is dependent on clock patch.
 
-> On Friday 26 September 2014 19:39:45 Jisheng Zhang wrote:
-> > We want to export machine name, soc family, chip revision and chipid to
-> > userspace via. the SOC BUS interface, i.e call soc_device_register()
-> > 
-> > It works perfectly, but there's one side effect: every device nodes will
-> > have an additional level. For example:
-> > 
-> > /sys/devices/soc.0/xxx.sdhci will be changed to
-> > 
-> > /sys/devices/soc0/soc.0/xxx.sdhci
-> > 
-> > This seems a bit ugly. I have one solution: remove "soc" subnodes in all
-> > berlin's dts, then we will have 
-> > 
-> > /sys/devices/soc0/xxx.sdhci
-> > 
-> > Is there any better solution? 
-> > 
-> 
-> As of a recent discussion, we decided that the soc_device_register is now
-> purely informational and not meant to be used as the root for all the
-> other devices.
-> 
-> The structure in the DTS is fine and will continue to do the right thing.
-> 
-> Originally the intention was that soc_device_register would be used to
-> register the soc device  that corresponds to your /soc device node in DT,
-> and then you'd populate the other devices below, but we never implemented
-> a nice way to call that, so you don't need to bother with it.
-> 
-> Instead, you will now have /sys/devices/soc0/ for the soc_device you
-> register manually, and /sys/devices/soc.0/ to correspond with the DT node
-> and continues to have the child devices. This is still a bit confusing, but
-> should be consistent across all (new) platforms.
-> 
+Pankaj Dubey (2):
+  clk: samsung: exynos3250: add uart2/3 related clocks
+  arm: dts: exynos3250: add device node support for serial2 and serial3
 
-Got it. Thanks for the detailed explanations. I will follow this solution both
-in mainline and mrvl internal berlin kernel tree.
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos3250.dtsi         |   24 ++++++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos3250.c      |   11 +++++++++++
+ include/dt-bindings/clock/exynos3250.h    |   10 +++++++++-
+ 4 files changed, 65 insertions(+), 1 deletion(-)
 
-Thanks very much,
-Jisheng
+-- 
+1.7.9.5
