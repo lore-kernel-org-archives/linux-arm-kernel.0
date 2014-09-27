@@ -1,104 +1,158 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Sep 2014 09:07:08 +0200
-Subject: [PATCH 1/7] clk: sunxi: Add post clk divider for factor clocks
-In-Reply-To: <CAGb2v64o-7La6Sd_WVDrPQC0DUTqXZPZoG7u=OpXb+xRB1tcog@mail.gmail.com>
-References: <1410000448-9999-1-git-send-email-wens@csie.org>
- <1410000448-9999-2-git-send-email-wens@csie.org>
- <54145822.4020607@elopez.com.ar> <20140916155711.GF2166@lukather>
- <CAGb2v64o-7La6Sd_WVDrPQC0DUTqXZPZoG7u=OpXb+xRB1tcog@mail.gmail.com>
-Message-ID: <20140927070708.GY15315@lukather>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Sat, 27 Sep 2014 15:11:28 +0800
+Subject: [PATCH v2] i2c: rk3x: adjust the LOW divison based on characteristics
+ of SCL
+Message-ID: <1411801888-3152-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 11:35:58PM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime, Emilio,
-> 
-> On Tue, Sep 16, 2014 at 11:57 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Emilio,
-> >
-> > On Sat, Sep 13, 2014 at 11:43:46AM -0300, Emilio L?pez wrote:
-> >> Hi,
-> >>
-> >> El 06/09/14 a las 07:47, Chen-Yu Tsai escibi?:
-> >> >Some factor clocks, mostly PLLs, have an extra fixed divider just before
-> >> >the clock output. Add an option to the factor clk driver config data to
-> >> >specify this divider.
-> >> >
-> >> >Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >---
-> >> >  drivers/clk/sunxi/clk-factors.c | 3 +++
-> >> >  drivers/clk/sunxi/clk-factors.h | 1 +
-> >> >  2 files changed, 4 insertions(+)
-> >> >
-> >> >diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> >> >index 2057c8a..435111d 100644
-> >> >--- a/drivers/clk/sunxi/clk-factors.c
-> >> >+++ b/drivers/clk/sunxi/clk-factors.c
-> >> >@@ -64,6 +64,9 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
-> >> >     /* Calculate the rate */
-> >> >     rate = (parent_rate * (n + config->n_start) * (k + 1) >> p) / (m + 1);
-> >> >
-> >> >+    if (config->post_div)
-> >> >+            rate /= config->post_div;
-> >> >+
-> >> >     return rate;
-> >> >  }
-> >> >
-> >> >diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-> >> >index d2d0efa..ce70c65 100644
-> >> >--- a/drivers/clk/sunxi/clk-factors.h
-> >> >+++ b/drivers/clk/sunxi/clk-factors.h
-> >> >@@ -16,6 +16,7 @@ struct clk_factors_config {
-> >> >     u8 pshift;
-> >> >     u8 pwidth;
-> >> >     u8 n_start;
-> >> >+    u8 post_div;
-> >> >  };
-> >> >
-> >> >  struct clk_factors {
-> >> >
-> >>
-> >> For the record, I liked your solution on[1] more, as it's in line
-> >> with what we're doing on the other sunxi platforms, instead of
-> >> adding features in factors to cover for some cases. But it's your
-> >> and Maxime's call, as I haven't written any of the sun6i code so
-> >> far.
-> >
-> > No, you still wrote most of the clock support, so your opinion is
-> > always valuable (and valued).
-> >
-> > Thing is, unlike what was done in the sun4i driver where there was a
-> > "real" technical issue that was preventing us from using only
-> > fixed-factor, we're not in such a case in sun6i (and later,
-> > apparently).
-> >
-> > PLL6 has only one output, which is then directly multiplied by
-> > fixed-factors, without any (pre|post)-dividers for any of them.
-> >
-> > That means that following what you did for the sun4i would just
-> > register 3 "dumbs" fixed-factors, that we couldn't reference from DT,
-> > or through a cryptic index (which is not even documented in our
-> > bindings).
-> >
-> > I'd be fine either way, I just prefer the solution that has less code
-> > and is more explicit.
-> 
-> What's the verdict on this series?
+From: Addy <addy.ke@rock-chips.com>
 
-If Emilio prefers to have a single clock node, fine. But please update
-the DT bindings documentation.
+As show in I2C specification:
+- Standard-mode: the minimum HIGH period of the scl clock is 4.0us
+                 the minimum LOW period of the scl clock is 4.7us
+- Fast-mode: the minimum HIGH period of the scl clock is 0.6us
+             the minimum LOW period of the scl clock is 1.3us
 
-Maxime
+I have measured i2c SCL waveforms in fast-mode by oscilloscope
+on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
+It is so critical that we must adjust LOW division to increase
+the LOW period of the scl clock.
 
+After put this patch, we can find that min_low_ns is about
+5.4us in Standard-mode and 1.6us in Fast-mode.
+
+Thanks Doug for the suggestion about division formulas.
+
+Signed-off-by: Addy <addy.ke@rock-chips.com>
+---
+Changes in v2:
+- remove Fast-mode plus and HS-mode
+- use new formulas suggested by Doug
+
+ drivers/i2c/busses/i2c-rk3x.c | 104 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 97 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index e637c32..81672a8 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -428,19 +428,109 @@ out:
+ 	return IRQ_HANDLED;
+ }
+ 
++static void rk3x_i2c_get_min_ns(unsigned int scl_rate,
++				unsigned long *min_low_ns,
++				unsigned long *min_high_ns)
++{
++	WARN_ON(scl_rate > 400000);
++
++	/* As show in I2C specification:
++	 * - Standard-mode(100KHz):
++	 *   min_low_ns is 4700ns
++	 *   min_high_ns is 4000ns
++	 * - Fast-mode(400KHz):
++	 *   min_low_ns is 1300ns
++	 *   min_high_ns is 600ns
++	 *
++	 * (min_low_ns + min_high_ns) up to 10000ns in Standard-mode
++	 * and 2500ns in Fast-mode
++	 */
++	if (scl_rate <= 100000) {
++		*min_low_ns = 4700 + 650;
++		*min_high_ns = 4000 + 650;
++	} else {
++		*min_low_ns = 1300 + 300;
++		*min_high_ns = 600 + 300;
++	}
++}
++
++static void rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
++			       unsigned long *div_low, unsigned long *div_high)
++{
++	unsigned long min_low_ns, min_high_ns, min_total_ns;
++	unsigned long min_low_div, min_high_div;
++	unsigned long min_total_div, min_div_for_hold;
++	unsigned long extra_div, extra_low_div, ideal_low_div;
++	unsigned long i2c_rate_khz, scl_rate_khz;
++
++	rk3x_i2c_get_min_ns(scl_rate, &min_low_ns, &min_high_ns);
++	min_total_ns = min_low_ns + min_high_ns;
++
++	/* To avoid from overflow warning */
++	i2c_rate_khz = i2c_rate / 1000;
++	scl_rate_khz = scl_rate / 1000;
++
++	/*We need the total div to be >= this number
++	 * so we don't clock too fast.
++	 */
++	min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
++
++	/* These are the min dividers needed for hold times */
++	min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
++	min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
++	min_div_for_hold = (min_low_div + min_high_div);
++
++	if (min_div_for_hold > min_total_div) {
++		/* Time needed to meet hold requirements is important.
++		 * Just use that
++		 * */
++		*div_low = min_low_div;
++		*div_high = min_high_div;
++	} else {
++		/* We've got to distribute some time among the low and high
++		 * so we don't run too fast.
++		 */
++		extra_div = min_total_div - min_div_for_hold;
++		/* We'll try to split things up perfectly evenly,
++		 * biasing slightly towards having a higher div
++		 * for low (spend more time low).
++		 */
++		ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
++					     scl_rate_khz * 8 * min_total_ns);
++		/* Handle when the ideal low div is going to take up
++		 * more than we have.
++		 */
++		if (ideal_low_div > min_low_div + extra_div)
++			ideal_low_div = min_low_div + extra_div;
++		/* Give low the "ideal" and give high whatever extra is left.*/
++		extra_low_div = ideal_low_div - min_low_div;
++		*div_low = ideal_low_div;
++		*div_high
++			= min_high_div + (extra_div - extra_low_div);
++	}
++
++	/* Adjust to the fact that the hardware has an implicit "+1".*/
++	*div_low = *div_low - 1;
++	*div_high = *div_high - 1;
++}
++
+ static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+ {
+ 	unsigned long i2c_rate = clk_get_rate(i2c->clk);
+-	unsigned int div;
++	unsigned long div_low, div_high;
+ 
+-	/* SCL rate = (clk rate) / (8 * DIV) */
+-	div = DIV_ROUND_UP(i2c_rate, scl_rate * 8);
++	/* The formulas in rk3x TRM:
++	 * - T_scl_high = T_clk * (divh + 1) * 8
++	 * - T_scl_low = T_clk * (divl + 1) * 8
++	 * */
++	rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
+ 
+-	/* The lower and upper half of the CLKDIV reg describe the length of
+-	 * SCL low & high periods. */
+-	div = DIV_ROUND_UP(div, 2);
++	i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
+ 
+-	i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
++	dev_dbg(i2c->dev, "scl_ns: %luns, scl_low_ns: %luns, scl_high_ns: %luns\n",
++		1000000000/scl_rate,
++		(1000000000 / i2c_rate) * (div_low + 1) * 8,
++		(1000000000 / i2c_rate) * (div_high + 1) * 8);
+ }
+ 
+ /**
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140927/b6bd7df0/attachment.sig>
+1.8.3.2
