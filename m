@@ -1,43 +1,43 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 27 Sep 2014 14:50:17 +0200
-Subject: [PATCH 0/5] pinctrl: samsung: Data structure clean-up
-In-Reply-To: <5423C904.60708@gmail.com>
-References: <1411499141-26551-1-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdZCMD4x+wrvTOrrWK-Dy4_rg6bD2xUAA4jtTGTbT1uDag@mail.gmail.com>
- <5423C904.60708@gmail.com>
-Message-ID: <5426B289.7070802@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 27 Sep 2014 16:47:44 +0400
+Subject: [PATCH 4/4] serial: mxs-auart: enable PPS support
+In-Reply-To: <1411811197-12638-5-git-send-email-j.uzycki@elproma.com.pl>
+References: <1411811197-12638-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1411811197-12638-5-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <5426B1F0.9050006@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello.
 
-On 25.09.2014 09:49, Tomasz Figa wrote:
-> On 25.09.2014 09:47, Linus Walleij wrote:
->> On Tue, Sep 23, 2014 at 9:05 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>
->>> This series intends to clean up data structures used by pinctrl-samsung driver.
->>> More specifically, it separates initial compile time constants from data used
->>> at runtime, allowing unused variant data to be dropped and selected structures
->>> constified to improve safety.
->>
->> I like the patch set, tried to apply it but patch 3/5 failed to apply to the
->> devel branch for pinctrl.
->>
->> Can you rebase this on my "devel" branch, include Marek's Tested-by
->> tag and resend, and I'll take it for v3.18.
-> 
-> Sure. Will do that today evening. Probably clashed with some other
-> changes queued in the meantime.
+On 9/27/2014 1:46 PM, Janusz Uzycki wrote:
 
-Uhm. I went back home and forgot about this series until now. Sorry.
+> Enables PPS support in mxs-auart serial driver to make PPS API working.
 
-I have rebased it on your "devel" branch, although it seems like this
-branch is missing [1], which in turn seems to be already present in your
-"for-next" branch and is going to cause a merge conflict with this
-series. Should I still proceed with posting the series based on "devel"?
+> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+> ---
+>   drivers/tty/serial/mxs-auart.c | 10 ++++++++++
+>   1 file changed, 10 insertions(+)
 
-[1] f6a8249f9e55d pinctrl: exynos: Lock GPIOs as interrupts when used as
-EINTs
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index ab127a2..4f1ab98 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -787,6 +787,15 @@ static void mxs_auart_settermios(struct uart_port *u,
+>   		mxs_auart_disable_ms(u);
+>   }
+>
+> +static void mxs_auart_set_ldisc(struct uart_port *port, int new)
+> +{
+> +	if (new == N_PPS) {
+> +		port->flags |= UPF_HARDPPS_CD;
+> +		mxs_auart_enable_ms(port);
+> +	} else
+> +		port->flags &= ~UPF_HARDPPS_CD;
 
-Best regards,
-Tomasz
+    The kernel coding style dictates that {} should be in both arms of the 
+*if* statement.
+
+[...]
+
+WBR, Sergei
