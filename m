@@ -1,82 +1,77 @@
-From: juha-matti.tilli@iki.fi (Juha-Matti Tilli)
-Date: Sat, 27 Sep 2014 15:06:49 +0300
-Subject: [PATCH v6 4/4] thermal: Add Tegra SOCTHERM thermal management
- driver
-In-Reply-To: <5425CC6F.2020309@kapsi.fi>
-References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
- <1411724593-4037-5-git-send-email-cyndis@kapsi.fi>
- <20140926114533.GN31106@ulmo> <5425CC6F.2020309@kapsi.fi>
-Message-ID: <20140927120649.GA70809@sandfort.unics.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 27 Sep 2014 13:18:14 +0100
+Subject: [PATCH 2/4] serial: mxs-auart: use mctrl_gpio helpers for
+ handling modem signals
+In-Reply-To: <54269C34.8040702@elproma.com.pl>
+References: <1411811197-12638-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1411811197-12638-3-git-send-email-j.uzycki@elproma.com.pl>
+ <5426926C.60402@elproma.com.pl>
+ <20140927105408.GD5182@n2100.arm.linux.org.uk>
+ <54269C34.8040702@elproma.com.pl>
+Message-ID: <20140927121814.GE5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 11:28:31PM +0300, Mikko Perttunen wrote:
-> > I think a more idiomatic way to write this would be:
-> >
-> > static int
-> > calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
-> >                               struct tsensor_shared_calibration shared,
-> >                               u32 *calib)
-[snip]
-> >
-> > While at it, perhaps make shared a const * instead of passing it in by
-> > value?
-> 
-> That is possible, but I'm not sure what the difference would be. Is 
-> there a style rule forbidding by-value compound types? (Also if I change 
-> the style, it would go over 80 characters by even more.)
+On Sat, Sep 27, 2014 at 01:15:00PM +0200, Janusz U?ycki wrote:
+> It means it is possible but not in Linux today?
 
-I guess the idea is that it's more space- and time-efficient to pass
-compound types as pointers instead of by value. Kernel stack is quite
-limited in size, so allocating structs from stack in this way quickly
-eats up the stack. Furthermore, there's less machine language
-instructions in the function call if passed as a pointer, because when
-passed as a value, each member of the struct needs to be pushed to the
-stack separately (unless the member size is smaller than word length of
-the machine architecture, in which case the compiler may optimize a
-bit). So it's faster, too, to pass by pointer. In the case of kernel
-coding, of these problems the limited stack size is far more serious.
+It depends on your maximum interrupt latency.
 
-In this case, however, the current struct is only 16 bytes vs 4/8 bytes
-for a pointer, so it shouldn't matter that much. But IMO as a general
-rule it's a far better style to pass compound types as pointers. I would
-definitely pass by pointer here instead of passing by value even given
-that the advantages in this particular case are limited. You should
-consider the possibility that in a future driver version struct
-tsensor_shared_calibration may become larger, and thus the code will be
-closer to stack overflow if the one who increases the size of struct
-tsensor_shared_calibration doesn't notice that it is passed by value.
+> I think the problem is not interrupt delay, which is often much below 100us
+> (we get ~10us delay on DCD).
 
-There are always ways to structure the code so that it looks fine and
-the additional "const *" will not cause the line length to become >80
-chars. In my opinion, line length considerations should never play a
-role on deciding whether to pass by value or pass by pointer. I don't
-understand why you think this particular function would have line length
-problems. In my opinion, the following is 78 chars max:
+http://archive.arm.linux.org.uk/lurker/message/20130724.145238.44ad37b5.en.html
 
-static int 
-calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
-                              const struct tsensor_shared_calibration *shared,
-                              u32 *calib)
+   I can believe why this all happens, when you see USB interrupts taking
+   upwards of 3ms to complete:
 
-Of course, if you want to have "static int" on the same line as the
-function name, then you'll have problems but even those can be avoided
-so that the code still looks fine:
+   Longest time: 3247506ns
+   Longest irq: 24
+   Longest handler: usb_hcd_irq+0x0/0x68
 
-static int calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
-                                         const struct
-                                             tsensor_shared_calibration *shared,
-                                         u32 *calib)
+This no longer seems to be the case - the maximum interrupt time I'm seeing
+on recent kernels is:
 
-Anyway, the root cause of line length problems here is overlong
-identifiers. For example, "calculate_tsensor_calibration" is in my
-opinion too long for a function name. You could easily abbreviate it to
-"calc_tsensor_calib" without losing any information. Similarly, "struct
-tsensor_shared_calibration" could be easily abbreviated to "struct
-tsensor_shared_calib". Then you could have easily:
+   Longest time: 382236ns
+   Longest irq: 62
+   Longest handler: mv_interrupt+0x0/0x948
 
-static int calc_tsensor_calib(const struct tegra_tsensor *sensor,
-                              const struct tsensor_shared_calib *shared,
-                              u32 *calib)
+My Dove kernel runs permanently with my own maximum interrupt latency
+tracking enabled.
 
-without being even close to the 80-character line length limitation.
+> Isn't the problem rather how to break DMA transmission fast?
+
+There are two factors there.  The first is being able to tell the DMA
+engine to stop, the second is the UART hardware FIFO draining.
+
+> Hardware flow control not always requires to stop transmission
+> immediately.
+
+No.  Hardware flow control is normally implemented at the UART, and
+CTS is normally implemented to prevent the transmitter starting a new
+character.  Any in-progress character is completed before the transmitter
+stops, so that there are no errors.
+
+At least, this is the behaviour found on the UARTs which I've seen
+implementing hardware flow control, and it is the only sane way to do
+it.
+
+> Usually delay of some chars is acceptable if remote receiver
+> implements low/high water mark (overflow trigger lower than RX FIFO size).
+
+The receiver you may be communicating with may have a receive FIFO of
+only 16 characters.  It may deassert CTS when it reaches half-full state.
+That leaves you with only 8 characters to send before it overflows.  At
+115200 baud, you will have started to send the 9th characters by 700us.
+
+However, that isn't the full picture.  The full picture is that CTS is
+normally controlled by software as well, and depends on the availability
+of buffers to store characters.  There's latency at the remote end to
+deassert CTS in software when the software buffers reach their high
+watermark, and there's the hope that there is sufficient room in those
+buffers to take the excess characters that the remote end may continue
+to send.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
