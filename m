@@ -1,59 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Sep 2014 10:54:42 +0200
-Subject: [PATCH 6/9] dmaengine: Create a generic dma_slave_caps callback
-In-Reply-To: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1411808085-27792-7-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sat, 27 Sep 2014 10:54:36 +0200
+Subject: [PATCH 0/9] dmaengine: Implement generic slave capabilities retrieval
+Message-ID: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dma_slave_caps is very important to the generic layers that might interact with
-dmaengine, such as ASoC. Unfortunately, it has been added as yet another
-dma_device callback, and most of the existing drivers haven't implemented it,
-reducing its reliability.
+Hi,
 
-Introduce a generic behaviour, pre-filling the dma_slave_caps struct with what
-it knows about the dma controller, before calling the dma_device callback, both
-to maintain a backward compatibility and to make sure that drivers can override
-that generic behaviour.
+As we discussed a couple of weeks ago, this is a first attempt at
+creating a generic behaviour for slave capabilities retrieval so that
+generic layers using dmaengine can actually rely on that.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- include/linux/dmaengine.h | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+That has been done mostly through two steps: by moving out the
+sub-commands of the device_control callback, so that the dmaengine
+core can then infer from that wether a sub-command is implemented, and
+then by moving the slave properties, such as the supported buswidth,
+to the structure dma_device itself.
 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index 4d0294ec3567..cfcbee145898 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -772,17 +772,24 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(
- 
- static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
- {
-+	struct dma_device *device;
-+
- 	if (!chan || !caps)
- 		return -EINVAL;
- 
-+	device = chan->device;
-+
- 	/* check if the channel supports slave transactions */
--	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-+	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
- 		return -ENXIO;
- 
--	if (chan->device->device_slave_caps)
--		return chan->device->device_slave_caps(chan, caps);
-+	caps->cmd_pause = !!device->device_pause;
-+	caps->cmd_terminate = !!device->device_terminate_all;
-+
-+	if (device->device_slave_caps)
-+		return device->device_slave_caps(chan, caps);
- 
--	return -ENXIO;
-+	return 0;
- }
- 
- static inline int dmaengine_terminate_all(struct dma_chan *chan)
+Comments are as usual appreciated!
+
+Thanks,
+Maxime
+
+Maxime Ripard (9):
+  dmaengine: Make the destination abbreviation coherent
+  dmaengine: Make channel allocation callbacks optional
+  dmaengine: Introduce a device_config callback
+  dmaengine: split out pause/resume operations from device_control
+  dmaengine: Add device_terminate_all callback
+  dmaengine: Create a generic dma_slave_caps callback
+  dmaengine: Move slave caps to dma_device
+  dmaengine: Mark device_control as deprecated
+  dmaengine: sun6i: Convert to generic slave_caps
+
+ drivers/dma/bcm2835-dma.c |   2 +-
+ drivers/dma/dmaengine.c   |   4 --
+ drivers/dma/edma.c        |   2 +-
+ drivers/dma/fsl-edma.c    |   2 +-
+ drivers/dma/omap-dma.c    |   2 +-
+ drivers/dma/pl330.c       |   2 +-
+ drivers/dma/sirf-dma.c    |   2 +-
+ drivers/dma/sun6i-dma.c   | 158 +++++++++++++++++++++++++---------------------
+ include/linux/dmaengine.h |  81 +++++++++++++++++++-----
+ 9 files changed, 158 insertions(+), 97 deletions(-)
+
 -- 
 2.1.0
