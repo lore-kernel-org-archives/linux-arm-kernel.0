@@ -1,47 +1,45 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Sat, 27 Sep 2014 15:36:38 +0200
-Subject: [PATCH] serial: mxs-auart: enable PPS support
-In-Reply-To: <5426B1F0.9050006@cogentembedded.com>
-References: <5426B1F0.9050006@cogentembedded.com>
-Message-ID: <1411824998-24050-1-git-send-email-j.uzycki@elproma.com.pl>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 27 Sep 2014 10:58:28 -0300
+Subject: [PATCH v2 1/3] drivers: of: add return value to
+ of_reserved_mem_device_init (fixup)
+In-Reply-To: <1411713865-26192-1-git-send-email-m.szyprowski@samsung.com>
+References: <1410434561-9294-2-git-send-email-m.szyprowski@samsung.com>
+ <1411713865-26192-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAOMZO5Be=E=TNiaKDSfJC3H=yQBTTnGSa7JBJnjVf7PV=vLLWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables PPS support in mxs-auart serial driver to make PPS API working.
+Hi Marek,
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
- drivers/tty/serial/mxs-auart.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+On Fri, Sep 26, 2014 at 3:44 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> This patch adds missing return value to error paths.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 4c238bf..fc262ba 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -782,6 +782,16 @@ static void mxs_auart_settermios(struct uart_port *u,
- 		mxs_auart_disable_ms(u);
- }
- 
-+static void mxs_auart_set_ldisc(struct uart_port *port, int new)
-+{
-+	if (new == N_PPS) {
-+		port->flags |= UPF_HARDPPS_CD;
-+		mxs_auart_enable_ms(port);
-+	} else {
-+		port->flags &= ~UPF_HARDPPS_CD;
-+	}
-+}
-+
- static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
- {
- 	u32 istat;
-@@ -949,6 +959,7 @@ static struct uart_ops mxs_auart_ops = {
- 	.startup	= mxs_auart_startup,
- 	.shutdown       = mxs_auart_shutdown,
- 	.set_termios    = mxs_auart_settermios,
-+	.set_ldisc      = mxs_auart_set_ldisc,
- 	.type	   	= mxs_auart_type,
- 	.release_port   = mxs_auart_release_port,
- 	.request_port   = mxs_auart_request_port,
--- 
-1.7.11.3
+I have also sent a similar fix:
+http://www.spinics.net/lists/devicetree/msg51127.html
+
+> ---
+>  drivers/of/of_reserved_mem.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index 7e7de03..e975156 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -250,13 +250,13 @@ int of_reserved_mem_device_init(struct device *dev)
+>
+>         np = of_parse_phandle(dev->of_node, "memory-region", 0);
+>         if (!np)
+> -               return;
+> +               return -ENODEV;
+>
+>         rmem = __find_rmem(np);
+>         of_node_put(np);
+>
+>         if (!rmem || !rmem->ops || !rmem->ops->device_init)
+> -               return;
+> +               return -ENIVAL;
+
+ENIVAL does not exist. I guess you meant EINVAL ;-)
