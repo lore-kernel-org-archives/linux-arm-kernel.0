@@ -1,77 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Sep 2014 13:18:14 +0100
-Subject: [PATCH 2/4] serial: mxs-auart: use mctrl_gpio helpers for
- handling modem signals
-In-Reply-To: <54269C34.8040702@elproma.com.pl>
-References: <1411811197-12638-1-git-send-email-j.uzycki@elproma.com.pl>
- <1411811197-12638-3-git-send-email-j.uzycki@elproma.com.pl>
- <5426926C.60402@elproma.com.pl>
- <20140927105408.GD5182@n2100.arm.linux.org.uk>
- <54269C34.8040702@elproma.com.pl>
-Message-ID: <20140927121814.GE5182@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 27 Sep 2014 14:50:17 +0200
+Subject: [PATCH 0/5] pinctrl: samsung: Data structure clean-up
+In-Reply-To: <5423C904.60708@gmail.com>
+References: <1411499141-26551-1-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdZCMD4x+wrvTOrrWK-Dy4_rg6bD2xUAA4jtTGTbT1uDag@mail.gmail.com>
+ <5423C904.60708@gmail.com>
+Message-ID: <5426B289.7070802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 01:15:00PM +0200, Janusz U?ycki wrote:
-> It means it is possible but not in Linux today?
+Hi Linus,
 
-It depends on your maximum interrupt latency.
+On 25.09.2014 09:49, Tomasz Figa wrote:
+> On 25.09.2014 09:47, Linus Walleij wrote:
+>> On Tue, Sep 23, 2014 at 9:05 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>
+>>> This series intends to clean up data structures used by pinctrl-samsung driver.
+>>> More specifically, it separates initial compile time constants from data used
+>>> at runtime, allowing unused variant data to be dropped and selected structures
+>>> constified to improve safety.
+>>
+>> I like the patch set, tried to apply it but patch 3/5 failed to apply to the
+>> devel branch for pinctrl.
+>>
+>> Can you rebase this on my "devel" branch, include Marek's Tested-by
+>> tag and resend, and I'll take it for v3.18.
+> 
+> Sure. Will do that today evening. Probably clashed with some other
+> changes queued in the meantime.
 
-> I think the problem is not interrupt delay, which is often much below 100us
-> (we get ~10us delay on DCD).
+Uhm. I went back home and forgot about this series until now. Sorry.
 
-http://archive.arm.linux.org.uk/lurker/message/20130724.145238.44ad37b5.en.html
+I have rebased it on your "devel" branch, although it seems like this
+branch is missing [1], which in turn seems to be already present in your
+"for-next" branch and is going to cause a merge conflict with this
+series. Should I still proceed with posting the series based on "devel"?
 
-   I can believe why this all happens, when you see USB interrupts taking
-   upwards of 3ms to complete:
+[1] f6a8249f9e55d pinctrl: exynos: Lock GPIOs as interrupts when used as
+EINTs
 
-   Longest time: 3247506ns
-   Longest irq: 24
-   Longest handler: usb_hcd_irq+0x0/0x68
-
-This no longer seems to be the case - the maximum interrupt time I'm seeing
-on recent kernels is:
-
-   Longest time: 382236ns
-   Longest irq: 62
-   Longest handler: mv_interrupt+0x0/0x948
-
-My Dove kernel runs permanently with my own maximum interrupt latency
-tracking enabled.
-
-> Isn't the problem rather how to break DMA transmission fast?
-
-There are two factors there.  The first is being able to tell the DMA
-engine to stop, the second is the UART hardware FIFO draining.
-
-> Hardware flow control not always requires to stop transmission
-> immediately.
-
-No.  Hardware flow control is normally implemented at the UART, and
-CTS is normally implemented to prevent the transmitter starting a new
-character.  Any in-progress character is completed before the transmitter
-stops, so that there are no errors.
-
-At least, this is the behaviour found on the UARTs which I've seen
-implementing hardware flow control, and it is the only sane way to do
-it.
-
-> Usually delay of some chars is acceptable if remote receiver
-> implements low/high water mark (overflow trigger lower than RX FIFO size).
-
-The receiver you may be communicating with may have a receive FIFO of
-only 16 characters.  It may deassert CTS when it reaches half-full state.
-That leaves you with only 8 characters to send before it overflows.  At
-115200 baud, you will have started to send the 9th characters by 700us.
-
-However, that isn't the full picture.  The full picture is that CTS is
-normally controlled by software as well, and depends on the availability
-of buffers to store characters.  There's latency at the remote end to
-deassert CTS in software when the software buffers reach their high
-watermark, and there's the hope that there is sufficient room in those
-buffers to take the excess characters that the remote end may continue
-to send.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Tomasz
