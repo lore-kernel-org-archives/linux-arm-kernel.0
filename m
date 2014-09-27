@@ -1,80 +1,55 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 26 Sep 2014 18:58:15 -0600
-Subject: [PATCH v7 7/7] arm: dts: qcom: Add idle states device nodes for 8084
-In-Reply-To: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1411779495-39724-8-git-send-email-lina.iyer@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Sat, 27 Sep 2014 11:19:13 +0800
+Subject: [RFC] should we remove soc subnode in all berlin SoC's dts if
+ SOC_BUS is selected
+In-Reply-To: <1821058.sf1gKKFj8T@wuerfel>
+References: <20140926193945.3bb94276@xhacker>
+	<1821058.sf1gKKFj8T@wuerfel>
+Message-ID: <20140927111913.26a69d4b@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add allowable C-States for each cpu using the cpu-idle-states node.
-ARM spec dictates WFI as the default idle state at 0. Support standalone
-power collapse (power down that does not affect any SoC idle states) for
-each cpu.
+On Fri, 26 Sep 2014 05:32:29 -0700
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8084.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> On Friday 26 September 2014 19:39:45 Jisheng Zhang wrote:
+> > We want to export machine name, soc family, chip revision and chipid to
+> > userspace via. the SOC BUS interface, i.e call soc_device_register()
+> > 
+> > It works perfectly, but there's one side effect: every device nodes will
+> > have an additional level. For example:
+> > 
+> > /sys/devices/soc.0/xxx.sdhci will be changed to
+> > 
+> > /sys/devices/soc0/soc.0/xxx.sdhci
+> > 
+> > This seems a bit ugly. I have one solution: remove "soc" subnodes in all
+> > berlin's dts, then we will have 
+> > 
+> > /sys/devices/soc0/xxx.sdhci
+> > 
+> > Is there any better solution? 
+> > 
+> 
+> As of a recent discussion, we decided that the soc_device_register is now
+> purely informational and not meant to be used as the root for all the
+> other devices.
+> 
+> The structure in the DTS is fine and will continue to do the right thing.
+> 
+> Originally the intention was that soc_device_register would be used to
+> register the soc device  that corresponds to your /soc device node in DT,
+> and then you'd populate the other devices below, but we never implemented
+> a nice way to call that, so you don't need to bother with it.
+> 
+> Instead, you will now have /sys/devices/soc0/ for the soc_device you
+> register manually, and /sys/devices/soc.0/ to correspond with the DT node
+> and continues to have the child devices. This is still a bit confusing, but
+> should be consistent across all (new) platforms.
+> 
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 3dda230..a1ea1c0 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -19,6 +19,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
- 			qcom,saw = <&saw0>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		cpu at 1 {
-@@ -29,6 +30,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
- 			qcom,saw = <&saw1>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		cpu at 2 {
-@@ -39,6 +41,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
- 			qcom,saw = <&saw2>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		cpu at 3 {
-@@ -49,6 +52,7 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
- 			qcom,saw = <&saw3>;
-+			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
- 		};
- 
- 		L2: l2-cache {
-@@ -56,6 +60,22 @@
- 			cache-level = <2>;
- 			qcom,saw = <&saw_l2>;
- 		};
-+
-+		idle-states {
-+			CPU_WFI: wfi {
-+				compatible = "qcom,idle-state-wfi", "arm,idle-state";
-+				entry-latency-us = <1>;
-+				exit-latency-us = <1>;
-+				min-residency-us = <2>;
-+			};
-+
-+			CPU_SPC: spc {
-+				compatible = "qcom,idle-state-spc", "arm,idle-state";
-+				entry-latency-us = <150>;
-+				exit-latency-us = <200>;
-+				min-residency-us = <2000>;
-+			};
-+		};
- 	};
- 
- 	cpu-pmu {
--- 
-1.9.1
+Got it. Thanks for the detailed explanations. I will follow this solution both
+in mainline and mrvl internal berlin kernel tree.
+
+Thanks very much,
+Jisheng
