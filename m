@@ -1,63 +1,57 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 26 Sep 2014 18:46:48 -0500
-Subject: [PATCH] ARM: fix set_tls for !CONFIG_KUSER_HELPERS
-Message-ID: <1411775208-14280-1-git-send-email-nathan_lynch@mentor.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 26 Sep 2014 17:05:02 -0700
+Subject: [GIT PULL] clk: mvebu changes for v3.18
+In-Reply-To: <20140914083328.GU21986@titan.lakedaemon.net>
+References: <20140914083328.GU21986@titan.lakedaemon.net>
+Message-ID: <20140927000502.19023.13749@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joachim Eastwood reports that commit fbfb872f5f41 "ARM: 8148/1: flush
-TLS and thumbee register state during exec" causes a boot-time crash
-on a Cortex-M4 nommu system:
+Quoting Jason Cooper (2014-09-14 01:33:28)
+> Mike,
+> 
+> It's pretty slow this cycle, here's the clock changes we've accrued for
+> mvebu.  They've been in -next.
+> 
+> Please pull.
 
-Freeing unused kernel memory: 68K (281e5000 - 281f6000)
-Unhandled exception: IPSR = 00000005 LR = fffffff1
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
-task: 29834000 ti: 29832000 task.ti: 29832000
-PC is at flush_thread+0x2e/0x40
-LR is at flush_thread+0x21/0x40
-pc : [<2800954a>] lr : [<2800953d>] psr: 4100000b
-sp : 29833d60 ip : 00000000 fp : 00000001
-r10: 00003cf8 r9 : 29b1f000 r8 : 00000000
-r7 : 29b0bc00 r6 : 29834000 r5 : 29832000 r4 : 29832000
-r3 : ffff0ff0 r2 : 29832000 r1 : 00000000 r0 : 282121f0
-xPSR: 4100000b
-CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
-[<2800afa5>] (unwind_backtrace) from [<2800a327>] (show_stack+0xb/0xc)
-[<2800a327>] (show_stack) from [<2800a963>] (__invalid_entry+0x4b/0x4c)
+Pulled!
 
-The problem is that set_tls is attempting to clear the TLS location in
-the kernel-user helper page, which isn't set up on V7M.
+Thanks,
+Mike
 
-Fix this by guarding the write to the kuser helper page with
-a CONFIG_KUSER_HELPERS ifdef.
-
-Reported-by: Joachim Eastwood <manabian@gmail.com>
-Fixes: fbfb872f5f41 ARM: 8148/1: flush TLS and thumbee register state during exec
-Cc: stable at vger.kernel.org
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
- arch/arm/include/asm/tls.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
-index 36172adda9d0..5f833f7adba1 100644
---- a/arch/arm/include/asm/tls.h
-+++ b/arch/arm/include/asm/tls.h
-@@ -81,6 +81,7 @@ static inline void set_tls(unsigned long val)
- 			asm("mcr p15, 0, %0, c13, c0, 3"
- 			    : : "r" (val));
- 		} else {
-+#ifdef CONFIG_KUSER_HELPERS
- 			/*
- 			 * User space must never try to access this
- 			 * directly.  Expect your app to break
-@@ -89,6 +90,7 @@ static inline void set_tls(unsigned long val)
- 			 * entry-armv.S for details)
- 			 */
- 			*((unsigned int *)0xffff0ff0) = val;
-+#endif
- 		}
- 
- 	}
--- 
-1.9.3
+> 
+> thx,
+> 
+> Jason.
+> 
+> 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3.18
+> 
+> for you to fetch changes up to ceac26c64200015a5e6e358e903b1ca9a6f41dd8:
+> 
+>   clk: mvebu: armada-375: Fix the description of the SAR in the comment (2014-09-09 15:15:22 +0000)
+> 
+> ----------------------------------------------------------------
+> clock changes for mvebu for v3.18
+> 
+>  - correct timer drift caused by SSCG deviation
+>  - fix typo in comment
+> 
+> ----------------------------------------------------------------
+> Gregory CLEMENT (3):
+>       clk: mvebu: Fix clk frequency value if SSCG is enabled
+>       clk: mvebu: armada-370: Fix timer drift caused by the SSCG deviation
+>       clk: mvebu: armada-375: Fix the description of the SAR in the comment
+> 
+>  drivers/clk/mvebu/armada-370.c |  8 +++++
+>  drivers/clk/mvebu/armada-375.c |  4 +--
+>  drivers/clk/mvebu/common.c     | 82 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/mvebu/common.h     |  7 ++++
+>  4 files changed, 99 insertions(+), 2 deletions(-)
