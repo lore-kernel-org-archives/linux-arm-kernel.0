@@ -1,43 +1,31 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 27 Sep 2014 10:05:44 +0200
-Subject: [PATCH] bcma: use device from DT (brcm,
- bus-gpio) for SoC GPIO chip
-In-Reply-To: <2539898.4te2VKk57a@wuerfel>
-References: <1411741733-13888-1-git-send-email-zajec5@gmail.com>
- <2539898.4te2VKk57a@wuerfel>
-Message-ID: <CACna6rwwfJOdnxhmnW7MUuUC1YBPx8bmDbiaSy1+G39hF4p7OA@mail.gmail.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Sat, 27 Sep 2014 13:37:46 +0530
+Subject: [PATCH v7 1/7] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1411779495-39724-2-git-send-email-lina.iyer@linaro.org>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <54267052.7020907@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 September 2014 00:03, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 26 September 2014 16:28:53 Rafa? Mi?ecki wrote:
->> +The top-level axi bus may contain following children:
->> +
->> +- gpio: GPIO chip on the SoC
->> +
->> +  Required properties:
->> +  - compatible: "brcm,bus-gpio"
->> +  - gpio-controller : makes the node a GPIO controller
->> +  - #gpio-cells : size of the GPIO specifier, must be 2
->> +
->>
->
-> I wonder if it would be better to avoid the subnode here and just
-> make the parent itself the gpio controller.
->
-> Is the gpio controller part of the bus itself in reality, or is it
-> a device that gets probed on the bus?
 
-I'm not sure how to treat this chip.
-We control GPIOs using ChipCommon regs (and ChipCommon is one of
-cores/devices on the bus), so you could also consider GPIO chip a
-sub-device of ChipCommon.
-I believe every Broadcom bus has a GPIO chip. In the ancient (MIPS)
-times, even if we didn't have ChipCommon, there was an EXTIF core that
-used to provide access to the GPIO chip.
+On 27-09-2014 06:28 AM, Lina Iyer wrote:
+> Based on work by many authors, available at codeaurora.org
+> 
 
-What do you think? Should I make it separated device, even it if
-depends on the SoC and its ChipCommon core (device)?
+..
 
--- 
-Rafa?
+> +int qcom_spm_set_low_power_mode(enum spm_mode mode)
+> +{
+> +	struct spm_driver_data *drv = &__get_cpu_var(cpu_spm_drv);
+> +	u32 start_addr = 0;
+initialization not necessary.
+
+> +	u32 ctl_val;
+> +
+> +	if (!drv || !drv->reg_data)
+
+..
+
+> +#endif  /* __QCOM_SPM_H */
+> 
