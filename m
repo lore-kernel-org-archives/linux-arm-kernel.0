@@ -1,36 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 27 Sep 2014 21:56:10 +0200
-Subject: pxa-dt and multiple platforms support
-In-Reply-To: <8738bcdf2r.fsf@free.fr>
-References: <877g0pc5g6.fsf@free.fr> <32462021.GYIKv5x9AF@wuerfel>
- <8738bcdf2r.fsf@free.fr>
-Message-ID: <2605016.XXNIkQVRuo@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Sat, 27 Sep 2014 14:18:55 -0600
+Subject: [PATCH v12 08/12] PCI: OF: Introduce helper function for
+ retrieving PCI domain numbers
+In-Reply-To: <20140926224752.GB22030@e106497-lin.cambridge.arm.com>
+References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
+ <1411498874-9864-9-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_Jsq+j40Xf208wCf4as3H=cDU=htJ-JWinB0DjpcORjatNXQ@mail.gmail.com>
+ <20140926212052.GA6030@borg.dudau.co.uk>
+ <CAL_JsqKJ6bfPuOofo4grVm3qW_WOpUzcS1juZvHxZdFyyF_19A@mail.gmail.com>
+ <20140926224752.GB22030@e106497-lin.cambridge.arm.com>
+Message-ID: <CAErSpo5Q-gZaeV91+UeMjmnUt7jqGndDY6zfZqsDWJUNh+Gm6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 September 2014 21:43:40 Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > I think it should be easy enough to move the function declarations you need out of
-> > mach/pxa3xx.h and mach/pxa27x.h into a file that is shared between the platforms,
-> > and that is included by both. The DT file won't need the register definitions
-> > or a lot of the other things that are provided by mach/pxa3xx.h.
-> 
-> Yes, I had thought of that, and generic.h would be a good candidate.
-> 
-> I have not mentioned it because there is one thing I'm afraid of : should we
-> discover that any pxa variant initialization requires one register to be
-> accessed, then the pxa-dt should be split into several pxaXXX-dt.c anyway.
-> 
-> It is not the case AFAIK. I'm pondering the risk against having 2 split apart
-> files ...
+[+cc Yinghai]
 
-The register definitions are total crap and you shouldn't use them for the
-DT file anyway. If you get to the point where you have to touch some
-registers, I think the right answer would be to have a DT node for the
-register block and use of_iomap with a platform specific offset, or
-a proper device driver.
+On Fri, Sep 26, 2014 at 4:47 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Fri, Sep 26, 2014 at 10:53:26PM +0100, Rob Herring wrote:
 
-It's more likely that you won't actually need this though.
+>> I thought Bjorn already applied the series. Who's agreement are you
+>> waiting for specifically.
+>
+> Looks like he only applied about 60% of the series.
 
-	Arnd
+I applied it all but Yinghai pointed out a problem with a patch in the
+middle, so I dropped that patch and everything after it because I didn't
+have time to work out whether the later patches depended on anything
+in the one I dropped.
+
+Bjorn
