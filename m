@@ -1,37 +1,32 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 27 Sep 2014 22:47:43 +0200
-Subject: [PATCH] bcma: use device from DT (brcm,bus-gpio) for SoC GPIO chip
-In-Reply-To: <CACna6rwYcSh7-uFYA+paNehNwrqddmn2az+a9ZwggVGofbDR7w@mail.gmail.com>
-References: <1411741733-13888-1-git-send-email-zajec5@gmail.com>	<2539898.4te2VKk57a@wuerfel>	<CACna6rwwfJOdnxhmnW7MUuUC1YBPx8bmDbiaSy1+G39hF4p7OA@mail.gmail.com>	<54267661.5000401@hauke-m.de>
- <CACna6rwYcSh7-uFYA+paNehNwrqddmn2az+a9ZwggVGofbDR7w@mail.gmail.com>
-Message-ID: <5427226F.8080601@hauke-m.de>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Sat, 27 Sep 2014 14:31:51 -0700
+Subject: [PATCH v2 0/2] iommu/arm-smmu: hard iova_to_phys
+Message-ID: <1411853513-9571-1-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2014 12:37 PM, Rafa? Mi?ecki wrote:
-> On 27 September 2014 10:33, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> I would make GPIO a subdevive of chipcommon. The chipcommon core has an
->> own IRQ which is also used for GPIO.
-> 
-> Which ChipCommon do yo mean?
-> 1) chipcommonA (compatible = "simple-bus")
-> 2) chipcommon at 0 (child of axi at 18000000 AKA brcm,bus-axi)
+This series introduces support for performing iova-to-phys translations via
+the ARM SMMU hardware on supported implementations. We also make use of
+some new generic macros for polling hardware registers.
 
-We should combine this (both are describing the same core) I added
-chipcommonA to get some serial without adding bcma support first. When
-we have dts support added to bcma, I would like to remove chipcommonA
-from dtsi and add a chipcommon as a child of axi.
+Changes since v1:
 
-> 
-> It seems that for some reason both of them use IRQ 85, while the IRQ
-> for ChipCommon is 117 I believe.
+  - Renamed one of the iopoll macros to use the more standard `_atomic'
+    suffix
+  - Removed some convenience iopoll wrappers to encourage explicitness
 
-That's the same.
 
-In the dtsi file it says:
-interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-this will result in the IRQ number 117, when it is GIC_SPI you have to
-add 32 to the irq number to get the actual number which will be given to
-request_irq().
+Matt Wagantall (1):
+  iopoll: Introduce memory-mapped IO polling macros
 
-Hauke
+Mitchel Humpherys (1):
+  iommu/arm-smmu: add support for iova_to_phys through ATS1PR
+
+ drivers/iommu/arm-smmu.c | 73 ++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/iopoll.h   | 77 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 149 insertions(+), 1 deletion(-)
+ create mode 100644 include/linux/iopoll.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
