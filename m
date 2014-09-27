@@ -1,209 +1,26 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Sat, 27 Sep 2014 12:33:16 +0200
-Subject: [PATCH 2/4] serial: mxs-auart: use mctrl_gpio helpers for handling
- modem signals
-In-Reply-To: <1411811197-12638-3-git-send-email-j.uzycki@elproma.com.pl>
-References: <1411811197-12638-1-git-send-email-j.uzycki@elproma.com.pl>
- <1411811197-12638-3-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <5426926C.60402@elproma.com.pl>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sat, 27 Sep 2014 12:37:33 +0200
+Subject: [PATCH] bcma: use device from DT (brcm,
+ bus-gpio) for SoC GPIO chip
+In-Reply-To: <54267661.5000401@hauke-m.de>
+References: <1411741733-13888-1-git-send-email-zajec5@gmail.com>
+ <2539898.4te2VKk57a@wuerfel>
+ <CACna6rwwfJOdnxhmnW7MUuUC1YBPx8bmDbiaSy1+G39hF4p7OA@mail.gmail.com>
+ <54267661.5000401@hauke-m.de>
+Message-ID: <CACna6rwYcSh7-uFYA+paNehNwrqddmn2az+a9ZwggVGofbDR7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Could somebody comment if DMA could be enabled also
-if CTS/RTS is supported by GPIOs? Is it safe?
-It would allow me to avoid ugly code in mxs_auart_settermios(),
-as commented Russel King.
-Otherwise I have to keep backward compatibility on DMA
-and HW flow control, and fix the ugly code.
+On 27 September 2014 10:33, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> I would make GPIO a subdevive of chipcommon. The chipcommon core has an
+> own IRQ which is also used for GPIO.
 
-Marek Vasut:
-"Why do you think DMA would do any good on long transfers without 
-flowcontrol."
+Which ChipCommon do yo mean?
+1) chipcommonA (compatible = "simple-bus")
+2) chipcommon at 0 (child of axi at 18000000 AKA brcm,bus-axi)
 
-In past: "serial: mxs: enable the DMA only when the RTS/CTS is valid":
-https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/tty/serial/mxs-auart.c?id=8418e67d95235c3449df6f2e5b33863343fa72f9 
+It seems that for some reason both of them use IRQ 85, while the IRQ
+for ChipCommon is 117 I believe.
 
-"The original DMA support works only when RTS/CTS is enabled.
-(see the "e800163 serial: mxs-auart: add the DMA support for mx28")
-But after several patches, DMA support has lost this limit.
-(see the "bcc20f9 serial: mxs-auart: move to use generic DMA helper")
-
-So an UART without the RTS/CTS lines may also enables the DMA support,
-in which case the UART may gets unpredictable results.
-
-This patch adds an optional property for the UART DT node
-which indicates the UART has RTS and CTS lines, and it also means you
-enable the DMA support for this UART.
-
-This patch also adds a macro MXS_AUART_RTSCTS, and uses it to check
-RTS/CTS before we enable the DMA for the UART. "
-
-best regards
-Janusz
-
-W dniu 2014-09-27 11:46, Janusz Uzycki pisze:
-> Dedicated CTS and RTS pins are unusable together with a lot of other
-> peripherals because they share the same line. Pinctrl is limited.
->
-> Moreover, the AUART controller doesn't handle DTR/DSR/DCD/RI signals,
-> so we have to control them via GPIO.
->
-> This patch permits to use GPIOs to control the CTS/RTS/DTR/DSR/DCD/RI
-> signals.
->
-> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
-> ---
->   .../devicetree/bindings/serial/fsl-mxs-auart.txt   | 10 +++++-
->   drivers/tty/serial/Kconfig           |  1 +
->   drivers/tty/serial/mxs-auart.c       | 37 ++++++++++++++++++++--
->   3 files changed, 44 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/serial/fsl-mxs-auart.txt
-> index 59a40f1..7c408c8 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-mxs-auart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-mxs-auart.txt
-> @@ -11,8 +11,13 @@ Required properties:
->   - dma-names: "rx" for RX channel, "tx" for TX channel.
->   
->   Optional properties:
-> -- fsl,uart-has-rtscts : Indicate the UART has RTS and CTS lines,
-> +- fsl,uart-has-rtscts : Indicate the UART has RTS and CTS lines
-> +  for hardware flow control,
->   	it also means you enable the DMA support for this UART.
-> +- {rts,cts,dtr,dsr,rng,dcd}-gpios: specify a GPIO for RTS/CTS/DTR/DSR/RI/DCD
-> +  line respectively. It will use specified PIO instead of the peripheral
-> +  function pin for the USART feature.
-> +  If unsure, don't specify this property.
->   
->   Example:
->   auart0: serial at 8006a000 {
-> @@ -21,6 +26,9 @@ auart0: serial at 8006a000 {
->   	interrupts = <112>;
->   	dmas = <&dma_apbx 8>, <&dma_apbx 9>;
->   	dma-names = "rx", "tx";
-> +	cts-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-> +	dsr-gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-> +	dcd-gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
->   };
->   
->   Note: Each auart port should have an alias correctly numbered in "aliases"
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 4fe8ca1..90e8516 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1357,6 +1357,7 @@ config SERIAL_MXS_AUART
->   	depends on ARCH_MXS
->   	tristate "MXS AUART support"
->   	select SERIAL_CORE
-> +	select SERIAL_MCTRL_GPIO if GPIOLIB
->   	help
->   	  This driver supports the MXS Application UART (AUART) port.
->   
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index c712108..fdfa8a9 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -42,6 +42,9 @@
->   
->   #include <asm/cacheflush.h>
->   
-> +#include <linux/err.h>
-> +#include "serial_mctrl_gpio.h"
-> +
->   #define MXS_AUART_PORTS 5
->   #define MXS_AUART_FIFO_SIZE		16
->   
-> @@ -158,6 +161,8 @@ struct mxs_auart_port {
->   	struct scatterlist rx_sgl;
->   	struct dma_chan	*rx_dma_chan;
->   	void *rx_dma_buf;
-> +
-> +	struct mctrl_gpios	*gpios;
->   };
->   
->   static struct platform_device_id mxs_auart_devtype[] = {
-> @@ -405,6 +410,8 @@ static void mxs_auart_release_port(struct uart_port *u)
->   
->   static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
->   {
-> +	struct mxs_auart_port *s = to_auart_port(u);
-> +
->   	u32 ctrl = readl(u->membase + AUART_CTRL2);
->   
->   	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
-> @@ -416,10 +423,13 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
->   	}
->   
->   	writel(ctrl, u->membase + AUART_CTRL2);
-> +
-> +	mctrl_gpio_set(s->gpios, mctrl);
->   }
->   
->   static u32 mxs_auart_get_mctrl(struct uart_port *u)
->   {
-> +	struct mxs_auart_port *s = to_auart_port(u);
->   	u32 stat = readl(u->membase + AUART_STAT);
->   	int ctrl2 = readl(u->membase + AUART_CTRL2);
->   	u32 mctrl = 0;
-> @@ -431,7 +441,7 @@ static u32 mxs_auart_get_mctrl(struct uart_port *u)
->   	if (ctrl2 & AUART_CTRL2_RTS)
->   		mctrl |= TIOCM_RTS;
->   
-> -	return mctrl;
-> +	return mctrl_gpio_get(s->gpios, &mctrl);
->   }
->   
->   static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s);
-> @@ -635,7 +645,12 @@ static void mxs_auart_settermios(struct uart_port *u,
->   		ctrl |= AUART_LINECTRL_STP2;
->   
->   	/* figure out the hardware flow control settings */
-> -	if (cflag & CRTSCTS) {
-> +	/* FIXME: Likely DMA could be enabled not only for HW flow control */
-> +	if (cflag & CRTSCTS &&
-> +			(IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios,
-> +					 UART_GPIO_RTS)) ||
-> +			 IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios,
-> +					 UART_GPIO_CTS)))) {
->   		/*
->   		 * The DMA has a bug(see errata:2836) in mx23.
->   		 * So we can not implement the DMA for auart in mx23,
-> @@ -695,7 +710,10 @@ static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
->   			s->port.membase + AUART_INTR_CLR);
->   
->   	if (istat & AUART_INTR_CTSMIS) {
-> -		uart_handle_cts_change(&s->port, stat & AUART_STAT_CTS);
-> +		if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(s->gpios,
-> +						UART_GPIO_CTS)))
-> +			uart_handle_cts_change(&s->port,
-> +					stat & AUART_STAT_CTS);
->   		writel(AUART_INTR_CTSMIS,
->   				s->port.membase + AUART_INTR_CLR);
->   		istat &= ~AUART_INTR_CTSMIS;
-> @@ -1019,6 +1037,14 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->   	return 0;
->   }
->   
-> +static int mxs_auart_init_gpios(struct mxs_auart_port *s, struct device *dev)
-> +{
-> +	s->gpios = mctrl_gpio_init(dev, 0);
-> +	if (IS_ERR_OR_NULL(s->gpios))
-> +		return -1;
-> +	return 0;
-> +}
-> +
->   static int mxs_auart_probe(struct platform_device *pdev)
->   {
->   	const struct of_device_id *of_id =
-> @@ -1074,6 +1100,11 @@ static int mxs_auart_probe(struct platform_device *pdev)
->   
->   	platform_set_drvdata(pdev, s);
->   
-> +	ret = mxs_auart_init_gpios(s, &pdev->dev);
-> +	if (ret < 0)
-> +		dev_err(&pdev->dev, "%s",
-> +			"Failed to initialize GPIOs. The serial port may not work as expected");
-> +
->   	auart_port[s->port.line] = s;
->   
->   	mxs_auart_reset(&s->port);
+-- 
+Rafa?
