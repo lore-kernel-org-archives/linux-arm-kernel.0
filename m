@@ -1,148 +1,88 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 27 Sep 2014 13:25:49 +0200
-Subject: =?UTF-8?q?=5BPATCH=20v4=5D=20ARM=3A=20zImage=3A=20add=20support=20for=20ARMv7-M?=
-In-Reply-To: <1411057343-20861-1-git-send-email-manabian@gmail.com>
-References: <1411057343-20861-1-git-send-email-manabian@gmail.com>
-Message-ID: <1411817149-5135-1-git-send-email-manabian@gmail.com>
+From: j.uzycki@elproma.com.pl (Janusz Uzycki)
+Date: Sat, 27 Sep 2014 13:44:11 +0200
+Subject: [PATCH] serial: mxs-auart: clean get_mctrl and set_mctrl
+In-Reply-To: <20140927100345.GB5182@n2100.arm.linux.org.uk>
+References: <20140927100345.GB5182@n2100.arm.linux.org.uk>
+Message-ID: <1411818251-21884-1-git-send-email-j.uzycki@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to enter zImage in Thumb mode for ARMv7M
-(Cortex-M) CPUs that does not support ARM mode. The kernel entry is
-also made in Thumb mode.
+Russell King:
+The only thing which the .get_mctrl method is supposed to do is
+to return the state of the /input/ lines, which are CTS, DCD, DSR, RI.
+The output line state is stored in port->mctrl, and is added to
+the returned value by serial_core when it's required.
+RTS output state should not be returned from the .get_mctrl method.
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+This patch removes ctrl variable from mxs_auart_port
+and removes useless reading back RTS line.
+
+The ctrl variable in mxs_auart_port duplicated mctrl,
+member of uart_port structure in serial_core.h.
+The removed code from mxs_auart_set_mctrl() and mxs_auart_get_mctrl
+duplicated uart_update_mctrl() and uart_tiocmget()
+in serial_core.c.
+
+Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
 ---
-Hi,
+ drivers/tty/serial/mxs-auart.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-Updated patch with comments from Uwe Kleine-K?nig.
-
-Changes
-v4: Preserve r1/r2. Add comment about class A/R.
-v3: Use defines for ARMv7M CPU registers.
-v2: Introduce AR_CLASS/M_CLASS macros. This reduces the amount
-    of ifdefs needed in compressed/head.S.
-
-Successfully tested on NXP LPC4357 (Cortex-M4).
-
-regards,
-Joachim Eastwood
-
- arch/arm/boot/compressed/head.S | 28 ++++++++++++++++++++++------
- arch/arm/include/asm/unified.h  |  8 ++++++++
- 2 files changed, 30 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 413fd94b5301..0afcbb1e1d7d 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -10,8 +10,11 @@
-  */
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/v7m.h>
-+
-+ AR_CLASS(	.arch	armv7-a	)
-+ M_CLASS(	.arch	armv7-m	)
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index e838e84..2d49901 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -143,7 +143,6 @@ struct mxs_auart_port {
+ #define MXS_AUART_DMA_RX_READY	3  /* bit 3 */
+ #define MXS_AUART_RTSCTS	4  /* bit 4 */
+ 	unsigned long flags;
+-	unsigned int ctrl;
+ 	enum mxs_auart_type devtype;
  
--	.arch	armv7-a
- /*
-  * Debugging stuff
-  *
-@@ -114,7 +117,12 @@
-  * sort out different calling conventions
-  */
- 		.align
--		.arm				@ Always enter in ARM state
-+		/*
-+		 * Always enter in ARM state for CPUs that support the ARM ISA.
-+		 * As of today (2014) that's exactly the members of the A and R
-+		 * classes.
-+		 */
-+ AR_CLASS(	.arm	)
- start:
- 		.type	start,#function
- 		.rept	7
-@@ -132,14 +140,15 @@ start:
+ 	unsigned int irq;
+@@ -406,8 +405,6 @@ static void mxs_auart_release_port(struct uart_port *u)
  
-  THUMB(		.thumb			)
- 1:
-- ARM_BE8(	setend	be )			@ go BE8 if compiled for BE8
--		mrs	r9, cpsr
-+ ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
-+ AR_CLASS(	mrs	r9, cpsr	)
- #ifdef CONFIG_ARM_VIRT_EXT
- 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
- #endif
- 		mov	r7, r1			@ save architecture ID
- 		mov	r8, r2			@ save atags pointer
+ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+ {
+-	struct mxs_auart_port *s = to_auart_port(u);
+-
+ 	u32 ctrl = readl(u->membase + AUART_CTRL2);
  
-+#ifndef CONFIG_CPU_V7M
- 		/*
- 		 * Booting from Angel - need to enter SVC mode and disable
- 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
-@@ -155,6 +164,7 @@ not_angel:
- 		safe_svcmode_maskall r0
- 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
- 						@ SPSR
-+#endif
- 		/*
- 		 * Note that some cache flushing and other stuff may
- 		 * be needed here - is there an Angel SWI call for this?
-@@ -790,6 +800,9 @@ __common_mmu_cache_on:
- call_cache_fn:	adr	r12, proc_types
- #ifdef CONFIG_CPU_CP15
- 		mrc	p15, 0, r9, c0, c0	@ get processor ID
-+#elif defined(CONFIG_CPU_V7M)
-+		ldr	r9, =BASEADDR_V7M_SCB
-+		ldr	r9, [r9, V7M_SCB_CPUID]
- #else
- 		ldr	r9, =CONFIG_PROCESSOR_ID
- #endif
-@@ -945,11 +958,13 @@ proc_types:
- 		W(b)	__armv4_mmu_cache_off
- 		W(b)	__armv6_mmu_cache_flush
+ 	ctrl &= ~(AUART_CTRL2_RTSEN | AUART_CTRL2_RTS);
+@@ -418,24 +415,17 @@ static void mxs_auart_set_mctrl(struct uart_port *u, unsigned mctrl)
+ 			ctrl |= AUART_CTRL2_RTS;
+ 	}
  
-+#ifndef CONFIG_CPU_V7M
- 		.word	0x000f0000		@ new CPU Id
- 		.word	0x000f0000
- 		W(b)	__armv7_mmu_cache_on
- 		W(b)	__armv7_mmu_cache_off
- 		W(b)	__armv7_mmu_cache_flush
-+#endif
+-	s->ctrl = mctrl;
+ 	writel(ctrl, u->membase + AUART_CTRL2);
+ }
  
- 		.word	0			@ unrecognised type
- 		.word	0
-@@ -1277,8 +1292,9 @@ __hyp_reentry_vectors:
+ static u32 mxs_auart_get_mctrl(struct uart_port *u)
+ {
+-	struct mxs_auart_port *s = to_auart_port(u);
+ 	u32 stat = readl(u->membase + AUART_STAT);
+-	int ctrl2 = readl(u->membase + AUART_CTRL2);
+-	u32 mctrl = s->ctrl;
++	u32 mctrl = 0;
  
- __enter_kernel:
- 		mov	r0, #0			@ must be 0
-- ARM(		mov	pc, r4	)		@ call kernel
-- THUMB(		bx	r4	)		@ entry point is always ARM
-+ ARM(		mov	pc, r4		)	@ call kernel
-+ M_CLASS(	add	r4, r4, #1	)	@ enter in Thumb mode for M class
-+ THUMB(		bx	r4		)	@ entry point is always ARM for A/R classes
+-	mctrl &= ~TIOCM_CTS;
+ 	if (stat & AUART_STAT_CTS)
+ 		mctrl |= TIOCM_CTS;
  
- reloc_code_end:
+-	if (ctrl2 & AUART_CTRL2_RTS)
+-		mctrl |= TIOCM_RTS;
+-
+ 	return mctrl;
+ }
  
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index b88beaba6b4a..200f9a7cd623 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -24,6 +24,14 @@
- 	.syntax unified
- #endif
+@@ -1071,8 +1061,6 @@ static int mxs_auart_probe(struct platform_device *pdev)
+ 	s->port.type = PORT_IMX;
+ 	s->port.dev = s->dev = &pdev->dev;
  
-+#ifdef CONFIG_CPU_V7M
-+#define AR_CLASS(x...)
-+#define M_CLASS(x...)	x
-+#else
-+#define AR_CLASS(x...)	x
-+#define M_CLASS(x...)
-+#endif
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 
- #if __GNUC__ < 4
+-	s->ctrl = 0;
+-
+ 	s->irq = platform_get_irq(pdev, 0);
+ 	s->port.irq = s->irq;
+ 	ret = request_irq(s->irq, mxs_auart_irq_handle, 0, dev_name(&pdev->dev), s);
 -- 
-1.8.0
+1.7.11.3
