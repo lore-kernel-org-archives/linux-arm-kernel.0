@@ -1,104 +1,64 @@
-From: bhuvanchandra.dv@toradex.com (BhuvanChandra.DV)
-Date: Sun, 28 Sep 2014 09:38:43 -0700
-Subject: [PATCH v3 1/2] ARM: dts: vf610-colibri: Add PWM support
-In-Reply-To: <20140926022232.GI21077@dragon>
-References: <cover.1411378369.git.bhuvanchandra.dv@toradex.com>
- <d508a6ad39e07d5489c4b5110784902ab0241c44.1411378369.git.bhuvanchandra.dv@toradex.com>
- <20140926022232.GI21077@dragon>
-Message-ID: <54283993.5070906@toradex.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 27 Sep 2014 18:13:33 +0200
+Subject: [GIT PULL] ARM: rockchip: add cpuclk handling - clock-tree part
+Message-ID: <2910342.TyvTvsiepE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike,
 
-On 9/25/2014 7:22 PM, Shawn Guo wrote:
+as requested yesterday here is the cpuclk series as pull request, based on
+your clk-next branch.
 
-> On Mon, Sep 22, 2014 at 03:38:11PM +0530, Bhuvanchandra DV wrote:
->> The Colibri standard defines four pins as PWM outputs, two of them (PWM
->> A and C) are routed to FTM instance 0 and the other two (PWM B and D)
->> are routed to FTM instance 1. Hence enable both FTM instances for the
->> Colibri module and mux the four pins accordingly.
->>
->> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> You should add Stefan's ACK tag.
+I've put the clock-id addition into a separate branch, so that it could
+also get pulled into arm-soc ... if we get another kernel-rc.
 
-Ok
-
->> ---
->>   arch/arm/boot/dts/vf610-colibri-eval-v3.dts |    8 ++++++++
->>   arch/arm/boot/dts/vf610-colibri.dtsi        |   24 ++++++++++++++++++++++++
->>   2 files changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> index 7fb3066..00f63d9 100644
->> --- a/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> +++ b/arch/arm/boot/dts/vf610-colibri-eval-v3.dts
->> @@ -33,6 +33,14 @@
->>   	status = "okay";
->>   };
->>   
->> +&pwm0 {
->> +	status = "okay";
->> +};
->> +
->> +&pwm1 {
->> +	status = "okay";
->> +};
->> +
-> I was trying to apply the patches, but found pwm1 is not available in
-> vf610.dtsi at all.  What tree is your patch generated against?  Or did I
-> miss any prerequisite patches?
->
-> Shawn
-
-One prerequisite patch(PATCH 1/3) was missed. Available over here:
-https://lkml.org/lkml/2014/9/17/86
+So if still possible, please pull the following.
 
 
->>   &uart0 {
->>   	status = "okay";
->>   };
->> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
->> index 0cd8343..1f73c1c 100644
->> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
->> @@ -44,6 +44,16 @@
->>   	arm,tag-latency = <3 2 3>;
->>   };
->>   
->> +&pwm0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_pwm0>;
->> +};
->> +
->> +&pwm1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_pwm1>;
->> +};
->> +
->>   &uart0 {
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&pinctrl_uart0>;
->> @@ -97,6 +107,20 @@
->>   			>;
->>   		};
->>   
->> +		pinctrl_pwm0: pwm0grp {
->> +			fsl,pins = <
->> +				VF610_PAD_PTB0__FTM0_CH0		0x1182
->> +				VF610_PAD_PTB1__FTM0_CH1		0x1182
->> +			>;
->> +		};
->> +
->> +		pinctrl_pwm1: pwm1grp {
->> +			fsl,pins = <
->> +				VF610_PAD_PTB8__FTM1_CH0		0x1182
->> +				VF610_PAD_PTB9__FTM1_CH1		0x1182
->> +			>;
->> +		};
->> +
->>   		pinctrl_uart0: uart0grp {
->>   			fsl,pins = <
->>   				VF610_PAD_PTB10__UART0_TX		0x21a2
->> -- 
->> 1.7.9.5
->>
+Thanks
+Heiko
+
+
+The following changes since commit b52f4914f3be3ff50e7308e3ce03a2ce71195ecc:
+
+  asm-generic: COMMON_CLK defines __clk_{get,put} (2014-09-25 18:00:45 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-cpuclk
+
+for you to fetch changes up to 0e5bdb3f9fa5c2bd4452c258de78122ef15f62d6:
+
+  clk: rockchip: switch to using the new cpuclk type for armclk (2014-09-27 17:57:46 +0200)
+
+----------------------------------------------------------------
+CPU clock handling for Rockchip SoCs
+
+----------------------------------------------------------------
+Doug Anderson (1):
+      clk: rockchip: change pll rate without a clk-notifier
+
+Heiko Stuebner (7):
+      clk: rockchip: add binding id for ARMCLK
+      Merge branch 'v3.18-next/armclkid' into v3.18-next/cpuclk
+      clk: rockchip: fix rk3066 pll status register location
+      clk: rockchip: reparent aclk_cpu_pre to the gpll
+      clk: rockchip: make tightly bound armclk child-clocks read-only
+      clk: rockchip: add new clock-type for the cpuclk
+      clk: rockchip: switch to using the new cpuclk type for armclk
+
+Jianqun (1):
+      clk: rockchip: fix rk3288 pll status register location
+
+ drivers/clk/rockchip/Makefile                 |   1 +
+ drivers/clk/rockchip/clk-cpu.c                | 329 ++++++++++++++++++++++++++
+ drivers/clk/rockchip/clk-pll.c                |  63 +----
+ drivers/clk/rockchip/clk-rk3188.c             | 161 +++++++++++--
+ drivers/clk/rockchip/clk-rk3288.c             |  93 +++++++-
+ drivers/clk/rockchip/clk.c                    |  21 ++
+ drivers/clk/rockchip/clk.h                    |  37 +++
+ include/dt-bindings/clock/rk3188-cru-common.h |   1 +
+ include/dt-bindings/clock/rk3288-cru.h        |   1 +
+ 9 files changed, 629 insertions(+), 78 deletions(-)
+ create mode 100644 drivers/clk/rockchip/clk-cpu.c
