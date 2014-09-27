@@ -1,132 +1,260 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 27 Sep 2014 16:49:50 +0800
-Subject: [PATCH v2 2/7] clk: sunxi: Implement A31 PLL6 as a divs clock for 2x
- output
+Date: Sat, 27 Sep 2014 16:49:52 +0800
+Subject: [PATCH v2 4/7] clk: sunxi: unify sun6i AHB1 clock with proper PLL6
+ pre-divider
 In-Reply-To: <1411807795-6575-1-git-send-email-wens@csie.org>
 References: <1411807795-6575-1-git-send-email-wens@csie.org>
-Message-ID: <1411807795-6575-3-git-send-email-wens@csie.org>
+Message-ID: <1411807795-6575-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clock modules on the A31 use PLL6x2 as one of their inputs.
-This patch changes the PLL6 implementation for A31 to a divs clock,
-i.e. clock with multiple outputs that have different dividers.
-The first output will be the normal PLL6 output, and the second
-will be PLL6x2.
-
-This patch fixes the PLL6 N factor in the clock driver, and removes
-any /2 dividers in the PLL6 factors clock part. The N factor counts
-from 1 to 32, mapping to values 0 to 31, as shown in the A31 manual.
+This patch unifies the sun6i AHB1 clock, originally supported
+with separate mux and divider clks. It also adds support for
+the pre-divider on the PLL6 input, thus allowing the clock to
+be muxed to PLL6 with proper clock rate calculation.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  5 ++--
- drivers/clk/sunxi/clk-sunxi.c                     | 28 +++++++++++++----------
- 2 files changed, 19 insertions(+), 14 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi.txt |   2 +-
+ drivers/clk/sunxi/clk-sunxi.c                     | 209 ++++++++++++++++++++++
+ 2 files changed, 210 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index d3a5c3c..0d84f4b 100644
+index 0d84f4b..e862818 100644
 --- a/Documentation/devicetree/bindings/clock/sunxi.txt
 +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -59,8 +59,9 @@ Required properties for all clocks:
- 	multiplexed clocks, the list order must match the hardware
- 	programming order.
- - #clock-cells : from common clock binding; shall be set to 0 except for
--	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk" and
--	"allwinner,sun4i-pll6-clk" where it shall be set to 1
-+	the following compatibles where it shall be set to 1:
-+	"allwinner,*-gates-clk", "allwinner,sun4i-pll5-clk",
-+	"allwinner,sun4i-pll6-clk", "allwinner, sun6i-a31-pll6-clk"
- - clock-output-names : shall be the corresponding names of the outputs.
- 	If the clock module only has one output, the name shall be the
- 	module name.
+@@ -23,7 +23,7 @@ Required properties:
+ 	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+ 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+ 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+-	"allwinner,sun6i-a31-ahb1-mux-clk" - for the AHB1 multiplexer on A31
++	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+ 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+ 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+ 	"allwinner,sun4i-a10-apb0-clk" - for the APB0 clock
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 05d9329..9caebff 100644
+index 9caebff..7151e2c 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -244,9 +244,9 @@ static void sun4i_get_pll5_factors(u32 *freq, u32 parent_rate,
+@@ -19,6 +19,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/reset-controller.h>
++#include <linux/log2.h>
+ 
+ #include "clk-factors.h"
+ 
+@@ -1357,3 +1358,211 @@ static void __init sun6i_init_clocks(struct device_node *node)
  }
- 
- /**
-- * sun6i_a31_get_pll6_factors() - calculates n, k factors for A31 PLL6
-- * PLL6 rate is calculated as follows
-- * rate = parent_rate * n * (k + 1) / 2
-+ * sun6i_a31_get_pll6_factors() - calculates n, k factors for A31 PLL6x2
-+ * PLL6x2 rate is calculated as follows
-+ * rate = parent_rate * (n + 1) * (k + 1)
-  * parent_rate is always 24Mhz
-  */
- 
-@@ -255,13 +255,7 @@ static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
- {
- 	u8 div;
- 
--	/*
--	 * We always have 24MHz / 2, so we can just say that our
--	 * parent clock is 12MHz.
--	 */
--	parent_rate = parent_rate / 2;
--
--	/* Normalize value to a parent_rate multiple (24M / 2) */
-+	/* Normalize value to a parent_rate multiple (24M) */
- 	div = *freq / parent_rate;
- 	*freq = parent_rate * div;
- 
-@@ -273,7 +267,7 @@ static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
- 	if (*k > 3)
- 		*k = 3;
- 
--	*n = DIV_ROUND_UP(div, (*k+1));
-+	*n = DIV_ROUND_UP(div, (*k+1)) - 1;
- }
- 
- /**
-@@ -494,6 +488,7 @@ static struct clk_factors_config sun6i_a31_pll6_config = {
- 	.nwidth = 5,
- 	.kshift = 4,
- 	.kwidth = 2,
-+	.n_start = 1,
- };
- 
- static struct clk_factors_config sun4i_apb1_config = {
-@@ -561,6 +556,7 @@ static const struct factors_data sun6i_a31_pll6_data __initconst = {
- 	.enable = 31,
- 	.table = &sun6i_a31_pll6_config,
- 	.getter = sun6i_a31_get_pll6_factors,
-+	.name = "pll6x2",
- };
- 
- static const struct factors_data sun4i_apb1_data __initconst = {
-@@ -1073,6 +1069,14 @@ static const struct divs_data pll6_divs_data __initconst = {
- 	}
- };
- 
-+static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
-+	.factors = &sun6i_a31_pll6_data,
-+	.ndivs = 1,
-+	.div = {
-+		{ .fixed = 2 }, /* normal output */
-+	}
+ CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
+ CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
++
++
++/**
++ * sun6i_a31_ahb1_clk_setup() - Setup function for a31 ahb1 composite clk
++ */
++
++#define SUN6I_AHB1_MAX_PARENTS		4
++#define SUN6I_AHB1_MUX_PARENT_PLL6	3
++#define SUN6I_AHB1_MUX_SHIFT		12
++#define SUN6I_AHB1_MUX_MASK		0x3
++#define SUN6I_AHB1_MUX_GET_PARENT(reg)	((reg >> SUN6I_AHB1_MUX_SHIFT) & \
++					 SUN6I_AHB1_MUX_MASK)
++#define SUN6I_AHB1_DIV_SHIFT		4
++#define SUN6I_AHB1_DIV_MASK		0x3
++#define SUN6I_AHB1_DIV_GET(reg)		((reg >> SUN6I_AHB1_DIV_SHIFT) & \
++					 SUN6I_AHB1_DIV_MASK)
++#define SUN6I_AHB1_DIV_SET(reg, div)	((reg & ~(SUN6I_AHB1_DIV_MASK << \
++						  SUN6I_AHB1_DIV_SHIFT)) | \
++					 (div << SUN6I_AHB1_DIV_SHIFT))
++#define SUN6I_AHB1_PLL6_DIV_SHIFT	6
++#define SUN6I_AHB1_PLL6_DIV_MASK	0x3
++#define SUN6I_AHB1_PLL6_DIV_GET(reg)	((reg >> SUN6I_AHB1_PLL6_DIV_SHIFT) & \
++					 SUN6I_AHB1_PLL6_DIV_MASK)
++#define SUN6I_AHB1_PLL6_DIV_SET(reg, div) ((reg & \
++					    ~(SUN6I_AHB1_PLL6_DIV_MASK << \
++					      SUN6I_AHB1_PLL6_DIV_SHIFT)) | \
++					   (div << SUN6I_AHB1_PLL6_DIV_SHIFT))
++
++struct sun6i_ahb1_clk {
++	struct clk_hw hw;
++	void __iomem *reg;
 +};
 +
- /**
-  * sunxi_divs_clk_setup() - Setup function for leaf divisors on clocks
-  *
-@@ -1213,7 +1217,6 @@ static const struct of_device_id clk_factors_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
- 	{.compatible = "allwinner,sun8i-a23-pll1-clk", .data = &sun8i_a23_pll1_data,},
- 	{.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
--	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
- 	{.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
- 	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
-@@ -1234,6 +1237,7 @@ static const struct of_device_id clk_div_match[] __initconst = {
- static const struct of_device_id clk_divs_match[] __initconst = {
- 	{.compatible = "allwinner,sun4i-a10-pll5-clk", .data = &pll5_divs_data,},
- 	{.compatible = "allwinner,sun4i-a10-pll6-clk", .data = &pll6_divs_data,},
-+	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_divs_data,},
- 	{}
- };
- 
++#define to_sun6i_ahb1_clk(_hw) container_of(_hw, struct sun6i_ahb1_clk, hw)
++
++static unsigned long sun6i_ahb1_clk_recalc_rate(struct clk_hw *hw,
++						unsigned long parent_rate)
++{
++	struct sun6i_ahb1_clk *ahb1 = to_sun6i_ahb1_clk(hw);
++	unsigned long rate;
++	u32 reg;
++
++	/* Fetch the register value */
++	reg = readl(ahb1->reg);
++
++	/* apply pre-divider first if parent is pll6 */
++	if (SUN6I_AHB1_MUX_GET_PARENT(reg) == SUN6I_AHB1_MUX_PARENT_PLL6)
++		parent_rate /= SUN6I_AHB1_PLL6_DIV_GET(reg) + 1;
++
++	/* clk divider */
++	rate = parent_rate >> SUN6I_AHB1_DIV_GET(reg);
++
++	return rate;
++}
++
++static long sun6i_ahb1_clk_round(unsigned long rate, u8 *divp, u8 *pre_divp,
++				 u8 parent, unsigned long parent_rate)
++{
++	u8 div, calcp, calcm = 1;
++
++	/* clock can only divide, so we will never be able to achieve
++	 * frequencies higher than the parent frequency */
++	if (parent_rate && rate > parent_rate)
++		rate = parent_rate;
++
++	div = DIV_ROUND_UP(parent_rate, rate);
++
++	/* calculate pre-divider if parent is pll6 */
++	if (parent == SUN6I_AHB1_MUX_PARENT_PLL6) {
++		if (div < 4)
++			calcp = 0;
++		else if (div / 2 < 4)
++			calcp = 1;
++		else if (div / 4 < 4)
++			calcp = 2;
++		else
++			calcp = 3;
++
++		calcm = DIV_ROUND_UP(div, 1 << calcp);
++	} else {
++		calcp = __roundup_pow_of_two(div);
++		calcp = calcp > 3 ? 3 : calcp;
++	}
++
++	if (divp) {
++		*divp = calcp;
++		*pre_divp = calcm - 1;
++	}
++
++	return (parent_rate / calcm) >> calcp;
++}
++
++static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
++					  unsigned long *best_parent_rate,
++					  struct clk **best_parent_clk)
++{
++	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
++	int i, num_parents;
++	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
++
++	/* find the parent that can help provide the fastest rate <= rate */
++	num_parents = __clk_get_num_parents(clk);
++	for (i = 0; i < num_parents; i++) {
++		parent = clk_get_parent_by_index(clk, i);
++		if (!parent)
++			continue;
++		if (__clk_get_flags(clk) & CLK_SET_RATE_PARENT)
++			parent_rate = __clk_round_rate(parent, rate);
++		else
++			parent_rate = __clk_get_rate(parent);
++
++		child_rate = sun6i_ahb1_clk_round(rate, NULL, NULL, i,
++						  parent_rate);
++
++		if (child_rate <= rate && child_rate > best_child_rate) {
++			best_parent = parent;
++			best = parent_rate;
++			best_child_rate = child_rate;
++		}
++	}
++
++	if (best_parent)
++		*best_parent_clk = best_parent;
++	*best_parent_rate = best;
++
++	return best_child_rate;
++}
++
++static int sun6i_ahb1_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++				   unsigned long parent_rate)
++{
++	struct sun6i_ahb1_clk *ahb1 = to_sun6i_ahb1_clk(hw);
++	unsigned long flags;
++	u8 div, pre_div, parent;
++	u32 reg;
++
++	spin_lock_irqsave(&clk_lock, flags);
++
++	reg = readl(ahb1->reg);
++
++	/* need to know which parent is used to apply pre-divider */
++	parent = SUN6I_AHB1_MUX_GET_PARENT(reg);
++	sun6i_ahb1_clk_round(rate, &div, &pre_div, parent, parent_rate);
++
++	reg = SUN6I_AHB1_DIV_SET(reg, div);
++	reg = SUN6I_AHB1_PLL6_DIV_SET(reg, pre_div);
++	writel(reg, ahb1->reg);
++
++	spin_unlock_irqrestore(&clk_lock, flags);
++
++	return 0;
++}
++
++static const struct clk_ops sun6i_ahb1_clk_ops = {
++	.determine_rate	= sun6i_ahb1_clk_determine_rate,
++	.recalc_rate	= sun6i_ahb1_clk_recalc_rate,
++	.set_rate	= sun6i_ahb1_clk_set_rate,
++};
++
++static void __init sun6i_ahb1_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	struct sun6i_ahb1_clk *ahb1;
++	struct clk_mux *mux;
++	const char *clk_name = node->name;
++	const char *parents[SUN6I_AHB1_MAX_PARENTS];
++	void __iomem *reg;
++	int i = 0;
++
++	reg = of_iomap(node, 0);
++
++	/* we have a mux, we will have >1 parents */
++	while (i < SUN6I_AHB1_MAX_PARENTS &&
++	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
++		i++;
++
++	of_property_read_string(node, "clock-output-names", &clk_name);
++
++	ahb1 = kzalloc(sizeof(struct sun6i_ahb1_clk), GFP_KERNEL);
++	if (!ahb1)
++		return;
++
++	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
++	if (!mux) {
++		kfree(ahb1);
++		return;
++	}
++
++	/* set up clock properties */
++	mux->reg = reg;
++	mux->shift = SUN6I_AHB1_MUX_SHIFT;
++	mux->mask = SUN6I_AHB1_MUX_MASK;
++	mux->lock = &clk_lock;
++	ahb1->reg = reg;
++
++	clk = clk_register_composite(NULL, clk_name, parents, i,
++				     &mux->hw, &clk_mux_ops,
++				     &ahb1->hw, &sun6i_ahb1_clk_ops,
++				     NULL, NULL, 0);
++
++	if (!IS_ERR(clk)) {
++		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++		clk_register_clkdev(clk, clk_name, NULL);
++	}
++}
++
++CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-clk",
++		sun6i_ahb1_clk_setup);
 -- 
 2.1.1
