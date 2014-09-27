@@ -1,80 +1,216 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 27 Sep 2014 10:54:44 +0200
-Subject: [PATCH 8/9] dmaengine: Mark device_control as deprecated
+Date: Sat, 27 Sep 2014 10:54:45 +0200
+Subject: [PATCH 9/9] dmaengine: sun6i: Convert to generic slave_caps
 In-Reply-To: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1411808085-27792-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1411808085-27792-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that device_control has been split into several functions, we can consider
-it deprecated.
-
-That also means that we don't want to make it mandatory any more. Since any
-device was free to implement any command of device_control, the only least
-common denominator is to not expect any callback anymore. Hopefully,
-device_slave_caps can provide such informations to the client.
+Convert the Allwinner A31 driver to the callbacks that have been introduced
+before, in order to support calls to retrieve slave capabilities.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/dmaengine.c   |  2 --
- include/linux/dmaengine.h | 10 ++++++----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/dma/sun6i-dma.c | 158 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 86 insertions(+), 72 deletions(-)
 
-diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-index cfcb181b1184..87348e6a3791 100644
---- a/drivers/dma/dmaengine.c
-+++ b/drivers/dma/dmaengine.c
-@@ -812,8 +812,6 @@ int dma_async_device_register(struct dma_device *device)
- 		!device->device_prep_dma_sg);
- 	BUG_ON(dma_has_cap(DMA_CYCLIC, device->cap_mask) &&
- 		!device->device_prep_dma_cyclic);
--	BUG_ON(dma_has_cap(DMA_SLAVE, device->cap_mask) &&
--		!device->device_control);
- 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
- 		!device->device_prep_interleaved_dma);
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index 1f92a56fd2b6..447de4d42251 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -358,38 +358,6 @@ static void sun6i_dma_free_desc(struct virt_dma_desc *vd)
+ 	kfree(txd);
+ }
  
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index e25a365b808c..9c0d16273ef9 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -619,7 +619,7 @@ struct dma_tx_state {
-  * @device_config: Pushes a new configuration to a channel, return 0 or an error
-  *	code
-  * @device_control: manipulate all pending operations on a channel, returns
-- *	zero or error code
-+ *	zero or error code (Deprecated)
-  * @device_pause: Pauses any transfer happening on a channel. Returns
-  *	0 or an error code
-  * @device_resume: Resumes any transfer on a channel previously
-@@ -631,7 +631,7 @@ struct dma_tx_state {
-  *	struct with auxiliary transfer status information, otherwise the call
-  *	will just return a simple status code
-  * @device_issue_pending: push pending transactions to hardware
-- * @device_slave_caps: return the slave channel capabilities
-+ * @device_slave_caps: return the slave channel capabilities (Deprecated)
-  */
- struct dma_device {
+-static int sun6i_dma_terminate_all(struct sun6i_vchan *vchan)
+-{
+-	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
+-	struct sun6i_pchan *pchan = vchan->phy;
+-	unsigned long flags;
+-	LIST_HEAD(head);
+-
+-	spin_lock(&sdev->lock);
+-	list_del_init(&vchan->node);
+-	spin_unlock(&sdev->lock);
+-
+-	spin_lock_irqsave(&vchan->vc.lock, flags);
+-
+-	vchan_get_all_descriptors(&vchan->vc, &head);
+-
+-	if (pchan) {
+-		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
+-		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
+-
+-		vchan->phy = NULL;
+-		pchan->vchan = NULL;
+-		pchan->desc = NULL;
+-		pchan->done = NULL;
+-	}
+-
+-	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+-
+-	vchan_dma_desc_free_list(&vchan->vc, &head);
+-
+-	return 0;
+-}
+-
+ static int sun6i_dma_start_desc(struct sun6i_vchan *vchan)
+ {
+ 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(vchan->vc.chan.device);
+@@ -673,57 +641,92 @@ err_lli_free:
+ 	return NULL;
+ }
  
-@@ -697,8 +697,6 @@ struct dma_device {
- 
- 	int (*device_config)(struct dma_chan *chan,
- 			     struct dma_slave_config *config);
--	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
--			      unsigned long arg);
- 	int (*device_pause)(struct dma_chan *chan);
- 	int (*device_resume)(struct dma_chan *chan);
- 	int (*device_terminate_all)(struct dma_chan *chan);
-@@ -706,6 +704,10 @@ struct dma_device {
- 					    dma_cookie_t cookie,
- 					    struct dma_tx_state *txstate);
- 	void (*device_issue_pending)(struct dma_chan *chan);
+-static int sun6i_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-		       unsigned long arg)
++static int sun6i_dma_config(struct dma_chan *chan,
++			    struct dma_slave_config *config)
++{
++	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
 +
-+	/* Deprecated */
-+	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-+			      unsigned long arg);
- 	int (*device_slave_caps)(struct dma_chan *chan, struct dma_slave_caps *caps);
- };
++	memcpy(&vchan->cfg, config, sizeof(*config));
++
++	return 0;
++}
++
++static int sun6i_dma_pause(struct dma_chan *chan)
++{
++	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
++	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
++	struct sun6i_pchan *pchan = vchan->phy;
++
++	dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
++
++	if (pchan) {
++		writel(DMA_CHAN_PAUSE_PAUSE,
++		       pchan->base + DMA_CHAN_PAUSE);
++	} else {
++		spin_lock(&sdev->lock);
++		list_del_init(&vchan->node);
++		spin_unlock(&sdev->lock);
++	}
++
++	return 0;
++}
++
++static int sun6i_dma_resume(struct dma_chan *chan)
+ {
+ 	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
+ 	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
+ 	struct sun6i_pchan *pchan = vchan->phy;
+ 	unsigned long flags;
+-	int ret = 0;
  
+-	switch (cmd) {
+-	case DMA_RESUME:
+-		dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
++	dev_dbg(chan2dev(chan), "vchan %p: resume\n", &vchan->vc);
+ 
+-		spin_lock_irqsave(&vchan->vc.lock, flags);
++	spin_lock_irqsave(&vchan->vc.lock, flags);
+ 
+-		if (pchan) {
+-			writel(DMA_CHAN_PAUSE_RESUME,
+-			       pchan->base + DMA_CHAN_PAUSE);
+-		} else if (!list_empty(&vchan->vc.desc_issued)) {
+-			spin_lock(&sdev->lock);
+-			list_add_tail(&vchan->node, &sdev->pending);
+-			spin_unlock(&sdev->lock);
+-		}
++	if (pchan) {
++		writel(DMA_CHAN_PAUSE_RESUME,
++		       pchan->base + DMA_CHAN_PAUSE);
++	} else if (!list_empty(&vchan->vc.desc_issued)) {
++		spin_lock(&sdev->lock);
++		list_add_tail(&vchan->node, &sdev->pending);
++		spin_unlock(&sdev->lock);
++	}
+ 
+-		spin_unlock_irqrestore(&vchan->vc.lock, flags);
+-		break;
++	spin_unlock_irqrestore(&vchan->vc.lock, flags);
+ 
+-	case DMA_PAUSE:
+-		dev_dbg(chan2dev(chan), "vchan %p: pause\n", &vchan->vc);
++	return 0;
++}
+ 
+-		if (pchan) {
+-			writel(DMA_CHAN_PAUSE_PAUSE,
+-			       pchan->base + DMA_CHAN_PAUSE);
+-		} else {
+-			spin_lock(&sdev->lock);
+-			list_del_init(&vchan->node);
+-			spin_unlock(&sdev->lock);
+-		}
+-		break;
++static int sun6i_dma_terminate_all(struct dma_chan *chan)
++{
++	struct sun6i_dma_dev *sdev = to_sun6i_dma_dev(chan->device);
++	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
++	struct sun6i_pchan *pchan = vchan->phy;
++	unsigned long flags;
++	LIST_HEAD(head);
+ 
+-	case DMA_TERMINATE_ALL:
+-		ret = sun6i_dma_terminate_all(vchan);
+-		break;
+-	case DMA_SLAVE_CONFIG:
+-		memcpy(&vchan->cfg, (void *)arg, sizeof(struct dma_slave_config));
+-		break;
+-	default:
+-		ret = -ENXIO;
+-		break;
++	spin_lock(&sdev->lock);
++	list_del_init(&vchan->node);
++	spin_unlock(&sdev->lock);
++
++	spin_lock_irqsave(&vchan->vc.lock, flags);
++
++	vchan_get_all_descriptors(&vchan->vc, &head);
++
++	if (pchan) {
++		writel(DMA_CHAN_ENABLE_STOP, pchan->base + DMA_CHAN_ENABLE);
++		writel(DMA_CHAN_PAUSE_RESUME, pchan->base + DMA_CHAN_PAUSE);
++
++		vchan->phy = NULL;
++		pchan->vchan = NULL;
++		pchan->desc = NULL;
++		pchan->done = NULL;
+ 	}
+-	return ret;
++
++	spin_unlock_irqrestore(&vchan->vc.lock, flags);
++
++	vchan_dma_desc_free_list(&vchan->vc, &head);
++
++	return 0;
+ }
+ 
+ static enum dma_status sun6i_dma_tx_status(struct dma_chan *chan,
+@@ -936,9 +939,20 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	sdc->slave.device_issue_pending		= sun6i_dma_issue_pending;
+ 	sdc->slave.device_prep_slave_sg		= sun6i_dma_prep_slave_sg;
+ 	sdc->slave.device_prep_dma_memcpy	= sun6i_dma_prep_dma_memcpy;
+-	sdc->slave.device_control		= sun6i_dma_control;
++	sdc->slave.device_config		= sun6i_dma_config;
++	sdc->slave.device_pause			= sun6i_dma_pause;
++	sdc->slave.device_resume		= sun6i_dma_resume;
++	sdc->slave.device_terminate_all		= sun6i_dma_terminate_all;
+ 	sdc->slave.chancnt			= NR_MAX_VCHANS;
+-
++	sdc->slave.src_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
++						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
++						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
++						  BIT(DMA_MEM_TO_DEV);
++	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
+ 	sdc->slave.dev = &pdev->dev;
+ 
+ 	sdc->pchans = devm_kcalloc(&pdev->dev, NR_MAX_CHANNELS,
 -- 
 2.1.0
