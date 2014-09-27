@@ -1,36 +1,32 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 27 Sep 2014 11:11:58 +0530
-Subject: [PATCH 2/3] clk: samsung: remove unnecessary CONFIG_OF from clk.c
-In-Reply-To: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1411796519-19417-3-git-send-email-pankaj.dubey@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 27 Sep 2014 09:06:01 +0200
+Subject: [PATCH v3 1/2] clk: sunxi: Add sun8i MBUS clock support
+In-Reply-To: <1410861842-2743-2-git-send-email-wens@csie.org>
+References: <1410861842-2743-1-git-send-email-wens@csie.org>
+ <1410861842-2743-2-git-send-email-wens@csie.org>
+Message-ID: <20140927070601.GX15315@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- drivers/clk/samsung/clk.c |    2 --
- 1 file changed, 2 deletions(-)
+On Tue, Sep 16, 2014 at 06:04:01PM +0800, Chen-Yu Tsai wrote:
+> The MBUS clock on sun8i is slightly different from the old mod0 clocks.
+> The divider is 3 bits wider, while also needing a divider table for the
+> higher 4 values, which all set the same divider.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index deab84d..31bf391 100644
---- a/drivers/clk/samsung/clk.c
-+++ b/drivers/clk/samsung/clk.c
-@@ -281,7 +281,6 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
-  * obtain the clock speed of all external fixed clock sources from device
-  * tree and register it
-  */
--#ifdef CONFIG_OF
- void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
- 			struct samsung_fixed_rate_clock *fixed_rate_clk,
- 			unsigned int nr_fixed_rate_clk,
-@@ -298,7 +297,6 @@ void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
- 	}
- 	samsung_clk_register_fixed_rate(ctx, fixed_rate_clk, nr_fixed_rate_clk);
- }
--#endif
- 
- /* utility function to get the rate of a specified clock */
- unsigned long _get_rate(const char *clk_name)
+Applied, thanks!
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140927/e227f7e0/attachment.sig>
