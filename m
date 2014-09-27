@@ -1,32 +1,147 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Fri, 26 Sep 2014 18:24:41 -0600
-Subject: 3.17-rc6 on ODROID: ERROR: Bad of_node_put() on /ehci@12580000/port@1
-Message-ID: <CAD8Lp45qyHpHqRnUy4T9Sm8zV4XJBDp=cLYXjtcxmVrS8GSjbg@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 26 Sep 2014 18:58:08 -0600
+Subject: [PATCH v7 0/7] QCOM 8974 and 8084 cpuidle driver 
+Message-ID: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Changes since v6:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg11012.html ]
+- SPM device nodes merged with existing SAW DT nodes
+- SPM register information is handled within the driver
+- Clean up from using 'msm' to 'qcom'
+	- Shorten some enumerations as well
+- Review comments from v6 addressed
+- New: Support for 8084 SoC
+	- Not tested. I do not have a board with this SoC, but the SPM
+	configuration should be identical for WFI and SPC
 
-Booting 3.17-rc6 on ODROID-U2, I see this message:
+Changes since v5:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10559.html ]
+- Merge spm-devices.c and spm.c into one file and one patch
+	- Simplify implementation of the driver.
+	- Update documentation mapping the DT properties with corresponding
+	  SPM register information.
+- Removed scm-boot changes for quad core warmboot, its has been pulled in.
 
-ERROR: Bad of_node_put() on /ehci at 12580000/port at 1
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.17.0-rc6-00376-g85cd8fd #1031
-[<c0016418>] (unwind_backtrace) from [<c0011f00>] (show_stack+0x10/0x14)
-[<c0011f00>] (show_stack) from [<c08213fc>] (dump_stack+0x84/0xc4)
-[<c08213fc>] (dump_stack) from [<c02dacc0>] (kobject_cleanup+0x58/0x6c)
-[<c02dacc0>] (kobject_cleanup) from [<c0608718>]
-(of_get_next_available_child+0x78/0x98)
-[<c0608718>] (of_get_next_available_child) from [<c05673c8>]
-(exynos_ehci_probe+0x254/0x424)
-[<c05673c8>] (exynos_ehci_probe) from [<c03ce700>]
-(platform_drv_probe+0x2c/0x5c)
-[<c03ce700>] (platform_drv_probe) from [<c03ccd00>]
-(driver_probe_device+0xe8/0x234)
-[<c03ccd00>] (driver_probe_device) from [<c03ccef8>] (__driver_attach+0x68/0x8c)
+Changes since v4:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10327.html ]
+- Update to the v8 of ARM generic idle states patches
+- Use platform device model for cpuidle-qcom
+- Clean up msm-pm.c to remove unnecessary include files and functions
+- Update commit text and documentation for all idle states
+- Remove scm-boot relocate patch from this series, submitted earlier
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10518.html ]
 
-This repeats for all of the ehci and ohci ports.
+Changes since v3:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10288.html ]
+- Fix CONFIG_QCOM_PM Kconfig as bool
+- More clean ups in spm.c and spm-devices.c
+	- Removed and re-organized data structures to make initialization simple
+	- Remove export of sequence flush functions
+	- Updated commit text
+	- Comments for use of barriers.
+- Rebase on top of 3.17-rc1
 
-Haven't had time to dig deeper. Is this a known issue?
+Changes since v2:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10148.html ]
+- Prune all the drivers to support basic WFI and power down cpuidle
+  functionality. Remove debug code.
+- Integrate KConfig changes into the drivers' patches.
+- Use Lorenzo's ARM idle-states patches as the basis for reading cpuidle
+  c-states from DT.
+  [ http://marc.info/?l=linux-pm&m=140794514812383&w=2 ]
+- Incorporate review comments
+- Rebase on top of 3.16
 
-Thanks
-Daniel
+Changes since v1/RFC:
+[ https://www.mail-archive.com/linux-arm-msm at vger.kernel.org/msg10065.html ]
+- Remove hotplug from the patch series. Will submit it separately.
+- Fix SPM drivers per the review comments
+- Modify patch sequence to compile SPM drivers independent of msm-pm, so as to
+  allow wfi() calls to use SPM even without SoC interface driver.
+
+8074/8084 like any ARM SoC can do architectural clock gating, that helps save
+on power, but not enough of leakage power.  Leakage power of the SoC can be
+further reduced by turning off power to the core. To aid this, every core (cpu
+and L2) is accompanied by a Sub-system Power Manager (SPM), that can be
+configured to indicate the low power mode, the core would be put into and the
+SPM programs the peripheral h/w accordingly to enter low power and turn off the
+power rail to the core.
+
+The idle invocation hierarchy - 
+
+	CPUIDLE
+	|
+	cpuidle-qcom.c [CPUIdle driver]
+	|
+	------>	pm.c [SoC Interface layer for QCOM chipsets]
+		|
+		------> spm.c [SPM driver]
+		|
+		------> scm-boot.c [SCM interface layer]		
+			|
+------------------------|--------------------------
+(EL)			Secure Monitor Code
+			|
+			|
+			wfi(); 
+------------------------|--------------------------
+(HW)			[CPU] {clock gate}
+			|
+			-----> [SPM] {statemachine}
+			
+
+The patchset does the following -
+
+- Introduce the SPM driver to control power to the core
+
+- Add device bindings for 8974 CPU SPM devices 
+
+- Add device bindings for 8084 CPU SPM devices
+
+- Introduce the SoC interface layer to configure SPM per the core's idle state.
+
+- Add CPUIDLE driver for QCOM cpus, using ARM generic idle state definitions.
+
+- Add device bindings for 8974 idle-states - WFI and SPC
+
+- Add device bindings for 8084 idle-states - WFI and SPC
+
+Thanks,
+Lina
+
+
+
+Lina Iyer (7):
+  qcom: spm: Add Subsystem Power Manager driver
+  arm: dts: qcom: Add SPM device bindings for 8974
+  arm: dts: qcom: Add SPM device bindings for 8084
+  qcom: pm: Add cpu low power mode functions
+  qcom: cpuidle: Add cpuidle driver for QCOM cpus
+  arm: dts: qcom: Add idle states device nodes for 8974
+  arm: dts: qcom: Add idle states device nodes for 8084
+
+ .../bindings/arm/msm/qcom,idle-state.txt           |  72 +++++++
+ .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  10 +-
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |  46 ++++-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  46 ++++-
+ drivers/cpuidle/Kconfig.arm                        |   7 +
+ drivers/cpuidle/Makefile                           |   1 +
+ drivers/cpuidle/cpuidle-qcom.c                     |  89 +++++++++
+ drivers/soc/qcom/Kconfig                           |   8 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/pm.c                              | 109 +++++++++++
+ drivers/soc/qcom/spm.c                             | 216 +++++++++++++++++++++
+ include/soc/qcom/pm.h                              |  26 +++
+ include/soc/qcom/spm.h                             |  35 ++++
+ 13 files changed, 658 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+ create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+ create mode 100644 drivers/soc/qcom/pm.c
+ create mode 100644 drivers/soc/qcom/spm.c
+ create mode 100644 include/soc/qcom/pm.h
+ create mode 100644 include/soc/qcom/spm.h
+
+-- 
+1.9.1
