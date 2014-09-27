@@ -1,166 +1,56 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Sat, 27 Sep 2014 14:31:53 -0700
-Subject: [PATCH v2 2/2] iommu/arm-smmu: add support for iova_to_phys through
- ATS1PR
-In-Reply-To: <1411853513-9571-1-git-send-email-mitchelh@codeaurora.org>
-References: <1411853513-9571-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <1411853513-9571-3-git-send-email-mitchelh@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 27 Sep 2014 16:01:05 -0700
+Subject: [PATCHv3 1/7] clk: at91: add a driver for the h32mx clock
+In-Reply-To: <20140922110425.2ec8a0af@bbrezillon>
+References: <1410797759-18675-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1410797759-18675-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <541C228F.70207@atmel.com> <20140922110425.2ec8a0af@bbrezillon>
+Message-ID: <20140927230105.19023.91442@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we provide the iommu_ops.iova_to_phys service by doing a
-table walk in software to translate IO virtual addresses to physical
-addresses. On SMMUs that support it, it can be useful to ask the SMMU
-itself to do the translation. This can be used to warm the TLBs for an
-SMMU. It can also be useful for testing and hardware validation.
+Quoting Boris BREZILLON (2014-09-22 02:04:25)
+> On Fri, 19 Sep 2014 14:33:19 +0200
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> 
+> > On 15/09/2014 18:15, Alexandre Belloni :
+> > > Newer SoCs have two different AHB interconnect. The AHB 32 bits Matrix
+> > > interconnect (h32mx) has a clock that can be setup at the half of the h64mx
+> > > clock (which is mck). The h32mx clock can not exceed 90 MHz.
+> > > 
+> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > Okay on my side:
+> > 
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > 
+> > > ---
+> > > Cc:Mike Turquette <mturquette@linaro.org>
+> > 
+> > Mike,
+> > 
+> > I guess that you didn't get this v3. Can you "Ack" this one of should we
+> > re-sent to you?
+> > 
+> > I would like to take this patch with the rest of the SAMA5D4 series: is
+> > it okay for you?
+> 
+> 
+> Hi Mike,
+> 
+> I gave my ack to this patch, so, if you don't mind letting Nicolas
+> take it through his tree, I think it will ease integration of the
+> sama5d4 support (no external dependencies on the clk tree).
 
-Since the address translation registers are optional on SMMUv2, only
-enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
-and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/iommu/arm-smmu.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 72 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 37dc3dd0df..7c4629cafd 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -36,6 +36,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/iommu.h>
-+#include <linux/iopoll.h>
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -140,6 +141,7 @@
- #define ID0_S2TS			(1 << 29)
- #define ID0_NTS				(1 << 28)
- #define ID0_SMS				(1 << 27)
-+#define ID0_ATOSNS			(1 << 26)
- #define ID0_PTFS_SHIFT			24
- #define ID0_PTFS_MASK			0x2
- #define ID0_PTFS_V8_ONLY		0x2
-@@ -233,11 +235,17 @@
- #define ARM_SMMU_CB_TTBR0_HI		0x24
- #define ARM_SMMU_CB_TTBCR		0x30
- #define ARM_SMMU_CB_S1_MAIR0		0x38
-+#define ARM_SMMU_CB_PAR_LO		0x50
-+#define ARM_SMMU_CB_PAR_HI		0x54
- #define ARM_SMMU_CB_FSR			0x58
- #define ARM_SMMU_CB_FAR_LO		0x60
- #define ARM_SMMU_CB_FAR_HI		0x64
- #define ARM_SMMU_CB_FSYNR0		0x68
- #define ARM_SMMU_CB_S1_TLBIASID		0x610
-+#define ARM_SMMU_CB_ATS1PR_LO		0x800
-+#define ARM_SMMU_CB_ATS1PR_HI		0x804
-+#define ARM_SMMU_CB_ATSR		0x8f0
-+#define ATSR_LOOP_TIMEOUT		1000000	/* 1s! */
- 
- #define SCTLR_S1_ASIDPNE		(1 << 12)
- #define SCTLR_CFCFG			(1 << 7)
-@@ -249,6 +257,10 @@
- #define SCTLR_M				(1 << 0)
- #define SCTLR_EAE_SBOP			(SCTLR_AFE | SCTLR_TRE)
- 
-+#define CB_PAR_F			(1 << 0)
-+
-+#define ATSR_ACTIVE			(1 << 0)
-+
- #define RESUME_RETRY			(0 << 0)
- #define RESUME_TERMINATE		(1 << 0)
- 
-@@ -366,6 +378,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_S1		(1 << 2)
- #define ARM_SMMU_FEAT_TRANS_S2		(1 << 3)
- #define ARM_SMMU_FEAT_TRANS_NESTED	(1 << 4)
-+#define ARM_SMMU_FEAT_TRANS_OPS		(1 << 5)
- 	u32				features;
- 
- #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
-@@ -1524,7 +1537,7 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return ret ? 0 : size;
- }
- 
--static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
-+static phys_addr_t arm_smmu_iova_to_phys_soft(struct iommu_domain *domain,
- 					 dma_addr_t iova)
- {
- 	pgd_t *pgdp, pgd;
-@@ -1557,6 +1570,59 @@ static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
- 	return __pfn_to_phys(pte_pfn(pte)) | (iova & ~PAGE_MASK);
- }
- 
-+static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
-+					dma_addr_t iova)
-+{
-+	struct arm_smmu_domain *smmu_domain = domain->priv;
-+	struct arm_smmu_device *smmu = smmu_domain->smmu;
-+	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-+	struct device *dev = smmu->dev;
-+	void __iomem *cb_base;
-+	u32 tmp;
-+	u64 phys;
-+
-+	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+
-+	if (smmu->version == 1) {
-+		u32 reg = iova & ~0xFFF;
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-+	} else {
-+		u32 reg = iova & ~0xFFF;
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-+		reg = (iova & ~0xFFF) >> 32;
-+		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
-+	}
-+
-+	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
-+				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
-+		dev_err(dev,
-+			"iova to phys timed out on 0x%pa for %s. Falling back to software table walk.\n",
-+			&iova, dev_name(dev));
-+		return arm_smmu_iova_to_phys_soft(domain, iova);
-+	}
-+
-+	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
-+	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
-+
-+	if (phys & CB_PAR_F) {
-+		dev_err(dev, "translation fault on %s!\n", dev_name(dev));
-+		dev_err(dev, "PAR = 0x%llx\n", phys);
-+	}
-+	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
-+
-+	return phys;
-+}
-+
-+static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
-+					dma_addr_t iova)
-+{
-+	struct arm_smmu_domain *smmu_domain = domain->priv;
-+
-+	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_TRANS_OPS)
-+		return arm_smmu_iova_to_phys_hard(domain, iova);
-+	return arm_smmu_iova_to_phys_soft(domain, iova);
-+}
-+
- static int arm_smmu_domain_has_cap(struct iommu_domain *domain,
- 				   unsigned long cap)
- {
-@@ -1777,6 +1843,11 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		return -ENODEV;
- 	}
- 
-+	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
-+		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
-+		dev_notice(smmu->dev, "\taddress translation ops\n");
-+	}
-+
- 	if (id & ID0_CTTW) {
- 		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
- 		dev_notice(smmu->dev, "\tcoherent table walk\n");
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> -- 
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
