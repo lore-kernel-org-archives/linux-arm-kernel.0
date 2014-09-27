@@ -1,52 +1,36 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 27 Sep 2014 11:11:59 +0530
-Subject: [PATCH 3/3] clk: samsung: remove unnecessary inclusion of header files
- from clk.h
+Date: Sat, 27 Sep 2014 11:11:58 +0530
+Subject: [PATCH 2/3] clk: samsung: remove unnecessary CONFIG_OF from clk.c
 In-Reply-To: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1411796519-19417-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1411796519-19417-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's remove unnecessary include of header files from clk.h and add
-required one in clk.c
-
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- drivers/clk/samsung/clk.c |    3 ++-
- drivers/clk/samsung/clk.h |    4 ----
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ drivers/clk/samsung/clk.c |    2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-index 31bf391..952f9ec 100644
+index deab84d..31bf391 100644
 --- a/drivers/clk/samsung/clk.c
 +++ b/drivers/clk/samsung/clk.c
-@@ -11,7 +11,8 @@
-  * clock framework for Samsung platforms.
- */
+@@ -281,7 +281,6 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
+  * obtain the clock speed of all external fixed clock sources from device
+  * tree and register it
+  */
+-#ifdef CONFIG_OF
+ void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
+ 			struct samsung_fixed_rate_clock *fixed_rate_clk,
+ 			unsigned int nr_fixed_rate_clk,
+@@ -298,7 +297,6 @@ void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
+ 	}
+ 	samsung_clk_register_fixed_rate(ctx, fixed_rate_clk, nr_fixed_rate_clk);
+ }
+-#endif
  
--#include <linux/syscore_ops.h>
-+#include <linux/of_address.h>
-+
- #include "clk.h"
- 
- void samsung_clk_save(void __iomem *base,
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index a1ece4a..29a5779 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -13,12 +13,8 @@
- #ifndef __SAMSUNG_CLK_H
- #define __SAMSUNG_CLK_H
- 
--#include <linux/clk.h>
- #include <linux/clkdev.h>
--#include <linux/io.h>
- #include <linux/clk-provider.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
- #include "clk-pll.h"
- 
- /**
+ /* utility function to get the rate of a specified clock */
+ unsigned long _get_rate(const char *clk_name)
 -- 
 1.7.9.5
