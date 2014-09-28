@@ -1,22 +1,82 @@
-From: recruitment@sednaoilrefineries.com (Sedna Oil Refineries)
-Date: Sat, 27 Sep 2014 15:47:03 -0600
-Subject: JOB VACANCY IN CANADA, 2014
-Message-ID: <E1XXzpX-0000kG-AT@s13.nzusatechgroup.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sun, 28 Sep 2014 10:24:01 +0200
+Subject: [PATCH V2] bcma: use device from DT (brcm, bus-gpio) for SoC GPIO chip
+In-Reply-To: <1411741733-13888-1-git-send-email-zajec5@gmail.com>
+References: <1411741733-13888-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1411892641-5662-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JOB VACANCY IN CANADA, 2014
+This will allow us to define GPIO-attached devices (LEDs, buttons) in
+the the device tree.
 
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+This is based on top of
+[PATCH v6] bcma: register bcma as device tree driver
+that I hope will reach wireless-next git tree.
 
-Sedna Oil Refinery is a leading global resources company in oil refining.   We are now creating new career opportunities for both experienced and fresh graduates outside Australia.  We offer challenging job opportunities to the right people on our latest career and job opportunities. With a global portfolio of businesses and commodities, we are always seeking talented, skilled and enthusiastic people to join our team.  It is a diverse and challenging environment offering great career opportunities for people who share our values.
+V2: Describe axi chilren and make gpio a child of chipcommon core.
+---
+ Documentation/devicetree/bindings/bus/bcma.txt | 24 ++++++++++++++++++++++++
+ drivers/bcma/driver_gpio.c                     |  5 +++++
+ 2 files changed, 29 insertions(+)
 
-Sedna Oil Refinery will be responsible for applicants Flight Ticket and also assist in securing successful applicants and directs on how to obtain work permit with visa through Canadian Immigration CIC office in Canada and United Kingdom. Interested applicants should contact Sedna Oil Refinery. Any interested applicants, should kindly send his or her CV/resume. Email id: recruitment at sednaoilrefineries.com
-
-
-
-Regards,
-Vincent Hugo
-Senior Manager
-Human Resources
-Sedna Oil Refineries
-Canada
+diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+index e9070c1..26ef4b7 100644
+--- a/Documentation/devicetree/bindings/bus/bcma.txt
++++ b/Documentation/devicetree/bindings/bus/bcma.txt
+@@ -9,6 +9,22 @@ Required properties:
+ The cores on the AXI bus are automatically detected by bcma with the
+ memory ranges they are using and they get registered afterwards.
+ 
++The top-level axi bus may contain children representing attached cores
++(devices). This is needed since some hardware details can't be auto
++detected (e.g. IRQ numbers).
++
++There is also one special core called ChipCommon that may contain some
++extra sub-devices. This is because some devices (e.g. GPIO chip) are
++not standalone cores and can be access using ChipCommon regs only.
++Possible ChipCommon children:
++
++- gpio: GPIO chip on the SoC
++
++  Required properties:
++  - compatible: "brcm,bus-gpio"
++  - gpio-controller : makes the node a GPIO controller
++  - #gpio-cells : size of the GPIO specifier, must be 2
++
+ Example:
+ 
+ 	axi at 18000000 {
+@@ -17,4 +33,12 @@ Example:
+ 		ranges = <0x00000000 0x18000000 0x00100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++
++		chipcommon at 0 {
++			gpio at 0 {
++				compatible = "brcm,bus-gpio";
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++		};
+ 	};
+diff --git a/drivers/bcma/driver_gpio.c b/drivers/bcma/driver_gpio.c
+index 8ea497c..7ae39a8 100644
+--- a/drivers/bcma/driver_gpio.c
++++ b/drivers/bcma/driver_gpio.c
+@@ -218,6 +218,11 @@ int bcma_gpio_init(struct bcma_drv_cc *cc)
+ #if IS_BUILTIN(CONFIG_BCM47XX)
+ 	chip->to_irq		= bcma_gpio_to_irq;
+ #endif
++#if IS_BUILTIN(CONFIG_OF)
++	if (cc->core->bus->hosttype == BCMA_HOSTTYPE_SOC)
++		chip->of_node	= of_find_compatible_node(NULL, NULL,
++							  "brcm,bus-gpio");
++#endif
+ 	switch (cc->core->bus->chipinfo.id) {
+ 	case BCMA_CHIP_ID_BCM5357:
+ 	case BCMA_CHIP_ID_BCM53572:
+-- 
+1.8.4.5
