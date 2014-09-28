@@ -1,34 +1,34 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Sun, 28 Sep 2014 19:15:03 +0800
-Subject: [RFT Part2 v2 00/24] Enable hierarchy irqdomian on x86 platforms
-In-Reply-To: <20140928110531.GB7351@pd.tnic>
-References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
- <20140926142931.GA10066@nazgul.tnic> <542594A6.4040504@amd.com>
- <20140928110531.GB7351@pd.tnic>
-Message-ID: <5427EDB7.9060002@linux.intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 28 Sep 2014 12:19:56 +0100
+Subject: [PATCH 1/3] spi:fsl-dspi:add dspi tcfq mode transfer support
+In-Reply-To: <1411640665-20671-1-git-send-email-b44548@freescale.com>
+References: <1411640665-20671-1-git-send-email-b44548@freescale.com>
+Message-ID: <20140928111956.GW27755@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
-	I have prepared a git tree at:
-https://github.com/jiangliu/linux.git irqdomain/p1v2
-https://github.com/jiangliu/linux.git irqdomain/p2v2
-https://github.com/jiangliu/linux.git irqdomain/p3v1
+On Thu, Sep 25, 2014 at 06:24:23PM +0800, Chao Fu wrote:
 
-Branch irqdomain/p3v1 also includes all changes in p1v2/p2v2.
-Regards!
-Gerry
+> Remove bitbang:
+> Add tcf funtions, DSPI module need get cs change information in a spi transfer.
+> According cs change, DSPI will give last data the right flag. Bitbang provide
+> cs change behind the last data in a transfer. So DSPI can not deal the last data in
+> every transfer properly, so remove the bitbang in the driver.
+>
+> Merge duplicate code:
+> 	dspi_data_from_popr
+> 	dspi_data_to_pushr
+> 
+> Remove clk reference in regmap I/O:
+> Set the clk parament is NULL in devm_regmap_init_mmio_clk, it will avoid clk handle
+> in every register read/write, and advance tranferring efficiency.
 
-On 2014/9/28 19:05, Borislav Petkov wrote:
-> On Fri, Sep 26, 2014 at 11:30:30AM -0500, Aravind Gopalakrishnan wrote:
->> Okay, I shall start looking into the patches and RFH as needed.
-> 
-> Btw, apparently, there's a third patchset too:
-> 
-> https://lkml.kernel.org/r/1411743478-31435-1-git-send-email-jiang.liu at linux.intel.com
-> 
-> Jiang, do you have a tree which has all required patches for testing so
-> that people don't have to go hunting for them..?
-> 
-> Thanks.
-> 
+Like Shawn says this is three separate changes so should be three
+separate patchess.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140928/cbf23951/attachment.sig>
