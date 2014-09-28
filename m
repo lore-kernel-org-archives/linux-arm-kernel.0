@@ -1,77 +1,62 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 28 Sep 2014 13:42:21 +0900
-Subject: [PATCH v5 RESEND 1/3] ARM: EXYNOS: Move code from hotplug.c to
- platsmp.c
-In-Reply-To: <542677B2.70506@samsung.com>
-References: <1409920495-16533-1-git-send-email-k.kozlowski@samsung.com>
- <201409262313.26272.arnd@arndb.de> <542677B2.70506@samsung.com>
-Message-ID: <542791AD.5080105@samsung.com>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Sun, 28 Sep 2014 05:20:16 +0000
+Subject: [PATCH v1 3/3] ARM: dts: imx6x: Add enet2 support for imx6sx-sdb
+ board
+In-Reply-To: <20140928034213.GD12999@dragon>
+References: <1411524680-12863-1-git-send-email-b38611@freescale.com>
+ <1411524680-12863-4-git-send-email-b38611@freescale.com>
+ <20140928032852.GC12999@dragon>
+ <49aafc1f34a34c13ac7af2cf4b04fd6d@BY2PR03MB377.namprd03.prod.outlook.com>
+ <20140928034213.GD12999@dragon>
+Message-ID: <7e14fd7a305d44df90bcae3b16b56d60@BY2PR03MB377.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/14 17:39, Krzysztof Kozlowski wrote:
-> W dniu 26.09.2014 o 23:13, Arnd Bergmann pisze:
->> On Friday 05 September 2014, Krzysztof Kozlowski wrote:
->>> The commit only moves code around with one additional observable change:
->>> the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
->>> CFLAGS are not necessary any more.
->>
->> This turns out to be wrong, and your change broke 'allmodconfig' builds
->> in linux-next. Please apply this patch on top.
+From: Guo Shawn-R65073 Sent: Sunday, September 28, 2014 11:42 AM + 0800
+>To: Duan Fugang-B38611
+>Cc: linux-arm-kernel at lists.infradead.org; b20596 at solarflare.com;
+>shawn.guo at linaro.org; kernel at pengutronix.de
+>Subject: Re: [PATCH v1 3/3] ARM: dts: imx6x: Add enet2 support for imx6sx-
+>sdb board
 >
-Arnd, Krzysztof commented its fix has been submitted and landed in my 
--test tree not -next because it should be handled in rmk's tree I think.
-
-I sent the patch to RMK patch tracking system just now and it should be 
-fine in there.
-
-BTW, I just applied the fix in my -next until its ladning in RMK tree 
-but as you know it will be not be sent to arm-soc via samsung tree...
-
-One more, Arnd please pull my pull-request 2nd round and 3rd round for 
-samsung stuff for 3.18.
-
-> My patch definitely needed more testing.
-> I posted a fix here:
-> https://lkml.org/lkml/2014/9/24/163
-> However it seems that it wasn't picked up by anyone yet.
+>On Sun, Sep 28, 2014 at 11:34:39AM +0800, Duan Fugang-B38611 wrote:
+>> From: Guo Shawn-R65073 Sent: Sunday, September 28, 2014 11:29 AM +
+>> 0800
+>> >To: Duan Fugang-B38611
+>> >Cc: linux-arm-kernel at lists.infradead.org; b20596 at solarflare.com;
+>> >shawn.guo at linaro.org; kernel at pengutronix.de
+>> >Subject: Re: [PATCH v1 3/3] ARM: dts: imx6x: Add enet2 support for
+>> >imx6sx- sdb board
+>> >
+>> >On Wed, Sep 24, 2014 at 10:11:20AM +0800, Fugang Duan wrote:
+>> >> Add enet2 support for imx6sx-sdb board, and add the "fsl,imx6q-fec"
+>> >> compatible for fec2 node to be compatible with the old version.
+>> >>
+>> >> Signed-off-by: Fugang Duan <B38611@freescale.com>
+>> >> ---
+>> >>  arch/arm/boot/dts/imx6sx-sdb.dts |   28 ++++++++++++++++++++++++++++
+>> >>  arch/arm/boot/dts/imx6sx.dtsi    |    2 +-
+>> >>  2 files changed, 29 insertions(+), 1 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts
+>> >> b/arch/arm/boot/dts/imx6sx-sdb.dts
+>> >> index 82d6b34..06e0977 100644
+>> >> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+>> >> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+>> >> @@ -133,6 +133,14 @@
+>> >>  &fec1 {
+>> >>  	pinctrl-names = "default";
+>> >>  	pinctrl-0 = <&pinctrl_enet1>;
+>> >> +	pinctrl-assert-gpios = <&gpio4 16 GPIO_ACTIVE_HIGH>, <&gpio2 6
+>> >> +GPIO_ACTIVE_LOW>;
+>> >
+>> >I do not think this property is supported by upstream kernel.
+>> The upstream kernel how to handle it ?
 >
-> Russell, could you pick up the patch (with acks from Nicolas and Kukjin)?
->
-I believe Russell will take the patch in his tree.
+>What are the purpose of these two GPIOs?
 
-Thanks,
-Kukjin
+MX6SX_PAD_ENET2_COL__GPIO2_IO_6: it is a switch which enable ENET_3V3 and 25Mhz clock for phy.
+MX6SX_PAD_QSPI1A_DATA0__GPIO4_IO_16: it is a switch which enable PERI_3V3 that supply power for some modules including enet MAC and phy.
 
->> 8<----------
->> From 4ba6bf8806caec386e35930314dbad071284c837 Mon Sep 17 00:00:00 2001
->> From: Arnd Bergmann <arnd@arndb.de>
->> Date: Fri, 26 Sep 2014 23:09:38 +0200
->> Subject: [PATCH] ARM: EXYNOS: fix build error in platsmp.c
->>
->> /tmp/ccYeWL3V.s: Assembler messages:
->> /tmp/ccYeWL3V.s:659: Error: selected processor does not support ARM
->> mode `isb '
->> /tmp/ccYeWL3V.s:664: Error: selected processor does not support ARM
->> mode `isb '
->> /tmp/ccYeWL3V.s:665: Error: selected processor does not support ARM
->> mode `dsb '
->> make[3]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Fixes: 17342534e1d932 ("ARM: EXYNOS: Move code from hotplug.c to
->> platsmp.c")
->>
->> diff --git a/arch/arm/mach-exynos/Makefile
->> b/arch/arm/mach-exynos/Makefile
->> index 4e49d4efb264..64324bf5edb4 100644
->> --- a/arch/arm/mach-exynos/Makefile
->> +++ b/arch/arm/mach-exynos/Makefile
->> @@ -21,6 +21,7 @@ obj-$(CONFIG_PM_SLEEP) += suspend.o
->> obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
->>
->> obj-$(CONFIG_SMP) += platsmp.o headsmp.o
->> +CFLAGS_platsmp.o := -march=armv7-a
->>
->> plus_sec := $(call as-instr,.arch_extension sec,+sec)
->> AFLAGS_exynos-smc.o :=-Wa,-march=armv7-a$(plus_sec)
+Regards,
+Andy
