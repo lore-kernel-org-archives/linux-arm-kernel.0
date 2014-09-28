@@ -1,34 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 28 Sep 2014 13:25:43 +0100
-Subject: [PATCH v1 1/3] regulator: act8865: Add support to turn off all
- outputs
-In-Reply-To: <CABgxDo+h2AYjAO4darK4+RTXqnhf4OqouGLfF2yuJCpu7r6tLg@mail.gmail.com>
-References: <1411834906-9533-1-git-send-email-romain.perier@gmail.com>
- <20140928103301.GN27755@sirena.org.uk>
- <CABgxDo+h2AYjAO4darK4+RTXqnhf4OqouGLfF2yuJCpu7r6tLg@mail.gmail.com>
-Message-ID: <20140928122543.GA27755@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 28 Sep 2014 14:43:35 +0200
+Subject: [PATCH 1/4] dt-bindings: Add a clocks property to the
+ simple-framebuffer binding
+Message-ID: <1411908218-20947-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 28, 2014 at 02:00:54PM +0200, PERIER Romain wrote:
-> 2014-09-28 12:33 GMT+02:00 Mark Brown <broonie@kernel.org>:
+A simple-framebuffer node represents a framebuffer setup by the firmware /
+bootloader. Such a framebuffer may have a number of clocks in use, add a
+property to communicate this to the OS.
 
-> > We really need to come up with a standard property for this and document
-> > it rather than continuing to add individual device specific properties
-> > all doing the same thing, and probably also some helper code and/or a
-> > standard operation for this - there's a lot of drivers implementing the
-> > same pattern here.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/video/simple-framebuffer.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> I completly agree about adding a unified and generic property for that purpose.
-> I already proposed something for that on devicetree ML, see the thread
-> "Proposal: generic property for system-power-controller".
-> Unfortunately I did not get replies :) .
-
-Did you CC relevant maintainers and send a patch?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140928/a69323c8/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index 70c26f3..e75478e 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -14,6 +14,9 @@ Required properties:
+   - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
+   - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+ 
++Optional properties:
++- clocks : List of clocks used by the framebuffer
++
+ Example:
+ 
+ 	framebuffer {
+-- 
+2.1.0
