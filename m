@@ -1,45 +1,22 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 28 Sep 2014 21:37:57 +0530
-Subject: [PATCH 2/9] dmaengine: Make channel allocation callbacks optional
-In-Reply-To: <1411808085-27792-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411808085-27792-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140928160757.GJ1638@intel.com>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Sun, 28 Sep 2014 17:41:46 +0100
+Subject: [PATCH 7/7] efi_rtc: probe function error out in case no efi
+ runtime enabled
+In-Reply-To: <20140923072426.GB3916@darkstar.nay.redhat.com>
+References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+ <1408007953-15151-1-git-send-email-dyoung@redhat.com>
+ <1411403609.25340.55.camel@deneb.redhat.com>
+ <20140923072426.GB3916@darkstar.nay.redhat.com>
+Message-ID: <20140928164146.GA18635@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 10:54:38AM +0200, Maxime Ripard wrote:
-> Nowadays, some drivers don't have anything in there channel allocation
-> callbacks anymore.
+On Tue, 23 Sep, at 03:24:26PM, Dave Young wrote:
 > 
-> Remove the BUG_ON if those callbacks aren't implemented, in order to allow
-> drivers to not implement them.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/dma/dmaengine.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index d5d30ed863ce..cfcb181b1184 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -817,8 +817,6 @@ int dma_async_device_register(struct dma_device *device)
->  	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
->  		!device->device_prep_interleaved_dma);
->  
-> -	BUG_ON(!device->device_alloc_chan_resources);
-> -	BUG_ON(!device->device_free_chan_resources);
-Dont think we have drivers without free. IIRC cppi one might be only
-instance
+> If that's the case then this patch should be unnecessary, I have no
+> machine to test it currently though.
+
+Thanks, I've dropped this from the v3.18 queue.
 
 -- 
-~Vinod
->  	BUG_ON(!device->device_tx_status);
->  	BUG_ON(!device->device_issue_pending);
->  	BUG_ON(!device->dev);
-> -- 
-> 2.1.0
-> 
-
--- 
+Matt Fleming, Intel Open Source Technology Center
