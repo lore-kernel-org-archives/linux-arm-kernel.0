@@ -1,31 +1,16 @@
-From: yocto6@gmail.com (Nicholas Krause)
-Date: Sat, 27 Sep 2014 22:50:52 -0400
-Subject: [PATCH] arm: Remove read of issue in sa1111.c in sa1111_resume
-Message-ID: <1411872652-16207-1-git-send-email-yocto6@gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Sun, 28 Sep 2014 03:51:14 +0100
+Subject: Legacy Code in gpmc-onenand.c
+In-Reply-To: <5427744E.4040409@gmail.com>
+References: <5427744E.4040409@gmail.com>
+Message-ID: <20140928025114.GY7996@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the FIXME message and issue with reading in this driver before resuming
-in the function, sa1111_resume.
+On Sat, Sep 27, 2014 at 10:37:02PM -0400, nick wrote:
+> Greetings Kevin and others,
+> I am wondering if the below code is legacy I can remove it as stated it the fix me.
+> Cheers Nick 
 
-Signed-off-by: Nicholas Krause <yocto6@gmail.com>
----
- arch/arm/common/sa1111.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index e57d7e5..0c4b9a9 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -950,9 +950,7 @@ static int sa1111_resume(struct platform_device *dev)
- 
- 	/*
- 	 * Ensure that the SA1111 is still here.
--	 * FIXME: shouldn't do this here.
- 	 */
--	id = sa1111_readl(sachip->base + SA1111_SKID);
- 	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
- 		__sa1111_remove(sachip);
- 		platform_set_drvdata(dev, NULL);
--- 
-1.9.1
+Nick, could you take that to more appropriate forum?  alt.sex.fetish.FIXME
+would probably be a good starting point...
