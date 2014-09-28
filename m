@@ -1,105 +1,36 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Sun, 28 Sep 2014 16:51:31 -0500
-Subject: [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle
- SATA controller
-In-Reply-To: <CAOesGMh_Ku-pReg5LHVFvRM0-s_zEO4rgAvaD5rv-eTfPD71Yw@mail.gmail.com>
-References: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
- <CAOesGMh_Ku-pReg5LHVFvRM0-s_zEO4rgAvaD5rv-eTfPD71Yw@mail.gmail.com>
-Message-ID: <542882E3.2050908@amd.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sun, 28 Sep 2014 15:03:00 -0700
+Subject: [PATCH 0/5] m25p80,spi-nor: Fix module aliases for m25p80; clean
+ up chip identification
+In-Reply-To: <1410714795.3040.45.camel@decadent.org.uk>
+References: <1410714624.3040.38.camel@decadent.org.uk>
+ <1410714795.3040.45.camel@decadent.org.uk>
+Message-ID: <20140928220300.GB3248@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Sep 14, 2014 at 06:13:15PM +0100, Ben Hutchings wrote:
+> On Sun, 2014-09-14 at 18:10 +0100, Ben Hutchings wrote:
+> > The first patch in the series restores the module aliases to m25p80, but
+> > it does so by duplicating the list of names.  This should be suitable
+> > for stable, but it isn't viable in the longer term.
+> > 
+> > The following patches change the spi-nor interface so that this
+> > duplication is no longer necessary.  This includes removing
+> > spi_nor::read_id, but it could be re-added after this with a different
+> > interface, e.g. returning a flash_info structure (which would need to be
+> > defined in spi_nor.h).
+> 
+> Note that these patch are:
+> - Based on your 'testing' branch
 
+Which testing branch? These two are the only official
+repos for MTD:
 
-On 09/11/2014 03:17 PM, Olof Johansson wrote:
-> On Tue, Sep 9, 2014 at 1:37 PM,  <suravee.suthikulpanit@amd.com> wrote:
->> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>
->> This patch adds ACPI support for non-PCI SATA contoller in ahci_platform driver.
->> It adds ACPI matching table in ahci_platform to support AMD Seattle SATA controller
->> with following ASL structure in DSDT:
->>
->>      Device (SATA0)
->>      {
->>        Name(_HID, "AMDI0600")    // Seattle AHSATA
->>        Name (_CCA, 1)            // Cache-coherent controller
->>        Name (_CRS, ResourceTemplate ()
->>        {
->>          Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
->>          Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
->>        })
->>      }
->>
->> Since ATA driver should not require PCI support for ATA_ACPI,
->> this patch also removes dependency in the driver/ata/Kconfig.
->>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> ---
->>   drivers/ata/Kconfig         |  2 +-
->>   drivers/ata/ahci_platform.c | 13 +++++++++++++
->>   2 files changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
->> index e1b9278..f2e6c9e 100644
->> --- a/drivers/ata/Kconfig
->> +++ b/drivers/ata/Kconfig
->> @@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
->>
->>   config ATA_ACPI
->>          bool "ATA ACPI Support"
->> -       depends on ACPI && PCI
->> +       depends on ACPI
->>          default y
->>          help
->>            This option adds support for ATA-related ACPI objects.
->> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->> index f61ddb9..3499bab 100644
->> --- a/drivers/ata/ahci_platform.c
->> +++ b/drivers/ata/ahci_platform.c
->> @@ -20,6 +20,9 @@
->>   #include <linux/platform_device.h>
->>   #include <linux/libata.h>
->>   #include <linux/ahci_platform.h>
->> +#ifdef CONFIG_ATA_ACPI
->> +#include <linux/acpi.h>
->> +#endif
->>   #include "ahci.h"
->>
->>   static const struct ata_port_info ahci_port_info = {
->> @@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
->>   };
->>   MODULE_DEVICE_TABLE(of, ahci_of_match);
->>
->> +#ifdef CONFIG_ATA_ACPI
->> +static const struct acpi_device_id ahci_acpi_match[] = {
->> +       { "AMDI0600", 0 }, /* AMD Seattle AHCI */
->> +       { },
->> +};
->> +#endif
->> +
->>   static struct platform_driver ahci_driver = {
->>          .probe = ahci_probe,
->>          .remove = ata_platform_remove_one,
->> @@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
->>                  .name = "ahci",
->>                  .owner = THIS_MODULE,
->>                  .of_match_table = ahci_of_match,
->> +#ifdef CONFIG_ATA_ACPI
->> +               .acpi_match_table = ACPI_PTR(ahci_acpi_match),
->> +#endif
->
-> The whole point of having ACPI_PTR() is to avoid having ifdefs like
-> these. The structure member is always there, so there's no need to
-> have it conditionally compiled out.
->
-> Come to think of it, the match table should be under CONFIG_ACPI
-> instead -- why do a separate config option just for this?
->
->
-> -Olof
->
+    git git://git.infradead.org/linux-mtd.git
+    git git://git.infradead.org/l2-mtd.git
 
-Good point. Thanks.  I will make change to this, and send out the next 
-one soon.
+> - Untested by me, aside from compiling and checking that m25p80 has the
+>   expected module aliases
 
-Suravee
+Brian
