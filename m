@@ -1,179 +1,103 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 28 Sep 2014 16:04:26 +0200
-Subject: [RFC PATCH] arm/arm64: KVM: Fix BE accesses to GICv2 EISR and ELRSR
- regs
-Message-ID: <1411913066-3787-1-git-send-email-christoffer.dall@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 28 Sep 2014 15:26:33 +0100
+Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
+In-Reply-To: <20140928110640.GB9797@udp189498uds.ap.freescale.net>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
+ <20140926121427.GO5182@n2100.arm.linux.org.uk>
+ <20140928110640.GB9797@udp189498uds.ap.freescale.net>
+Message-ID: <20140928142632.GG5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EIRSR and ELRSR registers are 32-bit registers on GICv2, and we
-store these as an array of two such registers on the vgic vcpu struct.
-However, we access them as a single 64-bit value or as a bitmap pointer
-in the generic vgic code, which breaks BE support.
+On Sun, Sep 28, 2014 at 07:06:40PM +0800, Chenhui Zhao wrote:
+> On Fri, Sep 26, 2014 at 01:14:27PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
+> > > +static int ls1_start_deepsleep(unsigned long addr)
+> > > +{
+> > > +	ls1_do_deepsleep(addr);
+> > > +
+> > > +	return 0;
+> > > +}
+> > ...
+> > > +	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
+> > 
+> > What's the point of this function?  Why can't ls1_do_deepsleep() just
+> > return zero?
+> 
+> Just leave space for adding C code in the future.
+> 
+> > 
+> > > +/*
+> > > + * r0: the physical entry address of SRAM code
+> > > + *
+> > > + */
+> > > +ENTRY(ls1_do_deepsleep)
+> > > +	mov	r13, r0
+> > > +
+> > > +	/* flush cache */
+> > > +	bl	v7_flush_dcache_all
+> > 
+> > Please explain the purpose of this call via a comment in the code.
+> > 
+> > The generic code will have saved the CPU state, and will have called
+> > flush_cache_louis() to flush the caches to the point of unification.
+> > 
+> > The only data which will have been loaded into the cache between that
+> > point is the stack for the return from __cpu_suspend_save, and
+> > speculative prefetches.
+> > 
+> > So, the only reason I can gather is that you need to flush data from
+> > lower levels of the cache below the point of unification.
+> > 
+> 
+> In deep sleep process, all caches will lost, so flush all caches to prevent
+> data loss.
 
-Instead, store them as u64 values on the vgic structure and do the
-word-swapping in the assembly code, which already handles the byte order
-for BE systems.
+You haven't answered my question.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-I don't have a working BE configuration, so sending this out as an
-*UNTESTED on BE* RFC in hoping that someone with a working setup can
-give it a test for me (Will tells me Virtio is broken with kvmtool no BE
-hosts though), and to avoid someone else also doing this work.
+> > > +
+> > > +	/* disable cache, C bit in SCTLR */
+> > > +	mrc	p15, 0, r0, c1, c0, 0
+> > > +	bic	r0, r0, #(1 << 2)
+> > > +	mcr	p15, 0, r0, c1, c0, 0
+> > > +	isb
+> > > +
+> > > +	/* disable coherency, SMP bit in ACTLR */
+> > > +	mrc	p15, 0, r0, c1, c0, 1
+> > > +	bic	r0, r0, #(1 << 6)
+> > > +	mcr	p15, 0, r0, c1, c0, 1
+> > > +	isb
+> > > +	dsb
+> > > +
+> > > +	/* disable MMU, M bit in SCTLR */
+> > > +	mrc	p15, 0, r0, c1, c0, 0
+> > > +	bic	r0, r0, #1
+> > > +	mcr	p15, 0, r0, c1, c0, 0
+> > > +	isb
+> > > +
+> > > +	/* jump to sram code using physical address */
+> > > +	bx	r13
+> > 
+> > This looks extremely fragile.  You are running in virtual space, and you
+> > turn the MMU off.  You are reliant on the MMU still being on for the
+> > following instructions to already be in the pipeline.  That's not a
+> > very good assumption to make (we've made it in the past and it breaks
+> > every so often when things change, eg when the code is no longer laid
+> > out how we expect.)
+> > 
+> > You need to disable the MMU safely, which means using the identity map
+> > page tables and executing code in the identity map region.
+> 
+> Yes, the code will switch off MMU, and switch to physical address space.
+> On LS1021, the DDR memory located at the physical address space started from
+> 0x80000000, the kernel space also started at 0x80000000 (CONFIG_PAGE_OFFSET = 0x80000000).
+> So the virtual address of kernel code is equal to the physical address.
 
- arch/arm/kvm/interrupts_head.S  |  7 +++++++
- arch/arm64/kvm/vgic-v2-switch.S | 12 ++++++++----
- include/kvm/arm_vgic.h          |  4 ++--
- virt/kvm/arm/vgic-v2.c          | 24 +++---------------------
- virt/kvm/arm/vgic.c             | 18 ++++++++++++++++--
- 5 files changed, 36 insertions(+), 29 deletions(-)
+You can't rely on that.
 
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 98c8c5b..14d4883 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -433,10 +433,17 @@ ARM_BE8(rev	r10, r10	)
- 	str	r3, [r11, #VGIC_V2_CPU_HCR]
- 	str	r4, [r11, #VGIC_V2_CPU_VMCR]
- 	str	r5, [r11, #VGIC_V2_CPU_MISR]
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+	str	r6, [r11, #(VGIC_V2_CPU_EISR + 4)]
-+	str	r7, [r11, #VGIC_V2_CPU_EISR]
-+	str	r8, [r11, #(VGIC_V2_CPU_ELRSR + 4)]
-+	str	r9, [r11, #VGIC_V2_CPU_ELRSR]
-+#else
- 	str	r6, [r11, #VGIC_V2_CPU_EISR]
- 	str	r7, [r11, #(VGIC_V2_CPU_EISR + 4)]
- 	str	r8, [r11, #VGIC_V2_CPU_ELRSR]
- 	str	r9, [r11, #(VGIC_V2_CPU_ELRSR + 4)]
-+#endif
- 	str	r10, [r11, #VGIC_V2_CPU_APR]
- 
- 	/* Clear GICH_HCR */
-diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
-index ae21177..f002fe1 100644
---- a/arch/arm64/kvm/vgic-v2-switch.S
-+++ b/arch/arm64/kvm/vgic-v2-switch.S
-@@ -67,10 +67,14 @@ CPU_BE(	rev	w11, w11 )
- 	str	w4, [x3, #VGIC_V2_CPU_HCR]
- 	str	w5, [x3, #VGIC_V2_CPU_VMCR]
- 	str	w6, [x3, #VGIC_V2_CPU_MISR]
--	str	w7, [x3, #VGIC_V2_CPU_EISR]
--	str	w8, [x3, #(VGIC_V2_CPU_EISR + 4)]
--	str	w9, [x3, #VGIC_V2_CPU_ELRSR]
--	str	w10, [x3, #(VGIC_V2_CPU_ELRSR + 4)]
-+CPU_LE(	str	w7, [x3, #VGIC_V2_CPU_EISR] )
-+CPU_LE(	str	w8, [x3, #(VGIC_V2_CPU_EISR + 4)] )
-+CPU_LE(	str	w9, [x3, #VGIC_V2_CPU_ELRSR] )
-+CPU_LE(	str	w10, [x3, #(VGIC_V2_CPU_ELRSR + 4)] )
-+CPU_BE(	str	w7, [x3, #(VGIC_V2_CPU_EISR + 4)] )
-+CPU_BE(	str	w8, [x3, #VGIC_V2_CPU_EISR] )
-+CPU_BE(	str	w9, [x3, #(VGIC_V2_CPU_ELRSR + 4)] )
-+CPU_BE(	str	w10, [x3, #VGIC_V2_CPU_ELRSR] )
- 	str	w11, [x3, #VGIC_V2_CPU_APR]
- 
- 	/* Clear GICH_HCR */
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 35b0c12..c66dc9ed 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -168,8 +168,8 @@ struct vgic_v2_cpu_if {
- 	u32		vgic_hcr;
- 	u32		vgic_vmcr;
- 	u32		vgic_misr;	/* Saved only */
--	u32		vgic_eisr[2];	/* Saved only */
--	u32		vgic_elrsr[2];	/* Saved only */
-+	u64		vgic_eisr;	/* Saved only */
-+	u64		vgic_elrsr;	/* Saved only */
- 	u32		vgic_apr;
- 	u32		vgic_lr[VGIC_V2_MAX_LRS];
- };
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index 416baed..2935405 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -71,35 +71,17 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
- 				  struct vgic_lr lr_desc)
- {
- 	if (!(lr_desc.state & LR_STATE_MASK))
--		__set_bit(lr, (unsigned long *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr);
-+		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
- }
- 
- static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
- {
--	u64 val;
--
--#if BITS_PER_LONG == 64
--	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[1];
--	val <<= 32;
--	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr[0];
--#else
--	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
--#endif
--	return val;
-+	return vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr;
- }
- 
- static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
- {
--	u64 val;
--
--#if BITS_PER_LONG == 64
--	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[1];
--	val <<= 32;
--	val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[0];
--#else
--	val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
--#endif
--	return val;
-+	return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
- }
- 
- static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 73eba79..30cf369 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -118,6 +118,20 @@ static const struct vgic_params *vgic;
- #define REG_OFFSET_SWIZZLE	0
- #endif
- 
-+/*
-+ * Call this function to convert a u64 value to an unsigned long * bitmask
-+ * in a way that works on both 32-bit and 64-bit LE and BE platforms.
-+ *
-+ * Warning: Calling this function may modify *val.
-+ */
-+static unsigned long *u64_to_bitmask(u64 *val)
-+{
-+#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
-+	*val = (*val >> 32) | (*val << 32);
-+#endif
-+	return (unsigned long *)val;
-+}
-+
- static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
- 				int cpuid, u32 offset)
- {
-@@ -1256,7 +1270,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 		 * active bit.
- 		 */
- 		u64 eisr = vgic_get_eisr(vcpu);
--		unsigned long *eisr_ptr = (unsigned long *)&eisr;
-+		unsigned long *eisr_ptr = u64_to_bitmask(&eisr);
- 		int lr;
- 
- 		for_each_set_bit(lr, eisr_ptr, vgic->nr_lr) {
-@@ -1304,7 +1318,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 
- 	level_pending = vgic_process_maintenance(vcpu);
- 	elrsr = vgic_get_elrsr(vcpu);
--	elrsr_ptr = (unsigned long *)&elrsr;
-+	elrsr_ptr = u64_to_bitmask(&elrsr);
- 
- 	/* Clear mappings for empty LRs */
- 	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
+Sorry, NAK.
+
 -- 
-2.0.0
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
