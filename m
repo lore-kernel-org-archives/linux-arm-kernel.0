@@ -1,474 +1,244 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Sun, 28 Sep 2014 15:53:27 -0500
-Subject: [RFC 1/4] arm64: amd-seattle: Adding device tree for AMD Seattle
- platform
+Date: Sun, 28 Sep 2014 15:53:28 -0500
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
 In-Reply-To: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
 References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <1411937610-22125-2-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Initial revision of device tree for AMD Seattle platform
+This patch adds ARM64 support to the generic PCI host driver.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+For MSI support, it adds new device tree binding "msi-parent",
+which should point to corresponded msi-controller.
+
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
-Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
 ---
- arch/arm64/boot/dts/Makefile                |   1 +
- arch/arm64/boot/dts/amd-seattle-periph.dtsi | 175 ++++++++++++++++++++
- arch/arm64/boot/dts/amd-seattle.dts         | 245 ++++++++++++++++++++++++++++
- 3 files changed, 421 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
- create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
+ .../devicetree/bindings/pci/host-generic-pci.txt   |  3 +
+ drivers/pci/host/Kconfig                           |  2 +-
+ drivers/pci/host/pci-host-generic.c                | 95 ++++++++++++++++++++--
+ 3 files changed, 90 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index c52bdb0..11cb2e3 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-+dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
+diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+index f0b0436..327e5b1 100644
+--- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
++++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+@@ -69,6 +69,9 @@ Practice: Interrupt Mapping' and requires the following properties:
  
- targets += dtbs
- targets += $(dtb-y)
-diff --git a/arch/arm64/boot/dts/amd-seattle-periph.dtsi b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
-new file mode 100644
-index 0000000..e5bcf1c
---- /dev/null
-+++ b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
-@@ -0,0 +1,175 @@
-+/*
-+ * DTS file for AMD Seattle Peripheral
-+ *
-+ * Copyright (C) 2014 Advanced Micro Devices, Inc.
-+ */
+ - interrupt-map-mask : <see aforementioned specification>
+ 
++Optinal Properties:
 +
-+motherboard {
-+	arm,v2m-memory-map = "rs1";
-+	compatible = "arm,vexpress,v2m-p1", "simple-bus";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	ranges;
++- msi-parent     : Specify the msi-controller phandle.
+ 
+ Example:
+ 
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index 90f5cca..44bf523 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -50,7 +50,7 @@ config PCI_RCAR_GEN2_PCIE
+ 
+ config PCI_HOST_GENERIC
+ 	bool "Generic PCI host controller"
+-	depends on ARM && OF
++	depends on (ARM || ARM64) && OF
+ 	help
+ 	  Say Y here if you want to support a simple generic PCI host
+ 	  controller, such as the one emulated by kvmtool.
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 3d2076f..f33c547 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -42,14 +42,24 @@ struct gen_pci {
+ 	struct pci_host_bridge			host;
+ 	struct gen_pci_cfg_windows		cfg;
+ 	struct list_head			resources;
++	struct device_node *msi_parent;
+ };
+ 
++#ifdef CONFIG_ARM64
++#define bus_to_gen_pci(b) \
++	((struct gen_pci *)b->sysdata)
++#else
++#define bus_to_gen_pci(b) \
++	((struct gen_pci *) \
++	(((struct pci_sys_data *) \
++	(bus->sysdata))->private_data))
++#endif
 +
-+	adl3clk_100mhz: clk100mhz_0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <100000000>;
-+		clock-output-names = "adl3clk_100mhz";
-+	};
+ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+ 					     unsigned int devfn,
+ 					     int where)
+ {
+-	struct pci_sys_data *sys = bus->sysdata;
+-	struct gen_pci *pci = sys->private_data;
++	struct gen_pci *pci = bus_to_gen_pci(bus);
+ 	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
+ 
+ 	return pci->cfg.win[idx] + ((devfn << 8) | where);
+@@ -64,8 +74,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
+ 					      unsigned int devfn,
+ 					      int where)
+ {
+-	struct pci_sys_data *sys = bus->sysdata;
+-	struct gen_pci *pci = sys->private_data;
++	struct gen_pci *pci = bus_to_gen_pci(bus);
+ 	resource_size_t idx = bus->number - pci->cfg.bus_range.start;
+ 
+ 	return pci->cfg.win[idx] + ((devfn << 12) | where);
+@@ -80,8 +89,7 @@ static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
+ 				int where, int size, u32 *val)
+ {
+ 	void __iomem *addr;
+-	struct pci_sys_data *sys = bus->sysdata;
+-	struct gen_pci *pci = sys->private_data;
++	struct gen_pci *pci = bus_to_gen_pci(bus);
+ 
+ 	addr = pci->cfg.ops->map_bus(bus, devfn, where);
+ 
+@@ -103,8 +111,7 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+ 				 int where, int size, u32 val)
+ {
+ 	void __iomem *addr;
+-	struct pci_sys_data *sys = bus->sysdata;
+-	struct gen_pci *pci = sys->private_data;
++	struct gen_pci *pci = bus_to_gen_pci(bus);
+ 
+ 	addr = pci->cfg.ops->map_bus(bus, devfn, where);
+ 
+@@ -144,8 +151,11 @@ static int gen_pci_calc_io_offset(struct device *dev,
+ 				  resource_size_t *offset)
+ {
+ 	static atomic_t wins = ATOMIC_INIT(0);
+-	int err, idx, max_win;
++	int idx, max_win;
+ 	unsigned int window;
++#ifndef CONFIG_ARM64
++	int err;
++#endif
+ 
+ 	if (!PAGE_ALIGNED(range->cpu_addr))
+ 		return -EINVAL;
+@@ -156,9 +166,12 @@ static int gen_pci_calc_io_offset(struct device *dev,
+ 		return -ENOSPC;
+ 
+ 	window = (idx - 1) * SZ_64K;
 +
-+	ccpclk_375mhz: clk375mhz {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <375000000>;
-+		clock-output-names = "ccpclk_375mhz";
-+	};
++#ifndef CONFIG_ARM64
+ 	err = pci_ioremap_io(window, range->cpu_addr);
+ 	if (err)
+ 		return err;
++#endif
+ 
+ 	of_pci_range_to_resource(range, dev->of_node, res);
+ 	res->start = window;
+@@ -310,12 +323,58 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+ 	return 0;
+ }
+ 
++#ifndef CONFIG_ARM64
+ static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+ {
+ 	struct gen_pci *pci = sys->private_data;
+ 	list_splice_init(&pci->resources, &sys->resources);
+ 	return 1;
+ }
++#endif
 +
-+	sataclk_333mhz: clk333mhz {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <333000000>;
-+		clock-output-names = "sataclk_333mhz";
-+	};
++#ifdef CONFIG_ARM64
++struct pci_bus *gen_scan_root_bus(struct device *parent, int bus,
++				       struct pci_ops *ops, void *sysdata,
++				       struct list_head *resources)
++{
++	struct pci_host_bridge_window *window;
++	bool found = false;
++	struct pci_bus *b;
++	int max;
++	struct gen_pci *pci = sysdata;
 +
-+	pcieclk_500mhz: clk500mhz_0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <500000000>;
-+		clock-output-names = "pcieclk_500mhz";
-+	};
++	list_for_each_entry(window, resources, list)
++		if (window->res->flags & IORESOURCE_BUS) {
++			found = true;
++			break;
++		}
 +
-+	dmaclk_500mhz: clk500mhz_1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <500000000>;
-+		clock-output-names = "dmaclk_500mhz";
-+	};
++	b = pci_create_root_bus(parent, bus, ops, sysdata, resources);
++	if (!b)
++		return NULL;
 +
-+	miscclk_250mhz: clk250mhz_4 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <250000000>;
-+		clock-output-names = "miscclk_250mhz";
-+	};
++	/* TODO:
++	 * This is probably should be done in the core pci driver somewhere
++	 */
++	if (pci->msi_parent)
++		b->msi = of_pci_find_msi_chip_by_node(pci->msi_parent);
 +
-+	uartspiclk_100mhz: clk100mhz_1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <100000000>;
-+		clock-output-names = "uartspiclk_100mhz";
-+	};
++	if (!found) {
++		dev_info(&b->dev,
++		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
++			bus);
++		pci_bus_insert_busn_res(b, bus, 255);
++	}
 +
-+	dma0: dma at 1,0500000 {
-+		compatible = "arm,pl330", "arm,primecell";
-+		reg = <0 0x0500000 0 0x1000>;
-+		interrupts =
-+			<0 368 4>,
-+			<0 369 4>,
-+			<0 370 4>,
-+			<0 371 4>,
-+			<0 372 4>,
-+			<0 373 4>,
-+			<0 374 4>,
-+			<0 375 4>;
-+		clocks = <&dmaclk_500mhz>;
-+		clock-names = "apb_pclk";
-+		#dma-cells = <1>;
-+		#stream-id-cells = <32>;
-+	};
++	max = pci_scan_child_bus(b);
 +
-+	sata0: sata at 1,00300000 {
-+		compatible = "snps,spear-ahci";
-+		reg = <0 0x300000 0 0x800>;
-+		interrupts = <0 355 4>;
-+		clocks = <&sataclk_333mhz>;
-+		clock-names = "apb_pclk";
-+		#stream-id-cells = <32>;
-+		dma-coherent;
-+	};
++	if (!found)
++		pci_bus_update_busn_res_end(b, max);
 +
-+	i2c at 1,1000000 {
-+		compatible = "snps,designware-i2c";
-+		reg = <0 0x01000000 0 0x1000>;
-+		interrupts = <0 357 4>;
-+		clocks = <&uartspiclk_100mhz>;
-+		clock-names = "apb_pclk";
-+	};
++	pci_bus_add_devices(b);
++	return b;
++}
++#endif
+ 
+ static int gen_pci_probe(struct platform_device *pdev)
+ {
+@@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
++#ifndef CONFIG_ARM64
+ 	struct hw_pci hw = {
+ 		.nr_controllers	= 1,
+ 		.private_data	= (void **)&pci,
+@@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 		.map_irq	= of_irq_parse_and_map_pci,
+ 		.ops		= &gen_pci_ops,
+ 	};
++#endif
+ 
+ 	if (!pci)
+ 		return -ENOMEM;
+@@ -368,8 +429,24 @@ static int gen_pci_probe(struct platform_device *pdev)
+ 		gen_pci_release_of_pci_ranges(pci);
+ 		return err;
+ 	}
++#ifdef CONFIG_ARM64
+ 
++#ifdef CONFIG_PCI_MSI
++	pci->msi_parent = of_parse_phandle(np, "msi-parent", 0);
++	if (!pci->msi_parent) {
++		dev_err(&pdev->dev, "Failed to allocate msi-parent.\n");
++		return -EINVAL;
++	}
++#endif
 +
-+	v2m_serial0: uart at 1,1010000 {
-+		compatible = "arm,pl011", "arm,primecell";
-+		reg = <0 0x1010000 0 0x1000>;
-+		interrupts = <0 328 4>;
-+		clocks = <&uartspiclk_100mhz>, <&uartspiclk_100mhz>;
-+		clock-names = "uartclk", "apb_pclk";
-+	};
-+
-+	ssp at 1,1020000 {
-+		#gpio-cells = <2>;
-+		compatible = "arm,pl022", "arm,primecell";
-+		reg = <0 0x1020000 0 0x1000>;
-+		spi-controller;
-+		interrupts = <0 330 4>;
-+		clocks = <&uartspiclk_100mhz>;
-+		clock-names = "apb_pclk";
-+	};
-+
-+	ssp at 1,1030000 {
-+		#gpio-cells = <2>;
-+		compatible = "arm,pl022", "arm,primecell";
-+		reg = <0 0x1030000 0 0x1000>;
-+		spi-controller;
-+		interrupts = <0 329 4>;
-+		clocks = <&uartspiclk_100mhz>;
-+		clock-names = "apb_pclk";
-+		num-cs = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		sdcard at 1 {
-+			compatible = "mmc-spi-slot";
-+			reg = <0>;
-+			spi-max-frequency = <20000000>;
-+			pl022,hierarchy = <0>;
-+			pl022,interface = <0>;
-+			pl022,com-mode = <0x0>;
-+			pl022,rx-level-trig = <0>;
-+			pl022,tx-level-trig = <0>;
-+		};
-+	};
-+
-+	gpio at 1,1040000 {
-+		#gpio-cells = <2>;
-+		compatible = "arm,pl061", "arm,primecell";
-+		reg = <0 0x1040000 0 0x1000>;
-+		gpio-controller;
-+		interrupts = <0 359 4>;
-+		clocks = <&uartspiclk_100mhz>;
-+		clock-names = "apb_pclk";
-+	};
-+
-+	gpio at 1,1050000 {
-+		#gpio-cells = <2>;
-+		compatible = "arm,pl061", "arm,primecell";
-+		reg = <0 0x1050000 0 0x1000>;
-+		gpio-controller;
-+		interrupts = <0 358 4>;
-+		clocks = <&uartspiclk_100mhz>;
-+		clock-names = "apb_pclk";
-+	};
-+
-+	timer at 1,1060000 {
-+		compatible = "arm,standalone_a5_twd";
-+		reg = <0 0x1060000 0 0x40>;
-+		interrupts =
-+			<0 378 4>,
-+			<0 379 4>;
-+	};
-+
-+	ccp: ccp at 1,00100000 {
-+		compatible = "amd,ccp-seattle-v1a";
-+		reg = <0 0x00100000 0 0x10000>;
-+		interrupts = <0 3 4>;
-+		dma-coherent;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amd-seattle.dts b/arch/arm64/boot/dts/amd-seattle.dts
-new file mode 100644
-index 0000000..3096d1a
---- /dev/null
-+++ b/arch/arm64/boot/dts/amd-seattle.dts
-@@ -0,0 +1,245 @@
-+/*
-+ * DTS file for AMD Seattle
-+ *
-+ * Copyright (C) 2014 Advanced Micro Devices, Inc.
-+ */
-+
-+/dts-v1/;
-+
-+/ {
-+	compatible = "amd,seattle";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	chosen {
-+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,0xe1010000";
-+		linux,pci-probe-only;
-+	};
-+
-+	aliases {
-+		serial0 = &v2m_serial0;
-+	};
-+
-+	/* Note: This entry is modified by UEFI */
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&CPU0>;
-+				};
-+				core1 {
-+					cpu = <&CPU1>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&CPU2>;
-+				};
-+				core1 {
-+					cpu = <&CPU3>;
-+				};
-+			};
-+			cluster2 {
-+				core0 {
-+					cpu = <&CPU4>;
-+				};
-+				core1 {
-+					cpu = <&CPU5>;
-+				};
-+			};
-+			cluster3 {
-+				core0 {
-+					cpu = <&CPU6>;
-+				};
-+				core1 {
-+					cpu = <&CPU7>;
-+				};
-+			};
-+		};
-+		/* Cluster 0 Core 0 */
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0000>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000050>;
-+		};
-+
-+		/* Cluster 0 Core 1 */
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0001>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000058>;
-+		};
-+
-+		/* Cluster 1 Core 0 */
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0100>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000060>;
-+		};
-+
-+		/* Cluster 1 Core 1 */
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0101>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000068>;
-+		};
-+
-+		/* Cluster 2 Core 0 */
-+		CPU4: cpu at 4 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0200>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000070>;
-+		};
-+
-+		/* Cluster 2 Core 1 */
-+		CPU5: cpu at 5 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0201>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000078>;
-+		};
-+
-+		/* Cluster 3 Core 0 */
-+		CPU6: cpu at 6 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0300>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000080>;
-+		};
-+
-+		/* Cluster 3 Core 1 */
-+		CPU7: cpu at 7 {
-+			device_type = "cpu";
-+			compatible = "arm,armv8";
-+			reg = <0x0 0x0301>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x80 0x30000088>;
-+		};
-+	};
-+
-+	/* Note: This entry is modified by UEFI */
-+	memory at 8000000000 {
-+		device_type = "memory";
-+		reg = <0x00000080 0x00000000 0x1 0x00000000>; /* 4GB */
-+	};
-+
-+	gic: interrupt-controller at e1101000 {
-+		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		interrupt-controller;
-+		ranges = <0 0 0 0xe1100000 0 0x100000>;
-+		reg = <0x0 0xe1110000 0 0x1000>,  /* gic dist */
-+		      <0x0 0xe112f000 0 0x2000>,  /* gic cpu */
-+		      <0x0 0xe1140000 0 0x10000>, /* gic virtual ic*/
-+		      <0x0 0xe1160000 0 0x10000>; /* gic virtual cpu*/
-+		interrupts = <1 8 0xf04>;
-+		v2m0: v2m at 0x8000 {
-+			compatible = "arm,gic-v2m-frame";
-+			msi-controller;
-+			arm,msi-base-spi = <64>;
-+			arm,msi-num-spis = <256>;
-+			reg = <0x0 0x80000 0 0x1000>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 13 0xff01>,
-+			     <1 14 0xff01>,
-+			     <1 11 0xff01>,
-+			     <1 10 0xff01>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <0 7 4>,
-+			     <0 8 4>,
-+			     <0 9 4>,
-+			     <0 10 4>,
-+			     <0 11 4>,
-+			     <0 12 4>,
-+			     <0 13 4>,
-+			     <0 14 4>;
-+	};
-+
-+	/* This entry is modified by UEFI */
-+	pcie0: pcie-controller{
-+		compatible = "pci-host-ecam-generic";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		bus-range = <0 0xff>;
-+		reg = <0 0xf0000000 0 0x10000000>;
-+		dma-coherent;
-+		msi-parent = <&v2m0>;
-+
-+		interrupts =
-+			<0 320 4>, /* ioc_soc_serr */
-+			<0 321 4>; /* ioc_soc_sci */
-+
-+		ranges = <
-+			/* I/O Memory (size=64K) */
-+			0x01000000 0x00 0xefff0000 0x00 0xefff0000 0x00 0x00010000
-+
-+			/* Non-Pref 32-bit MMIO (size=512M) */
-+			0x02000000 0x00 0x40000000 0x00 0x40000000 0x00 0x20000000
-+
-+			/* Non-Pref 32-bit MMIO (size=512M) */
-+			0x02000000 0x00 0x60000000 0x00 0x60000000 0x00 0x20000000
-+
-+			/* Non-Pref 32-bit MMIO (size=512M) */
-+			0x02000000 0x00 0x80000000 0x00 0x80000000 0x00 0x20000000
-+
-+			/* Non-Pref 32-bit MMIO (size=512M) */
-+			0x02000000 0x00 0xa0000000 0x00 0xa0000000 0x00 0x20000000
-+
-+			/* Pref 64-bit MMIO (size= 4G) */
-+			0x43000000 0x01 0x00000000 0x01 0x00000000 0x01 0x00000000
-+
-+			/* Pref 64-bit MMIO (size= 8G) */
-+			0x43000000 0x02 0x00000000 0x02 0x00000000 0x02 0x00000000
-+
-+			/* Pref 64-bit MMIO (size=16G) */
-+			0x43000000 0x04 0x00000000 0x04 0x00000000 0x04 0x00000000
-+
-+			/* Pref 64-bit MMIO (size=32G) */
-+			0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000
-+
-+			/* Pref 64-bit MMIO (size=64G) */
-+			0x43000000 0x10 0x00000000 0x10 0x00000000 0x10 0x00000000
-+
-+			/* Pref 64-bit MMIO (size=128G) */
-+			0x43000000 0x20 0x00000000 0x20 0x00000000 0x20 0x00000000
-+
-+			/* Pref 64-bit MMIO (size=256G) */
-+			0x43000000 0x40 0x00000000 0x40 0x00000000 0x40 0x00000000
-+		>;
-+	};
-+
-+	smb {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges = <0 0 0 0xE0000000 0 0x01300000>;
-+
-+		/include/ "amd-seattle-periph.dtsi"
-+	};
-+};
++	if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
++			       &gen_pci_ops, pci, &pci->resources)) {
++		dev_err(&pdev->dev, "failed to enable PCIe ports\n");
++		return -ENODEV;
++	}
++#else
+ 	pci_common_init_dev(dev, &hw);
++#endif /* CONFIG_ARM64 */
+ 	return 0;
+ }
+ 
 -- 
 1.9.3
