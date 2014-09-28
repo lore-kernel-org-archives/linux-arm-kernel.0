@@ -1,61 +1,54 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 28 Sep 2014 10:51:50 -0700
-Subject: [GIT PULL v2][for 3.18] pull request for the clock update of
- Hisilicon HiX5HD2 soc
-In-Reply-To: <54277F20.5090604@hisilicon.com>
-References: <54277F20.5090604@hisilicon.com>
-Message-ID: <20140928175150.19023.99961@quantum>
+Date: Sun, 28 Sep 2014 11:37:05 -0700
+Subject: [PATCH 1/4] dt-bindings: Add a clocks property to the
+ simple-framebuffer binding
+In-Reply-To: <1411908218-20947-1-git-send-email-hdegoede@redhat.com>
+References: <1411908218-20947-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAPtuhThAgUThzdHAnWydDeM8unV=fjT88PH3Ww6h5_ezeGEOYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Wei Xu (2014-09-27 20:23:12)
-> Hi Mike,
-> 
-> Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
-> 
-> Best Regards,
-> Wei
-> 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18-v2
+On Sun, Sep 28, 2014 at 5:43 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> A simple-framebuffer node represents a framebuffer setup by the firmware /
+> bootloader. Such a framebuffer may have a number of clocks in use, add a
+> property to communicate this to the OS.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Pulled!
+Acked-by: Mike Turquette <mturquette@linaro.org>
+or
+Reviewed-by: Mike Turquette <mturquette@linaro.org>
 
-Thanks,
+I don't know what is the right thing with these binding definitions...
+
+Also I have one suggestion below:
+
+> ---
+>  Documentation/devicetree/bindings/video/simple-framebuffer.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> index 70c26f3..e75478e 100644
+> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> @@ -14,6 +14,9 @@ Required properties:
+>    - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
+>    - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+>
+> +Optional properties:
+> +- clocks : List of clocks used by the framebuffer
+> +
+>  Example:
+>
+>         framebuffer {
+
+It might be nice to add the clocks property to the example. Something like:
+
+clocks = <&osc 1>, <&ref 0>;
+
+Regards,
 Mike
 
-> 
-> for you to fetch changes up to 45bcf9c6f299ae77c14c2ae8cea3f8e540fe80d1:
-> 
->   clk: hix5hd2: add I2C clocks (2014-09-28 10:27:09 +0800)
-> 
-> ----------------------------------------------------------------
-> Hisilicon HiX5HD2 clock updates for 3.18-v2
-> 
-> - Add I2C clocks
-> - Add watchdog clocks
-> - Add sd clocks
-> - Add complex clock implementation to support sata, usb and ethernet
-> 
-> ----------------------------------------------------------------
-> Guoxiong Yan (1):
->       clk: hix5hd2: add watchdog0 clocks
-> 
-> Jiancheng Xue (1):
->       clk: hix5hd2: add sd clk
-> 
-> Wei Yan (1):
->       clk: hix5hd2: add I2C clocks
-> 
-> Zhangfei Gao (1):
->       clk: hix5hd2: add complex clk
-> 
->  drivers/clk/hisilicon/clk-hix5hd2.c       | 232 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
->  include/dt-bindings/clock/hix5hd2-clock.h |  27 +++++++++++++++++++
->  2 files changed, 253 insertions(+), 6 deletions(-)
-> 
+> --
+> 2.1.0
+>
