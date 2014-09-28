@@ -1,67 +1,59 @@
 From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Sun, 28 Sep 2014 18:38:12 +0800
-Subject: [PATCH v7 4/5] ARM: dts: add main Thermal info to rk3288
+Date: Sun, 28 Sep 2014 18:38:11 +0800
+Subject: [PATCH v7 3/5] ARM: dts: add RK3xxx CPU Thermal data
 In-Reply-To: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
 References: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1411900693-30484-5-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is depend on rk3xxx-cpu-thermal.dtsi,or
-it will compile error.
+This patch changes a dtsi file to contain the thermal data
+on RK3288 and later SoCs. This data will
+enable a thermal shutdown over 125C.
 
 Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi | 32 +++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 36be7bb..79102b6 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
- #include <dt-bindings/clock/rk3288-cru.h>
+diff --git a/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi b/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
+new file mode 100644
+index 0000000..8888f7e
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
+@@ -0,0 +1,32 @@
++/*
++ * Device Tree Source for RK3XXX SoC CPU thermal
++ *
++ * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
 +#include <dt-bindings/thermal/thermal.h>
- #include "skeleton.dtsi"
- 
- / {
-@@ -215,6 +216,23 @@
- 		status = "disabled";
- 	};
- 
-+	thermal-zones {
-+		#include "rk3xxx-cpu-thermal.dtsi"
-+	};
 +
-+	tsadc: tsadc at ff280000 {
-+		compatible = "rockchip,rk3288-tsadc";
-+		reg = <0xff280000 0x100>;
-+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-+		clock-names = "tsadc", "apb_pclk";
-+		pinctrl-names = "otp_out";
-+		pinctrl-0 = <&otp_out>;
-+		#thermal-sensor-cells = <1>;
-+		hw-shut-temp = <120000>;
-+		status = "disabled";
-+	};
++cpu_thermal: cpu_thermal {
++	polling-delay-passive = <500>; /* milliseconds */
++	polling-delay = <1000>; /* milliseconds */
 +
- 	usb_host0_ehci: usb at ff500000 {
- 		compatible = "generic-ehci";
- 		reg = <0xff500000 0x100>;
-@@ -611,5 +629,11 @@
- 				rockchip,pins = <5 15 3 &pcfg_pull_none>;
- 			};
- 		};
++			/* sensor       ID */
++        thermal-sensors = <&tsadc     0>;
 +
-+                tsadc {
-+                        otp_out: otp-out {
-+                                rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
-+                    };
++        trips {
++                cpu_alert0: cpu_alert {
++                        temperature = <800000>; /* millicelsius */
++                        hysteresis = <2000>; /* millicelsius */
++                        type = "passive";
 +                };
- 	};
- };
++                cpu_crit: cpu_crit {
++                        temperature = <125000>; /* millicelsius */
++                        hysteresis = <2000>; /* millicelsius */
++                        type = "critical";
++                };
++        };
++};
 -- 
 1.9.1
