@@ -1,49 +1,45 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 28 Sep 2014 21:30:41 +0530
-Subject: [PATCH] dma: imx-sdma: fix another incorrect __init annotation
-In-Reply-To: <38530464.3ymIRX74DK@wuerfel>
-References: <38530464.3ymIRX74DK@wuerfel>
-Message-ID: <20140928160040.GI1638@intel.com>
+Date: Sun, 28 Sep 2014 21:37:57 +0530
+Subject: [PATCH 2/9] dmaengine: Make channel allocation callbacks optional
+In-Reply-To: <1411808085-27792-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1411808085-27792-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140928160757.GJ1638@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 11:24:00PM +0200, Arnd Bergmann wrote:
-> In e34b731faa7d1 ("dma: imx-sdma: Remove spurious __init annotation on
-> sdma_probe()"), Mark found an extraneous __init label and fixed it.
+On Sat, Sep 27, 2014 at 10:54:38AM +0200, Maxime Ripard wrote:
+> Nowadays, some drivers don't have anything in there channel allocation
+> callbacks anymore.
 > 
-> However, he missed another one, because now we get this other warning:
+> Remove the BUG_ON if those callbacks aren't implemented, in order to allow
+> drivers to not implement them.
 > 
-> WARNING: drivers/dma/imx-sdma.o(.text+0x3bb4): Section mismatch in reference from the function sdma_probe() to the function .init.text:sdma_get_firmware()
-> The function sdma_probe() references
-> the function __init sdma_get_firmware().
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/dma/dmaengine.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> Same reasoning as the last time, the function may get called at
-> runtime, so it can't be __init.
-> 
-Applied, thanks
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index d5d30ed863ce..cfcb181b1184 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -817,8 +817,6 @@ int dma_async_device_register(struct dma_device *device)
+>  	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&
+>  		!device->device_prep_interleaved_dma);
+>  
+> -	BUG_ON(!device->device_alloc_chan_resources);
+> -	BUG_ON(!device->device_free_chan_resources);
+Dont think we have drivers without free. IIRC cppi one might be only
+instance
 
 -- 
 ~Vinod
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>  	BUG_ON(!device->device_tx_status);
+>  	BUG_ON(!device->device_issue_pending);
+>  	BUG_ON(!device->dev);
+> -- 
+> 2.1.0
 > 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index 52ce1d21154c..88afc48c2ca7 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1334,7 +1334,7 @@ err_firmware:
->  	release_firmware(fw);
->  }
->  
-> -static int __init sdma_get_firmware(struct sdma_engine *sdma,
-> +static int sdma_get_firmware(struct sdma_engine *sdma,
->  		const char *fw_name)
->  {
->  	int ret;
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
