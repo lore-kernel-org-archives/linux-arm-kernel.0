@@ -1,136 +1,54 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 28 Sep 2014 11:56:33 +0800
-Subject: [PATCH 3/3] drivers/rtc/rtc-snvs: Add clock support
-In-Reply-To: <8a1904a59f7b171a7cf1e71b9e80f0cf7b1061c0.1411736171.git.maitysanchayan@gmail.com>
+Date: Sun, 28 Sep 2014 12:02:34 +0800
+Subject: [PATCH 2/3] ARM: dts: vf610: Add SNVS node
+In-Reply-To: <49cb7f5fc8319fc47dc2919a2ccbff981196d4ff.1411736171.git.maitysanchayan@gmail.com>
 References: <cover.1411736171.git.maitysanchayan@gmail.com>
- <8a1904a59f7b171a7cf1e71b9e80f0cf7b1061c0.1411736171.git.maitysanchayan@gmail.com>
-Message-ID: <20140928035631.GF12999@dragon>
+ <49cb7f5fc8319fc47dc2919a2ccbff981196d4ff.1411736171.git.maitysanchayan@gmail.com>
+Message-ID: <20140928040233.GG12999@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 06:44:01PM +0530, Sanchayan Maity wrote:
-> This patch adds clock enable and disable support
-> for the SNVS peripheral which is required by the
-> SNVS RTC.
+On Fri, Sep 26, 2014 at 06:44:00PM +0530, Sanchayan Maity wrote:
+> This adds a devicetree node for RTC support
+> for the VF610 platform.
 > 
 > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 > ---
->  drivers/rtc/rtc-snvs.c |   48 +++++++++++++++++++++++++++++++++++++++---------
->  1 file changed, 39 insertions(+), 9 deletions(-)
+>  arch/arm/boot/dts/vf610.dtsi |   15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
-> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
-> index fa384fe..f3e8f05 100644
-> --- a/drivers/rtc/rtc-snvs.c
-> +++ b/drivers/rtc/rtc-snvs.c
-> @@ -17,6 +17,7 @@
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/rtc.h>
-> +#include <linux/clk.h>
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 4d2ec32..3c0c757 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -381,6 +381,21 @@
+>  					<&clks VF610_CLK_DMAMUX3>;
+>  			};
 >  
->  /* These register offsets are relative to LP (Low Power) range */
->  #define SNVS_LPCR		0x04
-> @@ -39,6 +40,7 @@ struct snvs_rtc_data {
->  	void __iomem *ioaddr;
->  	int irq;
->  	spinlock_t lock;
-> +	struct clk *clk;
->  };
->  
->  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
-> @@ -260,8 +262,31 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->  	if (data->irq < 0)
->  		return data->irq;
->  
-> +	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
-> +			       IRQF_SHARED, "rtc alarm", &pdev->dev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
-> +			data->irq, ret);
-> +		return ret;
-> +	}
+> +			snvs0: snvs at 400a7000 {
+> +				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0 0x400a7000 0x2000>;
 > +
-> +	data->clk = devm_clk_get(&pdev->dev, "snvs");
-> +	if (IS_ERR(data->clk)) {
-> +		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
-> +						PTR_ERR(data->clk));
-> +		ret = PTR_ERR(data->clk);
-> +		return ret;
-> +	}
+> +				snvs-rtc-lp at 34 {
+> +					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> +					reg = <0x34 0x58>;
+> +					interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
+> +					clocks = <&clks VF610_CLK_SNVS>;
+> +					clock-names = "snvs";
 
-No. This will break all i.MX6 devices running a DTB without clock
-definition.
+The name should describe the clock usage inside the block, so "snvs" is
+not a good description.
 
 Shawn
 
+> +				};
+> +			};
 > +
->  	platform_set_drvdata(pdev, data);
->  
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev,
-> +			"Could not prepare or enable the snvs clock\n");
-> +		return ret;
-> +	}
-> +
->  	spin_lock_init(&data->lock);
->  
->  	/* Initialize glitch detect */
-> @@ -275,23 +300,20 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->  
->  	device_init_wakeup(&pdev->dev, true);
->  
-> -	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
-> -			       IRQF_SHARED, "rtc alarm", &pdev->dev);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
-> -			data->irq, ret);
-> -		return ret;
-> -	}
-> -
->  	data->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
->  					&snvs_rtc_ops, THIS_MODULE);
->  	if (IS_ERR(data->rtc)) {
->  		ret = PTR_ERR(data->rtc);
->  		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
-> -		return ret;
-> +		goto error_rtc_device_register;
->  	}
->  
->  	return 0;
-> +
-> +error_rtc_device_register:
-> +	clk_disable_unprepare(data->clk);
-> +
-> +	return ret;
->  }
->  
->  #ifdef CONFIG_PM_SLEEP
-> @@ -302,16 +324,24 @@ static int snvs_rtc_suspend(struct device *dev)
->  	if (device_may_wakeup(dev))
->  		enable_irq_wake(data->irq);
->  
-> +	clk_disable_unprepare(data->clk);
-> +
->  	return 0;
->  }
->  
->  static int snvs_rtc_resume(struct device *dev)
->  {
-> +	int ret;
-> +
->  	struct snvs_rtc_data *data = dev_get_drvdata(dev);
->  
->  	if (device_may_wakeup(dev))
->  		disable_irq_wake(data->irq);
->  
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret)
-> +		return ret;
-> +
->  	return 0;
->  }
->  #endif
+>  			uart4: serial at 400a9000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x400a9000 0x1000>;
 > -- 
 > 1.7.9.5
 > 
