@@ -1,38 +1,32 @@
-From: romain.perier@gmail.com (PERIER Romain)
-Date: Sun, 28 Sep 2014 17:04:26 +0200
-Subject: [PATCH v1 1/3] regulator: act8865: Add support to turn off all
- outputs
-In-Reply-To: <CABgxDo+Gor=xnOV83Oca6kez7Auyu95XpaOr7QW+iRHbtByGAg@mail.gmail.com>
-References: <1411834906-9533-1-git-send-email-romain.perier@gmail.com>
- <20140928103301.GN27755@sirena.org.uk>
- <CABgxDo+h2AYjAO4darK4+RTXqnhf4OqouGLfF2yuJCpu7r6tLg@mail.gmail.com>
- <20140928122543.GA27755@sirena.org.uk>
- <CABgxDo+Gor=xnOV83Oca6kez7Auyu95XpaOr7QW+iRHbtByGAg@mail.gmail.com>
-Message-ID: <CABgxDoJJEH387h7mSBG+5wTwyT6UkhvLjRzoryFX8NZjarxUHQ@mail.gmail.com>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Sun, 28 Sep 2014 21:44:07 +0530
+Subject: Legacy Code in gpmc-onenand.c
+In-Reply-To: <5427744E.4040409@gmail.com>
+References: <5427744E.4040409@gmail.com>
+Message-ID: <20140928161407.GA2493@sudip-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, I will think about it and I will propose a separated patch with
-a generic property and helper functions.
+On Sat, Sep 27, 2014 at 10:37:02PM -0400, nick wrote:
+> Greetings Kevin and others,
+> I am wondering if the below code is legacy I can remove it as stated it the fix me.
+> Cheers Nick 
+> else {
+>                 /*
+>                 * FIX ME: Appears to be legacy code from initial ONENAND commit.
+>                 * Unclear what boards this is for and if this can be removed.
+>                  */
+>                 if (!cpu_is_omap34xx())
+>                         onenand_sync.wait_on_read = true;
+>         }
 
-2014-09-28 15:25 GMT+02:00 PERIER Romain <romain.perier@gmail.com>:
-> 2014-09-28 14:25 GMT+02:00 Mark Brown <broonie@kernel.org>:
->> On Sun, Sep 28, 2014 at 02:00:54PM +0200, PERIER Romain wrote:
->>> 2014-09-28 12:33 GMT+02:00 Mark Brown <broonie@kernel.org>:
->>
->>> > We really need to come up with a standard property for this and document
->>> > it rather than continuing to add individual device specific properties
->>> > all doing the same thing, and probably also some helper code and/or a
->>> > standard operation for this - there's a lot of drivers implementing the
->>> > same pattern here.
->>
->>> I completly agree about adding a unified and generic property for that purpose.
->>> I already proposed something for that on devicetree ML, see the thread
->>> "Proposal: generic property for system-power-controller".
->>> Unfortunately I did not get replies :) .
->>
->> Did you CC relevant maintainers and send a patch?
->
-> No I did not propose patches as I was an open discussion. Perhaps I
-> might propose something as part of my contribution for act8865... (at
-> least for the property)
+the FIX ME does not say that you can remove the code. It says you need to find out that the code is being used by which board. And if you want to remove it then you have to explain why the code is removed , and after removing what will be the effect , and if there is no effect then why there is no effect.
+
+Good Luck.
+
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
