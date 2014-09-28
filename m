@@ -1,38 +1,43 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Sun, 28 Sep 2014 05:40:37 +0000
-Subject: [PATCH v1 3/3] ARM: dts: imx6x: Add enet2 support for imx6sx-sdb
- board
-In-Reply-To: <20140928053210.GJ12999@dragon>
-References: <1411524680-12863-1-git-send-email-b38611@freescale.com>
- <1411524680-12863-4-git-send-email-b38611@freescale.com>
- <20140928032852.GC12999@dragon>
- <49aafc1f34a34c13ac7af2cf4b04fd6d@BY2PR03MB377.namprd03.prod.outlook.com>
- <20140928034213.GD12999@dragon>
- <7e14fd7a305d44df90bcae3b16b56d60@BY2PR03MB377.namprd03.prod.outlook.com>
- <20140928053210.GJ12999@dragon>
-Message-ID: <84ceb11d00654462805551b5172d583f@BY2PR03MB377.namprd03.prod.outlook.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Sun, 28 Sep 2014 14:11:44 +0800
+Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
+ in all platforms
+In-Reply-To: <54277327.6070500@huawei.com>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <20140925074235.GN12423@ulmo> <20140925144855.GB31157@bart.dudau.co.uk>
+ <20140925164937.GB30382@ulmo> <20140925171612.GC31157@bart.dudau.co.uk>
+ <542505B3.7040208@huawei.com> <20140926085430.GG31106@ulmo>
+ <20140926090537.GH31106@ulmo> <54277327.6070500@huawei.com>
+Message-ID: <5427A6A0.5040703@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guo Shawn-R65073 Sent: Sunday, September 28, 2014 1:32 PM + 0800
->To: Duan Fugang-B38611
->Cc: linux-arm-kernel at lists.infradead.org; b20596 at solarflare.com;
->shawn.guo at linaro.org; kernel at pengutronix.de
->Subject: Re: [PATCH v1 3/3] ARM: dts: imx6x: Add enet2 support for imx6sx-
->sdb board
->
->On Sun, Sep 28, 2014 at 01:20:16PM +0800, Duan Fugang-B38611 wrote:
->> MX6SX_PAD_ENET2_COL__GPIO2_IO_6: it is a switch which enable ENET_3V3
->and 25Mhz clock for phy.
->> MX6SX_PAD_QSPI1A_DATA0__GPIO4_IO_16: it is a switch which enable
->PERI_3V3 that supply power for some modules including enet MAC and phy.
+On 2014/9/28 10:32, Yijing Wang wrote:
+> On 2014/9/26 17:05, Thierry Reding wrote:
+>> On Fri, Sep 26, 2014 at 10:54:32AM +0200, Thierry Reding wrote:
+>> [...]
+>>> At least for Tegra it's trivial to just hook it up in tegra_pcie_scan_bus()
+>>> directly (patch attached).
 >>
->
->So it sounds like they can be handled with fixed regulators?
->
->Shawn
+>> Really attached this time.
+>>
+>> Thierry
+>>
+> 
+> It looks good to me, so I will update the arm pci hostbridge driver to assign
+> pci root bus the msi chip instead of current pcibios_add_bus(). But for other
+> platforms which only have a one msi chip, I will kept the arch_find_msi_chip()
+> temporarily for more comments, especially from Bjorn.
 
-It make sense that it use fixed regulators.  I change it for next version.
+Oh, sorry, I found designware and rcar use pci_scan_root_bus(), so we can not simply
+assign msi chip to root bus in all host drivers's scan functions.
 
-Thanks,
-Andy
+> 
+> Thanks!
+> Yijing.
+> 
+
+
+-- 
+Thanks!
+Yijing
