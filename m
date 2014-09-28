@@ -1,116 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 28 Sep 2014 14:44:09 +0000 (UTC)
-Subject: OMAP baseline test results for v3.17-rc6
-Message-ID: <alpine.DEB.2.02.1409281442190.10306@utopia.booyaka.com>
+From: romain.perier@gmail.com (PERIER Romain)
+Date: Sun, 28 Sep 2014 17:04:26 +0200
+Subject: [PATCH v1 1/3] regulator: act8865: Add support to turn off all
+ outputs
+In-Reply-To: <CABgxDo+Gor=xnOV83Oca6kez7Auyu95XpaOr7QW+iRHbtByGAg@mail.gmail.com>
+References: <1411834906-9533-1-git-send-email-romain.perier@gmail.com>
+ <20140928103301.GN27755@sirena.org.uk>
+ <CABgxDo+h2AYjAO4darK4+RTXqnhf4OqouGLfF2yuJCpu7r6tLg@mail.gmail.com>
+ <20140928122543.GA27755@sirena.org.uk>
+ <CABgxDo+Gor=xnOV83Oca6kez7Auyu95XpaOr7QW+iRHbtByGAg@mail.gmail.com>
+Message-ID: <CABgxDoJJEH387h7mSBG+5wTwyT6UkhvLjRzoryFX8NZjarxUHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Well, I will think about it and I will propose a separated patch with
+a generic property and helper functions.
 
-Here are some basic OMAP test results for Linux v3.17-rc6.
-Logs and other details at:
-
-    http://www.pwsan.com/omap/testlogs/test_v3.17-rc6/20140921213558/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
-
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 2/17): 2430sdp, 5430es2sbct54
-    skip ( 1/17): 5912osk
-    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3517evm, 3530es3beagle,
-		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
-		  cmt3517, 5430es2uevm, 2420n800
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 8/12): am335xbonelt, 4430es2panda, 4460pandaes,
-		  4460varsomom, 3530es3beagle, 2430sdp, 5430es2uevm,
-		  5430es2sbct54
-    Pass ( 4/12): 37xxevm, 3530es31beagle, 3730beaglexm,
-		  3730es12beaglexm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 1/ 4): 3530es3beagle
-    Pass ( 3/ 4): 37xxevm, 3530es31beagle, 3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    FAIL ( 1/ 4): 3530es3beagle
-    Pass ( 3/ 4): 37xxevm, 3530es31beagle, 3730es12beaglexm
-
-
-vmlinux object size
-(delta in bytes from test_v3.17-rc5 (9e82bf014195d6f0054982c463575cdce24292be)):
-   text     data      bss    total  kernel
-   +105     +192        0     +297  omap1_defconfig
-   +105     +184        0     +289  omap1_defconfig_1510innovator_only
-   +105     +192        0     +297  omap1_defconfig_5912osk_only
-   +117     +192        0     +309  multi_v7_defconfig
-    +61     +192        0     +253  omap2plus_defconfig
-   -963     +224        0     -739  omap2plus_defconfig_2430sdp_only
-     +1     +192        0     +193  omap2plus_defconfig_am33xx_only
-     +1     +192        0     +193  omap2plus_defconfig_am43xx_only
-    +61     +256        0     +317  omap2plus_defconfig_cpupm
-     +1     +192        0     +193  omap2plus_defconfig_dra7xx_only
-    -11        0        0      -11  omap2plus_defconfig_n800_multi_omap2xxx
-    -11        0        0      -11  omap2plus_defconfig_n800_only_a
-     +1     +192        0     +193  omap2plus_defconfig_no_pm
-     +1     +192        0     +193  omap2plus_defconfig_omap2_4_only
-     +1     +192        0     +193  omap2plus_defconfig_omap3_4_only
-     +1     +192        0     +193  omap2plus_defconfig_omap5_only
-    +32        0        0      +32  rmk_omap3430_ldp_allnoconfig
-    +97        0        0      +97  rmk_omap3430_ldp_oldconfig
-    +32        0        0      +32  rmk_omap4430_sdp_allnoconfig
-    +61        0        0      +61  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.17-rc5 (9e82bf014195d6f0054982c463575cdce24292be))
-  avail  rsrvd   high  freed  board          kconfig
-     4k    -4k      .      .  am335xbonelt   omap2plus_defconfig
+2014-09-28 15:25 GMT+02:00 PERIER Romain <romain.perier@gmail.com>:
+> 2014-09-28 14:25 GMT+02:00 Mark Brown <broonie@kernel.org>:
+>> On Sun, Sep 28, 2014 at 02:00:54PM +0200, PERIER Romain wrote:
+>>> 2014-09-28 12:33 GMT+02:00 Mark Brown <broonie@kernel.org>:
+>>
+>>> > We really need to come up with a standard property for this and document
+>>> > it rather than continuing to add individual device specific properties
+>>> > all doing the same thing, and probably also some helper code and/or a
+>>> > standard operation for this - there's a lot of drivers implementing the
+>>> > same pattern here.
+>>
+>>> I completly agree about adding a unified and generic property for that purpose.
+>>> I already proposed something for that on devicetree ML, see the thread
+>>> "Proposal: generic property for system-power-controller".
+>>> Unfortunately I did not get replies :) .
+>>
+>> Did you CC relevant maintainers and send a patch?
+>
+> No I did not propose patches as I was an open discussion. Perhaps I
+> might propose something as part of my contribution for act8865... (at
+> least for the property)
