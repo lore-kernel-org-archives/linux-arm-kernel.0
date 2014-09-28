@@ -1,82 +1,46 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Sun, 28 Sep 2014 16:16:21 -0500
-Subject: [PATCH v12 10/12] PCI: Assign unassigned bus resources in
- pci_scan_root_bus()
-In-Reply-To: <CAErSpo5DR+TPYXBWGKRj9SRPjsbJ6kjZmAH1AXT12txEjGdZGQ@mail.gmail.com>
-References: <1411498874-9864-1-git-send-email-Liviu.Dudau@arm.com>
- <1411498874-9864-11-git-send-email-Liviu.Dudau@arm.com>
- <20140924011851.GD32643@bart.dudau.co.uk>
- <CAErSpo5DR+TPYXBWGKRj9SRPjsbJ6kjZmAH1AXT12txEjGdZGQ@mail.gmail.com>
-Message-ID: <54287AA5.3060408@amd.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 29 Sep 2014 00:25:26 +0300
+Subject: [periperi] How to set default GPIO pin ?
+In-Reply-To: <CACRpkdb1jF-ro3XcFHFC+Lhgi+0dEHzQYVSSLV6AWnAxiwNLdw@mail.gmail.com>
+References: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
+ <2862746.g5u9pdpKDi@avalon>
+ <CACRpkdb1jF-ro3XcFHFC+Lhgi+0dEHzQYVSSLV6AWnAxiwNLdw@mail.gmail.com>
+Message-ID: <2033766.6tR9OHe7ZC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 08:41 PM, Bjorn Helgaas wrote:
-> On Tue, Sep 23, 2014 at 7:18 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
->> On Tue, Sep 23, 2014 at 08:01:12PM +0100, Liviu Dudau wrote:
->>> If the firmware has not assigned all the bus resources and
->>> we are not just probing the PCIe busses, it makes sense to
->>> assign the unassigned resources in pci_scan_root_bus().
->>>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
->>> ---
->>>   drivers/pci/probe.c | 3 +++
->>>   1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->>> index ef891d2..508cf61 100644
->>> --- a/drivers/pci/probe.c
->>> +++ b/drivers/pci/probe.c
->>> @@ -1953,6 +1953,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
->>>        if (!found)
->>>                pci_bus_update_busn_res_end(b, max);
->>>
->>> +     if (!pci_has_flag(PCI_PROBE_ONLY))
->>> +             pci_assign_unassigned_bus_resources(b);
->>> +
->>>        pci_bus_add_devices(b);
->>>        return b;
->>>   }
->>> --
->>> 2.1.0
->>>
->>
->> Bjorn,
->>
->> If you are OK with this patch, can you let me know how do you feel about
->> making pci_scan_root_bus() set up the bus->msi pointer as well?
->
-> I'm not opposed to it, but I have the same question as for setting up
-> the domain: how does pci_scan_root_bus() learn what to assign to
-> bus->msi?  It currently only gets a "void *sysdata" so there's no
-> obvious place to put it there.  You could add a pcibios interface to
-> retrieve it, I suppose, but I'm starting to get uncomfortable with
-> adding more of those because we have such a mess of them already.
->
-> Bjorn
+Hi Linus and Morimoto-san,
 
-[Suravee] Liviu and I had a talk during Linaro Connect, and we came up
-with a new binding for the pcie controller called "msi-parent" which is
-supposed to contain phandle to the corresponded msi-controller.
+On Tuesday 23 September 2014 17:06:28 Linus Walleij wrote:
+> On Wed, Sep 10, 2014 at 10:55 AM, Laurent Pinchart wrote:
+> > On Sunday 31 August 2014 22:08:52 Kuninori Morimoto wrote:
+> >> I know we can use "defalt" PFC settings on DT.
+> >> But, how to use "defalt" GPIO pin settings on DT ?
+> >> 
+> >> We would like to use GPIO 7-17 as Low output,
+> >> and do nothing after boot.
+> > 
+> > From a DT point of view I believe this is supposed to be done by
+> > specifying the output-low or output-high properties in the pinctrl
+> > configuration node. However, these properties are not supported by the PFC
+> > driver, and there's no easy way for the PFC driver to configure GPIOs
+> > handled by a different driver such as the gpio-rcar driver for instance.
+> > 
+> > Linus, do you have any hindsight on how this should be implemented ?
+> 
+> I have suggested adding GPIO hogs, so that a GPIO node can specify
+> that some GPIO's specified on the local ship be hogged high or
+> low at probe. Generic DT bindings and generic code in gpiolib.c.
+> 
+> gpios-hog-high = <....>;
+> gpios-hog-low = <....>;
 
->
->> Side note: I don't know exactly how to do it now, but setting bus->msi is
->> needed by platforms that are based on my patches and want to use MSI,
->> otherwise they have to open code pci_scan_root_bus() to set it. I haven't
->> made any attempts to do it in this series as the GICv2m patches are not
->> ready yet, but I can see the need arriving soon.
+How about just a gpios-hog property, with a list of gpio specifiers + flags ? 
+That's bikeshedding I suppose.
 
-[Suravee] I just sent out an RFC which implements the described binding 
-here.
+Morimoto-san, would you like to implement that ? :-)
 
-https://lkml.org/lkml/2014/9/28/149
+-- 
+Regards,
 
-Any feedback/comments are welcome :)
-
-Thanks,
-
-Suravee
+Laurent Pinchart
