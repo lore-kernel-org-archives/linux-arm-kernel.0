@@ -1,32 +1,33 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Sun, 28 Sep 2014 09:57:18 +0800
-Subject: [PATCH 1/2] MAINTAINERS: add atmel ssc driver maintainer entry
-Message-ID: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
+Date: Sun, 28 Sep 2014 09:57:19 +0800
+Subject: [PATCH 2/2] MAINTAINERS: add atmel audio alsa driver maintainer entry
+In-Reply-To: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
+References: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <1411869439-2719-2-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
 
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 3705430..c004e6f 100644
+index c004e6f..30f92cf 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1703,6 +1703,13 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+@@ -1665,6 +1665,12 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
  S:	Supported
- F:	drivers/spi/spi-atmel.*
+ F:	drivers/tty/serial/atmel_serial.c
  
-+ATMEL SSC DRIVER
++ATMEL Audio ALSA driver
 +M:	Bo Shen <voice.shen@atmel.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
 +S:	Supported
-+F:	drivers/misc/atmel-ssc.c
-+F:	include/linux/atmel-ssc.h
++F:	sound/soc/atmel
 +
- ATMEL Timer Counter (TC) AND CLOCKSOURCE DRIVERS
+ ATMEL DMA DRIVER
  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
