@@ -1,107 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 28 Sep 2014 11:08:59 +0800
-Subject: [PATCH 0/9] ARM: vf610: Suspend/resume support
-In-Reply-To: <87y4t9kmgz.fsf@nbsps.com>
-References: <cover.1411404079.git.stefan@agner.ch> <87zjdqmjr3.fsf@nbsps.com>
- <4ee0621b0bf5f4d4e10eae7673bdf1cd@agner.ch>
- <87y4t9kmgz.fsf@nbsps.com>
-Message-ID: <20140928030857.GA12999@dragon>
+From: alvin.chen@intel.com (Chen, Alvin)
+Date: Sun, 28 Sep 2014 03:15:04 +0000
+Subject: [PATCH] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
+In-Reply-To: <20140926100832.GE27755@sirena.org.uk>
+References: <1411752349-31490-1-git-send-email-alvin.chen@intel.com>
+ <1411752349-31490-2-git-send-email-alvin.chen@intel.com>
+ <20140926100832.GE27755@sirena.org.uk>
+Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E9970F8@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 12:33:00PM -0400, Bill Pringlemeir wrote:
-> >> I think that Shawn Guo already did a patchset to remove stuff from
-> >> the vf610.dtsi to the machine/configuration DT files.
-
-Do you mean the pin configuration?  That's really more board-specific.
-But IP block/device is not really the case.
 
 > 
-> In this patchset, I suggested that we could include the notation in the
-> headers which are included in the 'DT' files.  So instead of 'dtsi', we
-> could use,
+> > +static u32 pxa2xx_spi_get_ssrc1_change_mask(const struct driver_data
+> > +*drv_data) {
+> > +	if (!is_quark_x1000_ssp(drv_data))
+> > +		return SSCR1_CHANGE_MASK;
+> > +
+> > +	return QUARK_X1000_SSCR1_CHANGE_MASK; }
 > 
->    #define VF610_GPC_SUPPORT \
->            gpc: gpc at 4006c000 {                \
->                    compatible = "fsl,vf610-gpc"; \
->                    reg = <0x4006c000 0x1000>;    \
->            };
+> These functions would be much better written as switch statements - think
+> how they're going to look when we've got another controller which needs
+> custom values.  It might also be helpful for review to have two patches, one
+> splitting things out into the functions and another adding the Quark support.
 > 
-> Or even,
-> 
->    #define VF610_SUSPEND_DT_SUPPORT \ ...
+OK. Let me use switch. BTW, for two patches, actually, using helpers is due to we support quark.
+Do you mean the first patch just introduce helpers, maybe it only support one type, then another patch to add
+quark supporting. Am I right?
 
-I don't think this will be accepted by DT maintainers.  We have already
-got some objections when we define pin function ID as multiple integers.
-They expect the DT macro is used for single integer case.
+> > +/*  see Quark SPI data sheet for implementation rationale */ static
+> > +u32 quark_x1000_set_clk_regvals(u32 rate, u32 *dds, u32 *clk_div) {
+> 
+> Please document this in the driver - I don't know if this datasheet is public but
+> even if it is it may not stay that way.
+OK. I will document it.
 
 > 
-> Anyways, the DT issue doesn't matter so much.  People will have to make
-> custom versions for their own boards.  Although, I don't think it is not
-> that hard to support it at the machine level.
+> > @@ -613,6 +759,8 @@ static void pump_transfers(unsigned long data)
+> >  	u32 cr1;
+> >  	u32 dma_thresh = drv_data->cur_chip->dma_threshold;
+> >  	u32 dma_burst = drv_data->cur_chip->dma_burst_size;
+> > +	u32 change_mask = pxa2xx_spi_get_ssrc1_change_mask(drv_data);
+> > +
+> >
 > 
-> I agree that so far there are some peripherals that make it difficult to
-> run the mainline Linux with an MQX.  However, I think this patch set
-> seems to bring it closer to making it impossible.  I am only suggesting
-> that we make it a configuration option and not include it for all Vybrid
-> devices.
+> Extra blank line being added here.
 > 
-> Is it clear that the desired way is to use,
-> 
->    &gpc { status = "disabled"; };
->    &src { status = "disabled"; };
-> 
-> We have,
-> 
-> arch/arm/mach-imx/gpc.c
-> 
->       void __init vf610_gpc_init(void)
->       {
->               struct device_node *np;
-> 
->               np = of_find_compatible_node(NULL, NULL, "fsl,vf610-gpc");
->               gpc_base = of_iomap(np, 0);
->               gpc_imr_base = gpc_base + VF610_GPC_IMR1;
->    ...
-> 
-> arch/arm/mach-imx/mach-vf610.c
-> 
->    static void __init vf610_init_irq(void)
->    {
->            vf610_gpc_init();
->            irqchip_init();
->    }
-> 
->    ...
-> 
->    +	.init_irq	= vf610_init_irq,
-> 
-> I don't think this will work.
+I will remove it.
 
-Yes, you're right.  But I guess this can be fixed by an additional
-of_device_is_available() check after of_find_compatible_node() call.
-
-> Not to mention that 'mach-vf610.c' will
-> not build if HAVE_IMX_GPC is not defined.
-
-HAVE_IMX_GPC cannot be configured out, because it's selected by 
-SOC_VF610.
-
-> Also, I don't really see a
-> use of the GPC module unless suspend/resume is active?   Even some wall
-> powered designs may wish to exclude this functionality?
+> > @@ -145,6 +147,9 @@ static inline int pxa25x_ssp_comp(struct driver_data
+> *drv_data)
+> >  		return 1;
+> >  	if (drv_data->ssp_type == CE4100_SSP)
+> >  		return 1;
+> > +	if (drv_data->ssp_type == QUARK_X1000_SSP)
+> > +		return 1;
+> > +
+> >  	return 0;
+> >  }
 > 
-> I think that the SRC maybe needed for secure parts.  I think that some
-> designs might wish to restrict Linux's access to these registers as
-> well.  I don't actually see why we need this module?  I think the imx6
-> needs it due to multi-CPU bring-up, but in the Vybrid case, this does
-> not exist.  Can you check to see why we need the SRC?  I don't see where
-> we actually use it?  In patch9/9, we record it but do we actually access
-> the registers?  Is it just for the vf610_src_init() code?  Even that
-> seems the whole 'src.c' file is only needed for the 'src_base'
-> reference, which we don't use?
-
-+1.  I'm also wondering how SRC is used by suspend routine in this
-series.
-
-Shawn
+> Things like this should also be refactored into switch statements - in general
+> anything that's deciding what to do based on ssp_type probably ought to be
+> using switch statements.
+OK. I will use switch.
