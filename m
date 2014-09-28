@@ -1,102 +1,52 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Sep 2014 15:26:33 +0100
-Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
-In-Reply-To: <20140928110640.GB9797@udp189498uds.ap.freescale.net>
+Date: Sun, 28 Sep 2014 15:27:26 +0100
+Subject: [PATCH 1/3] arm: ls1: add CPU hotplug platform support
+In-Reply-To: <CADRPPNQULzPhHt3Kk1EUnPRkfFOPGsWY4AqWEv=AdBc5y-Gg+Q@mail.gmail.com>
 References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
- <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
- <20140926121427.GO5182@n2100.arm.linux.org.uk>
- <20140928110640.GB9797@udp189498uds.ap.freescale.net>
-Message-ID: <20140928142632.GG5182@n2100.arm.linux.org.uk>
+ <1411730703-25836-2-git-send-email-chenhui.zhao@freescale.com>
+ <20140926122003.GP5182@n2100.arm.linux.org.uk>
+ <20140926124614.GD7422@leverpostej>
+ <20140926130311.GQ5182@n2100.arm.linux.org.uk>
+ <20140926132038.GF7422@leverpostej>
+ <CADRPPNQULzPhHt3Kk1EUnPRkfFOPGsWY4AqWEv=AdBc5y-Gg+Q@mail.gmail.com>
+Message-ID: <20140928142726.GH5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 28, 2014 at 07:06:40PM +0800, Chenhui Zhao wrote:
-> On Fri, Sep 26, 2014 at 01:14:27PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
-> > > +static int ls1_start_deepsleep(unsigned long addr)
-> > > +{
-> > > +	ls1_do_deepsleep(addr);
-> > > +
-> > > +	return 0;
-> > > +}
-> > ...
-> > > +	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
-> > 
-> > What's the point of this function?  Why can't ls1_do_deepsleep() just
-> > return zero?
+On Sun, Sep 28, 2014 at 06:57:18PM +0800, Li Yang wrote:
+> On Fri, Sep 26, 2014 at 9:20 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > This looks to be a carbon copy of the vexpress pseudo-hotplug in
+> >> > arch/arm/mach-vexpress/hotplug.c, which is obviously broken in the way
+> >> > you describe above. Perhaps we should go about ripping that out?
+> >>
+> >> The Versatile Express does not support suspend so the only problem case
+> >> is kexec.  However, isn't this support needed for big.LITTLE, and as
+> >> the Versatile Express is the platform which these features get developed
+> >> on, having working CPU hotplug seems rather fundamental for ARM kernel
+> >> feature development.
+> >>
+> >> In that regard, Versatile Express is something of a special case.
+> >
+> > It is admittedly helpful during development to perform pseudo-hotplug on
+> > Versatile Express. I have a local patch adding vexpress_cpu_disable so I
+> > can test for bugs that only trigger if CPU0 is hotplugged.
+> >
+> > Given that, perhaps we should make it clearer that Versatile Express is
+> > not a reference implementation for CPU hotplug; add some Kconfig (e.g.
+> > VEXPRESS_PSEUDO_HOTPLUG) that depends on !KEXEC && !SUSPEND, and putting
+> > a note in hotplug.c stating it's not suitable as a reference
+> > implementation.
+> >
+> > ...but perhaps that's overkill.
 > 
-> Just leave space for adding C code in the future.
-> 
-> > 
-> > > +/*
-> > > + * r0: the physical entry address of SRAM code
-> > > + *
-> > > + */
-> > > +ENTRY(ls1_do_deepsleep)
-> > > +	mov	r13, r0
-> > > +
-> > > +	/* flush cache */
-> > > +	bl	v7_flush_dcache_all
-> > 
-> > Please explain the purpose of this call via a comment in the code.
-> > 
-> > The generic code will have saved the CPU state, and will have called
-> > flush_cache_louis() to flush the caches to the point of unification.
-> > 
-> > The only data which will have been loaded into the cache between that
-> > point is the stack for the return from __cpu_suspend_save, and
-> > speculative prefetches.
-> > 
-> > So, the only reason I can gather is that you need to flush data from
-> > lower levels of the cache below the point of unification.
-> > 
-> 
-> In deep sleep process, all caches will lost, so flush all caches to prevent
-> data loss.
+> I agree that the pseudo-hotplug is breaking the kexec.  However, I
+> don't think it breaks the system suspend case as tasks and interrupts
+> have been moved out of the non-booting CPU.  The pseudo-hotplug would
+> be even better than real hotplug as it introduces less latency.
 
-You haven't answered my question.
+Sorry, that's not an acceptable reason to use it.
 
-> > > +
-> > > +	/* disable cache, C bit in SCTLR */
-> > > +	mrc	p15, 0, r0, c1, c0, 0
-> > > +	bic	r0, r0, #(1 << 2)
-> > > +	mcr	p15, 0, r0, c1, c0, 0
-> > > +	isb
-> > > +
-> > > +	/* disable coherency, SMP bit in ACTLR */
-> > > +	mrc	p15, 0, r0, c1, c0, 1
-> > > +	bic	r0, r0, #(1 << 6)
-> > > +	mcr	p15, 0, r0, c1, c0, 1
-> > > +	isb
-> > > +	dsb
-> > > +
-> > > +	/* disable MMU, M bit in SCTLR */
-> > > +	mrc	p15, 0, r0, c1, c0, 0
-> > > +	bic	r0, r0, #1
-> > > +	mcr	p15, 0, r0, c1, c0, 0
-> > > +	isb
-> > > +
-> > > +	/* jump to sram code using physical address */
-> > > +	bx	r13
-> > 
-> > This looks extremely fragile.  You are running in virtual space, and you
-> > turn the MMU off.  You are reliant on the MMU still being on for the
-> > following instructions to already be in the pipeline.  That's not a
-> > very good assumption to make (we've made it in the past and it breaks
-> > every so often when things change, eg when the code is no longer laid
-> > out how we expect.)
-> > 
-> > You need to disable the MMU safely, which means using the identity map
-> > page tables and executing code in the identity map region.
-> 
-> Yes, the code will switch off MMU, and switch to physical address space.
-> On LS1021, the DDR memory located at the physical address space started from
-> 0x80000000, the kernel space also started at 0x80000000 (CONFIG_PAGE_OFFSET = 0x80000000).
-> So the virtual address of kernel code is equal to the physical address.
-
-You can't rely on that.
-
-Sorry, NAK.
+NAK.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
