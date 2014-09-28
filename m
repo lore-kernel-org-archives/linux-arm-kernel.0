@@ -1,29 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 28 Sep 2014 12:43:53 +0100
-Subject: [PATCH] ARM: mvebu: use improved armada spi device tree
- compatible name
-In-Reply-To: <20140909160043.GP30828@titan.lakedaemon.net>
-References: <1410147029-30067-1-git-send-email-gerg@uclinux.org>
- <20140909160043.GP30828@titan.lakedaemon.net>
-Message-ID: <20140928114353.GY27755@sirena.org.uk>
+From: romain.perier@gmail.com (PERIER Romain)
+Date: Sun, 28 Sep 2014 14:00:54 +0200
+Subject: [PATCH v1 1/3] regulator: act8865: Add support to turn off all
+ outputs
+In-Reply-To: <20140928103301.GN27755@sirena.org.uk>
+References: <1411834906-9533-1-git-send-email-romain.perier@gmail.com>
+ <20140928103301.GN27755@sirena.org.uk>
+Message-ID: <CABgxDo+h2AYjAO4darK4+RTXqnhf4OqouGLfF2yuJCpu7r6tLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 12:00:43PM -0400, Jason Cooper wrote:
-> On Mon, Sep 08, 2014 at 01:30:29PM +1000, gerg at uclinux.org wrote:
+Hi Mark,
 
-> > Switch the Armada SoC SPI port device tree binding to use the new improved
-> > armada-370-spi compatible name. This allows for a wider range of baud rates
-> > to be used.
 
-> Applied to mvebu/dt.
+2014-09-28 12:33 GMT+02:00 Mark Brown <broonie@kernel.org>:
+> On Sat, Sep 27, 2014 at 04:21:44PM +0000, Romain Perier wrote:
+>> When the property "active-semi,system-power-controller" is found in the
+>> devicetree, the function pm_power_off is defined. This function sends the
+>> rights bit fields to the global off control register. shutdown/poweroff
+>> commands are now supported for hardware components which use these PMU.
+>
+> We really need to come up with a standard property for this and document
+> it rather than continuing to add individual device specific properties
+> all doing the same thing, and probably also some helper code and/or a
+> standard operation for this - there's a lot of drivers implementing the
+> same pattern here.
 
-Note that the corresponding driver change hasn't been applied (or sent
-to me for review) so this will break users.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140928/7b164e11/attachment.sig>
+I completly agree about adding a unified and generic property for that purpose.
+I already proposed something for that on devicetree ML, see the thread
+"Proposal: generic property for system-power-controller".
+Unfortunately I did not get replies :) .
+
+
+>
+>> +     if (dev->of_node &&
+>> +         of_property_read_bool(dev->of_node,
+>> +                               "active-semi,system-power-controller")) {
+>> +             act8865_i2c_client = client;
+>
+> Indentation seems messed up here - tabs vs spaces?
+
+Yes, I really don't understand where the problem is. I use good emacs
+settings to be compatible with kernel coding style and git diff does
+not show me indent/spaces problems :/ .
+Sorry because this is a very boring issue when reviewing patches... I
+will investigate ^^
+
+Romain
