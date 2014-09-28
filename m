@@ -1,31 +1,26 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Sat, 27 Sep 2014 20:22:33 -0700
-Subject: [PATCH v2 0/2] iommu/arm-smmu: hard iova_to_phys
-In-Reply-To: <1411853513-9571-1-git-send-email-mitchelh@codeaurora.org>
- (Mitchel Humpherys's message of "Sat, 27 Sep 2014 14:31:51 -0700")
-References: <1411853513-9571-1-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <vnkw8ul4mnt2.fsf@mitchelh-linux.qualcomm.com>
+From: alvin.chen@intel.com (Chen, Alvin)
+Date: Sun, 28 Sep 2014 03:23:21 +0000
+Subject: [PATCH] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
+In-Reply-To: <1411741357.22717.4.camel@linux.intel.com>
+References: <1411752349-31490-1-git-send-email-alvin.chen@intel.com>
+ <1411752349-31490-2-git-send-email-alvin.chen@intel.com>
+ <20140926100832.GE27755@sirena.org.uk>
+ <1411741357.22717.4.camel@linux.intel.com>
+Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E99710F@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27 2014 at 02:31:51 PM, Mitchel Humpherys <mitchelh@codeaurora.org> wrote:
-> This series introduces support for performing iova-to-phys translations via
-> the ARM SMMU hardware on supported implementations. We also make use of
-> some new generic macros for polling hardware registers.
->
-> Changes since v1:
->
->   - Renamed one of the iopoll macros to use the more standard `_atomic'
->     suffix
->   - Removed some convenience iopoll wrappers to encourage explicitness
-
-Hold on, just remembered there was another comment on the iova_to_phys
-patch.  v3 is en route...
-
-
-
--Mitch
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> >
+> > > +/*  see Quark SPI data sheet for implementation rationale */ static
+> > > +u32 quark_x1000_set_clk_regvals(u32 rate, u32 *dds, u32 *clk_div) {
+> >
+> > Please document this in the driver - I don't know if this datasheet is
+> > public but even if it is it may not stay that way.
+> 
+> Datasheet is public.
+> I'm just wondering if we can use just a formula instead of table.
+> 
+As I said before, there are two formulas, but for the given rate, from the formulas, we can get a lot of <dds, clk_div> pairs,
+and we also need to select them according to the guidelines which is not formula. The table the datasheet given should be
+the best one to meet the jitter and duty cycles as the datasheet documented.
