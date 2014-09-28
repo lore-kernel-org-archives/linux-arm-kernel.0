@@ -1,46 +1,27 @@
-From: yocto6@gmail.com (nick)
-Date: Sun, 28 Sep 2014 00:07:55 -0400
-Subject: [PATCH] arm: Remove read of issue in sa1111.c in sa1111_resume
-In-Reply-To: <5427810F.2000305@infradead.org>
-References: <1411872652-16207-1-git-send-email-yocto6@gmail.com>
- <5427810F.2000305@infradead.org>
-Message-ID: <5427899B.4050205@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 28 Sep 2014 12:13:24 +0800
+Subject: [PATCH v2 2/6] clk: imx5: add step clock, used when
+ reprogramming PLL1
+In-Reply-To: <1411738864-26549-2-git-send-email-l.stach@pengutronix.de>
+References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+ <1411738864-26549-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140928041322.GH12999@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 26, 2014 at 03:41:00PM +0200, Lucas Stach wrote:
+> This is the bypass clock used to feed the ARM partition
+> while we reprogram PLL1 to another rate.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c    | 9 ++++++++-
 
+This is a patch touching arch/arm/ file, so should be prefixed with "ARM".
+I fixed those prefix up and applied patch 2-5.
 
-On 14-09-27 11:31 PM, Randy Dunlap wrote:
-> On 09/27/14 19:50, Nicholas Krause wrote:
->> This removes the FIXME message and issue with reading in this driver before resuming
->> in the function, sa1111_resume.
-> 
-> You need to explain why this makes any sense.
-> Hint:  it doesn't.
-> 
->> Signed-off-by: Nicholas Krause <yocto6@gmail.com>
->> ---
->>  arch/arm/common/sa1111.c | 2 --
->>  1 file changed, 2 deletions(-)
->>
->> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
->> index e57d7e5..0c4b9a9 100644
->> --- a/arch/arm/common/sa1111.c
->> +++ b/arch/arm/common/sa1111.c
->> @@ -950,9 +950,7 @@ static int sa1111_resume(struct platform_device *dev)
->>  
->>  	/*
->>  	 * Ensure that the SA1111 is still here.
->> -	 * FIXME: shouldn't do this here.
->>  	 */
->> -	id = sa1111_readl(sachip->base + SA1111_SKID);
->>  	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
->>  		__sa1111_remove(sachip);
->>  		platform_set_drvdata(dev, NULL);
->>
-> 
-> 
-Thanks for the reply Randy. I was wondering if was what the FIX ME meant if it meant something else please let me 
-known.
-Sorry,
-Nick 
+Shawn
+
+>  include/dt-bindings/clock/imx5-clock.h | 4 +++-
+>  2 files changed, 11 insertions(+), 2 deletions(-)
