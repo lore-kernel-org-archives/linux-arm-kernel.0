@@ -1,93 +1,34 @@
-From: chenhui.zhao@freescale.com (Chenhui Zhao)
-Date: Sun, 28 Sep 2014 19:06:40 +0800
-Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
-In-Reply-To: <20140926121427.GO5182@n2100.arm.linux.org.uk>
-References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
- <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
- <20140926121427.GO5182@n2100.arm.linux.org.uk>
-Message-ID: <20140928110640.GB9797@udp189498uds.ap.freescale.net>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Sun, 28 Sep 2014 19:15:03 +0800
+Subject: [RFT Part2 v2 00/24] Enable hierarchy irqdomian on x86 platforms
+In-Reply-To: <20140928110531.GB7351@pd.tnic>
+References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+ <20140926142931.GA10066@nazgul.tnic> <542594A6.4040504@amd.com>
+ <20140928110531.GB7351@pd.tnic>
+Message-ID: <5427EDB7.9060002@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 01:14:27PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
-> > +static int ls1_start_deepsleep(unsigned long addr)
-> > +{
-> > +	ls1_do_deepsleep(addr);
-> > +
-> > +	return 0;
-> > +}
-> ...
-> > +	cpu_suspend(SRAM_CODE_BASE_PHY, ls1_start_deepsleep);
-> 
-> What's the point of this function?  Why can't ls1_do_deepsleep() just
-> return zero?
+Hi Borislav,
+	I have prepared a git tree at:
+https://github.com/jiangliu/linux.git irqdomain/p1v2
+https://github.com/jiangliu/linux.git irqdomain/p2v2
+https://github.com/jiangliu/linux.git irqdomain/p3v1
 
-Just leave space for adding C code in the future.
+Branch irqdomain/p3v1 also includes all changes in p1v2/p2v2.
+Regards!
+Gerry
 
+On 2014/9/28 19:05, Borislav Petkov wrote:
+> On Fri, Sep 26, 2014 at 11:30:30AM -0500, Aravind Gopalakrishnan wrote:
+>> Okay, I shall start looking into the patches and RFH as needed.
 > 
-> > +/*
-> > + * r0: the physical entry address of SRAM code
-> > + *
-> > + */
-> > +ENTRY(ls1_do_deepsleep)
-> > +	mov	r13, r0
-> > +
-> > +	/* flush cache */
-> > +	bl	v7_flush_dcache_all
+> Btw, apparently, there's a third patchset too:
 > 
-> Please explain the purpose of this call via a comment in the code.
+> https://lkml.kernel.org/r/1411743478-31435-1-git-send-email-jiang.liu at linux.intel.com
 > 
-> The generic code will have saved the CPU state, and will have called
-> flush_cache_louis() to flush the caches to the point of unification.
+> Jiang, do you have a tree which has all required patches for testing so
+> that people don't have to go hunting for them..?
 > 
-> The only data which will have been loaded into the cache between that
-> point is the stack for the return from __cpu_suspend_save, and
-> speculative prefetches.
+> Thanks.
 > 
-> So, the only reason I can gather is that you need to flush data from
-> lower levels of the cache below the point of unification.
-> 
-
-In deep sleep process, all caches will lost, so flush all caches to prevent
-data loss.
-
-> > +
-> > +	/* disable cache, C bit in SCTLR */
-> > +	mrc	p15, 0, r0, c1, c0, 0
-> > +	bic	r0, r0, #(1 << 2)
-> > +	mcr	p15, 0, r0, c1, c0, 0
-> > +	isb
-> > +
-> > +	/* disable coherency, SMP bit in ACTLR */
-> > +	mrc	p15, 0, r0, c1, c0, 1
-> > +	bic	r0, r0, #(1 << 6)
-> > +	mcr	p15, 0, r0, c1, c0, 1
-> > +	isb
-> > +	dsb
-> > +
-> > +	/* disable MMU, M bit in SCTLR */
-> > +	mrc	p15, 0, r0, c1, c0, 0
-> > +	bic	r0, r0, #1
-> > +	mcr	p15, 0, r0, c1, c0, 0
-> > +	isb
-> > +
-> > +	/* jump to sram code using physical address */
-> > +	bx	r13
-> 
-> This looks extremely fragile.  You are running in virtual space, and you
-> turn the MMU off.  You are reliant on the MMU still being on for the
-> following instructions to already be in the pipeline.  That's not a
-> very good assumption to make (we've made it in the past and it breaks
-> every so often when things change, eg when the code is no longer laid
-> out how we expect.)
-> 
-> You need to disable the MMU safely, which means using the identity map
-> page tables and executing code in the identity map region.
-
-Yes, the code will switch off MMU, and switch to physical address space.
-On LS1021, the DDR memory located at the physical address space started from
-0x80000000, the kernel space also started at 0x80000000 (CONFIG_PAGE_OFFSET = 0x80000000).
-So the virtual address of kernel code is equal to the physical address.
-
-Chenhui
