@@ -1,40 +1,61 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 28 Sep 2014 19:27:11 +0200
-Subject: [PATCH v7] watchdog: Add DA9063 PMIC watchdog driver.
-In-Reply-To: <5428433C.6060901@roeck-us.net>
-References: <1411923945-3538-1-git-send-email-mpa@pengutronix.de>
- <5428433C.6060901@roeck-us.net>
-Message-ID: <20140928172711.GL25366@pengutronix.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 28 Sep 2014 10:51:50 -0700
+Subject: [GIT PULL v2][for 3.18] pull request for the clock update of
+ Hisilicon HiX5HD2 soc
+In-Reply-To: <54277F20.5090604@hisilicon.com>
+References: <54277F20.5090604@hisilicon.com>
+Message-ID: <20140928175150.19023.99961@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 28, 2014 at 10:19:56AM -0700, Guenter Roeck wrote:
-> On 09/28/2014 10:05 AM, Markus Pargmann wrote:
-> >From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-> >
-> >This driver supports the watchdog device inside the DA9063 PMIC.
-> >
-> >Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-> >Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Quoting Wei Xu (2014-09-27 20:23:12)
+> Hi Mike,
 > 
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
+> 
+> Best Regards,
+> Wei
+> 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18-v2
 
-Thanks for your reviews.
+Pulled!
 
-Best regards,
+Thanks,
+Mike
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140928/a5b34896/attachment.sig>
+> 
+> for you to fetch changes up to 45bcf9c6f299ae77c14c2ae8cea3f8e540fe80d1:
+> 
+>   clk: hix5hd2: add I2C clocks (2014-09-28 10:27:09 +0800)
+> 
+> ----------------------------------------------------------------
+> Hisilicon HiX5HD2 clock updates for 3.18-v2
+> 
+> - Add I2C clocks
+> - Add watchdog clocks
+> - Add sd clocks
+> - Add complex clock implementation to support sata, usb and ethernet
+> 
+> ----------------------------------------------------------------
+> Guoxiong Yan (1):
+>       clk: hix5hd2: add watchdog0 clocks
+> 
+> Jiancheng Xue (1):
+>       clk: hix5hd2: add sd clk
+> 
+> Wei Yan (1):
+>       clk: hix5hd2: add I2C clocks
+> 
+> Zhangfei Gao (1):
+>       clk: hix5hd2: add complex clk
+> 
+>  drivers/clk/hisilicon/clk-hix5hd2.c       | 232 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+>  include/dt-bindings/clock/hix5hd2-clock.h |  27 +++++++++++++++++++
+>  2 files changed, 253 insertions(+), 6 deletions(-)
+> 
