@@ -1,26 +1,51 @@
-From: alvin.chen@intel.com (Chen, Alvin)
-Date: Sun, 28 Sep 2014 03:23:21 +0000
-Subject: [PATCH] SPI: spi-pxa2xx: SPI support for Intel Quark X1000
-In-Reply-To: <1411741357.22717.4.camel@linux.intel.com>
-References: <1411752349-31490-1-git-send-email-alvin.chen@intel.com>
- <1411752349-31490-2-git-send-email-alvin.chen@intel.com>
- <20140926100832.GE27755@sirena.org.uk>
- <1411741357.22717.4.camel@linux.intel.com>
-Message-ID: <4656BEB6164FC34F8171C6538F1A595B2E99710F@SHSMSX101.ccr.corp.intel.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Sun, 28 Sep 2014 11:23:12 +0800
+Subject: [GIT PULL v2][for 3.18] pull request for the clock update of Hisilicon
+ HiX5HD2 soc
+Message-ID: <54277F20.5090604@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> >
-> > > +/*  see Quark SPI data sheet for implementation rationale */ static
-> > > +u32 quark_x1000_set_clk_regvals(u32 rate, u32 *dds, u32 *clk_div) {
-> >
-> > Please document this in the driver - I don't know if this datasheet is
-> > public but even if it is it may not stay that way.
-> 
-> Datasheet is public.
-> I'm just wondering if we can use just a formula instead of table.
-> 
-As I said before, there are two formulas, but for the given rate, from the formulas, we can get a lot of <dds, clk_div> pairs,
-and we also need to select them according to the guidelines which is not formula. The table the datasheet given should be
-the best one to meet the jitter and duty cycles as the datasheet documented.
+Hi Mike,
+
+Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
+
+Best Regards,
+Wei
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18-v2
+
+for you to fetch changes up to 45bcf9c6f299ae77c14c2ae8cea3f8e540fe80d1:
+
+  clk: hix5hd2: add I2C clocks (2014-09-28 10:27:09 +0800)
+
+----------------------------------------------------------------
+Hisilicon HiX5HD2 clock updates for 3.18-v2
+
+- Add I2C clocks
+- Add watchdog clocks
+- Add sd clocks
+- Add complex clock implementation to support sata, usb and ethernet
+
+----------------------------------------------------------------
+Guoxiong Yan (1):
+      clk: hix5hd2: add watchdog0 clocks
+
+Jiancheng Xue (1):
+      clk: hix5hd2: add sd clk
+
+Wei Yan (1):
+      clk: hix5hd2: add I2C clocks
+
+Zhangfei Gao (1):
+      clk: hix5hd2: add complex clk
+
+ drivers/clk/hisilicon/clk-hix5hd2.c       | 232 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ include/dt-bindings/clock/hix5hd2-clock.h |  27 +++++++++++++++++++
+ 2 files changed, 253 insertions(+), 6 deletions(-)
