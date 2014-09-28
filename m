@@ -1,61 +1,474 @@
 From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Sun, 28 Sep 2014 15:53:26 -0500
-Subject: [RFC 0/4] Add PCI/MSI(x) support for AMD Seattle Platform
-Message-ID: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+Date: Sun, 28 Sep 2014 15:53:27 -0500
+Subject: [RFC 1/4] arm64: amd-seattle: Adding device tree for AMD Seattle
+ platform
+In-Reply-To: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1411937610-22125-2-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-This is an RFC to introduce support for AMD Seattle ARM64 platform.
+Initial revision of device tree for AMD Seattle platform
 
-It is also intended to provide support for validating Liviu's PCI patch series:
-    [PATCH v12 00/12] Support for creating generic PCI host bridges from DT
-    https://lkml.org/lkml/2014/9/23/852
-
-It is also intended to provide support for validating GICv2m patch series
-(w/o multi-MSI).
-
-Overview:
-
- * Patch 1 adds AMD Seattle device tree (w/ PCI and MSI support)
-
- * Patch 2-3) adds ARM64 and MSI support to the existing Generic PCI
-   host controller.
-
- * Patch 4 comes from the GICv2m patch series: 
-      [V8 2/2] irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
-      (https://lkml.org/lkml/2014/9/20/113)
-
-   It has been slightly modified to remove the multi-MSI supports for now
-   (awaiting discussion with other maintainers), and will be submitted
-   separately.
-
-Suravee Suthikulpanit (4):
-  arm64: amd-seattle: Adding device tree for AMD Seattle platform
-  PCI: generic: Add support for ARM64 and MSI(x)
-  arm64: Do not call enable PCI resources when specify PCI_PROBE_ONLY
-  irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
-
- Documentation/devicetree/bindings/arm/gic.txt      |  53 ++++
- .../devicetree/bindings/pci/host-generic-pci.txt   |   3 +
- arch/arm64/Kconfig                                 |   1 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/amd-seattle-periph.dtsi        | 175 ++++++++++++
- arch/arm64/boot/dts/amd-seattle.dts                | 245 +++++++++++++++++
- arch/arm64/kernel/pci.c                            |   8 +
- drivers/irqchip/Kconfig                            |   5 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-gic-v2m.c                      | 301 +++++++++++++++++++++
- drivers/irqchip/irq-gic.c                          |  82 ++++--
- drivers/irqchip/irq-gic.h                          |  54 ++++
- drivers/pci/host/Kconfig                           |   2 +-
- drivers/pci/host/pci-host-generic.c                |  95 ++++++-
- 14 files changed, 986 insertions(+), 40 deletions(-)
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Signed-off-by: Thomas Lendacky <Thomas.Lendacky@amd.com>
+Signed-off-by: Joel Schopp <Joel.Schopp@amd.com>
+---
+ arch/arm64/boot/dts/Makefile                |   1 +
+ arch/arm64/boot/dts/amd-seattle-periph.dtsi | 175 ++++++++++++++++++++
+ arch/arm64/boot/dts/amd-seattle.dts         | 245 ++++++++++++++++++++++++++++
+ 3 files changed, 421 insertions(+)
  create mode 100644 arch/arm64/boot/dts/amd-seattle-periph.dtsi
  create mode 100644 arch/arm64/boot/dts/amd-seattle.dts
- create mode 100644 drivers/irqchip/irq-gic-v2m.c
- create mode 100644 drivers/irqchip/irq-gic.h
 
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index c52bdb0..11cb2e3 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,5 +1,6 @@
+ dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
++dtb-$(CONFIG_ARCH_SEATTLE) += amd-seattle.dtb
+ 
+ targets += dtbs
+ targets += $(dtb-y)
+diff --git a/arch/arm64/boot/dts/amd-seattle-periph.dtsi b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
+new file mode 100644
+index 0000000..e5bcf1c
+--- /dev/null
++++ b/arch/arm64/boot/dts/amd-seattle-periph.dtsi
+@@ -0,0 +1,175 @@
++/*
++ * DTS file for AMD Seattle Peripheral
++ *
++ * Copyright (C) 2014 Advanced Micro Devices, Inc.
++ */
++
++motherboard {
++	arm,v2m-memory-map = "rs1";
++	compatible = "arm,vexpress,v2m-p1", "simple-bus";
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges;
++
++	adl3clk_100mhz: clk100mhz_0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++		clock-output-names = "adl3clk_100mhz";
++	};
++
++	ccpclk_375mhz: clk375mhz {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <375000000>;
++		clock-output-names = "ccpclk_375mhz";
++	};
++
++	sataclk_333mhz: clk333mhz {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <333000000>;
++		clock-output-names = "sataclk_333mhz";
++	};
++
++	pcieclk_500mhz: clk500mhz_0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <500000000>;
++		clock-output-names = "pcieclk_500mhz";
++	};
++
++	dmaclk_500mhz: clk500mhz_1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <500000000>;
++		clock-output-names = "dmaclk_500mhz";
++	};
++
++	miscclk_250mhz: clk250mhz_4 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <250000000>;
++		clock-output-names = "miscclk_250mhz";
++	};
++
++	uartspiclk_100mhz: clk100mhz_1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++		clock-output-names = "uartspiclk_100mhz";
++	};
++
++	dma0: dma at 1,0500000 {
++		compatible = "arm,pl330", "arm,primecell";
++		reg = <0 0x0500000 0 0x1000>;
++		interrupts =
++			<0 368 4>,
++			<0 369 4>,
++			<0 370 4>,
++			<0 371 4>,
++			<0 372 4>,
++			<0 373 4>,
++			<0 374 4>,
++			<0 375 4>;
++		clocks = <&dmaclk_500mhz>;
++		clock-names = "apb_pclk";
++		#dma-cells = <1>;
++		#stream-id-cells = <32>;
++	};
++
++	sata0: sata at 1,00300000 {
++		compatible = "snps,spear-ahci";
++		reg = <0 0x300000 0 0x800>;
++		interrupts = <0 355 4>;
++		clocks = <&sataclk_333mhz>;
++		clock-names = "apb_pclk";
++		#stream-id-cells = <32>;
++		dma-coherent;
++	};
++
++	i2c at 1,1000000 {
++		compatible = "snps,designware-i2c";
++		reg = <0 0x01000000 0 0x1000>;
++		interrupts = <0 357 4>;
++		clocks = <&uartspiclk_100mhz>;
++		clock-names = "apb_pclk";
++	};
++
++	v2m_serial0: uart at 1,1010000 {
++		compatible = "arm,pl011", "arm,primecell";
++		reg = <0 0x1010000 0 0x1000>;
++		interrupts = <0 328 4>;
++		clocks = <&uartspiclk_100mhz>, <&uartspiclk_100mhz>;
++		clock-names = "uartclk", "apb_pclk";
++	};
++
++	ssp at 1,1020000 {
++		#gpio-cells = <2>;
++		compatible = "arm,pl022", "arm,primecell";
++		reg = <0 0x1020000 0 0x1000>;
++		spi-controller;
++		interrupts = <0 330 4>;
++		clocks = <&uartspiclk_100mhz>;
++		clock-names = "apb_pclk";
++	};
++
++	ssp at 1,1030000 {
++		#gpio-cells = <2>;
++		compatible = "arm,pl022", "arm,primecell";
++		reg = <0 0x1030000 0 0x1000>;
++		spi-controller;
++		interrupts = <0 329 4>;
++		clocks = <&uartspiclk_100mhz>;
++		clock-names = "apb_pclk";
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sdcard at 1 {
++			compatible = "mmc-spi-slot";
++			reg = <0>;
++			spi-max-frequency = <20000000>;
++			pl022,hierarchy = <0>;
++			pl022,interface = <0>;
++			pl022,com-mode = <0x0>;
++			pl022,rx-level-trig = <0>;
++			pl022,tx-level-trig = <0>;
++		};
++	};
++
++	gpio at 1,1040000 {
++		#gpio-cells = <2>;
++		compatible = "arm,pl061", "arm,primecell";
++		reg = <0 0x1040000 0 0x1000>;
++		gpio-controller;
++		interrupts = <0 359 4>;
++		clocks = <&uartspiclk_100mhz>;
++		clock-names = "apb_pclk";
++	};
++
++	gpio at 1,1050000 {
++		#gpio-cells = <2>;
++		compatible = "arm,pl061", "arm,primecell";
++		reg = <0 0x1050000 0 0x1000>;
++		gpio-controller;
++		interrupts = <0 358 4>;
++		clocks = <&uartspiclk_100mhz>;
++		clock-names = "apb_pclk";
++	};
++
++	timer at 1,1060000 {
++		compatible = "arm,standalone_a5_twd";
++		reg = <0 0x1060000 0 0x40>;
++		interrupts =
++			<0 378 4>,
++			<0 379 4>;
++	};
++
++	ccp: ccp at 1,00100000 {
++		compatible = "amd,ccp-seattle-v1a";
++		reg = <0 0x00100000 0 0x10000>;
++		interrupts = <0 3 4>;
++		dma-coherent;
++	};
++};
+diff --git a/arch/arm64/boot/dts/amd-seattle.dts b/arch/arm64/boot/dts/amd-seattle.dts
+new file mode 100644
+index 0000000..3096d1a
+--- /dev/null
++++ b/arch/arm64/boot/dts/amd-seattle.dts
+@@ -0,0 +1,245 @@
++/*
++ * DTS file for AMD Seattle
++ *
++ * Copyright (C) 2014 Advanced Micro Devices, Inc.
++ */
++
++/dts-v1/;
++
++/ {
++	compatible = "amd,seattle";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen {
++		bootargs = "console=ttyAMA0,115200 earlycon=pl011,0xe1010000";
++		linux,pci-probe-only;
++	};
++
++	aliases {
++		serial0 = &v2m_serial0;
++	};
++
++	/* Note: This entry is modified by UEFI */
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&CPU0>;
++				};
++				core1 {
++					cpu = <&CPU1>;
++				};
++			};
++			cluster1 {
++				core0 {
++					cpu = <&CPU2>;
++				};
++				core1 {
++					cpu = <&CPU3>;
++				};
++			};
++			cluster2 {
++				core0 {
++					cpu = <&CPU4>;
++				};
++				core1 {
++					cpu = <&CPU5>;
++				};
++			};
++			cluster3 {
++				core0 {
++					cpu = <&CPU6>;
++				};
++				core1 {
++					cpu = <&CPU7>;
++				};
++			};
++		};
++		/* Cluster 0 Core 0 */
++		CPU0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0000>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000050>;
++		};
++
++		/* Cluster 0 Core 1 */
++		CPU1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0001>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000058>;
++		};
++
++		/* Cluster 1 Core 0 */
++		CPU2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0100>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000060>;
++		};
++
++		/* Cluster 1 Core 1 */
++		CPU3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0101>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000068>;
++		};
++
++		/* Cluster 2 Core 0 */
++		CPU4: cpu at 4 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0200>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000070>;
++		};
++
++		/* Cluster 2 Core 1 */
++		CPU5: cpu at 5 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0201>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000078>;
++		};
++
++		/* Cluster 3 Core 0 */
++		CPU6: cpu at 6 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0300>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000080>;
++		};
++
++		/* Cluster 3 Core 1 */
++		CPU7: cpu at 7 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0301>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x80 0x30000088>;
++		};
++	};
++
++	/* Note: This entry is modified by UEFI */
++	memory at 8000000000 {
++		device_type = "memory";
++		reg = <0x00000080 0x00000000 0x1 0x00000000>; /* 4GB */
++	};
++
++	gic: interrupt-controller at e1101000 {
++		compatible = "arm,gic-400", "arm,cortex-a15-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		interrupt-controller;
++		ranges = <0 0 0 0xe1100000 0 0x100000>;
++		reg = <0x0 0xe1110000 0 0x1000>,  /* gic dist */
++		      <0x0 0xe112f000 0 0x2000>,  /* gic cpu */
++		      <0x0 0xe1140000 0 0x10000>, /* gic virtual ic*/
++		      <0x0 0xe1160000 0 0x10000>; /* gic virtual cpu*/
++		interrupts = <1 8 0xf04>;
++		v2m0: v2m at 0x8000 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			arm,msi-base-spi = <64>;
++			arm,msi-num-spis = <256>;
++			reg = <0x0 0x80000 0 0x1000>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 0xff01>,
++			     <1 14 0xff01>,
++			     <1 11 0xff01>,
++			     <1 10 0xff01>;
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <0 7 4>,
++			     <0 8 4>,
++			     <0 9 4>,
++			     <0 10 4>,
++			     <0 11 4>,
++			     <0 12 4>,
++			     <0 13 4>,
++			     <0 14 4>;
++	};
++
++	/* This entry is modified by UEFI */
++	pcie0: pcie-controller{
++		compatible = "pci-host-ecam-generic";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		bus-range = <0 0xff>;
++		reg = <0 0xf0000000 0 0x10000000>;
++		dma-coherent;
++		msi-parent = <&v2m0>;
++
++		interrupts =
++			<0 320 4>, /* ioc_soc_serr */
++			<0 321 4>; /* ioc_soc_sci */
++
++		ranges = <
++			/* I/O Memory (size=64K) */
++			0x01000000 0x00 0xefff0000 0x00 0xefff0000 0x00 0x00010000
++
++			/* Non-Pref 32-bit MMIO (size=512M) */
++			0x02000000 0x00 0x40000000 0x00 0x40000000 0x00 0x20000000
++
++			/* Non-Pref 32-bit MMIO (size=512M) */
++			0x02000000 0x00 0x60000000 0x00 0x60000000 0x00 0x20000000
++
++			/* Non-Pref 32-bit MMIO (size=512M) */
++			0x02000000 0x00 0x80000000 0x00 0x80000000 0x00 0x20000000
++
++			/* Non-Pref 32-bit MMIO (size=512M) */
++			0x02000000 0x00 0xa0000000 0x00 0xa0000000 0x00 0x20000000
++
++			/* Pref 64-bit MMIO (size= 4G) */
++			0x43000000 0x01 0x00000000 0x01 0x00000000 0x01 0x00000000
++
++			/* Pref 64-bit MMIO (size= 8G) */
++			0x43000000 0x02 0x00000000 0x02 0x00000000 0x02 0x00000000
++
++			/* Pref 64-bit MMIO (size=16G) */
++			0x43000000 0x04 0x00000000 0x04 0x00000000 0x04 0x00000000
++
++			/* Pref 64-bit MMIO (size=32G) */
++			0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000
++
++			/* Pref 64-bit MMIO (size=64G) */
++			0x43000000 0x10 0x00000000 0x10 0x00000000 0x10 0x00000000
++
++			/* Pref 64-bit MMIO (size=128G) */
++			0x43000000 0x20 0x00000000 0x20 0x00000000 0x20 0x00000000
++
++			/* Pref 64-bit MMIO (size=256G) */
++			0x43000000 0x40 0x00000000 0x40 0x00000000 0x40 0x00000000
++		>;
++	};
++
++	smb {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges = <0 0 0 0xE0000000 0 0x01300000>;
++
++		/include/ "amd-seattle-periph.dtsi"
++	};
++};
 -- 
 1.9.3
