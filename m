@@ -1,86 +1,77 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Sun, 28 Sep 2014 12:22:09 +0800
-Subject: [PATCH v2 3/3] ARM: dts: hix5hd2: add i2c node
-In-Reply-To: <1411878129-19743-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1411878129-19743-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1411878129-19743-4-git-send-email-zhangfei.gao@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sun, 28 Sep 2014 13:42:21 +0900
+Subject: [PATCH v5 RESEND 1/3] ARM: EXYNOS: Move code from hotplug.c to
+ platsmp.c
+In-Reply-To: <542677B2.70506@samsung.com>
+References: <1409920495-16533-1-git-send-email-k.kozlowski@samsung.com>
+ <201409262313.26272.arnd@arndb.de> <542677B2.70506@samsung.com>
+Message-ID: <542791AD.5080105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- arch/arm/boot/dts/hisi-x5hd2.dtsi |   60 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+On 09/27/14 17:39, Krzysztof Kozlowski wrote:
+> W dniu 26.09.2014 o 23:13, Arnd Bergmann pisze:
+>> On Friday 05 September 2014, Krzysztof Kozlowski wrote:
+>>> The commit only moves code around with one additional observable change:
+>>> the hotplug.c was compiled with custom CFLAGS (-march=armv7-a). These
+>>> CFLAGS are not necessary any more.
+>>
+>> This turns out to be wrong, and your change broke 'allmodconfig' builds
+>> in linux-next. Please apply this patch on top.
+>
+Arnd, Krzysztof commented its fix has been submitted and landed in my 
+-test tree not -next because it should be handled in rmk's tree I think.
 
-diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index d3d99fb..17d0637 100644
---- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-+++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -476,5 +476,65 @@
-                         interrupts = <0 70 4>;
-                         clocks = <&clock HIX5HD2_SATA_CLK>;
- 		};
-+
-+		i2c0: i2c at b10000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb10000 0x1000>;
-+			interrupts = <0 38 4>;
-+			clocks = <&clock HIX5HD2_I2C0_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at b11000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb11000 0x1000>;
-+			interrupts = <0 39 4>;
-+			clocks = <&clock HIX5HD2_I2C1_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at b12000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb12000 0x1000>;
-+			interrupts = <0 40 4>;
-+			clocks = <&clock HIX5HD2_I2C2_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at b13000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb13000 0x1000>;
-+			interrupts = <0 41 4>;
-+			clocks = <&clock HIX5HD2_I2C3_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at b16000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb16000 0x1000>;
-+			interrupts = <0 43 4>;
-+			clocks = <&clock HIX5HD2_I2C4_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c5: i2c at b17000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb17000 0x1000>;
-+			interrupts = <0 44 4>;
-+			clocks = <&clock HIX5HD2_I2C5_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.9.5
+I sent the patch to RMK patch tracking system just now and it should be 
+fine in there.
+
+BTW, I just applied the fix in my -next until its ladning in RMK tree 
+but as you know it will be not be sent to arm-soc via samsung tree...
+
+One more, Arnd please pull my pull-request 2nd round and 3rd round for 
+samsung stuff for 3.18.
+
+> My patch definitely needed more testing.
+> I posted a fix here:
+> https://lkml.org/lkml/2014/9/24/163
+> However it seems that it wasn't picked up by anyone yet.
+>
+> Russell, could you pick up the patch (with acks from Nicolas and Kukjin)?
+>
+I believe Russell will take the patch in his tree.
+
+Thanks,
+Kukjin
+
+>> 8<----------
+>> From 4ba6bf8806caec386e35930314dbad071284c837 Mon Sep 17 00:00:00 2001
+>> From: Arnd Bergmann <arnd@arndb.de>
+>> Date: Fri, 26 Sep 2014 23:09:38 +0200
+>> Subject: [PATCH] ARM: EXYNOS: fix build error in platsmp.c
+>>
+>> /tmp/ccYeWL3V.s: Assembler messages:
+>> /tmp/ccYeWL3V.s:659: Error: selected processor does not support ARM
+>> mode `isb '
+>> /tmp/ccYeWL3V.s:664: Error: selected processor does not support ARM
+>> mode `isb '
+>> /tmp/ccYeWL3V.s:665: Error: selected processor does not support ARM
+>> mode `dsb '
+>> make[3]: *** [arch/arm/mach-exynos/platsmp.o] Error 1
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: 17342534e1d932 ("ARM: EXYNOS: Move code from hotplug.c to
+>> platsmp.c")
+>>
+>> diff --git a/arch/arm/mach-exynos/Makefile
+>> b/arch/arm/mach-exynos/Makefile
+>> index 4e49d4efb264..64324bf5edb4 100644
+>> --- a/arch/arm/mach-exynos/Makefile
+>> +++ b/arch/arm/mach-exynos/Makefile
+>> @@ -21,6 +21,7 @@ obj-$(CONFIG_PM_SLEEP) += suspend.o
+>> obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+>>
+>> obj-$(CONFIG_SMP) += platsmp.o headsmp.o
+>> +CFLAGS_platsmp.o := -march=armv7-a
+>>
+>> plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>> AFLAGS_exynos-smc.o :=-Wa,-march=armv7-a$(plus_sec)
