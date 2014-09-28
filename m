@@ -1,174 +1,223 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 28 Sep 2014 14:43:38 +0200
-Subject: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <1411908218-20947-1-git-send-email-hdegoede@redhat.com>
-References: <1411908218-20947-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1411908218-20947-4-git-send-email-hdegoede@redhat.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sun, 28 Sep 2014 14:18:31 +0100
+Subject: [PATCH] ARM: sun7i: add support for A20-OLinuXino-Lime2
+Message-ID: <54280AA7.1090401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Luc Verhaegen <libv@skynet.be>
+This adds support for the Olimex A20-OLinuXino-Lime2
+https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
 
-This claims and enables clocks listed in the simple framebuffer dt node.
-This is needed so that the display engine, in case the required clocks
-are known by the kernel code and are described in the dt, will remain
-properly enabled.
+Differences to previous Lime boards are 1GB RAM and gigabit ethernet
 
-Signed-off-by: Luc Verhaegen <libv@skynet.be>
-[hdegoede at redhat.com: drop dev_err on kzalloc failure]
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Iain Paton <ipaton0@gmail.com>
 ---
- drivers/video/fbdev/simplefb.c | 100 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 98 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index b7d5c08..f329cc1 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -26,6 +26,7 @@
- #include <linux/module.h>
- #include <linux/platform_data/simplefb.h>
- #include <linux/platform_device.h>
-+#include <linux/clk-provider.h>
- 
- static struct fb_fix_screeninfo simplefb_fix = {
- 	.id		= "simple",
-@@ -165,8 +166,98 @@ static int simplefb_parse_pd(struct platform_device *pdev,
- 	return 0;
- }
- 
+I'd like to see this go in with the dual license, but not really 
+sure if that's appropriate while sunxi-common-regulators.dtsi is still
+GPL only. Happy to resend with single license header if it's deemed
+better for now though.
+
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 178 ++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2f42b18..ea6c672 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -420,6 +420,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-hummingbird.dtb \
+ 	sun7i-a20-i12-tvbox.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
++	sun7i-a20-olinuxino-lime2.dtb \
+ 	sun7i-a20-olinuxino-micro.dtb \
+ 	sun7i-a20-pcduino3.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+new file mode 100644
+index 0000000..14fbc43
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -0,0 +1,178 @@
 +/*
-+ * Clock handling code.
++ * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
 + *
-+ * Here we handle the clocks property of our "simple-framebuffer" dt node.
-+ * This is necessary so that we can make sure that any clocks needed by
-+ * the display engine that the bootloader set up for us (and for which it
-+ * provided a simplefb dt node), stay up, for the life of the simplefb
-+ * driver.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * When the driver unloads, we cleanly disable, and then release the clocks.
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+struct simplefb_clock {
-+	struct list_head list;
-+	struct clk *clock;
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++	model = "Olimex A20-OLinuXino-LIME2";
++	compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
++
++	soc at 01c00000 {
++
++		ahci: sata at 01c18000 {
++			target-supply = <&reg_ahci_5v>;
++			status = "okay";
++		};
++
++		ehci0: usb at 01c14000 {
++			status = "okay";
++		};
++
++		ehci1: usb at 01c1c000 {
++			status = "okay";
++		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_rgmii_a>;
++			phy = <&phy1>;
++			phy-mode = "rgmii";
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++
++			axp209: pmic at 34 {
++				compatible = "x-powers,axp209";
++				reg = <0x34>;
++				interrupt-parent = <&nmi_intc>;
++				interrupts = <0 8>;
++
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
++
++		mmc0: mmc at 01c0f000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++			vmmc-supply = <&reg_vcc3v3>;
++			bus-width = <4>;
++			cd-gpios = <&pio 7 1 0>; /* PH1 */
++			cd-inverted;
++			status = "okay";
++		};
++
++		ohci0: usb at 01c14400 {
++			status = "okay";
++		};
++
++		ohci1: usb at 01c1c400 {
++			status = "okay";
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		usbphy: phy at 01c13400 {
++			usb1_vbus-supply = <&reg_usb1_vbus>;
++			usb2_vbus-supply = <&reg_usb2_vbus>;
++			status = "okay";
++		};
++
++		pinctrl at 01c20800 {
++			ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
++				allwinner,pins = "PC3";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			led_pins_olinuxinolime: led_pins at 0 {
++				allwinner,pins = "PH2";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olinuxinolime>;
++
++		green {
++			label = "a20-olinuxino-lime2:green:usr";
++			gpios = <&pio 7 2 0>;
++			default-state = "on";
++		};
++	};
++
++	reg_ahci_5v: ahci-5v {
++		pinctrl-0 = <&ahci_pwr_pin_olinuxinolime>;
++		gpio = <&pio 2 3 0>;
++		status = "okay";
++	};
++
++	reg_usb1_vbus: usb1-vbus {
++		status = "okay";
++	};
++
++	reg_usb2_vbus: usb2-vbus {
++		status = "okay";
++	};
 +};
-+
-+/*
-+ * We only complain about errors here, no action is taken as the most likely
-+ * error can only happen due to a mismatch between the bootloader which set
-+ * up simplefb, and the clock definitions in the device tree. Chances are
-+ * that there are no adverse effects, and if there are, a clean teardown of
-+ * the fb probe will not help us much either. So just complain and carry on,
-+ * and hope that the user actually gets a working fb at the end of things.
-+ */
-+static void
-+simplefb_clocks_init(struct platform_device *pdev, struct list_head *list)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int clock_count, i;
-+
-+	INIT_LIST_HEAD(list);
-+
-+	if (dev_get_platdata(&pdev->dev) || !np)
-+		return;
-+
-+	clock_count = of_clk_get_parent_count(np);
-+	for (i = 0; i < clock_count; i++) {
-+		struct simplefb_clock *entry;
-+		struct clk *clock = of_clk_get(np, i);
-+		int ret;
-+
-+		if (IS_ERR(clock)) {
-+			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
-+			       __func__, i, PTR_ERR(clock));
-+			continue;
-+		}
-+
-+		ret = clk_prepare_enable(clock);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"%s: failed to enable clock %d: %d\n",
-+			       __func__, i, ret);
-+			clk_put(clock);
-+			continue;
-+		}
-+
-+		entry = kzalloc(sizeof(struct simplefb_clock), GFP_KERNEL);
-+		if (!entry) {
-+			clk_disable_unprepare(clock);
-+			clk_put(clock);
-+			continue;
-+		}
-+
-+		entry->clock = clock;
-+		/*
-+		 * add to the front of the list, so we disable clocks in the
-+		 * correct order.
-+		 */
-+		list_add(&entry->list, list);
-+	}
-+}
-+
-+static void
-+simplefb_clocks_destroy(struct list_head *list)
-+{
-+	struct list_head *pos, *n;
-+
-+	list_for_each_safe(pos, n, list) {
-+		struct simplefb_clock *entry =
-+			container_of(pos, struct simplefb_clock, list);
-+
-+		list_del(&entry->list);
-+
-+		clk_disable_unprepare(entry->clock);
-+		clk_put(entry->clock);
-+		kfree(entry);
-+	}
-+}
-+
- struct simplefb_par {
- 	u32 palette[PSEUDO_PALETTE_SIZE];
-+	struct list_head clock_list[1];
- };
- 
- static int simplefb_probe(struct platform_device *pdev)
-@@ -236,6 +327,8 @@ static int simplefb_probe(struct platform_device *pdev)
- 	}
- 	info->pseudo_palette = par->palette;
- 
-+	simplefb_clocks_init(pdev, par->clock_list);
-+
- 	dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
- 			     info->fix.smem_start, info->fix.smem_len,
- 			     info->screen_base);
-@@ -247,14 +340,15 @@ static int simplefb_probe(struct platform_device *pdev)
- 	ret = register_framebuffer(info);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
--		goto error_unmap;
-+		goto error_clocks;
- 	}
- 
- 	dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
- 
- 	return 0;
- 
-- error_unmap:
-+ error_clocks:
-+	simplefb_clocks_destroy(par->clock_list);
- 	iounmap(info->screen_base);
- 
-  error_fb_release:
-@@ -266,8 +360,10 @@ static int simplefb_probe(struct platform_device *pdev)
- static int simplefb_remove(struct platform_device *pdev)
- {
- 	struct fb_info *info = platform_get_drvdata(pdev);
-+	struct simplefb_par *par = info->par;
- 
- 	unregister_framebuffer(info);
-+	simplefb_clocks_destroy(par->clock_list);
- 	framebuffer_release(info);
- 
- 	return 0;
 -- 
-2.1.0
+1.8.5.1
