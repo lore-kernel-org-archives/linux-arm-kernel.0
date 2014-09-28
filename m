@@ -1,32 +1,39 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 28 Sep 2014 18:59:17 +0200
-Subject: [PATCH RESEND v6 3/7] net: cpsw: header, Add missing include
-In-Reply-To: <1411923561-31524-1-git-send-email-mpa@pengutronix.de>
-References: <1411923561-31524-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1411923561-31524-4-git-send-email-mpa@pengutronix.de>
+Date: Sun, 28 Sep 2014 18:59:14 +0200
+Subject: [PATCH RESEND v6 0/7] DT doc: net: cpsw mac-address is optional
+Message-ID: <1411923561-31524-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"MII_BUS_ID_SIZE" is defined in linux/phy.h which is not included in the
-cpsw.h file.
+Hi,
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/net/ethernet/ti/cpsw.h | 1 +
- 1 file changed, 1 insertion(+)
+This is a resend of v6 of this series. I added the Acked-by of Tony Lindgren
+for patch 5/7. There are no other changes.
 
-diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index 574f49da693f..1b710674630c 100644
---- a/drivers/net/ethernet/ti/cpsw.h
-+++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -15,6 +15,7 @@
- #define __CPSW_H__
- 
- #include <linux/if_ether.h>
-+#include <linux/phy.h>
- 
- struct cpsw_slave_data {
- 	char		phy_id[MII_BUS_ID_SIZE];
+This series adds support to the cpsw driver to read the MACIDs of the am335x
+chip and use them as fallback. These addresses are only used if there are no
+mac addresses in the devicetree, for example set by a bootloader.
+
+Best regards,
+
+Markus
+
+
+Markus Pargmann (7):
+  DT doc: net: cpsw mac-address is optional
+  net: cpsw: Add missing return value
+  net: cpsw: header, Add missing include
+  net: cpsw: Replace pr_err by dev_err
+  net: cpsw: Add am33xx MACID readout
+  am33xx: define syscon control module device node
+  arm: dts: am33xx, Add syscon phandle to cpsw node
+
+ Documentation/devicetree/bindings/net/cpsw.txt |  6 +++-
+ arch/arm/boot/dts/am33xx.dtsi                  |  6 ++++
+ drivers/net/ethernet/ti/Kconfig                |  2 ++
+ drivers/net/ethernet/ti/cpsw.c                 | 45 ++++++++++++++++++++++++--
+ drivers/net/ethernet/ti/cpsw.h                 |  1 +
+ 5 files changed, 57 insertions(+), 3 deletions(-)
+
 -- 
 2.1.0
