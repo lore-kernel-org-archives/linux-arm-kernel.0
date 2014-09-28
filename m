@@ -1,30 +1,44 @@
 From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Sun, 28 Sep 2014 21:44:07 +0530
-Subject: Legacy Code in gpmc-onenand.c
-In-Reply-To: <5427744E.4040409@gmail.com>
-References: <5427744E.4040409@gmail.com>
-Message-ID: <20140928161407.GA2493@sudip-PC>
+Date: Sun, 28 Sep 2014 21:53:57 +0530
+Subject: [PATCH] arm: Remove read of issue in sa1111.c in sa1111_resume
+In-Reply-To: <1411872652-16207-1-git-send-email-yocto6@gmail.com>
+References: <1411872652-16207-1-git-send-email-yocto6@gmail.com>
+Message-ID: <20140928162357.GA2542@sudip-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 10:37:02PM -0400, nick wrote:
-> Greetings Kevin and others,
-> I am wondering if the below code is legacy I can remove it as stated it the fix me.
-> Cheers Nick 
-> else {
->                 /*
->                 * FIX ME: Appears to be legacy code from initial ONENAND commit.
->                 * Unclear what boards this is for and if this can be removed.
->                  */
->                 if (!cpu_is_omap34xx())
->                         onenand_sync.wait_on_read = true;
->         }
+On Sat, Sep 27, 2014 at 10:50:52PM -0400, Nicholas Krause wrote:
+> This removes the FIXME message and issue with reading in this driver before resuming
+> in the function, sa1111_resume.
+> 
+> Signed-off-by: Nicholas Krause <yocto6@gmail.com>
+> ---
+>  arch/arm/common/sa1111.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+> index e57d7e5..0c4b9a9 100644
+> --- a/arch/arm/common/sa1111.c
+> +++ b/arch/arm/common/sa1111.c
+> @@ -950,9 +950,7 @@ static int sa1111_resume(struct platform_device *dev)
+>  
+>  	/*
+>  	 * Ensure that the SA1111 is still here.
+> -	 * FIXME: shouldn't do this here.
+>  	 */
+> -	id = sa1111_readl(sachip->base + SA1111_SKID);
 
-the FIX ME does not say that you can remove the code. It says you need to find out that the code is being used by which board. And if you want to remove it then you have to explain why the code is removed , and after removing what will be the effect , and if there is no effect then why there is no effect.
+do you understand the effect of removing this???
+what is the value of id in the next part of the code?
 
-Good Luck.
-
-
+thanks
+sudip
+>  	if ((id & SKID_ID_MASK) != SKID_SA1111_ID) {
+>  		__sa1111_remove(sachip);
+>  		platform_set_drvdata(dev, NULL);
+> -- 
+> 1.9.1
+> 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 > the body of a message to majordomo at vger.kernel.org
