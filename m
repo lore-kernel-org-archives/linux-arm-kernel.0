@@ -1,27 +1,26 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Sep 2014 17:49:34 -0500
-Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
-In-Reply-To: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
-References: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
-Message-ID: <20140929224934.GB21681@saruman>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 29 Sep 2014 16:02:03 -0700
+Subject: [PATCH v7 2/7] arm: dts: qcom: Add SPM device bindings for 8974
+In-Reply-To: <1411779495-39724-3-git-send-email-lina.iyer@linaro.org>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5429E4EB.2050708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 05:00:51PM -0500, Andy Gross wrote:
-> The runtime pm calls need to be done before populating the children via the
-> i2c_add_adapter call.  If this is not done, a child can run into issues trying
-> to do i2c read/writes due to the pm_runtime_sync failing.
-> 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
+On 09/26/14 17:58, Lina Iyer wrote:
+> @@ -144,7 +148,27 @@
+>  			};
+>  		};
+>  
+> -		saw_l2: regulator at f9012000 {
+> +		saw0: saw at f9089000 {
+> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+> +			reg = <0xf9089000 0x1000>;
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+There is another reg property as part of the binding that should be
+specified here.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/bbd394d1/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
