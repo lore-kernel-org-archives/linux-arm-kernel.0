@@ -1,193 +1,54 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 20:06:49 +0200
-Subject: [PATCH 13/13] tty: serial: 8250: omap: add dma support
-In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1412014009-13315-14-git-send-email-bigeasy@linutronix.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 29 Sep 2014 20:26:54 +0200
+Subject: [PATCH 3/6] arm/arm64: KVM: add 'writable' parameter to
+ kvm_phys_addr_ioremap
+In-Reply-To: <54299EA8.8090600@samsung.com>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1410990981-665-4-git-send-email-ard.biesheuvel@linaro.org>
+ <54235BC6.2070503@samsung.com> <20140929122332.GD3095@cbox>
+ <54299EA8.8090600@samsung.com>
+Message-ID: <20140929182654.GL3095@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the required pieces to 8250-OMAP UART driver for DMA
-support. The TX burst size is set to 1 so we can send an arbitrary
-amount of bytes.
+On Mon, Sep 29, 2014 at 11:02:16AM -0700, Mario Smarduch wrote:
+> On 09/29/2014 05:23 AM, Christoffer Dall wrote:
+> > On Wed, Sep 24, 2014 at 05:03:18PM -0700, Mario Smarduch wrote:
+> >> Is DEVICE type the correct default, for device
+> >> regions that are prefetchable? The guest might
+> >> want something less restrictive to optimize device
+> >> access.
+> >>
+> > We don't have a use case for this yet, and we aren't supporting generic
+> > platform device passthrough yet.
+> > 
+> > So far this patch is solving a real problem, but if we need something
+> > more flexible, then patches are welcome :)
+> > 
+> > -Christoffer
+> > 
+> 
+> I understand the fix addresses a real issue, but once it's in,
+> it may go unnoticed for quite a while.
+> 
+> I would recommend some warning or comment that guest has no
+> control over device memory attributes. In my opinion
+> setting 2nd stage attributes to cacheble (with exception of
+> GIC range) should work letting the guest driver manage
+> attributes.
+> 
+Your case is only relevant for device-passthrough which we don't even
+support yet, and we would have to somehow mandate that we only allow the
+guest cacheable device memory regions for devices where it's safe to do
+so.
 
-The RX burst is currently set to 48 which means we receive an DMA
-interrupt every 48 bytes and have to reprogram everything. Less bytes in
-the RX-FIFO mean that no DMA transfer will happen and the UART will send a
-RX-timeout _or_ RDI event at which point the FIFO will be manually purged.
-There is a workaround for TX-DMA on AM33xx where we put the first byte
-into the FIFO to kick start the DMA process. Haven't seen this problem on
-OMAP36xx (beagle board xm) or DRA7xx.
+As long as we don't have anything measurable or any infrastructure
+supporting the case you are referring to, it's really not on my radar
+just yet.
 
-On AM375x there is "Usage Note 2.7: UART: Cannot Acknowledge Idle
-Requests in Smartidle Mode When Configured for DMA Operations" in the
-errata document. This problem persists even after disabling DMA in the
-UART and will be addressed in the HWMOD.
+Plus, we are fixing current functionality and in no way precluding later
+patches from optimizing something in the future, so as I said, patches
+are welcome.
 
-v10:
-	- delay update_registers() from set_termios() until TX-DMA is
-	  done. It has been reported / proved that invoking
-	  update_registers() while TX-DMA is in progress may stall the
-	  DMA operation and it won't finish.
-	- use the new omap DMA-TX-RX hooks and DMA only interrupt
-	  routine.
-
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- drivers/tty/serial/8250/8250_omap.c | 71 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
-
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index 6500547f8fda..57a8b1241b85 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -88,6 +88,7 @@ struct omap8250_priv {
- 	u8 wer;
- 	u8 xon;
- 	u8 xoff;
-+	u8 delayed_restore;
- 	u16 quot;
- 
- 	bool is_suspending;
-@@ -211,6 +212,18 @@ static void omap8250_update_scr(struct uart_8250_port *up,
- static void omap8250_restore_regs(struct uart_8250_port *up)
- {
- 	struct omap8250_priv *priv = up->port.private_data;
-+	struct uart_8250_dma	*dma = up->dma;
-+
-+	if (dma && dma->tx_running) {
-+		/*
-+		 * TCSANOW requests the change to occur immediately however if
-+		 * we have a TX-DMA operation in progress then it has been
-+		 * observed that it might stall and never complete. Therefore we
-+		 * delay DMA completes to prevent this hang from happen.
-+		 */
-+		priv->delayed_restore = 1;
-+		return;
-+	}
- 
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
- 	serial_out(up, UART_EFR, UART_EFR_ECB);
-@@ -375,6 +388,10 @@ static void omap_8250_set_termios(struct uart_port *port,
- 	priv->scr = OMAP_UART_SCR_RX_TRIG_GRANU1_MASK | OMAP_UART_SCR_TX_EMPTY |
- 		OMAP_UART_SCR_TX_TRIG_GRANU1_MASK;
- 
-+	if (up->dma)
-+		priv->scr |= OMAP_UART_SCR_DMAMODE_1 |
-+			OMAP_UART_SCR_DMAMODE_CTL;
-+
- 	priv->xon = termios->c_cc[VSTART];
- 	priv->xoff = termios->c_cc[VSTOP];
- 
-@@ -554,6 +571,9 @@ static int omap_8250_startup(struct uart_port *port)
- 		priv->wer |= OMAP_UART_TX_WAKEUP_EN;
- 	serial_out(up, UART_OMAP_WER, priv->wer);
- 
-+	if (up->dma)
-+		up->dma->rx_dma(up, 0);
-+
- 	pm_runtime_mark_last_busy(port->dev);
- 	pm_runtime_put_autosuspend(port->dev);
- 	return 0;
-@@ -572,6 +592,8 @@ static void omap_8250_shutdown(struct uart_port *port)
- 	struct omap8250_priv *priv = port->private_data;
- 
- 	flush_work(&priv->qos_work);
-+	if (up->dma)
-+		up->dma->rx_dma(up, UART_IIR_RX_TIMEOUT);
- 
- 	pm_runtime_get_sync(port->dev);
- 
-@@ -725,6 +747,7 @@ static void omap_8250_dma_tx_complete(void *param)
- 	struct circ_buf		*xmit = &p->port.state->xmit;
- 	unsigned long		flags;
- 	bool			en_thri = false;
-+	struct omap8250_priv	*priv = p->port.private_data;
- 
- 	dma_sync_single_for_cpu(dma->txchan->device->dev, dma->tx_addr,
- 				UART_XMIT_SIZE, DMA_TO_DEVICE);
-@@ -737,6 +760,11 @@ static void omap_8250_dma_tx_complete(void *param)
- 	xmit->tail &= UART_XMIT_SIZE - 1;
- 	p->port.icount.tx += dma->tx_size;
- 
-+	if (priv->delayed_restore) {
-+		priv->delayed_restore = 0;
-+		omap8250_restore_regs(p);
-+	}
-+
- 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
- 		uart_write_wakeup(&p->port);
- 
-@@ -909,6 +937,18 @@ static int omap_8250_dma_handle_irq(struct uart_port *port)
- 	serial8250_rpm_put(up);
- 	return 1;
- }
-+
-+static bool the_no_dma_filter_fn(struct dma_chan *chan, void *param)
-+{
-+	return false;
-+}
-+
-+#else
-+
-+static inline int omap_8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
-+{
-+	return -EINVAL;
-+}
- #endif
- 
- static int omap8250_probe(struct platform_device *pdev)
-@@ -1010,6 +1050,32 @@ static int omap8250_probe(struct platform_device *pdev)
- 	pm_runtime_get_sync(&pdev->dev);
- 
- 	omap_serial_fill_features_erratas(&up, priv);
-+#ifdef CONFIG_SERIAL_8250_DMA
-+	if (pdev->dev.of_node) {
-+		/*
-+		 * Oh DMA support. If there are no DMA properties in the DT then
-+		 * we will fall back to a generic DMA channel which does not
-+		 * really work here. To ensure that we do not get a generic DMA
-+		 * channel assigned, we have the the_no_dma_filter_fn() here.
-+		 * To avoid "failed to request DMA" messages we check for DMA
-+		 * properties in DT.
-+		 */
-+		ret = of_property_count_strings(pdev->dev.of_node, "dma-names");
-+		if (ret == 2) {
-+			up.dma = &priv->omap8250_dma;
-+			up.port.handle_irq = omap_8250_dma_handle_irq;
-+			priv->omap8250_dma.fn = the_no_dma_filter_fn;
-+			priv->omap8250_dma.tx_dma = omap_8250_tx_dma;
-+			priv->omap8250_dma.rx_dma = omap_8250_rx_dma;
-+			priv->omap8250_dma.rx_size = RX_TRIGGER;
-+			priv->omap8250_dma.rxconf.src_maxburst = RX_TRIGGER;
-+			priv->omap8250_dma.txconf.dst_maxburst = TX_TRIGGER;
-+
-+			if (of_machine_is_compatible("ti,am33xx"))
-+				priv->habit |= OMAP_DMA_TX_KICK;
-+		}
-+	}
-+#endif
- 	ret = serial8250_register_8250_port(&up);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "unable to register 8250 port\n");
-@@ -1146,6 +1212,8 @@ static int omap8250_runtime_suspend(struct device *dev)
- 	}
- 
- 	omap8250_enable_wakeup(priv, true);
-+	if (up->dma)
-+		omap_8250_rx_dma(up, UART_IIR_RX_TIMEOUT);
- 
- 	priv->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
- 	schedule_work(&priv->qos_work);
-@@ -1170,6 +1238,9 @@ static int omap8250_runtime_resume(struct device *dev)
- 	if (loss_cntx)
- 		omap8250_restore_regs(up);
- 
-+	if (up->dma)
-+		omap_8250_rx_dma(up, 0);
-+
- 	priv->latency = priv->calc_latency;
- 	schedule_work(&priv->qos_work);
- 	return 0;
--- 
-2.1.0
+Thanks,
+-Christoffer
