@@ -1,159 +1,127 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 29 Sep 2014 09:44:17 +0800
-Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
- in all platforms
-In-Reply-To: <20140928112144.GA4671@bart.dudau.co.uk>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <20140925074235.GN12423@ulmo> <20140925144855.GB31157@bart.dudau.co.uk>
- <20140925164937.GB30382@ulmo> <5424E09F.50701@huawei.com>
- <20140926085030.GE31157@bart.dudau.co.uk> <54276F6C.5010705@huawei.com>
- <20140928112144.GA4671@bart.dudau.co.uk>
-Message-ID: <5428B971.50101@huawei.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 29 Sep 2014 11:12:14 +0900
+Subject: [PATCH 1/2] clk: samsung: exynos3250: add uart2/3 related clocks
+In-Reply-To: <1411793928-32692-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1411793928-32692-1-git-send-email-pankaj.dubey@samsung.com>
+ <1411793928-32692-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5428BFFE.9090002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/28 19:21, Liviu Dudau wrote:
-> On Sun, Sep 28, 2014 at 10:16:12AM +0800, Yijing Wang wrote:
->>>>>> What I would like to see is a way of creating the pci_host_bridge structure outside
->>>>>> the pci_create_root_bus(). That would then allow us to pass this sort of platform
->>>>>> details like associated msi_chip into the host bridge and the child busses will
->>>>>> have an easy way of finding the information needed by finding the root bus and then
->>>>>> the host bridge structure. Then the generic pci_scan_root_bus() can be used by (mostly)
->>>>>> everyone and the drivers can remove their kludges that try to work around the
->>>>>> current limitations.
->>>>
->>>> So I think maybe save msi chip in PCI arch sysdata is a good candidate.
->>>
->>> Except that arch sysdata at the moment is an opaque pointer. I am all in favour in
->>> changing the type of sysdata from void* into pci_host_bridge* and arches can wrap their old
->>> sysdata around the pci_host_bridge*.
->>
->> I inspected every arch and found there are almost no common stuff,
+Hi Pankaj,
+
+On 09/27/2014 01:58 PM, Pankaj Dubey wrote:
+> Exynos3250 has four UART channels UART0,1,2 and 3. This patch adds
+> missing clock entries for UART2 and UART3.
 > 
-> I will disagree here. Most (all?) of the structures that are passed as sysdata argument to
+> CC: Mike Turquette <mturquette@linaro.org>
+> CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos3250.c   |   11 +++++++++++
+>  include/dt-bindings/clock/exynos3250.h |   10 +++++++++-
+>  2 files changed, 20 insertions(+), 1 deletion(-)
 
-Most.
+Exynos3250 has only two UART(0,1) port. Exynos3250 don't support UART 2,3.
 
-> pci_create_root_bus() or pci_scan_root_bus() have a set of resources for storing the MEM and
-> IO ranges, which struct pci_host_bridge already has. So that can be factored out of the
-> arch code. Same for pci_domain_nr. Then there are some variables that are used for communication
-> with the platform code due to convoluted way(s) in which PCI code gets instantiated.
-
-Yes, currently some archs store MEM and IO resource in pci sysdata, and others not, move the MEM and IO
-resource to pci_host_bride could make code become simple, we can clean up the resource list argument in
-pci scan functions.
+Thanks,
+Chanwoo Choi
 
 > 
-> What I am arguing here is not that the arch equivalent of pci_host_bridge structure is already
-> common, but that by moving the members that are common out of arch sysdata into pci_host_bridge
-> we will have more commonality and it will be easier to re-factor the code.
-
-Now, I got it, thanks!
-
-> 
->> and generic data struct should
->> be created in generic PCI code.
-> 
-> Not necessarily. What I have in mind is something like this:
-
-This is a good idea, what I'm worried is this series is already large, so I think we need to post
-another series to do it.
-
-
-> 
->  - drivers/pci/ exports pci_init_host_bridge() that does the initialisation of bridge->windows
->    and anything else that is needed (like find_pci_host_bridge() function).
->  - arch code does:
-> 
-> 	struct pci_controller {
-> 		struct pci_host_bridge bridge;
-> 		.....
-> 	};
-> 
-> 	#define to_pci_controller(bridge)	container_of(bridge, struct pci_controller, bridge)
-> 
-> 	static inline struct pci_controller *get_host_controller(const struct pci_bus *bus)
-> 	{
-> 		struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
-> 		if (bridge)
-> 			return to_pci_controller(bridge);
-> 
-> 		return NULL;
-> 	}
-> 
-> 	int arch_pci_init(....)
-> 	{
-> 		struct pci_controller *hose;
-> 		....
-> 		hose = kzalloc(sizeof(*hose), GFP_KERNEL);
-> 		pci_init_host_bridge(&hose->bridge);
-> 		....
-> 		pci_scan_root_bus(...., &hose->bridge, &resources);
-> 		....
-> 		return 0;
-> 	}
-> 
-> Then finding the right structure will be easy.
-> 
->> Another, I don't like associate msi chip and every PCI device, further more,
->> almost all platforms except arm have only one MSI controller, and currently, PCI enumerating code doesn't need
->> to know the MSI chip details, like for legacy IRQ, PCI device doesn't need to know which IRQ controller they
->> should deliver IRQ to. I would think more about it, and hope other PCI guys can give some comments, especially from Bjorn.
->>
-> 
-> I wasn't suggesing to associate an msi chip with every PCI device, but with the pci_host_bridge.
-> I don't expect a host bridge to have more than one msi chip, so that should be OK. Also, I'm
-> thinking that getting the associated msi chip should be some sort of pci_host_bridge ops function,
-> and for arches that don't care about MSI it doesn't get implemented.
-
-Currently, a property "msi-parent" was introduced in arm, and all msi chip integrated in irq chip controller will
-be added to of_pci_msi_chip_list. PCI host driver find the match msi chip by its of_node.
-
-Thanks!
-Yijing.
-
-> 
-> Best regards,
-> Liviu
-> 
+> diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+> index dc85f8e..0722fef 100644
+> --- a/drivers/clk/samsung/clk-exynos3250.c
+> +++ b/drivers/clk/samsung/clk-exynos3250.c
+> @@ -357,6 +357,8 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
+>  	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 3),
 >  
->> Thanks!
->> Yijing.
->>
->>>
->>> Best regards,
->>> Liviu
->>>
->>>>
->>>>>
->>>>> I think both issues are orthogonal. Last time I checked a lot of work
->>>>> was still necessary to unify host bridges enough so that it could be
->>>>> shared across architectures. But perhaps some of that work has
->>>>> happened in the meantime.
->>>>>
->>>>> But like I said, when you create the root bus, you can easily attach the
->>>>> MSI chip to it.
->>>>>
->>>>> Thierry
->>>>>
->>>>
->>>>
->>>> -- 
->>>> Thanks!
->>>> Yijing
->>>>
->>>>
->>>
->>
->>
->> -- 
->> Thanks!
->> Yijing
->>
->>
+>  	/* SRC_PERIL0 */
+> +	MUX(CLK_MOUT_UART3, "mout_uart3", group_sclk_p, SRC_PERIL0, 12, 4),
+> +	MUX(CLK_MOUT_UART2, "mout_uart2", group_sclk_p, SRC_PERIL0, 8, 4),
+>  	MUX(CLK_MOUT_UART1, "mout_uart1", group_sclk_p, SRC_PERIL0, 4, 4),
+>  	MUX(CLK_MOUT_UART0, "mout_uart0", group_sclk_p, SRC_PERIL0, 0, 4),
+>  
+> @@ -439,6 +441,8 @@ static struct samsung_div_clock div_clks[] __initdata = {
+>  	DIV(CLK_DIV_MMC0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
+>  
+>  	/* DIV_PERIL0 */
+> +	DIV(CLK_DIV_UART3, "div_uart3", "mout_uart3", DIV_PERIL0, 12, 4),
+> +	DIV(CLK_DIV_UART2, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
+>  	DIV(CLK_DIV_UART1, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
+>  	DIV(CLK_DIV_UART0, "div_uart0", "mout_uart0", DIV_PERIL0, 0, 4),
+>  
+> @@ -601,6 +605,10 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+>  		GATE_SCLK_PERIL, 7, CLK_SET_RATE_PARENT, 0),
+>  	GATE(CLK_SCLK_SPI0, "sclk_spi0", "div_spi0_pre",
+>  		GATE_SCLK_PERIL, 6, CLK_SET_RATE_PARENT, 0),
+> +	GATE(CLK_SCLK_UART3, "sclk_uart3", "div_uart3",
+> +		GATE_SCLK_PERIL, 3, CLK_SET_RATE_PARENT, 0),
+> +	GATE(CLK_SCLK_UART2, "sclk_uart2", "div_uart2",
+> +		GATE_SCLK_PERIL, 2, CLK_SET_RATE_PARENT, 0),
+>  	GATE(CLK_SCLK_UART1, "sclk_uart1", "div_uart1",
+>  		GATE_SCLK_PERIL, 1, CLK_SET_RATE_PARENT, 0),
+>  	GATE(CLK_SCLK_UART0, "sclk_uart0", "div_uart0",
+> @@ -679,6 +687,7 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+>  	GATE(CLK_USBOTG, "usbotg", "div_aclk_200", GATE_IP_FSYS, 13, 0, 0),
+>  	GATE(CLK_USBHOST, "usbhost", "div_aclk_200", GATE_IP_FSYS, 12, 0, 0),
+>  	GATE(CLK_SROMC, "sromc", "div_aclk_200", GATE_IP_FSYS, 11, 0, 0),
+> +	GATE(CLK_SDMMC2, "sdmmc2", "div_aclk_200", GATE_IP_FSYS, 7, 0, 0),
+>  	GATE(CLK_SDMMC1, "sdmmc1", "div_aclk_200", GATE_IP_FSYS, 6, 0, 0),
+>  	GATE(CLK_SDMMC0, "sdmmc0", "div_aclk_200", GATE_IP_FSYS, 5, 0, 0),
+>  	GATE(CLK_PDMA1, "pdma1", "div_aclk_200", GATE_IP_FSYS, 1, 0, 0),
+> @@ -698,6 +707,8 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+>  	GATE(CLK_I2C2, "i2c2", "div_aclk_100", GATE_IP_PERIL, 8, 0, 0),
+>  	GATE(CLK_I2C1, "i2c1", "div_aclk_100", GATE_IP_PERIL, 7, 0, 0),
+>  	GATE(CLK_I2C0, "i2c0", "div_aclk_100", GATE_IP_PERIL, 6, 0, 0),
+> +	GATE(CLK_UART3, "uart3", "div_aclk_100", GATE_IP_PERIL, 3, 0, 0),
+> +	GATE(CLK_UART2, "uart2", "div_aclk_100", GATE_IP_PERIL, 2, 0, 0),
+>  	GATE(CLK_UART1, "uart1", "div_aclk_100", GATE_IP_PERIL, 1, 0, 0),
+>  	GATE(CLK_UART0, "uart0", "div_aclk_100", GATE_IP_PERIL, 0, 0, 0),
+>  };
+> diff --git a/include/dt-bindings/clock/exynos3250.h b/include/dt-bindings/clock/exynos3250.h
+> index b535e9d..ffeb695 100644
+> --- a/include/dt-bindings/clock/exynos3250.h
+> +++ b/include/dt-bindings/clock/exynos3250.h
+> @@ -78,6 +78,8 @@
+>  #define CLK_MOUT_CORE			58
+>  #define CLK_MOUT_APLL			59
+>  #define CLK_MOUT_ACLK_266_SUB		60
+> +#define CLK_MOUT_UART2			61
+> +#define CLK_MOUT_UART3			62
+>  
+>  /* Dividers */
+>  #define CLK_DIV_GPL			64
+> @@ -126,6 +128,8 @@
+>  #define CLK_DIV_CORE			107
+>  #define CLK_DIV_HPM			108
+>  #define CLK_DIV_COPY			109
+> +#define CLK_DIV_UART2			110
+> +#define CLK_DIV_UART3			111
+>  
+>  /* Gates */
+>  #define CLK_ASYNC_G3D			128
+> @@ -222,6 +226,8 @@
+>  #define CLK_BLOCK_MFC			219
+>  #define CLK_BLOCK_CAM			220
+>  #define CLK_SMIES			221
+> +#define CLK_UART2			222
+> +#define CLK_UART3			223
+>  
+>  /* Special clocks */
+>  #define CLK_SCLK_JPEG			224
+> @@ -248,11 +254,13 @@
+>  #define CLK_SCLK_SPI0			245
+>  #define CLK_SCLK_UART1			246
+>  #define CLK_SCLK_UART0			247
+> +#define CLK_SCLK_UART2			248
+> +#define CLK_SCLK_UART3			249
+>  
+>  /*
+>   * Total number of clocks of main CMU.
+>   * NOTE: Must be equal to last clock ID increased by one.
+>   */
+> -#define CLK_NR_CLKS			248
+> +#define CLK_NR_CLKS			250
+>  
+>  #endif /* _DT_BINDINGS_CLOCK_SAMSUNG_EXYNOS3250_CLOCK_H */
 > 
-
-
--- 
-Thanks!
-Yijing
