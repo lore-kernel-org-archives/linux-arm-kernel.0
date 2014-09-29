@@ -1,126 +1,704 @@
-From: post@twien.net (post at twien.net)
-Date: Mon, 29 Sep 2014 12:09:16 +0200
-Subject: ARMADA 370 - Kernel panic during boot
-Message-ID: <6241a6200de0d573c982f73f062ed7fa@twien.net>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Mon, 29 Sep 2014 15:37:48 +0530
+Subject: [PATCH v2] i2c: axxia: Add I2C driver for AXM55xx
+In-Reply-To: <1411983159-4692-1-git-send-email-anders.berg@avagotech.com>
+References: <1411983159-4692-1-git-send-email-anders.berg@avagotech.com>
+Message-ID: <54292F74.2030209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm trying to run the linux 3.16.3 kernel on a custom board based on the 
-ARMADA 370 (88F6W11).
-The bootloader (U-boot) is the latest from Marvell. A custom .dts file 
-is created for the board.
-The Kernel panics during initialization. See screen dump.
-The error occurs when trying to read the interrupt control register (on 
-this line:)
+On 09/29/2014 03:02 PM, Anders Berg wrote:
+> Add I2C bus driver for the controller found in the LSI Axxia family SoCs. The
+> driver implements 10-bit addressing and SMBus transfer modes via emulation
+> (including SMBus block data read).
+>
+> Signed-off-by: Anders Berg <anders.berg@avagotech.com>
+> ---
+>
+> Changelog
+>
+> v2:
+>      - Document the len <= 255 limitation
+>      - return IRQ_HANDLED on unexpected IRQs
+>      - fixed a number of style issues
+>      - handle zero-length messages
+>      - use reinit_completion() where appropriate
+>      - enable for COMPILE_TEST
+>
+>   .../devicetree/bindings/i2c/i2c-axxia.txt          |  30 ++
+>   drivers/i2c/busses/Kconfig                         |  11 +
+>   drivers/i2c/busses/Makefile                        |   1 +
+>   drivers/i2c/busses/i2c-axxia.c                     | 561 +++++++++++++++++++++
+>   4 files changed, 603 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/i2c/i2c-axxia.txt
+>   create mode 100644 drivers/i2c/busses/i2c-axxia.c
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-axxia.txt b/Documentation/devicetree/bindings/i2c/i2c-axxia.txt
+> new file mode 100644
+> index 0000000..2296d78
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-axxia.txt
+> @@ -0,0 +1,30 @@
+> +LSI Axxia I2C
+> +
+> +Required properties :
+> +- compatible : Must be "lsi,api2c"
+> +- reg : Offset and length of the register set for the device
+> +- interrupts : the interrupt specifier
+> +- #address-cells : Must be <1>;
+> +- #size-cells : Must be <0>;
+> +- clock-names : Must contain "i2c".
+> +- clocks: Must contain an entry for each name in clock-names. See the common
+> +  clock bindings.
+> +
+> +Optional properties :
+> +- clock-frequency : Desired I2C bus clock frequency in Hz. If not specified,
+> +  the default 100 kHz frequency will be used. As only Normal and Fast modes
+> +  are supported, possible values are 100000 and 400000.
+> +
+> +Example :
+> +
+> +i2c at 02010084000 {
+> +	compatible = "lsi,api2c";
+> +	device_type = "i2c";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	reg = <0x20 0x10084000 0x00 0x1000>;
+> +	interrupts = <0 19 4>;
+> +	clocks = <&clk_per>;
+> +	clock-names = "i2c";
+> +	clock-frequency = <400000>;
+> +};
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index 2ac87fa..8983474 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -77,6 +77,17 @@ config I2C_AMD8111
+>   	  This driver can also be built as a module.  If so, the module
+>   	  will be called i2c-amd8111.
+>   
+> +config I2C_AXXIA
+> +	tristate "Axxia I2C controller"
+> +	depends on ARCH_AXXIA || COMPILE_TEST
+> +	default ARCH_AXXIA
+> +	help
+> +	  Say yes if you want to support the I2C bus on Axxia platforms.
+> +
+> +	  Please note that this controller is limited to transfers of maximum
+> +	  255 bytes in length. Any attempt to to a larger transfer will return
+> +	  an error.
+> +
+>   config I2C_I801
+>   	tristate "Intel 82801 (ICH/PCH)"
+>   	depends on PCI
+> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+> index 49bf07e..5899edb 100644
+> --- a/drivers/i2c/busses/Makefile
+> +++ b/drivers/i2c/busses/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_I2C_ALI15X3)	+= i2c-ali15x3.o
+>   obj-$(CONFIG_I2C_AMD756)	+= i2c-amd756.o
+>   obj-$(CONFIG_I2C_AMD756_S4882)	+= i2c-amd756-s4882.o
+>   obj-$(CONFIG_I2C_AMD8111)	+= i2c-amd8111.o
+> +obj-$(CONFIG_I2C_AXXIA)		+= i2c-axxia.o
+>   obj-$(CONFIG_I2C_I801)		+= i2c-i801.o
+>   obj-$(CONFIG_I2C_ISCH)		+= i2c-isch.o
+>   obj-$(CONFIG_I2C_ISMT)		+= i2c-ismt.o
+> diff --git a/drivers/i2c/busses/i2c-axxia.c b/drivers/i2c/busses/i2c-axxia.c
+> new file mode 100644
+> index 0000000..c6faca1
+> --- /dev/null
+> +++ b/drivers/i2c/busses/i2c-axxia.c
+> @@ -0,0 +1,561 @@
+> +/*
+> + * This driver implements I2C master functionality using the LSI API2C
+> + * controller.
+> + *
+> + * NOTE: The controller has a limitation in that it can only do transfers of
+> + * maximum 255 bytes at a time. If a larger transfer is attempted, error code
+> + * (-EINVAL) is returned.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/err.h>
+> +#include <linux/i2c.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define SCL_WAIT_TIMEOUT_NS 25000000
+> +#define I2C_XFER_TIMEOUT    (msecs_to_jiffies(250))
+> +#define I2C_STOP_TIMEOUT    (msecs_to_jiffies(100))
+> +#define FIFO_SIZE           8
+> +
+> +#define GLOBAL_CONTROL		0x00
+> +#define   GLOBAL_MST_EN         BIT(0)
+> +#define   GLOBAL_SLV_EN         BIT(1)
+> +#define   GLOBAL_IBML_EN        BIT(2)
+> +#define INTERRUPT_STATUS	0x04
+> +#define INTERRUPT_ENABLE	0x08
+> +#define   INT_SLV               BIT(1)
+> +#define   INT_MST               BIT(0)
+> +#define WAIT_TIMER_CONTROL	0x0c
+> +#define   WT_EN			BIT(15)
+> +#define   WT_VALUE(_x)		((_x) & 0x7fff)
+> +#define IBML_TIMEOUT		0x10
+> +#define IBML_LOW_MEXT		0x14
+> +#define IBML_LOW_SEXT		0x18
+> +#define TIMER_CLOCK_DIV		0x1c
+> +#define I2C_BUS_MONITOR		0x20
+> +#define SOFT_RESET		0x24
+> +#define MST_COMMAND		0x28
+> +#define   CMD_BUSY		(1<<3)
+> +#define   CMD_MANUAL		(0x00 | CMD_BUSY)
+> +#define   CMD_AUTO		(0x01 | CMD_BUSY)
+> +#define MST_RX_XFER		0x2c
+> +#define MST_TX_XFER		0x30
+> +#define MST_ADDR_1		0x34
+> +#define MST_ADDR_2		0x38
+> +#define MST_DATA		0x3c
+> +#define MST_TX_FIFO		0x40
+> +#define MST_RX_FIFO		0x44
+> +#define MST_INT_ENABLE		0x48
+> +#define MST_INT_STATUS		0x4c
+> +#define   MST_STATUS_RFL	(1 << 13) /* RX FIFO serivce */
+> +#define   MST_STATUS_TFL	(1 << 12) /* TX FIFO service */
+> +#define   MST_STATUS_SNS	(1 << 11) /* Manual mode done */
+> +#define   MST_STATUS_SS		(1 << 10) /* Automatic mode done */
+> +#define   MST_STATUS_SCC	(1 << 9)  /* Stop complete */
+> +#define   MST_STATUS_IP		(1 << 8)  /* Invalid parameter */
+> +#define   MST_STATUS_TSS	(1 << 7)  /* Timeout */
+> +#define   MST_STATUS_AL		(1 << 6)  /* Arbitration lost */
+> +#define   MST_STATUS_ND		(1 << 5)  /* NAK on data phase */
+> +#define   MST_STATUS_NA		(1 << 4)  /* NAK on address phase */
+> +#define   MST_STATUS_NAK	(MST_STATUS_NA | \
+> +				 MST_STATUS_ND)
+> +#define   MST_STATUS_ERR	(MST_STATUS_NAK | \
+> +				 MST_STATUS_AL  | \
+> +				 MST_STATUS_IP  | \
+> +				 MST_STATUS_TSS)
+> +#define MST_TX_BYTES_XFRD	0x50
+> +#define MST_RX_BYTES_XFRD	0x54
+> +#define SCL_HIGH_PERIOD		0x80
+> +#define SCL_LOW_PERIOD		0x84
+> +#define SPIKE_FLTR_LEN		0x88
+> +#define SDA_SETUP_TIME		0x8c
+> +#define SDA_HOLD_TIME		0x90
+> +
+> +/**
+> + * axxia_i2c_dev - I2C device context
+> + * @base: pointer to register struct
+> + * @msg: pointer to current message
+> + * @msg_xfrd: number of bytes transferred in msg
+> + * @msg_err: error code for completed message
+> + * @msg_complete: xfer completion object
+> + * @dev: device reference
+> + * @adapter: core i2c abstraction
+> + * @i2c_clk: clock reference for i2c input clock
+> + * @bus_clk_rate: current i2c bus clock rate
+> + */
+> +struct axxia_i2c_dev {
+> +	void __iomem *base;
+> +	struct i2c_msg *msg;
+> +	size_t msg_xfrd;
+> +	int msg_err;
+> +	struct completion msg_complete;
+> +	struct device *dev;
+> +	struct i2c_adapter adapter;
+> +	struct clk *i2c_clk;
+> +	u32 bus_clk_rate;
+> +};
+> +
+> +static void i2c_int_disable(struct axxia_i2c_dev *idev, u32 mask)
+> +{
+> +	u32 int_en;
+> +
+> +	int_en = readl(idev->base + MST_INT_ENABLE);
+> +	writel(int_en & ~mask, idev->base + MST_INT_ENABLE);
+> +}
+> +
+> +static void i2c_int_enable(struct axxia_i2c_dev *idev, u32 mask)
+> +{
+> +	u32 int_en;
+> +
+> +	int_en = readl(idev->base + MST_INT_ENABLE);
+> +	writel(int_en | mask, idev->base + MST_INT_ENABLE);
+> +}
+> +
+> +/**
+> + * ns_to_clk - Convert time (ns) to clock cycles for the given clock frequency.
+> + */
+> +static u32 ns_to_clk(u64 ns, u32 clk_mhz)
+> +{
+> +	return div_u64(ns * clk_mhz, 1000);
+> +}
+> +
+> +static int axxia_i2c_init(struct axxia_i2c_dev *idev)
+> +{
+> +	u32 divisor = clk_get_rate(idev->i2c_clk) / idev->bus_clk_rate;
+> +	u32 clk_mhz = clk_get_rate(idev->i2c_clk) / 1000000;
+> +	u32 t_setup;
+> +	u32 t_high, t_low;
+> +	u32 tmo_clk;
+> +	u32 prescale;
+> +	unsigned long timeout;
+> +
+> +	dev_dbg(idev->dev, "rate=%uHz per_clk=%uMHz -> ratio=1:%u\n",
+> +		idev->bus_clk_rate, clk_mhz, divisor);
+> +
+> +	/* Reset controller */
+> +	writel(0x01, idev->base + SOFT_RESET);
+> +	timeout = jiffies + msecs_to_jiffies(100);
+> +	while (readl(idev->base + SOFT_RESET) & 1) {
+> +		if (time_after(jiffies, timeout)) {
+> +			dev_warn(idev->dev, "Soft reset failed\n");
+> +			break;
+> +		}
+> +	}
+> +
+> +	/* Enable Master Mode */
+> +	writel(0x1, idev->base + GLOBAL_CONTROL);
+> +
+> +	if (idev->bus_clk_rate <= 100000) {
+> +		/* Standard mode SCL 50/50, tSU:DAT = 250 ns */
+> +		t_high = divisor * 1 / 2;
+> +		t_low = divisor * 1 / 2;
+> +		t_setup = ns_to_clk(250, clk_mhz);
+> +	} else {
+> +		/* Fast mode SCL 33/66, tSU:DAT = 100 ns */
+> +		t_high = divisor * 1 / 3;
+> +		t_low = divisor * 2 / 3;
+> +		t_setup = ns_to_clk(100, clk_mhz);
+> +	}
+> +
+> +	/* SCL High Time */
+> +	writel(t_high, idev->base + SCL_HIGH_PERIOD);
+> +	/* SCL Low Time */
+> +	writel(t_low, idev->base + SCL_LOW_PERIOD);
+> +	/* SDA Setup Time */
+> +	writel(t_setup, idev->base + SDA_SETUP_TIME);
+> +	/* SDA Hold Time, 300ns */
+> +	writel(ns_to_clk(300, clk_mhz), idev->base + SDA_HOLD_TIME);
+> +	/* Filter <50ns spikes */
+> +	writel(ns_to_clk(50, clk_mhz), idev->base + SPIKE_FLTR_LEN);
+> +
+> +	/* Configure Time-Out Registers */
+> +	tmo_clk = ns_to_clk(SCL_WAIT_TIMEOUT_NS, clk_mhz);
+> +
+> +	/* Find prescaler value that makes tmo_clk fit in 15-bits counter. */
+> +	for (prescale = 0; prescale < 15; ++prescale) {
+> +		if (tmo_clk <= 0x7fff)
+> +			break;
+> +		tmo_clk >>= 1;
+> +	}
+> +	if (tmo_clk > 0x7fff)
+> +		tmo_clk = 0x7fff;
+> +
+> +	/* Prescale divider (log2) */
+> +	writel(prescale, idev->base + TIMER_CLOCK_DIV);
+> +	/* Timeout in divided clocks */
+> +	writel(WT_EN | WT_VALUE(tmo_clk), idev->base + WAIT_TIMER_CONTROL);
+> +
+> +	/* Mask all master interrupt bits */
+> +	i2c_int_disable(idev, ~0);
+> +
+> +	/* Interrupt enable */
+> +	writel(0x01, idev->base + INTERRUPT_ENABLE);
+> +
+> +	return 0;
+> +}
+> +
+> +static int i2c_m_rd(const struct i2c_msg *msg)
+> +{
+> +	return (msg->flags & I2C_M_RD) != 0;
+> +}
+> +
+> +static int i2c_m_ten(const struct i2c_msg *msg)
+> +{
+> +	return (msg->flags & I2C_M_TEN) != 0;
+> +}
+> +
+> +static int i2c_m_recv_len(const struct i2c_msg *msg)
+> +{
+> +	return (msg->flags & I2C_M_RECV_LEN) != 0;
+> +}
+> +
+> +/**
+> + * axxia_i2c_empty_rx_fifo - Fetch data from RX FIFO and update SMBus block
+> + * transfer length if this is the first byte of such a transfer.
+> + */
+> +static int axxia_i2c_empty_rx_fifo(struct axxia_i2c_dev *idev)
+> +{
+> +	struct i2c_msg *msg = idev->msg;
+> +	size_t rx_fifo_avail = readl(idev->base + MST_RX_FIFO);
+> +	int bytes_to_transfer = min(rx_fifo_avail, msg->len - idev->msg_xfrd);
+> +
+> +	while (bytes_to_transfer-- > 0) {
+> +		int c = readl(idev->base + MST_DATA);
+> +
+> +		if (idev->msg_xfrd == 0 && i2c_m_recv_len(msg)) {
+> +			/*
+> +			 * Check length byte for SMBus block read
+> +			 */
+> +			if (c <= 0 || c > I2C_SMBUS_BLOCK_MAX) {
+> +				idev->msg_err = -EPROTO;
+> +				i2c_int_disable(idev, ~0);
+> +				complete(&idev->msg_complete);
+> +				break;
+> +			}
+> +			msg->len = 1 + c;
+> +			writel(msg->len, idev->base + MST_RX_XFER);
+> +		}
+> +		msg->buf[idev->msg_xfrd++] = c;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * axxia_i2c_fill_tx_fifo - Fill TX FIFO from current message buffer.
+> + * @return: Number of bytes left to transfer.
+> + */
+> +static int axxia_i2c_fill_tx_fifo(struct axxia_i2c_dev *idev)
+> +{
+> +	struct i2c_msg *msg = idev->msg;
+> +	size_t tx_fifo_avail = FIFO_SIZE - readl(idev->base + MST_TX_FIFO);
+> +	int bytes_to_transfer = min(tx_fifo_avail, msg->len - idev->msg_xfrd);
+> +	int ret = msg->len - idev->msg_xfrd - bytes_to_transfer;
+> +
+> +	while (bytes_to_transfer-- > 0)
+> +		writel(msg->buf[idev->msg_xfrd++], idev->base + MST_DATA);
+> +
+> +	return ret;
+> +}
+> +
+> +static irqreturn_t axxia_i2c_isr(int irq, void *_dev)
+> +{
+> +	struct axxia_i2c_dev *idev = _dev;
+> +	u32 status;
+> +
+> +	if (!(readl(idev->base + INTERRUPT_STATUS) & INT_MST))
+> +		return IRQ_NONE;
+> +
+> +	/* Read interrupt status bits */
+> +	status = readl(idev->base + MST_INT_STATUS);
+> +
+> +	if (!idev->msg) {
+> +		dev_warn(idev->dev, "unexpected interrupt");
 
-control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
-=> Unhandled fault: external abort on non-linefetch (0x1008) at 
-0xf0000a00
+Missed terminating new line '\n'
 
-Any hint in which direction to look is welcome. The MMU?
+> +		goto out;
+> +	}
+> +
+> +	/* RX FIFO needs service? */
+> +	if (i2c_m_rd(idev->msg) && (status & MST_STATUS_RFL))
+> +		axxia_i2c_empty_rx_fifo(idev);
+> +
+> +	/* TX FIFO needs service? */
+> +	if (!i2c_m_rd(idev->msg) && (status & MST_STATUS_TFL)) {
+> +		if (axxia_i2c_fill_tx_fifo(idev) == 0)
+> +			i2c_int_disable(idev, MST_STATUS_TFL);
+> +	}
+> +
+> +	if (status & MST_STATUS_SCC) {
+> +		/* Stop completed */
+> +		i2c_int_disable(idev, ~0);
+> +		complete(&idev->msg_complete);
+> +	} else if (status & MST_STATUS_SNS) {
+> +		/* Transfer done */
+> +		i2c_int_disable(idev, ~0);
+> +		if (i2c_m_rd(idev->msg) && idev->msg_xfrd < idev->msg->len)
+> +			axxia_i2c_empty_rx_fifo(idev);
+> +		complete(&idev->msg_complete);
+> +	} else if (unlikely(status & MST_STATUS_ERR)) {
+> +		/* Transfer error */
+> +		i2c_int_disable(idev, ~0);
+> +		if (status & MST_STATUS_AL)
+> +			idev->msg_err = -EAGAIN;
+> +		else if (status & MST_STATUS_NAK)
+> +			idev->msg_err = -ENXIO;
+> +		else
+> +			idev->msg_err = -EIO;
+> +		dev_dbg(idev->dev, "error %#x, addr=%#x rx=%u/%u tx=%u/%u\n",
+> +			status,
+> +			idev->msg->addr,
+> +			readl(idev->base + MST_RX_BYTES_XFRD),
+> +			readl(idev->base + MST_RX_XFER),
+> +			readl(idev->base + MST_TX_BYTES_XFRD),
+> +			readl(idev->base + MST_TX_XFER));
+> +		complete(&idev->msg_complete);
+> +	}
+> +
+> +out:
+> +	/* Clear interrupt */
+> +	writel(INT_MST, idev->base + INTERRUPT_STATUS);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
 
-Thanks, Tormod
+Its looks good if we move the entire ISR above probe/remove functionalities...
+
+> +static int axxia_i2c_xfer_msg(struct axxia_i2c_dev *idev, struct i2c_msg *msg)
+> +{
+> +	u32 int_mask = MST_STATUS_ERR | MST_STATUS_SNS;
+> +	u32 rx_xfer, tx_xfer;
+> +	u32 addr_1, addr_2;
+> +	int ret;
+> +
+> +	if (msg->len > 255) {
+> +		dev_warn(idev->dev, "unsupported length %u\n", msg->len);
+> +		return -EINVAL;
+> +	}
+> +
+> +	idev->msg = msg;
+> +	idev->msg_xfrd = 0;
+> +	idev->msg_err = 0;
+> +	reinit_completion(&idev->msg_complete);
+> +
+> +	if (i2c_m_ten(msg)) {
+> +		/* 10-bit address
+> +		 *   addr_1: 5'b11110 | addr[9:8] | (R/nW)
+> +		 *   addr_2: addr[7:0]
+> +		 */
+> +		addr_1 = 0xF0 | ((msg->addr >> 7) & 0x06);
+> +		addr_2 = msg->addr & 0xFF;
+> +	} else {
+> +		/* 7-bit address
+> +		 *   addr_1: addr[6:0] | (R/nW)
+> +		 *   addr_2: dont care
+> +		 */
+> +		addr_1 = (msg->addr << 1) & 0xFF;
+> +		addr_2 = 0;
+> +	}
+> +
+> +	if (i2c_m_rd(msg)) {
+> +		/* I2C read transfer */
+> +		rx_xfer = i2c_m_recv_len(msg) ? I2C_SMBUS_BLOCK_MAX : msg->len;
+> +		tx_xfer = 0;
+> +		addr_1 |= 1;	/* Set the R/nW bit of the address */
+> +	} else {
+> +		/* I2C write transfer */
+> +		rx_xfer = 0;
+> +		tx_xfer = msg->len;
+> +	}
+> +
+> +	writel(rx_xfer, idev->base + MST_RX_XFER);
+> +	writel(tx_xfer, idev->base + MST_TX_XFER);
+> +	writel(addr_1, idev->base + MST_ADDR_1);
+> +	writel(addr_2, idev->base + MST_ADDR_2);
+> +
+> +	if (i2c_m_rd(msg))
+> +		int_mask |= MST_STATUS_RFL;
+> +	else if (axxia_i2c_fill_tx_fifo(idev) != 0)
+> +		int_mask |= MST_STATUS_TFL;
+> +
+> +	/* Start manual mode */
+> +	writel(CMD_MANUAL, idev->base + MST_COMMAND);
+> +
+> +	i2c_int_enable(idev, int_mask);
+> +
+> +	ret = wait_for_completion_timeout(&idev->msg_complete,
+> +					  I2C_XFER_TIMEOUT);
+> +
+> +	i2c_int_disable(idev, int_mask);
+> +
+> +	if (readl(idev->base + MST_COMMAND) & CMD_BUSY)
+> +		dev_warn(idev->dev, "busy after xfer");
+
+'\n'
+
+> +
+> +	if (ret == 0)
+> +		idev->msg_err = -ETIMEDOUT;
+> +
+> +	if (unlikely(idev->msg_err) && idev->msg_err != -ENXIO)
+> +		axxia_i2c_init(idev);
+> +
+> +	return idev->msg_err;
+> +}
+> +
+> +static int axxia_i2c_stop(struct axxia_i2c_dev *idev)
+> +{
+> +	u32 int_mask = MST_STATUS_ERR | MST_STATUS_SCC;
+> +	int ret;
+> +
+> +	reinit_completion(&idev->msg_complete);
+> +
+> +	/* Issue stop */
+> +	writel(0xb, idev->base + MST_COMMAND);
+> +	i2c_int_enable(idev, int_mask);
+> +	ret = wait_for_completion_timeout(&idev->msg_complete,
+> +					  I2C_STOP_TIMEOUT);
+> +	i2c_int_disable(idev, int_mask);
+> +	if (ret == 0)
+> +		return -ETIMEDOUT;
+> +
+> +	if (readl(idev->base + MST_COMMAND) & CMD_BUSY)
+> +		dev_warn(idev->dev, "busy after stop");
+
+'\n'
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int
+> +axxia_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+> +{
+> +	struct axxia_i2c_dev *idev = i2c_get_adapdata(adap);
+> +	int i;
+> +	int ret = 0;
+> +
+> +	for (i = 0; ret == 0 && i < num; ++i)
+> +		ret = axxia_i2c_xfer_msg(idev, &msgs[i]);
+> +
+> +	axxia_i2c_stop(idev);
+> +
+> +	return ret ? : i;
+> +}
+> +
+> +static u32 axxia_i2c_func(struct i2c_adapter *adap)
+> +{
+> +	u32 caps = (I2C_FUNC_I2C |
+> +		    I2C_FUNC_10BIT_ADDR |
+> +		    I2C_FUNC_SMBUS_EMUL | I2C_FUNC_SMBUS_BLOCK_DATA);
+> +	return caps;
+
+return (I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR |
+	I2C_FUNC_SMBUS_EMUL | I2C_FUNC_SMBUS_BLOCK_DATA);
+
+> +}
+> +
+> +static const struct i2c_algorithm axxia_i2c_algo = {
+> +	.master_xfer = axxia_i2c_xfer,
+> +	.functionality = axxia_i2c_func,
+> +};
+> +
+> +static int axxia_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct axxia_i2c_dev *idev = NULL;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	int irq;
+> +	int ret = 0;
+> +
+> +	idev = devm_kzalloc(&pdev->dev, sizeof(*idev), GFP_KERNEL);
+> +	if (!idev)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+
+Error checking on *res*...?
+
+We should *return* on platform_get_resource() failure..
+
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "missing interrupt resource\n");
+> +		return irq;
+> +	}
+> +
+> +	idev->i2c_clk = devm_clk_get(&pdev->dev, "i2c");
+> +	if (IS_ERR(idev->i2c_clk)) {
+> +		dev_err(&pdev->dev, "missing clock");
+
+Missed terminating new line '\n'
+
+> +		return PTR_ERR(idev->i2c_clk);
+> +	}
+> +
+> +	idev->base = base;
+> +	idev->dev = &pdev->dev;
+> +	init_completion(&idev->msg_complete);
+> +
+> +	of_property_read_u32(np, "clock-frequency", &idev->bus_clk_rate);
+> +	if (idev->bus_clk_rate == 0)
+> +		idev->bus_clk_rate = 100000;	/* default clock rate */
+> +
+> +	ret = axxia_i2c_init(idev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to initialize");
+
+Missed terminating new line '\n'
+
+> +		return ret;
+> +	}
+> +
+> +	ret = devm_request_irq(&pdev->dev, irq, axxia_i2c_isr, 0,
+> +			       pdev->name, idev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to claim IRQ%d\n", irq);
+> +		return ret;
+> +	}
+> +
+> +	clk_prepare_enable(idev->i2c_clk);
+> +
+> +	i2c_set_adapdata(&idev->adapter, idev);
+> +	strlcpy(idev->adapter.name, pdev->name, sizeof(idev->adapter.name));
+> +	idev->adapter.owner = THIS_MODULE;
+> +	idev->adapter.class = I2C_CLASS_HWMON;
+> +	idev->adapter.algo = &axxia_i2c_algo;
+> +	idev->adapter.dev.parent = &pdev->dev;
+> +	idev->adapter.dev.of_node = pdev->dev.of_node;
+> +
+> +	platform_set_drvdata(pdev, idev);
+> +
+> +	ret = i2c_add_adapter(&idev->adapter);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to add adapter\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int axxia_i2c_remove(struct platform_device *pdev)
+> +{
+> +	struct axxia_i2c_dev *idev = platform_get_drvdata(pdev);
+> +
+> +	clk_disable_unprepare(idev->i2c_clk);
+> +	i2c_del_adapter(&idev->adapter);
+> +
+> +	return 0;
+> +}
+> +
+> +/* Match table for of_platform binding */
+> +static const struct of_device_id axxia_i2c_of_match[] = {
+> +	{ .compatible = "lsi,api2c", },
+> +	{},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, axxia_i2c_of_match);
+> +
+> +static struct platform_driver axxia_i2c_driver = {
+> +	.probe = axxia_i2c_probe,
+> +	.remove = axxia_i2c_remove,
+> +	.driver = {
+> +		.name = "axxia-i2c",
+> +		.of_match_table = axxia_i2c_of_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(axxia_i2c_driver);
+> +
+> +MODULE_DESCRIPTION("Axxia I2C Bus driver");
+> +MODULE_AUTHOR("Anders Berg <anders.berg@lsi.com>");
+> +MODULE_LICENSE("GPL v2");
 
 
-Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 3.16.3 (tormod at TW-Dell) (gcc version 4.6.4 
-(Linaro GCC branch-4.6.4. Marvell GCC Dev 201310-2126.3d181f66 64K 
-MAXPAGESIZE ALIGN) ) #13 SMP Wed Sep 24 14:45:08 CEST 2014
-[    0.000000] CPU: ARMv7 Processor [561f5811] revision 1 (ARMv7), 
-cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction 
-cache
-[    0.000000] Machine model: Marvell Armada 370 Ethernet Prototype
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Truncating RAM at 0x00000000-0x40000000 to -0x2f800000
-[    0.000000] Memory policy: Data cache writeback
-[    0.000000] CPU: All CPU(s) started in SVC mode.
-[    0.000000] PERCPU: Embedded 7 pages/cpu @ef137000 s5952 r8192 d14528 
-u32768
-[    0.000000] Kernel command line: console=ttyS0,115200 root=/dev/nfs 
-rw nfsroot=193.71.72.30:/srv/nfs4/fs ip=dhcp earlyprintk
-[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
-[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 
-bytes)
-[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 
-bytes)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
-[    0.000000]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
-[    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc04ba004   (4809 kB)
-[    0.000000]       .init : 0xc04bb000 - 0xc04e9740   ( 186 kB)
-[    0.000000]       .data : 0xc04ea000 - 0xc050f880   ( 151 kB)
-[    0.000000]        .bss : 0xc050f888 - 0xc0544afc   ( 213 kB)
-[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, 
-Nodes=1
-[    0.000000] Hierarchical RCU implementation.
-[    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=1.
-[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=16, 
-nr_cpu_ids=1
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] Unhandled fault: external abort on non-linefetch (0x1008) 
-at 0xf0000a00
-[    0.000000] Internal error: : 1008 [#1] SMP ARM
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.3 #13
-[    0.000000] task: c04f4c60 ti: c04ea000 task.ti: c04ea000
-[    0.000000] PC is at armada_370_xp_mpic_of_init+0xf8/0x1dc
-[    0.000000] LR is at ioremap_page_range+0xf4/0x19c
-[    0.000000] pc : [<c04ccda8>]    lr : [<c01f06d4>]    psr: a00001d3
-[    0.000000] sp : c04ebee0  ip : c04ebe78  fp : c04ebf44
-[    0.000000] r10: 00100100  r9 : 00200200  r8 : c04e6f00
-[    0.000000] r7 : 00000000  r6 : c0538cc0  r5 : 00000000  r4 : 
-ef144300
-[    0.000000] r3 : f0000a00  r2 : 00000000  r1 : d0021e13  r0 : 
-f0002870
-[    0.000000] Flags: NzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  
-Segment kernel
-[    0.000000] Control: 10c5387d  Table: 00004019  DAC: 00000015
-[    0.000000] Process swapper/0 (pid: 0, stack limit = 0xc04ea248)
-[    0.000000] Stack: (0xc04ebee0 to 0xc04ec000)
-[    0.000000] bee0: 00000000 ef144300 d0020a00 d0020bcf ef144358 
-00000200 00000000 00000000
-[    0.000000] bf00: 00000000 d0021870 d00218c7 ef144358 00000200 
-00000000 00000000 00000000
-[    0.000000] bf20: c02b3260 eec023c0 c04ebf48 c04ebf48 00000000 
-c04e6f00 c04ebf84 c04ebf48
-[    0.000000] bf40: c04d1dc8 c04cccbc c04ebf48 c04ebf48 c04ebf50 
-c04ebf50 ef7fcd00 c04e375c
-[    0.000000] bf60: c050f8c0 c04e376c ef7fcd00 00004059 561f5811 
-00000000 c04ebf94 c04ebf88
-[    0.000000] bf80: c04ccca4 c04d1c6c c04ebfa4 c04ebf98 c04c1528 
-c04ccc9c c04ebfbc c04ebfa8
-[    0.000000] bfa0: c04bc68c c04c1524 c04f27dc ffffffff c04ebff4 
-c04ebfc0 c04bbabc c04bc66c
-[    0.000000] bfc0: ffffffff ffffffff c04bb668 00000000 00000000 
-c04e376c c050fb54 c04f23fc
-[    0.000000] bfe0: c04e3768 c04f5c10 00000000 c04ebff8 00008074 
-c04bb8d4 00000000 00000000
-[    0.000000] Backtrace:
-[    0.000000] [<c04cccb0>] (armada_370_xp_mpic_of_init) from 
-[<c04d1dc8>] (of_irq_init+0x168/0x2a4)
-[    0.000000]  r8:c04e6f00 r7:00000000 r6:c04ebf48 r5:c04ebf48 
-r4:eec023c0
-[    0.000000] [<c04d1c60>] (of_irq_init) from [<c04ccca4>] 
-(irqchip_init+0x14/0x20)
-[    0.000000]  r10:00000000 r9:561f5811 r8:00004059 r7:ef7fcd00 
-r6:c04e376c r5:c050f8c0
-[    0.000000]  r4:c04e375c
-[    0.000000] [<c04ccc90>] (irqchip_init) from [<c04c1528>] 
-(mvebu_init_irq+0x10/0x5c)
-[    0.000000] [<c04c1518>] (mvebu_init_irq) from [<c04bc68c>] 
-(init_IRQ+0x2c/0x84)
-[    0.000000] [<c04bc660>] (init_IRQ) from [<c04bbabc>] 
-(start_kernel+0x1f4/0x318)
-[    0.000000]  r4:ffffffff r3:c04f27dc
-[    0.000000] [<c04bb8c8>] (start_kernel) from [<00008074>] (0x8074)
-[    0.000000]  r7:c04f5c10 r6:c04e3768 r5:c04f23fc r4:c050fb54
-[    0.000000] Code: e3500000 1a000000 e7f001f2 e5963000 (e5937000)
-[    0.000000] ---[ end trace 3406ff24bd97382e ]---
-[    0.000000] Kernel panic - not syncing: Attempted to kill the idle 
-task!
-[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill 
-the idle task!
+-- 
+Regards,
+Varka Bhadram.
