@@ -1,49 +1,62 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 29 Sep 2014 09:04:41 -0600
-Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <542934FE.1060506@smartplayin.com>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
- <542934FE.1060506@smartplayin.com>
-Message-ID: <20140929150441.GB1170@ilina-mac.local>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 29 Sep 2014 16:44:22 +0200
+Subject: [PATCH v6 09/11] ARM: at91/dt: define the HLCDC node available on
+ sama5d3 SoCs
+In-Reply-To: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1412001864-3251-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29 2014 at 04:27 -0600, Pramod Gurav wrote:
->Hi Lina
->
->One sections mismatch warning here as well:
->
->WARNING: drivers/cpuidle/built-in.o(.text+0x2740): Section mismatch in
->reference from the function qcom_cpuidle_probe() to the (unknown
->reference) .init.rodata:(unknown)
->The function qcom_cpuidle_probe() references
->the (unknown reference) __initconst (unknown).
->This is often because qcom_cpuidle_probe lacks a __initconst
->annotation or the annotation of (unknown) is wrong.
->
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Thanks, will fix it.
+Define the HLCDC (HLCD Controller) IP available on some sama5d3 SoCs
+(i.e. sama5d31, sama5d33, sama5d34 and sama5d36) in sama5d3 dtsi file.
 
->On Saturday 27 September 2014 06:28 AM, Lina Iyer wrote:
->> Add cpuidle driver interface to allow cpus to go into C-States. Use the
->> cpuidle DT interface common across ARM architectures to provide the
->> C-State information to the cpuidle framework.
->>
->>
->
->..
->
->> +};
->> +
->> +static const struct of_device_id qcom_idle_state_match[] __initconst = {
->This is causing it.
->
->> +	{ .compatible = "qcom,idle-state-wfi", .data = qcom_lpm_enter_wfi },
->> +	{ .compatible = "qcom,idle-state-spc", .data = qcom_lpm_enter_spc },
->> +	{ },
->> +};
->> +
->Thanks
->Pramod
->
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Tested-by: Anthony Harivel <anthony.harivel@emtrion.de>
+---
+ arch/arm/boot/dts/sama5d3_lcd.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
+index e7581f6..1874cf7 100644
+--- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
++++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
+@@ -166,6 +166,34 @@
+ 				};
+ 			};
+ 
++			hlcdc: hlcdc at f0030000 {
++				compatible = "atmel,sama5d3-hlcdc";
++				reg = <0xf0030000 0x2000>;
++				clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
++				clock-names = "periph_clk","sys_clk", "slow_clk";
++				status = "disabled";
++
++				hlcdc-display-controller {
++					compatible = "atmel,hlcdc-display-controller";
++					interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 0 {
++						#address-cells = <1>;
++						#size-cells = <0>;
++						reg = <0>;
++					};
++				};
++
++				hlcdc_pwm: hlcdc-pwm {
++					compatible = "atmel,hlcdc-pwm";
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_lcd_pwm>;
++					#pwm-cells = <3>;
++				};
++			};
++
+ 			pmc: pmc at fffffc00 {
+ 				periphck {
+ 					lcdc_clk: lcdc_clk {
+-- 
+1.9.1
