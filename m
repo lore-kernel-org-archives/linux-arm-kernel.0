@@ -1,38 +1,31 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 29 Sep 2014 11:02:16 -0700
-Subject: [PATCH 3/6] arm/arm64: KVM: add 'writable' parameter to
- kvm_phys_addr_ioremap
-In-Reply-To: <20140929122332.GD3095@cbox>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-4-git-send-email-ard.biesheuvel@linaro.org>
- <54235BC6.2070503@samsung.com> <20140929122332.GD3095@cbox>
-Message-ID: <54299EA8.8090600@samsung.com>
+Date: Mon, 29 Sep 2014 11:02:49 -0700
+Subject: [PATCH v11 2/6] KVM: Add generic implementation of
+ kvm_vm_ioctl_get_dirty_log
+In-Reply-To: <20140929191856.63ace99d.cornelia.huck@de.ibm.com>
+References: <1411433690-8104-1-git-send-email-m.smarduch@samsung.com>
+ <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
+ <20140929191856.63ace99d.cornelia.huck@de.ibm.com>
+Message-ID: <54299EC9.5070508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2014 05:23 AM, Christoffer Dall wrote:
-> On Wed, Sep 24, 2014 at 05:03:18PM -0700, Mario Smarduch wrote:
->> Is DEVICE type the correct default, for device
->> regions that are prefetchable? The guest might
->> want something less restrictive to optimize device
->> access.
+On 09/29/2014 10:18 AM, Cornelia Huck wrote:
+> On Mon, 22 Sep 2014 17:54:46 -0700
+> Mario Smarduch <m.smarduch@samsung.com> wrote:
+> 
+>> Add support for generic implementation of dirty log read function. For now
+>> x86_64 and ARMv7 share generic dirty log read. Other architectures call
+>> their architecture specific functions.
 >>
-> We don't have a use case for this yet, and we aren't supporting generic
-> platform device passthrough yet.
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > 
-> So far this patch is solving a real problem, but if we need something
-> more flexible, then patches are welcome :)
+> This (and the previous patch), once fitted on current kvm/next (trivial
+> rejects), seems to work fine on s390 and looks sane to me.
 > 
-> -Christoffer
+> So, for the s390 parts:
 > 
-
-I understand the fix addresses a real issue, but once it's in,
-it may go unnoticed for quite a while.
-
-I would recommend some warning or comment that guest has no
-control over device memory attributes. In my opinion
-setting 2nd stage attributes to cacheble (with exception of
-GIC range) should work letting the guest driver manage
-attributes.
-
-- Mario
+> Acked-by: Cornelia Huck <cornelia.huck@de.ibm.com>
+> 
+Thanks,
+  Mario
