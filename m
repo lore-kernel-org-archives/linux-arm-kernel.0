@@ -1,106 +1,50 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 20:06:41 +0200
-Subject: [PATCH 05/13] tty: serial: 8250_dma: keep own book keeping about RX
- transfers
+Date: Mon, 29 Sep 2014 20:06:38 +0200
+Subject: [PATCH 02/13] tty: serial: 8250: make serial8250_console_setup() non
+ _init
 In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
 References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1412014009-13315-6-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1412014009-13315-3-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After dmaengine_terminate_all() has been invoked then both DMA drivers
-(edma and omap-dma) do not invoke dma_cookie_complete() to mark the
-transfer as complete. This dma_cookie_complete() is performed by the
-Synopsys DesignWare driver which is probably the only one that is used
-by omap8250-dma and hence don't see following problem?
-?which is that once a RX transfer has been terminated then following
-query of channel status reports DMA_IN_PROGRESS (again: the actual
-transfer has been canceled, there is nothing going on anymore).
+if I boot with console=ttyS0 and the omap driver is module I end up with
 
-This means that serial8250_rx_dma() never enqueues another DMA transfer
-because it (wrongly) assumes that there is a transer already pending.
+| console [ttyS0] disabled
+| omap8250 44e09000.serial: ttyS0 at MMIO 0x44e09000 (irq = 88, base_baud = 3000000) is a 8250
+| Unable to handle kernel paging request at virtual address c07a9de0
+| Modules linked in: 8250_omap(+)
+| CPU: 0 PID: 908 Comm: modprobe Not tainted 3.17.0-rc5+ #1593
+| PC is at serial8250_console_setup+0x0/0xc8
+| LR is at register_console+0x13c/0x3a4
+| [<c0078788>] (register_console) from [<c02d0340>] (uart_add_one_port+0x3cc/0x420)
+| [<c02d0340>] (uart_add_one_port) from [<c02d38a4>] (serial8250_register_8250_port+0x298/0x39c)
+| [<c02d38a4>] (serial8250_register_8250_port) from [<bf006274>] (omap8250_probe+0x218/0x3dc [8250_omap])
+| [<bf006274>] (omap8250_probe [8250_omap]) from [<c02e3424>] (platform_drv_probe+0x2c/0x5c)
+| [<c02e3424>] (platform_drv_probe) from [<c02e1eac>] (driver_probe_device+0x104/0x228)
+?
+| [<c009fa48>] (SyS_init_module) from [<c000e6e0>] (ret_fast_syscall+0x0/0x30)
+| Code: 7823603b f8314620 051b3013 491ed416 (44792204)
 
-Vinod Koul refuses to accept a patch which adds this
-dma_cookie_complete() to both drivers and so dmaengine_tx_status() would
-report DMA_COMPLETE instead (and behave like the Synopsys DesignWare
-driver already does). He argues that I am not allowed to use the cookie
-to query the status and that the driver already cleaned everything up after
-the invokation of dmaengine_terminate_all().
+because serial8250_console_setup() is already gone.
 
-To end this I add a bookkeeping whether or not a RX-transfer has been
-started to the 8250-dma code. It has already been done for the TX side.
-*Now* we learn about the RX status based on our bookkeeping and don't
-need dmaengine_tx_status() for this anymore.
-
-Cc: vinod.koul at intel.com
-Reviewed-by: Tony Lindgren <tony@atomide.com>
-Tested-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250.h     |  1 +
- drivers/tty/serial/8250/8250_dma.c | 10 ++++------
- 2 files changed, 5 insertions(+), 6 deletions(-)
+ drivers/tty/serial/8250/8250_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
-index a63d198f8d03..ebab625179d4 100644
---- a/drivers/tty/serial/8250/8250.h
-+++ b/drivers/tty/serial/8250/8250.h
-@@ -42,6 +42,7 @@ struct uart_8250_dma {
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index a1904628a2a1..159b72471622 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -3237,7 +3237,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
+ 	serial8250_rpm_put(up);
+ }
  
- 	unsigned char		tx_running:1;
- 	unsigned char		tx_err: 1;
-+	unsigned char		rx_running:1;
- };
- 
- struct old_serial_port {
-diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
-index 69e54abb6e71..db9eda3c12d6 100644
---- a/drivers/tty/serial/8250/8250_dma.c
-+++ b/drivers/tty/serial/8250/8250_dma.c
-@@ -61,6 +61,7 @@ static void __dma_rx_complete(void *param)
- 	dma_sync_single_for_cpu(dma->rxchan->device->dev, dma->rx_addr,
- 				dma->rx_size, DMA_FROM_DEVICE);
- 
-+	dma->rx_running = 0;
- 	dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
- 	dmaengine_terminate_all(dma->rxchan);
- 
-@@ -123,10 +124,6 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
+-static int __init serial8250_console_setup(struct console *co, char *options)
++static int serial8250_console_setup(struct console *co, char *options)
  {
- 	struct uart_8250_dma		*dma = p->dma;
- 	struct dma_async_tx_descriptor	*desc;
--	struct dma_tx_state		state;
--	int				dma_status;
--
--	dma_status = dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
- 
- 	switch (iir & 0x3f) {
- 	case UART_IIR_RLSI:
-@@ -137,7 +134,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- 		 * If RCVR FIFO trigger level was not reached, complete the
- 		 * transfer and let 8250_core copy the remaining data.
- 		 */
--		if (dma_status == DMA_IN_PROGRESS) {
-+		if (dma->rx_running) {
- 			dmaengine_pause(dma->rxchan);
- 			__dma_rx_complete(p);
- 		}
-@@ -146,7 +143,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- 		break;
- 	}
- 
--	if (dma_status)
-+	if (dma->rx_running)
- 		return 0;
- 
- 	desc = dmaengine_prep_slave_single(dma->rxchan, dma->rx_addr,
-@@ -155,6 +152,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- 	if (!desc)
- 		return -EBUSY;
- 
-+	dma->rx_running = 1;
- 	desc->callback = __dma_rx_complete;
- 	desc->callback_param = p;
- 
+ 	struct uart_port *port;
+ 	int baud = 9600;
 -- 
 2.1.0
