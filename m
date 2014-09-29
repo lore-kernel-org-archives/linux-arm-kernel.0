@@ -1,95 +1,53 @@
-From: chenhui.zhao@freescale.com (Chenhui Zhao)
-Date: Mon, 29 Sep 2014 17:42:55 +0800
-Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
-In-Reply-To: <20140928142632.GG5182@n2100.arm.linux.org.uk>
-References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
- <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
- <20140926121427.GO5182@n2100.arm.linux.org.uk>
- <20140928110640.GB9797@udp189498uds.ap.freescale.net>
- <20140928142632.GG5182@n2100.arm.linux.org.uk>
-Message-ID: <20140929094255.GA14086@udp189498uds.ap.freescale.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 29 Sep 2014 11:42:44 +0200
+Subject: [GIT PULL 1/2] ARM: rockchip: cpu regulators and OPPs
+Message-ID: <7172632.O1FfdvXn6k@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 28, 2014 at 03:26:33PM +0100, Russell King - ARM Linux wrote:
-> On Sun, Sep 28, 2014 at 07:06:40PM +0800, Chenhui Zhao wrote:
-> > On Fri, Sep 26, 2014 at 01:14:27PM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
-> > > > +/*
-> > > > + * r0: the physical entry address of SRAM code
-> > > > + *
-> > > > + */
-> > > > +ENTRY(ls1_do_deepsleep)
-> > > > +	mov	r13, r0
-> > > > +
-> > > > +	/* flush cache */
-> > > > +	bl	v7_flush_dcache_all
-> > > 
-> > > Please explain the purpose of this call via a comment in the code.
-> > > 
-> > > The generic code will have saved the CPU state, and will have called
-> > > flush_cache_louis() to flush the caches to the point of unification.
-> > > 
-> > > The only data which will have been loaded into the cache between that
-> > > point is the stack for the return from __cpu_suspend_save, and
-> > > speculative prefetches.
-> > > 
-> > > So, the only reason I can gather is that you need to flush data from
-> > > lower levels of the cache below the point of unification.
-> > > 
-> > 
-> > In deep sleep process, all caches will lost, so flush all caches to prevent
-> > data loss.
-> 
-> You haven't answered my question.
-> 
+Hi Arnd, Olof,
 
-I want to flush L1 and L2 caches of Cortex-A7 in LS1021. However,
-flush_cache_louis() only flushed L1 cache. Therefore, call
-v7_flush_dcache_all() to flush L1 and L2 cache. 
+the corresponding clk changes made their way into the clock tree, so these
+changes add the necessary supplies, operating points and clocks to rockchip
+boards to enable cpu frequency scaling.
 
-> > > > +
-> > > > +	/* disable cache, C bit in SCTLR */
-> > > > +	mrc	p15, 0, r0, c1, c0, 0
-> > > > +	bic	r0, r0, #(1 << 2)
-> > > > +	mcr	p15, 0, r0, c1, c0, 0
-> > > > +	isb
-> > > > +
-> > > > +	/* disable coherency, SMP bit in ACTLR */
-> > > > +	mrc	p15, 0, r0, c1, c0, 1
-> > > > +	bic	r0, r0, #(1 << 6)
-> > > > +	mcr	p15, 0, r0, c1, c0, 1
-> > > > +	isb
-> > > > +	dsb
-> > > > +
-> > > > +	/* disable MMU, M bit in SCTLR */
-> > > > +	mrc	p15, 0, r0, c1, c0, 0
-> > > > +	bic	r0, r0, #1
-> > > > +	mcr	p15, 0, r0, c1, c0, 0
-> > > > +	isb
-> > > > +
-> > > > +	/* jump to sram code using physical address */
-> > > > +	bx	r13
-> > > 
-> > > This looks extremely fragile.  You are running in virtual space, and you
-> > > turn the MMU off.  You are reliant on the MMU still being on for the
-> > > following instructions to already be in the pipeline.  That's not a
-> > > very good assumption to make (we've made it in the past and it breaks
-> > > every so often when things change, eg when the code is no longer laid
-> > > out how we expect.)
-> > > 
-> > > You need to disable the MMU safely, which means using the identity map
-> > > page tables and executing code in the identity map region.
-> > 
-> > Yes, the code will switch off MMU, and switch to physical address space.
-> > On LS1021, the DDR memory located at the physical address space started from
-> > 0x80000000, the kernel space also started at 0x80000000 (CONFIG_PAGE_OFFSET = 0x80000000).
-> > So the virtual address of kernel code is equal to the physical address.
-> 
-> You can't rely on that.
-> 
-> Sorry, NAK.
+This pull request already includes commit
+    4d742e6230b5 ("clk: rockchip: add binding id for ARMCLK")
+that is shared with the clock tree [0].
 
-I'll try to use a safer method to implement it.
+[0] http://git.linaro.org/people/mike.turquette/linux.git/commit/4d742e6230b5ff157422d91d6ae8d2fc1303eb28
 
-Chenhui
+So please pull
+
+
+The following changes since commit 6051ddd4f94894cce8fde3aa29f90ae6c567fc46:
+
+  ARM: dts: rockchip: Remove "regulator-always-on" in vcc_rmii for Radxa Rock (2014-09-22 11:53:39 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-dts3
+
+for you to fetch changes up to 8848623b8c032ce7c41549ec743f8367c877d7f2:
+
+  ARM: dts: rockchip: add cpu supplies to boards (2014-09-28 13:14:56 +0200)
+
+----------------------------------------------------------------
+CPU opp and board supplies for Rockchip boards.
+
+----------------------------------------------------------------
+Heiko Stuebner (4):
+      clk: rockchip: add binding id for ARMCLK
+      Merge branch 'v3.18-next/armclkid' into v3.18-next/dts
+      ARM: dts: rockchip: add operating points and armclk references
+      ARM: dts: rockchip: add cpu supplies to boards
+
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts        |  4 ++++
+ arch/arm/boot/dts/rk3066a.dtsi                | 12 +++++++++++-
+ arch/arm/boot/dts/rk3188-radxarock.dts        |  6 +++++-
+ arch/arm/boot/dts/rk3188.dtsi                 | 15 ++++++++++++++-
+ arch/arm/boot/dts/rk3288-evb-rk808.dts        |  6 +++++-
+ arch/arm/boot/dts/rk3288.dtsi                 | 19 ++++++++++++++++++-
+ include/dt-bindings/clock/rk3188-cru-common.h |  1 +
+ include/dt-bindings/clock/rk3288-cru.h        |  1 +
+ 8 files changed, 59 insertions(+), 5 deletions(-)
