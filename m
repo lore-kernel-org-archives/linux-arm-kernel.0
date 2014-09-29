@@ -1,45 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 29 Sep 2014 10:37:30 +0200
-Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
- in all platforms
-In-Reply-To: <5427A6A0.5040703@huawei.com>
-References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
- <20140925074235.GN12423@ulmo> <20140925144855.GB31157@bart.dudau.co.uk>
- <20140925164937.GB30382@ulmo> <20140925171612.GC31157@bart.dudau.co.uk>
- <542505B3.7040208@huawei.com> <20140926085430.GG31106@ulmo>
- <20140926090537.GH31106@ulmo> <54277327.6070500@huawei.com>
- <5427A6A0.5040703@huawei.com>
-Message-ID: <1411979850.2625.7.camel@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 29 Sep 2014 10:38:28 +0200
+Subject: [PATCH] MAINTAINERS: add atmel nand driver maintainer entry
+In-Reply-To: <1411979763-1449-1-git-send-email-josh.wu@atmel.com>
+References: <1411979763-1449-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <54291A84.5080109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, den 28.09.2014, 14:11 +0800 schrieb Yijing Wang:
-> On 2014/9/28 10:32, Yijing Wang wrote:
-> > On 2014/9/26 17:05, Thierry Reding wrote:
-> >> On Fri, Sep 26, 2014 at 10:54:32AM +0200, Thierry Reding wrote:
-> >> [...]
-> >>> At least for Tegra it's trivial to just hook it up in tegra_pcie_scan_bus()
-> >>> directly (patch attached).
-> >>
-> >> Really attached this time.
-> >>
-> >> Thierry
-> >>
-> > 
-> > It looks good to me, so I will update the arm pci hostbridge driver to assign
-> > pci root bus the msi chip instead of current pcibios_add_bus(). But for other
-> > platforms which only have a one msi chip, I will kept the arch_find_msi_chip()
-> > temporarily for more comments, especially from Bjorn.
+On 29/09/2014 10:36, Josh Wu :
+> This patch adds an entry in MAINTAINERS file for ATMEL nand driver.
 > 
-> Oh, sorry, I found designware and rcar use pci_scan_root_bus(), so we can not simply
-> assign msi chip to root bus in all host drivers's scan functions.
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Designware will switch away from pci_scan_root_bus() in the 3.18 cycle
-and I would think it would be no problem to to the same with rcar.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Regards,
-Lucas
+> ---
+>  MAINTAINERS | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 3705430..1bdf3bf 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1698,6 +1698,12 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+>  S:	Supported
+>  F:	drivers/net/ethernet/cadence/
+>  
+> +ATMEL NAND DRIVER
+> +M:	Josh Wu <josh.wu@atmel.com>
+> +L:	linux-mtd at lists.infradead.org
+> +S:	Supported
+> +F:	drivers/mtd/nand/atmel_nand*
+> +
+>  ATMEL SPI DRIVER
+>  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+>  S:	Supported
+> 
+
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Nicolas Ferre
