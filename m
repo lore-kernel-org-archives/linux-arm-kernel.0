@@ -1,56 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 29 Sep 2014 11:56:20 +0300
-Subject: [PATCH v3] CLK: TI: consider the fact that of_clk_get() might
- return an error
-In-Reply-To: <20140918143327.GA4418@linutronix.de>
-References: <1410451272-31068-1-git-send-email-bigeasy@linutronix.de>
- <54198411.1080706@ti.com> <20140917155623.GA28043@linutronix.de>
- <20140917163559.GA25790@kahuna> <20140918143327.GA4418@linutronix.de>
-Message-ID: <54291EB4.9000906@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Sep 2014 10:58:03 +0200
+Subject: [periperi] How to set default GPIO pin ?
+In-Reply-To: <2033766.6tR9OHe7ZC@avalon>
+References: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
+ <2862746.g5u9pdpKDi@avalon>
+ <CACRpkdb1jF-ro3XcFHFC+Lhgi+0dEHzQYVSSLV6AWnAxiwNLdw@mail.gmail.com>
+ <2033766.6tR9OHe7ZC@avalon>
+Message-ID: <CACRpkdZg7_edUiAaGq_YPLyT4gCfOcZ8463rYb=hD0Xqr4gOYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2014 05:33 PM, Sebastian Andrzej Siewior wrote:
-> I "forgot" to update the dtb and the kernel crashed:
-> |Unable to handle kernel NULL pointer dereference at virtual address 0000002e
-> |PC is at __clk_get_flags+0x4/0xc
-> |LR is at ti_dt_clockdomains_setup+0x70/0xe8
+On Sun, Sep 28, 2014 at 11:25 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Linus and Morimoto-san,
 >
-> because I did not have the clock nodes. of_clk_get() returns an error
-> pointer which is not checked here.
+> On Tuesday 23 September 2014 17:06:28 Linus Walleij wrote:
+>> On Wed, Sep 10, 2014 at 10:55 AM, Laurent Pinchart wrote:
+>> > On Sunday 31 August 2014 22:08:52 Kuninori Morimoto wrote:
+>> >> I know we can use "defalt" PFC settings on DT.
+>> >> But, how to use "defalt" GPIO pin settings on DT ?
+>> >>
+>> >> We would like to use GPIO 7-17 as Low output,
+>> >> and do nothing after boot.
+>> >
+>> > From a DT point of view I believe this is supposed to be done by
+>> > specifying the output-low or output-high properties in the pinctrl
+>> > configuration node. However, these properties are not supported by the PFC
+>> > driver, and there's no easy way for the PFC driver to configure GPIOs
+>> > handled by a different driver such as the gpio-rcar driver for instance.
+>> >
+>> > Linus, do you have any hindsight on how this should be implemented ?
+>>
+>> I have suggested adding GPIO hogs, so that a GPIO node can specify
+>> that some GPIO's specified on the local ship be hogged high or
+>> low at probe. Generic DT bindings and generic code in gpiolib.c.
+>>
+>> gpios-hog-high = <....>;
+>> gpios-hog-low = <....>;
 >
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> How about just a gpios-hog property, with a list of gpio specifiers + flags ?
+> That's bikeshedding I suppose.
+>
+> Morimoto-san, would you like to implement that ? :-)
 
-Thanks, v3 applied to for-v3.18/ti-clk-drv.
+There was a proposed implementation from Boris BREZILLON, but I was
+unhappy with parts of it, however check it and see my comments on
+the patch set:
+"[RFC PATCH] gpio: add GPIO hogging mechanism"
 
--Tero
-
-> ---
->   v2?v3:
->      - added acked by
->      - fixed "CHECK: Alignment should match open parenthesis"
->
->   v1?v2:
->       add "%s __func__" to the added pr_err
->
->   drivers/clk/ti/clockdomain.c | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-> index f1e0038d76ac..b4c5faccaece 100644
-> --- a/drivers/clk/ti/clockdomain.c
-> +++ b/drivers/clk/ti/clockdomain.c
-> @@ -36,6 +36,11 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
->
->   	for (i = 0; i < num_clks; i++) {
->   		clk = of_clk_get(node, i);
-> +		if (IS_ERR(clk)) {
-> +			pr_err("%s: Failed get %s' clock nr %d (%ld)\n",
-> +			       __func__, node->full_name, i, PTR_ERR(clk));
-> +			continue;
-> +		}
->   		if (__clk_get_flags(clk) & CLK_IS_BASIC) {
->   			pr_warn("can't setup clkdm for basic clk %s\n",
->   				__clk_get_name(clk));
->
+Yours,
+Linus Walleij
