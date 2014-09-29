@@ -1,67 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 28 Sep 2014 21:52:24 -0400
-Subject: [PATCH] drivers/usb/host/ehci-xilinx-of.c: Include
- "linux/of_irq.h" to avoid compiling error
-In-Reply-To: <Pine.LNX.4.44L0.1409241141260.1580-100000@iolanthe.rowland.org>
-References: <e0dec78e-193e-43ee-bdb0-fa776a6dd044@BY2FFO11FD030.protection.gbl>
- <Pine.LNX.4.44L0.1409241141260.1580-100000@iolanthe.rowland.org>
-Message-ID: <20140929015224.GB27008@kroah.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Mon, 29 Sep 2014 08:26:55 +0200
+Subject: [PATCH 0/3] Fixes for CNS3xxx platform
+In-Reply-To: <201409252343.52997.arnd@arndb.de> (Arnd Bergmann's message of
+ "Thu, 25 Sep 2014 23:43:52 +0200")
+References: <m3d2av3lgt.fsf@t19.piap.pl> <201409252343.52997.arnd@arndb.de>
+Message-ID: <m3sijbaqmo.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 11:41:55AM -0400, Alan Stern wrote:
-> On Mon, 22 Sep 2014, Michal Simek wrote:
-> 
-> > Hi Alan and Greg,
-> > 
-> > On 09/20/2014 06:19 AM, Chen Gang wrote:
-> > > Hello Maintainers:
-> > > 
-> > > Please help check this patch, when you have time.
-> > > 
-> > > Thanks.
-> > > 
-> > > On 09/08/2014 01:20 PM, Michal Simek wrote:
-> > >> On 09/03/2014 05:50 PM, Chen Gang wrote:
-> > >>> Need include it for irq_of_parse_and_map(), the related error with
-> > >>> allmodconfig under microblaze:
-> > >>>
-> > >>>   drivers/usb/host/ehci-xilinx-of.c: In function ?ehci_hcd_xilinx_of_probe?:
-> > >>>   drivers/usb/host/ehci-xilinx-of.c:156:2: error: implicit declaration of function ?irq_of_parse_and_map? [-Werror=implicit-function-declaration]
-> > >>>     irq = irq_of_parse_and_map(dn, 0);
-> > >>>     ^
-> > >>>
-> > >>> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
-> > >>> ---
-> > >>>  drivers/usb/host/ehci-xilinx-of.c | 1 +
-> > >>>  1 file changed, 1 insertion(+)
-> > >>>
-> > >>> diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
-> > >>> index fe57710..a232836 100644
-> > >>> --- a/drivers/usb/host/ehci-xilinx-of.c
-> > >>> +++ b/drivers/usb/host/ehci-xilinx-of.c
-> > >>> @@ -31,6 +31,7 @@
-> > >>>  #include <linux/of.h>
-> > >>>  #include <linux/of_platform.h>
-> > >>>  #include <linux/of_address.h>
-> > >>> +#include <linux/of_irq.h>
-> > >>>  
-> > >>>  /**
-> > >>>   * ehci_xilinx_port_handed_over - hand the port out if failed to enable it
-> > >>>
-> > >>
-> > >> Acked-by: Michal Simek <monstr@monstr.eu>
-> > 
-> > Alan: Can you please add this patch to your queue?
-> > Greg: If Alan is not maintaining this part of kernel, is this patch in your queue?
-> > 
-> > I have also not a problem to add this patch through my microblaze tree
-> > but I think it will be much better to use any USB tree.
-> 
-> Greg should be able to accept a trivial patch like this one directly.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-I can, if someone will resend it so I can apply it :)
+> I ended up putting your patches into the next/fixes-non-critical branch,
+> which we will submit for 3.18, not 3.17, because by now it is very late
+> in the cycle and we mainly want to fix regressions against 3.16. Let us
+> know if there is a strong reason to have them in 3.17 after all.
 
-thanks,
+No problem. I mentioned 3.17 because it was at a bit earlier stage then.
 
-greg k-h
+> On a related note, Anton Vorontsov mentioned that he can no longer maintain
+> cns3xxx upstream, would you mind becoming the official contact? If that's
+> ok with you, please send an update for the MAINTAINERS file listing yourself
+> and any co-maintainers (Felix?) as well as the level of support you can give
+> ("Maintained" or "Odd Fixes" I guess).
+
+Will do.
+
+BTW, as Stephen and Russell pointed out, I've misplaced the UART
+CONFIG_* address. I will send a corrected patch shortly.
+-- 
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
