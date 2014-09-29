@@ -1,26 +1,64 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Sep 2014 15:36:08 +0200
-Subject: [PATCH v11 2/6] KVM: Add generic implementation of
- kvm_vm_ioctl_get_dirty_log
-In-Reply-To: <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
-References: <1411433690-8104-1-git-send-email-m.smarduch@samsung.com>
- <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140929133608.GI3095@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Sep 2014 15:36:31 +0200
+Subject: [PATCH 5/6] tty/serial: Add Spreadtrum's serial earlycon
+In-Reply-To: <1411992293-7729-6-git-send-email-zhang.lyra@gmail.com>
+References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
+ <1411992293-7729-6-git-send-email-zhang.lyra@gmail.com>
+Message-ID: <3038755.G9Y3LOUCHH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 05:54:46PM -0700, Mario Smarduch wrote:
-> Add support for generic implementation of dirty log read function. For now
-> x86_64 and ARMv7 share generic dirty log read. Other architectures call
-> their architecture specific functions.
+On Monday 29 September 2014 20:04:52 zhang.lyra at gmail.com wrote:
+> From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> Adds earlycon support for the Spreadtrum's serial.
+> 
+> Signed-off-by: chunyan.zhang <chunyan.zhang@spreadtrum.com>
 > ---
+>  drivers/tty/serial/Kconfig             |   12 ++++++
+>  drivers/tty/serial/Makefile            |    1 +
+>  drivers/tty/serial/serial_sprd_early.c |   64 ++++++++++++++++++++++++++++++++
+>  3 files changed, 77 insertions(+)
+>  create mode 100644 drivers/tty/serial/serial_sprd_early.c
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 26cec64..ede16e6 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -85,6 +85,18 @@ config SERIAL_EARLYCON_ARM_SEMIHOST
+>  	  with "earlycon=smh" on the kernel command line. The console is
+>  	  enabled when early_param is processed.
+>  
+> +config SERIAL_EARLYCON_SPRD
+> +	bool "Early console using SPRD serial"
+> +	depends on ARM64
+> +	select SERIAL_CORE
+> +	select SERIAL_CORE_CONSOLE
+> +	select SERIAL_EARLYCON
+> +	help
 
-This looks reasonable to me,
+I assume you will later want to have a proper device driver for
+this hardware, so it would be better to make the Kconfig symbol
+and the file name what you are going to use in the long run, but
+for now only have the earlycon support included.
 
-Other arch kvm-maintainers: will you give this a look and a spin for
-your ok?
 
-Thanks,
--Christoffer
+> +static int __init serial_sprd_early_console_setup(
+> +				struct earlycon_device *device,
+> +				const char *opt)
+> +{
+> +	if (!device->port.membase)
+> +		return -ENODEV;
+> +
+> +	device->con->write = serial_sprd_early_write;
+> +	return 0;
+> +}
+> +EARLYCON_DECLARE(serial_sprd, serial_sprd_early_console_setup);
+> +OF_EARLYCON_DECLARE(serial_sprd, "sprd,serial",
+> +		    serial_sprd_early_console_setup);
+> 
+
+I think you should drop the EARLYCON_DECLARE() line, using
+OF_EARLYCON_DECLARE should be enough.
+
+	Arnd
