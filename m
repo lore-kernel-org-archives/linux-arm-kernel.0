@@ -1,58 +1,85 @@
-From: post@twien.net (post at twien.net)
-Date: Mon, 29 Sep 2014 17:23:59 +0200
-Subject: ARMADA 370 - Kernel panic during boot
-In-Reply-To: <20140929155724.579964b5@free-electrons.com>
-References: <6241a6200de0d573c982f73f062ed7fa@twien.net>
- <542938A7.8050307@free-electrons.com>
- <d1be3a0a37860f969b99ecc09b4cfcd8@twien.net>
- <20140929155724.579964b5@free-electrons.com>
-Message-ID: <68f0f9805e88b1cc33c3d2f9521cc93f@twien.net>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 29 Sep 2014 16:27:33 +0100
+Subject: [RFC PATCH 00/10] drivers: PL011: add SBSA subset support
+In-Reply-To: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <54297A65.2020906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, that made it!
+Hi,
 
-Actually to change the Physical base address of the debug UART was 
-actually a shot in the dark, because I got nothing out, and I just 
-decided to give it a try.
-To me this is somewhat confusing: I thought the physical address of 
-those register were 0xd0000000 (according to the hardware specification) 
-and that the U-boot remapped those to the virtual address 0xf1000000. 
-Well, since it worked on another board with 0xd0000000 (ref. mail from 
-Gregory), I assume this is not so simple, and that this may vary 
-depending on how U-boot remaps the registers, or? I'm using the U-boot 
-provided by Marvell.
+(ping)
 
-I have to debug further though, because it stopped with the message 
-bootconsole [...] disabled. I guess the problem is that the switch chip 
-(88E6532) is not detected (in the U-boot OK though, as egiga0), and this 
-is my only way out.... (SGMII->PHY)
+On 19/09/14 13:21, Andre Przywara wrote:
+> (This version has still issues, but I'd like to have feedback on
+> the general feasibility of this approach before wasting even more
+> time on debugging).
+> 
+> The ARM Server Base System Architecture[1] document describes a
+> generic UART which is a subset of the PL011 UART.
+> It lacks DMA support, baud rate control and modem status line
+> control, among other things.
+> The idea is to move the UART initialization and setup into the
+> firmware (which does this job today already) and let the kernel just
+> use the UART for sending and receiving characters.
+> 
+> This patchset is an attempt to integrate support for this UART subset
+> into the existing PL011 driver - basically by refactoring some
+> functions and providing a new uart_ops structure for it. It also has
+> a separate probe function to be not dependent on AMBA/PrimeCell.
+> Beside the obvious effect of code sharing it has the advantage of not
+> introducing another serial device prefix, so it can go with ttyAMA,
+> which seems to be pretty common.
 
-So thanks for the help. I'll keep on with the debugging.
-Tormod
+Is there any opinion on this patchset? Is this approach of integrating
+the SBSA UART support in the PL011 driver a promising way?
+Or do we look for a separate driver - which could not go with ttyAMA?
 
+Grateful for any comments,
+Andre
 
-
-On 2014-09-29 15:57, Thomas Petazzoni wrote:
-> Hello,
 > 
-> On Mon, 29 Sep 2014 13:25:03 +0200, post at twien.net wrote:
+> There is still one issue in bringing up the UART. On the PL011 we
+> send a dummy character via the loopback facility with the FIFOs
+> disabled to get things going, but both FIFO control and loopback are
+> outside of the SBSA spec. I consider this loopback approach a kludge
+> anyway, but am struggling to find a better way of fixing this due to
+> my lack of understanding of the TTY/serial layer.
+> If someone with more wisdom could enlighten me, I would be grateful.
 > 
->> 	soc {
->> 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
 > 
-> Are you really sure about the 0xd0000000 value here? Your earlyprintk
-> works using CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y according to
-> your .config, which indicates that your internal registers are mapped 
-> at
-> 0xf1000000 and not at 0xd0000000 as your Device Tree indicates.
+> Patch 1/10 contains a bug fix which applies to the PL011 part also,
+> it should be considered regardless of the rest of the series.
+> Patch 2-7 refactor some PL011 functions by splitting them up into
+> smaller pieces, so that most the code can be reused later by the SBSA
+> part.
+> Patch 8 and 9 introduce two new properties for the vendor structure,
+> this is for SBSA functionality which cannot be controlled by
+> separate uart_ops members only.
+> Patch 10 then finally drops in the SBSA specific code, by providing
+> a new uart_ops, vendor struct and probe function for it.
 > 
-> Can you change this line to:
+> Please have a look and tell me whether this SBSA driver approach has
+> any future.
 > 
-> 	ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+> Regards,
+> Andre
 > 
-> And try again?
+> Andre Przywara (10):
+>   drivers: PL011: avoid potential unregister_driver call
+>   drivers: PL011: refactor pl011_startup()
+>   drivers: PL011: refactor pl011_shutdown()
+>   drivers: PL011: refactor pl011_set_termios()
+>   drivers: PL011: refactor pl011_probe()
+>   drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
+>   drivers: PL011: move cts_event workaround into separate function
+>   drivers: PL011: allow avoiding UART enabling/disabling
+>   drivers: PL011: allow to supply fixed option string
+>   drivers: PL011: add support for the ARM SBSA generic UART
 > 
-> Thanks,
+>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
+>  drivers/tty/serial/amba-pl011.c                    |  509 ++++++++++++++------
+>  2 files changed, 380 insertions(+), 138 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
 > 
-> Thomas
