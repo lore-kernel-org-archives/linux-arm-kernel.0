@@ -1,26 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 29 Sep 2014 16:02:03 -0700
-Subject: [PATCH v7 2/7] arm: dts: qcom: Add SPM device bindings for 8974
-In-Reply-To: <1411779495-39724-3-git-send-email-lina.iyer@linaro.org>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <5429E4EB.2050708@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 29 Sep 2014 17:08:49 -0600
+Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
+In-Reply-To: <1412029912.4285.110.camel@pasglop>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+ <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
+ <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
+ <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
+ <1412024521.4285.98.camel@pasglop>
+ <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
+ <1412029912.4285.110.camel@pasglop>
+Message-ID: <CAErSpo70t9TMdntjBt+GdTw3FVmMquACQePX8=SKkySPuG3F3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/14 17:58, Lina Iyer wrote:
-> @@ -144,7 +148,27 @@
->  			};
->  		};
->  
-> -		saw_l2: regulator at f9012000 {
-> +		saw0: saw at f9089000 {
-> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
-> +			reg = <0xf9089000 0x1000>;
+On Mon, Sep 29, 2014 at 4:31 PM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Mon, 2014-09-29 at 15:33 -0600, Bjorn Helgaas wrote:
+>> > Right and on powerpc and others as well. We need to survey existing
+>> > resources. We also have a number of platform things that might need
+>> > to happen before we do the final re-assignment pass.
+>>
+>> That's true today.  But I don't know whether it *has* to be this way
+>> forever.  On x86, pcibios_resource_survey() throws in E820 information
+>> (which we know long before we do any PCI enumeration) and some IO-APIC
+>> resources (it looks like we also know these before PCI enumeration).
+>> Powerpc has pcibios_reserve_legacy_regions(), but that looks like
+>> mostly stuff that could be done when we find the host bridge, before
+>> we enumerate PCI devices below it.
+>
+> Oh we can probably change that but it's going to be much more work than
+> just moving the assignment into pci_scan_root_bus().
 
-There is another reg property as part of the binding that should be
-specified here.
+Agreed.  It's obvious that we can't apply Liviu's patch as-is.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> There are also a
+> number of subtle and not-so-subtle bits of code that rely on side
+> effects of the current code such as anything that tests for bus->added
+> or dev->added. Again, nothing we can't sort out eventually but the
+> transition might be a bit painful.
+>
+> We might need to introduce a new flag for platforms converted to the
+> "new style" generalized resource assignment which we can deprecate once
+> everybody has moved over.
+
+There's definitely a lot of work here if we ever want to make this happen.
+
+Bjorn
