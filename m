@@ -1,47 +1,112 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 29 Sep 2014 11:48:43 -0400
-Subject: [PATCH] usb: gadget: uvc: fix up uvcg_v4l2_get_unmapped_area typo
-In-Reply-To: <1855096.u0jNJntfok@avalon>
-References: <3777003.OnaxFdNv7R@wuerfel>
- <1855096.u0jNJntfok@avalon>
-Message-ID: <20140929154843.GA32039@kroah.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 29 Sep 2014 17:53:01 +0200 (CEST)
+Subject: [RFT v2 01/24] irqdomain: Introduce new interfaces to support
+ hierarchy irqdomains
+In-Reply-To: <54294F1C.30606@huawei.com>
+References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+ <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
+ <54294F1C.30606@huawei.com>
+Message-ID: <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 03:34:11PM +0300, Laurent Pinchart wrote:
-> Hi Arnd,
+On Mon, 29 Sep 2014, Abel wrote:
+> On 2014/9/26 22:02, Jiang Liu wrote:
+> > +static void irq_domain_free_descs(unsigned int virq, unsigned int nr_irqs)
+> > +{
+> > +	unsigned int i;
+> > +
+> > +	for (i = 0; i < nr_irqs; i++)
+> > +		irq_free_desc(virq + i);
+> > +}
 > 
-> Thank you for the patch.
-> 
-> On Monday 29 September 2014 14:30:20 Arnd Bergmann wrote:
-> > Patch "usb: gadget: uvc: rename functions to avoid conflicts with host uvc"
-> > renamed a lot of symbols but missed one references that was inside of
-> > an #ifdef:
-> > 
-> > drivers/usb/gadget/function/uvc_v4l2.c:363:23: error:
-> > 'uvcg_v4l2_get_unmapped_area' undeclared here (not in a function)
-> > .get_unmapped_area = uvcg_v4l2_get_unmapped_area,
-> >                        ^
-> > drivers/usb/gadget/function/uvc_v4l2.c:344:22: warning:
-> > 'uvc_v4l2_get_unmapped_area' defined but not used [-Wunused-function]
-> > static unsigned long uvc_v4l2_get_unmapped_area(struct file *file, ^
-> > 
-> > This renames the reference according the changed function name.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 7ea95b110811 ("usb: gadget: uvc: rename functions to avoid conflicts
-> > with host uvc") Cc: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> > Cc: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> > Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: linux-usb at vger.kernel.org
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> Felipe, could you please this up ?
+> I am not sure why this function is needed, since it works in the exact same
+> way as irq_free_descs(virq, nr_irqs).
 
-I can take it.
+Indeed.
+ 
+> I've been through your patches and noticed that the only domain
+> which does not call irq_domain_alloc_irqs_parent() is
+> x86_vector_domain. And this makes sense *if* we already knew which
+> domain is the nearest one to the CPU.
 
-thanks,
+Right, and in case of x86 the vector domain _IS_ the one which is
+always the nearest one to the cpu.
 
-greg k-h
+> But I don't think a well implemented device driver should assume
+> itself be in a particular position of the interrupt delivery path.
+
+The device driver has no knowledge of this. The irq domain driver
+definitely has to know to some extent.
+
+> Actually it should be guaranteed by the core infrastructure that all
+> the domains in the interrupt delivery path should allocate a
+> hardware interrupt for the interrupt source.
+
+Well, that's what we do. We allocate down the irq domain hierarchy. If
+one level fails the whole operation fails.
+
+> And besides the comments/questions I mentioned above, I am also curious about
+> how the chained interrupts been processed.
+> 
+> Let's take a 3-level-chained-domains for example.
+> Given 3 interrupt controllers A, B and C, and the interrupt delivery path is:
+> 
+> DEV -> A -> B -> C -> CPU
+> 
+> After the hierarchy irqdomains are established, the unique linux interrupt of
+> DEV will be mapped with a hardware interrupt in each domain:
+> 
+> DomainA: HWIRQ_A => VIRQ_DEV
+> DomainB: HWIRQ_B => VIRQ_DEV
+> DomainC: HWIRQ_C => VIRQ_DEV
+> 
+> When the DEV triggered an interrupt signal, the CPU will acknowledge HWIRQ_C,
+
+Not necessarily. The CPU will process HWIRQ_C. The acknowledge
+mechanism depends on the implementation details of the hierarchy.
+
+> and then irq_find_mapping(DomainC, HWIRQ_C) will be called to get the linux
+> interrupt VIRQ_DEV, and after the handler of the VIRQ_DEV has been processed,
+> the interrupt will end with the level (if have) uncleared on B, which will
+> result in the interrupt of DEV cannot be processed again.
+> 
+> Or is there anything I misunderstand?
+
+This heavily depends on the properties of the stacked domains.
+
+It depends on the hardware requirements and the implementation of
+domain A and B how this is handled.
+
+It might be sufficient to have the following code in the irq_ack()
+callback of domain A:
+
+irq_ack_A(struct irq_data *d)
+{
+	ack_hw_A();
+}
+
+Another HW or stacking scenario requires
+
+irq_ack_A(struct irq_data *d)
+{
+	ack_hw_A();
+	ack_parent();
+}
+
+where ack_parent() does:
+
+      if (d->parent_data)
+      	 d->parent_data->chip->ack(d->parent_data);
+
+and ack_hw_A() can be anything from a nop to some more or less complex
+hw access.
+
+So we cannot define upfront how deep an ack/mask/unmask/... has to be
+propagated down the chain. This needs a careful consideration in terms
+of functionality and we want to be able to do performance shortcuts as
+well.
+
+Thanks,
+
+	tglx
