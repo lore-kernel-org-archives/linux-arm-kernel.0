@@ -1,42 +1,86 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 30 Sep 2014 08:31:52 +1000
-Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
- pci_scan_root_bus()
-In-Reply-To: <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
- <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
- <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
- <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
- <1412024521.4285.98.camel@pasglop>
- <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
-Message-ID: <1412029912.4285.110.camel@pasglop>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 30 Sep 2014 00:38:33 +0200
+Subject: [PATCH] serial: samsung: Fix serial config dependencies for
+ exynos7
+In-Reply-To: <1411967817-8423-1-git-send-email-a.kesavan@samsung.com>
+References: <1411967817-8423-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <5429DF69.8000201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-29 at 15:33 -0600, Bjorn Helgaas wrote:
-> > Right and on powerpc and others as well. We need to survey existing
-> > resources. We also have a number of platform things that might need
-> > to happen before we do the final re-assignment pass.
+Hi Abhilash,
+
+The patch itself seems fine, but I wonder if those config options aren't
+really just leftovers from the past and couldn't be completely removed.
+
+On 29.09.2014 07:16, Abhilash Kesavan wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
 > 
-> That's true today.  But I don't know whether it *has* to be this way
-> forever.  On x86, pcibios_resource_survey() throws in E820 information
-> (which we know long before we do any PCI enumeration) and some IO-APIC
-> resources (it looks like we also know these before PCI enumeration).
-> Powerpc has pcibios_reserve_legacy_regions(), but that looks like
-> mostly stuff that could be done when we find the host bridge, before
-> we enumerate PCI devices below it.
+> Exynos7 has a similar serial controller to that present in older Samsung
+> SoCs. To re-use the existing serial driver on Exynos7 we need to have
+> SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
+> possible because these symbols are dependent on PLAT_SAMSUNG which is
+> not present for the ARMv8 based exynos7.
+> 
+> Change the dependency of these symbols from PLAT_SAMSUNG to the serial
+> driver thus making it available on exynos7. As the existing platform
+> specific code making use of these symbols is related to uart driver this
+> change in dependency should not cause any issues.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> ---
+> Build tested with s3c6400_defconfig, exynos_defconfig and arm64's defconfig
+> with and without the serial driver enabled.
+> 
+>  drivers/tty/serial/Kconfig |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 81f6ee7..e6c0bcb 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -249,14 +249,14 @@ config SERIAL_SAMSUNG
+>  
+>  config SERIAL_SAMSUNG_UARTS_4
+>  	bool
+> -	depends on PLAT_SAMSUNG
+> +	depends on SERIAL_SAMSUNG
+>  	default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
+>  	help
+>  	  Internal node for the common case of 4 Samsung compatible UARTs
 
-Oh we can probably change that but it's going to be much more work than
-just moving the assignment into pci_scan_root_bus(). There are also a
-number of subtle and not-so-subtle bits of code that rely on side
-effects of the current code such as anything that tests for bus->added
-or dev->added. Again, nothing we can't sort out eventually but the
-transition might be a bit painful.
+The only place where this symbol is used is below.
 
-We might need to introduce a new flag for platforms converted to the
-"new style" generalized resource assignment which we can deprecate once
-everybody has moved over.
+>  
+>  config SERIAL_SAMSUNG_UARTS
+>  	int
+> -	depends on PLAT_SAMSUNG
+> +	depends on SERIAL_SAMSUNG
+>  	default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
+>  	default 3
+>  	help
+> 
 
-Cheers,
-Ben.
- 
+With this symbol the situation isn't that easy, but still should be
+manageable.
+
+Looking at the serial-samsung driver, all occurrences of
+CONFIG_SERIAL_SAMSUNG_UARTS could be simply replaced with a locally
+defined number equal to the maximum value - in this case 4.
+
+There are also two places in arch/arm where this symbol is used:
+
+1) In arch/arm/mach-s3c64xx/irq-pm.c it's used as the number of serial
+ports which need suspend/resume handling. Since on s3c64xx the number is
+always 4, it can be simply defined locally as a constant.
+
+2) In arch/arm/plat-samsung/init.c it is used to determine size of a
+static array of UART ports and to check whether the UART driver is
+enabled. In former case I believe it should be safe to hardcode it to 4
+as well, in latter CONFIG_SERIAL_SAMSUNG can be used.
+
+Best regards,
+Tomasz
