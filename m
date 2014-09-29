@@ -1,47 +1,75 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 29 Sep 2014 10:50:42 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140925151403.GH19396@linutronix.de>
-References: <2cf997d9-e7de-465b-915d-3a0a5e7b95f7@email.android.com>
- <54129F6C.7040508@linutronix.de>
- <20140912094010.GE28458@ci00147.xsens-tech.local>
- <5412C21A.8020203@linutronix.de>
- <20140912102816.GF28458@ci00147.xsens-tech.local>
- <541716DC.9020904@linutronix.de>
- <20140917102812.GA20438@ci00147.xsens-tech.local>
- <20140921204100.GA10111@linutronix.de>
- <20140922092853.GH20438@ci00147.xsens-tech.local>
- <20140925151403.GH19396@linutronix.de>
-Message-ID: <20140929085042.GA13952@ci00147.xsens-tech.local>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 29 Sep 2014 10:52:50 +0200
+Subject: [GIT PULL] at91: soc for 3.18 #2
+In-Reply-To: <2546543.KtIvf3hIpW@wuerfel>
+References: <1411391733-28891-1-git-send-email-nicolas.ferre@atmel.com>
+ <201409261250.02565.arnd@arndb.de> <54257C70.50008@atmel.com>
+ <2546543.KtIvf3hIpW@wuerfel>
+Message-ID: <54291DE2.2070404@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 05:14:03PM +0200, Sebastian Andrzej Siewior wrote:
-> * Frans Klaver | 2014-09-22 11:28:54 [+0200]:
+On 26/09/2014 20:55, Arnd Bergmann :
+> On Friday 26 September 2014 16:47:12 Nicolas Ferre wrote:
+>> On 26/09/2014 12:50, Arnd Bergmann :
+>>> On Monday 22 September 2014, Nicolas Ferre wrote:
+>>>
+>>>> Nicolas Ferre (4):
+>>>>       ARM: at91: introduce basic SAMA5D4 support
+>>>>       ARM: at91: SAMA5D4 SoC detection code and low level routines
+>>>
+>>> This resulted in build failures both in at91x40_defconfig and some
+>>> randconfigs with MMU disabled. I've applied the patch below on top
+>>> to fix it.
+>>
+>> Ok, I see: sorry for the inconvenience.
+>> What about taking the patch that I sent about removing completely the
+>> at91x40 as it is "Acked" by everybody now? The would prevent from adding
+>> these unneeded values.
 > 
-> >I guess then we'd still have to answer the question why the yocto build
-> >calls set_termios() so often, but that's not on you then. Did you notice
-> >it even changing settings? We might want to fix this even if the kernel
-> >should be able to cope.
+> I thought about that, but it would still be broken in randconfig builds
+> that turn off the MMU on any of the other at91 variants, as I wrote above.
+
+Okay, sorry, I overlooked this part.
+
+> at91 is actually one of the platforms that I'd assume would even work in
+> that configuration. We should at one point in the future discuss more
+> widely whether we try to fix more of the bugs one hits with this or
+> we just outright prevent users from turning off the MMU on platforms
+> that have one.
+
+Well, for the moment, it still makes sense to keep this possibility. So
+your patch is perfectly fine for me, if needed:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Bye,
+
+>>> I'm not exactly happy about the soc detection code anyway after I
+>>> had to look at that. Why do you even hardcode the physical register
+>>> location rather than getting it from DT?
+>>>
+>>> Also, why do you care about which SoC version you have for the
+>>> modern SAMA5 chips? All I see is a sama5d4_map_io() callback
+>>> that maps a lot of completely unused registers along with
+>>> the uart that you normally get from the implicit debug_ll_io_init,
+>>> and the SRAM that should probably be turned into a normal driver.
+>>
+>> Yes, as said by Alexandre, we are aware of the flaws of AT91 SoC
+>> initialization, but last time I tried, our code was called too early.
+>> Now with the work from Maxime with the timer (in 3.18) it might be
+>> possible to reorder all this.
+>> But please, I would really like to remove all !DT *and* !CCF material
+>> before starting this work, otherwise we will again have a double path
+>> for sam9's and I'd like to avoid this.
 > 
-> could you please test uart_v10_pre3? I dropped a few register sets and
-> delayed the register update until TX-DMA is complete. I am traveling
-> currently and have only my boneblack and it passes my limited testing.
-> If it solves your problems, too then I would address Heikki's latest
-> comments and prepare the final v10 (and I hope I didn't break beagle
-> board in between).
+> I'm not complaining about the use of the early registers on sam9, I know
+> you are working hard on cleaning that up. I still don't see why you
+> duplicate it for sama5, but it's ok as long as you have a plan.
+> 
+> 	Arnd
+> 
 
-This version fixes the console things for us. It also increases the
-amount of data we can push over the serial port. If I push the data
-towards our requirements, we're not there yet. I get the "too much work
-for irq" notice still. However, I don't think you'd need to be fixing
-that in this series (or at all). We had similar issues there with
-omap-serial as well.
 
-As far as I'm concerned, this is
-
-Tested-by: Frans Klaver <frans.klaver@xsens.com>
-
-Thanks,
-Frans
+-- 
+Nicolas Ferre
