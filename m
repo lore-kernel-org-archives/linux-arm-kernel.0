@@ -1,43 +1,32 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 29 Sep 2014 14:40:38 +0800
-Subject: mfd_add_devices() doesn't check whether nodes are "diabled" in dts
-Message-ID: <CAGsJ_4yqumj3=54HwxuzVffPjHdQZrCP2wYc2TSumKsg0-wm7w@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 29 Sep 2014 08:51:45 +0200
+Subject: [PATCH v1 1/4] arm: pxa: add device-tree irq init for pxa27x
+Message-ID: <1411973508-14301-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Samuel, Lee,
-the current mfd_add_devices() doesn't check whether nodes are diabled
-in dts, so even though we put status = "disabled" in dts for a MFD
-subnode, it will still create the platform_device. this will cause the
-platform_driver to execute probe() entry.
+Add the initializer for irqs in a device-tree machine on a pxa27x.
 
-mfd-core is doing:
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/pxa27x.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-mfd_add_device()
-
-alloc platform_device no matter it is disabled or not:
-
-92         pdev = platform_device_alloc(cell->name, id + cell->id);
- 93         if (!pdev)
- 94                 goto fail_alloc;
-
-....
-extend all nodes:
-
-112         if (parent->of_node && cell->of_compatible) {
-113                 for_each_child_of_node(parent->of_node, np) {
-114                         if (of_device_is_compatible(np,
-cell->of_compatible)) {
-115                                 pdev->dev.of_node = np;
-116                                 break;
-117                         }
-118                 }
-119         }
-
-it seems it doesn't match with the general behavior like
-of_platform_populate(), in which we only extend available nodes.
-
-how do you think if we do a fix for the behaviour of mfd_add_devices()
-and mfd_remove_devices()?
-
--barry
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index b040d7d..8ca62e2 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -398,6 +398,11 @@ void __init pxa27x_init_irq(void)
+ 	pxa_init_irq(34, pxa27x_set_wake);
+ }
+ 
++void __init pxa27x_dt_init_irq(void)
++{
++	pxa_dt_irq_init(pxa27x_set_wake);
++}
++
+ static struct map_desc pxa27x_io_desc[] __initdata = {
+ 	{	/* Mem Ctl */
+ 		.virtual	= (unsigned long)SMEMC_VIRT,
+-- 
+2.1.0
