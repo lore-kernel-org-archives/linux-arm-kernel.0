@@ -1,100 +1,123 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 20:06:42 +0200
-Subject: [PATCH 06/13] tty: serial: 8250: allow to use custom DMA
- implementation
+Date: Mon, 29 Sep 2014 20:06:40 +0200
+Subject: [PATCH 04/13] tty: serial: 8250_dma: handle error on TX submit
 In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
 References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1412014009-13315-7-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1412014009-13315-5-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP has a few corner cases where it needs a share of kindness of
-affection to do the right thing. Heikki Krogerus suggested that instead
-adding the quirks into the default DMA implementation, OMAP could get
-its own copy of the function. And Alan suggested the same thing so here
-we go.
+Right now it is possible that serial8250_tx_dma() fails and returns
+-EBUSY. The caller (serial8250_start_tx()) will then enable
+UART_IER_THRI which will generate an interrupt once the TX FIFO is
+empty.
+In serial8250_handle_irq() nothing will happen because up->dma is set
+and so serial8250_tx_chars() won't be invoked. We end up with plenty of
+interrupts and some "too much work for irq" output.
 
-This patch provides callbacks for custom TX/RX DMA implementation. If
-there are not setup / used, then the default (current) implementation is
-used.
+This patch introduces dma_tx_err in struct uart_8250_port to signal that
+the last invocation of serial8250_tx_dma() failed so we can fill the TX
+FIFO manually. Should the next invocation of serial8250_start_tx()
+succeed then the dma_tx_err flag along with the THRI bit is removed and
+DMA only usage may continue.
 
+Reviewed-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250.h      |  3 +++
- drivers/tty/serial/8250/8250_core.c | 11 ++++++++---
- drivers/tty/serial/8250/8250_dma.c  |  2 --
- 3 files changed, 11 insertions(+), 5 deletions(-)
+ drivers/tty/serial/8250/8250.h      |  1 +
+ drivers/tty/serial/8250/8250_core.c |  3 ++-
+ drivers/tty/serial/8250/8250_dma.c  | 30 +++++++++++++++++++++++++-----
+ 3 files changed, 28 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
-index ebab625179d4..4bb831ab5db0 100644
+index 1bcb4b2141a6..a63d198f8d03 100644
 --- a/drivers/tty/serial/8250/8250.h
 +++ b/drivers/tty/serial/8250/8250.h
-@@ -16,6 +16,9 @@
- #include <linux/dmaengine.h>
+@@ -41,6 +41,7 @@ struct uart_8250_dma {
+ 	size_t			tx_size;
  
- struct uart_8250_dma {
-+	int (*tx_dma)(struct uart_8250_port *p);
-+	int (*rx_dma)(struct uart_8250_port *p, unsigned int iir);
-+
- 	dma_filter_fn		fn;
- 	void			*rx_param;
- 	void			*tx_param;
+ 	unsigned char		tx_running:1;
++	unsigned char		tx_err: 1;
+ };
+ 
+ struct old_serial_port {
 diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index ea57c87f8528..93b0799936fd 100644
+index 159b72471622..ea57c87f8528 100644
 --- a/drivers/tty/serial/8250/8250_core.c
 +++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1350,7 +1350,7 @@ static void serial8250_start_tx(struct uart_port *port)
- 	struct uart_8250_port *up = up_to_u8250p(port);
- 
- 	serial8250_rpm_get_tx(up);
--	if (up->dma && !serial8250_tx_dma(up)) {
-+	if (up->dma && !up->dma->tx_dma(up)) {
- 		return;
- 	} else if (!(up->ier & UART_IER_THRI)) {
- 		up->ier |= UART_IER_THRI;
-@@ -1588,7 +1588,7 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
- 
- 	if (status & (UART_LSR_DR | UART_LSR_BI)) {
- 		if (up->dma)
--			dma_err = serial8250_rx_dma(up, iir);
-+			dma_err = up->dma->rx_dma(up, iir);
- 
- 		if (!up->dma || dma_err)
+@@ -1594,7 +1594,8 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
  			status = serial8250_rx_chars(up, status);
-@@ -3624,8 +3624,13 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
- 			uart->dl_read = up->dl_read;
- 		if (up->dl_write)
- 			uart->dl_write = up->dl_write;
--		if (up->dma)
-+		if (up->dma) {
- 			uart->dma = up->dma;
-+			if (!uart->dma->tx_dma)
-+				uart->dma->tx_dma = serial8250_tx_dma;
-+			if (!uart->dma->rx_dma)
-+				uart->dma->rx_dma = serial8250_rx_dma;
-+		}
+ 	}
+ 	serial8250_modem_status(up);
+-	if (!up->dma && (status & UART_LSR_THRE))
++	if ((!up->dma || (up->dma && up->dma->tx_err)) &&
++	    (status & UART_LSR_THRE))
+ 		serial8250_tx_chars(up);
  
- 		if (serial8250_isa_config != NULL)
- 			serial8250_isa_config(0, &uart->port,
+ 	spin_unlock_irqrestore(&port->lock, flags);
 diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
-index db9eda3c12d6..258430b72039 100644
+index 148ffe4c232f..69e54abb6e71 100644
 --- a/drivers/tty/serial/8250/8250_dma.c
 +++ b/drivers/tty/serial/8250/8250_dma.c
-@@ -118,7 +118,6 @@ int serial8250_tx_dma(struct uart_8250_port *p)
- 	dma->tx_err = 1;
- 	return ret;
+@@ -36,8 +36,16 @@ static void __dma_tx_complete(void *param)
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+ 		uart_write_wakeup(&p->port);
+ 
+-	if (!uart_circ_empty(xmit) && !uart_tx_stopped(&p->port))
+-		serial8250_tx_dma(p);
++	if (!uart_circ_empty(xmit) && !uart_tx_stopped(&p->port)) {
++		int ret;
++
++		ret = serial8250_tx_dma(p);
++		if (ret) {
++			dma->tx_err = 1;
++			p->ier |= UART_IER_THRI;
++			serial_port_out(&p->port, UART_IER, p->ier);
++		}
++	}
+ 
+ 	spin_unlock_irqrestore(&p->port.lock, flags);
  }
--EXPORT_SYMBOL_GPL(serial8250_tx_dma);
+@@ -69,6 +77,7 @@ int serial8250_tx_dma(struct uart_8250_port *p)
+ 	struct uart_8250_dma		*dma = p->dma;
+ 	struct circ_buf			*xmit = &p->port.state->xmit;
+ 	struct dma_async_tx_descriptor	*desc;
++	int ret;
  
- int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- {
-@@ -165,7 +164,6 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
+ 	if (uart_tx_stopped(&p->port) || dma->tx_running ||
+ 	    uart_circ_empty(xmit))
+@@ -80,8 +89,10 @@ int serial8250_tx_dma(struct uart_8250_port *p)
+ 					   dma->tx_addr + xmit->tail,
+ 					   dma->tx_size, DMA_MEM_TO_DEV,
+ 					   DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+-	if (!desc)
+-		return -EBUSY;
++	if (!desc) {
++		ret = -EBUSY;
++		goto err;
++	}
  
+ 	dma->tx_running = 1;
+ 
+@@ -94,8 +105,17 @@ int serial8250_tx_dma(struct uart_8250_port *p)
+ 				   UART_XMIT_SIZE, DMA_TO_DEVICE);
+ 
+ 	dma_async_issue_pending(dma->txchan);
+-
++	if (dma->tx_err) {
++		dma->tx_err = 0;
++		if (p->ier & UART_IER_THRI) {
++			p->ier &= ~UART_IER_THRI;
++			serial_out(p, UART_IER, p->ier);
++		}
++	}
  	return 0;
++err:
++	dma->tx_err = 1;
++	return ret;
  }
--EXPORT_SYMBOL_GPL(serial8250_rx_dma);
+ EXPORT_SYMBOL_GPL(serial8250_tx_dma);
  
- int serial8250_request_dma(struct uart_8250_port *p)
- {
 -- 
 2.1.0
