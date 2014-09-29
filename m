@@ -1,48 +1,59 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 29 Sep 2014 13:43:35 -0600
-Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140929194335.GA13747@google.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 29 Sep 2014 15:52:00 -0400 (EDT)
+Subject: [PATCH v5 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <1411667317-1163-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1411667317-1163-1-git-send-email-santosh.shilimkar@ti.com>
+ <1411667317-1163-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140929.155200.2231132602322345812.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 03:29:19PM +0100, Liviu Dudau wrote:
-> This is my version 13 of the attempt at adding support for generic PCI host
-> bridge controllers. It contains only cleanups to make it play nice with the
-> linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
-> asm-generic is going to revert some of its more aggresive patches, he has the
-> choice of queueing it into linux-next again.
-> ...
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Thu, 25 Sep 2014 13:48:36 -0400
 
-These patches above were already on my pci/host-generic branch and in
-linux-next:
+> +static inline int gbe_phy_link_status(struct gbe_slave *slave)
+> +{
+> +	if (!slave->phy)
+> +		return 1;
+> +
+> +	if (slave->phy->link)
+> +		return 1;
+> +
+> +	return 0;
+> +}
 
-   asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
-   of/pci: Add pci_register_io_range() and pci_pio_to_address()
-   ARM: Define PCI_IOBASE as the base of virtual PCI IO space
-   of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
-   of/pci: Move of_pci_range_to_resources() to of/address.c
-   of/pci: Fix the conversion of IO ranges into IO resources
+Please use 'bool' as the return type and return 'true' or 'false'.
 
-I added these three patches to my pci/host-generic branch:
+Do not use 'inline' in foo.c files, let the compiler decide.  Please
+audit this entire submission for this problem.
 
-   PCI: Add generic domain handling
-   of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
-   of/pci: Add support for parsing PCI host bridge resources from DT
+> +static int gbe_port_reset(struct gbe_slave *slave)
+> +{
+> +	u32 i, v;
+> +
+> +	/* Set the soft reset bit */
+> +	writel_relaxed(SOFT_RESET, GBE_REG_ADDR(slave, emac_regs, soft_reset));
 
-Yinghai pointed out a problem with this one, so I omitted it:
+This driver seems to use relaxed readl and writel for almost everything.
 
-   PCI: Assign unassigned bus resources in pci_scan_root_bus()
+That absolutely cannot be right.  For example, here, you depend upon the
+ordering of this writel_relaxed() to reset the chip relative to the
+real_relaxed() you subsequently do to check ths bits.
 
-I added this one to my pci/host-generic branch:
+I seriously think that *_relaxed() should only be done in very special
+circumstances where 1) the performance matters and 2) the validity of
+the usage has been put under a microscope and fully documented with huge
+comments above the *_relaxed() calls.
 
-   PCI: Add pci_remap_iospace() to map bus I/O resources
+If you cannot reduce and properly document the really necessary *_relaxed()
+uses, just convert them all to non-_relaxed() for now.
 
-I assume this depends on the pci_scan_root_bus() change (if not, let me
-know), so I omitted this one:
+I'm also warning you ahead of time that since nobody else seems to feel
+like reviewing this enormous submission, you are going to have to get used
+to me pushing back on these changes over and over for small things like
+coding style and structural/API issues until some reviews it on a higher
+level.
 
-   arm64: Add architectural support for PCI
-
-Bjorn
+I really don't want to apply this series until someone thinks seriously
+about the driver's design and the long term ramifications of having a
+driver like this in the tree with so many random TX etc. hooks.
