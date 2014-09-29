@@ -1,48 +1,49 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Sep 2014 15:06:17 +0200
-Subject: [PATCH 5/6] arm64: kvm: define PAGE_S2_DEVICE as read-only by
- default
-In-Reply-To: <1410990981-665-6-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 29 Sep 2014 15:07:45 +0200
+Subject: [PATCH 0/6] KVM: handling of MMIO pass-through regions
+In-Reply-To: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140929130617.GE25697@cbox>
+Message-ID: <20140929130745.GF3095@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 02:56:20PM -0700, Ard Biesheuvel wrote:
-> Now that we support read-only memslots, we need to make sure that
-> pass-through device mappings are not mapped writable if the guest
-> has requested them to be read-only. The existing implementation
-> already honours this by calling kvm_set_s2pte_writable() on the new
-> pte in case of writable mappings, so all we need to do is define
-> the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+On Wed, Sep 17, 2014 at 02:56:15PM -0700, Ard Biesheuvel wrote:
+> This is a followup to the patches 'kvm: define PAGE_S2_DEVICE as
+> read-only by default' I sent out last week. Essentially build tested
+> only: while QEMU on KVM still works correctly for my use case with
+> these patches applied, it does not in fact use passthrough mappings
+> of device memory.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/pgtable.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Patch #1 is a trivial fix for an issue identified by sparse where we
+> are calling memset(0) on 2 MB worth of pages.
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index ffe1ba0506d1..51f6f5284ce5 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -79,7 +79,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->  #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
->  
->  #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
-> -#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDWR | PTE_UXN)
-> +#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
->  
->  #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
->  #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
-> -- 
-> 1.8.3.2
+> Patch #2 fixes a potential NULL dereference in user_mem_abort()
 > 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Patch #3 adds a 'writable' parameter to kmv_phys_addr_ioremap() so that
+> read-only device regions can be mapped using this function. The existing
+> callers are updated to pass 'true' for this parameter.
+> 
+> Patch #4 and #5 were sent out before, and change the value of
+> PAGE_S2_DEVICE to read-only, so that read-only regions can be
+> ioremap()'ed
+> 
+> Patch #6 ensures that VM_PFNMAP linear mappings of non-system RAM host
+> memory are mapped eagerly rather than faulted in page by page.
+> 
+> 
+> Ard Biesheuvel (6):
+>   arm/arm64: KVM: use __GFP_ZERO not memset() to get zeroed pages
+>   arm/arm64: KVM: fix potential NULL dereference in user_mem_abort()
+>   arm/arm64: KVM: add 'writable' parameter to kvm_phys_addr_ioremap
+>   ARM: kvm: define PAGE_S2_DEVICE as read-only by default
+>   arm64: kvm: define PAGE_S2_DEVICE as read-only by default
+>   arm/arm64: KVM: map MMIO regions at creation time
+> 
 
-Catalin, Will,
-
-Are you fine with me queueing this through the kvmarm tree?
+So I only had comments on that last one and the others are fairly benign
+and small patches, so assuming the arch maintainers don't complain about
+the mm header changes, I can queue the first 5 patches and add the last
+one when we sort that out.
 
 Thanks,
 -Christoffer
