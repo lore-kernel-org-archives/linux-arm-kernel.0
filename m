@@ -1,245 +1,248 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 29 Sep 2014 14:17:38 +0530
-Subject: [PATCH v6] mfd: syscon: Decouple syscon interface from platform
- devices
-Message-ID: <1411980458-32329-1-git-send-email-pankaj.dubey@samsung.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 29 Sep 2014 11:52:17 +0300
+Subject: [PATCH 1/2 v2] SPI: spi-pxa2xx: Add helpers for regiseters'
+ accessing
+In-Reply-To: <1412000548-9908-2-git-send-email-alvin.chen@intel.com>
+References: <1412000548-9908-1-git-send-email-alvin.chen@intel.com>
+ <1412000548-9908-2-git-send-email-alvin.chen@intel.com>
+Message-ID: <1411980737.10697.0.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently a syscon entity can be only registered directly through a
-platform device that binds to a dedicated syscon driver. However in
-certain use cases it is desirable to make a device used with another
-driver a syscon interface provider.
+On Mon, 2014-09-29 at 07:22 -0700, Weike Chen wrote:
 
-For example, certain SoCs (e.g. Exynos) contain system controller
-blocks which perform various functions such as power domain control,
-CPU power management, low power mode control, but in addition contain
-certain IP integration glue, such as various signal masks,
-coprocessor power control, etc. In such case, there is a need to have
-a dedicated driver for such system controller but also share registers
-with other drivers. The latter is where the syscon interface is helpful.
 
-In case of DT based platforms, this patch decouples syscon object from
-syscon platform driver, and allows to create syscon objects first time
-when it is required by calling of syscon_regmap_lookup_by APIs and keep
-a list of such syscon objects along with syscon provider device_nodes
-and regmap handles.
+I'm okay with the current version, though I have few minor comments
+below.
 
-For non-DT based platforms, this patch keeps syscon platform driver
-structure where is can be probed and such non-DT based drivers can use
-syscon_regmap_lookup_by_pdev API and get access to regmap handles.
-Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-we can completely remove platform driver of syscon, and keep only helper
-functions to get regmap handles.
+> Introduce helper functions to access the 'SSCR0' and 'SSCR1'.
+> 
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
-Patch v5 and related discussions can be found here [1].
+Like you said in the summary there are many accessors to many registers,
+not only cr1/cr0. Perhaps, you may extend your commit message.
 
-Change since v5:
- - Dropping creation of dummy platform device in of_syscon_register.
- - As we are changing syscon to decouple from platform_device, creation of 
-   dummy platform_device does not look good option, and as suggested by Arnd,
-   I made another attempt so that regmap_mmio_init API should work with NULL
-   dev pointer itself. Since regmap needs to know about Syscon device node
-   properties so let's parse device node of syscon in syscon itself for any
-   such properties and using regmap_config parameter pass all such information
-   to regmap. Other concern of crashes due to NULL dev pointer in regmap already
-   addressed in separate patches of regmap. Please see [2] and [3].
-  
+In any case
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-Changes since v4:
- - Addressed Tomasz Figa's comments for v4.
- - Added error handing in of_syscon_register function.
- - Using devm_regmap_init_mmio instead of regmap_init_mmio.
 
-Changes since v3:
- - Addressed Arnd's comment for v2.
- - Updated of_syscon_register for adding dev pointer in regmap_init_mmio.
- - For early users created dummy platform device.
+More comments below.
 
-Changes since v2:
- - Added back platform device support from syscon, with one change that
-   syscon will not be probed for DT based platform.
- - Added back syscon_regmap_lookup_by_pdevname API so that non-DT base
-   users of syscon will not be broken.
- - Removed unwanted change in syscon.h.
- - Modified Signed-off-by list, added Suggested-by of Tomasz Figa and
-   Arnd Bergmann.
- - Added Tested-by of Vivek Gautam for testing on Exynos platform.
+> Signed-off-by: Weike Chen <alvin.chen@intel.com>
+> ---
+>  drivers/spi/spi-pxa2xx.c |  108 ++++++++++++++++++++++++++++++++++++----------
+>  1 file changed, 85 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+> index 256c0ab..e7ff9c5 100644
+> --- a/drivers/spi/spi-pxa2xx.c
+> +++ b/drivers/spi/spi-pxa2xx.c
+> @@ -80,6 +80,73 @@ static bool is_lpss_ssp(const struct driver_data *drv_data)
+>  	return drv_data->ssp_type == LPSS_SSP;
+>  }
+>  
+> +static u32 pxa2xx_spi_get_ssrc1_change_mask(const struct driver_data *drv_data)
+> +{
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		return SSCR1_CHANGE_MASK;
+> +	}
+> +}
+> +
+> +static u32
+> +pxa2xx_spi_get_rx_default_thre(const struct driver_data *drv_data)
+> +{
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		return RX_THRESH_DFLT;
+> +	}
+> +}
+> +
+> +static bool pxa2xx_spi_txfifo_full(const struct driver_data *drv_data)
+> +{
+> +	void __iomem *reg = drv_data->ioaddr;
+> +	u32 mask;
+> +
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		mask = SSSR_TFL_MASK;
+> +		break;
+> +	}
+> +
+> +	return (read_SSSR(reg) & mask) == mask;
+> +}
+> +
+> +static void pxa2xx_spi_clear_rx_thre(const struct driver_data *drv_data,
+> +				     u32 *sccr1_reg)
+> +{
+> +	u32 mask;
+> +
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		mask = SSCR1_RFT;
+> +		break;
+> +	}
+> +	*sccr1_reg &= ~mask;
+> +}
+> +
+> +static void pxa2xx_spi_set_rx_thre(const struct driver_data *drv_data,
+> +				   u32 *sccr1_reg, u32 threshold)
+> +{
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		*sccr1_reg |= SSCR1_RxTresh(threshold);
+> +		break;
+> +	}
+> +}
+> +
+> +static u32 pxa2xx_configure_sscr0(const struct driver_data *drv_data,
+> +				  u32 clk_div, u8 bits)
+> +{
+> +	switch (drv_data->ssp_type) {
+> +	default:
+> +		return clk_div
+> +			| SSCR0_Motorola
+> +			| SSCR0_DataSize(bits > 16 ? bits - 16 : bits)
+> +			| SSCR0_SSE
+> +			| (bits > 16 ? SSCR0_EDSS : 0);
+> +	}
+> +}
+> +
+>  /*
+>   * Read and write LPSS SSP private registers. Caller must first check that
+>   * is_lpss_ssp() returns true before these can be called.
+> @@ -234,7 +301,7 @@ static int null_writer(struct driver_data *drv_data)
+>  	void __iomem *reg = drv_data->ioaddr;
+>  	u8 n_bytes = drv_data->n_bytes;
+>  
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
 
-Changes since v1:
- - Removed of_syscon_unregister function.
- - Modified of_syscon_register function and it will be used by syscon.c
-   to create syscon objects whenever required.
- - Removed platform device support from syscon.
- - Removed syscon_regmap_lookup_by_pdevname API support.
- - As there are significant changes w.r.t patchset v1, I am taking over
-   author for this patchset from Tomasz Figa.
+Just wondering if those two could fit one line.
 
-[1]: https://lkml.org/lkml/2014/9/22/12
-[2]: https://lkml.org/lkml/2014/9/18/130
-[3]: https://lkml.org/lkml/2014/9/27/2
+>  		return 0;
+>  
+> @@ -262,7 +329,7 @@ static int u8_writer(struct driver_data *drv_data)
+>  {
+>  	void __iomem *reg = drv_data->ioaddr;
+>  
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
 
- drivers/mfd/syscon.c |  106 +++++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 84 insertions(+), 22 deletions(-)
+Ditto.
 
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index ca15878..00a8410 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -15,6 +15,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/list.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -22,31 +23,104 @@
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/slab.h>
- 
- static struct platform_driver syscon_driver;
- 
-+static DEFINE_SPINLOCK(syscon_list_slock);
-+static LIST_HEAD(syscon_list);
-+
- struct syscon {
-+	struct device_node *np;
- 	struct regmap *regmap;
-+	struct list_head list;
-+};
-+
-+static struct regmap_config syscon_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
- };
- 
--static int syscon_match_node(struct device *dev, void *data)
-+static struct syscon *of_syscon_register(struct device_node *np)
- {
--	struct device_node *dn = data;
-+	struct syscon *syscon;
-+	struct regmap *regmap;
-+	void __iomem *base;
-+	int ret;
-+	enum regmap_endian endian = REGMAP_ENDIAN_DEFAULT;
-+
-+	if (!of_device_is_compatible(np, "syscon"))
-+		return ERR_PTR(-EINVAL);
-+
-+	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
-+	if (!syscon)
-+		return ERR_PTR(-ENOMEM);
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		ret = -ENOMEM;
-+		goto err_map;
-+	}
-+
-+	/* Parse the device's DT node for an endianness specification */
-+	if (of_property_read_bool(np, "big-endian"))
-+		endian = REGMAP_ENDIAN_BIG;
-+	 else if (of_property_read_bool(np, "little-endian"))
-+		endian = REGMAP_ENDIAN_LITTLE;
-+
-+	/* If the endianness was specified in DT, use that */
-+	if (endian != REGMAP_ENDIAN_DEFAULT)
-+		syscon_regmap_config.val_format_endian = endian;
-+
-+	regmap = regmap_init_mmio(NULL, base, &syscon_regmap_config);
-+	if (IS_ERR(regmap)) {
-+		pr_err("regmap init failed\n");
-+		ret = PTR_ERR(regmap);
-+		goto err_regmap;
-+	}
-+
-+	syscon->regmap = regmap;
-+	syscon->np = np;
-+
-+	spin_lock(&syscon_list_slock);
-+	list_add_tail(&syscon->list, &syscon_list);
-+	spin_unlock(&syscon_list_slock);
- 
--	return (dev->of_node == dn) ? 1 : 0;
-+	/* Change back endianness of syscon_regmap_config.
-+	 * As this is static config in this file and in one system we may
-+	 * have more than one syscon
-+	 */
-+	syscon_regmap_config.val_format_endian = REGMAP_ENDIAN_DEFAULT;
-+
-+	return syscon;
-+
-+err_regmap:
-+	iounmap(base);
-+err_map:
-+	kfree(syscon);
-+	return ERR_PTR(ret);
- }
- 
- struct regmap *syscon_node_to_regmap(struct device_node *np)
- {
--	struct syscon *syscon;
--	struct device *dev;
-+	struct syscon *entry, *syscon = NULL;
- 
--	dev = driver_find_device(&syscon_driver.driver, NULL, np,
--				 syscon_match_node);
--	if (!dev)
--		return ERR_PTR(-EPROBE_DEFER);
-+	spin_lock(&syscon_list_slock);
- 
--	syscon = dev_get_drvdata(dev);
-+	list_for_each_entry(entry, &syscon_list, list)
-+		if (entry->np == np) {
-+			syscon = entry;
-+			break;
-+		}
-+
-+	spin_unlock(&syscon_list_slock);
-+
-+	if (!syscon)
-+		syscon = of_syscon_register(np);
-+
-+	if (IS_ERR(syscon))
-+		return ERR_CAST(syscon);
- 
- 	return syscon->regmap;
- }
-@@ -110,17 +184,6 @@ struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
- }
- EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_phandle);
- 
--static const struct of_device_id of_syscon_match[] = {
--	{ .compatible = "syscon", },
--	{ },
--};
--
--static struct regmap_config syscon_regmap_config = {
--	.reg_bits = 32,
--	.val_bits = 32,
--	.reg_stride = 4,
--};
--
- static int syscon_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -167,7 +230,6 @@ static struct platform_driver syscon_driver = {
- 	.driver = {
- 		.name = "syscon",
- 		.owner = THIS_MODULE,
--		.of_match_table = of_syscon_match,
- 	},
- 	.probe		= syscon_probe,
- 	.id_table	= syscon_ids,
+>  		return 0;
+>  
+> @@ -289,7 +356,7 @@ static int u16_writer(struct driver_data *drv_data)
+>  {
+>  	void __iomem *reg = drv_data->ioaddr;
+>  
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
+
+Ditto.
+
+>  		return 0;
+>  
+> @@ -316,7 +383,7 @@ static int u32_writer(struct driver_data *drv_data)
+>  {
+>  	void __iomem *reg = drv_data->ioaddr;
+>  
+> -	if (((read_SSSR(reg) & SSSR_TFL_MASK) == SSSR_TFL_MASK)
+> +	if (pxa2xx_spi_txfifo_full(drv_data)
+>  		|| (drv_data->tx == drv_data->tx_end))
+
+Ditto.
+
+>  		return 0;
+>  
+> @@ -508,8 +575,9 @@ static irqreturn_t interrupt_transfer(struct driver_data *drv_data)
+>  		 * remaining RX bytes.
+>  		 */
+>  		if (pxa25x_ssp_comp(drv_data)) {
+> +			u32 rx_thre;
+>  
+> -			sccr1_reg &= ~SSCR1_RFT;
+> +			pxa2xx_spi_clear_rx_thre(drv_data, &sccr1_reg);
+>  
+>  			bytes_left = drv_data->rx_end - drv_data->rx;
+>  			switch (drv_data->n_bytes) {
+> @@ -519,10 +587,12 @@ static irqreturn_t interrupt_transfer(struct driver_data *drv_data)
+>  				bytes_left >>= 1;
+>  			}
+>  
+> -			if (bytes_left > RX_THRESH_DFLT)
+> -				bytes_left = RX_THRESH_DFLT;
+> +			rx_thre = pxa2xx_spi_get_rx_default_thre(drv_data);
+> +			if (rx_thre > bytes_left)
+> +				rx_thre = bytes_left;
+>  
+> -			sccr1_reg |= SSCR1_RxTresh(bytes_left);
+> +			pxa2xx_spi_set_rx_thre(drv_data, &sccr1_reg,
+> +					       rx_thre);
+>  		}
+>  		write_SSCR1(sccr1_reg, reg);
+>  	}
+> @@ -613,6 +683,7 @@ static void pump_transfers(unsigned long data)
+>  	u32 cr1;
+>  	u32 dma_thresh = drv_data->cur_chip->dma_threshold;
+>  	u32 dma_burst = drv_data->cur_chip->dma_burst_size;
+> +	u32 change_mask = pxa2xx_spi_get_ssrc1_change_mask(drv_data);
+>  
+>  	/* Get current state information */
+>  	message = drv_data->cur_msg;
+> @@ -731,11 +802,7 @@ static void pump_transfers(unsigned long data)
+>  						     "pump_transfers: DMA burst size reduced to match bits_per_word\n");
+>  		}
+>  
+> -		cr0 = clk_div
+> -			| SSCR0_Motorola
+> -			| SSCR0_DataSize(bits > 16 ? bits - 16 : bits)
+> -			| SSCR0_SSE
+> -			| (bits > 16 ? SSCR0_EDSS : 0);
+> +		cr0 = pxa2xx_configure_sscr0(drv_data, clk_div, bits);
+>  	}
+>  
+>  	message->state = RUNNING_STATE;
+> @@ -772,16 +839,15 @@ static void pump_transfers(unsigned long data)
+>  	}
+>  
+>  	/* see if we need to reload the config registers */
+> -	if ((read_SSCR0(reg) != cr0)
+> -		|| (read_SSCR1(reg) & SSCR1_CHANGE_MASK) !=
+> -			(cr1 & SSCR1_CHANGE_MASK)) {
+> +	if ((read_SSCR0(reg) != cr0) ||
+> +	    (read_SSCR1(reg) & change_mask) != (cr1 & change_mask)) {
+>  
+>  		/* stop the SSP, and update the other bits */
+>  		write_SSCR0(cr0 & ~SSCR0_SSE, reg);
+>  		if (!pxa25x_ssp_comp(drv_data))
+>  			write_SSTO(chip->timeout, reg);
+>  		/* first set CR1 without interrupt and service enables */
+> -		write_SSCR1(cr1 & SSCR1_CHANGE_MASK, reg);
+> +		write_SSCR1(cr1 & change_mask, reg);
+>  		/* restart the SSP */
+>  		write_SSCR0(cr0, reg);
+>  
+> @@ -959,12 +1025,8 @@ static int setup(struct spi_device *spi)
+>  	clk_div = ssp_get_clk_div(drv_data, spi->max_speed_hz);
+>  	chip->speed_hz = spi->max_speed_hz;
+>  
+> -	chip->cr0 = clk_div
+> -			| SSCR0_Motorola
+> -			| SSCR0_DataSize(spi->bits_per_word > 16 ?
+> -				spi->bits_per_word - 16 : spi->bits_per_word)
+> -			| SSCR0_SSE
+> -			| (spi->bits_per_word > 16 ? SSCR0_EDSS : 0);
+> +	chip->cr0 = pxa2xx_configure_sscr0(drv_data, clk_div,
+> +					   spi->bits_per_word);
+>  	chip->cr1 &= ~(SSCR1_SPO | SSCR1_SPH);
+>  	chip->cr1 |= (((spi->mode & SPI_CPHA) != 0) ? SSCR1_SPH : 0)
+>  			| (((spi->mode & SPI_CPOL) != 0) ? SSCR1_SPO : 0);
+
+
 -- 
-1.7.9.5
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
