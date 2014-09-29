@@ -1,139 +1,41 @@
-From: kiran.padwal@smartplayin.com (Kiran Padwal)
-Date: Mon, 29 Sep 2014 15:56:41 +0530
-Subject: [PATCH 3/4] ARM: DT: apq8064: Add USB OTG support
-In-Reply-To: <1411982127-8048-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982127-8048-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <542933E1.8010809@smartplayin.com>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Mon, 29 Sep 2014 12:30:43 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140929095440.GB13142@linutronix.de>
+References: <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140917102812.GA20438@ci00147.xsens-tech.local>
+ <20140921204100.GA10111@linutronix.de>
+ <20140922092853.GH20438@ci00147.xsens-tech.local>
+ <20140925151403.GH19396@linutronix.de>
+ <20140929085042.GA13952@ci00147.xsens-tech.local>
+ <20140929095440.GB13142@linutronix.de>
+Message-ID: <20140929103042.GA31111@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On Mon, Sep 29, 2014 at 11:54:40AM +0200, Sebastian Andrzej Siewior wrote:
+> There is a patch named "ARM: edma: unconditionally ack the error
+> interrupt". I have the feeling that this is not really required once we
+> delay set_termios. I couldn't reproduce the bug with beagleblack with my
+> usual test case.
 
-Some review are comments inline.
+I think so too. I didn't need it either.
 
-On Monday 29 September 2014 02:45 PM, Srinivas Kandagatla wrote:
-> This patch adds USB OTG support on USB1 of APQ8064 SOC.
-> Tested on IFC6410 with ethernet gadget.
+
+> For your "too much work for irq" problem: Could you add trace_printk()
+> in tx/rx dma start/complete, and irq routine? The interresting part is
+> what is the irq routine doing once entered. It might be a condition that
+> is ignored at first and "acked" later while serving another event. Or it
+> is really doing something and this is more or less "legal".
+
+I'll have a look at that.
+
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 14 +++++++++
->  arch/arm/boot/dts/qcom-apq8064.dtsi        | 46 ++++++++++++++++++++++++++++++
->  2 files changed, 60 insertions(+)
+> >Thanks,
+> >Frans
 > 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> index d6036b8..f41fb39 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> @@ -40,6 +40,11 @@
->  			};
->  		};
->  
-> +		/* OTG */
-> +		usb1_phy:phy at 12500000 {
-> +			status = "ok";
-
-Its canonical value is "okay" (although in practice anything
-other than "disabled" should work).
-
-> +		};
-> +
->  		usb3_phy:phy at 12520000 {
->  			status = "ok";
->  		};
-> @@ -48,6 +53,15 @@
->  			status = "ok";
->  		};
->  
-> +		gadget1:gadget at 12500000 {
-> +			status = "ok";
-> +		};
-> +
-> +		/* OTG */
-> +		usb1: usb at 12500000 {
-> +			status = "ok";
-> +		};
-> +
->  		usb3: usb at 12520000 {
->  			status = "ok";
->  		};
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index 491a136..38d3efa 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -284,6 +284,16 @@
->  				qcom,boot-load = <50000>;
->  			};
->  
-> +			pm8921_l4: pm8921-l4 {
-> +				compatible	= "qcom,rpm-pm8921-pldo";
-> +				reg		= <QCOM_RPM_PM8921_LDO4>;
-> +
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +				qcom,boot-load = <50000>;
-> +			};
-> +
->  			pm8921_l23: pm8921-l23 {
->  				compatible	= "qcom,rpm-pm8921-pldo";
->  				reg		= <QCOM_RPM_PM8921_LDO23>;
-> @@ -296,6 +306,25 @@
->  
->  		};
->  
-> +		usb1_phy:phy at 12500000 {
-> +			compatible	= "qcom,usb-otg-ci";
-> +			reg		= <0x12500000 0x400>;
-> +			interrupts	= <0 100 0>;
-
-The trailing 0 might be IRQ_TYPE_NONE?
-
-> +			status		= "disabled";
-
-Usually the status property goes first.
-
-
-> +			dr_mode		= "host";
-> +
-> +			clocks		= <&gcc USB_HS1_XCVR_CLK>,
-> +					  <&gcc USB_HS1_H_CLK>;
-> +			clock-names	= "core", "iface";
-> +
-> +			vddcx-supply	= <&pm8921_s3>;
-> +			v3p3-supply	= <&pm8921_l3>;
-> +			v1p8-supply	= <&pm8921_l4>;
-> +
-> +			resets		= <&gcc USB_HS1_RESET>;
-> +			reset-names	= "link";
-> +		};
-> +
->  		usb3_phy:phy at 12520000 {
->  			compatible	= "qcom,usb-otg-ci";
->  			reg		= <0x12520000 0x400>;
-> @@ -334,6 +363,23 @@
->  			reset-names	= "link";
->  		};
->  
-> +		gadget1:gadget at 12500000 {
-> +			compatible	= "qcom,ci-hdrc";
-> +			reg		= <0x12500000 0x400>;
-> +			status		= "disabled";
-> +			dr_mode		= "peripheral";
-> +			interrupts	= <0 100 0>;
-> +			usb-phy		= <&usb1_phy>;
-> +		};
-> +
-> +		usb1: usb at 12500000 {
-> +			compatible	= "qcom,ehci-host";
-> +			reg		= <0x12500000 0x400>;
-> +			interrupts	= <0 100 0>;
-> +			status		= "disabled";
-> +			usb-phy		= <&usb1_phy>;
-> +		};
-> +
->  		usb3: usb at 12520000 {
->  			compatible	= "qcom,ehci-host";
->  			reg		= <0x12520000 0x400>;
-> 
+> Sebastian
