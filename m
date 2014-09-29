@@ -1,35 +1,59 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 29 Sep 2014 22:59:23 +0200
-Subject: [PATCH 1/2 v2] i2c: cros-ec-tunnel: Add of match table
-In-Reply-To: <1411114093-3505-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1411114093-3505-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1411114093-3505-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20140929205922.GB2758@katana>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 30 Sep 2014 07:02:01 +1000
+Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
+In-Reply-To: <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+ <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
+ <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
+ <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
+Message-ID: <1412024521.4285.98.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 10:08:12AM +0200, Sjoerd Simons wrote:
-> To enable the cros-ec-tunnel driver to be auto-loaded when build as a
-> module add an of match table (and export it) to match the modalias
-> information passed on to userspace as the Cros EC MFD driver registers
-> the MFD subdevices with an of_compatibility string.
+On Mon, 2014-09-29 at 12:06 -0700, Yinghai Lu wrote:
+> On Mon, Sep 29, 2014 at 11:25 AM, Yinghai Lu <yinghai@kernel.org> wrote:
+> > On Mon, Sep 29, 2014 at 7:29 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> If the firmware has not assigned all the bus resources and we are not just
+> >> probing the PCI buses, it makes sense to assign the unassigned resources
+> >> in pci_scan_root_bus().
+> >>
+> >> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> >> CC: Arnd Bergmann <arnd@arndb.de>
+> >> CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> >> CC: Rob Herring <robh+dt@kernel.org>
+> >> ---
+> >>  drivers/pci/probe.c | 3 +++
+> >>  1 file changed, 3 insertions(+)
+> >>
+> >> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> >> index 636d1c9..d2ebd49 100644
+> >> --- a/drivers/pci/probe.c
+> >> +++ b/drivers/pci/probe.c
+> >> @@ -1951,6 +1951,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+> >>         if (!found)
+> >>                 pci_bus_update_busn_res_end(b, max);
+> >>
+> >> +       if (!pci_has_flag(PCI_PROBE_ONLY))
+> >> +               pci_assign_unassigned_bus_resources(b);
+> >> +
+> >>         pci_bus_add_devices(b);
+> >>         return b;
+> >>  }
+> >
+> > No, you can not do it that early.
+> >
+> > On x86, we need to call
+> > pcibios_resource_survey_bus at first.
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> on x86:
+> pcibios_init
+> pcibios_resource_survey()
+> pcibios_assign_resources() via fs_initcall
+ 
+Right and on powerpc and others as well. We need to survey existing
+resources. We also have a number of platform things that might need
+to happen before we do the final re-assignment pass.
 
-Applied to for-next, thanks!
-
-However, since you are working on this driver: sparse rightfully
-complains about:
-
-drivers/i2c/busses/i2c-cros-ec-tunnel.c:97:44: warning: cast truncates bits from constant value (10000 becomes 0)
-
-I don't know the EC protocol, can you check?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/556cfafe/attachment.sig>
+Ben.
