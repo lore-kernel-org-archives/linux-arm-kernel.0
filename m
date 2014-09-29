@@ -1,79 +1,187 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 29 Sep 2014 11:26:06 +0200
-Subject: [PATCH 13/16] tty: serial: 8250_dma: add pm runtime
-In-Reply-To: <1410377411-26656-14-git-send-email-bigeasy@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-14-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140929092606.GC13952@ci00147.xsens-tech.local>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Mon, 29 Sep 2014 10:26:00 +0100
+Subject: [PATCH v2 00/22] Use MSI chip framework to configure MSI/MSI-X
+ in all platforms
+In-Reply-To: <5428B971.50101@huawei.com>
+References: <1411614872-4009-1-git-send-email-wangyijing@huawei.com>
+ <20140925074235.GN12423@ulmo>
+ <20140925144855.GB31157@bart.dudau.co.uk>
+ <20140925164937.GB30382@ulmo> <5424E09F.50701@huawei.com>
+ <20140926085030.GE31157@bart.dudau.co.uk>
+ <54276F6C.5010705@huawei.com>
+ <20140928112144.GA4671@bart.dudau.co.uk>
+ <5428B971.50101@huawei.com>
+Message-ID: <20140929092600.GA15854@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:30:08PM +0200, Sebastian Andrzej Siewior wrote:
-> There is nothing to do for RPM in the RX path. If the HW goes off then it
-> won't assert the DMA line and the transfer won't happen. So we hope that
-> the HW does not go off for RX to work (DMA or PIO makes no difference
-> here).
+On Mon, Sep 29, 2014 at 09:44:17AM +0800, Yijing Wang wrote:
+> On 2014/9/28 19:21, Liviu Dudau wrote:
+> > On Sun, Sep 28, 2014 at 10:16:12AM +0800, Yijing Wang wrote:
+> >>>>>> What I would like to see is a way of creating the pci_host_bridge structure outside
+> >>>>>> the pci_create_root_bus(). That would then allow us to pass this sort of platform
+> >>>>>> details like associated msi_chip into the host bridge and the child busses will
+> >>>>>> have an easy way of finding the information needed by finding the root bus and then
+> >>>>>> the host bridge structure. Then the generic pci_scan_root_bus() can be used by (mostly)
+> >>>>>> everyone and the drivers can remove their kludges that try to work around the
+> >>>>>> current limitations.
+> >>>>
+> >>>> So I think maybe save msi chip in PCI arch sysdata is a good candidate.
+> >>>
+> >>> Except that arch sysdata at the moment is an opaque pointer. I am all in favour in
+> >>> changing the type of sysdata from void* into pci_host_bridge* and arches can wrap their old
+> >>> sysdata around the pci_host_bridge*.
+> >>
+> >> I inspected every arch and found there are almost no common stuff,
+> > 
+> > I will disagree here. Most (all?) of the structures that are passed as sysdata argument to
 > 
-> For TX the situation is slightly different. RPM is enabled on
-> start_tx(). We can't disable RPM on DMA complete callback because there
-> is still data in the FIFO which is being sent. We have to wait until
-> the FIFO is empty before we disable it.
-> For this to happen we fake a TX sent error and enable THRI. Once the
-> FIFO is empty we receive an interrupt and since the TTY-buffer is still
-> empty we "put RPM" via __stop_tx(). Should it been filed then in the
-> start_tx() path we should program the DMA transfer and remove the error
-> flag and the THRI bit.
+> Most.
+> 
+> > pci_create_root_bus() or pci_scan_root_bus() have a set of resources for storing the MEM and
+> > IO ranges, which struct pci_host_bridge already has. So that can be factored out of the
+> > arch code. Same for pci_domain_nr. Then there are some variables that are used for communication
+> > with the platform code due to convoluted way(s) in which PCI code gets instantiated.
+> 
+> Yes, currently some archs store MEM and IO resource in pci sysdata, and others not, move the MEM and IO
+> resource to pci_host_bride could make code become simple, we can clean up the resource list argument in
+> pci scan functions.
+> 
+> > 
+> > What I am arguing here is not that the arch equivalent of pci_host_bridge structure is already
+> > common, but that by moving the members that are common out of arch sysdata into pci_host_bridge
+> > we will have more commonality and it will be easier to re-factor the code.
+> 
+> Now, I got it, thanks!
+> 
+> > 
+> >> and generic data struct should
+> >> be created in generic PCI code.
+> > 
+> > Not necessarily. What I have in mind is something like this:
+> 
+> This is a good idea, what I'm worried is this series is already large, so I think we need to post
+> another series to do it.
 
-That last sentence starts out a bit messy.
-
+I wasn't asking to do it here, I was just offering a suggestion (and sharing some experience) when
+it comes to handling msi chip in an arch independent way.
 
 > 
-> Reviewed-by: Tony Lindgren <tony@atomide.com>
-> Tested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  drivers/tty/serial/8250/8250_dma.c | 16 +++++++++++-----
->  1 file changed, 11 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
-> index 898a6781d0b3..e8850219b150 100644
-> --- a/drivers/tty/serial/8250/8250_dma.c
-> +++ b/drivers/tty/serial/8250/8250_dma.c
-> @@ -21,6 +21,7 @@ static void __dma_tx_complete(void *param)
->  	struct uart_8250_dma	*dma = p->dma;
->  	struct circ_buf		*xmit = &p->port.state->xmit;
->  	unsigned long	flags;
-> +	bool en_thri = false;
->  
->  	dma_sync_single_for_cpu(dma->txchan->device->dev, dma->tx_addr,
->  				UART_XMIT_SIZE, DMA_TO_DEVICE);
-> @@ -40,11 +41,16 @@ static void __dma_tx_complete(void *param)
->  		int ret;
->  
->  		ret = serial8250_tx_dma(p);
-> -		if (ret) {
-> -			dma->tx_err = 1;
-> -			p->ier |= UART_IER_THRI;
-> -			serial_port_out(&p->port, UART_IER, p->ier);
-> -		}
-> +		if (ret)
-> +			en_thri = true;
-> +
-> +	} else if (p->capabilities & UART_CAP_RPM)
-> +		en_thri = true;
-> +
-> +	if (en_thri) {
-> +		dma->tx_err = 1;
-> +		p->ier |= UART_IER_THRI;
-> +		serial_port_out(&p->port, UART_IER, p->ier);
->  	}
->  
->  	spin_unlock_irqrestore(&p->port.lock, flags);
+> > 
+> >  - drivers/pci/ exports pci_init_host_bridge() that does the initialisation of bridge->windows
+> >    and anything else that is needed (like find_pci_host_bridge() function).
+> >  - arch code does:
+> > 
+> > 	struct pci_controller {
+> > 		struct pci_host_bridge bridge;
+> > 		.....
+> > 	};
+> > 
+> > 	#define to_pci_controller(bridge)	container_of(bridge, struct pci_controller, bridge)
+> > 
+> > 	static inline struct pci_controller *get_host_controller(const struct pci_bus *bus)
+> > 	{
+> > 		struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> > 		if (bridge)
+> > 			return to_pci_controller(bridge);
+> > 
+> > 		return NULL;
+> > 	}
+> > 
+> > 	int arch_pci_init(....)
+> > 	{
+> > 		struct pci_controller *hose;
+> > 		....
+> > 		hose = kzalloc(sizeof(*hose), GFP_KERNEL);
+> > 		pci_init_host_bridge(&hose->bridge);
+> > 		....
+> > 		pci_scan_root_bus(...., &hose->bridge, &resources);
+> > 		....
+> > 		return 0;
+> > 	}
+> > 
+> > Then finding the right structure will be easy.
+> > 
+> >> Another, I don't like associate msi chip and every PCI device, further more,
+> >> almost all platforms except arm have only one MSI controller, and currently, PCI enumerating code doesn't need
+> >> to know the MSI chip details, like for legacy IRQ, PCI device doesn't need to know which IRQ controller they
+> >> should deliver IRQ to. I would think more about it, and hope other PCI guys can give some comments, especially from Bjorn.
+> >>
+> > 
+> > I wasn't suggesing to associate an msi chip with every PCI device, but with the pci_host_bridge.
+> > I don't expect a host bridge to have more than one msi chip, so that should be OK. Also, I'm
+> > thinking that getting the associated msi chip should be some sort of pci_host_bridge ops function,
+> > and for arches that don't care about MSI it doesn't get implemented.
+> 
+> Currently, a property "msi-parent" was introduced in arm, and all msi chip integrated in irq chip controller will
+> be added to of_pci_msi_chip_list. PCI host driver find the match msi chip by its of_node.
+
+OK. But as you might have seen that still implies open coding a separate version of pci_scan_root_bus().
+
+Best regards,
+Liviu
+
+> 
+> Thanks!
+> Yijing.
+> 
+> > 
+> > Best regards,
+> > Liviu
+> > 
+> >  
+> >> Thanks!
+> >> Yijing.
+> >>
+> >>>
+> >>> Best regards,
+> >>> Liviu
+> >>>
+> >>>>
+> >>>>>
+> >>>>> I think both issues are orthogonal. Last time I checked a lot of work
+> >>>>> was still necessary to unify host bridges enough so that it could be
+> >>>>> shared across architectures. But perhaps some of that work has
+> >>>>> happened in the meantime.
+> >>>>>
+> >>>>> But like I said, when you create the root bus, you can easily attach the
+> >>>>> MSI chip to it.
+> >>>>>
+> >>>>> Thierry
+> >>>>>
+> >>>>
+> >>>>
+> >>>> -- 
+> >>>> Thanks!
+> >>>> Yijing
+> >>>>
+> >>>>
+> >>>
+> >>
+> >>
+> >> -- 
+> >> Thanks!
+> >> Yijing
+> >>
+> >>
+> > 
+> 
+> 
 > -- 
-> 2.1.0
+> Thanks!
+> Yijing
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
