@@ -1,90 +1,106 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 29 Sep 2014 16:44:21 +0200
-Subject: [PATCH v6 08/11] ARM: AT91/dt: add alternative pin muxing for sama5d3
- lcd pins
-In-Reply-To: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1412001864-3251-9-git-send-email-boris.brezillon@free-electrons.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Tue, 30 Sep 2014 00:46:11 +1000
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929132123.GA30998@ulmo>
+References: <53FF1D6C.6090205@redhat.com> <20140829070116.GC13106@ulmo>
+ <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
+ <20140902092508.GR15297@lukather> <20140927235601.19023.31593@quantum>
+ <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
+ <20140929101805.GB26008@ulmo>
+ <CAGRGNgW94Jo_EuE1d3ta-yWW3b0sUs+ggyXnLOULV1_CfW=QZQ@mail.gmail.com>
+ <20140929132123.GA30998@ulmo>
+Message-ID: <CAGRGNgVaT73L-AY1rMdth8RiNpanFB=9fzGaUV_tmS0d4udf5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Hi Thierry,
 
-Define alternative pin muxing for the LCDC pins.
+On Mon, Sep 29, 2014 at 11:21 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Mon, Sep 29, 2014 at 09:00:01PM +1000, Julian Calaby wrote:
+>> Hi Thierry,
+>
+> If you address people directly please make sure they are in the To:
+> line. Or at least Cc.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Tested-by: Anthony Harivel <anthony.harivel@emtrion.de>
----
- arch/arm/boot/dts/sama5d3_lcd.dtsi | 50 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+Sorry about that, the mailing list I received this through (Google
+Groups based) generally strips to: and CC: lines, so my mail client
+(Gmail) doesn't do it automatically. I'm still getting used to it.
 
-diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-index 2186b89..e7581f6 100644
---- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-@@ -82,6 +82,28 @@
- 							 AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
- 							 AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
- 							 AT91_PIOA 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD15 pin */
-+							 AT91_PIOA 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD16 pin */
-+							 AT91_PIOA 17 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDD17 pin */
-+					};
-+
-+					pinctrl_lcd_rgb666_alt: lcd-rgb-2-alt {
-+						atmel,pins =
-+							<AT91_PIOA 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD0 pin */
-+							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD1 pin */
-+							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD2 pin */
-+							 AT91_PIOA 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD3 pin */
-+							 AT91_PIOA 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD4 pin */
-+							 AT91_PIOA 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD5 pin */
-+							 AT91_PIOA 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD6 pin */
-+							 AT91_PIOA 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD7 pin */
-+							 AT91_PIOA 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD8 pin */
-+							 AT91_PIOA 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD9 pin */
-+							 AT91_PIOA 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD10 pin */
-+							 AT91_PIOA 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD11 pin */
-+							 AT91_PIOA 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD12 pin */
-+							 AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
-+							 AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
-+							 AT91_PIOA 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD15 pin */
- 							 AT91_PIOC 14 AT91_PERIPH_C AT91_PINCTRL_NONE	/* LCDD16 pin */
- 							 AT91_PIOC 13 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* LCDD17 pin */
- 					};
-@@ -104,6 +126,34 @@
- 							 AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
- 							 AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
- 							 AT91_PIOA 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD15 pin */
-+							 AT91_PIOA 16 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD16 pin */
-+							 AT91_PIOA 17 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD17 pin */
-+							 AT91_PIOA 18 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD18 pin */
-+							 AT91_PIOA 19 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD19 pin */
-+							 AT91_PIOA 20 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD20 pin */
-+							 AT91_PIOA 21 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD21 pin */
-+							 AT91_PIOA 22 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD22 pin */
-+							 AT91_PIOA 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* LCDD23 pin */
-+					};
-+
-+					pinctrl_lcd_rgb888_alt: lcd-rgb-3-alt {
-+						atmel,pins =
-+							<AT91_PIOA 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD0 pin */
-+							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD1 pin */
-+							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD2 pin */
-+							 AT91_PIOA 3 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD3 pin */
-+							 AT91_PIOA 4 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD4 pin */
-+							 AT91_PIOA 5 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD5 pin */
-+							 AT91_PIOA 6 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD6 pin */
-+							 AT91_PIOA 7 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD7 pin */
-+							 AT91_PIOA 8 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD8 pin */
-+							 AT91_PIOA 9 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD9 pin */
-+							 AT91_PIOA 10 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD10 pin */
-+							 AT91_PIOA 11 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD11 pin */
-+							 AT91_PIOA 12 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD12 pin */
-+							 AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD13 pin */
-+							 AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD14 pin */
-+							 AT91_PIOA 15 AT91_PERIPH_A AT91_PINCTRL_NONE	/* LCDD15 pin */
- 							 AT91_PIOC 14 AT91_PERIPH_C AT91_PINCTRL_NONE	/* LCDD16 pin */
- 							 AT91_PIOC 13 AT91_PERIPH_C AT91_PINCTRL_NONE	/* LCDD17 pin */
- 							 AT91_PIOC 12 AT91_PERIPH_C AT91_PINCTRL_NONE	/* LCDD18 pin */
+>> On Mon, Sep 29, 2014 at 8:18 PM, Thierry Reding
+>> <thierry.reding@gmail.com> wrote:
+>> > On Mon, Sep 29, 2014 at 11:23:01AM +0200, Maxime Ripard wrote:
+>> >> On Mon, Sep 29, 2014 at 10:06:39AM +0200, Thierry Reding wrote:
+>> > [...]
+>> >> > simplefb doesn't deal at all with hardware details. It simply uses what
+>> >> > firmware has set up, which is the only reason why it will work for many
+>> >> > people. What is passed in via its device tree node is the minimum amount
+>> >> > of information needed to draw something into the framebuffer. Also note
+>> >> > that the simplefb device tree node is not statically added to a DTS file
+>> >> > but needs to be dynamically generated by firmware at runtime.
+>> >>
+>> >> Which makes the whole even simpler, since the firmware already knows
+>> >> all about which clocks it had to enable.
+>> >
+>> > It makes things very complicated in the firmware because it now needs to
+>> > be able to generate DTB content that we would otherwise be able to do
+>> > much easier with a text editor.
+>>
+>> As far as the kernel is concerned, this is a solved problem.
+>
+> It's not completely solved. There's still the issue of no generic way to
+> specify regulators like you can do for clocks, resets or power domains.
+> But the kernel isn't the real issue here. The issue is the firmware that
+> now has to go out of its way not only to initialize display hardware but
+> also create device tree content just to make Linux not turn everything
+> off.
+
+My point is that the firmware is going to be doing complicated stuff
+already, adding and using some helpers to configure a device tree node
+is relatively simple in comparison to dealing with the actual
+hardware. It wouldn't surprise me if u-boot, for example, ended up
+with a set of functions to handle this exact case as more graphics
+hardware gets brought up.
+
+>> Firmware is going to be doing some dark magic to set up the hardware
+>> to be a dumb frame buffer and some other stuff to add the simplefb
+>> device node - so by this point, adding the clocks (or whatever)
+>> required by the hardware should be fairly uncomplicated - the firmware
+>> already knows the hardware intimately. As for the actual device tree
+>> manipulations, U-boot (or whatever) will probably just grow some
+>> helper functions to make this simple.
+>
+> Have you looked at the code needed to do this? It's not at all trivial.
+> And the point is really that all this information is there already, so
+> we're completely duplicating this into a dynamically created device tree
+> node and for what reason? Only to have one driver request all these
+> resources and have them forcefully released a few seconds later.
+>
+>> Alternatively, it could simply add the relevant data to an existing
+>> device node and munge it's compatible property so simplefb picks it
+>> up.
+>
+> Yes, I think that'd be a much better solution. Of course it's going to
+> be very difficult to make that work with a generic driver because now
+> that generic driver needs to parse the DT binding for any number of
+> "compatible" devices.
+
+Not necessarily.
+
+The patch that started this discussion can work with any number of
+clocks specified in a "clocks" property. Therefore all that needs to
+happen is that the final hardware binding specifies it's clocks that
+way. This is how, for example, the ahci_platform driver's clock code
+works.
+
+I'm sure that as hardware diversifies, the other subsystems will grow
+in similar directions and eventually be dealt with using similarly
+generic code.
+
+Thanks,
+
 -- 
-1.9.1
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
