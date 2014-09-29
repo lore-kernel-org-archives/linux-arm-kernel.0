@@ -1,38 +1,32 @@
 From: zhang.lyra@gmail.com (zhang.lyra at gmail.com)
-Date: Mon, 29 Sep 2014 19:48:28 +0800
-Subject: [PATCH 0/6] Add Spreadtrum Shark64 SoC support
-Message-ID: <1411991314-6636-1-git-send-email-zhang.lyra@gmail.com>
+Date: Mon, 29 Sep 2014 19:48:29 +0800
+Subject: [PATCH 1/6] Documentation: DT: Add bindings for Spreadtrum serial
+In-Reply-To: <1411991314-6636-1-git-send-email-zhang.lyra@gmail.com>
+References: <1411991314-6636-1-git-send-email-zhang.lyra@gmail.com>
+Message-ID: <1411991314-6636-2-git-send-email-zhang.lyra@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
 
-Spreadtrum is a rapid growing chip vendor providing smart phone total solutions. 
-Shark64 is nominated as a SoC infrastructure that supports 4G/3G/2G standards based on ARMv8 multiple core architecture.
+Adds the device-tree documentation for Spreadtrum's serial.
 
-This patchset adds shark64 supports in arm64 device tree and implements the basic earlycon serial driver.
-
-chunyan.zhang (6):
-  Documentation: DT: Add bindings for Spreadtrum serial
-  arm64: Add DTS support for Spreadtrum's Shark64 SoC
-  arm64: dts/Makefile: Add support for Spreadtrum's Shark64 SoC.
-  arm64: Add support for Spreadtrum's Shark64 SoC in Kconfig and defconfig
-  tty/serial: add Spreadtrum's serial earlycon
-  Documentation: Add entry for Spreadtrum's Shark64 SoC
-
- Documentation/devicetree/bindings/arm/sprd.txt     |    6 ++
+Signed-off-by: chunyan.zhang <chunyan.zhang@spreadtrum.com>
+---
  .../devicetree/bindings/serial/of-serial.txt       |    1 +
- arch/arm64/Kconfig                                 |    5 +
- arch/arm64/boot/dts/Makefile                       |    1 +
- arch/arm64/boot/dts/sprd_shark64.dts               |  110 ++++++++++++++++++++
- arch/arm64/configs/defconfig                       |    1 +
- drivers/tty/serial/Kconfig                         |   12 +++
- drivers/tty/serial/Makefile                        |    1 +
- drivers/tty/serial/serial_sprd_early.c             |   64 ++++++++++++
- 9 files changed, 201 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
- create mode 100644 arch/arm64/boot/dts/sprd_shark64.dts
- create mode 100644 drivers/tty/serial/serial_sprd_early.c
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
+index 7705477..a0bb1d1 100644
+--- a/Documentation/devicetree/bindings/serial/of-serial.txt
++++ b/Documentation/devicetree/bindings/serial/of-serial.txt
+@@ -14,6 +14,7 @@ Required properties:
+ 	- "altr,16550-FIFO32"
+ 	- "altr,16550-FIFO64"
+ 	- "altr,16550-FIFO128"
++	- "sprd,serial"
+ 	- "serial" if the port type is unknown.
+ - reg : offset and length of the register set for the device.
+ - interrupts : should contain uart interrupt.
 -- 
 1.7.9.5
