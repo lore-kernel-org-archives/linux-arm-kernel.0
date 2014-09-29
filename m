@@ -1,25 +1,26 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Sep 2014 15:35:09 +0200
-Subject: [PATCH v11 6/6] arm: KVM: ARMv7 dirty page logging 2nd stage
- page fault
-In-Reply-To: <1411433690-8104-7-git-send-email-m.smarduch@samsung.com>
+Date: Mon, 29 Sep 2014 15:36:08 +0200
+Subject: [PATCH v11 2/6] KVM: Add generic implementation of
+ kvm_vm_ioctl_get_dirty_log
+In-Reply-To: <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
 References: <1411433690-8104-1-git-send-email-m.smarduch@samsung.com>
- <1411433690-8104-7-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140929133509.GH3095@cbox>
+ <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20140929133608.GI3095@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 05:54:50PM -0700, Mario Smarduch wrote:
-> This patch adds support for handling 2nd stage page faults during migration,
-> it disables faulting in huge pages, and dissolves huge pages to page tables.
-> In case migration is canceled huge pages may be used again.
-> 
+On Mon, Sep 22, 2014 at 05:54:46PM -0700, Mario Smarduch wrote:
+> Add support for generic implementation of dirty log read function. For now
+> x86_64 and ARMv7 share generic dirty log read. Other architectures call
+> their architecture specific functions.
 > 
 > Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
 
-It seems here and in a bunch of the other patches you didn't apply my
-Reviewed-by tags.  Did you change the patches in other ways than
-addressed by the review comments?
+This looks reasonable to me,
+
+Other arch kvm-maintainers: will you give this a look and a spin for
+your ok?
 
 Thanks,
 -Christoffer
