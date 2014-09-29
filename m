@@ -1,104 +1,70 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 29 Sep 2014 19:20:57 +0200
-Subject: [PATCH v6 05/11] drm: add Atmel HLCDC Display Controller support
-In-Reply-To: <1412001864-3251-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412001864-3251-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140929192057.1ede0346@bbrezillon>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 29 Sep 2014 18:22:28 +0100
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <20140929161625.GD1170@ilina-mac.local>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
+ <20140929161625.GD1170@ilina-mac.local>
+Message-ID: <20140929172228.GA5929@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Sep 2014 16:44:18 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> 
-> The Atmel HLCDC (HLCD Controller) IP available on some Atmel SoCs (i.e.
-> at91sam9n12, at91sam9x5 family or sama5d3 family) provides a display
-> controller device.
-> 
-> This display controller supports at least one primary plane and might
-> provide several overlays and an hardware cursor depending on the IP
-> version.
-> 
-> At the moment, this driver only implements an RGB connector to interface
-> with LCD panels, but support for other kind of external devices might be
-> added later.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reviewed-by: Rob Clark <robdclark@gmail.com>
-> Tested-by: Anthony Harivel <anthony.harivel@emtrion.de>
-> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/gpu/drm/Kconfig                          |   2 +
->  drivers/gpu/drm/Makefile                         |   1 +
->  drivers/gpu/drm/atmel-hlcdc/Kconfig              |  13 +
->  drivers/gpu/drm/atmel-hlcdc/Makefile             |   7 +
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 392 +++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 527 ++++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     | 216 ++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c  | 659 ++++++++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h  | 403 +++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 443 ++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  | 833 +++++++++++++++++++++++
->  11 files changed, 3496 insertions(+)
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> 
-> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-> index b066bb3..2d97f7e 100644
-> --- a/drivers/gpu/drm/Kconfig
-> +++ b/drivers/gpu/drm/Kconfig
-> @@ -185,6 +185,8 @@ source "drivers/gpu/drm/cirrus/Kconfig"
->  
+On Mon, Sep 29, 2014 at 05:16:25PM +0100, Lina Iyer wrote:
 
 [...]
 
-> +
-> +int atmel_hlcdc_crtc_mode_valid(struct drm_crtc *c,
-> +				struct drm_display_mode *mode)
-> +{
-> +	struct videomode vm;
-> +
-> +	vm.vfront_porch = mode->vsync_start - mode->vdisplay;
-> +	vm.vback_porch = mode->vtotal - mode->vsync_end;
-> +	vm.vsync_len = mode->vsync_end - mode->vsync_start;
-> +	vm.hfront_porch = mode->hsync_start - mode->hdisplay;
-> +	vm.hback_porch = mode->htotal - mode->hsync_end;
-> +	vm.hsync_len = mode->hsync_end - mode->hsync_start;
-> +
-> +	if (vm.hsync_len > 0x40 || vm.hsync_len < 1)
-> +		return MODE_HSYNC;
-> +
-> +	if (vm.vsync_len > 0x40 || vm.vsync_len < 1)
-> +		return MODE_VSYNC;
-> +
-> +	if (vm.vfront_porch > 0x40 || vm.hfront_porch < 1 ||
-> +	    vm.vback_porch > 0x40 || vm.vback_porch < 0 ||
-> +	    mode->hdisplay > 2048 || mode->hdisplay < 1)
-> +		return MODE_H_ILLEGAL;
-> +
-> +	if (vm.hfront_porch > 0x200 || vm.hfront_porch < 1 ||
-> +	    vm.hback_porch > 0x200 || vm.hback_porch < 1 ||
-> +	    mode->hdisplay > 2048 || mode->hdisplay < 1)
-> +		return MODE_V_ILLEGAL;
-> +
-> +	return MODE_OK;
-> +}
-> +
+> >> +processors when execute the wfi instruction will gate their internal clocks.
+> >> +QCOM cpus use this instruction as a trigger for the SPM state machine. Usually
+> >> +with a cpu entering WFI, the SPM is configured to do clock-gating as well. The
+> >> +SPM state machine waits for the interrrupt to trigger the core back in to
+> >
+> >s/interrrupt/interrupt/
+> >
+> >> +active. When all CPUs in the SoC, clock gate using the ARM wfi instruction, the
+> >> +second level cache usually can also clock gate sensing no cpu activity. When a
+> >> +cpu is ready to run, it needs the cache to be active before starting execution.
+> >> +Allowing the SPM to execute the clock gating statemachine and waiting for
+> >
+> >s/statemachine/state machine/
+> >
+> >You are defining a generic binding for Qualcomm idle states, so it should
+> >not be tied to a specific cache level (ie L2 gating), otherwise if the
+> >same state shows up in a future system with L3 you are back to square
+> >one.
+> >
+> >"Platform WFI" or something like that ? You got what I mean.
+> >
+> I am not, I am just explaining the difference between Architectural and
+> Platform WFI and how the WFI on the core, can help L2 enter shallower
+> idle states, which is true for L3 as well (provided there is enough time
+> and we are not allowed to do power down states).
 
-I forgot to squash the commit removing this function which a vestige
-from one of my attempt to provide a common mode_valid function that can
-be called from the connector mode_valid function.
+I wanted to say that instead of referring to L2 you can refer to the
+computing system as a whole, it is a computing subsystem clock gating.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Instead of referring to L2, refer to cache hierarchy, generically.
+
+It is just a nitpick to make your life easier in the future.
+
+[...]
+
+> >> +static int qcom_cpuidle_probe(struct platform_device *pdev)
+> >> +{
+> >> +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+> >> +	int ret;
+> >> +
+> >> +	qcom_idle_enter = (void *)(pdev->dev.platform_data);
+> >
+> >Casting a void* to a void* does not seem that useful to me, and that's valid
+> >for other CPUidle drivers too, the cast can be removed unless you explain
+> >to me what it is for.
+> >
+> Sure, I dont need it. 
+> 
+> Thanks for your time, Lorenzo.
+
+You are welcome, thanks for you patience in converting the driver to the
+new DT API.
+
+Lorenzo
