@@ -1,43 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Sep 2014 10:54:34 +0200
-Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic {read,
- write}s*()
-In-Reply-To: <1407925738-26170-7-git-send-email-thierry.reding@gmail.com>
-References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
- <1407925738-26170-7-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CAMuHMdW4emoma3nRUGna985tE17yPh5pNjMb-jxe5yc5UVr=cw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 29 Sep 2014 11:56:20 +0300
+Subject: [PATCH v3] CLK: TI: consider the fact that of_clk_get() might
+ return an error
+In-Reply-To: <20140918143327.GA4418@linutronix.de>
+References: <1410451272-31068-1-git-send-email-bigeasy@linutronix.de>
+ <54198411.1080706@ti.com> <20140917155623.GA28043@linutronix.de>
+ <20140917163559.GA25790@kahuna> <20140918143327.GA4418@linutronix.de>
+Message-ID: <54291EB4.9000906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 12:28 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> #ifndef memset_io
-> -#define memset_io(a, b, c)     memset(__io_virt(a), (b), (c))
-> +#define memset_io memset_io
-> +static inline void memset_io(void __iomem *addr, int value, size_t size)
-> +{
-> +       memset(__io_virt(addr), value, size);
-> +}
->  #endif
+On 09/18/2014 05:33 PM, Sebastian Andrzej Siewior wrote:
+> I "forgot" to update the dtb and the kernel crashed:
+> |Unable to handle kernel NULL pointer dereference at virtual address 0000002e
+> |PC is at __clk_get_flags+0x4/0xc
+> |LR is at ti_dt_clockdomains_setup+0x70/0xe8
+>
+> because I did not have the clock nodes. of_clk_get() returns an error
+> pointer which is not checked here.
+>
+> Acked-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-xtensa/allmodconfig:
+Thanks, v3 applied to for-v3.18/ti-clk-drv.
 
-include/asm-generic/io.h:820:2: error: implicit declaration of
-function 'memset' [-Werror=implicit-function-declaration]
-include/asm-generic/io.h:829:2: error: implicit declaration of
-function 'memcpy' [-Werror=implicit-function-declaration]
-arch/xtensa/include/asm/string.h:110:14: error: conflicting types for 'memset'
-arch/xtensa/include/asm/string.h:113:14: error: conflicting types for 'memcpy'
+-Tero
 
-http://kisskb.ellerman.id.au/kisskb/buildresult/12028900/
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>   v2?v3:
+>      - added acked by
+>      - fixed "CHECK: Alignment should match open parenthesis"
+>
+>   v1?v2:
+>       add "%s __func__" to the added pr_err
+>
+>   drivers/clk/ti/clockdomain.c | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+> index f1e0038d76ac..b4c5faccaece 100644
+> --- a/drivers/clk/ti/clockdomain.c
+> +++ b/drivers/clk/ti/clockdomain.c
+> @@ -36,6 +36,11 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
+>
+>   	for (i = 0; i < num_clks; i++) {
+>   		clk = of_clk_get(node, i);
+> +		if (IS_ERR(clk)) {
+> +			pr_err("%s: Failed get %s' clock nr %d (%ld)\n",
+> +			       __func__, node->full_name, i, PTR_ERR(clk));
+> +			continue;
+> +		}
+>   		if (__clk_get_flags(clk) & CLK_IS_BASIC) {
+>   			pr_warn("can't setup clkdm for basic clk %s\n",
+>   				__clk_get_name(clk));
+>
