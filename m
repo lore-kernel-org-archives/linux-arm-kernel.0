@@ -1,140 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 29 Sep 2014 08:51:46 +0200
-Subject: [PATCH v1 2/4] arm: pxa: move init functions into generic.h
-In-Reply-To: <1411973508-14301-1-git-send-email-robert.jarzmik@free.fr>
-References: <1411973508-14301-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1411973508-14301-2-git-send-email-robert.jarzmik@free.fr>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 29 Sep 2014 08:53:13 +0200
+Subject: [PATCH RESEND v6 1/7] DT doc: net: cpsw mac-address is optional
+In-Reply-To: <1411973599-18908-1-git-send-email-mpa@pengutronix.de>
+References: <1411973599-18908-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1411973599-18908-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to have a unique .c file for all pxa variants device-tree
-definitions, all the initialization functions for MACHINE_START and
-DT_MACHINE_START have been put together into generic.h.
+mac-address is an optional property. If no mac-address is set, a random
+mac-address will be generated.
 
-The alternative would have been one pxaXXX-dt.c file per variant.
-
-The move is necessary because each include/mach/pxaXXX.h includes the
-variant register descriptions which intersects and conflicts one with
-each other.
-
-The change is a preparation for pxa-dt.c to support multiple pxa,
-ie. pxa3xx and pxa27x.
-
-The machine files including mach/pxaXXX.h all include generic.h, which
-guarantees no regression should be introduced.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- arch/arm/mach-pxa/generic.h             | 26 ++++++++++++++++++++------
- arch/arm/mach-pxa/include/mach/pxa25x.h |  8 --------
- arch/arm/mach-pxa/include/mach/pxa27x.h |  4 ----
- arch/arm/mach-pxa/include/mach/pxa3xx.h |  5 -----
- 4 files changed, 20 insertions(+), 23 deletions(-)
+ Documentation/devicetree/bindings/net/cpsw.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/generic.h b/arch/arm/mach-pxa/generic.h
-index 8963984..d962ca6 100644
---- a/arch/arm/mach-pxa/generic.h
-+++ b/arch/arm/mach-pxa/generic.h
-@@ -13,11 +13,11 @@
+diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+index ae2b8b7f9c38..107caf174a0e 100644
+--- a/Documentation/devicetree/bindings/net/cpsw.txt
++++ b/Documentation/devicetree/bindings/net/cpsw.txt
+@@ -29,10 +29,10 @@ Slave Properties:
+ Required properties:
+ - phy_id		: Specifies slave phy id
+ - phy-mode		: See ethernet.txt file in the same directory
+-- mac-address		: See ethernet.txt file in the same directory
  
- struct irq_data;
+ Optional properties:
+ - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
++- mac-address		: See ethernet.txt file in the same directory
  
--extern void pxa_timer_init(void);
--
--extern void __init pxa_map_io(void);
--
- extern unsigned int get_clk_frequency_khz(int info);
-+extern void __init pxa_dt_irq_init(int (*fn)(struct irq_data *,
-+					     unsigned int));
-+extern void __init pxa_map_io(void);
-+extern void pxa_timer_init(void);
- 
- #define SET_BANK(__nr,__start,__size) \
- 	mi->bank[__nr].start = (__start), \
-@@ -26,13 +26,23 @@ extern unsigned int get_clk_frequency_khz(int info);
- #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
- 
- #ifdef CONFIG_PXA25x
-+#define pxa25x_handle_irq icip_handle_irq
- extern unsigned pxa25x_get_clk_frequency_khz(int);
-+extern void __init pxa25x_init_irq(void);
-+extern void __init pxa25x_map_io(void);
-+#ifdef CONFIG_CPU_PXA26x
-+extern void __init pxa26x_init_irq(void);
-+#endif
- #else
- #define pxa25x_get_clk_frequency_khz(x)		(0)
- #endif
- 
- #ifdef CONFIG_PXA27x
--extern unsigned pxa27x_get_clk_frequency_khz(int);
-+#define pxa27x_handle_irq ichp_handle_irq
-+extern void __init pxa27x_dt_init_irq(void);
-+extern unsigned	pxa27x_get_clk_frequency_khz(int);
-+extern void __init pxa27x_init_irq(void);
-+extern void __init pxa27x_map_io(void);
- #else
- #define pxa27x_get_clk_frequency_khz(x)		(0)
- #endif
-@@ -44,7 +54,11 @@ static inline void pxa2xx_clear_reset_status(unsigned int mask) {}
- #endif
- 
- #ifdef CONFIG_PXA3xx
--extern unsigned pxa3xx_get_clk_frequency_khz(int);
-+#define pxa3xx_handle_irq ichp_handle_irq
-+extern void __init pxa3xx_dt_init_irq(void);
-+extern unsigned	pxa3xx_get_clk_frequency_khz(int);
-+extern void __init pxa3xx_init_irq(void);
-+extern void __init pxa3xx_map_io(void);
- #else
- #define pxa3xx_get_clk_frequency_khz(x)		(0)
- #endif
-diff --git a/arch/arm/mach-pxa/include/mach/pxa25x.h b/arch/arm/mach-pxa/include/mach/pxa25x.h
-index 3ac0baa..5a34175 100644
---- a/arch/arm/mach-pxa/include/mach/pxa25x.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa25x.h
-@@ -6,12 +6,4 @@
- #include <mach/mfp-pxa25x.h>
- #include <mach/irqs.h>
- 
--extern void __init pxa25x_map_io(void);
--extern void __init pxa25x_init_irq(void);
--#ifdef CONFIG_CPU_PXA26x
--extern void __init pxa26x_init_irq(void);
--#endif
--
--#define pxa25x_handle_irq	icip_handle_irq
--
- #endif /* __MACH_PXA25x_H */
-diff --git a/arch/arm/mach-pxa/include/mach/pxa27x.h b/arch/arm/mach-pxa/include/mach/pxa27x.h
-index 7cff640..599b925 100644
---- a/arch/arm/mach-pxa/include/mach/pxa27x.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa27x.h
-@@ -19,11 +19,7 @@
- #define ARB_CORE_PARK		(1<<24)	   /* Be parked with core when idle */
- #define ARB_LOCK_FLAG		(1<<23)	   /* Only Locking masters gain access to the bus */
- 
--extern void __init pxa27x_map_io(void);
--extern void __init pxa27x_init_irq(void);
- extern int __init pxa27x_set_pwrmode(unsigned int mode);
- extern void pxa27x_cpu_pm_enter(suspend_state_t state);
- 
--#define pxa27x_handle_irq	ichp_handle_irq
--
- #endif /* __MACH_PXA27x_H */
-diff --git a/arch/arm/mach-pxa/include/mach/pxa3xx.h b/arch/arm/mach-pxa/include/mach/pxa3xx.h
-index 6dd7fa1..b4143fb 100644
---- a/arch/arm/mach-pxa/include/mach/pxa3xx.h
-+++ b/arch/arm/mach-pxa/include/mach/pxa3xx.h
-@@ -5,9 +5,4 @@
- #include <mach/pxa3xx-regs.h>
- #include <mach/irqs.h>
- 
--extern void __init pxa3xx_map_io(void);
--extern void __init pxa3xx_init_irq(void);
--
--#define pxa3xx_handle_irq	ichp_handle_irq
--
- #endif /* __MACH_PXA3XX_H */
+ Note: "ti,hwmods" field is used to fetch the base address and irq
+ resources from TI, omap hwmod data base during device registration.
 -- 
 2.1.0
