@@ -1,94 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 15:47:47 +0200
-Subject: [PATCH 2/6] arm64: Add DTS support for Spreadtrum's Shark64 SoC
-In-Reply-To: <1411992293-7729-3-git-send-email-zhang.lyra@gmail.com>
-References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <1411992293-7729-3-git-send-email-zhang.lyra@gmail.com>
-Message-ID: <4004425.NZAxCnE0qr@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Sep 2014 15:54:00 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929113436.GA4081@lukather>
+References: <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
+ <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
+ <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
+Message-ID: <20140929135358.GC30998@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 September 2014 20:04:49 zhang.lyra at gmail.com wrote:
-> +
-> +/memreserve/ 0x80000000 0x00010000;
+On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
+> On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
+> > > >> Plus, speaking more specifically about the clocks, that won't prevent
+> > > >> your clock to be shut down as a side effect of a later clk_disable
+> > > >> call from another driver.
+> > > 
+> > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
+> > > > preceding clk_enable()? There are patches being worked on that will
+> > > > enable per-user clocks and as I understand it they will specifically
+> > > > disallow drivers to disable the hardware clock if other drivers are
+> > > > still keeping them on via their own referenc.
+> > > 
+> > > Calling clk_disable() preceding clk_enable() is a bug.
+> > > 
+> > > Calling clk_disable() after clk_enable() will disable the clock (and
+> > > its parents)
+> > > if the clock subsystem thinks there are no other users, which is what will
+> > > happen here.
+> > 
+> > Right. I'm not sure this is really applicable to this situation, though.
+> 
+> It's actually very easy to do. Have a driver that probes, enables its
+> clock, fails to probe for any reason, call clk_disable in its exit
+> path. If there's no other user at that time of this particular clock
+> tree, it will be shut down. Bam. You just lost your framebuffer.
+> 
+> Really, it's just that simple, and relying on the fact that some other
+> user of the same clock tree will always be their is beyond fragile.
 
-Maybe add a comment explaining why it is reserved?
+Perhaps the meaning clk_ignore_unused should be revised, then. What you
+describe isn't at all what I'd expect from such an option. And it does
+not match the description in Documentation/kernel-parameters.txt either.
 
-> +	chosen {
-> +		bootargs = "earlycon=serial_sprd,0x70000000";
-> +      };
+> > Either way, if there are other users of a clock then they will just as
+> > likely want to modify the rate at which point simplefb will break just
+> > as badly.
+> 
+> And this can be handled just as well. Register a clock notifier,
+> refuse any rate change, done. But of course, that would require having
+> a clock handle.
+> 
+> Now, how would *you* prevent such a change?
 
-Just remove this for now, the command line should really be set by the
-boot loader, not hardcoded in the dts file.
+Like I said in the other thread. If you have two drivers that use the
+same clock but need different frequencies you've lost anyway.
 
-IIRC, the earlycon=... syntax is not recommended on DT based systems,
-better use the "stdout-path" syntax instead.
-
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,armv8";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x0 0x8000fff8>;
-> +		};
-
-New platforms should avoid using "spin-table" method. Please
-change the boot loader to implement PSCI if you can.
-
-> +	memory at 80000000 {
-> +		device_type = "memory";
-> +		reg = <0 0x80000000 0 0x20000000>;
-> +	};
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +	};
-
-These two belong into a board-specific file. I'd suggest renaming this
-file to sprd_shark64.dtsi (or whatever the SoC is called) and adding a
-.dts file that includes this and sets the aliases and memory node
-according to what the particular board has.
-
-> +	intc:interrupt-controller at 71400000 {
-> +		compatible = "sprd,intc";
-> +		#interrupt-cells = <0>;
-> +		interrupt-controller;
-> +		reg =	<0 0x71400000 0 0x1000>,
-> +			<0 0x71500000 0 0x1000>,
-> +			<0 0x71600000 0 0x1000>,
-> +			<0 0x71700000 0 0x1000>;
-> +	};
-
-This interrupt controller does not have a binding, so please add at least
-a documentation for the binding as well. The name should probably be more
-specific that this. Also, explain why you have an interrupt controller
-that has four memory regions but only one interrupt sink but no interrupt
-source.
-
-I assume this is a nested interrupt controller to which some internal
-peripherals are connected?
-
-> +	uart0: uart at 70000000 {
-> +		compatible = "sprd,serial";
-> +		reg = <0 0x70000000 0 0x100>;
-> +		interrupts = <0 2 0xf04>;
-> +	};
-> +
-> +	uart1: uart at 70100000 {
-> +		compatible = "sprd,serial";
-> +		reg = <0 0x70100000 0 0x100>;
-> +		interrupts = <0 3 0xf04>;
-> +	};
-
-Please rename these to serial at 70000000. Like the interrupt controller,
-it would be good to have a more specific compatible string.
-You may want to add a status="disabled" property in both these
-nodes, and override them from the board.dts file for the ports that
-are actually available.
-
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/1a341b5c/attachment.sig>
