@@ -1,62 +1,124 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Sep 2014 11:52:27 +0200
-Subject: [PATCH v2 6/7] devicetree: bindings: Document supported
- Allwinner sunxi SoCs
-In-Reply-To: <CAGb2v65pKo=6BC-HaMsEMq-bcQcoHZNc9GiX+kfTBgP1PE5wMg@mail.gmail.com>
+Date: Mon, 29 Sep 2014 11:53:44 +0200
+Subject: [PATCH v2 4/7] ARM: dts: sun9i: Add A80 Optimus Board support
+In-Reply-To: <CAGb2v65Yu=3rgQ+G6USJubKOPzcMJ5bqhe7d9wrYjpT9aFaZuw@mail.gmail.com>
 References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-7-git-send-email-wens@csie.org>
- <20140925133609.GK15315@lukather>
- <CAGb2v65pKo=6BC-HaMsEMq-bcQcoHZNc9GiX+kfTBgP1PE5wMg@mail.gmail.com>
-Message-ID: <20140929095227.GD4388@lukather>
+ <1411570141-29960-5-git-send-email-wens@csie.org>
+ <20140925133427.GI15315@lukather>
+ <CAGb2v65Yu=3rgQ+G6USJubKOPzcMJ5bqhe7d9wrYjpT9aFaZuw@mail.gmail.com>
+Message-ID: <20140929095344.GE4388@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 09:08:46PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Sep 25, 2014 at 9:36 PM, Maxime Ripard
+On Sat, Sep 27, 2014 at 09:10:48PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Sep 25, 2014 at 9:34 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > On Wed, Sep 24, 2014 at 10:49:00PM +0800, Chen-Yu Tsai wrote:
-> >> This adds a list of supported Allwinner SoC bindings.
+> > On Wed, Sep 24, 2014 at 10:48:58PM +0800, Chen-Yu Tsai wrote:
+> >> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
+> >> It was jointly developed by Allwinner and Merrii.
+> >>
+> >> This board has a UART port, a JTAG connector, USB host ports, a USB
+> >> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
+> >> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
+> >> jack, IR receiver, and additional GPIO headers.
+> >>
+> >> This patch adds only basic support.
 > >>
 > >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > >> ---
-> >>  Documentation/devicetree/bindings/arm/sunxi.txt | 12 ++++++++++++
-> >>  1 file changed, 12 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/sunxi.txt
+> >>  arch/arm/boot/dts/Makefile              |  2 +
+> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
+> >>  2 files changed, 68 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
 > >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index 2f42b18..098f319 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -424,6 +424,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+> >>       sun7i-a20-pcduino3.dtb
+> >>  dtb-$(CONFIG_MACH_SUN8I) += \
+> >>       sun8i-a23-ippo-q8h-v5.dtb
+> >> +dtb-$(CONFIG_MACH_SUN9I) += \
+> >> +     sun9i-a80-optimus.dtb
+> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+> >>       tegra20-iris-512.dtb \
+> >>       tegra20-medcom-wide.dtb \
+> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
 > >> new file mode 100644
-> >> index 0000000..d7d1039
+> >> index 0000000..f83abab
 > >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> >> @@ -0,0 +1,12 @@
-> >> +Allwinner sunXi Platforms Device Tree Bindings
+> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> @@ -0,0 +1,66 @@
+> >> +/*
+> >> + * Copyright 2014 Chen-Yu Tsai
+> >> + *
+> >> + * Chen-Yu Tsai <wens@csie.org>
+> >> + *
+> >> + * This file is dual-licensed: you can use it either under the terms
+> >> + * of the GPL or the X11 license, at your option. Note that this dual
+> >> + * licensing only applies to this file, and not this project as a
+> >> + * whole.
+> >> + *
+> >> + *  a) This library is free software; you can redistribute it and/or
+> >> + *     modify it under the terms of the GNU General Public License as
+> >> + *     published by the Free Software Foundation; either version 2 of the
+> >> + *     License, or (at your option) any later version.
+> >> + *
+> >> + *     This library is distributed in the hope that it will be useful,
+> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + *     GNU General Public License for more details.
+> >> + *
+> >> + *     You should have received a copy of the GNU General Public
+> >> + *     License along with this library; if not, write to the Free
+> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> >> + *     MA 02110-1301 USA
+> >> + *
+> >> + * Or, alternatively,
+> >> + *
+> >> + *  b) Permission is hereby granted, free of charge, to any person
+> >> + *     obtaining a copy of this software and associated documentation
+> >> + *     files (the "Software"), to deal in the Software without
+> >> + *     restriction, including without limitation the rights to use,
+> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >> + *     sell copies of the Software, and to permit persons to whom the
+> >> + *     Software is furnished to do so, subject to the following
+> >> + *     conditions:
+> >> + *
+> >> + *     The above copyright notice and this permission notice shall be
+> >> + *     included in all copies or substantial portions of the Software.
+> >> + *
+> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >> + */
 > >> +
-> >> +Each device tree must specify which Allwinner SoC it uses,
-> >> +using one of the following compatible stirngs:
-> >                                          ^ strings
-> 
-> Will fix.
-> 
+> >> +/dts-v1/;
+> >> +/include/ "sun9i-a80.dtsi"
 > >> +
-> >> +  allwinner,sun4i-a10
-> >> +  allwinner,sun5i-a10s
-> >> +  allwinner,sun5i-a13
-> >> +  allwinner,sun6i-a31
-> >> +  allwinner,sun7i-a20
-> >> +  allwinner,sun8i-a23
-> >> +  allwinner,sun9i-a80
+> >> +/ {
+> >> +     model = "Merrii A80 Optimus Board";
+> >> +     compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
+> >> +
+> >> +     chosen {
+> >> +             bootargs = "earlyprintk console=ttyS0,115200";
+> >> +     };
 > >
-> > Maybe you can just add this info to the already existing README?
+> > Since you changed the memory node in the DTSI, you should probably add
+> > one here too, don't you?
 > 
-> AFAIK the bindings are where they're supposed to be.
-> 
-> Putting the bindings outside of devicetree/bindings is unexpected
-> and confusing.
+> I thought we left fixing that to the bootloader?
+> I don't see any memory nodes in our other DTS.
 
-Ah, yes...
-
-Sorry about the noise, I was somehow convinced our README were under
-that directory, but you're obviously right :)
+Yes, but does the A80 bootloader supports DT and actually fixes it? If
+not, then you'll still have to have a memory node, just like on the
+A31 (and presumably on the A23).
 
 Maxime
 
@@ -70,4 +132,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/342ee36f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/b4f7842f/attachment.sig>
