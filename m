@@ -1,48 +1,50 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Sep 2014 15:01:25 +0200
-Subject: [PATCH 2/6] arm/arm64: KVM: fix potential NULL dereference in
- user_mem_abort()
-In-Reply-To: <1410990981-665-3-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 29 Sep 2014 15:02:18 +0200
+Subject: [PATCH 1/6] arm/arm64: KVM: use __GFP_ZERO not memset() to get
+ zeroed pages
+In-Reply-To: <1410990981-665-2-git-send-email-ard.biesheuvel@linaro.org>
 References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140929130125.GB25697@cbox>
+ <1410990981-665-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140929130218.GC25697@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 02:56:17PM -0700, Ard Biesheuvel wrote:
-> Handle the potential NULL return value of find_vma_intersection()
-> before dereferencing it.
+On Wed, Sep 17, 2014 at 02:56:16PM -0700, Ard Biesheuvel wrote:
+> Pass __GFP_ZERO to __get_free_pages() instead of calling memset()
+> explicitly.
 > 
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm/kvm/mmu.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  arch/arm/kvm/mmu.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
 > diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 152e0f896e63..c093e95ff7ef 100644
+> index c68ec28f17c3..152e0f896e63 100644
 > --- a/arch/arm/kvm/mmu.c
 > +++ b/arch/arm/kvm/mmu.c
-> @@ -776,7 +776,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	/* Let's check if we will get back a huge page backed by hugetlbfs */
->  	down_read(&current->mm->mmap_sem);
->  	vma = find_vma_intersection(current->mm, hva, hva + 1);
-> -	if (is_vm_hugetlb_page(vma)) {
-> +	if (unlikely(!vma)) {
-> +		kvm_err("Failed to find VMA for hva 0x%lx\n", hva);
-> +		up_read(&current->mm->mmap_sem);
-> +		return -EFAULT;
-> +	} else if (is_vm_hugetlb_page(vma)) {
->  		hugetlb = true;
->  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->  	} else {
-> -- 
-> 1.8.3.2
-> 
-Nice catch!
+> @@ -528,11 +528,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  		return -EINVAL;
+>  	}
+>  
+> -	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
+> +	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
+>  	if (!pgd)
+>  		return -ENOMEM;
+>  
+> -	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
+>  	kvm_clean_pgd(pgd);
+>  	kvm->arch.pgd = pgd;
+>  
 
-(This would only happen if the guest unmaps an mmap region after
-registering the memslot I believe, but still, we should absolutely merge
-this.).
+So I think the point here was that if you use concatenated first-level
+page tables, your MMU would only ever look in the first few entries of
+the first-level page table, and we didn't want to zero-out more memory
+than necessary.
+
+However, there's something to be said for the fact that for sanity, we
+should probably be clearing out the entire pgd anyhow.
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 Thanks,
 -Christoffer
