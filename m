@@ -1,33 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 15:30:34 +0200
-Subject: [PATCH 6/6] Documentation: Add entry for Spreadtrum's Shark64 SoC
-In-Reply-To: <1411992293-7729-7-git-send-email-zhang.lyra@gmail.com>
-References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <1411992293-7729-7-git-send-email-zhang.lyra@gmail.com>
-Message-ID: <7195852.7nSHtIu8oc@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Sep 2014 14:34:04 +0100
+Subject: [PATCH 5/6] arm64: kvm: define PAGE_S2_DEVICE as read-only by
+ default
+In-Reply-To: <20140929130617.GE25697@cbox>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1410990981-665-6-git-send-email-ard.biesheuvel@linaro.org>
+ <20140929130617.GE25697@cbox>
+Message-ID: <20140929133404.GF20303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 September 2014 20:04:53 zhang.lyra at gmail.com wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
-> new file mode 100644
-> index 0000000..b6dc143
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/sprd.txt
-> @@ -0,0 +1,6 @@
-> +Spreadtrum Platforms Device Tree Bindings
-> +----------------------------------------------------
-> +
-> +Shark64 Board
-> +Required root node properties:
-> +        - compatible = "sprd,shark64";
+On Mon, Sep 29, 2014 at 02:06:17PM +0100, Christoffer Dall wrote:
+> On Wed, Sep 17, 2014 at 02:56:20PM -0700, Ard Biesheuvel wrote:
+> > Now that we support read-only memslots, we need to make sure that
+> > pass-through device mappings are not mapped writable if the guest
+> > has requested them to be read-only. The existing implementation
+> > already honours this by calling kvm_set_s2pte_writable() on the new
+> > pte in case of writable mappings, so all we need to do is define
+> > the default pgprot_t value used for devices to be PTE_S2_RDONLY.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/pgtable.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> > index ffe1ba0506d1..51f6f5284ce5 100644
+> > --- a/arch/arm64/include/asm/pgtable.h
+> > +++ b/arch/arm64/include/asm/pgtable.h
+> > @@ -79,7 +79,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+> >  #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+> >  
+> >  #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+> > -#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDWR | PTE_UXN)
+> > +#define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+> >  
+> >  #define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
+> >  #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+> > -- 
+> > 1.8.3.2
+> > 
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
+> Catalin, Will,
+> 
+> Are you fine with me queueing this through the kvmarm tree?
 
-Is Shark a board or an SOC? The subject line of the patch and the contents
-seem to disagree here.
+Fine by me.
 
-It's generally better to have the exact SoC product numbers in here, e.g.
-"sprd,sc1234", in case we have to apply fixups based on the SoC. You should
-also have a board specific string in addition to the SoC-specific one.
-
-	Arnd
+Will
