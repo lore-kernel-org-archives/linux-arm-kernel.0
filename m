@@ -1,77 +1,40 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 29 Sep 2014 10:15:34 +0100
-Subject: [PATCH 4/4] ARM: DT: apq8064: Add SATA controller support.
-In-Reply-To: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1411982134-8090-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Sep 2014 10:22:30 +0100
+Subject: [PATCH] perf tools: fix build breakage on arm and arm64 targets
+In-Reply-To: <CAFrcx1=s4Ae2z6OAC3dUR34rhd=HpKA+O9DAtM=QVNpJ7oNnEg@mail.gmail.com>
+References: <1411750918-25220-1-git-send-email-will.deacon@arm.com>
+ <5425A008.2030901@arm.com>
+ <CAFrcx1=s4Ae2z6OAC3dUR34rhd=HpKA+O9DAtM=QVNpJ7oNnEg@mail.gmail.com>
+Message-ID: <20140929092229.GB20303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds AHCI based SATA controller support to APQ8064.
-Tested on IFC6410 board.
+On Mon, Sep 29, 2014 at 07:59:59AM +0100, Jean Pihet wrote:
+> Hi Will,
+> 
+> On 26 September 2014 19:19, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >
+> > On 26/09/14 18:01, Will Deacon wrote:
+> >>
+> >> Attempting to build the perf tool on arm or arm64 targets results in the
+> >> following failure:
+> >>
+> >> arch/arm/util/unwind-libunwind.c: In function ?libunwind__arch_reg_id?:
+> >> arch/arm/util/unwind-libunwind.c:43:3: error: implicit declaration of
+> >> function ?pr_err? [-Werror=implicit-function-declaration]
+> >>     pr_err("unwind: invalid reg id %d\n", regnum);
+> >>     ^
+> >> This is due to commit 84f5d36f4866 ("perf tools: Move pr_* debug macros
+> >> into debug object") moving the pr_* macros into a new header file, but
+> >> failing to update architectures other than x86.
+> >>
+> >> This patch adds the missing includes, and fixes the build again.
+> 
+> The fix for ARM is already in the tip tree at
+> http://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?id=29a3ce31c38c8f73f4e076b7ffc0876b4f5dd6c3.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi | 40 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+Thanks, but that doesn't fix the issue for arm64. I'm also not sure why
+these haven't been merged into mainline -- without them, the tool doesn't
+even build for arm/arm64 targets.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 38d3efa..fa057b7 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -274,6 +274,17 @@
- 				regulator-always-on;
- 			};
- 
-+			pm8921_s4: pm8921-s4 {
-+				compatible	= "qcom,rpm-pm8921-smps";
-+				reg		= <QCOM_RPM_PM8921_SMPS4>;
-+
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				qcom,boot-load 		= <200000>;
-+				qcom,switch-mode-frequency = <3200000>;
-+				regulator-always-on;
-+			};
-+
- 			pm8921_l3: pm8921-l3 {
- 				compatible	= "qcom,rpm-pm8921-pldo";
- 				reg		= <QCOM_RPM_PM8921_LDO3>;
-@@ -396,6 +407,35 @@
- 			usb-phy		= <&usb4_phy>;
- 		};
- 
-+		sata_phy0:sata-phy at 1b400000{
-+			compatible	= "qcom,apq8064-sata-phy";
-+			reg		= <0x1b400000 0x200>;
-+			reg-names	= "phy_mem";
-+			clocks		= <&gcc SATA_PHY_CFG_CLK>;
-+			clock-names = "cfg";
-+			#phy-cells = <0>;
-+		};
-+
-+		sata0: sata at 29000000 {
-+			compatible	= "generic-ahci";
-+			reg		= <0x29000000 0x180>;
-+			interrupts	= <0 209 0>;
-+			clocks = <&gcc SFAB_SATA_S_H_CLK>, <&gcc SATA_H_CLK>,
-+				 <&gcc SATA_A_CLK>, <&gcc SATA_RXOOB_CLK>,
-+				 <&gcc SATA_PMALIVE_CLK>;
-+
-+			clock-names = "slave_iface", "iface",
-+				      "bus", "rxoob",
-+				      "core_pmalive";
-+			assigned-clocks = <&gcc SATA_RXOOB_CLK>,
-+						<&gcc SATA_PMALIVE_CLK>;
-+			assigned-clock-rates = <100000000>, <100000000>;
-+
-+			phys  = <&sata_phy0>;
-+			phy-names = "sata-phy";
-+			target-supply = <&pm8921_s4>;
-+		};
-+
- 		/* Temporary fixed regulator */
- 		vsdcc_fixed: vsdcc-regulator {
- 			compatible = "regulator-fixed";
--- 
-1.9.1
+Will
