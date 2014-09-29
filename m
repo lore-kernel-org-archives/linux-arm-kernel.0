@@ -1,43 +1,48 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 20:06:37 +0200
-Subject: [PATCH 01/13] tty: serial: 8250: Fix wording in runtime-PM comments
+Date: Mon, 29 Sep 2014 20:06:45 +0200
+Subject: [PATCH 09/13] dmaengine: edma: check for echan->edesc => NULL in
+ edma_dma_pause()
 In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
 References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1412014009-13315-2-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1412014009-13315-10-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frans reworded the two comments with better English for better
-understanding. His review hit the mailing list after the patch got
-applied so here is an incremental update.
+I added book keeping of whether or not the 8250-dma driver has an RX
+transfer pending or not so we don't BUG here if it calls
+dmaengine_pause() on a channel which has not a pending transfer. Guess
+what, this is not enough.
+The following can be triggered with a busy RX channel and hackbench in
+background:
+- DMA transfer completes. The callback is delayed via
+  vchan_cookie_complete() into a tasklet so it das not happen asap.
+- hackbench keeps the system busy so the tasklet does not run "soon".
+- the UART collected enough data and generates an "timeout"-interrupt.
+  Since 8250-dma *thinks* the DMA-transfer is still pending it tries to
+  cancel it via invoking dmaengine_pause() first. This causes the segfault
+  because echan->edesc is NULL now that the transfer completed (however
+  the callback did not run yet).
 
-Reported-by: Frans Klaver <frans.klaver@xsens.com>
+With this patch we don't BUG in the scenario described.
+
+Cc: vinod.koul at intel.com
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250_core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/edma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 139f3d2b8aa9..a1904628a2a1 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -557,7 +557,7 @@ static void serial8250_rpm_put(struct uart_8250_port *p)
- }
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 7b65633f495e..123f578d6dd3 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -288,7 +288,7 @@ static int edma_slave_config(struct edma_chan *echan,
+ static int edma_dma_pause(struct edma_chan *echan)
+ {
+ 	/* Pause/Resume only allowed with cyclic mode */
+-	if (!echan->edesc->cyclic)
++	if (!echan->edesc || !echan->edesc->cyclic)
+ 		return -EINVAL;
  
- /*
-- * This two wrapper ensure, that enable_runtime_pm_tx() can be called more than
-+ * These two wrappers ensure that enable_runtime_pm_tx() can be called more than
-  * once and disable_runtime_pm_tx() will still disable RPM because the fifo is
-  * empty and the HW can idle again.
-  */
-@@ -1532,7 +1532,7 @@ void serial8250_tx_chars(struct uart_8250_port *up)
- 	DEBUG_INTR("THRE...");
- 
- 	/*
--	 * With RPM enabled, we have to wait once the FIFO is empty before the
-+	 * With RPM enabled, we have to wait until the FIFO is empty before the
- 	 * HW can go idle. So we get here once again with empty FIFO and disable
- 	 * the interrupt and RPM in __stop_tx()
- 	 */
+ 	edma_pause(echan->ch_num);
 -- 
 2.1.0
