@@ -1,54 +1,256 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 29 Sep 2014 13:00:10 +0530
-Subject: [PATCH 2/3] clk: samsung: remove unnecessary CONFIG_OF from clk.c
-In-Reply-To: <5426B9BB.90606@gmail.com>
-References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
- <1411796519-19417-3-git-send-email-pankaj.dubey@samsung.com>
- <5426B9BB.90606@gmail.com>
-Message-ID: <000101cfdbb7$3f02a5f0$bd07f1d0$@samsung.com>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Mon, 29 Sep 2014 15:45:37 +0800
+Subject: [PATCH v2] i2c: rk3x: adjust the LOW divison based on
+ characteristics of SCL
+In-Reply-To: <CAD=FV=XnM-2CuctP-L=-gj7TPyMXrkhsDS9Tmxeq+9Mx5p7PZA@mail.gmail.com>
+References: <1411801888-3152-1-git-send-email-addy.ke@rock-chips.com>
+ <CAD=FV=XnM-2CuctP-L=-gj7TPyMXrkhsDS9Tmxeq+9Mx5p7PZA@mail.gmail.com>
+Message-ID: <54290E21.2030007@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Doug
 
-On Saturday, September 27, 2014 6:51 PM, Tomasz Figa wrote,
-> Hi Pankaj,
+On 2014/9/29 12:39, Doug Anderson wrote:
+> Addy,
 > 
-> On 27.09.2014 07:41, Pankaj Dubey wrote:
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> On Sat, Sep 27, 2014 at 12:11 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+>> From: Addy <addy.ke@rock-chips.com>
+>>
+>> As show in I2C specification:
+>> - Standard-mode: the minimum HIGH period of the scl clock is 4.0us
+>>                  the minimum LOW period of the scl clock is 4.7us
+>> - Fast-mode: the minimum HIGH period of the scl clock is 0.6us
+>>              the minimum LOW period of the scl clock is 1.3us
+>>
+>> I have measured i2c SCL waveforms in fast-mode by oscilloscope
+>> on rk3288-pinky board. the LOW period of the scl clock is 1.3us.
+>> It is so critical that we must adjust LOW division to increase
+>> the LOW period of the scl clock.
+>>
+>> After put this patch, we can find that min_low_ns is about
+>> 5.4us in Standard-mode and 1.6us in Fast-mode.
+>>
+>> Thanks Doug for the suggestion about division formulas.
+>>
+>> Signed-off-by: Addy <addy.ke@rock-chips.com>
+>> ---
+>> Changes in v2:
+>> - remove Fast-mode plus and HS-mode
+>> - use new formulas suggested by Doug
+>>
+>>  drivers/i2c/busses/i2c-rk3x.c | 104 +++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 97 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+>> index e637c32..81672a8 100644
+>> --- a/drivers/i2c/busses/i2c-rk3x.c
+>> +++ b/drivers/i2c/busses/i2c-rk3x.c
+>> @@ -428,19 +428,109 @@ out:
+>>         return IRQ_HANDLED;
+>>  }
+>>
+>> +static void rk3x_i2c_get_min_ns(unsigned int scl_rate,
+>> +                               unsigned long *min_low_ns,
+>> +                               unsigned long *min_high_ns)
+>> +{
+>> +       WARN_ON(scl_rate > 400000);
+>> +
+>> +       /* As show in I2C specification:
+>> +        * - Standard-mode(100KHz):
+>> +        *   min_low_ns is 4700ns
+>> +        *   min_high_ns is 4000ns
+>> +        * - Fast-mode(400KHz):
+>> +        *   min_low_ns is 1300ns
+>> +        *   min_high_ns is 600ns
+>> +        *
+>> +        * (min_low_ns + min_high_ns) up to 10000ns in Standard-mode
+>> +        * and 2500ns in Fast-mode
+>> +        */
+>> +       if (scl_rate <= 100000) {
+>> +               *min_low_ns = 4700 + 650;
+>> +               *min_high_ns = 4000 + 650;
+>> +       } else {
+>> +               *min_low_ns = 1300 + 300;
+>> +               *min_high_ns = 600 + 300;
 > 
-> Missing patch description.
-
-OK, will add it.
-
+> Wait, where did the extra 650 and 300 come from here?  Are you just
+> trying to balance things out?  That's not the right way to do things.
+> Please explain what you were trying to accomplish and we can figure
+> out a better way.
 > 
-> > ---
-> >  drivers/clk/samsung/clk.c |    2 --
-> >  1 file changed, 2 deletions(-)
-> >
-> > diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> > index deab84d..31bf391 100644
-> > --- a/drivers/clk/samsung/clk.c
-> > +++ b/drivers/clk/samsung/clk.c
-> > @@ -281,7 +281,6 @@ void __init samsung_clk_register_gate(struct
-> samsung_clk_provider *ctx,
-> >   * obtain the clock speed of all external fixed clock sources from
-device
-> >   * tree and register it
-> >   */
-> > -#ifdef CONFIG_OF
+> ...maybe this helped make thins nicer in the clock rates you tried,
+> but I'd bet that I can find clock rates that this is broken for...
 > 
-> We still have non-DT platforms which use this code, i.e. s3c24xx and
-s3c64xx. Have
-> you checked if this compiles fine on them with CONFIG_OF disabled?
 > 
+650 = [(1000000000/100K) ns - min_low_ns_100k - min_high_ns_100k] / 2
+300 = [(1000000000/300K) ns - min_low_ns_400k - min_high_ns_400k] / 2
 
-Compile tested with s3c2410_defconfig and s3c6400_defconfig, and its
-compiled fine.
-In both cases CONFIG_OF was disabled.
+if there is no extra 650 and 300:
+extra_div is 3 in fast-mode and 11 in standard-mode.
 
-Thanks,
-Pankaj Dubey
+  1)if all of the "extra" is asssigned to the high part, the LOW period is too close to min_low.
+    In my test:
+    400k, scl_low_ns: 1440ns, scl_high_ns: 1120ns
+    100k, scl_low_ns: 4800ns, scl_high_ns: 5120ns
 
-> Best regards,
-> Tomasz
+  2)if not, dato hold time is too close to min_hold_time(400khz, 900ns)
+    In my test:
+    400k, scl_low_ns: 1760ns, scl_high_ns: 800ns
+    100k, scl_low_ns: 5304ns, scl_high_ns: 4368ns
+
+    hold_time_ns ~= scl_low_ns / 2 = 880ns
+
+So I think we must decrease min_low_ns:min_high_ns to decrease scl_low in case 2
+
+So I set the extra 650 and 300.
+
+After this, in my test:
+   400k, scl_low_ns: 1600ns, scl_high_ns: 960ns
+   100k, scl_low_ns: 5200ns, scl_hign_ns: 4576ns
+
+I think this value is more reasonable.
+
+ps:
+min_low_ns/min_high_ns >  (min_low_ns + extra) / (min_high_ns + extra) (if min_low_ns > min_high_ns)
+
+>> +       }
+>> +}
+>> +
+>> +static void rk3x_i2c_calc_divs(unsigned long i2c_rate, unsigned long scl_rate,
+>> +                              unsigned long *div_low, unsigned long *div_high)
+>> +{
+>> +       unsigned long min_low_ns, min_high_ns, min_total_ns;
+>> +       unsigned long min_low_div, min_high_div;
+>> +       unsigned long min_total_div, min_div_for_hold;
+>> +       unsigned long extra_div, extra_low_div, ideal_low_div;
+>> +       unsigned long i2c_rate_khz, scl_rate_khz;
+>> +
+>> +       rk3x_i2c_get_min_ns(scl_rate, &min_low_ns, &min_high_ns);
+>> +       min_total_ns = min_low_ns + min_high_ns;
+>> +
+>> +       /* To avoid from overflow warning */
+>> +       i2c_rate_khz = i2c_rate / 1000;
+>> +       scl_rate_khz = scl_rate / 1000;
+> 
+> DIV_ROUND_UP?
+> 
+>> +
+>> +       /*We need the total div to be >= this number
+>> +        * so we don't clock too fast.
+>> +        */
+> 
+> Please match the commenting style in the rest of the file.  That's:
+> 
+> /*
+>  * A
+>  * B
+>  * C
+>  */
+> 
+> Not:
+> 
+> /* A
+>  * B
+>  * C
+>  */
+> 
+>> +       min_total_div = DIV_ROUND_UP(i2c_rate_khz, scl_rate_khz * 8);
+>> +
+>> +       /* These are the min dividers needed for hold times */
+>> +       min_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns, 8 * 1000000);
+>> +       min_high_div = DIV_ROUND_UP(i2c_rate_khz * min_high_ns, 8 * 1000000);
+>> +       min_div_for_hold = (min_low_div + min_high_div);
+>> +
+>> +       if (min_div_for_hold > min_total_div) {
+>> +               /* Time needed to meet hold requirements is important.
+>> +                * Just use that
+>> +                * */
+> 
+> Extra "*" in "* */"
+> 
+> 
+>> +               *div_low = min_low_div;
+>> +               *div_high = min_high_div;
+>> +       } else {
+>> +               /* We've got to distribute some time among the low and high
+>> +                * so we don't run too fast.
+>> +                */
+>> +               extra_div = min_total_div - min_div_for_hold;
+>> +               /* We'll try to split things up perfectly evenly,
+>> +                * biasing slightly towards having a higher div
+>> +                * for low (spend more time low).
+>> +                */
+> 
+> Last I remember you said that this wasn't going to work quite right
+> and you were just going to assign all of the "extra" to the high part.
+> What changed?
+if all of the "extra" is asssigned to the high part, the LOW period is too close to min_low.
+As shown in the above.
+> 
+> 
+>> +               ideal_low_div = DIV_ROUND_UP(i2c_rate_khz * min_low_ns,
+>> +                                            scl_rate_khz * 8 * min_total_ns);
+>> +               /* Handle when the ideal low div is going to take up
+>> +                * more than we have.
+>> +                */
+>> +               if (ideal_low_div > min_low_div + extra_div)
+>> +                       ideal_low_div = min_low_div + extra_div;
+>> +               /* Give low the "ideal" and give high whatever extra is left.*/
+>> +               extra_low_div = ideal_low_div - min_low_div;
+>> +               *div_low = ideal_low_div;
+>> +               *div_high
+>> +                       = min_high_div + (extra_div - extra_low_div);
+>> +       }
+>> +
+>> +       /* Adjust to the fact that the hardware has an implicit "+1".*/
+>> +       *div_low = *div_low - 1;
+>> +       *div_high = *div_high - 1;
+>> +}
+>> +
+>>  static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+>>  {
+>>         unsigned long i2c_rate = clk_get_rate(i2c->clk);
+>> -       unsigned int div;
+>> +       unsigned long div_low, div_high;
+>>
+>> -       /* SCL rate = (clk rate) / (8 * DIV) */
+>> -       div = DIV_ROUND_UP(i2c_rate, scl_rate * 8);
+> 
+> Strangely this now seems to be based upon an older version of the
+> file.  I had to revert (b4a7bd7 i2c: rk3x: fix divisor calculation for
+> SCL frequency) in order to apply v2.  Please submit your code against
+> the latest accepted code.
+> 
+> 
+This patch is based on ../kernel/git/wsa/linux.git, master branch.
+It is my mistake.
+I will checkout for_next branch.
+Thank you.
+
+>> +       /* The formulas in rk3x TRM:
+>> +        * - T_scl_high = T_clk * (divh + 1) * 8
+>> +        * - T_scl_low = T_clk * (divl + 1) * 8
+>> +        * */
+>> +       rk3x_i2c_calc_divs(i2c_rate, scl_rate, &div_low, &div_high);
+>>
+>> -       /* The lower and upper half of the CLKDIV reg describe the length of
+>> -        * SCL low & high periods. */
+>> -       div = DIV_ROUND_UP(div, 2);
+>> +       i2c_writel(i2c, (div_high << 16) | (div_low & 0xffff), REG_CLKDIV);
+>>
+>> -       i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
+>> +       dev_dbg(i2c->dev, "scl_ns: %luns, scl_low_ns: %luns, scl_high_ns: %luns\n",
+>> +               1000000000/scl_rate,
+>> +               (1000000000 / i2c_rate) * (div_low + 1) * 8,
+>> +               (1000000000 / i2c_rate) * (div_high + 1) * 8);
+>>  }
+>>
+>>  /**
+>> --
+>> 1.8.3.2
+>>
+>>
+> 
+> 
+> 
