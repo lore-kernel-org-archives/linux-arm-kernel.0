@@ -1,64 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 15:36:31 +0200
-Subject: [PATCH 5/6] tty/serial: Add Spreadtrum's serial earlycon
-In-Reply-To: <1411992293-7729-6-git-send-email-zhang.lyra@gmail.com>
-References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <1411992293-7729-6-git-send-email-zhang.lyra@gmail.com>
-Message-ID: <3038755.G9Y3LOUCHH@wuerfel>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Mon, 29 Sep 2014 16:37:54 +0300
+Subject: [PATCH v6 4/4] thermal: Add Tegra SOCTHERM thermal management
+ driver
+In-Reply-To: <20140929082904.GF12506@ulmo>
+References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
+ <1411724593-4037-5-git-send-email-cyndis@kapsi.fi>
+ <20140926114533.GN31106@ulmo> <5425CC6F.2020309@kapsi.fi>
+ <20140929082904.GF12506@ulmo>
+Message-ID: <542960B2.1010200@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 September 2014 20:04:52 zhang.lyra at gmail.com wrote:
-> From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
-> 
-> Adds earlycon support for the Spreadtrum's serial.
-> 
-> Signed-off-by: chunyan.zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  drivers/tty/serial/Kconfig             |   12 ++++++
->  drivers/tty/serial/Makefile            |    1 +
->  drivers/tty/serial/serial_sprd_early.c |   64 ++++++++++++++++++++++++++++++++
->  3 files changed, 77 insertions(+)
->  create mode 100644 drivers/tty/serial/serial_sprd_early.c
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 26cec64..ede16e6 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -85,6 +85,18 @@ config SERIAL_EARLYCON_ARM_SEMIHOST
->  	  with "earlycon=smh" on the kernel command line. The console is
->  	  enabled when early_param is processed.
->  
-> +config SERIAL_EARLYCON_SPRD
-> +	bool "Early console using SPRD serial"
-> +	depends on ARM64
-> +	select SERIAL_CORE
-> +	select SERIAL_CORE_CONSOLE
-> +	select SERIAL_EARLYCON
-> +	help
+On 09/29/2014 11:29 AM, Thierry Reding wrote:
+> On Fri, Sep 26, 2014 at 11:28:31PM +0300, Mikko Perttunen wrote:
+>> On 09/26/2014 02:45 PM, Thierry Reding wrote:
+> [...]
+>>> I think a more idiomatic way to write this would be:
+>>>
+>>> static int
+>>> calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
+>>> 			      struct tsensor_shared_calibration shared,
+>>> 			      u32 *calib)
+>>
+>> If I do that, it will go over the 80 character limit by quite a few
+>> characters, which is why I didn't use that style. Personally I'm fine with
+>> either style.
+>
+> The above doesn't exceed the 80 character limit. Putting the return
+> value and the static keyword on a separate line is a pretty common way
+> to reduce line length.
 
-I assume you will later want to have a proper device driver for
-this hardware, so it would be better to make the Kconfig symbol
-and the file name what you are going to use in the long run, but
-for now only have the earlycon support included.
+Good point, I didn't think of doing that. I usually never use the above 
+style, but clearly here it is the best choice.
 
-
-> +static int __init serial_sprd_early_console_setup(
-> +				struct earlycon_device *device,
-> +				const char *opt)
-> +{
-> +	if (!device->port.membase)
-> +		return -ENODEV;
-> +
-> +	device->con->write = serial_sprd_early_write;
-> +	return 0;
-> +}
-> +EARLYCON_DECLARE(serial_sprd, serial_sprd_early_console_setup);
-> +OF_EARLYCON_DECLARE(serial_sprd, "sprd,serial",
-> +		    serial_sprd_early_console_setup);
-> 
-
-I think you should drop the EARLYCON_DECLARE() line, using
-OF_EARLYCON_DECLARE should be enough.
-
-	Arnd
+>
+>>>
+>>> While at it, perhaps make shared a const * instead of passing it in by
+>>> value?
+>>
+>> That is possible, but I'm not sure what the difference would be. Is there a
+>> style rule forbidding by-value compound types? (Also if I change the style,
+>> it would go over 80 characters by even more.)
+>
+> No it doesn't. The below fits within 80 characters per line just fine:
+>
+> static int
+> calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
+> 			      const struct tsensor_shared_calibration *shared,
+> 			      u32 *calib)
+>
+> Thierry
+>
