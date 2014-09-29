@@ -1,91 +1,101 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Sep 2014 14:52:35 +0200
-Subject: [PATCH 6/6] arm/arm64: KVM: map MMIO regions at creation time
-In-Reply-To: <1410990981-665-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140929125235.GE3095@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Sep 2014 14:54:34 +0200
+Subject: [PATCH] USB: host: st: fix ehci/ohci driver selection
+Message-ID: <2536929.C0XC0THfdJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 17, 2014 at 02:56:21PM -0700, Ard Biesheuvel wrote:
-> There is really no point in faulting in memory regions page by page
-> if they are not backed by demand paged system RAM but by a linear
-> passthrough mapping of a host MMIO region.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/kvm/mmu.c | 50 +++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 49 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index fe53c3a30383..b153ef0c6d9f 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1162,7 +1162,55 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
->  int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
->  			    unsigned long npages)
->  {
-> -	return 0;
-> +	hva_t hva = slot->userspace_addr;
-> +	phys_addr_t gpa = slot->base_gfn << PAGE_SHIFT;
-> +	phys_addr_t size = slot->npages << PAGE_SHIFT;
-> +	int ret = 0;
-> +
-> +	/*
-> +	 * A memslot could potentially cover multiple VMAs, so iterate
-> +	 * over all of them to find out if we can map any of them right now.
-> +	 *
-> +	 *     +--------------------------------------------+
-> +	 * +---+---------+-------------------+--------------+----+
-> +	 * |   : VMA 1   |       VMA 2       |       VMA 3  :    |
-> +	 * +---+---------+-------------------+--------------+----+
-> +	 *     |                   memslot                  |
-> +	 *     +--------------------------------------------+
-> +	 */
-> +	do {
-> +		struct vm_area_struct *vma = find_vma(current->mm, hva);
-> +		hva_t start, end;
-> +
-> +		if (!vma || vma->vm_start > hva) {
-> +			ret = -EFAULT;
-> +			break;
-> +		}
-> +
-> +		start = max(slot->userspace_addr, vma->vm_start);
-> +		end = min((hva_t)(slot->userspace_addr + size), vma->vm_end);
-> +
-> +		if (vma->vm_flags & VM_PFNMAP) {
-> +			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) + start -
-> +					 vma->vm_start;
-> +			bool writable = vma->vm_flags & VM_WRITE &&
-> +					!(slot->flags & KVM_MEM_READONLY);
-> +
-> +			ret = kvm_phys_addr_ioremap(kvm, gpa, pa, end - start,
-> +						    writable);
-> +			if (ret)
-> +				break;
-> +		}
-> +		hva += end - start;
-> +		gpa += end - start;
-> +	} while (hva < slot->userspace_addr + size);
-> +
-> +	if (ret) {
-> +		spin_lock(&kvm->mmu_lock);
-> +		unmap_stage2_range(kvm, slot->base_gfn << PAGE_SHIFT, size);
-> +		spin_unlock(&kvm->mmu_lock);
-> +	}
-> +	return ret;
->  }
->  
->  void kvm_arch_memslots_updated(struct kvm *kvm)
-> -- 
-> 1.8.3.2
-> 
+The newly added sti ehci and ohci drivers come with a single
+Kconfig entry that does not depend on either of the base drivers,
+which leads to a link error when they are disabled:
 
-Looks really good!  But we should handle moving a memslot as well, which
-also tells me we should probably move this logic to
-kvm_arch_prepare_memory_region() instead...
+drivers/built-in.o: In function `ohci_platform_init':
+:(.init.text+0x14788): undefined reference to `ohci_init_driver'
 
-Thanks,
--Christoffer
+To fix that, this patch introduces two separate Kconfig options
+with proper dependencies, which avoids the problem and is also
+more consistent with the other glue drivers.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: d115837259ada ("usb: host: ohci-st: Add OHCI driver support for ST STB devices")
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Peter Griffin <peter.griffin@linaro.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: linux-usb at vger.kernel.org
+
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index b943545f862c..002ba1d5bcf5 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -174,6 +174,15 @@ config USB_EHCI_HCD_SPEAR
+           Enables support for the on-chip EHCI controller on
+           ST SPEAr chips.
+ 
++config USB_EHCI_HCD_STI
++	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
++	depends on ARCH_STI && OF
++	select GENERIC_PHY
++	select USB_EHCI_HCD_PLATFORM
++	help
++	  Enable support for the on-chip EHCI controller found on
++	  STMicroelectronics consumer electronics SoC's.
++
+ config USB_EHCI_HCD_AT91
+         tristate  "Support for Atmel on-chip EHCI USB controller"
+         depends on USB_EHCI_HCD && ARCH_AT91
+@@ -402,6 +411,15 @@ config USB_OHCI_HCD_SPEAR
+           Enables support for the on-chip OHCI controller on
+           ST SPEAr chips.
+ 
++config USB_OHCI_HCD_STI
++	tristate "Support for ST STiHxxx on-chip OHCI USB controller"
++	depends on ARCH_STI && OF
++	select GENERIC_PHY
++	select USB_OHCI_HCD_PLATFORM
++	help
++	  Enable support for the on-chip OHCI controller found on
++	  STMicroelectronics consumer electronics SoC's.
++
+ config USB_OHCI_HCD_S3C2410
+         tristate "OHCI support for Samsung S3C24xx/S3C64xx SoC series"
+         depends on USB_OHCI_HCD && (ARCH_S3C24XX || ARCH_S3C64XX)
+@@ -761,14 +779,6 @@ config USB_HCD_SSB
+ 
+ 	  If unsure, say N.
+ 
+-config USB_HCD_ST
+-	tristate "ST USB driver for ST SoC Series"
+-	depends on ARCH_STI && OF
+-	select GENERIC_PHY
+-	help
+-	  Enable support for the on-chip OHCI & EHCI controller found on
+-	  STMicroelectronics consumer electronics SoC's.
+-
+ config USB_HCD_TEST_MODE
+ 	bool "HCD test mode support"
+ 	---help---
+diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+index ae2db0b87993..0336bb2c0e6f 100644
+--- a/drivers/usb/host/Makefile
++++ b/drivers/usb/host/Makefile
+@@ -38,6 +38,7 @@ obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
+ obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
+ obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
+ obj-$(CONFIG_USB_EHCI_HCD_SPEAR)	+= ehci-spear.o
++obj-$(CONFIG_USB_EHCI_HCD_ST)	+= ehci-st.o
+ obj-$(CONFIG_USB_EHCI_EXYNOS)	+= ehci-exynos.o
+ obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
+ obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
+@@ -55,6 +56,7 @@ obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
+ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
+ obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
+ obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
++obj-$(CONFIG_USB_OHCI_HCD_STI)	+= ohci-st.o
+ obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
+ obj-$(CONFIG_USB_OHCI_HCD_S3C2410)	+= ohci-s3c2410.o
+ obj-$(CONFIG_USB_OHCI_HCD_LPC32XX)	+= ohci-nxp.o
+@@ -77,4 +79,3 @@ obj-$(CONFIG_USB_HCD_SSB)	+= ssb-hcd.o
+ obj-$(CONFIG_USB_FUSBH200_HCD)	+= fusbh200-hcd.o
+ obj-$(CONFIG_USB_FOTG210_HCD)	+= fotg210-hcd.o
+ obj-$(CONFIG_USB_MAX3421_HCD)	+= max3421-hcd.o
+-obj-$(CONFIG_USB_HCD_ST)	+= ehci-st.o ohci-st.o
