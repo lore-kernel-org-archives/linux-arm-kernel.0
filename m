@@ -1,42 +1,48 @@
-From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Mon, 29 Sep 2014 15:21:58 -0400
-Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
- page aligned
-In-Reply-To: Your message of "Fri, 26 Sep 2014 10:40:54 +0800."
- <35FD53F367049845BC99AC72306C23D103D6DB49163B@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
- <20140919095959.GA2295@e104818-lin.cambridge.arm.com>
- <20140925143142.GF5182@n2100.arm.linux.org.uk>
- <20140925154403.GL10390@e104818-lin.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D103D6DB49163B@CNBJMBX05.corpusers.net>
-Message-ID: <15815.1412018518@turing-police.cc.vt.edu>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 29 Sep 2014 13:43:35 -0600
+Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140929194335.GA13747@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Sep 2014 10:40:54 +0800, "Wang, Yalin" said:
+On Mon, Sep 29, 2014 at 03:29:19PM +0100, Liviu Dudau wrote:
+> This is my version 13 of the attempt at adding support for generic PCI host
+> bridge controllers. It contains only cleanups to make it play nice with the
+> linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
+> asm-generic is going to revert some of its more aggresive patches, he has the
+> choice of queueing it into linux-next again.
+> ...
 
-> I am really confused,
-> I read this web:
-> http://www.arm.linux.org.uk/developer/patches/info.php
-> it said use diff -urN to generate patch like this:
->
-> diff -Nru linux.orig/lib/string.c linux/lib/string.c
->
-> but I see other developers use git format-patch to generate patch and
-> submit to the patch system.
-> Git format-patch format can also be accepted by the patch system correctly ?
-> If yes, I think this web should update,
-> Use git format-patch to generate patch is more convenient than use diff -urN
+These patches above were already on my pci/host-generic branch and in
+linux-next:
 
-'diff -urN' has the advantage that it will work against a tree extracted
-from a release tarball, and doesn't have a requirement that you have git
-installed.  Having said that, somebody who has access to the website probably
-should update it to mention that both methods are acceptable....
+   asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
+   of/pci: Add pci_register_io_range() and pci_pio_to_address()
+   ARM: Define PCI_IOBASE as the base of virtual PCI IO space
+   of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
+   of/pci: Move of_pci_range_to_resources() to of/address.c
+   of/pci: Fix the conversion of IO ranges into IO resources
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 848 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/67b69ff5/attachment.sig>
+I added these three patches to my pci/host-generic branch:
+
+   PCI: Add generic domain handling
+   of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
+   of/pci: Add support for parsing PCI host bridge resources from DT
+
+Yinghai pointed out a problem with this one, so I omitted it:
+
+   PCI: Assign unassigned bus resources in pci_scan_root_bus()
+
+I added this one to my pci/host-generic branch:
+
+   PCI: Add pci_remap_iospace() to map bus I/O resources
+
+I assume this depends on the pci_scan_root_bus() change (if not, let me
+know), so I omitted this one:
+
+   arm64: Add architectural support for PCI
+
+Bjorn
