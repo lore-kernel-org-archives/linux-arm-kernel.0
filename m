@@ -1,57 +1,257 @@
 From: ipaton0@gmail.com (Iain Paton)
-Date: Mon, 29 Sep 2014 13:56:49 +0100
-Subject: [PATCH] ARM: sun7i: add support for A20-OLinuXino-Lime2
-In-Reply-To: <20140928164337.GB15315@lukather>
-References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
-Message-ID: <54295711.9010901@gmail.com>
+Date: Mon, 29 Sep 2014 13:56:58 +0100
+Subject: [PATCH v2] ARM: sun7i: add support for A20-OLinuXino-Lime2
+Message-ID: <5429571A.1090205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/14 17:43, Maxime Ripard wrote:
-> On Sun, Sep 28, 2014 at 02:18:31PM +0100, Iain Paton wrote:
+This adds support for the Olimex A20-OLinuXino-Lime2
+https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
 
->> +
->> +		i2c0: i2c at 01c2ac00 {
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c0_pins_a>;
->> +			status = "okay";
->> +
->> +			axp209: pmic at 34 {
->> +				compatible = "x-powers,axp209";
->> +				reg = <0x34>;
->> +				interrupt-parent = <&nmi_intc>;
->> +				interrupts = <0 8>;
->> +
->> +				interrupt-controller;
->> +				#interrupt-cells = <1>;
-> 
-> It would be greate if you could add the regulators used on the board
-> here.
-> 
-> You might want to hold off a bit until the merge window is out, since
-> some patches useful for this are still pending, or based your patch on
-> top of linux-next
+Differences to previous Lime boards are 1GB RAM and gigabit ethernet
+---
 
-I'll take a bash at it, although as there seems to be no binding doc 
-for the driver and I can't find any other board that has axp209 
-regulators defined I may need a bit of help to get this right.
+changes for v2
+ add axp209 regulators node
 
-What additional patches are we talking about?  The following:
-regulator: axp20x: Use parent device as regulator configuration device
-i2c: mv64xxx: continue probe when clock-frequency is missing
-or are there others I'd need to pick out of linux-next?
 
-linux-next 20140926 doesn't build for me:
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 215 ++++++++++++++++++++++++
+ 2 files changed, 216 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
 
-   LD      init/built-in.o
-kernel/built-in.o: In function `cputime_adjust':
-:(.text+0x25588): undefined reference to `__bad_cmpxchg'
-:(.text+0x255f8): undefined reference to `__bad_cmpxchg'
-/data/linux/source/linux-next-org/Makefile:956: recipe for target 'vmlinux' failed
-
-I suppose as a result of https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/kernel/sched/cputime.c?id=eb1b4af0a64ac7bb0ee36f579c1c7cefcbc3ac2c
-
-having reverted that one, the resulting kernel doesn't want to talk 
-to my SD card.  Both your tree and 3.16 work fine though.
-
-Anyway, v2 on it's way.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8f12390..ff5324f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -439,6 +439,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+     sun7i-a20-hummingbird.dtb \
+     sun7i-a20-i12-tvbox.dtb \
+     sun7i-a20-olinuxino-lime.dtb \
++    sun7i-a20-olinuxino-lime2.dtb \
+     sun7i-a20-olinuxino-micro.dtb \
+     sun7i-a20-pcduino3.dtb
+ dtb-$(CONFIG_MACH_SUN8I) += \
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+new file mode 100644
+index 0000000..44043f6
+--- /dev/null
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -0,0 +1,215 @@
++/*
++ * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this library; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "sun7i-a20.dtsi"
++/include/ "sunxi-common-regulators.dtsi"
++
++/ {
++    model = "Olimex A20-OLinuXino-LIME2";
++    compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
++
++    soc at 01c00000 {
++
++        ahci: sata at 01c18000 {
++            target-supply = <&reg_ahci_5v>;
++            status = "okay";
++        };
++
++        ehci0: usb at 01c14000 {
++            status = "okay";
++        };
++
++        ehci1: usb at 01c1c000 {
++            status = "okay";
++        };
++
++        gmac: ethernet at 01c50000 {
++            pinctrl-names = "default";
++            pinctrl-0 = <&gmac_pins_rgmii_a>;
++            phy = <&phy1>;
++            phy-mode = "rgmii";
++            status = "okay";
++
++            phy1: ethernet-phy at 1 {
++                reg = <1>;
++            };
++        };
++
++        i2c0: i2c at 01c2ac00 {
++            pinctrl-names = "default";
++            pinctrl-0 = <&i2c0_pins_a>;
++            status = "okay";
++
++            axp209: pmic at 34 {
++                compatible = "x-powers,axp209";
++                reg = <0x34>;
++                interrupt-parent = <&nmi_intc>;
++                interrupts = <0 8>;
++
++                interrupt-controller;
++                #interrupt-cells = <1>;
++
++                regulators {
++                    reg_ldo1: ldo1 {
++                        regulator-min-microvolt = <1300000>;
++                        regulator-max-microvolt = <1300000>;
++                        regulator-always-on;
++                    };
++                    reg_ldo2: ldo2 {
++                        regulator-min-microvolt = <1800000>;
++                        regulator-max-microvolt = <3300000>;
++                        regulator-always-on;
++                    };
++                    reg_ldo3: ldo3 {
++                        regulator-min-microvolt = <700000>;
++                        regulator-max-microvolt = <3500000>;
++                        regulator-always-on;
++                    };
++                    reg_ldo4: ldo4 {
++                        regulator-min-microvolt = <1250000>;
++                        regulator-max-microvolt = <3300000>;
++                        regulator-always-on;
++                    };
++                    reg_ldo5: ldo5 {
++                        regulator-min-microvolt = <1800000>;
++                        regulator-max-microvolt = <3300000>;
++                        regulator-always-on;
++                    };
++                    reg_dcdc2: dcdc2 {
++                        regulator-min-microvolt = <1400000>;
++                        regulator-max-microvolt = <1400000>;
++                        regulator-always-on;
++                    };
++                    reg_dcdc3: dcdc3 {
++                        regulator-min-microvolt = <1250000>;
++                        regulator-max-microvolt = <1250000>;
++                        regulator-always-on;
++                    };
++                };
++            };
++        };
++
++        i2c1: i2c at 01c2b000 {
++            pinctrl-names = "default";
++            pinctrl-0 = <&i2c1_pins_a>;
++            status = "okay";
++        };
++
++        mmc0: mmc at 01c0f000 {
++            pinctrl-names = "default";
++            pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++            vmmc-supply = <&reg_vcc3v3>;
++            bus-width = <4>;
++            cd-gpios = <&pio 7 1 0>; /* PH1 */
++            cd-inverted;
++            status = "okay";
++        };
++
++        ohci0: usb at 01c14400 {
++            status = "okay";
++        };
++
++        ohci1: usb at 01c1c400 {
++            status = "okay";
++        };
++
++        uart0: serial at 01c28000 {
++            pinctrl-names = "default";
++            pinctrl-0 = <&uart0_pins_a>;
++            status = "okay";
++        };
++
++        usbphy: phy at 01c13400 {
++            usb1_vbus-supply = <&reg_usb1_vbus>;
++            usb2_vbus-supply = <&reg_usb2_vbus>;
++            status = "okay";
++        };
++
++        pinctrl at 01c20800 {
++            ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
++                allwinner,pins = "PC3";
++                allwinner,function = "gpio_out";
++                allwinner,drive = <0>;
++                allwinner,pull = <0>;
++            };
++
++            led_pins_olinuxinolime: led_pins at 0 {
++                allwinner,pins = "PH2";
++                allwinner,function = "gpio_out";
++                allwinner,drive = <1>;
++                allwinner,pull = <0>;
++            };
++        };
++    };
++
++    leds {
++        compatible = "gpio-leds";
++        pinctrl-names = "default";
++        pinctrl-0 = <&led_pins_olinuxinolime>;
++
++        green {
++            label = "a20-olinuxino-lime2:green:usr";
++            gpios = <&pio 7 2 0>;
++            default-state = "on";
++        };
++    };
++
++    reg_ahci_5v: ahci-5v {
++        pinctrl-0 = <&ahci_pwr_pin_olinuxinolime>;
++        gpio = <&pio 2 3 0>;
++        status = "okay";
++    };
++
++    reg_usb1_vbus: usb1-vbus {
++        status = "okay";
++    };
++
++    reg_usb2_vbus: usb2-vbus {
++        status = "okay";
++    };
++};
+-- 
+1.8.5.1
