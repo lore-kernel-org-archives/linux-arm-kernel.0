@@ -1,48 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 16:42:18 +0200
-Subject: [RFC 4/4] irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <1411937610-22125-5-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411937610-22125-5-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <2648363.DSa0NxqRJL@wuerfel>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 29 Sep 2014 16:44:17 +0200
+Subject: [PATCH v6 04/11] pwm: add DT bindings documentation for
+ atmel-hlcdc-pwm driver
+In-Reply-To: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412001864-3251-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1412001864-3251-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 September 2014 15:53:30 suravee.suthikulpanit at amd.com wrote:
-> +       interrupt-controller at e1101000 {
-> +               compatible = "arm,gic-400";
-> +               #interrupt-cells = >;
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               interrupt-controller;
-> +               interrupts = <1 8 0xf04>;
-> +               ranges = <0 0 0 0xe1100000 0 0x100000>;
-> +               reg = <0x0 0xe1110000 0 0x01000>,
-> +                     <0x0 0xe112f000 0 0x02000>,
-> +                     <0x0 0xe1140000 0 0x10000>,
-> +                     <0x0 0xe1160000 0 0x10000>;
-> +               v2m0: v2m at 0x8000 {
-> +                       compatible = "arm,gic-v2m-frame";
-> +                       msi-controller;
-> +                       reg = <0x0 0x80000 0 0x1000>;
-> +               };
-> +
-> +               ....
-> +
-> +               v2mN: v2m at 0x9000 {
-> +                       compatible = "arm,gic-v2m-frame";
-> +                       msi-controller;
-> +                       reg = <0x0 0x90000 0 0x1000>;
-> +               };
-> +       };
-> 
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Could this just be modeled as a separate msi-controller node
-outside of the GIC?
+The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
+at91sam9x5 family or sama5d3 family) provide a PWM device.
 
-Instead of the arm,msi-base-spi/arm,msi-num-spis properties, how
-about using regular "interrupts"/"interrupt-parent" properties listing
-the exact interrupts? That would also make it more flexible in
-case the same layout is used with a parent other than the GIC.
+The DT bindings used for this PWM device is following the default 3 cells
+bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
 
-	ARnd
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+
+diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+new file mode 100644
+index 0000000..86ad3e2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+@@ -0,0 +1,55 @@
++Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
++
++The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
++See ../mfd/atmel-hlcdc.txt for more details.
++
++Required properties:
++ - compatible: value should be one of the following:
++   "atmel,hlcdc-pwm"
++ - pinctr-names: the pin control state names. Should contain "default".
++ - pinctrl-0: should contain the pinctrl states described by pinctrl
++   default.
++ - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
++   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
++   The first cell encodes the PWM id (0 is the only acceptable value here,
++   because the chip only provide one PWM).
++   The second cell encodes the PWM period in nanoseconds.
++   The third cell encodes the PWM flags (the only supported flag is
++   PWM_POLARITY_INVERTED)
++
++Example:
++
++	hlcdc: hlcdc at f0030000 {
++		compatible = "atmel,sama5d3-hlcdc";
++		reg = <0xf0030000 0x2000>;
++		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
++		clock-names = "periph_clk","sys_clk", "slow_clk";
++		status = "disabled";
++
++		hlcdc-display-controller {
++			compatible = "atmel,hlcdc-display-controller";
++			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				hlcdc_panel_output: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&panel_input>;
++				};
++			};
++		};
++
++		hlcdc_pwm: hlcdc-pwm {
++			compatible = "atmel,hlcdc-pwm";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_lcd_pwm>;
++			#pwm-cells = <3>;
++		};
++	};
+-- 
+1.9.1
