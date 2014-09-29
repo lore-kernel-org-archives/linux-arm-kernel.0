@@ -1,101 +1,254 @@
-From: asierra@xes-inc.com (Aaron Sierra)
-Date: Mon, 29 Sep 2014 14:16:30 -0500 (CDT)
-Subject: [RFT PATCH v3] mtd: ixp4xx: Unrequire CONFIG_MTD_CFI_BE_BYTE_SWAP
-In-Reply-To: <27037991.83033.1412017947397.JavaMail.zimbra@xes-inc.com>
-Message-ID: <721120426.83373.1412018190530.JavaMail.zimbra@xes-inc.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 30 Sep 2014 00:49:01 +0530
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <CA+sq2CddHa06tZvg8VmZj6tO5KE+Zsz3qupD78NaaUs9qUg6Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The .swap member of the map_info structure is provided for situations
-where a mapping must always be big or little endian regardless of the
-endianness of the system performing the access.
+How does the res->parent for devices of non-"PCI_PROBE_ONLY" controller
+gets set with this patch ?
 
-Signed-off-by: Aaron Sierra <asierra@xes-inc.com>
----
-I am looking for testers before submitting to MTD mailing list.
-
-v2: Account for 32-bit swapping
-v3: Account for big-endian byte-wise access
-
- drivers/mtd/maps/ixp4xx.c | 38 ++++++++++++++++----------------------
- 1 file changed, 16 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/mtd/maps/ixp4xx.c b/drivers/mtd/maps/ixp4xx.c
-index 6a589f1..8302784 100644
---- a/drivers/mtd/maps/ixp4xx.c
-+++ b/drivers/mtd/maps/ixp4xx.c
-@@ -26,6 +26,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/map.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/mtd/cfi_endian.h>
- 
- #include <asm/io.h>
- #include <asm/mach/flash.h>
-@@ -48,42 +49,34 @@
-  *     | C | D | 2
-  *     +---+---+
-  * This means that on LE systems each 16 bit word must be swapped. Note that
-- * this requires CONFIG_MTD_CFI_BE_BYTE_SWAP to be enabled to 'unswap' the CFI
-- * data and other flash commands which are always in D7-D0.
-+ * this is accounted for by defining map_info.swap to be CFI_BIG_ENDIAN to
-+ * 'unswap' the CFI commands and using cpu_to_be16/be16_to_cpu to 'unswap'
-+ * the data.
-  */
--#ifndef __ARMEB__
--#ifndef CONFIG_MTD_CFI_BE_BYTE_SWAP
--#  error CONFIG_MTD_CFI_BE_BYTE_SWAP required
-+#ifdef __ARMEB__
-+#define fixup_32(io) (io)
-+#else
-+#define fixup_32(io) (void __iomem *)((unsigned long)(io) ^ 2)
- #endif
- 
- static inline u16 flash_read16(void __iomem *addr)
- {
--	return be16_to_cpu(__raw_readw((void __iomem *)((unsigned long)addr ^ 0x2)));
-+	return be16_to_cpu(__raw_readw(fixup_32(addr)));
- }
- 
- static inline void flash_write16(u16 d, void __iomem *addr)
- {
--	__raw_writew(cpu_to_be16(d), (void __iomem *)((unsigned long)addr ^ 0x2));
-+	__raw_writew(cpu_to_be16(d), fixup_32(addr));
- }
- 
--#define	BYTE0(h)	((h) & 0xFF)
--#define	BYTE1(h)	(((h) >> 8) & 0xFF)
--
--#else
--
--static inline u16 flash_read16(const void __iomem *addr)
-+static inline u8 __to_byte(u16 val, bool zero)
- {
--	return __raw_readw(addr);
-+	u8 *bytes = (u8 *)&val;
-+	return zero ? bytes[0] : bytes[1];
- }
- 
--static inline void flash_write16(u16 d, void __iomem *addr)
--{
--	__raw_writew(d, addr);
--}
--
--#define	BYTE0(h)	(((h) >> 8) & 0xFF)
--#define	BYTE1(h)	((h) & 0xFF)
--#endif
-+#define	BYTE0(h)	__to_byte((h), true)
-+#define	BYTE1(h)	__to_byte((h), false)
- 
- static map_word ixp4xx_read16(struct map_info *map, unsigned long ofs)
- {
-@@ -200,6 +193,7 @@ static int ixp4xx_flash_probe(struct platform_device *dev)
- 	 * Tell the MTD layer we're not 1:1 mapped so that it does
- 	 * not attempt to do a direct access on us.
- 	 */
-+	info->map.swap = CFI_BIG_ENDIAN;
- 	info->map.phys = NO_XIP;
- 	info->map.size = resource_size(dev->resource);
- 
--- 
-1.9.1
+On Mon, Sep 29, 2014 at 2:23 AM,  <suravee.suthikulpanit@amd.com> wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>
+> This patch adds ARM64 support to the generic PCI host driver.
+>
+> For MSI support, it adds new device tree binding "msi-parent",
+> which should point to corresponded msi-controller.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  .../devicetree/bindings/pci/host-generic-pci.txt   |  3 +
+>  drivers/pci/host/Kconfig                           |  2 +-
+>  drivers/pci/host/pci-host-generic.c                | 95 ++++++++++++++++++++--
+>  3 files changed, 90 insertions(+), 10 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index f0b0436..327e5b1 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -69,6 +69,9 @@ Practice: Interrupt Mapping' and requires the following properties:
+>
+>  - interrupt-map-mask : <see aforementioned specification>
+>
+> +Optinal Properties:
+> +
+> +- msi-parent     : Specify the msi-controller phandle.
+>
+>  Example:
+>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 90f5cca..44bf523 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -50,7 +50,7 @@ config PCI_RCAR_GEN2_PCIE
+>
+>  config PCI_HOST_GENERIC
+>         bool "Generic PCI host controller"
+> -       depends on ARM && OF
+> +       depends on (ARM || ARM64) && OF
+>         help
+>           Say Y here if you want to support a simple generic PCI host
+>           controller, such as the one emulated by kvmtool.
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 3d2076f..f33c547 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -42,14 +42,24 @@ struct gen_pci {
+>         struct pci_host_bridge                  host;
+>         struct gen_pci_cfg_windows              cfg;
+>         struct list_head                        resources;
+> +       struct device_node *msi_parent;
+>  };
+>
+> +#ifdef CONFIG_ARM64
+> +#define bus_to_gen_pci(b) \
+> +       ((struct gen_pci *)b->sysdata)
+> +#else
+> +#define bus_to_gen_pci(b) \
+> +       ((struct gen_pci *) \
+> +       (((struct pci_sys_data *) \
+> +       (bus->sysdata))->private_data))
+> +#endif
+> +
+>  static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+>                                              unsigned int devfn,
+>                                              int where)
+>  {
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = bus_to_gen_pci(bus);
+>         resource_size_t idx = bus->number - pci->cfg.bus_range.start;
+>
+>         return pci->cfg.win[idx] + ((devfn << 8) | where);
+> @@ -64,8 +74,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
+>                                               unsigned int devfn,
+>                                               int where)
+>  {
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = bus_to_gen_pci(bus);
+>         resource_size_t idx = bus->number - pci->cfg.bus_range.start;
+>
+>         return pci->cfg.win[idx] + ((devfn << 12) | where);
+> @@ -80,8 +89,7 @@ static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
+>                                 int where, int size, u32 *val)
+>  {
+>         void __iomem *addr;
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = bus_to_gen_pci(bus);
+>
+>         addr = pci->cfg.ops->map_bus(bus, devfn, where);
+>
+> @@ -103,8 +111,7 @@ static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
+>                                  int where, int size, u32 val)
+>  {
+>         void __iomem *addr;
+> -       struct pci_sys_data *sys = bus->sysdata;
+> -       struct gen_pci *pci = sys->private_data;
+> +       struct gen_pci *pci = bus_to_gen_pci(bus);
+>
+>         addr = pci->cfg.ops->map_bus(bus, devfn, where);
+>
+> @@ -144,8 +151,11 @@ static int gen_pci_calc_io_offset(struct device *dev,
+>                                   resource_size_t *offset)
+>  {
+>         static atomic_t wins = ATOMIC_INIT(0);
+> -       int err, idx, max_win;
+> +       int idx, max_win;
+>         unsigned int window;
+> +#ifndef CONFIG_ARM64
+> +       int err;
+> +#endif
+>
+>         if (!PAGE_ALIGNED(range->cpu_addr))
+>                 return -EINVAL;
+> @@ -156,9 +166,12 @@ static int gen_pci_calc_io_offset(struct device *dev,
+>                 return -ENOSPC;
+>
+>         window = (idx - 1) * SZ_64K;
+> +
+> +#ifndef CONFIG_ARM64
+>         err = pci_ioremap_io(window, range->cpu_addr);
+>         if (err)
+>                 return err;
+> +#endif
+>
+>         of_pci_range_to_resource(range, dev->of_node, res);
+>         res->start = window;
+> @@ -310,12 +323,58 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>         return 0;
+>  }
+>
+> +#ifndef CONFIG_ARM64
+>  static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+>  {
+>         struct gen_pci *pci = sys->private_data;
+>         list_splice_init(&pci->resources, &sys->resources);
+>         return 1;
+>  }
+> +#endif
+> +
+> +#ifdef CONFIG_ARM64
+> +struct pci_bus *gen_scan_root_bus(struct device *parent, int bus,
+> +                                      struct pci_ops *ops, void *sysdata,
+> +                                      struct list_head *resources)
+> +{
+> +       struct pci_host_bridge_window *window;
+> +       bool found = false;
+> +       struct pci_bus *b;
+> +       int max;
+> +       struct gen_pci *pci = sysdata;
+> +
+> +       list_for_each_entry(window, resources, list)
+> +               if (window->res->flags & IORESOURCE_BUS) {
+> +                       found = true;
+> +                       break;
+> +               }
+> +
+> +       b = pci_create_root_bus(parent, bus, ops, sysdata, resources);
+> +       if (!b)
+> +               return NULL;
+> +
+> +       /* TODO:
+> +        * This is probably should be done in the core pci driver somewhere
+> +        */
+> +       if (pci->msi_parent)
+> +               b->msi = of_pci_find_msi_chip_by_node(pci->msi_parent);
+> +
+> +       if (!found) {
+> +               dev_info(&b->dev,
+> +                "No busn resource found for root bus, will use [bus %02x-ff]\n",
+> +                       bus);
+> +               pci_bus_insert_busn_res(b, bus, 255);
+> +       }
+> +
+> +       max = pci_scan_child_bus(b);
+> +
+> +       if (!found)
+> +               pci_bus_update_busn_res_end(b, max);
+> +
+> +       pci_bus_add_devices(b);
+> +       return b;
+> +}
+> +#endif
+>
+>  static int gen_pci_probe(struct platform_device *pdev)
+>  {
+> @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>         struct device *dev = &pdev->dev;
+>         struct device_node *np = dev->of_node;
+>         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +#ifndef CONFIG_ARM64
+>         struct hw_pci hw = {
+>                 .nr_controllers = 1,
+>                 .private_data   = (void **)&pci,
+> @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>                 .map_irq        = of_irq_parse_and_map_pci,
+>                 .ops            = &gen_pci_ops,
+>         };
+> +#endif
+>
+>         if (!pci)
+>                 return -ENOMEM;
+> @@ -368,8 +429,24 @@ static int gen_pci_probe(struct platform_device *pdev)
+>                 gen_pci_release_of_pci_ranges(pci);
+>                 return err;
+>         }
+> +#ifdef CONFIG_ARM64
+>
+> +#ifdef CONFIG_PCI_MSI
+> +       pci->msi_parent = of_parse_phandle(np, "msi-parent", 0);
+> +       if (!pci->msi_parent) {
+> +               dev_err(&pdev->dev, "Failed to allocate msi-parent.\n");
+> +               return -EINVAL;
+> +       }
+> +#endif
+> +
+> +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
+> +                              &gen_pci_ops, pci, &pci->resources)) {
+> +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
+> +               return -ENODEV;
+> +       }
+> +#else
+>         pci_common_init_dev(dev, &hw);
+> +#endif /* CONFIG_ARM64 */
+>         return 0;
+>  }
+>
+> --
+> 1.9.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
