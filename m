@@ -1,41 +1,78 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 29 Sep 2014 08:51:47 +0200
-Subject: [PATCH v1 3/4] arm: pxa: remove unecessary includes from pxa-dt
+Date: Mon, 29 Sep 2014 08:51:48 +0200
+Subject: [PATCH v1 4/4] arm: pxa: add pxa27x device-tree support
 In-Reply-To: <1411973508-14301-1-git-send-email-robert.jarzmik@free.fr>
 References: <1411973508-14301-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1411973508-14301-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1411973508-14301-4-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the init functions necessary for machine init have moved to
-generic.h, remove the unecessary includes and prototypes definitions
-from pxa-dt.c.
-
-This removes the include of mach/pxaXXX-regs.h, and make pxa-dt generic
-enough to accept other pxa variants.
+Add a device-tree machine entry (DT_MACHINE_START)  for pxa27x based
+platforms.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/pxa-dt.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/mach-pxa/Kconfig  | 11 +++++++++++
+ arch/arm/mach-pxa/Makefile |  1 +
+ arch/arm/mach-pxa/pxa-dt.c | 15 +++++++++++++++
+ 3 files changed, 27 insertions(+)
 
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index e6690a4..83efe91 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -4,6 +4,17 @@ menu "Intel PXA2xx/PXA3xx Implementations"
+ 
+ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
+ 
++config MACH_PXA27X_DT
++	bool "Support PXA27x platforms from device tree"
++	select CPU_PXA27x
++	select POWER_SUPPLY
++	select PXA27x
++	select USE_OF
++	help
++	  Include support for Marvell PXA27x based platforms using
++	  the device tree. Needn't select any other machine while
++	  MACH_PXA27X_DT is enabled.
++
+ config MACH_PXA3XX_DT
+ 	bool "Support PXA3xx platforms from device tree"
+ 	select CPU_PXA300
+diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+index 2fe1824..eb0bf76 100644
+--- a/arch/arm/mach-pxa/Makefile
++++ b/arch/arm/mach-pxa/Makefile
+@@ -21,6 +21,7 @@ obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
+ 
+ # Device Tree support
+ obj-$(CONFIG_MACH_PXA3XX_DT)	+= pxa-dt.o
++obj-$(CONFIG_MACH_PXA27X_DT)	+= pxa-dt.o
+ 
+ # Intel/Marvell Dev Platforms
+ obj-$(CONFIG_ARCH_LUBBOCK)	+= lubbock.o
 diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
-index f6a2c4b..b070196 100644
+index b070196..7e0e5bd 100644
 --- a/arch/arm/mach-pxa/pxa-dt.c
 +++ b/arch/arm/mach-pxa/pxa-dt.c
-@@ -15,13 +15,10 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include <mach/irqs.h>
--#include <mach/pxa3xx.h>
- 
- #include "generic.h"
- 
- #ifdef CONFIG_PXA3xx
--extern void __init pxa3xx_dt_init_irq(void);
--
- static const struct of_dev_auxdata pxa3xx_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
- 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
+@@ -58,3 +58,18 @@ DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
+ 	.dt_compat	= pxa3xx_dt_board_compat,
+ MACHINE_END
+ #endif
++
++#ifdef CONFIG_PXA27x
++static const char * const pxa27x_dt_board_compat[] __initconst = {
++	"marvell,pxa270",
++	NULL,
++};
++
++DT_MACHINE_START(PXA27X_DT, "Marvell PXA2xx (Device Tree Support)")
++	.map_io		= pxa27x_map_io,
++	.init_irq	= pxa27x_dt_init_irq,
++	.handle_irq	= pxa27x_handle_irq,
++	.restart	= pxa_restart,
++	.dt_compat	= pxa27x_dt_board_compat,
++MACHINE_END
++#endif
 -- 
 2.1.0
