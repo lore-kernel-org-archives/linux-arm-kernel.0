@@ -1,83 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 29 Sep 2014 18:46:17 +0200
-Subject: ARMADA 370 - Kernel panic during boot
-In-Reply-To: <68f0f9805e88b1cc33c3d2f9521cc93f@twien.net>
-References: <6241a6200de0d573c982f73f062ed7fa@twien.net>
- <542938A7.8050307@free-electrons.com>
- <d1be3a0a37860f969b99ecc09b4cfcd8@twien.net>
- <20140929155724.579964b5@free-electrons.com>
- <68f0f9805e88b1cc33c3d2f9521cc93f@twien.net>
-Message-ID: <20140929184617.0a333b09@free-electrons.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Mon, 29 Sep 2014 09:47:34 -0700
+Subject: [PATCH v3 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <20140929083136.GG12506@ulmo> (Thierry Reding's message of "Mon,
+ 29 Sep 2014 10:31:37 +0200")
+References: <1411874849-343-1-git-send-email-mitchelh@codeaurora.org>
+ <1411874849-343-2-git-send-email-mitchelh@codeaurora.org>
+ <20140929083136.GG12506@ulmo>
+Message-ID: <vnkwmw9il6ft.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Sep 29 2014 at 01:31:37 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Sat, Sep 27, 2014 at 08:27:28PM -0700, Mitchel Humpherys wrote:
+>> From: Matt Wagantall <mattw@codeaurora.org>
+>> 
+>> It is sometimes necessary to poll a memory-mapped register until its
+>> value satisfies some condition. Introduce a family of convenience macros
+>> that do this. Tight-loop and sleeping versions are provided with and
+>> without timeouts.
+>> 
+>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+>> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+>> ---
+>>  include/linux/iopoll.h | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 77 insertions(+)
+>>  create mode 100644 include/linux/iopoll.h
+>
+> It would be good to provide a changelog with each new version of the
+> patch. As it is I now have v2 and v3 of this patch in my inbox and I
+> have no idea what the differences are, so I'd need to download both
+> and run them through interdiff to find out.
 
-On Mon, 29 Sep 2014 17:23:59 +0200, post at twien.net wrote:
+Yeah I put the changelog in the cover letter.  There were no changes on
+this patch, though I admit that wasn't entirely clear now re-reading the
+cover letter text.  I also didn't account for the fact that you probably
+aren't reading the whole series since I only Cc'd you on this patch, not
+the whole series.  In any case, I probably shouldn't have re-sent the
+whole series after one minor modification to one patch in the series.
 
-> Thanks, that made it!
 
-You're welcome.
+-Mitch
 
-> Actually to change the Physical base address of the debug UART was 
-> actually a shot in the dark, because I got nothing out, and I just 
-> decided to give it a try.
-> To me this is somewhat confusing: I thought the physical address of 
-> those register were 0xd0000000 (according to the hardware specification) 
-> and that the U-boot remapped those to the virtual address 0xf1000000. 
-
-0xf1000000 is not a virtual address, it's a physical address. The SoC
-has the capability of defining where its internal registers are located
-in terms of physical address. Out of reset, they are mapped at
-0xd0000000, but by using one register, you can remap them to some other
-location. The tradition for most Marvell EBU bootloaders is to remap
-them at 0xf1000000. This way, there is less space in the 0x0 ->
-0xffffffff space used for registers, and therefore more RAM of the
-first 4 GB is actually usable.
-
-> Well, since it worked on another board with 0xd0000000 (ref. mail from 
-> Gregory), I assume this is not so simple, and that this may vary 
-> depending on how U-boot remaps the registers, or? I'm using the U-boot 
-> provided by Marvell.
-
-As said earlier, for most Marvell EBU platforms, the registers are
-remapped by the bootloader at 0xf1000000. Except that there was a small
-issue in early revisions of the Armada 370 and XP that broke some
-features if another value than 0xd0000000 was used. For this
-reason, some early Armada 370/XP platforms use old Marvell U-Boot
-versions that keep registers at 0xd0000000. But more recent Marvell
-U-Boot versions properly do the remapping at 0xf1000000 since the
-hardware issue was fixed in the production silicon.
-
-Bottom line is: depending on which bootloader version you're using, it
-may be 0xd0000000 or 0xf1000000. From your bootloader, you can do:
-
-	md 0xd0020080
-	md 0xf1020080
-
-If one crashes, then it's the other one that will work, and that will
-tell you the location of the internal registers.
-
-The trick is that as you can see, the register that configures the
-address of the internal registers is itself part of the internal
-registers :-)
-
-> I have to debug further though, because it stopped with the message 
-> bootconsole [...] disabled. I guess the problem is that the switch chip 
-> (88E6532) is not detected (in the U-boot OK though, as egiga0), and this 
-> is my only way out.... (SGMII->PHY)
-
-Seems weird. If you have an UART plugged in, a switch chip should
-definitely not cause the kernel to hang in its boot process. Do you
-have the correct console=ttySx,115200 parameter passed in the kernel
-command line? It seems like after switching from the early console to
-the real console, you stop having messages, which might indicate a
-wrong console= value.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
