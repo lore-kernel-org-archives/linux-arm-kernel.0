@@ -1,208 +1,43 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 29 Sep 2014 11:55:08 +0300
-Subject: [PATCHv2] clk: ti: change clock init to use generic of_clk_init
-In-Reply-To: <20140923154901.GA2451@atomide.com>
-References: <1410523317-14787-1-git-send-email-t-kristo@ti.com>
- <20140923154901.GA2451@atomide.com>
-Message-ID: <54291E6C.40308@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Sep 2014 10:54:34 +0200
+Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic {read,
+ write}s*()
+In-Reply-To: <1407925738-26170-7-git-send-email-thierry.reding@gmail.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+ <1407925738-26170-7-git-send-email-thierry.reding@gmail.com>
+Message-ID: <CAMuHMdW4emoma3nRUGna985tE17yPh5pNjMb-jxe5yc5UVr=cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 06:49 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [140912 05:02]:
->> Previously, the TI clock driver initialized all the clocks hierarchically
->> under each separate clock provider node. Now, each clock that requires
->> IO access will instead check their parent node to find out which IO range
->> to use.
->>
->> This patch allows the TI clock driver to use a few new features provided
->> by the generic of_clk_init, and also allows registration of clock nodes
->> outside the clock hierarchy (for example, any external clocks.)
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> Cc: Mike Turquette <mturquette@linaro.org>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> Cc: Jyri Sarha <jsarha@ti.com>
->> Cc: Stefan Assmann <sassmann@kpanic.de>
->> ---
->> Changes from v1:
->>    - fixed the retry logic for deferred clock inits, this wasn't working
->>      properly in v1
->
-> Sounds like you want to merge this via the clock tree, so please
-> feel free to add:
->
-> Acked-by: Tony Lindgren <tony@atomide.com>
+On Wed, Aug 13, 2014 at 12:28 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> #ifndef memset_io
+> -#define memset_io(a, b, c)     memset(__io_virt(a), (b), (c))
+> +#define memset_io memset_io
+> +static inline void memset_io(void __iomem *addr, int value, size_t size)
+> +{
+> +       memset(__io_virt(addr), value, size);
+> +}
+>  #endif
 
-Thanks, applied to for-v3.18/ti-clk-drv.
+xtensa/allmodconfig:
 
--Tero
+include/asm-generic/io.h:820:2: error: implicit declaration of
+function 'memset' [-Werror=implicit-function-declaration]
+include/asm-generic/io.h:829:2: error: implicit declaration of
+function 'memcpy' [-Werror=implicit-function-declaration]
+arch/xtensa/include/asm/string.h:110:14: error: conflicting types for 'memset'
+arch/xtensa/include/asm/string.h:113:14: error: conflicting types for 'memcpy'
 
->
->>   arch/arm/mach-omap2/io.c         |   12 +++++--
->>   arch/arm/mach-omap2/prm_common.c |    2 --
->>   drivers/clk/ti/clk.c             |   68 ++++++++++++++++++++++++--------------
->>   include/linux/clk/ti.h           |    1 +
->>   4 files changed, 54 insertions(+), 29 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->> index 5d0667c..a1b82a9 100644
->> --- a/arch/arm/mach-omap2/io.c
->> +++ b/arch/arm/mach-omap2/io.c
->> @@ -734,8 +734,16 @@ int __init omap_clk_init(void)
->>   	ti_clk_init_features();
->>
->>   	ret = of_prcm_init();
->> -	if (!ret)
->> -		ret = omap_clk_soc_init();
->> +	if (ret)
->> +		return ret;
->> +
->> +	of_clk_init(NULL);
->> +
->> +	ti_dt_clk_init_retry_clks();
->> +
->> +	ti_dt_clockdomains_setup();
->> +
->> +	ret = omap_clk_soc_init();
->>
->>   	return ret;
->>   }
->> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
->> index 76ca320..3b89080 100644
->> --- a/arch/arm/mach-omap2/prm_common.c
->> +++ b/arch/arm/mach-omap2/prm_common.c
->> @@ -525,8 +525,6 @@ int __init of_prcm_init(void)
->>   		memmap_index++;
->>   	}
->>
->> -	ti_dt_clockdomains_setup();
->> -
->>   	return 0;
->>   }
->>
->> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
->> index b1a6f71..337abe5 100644
->> --- a/drivers/clk/ti/clk.c
->> +++ b/drivers/clk/ti/clk.c
->> @@ -25,8 +25,8 @@
->>   #undef pr_fmt
->>   #define pr_fmt(fmt) "%s: " fmt, __func__
->>
->> -static int ti_dt_clk_memmap_index;
->>   struct ti_clk_ll_ops *ti_clk_ll_ops;
->> +static struct device_node *clocks_node_ptr[CLK_MAX_MEMMAPS];
->>
->>   /**
->>    * ti_dt_clocks_register - register DT alias clocks during boot
->> @@ -108,9 +108,21 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
->>   	struct clk_omap_reg *reg;
->>   	u32 val;
->>   	u32 tmp;
->> +	int i;
->>
->>   	reg = (struct clk_omap_reg *)&tmp;
->> -	reg->index = ti_dt_clk_memmap_index;
->> +
->> +	for (i = 0; i < CLK_MAX_MEMMAPS; i++) {
->> +		if (clocks_node_ptr[i] == node->parent)
->> +			break;
->> +	}
->> +
->> +	if (i == CLK_MAX_MEMMAPS) {
->> +		pr_err("clk-provider not found for %s!\n", node->name);
->> +		return NULL;
->> +	}
->> +
->> +	reg->index = i;
->>
->>   	if (of_property_read_u32_index(node, "reg", index, &val)) {
->>   		pr_err("%s must have reg[%d]!\n", node->name, index);
->> @@ -127,20 +139,14 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
->>    * @parent: master node
->>    * @index: internal index for clk_reg_ops
->>    *
->> - * Initializes a master clock IP block and its child clock nodes.
->> - * Regmap is provided for accessing the register space for the
->> - * IP block and all the clocks under it.
->> + * Initializes a master clock IP block. This basically sets up the
->> + * mapping from clocks node to the memory map index. All the clocks
->> + * are then initialized through the common of_clk_init call, and the
->> + * clocks will access their memory maps based on the node layout.
->>    */
->>   void ti_dt_clk_init_provider(struct device_node *parent, int index)
->>   {
->> -	const struct of_device_id *match;
->> -	struct device_node *np;
->>   	struct device_node *clocks;
->> -	of_clk_init_cb_t clk_init_cb;
->> -	struct clk_init_item *retry;
->> -	struct clk_init_item *tmp;
->> -
->> -	ti_dt_clk_memmap_index = index;
->>
->>   	/* get clocks for this parent */
->>   	clocks = of_get_child_by_name(parent, "clocks");
->> @@ -149,19 +155,31 @@ void ti_dt_clk_init_provider(struct device_node *parent, int index)
->>   		return;
->>   	}
->>
->> -	for_each_child_of_node(clocks, np) {
->> -		match = of_match_node(&__clk_of_table, np);
->> -		if (!match)
->> -			continue;
->> -		clk_init_cb = (of_clk_init_cb_t)match->data;
->> -		pr_debug("%s: initializing: %s\n", __func__, np->name);
->> -		clk_init_cb(np);
->> -	}
->> +	/* add clocks node info */
->> +	clocks_node_ptr[index] = clocks;
->> +}
->>
->> -	list_for_each_entry_safe(retry, tmp, &retry_list, link) {
->> -		pr_debug("retry-init: %s\n", retry->node->name);
->> -		retry->func(retry->hw, retry->node);
->> -		list_del(&retry->link);
->> -		kfree(retry);
->> +/**
->> + * ti_dt_clk_init_retry_clks - init clocks from the retry list
->> + *
->> + * Initializes any clocks that have failed to initialize before,
->> + * reasons being missing parent node(s) during earlier init. This
->> + * typically happens only for DPLLs which need to have both of their
->> + * parent clocks ready during init.
->> + */
->> +void ti_dt_clk_init_retry_clks(void)
->> +{
->> +	struct clk_init_item *retry;
->> +	struct clk_init_item *tmp;
->> +	int retries = 5;
->> +
->> +	while (!list_empty(&retry_list) && retries) {
->> +		list_for_each_entry_safe(retry, tmp, &retry_list, link) {
->> +			pr_debug("retry-init: %s\n", retry->node->name);
->> +			retry->func(retry->hw, retry->node);
->> +			list_del(&retry->link);
->> +			kfree(retry);
->> +		}
->> +		retries--;
->>   	}
->>   }
->> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
->> index e8d8a35..f75acbf 100644
->> --- a/include/linux/clk/ti.h
->> +++ b/include/linux/clk/ti.h
->> @@ -292,6 +292,7 @@ void omap2xxx_clkt_vps_init(void);
->>   void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
->>   void ti_dt_clocks_register(struct ti_dt_clk *oclks);
->>   void ti_dt_clk_init_provider(struct device_node *np, int index);
->> +void ti_dt_clk_init_retry_clks(void);
->>   void ti_dt_clockdomains_setup(void);
->>   int ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
->>   		      ti_of_clk_init_cb_t func);
->> --
->> 1.7.9.5
->>
+http://kisskb.ellerman.id.au/kisskb/buildresult/12028900/
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
