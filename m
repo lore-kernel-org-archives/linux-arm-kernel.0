@@ -1,257 +1,117 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Mon, 29 Sep 2014 13:56:58 +0100
-Subject: [PATCH v2] ARM: sun7i: add support for A20-OLinuXino-Lime2
-Message-ID: <5429571A.1090205@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Sep 2014 14:57:19 +0200
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+References: <540C7F5B.6070307@gmail.com> <540C83DE.10505@collabora.co.uk>
+ <540C8577.2070907@gmail.com> <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+ <20140910143144.GF7960@sirena.org.uk>
+ <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+Message-ID: <20140929125716.GE26008@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Olimex A20-OLinuXino-Lime2
-https://www.olimex.com/Products/OLinuXino/A20/A20-OLinuXIno-LIME2
+On Wed, Sep 10, 2014 at 03:56:16PM +0100, Grant Likely wrote:
+> On Wed, Sep 10, 2014 at 3:31 PM, Mark Brown <broonie@kernel.org> wrote:
+> > On Wed, Sep 10, 2014 at 06:06:46AM -0700, Olof Johansson wrote:
+> >> On Mon, Sep 8, 2014 at 12:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >
+> >> > Well, lets see... We've got a real user complaining about a platform
+> >> > that used to work on mainline, and no longer does. The only loophole
+> >> > for ignoring breakage is if there nobody cares that it is broken. That
+> >> > currently isn't the case. So even though it's based on a patch that
+> >> > has "DO NOT SUBMIT" in large friendly letters on the front cover, it
+> >> > doesn't change the situation that mainline has a regression.
+> >
+> >> Yeah, I'm with you on this Grant, it doesn't matter what the patch is
+> >> labelled as.
+> >
+> >> One way to deal with this could be to add a quirk at boot time --
+> >> looking for the simplefb and if found, modifies the regulators to keep
+> >> them on. That'd go in the kernel, not in firmware.
+> >
+> > Well, we should also be fixing simplefb to manage the resources it uses
+> > though that doesn't clean up after the broken DTs that are currently
+> > deployed.
+> >
+> > As well as the regulators we'll also need to fix the clocks.  If we're
+> > going to start adding these fixups perhaps we want to consider having a
+> > wrapper stage that deals with rewriting DTs prior to trying to use them?
+> > I'm not sure if it makes much difference but there's overlap with other
+> > tools like the ATAGs conversion wrapper and building separately would
+> > let the fixup code run early without directly going into the early init
+> > code (which seems a bit scary).
+> >
+> >> Much better would have been if the DRM changes worked when they
+> >> landed, so that the migration form simplefb to drm was invisible to
+> >> the user. Or at least, to get them working ASAP since they're still
+> >> broken. :(
+> >
+> > As far as I can tell the problem here is coming from the decision to
+> > have simplefb use resources without knowing about them - can we agree
+> > that this is a bad idea?
+> 
+> No, I don't think we can... there is a certain amount of "firmware got
+> things working for us, and we're going to use it for a while" that is
+> absolutely reasonable. simplefb is a good example, but there are
+> certainly others.
+> 
+> I /do/ think it would be better for the simplefb data to get embedded
+> or linked into the node of the graphics controller so that it can be
+> torn down appropriately, and we need a rule for how long boot-state
+> can be considered valid so that a proper driver can either reserve the
+> resources for a given SoC, or do a full handoff from the simplefb.
+> Even without that though, we need to be able to handle the case of an
+> anonymous simplefb node with no regulator information. If that means
+> the default simplefb behaviour is to inhibit runtime pm on all
+> resources until a real driver show up, then that might just be what we
+> need to do.
+> 
+> Two things should probably be changed from the current setup. 1)
+> simplefb shouldn't be a platform driver. It is a boot thing that
+> handles initial state from the graphics chip. By implementing it as a
+> platform driver, it prevents the real driver from binding to the real
+> device if the simplefb data embedded into it. 2) make sure that an SoC
+> driver can protect the needed resources before they are automatically
+> disabled. Either by putting them in an earlier initcall, or handling
+> it in the subsystem code. I don't know enough about the regulator and
+> clock runtime PM to know what the best way to do this is.
 
-Differences to previous Lime boards are 1GB RAM and gigabit ethernet
----
+I posted a patch[0] earlier to do this for the clock framework in "that
+other thread". The idea is that shim drivers for these types of firmware
+devices can tell the various subsystems that they might need resources
+that aren't explicitly requested. The current implementation simply uses
+the existing infrastructure already present for the clk_ignore_unused
+command-line argument and allows drivers to declare this requirement. It
+also allows these drivers to retire the request once they've properly
+handed off to the real driver.
 
-changes for v2
- add axp209 regulators node
+Something similar could be done other frameworks.
 
+One of the objections to that in the other thread is that it won't
+prevent clocks from being disabled if some other driver was using those
+same clocks and doing a clk_enable()/clk_disable() on them. But quite
+frankly I don't think that's something we need to worry about.
 
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 215 ++++++++++++++++++++++++
- 2 files changed, 216 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+Though there are two cases: one is to use simplefb as a means to have
+early boot messages on a graphical display (and optionally hand off to a
+real driver). The other is to use simplefb as the only framebuffer
+driver until a proper driver has been implemented. The latter would have
+the disadvantage of not allowing unused resources from being garbage
+collected at all. Then again, I don't think power consumption is going
+to be a very big issue on hardware where no proper display driver is
+available.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8f12390..ff5324f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -439,6 +439,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
-     sun7i-a20-hummingbird.dtb \
-     sun7i-a20-i12-tvbox.dtb \
-     sun7i-a20-olinuxino-lime.dtb \
-+    sun7i-a20-olinuxino-lime2.dtb \
-     sun7i-a20-olinuxino-micro.dtb \
-     sun7i-a20-pcduino3.dtb
- dtb-$(CONFIG_MACH_SUN8I) += \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-new file mode 100644
-index 0000000..44043f6
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -0,0 +1,215 @@
-+/*
-+ * Copyright 2014 - Iain Paton <ipaton0@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+    model = "Olimex A20-OLinuXino-LIME2";
-+    compatible = "olimex,a20-olinuxino-lime2", "allwinner,sun7i-a20";
-+
-+    soc at 01c00000 {
-+
-+        ahci: sata at 01c18000 {
-+            target-supply = <&reg_ahci_5v>;
-+            status = "okay";
-+        };
-+
-+        ehci0: usb at 01c14000 {
-+            status = "okay";
-+        };
-+
-+        ehci1: usb at 01c1c000 {
-+            status = "okay";
-+        };
-+
-+        gmac: ethernet at 01c50000 {
-+            pinctrl-names = "default";
-+            pinctrl-0 = <&gmac_pins_rgmii_a>;
-+            phy = <&phy1>;
-+            phy-mode = "rgmii";
-+            status = "okay";
-+
-+            phy1: ethernet-phy at 1 {
-+                reg = <1>;
-+            };
-+        };
-+
-+        i2c0: i2c at 01c2ac00 {
-+            pinctrl-names = "default";
-+            pinctrl-0 = <&i2c0_pins_a>;
-+            status = "okay";
-+
-+            axp209: pmic at 34 {
-+                compatible = "x-powers,axp209";
-+                reg = <0x34>;
-+                interrupt-parent = <&nmi_intc>;
-+                interrupts = <0 8>;
-+
-+                interrupt-controller;
-+                #interrupt-cells = <1>;
-+
-+                regulators {
-+                    reg_ldo1: ldo1 {
-+                        regulator-min-microvolt = <1300000>;
-+                        regulator-max-microvolt = <1300000>;
-+                        regulator-always-on;
-+                    };
-+                    reg_ldo2: ldo2 {
-+                        regulator-min-microvolt = <1800000>;
-+                        regulator-max-microvolt = <3300000>;
-+                        regulator-always-on;
-+                    };
-+                    reg_ldo3: ldo3 {
-+                        regulator-min-microvolt = <700000>;
-+                        regulator-max-microvolt = <3500000>;
-+                        regulator-always-on;
-+                    };
-+                    reg_ldo4: ldo4 {
-+                        regulator-min-microvolt = <1250000>;
-+                        regulator-max-microvolt = <3300000>;
-+                        regulator-always-on;
-+                    };
-+                    reg_ldo5: ldo5 {
-+                        regulator-min-microvolt = <1800000>;
-+                        regulator-max-microvolt = <3300000>;
-+                        regulator-always-on;
-+                    };
-+                    reg_dcdc2: dcdc2 {
-+                        regulator-min-microvolt = <1400000>;
-+                        regulator-max-microvolt = <1400000>;
-+                        regulator-always-on;
-+                    };
-+                    reg_dcdc3: dcdc3 {
-+                        regulator-min-microvolt = <1250000>;
-+                        regulator-max-microvolt = <1250000>;
-+                        regulator-always-on;
-+                    };
-+                };
-+            };
-+        };
-+
-+        i2c1: i2c at 01c2b000 {
-+            pinctrl-names = "default";
-+            pinctrl-0 = <&i2c1_pins_a>;
-+            status = "okay";
-+        };
-+
-+        mmc0: mmc at 01c0f000 {
-+            pinctrl-names = "default";
-+            pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+            vmmc-supply = <&reg_vcc3v3>;
-+            bus-width = <4>;
-+            cd-gpios = <&pio 7 1 0>; /* PH1 */
-+            cd-inverted;
-+            status = "okay";
-+        };
-+
-+        ohci0: usb at 01c14400 {
-+            status = "okay";
-+        };
-+
-+        ohci1: usb at 01c1c400 {
-+            status = "okay";
-+        };
-+
-+        uart0: serial at 01c28000 {
-+            pinctrl-names = "default";
-+            pinctrl-0 = <&uart0_pins_a>;
-+            status = "okay";
-+        };
-+
-+        usbphy: phy at 01c13400 {
-+            usb1_vbus-supply = <&reg_usb1_vbus>;
-+            usb2_vbus-supply = <&reg_usb2_vbus>;
-+            status = "okay";
-+        };
-+
-+        pinctrl at 01c20800 {
-+            ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
-+                allwinner,pins = "PC3";
-+                allwinner,function = "gpio_out";
-+                allwinner,drive = <0>;
-+                allwinner,pull = <0>;
-+            };
-+
-+            led_pins_olinuxinolime: led_pins at 0 {
-+                allwinner,pins = "PH2";
-+                allwinner,function = "gpio_out";
-+                allwinner,drive = <1>;
-+                allwinner,pull = <0>;
-+            };
-+        };
-+    };
-+
-+    leds {
-+        compatible = "gpio-leds";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&led_pins_olinuxinolime>;
-+
-+        green {
-+            label = "a20-olinuxino-lime2:green:usr";
-+            gpios = <&pio 7 2 0>;
-+            default-state = "on";
-+        };
-+    };
-+
-+    reg_ahci_5v: ahci-5v {
-+        pinctrl-0 = <&ahci_pwr_pin_olinuxinolime>;
-+        gpio = <&pio 2 3 0>;
-+        status = "okay";
-+    };
-+
-+    reg_usb1_vbus: usb1-vbus {
-+        status = "okay";
-+    };
-+
-+    reg_usb2_vbus: usb2-vbus {
-+        status = "okay";
-+    };
-+};
--- 
-1.8.5.1
+Thierry
+
+[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/291295.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/2fbc15c3/attachment.sig>
