@@ -1,41 +1,68 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 29 Sep 2014 12:30:43 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140929095440.GB13142@linutronix.de>
-References: <20140912094010.GE28458@ci00147.xsens-tech.local>
- <5412C21A.8020203@linutronix.de>
- <20140912102816.GF28458@ci00147.xsens-tech.local>
- <541716DC.9020904@linutronix.de>
- <20140917102812.GA20438@ci00147.xsens-tech.local>
- <20140921204100.GA10111@linutronix.de>
- <20140922092853.GH20438@ci00147.xsens-tech.local>
- <20140925151403.GH19396@linutronix.de>
- <20140929085042.GA13952@ci00147.xsens-tech.local>
- <20140929095440.GB13142@linutronix.de>
-Message-ID: <20140929103042.GA31111@ci00147.xsens-tech.local>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Sep 2014 12:35:17 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929101805.GB26008@ulmo>
+References: <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com> <20140829070116.GC13106@ulmo>
+ <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
+ <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+Message-ID: <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 11:54:40AM +0200, Sebastian Andrzej Siewior wrote:
-> There is a patch named "ARM: edma: unconditionally ack the error
-> interrupt". I have the feeling that this is not really required once we
-> delay set_termios. I couldn't reproduce the bug with beagleblack with my
-> usual test case.
+Hi Thierry,
 
-I think so too. I didn't need it either.
+On Mon, Sep 29, 2014 at 12:18 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+>> How is that less generic?
+>
+> It's more generic. That's the whole point.
+>
+> The difference is that with the solution I proposed we don't have to
+> keep track of all the resources. We know that firmware has set them up
+> and we know that a real driver will properly take them over at some
+> point, so duplicating what the real driver does within the simplefb
+> driver is just that, duplication. We don't allow duplication anywhere
+> else in the kernel, why should simplefb be an exception?
+>
+>> You know that you are going to call that for regulator, reset, power
+>> domains, just as you would have needed to with the proper API, unless
+>> that with this kind of solution, you would have to modify *every*
+>> framework that might interact with any resource involved in getting
+>> simplefb running?
+>
+> We have to add handling for every kind of resource either way. Also if
+> this evolves into a common pattern we can easily wrap it up in a single
+> function call.
 
+disable_all_power_management(), as this is not limited to clocks.
 
-> For your "too much work for irq" problem: Could you add trace_printk()
-> in tx/rx dma start/complete, and irq routine? The interresting part is
-> what is the irq routine doing once entered. It might be a condition that
-> is ignored at first and "acked" later while serving another event. Or it
-> is really doing something and this is more or less "legal".
+>> Plus, speaking more specifically about the clocks, that won't prevent
+>> your clock to be shut down as a side effect of a later clk_disable
+>> call from another driver.
 
-I'll have a look at that.
+> Furthermore isn't it a bug for a driver to call clk_disable() before a
+> preceding clk_enable()? There are patches being worked on that will
+> enable per-user clocks and as I understand it they will specifically
+> disallow drivers to disable the hardware clock if other drivers are
+> still keeping them on via their own referenc.
 
-> 
-> >Thanks,
-> >Frans
-> 
-> Sebastian
+Calling clk_disable() preceding clk_enable() is a bug.
+
+Calling clk_disable() after clk_enable() will disable the clock (and
+its parents)
+if the clock subsystem thinks there are no other users, which is what will
+happen here.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
