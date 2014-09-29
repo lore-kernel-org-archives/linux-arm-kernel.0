@@ -1,119 +1,80 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 29 Sep 2014 14:12:43 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140929125716.GE26008@ulmo>
-References: <540C7F5B.6070307@gmail.com> <540C83DE.10505@collabora.co.uk>
- <540C8577.2070907@gmail.com> <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
- <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
- <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
- <20140910143144.GF7960@sirena.org.uk>
- <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
- <20140929125716.GE26008@ulmo>
-Message-ID: <CACxGe6uDYNOuhgM_5iQTp=iB4X-osSz8WESiUb2QGj5ZmWFp-A@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Sep 2014 15:21:25 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAGRGNgW94Jo_EuE1d3ta-yWW3b0sUs+ggyXnLOULV1_CfW=QZQ@mail.gmail.com>
+References: <53FF1D6C.6090205@redhat.com> <20140829070116.GC13106@ulmo>
+ <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
+ <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <CAGRGNgW94Jo_EuE1d3ta-yWW3b0sUs+ggyXnLOULV1_CfW=QZQ@mail.gmail.com>
+Message-ID: <20140929132123.GA30998@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 1:57 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Sep 10, 2014 at 03:56:16PM +0100, Grant Likely wrote:
->> On Wed, Sep 10, 2014 at 3:31 PM, Mark Brown <broonie@kernel.org> wrote:
->> > On Wed, Sep 10, 2014 at 06:06:46AM -0700, Olof Johansson wrote:
->> >> On Mon, Sep 8, 2014 at 12:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> >
->> >> > Well, lets see... We've got a real user complaining about a platform
->> >> > that used to work on mainline, and no longer does. The only loophole
->> >> > for ignoring breakage is if there nobody cares that it is broken. That
->> >> > currently isn't the case. So even though it's based on a patch that
->> >> > has "DO NOT SUBMIT" in large friendly letters on the front cover, it
->> >> > doesn't change the situation that mainline has a regression.
->> >
->> >> Yeah, I'm with you on this Grant, it doesn't matter what the patch is
->> >> labelled as.
->> >
->> >> One way to deal with this could be to add a quirk at boot time --
->> >> looking for the simplefb and if found, modifies the regulators to keep
->> >> them on. That'd go in the kernel, not in firmware.
->> >
->> > Well, we should also be fixing simplefb to manage the resources it uses
->> > though that doesn't clean up after the broken DTs that are currently
->> > deployed.
->> >
->> > As well as the regulators we'll also need to fix the clocks.  If we're
->> > going to start adding these fixups perhaps we want to consider having a
->> > wrapper stage that deals with rewriting DTs prior to trying to use them?
->> > I'm not sure if it makes much difference but there's overlap with other
->> > tools like the ATAGs conversion wrapper and building separately would
->> > let the fixup code run early without directly going into the early init
->> > code (which seems a bit scary).
->> >
->> >> Much better would have been if the DRM changes worked when they
->> >> landed, so that the migration form simplefb to drm was invisible to
->> >> the user. Or at least, to get them working ASAP since they're still
->> >> broken. :(
->> >
->> > As far as I can tell the problem here is coming from the decision to
->> > have simplefb use resources without knowing about them - can we agree
->> > that this is a bad idea?
->>
->> No, I don't think we can... there is a certain amount of "firmware got
->> things working for us, and we're going to use it for a while" that is
->> absolutely reasonable. simplefb is a good example, but there are
->> certainly others.
->>
->> I /do/ think it would be better for the simplefb data to get embedded
->> or linked into the node of the graphics controller so that it can be
->> torn down appropriately, and we need a rule for how long boot-state
->> can be considered valid so that a proper driver can either reserve the
->> resources for a given SoC, or do a full handoff from the simplefb.
->> Even without that though, we need to be able to handle the case of an
->> anonymous simplefb node with no regulator information. If that means
->> the default simplefb behaviour is to inhibit runtime pm on all
->> resources until a real driver show up, then that might just be what we
->> need to do.
->>
->> Two things should probably be changed from the current setup. 1)
->> simplefb shouldn't be a platform driver. It is a boot thing that
->> handles initial state from the graphics chip. By implementing it as a
->> platform driver, it prevents the real driver from binding to the real
->> device if the simplefb data embedded into it. 2) make sure that an SoC
->> driver can protect the needed resources before they are automatically
->> disabled. Either by putting them in an earlier initcall, or handling
->> it in the subsystem code. I don't know enough about the regulator and
->> clock runtime PM to know what the best way to do this is.
->
-> I posted a patch[0] earlier to do this for the clock framework in "that
-> other thread". The idea is that shim drivers for these types of firmware
-> devices can tell the various subsystems that they might need resources
-> that aren't explicitly requested. The current implementation simply uses
-> the existing infrastructure already present for the clk_ignore_unused
-> command-line argument and allows drivers to declare this requirement. It
-> also allows these drivers to retire the request once they've properly
-> handed off to the real driver.
->
-> Something similar could be done other frameworks.
->
-> One of the objections to that in the other thread is that it won't
-> prevent clocks from being disabled if some other driver was using those
-> same clocks and doing a clk_enable()/clk_disable() on them. But quite
-> frankly I don't think that's something we need to worry about.
+On Mon, Sep 29, 2014 at 09:00:01PM +1000, Julian Calaby wrote:
+> Hi Thierry,
 
-Agreed
+If you address people directly please make sure they are in the To:
+line. Or at least Cc.
 
-> Though there are two cases: one is to use simplefb as a means to have
-> early boot messages on a graphical display (and optionally hand off to a
-> real driver). The other is to use simplefb as the only framebuffer
-> driver until a proper driver has been implemented. The latter would have
-> the disadvantage of not allowing unused resources from being garbage
-> collected at all. Then again, I don't think power consumption is going
-> to be a very big issue on hardware where no proper display driver is
-> available.
+> On Mon, Sep 29, 2014 at 8:18 PM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > On Mon, Sep 29, 2014 at 11:23:01AM +0200, Maxime Ripard wrote:
+> >> On Mon, Sep 29, 2014 at 10:06:39AM +0200, Thierry Reding wrote:
+> > [...]
+> >> > simplefb doesn't deal at all with hardware details. It simply uses what
+> >> > firmware has set up, which is the only reason why it will work for many
+> >> > people. What is passed in via its device tree node is the minimum amount
+> >> > of information needed to draw something into the framebuffer. Also note
+> >> > that the simplefb device tree node is not statically added to a DTS file
+> >> > but needs to be dynamically generated by firmware at runtime.
+> >>
+> >> Which makes the whole even simpler, since the firmware already knows
+> >> all about which clocks it had to enable.
+> >
+> > It makes things very complicated in the firmware because it now needs to
+> > be able to generate DTB content that we would otherwise be able to do
+> > much easier with a text editor.
+> 
+> As far as the kernel is concerned, this is a solved problem.
 
-When simplefb is the only framebuffer to get a platform working, it is
-reasonable to have a placeholder driver that grabs the resources and
-nothing else. When a real driver is implemented, and merged, the
-placeholder driver should drop compatibility with the device node at
-the same time.
+It's not completely solved. There's still the issue of no generic way to
+specify regulators like you can do for clocks, resets or power domains.
 
-g.
+But the kernel isn't the real issue here. The issue is the firmware that
+now has to go out of its way not only to initialize display hardware but
+also create device tree content just to make Linux not turn everything
+off.
+
+> Firmware is going to be doing some dark magic to set up the hardware
+> to be a dumb frame buffer and some other stuff to add the simplefb
+> device node - so by this point, adding the clocks (or whatever)
+> required by the hardware should be fairly uncomplicated - the firmware
+> already knows the hardware intimately. As for the actual device tree
+> manipulations, U-boot (or whatever) will probably just grow some
+> helper functions to make this simple.
+
+Have you looked at the code needed to do this? It's not at all trivial.
+And the point is really that all this information is there already, so
+we're completely duplicating this into a dynamically created device tree
+node and for what reason? Only to have one driver request all these
+resources and have them forcefully released a few seconds later.
+
+> Alternatively, it could simply add the relevant data to an existing
+> device node and munge it's compatible property so simplefb picks it
+> up.
+
+Yes, I think that'd be a much better solution. Of course it's going to
+be very difficult to make that work with a generic driver because now
+that generic driver needs to parse the DT binding for any number of
+"compatible" devices.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/a6e9e08a/attachment.sig>
