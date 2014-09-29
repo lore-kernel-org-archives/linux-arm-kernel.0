@@ -1,44 +1,54 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 29 Sep 2014 09:29:42 +0200
-Subject: [PATCH RESEND] tty: serial: omap: Remove probe error message
-Message-ID: <1411975782-23709-1-git-send-email-mpa@pengutronix.de>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 29 Sep 2014 13:00:10 +0530
+Subject: [PATCH 2/3] clk: samsung: remove unnecessary CONFIG_OF from clk.c
+In-Reply-To: <5426B9BB.90606@gmail.com>
+References: <1411796519-19417-1-git-send-email-pankaj.dubey@samsung.com>
+ <1411796519-19417-3-git-send-email-pankaj.dubey@samsung.com>
+ <5426B9BB.90606@gmail.com>
+Message-ID: <000101cfdbb7$3f02a5f0$bd07f1d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This error message is not necessary. The driver core code will print all
-probe error messages. It also resolves some error codes to proper error
-messages. For example -EPROBE_DEFER will only be printed as an info message.
+Hi Tomasz,
 
-This patch removes the error message as the core prints the same
-information.
+On Saturday, September 27, 2014 6:51 PM, Tomasz Figa wrote,
+> Hi Pankaj,
+> 
+> On 27.09.2014 07:41, Pankaj Dubey wrote:
+> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> Missing patch description.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
+OK, will add it.
 
-Hi,
+> 
+> > ---
+> >  drivers/clk/samsung/clk.c |    2 --
+> >  1 file changed, 2 deletions(-)
+> >
+> > diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> > index deab84d..31bf391 100644
+> > --- a/drivers/clk/samsung/clk.c
+> > +++ b/drivers/clk/samsung/clk.c
+> > @@ -281,7 +281,6 @@ void __init samsung_clk_register_gate(struct
+> samsung_clk_provider *ctx,
+> >   * obtain the clock speed of all external fixed clock sources from
+device
+> >   * tree and register it
+> >   */
+> > -#ifdef CONFIG_OF
+> 
+> We still have non-DT platforms which use this code, i.e. s3c24xx and
+s3c64xx. Have
+> you checked if this compiles fine on them with CONFIG_OF disabled?
+> 
 
-I am not sure if this patch got lost, so I resend it. I rebased the patch onto
-v3.17-rc1 without conflicts.
+Compile tested with s3c2410_defconfig and s3c6400_defconfig, and its
+compiled fine.
+In both cases CONFIG_OF was disabled.
 
-Best regards,
+Thanks,
+Pankaj Dubey
 
-Markus
-
- drivers/tty/serial/omap-serial.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index d017cec8a34a..a153bad142c8 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1733,8 +1733,6 @@ err_add_port:
- 	pm_runtime_disable(&pdev->dev);
- err_rs485:
- err_port_line:
--	dev_err(&pdev->dev, "[UART%d]: failure [%s]: %d\n",
--				pdev->id, __func__, ret);
- 	return ret;
- }
- 
--- 
-2.1.0
+> Best regards,
+> Tomasz
