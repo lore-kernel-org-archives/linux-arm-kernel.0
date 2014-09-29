@@ -1,53 +1,41 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 29 Sep 2014 11:42:44 +0200
-Subject: [GIT PULL 1/2] ARM: rockchip: cpu regulators and OPPs
-Message-ID: <7172632.O1FfdvXn6k@phil>
+Date: Mon, 29 Sep 2014 11:43:37 +0200
+Subject: [GIT PULL 2/2] ARM: rockchip: cpufreq-cpu0 device
+In-Reply-To: <7172632.O1FfdvXn6k@phil>
+References: <7172632.O1FfdvXn6k@phil>
+Message-ID: <201717175.L17Ccvmpek@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-the corresponding clk changes made their way into the clock tree, so these
-changes add the necessary supplies, operating points and clocks to rockchip
-boards to enable cpu frequency scaling.
+this one patch adds a platform-device for cpufreq-cpu0 to mach-rockchip,
+enabling frequency scaling using this cpufreq driver.
 
-This pull request already includes commit
-    4d742e6230b5 ("clk: rockchip: add binding id for ARMCLK")
-that is shared with the clock tree [0].
-
-[0] http://git.linaro.org/people/mike.turquette/linux.git/commit/4d742e6230b5ff157422d91d6ae8d2fc1303eb28
+While it could be small enough to simply be included in the dt branch,
+I didn't want to take that decision on my own :-)
 
 So please pull
 
 
-The following changes since commit 6051ddd4f94894cce8fde3aa29f90ae6c567fc46:
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-  ARM: dts: rockchip: Remove "regulator-always-on" in vcc_rmii for Radxa Rock (2014-09-22 11:53:39 +0200)
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-dts3
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-cpufreqdev
 
-for you to fetch changes up to 8848623b8c032ce7c41549ec743f8367c877d7f2:
+for you to fetch changes up to 47b06fc2d97a0d98d6053357561f2953d6547d25:
 
-  ARM: dts: rockchip: add cpu supplies to boards (2014-09-28 13:14:56 +0200)
-
-----------------------------------------------------------------
-CPU opp and board supplies for Rockchip boards.
+  ARM: rockchip: add a cpufreq-cpu0 device (2014-09-29 09:21:38 +0200)
 
 ----------------------------------------------------------------
-Heiko Stuebner (4):
-      clk: rockchip: add binding id for ARMCLK
-      Merge branch 'v3.18-next/armclkid' into v3.18-next/dts
-      ARM: dts: rockchip: add operating points and armclk references
-      ARM: dts: rockchip: add cpu supplies to boards
+Add a simple cpufreq-cpu0 device for mach-rockchip
 
- arch/arm/boot/dts/rk3066a-bqcurie2.dts        |  4 ++++
- arch/arm/boot/dts/rk3066a.dtsi                | 12 +++++++++++-
- arch/arm/boot/dts/rk3188-radxarock.dts        |  6 +++++-
- arch/arm/boot/dts/rk3188.dtsi                 | 15 ++++++++++++++-
- arch/arm/boot/dts/rk3288-evb-rk808.dts        |  6 +++++-
- arch/arm/boot/dts/rk3288.dtsi                 | 19 ++++++++++++++++++-
- include/dt-bindings/clock/rk3188-cru-common.h |  1 +
- include/dt-bindings/clock/rk3288-cru.h        |  1 +
- 8 files changed, 59 insertions(+), 5 deletions(-)
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      ARM: rockchip: add a cpufreq-cpu0 device
+
+ arch/arm/mach-rockchip/rockchip.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
