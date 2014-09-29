@@ -1,75 +1,84 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 15:27:12 +0200
-Subject: [PATCH 06/16] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <20140929093823.GD13952@ci00147.xsens-tech.local>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-7-git-send-email-bigeasy@linutronix.de>
- <20140929093823.GD13952@ci00147.xsens-tech.local>
-Message-ID: <20140929132712.GD13142@linutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Sep 2014 15:25:43 +0200
+Subject: [PATCH] ARM: sun7i: add support for A20-OLinuXino-Lime2
+In-Reply-To: <54295711.9010901@gmail.com>
+References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
+ <54295711.9010901@gmail.com>
+Message-ID: <20140929132543.GC4081@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Frans Klaver | 2014-09-29 11:38:23 [+0200]:
+On Mon, Sep 29, 2014 at 01:56:49PM +0100, Iain Paton wrote:
+> On 28/09/14 17:43, Maxime Ripard wrote:
+> > On Sun, Sep 28, 2014 at 02:18:31PM +0100, Iain Paton wrote:
+> 
+> >> +
+> >> +		i2c0: i2c at 01c2ac00 {
+> >> +			pinctrl-names = "default";
+> >> +			pinctrl-0 = <&i2c0_pins_a>;
+> >> +			status = "okay";
+> >> +
+> >> +			axp209: pmic at 34 {
+> >> +				compatible = "x-powers,axp209";
+> >> +				reg = <0x34>;
+> >> +				interrupt-parent = <&nmi_intc>;
+> >> +				interrupts = <0 8>;
+> >> +
+> >> +				interrupt-controller;
+> >> +				#interrupt-cells = <1>;
+> > 
+> > It would be greate if you could add the regulators used on the board
+> > here.
+> > 
+> > You might want to hold off a bit until the merge window is out, since
+> > some patches useful for this are still pending, or based your patch on
+> > top of linux-next
+> 
+> I'll take a bash at it, although as there seems to be no binding doc 
+> for the driver and I can't find any other board that has axp209 
+> regulators defined I may need a bit of help to get this right.
 
->threshold
-fixed
+Hmmm, that's odd. I was 100% sure it had one, but now that you mention
+it, I can't find it either.
 
->> +	/*
->> +	 * It claims to be 16C750 compatible however it is a little different.
->> +	 * It has EFR and has no FCR7_64byte bit. The AFE (which it claims to
->> +	 * have) is enabled via EFR instead of MCR. The type is set here 8250
->> +	 * just to get things going. UNKNOWN does not work for a few reasons and
->> +	 * we don't need our own type since we don't use 8250's set_termios()
->> +	 * and our "bugs" are handeld via the bug member.
->
->handled
-replaced that last line with 
-    or pm callback.
+I should find where that patch went, and merge it then...
 
-since there no bugs member anymore.
+> What additional patches are we talking about?  The following:
+> regulator: axp20x: Use parent device as regulator configuration device
+> i2c: mv64xxx: continue probe when clock-frequency is missing
+> or are there others I'd need to pick out of linux-next?
 
->
->> +	 */
->> +	up.port.type = PORT_8250;
->> +	up.port.iotype = UPIO_MEM;
->> +	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE | UPF_SOFT_FLOW |
->> +		UPF_HARD_FLOW;
->> +	up.port.private_data = priv;
->> +
->> +	up.port.regshift = 2;
->> +	up.port.fifosize = 64;
->> +	up.tx_loadsz = 64;
->> +	up.capabilities = UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP;
->> +#ifdef CONFIG_PM_RUNTIME
->> +	/*
->> +	 * PM_RUNTIME is mostly transparent. However to do it right we need to a
->
->need to _do_ a ...?
-I think dropping that 'to' should fix it.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288901.html
 
->> +	 * TX empty interrupt before we can put the device to auto idle. So if
->> +	 * PM_RUNTIME is not enabled we don't add that flag and can spare that
->> +	 * one extra interrupt in the TX path.
->> +	 */
->
-><snip>
->
->> +config SERIAL_8250_OMAP
->> +	tristate "Support for OMAP internal UART (8250 based driver)"
->> +	depends on SERIAL_8250 && ARCH_OMAP2PLUS
->> +	help
->> +	  If you have a machine based on an Texas Instruments OMAP CPU you
->> +	  can enable its onboard serial ports by enabling this option.
->> +
->> +	  This driver is in early stage and uses ttyS instead of ttyO.
->> +
->
->I just wondered if this driver should be marked experimental?
-What did you have in mind? CONFIG_EXPERIMENTAL is gone. After all that
-debuging that I had in the meantime I was thinking about dropping that
-"early stage".
+> linux-next 20140926 doesn't build for me:
+> 
+>    LD      init/built-in.o
+> kernel/built-in.o: In function `cputime_adjust':
+> :(.text+0x25588): undefined reference to `__bad_cmpxchg'
+> :(.text+0x255f8): undefined reference to `__bad_cmpxchg'
+> /data/linux/source/linux-next-org/Makefile:956: recipe for target 'vmlinux' failed
+> 
+> I suppose as a result of https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/kernel/sched/cputime.c?id=eb1b4af0a64ac7bb0ee36f579c1c7cefcbc3ac2c
+> 
+> having reverted that one, the resulting kernel doesn't want to talk 
+> to my SD card.  Both your tree and 3.16 work fine though.
 
->Thanks,
->Frans
+Leave it out then. If you have no way to test it, it's going to be
+very bug prone, and we can always add it later.
 
-Sebastian
+The SD card issue is more troublesome. We'll have to look into it.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/1498a8f5/attachment.sig>
