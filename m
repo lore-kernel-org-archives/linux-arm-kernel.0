@@ -1,47 +1,34 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Sep 2014 10:29:05 +0200
-Subject: [PATCH v6 4/4] thermal: Add Tegra SOCTHERM thermal management
- driver
-In-Reply-To: <5425CC6F.2020309@kapsi.fi>
-References: <1411724593-4037-1-git-send-email-cyndis@kapsi.fi>
- <1411724593-4037-5-git-send-email-cyndis@kapsi.fi>
- <20140926114533.GN31106@ulmo> <5425CC6F.2020309@kapsi.fi>
-Message-ID: <20140929082904.GF12506@ulmo>
+Date: Mon, 29 Sep 2014 10:31:37 +0200
+Subject: [PATCH v3 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <1411874849-343-2-git-send-email-mitchelh@codeaurora.org>
+References: <1411874849-343-1-git-send-email-mitchelh@codeaurora.org>
+ <1411874849-343-2-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140929083136.GG12506@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 26, 2014 at 11:28:31PM +0300, Mikko Perttunen wrote:
-> On 09/26/2014 02:45 PM, Thierry Reding wrote:
-[...]
-> > I think a more idiomatic way to write this would be:
-> >
-> > static int
-> > calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
-> > 			      struct tsensor_shared_calibration shared,
-> > 			      u32 *calib)
+On Sat, Sep 27, 2014 at 08:27:28PM -0700, Mitchel Humpherys wrote:
+> From: Matt Wagantall <mattw@codeaurora.org>
 > 
-> If I do that, it will go over the 80 character limit by quite a few
-> characters, which is why I didn't use that style. Personally I'm fine with
-> either style.
-
-The above doesn't exceed the 80 character limit. Putting the return
-value and the static keyword on a separate line is a pretty common way
-to reduce line length.
-
-> >
-> >While at it, perhaps make shared a const * instead of passing it in by
-> >value?
+> It is sometimes necessary to poll a memory-mapped register until its
+> value satisfies some condition. Introduce a family of convenience macros
+> that do this. Tight-loop and sleeping versions are provided with and
+> without timeouts.
 > 
-> That is possible, but I'm not sure what the difference would be. Is there a
-> style rule forbidding by-value compound types? (Also if I change the style,
-> it would go over 80 characters by even more.)
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  include/linux/iopoll.h | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 77 insertions(+)
+>  create mode 100644 include/linux/iopoll.h
 
-No it doesn't. The below fits within 80 characters per line just fine:
-
-static int
-calculate_tsensor_calibration(const struct tegra_tsensor *sensor,
-			      const struct tsensor_shared_calibration *shared,
-			      u32 *calib)
+It would be good to provide a changelog with each new version of the
+patch. As it is I now have v2 and v3 of this patch in my inbox and I
+have no idea what the differences are, so I'd need to download both
+and run them through interdiff to find out.
 
 Thierry
 -------------- next part --------------
@@ -50,4 +37,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/328dffc3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/42876baa/attachment.sig>
