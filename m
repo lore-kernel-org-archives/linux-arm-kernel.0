@@ -1,31 +1,38 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 29 Sep 2014 13:17:46 +0530
-Subject: [PATCH v2 1/3] clk: samsung: Spelling s/bwtween/between/
+Date: Mon, 29 Sep 2014 13:17:47 +0530
+Subject: [PATCH v2 2/3] clk: samsung: remove unnecessary CONFIG_OF from clk.c
 In-Reply-To: <1411976868-22209-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1411976868-22209-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1411976868-22209-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1411976868-22209-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a typo in comment section of "struct samsung_clk_provider".
+Remove unnecessary CONFIG_OF from samsung/clk.c.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- drivers/clk/samsung/clk.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/samsung/clk.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index 66ab36b..a1ece4a 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -25,7 +25,7 @@
-  * struct samsung_clk_provider: information about clock provider
-  * @reg_base: virtual address for the register base.
-  * @clk_data: holds clock related data like clk* and number of clocks.
-- * @lock: maintains exclusion bwtween callbacks for a given clock-provider.
-+ * @lock: maintains exclusion between callbacks for a given clock-provider.
+diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+index deab84d..31bf391 100644
+--- a/drivers/clk/samsung/clk.c
++++ b/drivers/clk/samsung/clk.c
+@@ -281,7 +281,6 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
+  * obtain the clock speed of all external fixed clock sources from device
+  * tree and register it
   */
- struct samsung_clk_provider {
- 	void __iomem *reg_base;
+-#ifdef CONFIG_OF
+ void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
+ 			struct samsung_fixed_rate_clock *fixed_rate_clk,
+ 			unsigned int nr_fixed_rate_clk,
+@@ -298,7 +297,6 @@ void __init samsung_clk_of_register_fixed_ext(struct samsung_clk_provider *ctx,
+ 	}
+ 	samsung_clk_register_fixed_rate(ctx, fixed_rate_clk, nr_fixed_rate_clk);
+ }
+-#endif
+ 
+ /* utility function to get the rate of a specified clock */
+ unsigned long _get_rate(const char *clk_name)
 -- 
 1.7.9.5
