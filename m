@@ -1,32 +1,38 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 29 Sep 2014 20:00:37 +0800
-Subject: [PATCH v2 6/6] ARM: imx53: add cpufreq support
-In-Reply-To: <1411979628.2625.5.camel@pengutronix.de>
-References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
- <1411738864-26549-6-git-send-email-l.stach@pengutronix.de>
- <20140928041513.GI12999@dragon>
- <1411979628.2625.5.camel@pengutronix.de>
-Message-ID: <20140929120035.GB14087@tiger>
+From: zhang.lyra@gmail.com (zhang.lyra at gmail.com)
+Date: Mon, 29 Sep 2014 20:04:47 +0800
+Subject: [PATCH 0/6] Add Spreadtrum Shark64 SoC support
+Message-ID: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 10:33:48AM +0200, Lucas Stach wrote:
-> Am Sonntag, den 28.09.2014, 12:15 +0800 schrieb Shawn Guo:
-> > On Fri, Sep 26, 2014 at 03:41:04PM +0200, Lucas Stach wrote:
-> > > Instanciate device for the generic cpufreq-dt driver.
-> > > 
-> > > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > 
-> > I assume that I should only apply this patch after the cpufreq-dt change
-> > gets merged and shows up on my base.
-> > 
-> > Shawn
-> > 
-> I would think its safe to merge this patch. The cpufreq-dt change will
-> be merged with 3.18. Until then the worst that could happen is that the
-> cpufreq driver doesn't bind to the mx5 cpu device.
+From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
 
-Ah, right.  The device will not bind on my tree, so it's safe to apply
-it right away.
+Spreadtrum is a rapid growing chip vendor providing smart phone total solutions. 
+Shark64 is nominated as a SoC infrastructure that supports 4G/3G/2G standards based on ARMv8 multiple core architecture.
 
-Applied, thanks.
+This patchset adds shark64 supports in arm64 device tree and implements the basic earlycon serial driver.
+
+chunyan.zhang (6):
+  Documentation: DT: Add bindings for Spreadtrum serial
+  arm64: Add DTS support for Spreadtrum's Shark64 SoC
+  arm64: dts/Makefile: Add support for Spreadtrum's Shark64 SoC.
+  arm64: Add support for Spreadtrum's Shark64 SoC in Kconfig and defconfig
+  tty/serial: add Spreadtrum's serial earlycon
+  Documentation: Add entry for Spreadtrum's Shark64 SoC
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |    6 ++
+ .../devicetree/bindings/serial/of-serial.txt       |    1 +
+ arch/arm64/Kconfig                                 |    5 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/sprd_shark64.dts               |  110 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/tty/serial/Kconfig                         |   12 +++
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/serial_sprd_early.c             |   64 ++++++++++++
+ 9 files changed, 201 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+ create mode 100644 arch/arm64/boot/dts/sprd_shark64.dts
+ create mode 100644 drivers/tty/serial/serial_sprd_early.c
+
+-- 
+1.7.9.5
