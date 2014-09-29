@@ -1,45 +1,57 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 29 Sep 2014 19:48:45 +0200
-Subject: [PATCH v1 2/4] arm: pxa: move init functions into generic.h
-In-Reply-To: <3547658.YqqGlbv966@wuerfel> (Arnd Bergmann's message of "Mon, 29
- Sep 2014 18:08:39 +0200")
-References: <1411973508-14301-1-git-send-email-robert.jarzmik@free.fr>
- <1411973508-14301-2-git-send-email-robert.jarzmik@free.fr>
- <3547658.YqqGlbv966@wuerfel>
-Message-ID: <87y4t2b9mq.fsf@free.fr>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Mon, 29 Sep 2014 10:49:51 -0700
+Subject: [PATCH] arm64: ptrace: hw_break_set take into account hardware
+ breakpoints number
+In-Reply-To: <20140929101626.GE20303@arm.com>
+References: <1411977842-16515-1-git-send-email-victor.kamensky@linaro.org>
+ <1411977842-16515-2-git-send-email-victor.kamensky@linaro.org>
+ <20140929101626.GE20303@arm.com>
+Message-ID: <CAA3XUr3B0XKrVaXgTR2G43B67YNV3q1wKsuXvMFsBaME4oXUYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi Will,
 
-> On Monday 29 September 2014 08:51:46 Robert Jarzmik wrote:
->> 
->>  #ifdef CONFIG_PXA25x
->> +#define pxa25x_handle_irq icip_handle_irq
->>  extern unsigned pxa25x_get_clk_frequency_khz(int);
->> +extern void __init pxa25x_init_irq(void);
->> +extern void __init pxa25x_map_io(void);
->> +#ifdef CONFIG_CPU_PXA26x
->> +extern void __init pxa26x_init_irq(void);
->> +#endif
->>  #else
->>  #define pxa25x_get_clk_frequency_khz(x)                (0)
->>  #endif
->> 
+On 29 September 2014 03:16, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Victor,
 >
-> It's better to add the declarations outside of the #ifdef. I believe
-> the existing #ifdef is meant to provide a dummy alternative, but you
-> don't actually want that for the other declarations, so just add them
-> to a globally visible location.
-OK for v2.
+> On Mon, Sep 29, 2014 at 09:04:02AM +0100, Victor Kamensky wrote:
+>> hw_break_set function that performs ptrace_regset for hardware
+>> breakpoints and watchpoints needs to take into account actual
+>> number of hardware breakpoints and watchpoints available in CPU.
+>>
+>> Current code iterates over all 16 entries of 'struct user_hwdebug_state'
+>> and tries to reserve hardware breakpoint for each index, which fails
+>> if CPU supports less than 16 hardware breakpoints. One manifestation of
+>> the issue is that gdb fails to debug multithreaded user land application
+>> and exits with 'Unexpected error setting hardware debug registers'
+>> error - ptrace system call for hardware breakpoints regset fails with
+>> ENOSPC.
+>
+> When does this happen? hw_break_set is driven by userspace, so if GDB is
+> asking for more registers than we actually have, then this is a GDB bug and
+> the kernel is doing the right thing.
+>
+> Have you reproduced this with the latest version of GDB?
 
-I will also put a note on my todo list to kill them. Their remaining purpose is
-to provide frequency read accessor for get_clk_frequency(). Once the clock
-framework will be done for all PXAs, get_clk_frequency() will become a simple
-clk_get_rate(), or even better will be removed if I manage to transform viper.c
-and the cpu frequency driver.
+Thank you for the reply. Just checked latest version of GDB, indeed it
+does not have my original issue. It turns out my gdb is based on some
+old linaro gdb version that unconditionally passes sizeof(user_hwdebug_state)
+as iov.len to PTRACE_SETREGSET with note type NT_ARM_HW_BREAK.
+Latest gdb adjusts iov.len based on available number of hardware breakpoints.
+I should have checked latest gdb before posting this. Naturally previously
+suggested patch is withdrawn.
 
-Cheers.
+Question is there any place where variable payload nature of
+PTRACE_SETREGSET with note type NT_ARM_HW_BREAK and
+NT_ARM_HW_WATCH documented? I've tried kernel Documentation
+directory, aarch64 abi document, http://infocenter.arm.com search, none
+of them mention NT_ARM_HW_BREAK. Just curious is there any place
+for that sort of information to look in the future. If answer that it is
+documented by existing kernel/gdb code :), please feel free to ignore
+this question.
 
--- 
-Robert
+Thanks,
+Victor
+
+> Will
