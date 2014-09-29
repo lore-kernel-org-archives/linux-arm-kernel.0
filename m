@@ -1,94 +1,207 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 29 Sep 2014 19:51:41 +0800
-Subject: [PATCH v2 3/3] ARM: vf610: Add ARM Global Timer clocksource option
-In-Reply-To: <1411575610-20895-4-git-send-email-stefan@agner.ch>
-References: <1411575610-20895-1-git-send-email-stefan@agner.ch>
- <1411575610-20895-4-git-send-email-stefan@agner.ch>
-Message-ID: <20140929115122.GA14087@tiger>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 29 Sep 2014 17:28:53 +0530
+Subject: [RFC v2] arm64: kgdb: fix single stepping
+In-Reply-To: <1411732453-5437-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1411732453-5437-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <CALicx6vxZOh44apx4+s5pkTnmVeXzqvxys_8QempVLbKu3h=oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 24, 2014 at 06:20:10PM +0200, Stefan Agner wrote:
-> Add the ARM Global Timer as clocksource/scheduler clock option and
-> use it as default scheduler clock. This leaves the PIT timer for
-> other users e.g. the secondary Cortex-M4 core. Also, the Global Timer
-> has double the precission (running at pheripheral clock compared to
-> IPG clock) and a 64-bit incrementing counter register. We still keep
-> the PIT timer as an secondary option in case the ARM Global Timer is
-> not available.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Hi Akashi,
+
+On Fri, Sep 26, 2014 at 5:24 PM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> I tried to verify kgdb in vanilla kernel on fast model, but it seems that
+> the single stepping with kgdb doesn't work correctly since its first
+> appearance at v3.15.
+>
+> On v3.15, 'stepi' command after breaking the kernel at some breakpoint
+> steps forward to the next instruction, but the succeeding 'stepi' never
+> goes beyond that.
+> On v3.16, 'stepi' moves forward and stops at the next instruction just
+> after enable_dbg in el1_dbg, and never goes beyond that. This variance of
+> behavior seems to come in with the following patch in v3.16:
+>
+>     commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+>     paths where possible")
+>
+> This patch
+> (1) moves kgdb_disable_single_step() from 'c' command handling to single
+>     step handler.
+>     This makes sure that single stepping gets effective at every 's' command.
+>     Please note that, under the current implementation, single step bit in
+>     spsr, which is cleared by the first single stepping, will not be set
+>     again for the consecutive 's' commands because single step bit in mdscr
+>     is still kept on (that is, kernel_active_single_step() in
+>     kgdb_arch_handle_exception() is true).
+
+Have you please check the functionality by running KGDB test suit
+with multicores?
+
+> (2) removes 'enable_dbg' in el1_dbg.
+>     Single step bit in mdscr is turned on in do_handle_exception()->
+>     kgdb_handle_expection() before returning to debugged context, and if
+>     debug exception is enabled in el1_dbg, we will see unexpected single-
+>     stepping in el1_dbg.
+> (3) masks interrupts while single-stepping one instruction.
+>     If an interrupt is caught during processing a single-stepping, debug
+>     exception is unintentionally enabled by el1_irq's 'enable_dbg' before
+>     returning to debugged context.
+>     Thus, like in (2), we will see unexpected single-stepping in el1_irq.
+>
+> Basically (1) is for v3.15, (2) and (3) with (1) for v3.16.
+>
+> With those changes, we will see another problem if a breakpoint is set
+> at interrupt-sensible places, like gic_handle_irq():
+>
+>     KGDB: re-enter error: breakpoint removed ffffffc000081258
+>     ------------[ cut here ]------------
+>     WARNING: CPU: 0 PID: 650 at kernel/debug/debug_core.c:435
+>                                         kgdb_handle_exception+0x1dc/0x1f4()
+>     Modules linked in:
+>     CPU: 0 PID: 650 Comm: sh Not tainted 3.17.0-rc2+ #177
+>     Call trace:
+>     [<ffffffc000087fac>] dump_backtrace+0x0/0x130
+>     [<ffffffc0000880ec>] show_stack+0x10/0x1c
+>     [<ffffffc0004d683c>] dump_stack+0x74/0xb8
+>     [<ffffffc0000ab824>] warn_slowpath_common+0x8c/0xb4
+>     [<ffffffc0000ab90c>] warn_slowpath_null+0x14/0x20
+>     [<ffffffc000121bfc>] kgdb_handle_exception+0x1d8/0x1f4
+>     [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>     [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>     [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>     Exception stack(0xffffffc07e027650 to 0xffffffc07e027770)
+>     ...
+>     [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>     [<ffffffc00012178c>] kgdb_cpu_enter+0x464/0x5c0
+>     [<ffffffc000121bb4>] kgdb_handle_exception+0x190/0x1f4
+>     [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+>     [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+>     [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+>     Exception stack(0xffffffc07e027ac0 to 0xffffffc07e027be0)
+>     ...
+>     [<ffffffc000083cac>] el1_dbg+0x14/0x68
+>     [<ffffffc00032e4b4>] __handle_sysrq+0x11c/0x190
+>     [<ffffffc00032e93c>] write_sysrq_trigger+0x4c/0x60
+>     [<ffffffc0001e7d58>] proc_reg_write+0x54/0x84
+>     [<ffffffc000192fa4>] vfs_write+0x98/0x1c8
+>     [<ffffffc0001939b0>] SyS_write+0x40/0xa0
+>
+> Once some interrupt occurs, a breakpoint at gic_handle_irq() triggers kgdb.
+> Kgdb then calls kgdb_roundup_cpus() to sync with other cpus.
+> Current kgdb_roundup_cpus() unmasks interrupts temporarily to
+> use smp_call_function().
+> This eventually allows another interrupt to occur and likely results in
+> hitting a breakpoint at gic_handle_irq() again since debug exception is
+> always enabled in el1_irq.
+>
+> We can avoid this issue by specifying "nokgdbroundup" in kernel parameter,
+> but this will also leave other cpus be in unknown state in terms of kgdb,
+> and may result in interfering with kgdb activity.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
->  arch/arm/mach-imx/Kconfig | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 11b2957..9482f58 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -633,12 +633,29 @@ config SOC_VF610
->  	bool "Vybrid Family VF610 support"
->  	select ARM_GIC
->  	select PINCTRL_VF610
-> -	select VF_PIT_TIMER
->  	select PL310_ERRATA_769419 if CACHE_L2X0
->  
->  	help
->  	  This enable support for Freescale Vybrid VF610 processor.
->  
-> +choice
-> +	prompt "Clocksource for scheduler clock"
-> +	depends on SOC_VF610
-> +	default ARM_GLOBAL_TIMER
+>  arch/arm64/kernel/entry.S |    1 -
+>  arch/arm64/kernel/kgdb.c  |   29 +++++++++++++++++++----------
+>  2 files changed, 19 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index fdd6eae..a935d5f 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -325,7 +325,6 @@ el1_dbg:
+>         mrs     x0, far_el1
+>         mov     x2, sp                          // struct pt_regs
+>         bl      do_debug_exception
+> -       enable_dbg
+>         kernel_exit 1
+>  el1_inv:
+>         // TODO: add support for undefined instructions in kernel mode
+> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+> index 75c9cf1..f1fc1d8 100644
+> --- a/arch/arm64/kernel/kgdb.c
+> +++ b/arch/arm64/kernel/kgdb.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/kdebug.h>
+>  #include <linux/kgdb.h>
+> +#include <asm/percpu.h>
+>  #include <asm/traps.h>
+>
+>  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+> @@ -95,6 +96,8 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+>         { "fpcr", 4, -1 },
+>  };
+>
+> +static DEFINE_PER_CPU(unsigned int, kgdb_pstate);
 > +
-> +	config ARM_GLOBAL_TIMER
-> +		bool "Use ARM Global Timer"
-> +		select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> +		help
-> +		  Use the ARM Global Timer as clocksource
+>  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
+>  {
+>         if (regno >= DBG_MAX_REG_NUM || regno < 0)
+> @@ -176,18 +179,14 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+>                  * over and over again.
+>                  */
+>                 kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+> -               atomic_set(&kgdb_cpu_doing_single_step, -1);
+> -               kgdb_single_step =  0;
+> -
+> -               /*
+> -                * Received continue command, disable single step
+> -                */
+> -               if (kernel_active_single_step())
+> -                       kernel_disable_single_step();
+>
+>                 err = 0;
+>                 break;
+>         case 's':
+> +               /* mask interrupts while single stepping */
+> +               __this_cpu_write(kgdb_pstate, linux_regs->pstate);
+> +               linux_regs->pstate |= (1 << 7);
+
+Hard coded values.
+
 > +
-> +	config VF_PIT_TIMER
-> +		bool "Use PIT timer"
-> +		help
-> +		  Use SoC Periodic Interrupt Timer (PIT) as clocksource
+>                 /*
+>                  * Update step address value with address passed
+>                  * with step packet.
+> @@ -198,8 +197,6 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+>                  */
+>                 kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+>                 atomic_set(&kgdb_cpu_doing_single_step, raw_smp_processor_id());
+> -               kgdb_single_step =  1;
+
+why kgdb_single_step is not set?
+
+> -
+>                 /*
+>                  * Enable single step handling
+>                  */
+> @@ -229,6 +226,18 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr)
+>
+>  static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+>  {
+> +       unsigned int pstate;
 > +
-> +endchoice
+> +       kernel_disable_single_step();
+> +       atomic_set(&kgdb_cpu_doing_single_step, -1);
 > +
+> +       /* restore interrupt mask status */
+> +       pstate = __this_cpu_read(kgdb_pstate);
+> +       if (pstate & (1 << 7))
+> +               regs->pstate |= (1 << 7);
+> +       else
+> +               regs->pstate &= ~(1 << 7);
+> +
+Same as above comment
 
-As per the report from 0-DAY kernel build test (thanks), the change
-causes the following warning on a particular config.
-
-warning: (ARCH_ROCKCHIP && ARCH_BCM_5301X) selects CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK which has unmet direct dependencies (ARM_GLOBAL_TIMER)
-
-It looks the redefinition of ARM_GLOBAL_TIMER is the cause for that
-warning.  I think it's more safer to use new config symbols for choosing
-the clocksource device for VF610.  I propose the following change to fix
-the warning.  If there is no objection, I will squash it into the
-original commit soon.
-
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 9482f5837b7e..e26b0fdd72db 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -641,16 +641,18 @@ config SOC_VF610
- choice
-        prompt "Clocksource for scheduler clock"
-        depends on SOC_VF610
--       default ARM_GLOBAL_TIMER
-+       default VF_USE_ARM_GLOBAL_TIMER
- 
--       config ARM_GLOBAL_TIMER
-+       config VF_USE_ARM_GLOBAL_TIMER
-                bool "Use ARM Global Timer"
-+               select ARM_GLOBAL_TIMER
-                select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-                help
-                  Use the ARM Global Timer as clocksource
- 
--       config VF_PIT_TIMER
-+       config VF_USE_PIT_TIMER
-                bool "Use PIT timer"
-+               select VF_PIT_TIMER
-                help
-                  Use SoC Periodic Interrupt Timer (PIT) as clocksource
- 
+>         kgdb_handle_exception(1, SIGTRAP, 0, regs);
+>         return 0;
+>  }
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
