@@ -1,79 +1,139 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 29 Sep 2014 12:28:32 +0200
-Subject: [GIT PULL] arm: mediatek: Add support for mt8127 and mt8135 SoCs
-In-Reply-To: <CABuKBeK6iUdRqTuOZyTHW-Xt3O4giXoQTJ76vkh4Mv4cA52THQ@mail.gmail.com>
-References: <CABuKBeK6iUdRqTuOZyTHW-Xt3O4giXoQTJ76vkh4Mv4cA52THQ@mail.gmail.com>
-Message-ID: <CABuKBeL9vy6fZVsDuuiWyhDvCJrFXAUUMBc12SxJODaTx8H1vA@mail.gmail.com>
+From: kiran.padwal@smartplayin.com (Kiran Padwal)
+Date: Mon, 29 Sep 2014 15:56:41 +0530
+Subject: [PATCH 3/4] ARM: DT: apq8064: Add USB OTG support
+In-Reply-To: <1411982127-8048-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1411982127-8048-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <542933E1.8010809@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Hi Srinivas,
 
-2014-09-22 22:59 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> Hi Olof and Arnd,
->
-> Here comes the pull request to introduce mt8127 and mt8135 support.
-> It is based on the former pull request I send [0].
->
-> Cheers,
-> Matthias
->
-> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287506.html
->
+Some review are comments inline.
+
+On Monday 29 September 2014 02:45 PM, Srinivas Kandagatla wrote:
+> This patch adds USB OTG support on USB1 of APQ8064 SOC.
+> Tested on IFC6410 with ethernet gadget.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->
-> The following changes since commit 467dc3a11b4c82dd94f4d0e8d6894cc60adef5ea:
->
->   arm: dts: mt6589: Change compatible string for GIC (2014-09-09 18:37:50 +0200)
->
-> are available in the git repository at:
->
->   https://github.com/mbgg/linux-mediatek.git tags/v3.18-next-mt81xx
->
-> for you to fetch changes up to f107b96ea9705aac9fd28c4278d4856062d3ebe8:
->
->   arm: mediatek: Add earlyprintk support for mt8127 & mt8135
-> (2014-09-22 22:34:50 +0200)
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 14 +++++++++
+>  arch/arm/boot/dts/qcom-apq8064.dtsi        | 46 ++++++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> index d6036b8..f41fb39 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> @@ -40,6 +40,11 @@
+>  			};
+>  		};
+>  
+> +		/* OTG */
+> +		usb1_phy:phy at 12500000 {
+> +			status = "ok";
 
-Any comments on this pull request?
-Do you want me to split the pull request in two, as there are three
-patches for next/soc and the
-remaining four for next/dt?
+Its canonical value is "okay" (although in practice anything
+other than "disabled" should work).
 
-Please give me some feedback on this.
+> +		};
+> +
+>  		usb3_phy:phy at 12520000 {
+>  			status = "ok";
+>  		};
+> @@ -48,6 +53,15 @@
+>  			status = "ok";
+>  		};
+>  
+> +		gadget1:gadget at 12500000 {
+> +			status = "ok";
+> +		};
+> +
+> +		/* OTG */
+> +		usb1: usb at 12500000 {
+> +			status = "ok";
+> +		};
+> +
+>  		usb3: usb at 12520000 {
+>  			status = "ok";
+>  		};
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 491a136..38d3efa 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -284,6 +284,16 @@
+>  				qcom,boot-load = <50000>;
+>  			};
+>  
+> +			pm8921_l4: pm8921-l4 {
+> +				compatible	= "qcom,rpm-pm8921-pldo";
+> +				reg		= <QCOM_RPM_PM8921_LDO4>;
+> +
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				qcom,boot-load = <50000>;
+> +			};
+> +
+>  			pm8921_l23: pm8921-l23 {
+>  				compatible	= "qcom,rpm-pm8921-pldo";
+>  				reg		= <QCOM_RPM_PM8921_LDO23>;
+> @@ -296,6 +306,25 @@
+>  
+>  		};
+>  
+> +		usb1_phy:phy at 12500000 {
+> +			compatible	= "qcom,usb-otg-ci";
+> +			reg		= <0x12500000 0x400>;
+> +			interrupts	= <0 100 0>;
 
-Thanks,
-Matthias
+The trailing 0 might be IRQ_TYPE_NONE?
 
->
-> ----------------------------------------------------------------
-> Add support for mt8127 and mt8135 SoCs
->
-> ----------------------------------------------------------------
-> Joe.C (7):
->       arm: mediatek: Add basic support for mt8127
->       arm: mediatek: add dts for 8127 Moose board
->       arm: mediatek: Add basic support for mt8135
->       arm: mediatek: add dts for MT8135 evaluation board.
->       dt-bindings: add more chips in documentation for Mediatek SoC
->       arm: dts: Build dtb for mt8127 & mt8135
->       arm: mediatek: Add earlyprintk support for mt8127 & mt8135
->
->  Documentation/devicetree/bindings/arm/mediatek.txt |  15 ++-
->  arch/arm/Kconfig.debug                             |  20 ++++
->  arch/arm/boot/dts/Makefile                         |   4 +-
->  arch/arm/boot/dts/mt8127-moose.dts                 |  24 +++++
->  arch/arm/boot/dts/mt8127.dtsi                      |  93 +++++++++++++++++
->  arch/arm/boot/dts/mt8135-evbp1.dts                 |  24 +++++
->  arch/arm/boot/dts/mt8135.dtsi                      | 115 +++++++++++++++++++++
->  arch/arm/mach-mediatek/mediatek.c                  |   2 +
->  8 files changed, 293 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
->  create mode 100644 arch/arm/boot/dts/mt8127.dtsi
->  create mode 100644 arch/arm/boot/dts/mt8135-evbp1.dts
->  create mode 100644 arch/arm/boot/dts/mt8135.dtsi
+> +			status		= "disabled";
+
+Usually the status property goes first.
 
 
-
--- 
-motzblog.wordpress.com
+> +			dr_mode		= "host";
+> +
+> +			clocks		= <&gcc USB_HS1_XCVR_CLK>,
+> +					  <&gcc USB_HS1_H_CLK>;
+> +			clock-names	= "core", "iface";
+> +
+> +			vddcx-supply	= <&pm8921_s3>;
+> +			v3p3-supply	= <&pm8921_l3>;
+> +			v1p8-supply	= <&pm8921_l4>;
+> +
+> +			resets		= <&gcc USB_HS1_RESET>;
+> +			reset-names	= "link";
+> +		};
+> +
+>  		usb3_phy:phy at 12520000 {
+>  			compatible	= "qcom,usb-otg-ci";
+>  			reg		= <0x12520000 0x400>;
+> @@ -334,6 +363,23 @@
+>  			reset-names	= "link";
+>  		};
+>  
+> +		gadget1:gadget at 12500000 {
+> +			compatible	= "qcom,ci-hdrc";
+> +			reg		= <0x12500000 0x400>;
+> +			status		= "disabled";
+> +			dr_mode		= "peripheral";
+> +			interrupts	= <0 100 0>;
+> +			usb-phy		= <&usb1_phy>;
+> +		};
+> +
+> +		usb1: usb at 12500000 {
+> +			compatible	= "qcom,ehci-host";
+> +			reg		= <0x12500000 0x400>;
+> +			interrupts	= <0 100 0>;
+> +			status		= "disabled";
+> +			usb-phy		= <&usb1_phy>;
+> +		};
+> +
+>  		usb3: usb at 12520000 {
+>  			compatible	= "qcom,ehci-host";
+>  			reg		= <0x12520000 0x400>;
+> 
