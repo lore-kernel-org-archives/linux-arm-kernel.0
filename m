@@ -1,45 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 29 Sep 2014 10:36:00 +0200
-Subject: [PATCH 2/2] MAINTAINERS: add atmel audio alsa driver maintainer
- entry
-In-Reply-To: <1411869439-2719-2-git-send-email-voice.shen@atmel.com>
-References: <1411869439-2719-1-git-send-email-voice.shen@atmel.com>
- <1411869439-2719-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <542919F0.9050509@atmel.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 29 Sep 2014 16:36:03 +0800
+Subject: [PATCH] MAINTAINERS: add atmel nand driver maintainer entry
+Message-ID: <1411979763-1449-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/2014 03:57, Bo Shen :
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+This patch adds an entry in MAINTAINERS file for ATMEL nand driver.
 
-For the record:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-
-> ---
-> 
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c004e6f..30f92cf 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1665,6 +1665,12 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
->  S:	Supported
->  F:	drivers/tty/serial/atmel_serial.c
->  
-> +ATMEL Audio ALSA driver
-> +M:	Bo Shen <voice.shen@atmel.com>
-> +L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
-> +S:	Supported
-> +F:	sound/soc/atmel
-> +
->  ATMEL DMA DRIVER
->  M:	Nicolas Ferre <nicolas.ferre@atmel.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> 
-
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3705430..1bdf3bf 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1698,6 +1698,12 @@ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+ F:	drivers/net/ethernet/cadence/
+ 
++ATMEL NAND DRIVER
++M:	Josh Wu <josh.wu@atmel.com>
++L:	linux-mtd at lists.infradead.org
++S:	Supported
++F:	drivers/mtd/nand/atmel_nand*
++
+ ATMEL SPI DRIVER
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
 -- 
-Nicolas Ferre
+1.9.1
