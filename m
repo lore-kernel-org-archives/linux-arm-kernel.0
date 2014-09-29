@@ -1,37 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 16:38:09 +0200
-Subject: [RFC 3/4] arm64: Do not call enable PCI resources when specify
- PCI_PROBE_ONLY
-In-Reply-To: <1411937610-22125-4-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411937610-22125-4-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <4139946.HEULtVYyUh@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 29 Sep 2014 17:38:15 +0300
+Subject: [PATCH v1 0/4] ARM: keystone: pm: switch to use generic pm domains
+Message-ID: <1412001499-19369-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 September 2014 15:53:29 suravee.suthikulpanit at amd.com wrote:
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index ce5836c..7fd4d2b 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -68,3 +68,11 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->         bus->domain_nr = domain;
->  }
->  #endif
-> +
-> +int pcibios_enable_device(struct pci_dev *dev, int mask)
-> +{
-> +       if (pci_has_flag(PCI_PROBE_ONLY))
-> +               return 0;
-> +
-> +       return pci_enable_resources(dev, mask);
-> +}
+Hi Santosh, Kevin,
 
-This doesn't look arm64 specific to me, and there is already a generic
-pcibios_enable_device() function in drivers/pci/pci.c. Would it
-be possible to move the check for PCI_PROBE_ONLY there without breaking
-other architectures?
+This series switches Keystone 2 PM code to use Generic PM domains
+instead of PM clock domains because of the lack of DT support
+for the last.
+It will finally allow to enable Runtime PM for Keystone 2.
 
-If that works, please do so.
+Patch 1 was reused from [1].
+Patch 4 is added to illustrate Keystone 2 PM domains configuration in DT.
 
-	Arnd
+RFC version of patches can be found at [2].
+
+[1] "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+  https://lkml.org/lkml/2014/4/24/1118
+
+[2] "[RFC PATCH 0/4] ARM: keystone: pm: switch to use generic pm domains"
+  https://lkml.org/lkml/2014/9/25/364
+
+Geert Uytterhoeven (1):
+  PM / clock_ops: Add pm_clk_add_clk()
+
+Grygorii Strashko (3):
+  ARM: keystone: pm: switch to use generic pm domains
+  ARM: dts: keystone: add generic pm controller node
+  ARM: dts: k2hk-evm: attach net, qmss and knav_dmas to keystone-gpc
+
+ .../devicetree/bindings/power/ti,keystone-gpc.txt  |  31 ++++++
+ arch/arm/boot/dts/k2hk-evm.dts                     |   7 ++
+ arch/arm/boot/dts/keystone.dtsi                    |   6 ++
+ arch/arm/mach-keystone/Kconfig                     |   1 +
+ arch/arm/mach-keystone/pm_domain.c                 | 115 ++++++++++++++-------
+ drivers/base/power/clock_ops.c                     |  41 ++++++--
+ include/linux/pm_clock.h                           |   8 ++
+ 7 files changed, 162 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
+
+-- 
+1.9.1
