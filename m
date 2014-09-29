@@ -1,79 +1,95 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 29 Sep 2014 11:38:23 +0200
-Subject: [PATCH 06/16] tty: serial: Add 8250-core based omap driver
-In-Reply-To: <1410377411-26656-7-git-send-email-bigeasy@linutronix.de>
-References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
- <1410377411-26656-7-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140929093823.GD13952@ci00147.xsens-tech.local>
+From: chenhui.zhao@freescale.com (Chenhui Zhao)
+Date: Mon, 29 Sep 2014 17:42:55 +0800
+Subject: [PATCH 3/3] arm: pm: add deep sleep support for LS1
+In-Reply-To: <20140928142632.GG5182@n2100.arm.linux.org.uk>
+References: <1411730703-25836-1-git-send-email-chenhui.zhao@freescale.com>
+ <1411730703-25836-4-git-send-email-chenhui.zhao@freescale.com>
+ <20140926121427.GO5182@n2100.arm.linux.org.uk>
+ <20140928110640.GB9797@udp189498uds.ap.freescale.net>
+ <20140928142632.GG5182@n2100.arm.linux.org.uk>
+Message-ID: <20140929094255.GA14086@udp189498uds.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:30:01PM +0200, Sebastian Andrzej Siewior wrote:
-> +	/*
-> +	 * We enable TRIG_GRANU for RX and TX and additionaly we set
-> +	 * SCR_TX_EMPTY bit. The result is the following:
-> +	 * - RX_TRIGGER amount of bytes in the FIFO will cause an interrupt.
-> +	 * - less than RX_TRIGGER number of bytes will also cause an interrupt
-> +	 *   once the UART decides that there no new bytes arriving.
-> +	 * - Once THRE is enabled, the interrupt will be fired once the FIFO is
-> +	 *   empty - the trigger level is ignored here.
-> +	 *
-> +	 * Once DMA is enabled:
-> +	 * - UART will assert the TX DMA line once there is room for TX_TRIGGER
-> +	 *   bytes in the TX FIFO. On each assert the DMA engine will move
-> +	 *   TX_TRIGGER bytes into the FIFO.
-> +	 * - UART will assert the RX DMA line once there are RX_TRIGGER bytes in
-> +	 *   the FIFO and move RX_TRIGGER bytes.
-> +	 * This is because treshold and trigger values are the same.
+On Sun, Sep 28, 2014 at 03:26:33PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Sep 28, 2014 at 07:06:40PM +0800, Chenhui Zhao wrote:
+> > On Fri, Sep 26, 2014 at 01:14:27PM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Sep 26, 2014 at 07:25:03PM +0800, Chenhui Zhao wrote:
+> > > > +/*
+> > > > + * r0: the physical entry address of SRAM code
+> > > > + *
+> > > > + */
+> > > > +ENTRY(ls1_do_deepsleep)
+> > > > +	mov	r13, r0
+> > > > +
+> > > > +	/* flush cache */
+> > > > +	bl	v7_flush_dcache_all
+> > > 
+> > > Please explain the purpose of this call via a comment in the code.
+> > > 
+> > > The generic code will have saved the CPU state, and will have called
+> > > flush_cache_louis() to flush the caches to the point of unification.
+> > > 
+> > > The only data which will have been loaded into the cache between that
+> > > point is the stack for the return from __cpu_suspend_save, and
+> > > speculative prefetches.
+> > > 
+> > > So, the only reason I can gather is that you need to flush data from
+> > > lower levels of the cache below the point of unification.
+> > > 
+> > 
+> > In deep sleep process, all caches will lost, so flush all caches to prevent
+> > data loss.
+> 
+> You haven't answered my question.
+> 
 
-threshold
+I want to flush L1 and L2 caches of Cortex-A7 in LS1021. However,
+flush_cache_louis() only flushed L1 cache. Therefore, call
+v7_flush_dcache_all() to flush L1 and L2 cache. 
 
-> +	/*
-> +	 * It claims to be 16C750 compatible however it is a little different.
-> +	 * It has EFR and has no FCR7_64byte bit. The AFE (which it claims to
-> +	 * have) is enabled via EFR instead of MCR. The type is set here 8250
-> +	 * just to get things going. UNKNOWN does not work for a few reasons and
-> +	 * we don't need our own type since we don't use 8250's set_termios()
-> +	 * and our "bugs" are handeld via the bug member.
+> > > > +
+> > > > +	/* disable cache, C bit in SCTLR */
+> > > > +	mrc	p15, 0, r0, c1, c0, 0
+> > > > +	bic	r0, r0, #(1 << 2)
+> > > > +	mcr	p15, 0, r0, c1, c0, 0
+> > > > +	isb
+> > > > +
+> > > > +	/* disable coherency, SMP bit in ACTLR */
+> > > > +	mrc	p15, 0, r0, c1, c0, 1
+> > > > +	bic	r0, r0, #(1 << 6)
+> > > > +	mcr	p15, 0, r0, c1, c0, 1
+> > > > +	isb
+> > > > +	dsb
+> > > > +
+> > > > +	/* disable MMU, M bit in SCTLR */
+> > > > +	mrc	p15, 0, r0, c1, c0, 0
+> > > > +	bic	r0, r0, #1
+> > > > +	mcr	p15, 0, r0, c1, c0, 0
+> > > > +	isb
+> > > > +
+> > > > +	/* jump to sram code using physical address */
+> > > > +	bx	r13
+> > > 
+> > > This looks extremely fragile.  You are running in virtual space, and you
+> > > turn the MMU off.  You are reliant on the MMU still being on for the
+> > > following instructions to already be in the pipeline.  That's not a
+> > > very good assumption to make (we've made it in the past and it breaks
+> > > every so often when things change, eg when the code is no longer laid
+> > > out how we expect.)
+> > > 
+> > > You need to disable the MMU safely, which means using the identity map
+> > > page tables and executing code in the identity map region.
+> > 
+> > Yes, the code will switch off MMU, and switch to physical address space.
+> > On LS1021, the DDR memory located at the physical address space started from
+> > 0x80000000, the kernel space also started at 0x80000000 (CONFIG_PAGE_OFFSET = 0x80000000).
+> > So the virtual address of kernel code is equal to the physical address.
+> 
+> You can't rely on that.
+> 
+> Sorry, NAK.
 
-handled
+I'll try to use a safer method to implement it.
 
-> +	 */
-> +	up.port.type = PORT_8250;
-> +	up.port.iotype = UPIO_MEM;
-> +	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE | UPF_SOFT_FLOW |
-> +		UPF_HARD_FLOW;
-> +	up.port.private_data = priv;
-> +
-> +	up.port.regshift = 2;
-> +	up.port.fifosize = 64;
-> +	up.tx_loadsz = 64;
-> +	up.capabilities = UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP;
-> +#ifdef CONFIG_PM_RUNTIME
-> +	/*
-> +	 * PM_RUNTIME is mostly transparent. However to do it right we need to a
-
-need to _do_ a ...?
-
-> +	 * TX empty interrupt before we can put the device to auto idle. So if
-> +	 * PM_RUNTIME is not enabled we don't add that flag and can spare that
-> +	 * one extra interrupt in the TX path.
-> +	 */
-
-<snip>
-
-> +config SERIAL_8250_OMAP
-> +	tristate "Support for OMAP internal UART (8250 based driver)"
-> +	depends on SERIAL_8250 && ARCH_OMAP2PLUS
-> +	help
-> +	  If you have a machine based on an Texas Instruments OMAP CPU you
-> +	  can enable its onboard serial ports by enabling this option.
-> +
-> +	  This driver is in early stage and uses ttyS instead of ttyO.
-> +
-
-I just wondered if this driver should be marked experimental?
-
-
-Thanks,
-Frans
+Chenhui
