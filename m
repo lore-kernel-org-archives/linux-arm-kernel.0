@@ -1,46 +1,57 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 29 Sep 2014 08:11:25 -0700
-Subject: [PATCH] sched/nohz: add debugfs control over
- sched_tick_max_deferment
-In-Reply-To: <20140927165938.GB21729@lerouge> (Frederic Weisbecker's message
- of "Sat, 27 Sep 2014 18:59:39 +0200")
-References: <1411760732-14102-1-git-send-email-khilman@kernel.org>
- <20140927165938.GB21729@lerouge>
-Message-ID: <7hh9zq31ia.fsf@deeprootsystems.com>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Mon, 29 Sep 2014 12:14:12 -0300
+Subject: [PATCH] [media] pt3: remove bogus module_is_live() check
+In-Reply-To: <6460819.BmnhuA22YH@wuerfel>
+References: <6460819.BmnhuA22YH@wuerfel>
+Message-ID: <20140929121412.66f2dd67.m.chehab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frederic Weisbecker <fweisbec@gmail.com> writes:
+Hi Arnd,
 
-> On Fri, Sep 26, 2014 at 12:45:32PM -0700, Kevin Hilman wrote:
->> From: Kevin Hilman <khilman@linaro.org>
->> 
->> Allow debugfs override of sched_tick_max_deferment in order to ease
->> finding/fixing the remaining issues with full nohz.
->> 
->> The value to be written is in jiffies, and -1 means the max deferment
->> is disabled (scheduler_tick_max_deferment() returns KTIME_MAX.)
->> 
->> Cc: Frederic Weisbecker <fweisbec@gmail.com>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->
-> So, I'm worried that it becomes a hack that everybody uses to shutdown
-> the tick completely then nobody will come and fix the issue that prevents
-> from doing it properly.
+Em Mon, 29 Sep 2014 16:28:55 +0200
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-OK.
+> The new pt3 driver checks the module reference for presence
+> before dropping it, which fails to compile when modules
+> are disabled:
+> 
+> media/pci/pt3/pt3.c: In function 'pt3_attach_fe':
+> media/pci/pt3/pt3.c:433:6: error: implicit declaration of function 'module_is_live' [-Werror=implicit-function-declaration]
+>       module_is_live(pt3->adaps[i]->i2c_tuner->dev.driver->owner))
+> 
+> As far as I can tell however, this check is not needed at all, because
+> the module will not go away as long as pt3 is holding a reference on
+> it. Also the previous check for NULL pointer is not needed at all,
+> because module_put has the same check.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> I seriously doubt this will be used for development purpose to help
-> fixing the real problem. 
+Thanks for this patch. Antti was quicker than you ;)
 
-Well, that's what I was using it for, until I was distracted by other
-tasks.
+I merged the patch on my tree yesterday. It should be popping up
+on the tomorrow's -next (I think that sfr didn't release one today).
 
-> Quite the opposite. If developers want to do
-> testing, they can as well comment out the call to scheduler_max_tick_deferment().
-
-OK, fair enough.
-
-Thanks,
-
-Kevin
+> 
+> diff --git a/drivers/media/pci/pt3/pt3.c b/drivers/media/pci/pt3/pt3.c
+> index 90f86ce7a001..39305f07dc2e 100644
+> --- a/drivers/media/pci/pt3/pt3.c
+> +++ b/drivers/media/pci/pt3/pt3.c
+> @@ -429,14 +429,10 @@ static int pt3_attach_fe(struct pt3_board *pt3, int i)
+>  
+>  err_tuner:
+>  	i2c_unregister_device(pt3->adaps[i]->i2c_tuner);
+> -	if (pt3->adaps[i]->i2c_tuner->dev.driver->owner &&
+> -	    module_is_live(pt3->adaps[i]->i2c_tuner->dev.driver->owner))
+> -		module_put(pt3->adaps[i]->i2c_tuner->dev.driver->owner);
+> +	module_put(pt3->adaps[i]->i2c_tuner->dev.driver->owner);
+>  err_demod:
+>  	i2c_unregister_device(pt3->adaps[i]->i2c_demod);
+> -	if (pt3->adaps[i]->i2c_demod->dev.driver->owner &&
+> -	    module_is_live(pt3->adaps[i]->i2c_demod->dev.driver->owner))
+> -		module_put(pt3->adaps[i]->i2c_demod->dev.driver->owner);
+> +	module_put(pt3->adaps[i]->i2c_demod->dev.driver->owner);
+>  	return ret;
+>  }
+>  
+> 
