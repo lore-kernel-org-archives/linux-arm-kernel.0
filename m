@@ -1,48 +1,46 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 29 Sep 2014 17:00:51 -0500
-Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
-Message-ID: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+From: libv@skynet.be (Luc Verhaegen)
+Date: Tue, 30 Sep 2014 00:02:50 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929165842.GC5599@skynet.be>
+References: <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
+ <20140929162814.GE4081@lukather> <20140929165842.GC5599@skynet.be>
+Message-ID: <20140929220250.GD5599@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The runtime pm calls need to be done before populating the children via the
-i2c_add_adapter call.  If this is not done, a child can run into issues trying
-to do i2c read/writes due to the pm_runtime_sync failing.
+On Mon, Sep 29, 2014 at 06:58:42PM +0200, Luc Verhaegen wrote:
+> 
+> In the 2nd round of this discussion, i stated that another fb or even a 
+> drm driver altogether seemed to be the sensible way out of this mess.
+> 
+> I suggest drm_rescue.
+> 
+> Very early on, now almost two months back, i used the word "denialfb".
+> rpifb is the real name of this thing though, but then the dt binding 
+> names would have to change and whatnot.
+> 
+> I don't get the resistance, at least not from a technical point of view. 
+> And i do not care enough to get properly involved in this pointless and 
+> endless discussion. drm_rescue it is.
+> 
+> Luc Verhaegen.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- drivers/i2c/busses/i2c-qup.c |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+So Thierry, let's review what we have achieved here.
 
-diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index 3a4d64e..092d89b 100644
---- a/drivers/i2c/busses/i2c-qup.c
-+++ b/drivers/i2c/busses/i2c-qup.c
-@@ -674,16 +674,20 @@ static int qup_i2c_probe(struct platform_device *pdev)
- 	qup->adap.dev.of_node = pdev->dev.of_node;
- 	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
- 
--	ret = i2c_add_adapter(&qup->adap);
--	if (ret)
--		goto fail;
--
- 	pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
- 	pm_runtime_use_autosuspend(qup->dev);
- 	pm_runtime_set_active(qup->dev);
- 	pm_runtime_enable(qup->dev);
-+
-+	ret = i2c_add_adapter(&qup->adap);
-+	if (ret)
-+		goto fail_runtime;
-+
- 	return 0;
- 
-+fail_runtime:
-+	pm_runtime_disable(qup->dev);
-+	pm_runtime_set_suspended(qup->dev);
- fail:
- 	qup_i2c_disable_clocks(qup);
- 	return ret;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1) you keep simplefb absolutely true to the name. Congratulations.
+2) Simplefb will only have a single user: the rpi. As the only other 
+users i can think of, which does not have a full driver and which does 
+not have clocks automatically disabled, are discrete cards. And they do 
+not really tend to happen with dt or platform devices.
+3) a competing driver will be created, which will do these dt-ishy 
+things.
+4) it's just a matter of time before the rpi either gets a full driver, 
+or switches over to the driver that everyone else is actually using. And 
+then the misnomer gets deprecated.
+
+Was that the outcome you were looking for? I think not.
+
+Luc Verhaegen.
