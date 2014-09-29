@@ -1,48 +1,44 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 29 Sep 2014 11:52:21 +0300
-Subject: [PATCH] clk: ti: dra7-atl-clock: fix a memory leak
-In-Reply-To: <5416ABD8.4040906@ti.com>
-References: <1410529147-19950-1-git-send-email-t-kristo@ti.com>
- <5416ABD8.4040906@ti.com>
-Message-ID: <54291DC5.1020907@ti.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 29 Sep 2014 14:21:28 +0530
+Subject: [PATCH RESEND v6 0/7] net: cpsw: Support for am335x chip MACIDs
+In-Reply-To: <1411973599-18908-1-git-send-email-mpa@pengutronix.de>
+References: <1411973599-18908-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <54291D90.4010806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2014 12:05 PM, Peter Ujfalusi wrote:
-> On 09/12/2014 04:39 PM, Tero Kristo wrote:
->> of_clk_add_provider makes an internal copy of the parent_names property
->> while its called, thus it is no longer needed after this call and can
->> be freed.
->
-> Thanks Tero, indeed this was overlooked in the original driver.
->
-> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On Monday 29 September 2014 12:23 PM, Markus Pargmann wrote:
+> Hi,
+> 
+> Another resend of this series to add the netdev list.
+> 
+> This series adds support to the cpsw driver to read the MACIDs of the am335x
+> chip and use them as fallback. These addresses are only used if there are no
+> mac addresses in the devicetree, for example set by a bootloader.
+> 
+> Best regards,
+> 
+> Markus
+> 
+> 
+> Markus Pargmann (7):
+>   DT doc: net: cpsw mac-address is optional
+>   net: cpsw: Add missing return value
+>   net: cpsw: header, Add missing include
+>   net: cpsw: Replace pr_err by dev_err
+>   net: cpsw: Add am33xx MACID readout
+>   am33xx: define syscon control module device node
+>   arm: dts: am33xx, Add syscon phandle to cpsw node
+> 
+>  Documentation/devicetree/bindings/net/cpsw.txt |  6 +++-
+>  arch/arm/boot/dts/am33xx.dtsi                  |  6 ++++
+>  drivers/net/ethernet/ti/Kconfig                |  2 ++
+>  drivers/net/ethernet/ti/cpsw.c                 | 45 ++++++++++++++++++++++++--
+>  drivers/net/ethernet/ti/cpsw.h                 |  1 +
+>  5 files changed, 57 insertions(+), 3 deletions(-)
+> 
 
-Applied to for-v3.18/ti-clk-driver.
+Acked-by: Mugunthan V N <mugunthanvnm@gmail.com>
 
--Tero
-
->
->
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> Cc: Mike Turquette <mturquette@linaro.org>
->> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>   drivers/clk/ti/clk-dra7-atl.c |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
->> index 4a65b41..3f9308a 100644
->> --- a/drivers/clk/ti/clk-dra7-atl.c
->> +++ b/drivers/clk/ti/clk-dra7-atl.c
->> @@ -199,6 +199,7 @@ static void __init of_dra7_atl_clock_setup(struct device_node *node)
->>
->>   	if (!IS_ERR(clk)) {
->>   		of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +		kfree(parent_names);
->>   		return;
->>   	}
->>   cleanup:
->>
->
->
+Regards
+Mugunthan V N
