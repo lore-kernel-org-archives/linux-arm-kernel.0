@@ -1,64 +1,393 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 29 Sep 2014 10:55:39 +0530
-Subject: [PATCH v3 3/4] rtc: omap: Update Kconfig for OMAP RTC
-In-Reply-To: <1411637529-18289-4-git-send-email-lokeshvutla@ti.com>
-References: <1411637529-18289-4-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1411968339-9933-1-git-send-email-lokeshvutla@ti.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Sun, 28 Sep 2014 22:47:29 -0700
+Subject: [PATCH 1/2] regulator: anatop: allow LDO bypass to be set from
+ device-tree
+In-Reply-To: <1411721842.4147.1.camel@pengutronix.de>
+References: <1411711172-16498-1-git-send-email-tharvey@gateworks.com>
+ <1411711172-16498-2-git-send-email-tharvey@gateworks.com>
+ <1411721842.4147.1.camel@pengutronix.de>
+Message-ID: <CAJ+vNU0HzO-0vq9Qf76y81hQqF7TniW821+_JX-x3_vS14NV0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <t-kristo@ti.com>
+On Fri, Sep 26, 2014 at 1:57 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Tim,
+>
+> Am Donnerstag, den 25.09.2014, 22:59 -0700 schrieb Tim Harvey:
+>> The core regulators provided by the Anatop regulator (reg_core, reg_soc,
+>> reg_pu) should be set in bypass mode if an extern PMIC regulator is used.
+>
+> Agreed, but ...
+>
+>> This allows configuring this from device-tree.
+>
+> ... this should not be configured from the device tree.
+>
+> If the PMIC driver is not loaded or cpufreq is disabled for other
+> reasons, the full LDO input voltage will be passed through to the core
+> all the time. The bypass should only be enabled if there is actually a
+> driver to reduce the voltage of the PMIC regulators.
 
-RTC is present in AM43xx and DRA7xx also. Updating the Kconfig
-to depend on ARCH_OMAP or ARCH_DAVINCI
+Yes, I agree
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
-Changes since v2:
- 	- Updated depends on in Kconfig.
- drivers/rtc/Kconfig    | 6 +++---
- drivers/rtc/rtc-omap.c | 4 ++--
- 2 files changed, 5 insertions(+), 5 deletions(-)
+>
+> I have a patch to imx6q-cpufreq (see below) that uses the regulator API
+> to enable the bypass on the core LDOs if additional PMIC regulators are
+> provided in the device tree and regulator-allow-bypass is set on the LDO
+> regulators. But it has its own problems.
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index a168e96..f14d200 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -971,11 +971,11 @@ config RTC_DRV_IMXDI
- 	   will be called "rtc-imxdi".
- 
- config RTC_DRV_OMAP
--	tristate "TI OMAP1"
--	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
-+	tristate "TI OMAP Real Time Clock"
-+	depends on ARCH_OMAP || ARCH_DAVINCI
- 	help
- 	  Say "yes" here to support the on chip real time clock
--	  present on TI OMAP1, AM33xx and DA8xx/OMAP-L13x.
-+	  present on TI OMAP1, AM33xx, DA8xx/OMAP-L13x, AM43xx and DRA7xx.
- 
- 	  This driver can also be built as a module, if so, module
- 	  will be called rtc-omap.
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index 93c5424..f28f1fd 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -1,5 +1,5 @@
- /*
-- * TI OMAP1 Real Time Clock interface for Linux
-+ * TI OMAP Real Time Clock interface for Linux
-  *
-  * Copyright (C) 2003 MontaVista Software, Inc.
-  * Author: George G. Davis <gdavis@mvista.com> or <source@mvista.com>
-@@ -25,7 +25,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/io.h>
- 
--/* The OMAP1 RTC is a year/month/day/hours/minutes/seconds BCD clock
-+/* The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
-  * with century-range alarm matching, driven by the 32kHz clock.
-  *
-  * The main user-visible ways it differs from PC RTCs are by omitting
--- 
-1.9.1
+So you too the third approach I mention in my cover-letter where you
+determine if there are external regulators. You use new props in the
+cpu0 node to point to them which makes sense (this is the part that I
+couldn't figure out how to do properly). I think this approach is the
+best approach, but I think it needs some more work to deal with the
+1.2GHz case.
+
+> First, it adds even more regulators. I'd rather move the voltage
+> regulation details out of imx6-cpufreq instead, because ideally that
+> should only have to care about the ARM voltage.
+
+imx6-cpufreq also needs to care about the SOC voltage.
+
+I don't think we can move the regulation details out of imx6-cpufreq
+because of the special handling of the 1.2GHz case.
+
+> Second, regulator_allow_bypass does nothing if there are other consumers
+> that have not allowed bypass yet, but immediately enables bypass once
+> the last registered consumer allows it. In our case the PU power domain
+> driver is, or rather will be, a second consumer of the VDDSOC regulator,
+> even though it does not care about the voltage level. This makes the
+> allow-bypass ordering a bit of a hassle.
+>
+> regards
+> Philipp
+>
+> --8<--
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> Subject: [PATCH] cpufreq: imx6q: Add support for bypass modes
+>
+> The internal LDOs can be set to bypass if separate external regulators
+> are available for VDDARM and VDDSOC inputs.
+>
+> To use external switching regulators, they have to be added to the cpu0
+> device tree node using the vddarm-supply and vddsoc-supply properties.
+> Further, the reg_arm, reg_pu, and reg_soc regulators need to have the
+> regulator-allow-bypass property set.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 152 +++++++++++++++++++++++++++++++++-------
+>  1 file changed, 126 insertions(+), 26 deletions(-)
+>
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index c2d3076..c0b3558 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -23,6 +23,8 @@
+>  static struct regulator *arm_reg;
+>  static struct regulator *pu_reg;
+>  static struct regulator *soc_reg;
+> +static struct regulator *vddarm_reg;
+> +static struct regulator *vddsoc_reg;
+
+maybe a comment should be here that arm_reg/pu_reg/soc_reg are the
+internal IMX6 anatop regulators and vddarm_reg/vddsoc_reg are external
+PMIC regulators.
+
+>
+>  static struct clk *arm_clk;
+>  static struct clk *pll1_sys_clk;
+> @@ -40,6 +42,7 @@ static u32 soc_opp_count;
+>  static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  {
+>         struct dev_pm_opp *opp;
+> +       struct regulator *reg;
+>         unsigned long freq_hz, volt, volt_old;
+>         unsigned int old_freq, new_freq;
+>         int ret;
+> @@ -64,21 +67,31 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>                 old_freq / 1000, volt_old / 1000,
+>                 new_freq / 1000, volt / 1000);
+>
+> +       reg = vddarm_reg ? vddarm_reg : arm_reg;
+> +
+>         /* scaling up?  scale voltage before frequency */
+>         if (new_freq > old_freq) {
+> -               if (!IS_ERR(pu_reg)) {
+> -                       ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> +               if (!IS_ERR(vddsoc_reg)) {
+> +                       ret = regulator_set_voltage_tol(vddsoc_reg, imx6_soc_volt[index], 0);
+>                         if (ret) {
+> -                               dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
+> +                               dev_err(cpu_dev, "failed to scale vddsoc up: %d\n", ret);
+> +                               return ret;
+> +                       }
+> +               } else {
+> +                       if (!IS_ERR(pu_reg)) {
+> +                               ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> +                               if (ret) {
+> +                                       dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
+> +                                       return ret;
+> +                               }
+> +                       }
+> +                       ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> +                       if (ret) {
+> +                               dev_err(cpu_dev, "failed to scale vddsoc up: %d\n", ret);
+>                                 return ret;
+>                         }
+>                 }
+> -               ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> -               if (ret) {
+> -                       dev_err(cpu_dev, "failed to scale vddsoc up: %d\n", ret);
+> -                       return ret;
+> -               }
+> -               ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> +               ret = regulator_set_voltage_tol(reg, volt, 0);
+>                 if (ret) {
+>                         dev_err(cpu_dev,
+>                                 "failed to scale vddarm up: %d\n", ret);
+> @@ -106,29 +119,37 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>         ret = clk_set_rate(arm_clk, new_freq * 1000);
+>         if (ret) {
+>                 dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
+> -               regulator_set_voltage_tol(arm_reg, volt_old, 0);
+> +               regulator_set_voltage_tol(reg, volt_old, 0);
+>                 return ret;
+>         }
+>
+>         /* scaling down?  scale voltage after frequency */
+>         if (new_freq < old_freq) {
+> -               ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+> +               ret = regulator_set_voltage_tol(reg, volt, 0);
+>                 if (ret) {
+>                         dev_warn(cpu_dev,
+>                                  "failed to scale vddarm down: %d\n", ret);
+>                         ret = 0;
+>                 }
+> -               ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+> -               if (ret) {
+> -                       dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+> -                       ret = 0;
+> -               }
+> -               if (!IS_ERR(pu_reg)) {
+> -                       ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> +               if (!IS_ERR(vddsoc_reg)) {
+> +                       ret = regulator_set_voltage_tol(vddsoc_reg, imx6_soc_volt[index], 0);
+> +                       if (ret) {
+> +                               dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+> +                               ret = 0;
+> +                       }
+> +               } else {
+> +                       ret = regulator_set_voltage_tol(soc_reg, imx6_soc_volt[index], 0);
+>                         if (ret) {
+> -                               dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
+> +                               dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+>                                 ret = 0;
+>                         }
+> +                       if (!IS_ERR(pu_reg)) {
+> +                               ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> +                               if (ret) {
+> +                                       dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
+> +                                       ret = 0;
+> +                               }
+> +                       }
+>                 }
+>         }
+>
+> @@ -155,7 +176,10 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  {
+>         struct device_node *np;
+>         struct dev_pm_opp *opp;
+> +       struct regulator *reg;
+>         unsigned long min_volt, max_volt;
+> +       unsigned long vddarm_old = 0;
+> +       unsigned long vddsoc_old = 0;
+>         int num, ret;
+>         const struct property *prop;
+>         const __be32 *val;
+> @@ -185,15 +209,31 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>                 goto put_clk;
+>         }
+>
+> +       vddarm_reg = regulator_get_optional(cpu_dev, "vddarm");
+> +       vddsoc_reg = regulator_get_optional(cpu_dev, "vddsoc");
+
+ok, so you've added these regs to the cpu0 device-tree node.
+
+>         arm_reg = regulator_get(cpu_dev, "arm");
+>         pu_reg = regulator_get_optional(cpu_dev, "pu");
+>         soc_reg = regulator_get(cpu_dev, "soc");
+> +       if (PTR_ERR(vddarm_reg) == -EPROBE_DEFER ||
+> +           PTR_ERR(vddsoc_reg) == -EPROBE_DEFER ||
+> +           PTR_ERR(arm_reg) == -EPROBE_DEFER ||
+> +           PTR_ERR(pu_reg) == -EPROBE_DEFER ||
+> +           PTR_ERR(soc_reg) == -EPROBE_DEFER) {
+> +               ret = -EPROBE_DEFER;
+> +               goto put_reg;
+> +       }
+
+So you are also making these new regulators required in the cpu0 node
+correct? We will also need a patch that updates the device-tree
+bindings.
+
+>         if (IS_ERR(arm_reg) || IS_ERR(soc_reg)) {
+>                 dev_err(cpu_dev, "failed to get regulators\n");
+>                 ret = -ENOENT;
+>                 goto put_reg;
+>         }
+>
+> +       if (!IS_ERR(vddarm_reg) && vddarm_reg == vddsoc_reg) {
+> +               dev_warn(cpu_dev, "arm and pu/soc supplied from the same regulator\n");
+> +               ret = -EINVAL;
+> +               goto put_reg;
+> +       }
+> +
+>         /*
+>          * We expect an OPP table supplied by platform.
+>          * Just, incase the platform did not supply the OPP
+> @@ -269,13 +309,19 @@ soc_opp_out:
+>          * Calculate the ramp time for max voltage change in the
+>          * VDDSOC and VDDPU regulators.
+>          */
+> -       ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> -       if (ret > 0)
+> -               transition_latency += ret * 1000;
+> -       if (!IS_ERR(pu_reg)) {
+> -               ret = regulator_set_voltage_time(pu_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> +       if (!IS_ERR(vddsoc_reg)) {
+> +               ret = regulator_set_voltage_time(vddsoc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> +               if (ret > 0)
+> +                       transition_latency += ret * 1000;
+> +       } else {
+> +               ret = regulator_set_voltage_time(soc_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+>                 if (ret > 0)
+>                         transition_latency += ret * 1000;
+> +               if (!IS_ERR(pu_reg)) {
+> +                       ret = regulator_set_voltage_time(pu_reg, imx6_soc_volt[0], imx6_soc_volt[num - 1]);
+> +                       if (ret > 0)
+> +                               transition_latency += ret * 1000;
+> +               }
+>         }
+>
+>         /*
+> @@ -291,22 +337,72 @@ soc_opp_out:
+>                                   freq_table[--num].frequency * 1000, true);
+>         max_volt = dev_pm_opp_get_voltage(opp);
+>         rcu_read_unlock();
+> -       ret = regulator_set_voltage_time(arm_reg, min_volt, max_volt);
+> +
+> +       reg = vddarm_reg ? vddarm_reg : arm_reg;
+> +       ret = regulator_set_voltage_time(reg, min_volt, max_volt);
+>         if (ret > 0)
+>                 transition_latency += ret * 1000;
+>
+> +       /* Bypass internal LDOs if external supplies are given */
+> +       if (vddarm_reg) {
+> +               vddarm_old = regulator_get_voltage(vddarm_reg);
+> +               regulator_set_voltage_tol(vddarm_reg, max_volt, 0);
+> +               ret = regulator_allow_bypass(arm_reg, true);
+> +               if (ret) {
+> +                       dev_err(cpu_dev, "failed to bypass arm supply: %d\n",
+> +                               ret);
+> +                       goto restore_vddarm;
+> +               }
+
+here we are setting vddarm_reg (the external pmic regulator) to the
+max volt needed for the highest opp then attempting to put the anatop
+regulator in bypass mode.
+
+Is this where you are saying there is an issue? If another consumer
+exists for vddarm_reg that may not allow bypass this will fail (but at
+least you handle that).
+
+> +       }
+> +       if (vddsoc_reg) {
+> +               vddsoc_old = regulator_get_voltage(vddsoc_reg);
+> +               if (freq_table[num].frequency == FREQ_1P2_GHZ / 1000)
+> +                       regulator_set_voltage_tol(vddsoc_reg,
+> +                                                 PU_SOC_VOLTAGE_HIGH, 0);
+> +               else
+> +                       regulator_set_voltage_tol(vddsoc_reg,
+> +                                                 PU_SOC_VOLTAGE_NORMAL, 0);
+> +               ret = regulator_allow_bypass(pu_reg, true);
+> +               if (ret) {
+> +                       dev_err(cpu_dev, "failed to bypass pu supply: %d\n",
+> +                               ret);
+> +                       goto restore_vddsoc;
+> +               }
+> +               ret = regulator_allow_bypass(soc_reg, true);
+> +               if (ret) {
+> +                       dev_err(cpu_dev, "failed to bypass soc supply: %d\n",
+> +                               ret);
+> +                       goto restore_vddsoc;
+> +               }
+> +       }
+> +
+
+shouldn't we not even allow ldo bypass for 1.2GHz? I'm having trouble
+finding where Freescale specifies this but I have seen it mentioned in
+their pfuze code.
+
+>         ret = cpufreq_register_driver(&imx6q_cpufreq_driver);
+>         if (ret) {
+>                 dev_err(cpu_dev, "failed register driver: %d\n", ret);
+> -               goto free_freq_table;
+> +               goto restore_vddsoc;
+>         }
+>
+>         of_node_put(np);
+>         return 0;
+>
+> +restore_vddsoc:
+> +       if (vddsoc_reg) {
+> +               regulator_allow_bypass(pu_reg, false);
+> +               regulator_allow_bypass(soc_reg, false);
+> +               regulator_set_voltage_tol(vddsoc_reg, vddsoc_old, 0);
+> +       }
+> +restore_vddarm:
+> +       if (vddarm_reg) {
+> +               regulator_allow_bypass(arm_reg, false);
+> +               regulator_set_voltage_tol(vddarm_reg, vddarm_old, 0);
+> +       }
+>  free_freq_table:
+>         dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+>  put_reg:
+> +       if (!IS_ERR_OR_NULL(vddarm_reg))
+> +               regulator_put(vddarm_reg);
+> +       if (!IS_ERR_OR_NULL(vddsoc_reg))
+> +               regulator_put(vddsoc_reg);
+>         if (!IS_ERR(arm_reg))
+>                 regulator_put(arm_reg);
+>         if (!IS_ERR(pu_reg))
+> @@ -332,6 +428,10 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
+>  {
+>         cpufreq_unregister_driver(&imx6q_cpufreq_driver);
+>         dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+> +       if (vddarm_reg)
+> +               regulator_put(vddarm_reg);
+> +       if (vddsoc_reg)
+> +               regulator_put(vddsoc_reg);
+>         regulator_put(arm_reg);
+>         if (!IS_ERR(pu_reg))
+>                 regulator_put(pu_reg);
+> --
+> 2.1.0
+>
+>
+
+Additionally however, we can't forget about the case where a 1.2GHz
+capable CPU with external PMIC is shifting to 1.2GHz in which case LDO
+bypass should be disabled and re-enabled when shifting back. This also
+makes me think that whatever is doing this shifting (the cpufreq
+driver) needs to manage this and needs to bump the PMIC regulators by
+125mV in the case of enabling the LDO for 1.2GHz.
+
+Also, what about the case when external PMIC regulators are used and
+yet LDO's are still enabled (not bypassed) - in this case the cpufreq
+driver should be setting the voltages to 125mV over the operating
+points. This would be occurring now with boards that have external
+PMIC's and do not use a bootloader that sets them in LDO bypass mode.
+
+Regards,
+
+Tim
