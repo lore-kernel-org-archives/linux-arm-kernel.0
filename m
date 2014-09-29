@@ -1,67 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 14:47:45 +0200
-Subject: [PATCH] staging/lustre/lvfs: fix building without CONFIG_PROC_FS
-Message-ID: <2146246.DTeNN9Vm3N@wuerfel>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Mon, 29 Sep 2014 20:49:22 +0800
+Subject: [PATCH v2 2/3] i2c: hix5hd2: add i2c controller driver
+In-Reply-To: <1411878129-19743-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1411878129-19743-1-git-send-email-zhangfei.gao@linaro.org>
+ <1411878129-19743-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <54295552.2020501@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch "staging/lustre/lvfs: remove the lvfs layer" moved some code around
-that was previously only built when CONFIG_PROC_FS was set, which now
-causes an invalid access to the obd_memory variable:
 
-ERROR: "obd_memory" [drivers/staging/lustre/lustre/obdclass/obdclass.ko] undefined!
 
-This fixes it by using adding a compile-time check around the access.
+On 09/28/2014 12:22 PM, Zhangfei Gao wrote:
+> From: Wei Yan <sledge.yanwei@huawei.com>
+>
+> I2C drivers for hix5hd2 soc series, including following chipset
+> Hi3716CV200, Hi3719CV100, Hi3718CV100, Hi3719MV100, Hi3718MV100.
+>
+> Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>   drivers/i2c/busses/Kconfig       |   10 +
+>   drivers/i2c/busses/Makefile      |    1 +
+>   drivers/i2c/busses/i2c-hix5hd2.c |  554 ++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 565 insertions(+)
+>   create mode 100644 drivers/i2c/busses/i2c-hix5hd2.c
+>
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index 2ac87fa..ba0f43c 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -77,6 +77,16 @@ config I2C_AMD8111
+>   	  This driver can also be built as a module.  If so, the module
+>   	  will be called i2c-amd8111.
+>
+> +config I2C_HIX5HD2
+> +	tristate "Hix5hd2 high-speed I2C driver"
+> +	depends on ARCH_HIX5HD2
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: fdedd94509fd ("staging/lustre/lvfs: remove the lvfs layer")
-Cc: James Simmons <uja.ornl@gmail.com>
-Cc: Mikhail Pershin <mike.pershin@intel.com>
-Cc: John L. Hammond <john.hammond@intel.com>
-Cc: Jian Yu <jian.yu@intel.com>
-Cc: Bob Glossman <bob.glossman@intel.com>
-Cc: Oleg Drokin <oleg.drokin@intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Would like to remove the dependence in next version to enable compile-test.
+The commit 4c255791ffd6410f ("asm-generic: io: implement relaxed 
+accessor macros as conditional wrappers") adds wrappers to asm-generic 
+of {read,write}{b,w,l,q}_relaxed.
 
-diff --git a/drivers/staging/lustre/lustre/obdclass/class_obd.c b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-index 8b8d338e41e8..7265ecbc6f9d 100644
---- a/drivers/staging/lustre/lustre/obdclass/class_obd.c
-+++ b/drivers/staging/lustre/lustre/obdclass/class_obd.c
-@@ -534,20 +534,23 @@ static int __init init_obdclass(void)
- 	spin_lock_init(&obd_types_lock);
- 	obd_zombie_impexp_init();
- 
--	obd_memory = lprocfs_alloc_stats(OBD_STATS_NUM,
--					 LPROCFS_STATS_FLAG_NONE |
--					 LPROCFS_STATS_FLAG_IRQ_SAFE);
--	if (obd_memory == NULL) {
--		CERROR("kmalloc of 'obd_memory' failed\n");
--		return -ENOMEM;
--	}
--
--	lprocfs_counter_init(obd_memory, OBD_MEMORY_STAT,
--			     LPROCFS_CNTR_AVGMINMAX,
--			     "memused", "bytes");
--	lprocfs_counter_init(obd_memory, OBD_MEMORY_PAGES_STAT,
--			     LPROCFS_CNTR_AVGMINMAX,
--			     "pagesused", "pages");
-+	if (IS_ENABLED(CONFIG_PROC_FS)) {
-+		obd_memory = lprocfs_alloc_stats(OBD_STATS_NUM,
-+						 LPROCFS_STATS_FLAG_NONE |
-+						 LPROCFS_STATS_FLAG_IRQ_SAFE);
-+
-+		if (obd_memory == NULL) {
-+			CERROR("kmalloc of 'obd_memory' failed\n");
-+			return -ENOMEM;
-+		}
-+
-+		lprocfs_counter_init(obd_memory, OBD_MEMORY_STAT,
-+				     LPROCFS_CNTR_AVGMINMAX,
-+				     "memused", "bytes");
-+		lprocfs_counter_init(obd_memory, OBD_MEMORY_PAGES_STAT,
-+				     LPROCFS_CNTR_AVGMINMAX,
-+				     "pagesused", "pages");
-+	}
- 
- 	err = obd_init_checks();
- 	if (err == -EOVERFLOW)
+Thanks
