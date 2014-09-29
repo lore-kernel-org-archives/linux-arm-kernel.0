@@ -1,143 +1,84 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 29 Sep 2014 15:29:27 +0100
-Subject: [PATCH v13 08/12] of/pci: Add pci_get_new_domain_nr() and
- of_get_pci_domain_nr()
-In-Reply-To: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1412000971-9242-9-git-send-email-Liviu.Dudau@arm.com>
+Date: Mon, 29 Sep 2014 15:29:19 +0100
+Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges from
+ DT
+Message-ID: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pci_get_new_domain_nr() to allocate a new domain number and
-of_get_pci_domain_nr() to retrieve the PCI domain number of a given device
-from DT.  Host bridge drivers or architecture-specific code can choose to
-implement their PCI domain number policy using these two functions.
+This is my version 13 of the attempt at adding support for generic PCI host
+bridge controllers. It contains only cleanups to make it play nice with the
+linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
+asm-generic is going to revert some of its more aggresive patches, he has the
+choice of queueing it into linux-next again.
 
-Using of_get_pci_domain_nr() guarantees a stable PCI domain number on every
-boot provided that all host bridge controllers are assigned a number in the
-device tree using "linux,pci-domain" property.  Mixing use of
-pci_get_new_domain_nr() and of_get_pci_domain_nr() is not recommended as it
-can lead to potentially conflicting domain numbers being assigned to root
-buses behind different host bridges.
+Changes from v12:
+- refreshed the whole series based on what Bjorn has submitted into linux-next.
+  He has added Signed-off-bys and change the title of some commits, plus
+  reworked the patches that move of_pci_range_to_resource() from of_address.h into
+  address.c.
+- updated "[PATCH 01/12] asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP"
+  to match the patch that Thierry Reding has submitted through the asm-generic branch.
+  If his series lands first upstream this patch will be skipped.
+- updated "[PATCH 03/12] ARM: Define PCI_IOBASE as the base of virtual PCI IO space" to
+  cast the PCI_IOBASE value to (void __iomem *) as is the case with most #defined versions
+- dropped the patch that was changing the order of initialisation between pci_host_bridge
+  and root bus in pci_create_root_bus()
+- fixed "[PATCH 07/12] PCI: Add generic domain handling" to account for the previous patch
+  being removed
+- fixed the title of commit 08/12 to reflect the name of the functions that are actually
+  added (s/of_pci_get_domain_nr/pci_get_new_domain_nr/)
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Catalin Marinas <catalin.marinas@arm.com>
----
- drivers/of/of_pci.c    | 25 +++++++++++++++++++++++++
- drivers/pci/pci.c      |  9 +++++++++
- include/linux/of_pci.h |  7 +++++++
- include/linux/pci.h    |  3 +++
- 4 files changed, 44 insertions(+)
+v12 thread here: https://lkml.org/lkml/2014/9/23/852
+v11 thread here: https://lkml.org/lkml/2014/9/17/732
+v10 thread here: https://lkml.org/lkml/2014/9/8/333
+v9 thread here, with links to previous threads: https://lkml.org/lkml/2014/8/12/361
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 8481996..82d172f 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -89,6 +89,31 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- }
- EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
- 
-+/**
-+ * This function will try to obtain the host bridge domain number by
-+ * finding a property called "linux,pci-domain" of the given device node.
-+ *
-+ * @node: device tree node with the domain information
-+ *
-+ * Returns the associated domain number from DT in the range [0-0xffff], or
-+ * a negative value if the required property is not found.
-+ */
-+int of_get_pci_domain_nr(struct device_node *node)
-+{
-+	const __be32 *value;
-+	int len;
-+	u16 domain;
-+
-+	value = of_get_property(node, "linux,pci-domain", &len);
-+	if (!value || len < sizeof(*value))
-+		return -EINVAL;
-+
-+	domain = (u16)be32_to_cpup(value);
-+
-+	return domain;
-+}
-+EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
-+
- #ifdef CONFIG_PCI_MSI
- 
- static LIST_HEAD(of_pci_msi_chip_list);
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 2c9ac70..d36f35f 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4406,6 +4406,15 @@ static void pci_no_domains(void)
- #endif
- }
- 
-+#ifdef CONFIG_PCI_DOMAINS
-+static atomic_t __domain_nr = ATOMIC_INIT(-1);
-+
-+int pci_get_new_domain_nr(void)
-+{
-+	return atomic_inc_return(&__domain_nr);
-+}
-+#endif
-+
- /**
-  * pci_ext_cfg_avail - can we access extended PCI config space?
-  *
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index dde3a4a..71062e9 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -15,6 +15,7 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- int of_pci_get_devfn(struct device_node *np);
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-+int of_get_pci_domain_nr(struct device_node *node);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -43,6 +44,12 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- {
- 	return -EINVAL;
- }
-+
-+static inline int
-+of_get_pci_domain_nr(struct device_node *node)
-+{
-+	return -1;
-+}
- #endif
- 
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index a494e5d..150da2d 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1285,10 +1285,12 @@ void pci_cfg_access_unlock(struct pci_dev *dev);
-  */
- #ifdef CONFIG_PCI_DOMAINS
- extern int pci_domains_supported;
-+int pci_get_new_domain_nr(void);
- #else
- enum { pci_domains_supported = 0 };
- static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
- static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
-+static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
- #endif /* CONFIG_PCI_DOMAINS */
- 
- /*
-@@ -1417,6 +1419,7 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
- 
- static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
- static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
-+static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
- 
- #define dev_is_pci(d) (false)
- #define dev_is_pf(d) (false)
+Best regards,
+Liviu
+
+
+Bjorn Helgaas (1):
+  of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
+
+Catalin Marinas (1):
+  PCI: Add generic domain handling
+
+Liviu Dudau (10):
+  asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
+  of/pci: Add pci_register_io_range() and pci_pio_to_address()
+  ARM: Define PCI_IOBASE as the base of virtual PCI IO space
+  of/pci: Move of_pci_range_to_resources() to of/address.c
+  of/pci: Fix the conversion of IO ranges into IO resources
+  of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
+  of/pci: Add support for parsing PCI host bridge resources from DT
+  PCI: Assign unassigned bus resources in pci_scan_root_bus()
+  PCI: Add pci_remap_iospace() to map bus I/O resources
+  arm64: Add architectural support for PCI
+
+ arch/arm/include/asm/io.h         |   1 +
+ arch/arm/mach-integrator/pci_v3.c |  23 +++---
+ arch/arm64/Kconfig                |  22 +++++-
+ arch/arm64/include/asm/Kbuild     |   1 +
+ arch/arm64/include/asm/io.h       |   3 +-
+ arch/arm64/include/asm/pci.h      |  37 +++++++++
+ arch/arm64/include/asm/pgtable.h  |   2 +
+ arch/arm64/kernel/Makefile        |   1 +
+ arch/arm64/kernel/pci.c           |  70 +++++++++++++++++
+ drivers/of/address.c              | 154 ++++++++++++++++++++++++++++++++++++++
+ drivers/of/of_pci.c               | 142 +++++++++++++++++++++++++++++++++++
+ drivers/pci/host/pci-tegra.c      |  10 ++-
+ drivers/pci/host/pcie-rcar.c      |  21 ++++--
+ drivers/pci/pci.c                 |  40 ++++++++++
+ drivers/pci/probe.c               |  14 +++-
+ include/asm-generic/io.h          |   2 +-
+ include/asm-generic/pgtable.h     |   4 +
+ include/linux/of_address.h        |  17 ++---
+ include/linux/of_pci.h            |  13 ++++
+ include/linux/pci.h               |  27 +++++++
+ 20 files changed, 566 insertions(+), 38 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/pci.c
+
 -- 
 2.1.1
