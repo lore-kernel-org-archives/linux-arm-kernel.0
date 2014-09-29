@@ -1,76 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 16:36:30 +0200
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
+Date: Mon, 29 Sep 2014 16:38:09 +0200
+Subject: [RFC 3/4] arm64: Do not call enable PCI resources when specify
+ PCI_PROBE_ONLY
+In-Reply-To: <1411937610-22125-4-git-send-email-suravee.suthikulpanit@amd.com>
 References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <8631927.qWHZsjCs8e@wuerfel>
+ <1411937610-22125-4-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <4139946.HEULtVYyUh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 September 2014 15:53:28 suravee.suthikulpanit at amd.com wrote:
+On Sunday 28 September 2014 15:53:29 suravee.suthikulpanit at amd.com wrote:
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index ce5836c..7fd4d2b 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -68,3 +68,11 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>         bus->domain_nr = domain;
+>  }
+>  #endif
 > +
-> +#ifdef CONFIG_ARM64
-> +struct pci_bus *gen_scan_root_bus(struct device *parent, int bus,
-> +                                      struct pci_ops *ops, void *sysdata,
-> +                                      struct list_head *resources)
+> +int pcibios_enable_device(struct pci_dev *dev, int mask)
 > +{
+> +       if (pci_has_flag(PCI_PROBE_ONLY))
+> +               return 0;
+> +
+> +       return pci_enable_resources(dev, mask);
+> +}
 
-I don't see anything ARM64 specific in this, the function only uses
-the newly added generic helpers.
+This doesn't look arm64 specific to me, and there is already a generic
+pcibios_enable_device() function in drivers/pci/pci.c. Would it
+be possible to move the check for PCI_PROBE_ONLY there without breaking
+other architectures?
 
->  static int gen_pci_probe(struct platform_device *pdev)
->  {
-> @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->         struct device *dev = &pdev->dev;
->         struct device_node *np = dev->of_node;
->         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> +#ifndef CONFIG_ARM64
->         struct hw_pci hw = {
->                 .nr_controllers = 1,
->                 .private_data   = (void **)&pci,
-> @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
->                 .map_irq        = of_irq_parse_and_map_pci,
->                 .ops            = &gen_pci_ops,
->         };
-> +#endif
->  
-
-Same here, I'd suggest marking this "#ifdef CONFIG_ARM" instead, as hw_pci
-is an arm32 specific data structure.
-
->         if (!pci)
->                 return -ENOMEM;
-> @@ -368,8 +429,24 @@ static int gen_pci_probe(struct platform_device *pdev)
->                 gen_pci_release_of_pci_ranges(pci);
->                 return err;
->         }
-> +#ifdef CONFIG_ARM64
->  
-> +#ifdef CONFIG_PCI_MSI
-> +       pci->msi_parent = of_parse_phandle(np, "msi-parent", 0);
-> +       if (!pci->msi_parent) {
-> +               dev_err(&pdev->dev, "Failed to allocate msi-parent.\n");
-> +               return -EINVAL;
-> +       }
-> +#endif
-
-We probably want to enable MSI unconditionally on ARM64, so the #ifdef is
-not necessary here. However, I don't think that a missing msi-parent should
-be a fatal error here: we can still continue without MSI support if this
-case.
-
-> +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
-> +                              &gen_pci_ops, pci, &pci->resources)) {
-> +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
-> +               return -ENODEV;
-> +       }
-> +#else
->         pci_common_init_dev(dev, &hw);
-> +#endif /* CONFIG_ARM64 */
-> 
-
-Again, just make the pci_common_init_dev() call #ifdef CONFIG_ARM, and move
-the generic case after it, outside of the #ifdef.
+If that works, please do so.
 
 	Arnd
