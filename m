@@ -1,54 +1,76 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 29 Sep 2014 10:46:57 +0530
-Subject: [PATCH] serial: samsung: Fix serial config dependencies for exynos7
-Message-ID: <1411967817-8423-1-git-send-email-a.kesavan@samsung.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Mon, 29 Sep 2014 10:50:14 +0530
+Subject: [PATCH v2 2/5] pinctrl: exynos: Add irq_chip instance for Exynos7
+ wakeup interrupts
+In-Reply-To: <54218882.1050401@gmail.com>
+References: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
+ <1411460169-30536-3-git-send-email-a.kesavan@samsung.com>
+ <54218882.1050401@gmail.com>
+Message-ID: <CAM4voakz5JpKV9sK8EHWDmBTFxy8YDCFejGz_VbZ0bamtVmteQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dubey <pankaj.dubey@samsung.com>
+Hi Tomasz,
 
-Exynos7 has a similar serial controller to that present in older Samsung
-SoCs. To re-use the existing serial driver on Exynos7 we need to have
-SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS selected. This is not
-possible because these symbols are dependent on PLAT_SAMSUNG which is
-not present for the ARMv8 based exynos7.
+On Tue, Sep 23, 2014 at 8:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On 23.09.2014 10:16, Abhilash Kesavan wrote:
+> [snip]
+>> @@ -383,9 +377,11 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
+>>  /*
+>>   * irq_chip for wakeup interrupts
+>>   */
+>> -static struct exynos_irq_chip exynos_wkup_irq_chip = {
+>> +static struct exynos_irq_chip *exynos_wkup_irq_chip;
+>> +
+> [snip]
+>> @@ -459,7 +480,7 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
+>>  static int exynos_wkup_irq_map(struct irq_domain *h, unsigned int virq,
+>>                                       irq_hw_number_t hw)
+>>  {
+>> -     irq_set_chip_and_handler(virq, &exynos_wkup_irq_chip.chip,
+>> +     irq_set_chip_and_handler(virq, &exynos_wkup_irq_chip->chip,
+>>                                       handle_level_irq);
+>>       irq_set_chip_data(virq, h->host_data);
+>>       set_irq_flags(virq, IRQF_VALID);
+>> @@ -491,7 +512,12 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+>>       int idx, irq;
+>>
+>>       for_each_child_of_node(dev->of_node, np) {
+>> -             if (of_match_node(exynos_wkup_irq_ids, np)) {
+>> +             const struct of_device_id *match;
+>> +
+>> +             match = of_match_node(exynos_wkup_irq_ids, np);
+>> +             if (match) {
+>> +                     exynos_wkup_irq_chip = kmemdup(match->data,
+>> +                             sizeof(struct exynos_irq_chip), GFP_KERNEL);
+>
+> That's not exactly what I had in my mind.
+>
+> You just changed the code to write to another global variable. This is
+> not the best practice and might cause hard to track issues in future,
+> when extending the driver.
+>
+> From what I can see, the best solution would be to add .irq_chip field
+> to samsung_pin_bank struct. Then exynos_wkup_irq_map() could access it
+> through h->host_data pointer and exynos_irq_demux_eint16_31() could also
+> retrieve the irq chip through bank struct without the need too add chip
+> field to exynos_muxed_weint_data struct.
+>
+> As a side effect, it would be possible to consolidate
+> exynos_wkup_irqd_ops with exynos_gpio_irqd_ops, which currently only
+> differ in irq chip passed as argument to irq_set_chip_and_handler() in
+> .map() callback.
 
-Change the dependency of these symbols from PLAT_SAMSUNG to the serial
-driver thus making it available on exynos7. As the existing platform
-specific code making use of these symbols is related to uart driver this
-change in dependency should not cause any issues.
+I have posted v3 adding a new irq_chip field to the samsung_pin_bank
+structure as per your suggestion. Please take a look.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
-Build tested with s3c6400_defconfig, exynos_defconfig and arm64's defconfig
-with and without the serial driver enabled.
-
- drivers/tty/serial/Kconfig |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 81f6ee7..e6c0bcb 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -249,14 +249,14 @@ config SERIAL_SAMSUNG
- 
- config SERIAL_SAMSUNG_UARTS_4
- 	bool
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
- 	help
- 	  Internal node for the common case of 4 Samsung compatible UARTs
- 
- config SERIAL_SAMSUNG_UARTS
- 	int
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
- 	default 3
- 	help
--- 
-1.7.9.5
+Regards,
+Abhilash
+>
+> Best regards,
+> Tomasz
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
