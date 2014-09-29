@@ -1,65 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Sep 2014 13:34:36 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140929104454.GD26008@ulmo>
-References: <20140829070116.GC13106@ulmo> <20140829141244.GH15297@lukather>
- <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
- <20140929104454.GD26008@ulmo>
-Message-ID: <20140929113436.GA4081@lukather>
+From: zhang.lyra@gmail.com (zhang.lyra at gmail.com)
+Date: Mon, 29 Sep 2014 19:48:28 +0800
+Subject: [PATCH 0/6] Add Spreadtrum Shark64 SoC support
+Message-ID: <1411991314-6636-1-git-send-email-zhang.lyra@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
-> > >> Plus, speaking more specifically about the clocks, that won't prevent
-> > >> your clock to be shut down as a side effect of a later clk_disable
-> > >> call from another driver.
-> > 
-> > > Furthermore isn't it a bug for a driver to call clk_disable() before a
-> > > preceding clk_enable()? There are patches being worked on that will
-> > > enable per-user clocks and as I understand it they will specifically
-> > > disallow drivers to disable the hardware clock if other drivers are
-> > > still keeping them on via their own referenc.
-> > 
-> > Calling clk_disable() preceding clk_enable() is a bug.
-> > 
-> > Calling clk_disable() after clk_enable() will disable the clock (and
-> > its parents)
-> > if the clock subsystem thinks there are no other users, which is what will
-> > happen here.
-> 
-> Right. I'm not sure this is really applicable to this situation, though.
+From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
 
-It's actually very easy to do. Have a driver that probes, enables its
-clock, fails to probe for any reason, call clk_disable in its exit
-path. If there's no other user at that time of this particular clock
-tree, it will be shut down. Bam. You just lost your framebuffer.
+Spreadtrum is a rapid growing chip vendor providing smart phone total solutions. 
+Shark64 is nominated as a SoC infrastructure that supports 4G/3G/2G standards based on ARMv8 multiple core architecture.
 
-Really, it's just that simple, and relying on the fact that some other
-user of the same clock tree will always be their is beyond fragile.
+This patchset adds shark64 supports in arm64 device tree and implements the basic earlycon serial driver.
 
-> Either way, if there are other users of a clock then they will just as
-> likely want to modify the rate at which point simplefb will break just
-> as badly.
+chunyan.zhang (6):
+  Documentation: DT: Add bindings for Spreadtrum serial
+  arm64: Add DTS support for Spreadtrum's Shark64 SoC
+  arm64: dts/Makefile: Add support for Spreadtrum's Shark64 SoC.
+  arm64: Add support for Spreadtrum's Shark64 SoC in Kconfig and defconfig
+  tty/serial: add Spreadtrum's serial earlycon
+  Documentation: Add entry for Spreadtrum's Shark64 SoC
 
-And this can be handled just as well. Register a clock notifier,
-refuse any rate change, done. But of course, that would require having
-a clock handle.
-
-Now, how would *you* prevent such a change?
-
-Maxime
+ Documentation/devicetree/bindings/arm/sprd.txt     |    6 ++
+ .../devicetree/bindings/serial/of-serial.txt       |    1 +
+ arch/arm64/Kconfig                                 |    5 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/sprd_shark64.dts               |  110 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/tty/serial/Kconfig                         |   12 +++
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/serial_sprd_early.c             |   64 ++++++++++++
+ 9 files changed, 201 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/sprd.txt
+ create mode 100644 arch/arm64/boot/dts/sprd_shark64.dts
+ create mode 100644 drivers/tty/serial/serial_sprd_early.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/a36af406/attachment.sig>
+1.7.9.5
