@@ -1,35 +1,139 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 29 Sep 2014 02:58:25 -0700
-Subject: [PATCHv3 3/4] ARM: exynos: Add exynos3250 compatible to use
- generic cpufreq driver
-In-Reply-To: <1411628707-8496-4-git-send-email-cw00.choi@samsung.com>
-References: <1411628707-8496-1-git-send-email-cw00.choi@samsung.com>
- <1411628707-8496-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CAKohpokXNEYZBqsKyJDMUCZA7BY_E0=G5eVmTx_cBKvAyoSi9w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 29 Sep 2014 18:04:50 +0800
+Subject: [PATCH v2 4/7] ARM: dts: sun9i: Add A80 Optimus Board support
+In-Reply-To: <20140929095344.GE4388@lukather>
+References: <1411570141-29960-1-git-send-email-wens@csie.org>
+ <1411570141-29960-5-git-send-email-wens@csie.org>
+ <20140925133427.GI15315@lukather>
+ <CAGb2v65Yu=3rgQ+G6USJubKOPzcMJ5bqhe7d9wrYjpT9aFaZuw@mail.gmail.com>
+ <20140929095344.GE4388@lukather>
+Message-ID: <CAGb2v64-zshYgcPo-WR0TVebUDY3=LKBA9DfTVDKk2PA6VSiUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2014 00:05, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patch add exynos3250 compatible string to exynos_cpufreq_matches
-> for supporting generic cpufreq driver on Exynos3250.
+On Mon, Sep 29, 2014 at 5:53 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Sep 27, 2014 at 09:10:48PM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Sep 25, 2014 at 9:34 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Wed, Sep 24, 2014 at 10:48:58PM +0800, Chen-Yu Tsai wrote:
+>> >> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
+>> >> It was jointly developed by Allwinner and Merrii.
+>> >>
+>> >> This board has a UART port, a JTAG connector, USB host ports, a USB
+>> >> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
+>> >> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
+>> >> jack, IR receiver, and additional GPIO headers.
+>> >>
+>> >> This patch adds only basic support.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >> ---
+>> >>  arch/arm/boot/dts/Makefile              |  2 +
+>> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
+>> >>  2 files changed, 68 insertions(+)
+>> >>  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> >> index 2f42b18..098f319 100644
+>> >> --- a/arch/arm/boot/dts/Makefile
+>> >> +++ b/arch/arm/boot/dts/Makefile
+>> >> @@ -424,6 +424,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>> >>       sun7i-a20-pcduino3.dtb
+>> >>  dtb-$(CONFIG_MACH_SUN8I) += \
+>> >>       sun8i-a23-ippo-q8h-v5.dtb
+>> >> +dtb-$(CONFIG_MACH_SUN9I) += \
+>> >> +     sun9i-a80-optimus.dtb
+>> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+>> >>       tegra20-iris-512.dtb \
+>> >>       tegra20-medcom-wide.dtb \
+>> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+>> >> new file mode 100644
+>> >> index 0000000..f83abab
+>> >> --- /dev/null
+>> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+>> >> @@ -0,0 +1,66 @@
+>> >> +/*
+>> >> + * Copyright 2014 Chen-Yu Tsai
+>> >> + *
+>> >> + * Chen-Yu Tsai <wens@csie.org>
+>> >> + *
+>> >> + * This file is dual-licensed: you can use it either under the terms
+>> >> + * of the GPL or the X11 license, at your option. Note that this dual
+>> >> + * licensing only applies to this file, and not this project as a
+>> >> + * whole.
+>> >> + *
+>> >> + *  a) This library is free software; you can redistribute it and/or
+>> >> + *     modify it under the terms of the GNU General Public License as
+>> >> + *     published by the Free Software Foundation; either version 2 of the
+>> >> + *     License, or (at your option) any later version.
+>> >> + *
+>> >> + *     This library is distributed in the hope that it will be useful,
+>> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> >> + *     GNU General Public License for more details.
+>> >> + *
+>> >> + *     You should have received a copy of the GNU General Public
+>> >> + *     License along with this library; if not, write to the Free
+>> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>> >> + *     MA 02110-1301 USA
+>> >> + *
+>> >> + * Or, alternatively,
+>> >> + *
+>> >> + *  b) Permission is hereby granted, free of charge, to any person
+>> >> + *     obtaining a copy of this software and associated documentation
+>> >> + *     files (the "Software"), to deal in the Software without
+>> >> + *     restriction, including without limitation the rights to use,
+>> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> >> + *     sell copies of the Software, and to permit persons to whom the
+>> >> + *     Software is furnished to do so, subject to the following
+>> >> + *     conditions:
+>> >> + *
+>> >> + *     The above copyright notice and this permission notice shall be
+>> >> + *     included in all copies or substantial portions of the Software.
+>> >> + *
+>> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> >> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> >> + */
+>> >> +
+>> >> +/dts-v1/;
+>> >> +/include/ "sun9i-a80.dtsi"
+>> >> +
+>> >> +/ {
+>> >> +     model = "Merrii A80 Optimus Board";
+>> >> +     compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
+>> >> +
+>> >> +     chosen {
+>> >> +             bootargs = "earlyprintk console=ttyS0,115200";
+>> >> +     };
+>> >
+>> > Since you changed the memory node in the DTSI, you should probably add
+>> > one here too, don't you?
+>>
+>> I thought we left fixing that to the bootloader?
+>> I don't see any memory nodes in our other DTS.
 >
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  arch/arm/mach-exynos/exynos.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 8923d37..1318d69 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -285,6 +285,7 @@ static const struct of_device_id exynos_cpufreq_matches[] = {
->         { .compatible = "samsung,exynos5420", .data = "arm-bL-cpufreq-dt" },
->         { .compatible = "samsung,exynos5250", .data = "cpufreq-cpu0" },
->         { .compatible = "samsung,exynos4210", .data = "cpufreq-cpu0" },
-> +       { .compatible = "samsung,exynos3250", .data = "cpufreq-cpu0" },
+> Yes, but does the A80 bootloader supports DT and actually fixes it? If
+> not, then you'll still have to have a memory node, just like on the
+> A31 (and presumably on the A23).
 
-cpufreq-cpu0 is renamed to cpufreq-dt now.
+Not at the moment no. But last I checked none of our board dts files
+have separate memory nodes. We only have them in the dtsi, with the
+largest supported ram size as its value. Also the bootloader
+(u-boot that is) can pass the memory size via atags I think.
+
+At least I'm only getting 512MB RAM on my Optimus, due to u-boot
+incorrectly assuming I only have as much. But that's another problem. :(
+
+Would this be a problem when using Android fastboot from the stock
+u-boot?
+
+
+Cheers
+ChenYu
