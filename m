@@ -1,112 +1,64 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 29 Sep 2014 17:53:01 +0200 (CEST)
-Subject: [RFT v2 01/24] irqdomain: Introduce new interfaces to support
- hierarchy irqdomains
-In-Reply-To: <54294F1C.30606@huawei.com>
-References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
- <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
- <54294F1C.30606@huawei.com>
-Message-ID: <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 29 Sep 2014 16:55:17 +0100
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929134708.GB30998@ulmo>
+References: <20140829070116.GC13106@ulmo> <20140829141244.GH15297@lukather>
+ <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
+Message-ID: <20140929155517.GR16977@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Sep 2014, Abel wrote:
-> On 2014/9/26 22:02, Jiang Liu wrote:
-> > +static void irq_domain_free_descs(unsigned int virq, unsigned int nr_irqs)
-> > +{
-> > +	unsigned int i;
-> > +
-> > +	for (i = 0; i < nr_irqs; i++)
-> > +		irq_free_desc(virq + i);
-> > +}
-> 
-> I am not sure why this function is needed, since it works in the exact same
-> way as irq_free_descs(virq, nr_irqs).
+On Mon, Sep 29, 2014 at 03:47:15PM +0200, Thierry Reding wrote:
 
-Indeed.
- 
-> I've been through your patches and noticed that the only domain
-> which does not call irq_domain_alloc_irqs_parent() is
-> x86_vector_domain. And this makes sense *if* we already knew which
-> domain is the nearest one to the CPU.
+> What happened in the Snow example is that regulators that were
+> previously on would all of a sudden be automatically disabled on boot
+> because there was now a driver that registered them with a generic
+> framework.
 
-Right, and in case of x86 the vector domain _IS_ the one which is
-always the nearest one to the cpu.
+Not quite - there was also DT added for them.  With just the driver the
+regulator API shouldn't have touched them, it'd just have exposed them
+read only.
 
-> But I don't think a well implemented device driver should assume
-> itself be in a particular position of the interrupt delivery path.
+> The same thing is going to happen with simplefb for your device. If you
+> later realize that you need a regulator to keep the panel going, you'll
+> have to add code to your firmware to populate the corresponding
+> properties, otherwise the regulator will end up unused and will be
+> automatically disabled. At the same time you're going to break upstream
+> for all users of your old firmware because it doesn't add that property
+> yet.
 
-The device driver has no knowledge of this. The irq domain driver
-definitely has to know to some extent.
+> And the same will continue to happen for every new type of resource
+> you're going to add.
 
-> Actually it should be guaranteed by the core infrastructure that all
-> the domains in the interrupt delivery path should allocate a
-> hardware interrupt for the interrupt source.
+So long as we're ensuring that when we don't start supporting resources
+without DT additions or at least require DT additions to actively manage
+them (which can then include simplefb hookup) we should be fine.
 
-Well, that's what we do. We allocate down the irq domain hierarchy. If
-one level fails the whole operation fails.
+> > > The difference is that with the solution I proposed we don't have to
+> > > keep track of all the resources. We know that firmware has set them up
+> > > and we know that a real driver will properly take them over at some
+> > > point
 
-> And besides the comments/questions I mentioned above, I am also curious about
-> how the chained interrupts been processed.
-> 
-> Let's take a 3-level-chained-domains for example.
-> Given 3 interrupt controllers A, B and C, and the interrupt delivery path is:
-> 
-> DEV -> A -> B -> C -> CPU
-> 
-> After the hierarchy irqdomains are established, the unique linux interrupt of
-> DEV will be mapped with a hardware interrupt in each domain:
-> 
-> DomainA: HWIRQ_A => VIRQ_DEV
-> DomainB: HWIRQ_B => VIRQ_DEV
-> DomainC: HWIRQ_C => VIRQ_DEV
-> 
-> When the DEV triggered an interrupt signal, the CPU will acknowledge HWIRQ_C,
+> > You keep saying that... and you know that you can't make this
+> > assumption.
 
-Not necessarily. The CPU will process HWIRQ_C. The acknowledge
-mechanism depends on the implementation details of the hierarchy.
+> Why not? Are you really expecting to keep running with simplefb forever?
+> Nobody is going to seriously use an upstream kernel in any product with
+> only simplefb as a framebuffer. I've said before that this is a hack to
+> get you working display. And that's all it is. If you want to do it
+> properly go and write a DRM/KMS driver.
 
-> and then irq_find_mapping(DomainC, HWIRQ_C) will be called to get the linux
-> interrupt VIRQ_DEV, and after the handler of the VIRQ_DEV has been processed,
-> the interrupt will end with the level (if have) uncleared on B, which will
-> result in the interrupt of DEV cannot be processed again.
-> 
-> Or is there anything I misunderstand?
-
-This heavily depends on the properties of the stacked domains.
-
-It depends on the hardware requirements and the implementation of
-domain A and B how this is handled.
-
-It might be sufficient to have the following code in the irq_ack()
-callback of domain A:
-
-irq_ack_A(struct irq_data *d)
-{
-	ack_hw_A();
-}
-
-Another HW or stacking scenario requires
-
-irq_ack_A(struct irq_data *d)
-{
-	ack_hw_A();
-	ack_parent();
-}
-
-where ack_parent() does:
-
-      if (d->parent_data)
-      	 d->parent_data->chip->ack(d->parent_data);
-
-and ack_hw_A() can be anything from a nop to some more or less complex
-hw access.
-
-So we cannot define upfront how deep an ack/mask/unmask/... has to be
-propagated down the chain. This needs a careful consideration in terms
-of functionality and we want to be able to do performance shortcuts as
-well.
-
-Thanks,
-
-	tglx
+Well, for product probably not.  But in terms of the runtime of a kernel
+I'd not be so sure - people do dogfood and we should be allowing that.
+I've used unaccelerated displays with reasonable success for a large
+part of my work in the past.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/946d1de9/attachment.sig>
