@@ -1,53 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 29 Sep 2014 08:53:32 +0100
-Subject: mfd_add_devices() doesn't check whether nodes are "diabled" in dts
-In-Reply-To: <CAGsJ_4yqumj3=54HwxuzVffPjHdQZrCP2wYc2TSumKsg0-wm7w@mail.gmail.com>
-References: <CAGsJ_4yqumj3=54HwxuzVffPjHdQZrCP2wYc2TSumKsg0-wm7w@mail.gmail.com>
-Message-ID: <20140929075332.GC7308@lee--X1>
+From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
+Date: Mon, 29 Sep 2014 07:55:31 +0000
+Subject: [PATCH v7] watchdog: Add DA9063 PMIC watchdog driver.
+In-Reply-To: <1411923945-3538-1-git-send-email-mpa@pengutronix.de>
+References: <1411923945-3538-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B4097F@SW-EX-MBX02.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Sep 2014, Barry Song wrote:
+On 28 September 2014 18:06 Markus Pargmann wrote:
 
-> hi Samuel, Lee,
-> the current mfd_add_devices() doesn't check whether nodes are diabled
-> in dts, so even though we put status = "disabled" in dts for a MFD
-> subnode, it will still create the platform_device. this will cause the
-> platform_driver to execute probe() entry.
+> From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
 > 
-> mfd-core is doing:
+> This driver supports the watchdog device inside the DA9063 PMIC.
 > 
-> mfd_add_device()
+> Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
 > 
-> alloc platform_device no matter it is disabled or not:
-> 
-> 92         pdev = platform_device_alloc(cell->name, id + cell->id);
->  93         if (!pdev)
->  94                 goto fail_alloc;
-> 
-> ....
-> extend all nodes:
-> 
-> 112         if (parent->of_node && cell->of_compatible) {
-> 113                 for_each_child_of_node(parent->of_node, np) {
-> 114                         if (of_device_is_compatible(np,
-> cell->of_compatible)) {
-> 115                                 pdev->dev.of_node = np;
-> 116                                 break;
-> 117                         }
-> 118                 }
-> 119         }
-> 
-> it seems it doesn't match with the general behavior like
-> of_platform_populate(), in which we only extend available nodes.
-> 
-> how do you think if we do a fix for the behaviour of mfd_add_devices()
-> and mfd_remove_devices()?
 
-Yes, sounds good.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thank you Markus,
+I'll get a reply back to you as soon as I can ...
+Regards,
+Steve
