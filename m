@@ -1,186 +1,97 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 29 Sep 2014 10:45:10 +0530
-Subject: [PATCH v3 4/6] pinctrl: exynos: Add initial driver data for Exynos7
+Date: Mon, 29 Sep 2014 10:45:08 +0530
+Subject: [PATCH v3 2/6] pinctrl: exynos: Consolidate irq domain callbacks
 In-Reply-To: <1411967712-8321-1-git-send-email-a.kesavan@samsung.com>
 References: <1411967712-8321-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1411967712-8321-5-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1411967712-8321-3-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
+Adding a irq_chip field to the samsung_pin_bank struct helps in
+consolidating the irq domain callbacks for external gpio and wakeup
+interrupt controllers. The exynos_wkup_irqd_ops and exynos_gpio_irqd_ops
+have now been merged into a single exynos_eint_irqd_ops.
 
-This patch adds initial driver data for Exynos7 pinctrl support.
-
-Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
 Tested-by: Thomas Abraham <thomas.ab@samsung.com>
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../bindings/pinctrl/samsung-pinctrl.txt           |    1 +
- drivers/pinctrl/samsung/pinctrl-exynos.c           |  113 ++++++++++++++++++++
- drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
- drivers/pinctrl/samsung/pinctrl-samsung.h          |    1 +
- 4 files changed, 117 insertions(+)
+ drivers/pinctrl/samsung/pinctrl-exynos.c |   32 ++++++------------------------
+ 1 file changed, 6 insertions(+), 26 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-index f80519a..8425838 100644
---- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-@@ -18,6 +18,7 @@ Required Properties:
-   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
-   - "samsung,exynos5260-pinctrl": for Exynos5260 compatible pin-controller.
-   - "samsung,exynos5420-pinctrl": for Exynos5420 compatible pin-controller.
-+  - "samsung,exynos7-pinctrl": for Exynos7 compatible pin-controller.
- 
- - reg: Base address of the pin controller hardware module and length of
-   the address space it occupies.
 diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 4ec2d3d..29e6070 100644
+index 14b9b44..54ebcb6 100644
 --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
 +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1189,3 +1189,116 @@ struct samsung_pin_ctrl exynos5420_pin_ctrl[] = {
- 		.label		= "exynos5420-gpio-ctrl4",
- 	},
+@@ -254,7 +254,7 @@ static struct exynos_irq_chip exynos_gpio_irq_chip = {
+ 	.eint_pend = EXYNOS_GPIO_EPEND_OFFSET,
  };
-+
-+/* pin banks of exynos7 pin-controller - ALIVE */
-+static struct samsung_pin_bank exynos7_pin_banks0[] = {
-+	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-+	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
-+};
-+
-+/* pin banks of exynos7 pin-controller - BUS0 */
-+static struct samsung_pin_bank exynos7_pin_banks1[] = {
-+	EXYNOS_PIN_BANK_EINTG(5, 0x000, "gpb0", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpc0", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x040, "gpc1", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x060, "gpc2", 0x0c),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x080, "gpc3", 0x10),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x0a0, "gpd0", 0x14),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x0c0, "gpd1", 0x18),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x0e0, "gpd2", 0x1c),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x100, "gpd4", 0x20),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x120, "gpd5", 0x24),
-+	EXYNOS_PIN_BANK_EINTG(6, 0x140, "gpd6", 0x28),
-+	EXYNOS_PIN_BANK_EINTG(3, 0x160, "gpd7", 0x2c),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x180, "gpd8", 0x30),
-+	EXYNOS_PIN_BANK_EINTG(2, 0x1a0, "gpg0", 0x34),
-+	EXYNOS_PIN_BANK_EINTG(4, 0x1c0, "gpg3", 0x38),
-+};
-+
-+/* pin banks of exynos7 pin-controller - NFC */
-+static struct samsung_pin_bank exynos7_pin_banks2[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
-+};
-+
-+/* pin banks of exynos7 pin-controller - TOUCH */
-+static struct samsung_pin_bank exynos7_pin_banks3[] = {
-+	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
-+};
-+
-+/* pin banks of exynos7 pin-controller - FF */
-+static struct samsung_pin_bank exynos7_pin_banks4[] = {
-+	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpg4", 0x00),
-+};
-+
-+/* pin banks of exynos7 pin-controller - ESE */
-+static struct samsung_pin_bank exynos7_pin_banks5[] = {
-+	EXYNOS_PIN_BANK_EINTG(5, 0x000, "gpv7", 0x00),
-+};
-+
-+/* pin banks of exynos7 pin-controller - FSYS0 */
-+static struct samsung_pin_bank exynos7_pin_banks6[] = {
-+	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpr4", 0x00),
-+};
-+
-+/* pin banks of exynos7 pin-controller - FSYS1 */
-+static struct samsung_pin_bank exynos7_pin_banks7[] = {
-+	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpr0", 0x00),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpr1", 0x04),
-+	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr2", 0x08),
-+	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr3", 0x0c),
-+};
-+
-+struct samsung_pin_ctrl exynos7_pin_ctrl[] = {
-+	{
-+		/* pin-controller instance 0 Alive data */
-+		.pin_banks	= exynos7_pin_banks0,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks0),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.eint_wkup_init = exynos_eint_wkup_init,
-+		.label		= "exynos7-gpio-ctrl0",
-+	}, {
-+		/* pin-controller instance 1 BUS0 data */
-+		.pin_banks	= exynos7_pin_banks1,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks1),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl1",
-+	}, {
-+		/* pin-controller instance 2 NFC data */
-+		.pin_banks	= exynos7_pin_banks2,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks2),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl2",
-+	}, {
-+		/* pin-controller instance 3 TOUCH data */
-+		.pin_banks	= exynos7_pin_banks3,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks3),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl3",
-+	}, {
-+		/* pin-controller instance 4 FF data */
-+		.pin_banks	= exynos7_pin_banks4,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks4),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl4",
-+	}, {
-+		/* pin-controller instance 5 ESE data */
-+		.pin_banks	= exynos7_pin_banks5,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks5),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl5",
-+	}, {
-+		/* pin-controller instance 6 FSYS0 data */
-+		.pin_banks	= exynos7_pin_banks6,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks6),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl6",
-+	}, {
-+		/* pin-controller instance 7 FSYS1 data */
-+		.pin_banks	= exynos7_pin_banks7,
-+		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks7),
-+		.eint_gpio_init = exynos_eint_gpio_init,
-+		.label		= "exynos7-gpio-ctrl7",
-+	},
-+};
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 4a47691..46efdbf 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -1233,6 +1233,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
- 		.data = (void *)exynos5420_pin_ctrl },
- 	{ .compatible = "samsung,s5pv210-pinctrl",
- 		.data = (void *)s5pv210_pin_ctrl },
-+	{ .compatible = "samsung,exynos7-pinctrl",
-+		.data = (void *)exynos7_pin_ctrl },
- #endif
- #ifdef CONFIG_PINCTRL_S3C64XX
- 	{ .compatible = "samsung,s3c64xx-pinctrl",
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index d2c38c8..c0a48ac1 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -244,6 +244,7 @@ extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
- extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
- extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
- extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
-+extern struct samsung_pin_ctrl exynos7_pin_ctrl[];
- extern struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
- extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
- extern struct samsung_pin_ctrl s3c2416_pin_ctrl[];
+ 
+-static int exynos_gpio_irq_map(struct irq_domain *h, unsigned int virq,
++static int exynos_eint_irq_map(struct irq_domain *h, unsigned int virq,
+ 					irq_hw_number_t hw)
+ {
+ 	struct samsung_pin_bank *b = h->host_data;
+@@ -267,10 +267,10 @@ static int exynos_gpio_irq_map(struct irq_domain *h, unsigned int virq,
+ }
+ 
+ /*
+- * irq domain callbacks for external gpio interrupt controller.
++ * irq domain callbacks for external gpio and wakeup interrupt controllers.
+  */
+-static const struct irq_domain_ops exynos_gpio_irqd_ops = {
+-	.map	= exynos_gpio_irq_map,
++static const struct irq_domain_ops exynos_eint_irqd_ops = {
++	.map	= exynos_eint_irq_map,
+ 	.xlate	= irq_domain_xlate_twocell,
+ };
+ 
+@@ -330,7 +330,7 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
+ 		if (bank->eint_type != EINT_TYPE_GPIO)
+ 			continue;
+ 		bank->irq_domain = irq_domain_add_linear(bank->of_node,
+-				bank->nr_pins, &exynos_gpio_irqd_ops, bank);
++				bank->nr_pins, &exynos_eint_irqd_ops, bank);
+ 		if (!bank->irq_domain) {
+ 			dev_err(dev, "gpio irq domain add failed\n");
+ 			ret = -ENXIO;
+@@ -457,26 +457,6 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
+-static int exynos_wkup_irq_map(struct irq_domain *h, unsigned int virq,
+-					irq_hw_number_t hw)
+-{
+-	struct samsung_pin_bank *b = h->host_data;
+-
+-	irq_set_chip_and_handler(virq, &b->irq_chip->chip,
+-					handle_level_irq);
+-	irq_set_chip_data(virq, h->host_data);
+-	set_irq_flags(virq, IRQF_VALID);
+-	return 0;
+-}
+-
+-/*
+- * irq domain callbacks for external wakeup interrupt controller.
+- */
+-static const struct irq_domain_ops exynos_wkup_irqd_ops = {
+-	.map	= exynos_wkup_irq_map,
+-	.xlate	= irq_domain_xlate_twocell,
+-};
+-
+ /*
+  * exynos_eint_wkup_init() - setup handling of external wakeup interrupts.
+  * @d: driver data of samsung pinctrl driver.
+@@ -508,7 +488,7 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 			continue;
+ 
+ 		bank->irq_domain = irq_domain_add_linear(bank->of_node,
+-				bank->nr_pins, &exynos_wkup_irqd_ops, bank);
++				bank->nr_pins, &exynos_eint_irqd_ops, bank);
+ 		if (!bank->irq_domain) {
+ 			dev_err(dev, "wkup irq domain add failed\n");
+ 			return -ENXIO;
 -- 
 1.7.9.5
