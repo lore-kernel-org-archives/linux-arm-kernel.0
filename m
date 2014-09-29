@@ -1,31 +1,43 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 29 Sep 2014 11:02:49 -0700
-Subject: [PATCH v11 2/6] KVM: Add generic implementation of
- kvm_vm_ioctl_get_dirty_log
-In-Reply-To: <20140929191856.63ace99d.cornelia.huck@de.ibm.com>
-References: <1411433690-8104-1-git-send-email-m.smarduch@samsung.com>
- <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
- <20140929191856.63ace99d.cornelia.huck@de.ibm.com>
-Message-ID: <54299EC9.5070508@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 29 Sep 2014 20:06:37 +0200
+Subject: [PATCH 01/13] tty: serial: 8250: Fix wording in runtime-PM comments
+In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1412014009-13315-2-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2014 10:18 AM, Cornelia Huck wrote:
-> On Mon, 22 Sep 2014 17:54:46 -0700
-> Mario Smarduch <m.smarduch@samsung.com> wrote:
-> 
->> Add support for generic implementation of dirty log read function. For now
->> x86_64 and ARMv7 share generic dirty log read. Other architectures call
->> their architecture specific functions.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> 
-> This (and the previous patch), once fitted on current kvm/next (trivial
-> rejects), seems to work fine on s390 and looks sane to me.
-> 
-> So, for the s390 parts:
-> 
-> Acked-by: Cornelia Huck <cornelia.huck@de.ibm.com>
-> 
-Thanks,
-  Mario
+Frans reworded the two comments with better English for better
+understanding. His review hit the mailing list after the patch got
+applied so here is an incremental update.
+
+Reported-by: Frans Klaver <frans.klaver@xsens.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/tty/serial/8250/8250_core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 139f3d2b8aa9..a1904628a2a1 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -557,7 +557,7 @@ static void serial8250_rpm_put(struct uart_8250_port *p)
+ }
+ 
+ /*
+- * This two wrapper ensure, that enable_runtime_pm_tx() can be called more than
++ * These two wrappers ensure that enable_runtime_pm_tx() can be called more than
+  * once and disable_runtime_pm_tx() will still disable RPM because the fifo is
+  * empty and the HW can idle again.
+  */
+@@ -1532,7 +1532,7 @@ void serial8250_tx_chars(struct uart_8250_port *up)
+ 	DEBUG_INTR("THRE...");
+ 
+ 	/*
+-	 * With RPM enabled, we have to wait once the FIFO is empty before the
++	 * With RPM enabled, we have to wait until the FIFO is empty before the
+ 	 * HW can go idle. So we get here once again with empty FIFO and disable
+ 	 * the interrupt and RPM in __stop_tx()
+ 	 */
+-- 
+2.1.0
