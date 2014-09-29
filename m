@@ -1,59 +1,27 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 30 Sep 2014 00:49:25 +0200
-Subject: [PATCH v3 0/6] Add initial support for pinctrl on Exynos7
-In-Reply-To: <1411967712-8321-1-git-send-email-a.kesavan@samsung.com>
-References: <1411967712-8321-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <5429E1F5.6070206@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Sep 2014 17:49:34 -0500
+Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
+In-Reply-To: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+References: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20140929224934.GB21681@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.09.2014 07:15, Abhilash Kesavan wrote:
-> Changes since v1:
-> 	- Marked the newly created irq_chip instances as __initdata
-> 	- Used kmemdup to keep a copy of the irq_chip
-> 	- Change the pinctrl name from sd0_rdqs to sd0_ds as per UM
-> 	- Moved the pinctrl enablement for exynos7 into a separate patch
-> 	- Added tested-by and reviewed-by tags from Thomas Abraham
+On Mon, Sep 29, 2014 at 05:00:51PM -0500, Andy Gross wrote:
+> The runtime pm calls need to be done before populating the children via the
+> i2c_add_adapter call.  If this is not done, a child can run into issues trying
+> to do i2c read/writes due to the pm_runtime_sync failing.
 > 
-> Following patches have been tested on linux-next (20140926).
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/
->  
-> Following patches are required for this series:
-> 1) "tty/serial: fix config dependencies for samsung serial"
->    https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36208.html
-> 2) "dts, kbuild: Implement support for dtb vendor subdirs" patchset 
->    http://comments.gmane.org/gmane.linux.kbuild.devel/12131
-> 3) "arch: arm64: enable support for Samsung Exynos7 SoC" patchset (v5)
->    http://www.spinics.net/lists/arm-kernel/msg364014.html
-> 
-> Abhilash Kesavan (3):
->   pinctrl: exynos: Generalize the eint16_31 demux code
->   pinctrl: exynos: Consolidate irq domain callbacks
->   pinctrl: exynos: Add irq_chip instance for Exynos7 wakeup interrupts
-> 
-> Naveen Krishna Ch (3):
->   pinctrl: exynos: Add initial driver data for Exynos7
->   arm64: dts: Add initial pinctrl support to EXYNOS7
->   arm64: exynos: Enable pinctrl support for Exynos7
-> 
->  .../bindings/pinctrl/samsung-pinctrl.txt           |    3 +
->  arch/arm64/Kconfig                                 |    2 +
->  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    |  560 ++++++++++++++++++++
->  arch/arm64/boot/dts/exynos/exynos7.dtsi            |   66 +++
->  drivers/pinctrl/samsung/pinctrl-exynos.c           |  196 +++++--
->  drivers/pinctrl/samsung/pinctrl-exynos.h           |    3 +
->  drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
->  drivers/pinctrl/samsung/pinctrl-samsung.h          |    3 +
->  8 files changed, 799 insertions(+), 36 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
-> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 
-For patches 1-2, 4-6:
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-
-Linus, I have replied for patch 3 with 2 minor issues with coding style.
-If you don't mind them, feel free to take the whole series with my Ack.
-
-Best regards,
-Tomasz
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/bbd394d1/attachment.sig>
