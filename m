@@ -1,52 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Sep 2014 10:03:13 +0100
-Subject: [PATCH] ARM: fix set_tls for !CONFIG_KUSER_HELPERS
-In-Reply-To: <CAGhQ9VzRRAj76VU19DoBZNP4HAKrEoTNmXEswkUtL00gjSyqCQ@mail.gmail.com>
-References: <1411775208-14280-1-git-send-email-nathan_lynch@mentor.com>
- <CAGhQ9VzRRAj76VU19DoBZNP4HAKrEoTNmXEswkUtL00gjSyqCQ@mail.gmail.com>
-Message-ID: <20140929090313.GA20303@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Sep 2014 11:10:53 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929085421.GH12506@ulmo>
+References: <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com> <20140829070116.GC13106@ulmo>
+ <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
+ <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <CAMuHMdV8job81-sf88Dx6w=0GZsWD02h94picAtYw2BtSz=Kgw@mail.gmail.com>
+ <20140929085421.GH12506@ulmo>
+Message-ID: <CAMuHMdU0_GjbOjVE9Vnp703TnsdmkN-nxCxrigCWO7RPMzPRyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 11:30:26AM +0100, Joachim Eastwood wrote:
-> On 27 September 2014 01:46, Nathan Lynch <nathan_lynch@mentor.com> wrote:
-> > Joachim Eastwood reports that commit fbfb872f5f41 "ARM: 8148/1: flush
-> > TLS and thumbee register state during exec" causes a boot-time crash
-> > on a Cortex-M4 nommu system:
-> >
-> > Freeing unused kernel memory: 68K (281e5000 - 281f6000)
-> > Unhandled exception: IPSR = 00000005 LR = fffffff1
-> > CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
-> > task: 29834000 ti: 29832000 task.ti: 29832000
-> > PC is at flush_thread+0x2e/0x40
-> > LR is at flush_thread+0x21/0x40
-> > pc : [<2800954a>] lr : [<2800953d>] psr: 4100000b
-> > sp : 29833d60 ip : 00000000 fp : 00000001
-> > r10: 00003cf8 r9 : 29b1f000 r8 : 00000000
-> > r7 : 29b0bc00 r6 : 29834000 r5 : 29832000 r4 : 29832000
-> > r3 : ffff0ff0 r2 : 29832000 r1 : 00000000 r0 : 282121f0
-> > xPSR: 4100000b
-> > CPU: 0 PID: 1 Comm: swapper Not tainted 3.17.0-rc6-00313-gd2205fa30aa7 #191
-> > [<2800afa5>] (unwind_backtrace) from [<2800a327>] (show_stack+0xb/0xc)
-> > [<2800a327>] (show_stack) from [<2800a963>] (__invalid_entry+0x4b/0x4c)
-> >
-> > The problem is that set_tls is attempting to clear the TLS location in
-> > the kernel-user helper page, which isn't set up on V7M.
-> >
-> > Fix this by guarding the write to the kuser helper page with
-> > a CONFIG_KUSER_HELPERS ifdef.
-> >
-> > Reported-by: Joachim Eastwood <manabian@gmail.com>
-> > Fixes: fbfb872f5f41 ARM: 8148/1: flush TLS and thumbee register state during exec
-> > Cc: stable at vger.kernel.org
-> > Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> > ---
-> 
-> Works for me.
-> 
-> Tested-by: Joachim Eastwood <manabian@gmail.com>
+Hi Thierry,
 
-Out of interest, which M4 board are you using to run Linux? Are they
-generally available?
+On Mon, Sep 29, 2014 at 10:54 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Mon, Sep 29, 2014 at 10:27:41AM +0200, Geert Uytterhoeven wrote:
+>> (CC linux-pm, as PM is the real reason behind disabling unused clocks)
+>> (CC gregkh and lkml, for driver core)
+>>
+>> On Mon, Sep 29, 2014 at 10:06 AM, Thierry Reding
+>> <thierry.reding@gmail.com> wrote:
+>> > If we start extending the binding with board-level details we end up
+>> > duplicating the device tree node for the proper video device. Also note
+>> > that it won't stop at clocks. Other setups will require regulators to be
+>> > listed in this device tree node as well so that they don't get disabled
+>> > at late_initcall. And the regulator bindings don't provide a method to
+>> > list an arbitrary number of clocks in a single property in the way that
+>> > the clocks property works.
+>>
+>> Then (optional) regulator support needs to be added.
+>
+> Can you elaborate?
 
-Will
+I'm not so familiar with regulators, but I guess it's similar to clocks?
+
+>> > There may be also resets involved. Fortunately the reset framework is
+>> > minimalistic enough not to care about asserting all unused resets at
+>> > late_initcall. And other things like power domains may also need to be
+>> > kept on.
+>>
+>> Fortunately, unlike clocks, PM domains are first class citizens in the
+>> device framework, as they're handled by the driver core.
+>> So just adding a power-domains property to DTS will work, without any
+>> driver change.
+>
+> Well, the device driver would also need to call into the PM runtime
+> framework to enable all the first class citizen magic. But even if it
+> were to do that, you'd still need to add all the domains to the DTB.
+
+Powering up domains can be done solely by the device-specific PM
+domain code, without PM runtime. If simplefb is tied to the PM domain
+and doesn't do any PM runtime, the domain will stay powered on
+(only unused PM domains are powered down via late_initcall).
+
+> Note that I'm saying DT*B* here, because the firmware needs to fill in
+> those properties after the DTS has been compiled. And since most of
+> these resources are linked via phandle you actually need to resolve
+> these first before you can fill in the new properties of this
+> dynamically created node.
+>
+> So firmware needs to know exactly what device tree node to look for,
+> find a corresponding phandle and then put the phandle value in the
+> simplefb device tree node. And it needs to know intimate details about
+> the clock provider binding because it needs to add an appropriate
+> specifier, too.
+
+Indeed. Complicated.
+
+> And then all of a sudden something that was supposed to be simple and
+> generic needs to know the specifics of some hardware device.
+
+And suddenly we wish we could write a real driver and put the stuff in
+the DTS, not DTB...
+
+>> > The only reasonable thing for simplefb to do is not deal with any kind
+>> > of resource at all (except perhaps area that contains the framebuffer
+>> > memory).
+>> >
+>> > So how about instead of requiring resources to be explicitly claimed we
+>> > introduce something like the below patch? The intention being to give
+>> > "firmware device" drivers a way of signalling to the clock framework
+>> > that they need rely on clocks set up by firmware and when they no longer
+>> > need them. This implements essentially what Mark (CC'ing again on this
+>> > subthread) suggested earlier in this thread. Basically, it will allow
+>> > drivers to determine the time when unused clocks are really unused. It
+>> > will of course only work when used correctly by drivers. For the case of
+>> > simplefb I'd expect its .probe() implementation to call the new
+>> > clk_ignore_unused() function and once it has handed over control of the
+>> > display hardware to the real driver it can call clk_unignore_unused() to
+>> > signal that all unused clocks that it cares about have now been claimed.
+>> > This is "reference counted" and can therefore be used by more than a
+>> > single driver if necessary. Similar functionality could be added for
+>> > other resource subsystems as needed.
+>>
+>> This still won't work for modules, right? Or am I missing something?
+>> With modules you will never know in advance what will be used and what
+>> won't be used, so you need to keep all clocks, regulators, PM domains, ...
+>> up and running?
+>
+> No. The way this works is that your firmware shim driver, simplefb in
+> this case, will call clk_ignore_unused() to tell the clock framework
+> that it uses clocks set up by the firmware, and therefore requests that
+> no clocks should be considered unused (for now). Later on when the
+> proper driver has successfully taken over from the shim driver, the shim
+> driver can unregister itself and call clk_unignore_unused(), which will
+> drop its "reference" on the unused clocks. When all references have been
+> dropped the clock framework will then disable all remaining unused
+> clocks.
+
+So the shim must be built-in, not modular.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
