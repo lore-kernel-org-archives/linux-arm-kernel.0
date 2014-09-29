@@ -1,49 +1,116 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 29 Sep 2014 17:08:49 -0600
-Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
- pci_scan_root_bus()
-In-Reply-To: <1412029912.4285.110.camel@pasglop>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
- <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
- <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
- <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
- <1412024521.4285.98.camel@pasglop>
- <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
- <1412029912.4285.110.camel@pasglop>
-Message-ID: <CAErSpo70t9TMdntjBt+GdTw3FVmMquACQePX8=SKkySPuG3F3Q@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 29 Sep 2014 16:18:46 -0700
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5429E8D6.6080101@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 4:31 PM, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> On Mon, 2014-09-29 at 15:33 -0600, Bjorn Helgaas wrote:
->> > Right and on powerpc and others as well. We need to survey existing
->> > resources. We also have a number of platform things that might need
->> > to happen before we do the final re-assignment pass.
->>
->> That's true today.  But I don't know whether it *has* to be this way
->> forever.  On x86, pcibios_resource_survey() throws in E820 information
->> (which we know long before we do any PCI enumeration) and some IO-APIC
->> resources (it looks like we also know these before PCI enumeration).
->> Powerpc has pcibios_reserve_legacy_regions(), but that looks like
->> mostly stuff that could be done when we find the host bridge, before
->> we enumerate PCI devices below it.
->
-> Oh we can probably change that but it's going to be much more work than
-> just moving the assignment into pci_scan_root_bus().
+On 09/26/14 17:58, Lina Iyer wrote:
+> diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
+> new file mode 100644
+> index 0000000..2fcf79a
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-qcom.c
+> @@ -0,0 +1,89 @@
+> +/*
+> + * Copyright (c) 2014, Linaro Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/cpu_pm.h>
+> +#include <linux/cpuidle.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <soc/qcom/pm.h>
+> +#include "dt_idle_states.h"
+> +
+> +static void (*qcom_idle_enter)(enum pm_sleep_mode);
+> +
+> +static int qcom_lpm_enter_wfi(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv, int index)
+> +{
+> +	qcom_idle_enter(PM_SLEEP_MODE_WFI);
 
-Agreed.  It's obvious that we can't apply Liviu's patch as-is.
+Why can't we just pass index here? It would be nice to not need to
+include soc/qcom/pm.h in this file.
 
-> There are also a
-> number of subtle and not-so-subtle bits of code that rely on side
-> effects of the current code such as anything that tests for bus->added
-> or dev->added. Again, nothing we can't sort out eventually but the
-> transition might be a bit painful.
->
-> We might need to introduce a new flag for platforms converted to the
-> "new style" generalized resource assignment which we can deprecate once
-> everybody has moved over.
+> +
+> +	return index;
+> +}
+> +
+> +static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
+> +				struct cpuidle_driver *drv, int index)
+> +{
+> +	cpu_pm_enter();
+> +	qcom_idle_enter(PM_SLEEP_MODE_SPC);
+> +	cpu_pm_exit();
+> +
+> +	return index;
+> +}
+> +
+> +static struct cpuidle_driver qcom_cpuidle_driver = {
+> +	.name	= "qcom_cpuidle",
+> +	.owner	= THIS_MODULE,
+> +};
+> +
+> +static const struct of_device_id qcom_idle_state_match[] __initconst = {
+> +	{ .compatible = "qcom,idle-state-wfi", .data = qcom_lpm_enter_wfi },
+> +	{ .compatible = "qcom,idle-state-spc", .data = qcom_lpm_enter_spc },
+> +	{ },
+> +};
+> +
+> +static int qcom_cpuidle_probe(struct platform_device *pdev)
+> +{
+> +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+> +	int ret;
+> +
+> +	qcom_idle_enter = (void *)(pdev->dev.platform_data);
+> +	if (!qcom_idle_enter)
+> +		return -EFAULT;
 
-There's definitely a lot of work here if we ever want to make this happen.
+Error code looks a little wrong. -ENODEV?
 
-Bjorn
+> +
+> +	 /* Probe for other states including platform WFI */
+> +	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
+> +	if (ret <= 0) {
+> +		pr_err("%s: No cpuidle state found.\n", __func__);
+
+This would be true if ret == 0, but if it's < 0 that isn't true. Drop
+the print?
+
+> +		return ret;
+> +	}
+> +
+> +	ret = cpuidle_register(drv, NULL);
+> +	if (ret) {
+> +		pr_err("%s: failed to register cpuidle driver\n", __func__);
+
+This seems redundant given that cpuidle_register() already prints an
+error when it fails.
+
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+
+Could just be return cpuidle_register(drv, NULL);
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
