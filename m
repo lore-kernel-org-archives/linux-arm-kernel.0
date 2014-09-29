@@ -1,123 +1,189 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 29 Sep 2014 14:47:13 +0200
-Subject: [PATCH 0/9] ARM: vf610: Suspend/resume support
-In-Reply-To: <20140928030857.GA12999@dragon>
-References: <cover.1411404079.git.stefan@agner.ch>
- <87zjdqmjr3.fsf@nbsps.com> <4ee0621b0bf5f4d4e10eae7673bdf1cd@agner.ch>
- <87y4t9kmgz.fsf@nbsps.com> <20140928030857.GA12999@dragon>
-Message-ID: <64d37b2cfb24737db93afbb6cf47978a@agner.ch>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 29 Sep 2014 14:46:15 +0200
+Subject: ARMADA 370 - Kernel panic during boot
+In-Reply-To: <d1be3a0a37860f969b99ecc09b4cfcd8@twien.net>
+References: <6241a6200de0d573c982f73f062ed7fa@twien.net>
+ <542938A7.8050307@free-electrons.com>
+ <d1be3a0a37860f969b99ecc09b4cfcd8@twien.net>
+Message-ID: <54295497.1080807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bill, Hi Shawn,
+Hi,
 
-Am 2014-09-28 05:08, schrieb Shawn Guo:
-> On Wed, Sep 24, 2014 at 12:33:00PM -0400, Bill Pringlemeir wrote:
->> >> I think that Shawn Guo already did a patchset to remove stuff from
->> >> the vf610.dtsi to the machine/configuration DT files.
+On 29/09/2014 13:25, post at twien.net wrote:
+> Hi,
+> Thanks for your reply.
+> Here are my .config and .dts files.
+
+I built a kernel with  your .config and then also your dts on an other
+Armada 370 based board and I didn't get any issue during the initialization
+of the MPIC.
+
+I think that your issue could come either from your bootloader or from
+your hardware itself.
+
+Gregory
+
+> BR,
+> Tormod
+
+>> On 29/09/2014 12:09, post at twien.net wrote:
+>>> I'm trying to run the linux 3.16.3 kernel on a custom board based on 
+>>> the
+>>> ARMADA 370 (88F6W11).
+>>> The bootloader (U-boot) is the latest from Marvell. A custom .dts file
+>>> is created for the board.
+
+[...]
+
+
+>>> The Kernel panics during initialization. See screen dump.
+>>> The error occurs when trying to read the interrupt control register 
+>>> (on
+>>> this line:)
+>>>
+>>> control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+>>> => Unhandled fault: external abort on non-linefetch (0x1008) at
+>>> 0xf0000a00
+>>
+>> It is not the first access on this register so it's surprising that it
+>> crashes here.
+>>
+>>>
+>>> Any hint in which direction to look is welcome. The MMU?
+>>
+>> I put the other mvebu maintainer in copy and also the main developer on
+>> this SoC to see if it something familiar to them.
+>>
+>> Gregory
+>>>
+>>> Thanks, Tormod
+>>>
+>>>
+>>> Booting Linux on physical CPU 0x0
+>>> [    0.000000] Linux version 3.16.3 (tormod at TW-Dell) (gcc version 
+>>> 4.6.4
+>>> (Linaro GCC branch-4.6.4. Marvell GCC Dev 201310-2126.3d181f66 64K
+>>> MAXPAGESIZE ALIGN) ) #13 SMP Wed Sep 24 14:45:08 CEST 2014
+>>> [    0.000000] CPU: ARMv7 Processor [561f5811] revision 1 (ARMv7),
+>>> cr=10c5387d
+>>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT 
+>>> instruction
+>>> cache
+>>> [    0.000000] Machine model: Marvell Armada 370 Ethernet Prototype
+>>> [    0.000000] bootconsole [earlycon0] enabled
+>>> [    0.000000] Truncating RAM at 0x00000000-0x40000000 to -0x2f800000
+>>> [    0.000000] Memory policy: Data cache writeback
+>>> [    0.000000] CPU: All CPU(s) started in SVC mode.
+>>> [    0.000000] PERCPU: Embedded 7 pages/cpu @ef137000 s5952 r8192 
+>>> d14528
+>>> u32768
+>>> [    0.000000] Kernel command line: console=ttyS0,115200 root=/dev/nfs
+>>> rw nfsroot=193.71.72.30:/srv/nfs4/fs ip=dhcp earlyprintk
+>>> [    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
+>>> [    0.000000] Dentry cache hash table entries: 131072 (order: 7, 
+>>> 524288
+>>> bytes)
+>>> [    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144
+>>> bytes)
+>>> [    0.000000] Virtual kernel memory layout:
+>>> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+>>> [    0.000000]     fixmap  : 0xffc00000 - 0xffe00000   (2048 kB)
+>>> [    0.000000]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
+>>> [    0.000000]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
+>>> [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+>>> [    0.000000]       .text : 0xc0008000 - 0xc04ba004   (4809 kB)
+>>> [    0.000000]       .init : 0xc04bb000 - 0xc04e9740   ( 186 kB)
+>>> [    0.000000]       .data : 0xc04ea000 - 0xc050f880   ( 151 kB)
+>>> [    0.000000]        .bss : 0xc050f888 - 0xc0544afc   ( 213 kB)
+>>> [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1,
+>>> Nodes=1
+>>> [    0.000000] Hierarchical RCU implementation.
+>>> [    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=1.
+>>> [    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=16,
+>>> nr_cpu_ids=1
+>>> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+>>> [    0.000000] Unhandled fault: external abort on non-linefetch 
+>>> (0x1008)
+>>> at 0xf0000a00
+>>> [    0.000000] Internal error: : 1008 [#1] SMP ARM
+>>> [    0.000000] Modules linked in:
+>>> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.3 #13
+>>> [    0.000000] task: c04f4c60 ti: c04ea000 task.ti: c04ea000
+>>> [    0.000000] PC is at armada_370_xp_mpic_of_init+0xf8/0x1dc
+>>> [    0.000000] LR is at ioremap_page_range+0xf4/0x19c
+>>> [    0.000000] pc : [<c04ccda8>]    lr : [<c01f06d4>]    psr: a00001d3
+>>> [    0.000000] sp : c04ebee0  ip : c04ebe78  fp : c04ebf44
+>>> [    0.000000] r10: 00100100  r9 : 00200200  r8 : c04e6f00
+>>> [    0.000000] r7 : 00000000  r6 : c0538cc0  r5 : 00000000  r4 :
+>>> ef144300
+>>> [    0.000000] r3 : f0000a00  r2 : 00000000  r1 : d0021e13  r0 :
+>>> f0002870
+>>> [    0.000000] Flags: NzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM
+>>> Segment kernel
+>>> [    0.000000] Control: 10c5387d  Table: 00004019  DAC: 00000015
+>>> [    0.000000] Process swapper/0 (pid: 0, stack limit = 0xc04ea248)
+>>> [    0.000000] Stack: (0xc04ebee0 to 0xc04ec000)
+>>> [    0.000000] bee0: 00000000 ef144300 d0020a00 d0020bcf ef144358
+>>> 00000200 00000000 00000000
+>>> [    0.000000] bf00: 00000000 d0021870 d00218c7 ef144358 00000200
+>>> 00000000 00000000 00000000
+>>> [    0.000000] bf20: c02b3260 eec023c0 c04ebf48 c04ebf48 00000000
+>>> c04e6f00 c04ebf84 c04ebf48
+>>> [    0.000000] bf40: c04d1dc8 c04cccbc c04ebf48 c04ebf48 c04ebf50
+>>> c04ebf50 ef7fcd00 c04e375c
+>>> [    0.000000] bf60: c050f8c0 c04e376c ef7fcd00 00004059 561f5811
+>>> 00000000 c04ebf94 c04ebf88
+>>> [    0.000000] bf80: c04ccca4 c04d1c6c c04ebfa4 c04ebf98 c04c1528
+>>> c04ccc9c c04ebfbc c04ebfa8
+>>> [    0.000000] bfa0: c04bc68c c04c1524 c04f27dc ffffffff c04ebff4
+>>> c04ebfc0 c04bbabc c04bc66c
+>>> [    0.000000] bfc0: ffffffff ffffffff c04bb668 00000000 00000000
+>>> c04e376c c050fb54 c04f23fc
+>>> [    0.000000] bfe0: c04e3768 c04f5c10 00000000 c04ebff8 00008074
+>>> c04bb8d4 00000000 00000000
+>>> [    0.000000] Backtrace:
+>>> [    0.000000] [<c04cccb0>] (armada_370_xp_mpic_of_init) from
+>>> [<c04d1dc8>] (of_irq_init+0x168/0x2a4)
+>>> [    0.000000]  r8:c04e6f00 r7:00000000 r6:c04ebf48 r5:c04ebf48
+>>> r4:eec023c0
+>>> [    0.000000] [<c04d1c60>] (of_irq_init) from [<c04ccca4>]
+>>> (irqchip_init+0x14/0x20)
+>>> [    0.000000]  r10:00000000 r9:561f5811 r8:00004059 r7:ef7fcd00
+>>> r6:c04e376c r5:c050f8c0
+>>> [    0.000000]  r4:c04e375c
+>>> [    0.000000] [<c04ccc90>] (irqchip_init) from [<c04c1528>]
+>>> (mvebu_init_irq+0x10/0x5c)
+>>> [    0.000000] [<c04c1518>] (mvebu_init_irq) from [<c04bc68c>]
+>>> (init_IRQ+0x2c/0x84)
+>>> [    0.000000] [<c04bc660>] (init_IRQ) from [<c04bbabc>]
+>>> (start_kernel+0x1f4/0x318)
+>>> [    0.000000]  r4:ffffffff r3:c04f27dc
+>>> [    0.000000] [<c04bb8c8>] (start_kernel) from [<00008074>] (0x8074)
+>>> [    0.000000]  r7:c04f5c10 r6:c04e3768 r5:c04f23fc r4:c050fb54
+>>> [    0.000000] Code: e3500000 1a000000 e7f001f2 e5963000 (e5937000)
+>>> [    0.000000] ---[ end trace 3406ff24bd97382e ]---
+>>> [    0.000000] Kernel panic - not syncing: Attempted to kill the idle
+>>> task!
+>>> [    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill
+>>> the idle task!
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
 > 
-> Do you mean the pin configuration?  That's really more board-specific.
-> But IP block/device is not really the case.
-> 
->>
->> In this patchset, I suggested that we could include the notation in the
->> headers which are included in the 'DT' files.  So instead of 'dtsi', we
->> could use,
->>
->>    #define VF610_GPC_SUPPORT \
->>            gpc: gpc at 4006c000 {                \
->>                    compatible = "fsl,vf610-gpc"; \
->>                    reg = <0x4006c000 0x1000>;    \
->>            };
->>
->> Or even,
->>
->>    #define VF610_SUSPEND_DT_SUPPORT \ ...
-> 
-> I don't think this will be accepted by DT maintainers.  We have already
-> got some objections when we define pin function ID as multiple integers.
-> They expect the DT macro is used for single integer case.
-> 
->>
->> Anyways, the DT issue doesn't matter so much.  People will have to make
->> custom versions for their own boards.  Although, I don't think it is not
->> that hard to support it at the machine level.
->>
->> I agree that so far there are some peripherals that make it difficult to
->> run the mainline Linux with an MQX.  However, I think this patch set
->> seems to bring it closer to making it impossible.  I am only suggesting
->> that we make it a configuration option and not include it for all Vybrid
->> devices.
->>
->> Is it clear that the desired way is to use,
->>
->>    &gpc { status = "disabled"; };
->>    &src { status = "disabled"; };
->>
->> We have,
->>
->> arch/arm/mach-imx/gpc.c
->>
->>       void __init vf610_gpc_init(void)
->>       {
->>               struct device_node *np;
->>
->>               np = of_find_compatible_node(NULL, NULL, "fsl,vf610-gpc");
->>               gpc_base = of_iomap(np, 0);
->>               gpc_imr_base = gpc_base + VF610_GPC_IMR1;
->>    ...
->>
->> arch/arm/mach-imx/mach-vf610.c
->>
->>    static void __init vf610_init_irq(void)
->>    {
->>            vf610_gpc_init();
->>            irqchip_init();
->>    }
->>
->>    ...
->>
->>    +	.init_irq	= vf610_init_irq,
->>
->> I don't think this will work.
-> 
-> Yes, you're right.  But I guess this can be fixed by an additional
-> of_device_is_available() check after of_find_compatible_node() call.
-> 
->> Not to mention that 'mach-vf610.c' will
->> not build if HAVE_IMX_GPC is not defined.
-> 
-> HAVE_IMX_GPC cannot be configured out, because it's selected by 
-> SOC_VF610.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
 
-Maybe we can make that optional when CONFIG_PM is on, e.g.
-select HAVE_IMX_GPC if PM
 
-The GPC module is all about power management, hence in case we want the
-M4 taken care of that, we just have to configure a Linux kernel without
-CONFIG_PM support.
-
->> Also, I don't really see a
->> use of the GPC module unless suspend/resume is active?   Even some wall
->> powered designs may wish to exclude this functionality?
->>
->> I think that the SRC maybe needed for secure parts.  I think that some
->> designs might wish to restrict Linux's access to these registers as
->> well.  I don't actually see why we need this module?  I think the imx6
->> needs it due to multi-CPU bring-up, but in the Vybrid case, this does
->> not exist.  Can you check to see why we need the SRC?  I don't see where
->> we actually use it?  In patch9/9, we record it but do we actually access
->> the registers?  Is it just for the vf610_src_init() code?  Even that
->> seems the whole 'src.c' file is only needed for the 'src_base'
->> reference, which we don't use?
-> 
-> +1.  I'm also wondering how SRC is used by suspend routine in this
-> series.
-
-Well I tried to bring LPStop modes to work, which would need GPR0/GPR1
-registers of SRC. If I have it working in the next series, I will need
-that, but if not, I will drop those changes.
-
---
-Stefan
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
