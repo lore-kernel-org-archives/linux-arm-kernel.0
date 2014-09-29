@@ -1,66 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 11:46:22 +0200
-Subject: [PATCH v6] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <1411980458-32329-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1411980458-32329-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <8048434.zrhWRM6Kke@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Mon, 29 Sep 2014 11:47:53 +0200
+Subject: [PATCH 1/2] mtd: m25p80: get rid of spi_get_device_id
+Message-ID: <1411984074-3850-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 September 2014 14:17:38 Pankaj Dubey wrote:
-> Currently a syscon entity can be only registered directly through a
-> platform device that binds to a dedicated syscon driver. However in
-> certain use cases it is desirable to make a device used with another
-> driver a syscon interface provider.
-> 
-> For example, certain SoCs (e.g. Exynos) contain system controller
-> blocks which perform various functions such as power domain control,
-> CPU power management, low power mode control, but in addition contain
-> certain IP integration glue, such as various signal masks,
-> coprocessor power control, etc. In such case, there is a need to have
-> a dedicated driver for such system controller but also share registers
-> with other drivers. The latter is where the syscon interface is helpful.
-> 
-> In case of DT based platforms, this patch decouples syscon object from
-> syscon platform driver, and allows to create syscon objects first time
-> when it is required by calling of syscon_regmap_lookup_by APIs and keep
-> a list of such syscon objects along with syscon provider device_nodes
-> and regmap handles.
-> 
-> For non-DT based platforms, this patch keeps syscon platform driver
-> structure where is can be probed and such non-DT based drivers can use
-> syscon_regmap_lookup_by_pdev API and get access to regmap handles.
-> Once all users of "syscon_regmap_lookup_by_pdev" migrated to DT based,
-> we can completely remove platform driver of syscon, and keep only helper
-> functions to get regmap handles.
-> 
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
-> Patch v5 and related discussions can be found here [1].
-> 
-> Change since v5:
->  - Dropping creation of dummy platform device in of_syscon_register.
->  - As we are changing syscon to decouple from platform_device, creation of 
->    dummy platform_device does not look good option, and as suggested by Arnd,
->    I made another attempt so that regmap_mmio_init API should work with NULL
->    dev pointer itself. Since regmap needs to know about Syscon device node
->    properties so let's parse device node of syscon in syscon itself for any
->    such properties and using regmap_config parameter pass all such information
->    to regmap. Other concern of crashes due to NULL dev pointer in regmap already
->    addressed in separate patches of regmap. Please see [2] and [3].
->   
-> 
-> 
+This simplifies the way we use spi_nor framework and will allow us to
+drop spi_nor_match_id.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ drivers/mtd/devices/m25p80.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Looks good to me, thanks a lot!
-
-
-
-	Arnd
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index dcda628..822209d 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -197,6 +197,7 @@ static int m25p_probe(struct spi_device *spi)
+ 	struct m25p *flash;
+ 	struct spi_nor *nor;
+ 	enum read_mode mode = SPI_NOR_NORMAL;
++	char *flash_name = NULL;
+ 	int ret;
+ 
+ 	data = dev_get_platdata(&spi->dev);
+@@ -236,12 +237,11 @@ static int m25p_probe(struct spi_device *spi)
+ 	 * If that's the case, respect "type" and ignore a "name".
+ 	 */
+ 	if (data && data->type)
+-		id = spi_nor_match_id(data->type);
+-
+-	/* If we didn't get name from platform, simply use "modalias". */
+-	if (!id)
+-		id = spi_get_device_id(spi);
++		flash_name = data->type;
++	else
++		flash_name = spi->modalias;
+ 
++	id = spi_nor_match_id(flash_name);
+ 	ret = spi_nor_scan(nor, id, mode);
+ 	if (ret)
+ 		return ret;
+-- 
+1.8.4.5
