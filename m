@@ -1,35 +1,42 @@
 From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Mon, 29 Sep 2014 15:19:28 -0400
-Subject: [PATCH v3 6/8] phy: miphy28lp: Add SSC support for PCIE
-In-Reply-To: Your message of "Fri, 26 Sep 2014 10:54:15 +0200."
- <1411721657-9924-7-git-send-email-gabriel.fernandez@linaro.org>
-References: <1411721657-9924-1-git-send-email-gabriel.fernandez@linaro.org>
- <1411721657-9924-7-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <15685.1412018368@turing-police.cc.vt.edu>
+Date: Mon, 29 Sep 2014 15:21:58 -0400
+Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
+ page aligned
+In-Reply-To: Your message of "Fri, 26 Sep 2014 10:40:54 +0800."
+ <35FD53F367049845BC99AC72306C23D103D6DB49163B@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
+ <20140919095959.GA2295@e104818-lin.cambridge.arm.com>
+ <20140925143142.GF5182@n2100.arm.linux.org.uk>
+ <20140925154403.GL10390@e104818-lin.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D103D6DB49163B@CNBJMBX05.corpusers.net>
+Message-ID: <15815.1412018518@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Sep 2014 10:54:15 +0200, Gabriel FERNANDEZ said:
-> SSC is the technique of modulating the operating frequency of a signal
-> slightly to spread its radiated emissions over a range of frequencies.
-> This reduction in the maximum emission for a given frequency helps meet
-> radiated emission requirements.
-> These settings are applicable for PCIE with Internal clock.
+On Fri, 26 Sep 2014 10:40:54 +0800, "Wang, Yalin" said:
 
-> +		writeb_relaxed(0x69, miphy_phy->base + MIPHY_PLL_SBR_3);
-> +		writeb_relaxed(0x21, miphy_phy->base + MIPHY_PLL_SBR_4);
-> +		writeb_relaxed(0x3c, miphy_phy->base + MIPHY_PLL_SBR_2);
-> +		writeb_relaxed(0x21, miphy_phy->base + MIPHY_PLL_SBR_4);
-> +		writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
-> +		writeb_relaxed(0x02, miphy_phy->base + MIPHY_PLL_SBR_1);
-> +		writeb_relaxed(0x00, miphy_phy->base + MIPHY_PLL_SBR_1);
+> I am really confused,
+> I read this web:
+> http://www.arm.linux.org.uk/developer/patches/info.php
+> it said use diff -urN to generate patch like this:
+>
+> diff -Nru linux.orig/lib/string.c linux/lib/string.c
+>
+> but I see other developers use git format-patch to generate patch and
+> submit to the patch system.
+> Git format-patch format can also be accepted by the patch system correctly ?
+> If yes, I think this web should update,
+> Use git format-patch to generate patch is more convenient than use diff -urN
 
-I'd feel a lot better about all these magic numbers (and the triple write
-to SBR_1) if the Changelog or something referenced where they came from....
+'diff -urN' has the advantage that it will work against a tree extracted
+from a release tarball, and doesn't have a requirement that you have git
+installed.  Having said that, somebody who has access to the website probably
+should update it to mention that both methods are acceptable....
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 848 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/b7d5b790/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/67b69ff5/attachment.sig>
