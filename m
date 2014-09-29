@@ -1,52 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Sep 2014 10:58:03 +0200
-Subject: [periperi] How to set default GPIO pin ?
-In-Reply-To: <2033766.6tR9OHe7ZC@avalon>
-References: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
- <2862746.g5u9pdpKDi@avalon>
- <CACRpkdb1jF-ro3XcFHFC+Lhgi+0dEHzQYVSSLV6AWnAxiwNLdw@mail.gmail.com>
- <2033766.6tR9OHe7ZC@avalon>
-Message-ID: <CACRpkdZg7_edUiAaGq_YPLyT4gCfOcZ8463rYb=hD0Xqr4gOYg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 29 Sep 2014 10:59:09 +0200
+Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic
+ {read,write}s*()
+In-Reply-To: <CAMuHMdW4emoma3nRUGna985tE17yPh5pNjMb-jxe5yc5UVr=cw@mail.gmail.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+ <1407925738-26170-7-git-send-email-thierry.reding@gmail.com>
+ <CAMuHMdW4emoma3nRUGna985tE17yPh5pNjMb-jxe5yc5UVr=cw@mail.gmail.com>
+Message-ID: <20140929085908.GI12506@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 28, 2014 at 11:25 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Linus and Morimoto-san,
->
-> On Tuesday 23 September 2014 17:06:28 Linus Walleij wrote:
->> On Wed, Sep 10, 2014 at 10:55 AM, Laurent Pinchart wrote:
->> > On Sunday 31 August 2014 22:08:52 Kuninori Morimoto wrote:
->> >> I know we can use "defalt" PFC settings on DT.
->> >> But, how to use "defalt" GPIO pin settings on DT ?
->> >>
->> >> We would like to use GPIO 7-17 as Low output,
->> >> and do nothing after boot.
->> >
->> > From a DT point of view I believe this is supposed to be done by
->> > specifying the output-low or output-high properties in the pinctrl
->> > configuration node. However, these properties are not supported by the PFC
->> > driver, and there's no easy way for the PFC driver to configure GPIOs
->> > handled by a different driver such as the gpio-rcar driver for instance.
->> >
->> > Linus, do you have any hindsight on how this should be implemented ?
->>
->> I have suggested adding GPIO hogs, so that a GPIO node can specify
->> that some GPIO's specified on the local ship be hogged high or
->> low at probe. Generic DT bindings and generic code in gpiolib.c.
->>
->> gpios-hog-high = <....>;
->> gpios-hog-low = <....>;
->
-> How about just a gpios-hog property, with a list of gpio specifiers + flags ?
-> That's bikeshedding I suppose.
->
-> Morimoto-san, would you like to implement that ? :-)
+On Mon, Sep 29, 2014 at 10:54:34AM +0200, Geert Uytterhoeven wrote:
+> On Wed, Aug 13, 2014 at 12:28 PM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > #ifndef memset_io
+> > -#define memset_io(a, b, c)     memset(__io_virt(a), (b), (c))
+> > +#define memset_io memset_io
+> > +static inline void memset_io(void __iomem *addr, int value, size_t size)
+> > +{
+> > +       memset(__io_virt(addr), value, size);
+> > +}
+> >  #endif
+> 
+> xtensa/allmodconfig:
+> 
+> include/asm-generic/io.h:820:2: error: implicit declaration of
+> function 'memset' [-Werror=implicit-function-declaration]
+> include/asm-generic/io.h:829:2: error: implicit declaration of
+> function 'memcpy' [-Werror=implicit-function-declaration]
+> arch/xtensa/include/asm/string.h:110:14: error: conflicting types for 'memset'
+> arch/xtensa/include/asm/string.h:113:14: error: conflicting types for 'memcpy'
+> 
+> http://kisskb.ellerman.id.au/kisskb/buildresult/12028900/
 
-There was a proposed implementation from Boris BREZILLON, but I was
-unhappy with parts of it, however check it and see my comments on
-the patch set:
-"[RFC PATCH] gpio: add GPIO hogging mechanism"
+I think this can be fixed by including linux/string.h for memset() and
+memcpy() in include/asm-generic/io.h.
 
-Yours,
-Linus Walleij
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/9eeff4dc/attachment-0001.sig>
