@@ -1,29 +1,48 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 29 Sep 2014 11:53:14 +0200
-Subject: [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-In-Reply-To: <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
-References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714670.3040.39.camel@decadent.org.uk>
- <20140928222150.GC3248@norris-Latitude-E6410>
- <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
-Message-ID: <CACna6ry91b3wcHsG4C-td+STPuiaH7oaAcQuKiKdhud+jctUeA@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 29 Sep 2014 11:54:40 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140929085042.GA13952@ci00147.xsens-tech.local>
+References: <54129F6C.7040508@linutronix.de>
+ <20140912094010.GE28458@ci00147.xsens-tech.local>
+ <5412C21A.8020203@linutronix.de>
+ <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140917102812.GA20438@ci00147.xsens-tech.local>
+ <20140921204100.GA10111@linutronix.de>
+ <20140922092853.GH20438@ci00147.xsens-tech.local>
+ <20140925151403.GH19396@linutronix.de>
+ <20140929085042.GA13952@ci00147.xsens-tech.local>
+Message-ID: <20140929095440.GB13142@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 September 2014 08:36, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> 1) The main urgent issue: broken auto-loading
-> Tracked in the thread: http://www.spinics.net/lists/linux-spi/msg01726.html
-> Problem: m25p80.c references spi_nor_ids (from external file)
-> Short-term solution: duplicate IDs in the m25p80.c
+* Frans Klaver | 2014-09-29 10:50:42 [+0200]:
+
+>This version fixes the console things for us. It also increases the
+>amount of data we can push over the serial port. If I push the data
+>towards our requirements, we're not there yet. I get the "too much work
+>for irq" notice still. However, I don't think you'd need to be fixing
+>that in this series (or at all). We had similar issues there with
+>omap-serial as well.
 >
-> Ben: just like Brian, I think the patch like this one (
-> [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-> ) is the way to go. However few comments:
+>As far as I'm concerned, this is
+>
+>Tested-by: Frans Klaver <frans.klaver@xsens.com>
 
-I started wondering... would this be possible to fix all m25p80 users
-instead? Make them always specify modalias as "m25p80" and then
-provide platform_data if needed?
+Thanks a lot.
+There is a patch named "ARM: edma: unconditionally ack the error
+interrupt". I have the feeling that this is not really required once we
+delay set_termios. I couldn't reproduce the bug with beagleblack with my
+usual test case.
 
-Has anyone checked in how many places we use "wrong" (or should I say
-"weird") modaliases? I guess some would need to grep kernel for all
-possible names.
+For your "too much work for irq" problem: Could you add trace_printk()
+in tx/rx dma start/complete, and irq routine? The interresting part is
+what is the irq routine doing once entered. It might be a condition that
+is ignored at first and "acked" later while serving another event. Or it
+is really doing something and this is more or less "legal".
+
+>Thanks,
+>Frans
+
+Sebastian
