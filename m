@@ -1,54 +1,50 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 29 Sep 2014 20:26:54 +0200
-Subject: [PATCH 3/6] arm/arm64: KVM: add 'writable' parameter to
- kvm_phys_addr_ioremap
-In-Reply-To: <54299EA8.8090600@samsung.com>
-References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
- <1410990981-665-4-git-send-email-ard.biesheuvel@linaro.org>
- <54235BC6.2070503@samsung.com> <20140929122332.GD3095@cbox>
- <54299EA8.8090600@samsung.com>
-Message-ID: <20140929182654.GL3095@cbox>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 29 Sep 2014 20:06:46 +0200
+Subject: [PATCH 10/13] arm: dts: am33xx: add DMA properties for UART
+In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1412014009-13315-11-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 11:02:16AM -0700, Mario Smarduch wrote:
-> On 09/29/2014 05:23 AM, Christoffer Dall wrote:
-> > On Wed, Sep 24, 2014 at 05:03:18PM -0700, Mario Smarduch wrote:
-> >> Is DEVICE type the correct default, for device
-> >> regions that are prefetchable? The guest might
-> >> want something less restrictive to optimize device
-> >> access.
-> >>
-> > We don't have a use case for this yet, and we aren't supporting generic
-> > platform device passthrough yet.
-> > 
-> > So far this patch is solving a real problem, but if we need something
-> > more flexible, then patches are welcome :)
-> > 
-> > -Christoffer
-> > 
-> 
-> I understand the fix addresses a real issue, but once it's in,
-> it may go unnoticed for quite a while.
-> 
-> I would recommend some warning or comment that guest has no
-> control over device memory attributes. In my opinion
-> setting 2nd stage attributes to cacheble (with exception of
-> GIC range) should work letting the guest driver manage
-> attributes.
-> 
-Your case is only relevant for device-passthrough which we don't even
-support yet, and we would have to somehow mandate that we only allow the
-guest cacheable device memory regions for devices where it's safe to do
-so.
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-As long as we don't have anything measurable or any infrastructure
-supporting the case you are referring to, it's really not on my radar
-just yet.
-
-Plus, we are fixing current functionality and in no way precluding later
-patches from optimizing something in the future, so as I said, patches
-are welcome.
-
-Thanks,
--Christoffer
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 3a0a161342ba..078a760a4a21 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -200,6 +200,8 @@
+ 			reg = <0x44e09000 0x2000>;
+ 			interrupts = <72>;
+ 			status = "disabled";
++			dmas = <&edma 26>, <&edma 27>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart1: serial at 48022000 {
+@@ -209,6 +211,8 @@
+ 			reg = <0x48022000 0x2000>;
+ 			interrupts = <73>;
+ 			status = "disabled";
++			dmas = <&edma 28>, <&edma 29>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart2: serial at 48024000 {
+@@ -218,6 +222,8 @@
+ 			reg = <0x48024000 0x2000>;
+ 			interrupts = <74>;
+ 			status = "disabled";
++			dmas = <&edma 30>, <&edma 31>;
++			dma-names = "tx", "rx";
+ 		};
+ 
+ 		uart3: serial at 481a6000 {
+-- 
+2.1.0
