@@ -1,102 +1,186 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Mon, 29 Sep 2014 10:45:07 +0530
-Subject: [PATCH v3 1/6] pinctrl: exynos: Generalize the eint16_31 demux code
+Date: Mon, 29 Sep 2014 10:45:10 +0530
+Subject: [PATCH v3 4/6] pinctrl: exynos: Add initial driver data for Exynos7
 In-Reply-To: <1411967712-8321-1-git-send-email-a.kesavan@samsung.com>
 References: <1411967712-8321-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1411967712-8321-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1411967712-8321-5-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function exynos_irq_demux_eint16_31 uses pre-defined offsets for external
-interrupt pending status and mask registers. So this function is not extensible
-for Exynos7 SoC which has these registers at different offsets. Generalize
-the exynos_irq_demux_eint16_31 function by using the pending/mask register
-offset values from the exynos_irq_chip structure. This is done by adding a
-irq_chip field to the samsung_pin_bank struct.
+From: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
 
+This patch adds initial driver data for Exynos7 pinctrl support.
+
+Signed-off-by: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
 Tested-by: Thomas Abraham <thomas.ab@samsung.com>
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c  |   14 ++++++++++----
- drivers/pinctrl/samsung/pinctrl-samsung.h |    2 ++
- 2 files changed, 12 insertions(+), 4 deletions(-)
+ .../bindings/pinctrl/samsung-pinctrl.txt           |    1 +
+ drivers/pinctrl/samsung/pinctrl-exynos.c           |  113 ++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |    1 +
+ 4 files changed, 117 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+index f80519a..8425838 100644
+--- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+@@ -18,6 +18,7 @@ Required Properties:
+   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
+   - "samsung,exynos5260-pinctrl": for Exynos5260 compatible pin-controller.
+   - "samsung,exynos5420-pinctrl": for Exynos5420 compatible pin-controller.
++  - "samsung,exynos7-pinctrl": for Exynos7 compatible pin-controller.
+ 
+ - reg: Base address of the pin controller hardware module and length of
+   the address space it occupies.
 diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index d7154ed..14b9b44 100644
+index 4ec2d3d..29e6070 100644
 --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
 +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -260,7 +260,7 @@ static int exynos_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 	struct samsung_pin_bank *b = h->host_data;
- 
- 	irq_set_chip_data(virq, b);
--	irq_set_chip_and_handler(virq, &exynos_gpio_irq_chip.chip,
-+	irq_set_chip_and_handler(virq, &b->irq_chip->chip,
- 					handle_level_irq);
- 	set_irq_flags(virq, IRQF_VALID);
- 	return 0;
-@@ -344,6 +344,8 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
- 			ret = -ENOMEM;
- 			goto err_domains;
- 		}
+@@ -1189,3 +1189,116 @@ struct samsung_pin_ctrl exynos5420_pin_ctrl[] = {
+ 		.label		= "exynos5420-gpio-ctrl4",
+ 	},
+ };
 +
-+		bank->irq_chip = &exynos_gpio_irq_chip;
- 	}
- 
- 	return 0;
-@@ -445,9 +447,9 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
- 
- 	for (i = 0; i < eintd->nr_banks; ++i) {
- 		struct samsung_pin_bank *b = eintd->banks[i];
--		pend = readl(d->virt_base + EXYNOS_WKUP_EPEND_OFFSET
-+		pend = readl(d->virt_base + b->irq_chip->eint_pend
- 				+ b->eint_offset);
--		mask = readl(d->virt_base + EXYNOS_WKUP_EMASK_OFFSET
-+		mask = readl(d->virt_base + b->irq_chip->eint_mask
- 				+ b->eint_offset);
- 		exynos_irq_demux_eint(pend & ~mask, b->irq_domain);
- 	}
-@@ -458,7 +460,9 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
- static int exynos_wkup_irq_map(struct irq_domain *h, unsigned int virq,
- 					irq_hw_number_t hw)
- {
--	irq_set_chip_and_handler(virq, &exynos_wkup_irq_chip.chip,
-+	struct samsung_pin_bank *b = h->host_data;
++/* pin banks of exynos7 pin-controller - ALIVE */
++static struct samsung_pin_bank exynos7_pin_banks0[] = {
++	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
++	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
++	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
++};
 +
-+	irq_set_chip_and_handler(virq, &b->irq_chip->chip,
- 					handle_level_irq);
- 	irq_set_chip_data(virq, h->host_data);
- 	set_irq_flags(virq, IRQF_VALID);
-@@ -510,6 +514,8 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
- 			return -ENXIO;
- 		}
- 
-+		bank->irq_chip = &exynos_wkup_irq_chip;
++/* pin banks of exynos7 pin-controller - BUS0 */
++static struct samsung_pin_bank exynos7_pin_banks1[] = {
++	EXYNOS_PIN_BANK_EINTG(5, 0x000, "gpb0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpc0", 0x04),
++	EXYNOS_PIN_BANK_EINTG(2, 0x040, "gpc1", 0x08),
++	EXYNOS_PIN_BANK_EINTG(6, 0x060, "gpc2", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x080, "gpc3", 0x10),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0a0, "gpd0", 0x14),
++	EXYNOS_PIN_BANK_EINTG(6, 0x0c0, "gpd1", 0x18),
++	EXYNOS_PIN_BANK_EINTG(8, 0x0e0, "gpd2", 0x1c),
++	EXYNOS_PIN_BANK_EINTG(5, 0x100, "gpd4", 0x20),
++	EXYNOS_PIN_BANK_EINTG(4, 0x120, "gpd5", 0x24),
++	EXYNOS_PIN_BANK_EINTG(6, 0x140, "gpd6", 0x28),
++	EXYNOS_PIN_BANK_EINTG(3, 0x160, "gpd7", 0x2c),
++	EXYNOS_PIN_BANK_EINTG(2, 0x180, "gpd8", 0x30),
++	EXYNOS_PIN_BANK_EINTG(2, 0x1a0, "gpg0", 0x34),
++	EXYNOS_PIN_BANK_EINTG(4, 0x1c0, "gpg3", 0x38),
++};
 +
- 		if (!of_find_property(bank->of_node, "interrupts", NULL)) {
- 			bank->eint_type = EINT_TYPE_WKUP_MUX;
- 			++muxed_banks;
++/* pin banks of exynos7 pin-controller - NFC */
++static struct samsung_pin_bank exynos7_pin_banks2[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
++};
++
++/* pin banks of exynos7 pin-controller - TOUCH */
++static struct samsung_pin_bank exynos7_pin_banks3[] = {
++	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
++};
++
++/* pin banks of exynos7 pin-controller - FF */
++static struct samsung_pin_bank exynos7_pin_banks4[] = {
++	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpg4", 0x00),
++};
++
++/* pin banks of exynos7 pin-controller - ESE */
++static struct samsung_pin_bank exynos7_pin_banks5[] = {
++	EXYNOS_PIN_BANK_EINTG(5, 0x000, "gpv7", 0x00),
++};
++
++/* pin banks of exynos7 pin-controller - FSYS0 */
++static struct samsung_pin_bank exynos7_pin_banks6[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpr4", 0x00),
++};
++
++/* pin banks of exynos7 pin-controller - FSYS1 */
++static struct samsung_pin_bank exynos7_pin_banks7[] = {
++	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpr0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpr1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr2", 0x08),
++	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpr3", 0x0c),
++};
++
++struct samsung_pin_ctrl exynos7_pin_ctrl[] = {
++	{
++		/* pin-controller instance 0 Alive data */
++		.pin_banks	= exynos7_pin_banks0,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks0),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.eint_wkup_init = exynos_eint_wkup_init,
++		.label		= "exynos7-gpio-ctrl0",
++	}, {
++		/* pin-controller instance 1 BUS0 data */
++		.pin_banks	= exynos7_pin_banks1,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks1),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl1",
++	}, {
++		/* pin-controller instance 2 NFC data */
++		.pin_banks	= exynos7_pin_banks2,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks2),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl2",
++	}, {
++		/* pin-controller instance 3 TOUCH data */
++		.pin_banks	= exynos7_pin_banks3,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks3),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl3",
++	}, {
++		/* pin-controller instance 4 FF data */
++		.pin_banks	= exynos7_pin_banks4,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks4),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl4",
++	}, {
++		/* pin-controller instance 5 ESE data */
++		.pin_banks	= exynos7_pin_banks5,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks5),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl5",
++	}, {
++		/* pin-controller instance 6 FSYS0 data */
++		.pin_banks	= exynos7_pin_banks6,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks6),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl6",
++	}, {
++		/* pin-controller instance 7 FSYS1 data */
++		.pin_banks	= exynos7_pin_banks7,
++		.nr_banks	= ARRAY_SIZE(exynos7_pin_banks7),
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos7-gpio-ctrl7",
++	},
++};
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index 4a47691..46efdbf 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1233,6 +1233,8 @@ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ 		.data = (void *)exynos5420_pin_ctrl },
+ 	{ .compatible = "samsung,s5pv210-pinctrl",
+ 		.data = (void *)s5pv210_pin_ctrl },
++	{ .compatible = "samsung,exynos7-pinctrl",
++		.data = (void *)exynos7_pin_ctrl },
+ #endif
+ #ifdef CONFIG_PINCTRL_S3C64XX
+ 	{ .compatible = "samsung,s3c64xx-pinctrl",
 diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 5cedc9d..d2c38c8 100644
+index d2c38c8..c0a48ac1 100644
 --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
 +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -127,6 +127,7 @@ struct samsung_pin_bank_type {
-  * @irq_domain: IRQ domain of the bank.
-  * @gpio_chip: GPIO chip of the bank.
-  * @grange: linux gpio pin range supported by this bank.
-+ * @irq_chip: link to irq chip for external gpio and wakeup interrupts.
-  * @slock: spinlock protecting bank registers
-  * @pm_save: saved register values during suspend
-  */
-@@ -146,6 +147,7 @@ struct samsung_pin_bank {
- 	struct irq_domain *irq_domain;
- 	struct gpio_chip gpio_chip;
- 	struct pinctrl_gpio_range grange;
-+	struct exynos_irq_chip *irq_chip;
- 	spinlock_t slock;
- 
- 	u32 pm_save[PINCFG_TYPE_NUM + 1]; /* +1 to handle double CON registers*/
+@@ -244,6 +244,7 @@ extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
+ extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
++extern struct samsung_pin_ctrl exynos7_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
+ extern struct samsung_pin_ctrl s3c2416_pin_ctrl[];
 -- 
 1.7.9.5
