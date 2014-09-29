@@ -1,39 +1,75 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 29 Sep 2014 15:22:15 +0200
-Subject: [PATCH v7 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <CAGm_ybgFfnS=bhz2yWUt_b_95Wg=eDNxadzfy7WF+VNFx+pO6Q@mail.gmail.com>
-References: <1408625982-3267-1-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybh-R1GsHF-BRhRYQKkCpQFQSE6Mem=A3kz=H3Bemor9xA@mail.gmail.com>
- <CABxcv=kHwCCYhit20qO1q=Nn3KVj8U=8cpCu=DQRuy+R86N0kQ@mail.gmail.com>
- <CAGm_ybgFfnS=bhz2yWUt_b_95Wg=eDNxadzfy7WF+VNFx+pO6Q@mail.gmail.com>
-Message-ID: <CABxcv==E9h_V8_YmcvuxRORg7tbnc9uDT-rwqKJeXb_bNr0xXw@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 29 Sep 2014 15:27:12 +0200
+Subject: [PATCH 06/16] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <20140929093823.GD13952@ci00147.xsens-tech.local>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+ <1410377411-26656-7-git-send-email-bigeasy@linutronix.de>
+ <20140929093823.GD13952@ci00147.xsens-tech.local>
+Message-ID: <20140929132712.GD13142@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vikas,
+* Frans Klaver | 2014-09-29 11:38:23 [+0200]:
 
-On Mon, Sep 29, 2014 at 2:59 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Hi Javier,
->
->
-> On Thu, Sep 25, 2014 at 10:45 PM, Javier Martinez Canillas
->>
->> The mentioned patches from the PMU series depend on the patch to
->> decouple the syscon interface from syscon drivers. The latest version
->> of that patch is Pankaj's "[PATCH v5] mfd: syscon: Decouple syscon
->> interface from platform devices" [0].
->>
->
->  Since Arnd has given "Reviewed-by" to Pankaj's MFD syscon patch now,
-> Pankaj can rebase his PMU patchset [1],  so that I can re-spin my 5420
-> S2R patchset on top his PMU patchset.
->
+>threshold
+fixed
 
-Indeed, that would be great. Thanks a lot!
+>> +	/*
+>> +	 * It claims to be 16C750 compatible however it is a little different.
+>> +	 * It has EFR and has no FCR7_64byte bit. The AFE (which it claims to
+>> +	 * have) is enabled via EFR instead of MCR. The type is set here 8250
+>> +	 * just to get things going. UNKNOWN does not work for a few reasons and
+>> +	 * we don't need our own type since we don't use 8250's set_termios()
+>> +	 * and our "bugs" are handeld via the bug member.
+>
+>handled
+replaced that last line with 
+    or pm callback.
+
+since there no bugs member anymore.
 
 >
-> Regards
-> Vikas Sajjan
+>> +	 */
+>> +	up.port.type = PORT_8250;
+>> +	up.port.iotype = UPIO_MEM;
+>> +	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE | UPF_SOFT_FLOW |
+>> +		UPF_HARD_FLOW;
+>> +	up.port.private_data = priv;
+>> +
+>> +	up.port.regshift = 2;
+>> +	up.port.fifosize = 64;
+>> +	up.tx_loadsz = 64;
+>> +	up.capabilities = UART_CAP_FIFO | UART_CAP_EFR | UART_CAP_SLEEP;
+>> +#ifdef CONFIG_PM_RUNTIME
+>> +	/*
+>> +	 * PM_RUNTIME is mostly transparent. However to do it right we need to a
+>
+>need to _do_ a ...?
+I think dropping that 'to' should fix it.
 
-Best regards,
-Javier
+>> +	 * TX empty interrupt before we can put the device to auto idle. So if
+>> +	 * PM_RUNTIME is not enabled we don't add that flag and can spare that
+>> +	 * one extra interrupt in the TX path.
+>> +	 */
+>
+><snip>
+>
+>> +config SERIAL_8250_OMAP
+>> +	tristate "Support for OMAP internal UART (8250 based driver)"
+>> +	depends on SERIAL_8250 && ARCH_OMAP2PLUS
+>> +	help
+>> +	  If you have a machine based on an Texas Instruments OMAP CPU you
+>> +	  can enable its onboard serial ports by enabling this option.
+>> +
+>> +	  This driver is in early stage and uses ttyS instead of ttyO.
+>> +
+>
+>I just wondered if this driver should be marked experimental?
+What did you have in mind? CONFIG_EXPERIMENTAL is gone. After all that
+debuging that I had in the meantime I was thinking about dropping that
+"early stage".
+
+>Thanks,
+>Frans
+
+Sebastian
