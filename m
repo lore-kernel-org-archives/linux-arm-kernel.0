@@ -1,62 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 29 Sep 2014 16:23:08 +0200 (CEST)
-Subject: [RFC 4/4] irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <54287F17.8000503@amd.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411937610-22125-5-git-send-email-suravee.suthikulpanit@amd.com>
- <54287F17.8000503@amd.com>
-Message-ID: <alpine.DEB.2.02.1409291611030.22082@ionos.tec.linutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Sep 2014 16:28:55 +0200
+Subject: [PATCH] [media] pt3: remove bogus module_is_live() check
+Message-ID: <6460819.BmnhuA22YH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Sep 2014, Suravee Suthikulpanit wrote:
+The new pt3 driver checks the module reference for presence
+before dropping it, which fails to compile when modules
+are disabled:
 
-> Jason/Thomas,
-> 
-> This patch comes from:
->     [V8 2/2] irqchip: gicv2m: Add supports for ARM GICv2m MSI(-X)
->     (https://lkml.org/lkml/2014/9/20/113)
-> 
-> It has been slightly modified to remove the multi-MSI supports for now
-> (I am waiting to discuss with Marc after he returned from vacation.), and will
-> be submitted separately.
-> 
-> Since this patch is independent from the multi-MSI stuff.  Please let me know
-> if you would consider taking this separately.
+media/pci/pt3/pt3.c: In function 'pt3_attach_fe':
+media/pci/pt3/pt3.c:433:6: error: implicit declaration of function 'module_is_live' [-Werror=implicit-function-declaration]
+      module_is_live(pt3->adaps[i]->i2c_tuner->dev.driver->owner))
 
-Not without an explicit reviewed/acked from Marc for the GIC part and
-a reviewed/acked from the DT folks.
+As far as I can tell however, this check is not needed at all, because
+the module will not go away as long as pt3 is holding a reference on
+it. Also the previous check for NULL pointer is not needed at all,
+because module_put has the same check.
 
-Aside of that the conditional madness is just horrible:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/media/pci/pt3/pt3.c b/drivers/media/pci/pt3/pt3.c
+index 90f86ce7a001..39305f07dc2e 100644
+--- a/drivers/media/pci/pt3/pt3.c
++++ b/drivers/media/pci/pt3/pt3.c
+@@ -429,14 +429,10 @@ static int pt3_attach_fe(struct pt3_board *pt3, int i)
  
-> > +static inline
-> > +struct gic_chip_data *irq_data_get_gic_chip_data(struct irq_data *d)
-> > +{
-> > +	struct gic_chip_data *gic_data;
-> > +	struct msi_chip *mchip;
-> > +	struct v2m_data *v2mdat;
-> > +
-> > +	/*
-> > +	 * For MSI, irq_data.chip_data points to struct msi_chip.
-> > +	 * For non-MSI, irq_data.chip_data points to struct gic_chip_data.
-> > +	 */
-> > +	if (d->msi_desc) {
-> > +		mchip = irq_data_get_irq_chip_data(d);
-> > +		v2mdat = container_of(mchip, struct v2m_data, msi_chip);
-> > +		gic_data = v2mdat->gic;
-> > +	} else {
-> > +		gic_data = irq_data_get_irq_chip_data(d);
-> > +	}
-> > +	return gic_data;
-> > +}
-
-For heavens sake, why are you insisting on duct-taping that into the
-GIC proper instead of coming up with a proper layering?
-
-    https://lkml.org/lkml/2014/8/27/228
-    https://lkml.org/lkml/2014/8/26/707
-
-Thanks,
-
-	tglx
-    
+ err_tuner:
+ 	i2c_unregister_device(pt3->adaps[i]->i2c_tuner);
+-	if (pt3->adaps[i]->i2c_tuner->dev.driver->owner &&
+-	    module_is_live(pt3->adaps[i]->i2c_tuner->dev.driver->owner))
+-		module_put(pt3->adaps[i]->i2c_tuner->dev.driver->owner);
++	module_put(pt3->adaps[i]->i2c_tuner->dev.driver->owner);
+ err_demod:
+ 	i2c_unregister_device(pt3->adaps[i]->i2c_demod);
+-	if (pt3->adaps[i]->i2c_demod->dev.driver->owner &&
+-	    module_is_live(pt3->adaps[i]->i2c_demod->dev.driver->owner))
+-		module_put(pt3->adaps[i]->i2c_demod->dev.driver->owner);
++	module_put(pt3->adaps[i]->i2c_demod->dev.driver->owner);
+ 	return ret;
+ }
+ 
