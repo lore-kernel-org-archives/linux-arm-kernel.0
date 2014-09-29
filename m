@@ -1,77 +1,43 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 29 Sep 2014 08:36:46 +0200
-Subject: [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-In-Reply-To: <20140928222150.GC3248@norris-Latitude-E6410>
-References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714670.3040.39.camel@decadent.org.uk>
- <20140928222150.GC3248@norris-Latitude-E6410>
-Message-ID: <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 29 Sep 2014 14:40:38 +0800
+Subject: mfd_add_devices() doesn't check whether nodes are "diabled" in dts
+Message-ID: <CAGsJ_4yqumj3=54HwxuzVffPjHdQZrCP2wYc2TSumKsg0-wm7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 September 2014 00:21, Brian Norris <computersforpeace@gmail.com> wrote:
-> + Rafal
->
-> Rafal has been looking at the same area of code. I'd really like to get
-> this patch into 3.18 if possible, so the more eyes the better.
+hi Samuel, Lee,
+the current mfd_add_devices() doesn't check whether nodes are diabled
+in dts, so even though we put status = "disabled" in dts for a MFD
+subnode, it will still create the platform_device. this will cause the
+platform_driver to execute probe() entry.
 
-Thanks Brian.
+mfd-core is doing:
 
-I took me a while to follow this issue, too bad I wasn't subscribed to
-the ML earlier. Let me try to sum it up.
+mfd_add_device()
 
+alloc platform_device no matter it is disabled or not:
 
+92         pdev = platform_device_alloc(cell->name, id + cell->id);
+ 93         if (!pdev)
+ 94                 goto fail_alloc;
 
-1) The main urgent issue: broken auto-loading
-Tracked in the thread: http://www.spinics.net/lists/linux-spi/msg01726.html
-Problem: m25p80.c references spi_nor_ids (from external file)
-Short-term solution: duplicate IDs in the m25p80.c
+....
+extend all nodes:
 
-Ben: just like Brian, I think the patch like this one (
-[PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-) is the way to go. However few comments:
+112         if (parent->of_node && cell->of_compatible) {
+113                 for_each_child_of_node(parent->of_node, np) {
+114                         if (of_device_is_compatible(np,
+cell->of_compatible)) {
+115                                 pdev->dev.of_node = np;
+116                                 break;
+117                         }
+118                 }
+119         }
 
-a) I don't see why you modify m25p_probe in it.
+it seems it doesn't match with the general behavior like
+of_platform_populate(), in which we only extend available nodes.
 
-b) I don't think the described clean solution (you described it in the
-commit message):
-> A clean solution to this will involve defining the list of device
-> IDs in spi-nor.h and removing struct spi_device_id from the spi-nor
-> API, but this is quite a large change.
-is the correct one. I think there should be a single string to trigger
-m25p80 load and the rest should be handled using JEDEC, with some
-workarounds for incompatible devices only.
+how do you think if we do a fix for the behaviour of mfd_add_devices()
+and mfd_remove_devices()?
 
-One thing I wonder about is sense of pushing this patch to the Linus's
-tree. Do you think we could prepare a real fix for Linus and leave
-this patch for stable@ only? I'm far from being an expert on such
-things, just asking.
-
-
-
-2) On going cleanups
-It seems there are at least 2 ppl (me, Ben) working on some cleanups
-independently.
-
-a) There is (l2-mtd pushed) patch moving flash_platform_data into m25p80:
-https://patchwork.ozlabs.org/patch/394219/
-
-b) Removing spi_nor::read_id
-https://patchwork.ozlabs.org/patch/389073/
-Ben: I think this one has a NACK from me, because I'm going to use
-custom read_id in the bcm53xxspiflash driver.
-See following thread for bcm53xxspiflash description:
-http://comments.gmane.org/gmane.linux.drivers.mtd/54578
-Initial commit (it uses read_id): https://patchwork.ozlabs.org/patch/381902/
-
-c) Obsoleting spi_device_id
-It seems we both were working on the same thing, me slightly slower however ;)
-https://patchwork.ozlabs.org/patch/377917/
-https://patchwork.ozlabs.org/patch/389074/
-https://patchwork.ozlabs.org/patch/389075/
-I still have to review calmly your changes, but they need to be rebased anyway.
-
-d) Cleaning m25p80
-https://patchwork.ozlabs.org/patch/389076/
-Ben: As said before, I think we should do smarter in the m25p80. We
-should get rid of all that duplicated strings.
+-barry
