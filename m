@@ -1,154 +1,69 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Sep 2014 22:30:49 +0200
-Subject: [PATCH v1 2/4] ARM: keystone: pm: switch to use generic pm domains
-In-Reply-To: <1412001499-19369-3-git-send-email-grygorii.strashko@ti.com>
-References: <1412001499-19369-1-git-send-email-grygorii.strashko@ti.com>
- <1412001499-19369-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CAMuHMdVhu4-ZOK3QHQTzCViRvvoQ7H-pZLe4GkwGkzBBfJ8ayw@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 29 Sep 2014 22:34:10 +0200
+Subject: [GIT PULL] Samsung clock changes for v3.18
+Message-ID: <1412022850-7842-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+The following changes since commit a52ae5a755d980e9ff812c6f45a415ba27bfd33b:
 
-On Mon, Sep 29, 2014 at 4:38 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> This patch switches Keystone 2 PM code to use Generic PM domains
-> instead of PM clock domains because of the lack of DT support
-> for the last.
+  Merge branch 'clk-fixes' into clk-next (2014-09-17 11:47:56 -0700)
 
-Thanks, this looks interesting, as today I've been digging deeper into the
-!CONFIG_PM_RUNTIME case for my patch series, and ended up with something
-similar...
+are available in the git repository at:
 
-> --- a/arch/arm/mach-keystone/pm_domain.c
-> +++ b/arch/arm/mach-keystone/pm_domain.c
-> @@ -12,69 +12,110 @@
->   * version 2, as published by the Free Software Foundation.
->   */
->
-> +#include <linux/clk.h>
->  #include <linux/init.h>
-> -#include <linux/pm_runtime.h>
->  #include <linux/pm_clock.h>
-> +#include <linux/pm_domain.h>
->  #include <linux/platform_device.h>
-> -#include <linux/clk-provider.h>
->  #include <linux/of.h>
->
-> -#ifdef CONFIG_PM_RUNTIME
-> -static int keystone_pm_runtime_suspend(struct device *dev)
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS
-> +
-> +struct keystone_domain {
-> +       struct generic_pm_domain base;
-> +       struct device   *dev;
-> +};
-> +
-> +void keystone_pm_domain_attach_dev(struct device *dev)
->  {
-> +       struct clk *clk;
->         int ret;
-> +       int i = 0;
->
->         dev_dbg(dev, "%s\n", __func__);
->
-> -       ret = pm_generic_runtime_suspend(dev);
-> -       if (ret)
-> -               return ret;
-> -
-> -       ret = pm_clk_suspend(dev);
-> +       ret = pm_clk_create(dev);
->         if (ret) {
-> -               pm_generic_runtime_resume(dev);
-> -               return ret;
-> +               dev_err(dev, "pm_clk_create failed %d\n", ret);
-> +               return;
-> +       };
-> +
-> +       while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
-> +               ret = pm_clk_add_clk(dev, clk);
+  git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.18/samsung-clk
 
-This is an important difference compared to the non-DT pm_clk_notify()
-version for !CONFIG_PM_RUNTIME.
+for you to fetch changes up to fa0111be4ff30150720db3c3e5ee8d7823921639:
 
-You do call pm_clk_create() and pm_clk_add_clk(), while
-pm_clk_notify() doesn't. Hence for the latter, the clocklist is always empty.
+  clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation (2014-09-24 12:41:33 +0200)
 
-> +               if (ret) {
-> +                       dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
-> +                       goto clk_err;
-> +               };
->         }
->
-> -       return 0;
-> +       if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
-> +               ret = pm_clk_resume(dev);
+----------------------------------------------------------------
+Samsung clock patches for v3.18
 
-As a consequence of the above, calling pm_clk_resume() here just works,
-and there's no need for the separate enable_clock()/disable_clock()
-functions, like in drivers/base/power/clock_ops.c.
+1) non-critical fixes (without the need to push to stable)
 
-> +               if (ret) {
-> +                       dev_err(dev, "pm_clk_resume failed %d\n", ret);
-> +                       goto clk_err;
-> +               };
-> +       }
-> +       return;
-> +
-> +clk_err:
-> +       pm_clk_destroy(dev);
->  }
->
-> -static int keystone_pm_runtime_resume(struct device *dev)
-> +void keystone_pm_domain_detach_dev(struct device *dev)
->  {
->         dev_dbg(dev, "%s\n", __func__);
-> -
-> -       pm_clk_resume(dev);
-> -
-> -       return pm_generic_runtime_resume(dev);
-> +       pm_clk_destroy(dev);
->  }
-> -#endif
->
-> -static struct dev_pm_domain keystone_pm_domain = {
-> -       .ops = {
-> -               SET_RUNTIME_PM_OPS(keystone_pm_runtime_suspend,
-> -                                  keystone_pm_runtime_resume, NULL)
-> -               USE_PLATFORM_PM_SLEEP_OPS
-> +static const struct keystone_domain keystone_domain = {
-> +       .base = {
-> +               .name = "keystone",
-> +               .attach_dev = keystone_pm_domain_attach_dev,
-> +               .detach_dev = keystone_pm_domain_detach_dev,
-> +               .dev_ops = {
-> +                       .stop = pm_clk_suspend,
-> +                       .start = pm_clk_resume,
+fa0111be4ff3 clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation
+b511593d7165 clk: samsung: exynos4: fix g3d clocks
+c14254300131 clk: samsung: exynos4: add missing smmu_g2d clock and update comments
+22842d244af3 clk: samsung: exynos5260: fix typo in clock name
+e82ba578ccde clk: samsung: exynos3250: fix width field of mout_mmc0/1
+59037b92f440 clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
+5ce37f266650 clk: samsung: exynos3250: fix mout_cam_blk parent list
 
-Same here: the clocks will be disabled/enabled on system suspend/resume,
-which is not the case for the non-DT case.
+2) Clock driver extensions
 
-Rafael: shouldn't pm_clk_notify() in drivers/base/power/clock_ops.c
-behave the same as above?
-Or is there a good reason the non-PM runtime version doesn't call pm_clk_add()?
+07ccf02ba5c3 dt-bindings: clk: samsung: Document the DMC domain of Exynos3250 CMU
+d0e73eaf1925 ARM: dts: exynos3250: Add CMU node for DMC domain clocks
+e3c3f19bc618 clk: samsung: exynos3250: Register DMC clk provider
+4676f0aab9dc clk: samsung: exynos4: add support for MOUT_HDMI and MOUT_MIXER clocks
 
-Then the two versions (CONFIG_PM_RUNTIME enabled vs. disabled) can become
-more similar, and perhaps be merged.
+----------------------------------------------------------------
+Chander Kashyap (1):
+      clk: samsung: exynos5260: fix typo in clock name
 
-> +               },
-> +               .power_off_latency_ns = 25000,
-> +               .power_on_latency_ns = 2000000,
->         },
->  };
+Krzysztof Kozlowski (3):
+      clk: samsung: exynos3250: Register DMC clk provider
+      ARM: dts: exynos3250: Add CMU node for DMC domain clocks
+      dt-bindings: clk: samsung: Document the DMC domain of Exynos3250 CMU
 
+Marek Szyprowski (3):
+      clk: samsung: exynos4: add missing smmu_g2d clock and update comments
+      clk: samsung: exynos4: add support for MOUT_HDMI and MOUT_MIXER clocks
+      clk: samsung: exynos4: fix g3d clocks
 
-Gr{oetje,eeting}s,
+Pankaj Dubey (3):
+      clk: samsung: exynos3250: fix mout_cam_blk parent list
+      clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
+      clk: samsung: exynos3250: fix width field of mout_mmc0/1
 
-                        Geert
+Thomas Abraham (1):
+      clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+ .../devicetree/bindings/clock/exynos3250-clock.txt |  10 +-
+ arch/arm/boot/dts/exynos3250.dtsi                  |   6 +
+ drivers/clk/samsung/clk-exynos3250.c               | 202 ++++++++++++++++++++-
+ drivers/clk/samsung/clk-exynos4.c                  |  18 +-
+ drivers/clk/samsung/clk-exynos5260.c               |   2 +-
+ include/dt-bindings/clock/exynos3250.h             |  27 +++
+ include/dt-bindings/clock/exynos4.h                |  12 +-
+ 7 files changed, 257 insertions(+), 20 deletions(-)
