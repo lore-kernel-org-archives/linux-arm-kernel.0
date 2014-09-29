@@ -1,26 +1,33 @@
-From: cornelia.huck@de.ibm.com (Cornelia Huck)
-Date: Mon, 29 Sep 2014 19:18:56 +0200
-Subject: [PATCH v11 2/6] KVM: Add generic implementation of
- kvm_vm_ioctl_get_dirty_log
-In-Reply-To: <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
-References: <1411433690-8104-1-git-send-email-m.smarduch@samsung.com>
- <1411433690-8104-3-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20140929191856.63ace99d.cornelia.huck@de.ibm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 29 Sep 2014 10:20:50 -0700
+Subject: OMAP baseline test results for v3.17-rc7
+In-Reply-To: <alpine.DEB.2.02.1409291709020.7233@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1409291709020.7233@utopia.booyaka.com>
+Message-ID: <20140929172049.GD3122@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Sep 2014 17:54:46 -0700
-Mario Smarduch <m.smarduch@samsung.com> wrote:
-
-> Add support for generic implementation of dirty log read function. For now
-> x86_64 and ARMv7 share generic dirty log read. Other architectures call
-> their architecture specific functions.
+* Paul Walmsley <paul@pwsan.com> [140929 10:14]:
+>
+> PM: chip off except CORE via suspend:
+>     Pass ( 1/ 1): 3730beaglexm
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> PM: chip off except CORE via dynamic idle:
+>     Pass ( 1/ 1): 3730beaglexm
 
-This (and the previous patch), once fitted on current kvm/next (trivial
-rejects), seems to work fine on s390 and looks sane to me.
+Most likely the two tests above should now also work also for 37xxevm,
+3530es3beagle and 3530es31beagle in case you want to enable that.
+ 
+> PM: chip off via suspend:
+>     Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+> 		  3730es12beaglexm
+> 
+> PM: chip off via dynamic idle:
+>     Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+> 		  3730es12beaglexm
 
-So, for the s390 parts:
+Since looks like these are working finally :)
 
-Acked-by: Cornelia Huck <cornelia.huck@de.ibm.com>
+Regards,
+
+Tony
