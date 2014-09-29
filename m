@@ -1,147 +1,83 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 29 Sep 2014 14:57:28 +0200
-Subject: [PATCH 3/3] drivers/rtc/rtc-snvs: Add clock support
-In-Reply-To: <20140928035631.GF12999@dragon>
-References: <cover.1411736171.git.maitysanchayan@gmail.com>
- <8a1904a59f7b171a7cf1e71b9e80f0cf7b1061c0.1411736171.git.maitysanchayan@gmail.com>
- <20140928035631.GF12999@dragon>
-Message-ID: <ff3b3c43678ba2e4c35b667af1d6bf20@agner.ch>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 29 Sep 2014 14:59:23 +0200
+Subject: [PATCH 3/6] arm/arm64: KVM: add 'writable' parameter to
+ kvm_phys_addr_ioremap
+In-Reply-To: <1410990981-665-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1410990981-665-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140929125923.GA25697@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-28 05:56, schrieb Shawn Guo:
-> On Fri, Sep 26, 2014 at 06:44:01PM +0530, Sanchayan Maity wrote:
->> This patch adds clock enable and disable support
->> for the SNVS peripheral which is required by the
->> SNVS RTC.
->>
->> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> ---
->>  drivers/rtc/rtc-snvs.c |   48 +++++++++++++++++++++++++++++++++++++++---------
->>  1 file changed, 39 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
->> index fa384fe..f3e8f05 100644
->> --- a/drivers/rtc/rtc-snvs.c
->> +++ b/drivers/rtc/rtc-snvs.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/of_device.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/rtc.h>
->> +#include <linux/clk.h>
->>
->>  /* These register offsets are relative to LP (Low Power) range */
->>  #define SNVS_LPCR		0x04
->> @@ -39,6 +40,7 @@ struct snvs_rtc_data {
->>  	void __iomem *ioaddr;
->>  	int irq;
->>  	spinlock_t lock;
->> +	struct clk *clk;
->>  };
->>
->>  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
->> @@ -260,8 +262,31 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->>  	if (data->irq < 0)
->>  		return data->irq;
->>
->> +	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
->> +			       IRQF_SHARED, "rtc alarm", &pdev->dev);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
->> +			data->irq, ret);
->> +		return ret;
->> +	}
->> +
->> +	data->clk = devm_clk_get(&pdev->dev, "snvs");
->> +	if (IS_ERR(data->clk)) {
->> +		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
->> +						PTR_ERR(data->clk));
->> +		ret = PTR_ERR(data->clk);
->> +		return ret;
->> +	}
+On Wed, Sep 17, 2014 at 02:56:18PM -0700, Ard Biesheuvel wrote:
+> Add support for read-only MMIO passthrough mappings by adding a
+> 'writable' parameter to kvm_phys_addr_ioremap. For the moment,
+> mappings will be read-write even if 'writable' is false, but once
+> the definition of PAGE_S2_DEVICE gets changed, those mappings will
+> be created read-only.
 > 
-> No. This will break all i.MX6 devices running a DTB without clock
-> definition.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/kvm/mmu.c               | 5 ++++-
+>  arch/arm64/include/asm/kvm_mmu.h | 2 +-
+>  virt/kvm/arm/vgic.c              | 3 ++-
+>  3 files changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index c093e95ff7ef..fe53c3a30383 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -674,7 +674,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>   * @size:	The size of the mapping
+>   */
+>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+> -			  phys_addr_t pa, unsigned long size)
+> +			  phys_addr_t pa, unsigned long size, bool writable)
+>  {
+>  	phys_addr_t addr, end;
+>  	int ret = 0;
+> @@ -687,6 +687,9 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+>  	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+>  		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+>  
+> +		if (writable)
+> +			kvm_set_s2pte_writable(&pte);
+> +
+>  		ret = mmu_topup_memory_cache(&cache, 2, 2);
+>  		if (ret)
+>  			goto out;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 737da742b293..7474e611bb2a 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -78,7 +78,7 @@ void free_hyp_pgds(void);
+>  int kvm_alloc_stage2_pgd(struct kvm *kvm);
+>  void kvm_free_stage2_pgd(struct kvm *kvm);
+>  int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+> -			  phys_addr_t pa, unsigned long size);
+> +			  phys_addr_t pa, unsigned long size, bool writable);
+>  
+>  int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>  
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 73eba793b17f..c2bdbf4e25c2 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1628,7 +1628,8 @@ int kvm_vgic_init(struct kvm *kvm)
+>  	}
+>  
+>  	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+> -				    vgic->vcpu_base, KVM_VGIC_V2_CPU_SIZE);
+> +				    vgic->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
+> +				    true);
+>  	if (ret) {
+>  		kvm_err("Unable to remap VGIC CPU to VCPU\n");
+>  		goto out;
+> -- 
+> 1.8.3.2
 > 
 
-Shawn, do you know how this works in i.MX6? Is there no clock gating for
-that module or is that clock just missing as of now?
+You forgot the 32-bit prototype, but I can fix that up when applying it.
 
-But then, I guess even there is a clock on i.MX6 too, we would still
-need to make the clock optional.
-
---
-Stefan
-
-
->> +
->>  	platform_set_drvdata(pdev, data);
->>
->> +	ret = clk_prepare_enable(data->clk);
->> +	if (ret) {
->> +		dev_err(&pdev->dev,
->> +			"Could not prepare or enable the snvs clock\n");
->> +		return ret;
->> +	}
->> +
->>  	spin_lock_init(&data->lock);
->>
->>  	/* Initialize glitch detect */
->> @@ -275,23 +300,20 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->>
->>  	device_init_wakeup(&pdev->dev, true);
->>
->> -	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
->> -			       IRQF_SHARED, "rtc alarm", &pdev->dev);
->> -	if (ret) {
->> -		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
->> -			data->irq, ret);
->> -		return ret;
->> -	}
->> -
->>  	data->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
->>  					&snvs_rtc_ops, THIS_MODULE);
->>  	if (IS_ERR(data->rtc)) {
->>  		ret = PTR_ERR(data->rtc);
->>  		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
->> -		return ret;
->> +		goto error_rtc_device_register;
->>  	}
->>
->>  	return 0;
->> +
->> +error_rtc_device_register:
->> +	clk_disable_unprepare(data->clk);
->> +
->> +	return ret;
->>  }
->>
->>  #ifdef CONFIG_PM_SLEEP
->> @@ -302,16 +324,24 @@ static int snvs_rtc_suspend(struct device *dev)
->>  	if (device_may_wakeup(dev))
->>  		enable_irq_wake(data->irq);
->>
->> +	clk_disable_unprepare(data->clk);
->> +
->>  	return 0;
->>  }
->>
->>  static int snvs_rtc_resume(struct device *dev)
->>  {
->> +	int ret;
->> +
->>  	struct snvs_rtc_data *data = dev_get_drvdata(dev);
->>
->>  	if (device_may_wakeup(dev))
->>  		disable_irq_wake(data->irq);
->>
->> +	ret = clk_prepare_enable(data->clk);
->> +	if (ret)
->> +		return ret;
->> +
->>  	return 0;
->>  }
->>  #endif
->> --
->> 1.7.9.5
->>
+Thanks,
+-Christoffer
