@@ -1,48 +1,73 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 11:54:40 +0200
-Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
- for AM33xx
-In-Reply-To: <20140929085042.GA13952@ci00147.xsens-tech.local>
-References: <54129F6C.7040508@linutronix.de>
- <20140912094010.GE28458@ci00147.xsens-tech.local>
- <5412C21A.8020203@linutronix.de>
- <20140912102816.GF28458@ci00147.xsens-tech.local>
- <541716DC.9020904@linutronix.de>
- <20140917102812.GA20438@ci00147.xsens-tech.local>
- <20140921204100.GA10111@linutronix.de>
- <20140922092853.GH20438@ci00147.xsens-tech.local>
- <20140925151403.GH19396@linutronix.de>
- <20140929085042.GA13952@ci00147.xsens-tech.local>
-Message-ID: <20140929095440.GB13142@linutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Sep 2014 11:52:27 +0200
+Subject: [PATCH v2 6/7] devicetree: bindings: Document supported
+ Allwinner sunxi SoCs
+In-Reply-To: <CAGb2v65pKo=6BC-HaMsEMq-bcQcoHZNc9GiX+kfTBgP1PE5wMg@mail.gmail.com>
+References: <1411570141-29960-1-git-send-email-wens@csie.org>
+ <1411570141-29960-7-git-send-email-wens@csie.org>
+ <20140925133609.GK15315@lukather>
+ <CAGb2v65pKo=6BC-HaMsEMq-bcQcoHZNc9GiX+kfTBgP1PE5wMg@mail.gmail.com>
+Message-ID: <20140929095227.GD4388@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Frans Klaver | 2014-09-29 10:50:42 [+0200]:
+On Sat, Sep 27, 2014 at 09:08:46PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Sep 25, 2014 at 9:36 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Wed, Sep 24, 2014 at 10:49:00PM +0800, Chen-Yu Tsai wrote:
+> >> This adds a list of supported Allwinner SoC bindings.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/arm/sunxi.txt | 12 ++++++++++++
+> >>  1 file changed, 12 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/arm/sunxi.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> >> new file mode 100644
+> >> index 0000000..d7d1039
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> >> @@ -0,0 +1,12 @@
+> >> +Allwinner sunXi Platforms Device Tree Bindings
+> >> +
+> >> +Each device tree must specify which Allwinner SoC it uses,
+> >> +using one of the following compatible stirngs:
+> >                                          ^ strings
+> 
+> Will fix.
+> 
+> >> +
+> >> +  allwinner,sun4i-a10
+> >> +  allwinner,sun5i-a10s
+> >> +  allwinner,sun5i-a13
+> >> +  allwinner,sun6i-a31
+> >> +  allwinner,sun7i-a20
+> >> +  allwinner,sun8i-a23
+> >> +  allwinner,sun9i-a80
+> >
+> > Maybe you can just add this info to the already existing README?
+> 
+> AFAIK the bindings are where they're supposed to be.
+> 
+> Putting the bindings outside of devicetree/bindings is unexpected
+> and confusing.
 
->This version fixes the console things for us. It also increases the
->amount of data we can push over the serial port. If I push the data
->towards our requirements, we're not there yet. I get the "too much work
->for irq" notice still. However, I don't think you'd need to be fixing
->that in this series (or at all). We had similar issues there with
->omap-serial as well.
->
->As far as I'm concerned, this is
->
->Tested-by: Frans Klaver <frans.klaver@xsens.com>
+Ah, yes...
 
-Thanks a lot.
-There is a patch named "ARM: edma: unconditionally ack the error
-interrupt". I have the feeling that this is not really required once we
-delay set_termios. I couldn't reproduce the bug with beagleblack with my
-usual test case.
+Sorry about the noise, I was somehow convinced our README were under
+that directory, but you're obviously right :)
 
-For your "too much work for irq" problem: Could you add trace_printk()
-in tx/rx dma start/complete, and irq routine? The interresting part is
-what is the irq routine doing once entered. It might be a condition that
-is ignored at first and "acked" later while serving another event. Or it
-is really doing something and this is more or less "legal".
+Maxime
 
->Thanks,
->Frans
-
-Sebastian
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/342ee36f/attachment.sig>
