@@ -1,57 +1,125 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Mon, 29 Sep 2014 18:58:42 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140929162814.GE4081@lukather>
-References: <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
- <20140902092508.GR15297@lukather> <20140927235601.19023.31593@quantum>
- <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
- <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
- <20140929134708.GB30998@ulmo> <20140929162814.GE4081@lukather>
-Message-ID: <20140929165842.GC5599@skynet.be>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 29 Sep 2014 17:13:05 +0000 (UTC)
+Subject: OMAP baseline test results for v3.17-rc7
+Message-ID: <alpine.DEB.2.02.1409291709020.7233@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 06:28:14PM +0200, Maxime Ripard wrote:
-> On Mon, Sep 29, 2014 at 03:47:15PM +0200, Thierry Reding wrote:
-> > 
-> > This is a fundamental issue that we are facing and I'm trying to come up
-> > with a solution that is future-proof and will work for drivers other
-> > than simplefb.
-> > 
-> > Just because we currently lack this functionality doesn't make it a hack
-> > trying to add it.
-> 
-> Or maybe it's just showing that the trend to rely more and more on the
-> firmware is a bad idea?
-> 
-> I really start to consider adding a sunxi-uboot-fb, that would just
-> duplicate the source code of simplefb but also taking the
-> clocks. Somehow, I feel like it will be easier (and definitely less of
-> a hack than using the generic common clock API).
 
-In the 2nd round of this discussion, i stated that another fb or even a 
-drm driver altogether seemed to be the sensible way out of this mess.
+Here are some basic OMAP test results for Linux v3.17-rc7.
+Logs and other details at:
 
-I suggest drm_rescue.
+    http://www.pwsan.com/omap/testlogs/test_v3.17-rc7/20140928222901/
 
-> > Then instead of hacking existing drivers to work on your particular
-> > platform you should start looking into hacking your platform drivers to
-> > cope with the lack of a proper display driver. Or alternatively spend
-> > the time getting a proper display driver merged.
-> > 
-> > Whether simplefb is used as primary framebuffer or just during only boot
-> > until hand-off to a real driver, it still remains a stop-gap solution.
-> 
-> Then really, simplefb deserves a more appropriate name. Like
-> uselessfb, tegrafb, DONOTUSEITYOUSTUPIDDEVfb or whatever makes it not
-> look generic.
 
-Very early on, now almost two months back, i used the word "denialfb".
-rpifb is the real name of this thing though, but then the dt binding 
-names would have to change and whatnot.
+Test summary
+------------
 
-I don't get the resistance, at least not from a technical point of view. 
-And i do not care enough to get properly involved in this pointless and 
-endless discussion. drm_rescue it is.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-Luc Verhaegen.
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 4430es2panda, 3517evm
+    Pass (13/17): am335xbonelt, am335xbone, 4460pandaes, 4460varsomom,
+		  37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
+
+PM: chip retention via suspend:
+    skip ( 1/12): 4430es2panda
+    FAIL ( 5/12): am335xbonelt, 4460varsomom, 2430sdp, 5430es2uevm,
+		  5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    skip ( 1/12): 4430es2panda
+    FAIL ( 6/12): am335xbonelt, 4460pandaes, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 5/12): 37xxevm, 3530es3beagle, 3530es31beagle, 3730beaglexm,
+		  3730es12beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+
+vmlinux object size
+(delta in bytes from test_v3.17-rc6 (0f33be009b89d2268e94194dc4fd01a7851b6d51)):
+   text     data      bss    total  kernel
+    -53        0        0      -53  omap1_defconfig
+    +11      +32        0      +43  omap1_defconfig_1510innovator_only
+    -21        0        0      -21  omap1_defconfig_5912osk_only
+   +775       -8        0     +767  multi_v7_defconfig
+   +551        0        0     +551  omap2plus_defconfig
+     -5        0        0       -5  omap2plus_defconfig_2430sdp_only
+   +391        0        0     +391  omap2plus_defconfig_am33xx_only
+    +79        0        0      +79  omap2plus_defconfig_am43xx_only
+   +551        0        0     +551  omap2plus_defconfig_cpupm
+   +151        0        0     +151  omap2plus_defconfig_dra7xx_only
+   -159        0        0     -159  omap2plus_defconfig_n800_multi_omap2xxx
+   -159       +8        0     -151  omap2plus_defconfig_n800_only_a
+   +547        0        0     +547  omap2plus_defconfig_no_pm
+    +79        0        0      +79  omap2plus_defconfig_omap2_4_only
+   +227        0        0     +227  omap2plus_defconfig_omap3_4_only
+    +79        0        0      +79  omap2plus_defconfig_omap5_only
+   +260        0      -60     +200  rmk_omap3430_ldp_allnoconfig
+    +99       -8        0      +91  rmk_omap3430_ldp_oldconfig
+    +48        0       +4      +52  rmk_omap4430_sdp_allnoconfig
+    -23       -8        0      -31  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.17-rc6 (0f33be009b89d2268e94194dc4fd01a7851b6d51))
+  avail  rsrvd   high  freed  board          kconfig
+ -224768k -36352k      .  -404k  3517evm        omap2plus_defconfig
+ -484604k -38660k      .  -404k  4430es2panda   omap2plus_defconfig
+    -4k     4k      .      .  am335xbonelt   omap2plus_defconfig
+
+
+The 4430 Pandaboard and the 3517EVM have gone offline.  These boards will 
+require some additional investigation which probably won't happen until 
+November.  In the meantime, they've been moved to the "skip" column in the 
+test results.
