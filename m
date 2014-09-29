@@ -1,43 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Sep 2014 16:28:55 +0200
-Subject: [PATCH] [media] pt3: remove bogus module_is_live() check
-Message-ID: <6460819.BmnhuA22YH@wuerfel>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 29 Sep 2014 15:29:26 +0100
+Subject: [PATCH v13 07/12] PCI: Add generic domain handling
+In-Reply-To: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1412000971-9242-8-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new pt3 driver checks the module reference for presence
-before dropping it, which fails to compile when modules
-are disabled:
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-media/pci/pt3/pt3.c: In function 'pt3_attach_fe':
-media/pci/pt3/pt3.c:433:6: error: implicit declaration of function 'module_is_live' [-Werror=implicit-function-declaration]
-      module_is_live(pt3->adaps[i]->i2c_tuner->dev.driver->owner))
+The handling of PCI domains (or PCI segments in ACPI speak) is usually a
+straightforward affair but its implementation is currently left to the
+architectural code, with pci_domain_nr(b) querying the value of the domain
+associated with bus b.
 
-As far as I can tell however, this check is not needed at all, because
-the module will not go away as long as pt3 is holding a reference on
-it. Also the previous check for NULL pointer is not needed at all,
-because module_put has the same check.
+This patch introduces CONFIG_PCI_DOMAINS_GENERIC as an option that can be
+selected if an architecture wants a simple implementation where the value
+of the domain associated with a bus is stored in struct pci_bus.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+The architectures that select CONFIG_PCI_DOMAINS_GENERIC will then have to
+implement pci_bus_assign_domain_nr() as a way of setting the domain number
+associated with a root bus.  All child buses except the root bus will
+inherit the domain_nr value from their parent.
 
-diff --git a/drivers/media/pci/pt3/pt3.c b/drivers/media/pci/pt3/pt3.c
-index 90f86ce7a001..39305f07dc2e 100644
---- a/drivers/media/pci/pt3/pt3.c
-+++ b/drivers/media/pci/pt3/pt3.c
-@@ -429,14 +429,10 @@ static int pt3_attach_fe(struct pt3_board *pt3, int i)
- 
- err_tuner:
- 	i2c_unregister_device(pt3->adaps[i]->i2c_tuner);
--	if (pt3->adaps[i]->i2c_tuner->dev.driver->owner &&
--	    module_is_live(pt3->adaps[i]->i2c_tuner->dev.driver->owner))
--		module_put(pt3->adaps[i]->i2c_tuner->dev.driver->owner);
-+	module_put(pt3->adaps[i]->i2c_tuner->dev.driver->owner);
- err_demod:
- 	i2c_unregister_device(pt3->adaps[i]->i2c_demod);
--	if (pt3->adaps[i]->i2c_demod->dev.driver->owner &&
--	    module_is_live(pt3->adaps[i]->i2c_demod->dev.driver->owner))
--		module_put(pt3->adaps[i]->i2c_demod->dev.driver->owner);
-+	module_put(pt3->adaps[i]->i2c_demod->dev.driver->owner);
- 	return ret;
+Signed-off-by: Catalin Marinas <Catalin.Marinas@arm.com>
+[Renamed pci_set_domain_nr() to pci_bus_assign_domain_nr()]
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/pci/probe.c | 11 ++++++++---
+ include/linux/pci.h | 21 +++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index e3cf8a2..636d1c9 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -485,7 +485,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
+ 	}
  }
  
+-static struct pci_bus *pci_alloc_bus(void)
++static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
+ {
+ 	struct pci_bus *b;
+ 
+@@ -500,6 +500,10 @@ static struct pci_bus *pci_alloc_bus(void)
+ 	INIT_LIST_HEAD(&b->resources);
+ 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
+ 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++	if (parent)
++		b->domain_nr = parent->domain_nr;
++#endif
+ 	return b;
+ }
+ 
+@@ -671,7 +675,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	/*
+ 	 * Allocate a new bus, and inherit stuff from the parent..
+ 	 */
+-	child = pci_alloc_bus();
++	child = pci_alloc_bus(parent);
+ 	if (!child)
+ 		return NULL;
+ 
+@@ -1761,13 +1765,14 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	char bus_addr[64];
+ 	char *fmt;
+ 
+-	b = pci_alloc_bus();
++	b = pci_alloc_bus(NULL);
+ 	if (!b)
+ 		return NULL;
+ 
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
++	pci_bus_assign_domain_nr(b, parent);
+ 	b2 = pci_find_bus(pci_domain_nr(b), bus);
+ 	if (b2) {
+ 		/* If we already got to this bus through a different bridge, ignore it */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 61978a4..a494e5d 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -456,6 +456,9 @@ struct pci_bus {
+ 	unsigned char	primary;	/* number of primary bridge */
+ 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
+ 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++	int		domain_nr;
++#endif
+ 
+ 	char		name[48];
+ 
+@@ -1288,6 +1291,24 @@ static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+ static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
+ #endif /* CONFIG_PCI_DOMAINS */
+ 
++/*
++ * Generic implementation for PCI domain support. If your
++ * architecture does not need custom management of PCI
++ * domains then this implementation will be used
++ */
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++static inline int pci_domain_nr(struct pci_bus *bus)
++{
++	return bus->domain_nr;
++}
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
++#else
++static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
++					struct device *parent)
++{
++}
++#endif
++
+ /* some architectures require additional setup to direct VGA traffic */
+ typedef int (*arch_set_vga_state_t)(struct pci_dev *pdev, bool decode,
+ 		      unsigned int command_bits, u32 flags);
+-- 
+2.1.1
