@@ -1,50 +1,51 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 29 Sep 2014 20:06:46 +0200
-Subject: [PATCH 10/13] arm: dts: am33xx: add DMA properties for UART
-In-Reply-To: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1412014009-13315-11-git-send-email-bigeasy@linutronix.de>
+From: yinghai@kernel.org (Yinghai Lu)
+Date: Mon, 29 Sep 2014 12:06:10 -0700
+Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
+In-Reply-To: <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+ <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
+ <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
+Message-ID: <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Reviewed-by: Tony Lindgren <tony@atomide.com>
-Tested-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- arch/arm/boot/dts/am33xx.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Mon, Sep 29, 2014 at 11:25 AM, Yinghai Lu <yinghai@kernel.org> wrote:
+> On Mon, Sep 29, 2014 at 7:29 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+>> If the firmware has not assigned all the bus resources and we are not just
+>> probing the PCI buses, it makes sense to assign the unassigned resources
+>> in pci_scan_root_bus().
+>>
+>> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>> CC: Arnd Bergmann <arnd@arndb.de>
+>> CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> ---
+>>  drivers/pci/probe.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 636d1c9..d2ebd49 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1951,6 +1951,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+>>         if (!found)
+>>                 pci_bus_update_busn_res_end(b, max);
+>>
+>> +       if (!pci_has_flag(PCI_PROBE_ONLY))
+>> +               pci_assign_unassigned_bus_resources(b);
+>> +
+>>         pci_bus_add_devices(b);
+>>         return b;
+>>  }
+>
+> No, you can not do it that early.
+>
+> On x86, we need to call
+> pcibios_resource_survey_bus at first.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 3a0a161342ba..078a760a4a21 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -200,6 +200,8 @@
- 			reg = <0x44e09000 0x2000>;
- 			interrupts = <72>;
- 			status = "disabled";
-+			dmas = <&edma 26>, <&edma 27>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		uart1: serial at 48022000 {
-@@ -209,6 +211,8 @@
- 			reg = <0x48022000 0x2000>;
- 			interrupts = <73>;
- 			status = "disabled";
-+			dmas = <&edma 28>, <&edma 29>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		uart2: serial at 48024000 {
-@@ -218,6 +222,8 @@
- 			reg = <0x48024000 0x2000>;
- 			interrupts = <74>;
- 			status = "disabled";
-+			dmas = <&edma 30>, <&edma 31>;
-+			dma-names = "tx", "rx";
- 		};
- 
- 		uart3: serial at 481a6000 {
--- 
-2.1.0
+on x86:
+pcibios_init
+pcibios_resource_survey()
+pcibios_assign_resources() via fs_initcall
