@@ -1,58 +1,76 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 29 Sep 2014 16:34:02 +0200
-Subject: [PATCH v5 09/10] ARM: dts: berlin: add the Ethernet node
-In-Reply-To: <5425A178.4050501@cogentembedded.com>
-References: <1411742036-23520-1-git-send-email-antoine.tenart@free-electrons.com>
- <1411742036-23520-10-git-send-email-antoine.tenart@free-electrons.com>
- <5425A178.4050501@cogentembedded.com>
-Message-ID: <54296DDA.8000400@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Sep 2014 16:36:30 +0200
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <8631927.qWHZsjCs8e@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 07:25 PM, Sergei Shtylyov wrote:
-> On 09/26/2014 06:33 PM, Antoine Tenart wrote:
->> This patch adds the Ethernet node, enabling the network unit on Berlin
->> BG2Q SoCs.
->
->> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->>   arch/arm/boot/dts/berlin2q.dtsi | 17 +++++++++++++++++
->>   1 file changed, 17 insertions(+)
->
->> diff --git a/arch/arm/boot/dts/berlin2q.dtsi
->> b/arch/arm/boot/dts/berlin2q.dtsi
->> index 902eddb19cd8..d442b22fd1ea 100644
->> --- a/arch/arm/boot/dts/berlin2q.dtsi
->> +++ b/arch/arm/boot/dts/berlin2q.dtsi
->> @@ -114,6 +114,23 @@
->>               #interrupt-cells = <3>;
->>           };
->>
->> +        eth0: ethernet at b90000 {
->> +            compatible = "marvell,pxa168-eth";
->> +            reg = <0xb90000 0x10000>;
->> +            clocks = <&chip CLKID_GETH0>;
->> +            interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
->> +            /* set by bootloader */
->> +            local-mac-address = [00 00 00 00 00 00];
->> +            #address-cells = <1>;
->> +            #size-cells = <0>;
->> +            phy-handle = <&ethphy0>;
->> +            status = "disabled";
->> +
->> +            ethphy0: ethernet-phy at 0 {
->> +                reg = <0>;
->> +            };
->> +        };
->> +
->
->     Hm, is the PHY internal to the Ethernet controller?
+On Sunday 28 September 2014 15:53:28 suravee.suthikulpanit at amd.com wrote:
+> +
+> +#ifdef CONFIG_ARM64
+> +struct pci_bus *gen_scan_root_bus(struct device *parent, int bus,
+> +                                      struct pci_ops *ops, void *sysdata,
+> +                                      struct list_head *resources)
+> +{
 
-Sergei,
+I don't see anything ARM64 specific in this, the function only uses
+the newly added generic helpers.
 
-at least for BG2 and BG2CD the PHY is internal to the SoC. Also,
-MDIO bus is part of the ethernet IP, so placing the PHY inside
-the combined Ethernet/MDIO IP node is sane.
+>  static int gen_pci_probe(struct platform_device *pdev)
+>  {
+> @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>         struct device *dev = &pdev->dev;
+>         struct device_node *np = dev->of_node;
+>         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +#ifndef CONFIG_ARM64
+>         struct hw_pci hw = {
+>                 .nr_controllers = 1,
+>                 .private_data   = (void **)&pci,
+> @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>                 .map_irq        = of_irq_parse_and_map_pci,
+>                 .ops            = &gen_pci_ops,
+>         };
+> +#endif
+>  
 
-Sebastian
+Same here, I'd suggest marking this "#ifdef CONFIG_ARM" instead, as hw_pci
+is an arm32 specific data structure.
+
+>         if (!pci)
+>                 return -ENOMEM;
+> @@ -368,8 +429,24 @@ static int gen_pci_probe(struct platform_device *pdev)
+>                 gen_pci_release_of_pci_ranges(pci);
+>                 return err;
+>         }
+> +#ifdef CONFIG_ARM64
+>  
+> +#ifdef CONFIG_PCI_MSI
+> +       pci->msi_parent = of_parse_phandle(np, "msi-parent", 0);
+> +       if (!pci->msi_parent) {
+> +               dev_err(&pdev->dev, "Failed to allocate msi-parent.\n");
+> +               return -EINVAL;
+> +       }
+> +#endif
+
+We probably want to enable MSI unconditionally on ARM64, so the #ifdef is
+not necessary here. However, I don't think that a missing msi-parent should
+be a fatal error here: we can still continue without MSI support if this
+case.
+
+> +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
+> +                              &gen_pci_ops, pci, &pci->resources)) {
+> +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
+> +               return -ENODEV;
+> +       }
+> +#else
+>         pci_common_init_dev(dev, &hw);
+> +#endif /* CONFIG_ARM64 */
+> 
+
+Again, just make the pci_common_init_dev() call #ifdef CONFIG_ARM, and move
+the generic case after it, outside of the #ifdef.
+
+	Arnd
