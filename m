@@ -1,145 +1,126 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 29 Sep 2014 19:25:18 +0200
-Subject: [PATCH v2 2/5] pinctrl: imx: add gpio pinmux support for vf610
-In-Reply-To: <87sijaeab6.fsf@nbsps.com>
-References: <cover.1411492954.git.stefan@agner.ch>
- <bb68d2360314158cd8ccb9c6794877c3bb45d72e.1411492954.git.stefan@agner.ch>
- <20140925024712.GB6405@dragon> <1d3735aff5e0961c43d349d673a1c2b2@agner.ch>
- <20140925090714.GH6405@dragon> <26008fa68a3eaf5f806a7dc4df48f77e@agner.ch>
- <877g0rlkh3.fsf@nbsps.com> <e9ddcd256056187ffea0b05b7b31c1a6@agner.ch>
- <87sijaeab6.fsf@nbsps.com>
-Message-ID: <3bdbe13465f857fe29248c0fdfd54019@agner.ch>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Mon, 29 Sep 2014 10:30:32 -0700
+Subject: [PATCH v3] clocksource: arch_timer: Allow the device tree to
+ specify the physical timer
+In-Reply-To: <20140926100025.GC4476@leverpostej>
+References: <1410454801-14231-1-git-send-email-dianders@chromium.org>
+ <20140926100025.GC4476@leverpostej>
+Message-ID: <CAPz6YkWZWgm--6EJxoV1s3zqTNpAF6+CBOrRc5qxdm5=hFzj1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-09-29 17:05, schrieb Bill Pringlemeir:
->>> On 25 Sep 2014, stefan at agner.ch wrote:
-> 
->>>> IMHO, fully orthogonal is not possible, since on Vybrid those two
->>>> depend on each other. But in order to make it "more orthogonal", we
->>>> maybe should force applying the full configuration in
->>>> imx_pmx_gpio_request_enable (e.g. drive strenght etc), rather then
->>>> only mux the pad to to GPIO...
->>>> What do you think?
-> 
->> Am 2014-09-25 18:43, schrieb Bill Pringlemeir:
-> 
->>> The muxing must have been done, that is correct.  However, this could
->>> be by a boot loader, by some other API, etc.  People maybe concerned
->>> about Linux affecting 'CAN' (or some 'mission critical' pins) muxing
->>> for instance, but want the A5 to handle GPIO.
->>>
->>> If somewhere, somehow the pin was muxed properly and the GPIO code
->>> still works, I believe this is a win.  I see that this flexibility
->>> makes it more difficult to get something that just works.  I think
->>> the device trees take care of this for normal users.  It might be
->>> appropriate to add a DT node that sets 'GPIO_CONTROL' and put a note
->>> in the DT-GPIO document, that pinctrl is needed for a normal case or
->>> if some external muxing is used or not needed, then 'control=false'
->>> can be set (or whatever good DT terminology)?  Then the
->>> 'GPIO_CONTROL' check would be in the 'vf610_gpio_direction_input()'
->>> functions.  The 'pinctrl' functions are currently compiled to stubs
->>> if that is configured out.
-> 
-> On 26 Sep 2014, stefan at agner.ch wrote:
-> 
->> Currently pinctrl is not optional for Vybrid (Kconfig mandates pinctrl
->> by "select PINCTRL_VF610").
-> 
->> IMHO there is no real value having a way to mark a pin as "muxed
->> externally" (control=false). If we use a pin, we should configure and
->> mux that properly in Linux, and if we don't have valid
->> configuration/mux information, we should not touch that pin.
-> 
-> I didn't mean per-pin, I meant for the GPIO controller as a whole.  I
-> was also looking at a IOMUX controlled by the M4 and/or a boot loader.
-> I agree it is not possible with the mainline.  This just makes it even
-> less possible.  This is great if we know we are going that route.
+On Fri, Sep 26, 2014 at 3:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Sep 11, 2014 at 06:00:01PM +0100, Doug Anderson wrote:
+>> Some 32-bit (ARMv7) systems are architected like this:
+>>
+>> * The firmware doesn't know and doesn't care about hypervisor mode and
+>>   we don't want to add the complexity of hypervisor there.
+>>
+>> * The firmware isn't involved in SMP bringup or resume.
+>>
+>> * The ARCH timer come up with an uninitialized offset between the
+>>   virtual and physical counters.  Each core gets a different random
+>>   offset.
+>>
+>> * The device boots in "Secure SVC" mode.
+>>
+>> * Nothing has touched the reset value of CNTHCTL.PL1PCEN or
+>>   CNTHCTL.PL1PCTEN (both default to 1 at reset)
+>>
+>> On systems like the above, it doesn't make sense to use the virtual
+>> counter.  There's nobody managing the offset and each time a core goes
+>> down and comes back up it will get reinitialized to some other random
+>> value.
+>>
+>> Let's add a property to the device tree to say that we shouldn't use
+>> the virtual timer.  Firmware could potentially remove this property
+>> before passing the device tree to the kernel if it really wants the
+>> kernel to use a virtual timer.
+>>
+>> Note that it's been said that ARM64 (ARMv8) systems the firmware and
+>> kernel really can't be architected as described above.  That means
+>> using the physical timer like this really only makes sense for ARMv7
+>> systems.
+>>
+>> In order for this patch to do anything useful, we also need Sonny's
+>> patch at <https://patchwork.kernel.org/patch/4790921/>
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+>> ---
+>> Changes in v3:
+>> - Wording changes to bindings and patch desc as per Will Deacon
+>>
+>> Changes in v2:
+>> - Add "#ifdef CONFIG_ARM" as per Will Deacon
+>>
+>>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>>  drivers/clocksource/arm_arch_timer.c                 | 5 +++++
+>>  2 files changed, 11 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> index 37b2caf..e28fced 100644
+>> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> @@ -22,6 +22,12 @@ to deliver its interrupts via SPIs.
+>>  - always-on : a boolean property. If present, the timer is powered through an
+>>    always-on power domain, therefore it never loses context.
+>>
+>> +** Optional properties:
+>> +
+>> +- arm,use-physical-timer : Don't ever use the virtual timer, just use the
+>> +  physical one.  Only supported for ARM (not ARM64).
+>
+> I'm still not keen on telling the kernel what to do rather than
+> describing the actual state of affairs and having the kernel decide what
+> to do. Perhaps what we actually need is:
+>
+> - cntvoff-not-fw-configured: Firmware does not configure CNTVOFF, which
+>   may reset to (different) arbitrary values on each CPU.
+>
+> This also doesn't describe that CNTHCTL.PL1PC(T)EN must both be 1. While
+> that is the reset state, it still feels dodbgy to me to rely on that.
+>
+> Mark.
 
-Ok, but this patch doesn't make it less possible then before: You can
-disable the GPIO driver or disable all gpio device tree entries.
+Mark, I'm happy to repost it with that name for Doug.
 
-> 
->> In v2 of this patchset, the GPIO code only worked when there _is_ a
->> pinctrl entry for that GPIO pin in the DT. This is because I need the
->> register offset, which is provided by the entry itself. But the pad
->> configuration is another point, which I did not consider in v2. But in
->> v3, the GPIO code also writes the pad control.
-> 
-> I was a little concerned about this as the pin may have pull-ups and
-> pull-downs.  We would not want to dynamically change this.  However, I
-> don't fully understand this path.
-> 
-> [snip]
-> 
->>> Then there is 'multi-machine' support with DT and compile time
->>> selects with CONFIG_PINCTRL and I don't think there is a lot of
->>> additional code or confusion?
-> 
->> I don't understand that.
-> 
-> I was thinking of a modified Vybrid which would allow us to not select
-> PINCTRL.  As per Shawn's comment, it is suppose to be
-> optional/orthogonal to the GPIO controller.  If someone made the change
-> to not select PINCTRL_VF610, then the GPIO code calls would currently
-> compile to stubs.  To get the same things with a multi-machine
-> (Vybrid/Imx with/without pinctrl), then you could use the DT property
-> which would avoid the pinctrl calls.
+I think it's fair to describe this state in the binding, and if a
+firmware were to put this property into the device-tree for and
+CNTHCTL.PL1P(T)CEN also have configured to 0, then the kernel can
+merely consider that to be a broken usage of this property.   We
+certainly can't protect against all of the possible invalid states
+caused and probably shouldn't try.  If we implement something like
+Christopher's suggestion for transitioning from secure svc to NS hyp
+mode then the kernel can simply ignore this property at that point.
 
-Now I understand, you mean a kernel with PINCTRL support but having an
-option to still disable the pinctrl functionality for Vybrids GPIOs.
-
-I think if you descide to use a pin as GPIO from Linux on A5, you also
-want that pin to be "pinctrl"ed by Linux. I don't see a reason why you
-want a pin configured by something else (bootloader or firmware on M4),
-but then use that same pin as GPIO from Linux. IMHO, it's good to get
-this as a package (GPIO which does pinctrl).
-
-In the IOMUXC module each pin has its own register, so here it's ok to
-have multiple sytems fiddling with it, as long as the systems are not
-touching the same pins at the same time.
-
-> The more required modules we require for each feature, the harder it is
-> to partition the AIPS peripherals between cores.  It sort of makes the
-> mainline Linux only useful for the VF5xx non-secure parts.
-
-I agree, having the option to partition AIPS peripherals is useful,
-especially on Vybrid (and i.MX6SX). And this is perfectly possible with
-device tree. Just disable the gpio device tree sections (which are
-compatible = "fsl,vf610-gpio") which you don't plan to use on Linux.
-Linux creates 5 instances of the driver when all 5 gpio device tree
-entries are active. However, you can create a board file with only one
-gpio section, and you get only one instance of the driver which takes
-care of the associated 32 pins. Or even no gpio device tree sections at
-all, and you have the same situation before this driver was merged...
-However, sub GPIO/PORT bank partitioning is not possible... The PORT and
-GPIO module have shared register for 32 pins, and some operation might
-not be atomic, so locking would be required. Having two system accessing
-the same PORT/GPIO bank would certainly impose problems, for instance
-when handling a PORT interrupt.
-
-
-> I guess another option is to make another pinctrl module for the Vybrid
-> which uses some inter-core communications to alter the MUX
-> configuration.  This makes sense for the pinctrl and the CCM/clock
-> modules.  Each and every driver depends on them, so it is probably good
-> for sanity to require that Linux has some version of these modules.  If
-> the 'M4' was to control the pins and/or clock, then some other modules
-> could be written that makes some calls to that CPU (or world).
-
-I also have some M4 firmwares running (eCos, bare-metal), and usually we
-just let them access the CCM in a "read-only" mode. It works fairly
-well, however I agree this solution is not perfect. The hardware
-designers gave us hardware semaphores and CPU to CPU interrupts, so we
-could build a configuration interface (and maybe a resource allocation
-as well) around this. This would then implicate an ABI, and this
-certainly would need some time and discussion to make it good enough for
-mainline, if possible at all.
-
-> For other AIPS peripherals, it would be nice if they could be either
-> configured out and/or set to disabled by the device tree.
-
-Agreed, we should do this as much as possible for Vybrid. 
-
---
-Stefan
+>> +
+>> +
+>>  Example:
+>>
+>>       timer {
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 5163ec1..e7aa256 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -649,6 +649,11 @@ static void __init arch_timer_init(struct device_node *np)
+>>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>>       arch_timer_detect_rate(NULL, np);
+>>
+>> +#ifdef CONFIG_ARM
+>> +     if (of_property_read_bool(np, "arm,use-physical-timer"))
+>> +             arch_timer_use_virtual = false;
+>> +#endif
+>> +
+>>       /*
+>>        * If HYP mode is available, we know that the physical timer
+>>        * has been configured to be accessible from PL1. Use it, so
+>> --
+>> 2.1.0.rc2.206.gedb03e5
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
