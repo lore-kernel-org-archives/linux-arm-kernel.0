@@ -1,36 +1,36 @@
-From: j.uzycki@elproma.com.pl (Janusz Uzycki)
-Date: Mon, 29 Sep 2014 15:59:20 +0200
-Subject: [PATCH RESEND] serial: mxs-auart: add sysrq support
-In-Reply-To: <1411999160-26804-1-git-send-email-j.uzycki@elproma.com.pl>
-References: <Re: [PATCH] serial: mxs-auart: add sysrq support>
- <1411999160-26804-1-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <1411999160-26804-2-git-send-email-j.uzycki@elproma.com.pl>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 29 Sep 2014 15:57:24 +0200
+Subject: ARMADA 370 - Kernel panic during boot
+In-Reply-To: <d1be3a0a37860f969b99ecc09b4cfcd8@twien.net>
+References: <6241a6200de0d573c982f73f062ed7fa@twien.net>
+ <542938A7.8050307@free-electrons.com>
+ <d1be3a0a37860f969b99ecc09b4cfcd8@twien.net>
+Message-ID: <20140929155724.579964b5@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using mxs-auart based console, sometime we need the sysrq function
-to help debugging kernel. The sysrq code is basically there,
-this patch just simply enable it.
+Hello,
 
-Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
----
- drivers/tty/serial/mxs-auart.c | 4 ++++
- 1 file changed, 4 insertions(+)
+On Mon, 29 Sep 2014 13:25:03 +0200, post at twien.net wrote:
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 9381732..4c998a3 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -14,6 +14,10 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#if defined(CONFIG_SERIAL_MXS_AUART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-+#define SUPPORT_SYSRQ
-+#endif
-+
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/init.h>
+> 	soc {
+> 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
+
+Are you really sure about the 0xd0000000 value here? Your earlyprintk
+works using CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y according to
+your .config, which indicates that your internal registers are mapped at
+0xf1000000 and not@0xd0000000 as your Device Tree indicates.
+
+Can you change this line to:
+
+	ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+
+And try again?
+
+Thanks,
+
+Thomas
 -- 
-1.7.11.3
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
