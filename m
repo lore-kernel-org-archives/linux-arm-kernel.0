@@ -1,62 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 29 Sep 2014 15:20:45 -0700
-Subject: [PATCH 4/4] ARM: DT: apq8064: Add SATA controller support.
-In-Reply-To: <1411982134-8090-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982134-8090-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5429DB3D.5080701@codeaurora.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Tue, 30 Sep 2014 08:31:52 +1000
+Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
+In-Reply-To: <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+ <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
+ <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
+ <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
+ <1412024521.4285.98.camel@pasglop>
+ <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
+Message-ID: <1412029912.4285.110.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/14 02:15, Srinivas Kandagatla wrote:
-> @@ -396,6 +407,35 @@
->  			usb-phy		= <&usb4_phy>;
->  		};
->  
-> +		sata_phy0:sata-phy at 1b400000{
+On Mon, 2014-09-29 at 15:33 -0600, Bjorn Helgaas wrote:
+> > Right and on powerpc and others as well. We need to survey existing
+> > resources. We also have a number of platform things that might need
+> > to happen before we do the final re-assignment pass.
+> 
+> That's true today.  But I don't know whether it *has* to be this way
+> forever.  On x86, pcibios_resource_survey() throws in E820 information
+> (which we know long before we do any PCI enumeration) and some IO-APIC
+> resources (it looks like we also know these before PCI enumeration).
+> Powerpc has pcibios_reserve_legacy_regions(), but that looks like
+> mostly stuff that could be done when we find the host bridge, before
+> we enumerate PCI devices below it.
 
-add some spaces here?
+Oh we can probably change that but it's going to be much more work than
+just moving the assignment into pci_scan_root_bus(). There are also a
+number of subtle and not-so-subtle bits of code that rely on side
+effects of the current code such as anything that tests for bus->added
+or dev->added. Again, nothing we can't sort out eventually but the
+transition might be a bit painful.
 
-> +			compatible	= "qcom,apq8064-sata-phy";
-> +			reg		= <0x1b400000 0x200>;
-> +			reg-names	= "phy_mem";
-> +			clocks		= <&gcc SATA_PHY_CFG_CLK>;
-> +			clock-names = "cfg";
-> +			#phy-cells = <0>;
+We might need to introduce a new flag for platforms converted to the
+"new style" generalized resource assignment which we can deprecate once
+everybody has moved over.
 
-These two lost the pretty tabs.
-
-> +		};
-> +
-> +		sata0: sata at 29000000 {
-> +			compatible	= "generic-ahci";
-> +			reg		= <0x29000000 0x180>;
-> +			interrupts	= <0 209 0>;
-
-Sorry I'm nitpicking but it annoys me. Either align it all or don't
-align it.
-
-> +			clocks = <&gcc SFAB_SATA_S_H_CLK>, <&gcc SATA_H_CLK>,
-> +				 <&gcc SATA_A_CLK>, <&gcc SATA_RXOOB_CLK>,
-> +				 <&gcc SATA_PMALIVE_CLK>;
-> +
-> +			clock-names = "slave_iface", "iface",
-> +				      "bus", "rxoob",
-> +				      "core_pmalive";
-> +			assigned-clocks = <&gcc SATA_RXOOB_CLK>,
-> +						<&gcc SATA_PMALIVE_CLK>;
-> +			assigned-clock-rates = <100000000>, <100000000>;
-> +
-> +			phys  = <&sata_phy0>;
-> +			phy-names = "sata-phy";
-> +			target-supply = <&pm8921_s4>;
-> +		};
-> +
->  		/* Temporary fixed regulator */
->  		vsdcc_fixed: vsdcc-regulator {
->  			compatible = "regulator-fixed";
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Cheers,
+Ben.
+ 
