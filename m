@@ -1,76 +1,47 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 29 Sep 2014 10:50:14 +0530
-Subject: [PATCH v2 2/5] pinctrl: exynos: Add irq_chip instance for Exynos7
- wakeup interrupts
-In-Reply-To: <54218882.1050401@gmail.com>
-References: <1411460169-30536-1-git-send-email-a.kesavan@samsung.com>
- <1411460169-30536-3-git-send-email-a.kesavan@samsung.com>
- <54218882.1050401@gmail.com>
-Message-ID: <CAM4voakz5JpKV9sK8EHWDmBTFxy8YDCFejGz_VbZ0bamtVmteQ@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 29 Sep 2014 10:55:32 +0530
+Subject: [PATCH v2 3/4] rtc: omap: Update Kconfig for OMAP RTC
+In-Reply-To: <20140925151117.GL28045@saruman>
+References: <1411637529-18289-1-git-send-email-lokeshvutla@ti.com>
+ <1411637529-18289-4-git-send-email-lokeshvutla@ti.com>
+ <20140925151117.GL28045@saruman>
+Message-ID: <5428ED4C.8030306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
-
-On Tue, Sep 23, 2014 at 8:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On 23.09.2014 10:16, Abhilash Kesavan wrote:
-> [snip]
->> @@ -383,9 +377,11 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
->>  /*
->>   * irq_chip for wakeup interrupts
->>   */
->> -static struct exynos_irq_chip exynos_wkup_irq_chip = {
->> +static struct exynos_irq_chip *exynos_wkup_irq_chip;
->> +
-> [snip]
->> @@ -459,7 +480,7 @@ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
->>  static int exynos_wkup_irq_map(struct irq_domain *h, unsigned int virq,
->>                                       irq_hw_number_t hw)
->>  {
->> -     irq_set_chip_and_handler(virq, &exynos_wkup_irq_chip.chip,
->> +     irq_set_chip_and_handler(virq, &exynos_wkup_irq_chip->chip,
->>                                       handle_level_irq);
->>       irq_set_chip_data(virq, h->host_data);
->>       set_irq_flags(virq, IRQF_VALID);
->> @@ -491,7 +512,12 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
->>       int idx, irq;
+On Thursday 25 September 2014 08:41 PM, Felipe Balbi wrote:
+> On Thu, Sep 25, 2014 at 03:02:08PM +0530, Lokesh Vutla wrote:
+>> From: Tero Kristo <t-kristo@ti.com>
 >>
->>       for_each_child_of_node(dev->of_node, np) {
->> -             if (of_match_node(exynos_wkup_irq_ids, np)) {
->> +             const struct of_device_id *match;
->> +
->> +             match = of_match_node(exynos_wkup_irq_ids, np);
->> +             if (match) {
->> +                     exynos_wkup_irq_chip = kmemdup(match->data,
->> +                             sizeof(struct exynos_irq_chip), GFP_KERNEL);
->
-> That's not exactly what I had in my mind.
->
-> You just changed the code to write to another global variable. This is
-> not the best practice and might cause hard to track issues in future,
-> when extending the driver.
->
-> From what I can see, the best solution would be to add .irq_chip field
-> to samsung_pin_bank struct. Then exynos_wkup_irq_map() could access it
-> through h->host_data pointer and exynos_irq_demux_eint16_31() could also
-> retrieve the irq chip through bank struct without the need too add chip
-> field to exynos_muxed_weint_data struct.
->
-> As a side effect, it would be possible to consolidate
-> exynos_wkup_irqd_ops with exynos_gpio_irqd_ops, which currently only
-> differ in irq chip passed as argument to irq_set_chip_and_handler() in
-> .map() callback.
+>> RTC is present in AM43xx and DRA7xx also. Updating the
+>> same in Kconfig.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>> Changes since v1:
+>> 	- New patch
+>>  drivers/rtc/Kconfig    | 6 +++---
+>>  drivers/rtc/rtc-omap.c | 4 ++--
+>>  2 files changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+>> index a168e96..b092e2f 100644
+>> --- a/drivers/rtc/Kconfig
+>> +++ b/drivers/rtc/Kconfig
+>> @@ -971,11 +971,11 @@ config RTC_DRV_IMXDI
+>>  	   will be called "rtc-imxdi".
+>>  
+>>  config RTC_DRV_OMAP
+>> -	tristate "TI OMAP1"
+>> -	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
+>> +	tristate "TI OMAP Real Time Clock"
+>> +	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX || SOC_DRA7XX || SOC_AM43XX
+> 
+> do you mind if we just make this "depends on ARCH_OMAP || ARCH_DAVINCI" ? Pretty much
+> every incarnation has this anyway.
+Ok..will update it and repost.
 
-I have posted v3 adding a new irq_chip field to the samsung_pin_bank
-structure as per your suggestion. Please take a look.
-
-Regards,
-Abhilash
->
-> Best regards,
-> Tomasz
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks and regards,
+Lokesh
+> 
