@@ -1,40 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Sep 2014 10:31:37 +0200
-Subject: [PATCH v3 1/2] iopoll: Introduce memory-mapped IO polling macros
-In-Reply-To: <1411874849-343-2-git-send-email-mitchelh@codeaurora.org>
-References: <1411874849-343-1-git-send-email-mitchelh@codeaurora.org>
- <1411874849-343-2-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20140929083136.GG12506@ulmo>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 29 Sep 2014 10:33:48 +0200
+Subject: [PATCH v2 6/6] ARM: imx53: add cpufreq support
+In-Reply-To: <20140928041513.GI12999@dragon>
+References: <1411738864-26549-1-git-send-email-l.stach@pengutronix.de>
+ <1411738864-26549-6-git-send-email-l.stach@pengutronix.de>
+ <20140928041513.GI12999@dragon>
+Message-ID: <1411979628.2625.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 08:27:28PM -0700, Mitchel Humpherys wrote:
-> From: Matt Wagantall <mattw@codeaurora.org>
+Am Sonntag, den 28.09.2014, 12:15 +0800 schrieb Shawn Guo:
+> On Fri, Sep 26, 2014 at 03:41:04PM +0200, Lucas Stach wrote:
+> > Instanciate device for the generic cpufreq-dt driver.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > 
-> It is sometimes necessary to poll a memory-mapped register until its
-> value satisfies some condition. Introduce a family of convenience macros
-> that do this. Tight-loop and sleeping versions are provided with and
-> without timeouts.
+> I assume that I should only apply this patch after the cpufreq-dt change
+> gets merged and shows up on my base.
 > 
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
->  include/linux/iopoll.h | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 77 insertions(+)
->  create mode 100644 include/linux/iopoll.h
+> Shawn
+> 
+I would think its safe to merge this patch. The cpufreq-dt change will
+be merged with 3.18. Until then the worst that could happen is that the
+cpufreq driver doesn't bind to the mx5 cpu device.
 
-It would be good to provide a changelog with each new version of the
-patch. As it is I now have v2 and v3 of this patch in my inbox and I
-have no idea what the differences are, so I'd need to download both
-and run them through interdiff to find out.
+> > ---
+> > v2:
+> > - new patch, split out from DTS changes and rebased
+> >   with new name for cpufreq driver
+> > ---
+> >  arch/arm/mach-imx/mach-imx53.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
+> > index 03dd6ea13acc..7587cf0cba3e 100644
+> > --- a/arch/arm/mach-imx/mach-imx53.c
+> > +++ b/arch/arm/mach-imx/mach-imx53.c
+> > @@ -41,6 +41,8 @@ static void __init imx53_dt_init(void)
+> >  static void __init imx53_init_late(void)
+> >  {
+> >  	imx53_pm_init();
+> > +
+> > +	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> >  }
+> >  
+> >  static const char * const imx53_dt_board_compat[] __initconst = {
+> > -- 
+> > 2.1.0
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140929/42876baa/attachment.sig>
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
