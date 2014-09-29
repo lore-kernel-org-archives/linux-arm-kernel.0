@@ -1,181 +1,80 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 29 Sep 2014 15:29:28 +0100
-Subject: [PATCH v13 09/12] of/pci: Add support for parsing PCI host bridge
- resources from DT
-In-Reply-To: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1412000971-9242-10-git-send-email-Liviu.Dudau@arm.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Mon, 29 Sep 2014 15:32:43 +0100
+Subject: [PATCH] ARM: sun7i: add support for A20-OLinuXino-Lime2
+In-Reply-To: <20140929132543.GC4081@lukather>
+References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
+ <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
+Message-ID: <54296D8B.3080304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a function to parse the PCI DT ranges that can be used to create a
-pci_host_bridge structure together with its associated bus.
+On 29/09/14 14:25, Maxime Ripard wrote:
+> On Mon, Sep 29, 2014 at 01:56:49PM +0100, Iain Paton wrote:
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-[make io_base parameter optional]
-Signed-off-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Catalin Marinas <catalin.marinas@arm.com>
----
- drivers/of/of_pci.c    | 117 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h |   6 +++
- 2 files changed, 123 insertions(+)
+>> What additional patches are we talking about?  The following:
+>> regulator: axp20x: Use parent device as regulator configuration device
+>> i2c: mv64xxx: continue probe when clock-frequency is missing
+>> or are there others I'd need to pick out of linux-next?
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288901.html
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 82d172f..8882b46 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -1,7 +1,9 @@
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_pci.h>
-+#include <linux/slab.h>
- 
- static inline int __of_pci_pci_compare(struct device_node *node,
- 				       unsigned int data)
-@@ -114,6 +116,121 @@ int of_get_pci_domain_nr(struct device_node *node)
- }
- EXPORT_SYMBOL_GPL(of_get_pci_domain_nr);
- 
-+#if defined(CONFIG_OF_ADDRESS)
-+/**
-+ * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-+ * @dev: device node of the host bridge having the range property
-+ * @busno: bus number associated with the bridge root bus
-+ * @bus_max: maximum number of buses for this bridge
-+ * @resources: list where the range of resources will be added after DT parsing
-+ * @io_base: pointer to a variable that will contain on return the physical
-+ * address for the start of the I/O range. Can be NULL if the caller doesn't
-+ * expect IO ranges to be present in the device tree.
-+ *
-+ * It is the caller's job to free the @resources list.
-+ *
-+ * This function will parse the "ranges" property of a PCI host bridge device
-+ * node and setup the resource mapping based on its content. It is expected
-+ * that the property conforms with the Power ePAPR document.
-+ *
-+ * It returns zero if the range parsing has been successful or a standard error
-+ * value if it failed.
-+ */
-+int of_pci_get_host_bridge_resources(struct device_node *dev,
-+			unsigned char busno, unsigned char bus_max,
-+			struct list_head *resources, resource_size_t *io_base)
-+{
-+	struct resource *res;
-+	struct resource *bus_range;
-+	struct of_pci_range range;
-+	struct of_pci_range_parser parser;
-+	char range_type[4];
-+	int err;
-+
-+	if (io_base)
-+		*io_base = (resource_size_t)OF_BAD_ADDR;
-+
-+	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-+	if (!bus_range)
-+		return -ENOMEM;
-+
-+	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-+
-+	err = of_pci_parse_bus_range(dev, bus_range);
-+	if (err) {
-+		bus_range->start = busno;
-+		bus_range->end = bus_max;
-+		bus_range->flags = IORESOURCE_BUS;
-+		pr_info("  No bus range found for %s, using %pR\n",
-+			dev->full_name, bus_range);
-+	} else {
-+		if (bus_range->end > bus_range->start + bus_max)
-+			bus_range->end = bus_range->start + bus_max;
-+	}
-+	pci_add_resource(resources, bus_range);
-+
-+	/* Check for ranges property */
-+	err = of_pci_range_parser_init(&parser, dev);
-+	if (err)
-+		goto parse_failed;
-+
-+	pr_debug("Parsing ranges property...\n");
-+	for_each_of_pci_range(&parser, &range) {
-+		/* Read next ranges element */
-+		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-+			snprintf(range_type, 4, " IO");
-+		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
-+			snprintf(range_type, 4, "MEM");
-+		else
-+			snprintf(range_type, 4, "err");
-+		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
-+			range.cpu_addr, range.cpu_addr + range.size - 1,
-+			range.pci_addr);
-+
-+		/*
-+		 * If we failed translation or got a zero-sized region
-+		 * then skip this range
-+		 */
-+		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-+			continue;
-+
-+		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-+		if (!res) {
-+			err = -ENOMEM;
-+			goto parse_failed;
-+		}
-+
-+		err = of_pci_range_to_resource(&range, dev, res);
-+		if (err)
-+			goto conversion_failed;
-+
-+		if (resource_type(res) == IORESOURCE_IO) {
-+			if (!io_base) {
-+				pr_err("I/O range found for %s. Please provide an io_base pointer to save CPU base address\n",
-+					dev->full_name);
-+				err = -EINVAL;
-+				goto conversion_failed;
-+			}
-+			if (*io_base != (resource_size_t)OF_BAD_ADDR)
-+				pr_warn("More than one I/O resource converted for %s. CPU base address for old range lost!\n",
-+					dev->full_name);
-+			*io_base = range.cpu_addr;
-+		}
-+
-+		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
-+	}
-+
-+	return 0;
-+
-+conversion_failed:
-+	kfree(res);
-+parse_failed:
-+	pci_free_resource_list(resources);
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-+#endif /* CONFIG_OF_ADDRESS */
-+
- #ifdef CONFIG_PCI_MSI
- 
- static LIST_HEAD(of_pci_msi_chip_list);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 71062e9..1fd207e 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -52,6 +52,12 @@ of_get_pci_domain_nr(struct device_node *node)
- }
- #endif
- 
-+#if defined(CONFIG_OF_ADDRESS)
-+int of_pci_get_host_bridge_resources(struct device_node *dev,
-+			unsigned char busno, unsigned char bus_max,
-+			struct list_head *resources, resource_size_t *io_base);
-+#endif
-+
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
- int of_pci_msi_chip_add(struct msi_chip *chip);
- void of_pci_msi_chip_remove(struct msi_chip *chip);
--- 
-2.1.1
+Ok, I'll pull those on top of something not quite as bleeding edge as linux-next
+
+> Leave it out then. If you have no way to test it, it's going to be
+> very bug prone, and we can always add it later.
+
+I moved my root disk to a SATA drive, so only a minor inconvenience.
+
+dmesg shows the following with the regulators node as in the v2 patch, 
+the bottom half being mostly what I'd expect
+
+[    0.868607] sunxi-rtc 1c20d00.rtc: RTC enabled
+[    0.877062] Adding alias for supply acin,(null) -> acin,0-0034
+[    0.882948] Adding alias for supply vin2,(null) -> vin2,0-0034
+[    0.888775] Adding alias for supply vin3,(null) -> vin3,0-0034
+[    0.894612] Adding alias for supply ldo24in,(null) -> ldo24in,0-0034
+[    0.900956] Adding alias for supply ldo3in,(null) -> ldo3in,0-0034
+[    0.907160] Adding alias for supply ldo5in,(null) -> ldo5in,0-0034
+[    0.914029] LDO1: 1300 mV 
+[    0.917428] LDO2: 1800 <--> 3300 mV at 3000 mV 
+[    0.922483] LDO3: 700 <--> 3500 mV at 2275 mV 
+[    0.927136] LDO4: 1250 <--> 3300 mV at 2800 mV 
+[    0.932334] LDO5: 1800 <--> 3300 mV at 2800 mV 
+[    0.937308] DCDC2: 1400 mV 
+[    0.940552] DCDC3: 1250 mV 
+[    0.943474] axp20x 0-0034: AXP20X driver loaded
+
+
+> The SD card issue is more troublesome. We'll have to look into it.
+
+dmesg shows the mmc driver loading:
+
+[    0.957716] sdhci: Secure Digital Host Controller Interface driver
+[    0.963963] sdhci: Copyright(c) Pierre Ossman
+[    0.968843] sunxi-mmc 1c0f000.mmc: No vqmmc regulator found
+[    0.974918] sunxi-mmc 1c0f000.mmc: Got CD GPIO
+[    1.012036] sunxi-mmc 1c0f000.mmc: base:0xf00ac000 irq:64
+[    1.017623] sdhci-pltfm: SDHCI platform and OF driver helper
+
+however on an older, working, kernel I get a number on the end of 
+the 'Got CD GPIO' line like this:
+
+[    0.896271] sunxi-mmc 1c0f000.mmc: Got CD GPIO #225.
+
+when I remove the SD card I see:
+
+[   20.147667] sunxi-mmc 1c0f000.mmc: smc 0 err, cmd 8, RTO !!
+[   20.157319] sunxi-mmc 1c0f000.mmc: smc 0 err, cmd 55, RTO !!
+[   20.163796] sunxi-mmc 1c0f000.mmc: smc 0 err, cmd 55, RTO !!
+[   20.170268] sunxi-mmc 1c0f000.mmc: smc 0 err, cmd 55, RTO !!
+[   20.176743] sunxi-mmc 1c0f000.mmc: smc 0 err, cmd 55, RTO !!
+[   20.183250] sunxi-mmc 1c0f000.mmc: smc 0 err, cmd 1, RTO !!
+
+Which gives the impression that it's seeing CD inverted, however I 
+tried taking the cd-inverted; line out of the dts with no change.
+No messages at all on card insertion.
+
+I'll try the same kernel on an A10-lime later, if it has the same 
+problem it'll rule out something in this new dts.
+
+Iain
