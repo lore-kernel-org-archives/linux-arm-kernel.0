@@ -1,203 +1,174 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 30 Sep 2014 10:27:48 -0600
-Subject: [PATCH v7 1/7] qcom: spm: Add Subsystem Power Manager driver
-In-Reply-To: <5429E91A.8070901@codeaurora.org>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-2-git-send-email-lina.iyer@linaro.org>
- <5429E91A.8070901@codeaurora.org>
-Message-ID: <20140930162748.GD528@ilina-mac.local>
+From: drake@endlessm.com (Daniel Drake)
+Date: Tue, 30 Sep 2014 10:40:11 -0600
+Subject: [PATCH] ASoC: samsung: fix CDCLK handling
+Message-ID: <1412095211-4012-1-git-send-email-drake@endlessm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29 2014 at 17:19 -0600, Stephen Boyd wrote:
->On 09/26/14 17:58, Lina Iyer wrote:
+ODROID is the only platform that uses CDCLK, and right now,
+CDCLK handling is buggy. If you start pulseaudio on ODROID,
+audio is broken until reboot (even after killing pulse).
 
->  	Definition: shall contain "qcom,saw2". A more specific value should be
->>  		    one of:
->> -			 "qcom,saw2-v1"
->> -			 "qcom,saw2-v1.1"
->> -			 "qcom,saw2-v2"
->> -			 "qcom,saw2-v2.1"
->> +			 "qcom,apq8064-saw2-v1.1-cpu"
->> +			 "qcom,msm8974-saw2-v2.1-cpu"
->> +			 "qcom,apq8084-saw2-v2.1-cpu"
->
->It's probably not good to remove the old compatibles. Just add more to
->the list. Please Cc dt reviewers on dt bindings.
->
-You are right, I should not have removed them.
->>
->>  - reg:
->>  	Usage: required
->> @@ -26,10 +25,9 @@ PROPERTIES
->>  		    the register region. An optional second element specifies
->>  		    the base address and size of the alias register region.
->>
->> -
->>  Example:
->>
->> -	regulator at 2099000 {
->> +	saw at 2099000 {
->
->saw is not a standard thing. Hence the usage of regulator here. I agree
->when it doesn't directly control a regulator then it should be called
->something else, power-controller perhaps? I don't really see a need to
->change this example though.
->
-I am okay with the name power controller.
+This happens because CDCLK gets disabled by i2s.c and never enabled again.
 
->> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> +config QCOM_PM
->> +	bool "Qualcomm Power Management"
->> +	depends on PM && ARCH_QCOM
->
->Drop the PM dependency. There isn't any right? Honestly we don't want
->this type of option at all. We want an option for each driver introduced.
->
-OK.
+pulseaudio does:
+1. i2s_startup for playback channel
+2. i2s_startup for capture channel
+3. i2s_shutdown for capture channel
+4. i2s_shutdown for playback channel
 
-We want? Why? Thats just many config items that we have to configure to
-build the kernel. If you know of a reason, please let me know.
+In step 3 we disable CDCLK even though playback should still be active.
 
-[...]
-> +
->> +/* SPM register data for 8974, 8084 */
->> +static const struct spm_reg_data spm_reg_8974_8084_cpu  = {
->> +	.reg[SPM_REG_CFG]		= {0x08, 0x1},
->> +	.reg[SPM_REG_SPM_STS]		= {0x0C, 0x0},
->> +	.reg[SPM_REG_PMIC_STS]		= {0x14, 0x0},
->> +	.reg[SPM_REG_VCTL]		= {0x1C, 0x0},
->> +	.reg[SPM_REG_SPM_CTL]		= {0x30, 0x1},
->> +	.reg[SPM_REG_DLY]		= {0x34, 0x3C102800},
->> +	.reg[SPM_REG_PMIC_DATA_0]	= {0x40, 0x0},
->> +	.reg[SPM_REG_PMIC_DATA_1]	= {0x44, 0x0},
->> +	.reg[SPM_REG_PMIC_DATA_2]	= {0x48, 0x0},
->> +	.reg[SPM_REG_SEQ_ENTRY_0]	= {0x80, 0x000F0B03},
->> +	.reg[SPM_REG_SEQ_ENTRY_1]	= {0x84, 0xE8108020},
->> +	.reg[SPM_REG_SEQ_ENTRY_2]	= {0x88, 0xE83B035B},
->> +	.reg[SPM_REG_SEQ_ENTRY_3]	= {0x8C, 0x300B1082},
->> +	.reg[SPM_REG_SEQ_ENTRY_4]	= {0x90, 0x0F302606},
->
->Is this endian agnostic? 
-I dont think I considered that.
+In step 4 we do this:
+	u32 mod = readl(i2s->addr + I2SMOD);
+	i2s->cdclk_out = !(mod & MOD_CDCLKCON);
 
->We don't need this initial value table. The
->only thing that really is different is delay and seq entries. 
-I need the PMIC_DATA for supporting 8064. And the voltage control and
-the status registers for verifying the changes. I looked at the common
-functionality with SoC that I plan to support and used them here.
+and now cdclk_out is always going to be 0, so we'll never turn it back
+on again.
 
->The seq
->entries can be a byte array that gets written to the device in an endian
->agnostic fashion and the delay can be a different struct member.
-Endianness is something I may need to think about. So for that purpose,
-I may need to fashion this into sequences. I just removed a bunch of
-code that did that. Made the driver a lot easy on the eyes.
+Both this bug and the one that b97c60abf9a tries to fix happened
+because of the way that CDCLK handling is painfully split between
+platform and i2s drivers.
 
->The
->register map can be per version of the spm (i.e. not per-soc) and that
->can be pointed to by the SoC data.
->
-I thought about it, its just unnecessary bunch of data structures. This
-is clearly a name, value pair and is much more readable.
+Simplify the situation and solve the bug with the following approach:
+ - as before, samsung_i2s_dai_probe() gates CDCLK by default
+   (no need for smartq_wm8987 to do this as well)
+ - platform drivers can gate/ungate CDCLK as necessary
+   (currently only odroidx2 needs to do this)
+ - i2s code has no other interaction with CDCLK
 
+Signed-off-by: Daniel Drake <drake@endlessm.com>
+---
+ sound/soc/samsung/i2s.c               | 19 ++----------------
+ sound/soc/samsung/odroidx2_max98090.c | 36 ++++++++++++++++++++++++++---------
+ sound/soc/samsung/smartq_wm8987.c     |  6 ------
+ 3 files changed, 29 insertions(+), 32 deletions(-)
 
->I really don't like setting the SPM_CTL register's enable bit to 1 with
->this table either. That should be done explicitly because it isn't
->"configuration" like the delays or the sequences are. It's a bit that
->will have some effect. It probably even needs to be cleared if we're
->reprogramming the SPM sequence in a scenario like kexec where the bit
->may already be set.
->
-Fair enough.
-
->> +	.reg[SPM_REG_SEQ_ENTRY_5]	= {0x94, 0x0},
->> +	.reg[SPM_REG_SEQ_ENTRY_6]	= {0x98, 0x0},
->> +	.reg[SPM_REG_SEQ_ENTRY_7]	= {0x9C, 0x0},
->> +
->> +	.start_addr[SPM_MODE_CLOCK_GATING]	= 0,
->> +	.start_addr[SPM_MODE_POWER_COLLAPSE]	= 3,
->> +};
->> +
->> +static DEFINE_PER_CPU_SHARED_ALIGNED(struct spm_driver_data, cpu_spm_drv);
->> +
->> +/**
->> + * spm_set_low_power_mode() - Configure SPM start address for low power mode
->> + * @mode: SPM LPM mode to enter
->> + */
->> +int qcom_spm_set_low_power_mode(enum spm_mode mode)
->> +{
->> +	struct spm_driver_data *drv = &__get_cpu_var(cpu_spm_drv);
->> +	u32 start_addr = 0;
->
->Unnecessary assignment.
->
-Done.
->> +	u32 ctl_val;
->> +
->> +	if (!drv || !drv->reg_data)
->> +		return -ENXIO;
->
->Does this ever happen? Please remove.
->
-Possible, if the idle driver makes a call, before the SPM is ready.
->> +
->> +	start_addr = drv->reg_data->start_addr[mode];
->> +
->> +	/* Update bits 10:4 in the SPM CTL register */
->
->This comment provides nothing that isn't evident from the code. Remove.
->
-okay
-
-> +	for_each_possible_cpu(cpu) {
->> +		cpu_node = of_get_cpu_node(cpu, NULL);
->> +		if (!cpu_node)
->> +			continue;
->> +		saw_node = of_parse_phandle(cpu_node, "qcom,saw", 0);
->> +		if (!saw_node)
->> +			continue;
->> +		if (saw_node == pdev->dev.of_node) {
->> +			drv = &per_cpu(cpu_spm_drv, cpu);
->> +			break;
->> +		}
->
->Missing a couple of_node_put()s.
->
-Argh. I saw them after I sent the patches. Thanks for pointing it out.
-
-> +
->> +static struct platform_driver spm_driver = {
->> +	.probe = spm_dev_probe,
->> +	.driver = {
->> +		.name = "spm",
->
->qcom-spm?
->
-ok
-
->> +static int __init spm_driver_init(void)
->> +{
->> +	return platform_driver_register(&spm_driver);
->> +}
->> +device_initcall(spm_driver_init);
->
->Why can't we support modules?
->
-It just happens later than we would like.
-
->> diff --git a/include/soc/qcom/spm.h b/include/soc/qcom/spm.h
->> new file mode 100644
->> index 0000000..997abfc
->> --- /dev/null
->> +++ b/include/soc/qcom/spm.h
-
-> +#endif  /* __QCOM_SPM_H */
->
->It would be nice to not have this file.
->
-Why?
-
-Thanks for your time Stephen.
-
-Lina
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 9d51347..6654ce6 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -68,8 +68,6 @@ struct i2s_dai {
+ #define DAI_OPENED	(1 << 0) /* Dai is opened */
+ #define DAI_MANAGER	(1 << 1) /* Dai is the manager */
+ 	unsigned mode;
+-	/* CDCLK pin direction: 0  - input, 1 - output */
+-	unsigned int cdclk_out:1;
+ 	/* Driver for this DAI */
+ 	struct snd_soc_dai_driver i2s_dai_drv;
+ 	/* DMA parameters */
+@@ -739,9 +737,6 @@ static int i2s_startup(struct snd_pcm_substream *substream,
+ 
+ 	spin_unlock_irqrestore(&lock, flags);
+ 
+-	if (!is_opened(other) && i2s->cdclk_out)
+-		i2s_set_sysclk(dai, SAMSUNG_I2S_CDCLK,
+-				0, SND_SOC_CLOCK_OUT);
+ 	return 0;
+ }
+ 
+@@ -757,24 +752,14 @@ static void i2s_shutdown(struct snd_pcm_substream *substream,
+ 	i2s->mode &= ~DAI_OPENED;
+ 	i2s->mode &= ~DAI_MANAGER;
+ 
+-	if (is_opened(other)) {
++	if (is_opened(other))
+ 		other->mode |= DAI_MANAGER;
+-	} else {
+-		u32 mod = readl(i2s->addr + I2SMOD);
+-		i2s->cdclk_out = !(mod & MOD_CDCLKCON);
+-		if (other)
+-			other->cdclk_out = i2s->cdclk_out;
+-	}
++
+ 	/* Reset any constraint on RFS and BFS */
+ 	i2s->rfs = 0;
+ 	i2s->bfs = 0;
+ 
+ 	spin_unlock_irqrestore(&lock, flags);
+-
+-	/* Gate CDCLK by default */
+-	if (!is_opened(other))
+-		i2s_set_sysclk(dai, SAMSUNG_I2S_CDCLK,
+-				0, SND_SOC_CLOCK_IN);
+ }
+ 
+ static int config_setup(struct i2s_dai *i2s)
+diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
+index 278edf9..b700284 100644
+--- a/sound/soc/samsung/odroidx2_max98090.c
++++ b/sound/soc/samsung/odroidx2_max98090.c
+@@ -21,20 +21,37 @@ struct odroidx2_drv_data {
+ /* The I2S CDCLK output clock frequency for the MAX98090 codec */
+ #define MAX98090_MCLK 19200000
+ 
++static int odroidx2_startup(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++
++	if (rtd->cpu_dai->active)
++		return 0;
++
++	return snd_soc_dai_set_sysclk(rtd->cpu_dai, SAMSUNG_I2S_CDCLK,
++				      0, SND_SOC_CLOCK_OUT);
++}
++
++static void odroidx2_shutdown(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++
++	if (!rtd->cpu_dai->active)
++		snd_soc_dai_set_sysclk(rtd->cpu_dai, SAMSUNG_I2S_CDCLK,
++				       0, SND_SOC_CLOCK_IN);
++}
++
++static const struct snd_soc_ops odroidx2_ops = {
++	.startup = odroidx2_startup,
++	.shutdown = odroidx2_shutdown,
++};
++
+ static int odroidx2_late_probe(struct snd_soc_card *card)
+ {
+ 	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
+-	struct snd_soc_dai *cpu_dai = card->rtd[0].cpu_dai;
+-	int ret;
+ 
+-	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
++	return snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
+ 						SND_SOC_CLOCK_IN);
+-	if (ret < 0)
+-		return ret;
+-
+-	/* Set the cpu DAI configuration in order to use CDCLK */
+-	return snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
+-					0, SND_SOC_CLOCK_OUT);
+ }
+ 
+ static const struct snd_soc_dapm_widget odroidx2_dapm_widgets[] = {
+@@ -55,6 +72,7 @@ static struct snd_soc_dai_link odroidx2_dai[] = {
+ 		.codec_dai_name	= "HiFi",
+ 		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 				  SND_SOC_DAIFMT_CBM_CFM,
++		.ops		= &odroidx2_ops,
+ 	}
+ };
+ 
+diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
+index 9b0ffac..2b5e7c5 100644
+--- a/sound/soc/samsung/smartq_wm8987.c
++++ b/sound/soc/samsung/smartq_wm8987.c
+@@ -76,12 +76,6 @@ static int smartq_hifi_hw_params(struct snd_pcm_substream *substream,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	/* Gate the RCLK output on PAD */
+-	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
+-					0, SND_SOC_CLOCK_IN);
+-	if (ret < 0)
+-		return ret;
+-
+ 	/* set the codec system clock for DAC and ADC */
+ 	ret = snd_soc_dai_set_sysclk(codec_dai, WM8750_SYSCLK, clk,
+ 				     SND_SOC_CLOCK_IN);
+-- 
+1.9.1
