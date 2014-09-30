@@ -1,54 +1,48 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Tue, 30 Sep 2014 12:38:08 +0100
-Subject: [PATCH v2 3/5] spi-nor: Make spi_nor_scan() take a chip type
- name, not an spi_device_id
-In-Reply-To: <CACna6ryNp7+4y7oSs60atDZhUwFhiAyV4Oq5ELi1gyen45zhVw@mail.gmail.com>
-References: <1412043222.9388.81.camel@decadent.org.uk>
- <1412043317.9388.84.camel@decadent.org.uk>
- <CACna6ryNp7+4y7oSs60atDZhUwFhiAyV4Oq5ELi1gyen45zhVw@mail.gmail.com>
-Message-ID: <1412077088.9388.98.camel@decadent.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 13:38:20 +0200
+Subject: [PATCH] ARM: KVM: fix vgic-disabled build
+Message-ID: <3777204.xp7MBjnQbJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-09-30 at 07:14 +0200, Rafa? Mi?ecki wrote:
-> On 30 September 2014 04:15, Ben Hutchings <ben@decadent.org.uk> wrote:
-> > @@ -236,16 +236,13 @@ static int m25p_probe(struct spi_device *spi)
-> >          * If that's the case, respect "type" and ignore a "name".
-> >          */
-> >         if (data && data->type)
-> > -               id = spi_nor_match_id(data->type);
-> > +               name = data->type;
-> >
-> >         /* If we didn't get name from platform, simply use "modalias". */
-> > -       if (!id) {
-> > -               id = spi_nor_match_id(spi_get_device_id(spi)->name);
-> > -               if (WARN_ON(!id))
-> > -                       return -ENODEV;
-> > -       }
-> > +       if (!name)
-> > +               name = spi_get_device_id(spi)->name;
-> 
-> Huh? Iterating the whole id_table, checking the entries (looking for
-> one with name equal to the spi->modalias) and then... getting that
-> name?
+The vgic code can be disabled in Kconfig and there are dummy implementations
+of most of the provided API functions for the disabled case.
 
-Ah, I didn't realise what spi_get_device_id() was doing.
+However, the newly introduced kvm_vgic_destroy/kvm_vgic_vcpu_destroy
+functions are lacking those dummies, resulting in this build error:
 
-> Did it hurt to use the patch I've sent
-> mtd: m25p80: get rid of spi_get_device_id
-> https://patchwork.ozlabs.org/patch/394328/
+arch/arm/kvm/arm.c: In function 'kvm_arch_destroy_vm':
+arch/arm/kvm/arm.c:165:2: error: implicit declaration of function 'kvm_vgic_destroy' [-Werror=implicit-function-declaration]
+  kvm_vgic_destroy(kvm);
+  ^
+arch/arm/kvm/arm.c: In function 'kvm_arch_vcpu_free':
+arch/arm/kvm/arm.c:248:2: error: implicit declaration of function 'kvm_vgic_vcpu_destroy' [-Werror=implicit-function-declaration]
+  kvm_vgic_vcpu_destroy(vcpu);
+  ^
 
-It would make sense to insert that before this.
+This adds two inline helpers to get it to build again in this configuration.
 
-Ben.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: c1bfb577add ("arm/arm64: KVM: vgic: switch to dynamic allocation")
+---
+found during randconfig testing on -next
 
--- 
-Ben Hutchings
-The two most common things in the universe are hydrogen and stupidity.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/a819adbf/attachment.sig>
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 2f2aac8448a4..ec559d3264cc 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -331,6 +331,14 @@ static inline int kvm_vgic_create(struct kvm *kvm)
+ 	return 0;
+ }
+ 
++static inline void kvm_vgic_destroy(struct kvm *kvm)
++{
++}
++
++static inline void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
++{
++}
++
+ static inline int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+ 	return 0;
