@@ -1,31 +1,116 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 30 Sep 2014 15:37:49 +0200
-Subject: [PATCH] sched, time: cmpxchg does not work on 64-bit variable
-In-Reply-To: <542AA33E.2050008@redhat.com>
-References: <2547036.UshV4pXvhf@wuerfel>
- <542AA33E.2050008@redhat.com>
-Message-ID: <20140930133749.GD4241@worktop.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 15:40:10 +0200
+Subject: [PATCH v6] bcma: register bcma as device tree driver
+In-Reply-To: <1411682959-21557-1-git-send-email-hauke@hauke-m.de>
+References: <1411682959-21557-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <7004113.vCTZUyLSaf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 08:34:06AM -0400, Rik van Riel wrote:
-> On 09/30/2014 07:56 AM, Arnd Bergmann wrote:
-> > A recent change to update the stime/utime members of task_struct 
-> > using atomic cmpxchg broke configurations on 32-bit machines with 
-> > CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that uses 64-bit 
-> > nanoseconds, leading to a link-time error:
-> > 
-> > kernel/built-in.o: In function `cputime_adjust': :(.text+0x25234):
-> > undefined reference to `__bad_cmpxchg'
-> > 
-> > This reverts the change that caused the problem, I suspect the real
-> > fix is to conditionally use cmpxchg64 instead, but I have not
-> > checked if that will work on all architectures.
+On Friday 26 September 2014 00:09:19 Hauke Mehrtens wrote:
+> This driver is used by the bcm53xx ARM SoC code. Now it is possible to
+> give the address of the chipcommon core in device tree and bcma will
+> search for all the other cores.
 > 
-> I see that kernel/sched/clock.c uses cmpxchg64 in a non
-> architecture, non 64 bit specific piece of code, and
-> nobody complained about that file not building, so I have
-> to assume cmpxchg64 works :)
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-That code is only ever used on x86 and ia64, most other archs have
-managed to not mess up their clocks quite as bad.
+I'm basically happy with this patch, so
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+A few details that I think are worth improving:
+
+> diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+> new file mode 100644
+> index 0000000..e9070c1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/bcma.txt
+> @@ -0,0 +1,20 @@
+> +Driver for ARM AXI Bus with Broadcom Plugins (bcma)
+> +
+> +Required properties:
+> +
+> +- compatible : brcm,bus-axi
+> +
+> +- reg : iomem address range of chipcommon core
+> +
+> +The cores on the AXI bus are automatically detected by bcma with the
+> +memory ranges they are using and they get registered afterwards.
+> +
+> +Example:
+> +
+> +	axi at 18000000 {
+> +		compatible = "brcm,bus-axi";
+> +		reg = <0x18000000 0x1000>;
+> +		ranges = <0x00000000 0x18000000 0x00100000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +	};
+
+I think it would be good to document how you can specify child nodes
+here, and give one node as the example.
+
+> +
+> +#ifdef CONFIG_OF
+> +static int bcma_host_soc_probe(struct platform_device *pdev)
+> +{
+
+We generally try to avoid #ifdef in device drivers, I think it would
+be trivial to avoid this one by moving the contents into a new file.
+
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct bcma_bus *bus;
+> +	int err;
+> +
+> +	/* Alloc */
+> +	bus = devm_kzalloc(dev, sizeof(*bus), GFP_KERNEL);
+> +	if (!bus)
+> +		return -ENOMEM;
+> +
+> +	/* Map MMIO */
+> +	bus->mmio = of_iomap(np, 0);
+> +	if (!bus->mmio)
+> +		return -ENOMEM;
+
+this could use devm_ioremap_resource() to avoid the iounmap
+in the failu
+
+> +#ifdef CONFIG_OF
+> +static struct device_node *bcma_of_find_child_device(struct platform_device *parent,
+> +						     struct bcma_device *core)
+> +{
+> +	struct device_node *node;
+> +	u64 size;
+> +	const __be32 *reg;
+> +
+> +	if (!parent || !parent->dev.of_node)
+> +		return NULL;
+> +
+> +	for_each_child_of_node(parent->dev.of_node, node) {
+> +		reg = of_get_address(node, 0, &size, NULL);
+> +		if (!reg)
+> +			continue;
+> +		if (of_translate_address(node, reg) == core->addr)
+> +			return node;
+> +	}
+> +	return NULL;
+> +}
+
+I think this will compile into nothing if CONFIG_OF is disabled, so no
+need for the #ifdef.
+
+> +
+> +static void bcma_of_fill_device(struct platform_device *parent,
+> +				struct bcma_device *core)
+> +{
+> +	struct device_node *node;
+> +
+> +	node = bcma_of_find_child_device(parent, core);
+> +	if (node)
+> +		core->dev.of_node = node;
+> +}
+
+and consequently, this function can be moved into the caller.
+
+	Arnd
