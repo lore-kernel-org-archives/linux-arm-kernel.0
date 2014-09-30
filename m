@@ -1,36 +1,33 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 31 Oct 2014 20:52:58 -0700
-Subject: [PATCH 2/2] regulator: of: Add support for parsing microvolts for
- suspend state
-In-Reply-To: <1414813978-32233-1-git-send-email-dianders@chromium.org>
-References: <1414813978-32233-1-git-send-email-dianders@chromium.org>
-Message-ID: <1414813978-32233-2-git-send-email-dianders@chromium.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 01 Oct 2014 00:01:53 +0200
+Subject: [PATCH v6 00/10] ARM: Berlin: Ethernet support
+In-Reply-To: <20140930.163735.2099691931550261883.davem@davemloft.net>
+References: <1412087296-18475-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20140930.163735.2099691931550261883.davem@davemloft.net>
+Message-ID: <542B2851.2050705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Leverage all the work that was done in (40e20d6 regulator: of: Add
-support for parsing regulator_state for suspend state) and throw in
-the ability to set suspend microvolts from the device tree.
+On 30.09.2014 22:37, David Miller wrote:
+> From: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Date: Tue, 30 Sep 2014 16:28:06 +0200
+>
+>> This series introduce support for the Ethernet controller on Berlin SoCs,
+>> using the existing pxa168 Ethernet driver. In order to do this, DT
+>> support is added to the driver alongside some other modifications and
+>> fixes.
+>>
+>> This has been tested on a Berlin BG2Q DMP board.
+>
+> Applied to net-next, thanks.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/regulator/of_regulator.c | 4 ++++
- 1 file changed, 4 insertions(+)
+David,
 
-diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
-index f0d19fc..7fe93c5 100644
---- a/drivers/regulator/of_regulator.c
-+++ b/drivers/regulator/of_regulator.c
-@@ -107,6 +107,10 @@ static void of_get_regulation_constraints(struct device_node *np,
- 					"regulator-off-in-suspend"))
- 			suspend_state->disabled = true;
- 
-+		if (!of_property_read_u32(suspend_np,
-+					"regulator-suspend-microvolt", &pval))
-+			suspend_state->uV = pval;
-+
- 		of_node_put(suspend_np);
- 		suspend_state = NULL;
- 		suspend_np = NULL;
--- 
-2.1.0.rc2.206.gedb03e5
+usually I'd prefer to take the dts patches through berlin and arm-soc
+tree, _but_ as they are touching berlin stuff only I am fine with you
+taking them, too.
+
+Just to make sure how long I have to take care of potential merge
+issues, is your current net-next meant for v3.18 or v3.19?
+
+Sebastian
