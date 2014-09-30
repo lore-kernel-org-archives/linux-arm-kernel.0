@@ -1,39 +1,116 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 14:04:17 +0200
-Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
-Message-ID: <1811108.CcWEs0vKNL@wuerfel>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 30 Sep 2014 14:06:38 +0200
+Subject: [PATCH] USB: host: st: fix ehci/ohci driver selection
+In-Reply-To: <2536929.C0XC0THfdJ@wuerfel>
+References: <2536929.C0XC0THfdJ@wuerfel>
+Message-ID: <1412078798.21730.6.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the OMAP nand driver is built-in but the BCH driver is a module,
-we get a link-time error:
+On Mon, 2014-09-29 at 14:54 +0200, Arnd Bergmann wrote:
+> The newly added sti ehci and ohci drivers come with a single
+> Kconfig entry that does not depend on either of the base drivers,
+> which leads to a link error when they are disabled:
+> 
+> drivers/built-in.o: In function `ohci_platform_init':
+> :(.init.text+0x14788): undefined reference to `ohci_init_driver'
+> 
+> To fix that, this patch introduces two separate Kconfig options
+> with proper dependencies, which avoids the problem and is also
+> more consistent with the other glue drivers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d115837259ada ("usb: host: ohci-st: Add OHCI driver support for ST STB devices")
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Peter Griffin <peter.griffin@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: linux-usb at vger.kernel.org
 
-drivers/built-in.o: In function `omap_elm_correct_data':
-:(.text+0x174e88): undefined reference to `elm_decode_bch_error_page'
-drivers/built-in.o: In function `omap_nand_probe':
-:(.text+0x175b48): undefined reference to `elm_config'
+This became commit 905e300e1043 ("USB: host: st: fix ehci/ohci driver
+selection") in next-20140930.
 
-There are two possible ways to deal with this, either prevent that
-configuration in Kconfig or make sure we don't reference the ELM
-driver in this case.
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index b943545f862c..002ba1d5bcf5 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -174,6 +174,15 @@ config USB_EHCI_HCD_SPEAR
+>            Enables support for the on-chip EHCI controller on
+>            ST SPEAr chips.
+>  
+> +config USB_EHCI_HCD_STI
+> +	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
+> +	depends on ARCH_STI && OF
+> +	select GENERIC_PHY
+> +	select USB_EHCI_HCD_PLATFORM
+> +	help
+> +	  Enable support for the on-chip EHCI controller found on
+> +	  STMicroelectronics consumer electronics SoC's.
+> +
+>  config USB_EHCI_HCD_AT91
+>          tristate  "Support for Atmel on-chip EHCI USB controller"
+>          depends on USB_EHCI_HCD && ARCH_AT91
+> @@ -402,6 +411,15 @@ config USB_OHCI_HCD_SPEAR
+>            Enables support for the on-chip OHCI controller on
+>            ST SPEAr chips.
+>  
+> +config USB_OHCI_HCD_STI
+> +	tristate "Support for ST STiHxxx on-chip OHCI USB controller"
+> +	depends on ARCH_STI && OF
+> +	select GENERIC_PHY
+> +	select USB_OHCI_HCD_PLATFORM
+> +	help
+> +	  Enable support for the on-chip OHCI controller found on
+> +	  STMicroelectronics consumer electronics SoC's.
+> +
+>  config USB_OHCI_HCD_S3C2410
+>          tristate "OHCI support for Samsung S3C24xx/S3C64xx SoC series"
+>          depends on USB_OHCI_HCD && (ARCH_S3C24XX || ARCH_S3C64XX)
+> @@ -761,14 +779,6 @@ config USB_HCD_SSB
+>  
+>  	  If unsure, say N.
+>  
+> -config USB_HCD_ST
+> -	tristate "ST USB driver for ST SoC Series"
+> -	depends on ARCH_STI && OF
+> -	select GENERIC_PHY
+> -	help
+> -	  Enable support for the on-chip OHCI & EHCI controller found on
+> -	  STMicroelectronics consumer electronics SoC's.
+> -
+>  config USB_HCD_TEST_MODE
+>  	bool "HCD test mode support"
+>  	---help---
+> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> index ae2db0b87993..0336bb2c0e6f 100644
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -38,6 +38,7 @@ obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
+>  obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
+>  obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
+>  obj-$(CONFIG_USB_EHCI_HCD_SPEAR)	+= ehci-spear.o
+> +obj-$(CONFIG_USB_EHCI_HCD_ST)	+= ehci-st.o
 
-This patch picks the second approach, which makes it possible to
-use the ELM driver in other modules while still having the OMAP
-NAND driver built-in.
+This should have been
+    CONFIG_USB_EHCI_HCD_STI
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 93af53b8633c ("nand: omap2: Remove horrible ifdefs to fix module probe")
+(A rather subtle typo, easy to make given the rest of the patch.)
 
-diff --git a/include/linux/platform_data/elm.h b/include/linux/platform_data/elm.h
-index b8686c00f15f..cbca66ce7c10 100644
---- a/include/linux/platform_data/elm.h
-+++ b/include/linux/platform_data/elm.h
-@@ -42,7 +42,7 @@ struct elm_errorvec {
- 	int error_loc[16];
- };
- 
--#if IS_ENABLED(CONFIG_MTD_NAND_OMAP_BCH)
-+#if defined(CONFIG_MTD_NAND_OMAP_BCH) || (defined(CONFIG_MTD_NAND_OMAP_BCH_MODULE) && defined(MODULE))
- void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
- 		struct elm_errorvec *err_vec);
- int elm_config(struct device *dev, enum bch_ecc bch_type,
+>  obj-$(CONFIG_USB_EHCI_EXYNOS)	+= ehci-exynos.o
+>  obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
+>  obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
+> @@ -55,6 +56,7 @@ obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
+>  obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
+>  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
+>  obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
+> +obj-$(CONFIG_USB_OHCI_HCD_STI)	+= ohci-st.o
+>  obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
+>  obj-$(CONFIG_USB_OHCI_HCD_S3C2410)	+= ohci-s3c2410.o
+>  obj-$(CONFIG_USB_OHCI_HCD_LPC32XX)	+= ohci-nxp.o
+> @@ -77,4 +79,3 @@ obj-$(CONFIG_USB_HCD_SSB)	+= ssb-hcd.o
+>  obj-$(CONFIG_USB_FUSBH200_HCD)	+= fusbh200-hcd.o
+>  obj-$(CONFIG_USB_FOTG210_HCD)	+= fotg210-hcd.o
+>  obj-$(CONFIG_USB_MAX3421_HCD)	+= max3421-hcd.o
+> -obj-$(CONFIG_USB_HCD_ST)	+= ehci-st.o ohci-st.o
+
+
+Paul Bolle
