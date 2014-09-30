@@ -1,70 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 30 Sep 2014 16:22:07 +0900
-Subject: [PATCH v2 00/11] ARM: shmobile: r8a7740/armadillo800eva legacy PM
- domain support
-In-Reply-To: <CAMuHMdUgP6OEt6G4VhHoDncz+17j-bDu7u_pcHM0ETmqsDKOiA@mail.gmail.com>
-References: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
- <20140930042047.GA24253@verge.net.au>
- <CAMuHMdUgP6OEt6G4VhHoDncz+17j-bDu7u_pcHM0ETmqsDKOiA@mail.gmail.com>
-Message-ID: <CANqRtoS+bur8DA0+gG0Q0hL9RLsQdOLyfSUbgE_6nZ8mCST0Jg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 30 Sep 2014 09:22:44 +0200
+Subject: [PATCH v2 5/5] m25p80,spi-nor: Share the list of supported chip
+ type names again
+In-Reply-To: <1412043352.9388.86.camel@decadent.org.uk>
+References: <1412043222.9388.81.camel@decadent.org.uk>
+ <1412043352.9388.86.camel@decadent.org.uk>
+Message-ID: <CAMuHMdXRu0tMc1kbWfoVzh=Efky31zQEJDZtRUg_EHXdi-xCjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Ben,
 
-On Tue, Sep 30, 2014 at 4:16 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Simon,
+On Tue, Sep 30, 2014 at 4:15 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+> Move the list of chip type information to a macro in spi-nor.h, but
+> leave the definitions of INFO and CAT25_INFO in spi-nor.
 >
-> On Tue, Sep 30, 2014 at 6:20 AM, Simon Horman <horms@verge.net.au> wrote:
->> On Thu, Sep 25, 2014 at 06:15:31PM +0200, Geert Uytterhoeven wrote:
->>> This series improves PM domain support for r8a7740/armadillo800eva legacy,
->>> mimicking (parts of) the existing PM domain support for sh7372/mackerel.
->>>
->>> More specifically, they
->>>   - Add missing devices to existing PM domains,
->>>   - Add missing PM domains, hooking up devices and subdomains,
->>>
->>> Changes in v2:
->>>   - Dropped FIXMes on behavior that turned out to be expected,
->>>   - Hook up the HDMI-Link hardware block,
->>>   - Really add the A4MP and D4 PM domains, as fixes are available (see
->>>     dependencies below),
->>>   - Move special CPU domain handling from A4S to A3SM,
->>>
->>> There are a few dependencies to make resume from s2ram work:
->>>   - "[PATCH/RFC] fbdev: sh_mobile_hdmi: Re-init regs before irq re-enable on
->>>     resume",
->>>   - "[PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on wake-up",
->>>     or an alternative solution.
->>>
->>> Apart from that, I'm not aware of any regressions (except perhaps for USB,
->>> which I was unable to get working anyway).
->>
->> Hi Geert,
->>
->> what is your feeling about (me) queueing up part of all of this series now?
+> In m25p80, define the INFO and CAT25_INFO macros to initialise a
+> struct spi_device_id with the name, ignoring the remaining parameters.
 >
-> If you (Magnus?) can live with non-working resume from s2ram for now,
-> it can be queued for v3.19.
-
-If the series as a whole introduces a known regression then I think we
-should only merge the portions that work without introducing some
-issue.
-
-> I don't think I can improve on the HDMI fix without getting docs and spending
-> (much) time to get HDMI working on Armadillo.
-
-Ok, and I suspect it is quite unlikely we will receive any improved
-docs for r8a7740.
-
-> The hw_breakpoint fix has to be replaced by something better/acceptable,
-> I'm working on that.
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
 
 Thanks!
 
-So what is a good way to proceed with this series I wonder?
+I didn't have an in-depth look, but this looks much better, and has less
+opportunities for getting out-of-sync.
 
-Cheers,
+Gr{oetje,eeting}s,
 
-/ magnus
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
