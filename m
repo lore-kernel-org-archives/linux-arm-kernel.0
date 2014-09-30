@@ -1,46 +1,36 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 30 Sep 2014 12:56:53 -0700
-Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
-In-Reply-To: <542B00C1.3010702@codeaurora.org>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5429DA95.80505@codeaurora.org>
- <20140930050203.GG28481@sonymobile.com>
- <542AF5FE.1000006@codeaurora.org>
- <20140930190023.GS28481@sonymobile.com>
- <542B00C1.3010702@codeaurora.org>
-Message-ID: <20140930195652.GT28481@sonymobile.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 30 Sep 2014 14:59:23 -0500
+Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
+In-Reply-To: <20140930015323.GE28481@sonymobile.com>
+References: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+ <20140930015323.GE28481@sonymobile.com>
+Message-ID: <20140930195923.GB26928@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30 Sep 12:13 PDT 2014, Stephen Boyd wrote:
-
-> On 09/30/14 12:00, Bjorn Andersson wrote:
-> >
-> > Hmm, seems I got that wrong, sorry about that.
-> >
-> > But do you mean "all wrong" as in that I use the wrong bit or to some greater
-> > extent? Currently all following requests should timeout, but maybe we should
-> > have a faster fail-path when we've hit this point?
+On Mon, Sep 29, 2014 at 06:53:24PM -0700, Bjorn Andersson wrote:
+> On Mon 29 Sep 15:00 PDT 2014, Andy Gross wrote:
 > 
-> Yes. We just ack the interrupt and go on happy to keep allowing clients
-> to request things. I'd rather see us blow up or start failing requests,
-> or maybe both.
+> > The runtime pm calls need to be done before populating the children via the
+> > i2c_add_adapter call.  If this is not done, a child can run into issues trying
+> > to do i2c read/writes due to the pm_runtime_sync failing.
+> > 
 > 
+> May I ask in what case this would fail?  I thought we tested this as we found
+> the faulty error check after calling pm_runtime_get_sync().
 
-Okay, I naively figured that the RPM would be dead after this happened and from
-this point we would start getting timeouts. Let's ack the right bit and fail
-early after the RPM have rejected things.
+This is a different kind of failure.   If during probe, the children do some I2C
+activity, they will encounter issues with the runtime_sync due to the pm_runtime
+not being initialized.  However, once the qup probe completes, everything works
+fine.
 
-> >
-> > From a practical pov I guess that once the rpm starts returning errors on
-> > updates to regulators, root clocks and bus scaling then most of the system is
-> > becoming useless.
-> 
-> Right. Rebooting will be required fairly soon.
-> 
+The original runtime_sync issue revolved around the runtime_sync return value
+being misinterpreted due to the incorrect check.
 
-Yes, but we want something else to trigger that right?
+<snip>
 
-Regards,
-Bjorn
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
