@@ -1,76 +1,77 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 30 Sep 2014 14:33:58 +0200
-Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
-In-Reply-To: <1411454100-6814-4-git-send-email-jszhang@marvell.com>
-References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
- <1411454100-6814-4-git-send-email-jszhang@marvell.com>
-Message-ID: <542AA336.6070206@gmail.com>
+From: riel@redhat.com (Rik van Riel)
+Date: Tue, 30 Sep 2014 08:34:06 -0400
+Subject: [PATCH] sched, time: cmpxchg does not work on 64-bit variable
+In-Reply-To: <2547036.UshV4pXvhf@wuerfel>
+References: <2547036.UshV4pXvhf@wuerfel>
+Message-ID: <542AA33E.2050008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
-> This patch adds in support for S2R for dw-apb-ictl irqchip driver.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
->   1 file changed, 19 insertions(+)
->
-> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
-> index c136b67..53bb732 100644
-> --- a/drivers/irqchip/irq-dw-apb-ictl.c
-> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-> @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
->   	chained_irq_exit(chip, desc);
->   }
->
-> +#ifdef CONFIG_PM
-> +static void dw_apb_ictl_resume(struct irq_data *d)
-> +{
-> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-> +
-> +	irq_gc_lock(gc);
-> +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
-> +	writel_relaxed(*ct->mask_cache, gc->reg_base + ct->regs.mask);
-> +	irq_gc_unlock(gc);
-> +}
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-I agree with the overall change, but may this also be suited for a
-generic irq_chip helper instead of being a driver specific one?
+On 09/30/2014 07:56 AM, Arnd Bergmann wrote:
+> A recent change to update the stime/utime members of task_struct 
+> using atomic cmpxchg broke configurations on 32-bit machines with 
+> CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that uses 64-bit 
+> nanoseconds, leading to a link-time error:
+> 
+> kernel/built-in.o: In function `cputime_adjust': :(.text+0x25234):
+> undefined reference to `__bad_cmpxchg'
+> 
+> This reverts the change that caused the problem, I suspect the real
+> fix is to conditionally use cmpxchg64 instead, but I have not
+> checked if that will work on all architectures.
 
-Maybe Thomas or Jason can comment on this.
+I see that kernel/sched/clock.c uses cmpxchg64 in a non
+architecture, non 64 bit specific piece of code, and
+nobody complained about that file not building, so I have
+to assume cmpxchg64 works :)
 
-Also, now that you are using writel_relaxed, I understand that both
-writes above can happen in any order? Are there any implication we
-have to consider, i.e. do we require any of the registers above to
-be written first?
+The revert seems like a bad idea, since it will reintroduce
+a race condition with sys_times().
 
-Sebastian
+One problem is that include/asm-generic/cputime_nsecs.h
+defines cputime_t as u64, while cputime_jiffies.h defines
+cputime_t as a long...
 
-> +#else
-> +#define dw_apb_ictl_resume	NULL
-> +#endif /* CONFIG_PM */
-> +
->   static int __init dw_apb_ictl_init(struct device_node *np,
->   				   struct device_node *parent)
->   {
-> @@ -127,13 +142,17 @@ static int __init dw_apb_ictl_init(struct device_node *np,
->   	gc->reg_base = iobase;
->
->   	gc->chip_types[0].regs.mask = APB_INT_MASK_L;
-> +	gc->chip_types[0].regs.enable = APB_INT_ENABLE_L;
->   	gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
->   	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
-> +	gc->chip_types[0].chip.irq_resume = dw_apb_ictl_resume;
->
->   	if (nrirqs > 32) {
->   		gc->chip_types[1].regs.mask = APB_INT_MASK_H;
-> +		gc->chip_types[1].regs.enable = APB_INT_ENABLE_H;
->   		gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
->   		gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
-> +		gc->chip_types[1].chip.irq_resume = dw_apb_ictl_resume;
->   	}
->
->   	irq_set_handler_data(irq, gc);
->
+Will anybody barf at a cmpxchg_cputime, or is the solution
+to fix cmpxchg on architectures where it does not accept a
+64 bit type?  Not quite sure how to do the latter...
+
+Arnd, on which architecture are you seeing a build failure?
+Is it just 32 bit arm?
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de> Fixes: eb1b4af0a64a
+> ("sched, time: Atomically increment stime & utime") --- found in
+> ARM randconfig builds on linux-next
+> 
+> diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c index
+> 64492dff8a81..e99e7e54131c 100644 --- a/kernel/sched/cputime.c +++
+> b/kernel/sched/cputime.c @@ -603,12 +603,9 @@ static void
+> cputime_adjust(struct task_cputime *curr, * If the tick based count
+> grows faster than the scheduler one, * the result of the scaling
+> may go backward. * Let's enforce monotonicity. -	 * Atomic exchange
+> protects against concurrent cputime_adjust(). */ -	while (stime >
+> (rtime = ACCESS_ONCE(prev->stime))) -		cmpxchg(&prev->stime, rtime,
+> stime); -	while (utime > (rtime = ACCESS_ONCE(prev->utime))) -
+> cmpxchg(&prev->utime, rtime, utime); +	prev->stime =
+> max(prev->stime, stime); +	prev->utime = max(prev->utime, utime);
+> 
+> out: *ut = prev->utime;
+> 
+
+
+- -- 
+All rights reversed
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQEcBAEBAgAGBQJUKqM+AAoJEM553pKExN6Dc8EH/3BuP9ZSvWTXpFI070Wy0uuo
+/gqpFqdyLLtJ+i850HW4356ew5SeIYjzKHxDcWFJDYYUBI2/LuUjyaOo02KK/AjX
+0G0Qblli94dYB9B1eiMqQc9pU9VLjGHD1Gh5T0IjahTpmxKUCTNw4tv80ykdIDEe
+JVrZGNAxFUQXJ+3S2RwhRHRLHGVN3/EGPvhkibPK+xvth17isasv/AdIFkgdDYPY
+6UtDuKPtLAilmIEXit82z/OOqInSYPrMzvcB+psnY3NlqHwTWW8IuI5zZmEh2h+a
+aQhA/D+4he49Xc2O+7eIFwzLJbBnv0+4mlUQwiw9v2bBXHg1MepqUT8hwveggxE=
+=SPyM
+-----END PGP SIGNATURE-----
