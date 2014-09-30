@@ -1,92 +1,110 @@
-From: xjq@rock-chips.com (Jianqun)
-Date: Tue, 30 Sep 2014 11:44:44 +0800
-Subject: [PATCH] clk: rockchip: rk3288: i2s_frac adds flag to set parent's
- rate
-In-Reply-To: <542A25D0.1030900@rock-chips.com>
-References: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
- <542A25D0.1030900@rock-chips.com>
-Message-ID: <542A272C.9020009@rock-chips.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 29 Sep 2014 20:55:58 -0700
+Subject: [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
+In-Reply-To: <1412042858.9388.79.camel@decadent.org.uk>
+References: <1410714624.3040.38.camel@decadent.org.uk>
+ <1410714670.3040.39.camel@decadent.org.uk>
+ <20140928222150.GC3248@norris-Latitude-E6410>
+ <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
+ <1412042858.9388.79.camel@decadent.org.uk>
+Message-ID: <20140930035558.GA8687@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 30, 2014 at 03:07:38AM +0100, Ben Hutchings wrote:
+> On Mon, 2014-09-29 at 08:36 +0200, Rafa? Mi?ecki wrote:
+> > b) I don't think the described clean solution (you described it in the
+> > commit message):
+> > > A clean solution to this will involve defining the list of device
+> > > IDs in spi-nor.h and removing struct spi_device_id from the spi-nor
+> > > API, but this is quite a large change.
+> > is the correct one. I think there should be a single string to trigger
+> > m25p80 load and the rest should be handled using JEDEC, with some
+> > workarounds for incompatible devices only.
+> 
+> That certainly makes sense for Linux-specific platform data, but I don't
+> think it works for Device Tree "compatible" strings (see
+> <http://mid.gmane.org/1410660009.3040.29.camel@decadent.org.uk>).
 
+I think it might work.
 
-? 09/30/2014 11:38 AM, Kever Yang ??:
-> Hi Jianqun,
-> 
->     pls add linux-rockchip at lists.infradead.org next time.
-> 
-OK, thanks
-> On 09/30/2014 11:12 AM, Jianqun wrote:
->> The relation of i2s nodes as follows:
->>            i2s_src               0           0            594000000  0
->>               i2s_frac           0           0            11289600   0
->>                  i2s_pre         0           0            11289600   0
->>                     sclk_i2s0    0           0            11289600   0
->>                     i2s0_clkout  0           0            11289600   0
->>                        hclk_i2s0 1           1            99000000   0
-> I always got the result as following when I set sclk_i2s0 to 11289600,
-> any one knows the reason?
-> 
->       gpll                     6           6            594000000 0
->           sclk_emmc             1           1            99000000 0
->           i2s_src               0           0            11207548 0
->              i2s_pre            0           0            11207548 0
->                 sclk_i2s0       0           0            11207548 0
->                 i2s0_clkout     0           0            11207548 0
->              i2s_frac           0           0            646456897 0
-Hi, as clock tree shows, i2s_pre should come from i2s_frac, that's the root different above two trees.
+Your quote from that thread:
 
->> sclk_i2s0 is the master clock, when to set rate of sclk_i2s0, should
->> allow to set its parent's rate, by add flag CLK_SET_RATE_PARENT for
->> "i2s_frac", "i2s_pre", "i2s0_clkout" and "sclk_i2s0".
->>
->> Tested on rk3288 board using max98090, with command "aplay <music.wav>"
->>
->> Change-Id: I12faad082566532b65a7de8c0a6845e1c17870e6
->> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
->> ---
->>   drivers/clk/rockchip/clk-rk3288.c | 8 ++++----
->>   1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
->> index c770de0..baf19b4 100644
->> --- a/drivers/clk/rockchip/clk-rk3288.c
->> +++ b/drivers/clk/rockchip/clk-rk3288.c
->> @@ -301,15 +301,15 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
->>       COMPOSITE(0, "i2s_src", mux_pll_src_cpll_gpll_p, 0,
->>               RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
->>               RK3288_CLKGATE_CON(4), 1, GFLAGS),
->> -    COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", 0,
->> +    COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
->>               RK3288_CLKSEL_CON(8), 0,
->>               RK3288_CLKGATE_CON(4), 2, GFLAGS),
->> -    MUX(0, "i2s_pre", mux_i2s_pre_p, 0,
->> +    MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
->>               RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
->> -    COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
->> +    COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
->>               RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
->>               RK3288_CLKGATE_CON(4), 0, GFLAGS),
->> -    GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", 0,
->> +    GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
->>               RK3288_CLKGATE_CON(4), 3, GFLAGS),
->>         MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
-> 
-> 
-> 
-> 
+  "I think that a DT node is always supposed to include a compatible
+  string for the specific device.  It could also include a generic
+  compatible string for SPI NOR chips, but the *only* thing a driver can
+  do with that is to use the JEDEC ID command.  It can't even
+  generically read a single byte, since addresses may be either 3 or 4
+  bytes long!  So I think that if a generic compatible string is
+  defined, the DT binding must also define the properties that spi-nor
+  currently reads out of its static table."
 
--- 
-Jianqun Xu
+For every current entry (except the "*-nonjedec" entries; I don't think
+we should be supporting any more entries like this, and I'd like to kill
+the existing ones if possible), we can do just that; read out the JEDEC
+ID and go from there. (Rafal is also looking at non-JEDEC RDID commands,
+but that would just require a different type of binding.)
 
-****************************************************************************
-*IMPORTANT NOTICE:*This email is from Fuzhou Rockchip Electronics Co.,
-Ltd .The contents of this email and any attachments may contain
-information that is privileged, confidential and/or exempt from
-disclosure under applicable law and relevant NDA. If you are not the
-intended recipient, you are hereby notified that any disclosure,
-copying, distribution, or use of the information is STRICTLY PROHIBITED.
-Please immediately contact the sender as soon as possible and destroy
-the material in its entirety in any format. Thank you.
-****************************************************************************
+In fact, for most of these entries, we'll read out the ID and override
+the match provided by the driver anyway. See:
+
+int spi_nor_scan(...)
+{
+...
+	[Note: almost all 'info' entries provide a non-zero jedec_id field]
+	if (info->jedec_id) {
+		const struct spi_device_id *jid;
+
+		jid = nor->read_id(nor);
+		if (IS_ERR(jid)) {
+			return PTR_ERR(jid);
+		} else if (jid != id) {
+			/*
+			 * JEDEC knows better, so overwrite platform ID. We
+			 * can't trust partitions any longer, but we'll let
+			 * mtd apply them anyway, since some partitions may be
+			 * marked read-only, and we don't want to lose that
+			 * information, even if it's not 100% accurate.
+			 */
+			dev_warn(dev, "found %s, expected %s\n",
+				 jid->name, id->name);
+			id = jid;
+			info = (void *)jid->driver_data;
+		}
+	}
+...
+}
+
+I think this chunk might be reworked (or at least, modify the comments)
+to note how we primarily expect to override the input ID. We might even
+drop the dev_warn() eventually, and make it more informative instead.
+
+> [...]
+> > b) Removing spi_nor::read_id
+> > https://patchwork.ozlabs.org/patch/389073/
+> > Ben: I think this one has a NACK from me, because I'm going to use
+> > custom read_id in the bcm53xxspiflash driver.
+> > See following thread for bcm53xxspiflash description:
+> > http://comments.gmane.org/gmane.linux.drivers.mtd/54578
+> > Initial commit (it uses read_id): https://patchwork.ozlabs.org/patch/381902/
+> [...]
+> 
+> But it has to use spi_nor_match_id() because of the driver_data
+> requirement.  This just illustrates that the read_id operation doesn't
+> make sense as currently defined.
+
+Right. I think it may turn out better to drop it and force a redesign
+for the next user.
+
+> I accept that there will be a need for a read_id operation, but I think
+> it should fill in a struct flash_info rather than requiring every chip
+> to be described and named in spi-nor.c.
+
+Maybe struct flash_info, but this still leaks more spi-nor.c internal
+info into drivers. Perhaps Rafal's use case could be served by a
+select-able 'READ ID' opcode, with his flash_info structs still stored
+in spi_nor_ids[] -- or possibly as a separate ID table within spi-nor.c.
+
+But either way, I agree the current read_id() hook is not satisfactory.
+
+Brian
