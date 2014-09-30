@@ -1,31 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Oct 2014 00:09:06 +0100
-Subject: [PATCH] ASoC: fsl: fix dependencies for wm8962
-In-Reply-To: <20140930174241.GA1296@Asurada>
-References: <1950588.ErdGoiHh8p@wuerfel> <20140930164510.GF4273@sirena.org.uk>
- <20140930174241.GA1296@Asurada>
-Message-ID: <20140930230906.GQ4273@sirena.org.uk>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 1 Oct 2014 09:40:01 +1000
+Subject: [PATCH v7 00/11] kernel: Add support for restart handler call
+ chain
+In-Reply-To: <20140930223000.GA20946@roeck-us.net>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <20140930142002.e09ef32392a2b5a7c81e5e57@linux-foundation.org>
+ <20140930223000.GA20946@roeck-us.net>
+Message-ID: <20141001094001.2b85f54c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 10:42:42AM -0700, Nicolin Chen wrote:
-> On Tue, Sep 30, 2014 at 05:45:10PM +0100, Mark Brown wrote:
+Hi Guenter,
 
-> > That select shouldn't be there in the first place, I asked Nicolin to
-> > fix this when I applied the driver but he's not got round to it yet.
+On Tue, 30 Sep 2014 15:30:00 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+>
+> On Tue, Sep 30, 2014 at 02:20:02PM -0700, Andrew Morton wrote:
+> > On Tue, 19 Aug 2014 17:45:27 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+> > 
+> > > Introduce a system restart handler call chain to solve the described problems.
+> > 
+> > So someone has merged eight of these patches into linux-next but these
+> > three:
+> > 
+> > watchdog-s3c2410-add-restart-handler.patch
+> > clk-samsung-register-restart-handlers-for-s3c2412-and-s3c2443.patch
+> > clk-rockchip-add-restart-handler.patch
+> > 
+> > were omitted.  What's up?
+> 
+> Most likely PBKC on my side; Looks like I forgot to add those when I created
+> the immutable branch for others to merge. Sorry for that :-(.
+> 
+> Having said that, I somehow thought that the clock patches would go in through
+> the clock tree. Heiko, did I get that wrong ? Separately, I sent a pull request
+> that includes the watchdog patch to Wim.
 
-> I think I might have missed something around those days, even though
-> the 'Applied' mail seemly doesn't have any comment against this part:
-> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-August/080083.html
+So far, that immutable branch has been merged into the battery tree
+(and thus into linux-next) by Sebastian in order to add (I assume):
 
-> Is that possible for you to copy and paste the comments again?
+18a702e0de98 power: reset: use restart_notifier mechanism for msm-poweroff
+371bb20d6927 power: Add simple gpio-restart driver
 
-I suspect it was on an earlier version of the patch or a cover letter;
-IIRC you were resending while I was reviewing.
+on top of it.
+
+So, I guess the watchdog and clk trees also need to merge that
+immutable branch and then add their respective patches from the mmotm
+series to their trees.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/04bf7c83/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/874b8c8b/attachment.sig>
