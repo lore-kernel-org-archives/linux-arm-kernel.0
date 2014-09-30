@@ -1,209 +1,173 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 30 Sep 2014 10:10:55 +1000
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140929151949.GC2273@ulmo>
-References: <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
- <20140902092508.GR15297@lukather> <20140927235601.19023.31593@quantum>
- <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
- <20140929101805.GB26008@ulmo>
- <CAGRGNgW94Jo_EuE1d3ta-yWW3b0sUs+ggyXnLOULV1_CfW=QZQ@mail.gmail.com>
- <20140929132123.GA30998@ulmo>
- <CAGRGNgVaT73L-AY1rMdth8RiNpanFB=9fzGaUV_tmS0d4udf5g@mail.gmail.com>
- <20140929151949.GC2273@ulmo>
-Message-ID: <CAGRGNgULNzyyM=CKr83cug=_=Yyze=hRNTLWm_mxQPkyTihvRg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 29 Sep 2014 17:12:05 -0700
+Subject: [PATCH v2 4/4] clk: Use ww_mutexes for clk_prepare_{lock/unlock}
+In-Reply-To: <20140928024131.19023.40641@quantum>
+References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
+ <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
+ <20140928024131.19023.40641@quantum>
+Message-ID: <5429F555.9030108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On 09/27/14 19:41, Mike Turquette wrote:
+> Quoting Stephen Boyd (2014-09-03 18:01:06)
+>> @@ -1069,11 +1305,24 @@ static void __clk_recalc_accuracies(struct clk *clk)
+>>   */
+>>  long clk_get_accuracy(struct clk *clk)
+>>  {
+>> +       struct ww_acquire_ctx ctx;
+>> +       LIST_HEAD(list);
+>>         unsigned long accuracy;
+>>  
+>> -       clk_prepare_lock();
+>> +       if (clk && !(clk->flags & CLK_GET_ACCURACY_NOCACHE)) {
+>> +               ww_mutex_lock(&clk->lock, NULL);
+>> +       } else {
+>> +               ww_acquire_init(&ctx, &prepare_ww_class);
+>> +               clk_lock_subtree(clk, &list, &ctx);
+>> +               ww_acquire_done(&ctx);
+>> +       }
+> It looks a little weird to access clk->flags outside of the lock, but
+> flags is immutable after registration-time, so I guess it is OK. Let me
+> know if I'm wrong.
 
-On Tue, Sep 30, 2014 at 1:19 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Tue, Sep 30, 2014 at 12:46:11AM +1000, Julian Calaby wrote:
->> Hi Thierry,
->>
->> On Mon, Sep 29, 2014 at 11:21 PM, Thierry Reding
->> <thierry.reding@gmail.com> wrote:
->> > On Mon, Sep 29, 2014 at 09:00:01PM +1000, Julian Calaby wrote:
->> >> Hi Thierry,
->> >
->> > If you address people directly please make sure they are in the To:
->> > line. Or at least Cc.
->>
->> Sorry about that, the mailing list I received this through (Google
->> Groups based) generally strips to: and CC: lines, so my mail client
->> (Gmail) doesn't do it automatically. I'm still getting used to it.
+Right. We can ww_acquire_init() and ww_mutex_lock() with that context
+before checking the flags. In the single lock case it's better to just
+grab the mutex though, without the context, to avoid the whole deadlock
+detection overhead that we don't care about.
+
 >
-> Yeah, I wish mailing lists would stop doing that.
+>> +
+>>         rate = __clk_get_rate(clk);
+>> -       clk_prepare_unlock();
+>> +
+>> +       if (clk && !(clk->flags & CLK_GET_RATE_NOCACHE))
+>> +               ww_mutex_unlock(&clk->lock);
+>> +       else
+>> +               clk_unlock(&list, &ctx);
+>>  
+>>         return rate;
+>>  }
+>> @@ -1317,9 +1579,11 @@ out:
+>>         return ret;
+>>  }
+>>  
+>> -static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
+>> -                            struct clk *new_parent, u8 p_index)
+>> +static int clk_calc_subtree(struct clk *clk, unsigned long new_rate,
+>> +                            struct clk *new_parent, u8 p_index,
+>> +                            struct list_head *list, struct ww_acquire_ctx *ctx)
+>>  {
+>> +       int ret;
+>>         struct clk *child;
+>>  
+>>         clk->new_rate = new_rate;
+>> @@ -1331,27 +1595,43 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
+>>                 new_parent->new_child = clk;
+>>  
+>>         hlist_for_each_entry(child, &clk->children, child_node) {
+>> +               ret = clk_lock_one(child, list, ctx);
+>> +               if (ret == -EDEADLK)
+>> +                       return ret;
+> Why bother with any locking here at all? Why not call clk_lock_subtree
+> from clk_calc_new_rates? I guess you avoid an extra tree walk?
+
+Yes we save on the tree walk.
+
 >
->> >> On Mon, Sep 29, 2014 at 8:18 PM, Thierry Reding
->> >> <thierry.reding@gmail.com> wrote:
->> >> > On Mon, Sep 29, 2014 at 11:23:01AM +0200, Maxime Ripard wrote:
->> >> >> On Mon, Sep 29, 2014 at 10:06:39AM +0200, Thierry Reding wrote:
->> >> > [...]
->> >> >> > simplefb doesn't deal at all with hardware details. It simply uses what
->> >> >> > firmware has set up, which is the only reason why it will work for many
->> >> >> > people. What is passed in via its device tree node is the minimum amount
->> >> >> > of information needed to draw something into the framebuffer. Also note
->> >> >> > that the simplefb device tree node is not statically added to a DTS file
->> >> >> > but needs to be dynamically generated by firmware at runtime.
->> >> >>
->> >> >> Which makes the whole even simpler, since the firmware already knows
->> >> >> all about which clocks it had to enable.
->> >> >
->> >> > It makes things very complicated in the firmware because it now needs to
->> >> > be able to generate DTB content that we would otherwise be able to do
->> >> > much easier with a text editor.
->> >>
->> >> As far as the kernel is concerned, this is a solved problem.
->> >
->> > It's not completely solved. There's still the issue of no generic way to
->> > specify regulators like you can do for clocks, resets or power domains.
->> > But the kernel isn't the real issue here. The issue is the firmware that
->> > now has to go out of its way not only to initialize display hardware but
->> > also create device tree content just to make Linux not turn everything
->> > off.
->>
->> My point is that the firmware is going to be doing complicated stuff
->> already, adding and using some helpers to configure a device tree node
->> is relatively simple in comparison to dealing with the actual
->> hardware. It wouldn't surprise me if u-boot, for example, ended up
->> with a set of functions to handle this exact case as more graphics
->> hardware gets brought up.
+>> +
+>>                 child->new_rate = clk_recalc(child, new_rate);
+>> -               clk_calc_subtree(child, child->new_rate, NULL, 0);
+>> +               ret = clk_calc_subtree(child, child->new_rate, NULL, 0, list,
+>> +                                       ctx);
+>> +               if (ret)
+>> +                       return ret;
+>>         }
+>> +
+>> +       return 0;
+>>  }
+>>  
+>>  /*
+>>   * calculate the new rates returning the topmost clock that has to be
+>>   * changed.
+>>   */
+>> -static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+>> +static struct clk *
+>> +clk_calc_new_rates(struct clk *clk, unsigned long rate, struct list_head *list,
+>> +                  struct ww_acquire_ctx *ctx)
+>>  {
+>>         struct clk *top = clk;
+>>         struct clk *old_parent, *parent;
+>>         unsigned long best_parent_rate = 0;
+>>         unsigned long new_rate;
+>>         int p_index = 0;
+>> +       int ret;
+>>  
+>>         /* sanity */
+>>         if (IS_ERR_OR_NULL(clk))
+>>                 return NULL;
+>>  
+>> +       ret = clk_lock_one(clk, list, ctx);
+>> +       if (ret == -EDEADLK)
+>> +               return ERR_PTR(ret);
+> It seems to me that we should call clk_parent_lock here instead, since
+> we access the parent's rate. I know that any concurrent access to the
+> parent which would change its rate would fail, since we can't lock the
+> subtree (including *this* lock). But it still seems more correct to lock
+> the parent to me. Let me know what you think.
+
+Blocking the other user of the parent is bad. In our CPU case we have XO
+-> PLLn -> CPUn for each CPU. So if we want to change the frequency of
+CPU0 we change the frequency of PLL0. If we were to always lock the
+parent, in this case XO, then we wouldn't gain anything because the two
+CPUs trying to change rates independently would both be trying to
+acquire the XO clock's lock, thus synchronizing the two things we're
+trying to parallelize.
+
 >
-> Not all firmware is based on U-Boot. Essentially whatever binding
-> changes we make will need to be implemented in all firmware. And the
-> complexity isn't so much about writing the actual DT data, but more
-> about figuring out which data to write. Every firmware image needs to
-> know exactly which clocks and other resources to transcribe for a given
-> board. It'll essentially need to contain some sort of "driver" for each
-> device that parses a DTB, correlates the data to what it knows of the
-> device internals and write a subset of that data back into the DTB in a
-> slightly different format. That's just whacky.
+> It might also help the collision case fail faster since you will fail
+> trying to grab the parent lock instead of grabbing the parent lock, then
+> failing to lock the subtree.
+
+I don't follow this part. Hopefully it doesn't matter though.
+
 >
-> DT was meant to simplify things.
-
-Ok, fair enough, while it's a tempting solution - it makes the kernel
-end of things nice and simple, it's probably not completely scalable.
-U-boot definitely does have "drivers" for the hardware it supports,
-but we can't expect every bootloader to do that.
-
->> >> Firmware is going to be doing some dark magic to set up the hardware
->> >> to be a dumb frame buffer and some other stuff to add the simplefb
->> >> device node - so by this point, adding the clocks (or whatever)
->> >> required by the hardware should be fairly uncomplicated - the firmware
->> >> already knows the hardware intimately. As for the actual device tree
->> >> manipulations, U-boot (or whatever) will probably just grow some
->> >> helper functions to make this simple.
->> >
->> > Have you looked at the code needed to do this? It's not at all trivial.
->> > And the point is really that all this information is there already, so
->> > we're completely duplicating this into a dynamically created device tree
->> > node and for what reason? Only to have one driver request all these
->> > resources and have them forcefully released a few seconds later.
->> >
->> >> Alternatively, it could simply add the relevant data to an existing
->> >> device node and munge it's compatible property so simplefb picks it
->> >> up.
->> >
->> > Yes, I think that'd be a much better solution. Of course it's going to
->> > be very difficult to make that work with a generic driver because now
->> > that generic driver needs to parse the DT binding for any number of
->> > "compatible" devices.
->>
->> Not necessarily.
->>
->> The patch that started this discussion can work with any number of
->> clocks specified in a "clocks" property. Therefore all that needs to
->> happen is that the final hardware binding specifies it's clocks that
->> way.
+> Though in all honestly, I haven't finished thinking it through. The
+> wait/wound algorithm opens up a lot of possibilities around very
+> aggressive locking strategies to prevent contention. For example if we
+> call clk_parent_lock it will lock the subtree starting from the parent,
+> thus holding potentially a LOT more child locks, which only need to be
+> updated during the recalc rate phase.  We could avoid holding those
+> children until the moment that we need to lock them... I'll think about
+> it some more.
 >
-> Are you suggesting that we should be modeling the hardware specific
-> binding to match what the simplefb binding does?
-
-I'll admit that this sounded pretty dumb when I thought over it in the
-morning. Let's call it a strawman and let's call me a hilariously
-unskilled debater.
-
-I don't have a kernel tree in front of me, so I don't know that all
-the helpers used below exist or are named like I've shown, but code
-like this could grab all the resources specified in a tree of nodes:
-
-void simplefb_grab_all_resources(node *root)
-{
-    node *next = root;
-    node *cur;
-
-    while( next ) {
-        cur = next;
-
-        get_all_resources(cur);
-
-        if( next = of_get_first_child(cur) )
-            continue;
-
-        if( next = of_get_next_sibling(cur) )
-            continue;
-
-        while( !next && cur != root ) {
-            cur = of_get_parent_node(cur);
-            next = of_get_next_sibling(cur);
-        }
-
-        if( cur == root )
-            break;
-    }
-}
-
-If we added in a few tests in get_all_resources() to keep it from
-doing things which are obviously stupid (e.g. grabbing resources for
-nodes which have drivers we already have registered) that should work
-for any binding and could easily be extended to any resource type.
-We're already using linked lists to hold references to those
-resources, so there's no problems I can see here, other than adding
-some code.
-
->> I'm sure that as hardware diversifies, the other subsystems will grow
->> in similar directions and eventually be dealt with using similarly
->> generic code.
+> Oh wait, no we couldn't. We have to take all of our locks up front via
+> ww_acquire_done(), which happens below.
 >
-> For regulators this already works very differently. As opposed to the
-> clocks/clock-names type of binding it uses one where the consumer name
-> of the regulator comes from the prefix of a -supply property. That is
-> you'd get something like this:
+>> +
+>>         /* save parent rate, if it exists */
+>>         parent = old_parent = clk->parent;
+>>         if (parent)
+> The context cuts it off, but the next line down accesses parent->rate.
+> Again I think this happens without first having locked parent?
+
+Yes.
+
+>> +       ww_acquire_done(ctx);
+> ww_acquire_done() happens here. OK. Neverrmind, just thinking through
+> out loud.  This looks good.
 >
->         foo-supply = <&reg1>;
->         bar-supply = <&reg2>;
+> Let me know what you think about the questions above. I've also Cc'd
+> Colin Cross who has experimented with per-clock locking before as well.
+> He may or may not have an interest in this now.
 >
-> And since you don't have enough information in the kernel simplefb
-> driver to attach any meaning to these, the best you can do would be
-> iterating over a range and have:
 >
->         0-supply = <&reg0>;
->         1-supply = <&reg1>;
->         ...
->         n-supply = <&reg2>;
->
-> This is made more difficult by the fact that these regulators may be
-> required by components not immediately related to the display engine.
-> They could be for an attached panel, a video bridge or the +5V pin on
-> the HDMI connector.
 
-Surely an iterator could be constructed to go through each node and
-process every one named something like "*-supply"?
-
-As for there being regulators for each separate part of the device,
-could we read what their current state is then maintain that state?
-
-I'll admit that this is getting rather hairy at this point.
-
-Finally, the clock subsystem has evolved away from "*-clock" bindings
-towards the current "clocks" and "clock-names" bindings. I'm sure
-other subsystems will follow.
-
-Thanks,
+Thanks for reviewing Mike. I've rebased the patches to clk-next as of
+today. I still need to update the locking documentation before I send it
+out again, hopefully by today or tomorrow. I'm also auditing clock
+drivers to find potential brokenness.
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
