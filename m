@@ -1,61 +1,81 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 30 Sep 2014 16:27:41 -0500
-Subject: [PATCHv6 0/5] hwspinlock core/omap dt support
-In-Reply-To: <CAJAp7Ogbj5K4N7=TEQQ8HJ0X7hkOqzFwv=1bRicVCNX9cv_jaA@mail.gmail.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
- <CAJAp7Ogbj5K4N7=TEQQ8HJ0X7hkOqzFwv=1bRicVCNX9cv_jaA@mail.gmail.com>
-Message-ID: <542B204D.7050105@ti.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Tue, 30 Sep 2014 22:28:55 +0100
+Subject: [PATCH] of/pci: add pci_pio_to_address dummy for !CONFIG_OF
+In-Reply-To: <CAErSpo61favodLTSwCYzFZq-sB60+ZH6_WvwSGHgRx6cPKtXpA@mail.gmail.com>
+References: <706416181.hbVGLDA3o6@wuerfel> <20140930160139.GA5625@google.com>
+ <20140930171002.GB15854@bart.dudau.co.uk>
+ <CAErSpo61favodLTSwCYzFZq-sB60+ZH6_WvwSGHgRx6cPKtXpA@mail.gmail.com>
+Message-ID: <20140930212855.GA15713@borg.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 30, 2014 at 01:53:06PM -0600, Bjorn Helgaas wrote:
+> On Tue, Sep 30, 2014 at 11:10 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> > On Tue, Sep 30, 2014 at 10:01:39AM -0600, Bjorn Helgaas wrote:
+> >> On Tue, Sep 30, 2014 at 03:19:05PM +0200, Arnd Bergmann wrote:
+> >> > The pci_register_io_range() and pci_pio_to_address() were recently
+> >> > introduced to generalize the handling of memory mapped PCI I/O space,
+> >> > but they are only valid when CONFIG_OF is set, leading to a possible
+> >> > build error:
+> >> >
+> >> > drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_setup_window':
+> >> > drivers/pci/host/pcie-rcar.c:340:3: error: implicit declaration of function 'pci_pio_to_address' [-Werror=implicit-function-declaration]
+> >> >    res_start = pci_pio_to_address(res->start);
+> >> >    ^
+> >> > drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_probe':
+> >> > drivers/pci/host/pcie-rcar.c:945:3: error: implicit declaration of function 'of_pci_range_to_resource' [-Werror=implicit-function-declaration]
+> >> >    err = of_pci_range_to_resource(&range, pdev->dev.of_node,
+> >> >    ^
+> >> > cc1: some warnings being treated as errors
+> >> >
+> >> > This provides inline dummy implementations for the case that
+> >> > CONFIG_OF is disabled, to allow better build testing.
+> >> >
+> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> > Fixes: 279c5dd046 ("of/pci: Add pci_register_io_range() and pci_pio_to_address()")
+> >>
+> >> I'm rebuilding the pci/host-generic branch to pick up the other v13 fixes,
+> >> so I folded this fix directly into the "of/pci: Add pci_register_io_range()
+> >> and pci_pio_to_address()" patch.  Thanks for finding this; the config
+> >> dependencies are a bit of a mess.
+> >
+> > Bjorn,
+> >
+> > I suggest splitting this patch into 2 parts, move the one that adds pci_pio_to_address() in patch 2
+> > and the other in patch 5.
+> 
+> Yeah, I screwed that up.  I had just applied Arnd's patch completely
+> to 279c5dd046, which doesn't quite make sense.
+> 
+> I tried again like this:
+> 
+>   - In "of/pci: Add pci_register_io_range() and pci_pio_to_address()",
+> I added the dummy pci_pio_to_address(), so there's an extern and a
+> definition in address.c when CONFIG_OF_ADDRESS=y, and an inline dummy
+> otherwise.
+> 
+>   - I dropped "of/pci: Define of_pci_range_to_resource() only when
+> CONFIG_PCI=y".
+> 
+>   - In "of/pci: Move of_pci_range_to_resource() to of/address.c", I
+> added the dummy of_pci_range_to_resource(), so there's an extern an a
+> definition in address.c when CONFIG_OF_ADDRESS=y and CONFIG_PCI=y, and
+> an inline dummy otherwise.
+> 
+> I'm not really set up to build test this, and my head is swimming a
+> bit, so I hope this is it.  I pushed the pci/host-generic branch
+> again, so you can look at it yourself.
+
 Hi Bjorn,
 
-On 09/30/2014 03:54 PM, Bjorn Andersson wrote:
-> On Fri, Sep 12, 2014 at 1:24 PM, Suman Anna <s-anna@ti.com> wrote:
->> Hi Ohad,
->>
->> This is an update to the hwspinlock dt support series. The series
->> is rebased onto v3.17-rc3, and addresses the review comments on the
->> previous v5 series. I have also split and left out the RFC patches
->> about the support for reserved locks (will post these as a separate
->> series) and return code convention changes in the hwspinlock core
->> (will not be needed anymore). The support for deferred probing of
->> clients is supported in the new of_hwspin_lock_get_id() function
->> itself.
->>
-> 
-> Thanks for your reply to me, I had missed that you continued this work.
-> 
-> 
-> I find it somewhat awkward to have to call both of_hwspin_lock_get_id() and
-> then hwspin_lock_request_specific(), but I found the request from Ohad, so
-> let's stick with it.
-> 
-> Am I right that hwlock-num-locks and hwlock-base-id are optional from the
-> frameworks perspective and only there to aid the hwspin drivers? If so it is
-> strange to have in the common binding and have the helper functions in the core
-> for simply reading hwspin device specific properties.
+It looks good to me. Functionality-wise I can only test it tomorrow UK time,
+but from the diffs I've done I thinks we're good.
 
-The hwlock-num-locks and hwlock-base-id would be common features to all
-the hwspinlock drivers, so they are added as common bindings which the
-individual implementations should use instead of defining their own
-properties. These are added based on discussion way back on v1. You
-ought to replace the "qcom,num-locks" with the first one.
+Will wait for more reports from the build bot.
 
-I will respond to your v4 with a few comments so that we don't loose the
-context in that thread.
+Take care,
+Liviu
 
 > 
-> Otherwise I think it looks sane, although I haven't spend that much time
-> reviewing it.
+> Bjorn
 > 
-> I did throw it into my tree and gave it a testrun with the Qualcomm code I've
-> been working on. So for the non-omap parts:
-> 
-> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> 
-
-Thanks for testing this with the new Qualcomm driver.
-
-regards
-Suman
