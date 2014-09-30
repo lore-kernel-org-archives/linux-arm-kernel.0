@@ -1,78 +1,80 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 29 Sep 2014 23:44:04 -0700
-Subject: [GIT PULL] Samsung clock changes for v3.18
-In-Reply-To: <1412022850-7842-1-git-send-email-tomasz.figa@gmail.com>
-References: <1412022850-7842-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20140930064404.19023.96162@quantum>
+Date: Tue, 30 Sep 2014 00:01:17 -0700
+Subject: [PATCH v3 03/12] clk: Add a function to retrieve phase
+In-Reply-To: <20140929082421.GA4388@lukather>
+References: <1410466706-27386-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1410466706-27386-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140928001732.19023.2496@quantum> <20140929082421.GA4388@lukather>
+Message-ID: <20140930070117.19023.51389@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomasz Figa (2014-09-29 13:34:10)
-> The following changes since commit a52ae5a755d980e9ff812c6f45a415ba27bfd33b:
+Quoting Maxime Ripard (2014-09-29 01:24:21)
+> Hi Mike,
 > 
->   Merge branch 'clk-fixes' into clk-next (2014-09-17 11:47:56 -0700)
+> On Sat, Sep 27, 2014 at 05:17:32PM -0700, Mike Turquette wrote:
+> > Quoting Maxime Ripard (2014-09-11 13:18:17)
+> > > The current phase API doesn't look into the actual hardware to get the phase
+> > > value, but will rather get it from a variable only set by the set_phase
+> > > function.
+> > > 
+> > > This will cause issue when the client driver will never call the set_phase
+> > > function, where we can end up having a reported phase that will not match what
+> > > the hardware has been programmed to by the bootloader or what phase is
+> > > programmed out of reset.
+> > > 
+> > > Add a new get_phase function for the drivers to implement so that we can get
+> > > this value.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/clk/clk.c            | 10 ++++++++++
+> > >  include/linux/clk-provider.h |  5 +++++
+> > >  2 files changed, 15 insertions(+)
+> > > 
+> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > index d87661af0c72..113d75db371d 100644
+> > > --- a/drivers/clk/clk.c
+> > > +++ b/drivers/clk/clk.c
+> > > @@ -1934,6 +1934,16 @@ int __clk_init(struct device *dev, struct clk *clk)
+> > >                 clk->accuracy = 0;
+> > >  
+> > >         /*
+> > > +        * Set clk's phase.
+> > > +        * Since a phase is by definition relative to its parent, just
+> > > +        * query the current clock phase, or just assume it's in phase.
+> > > +        */
+> > > +       if (clk->ops->get_phase)
+> > > +               clk->phase = clk->ops->get_phase(clk->hw);
+> > > +       else
+> > > +               clk->phase = 0;
+> > 
+> > I probably wasn't paying enough attention to this. Based on the
+> > coverletter I thought that v3 would introduce something like
+> > CLK_GET_PHASE_NOCACHE and stuff that logic into a __clk_get_phase
+> > function? Looks like this version of the series doesn't handle phases
+> > that can be changed by hardware (e.g. coming out of idle).
+> > 
+> > Correct me if I am wrong, but it looks like we retrieve the phase only
+> > once at init and then never again? The rest of the time we rely on
+> > clk->phase to always be accurate...
 > 
-> are available in the git repository at:
+> Yeah, I didn't have any use for it at the moment, and thought that if
+> someone ever needed it, it would be trivial to add, so I left it out.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.18/samsung-clk
-> 
-> for you to fetch changes up to fa0111be4ff30150720db3c3e5ee8d7823921639:
-> 
->   clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation (2014-09-24 12:41:33 +0200)
+> If you want me to still do it, I can send an additional patch.
 
-Pulled!
+No it is fine. A bit asymmetrical for my brain but it is dead code if no
+one is using it (yet).
 
-Thanks,
+Regards,
 Mike
 
 > 
-> ----------------------------------------------------------------
-> Samsung clock patches for v3.18
+> Thanks!
+> Maxime
 > 
-> 1) non-critical fixes (without the need to push to stable)
-> 
-> fa0111be4ff3 clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation
-> b511593d7165 clk: samsung: exynos4: fix g3d clocks
-> c14254300131 clk: samsung: exynos4: add missing smmu_g2d clock and update comments
-> 22842d244af3 clk: samsung: exynos5260: fix typo in clock name
-> e82ba578ccde clk: samsung: exynos3250: fix width field of mout_mmc0/1
-> 59037b92f440 clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
-> 5ce37f266650 clk: samsung: exynos3250: fix mout_cam_blk parent list
-> 
-> 2) Clock driver extensions
-> 
-> 07ccf02ba5c3 dt-bindings: clk: samsung: Document the DMC domain of Exynos3250 CMU
-> d0e73eaf1925 ARM: dts: exynos3250: Add CMU node for DMC domain clocks
-> e3c3f19bc618 clk: samsung: exynos3250: Register DMC clk provider
-> 4676f0aab9dc clk: samsung: exynos4: add support for MOUT_HDMI and MOUT_MIXER clocks
-> 
-> ----------------------------------------------------------------
-> Chander Kashyap (1):
->       clk: samsung: exynos5260: fix typo in clock name
-> 
-> Krzysztof Kozlowski (3):
->       clk: samsung: exynos3250: Register DMC clk provider
->       ARM: dts: exynos3250: Add CMU node for DMC domain clocks
->       dt-bindings: clk: samsung: Document the DMC domain of Exynos3250 CMU
-> 
-> Marek Szyprowski (3):
->       clk: samsung: exynos4: add missing smmu_g2d clock and update comments
->       clk: samsung: exynos4: add support for MOUT_HDMI and MOUT_MIXER clocks
->       clk: samsung: exynos4: fix g3d clocks
-> 
-> Pankaj Dubey (3):
->       clk: samsung: exynos3250: fix mout_cam_blk parent list
->       clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
->       clk: samsung: exynos3250: fix width field of mout_mmc0/1
-> 
-> Thomas Abraham (1):
->       clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation
-> 
->  .../devicetree/bindings/clock/exynos3250-clock.txt |  10 +-
->  arch/arm/boot/dts/exynos3250.dtsi                  |   6 +
->  drivers/clk/samsung/clk-exynos3250.c               | 202 ++++++++++++++++++++-
->  drivers/clk/samsung/clk-exynos4.c                  |  18 +-
->  drivers/clk/samsung/clk-exynos5260.c               |   2 +-
->  include/dt-bindings/clock/exynos3250.h             |  27 +++
->  include/dt-bindings/clock/exynos4.h                |  12 +-
->  7 files changed, 257 insertions(+), 20 deletions(-)
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
