@@ -1,19 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 15:26:06 +0200
-Subject: [PATCH] sched, time: cmpxchg does not work on 64-bit variable
-In-Reply-To: <542AA33E.2050008@redhat.com>
-References: <2547036.UshV4pXvhf@wuerfel> <542AA33E.2050008@redhat.com>
-Message-ID: <6045627.KStXj7ELPe@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 30 Sep 2014 15:28:23 +0200
+Subject: [PATCH v5 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D174A1012@AcuExch.aculab.com>
+References: <1411667317-1163-1-git-send-email-santosh.shilimkar@ti.com>
+ <1411667317-1163-3-git-send-email-santosh.shilimkar@ti.com>
+ <20140929.155200.2231132602322345812.davem@davemloft.net>
+ <063D6719AE5E284EB5DD2968C1650D6D174A1012@AcuExch.aculab.com>
+Message-ID: <CAMuHMdXe2H4qfX4X4GDzJSgoWzu-BrvRL6KoZagepY1GYEA4Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 08:34:06 Rik van Riel wrote:
-> 
-> Arnd, on which architecture are you seeing a build failure?
-> Is it just 32 bit arm?
-> 
+On Tue, Sep 30, 2014 at 3:09 PM, David Laight <David.Laight@aculab.com> wrote:
+>> > +static inline int gbe_phy_link_status(struct gbe_slave *slave)
+>> > +{
+>> > +   if (!slave->phy)
+>> > +           return 1;
+>> > +
+>> > +   if (slave->phy->link)
+>> > +           return 1;
+>> > +
+>> > +   return 0;
+>> > +}
+>>
+>> Please use 'bool' as the return type and return 'true' or 'false'.
+>
+> That function body could also be just:
+>         return !slave->phy && slave->phy->link;
+> which might be more readable if directly coded.
 
-Yes, I only tested on arm32, but I assume that most other 32-bit
-architectures will behave in a similar way.
+return !slave->phy || slave->phy->link;
 
-	Arnd
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
