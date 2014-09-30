@@ -1,42 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 30 Sep 2014 15:28:23 +0200
-Subject: [PATCH v5 2/3] net: Add Keystone NetCP ethernet driver
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D174A1012@AcuExch.aculab.com>
-References: <1411667317-1163-1-git-send-email-santosh.shilimkar@ti.com>
- <1411667317-1163-3-git-send-email-santosh.shilimkar@ti.com>
- <20140929.155200.2231132602322345812.davem@davemloft.net>
- <063D6719AE5E284EB5DD2968C1650D6D174A1012@AcuExch.aculab.com>
-Message-ID: <CAMuHMdXe2H4qfX4X4GDzJSgoWzu-BrvRL6KoZagepY1GYEA4Ag@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 30 Sep 2014 15:30:49 +0200
+Subject: [PATCH v8 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <1412074969-12704-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1412074969-12704-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CABxcv=kEVma+Ho6PPy+4t+zYH67sAWbbvJvrviPop-MBqktbjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 3:09 PM, David Laight <David.Laight@aculab.com> wrote:
->> > +static inline int gbe_phy_link_status(struct gbe_slave *slave)
->> > +{
->> > +   if (!slave->phy)
->> > +           return 1;
->> > +
->> > +   if (slave->phy->link)
->> > +           return 1;
->> > +
->> > +   return 0;
->> > +}
->>
->> Please use 'bool' as the return type and return 'true' or 'false'.
+Hello Vikas,
+
+Thanks a lot for the re-spin.
+
+On Tue, Sep 30, 2014 at 1:02 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
 >
-> That function body could also be just:
->         return !slave->phy && slave->phy->link;
-> which might be more readable if directly coded.
+> Tested on Kukjin Kim's tree, for-next branch +
+> 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
+> 2] https://lkml.org/lkml/2014/9/30/156
 
-return !slave->phy || slave->phy->link;
+I wanted to test your series but I noticed that Abhilash's patch:
 
-Gr{oetje,eeting}s,
+"[PATCH v7] ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420"
 
-                        Geert
+does not apply cleanly on Kukjin's for-next branch. I see that all the
+dependencies mentioned (modulo $subject or course) have already been
+merged though.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Did you rebase Abhilash's to test your series?. I can forward port as
+well but just want to be sure that I'm not missing any other
+dependency.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+These are the patches I've on top of Kukjin's for-next branch fyi:
+
+663dfa7 ARM: exynos5: Add Suspend-to-RAM support for 5420
+b4b3b76 ARM: exynos5: Add PMU support for 5420
+6c0e381 ARM: EXYNOS: Move PMU specific definitions from common.h
+cdf79fe ARM: EXYNOS: Add platform driver support for Exynos PMU
+d2d8bc6 mfd: syscon: Decouple syscon interface from platform devices
+
+Best regards,
+Javier
