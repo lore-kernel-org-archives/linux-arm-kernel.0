@@ -1,65 +1,63 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 30 Sep 2014 07:51:32 -0700
-Subject: [RFC 0/7] Qualcomm SMEM, SMD, RPM and regulators
-In-Reply-To: <E6EEBBAE-C710-4280-824D-CC5D54CB2551@codeaurora.org>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <E6EEBBAE-C710-4280-824D-CC5D54CB2551@codeaurora.org>
-Message-ID: <20140930145131.GL28481@sonymobile.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Tue, 30 Sep 2014 20:28:55 +0530
+Subject: [PATCH v8 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <CABxcv=ndW1j6FfE5a-6jHKjPVsSsp4Hjjz5YK8su8DCjG11-sA@mail.gmail.com>
+References: <1412074969-12704-1-git-send-email-vikas.sajjan@samsung.com>
+ <CABxcv=kEVma+Ho6PPy+4t+zYH67sAWbbvJvrviPop-MBqktbjw@mail.gmail.com>
+ <CAM4voa=TYhF_x7WnM=rkUevuKkt5jqVgjuo7ABa92+bziG+uJw@mail.gmail.com>
+ <CABxcv=ndW1j6FfE5a-6jHKjPVsSsp4Hjjz5YK8su8DCjG11-sA@mail.gmail.com>
+Message-ID: <CAM4voakGhLeP-mk1dA2zkNqmge+E_csOdAKvYUvbuWj8-zsJig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30 Sep 06:49 PDT 2014, Kumar Gala wrote:
+HI Javier,
 
-> 
-> On Sep 29, 2014, at 7:34 PM, Bjorn Andersson <Bjorn.Andersson@sonymobile.com> wrote:
-> 
-> > All Qualcomm platforms implements a shared heap among the processors in the
-> > SoC, used for sharing data with other parts of the system.
-> > 
-> > One consumer of items from this heap is the "Shared Memory Driver", a ring
-> > buffer based point-to-point communication mechanism used to send either stream
-> > or packet based data to remote processors.
-> > 
-> > Starting with 8x74 this system is used to talk to the Resource Power Manager
-> > (RPM), a power efficient "coprocessor" with responsibility of aggregate votes
-> > from the various systems in the SoC related to regulators, clocks and bus
-> > frequencies.
-> > 
-> > The PMIC regulators and root clocks in these platforms are only accessible via
-> > the RPM, so to get access to these we need the full chain of smem, smd, rpm and
-> > a regulator driver implemented. And that is exactly what this series provides.
-> > 
-> > 
-> > A key outstanding question is where in the tree we should put the
-> > implementation, for now I dropped them in drivers/soc/qcom but that's only
-> > because I don't know where to put it otherwise. I have not found any equivalent
-> > of the SMEM driver, SMD resembles mailbox and rpmsg - but comments in that
-> > patch on why it's neither.
-> > 
-> > RPM is a mfd and regulator is a regulator :)
-> 
-> I still don?t see why RPM support for either A-family or B-family should
-> exist in MFD vis drivers/soc/qcom.  What benefit is there in putting this in
-> MFD?
-> 
-> I think both A and B-family support should be in drivers/soc/qcom for the
-> current time being until we determine there is some framework that makes more
-> sense in the future.  I almost see RPM more like a bus controller than
-> anything else.  Something like an I2C bus controller that than has some set
-> of devices off of that bus.
-> 
+On Tue, Sep 30, 2014 at 8:12 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Abhilash,
+>
+> Thanks a lot for your quick reply.
+>
+> On Tue, Sep 30, 2014 at 4:24 PM, Abhilash Kesavan
+> <kesavan.abhilash@gmail.com> wrote:
+>> Hi Javier,
+>>
+>> On Tue, Sep 30, 2014 at 7:00 PM, Javier Martinez Canillas
+>> <javier@dowhile0.org> wrote:
+>>> Hello Vikas,
+>>>
+>>> Thanks a lot for the re-spin.
+>>>
+>>> On Tue, Sep 30, 2014 at 1:02 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>>>>
+>>>> Tested on Kukjin Kim's tree, for-next branch +
+>>>> 1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
+>>>> 2] https://lkml.org/lkml/2014/9/30/156
+>>>
+>>> I wanted to test your series but I noticed that Abhilash's patch:
+>>>
+>>> "[PATCH v7] ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420"
+>>>
+>>> does not apply cleanly on Kukjin's for-next branch. I see that all the
+>>> dependencies mentioned (modulo $subject or course) have already been
+>>> merged though.
+>>
+>> If you are looking to test this series right now then I can post an
+>> untested rebased version. Otherwise, I will test it tomorrow and post.
+>>
+>
+> Up to you. If is easy for you to post an untested version, that would
+> be great and I can test it. But is OK if you prefer to do it tomorrow
+> too.
 
-When you look at what functionality the RPM exposes it has very much in common
-with a PMIC. So after looking at this back and forth for months I think MFD is
-a nice fit.
-
-As with all the other pmics we could create a new subsystem (drivers/pmic?) for
-this kind of devices that exposes variable size registers for children to read
-and write.
-
-But if you can convince the maintainers about that then we have a whole bunch
-of stuff in mfd etc that we should move out, so let's not put this in
-qcom-staging just for the sake of it.
+Just posted the rebased patch.
 
 Regards,
-Bjorn
+Abhilash
+>
+>> Regards,
+>> Abhilash
+>>>
+>
+> Best regards,
+> Javier
