@@ -1,132 +1,80 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 30 Sep 2014 11:48:49 +0300
-Subject: [PATCH] clk: prevent erronous parsing of children during rate
- change
-In-Reply-To: <20140930070732.19023.37829@quantum>
-References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
- <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
- <5424C2FA.4000508@codeaurora.org> <5425135F.2070809@ti.com>
- <20140926232453.19023.25483@quantum> <542913B4.2020808@ti.com>
- <20140930070732.19023.37829@quantum>
-Message-ID: <542A6E71.10703@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 30 Sep 2014 09:54:07 +0100
+Subject: [PATCH v13 10/12] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
+In-Reply-To: <CAErSpo70t9TMdntjBt+GdTw3FVmMquACQePX8=SKkySPuG3F3Q@mail.gmail.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+ <1412000971-9242-11-git-send-email-Liviu.Dudau@arm.com>
+ <CAE9FiQXEUZvkuzwOrK+2zGVj0ywFaQsiWH7SHufZk9BRWnwddQ@mail.gmail.com>
+ <CAE9FiQUkcPRMUEn01VJMyXz8aYvk6C5MBNZi5NCV2m3qkNabeg@mail.gmail.com>
+ <1412024521.4285.98.camel@pasglop>
+ <CAErSpo62ap1YkzvuZ6MCpXry9=VpLv+Skzrwr10h=+Lc4VfVgQ@mail.gmail.com>
+ <1412029912.4285.110.camel@pasglop>
+ <CAErSpo70t9TMdntjBt+GdTw3FVmMquACQePX8=SKkySPuG3F3Q@mail.gmail.com>
+Message-ID: <20140930085407.GL841@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2014 10:07 AM, Mike Turquette wrote:
-> Quoting Tero Kristo (2014-09-29 01:09:24)
->> On 09/27/2014 02:24 AM, Mike Turquette wrote:
->>> Quoting Tero Kristo (2014-09-26 00:18:55)
->>>> On 09/26/2014 04:35 AM, Stephen Boyd wrote:
->>>>> On 09/23/14 06:38, Tero Kristo wrote:
->>>>>> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
->>>>>>> On 08/21, Tero Kristo wrote:
->>>>>>>>              /* Skip children who will be reparented to another clock */
->>>>>>>>              if (child->new_parent && child->new_parent != clk)
->>>>>>>>                  continue;
->>>>>>>
->>>>>>> Are we not hitting the new_parent check here? I don't understand
->>>>>>> how we can be changing parents here unless the check is being
->>>>>>> avoided, in which case I wonder why determine_rate isn't being
->>>>>>> used.
->>>>>>>
->>>>>>
->>>>>> It depends how the clock underneath handles the situation. The error I
->>>>>> am seeing actually happens with a SoC specific compound clock (DPLL)
->>>>>> which integrates set_rate + mux functionality into a single clock
->>>>>> node. A call to the clk_set_rate changes the parent of this clock
->>>>>> (from bypass clock to reference clock), in addition to changing the
->>>>>> rate (tune the mul+div.) I looked at using the determine rate call
->>>>>> with this type but it breaks everything up... the parent gets changed
->>>>>> but not the clock rate, in addition to some other issues.
->>>>>
->>>>> Ok. Is this omap3_noncore_dpll_set_rate()?
->>>>
->>>> Yes.
->>>>
->>>>    > Can we use determine_rate +
->>>>> clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
->>>>> allow us to do the mult+div and the parent in the same op call, although
->>>>> I don't understand why setting the parent and then setting the rate is
->>>>> not going to work.
->>>>
->>>> Well, setting parent first, then rate later causes problems with the
->>>> DPLL ending up running with illegal (non-specified) rate, the M+N values
->>>> are most likely wrong if you just switch from bypass clock to reference
->>>> clock first without programming the M+N first.
->>>
->>> I took a quick look and it still seems to me that the OMAP DPLLs are
->>> still not modeled properly as mux clocks. Is this correct?
->>
->> Yeah, they are not mux clocks, but rather a compound of mux + DPLL
->> multiplier/divider logic. Changing the DPLL to be a separate mux + DPLL
->> div/mult clock will still have overlapping usage of the DPLL_EN field,
->
-> I'm not talking about splitting up the clock into two separate clocks.
-> If memory serves the DPLL clock implementation "cheats" and hides the
-> bypass_clk info from the clock framework. To be explicit, from the
-> perspective of Linux clock framework DPLL clocks only have one parent.
->
-> In reality a typical DPLL should have at least 2 parents (and in some
-> cases starting with OMAP4, some of the DPLL output clocks should have a
-> second HSD parent). But the implementation does not reflect this.
+On Tue, Sep 30, 2014 at 12:08:49AM +0100, Bjorn Helgaas wrote:
+> On Mon, Sep 29, 2014 at 4:31 PM, Benjamin Herrenschmidt
+> <benh@kernel.crashing.org> wrote:
+> > On Mon, 2014-09-29 at 15:33 -0600, Bjorn Helgaas wrote:
+> >> > Right and on powerpc and others as well. We need to survey existing
+> >> > resources. We also have a number of platform things that might need
+> >> > to happen before we do the final re-assignment pass.
+> >>
+> >> That's true today.  But I don't know whether it *has* to be this way
+> >> forever.  On x86, pcibios_resource_survey() throws in E820 information
+> >> (which we know long before we do any PCI enumeration) and some IO-APIC
+> >> resources (it looks like we also know these before PCI enumeration).
+> >> Powerpc has pcibios_reserve_legacy_regions(), but that looks like
+> >> mostly stuff that could be done when we find the host bridge, before
+> >> we enumerate PCI devices below it.
+> >
+> > Oh we can probably change that but it's going to be much more work than
+> > just moving the assignment into pci_scan_root_bus().
+> 
+> Agreed.  It's obvious that we can't apply Liviu's patch as-is.
 
-No, this is not the DPLLs are modelled. Each DPLL has currently two 
-parents, ref-clk and bypass-clk, which are both modelled as separate 
-clock nodes, and the DPLL switches parents based on bypass/lock mode. 
-The bypass clock is also usually a mux clock, which further selects 
-separate bypass parent, resulting in 3 or more parents for a certain DPLL.
+Thanks everyone for the feedback!
 
->
->> as the DPLL must be in bypass mode during M+N change. Or, should the
->> DPLL rate change only be allowed if the mux is in bypass setting?
->> Several drivers still depend on direct dpll clk_set_rate working
->> 'properly' (there are some other issues currently present also which
->> have nothing to do with the mux behavior.)
->>
->>> This issue has been lingering for a long time and we can't use
->>> determine_rate unless that clock has multiple parents. Simply hacking
->>> knowledge of the parent bypass clock into the .set_rate callback is not
->>> enough.
->>
->> If you believe this _must_ be changed, I can take a look at this for
->> next merge window, but this will cause a DT data compatibility break if
->> nothing else (personally I don't care about this as I always rebuild DT
->> blob with kernel, but lots of other people seem to do.)
->
-> Well I guess the question is how long will we put up with the many small
-> headaches caused by incorrectly modeling the clock?
+Bjorn, you can drop this patch from the series if you want to add it to
+your tree, and the host bridge drivers will have to reimplement pci_scan_root_bus()
+for now (most do it already as they need to add msi information as well).
 
-Well, its not kind of incorrectly modelled, it is just modelled in such 
-way that clk_set_rate doesn't cope too well with it.
+Benjamin, I still have on my ToDo list to convert powerpc. I might not be
+able to do it successfully on my own (as I don't understand a lot of the
+corner cases) but Bjorn is correct here in that pcibios_reserve_legacy_regions()
+will move out of the scanning of the root bus.
 
-> determine_rate and clk_set_parent_and_rate should be sufficient for the
-> OMAP DPLLs but only if they are correctly modeled in the framework.
+> 
+> > There are also a
+> > number of subtle and not-so-subtle bits of code that rely on side
+> > effects of the current code such as anything that tests for bus->added
+> > or dev->added. Again, nothing we can't sort out eventually but the
+> > transition might be a bit painful.
+> >
+> > We might need to introduce a new flag for platforms converted to the
+> > "new style" generalized resource assignment which we can deprecate once
+> > everybody has moved over.
+> 
+> There's definitely a lot of work here if we ever want to make this happen.
 
-Do we have implementation for clk_set_parent_and_rate someplace? I 
-looked at rc7 and didn't find this. I think this would fix the issues I 
-am seeing combined with determine_rate, if clk_set_rate would internally 
-handle changing both rate + parent.
+I know :)
 
--Tero
+Best regards,
+Liviu
 
->
-> Regards,
-> Mike
->
->>
->> -Tero
->>
->>>
->>> Regards,
->>> Mike
->>>
->>>>
->>>>     I'm interested in the other issues that you mentioned
->>>>> too.
->>>>
->>>> Mostly these were side-effects from the illegal DPLL setup I guess, like
->>>> boot hang, failed drivers etc. I didn't really investigate this that
->>>> much as it is much more simpler just to use safe list iteration here.
->>>>
->>>> -Tero
->>
+> 
+> Bjorn
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
