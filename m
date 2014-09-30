@@ -1,137 +1,86 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 29 Sep 2014 21:37:38 -0700
-Subject: [PATCH 1/6] watchdog: watchdog_dev: WATCHDOG_KEEP_ON feature
-In-Reply-To: <542987F9.2080907@elproma.com.pl>
-References: <1411419350-1297-1-git-send-email-j.uzycki@elproma.com.pl>
- <5424E535.7060009@roeck-us.net> <542987F9.2080907@elproma.com.pl>
-Message-ID: <542A3392.8020903@roeck-us.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 30 Sep 2014 14:46:56 +1000
+Subject: linux-next: manual merge of the battery tree with the arm-soc tree
+Message-ID: <20140930144656.35afeae4@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2014 09:25 AM, Janusz U?ycki wrote:
->
-> W dniu 2014-09-26 06:01, Guenter Roeck pisze:
->> On 09/22/2014 01:55 PM, Janusz Uzycki wrote:
->>> Some applications require to start watchdog before userspace software.
->>> This patch enables such feature. Only the flag is necessary
->>> to enable it.
->>> Moreover kernel's ping is re-enabled when userspace software closed
->>> watchdog using the magic character. The features improves kernel's
->>> reliability if hardware watchdog is available.
->>>
->>> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
->>
->
-> Hi Guenter,
->
->>
->> This patch set is trying to solve four problems at once:
->>
->> 1) Auto-start watchdog when its driver registers
->> 2) Keep watchdog running when its driver registers until userspace opens it
->> 3) Handle watchdogs which can not be stopped after being started
->> 4) Keep watchdog running with kernel timer after it has been closed,
->>    even if it can be stopped.
->>
->> The next time adds 'boot time protection', which is really another term
->> for an initial timeout, and case 5).
->>
->> That is a bit too much for a single patch and, even more so, a single flag.
->
-> OK, but I think [PATCH 3/6] could be applied.
-> Do you agree? Should I resent it separately?
+Hi Sebastian,
 
-Yes, it looks ok.
+Today's linux-next merge of the battery tree got conflicts in
+drivers/power/reset/Kconfig and drivers/power/reset/Makefile between
+commit 0e545f57b708 ("power: reset: driver for the Versatile syscon
+reboot") from the arm-soc tree and commit f0745f3696e8 ("power: reset:
+Add restart functionality for STiH41x platforms") from the battery tree.
 
-> I omited in the comment
-> "The patch adds suspend/resume PM support to stmp3xxx_rtc_wdt
-> watchdog driver" because the subject is almost the same.
->
->> Let's look at one case after another.
->>
->> Auto-start watchdog when its driver registers - this makes sense as a
->> feature just by itself. A good name for its flag might be something like
->> WDT_AUTOSTART. A matching module parameter might also make sense.
->>
->> autostart:
->>     Set to 0 to disable, -1 to enable with unlimited timeout,
->>     or <n> for an initial timeout of <n> seconds.
->
-> Current start(1) + keep-on(2,3,4) + boottime(5) combined. It looks OK.
->
-Maybe for you. For me they are different cases.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
->>
->> This could be accompanied by a variable in watchdog_device:
->>     int init_timeout;    /* initial timeout in seconds */
->
-> As the module parameter, instead of "boottime" in watchdog_core?
->
->>
->> An API function such as watchdog_set_autostart() with the initial timeout
->> as parameter would also be helpful. This function could then be used to
->> implement 2).
->>
->>     if (autostart || (keep_running && this_watchdog_is_running())
->>         watchdog_set_autostart(&wdd, autostart ? : keep_running);
->>
-> I don't understand the difference exactly and why to check the watchdog
-> is running? This means watchdog is active or something new?
->
->> keep_running could then be a another module parameter with the same meaning
->> as autostart.
-> But autostart and keep_running aren't in conflict.
-> So I don't understand also "autostart ? : keep_running".
->
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-The functionality is distinctively different.
-
-autostart: start watchdog on module load
-keep_running: If the watchdog is already running, keep it running. Otherwise do nothing.
-
-Both have different use cases which should not be combined.
-
->>
->> Together this would also solve problem 5) while at the same time keeping
->> the use cases separate.
->
-> It is solved by current code.
->
->>
->> For 3) we really need another flag. Actually, it might be sufficient to have
->> watchdog drivers with this condition simply not provide a 'stop' function.
-> or use "NOT SUPPORTED" error code in stop,
-> Stop could be called on register and new flag is set.
->
-
-Seems to add complexity for no real benefit. Please explain why you think
-it is a good idea to have multiple drivers implement the same function
-just to return an error and do nothing else,
-
->> If we use a flag, something like WDOG_HW_NO_WAY_OUT with matching
->> WATCHDOG_HW_NOWAYOUT might make sense. Its functionality is slightly
->
-> What is difference between WDOG_HW_NO_WAY_OUT
-> and WATCHDOG_HW_NOWAYOUT?
->
-Similar to other flags
-
-#define WDOG_HW_NO_WAY_OUT	5
-#define WATCHDOG_HW_NOWAYOUT	(1 << WDOG_HW_NO_WAY_OUT)
-
->> different to the other conditions: It would not auto-start a watchdog,
->> but keep it running with the internal timer when the watchdog file is closed.
->>
->> As for 4), I don't really know if it makes sense to have this functionality.
->
-> Yes, it is rootfs specific need. Script based code runs watchdog before
-> critical function and after exit the watchdog using magic char.
-> Critical section has timeout equal watchdog timeout value.
-> The feature allow to avoid userland application for watchdog
-> and does not cost much in the kernel.
->
-Sorry, I can not follow your logic here. A basic userland implementation
-doesn't cost much either, is much safer, and even init systems such as
-systemd implement it nowadays.
-
-Guenter
+diff --cc drivers/power/reset/Kconfig
+index 527a0f47ef44,a178e9c50a20..000000000000
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@@ -69,9 -59,16 +77,16 @@@ config POWER_RESET_MS
+  	help
+  	  Power off and restart support for Qualcomm boards.
+  
++ config POWER_RESET_LTC2952
++ 	bool "LTC2952 PowerPath power-off driver"
++ 	depends on OF_GPIO && POWER_RESET
++ 	help
++ 	  This driver supports an external powerdown trigger and board power
++ 	  down via the LTC2952. Bindings are made in the device tree.
++ 
+  config POWER_RESET_QNAP
+  	bool "QNAP power-off driver"
+ -	depends on OF_GPIO && POWER_RESET && PLAT_ORION
+ +	depends on OF_GPIO && PLAT_ORION
+  	help
+  	  This driver supports turning off QNAP NAS devices by sending
+  	  commands to the microcontroller which controls the main power.
+@@@ -92,15 -89,13 +107,21 @@@ config POWER_RESET_SUN6
+  	help
+  	  Reboot support for the Allwinner A31 SoCs.
+  
++ config POWER_RESET_ST
++ 	bool "ST restart power-off driver"
++ 	depends on POWER_RESET && ARCH_STI
++ 	help
++ 	  Power off and reset support for STMicroelectronics boards.
++ 
+ +config POWER_RESET_VERSATILE
+ +	bool "ARM Versatile family reboot driver"
+ +	depends on ARM
+ +	depends on MFD_SYSCON
+ +	depends on OF
+ +	help
+ +	  Power off and restart support for ARM Versatile family of
+ +	  reference boards.
+ +
+  config POWER_RESET_VEXPRESS
+  	bool "ARM Versatile Express power-off and reset driver"
+  	depends on ARM || ARM64
+diff --cc drivers/power/reset/Makefile
+index 73221009f2bf,ab8cd348a099..000000000000
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@@ -9,7 -9,7 +11,8 @@@ obj-$(CONFIG_POWER_RESET_LTC2952) += lt
+  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+  obj-$(CONFIG_POWER_RESET_SUN6I) += sun6i-reboot.o
++ obj-$(CONFIG_POWER_RESET_ST) += st-poweroff.o
+ +obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
+  obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+  obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
+  obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/262ef3c5/attachment.sig>
