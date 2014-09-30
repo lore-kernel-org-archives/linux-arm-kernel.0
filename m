@@ -1,45 +1,83 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 30 Sep 2014 08:49:52 -0500
-Subject: [RFC 0/7] Qualcomm SMEM, SMD, RPM and regulators
-In-Reply-To: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Tue, 30 Sep 2014 08:52:35 -0500
+Subject: [RFC 1/7] soc: qcom: Add device tree binding for SMEM
+In-Reply-To: <1412037291-16880-2-git-send-email-bjorn.andersson@sonymobile.com>
 References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <E6EEBBAE-C710-4280-824D-CC5D54CB2551@codeaurora.org>
+ <1412037291-16880-2-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <8D91095C-63ED-4988-A4C8-68DADF95FF64@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 On Sep 29, 2014, at 7:34 PM, Bjorn Andersson <Bjorn.Andersson@sonymobile.com> wrote:
 
-> All Qualcomm platforms implements a shared heap among the processors in the
-> SoC, used for sharing data with other parts of the system.
+> Add device tree binding documentation for the Qualcom Shared Memory
+> manager.
 > 
-> One consumer of items from this heap is the "Shared Memory Driver", a ring
-> buffer based point-to-point communication mechanism used to send either stream
-> or packet based data to remote processors.
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
 > 
-> Starting with 8x74 this system is used to talk to the Resource Power Manager
-> (RPM), a power efficient "coprocessor" with responsibility of aggregate votes
-> from the various systems in the SoC related to regulators, clocks and bus
-> frequencies.
+> Exposed by this node is a set of items of different sizes. For many things a
+> standard of_xlate method of referencing the individual nodes would be
+> preferable, so a #something-cells would make sense. We do however also needs
+> access to these items without explicitly stating the references in devicetree
+> (e.g. SMD references 257 of these). I haven't found any good example of how to
+> implement this, so suggestions are welcome.
 > 
-> The PMIC regulators and root clocks in these platforms are only accessible via
-> the RPM, so to get access to these we need the full chain of smem, smd, rpm and
-> a regulator driver implemented. And that is exactly what this series provides.
+> Note that the hwspinlock reference is not yet supported in the mainline, but
+> this will likely need a few iterations so I wanted to get this out.
 > 
+> .../devicetree/bindings/soc/qcom/qcom,smem.txt     |   34 ++++++++++++++++++++
+> 1 file changed, 34 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
 > 
-> A key outstanding question is where in the tree we should put the
-> implementation, for now I dropped them in drivers/soc/qcom but that's only
-> because I don't know where to put it otherwise. I have not found any equivalent
-> of the SMEM driver, SMD resembles mailbox and rpmsg - but comments in that
-> patch on why it's neither.
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
+> new file mode 100644
+> index 0000000..ddd58c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
+> @@ -0,0 +1,34 @@
+> +Qualcomm Shared Memory binding
+> +
+> +This binding describes the Qualcomm Shared Memory, used to share data between
+> +various subsystems and OSes in Qualcomm platforms.
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: must be:
+> +		    "qcom,smem"
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: base address and size pair for each area representing the
+> +		    shared memory. The first pair will must represent the "main"
+> +		    area, where the shared memory header and table-of-content
+> +		    can be found.
+> +
+> +- hwspinlocks:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: reference to a hwspinlock used to protect allocations from
+> +		    the shared memory
+> +
+> += EXAMPLE
+> +
+> +        smem: smem at fa00000 {
+> +                compatible = "qcom,smem";
+> +                reg = <0x0fa00000 0x200000>,
+> +                      <0xfc428000 0x4000>;
+> +
+> +                hwspinlocks = <&tcsr_mutex 3>;
+> +        };
+> -- 
+> 1.7.9.5
 > 
-> RPM is a mfd and regulator is a regulator :)
-
-I still don?t see why RPM support for either A-family or B-family should exist in MFD vis drivers/soc/qcom.  What benefit is there in putting this in MFD?
-
-I think both A and B-family support should be in drivers/soc/qcom for the current time being until we determine there is some framework that makes more sense in the future.  I almost see RPM more like a bus controller than anything else.  Something like an I2C bus controller that than has some set of devices off of that bus.
-
-- k
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
