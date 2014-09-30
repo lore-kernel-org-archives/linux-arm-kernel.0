@@ -1,113 +1,206 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 29 Sep 2014 17:34:46 -0700
-Subject: [RFC 2/7] soc: qcom: Add device tree binding for SMD
+Date: Mon, 29 Sep 2014 17:34:47 -0700
+Subject: [RFC 3/7] mfd: devicetree: bindings: Add Qualcomm SMD based RPM DT
+ binding
 In-Reply-To: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
 References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1412037291-16880-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1412037291-16880-4-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for the Qualcomm Shared Memory
-Device.
+Add binding documentation for the Qualcomm Resource Power Manager (RPM)
+using shared memory (Qualcomm SMD) as transport mechanism. This is found
+in 8974 and newer based devices.
+
+The binding currently describes the rpm itself and the regulator
+subnodes.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 ---
 
-I was looking at having one smd node per remote processor - e.g flatten the
-first and second level. As all the channels, for all the remote processors are
-allocated from the same pool this does however not feel very natural.
+Note that this patch extends the rpm dt-bindings header from [1].
 
- .../devicetree/bindings/soc/qcom/qcom,smd.txt      |   82 ++++++++++++++++++++
- 1 file changed, 82 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+[1] https://lkml.org/lkml/2014/9/22/733
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+ .../devicetree/bindings/mfd/qcom-rpm-smd.txt       |  122 ++++++++++++++++++++
+ include/dt-bindings/mfd/qcom-rpm.h                 |   36 ++++++
+ 2 files changed, 158 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
+
+diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
 new file mode 100644
-index 0000000..c56e4fc
+index 0000000..a846101
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
-@@ -0,0 +1,82 @@
-+Qualcomm Shared Memory Driver (SMD) binding
++++ b/Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
+@@ -0,0 +1,122 @@
++Qualcomm Resource Power Manager (RPM) over SMD
 +
-+This binding describes the Qualcomm Shared Memory Driver, a fifo based
-+communication channel for sending data between the various subsystems in
-+Qualcomm platforms.
++This driver is used to interface with the Resource Power Manager (RPM) found in
++various Qualcomm platforms. The RPM allows each component in the system to vote
++for state of the system resources, such as clocks, regulators and bus
++frequencies.
 +
 +- compatible:
 +	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be "qcom,smd"
-+
-+- qcom,smem:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: reference to a smem node managing the shared memory items
-+		    used for smd
-+
-+= EDGES
-+
-+Each subnode of the SMD node represents a remote subsystem, i.e. a remote
-+processor of some sort - in SMD language called an "edge". The name of the
-+edges are not important.
-+
-+- interrupts:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: should specify the IRQ used by the remote processor to
-+		    signal this processor about communication related updates
-+
-+- qcom,ipc:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: three entries specifying the outgoing ipc bit used for
-+		    signaling the remote processor:
-+		    - phandle to a syscon node representing the apcs registers
-+		    - u32 representing offset to the register within the syscon
-+		    - u32 representing the ipc bit within the register
-+
-+- qcom,smd-edge:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: an identifier representing the remote processor
-+
-+= SMD DEVICES
-+
-+In turn, subnodes of the "edges" represent devices tied to SMD channels on that
-+"edge". The names of the devices are not important. The properties of these
-+nodes are defined by the individual bindings for the SMD devices - but must
-+contain the following property:
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,rpm-msm8974"
 +
 +- qcom,smd-channels:
 +	Usage: required
 +	Value type: <stringlist>
-+	Definition: a list of channels tied to this device, used for matching
-+		    the device to channels
++	Definition: Shared Memory Channel used for communication with the RPM
++
++- #address-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 1
++
++- #size-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 0
++
++= SUBDEVICES
++
++The RPM exposes resources to its subnodes. The below bindings specify the set
++of valid subnodes that can operate on these resources.
++
++== Switch-mode Power Supply regulator
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,rpm-pm8841-smps"
++		    "qcom,rpm-pm8941-smps"
++
++
++- reg:
++	Usage: required
++	Value type: <u32>
++	Definition: resource as defined in <dt-bindings/mfd/qcom-rpm.h>
++		    must be one of:
++		    QCOM_RPM_PM8841_SMPS1 - QCOM_RPM_PM8841_SMPS4,
++		    QCOM_RPM_PM8941_SMPS1 - QCOM_RPM_PM8941_SMPS3
++
++Standard regulator bindings are used inside switch mode power supply subnodes.
++Check Documentation/devicetree/bindings/regulator/regulator.txt for more
++details.
++
++== Low-dropout regulator
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,rpm-pm8941-ldo"
++
++- reg:
++	Usage: required
++	Value type: <u32>
++	Definition: resource as defined in <dt-bindings/mfd/qcom-rpm.h>
++		    must be one of:
++		    QCOM_RPM_PM8941_LDO1 - QCOM_RPM_PM8941_LDO24
++
++Standard regulator bindings are used inside switch low-dropout regulator
++subnodes.  Check Documentation/devicetree/bindings/regulator/regulator.txt for
++more details.
++
++== Switch
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: must be one of:
++		    "qcom,rpm-pm8941-switch"
++
++- reg:
++	Usage: required
++	Value type: <u32>
++	Definition: resource as defined in <dt-bindings/mfd/qcom/qcom-rpm.h>
++		    must be one of:
++		    QCOM_RPM_PM8941_LVS1 - QCOM_RPM_PM8941_LVS3,
++		    QCOM_RPM_PM8941_MVS1 - QCOM_RPM_PM8941_MVS2
++
++Standard regulator bindings are used inside switch regulator subnodes.  Check
++Documentation/devicetree/bindings/regulator/regulator.txt for more details.
 +
 += EXAMPLE
 +
-+The following example represents a smd node, with one edge representing the
-+"rpm" subsystem. For the "rpm" subsystem we have a device tied to the
-+"rpm_request" channel.
++	#include <dt-bindings/mfd/qcom-rpm.h>
 +
-+        smd {
-+                compatible = "qcom,smd";
-+                qcom,smem = <&smem>;
++	rpm at 108000 {
++		compatible = "qcom,rpm-msm8960";
++		qcom,smd-channels = "rpm_requests";
 +
-+                rpm {
-+                        interrupts = <0 168 1>;
-+                        qcom,ipc = <&apcs 8 0>;
-+                        qcom,smd-edge = <15>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+                        rpm_requests {
-+                                compatible = "qcom,rpm-msm8974";
-+                                qcom,smd-channels = "rpm_requests";
++		pm8941_s1: regulator-s1 {
++			compatible = "qcom,rpm-pm8941-smps";
++			reg = <QCOM_RPM_PM8941_SMPS1>;
 +
-+                                #address-cells = <1>;
-+                                #size-cells = <0>;
-+
-+				...
-+			};
++			regulator-min-microvolt = <1300000>;
++			regulator-max-microvolt = <1300000>;
 +		};
++
++		pm8941_l3: pm8941-l3 {
++			compatible = "qcom,rpm-pm8941-ldo";
++			reg = <QCOM_RPM_PM8941_LDO3>;
++
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <1200000>;
++		};
++
 +	};
++
+diff --git a/include/dt-bindings/mfd/qcom-rpm.h b/include/dt-bindings/mfd/qcom-rpm.h
+index 388a6f3..a5c473e 100644
+--- a/include/dt-bindings/mfd/qcom-rpm.h
++++ b/include/dt-bindings/mfd/qcom-rpm.h
+@@ -141,6 +141,42 @@
+ #define QCOM_RPM_SYS_FABRIC_MODE		131
+ #define QCOM_RPM_USB_OTG_SWITCH			132
+ #define QCOM_RPM_VDDMIN_GPIO			133
++#define QCOM_RPM_PM8841_SMPS1			134
++#define QCOM_RPM_PM8841_SMPS2			135
++#define QCOM_RPM_PM8841_SMPS3			136
++#define QCOM_RPM_PM8841_SMPS4			137
++#define QCOM_RPM_PM8941_SMPS1			138
++#define QCOM_RPM_PM8941_SMPS2			139
++#define QCOM_RPM_PM8941_SMPS3			140
++#define QCOM_RPM_PM8941_LDO1			141
++#define QCOM_RPM_PM8941_LDO2			142
++#define QCOM_RPM_PM8941_LDO3			143
++#define QCOM_RPM_PM8941_LDO4			144
++#define QCOM_RPM_PM8941_LDO5			145
++#define QCOM_RPM_PM8941_LDO6			146
++#define QCOM_RPM_PM8941_LDO7			147
++#define QCOM_RPM_PM8941_LDO8			148
++#define QCOM_RPM_PM8941_LDO9			149
++#define QCOM_RPM_PM8941_LDO10			150
++#define QCOM_RPM_PM8941_LDO11			151
++#define QCOM_RPM_PM8941_LDO12			152
++#define QCOM_RPM_PM8941_LDO13			153
++#define QCOM_RPM_PM8941_LDO14			154
++#define QCOM_RPM_PM8941_LDO15			155
++#define QCOM_RPM_PM8941_LDO16			156
++#define QCOM_RPM_PM8941_LDO17			157
++#define QCOM_RPM_PM8941_LDO18			158
++#define QCOM_RPM_PM8941_LDO19			159
++#define QCOM_RPM_PM8941_LDO20			160
++#define QCOM_RPM_PM8941_LDO21			161
++#define QCOM_RPM_PM8941_LDO22			162
++#define QCOM_RPM_PM8941_LDO23			163
++#define QCOM_RPM_PM8941_LDO24			164
++#define QCOM_RPM_PM8941_LVS1			165
++#define QCOM_RPM_PM8941_LVS2			166
++#define QCOM_RPM_PM8941_LVS3			167
++#define QCOM_RPM_PM8941_MVS1			168
++#define QCOM_RPM_PM8941_MVS2			169
+ 
+ /*
+  * Constants used to select force mode for regulators.
 -- 
 1.7.9.5
