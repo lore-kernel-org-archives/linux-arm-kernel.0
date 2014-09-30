@@ -1,38 +1,25 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 30 Sep 2014 16:27:46 -0400
-Subject: [PATCH 02/13] tty: serial: 8250: make serial8250_console_setup()
- non _init
-In-Reply-To: <1412014009-13315-3-git-send-email-bigeasy@linutronix.de>
-References: <1412014009-13315-1-git-send-email-bigeasy@linutronix.de>
- <1412014009-13315-3-git-send-email-bigeasy@linutronix.de>
-Message-ID: <542B1242.1010609@hurleysoftware.com>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 30 Sep 2014 16:29:04 -0400
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <cover.1411604443.git.geoff@infradead.org>
+References: <cover.1411604443.git.geoff@infradead.org>
+Message-ID: <20140930202904.GB24153@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2014 02:06 PM, Sebastian Andrzej Siewior wrote:
-> if I boot with console=ttyS0 and the omap driver is module I end up with
-> 
-> | console [ttyS0] disabled
+On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
 
-Note to self: make ISA config optional.
-
-> | omap8250 44e09000.serial: ttyS0 at MMIO 0x44e09000 (irq = 88, base_baud = 3000000) is a 8250
-> | Unable to handle kernel paging request at virtual address c07a9de0
-> | Modules linked in: 8250_omap(+)
-> | CPU: 0 PID: 908 Comm: modprobe Not tainted 3.17.0-rc5+ #1593
-> | PC is at serial8250_console_setup+0x0/0xc8
-> | LR is at register_console+0x13c/0x3a4
-> | [<c0078788>] (register_console) from [<c02d0340>] (uart_add_one_port+0x3cc/0x420)
-> | [<c02d0340>] (uart_add_one_port) from [<c02d38a4>] (serial8250_register_8250_port+0x298/0x39c)
-> | [<c02d38a4>] (serial8250_register_8250_port) from [<bf006274>] (omap8250_probe+0x218/0x3dc [8250_omap])
-> | [<bf006274>] (omap8250_probe [8250_omap]) from [<c02e3424>] (platform_drv_probe+0x2c/0x5c)
-> | [<c02e3424>] (platform_drv_probe) from [<c02e1eac>] (driver_probe_device+0x104/0x228)
-> ?
-> | [<c009fa48>] (SyS_init_module) from [<c000e6e0>] (ret_fast_syscall+0x0/0x30)
-> | Code: 7823603b f8314620 051b3013 491ed416 (44792204)
+[..]
+> To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
+> kexec-tools [2], which have not yet been merged upstream, are needed.
 > 
-> because serial8250_console_setup() is already gone.
-> 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> This series does not include some re-work of the spin-table CPU enable method
+> that is needed to support it,
 
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+Hi Geoff,
+
+How do I figure out if my system has spin table enable method or psci
+enable method. Can one change it. I wanted to test your patches.
+
+Thanks
+Vivek
