@@ -1,93 +1,60 @@
-From: dianders@google.com (Doug Anderson)
-Date: Tue, 30 Sep 2014 10:22:34 -0700
-Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
- handle regulators
-In-Reply-To: <28242432.noIRZ0lve1@amdc1032>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-2-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqiv+eGQ_kRpXjRY207PN4J3DGcZU1n5UU0evp_5Dn_Pg@mail.gmail.com>
- <28242432.noIRZ0lve1@amdc1032>
-Message-ID: <CAD=FV=W_KiXUU7SmGxTu-JzagW-zEs6AYAbrRMFU3KvppVk_BA@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 30 Sep 2014 10:26:35 -0700
+Subject: [PATCH v7 1/7] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <1411779495-39724-2-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Fri, 26 Sep 2014 18:58:09 -0600")
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7hiok510l0.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-On Mon, Sep 29, 2014 at 5:31 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
+> Based on work by many authors, available at codeaurora.org
 >
-> Hi,
+> SPM is a hardware block that controls the peripheral logic surrounding
+> the application cores (cpu/l$). When the core executes WFI instruction,
+> the SPM takes over the putting the core in low power state as
+> configured. The wake up for the SPM is an interrupt at the GIC, which
+> then completes the rest of low power mode sequence and brings the core
+> out of low power mode.
 >
-> On Friday, August 29, 2014 01:34:44 PM Ulf Hansson wrote:
->> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->> > This patch makes use of mmc_regulator_get_supply() to handle
->> > the vmmc and vqmmc regulators.Also it moves the code handling
->> > the these regulators to dw_mci_set_ios().It turned on the vmmc
->> > and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
->> > during MMC_POWER_OFF.
->> >
->> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->>
->> Thanks! Applied for next.
+> The SPM has a set of control registers that configure the SPMs
+> individually based on the type of the core and the runtime conditions.
+> SPM is a finite state machine block to which a sequence is provided and
+> it interprets the bytes  and executes them in sequence. Each low power
+> mode that the core can enter into is provided to the SPM as a sequence.
 >
-> Unfortunately this patch breaks mmc1 card (Kingston 32GB micro SDHC)
-> detection on Exynos5420 Arndale Octa for me:
+> Configure the SPM to set the core (cpu or L2) into its low power mode,
+> the index of the first command in the sequence is set in the SPM_CTL
+> register. When the core executes ARM wfi instruction, it triggers the
+> SPM state machine to start executing from that index. The SPM state
+> machine waits until the interrupt occurs and starts executing the rest
+> of the sequence until it hits the end of the sequence. The end of the
+> sequence jumps the core out of its low power mode.
 >
-> [   10.797979] dwmmc_exynos 12220000.mmc: no support for card's volts
-> [   10.797998] mmc1: error -22 whilst initialising SD card
->
-> Without the patch:
->
-> [   10.866926] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
-> [   10.866977] mmc1: new high speed SDHC card at address 1234
-> [   10.868730] mmcblk1: mmc1:1234 SA32G 29.3 GiB
-> [   10.915054]  mmcblk1: p1 p2 p3
->
-> The config is attached (exynos_defconfig doesn't work correctly for
-> this board yet).
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-Yup, this is an expected behavior, unfortunately.  This was talked
-about extensively during the review of this patch series.
+[...]
 
-I believe that patch #3 in Yuvaraj's series would fix your problem.
-Specifically <https://patchwork.kernel.org/patch/4763891/>.
+> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> index 1505fb8..9a9cc99 100644
+> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> @@ -14,10 +14,9 @@ PROPERTIES
+>  	Value type: <string>
+>  	Definition: shall contain "qcom,saw2". A more specific value should be
+>  		    one of:
+> -			 "qcom,saw2-v1"
+> -			 "qcom,saw2-v1.1"
+> -			 "qcom,saw2-v2"
+> -			 "qcom,saw2-v2.1"
+> +			 "qcom,apq8064-saw2-v1.1-cpu"
+> +			 "qcom,msm8974-saw2-v2.1-cpu"
+> +			 "qcom,apq8084-saw2-v2.1-cpu"
 
+This looks odd (to me.)  Why are the SoC name and the SAW2 version both
+needed?
 
-The current summary of this issue is (Ulf, please correct me if I got
-anything wrong):
-
-1. If nothing else, Yuvaraj's patch should probably be split in two.
-One half should be the MMC core half that I originally sent Yuvaraj.
-I just rebased and re-uploaed it at
-<https://chromium-review.googlesource.com/220560> in case you're
-curious.  The second half should be the dw_mmc piece that Yuvaraj
-wrote.
-
-2. Ulf has indicated that he thinks that the MMC core change (and thus
-Yuvaraj's patch) is ugly and not necessary.  He advocates instead
-using the MMC_CAP_NEEDS_POLL on all affected platforms.  That means
-we'll turn on the power every second, check for the card, then turn
-off power.
-
-3. I'm still of the opinion that the MMC core change isn't _that_
-ugly.  Given that there are a large number of systems affected (across
-at least two SoC vendors) and that it would be nice if those systems
-didn't have to poll, I'd still be happy if the MMC core change could
-go in.  ...but I'm a pragmatist and know that the polling isn't
-_terrible_, so if that's the way we need to go then so be it.
-
---
-
-My understanding was that Yuvaraj was going to spin his patch to use a
-similar type of scheme to autodetect affected SoCs (looking for SoCs
-known to have this problem where the platform data shows them using
-the built-in card detect) and then enable MMC_CAP_NEEDS_POLL.  I
-haven't seen a patch from him, so maybe you could post this up?
-
-Note: the reason why exynos5250-snow and some other boards aren't
-affected yet is that the regulator is simply not specified in the
-device tree (it's just left always on).
-
----
-
--Doug
+Kevin
