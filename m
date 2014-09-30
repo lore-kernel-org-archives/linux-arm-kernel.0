@@ -1,151 +1,27 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 30 Sep 2014 15:51:21 +0530
-Subject: [PATCH v8 2/2] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <1412072481-22370-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1412072481-22370-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1412072481-22370-3-git-send-email-pankaj.dubey@samsung.com>
+From: jcmvbkbc@gmail.com (Max Filippov)
+Date: Tue, 30 Sep 2014 14:26:20 +0400
+Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic {read,
+ write}s*()
+In-Reply-To: <CAMo8BfJ9VJ24zsn_6VwNrAntmDqdJu11O79OyMd8eThv3UaaUw@mail.gmail.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+ <1407925738-26170-7-git-send-email-thierry.reding@gmail.com>
+ <CAMuHMdW4emoma3nRUGna985tE17yPh5pNjMb-jxe5yc5UVr=cw@mail.gmail.com>
+ <20140929085908.GI12506@ulmo>
+ <CAMo8BfJ9VJ24zsn_6VwNrAntmDqdJu11O79OyMd8eThv3UaaUw@mail.gmail.com>
+Message-ID: <CAMo8Bf+u8er_KF4nJPSPNf9OmKZHu4y0x3Pcb7DU17y5ocBJqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves PMU specific definitions into a new file
-as exynos-pmu.h.
-This will help in reducing dependency of common.h in pmu.c.
+On Tue, Sep 30, 2014 at 2:22 PM, Max Filippov <jcmvbkbc@gmail.com> wrote:
+> Hi Thierry,
+>
+>> I think this can be fixed by including linux/string.h for memset() and
+>> memcpy() in include/asm-generic/io.h.
+>
+> Will you send that fix or do I need to do it?
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/common.h     |   17 -----------------
- arch/arm/mach-exynos/exynos-pmu.h |   24 ++++++++++++++++++++++++
- arch/arm/mach-exynos/pm.c         |    1 +
- arch/arm/mach-exynos/pmu.c        |   20 +++++++++++++++++++-
- arch/arm/mach-exynos/suspend.c    |    1 +
- 5 files changed, 45 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+Never mind, found that it's fixed in today's next.
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index d4d09bc..431be1b 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -139,23 +139,6 @@ extern void exynos_cpu_resume_ns(void);
- 
- extern struct smp_operations exynos_smp_ops;
- 
--/* PMU(Power Management Unit) support */
--
--#define PMU_TABLE_END	(-1U)
--
--enum sys_powerdown {
--	SYS_AFTR,
--	SYS_LPA,
--	SYS_SLEEP,
--	NUM_SYS_POWERDOWN,
--};
--
--struct exynos_pmu_conf {
--	unsigned int offset;
--	unsigned int val[NUM_SYS_POWERDOWN];
--};
--
--extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
- extern void exynos_cpu_power_down(int cpu);
- extern void exynos_cpu_power_up(int cpu);
- extern int  exynos_cpu_power_state(int cpu);
-diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/arch/arm/mach-exynos/exynos-pmu.h
-new file mode 100644
-index 0000000..a2ab0d5
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-pmu.h
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Header for EXYNOS PMU Driver support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __EXYNOS_PMU_H
-+#define __EXYNOS_PMU_H
-+
-+enum sys_powerdown {
-+	SYS_AFTR,
-+	SYS_LPA,
-+	SYS_SLEEP,
-+	NUM_SYS_POWERDOWN,
-+};
-+
-+extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-+
-+#endif /* __EXYNOS_PMU_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 4f10fa6..86f3ecd 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -26,6 +26,7 @@
- #include <plat/pm-common.h>
- 
- #include "common.h"
-+#include "exynos-pmu.h"
- #include "regs-pmu.h"
- #include "regs-sys.h"
- 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 1f5aaa7..87613e0 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -13,9 +13,16 @@
- #include <linux/of.h>
- #include <linux/platform_device.h>
- 
--#include "common.h"
-+#include "exynos-pmu.h"
- #include "regs-pmu.h"
- 
-+#define PMU_TABLE_END	(-1U)
-+
-+struct exynos_pmu_conf {
-+	unsigned int offset;
-+	unsigned int val[NUM_SYS_POWERDOWN];
-+};
-+
- struct exynos_pmu_data {
- 	const struct exynos_pmu_conf *pmu_config;
- 	const struct exynos_pmu_conf *pmu_config_extra;
-@@ -29,8 +36,19 @@ struct exynos_pmu_context {
- 	const struct exynos_pmu_data *pmu_data;
- };
- 
-+static void __iomem *pmu_base_addr;
- static struct exynos_pmu_context *pmu_context;
- 
-+static inline void pmu_raw_writel(u32 val, u32 offset)
-+{
-+	__raw_writel(val, pmu_base_addr + offset);
-+}
-+
-+static inline u32 pmu_raw_readl(u32 offset)
-+{
-+	return __raw_readl(pmu_base_addr + offset);
-+}
-+
- static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
- 	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */
- 	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index f5d9773..079d999 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -33,6 +33,7 @@
- #include "common.h"
- #include "regs-pmu.h"
- #include "regs-sys.h"
-+#include "exynos-pmu.h"
- 
- #define S5P_CHECK_SLEEP 0x00000BAD
- 
 -- 
-1.7.9.5
+Thanks.
+-- Max
