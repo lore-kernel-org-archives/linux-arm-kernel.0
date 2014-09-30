@@ -1,27 +1,24 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 29 Sep 2014 23:43:48 -0700
-Subject: [GIT PULL] TI clock driver changes for 3.18 merge window
-In-Reply-To: <54298515.3040201@ti.com>
-References: <54298515.3040201@ti.com>
-Message-ID: <20140930064348.19023.42102@quantum>
+Date: Mon, 29 Sep 2014 23:44:04 -0700
+Subject: [GIT PULL] Samsung clock changes for v3.18
+In-Reply-To: <1412022850-7842-1-git-send-email-tomasz.figa@gmail.com>
+References: <1412022850-7842-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <20140930064404.19023.96162@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2014-09-29 09:13:09)
-> Hi Mike,
+Quoting Tomasz Figa (2014-09-29 13:34:10)
+> The following changes since commit a52ae5a755d980e9ff812c6f45a415ba27bfd33b:
 > 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> 
->    Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>   Merge branch 'clk-fixes' into clk-next (2014-09-17 11:47:56 -0700)
 > 
 > are available in the git repository at:
 > 
->    git at github.com:t-kristo/linux-pm.git for-v3.18/ti-clk-driver
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tfiga/samsung-clk.git tags/for_3.18/samsung-clk
 > 
-> for you to fetch changes up to 04ed831f224d4553682f48e1b4a6b68f2622b68e:
+> for you to fetch changes up to fa0111be4ff30150720db3c3e5ee8d7823921639:
 > 
->    clk: ti: dra7-atl-clock: Mark the device as pm_runtime_irq_safe 
-> (2014-09-29 11:51:14 +0300)
+>   clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation (2014-09-24 12:41:33 +0200)
 
 Pulled!
 
@@ -30,30 +27,52 @@ Mike
 
 > 
 > ----------------------------------------------------------------
-> Mostly fixes, except for the of_clk_init() change for the clock driver. 
-> Boot tested on pretty much every board I have access to, also merge 
-> tested with latest master to see if there are any conflicts with anything.
+> Samsung clock patches for v3.18
+> 
+> 1) non-critical fixes (without the need to push to stable)
+> 
+> fa0111be4ff3 clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation
+> b511593d7165 clk: samsung: exynos4: fix g3d clocks
+> c14254300131 clk: samsung: exynos4: add missing smmu_g2d clock and update comments
+> 22842d244af3 clk: samsung: exynos5260: fix typo in clock name
+> e82ba578ccde clk: samsung: exynos3250: fix width field of mout_mmc0/1
+> 59037b92f440 clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
+> 5ce37f266650 clk: samsung: exynos3250: fix mout_cam_blk parent list
+> 
+> 2) Clock driver extensions
+> 
+> 07ccf02ba5c3 dt-bindings: clk: samsung: Document the DMC domain of Exynos3250 CMU
+> d0e73eaf1925 ARM: dts: exynos3250: Add CMU node for DMC domain clocks
+> e3c3f19bc618 clk: samsung: exynos3250: Register DMC clk provider
+> 4676f0aab9dc clk: samsung: exynos4: add support for MOUT_HDMI and MOUT_MIXER clocks
 > 
 > ----------------------------------------------------------------
-> Behan Webster (1):
->        clk: ti: LLVMLinux: Move __init outside of type definition
+> Chander Kashyap (1):
+>       clk: samsung: exynos5260: fix typo in clock name
 > 
-> Peter Ujfalusi (1):
->        clk: ti: dra7-atl-clock: Mark the device as pm_runtime_irq_safe
+> Krzysztof Kozlowski (3):
+>       clk: samsung: exynos3250: Register DMC clk provider
+>       ARM: dts: exynos3250: Add CMU node for DMC domain clocks
+>       dt-bindings: clk: samsung: Document the DMC domain of Exynos3250 CMU
 > 
-> Sebastian Andrzej Siewior (1):
->        clk: ti: consider the fact that of_clk_get() might return an error
+> Marek Szyprowski (3):
+>       clk: samsung: exynos4: add missing smmu_g2d clock and update comments
+>       clk: samsung: exynos4: add support for MOUT_HDMI and MOUT_MIXER clocks
+>       clk: samsung: exynos4: fix g3d clocks
 > 
-> Tero Kristo (2):
->        clk: ti: change clock init to use generic of_clk_init
->        clk: ti: dra7-atl-clock: fix a memory leak
+> Pankaj Dubey (3):
+>       clk: samsung: exynos3250: fix mout_cam_blk parent list
+>       clk: samsung: exynos3250: fix width and shift of div_spi0_isp clock
+>       clk: samsung: exynos3250: fix width field of mout_mmc0/1
 > 
->   arch/arm/mach-omap2/io.c         |   12 +++++--
->   arch/arm/mach-omap2/prm_common.c |    2 --
->   drivers/clk/ti/clk-dra7-atl.c    |    2 ++
->   drivers/clk/ti/clk.c             |   68 
-> ++++++++++++++++++++++++--------------
->   drivers/clk/ti/clockdomain.c     |    5 +++
->   drivers/clk/ti/divider.c         |    4 +--
->   include/linux/clk/ti.h           |    1 +
->   7 files changed, 63 insertions(+), 31 deletions(-)
+> Thomas Abraham (1):
+>       clk: samsung: exynos4: remove duplicate div_core2 divider clock instantiation
+> 
+>  .../devicetree/bindings/clock/exynos3250-clock.txt |  10 +-
+>  arch/arm/boot/dts/exynos3250.dtsi                  |   6 +
+>  drivers/clk/samsung/clk-exynos3250.c               | 202 ++++++++++++++++++++-
+>  drivers/clk/samsung/clk-exynos4.c                  |  18 +-
+>  drivers/clk/samsung/clk-exynos5260.c               |   2 +-
+>  include/dt-bindings/clock/exynos3250.h             |  27 +++
+>  include/dt-bindings/clock/exynos4.h                |  12 +-
+>  7 files changed, 257 insertions(+), 20 deletions(-)
