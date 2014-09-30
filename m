@@ -1,33 +1,42 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 01 Oct 2014 00:01:53 +0200
-Subject: [PATCH v6 00/10] ARM: Berlin: Ethernet support
-In-Reply-To: <20140930.163735.2099691931550261883.davem@davemloft.net>
-References: <1412087296-18475-1-git-send-email-antoine.tenart@free-electrons.com>
- <20140930.163735.2099691931550261883.davem@davemloft.net>
-Message-ID: <542B2851.2050705@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 01 Oct 2014 00:02:36 +0200
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <20140930195257.19023.57219@quantum> (Mike Turquette's message of
+ "Tue, 30 Sep 2014 12:52:57 -0700")
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <1465795.XsPpj3dZHX@wuerfel> <87d2bq43pc.fsf@free.fr>
+ <201408241408.19861.arnd@arndb.de>
+ <20140903184956.11368.47800@quantum> <874mw2xoau.fsf@free.fr>
+ <20140930195257.19023.57219@quantum>
+Message-ID: <87iok4bwcj.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.09.2014 22:37, David Miller wrote:
-> From: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Date: Tue, 30 Sep 2014 16:28:06 +0200
+Mike Turquette <mturquette@linaro.org> writes:
+
+> Quoting Robert Jarzmik (2014-09-20 09:13:45)
+> Hi Robert,
 >
->> This series introduce support for the Ethernet controller on Berlin SoCs,
->> using the existing pxa168 Ethernet driver. In order to do this, DT
->> support is added to the driver alongside some other modifications and
->> fixes.
->>
->> This has been tested on a Berlin BG2Q DMP board.
+> Tomeu's stuff won't go into 3.18. I should have circled back to these
+> patches when that become apparent, but it got lost in the paperwork.
 >
-> Applied to net-next, thanks.
+> I can take these patches without you rebasing onto his work. Since we
+> have -rc7 I think there is time and these patches shouldn't wait for
+> another merge window. I've applied them to clk-next from a stable branch
+> with these six patches based on -rc1.
 
-David,
+Thanks Mike, that's perfect. These patches are my corner stone to unblock the
+pxa device-tree port (at least on pxa27x).
 
-usually I'd prefer to take the dts patches through berlin and arm-soc
-tree, _but_ as they are touching berlin stuff only I am fine with you
-taking them, too.
+There will be at least 1 corrective patch for init ordering (clocks must be
+initialized before the clocksource). But I believe it will go during the
+3.18-rcs. I'll post the patch tomorrow for it to gather enough acks.
 
-Just to make sure how long I have to take care of potential merge
-issues, is your current net-next meant for v3.18 or v3.19?
+And I have also a patch for Tomeu's change. It's really small, so I'll post it
+too, but not for submission, just to have it reviewed when the API change will
+be ready.
 
-Sebastian
+Thanks.
+
+-- 
+Robert
