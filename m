@@ -1,147 +1,49 @@
 From: fkan@apm.com (Feng Kan)
-Date: Tue, 30 Sep 2014 16:25:03 -0700
-Subject: [PATCH RESEND V9 1/6] power: reset: Add generic SYSCON register
- mapped reset
+Date: Tue, 30 Sep 2014 16:25:04 -0700
+Subject: [PATCH RESEND V9 2/6] Documentation: power: reset: Add documentation
+ for generic SYSCON reboot driver
 In-Reply-To: <1412119508-22864-1-git-send-email-fkan@apm.com>
 References: <1412119508-22864-1-git-send-email-fkan@apm.com>
-Message-ID: <1412119508-22864-2-git-send-email-fkan@apm.com>
+Message-ID: <1412119508-22864-3-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic SYSCON register mapped reset mechanism.
+Add documentation for generic SYSCON reboot driver.
 
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- drivers/power/reset/Kconfig         |  5 ++
- drivers/power/reset/Makefile        |  1 +
- drivers/power/reset/syscon-reboot.c | 96 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 102 insertions(+)
- create mode 100644 drivers/power/reset/syscon-reboot.c
+ .../bindings/power/reset/syscon-reboot.txt         | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 1915dde..a863fa1 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -143,4 +143,9 @@ config POWER_RESET_KEYSTONE
- 	help
- 	  Reboot support for the KEYSTONE SoCs.
- 
-+config POWER_RESET_SYSCON
-+	bool "Generic SYSCON regmap reset driver"
-+	depends on POWER_RESET && MFD_SYSCON && OF
-+	help
-+	  Reboot support for generic SYSCON mapped register reset.
- endif
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index 01e401d..76ce1c5 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -16,3 +16,4 @@ obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
- obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
- obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
-+obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
-diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
 new file mode 100644
-index 0000000..948e0ee
+index 0000000..1190631
 --- /dev/null
-+++ b/drivers/power/reset/syscon-reboot.c
-@@ -0,0 +1,96 @@
-+/*
-+ * Generic Syscon Reboot Driver
-+ *
-+ * Copyright (c) 2013, Applied Micro Circuits Corporation
-+ * Author: Feng Kan <fkan@apm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/io.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/notifier.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+#include <linux/reboot.h>
++++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot.txt
+@@ -0,0 +1,23 @@
++Generic SYSCON mapped register reset driver
 +
-+struct syscon_reboot_context {
-+	struct regmap *map;
-+	u32 offset;
-+	u32 mask;
-+	struct notifier_block restart_handler;
-+};
++This is a generic reset driver using syscon to map the reset register.
++The reset is generally performed with a write to the reset register
++defined by the register map pointed by syscon reference plus the offset
++with the mask defined in the reboot node.
 +
-+static struct syscon_reboot_context *syscon_reboot_ctx;
++Required properties:
++- compatible: should contain "syscon-reboot"
++- regmap: this is phandle to the register map node
++- offset: offset in the register map for the reboot register (in bytes)
++- mask: the reset value written to the reboot register (32 bit access)
 +
-+static int syscon_restart_handle(struct notifier_block *this,
-+					unsigned long mode, void *cmd)
-+{
-+	struct syscon_reboot_context *ctx = syscon_reboot_ctx;
-+	unsigned long timeout;
++Default will be little endian mode, 32 bit access only.
 +
-+	/* Issue the reboot */
-+	if (ctx->map)
-+		regmap_write(ctx->map, ctx->offset, ctx->mask);
++Examples:
 +
-+	timeout = jiffies + HZ;
-+	while (time_before(jiffies, timeout))
-+		cpu_relax();
-+
-+	pr_emerg("Unable to restart system\n");
-+	return NOTIFY_DONE;
-+}
-+
-+static int syscon_reboot_probe(struct platform_device *pdev)
-+{
-+	struct syscon_reboot_context *ctx;
-+	struct device *dev = &pdev->dev;
-+	int err;
-+
-+	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
-+	if (!ctx)
-+		return -ENOMEM;
-+
-+	ctx->map = syscon_regmap_lookup_by_phandle(dev->of_node, "regmap");
-+	if (IS_ERR(ctx->map))
-+		return PTR_ERR(ctx->map);
-+
-+	if (of_property_read_u32(pdev->dev.of_node, "offset", &ctx->offset))
-+		return -EINVAL;
-+
-+	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
-+		return -EINVAL;
-+
-+	ctx->restart_handler.notifier_call = syscon_restart_handle;
-+	ctx->restart_handler.priority = 128;
-+	err = register_restart_handler(&ctx->restart_handler);
-+	if (err)
-+		dev_err(dev, "can't register restart notifier (err=%d)\n", err);
-+
-+	syscon_reboot_ctx = ctx;
-+
-+	return 0;
-+}
-+
-+static struct of_device_id syscon_reboot_of_match[] = {
-+	{ .compatible = "syscon-reboot" },
-+	{}
-+};
-+
-+static struct platform_driver syscon_reboot_driver = {
-+	.probe = syscon_reboot_probe,
-+	.driver = {
-+		.name = "syscon-reboot",
-+		.of_match_table = syscon_reboot_of_match,
-+	},
-+};
-+module_platform_driver(syscon_reboot_driver);
++	reboot {
++	   compatible = "syscon-reboot";
++	   regmap = <&regmapnode>;
++	   offset = <0x0>;
++	   mask = <0x1>;
++	};
 -- 
 1.9.1
