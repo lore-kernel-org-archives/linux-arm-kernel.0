@@ -1,137 +1,96 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Tue, 30 Sep 2014 10:27:35 +0530
-Subject: [PATCH 3/3] drivers/rtc/rtc-snvs: Add clock support
-In-Reply-To: <8e48ef6e52a8c6eaa1cda95fbd3c1bc7@agner.ch>
-References: <cover.1411736171.git.maitysanchayan@gmail.com>
- <8a1904a59f7b171a7cf1e71b9e80f0cf7b1061c0.1411736171.git.maitysanchayan@gmail.com>
- <8e48ef6e52a8c6eaa1cda95fbd3c1bc7@agner.ch>
-Message-ID: <542A383F.3000900@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 30 Sep 2014 06:59:59 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929155718.GD4081@lukather>
+References: <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
+ <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
+ <20140929135358.GC30998@ulmo> <20140929155718.GD4081@lukather>
+Message-ID: <20140930045957.GA29874@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> This patch adds clock enable and disable support
->> for the SNVS peripheral which is required by the
->> SNVS RTC.
->>
->> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> ---
->>  drivers/rtc/rtc-snvs.c |   48 +++++++++++++++++++++++++++++++++++++++---------
->>  1 file changed, 39 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
->> index fa384fe..f3e8f05 100644
->> --- a/drivers/rtc/rtc-snvs.c
->> +++ b/drivers/rtc/rtc-snvs.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/of_device.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/rtc.h>
->> +#include <linux/clk.h>
->>  
->>  /* These register offsets are relative to LP (Low Power) range */
->>  #define SNVS_LPCR		0x04
->> @@ -39,6 +40,7 @@ struct snvs_rtc_data {
->>  	void __iomem *ioaddr;
->>  	int irq;
->>  	spinlock_t lock;
->> +	struct clk *clk;
->>  };
->>  
->>  static u32 rtc_read_lp_counter(void __iomem *ioaddr)
->> @@ -260,8 +262,31 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->>  	if (data->irq < 0)
->>  		return data->irq;
->>  
->> +	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
->> +			       IRQF_SHARED, "rtc alarm", &pdev->dev);
->> +	if (ret) {
->> +		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
->> +			data->irq, ret);
->> +		return ret;
->> +	}
->> +
->> +	data->clk = devm_clk_get(&pdev->dev, "snvs");
->> +	if (IS_ERR(data->clk)) {
->> +		dev_err(&pdev->dev, "failed getting clock, err = %ld\n",
->> +						PTR_ERR(data->clk));
->> +		ret = PTR_ERR(data->clk);
->> +		return ret;
->> +	}
->> +
->>  	platform_set_drvdata(pdev, data);
->>  
->> +	ret = clk_prepare_enable(data->clk);
->> +	if (ret) {
->> +		dev_err(&pdev->dev,
->> +			"Could not prepare or enable the snvs clock\n");
->> +		return ret;
->> +	}
->> +
->>  	spin_lock_init(&data->lock);
->>  
->>  	/* Initialize glitch detect */
->> @@ -275,23 +300,20 @@ static int snvs_rtc_probe(struct platform_device *pdev)
->>  
->>  	device_init_wakeup(&pdev->dev, true);
->>  
->> -	ret = devm_request_irq(&pdev->dev, data->irq, snvs_rtc_irq_handler,
->> -			       IRQF_SHARED, "rtc alarm", &pdev->dev);
->> -	if (ret) {
->> -		dev_err(&pdev->dev, "failed to request irq %d: %d\n",
->> -			data->irq, ret);
->> -		return ret;
->> -	}
->> -
+On Mon, Sep 29, 2014 at 05:57:18PM +0200, Maxime Ripard wrote:
+> On Mon, Sep 29, 2014 at 03:54:00PM +0200, Thierry Reding wrote:
+> > On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
+> > > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
+> > > > > >> Plus, speaking more specifically about the clocks, that won't prevent
+> > > > > >> your clock to be shut down as a side effect of a later clk_disable
+> > > > > >> call from another driver.
+> > > > > 
+> > > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
+> > > > > > preceding clk_enable()? There are patches being worked on that will
+> > > > > > enable per-user clocks and as I understand it they will specifically
+> > > > > > disallow drivers to disable the hardware clock if other drivers are
+> > > > > > still keeping them on via their own referenc.
+> > > > > 
+> > > > > Calling clk_disable() preceding clk_enable() is a bug.
+> > > > > 
+> > > > > Calling clk_disable() after clk_enable() will disable the clock (and
+> > > > > its parents)
+> > > > > if the clock subsystem thinks there are no other users, which is what will
+> > > > > happen here.
+> > > > 
+> > > > Right. I'm not sure this is really applicable to this situation, though.
+> > > 
+> > > It's actually very easy to do. Have a driver that probes, enables its
+> > > clock, fails to probe for any reason, call clk_disable in its exit
+> > > path. If there's no other user at that time of this particular clock
+> > > tree, it will be shut down. Bam. You just lost your framebuffer.
+> > > 
+> > > Really, it's just that simple, and relying on the fact that some other
+> > > user of the same clock tree will always be their is beyond fragile.
+> > 
+> > Perhaps the meaning clk_ignore_unused should be revised, then. What you
+> > describe isn't at all what I'd expect from such an option. And it does
+> > not match the description in Documentation/kernel-parameters.txt either.
 > 
-> Is there a reason why you moved the irq request before enabling/getting
-> the clocks? AFAIK the irq is quite independent from the clock of that
-> IP, so you could that leave here. Try to make as few changes to the code
-> as possible to archive your goal.
+> Well, it never says that it also prevent them from being disabled
+> later on. But it's true it's not very explicit.
 
-Ok. Will fix this, if the patch gets accepted in some form. Seems separating the
-patch for SNVS node addition to the VF610 dts will be better. 
+It says:
 
+	Keep all clocks already enabled by bootloader on,
+	even if no driver has claimed them. ...
+
+There's no "until" or anything there, so I interpret that as
+indefinitely.
+
+> > > > Either way, if there are other users of a clock then they will just as
+> > > > likely want to modify the rate at which point simplefb will break just
+> > > > as badly.
+> > > 
+> > > And this can be handled just as well. Register a clock notifier,
+> > > refuse any rate change, done. But of course, that would require having
+> > > a clock handle.
+> > > 
+> > > Now, how would *you* prevent such a change?
+> > 
+> > Like I said in the other thread. If you have two drivers that use the
+> > same clock but need different frequencies you've lost anyway.
 > 
->>  	data->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
->>  					&snvs_rtc_ops, THIS_MODULE);
->>  	if (IS_ERR(data->rtc)) {
->>  		ret = PTR_ERR(data->rtc);
->>  		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
->> -		return ret;
->> +		goto error_rtc_device_register;
->>  	}
->>  
->>  	return 0;
->> +
->> +error_rtc_device_register:
->> +	clk_disable_unprepare(data->clk);
->> +
->> +	return ret;
->>  }
->>  
->>  #ifdef CONFIG_PM_SLEEP
->> @@ -302,16 +324,24 @@ static int snvs_rtc_suspend(struct device *dev)
->>  	if (device_may_wakeup(dev))
->>  		enable_irq_wake(data->irq);
->>  
->> +	clk_disable_unprepare(data->clk);
->> +
->>  	return 0;
->>  }
->>  
->>  static int snvs_rtc_resume(struct device *dev)
->>  {
->> +	int ret;
->> +
->>  	struct snvs_rtc_data *data = dev_get_drvdata(dev);
->>  
->>  	if (device_may_wakeup(dev))
->>  		disable_irq_wake(data->irq);
->>  
->> +	ret = clk_prepare_enable(data->clk);
->> +	if (ret)
->> +		return ret;
->> +
->>  	return 0;
->>  }
->>  #endif
+> Except that the driver that has the most logic (ie not simplefb) will
+> have a way to recover and deal with that.
+
+You're making an assumption here. Why would the driver have such logic
+if nothing ever prevented it from setting the rate properly before.
+
+> But sure, you can still try to point new issues, get an obvious and
+> robust solution, and then discard the issue when the solution doesn't
+> go your way...
+
+And you've already proven that you're completely unwilling to even
+consider any other solution than what was originally proposed, so I
+really don't see how discussing this further with you is going to be
+productive.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/34cb9718/attachment.sig>
