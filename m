@@ -1,75 +1,42 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 29 Sep 2014 22:17:29 -0700
-Subject: [PATCH 2/4] ARM: DT: apq8064: Add usb host support.
-In-Reply-To: <1411982100-7964-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982100-7964-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20140930051728.GI28481@sonymobile.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 30 Sep 2014 10:48:48 +0530
+Subject: [GIT PULL 2/2] ARM: rockchip: cpufreq-cpu0 device
+In-Reply-To: <201717175.L17Ccvmpek@phil>
+References: <7172632.O1FfdvXn6k@phil>
+	<201717175.L17Ccvmpek@phil>
+Message-ID: <CAOh2x=nJvtryNgEa6Jx1JMdNa-xW4KQVvrk7epXvdN6hPDbXLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 29 Sep 02:15 PDT 2014, Srinivas Kandagatla wrote:
+On Mon, Sep 29, 2014 at 3:13 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Arnd, Olof,
+>
+> this one patch adds a platform-device for cpufreq-cpu0 to mach-rockchip,
+> enabling frequency scaling using this cpufreq driver.
+>
+> While it could be small enough to simply be included in the dt branch,
+> I didn't want to take that decision on my own :-)
+>
+> So please pull
+>
+>
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+>
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-cpufreqdev
+>
+> for you to fetch changes up to 47b06fc2d97a0d98d6053357561f2953d6547d25:
+>
+>   ARM: rockchip: add a cpufreq-cpu0 device (2014-09-29 09:21:38 +0200)
+>
+> ----------------------------------------------------------------
+> Add a simple cpufreq-cpu0 device for mach-rockchip
+>
+> ----------------------------------------------------------------
+> Heiko Stuebner (1):
+>       ARM: rockchip: add a cpufreq-cpu0 device
 
-> This patch adds device tree nodes to support two usb hosts on APQ8064
-> SOC.
-> 
-
-Sorry for not looking at the entire series before answering patch 1.
-I still think you should add all the regulators in the first patch anyways.
-
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -263,6 +263,91 @@
->  			#address-cells	= <1>;
->  			#size-cells	= <0>;
->  
-> +			pm8921_s3: pm8921-s3 {
-> +				compatible	= "qcom,rpm-pm8921-smps";
-> +				reg		= <QCOM_RPM_PM8921_SMPS3>;
-> +
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1400000>;
-> +				qcom,boot-load 		= <49360>;
-
-As it was unclear how to handle load in the driver I dropped boot-load for now.
-Please leave it out until someone have added it to the driver.
-
-> +				qcom,switch-mode-frequency = <3200000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			pm8921_l3: pm8921-l3 {
-> +				compatible	= "qcom,rpm-pm8921-pldo";
-> +				reg		= <QCOM_RPM_PM8921_LDO3>;
-> +
-> +				regulator-min-microvolt = <3050000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +				qcom,boot-load = <50000>;
-
-Dito
-
-> +			};
-> +
-> +			pm8921_l23: pm8921-l23 {
-> +				compatible	= "qcom,rpm-pm8921-pldo";
-> +				reg		= <QCOM_RPM_PM8921_LDO23>;
-> +
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				qcom,boot-load = <50000>;
-
-Dito
-
-> +				regulator-always-on;
-
-Why are all these "always-on"?
-
-> +			};
-> +
-> +		};
-> +
->  
->  		/* Temporary fixed regulator */
-> -- 
-> 1.9.1
-> 
+cpufreq-cpu0 is recently renamed to cpufreq-dt just in case you missed that.
