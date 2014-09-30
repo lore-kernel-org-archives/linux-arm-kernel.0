@@ -1,42 +1,72 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 30 Sep 2014 12:51:19 +0200
-Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic
- {read,write}s*()
-In-Reply-To: <1799506.5Clfp6gmMu@wuerfel>
-References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
- <CAMo8BfJ9VJ24zsn_6VwNrAntmDqdJu11O79OyMd8eThv3UaaUw@mail.gmail.com>
- <CAMo8Bf+u8er_KF4nJPSPNf9OmKZHu4y0x3Pcb7DU17y5ocBJqw@mail.gmail.com>
- <1799506.5Clfp6gmMu@wuerfel>
-Message-ID: <20140930105118.GA27560@ulmo>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 30 Sep 2014 12:55:48 +0200
+Subject: [PATCH V4] bcma: use chipcommon node from DT for SoC GPIO chip
+In-Reply-To: <1412072546-3529-1-git-send-email-zajec5@gmail.com>
+References: <1412072546-3529-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1412074548-14614-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 12:39:37PM +0200, Arnd Bergmann wrote:
-> On Tuesday 30 September 2014 14:26:20 Max Filippov wrote:
-> > On Tue, Sep 30, 2014 at 2:22 PM, Max Filippov <jcmvbkbc@gmail.com> wrote:
-> > > Hi Thierry,
-> > >
-> > >> I think this can be fixed by including linux/string.h for memset() and
-> > >> memcpy() in include/asm-generic/io.h.
-> > >
-> > > Will you send that fix or do I need to do it?
-> > 
-> > Never mind, found that it's fixed in today's next.
-> > 
-> > 
-> 
-> 
-> Actually I just backed out the original patches, the problem is still
-> there in my tree.
+This will allow us to define GPIO-attached devices (LEDs, buttons) in
+the the device tree.
 
-I'll integrate the fix for this in my series, so this should be gone
-with v5.
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+This is based on top of
+[PATCH v6] bcma: register bcma as device tree driver
+that I hope will reach wireless-next git tree.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/bbc88ae8/attachment.sig>
+V2: Describe axi chilren and make gpio a child of chipcommon core.
+V3: Make chipcommon a GPIO controller (avoid extra sub-child)
+    Speed up finding OF node in driver_gpio.c
+V4: Simplify setting of_node in driver_gpio.c
+---
+ Documentation/devicetree/bindings/bus/bcma.txt | 12 ++++++++++++
+ drivers/bcma/driver_gpio.c                     |  4 ++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+index e9070c1..62a4834 100644
+--- a/Documentation/devicetree/bindings/bus/bcma.txt
++++ b/Documentation/devicetree/bindings/bus/bcma.txt
+@@ -9,6 +9,11 @@ Required properties:
+ The cores on the AXI bus are automatically detected by bcma with the
+ memory ranges they are using and they get registered afterwards.
+ 
++The top-level axi bus may contain children representing attached cores
++(devices). This is needed since some hardware details can't be auto
++detected (e.g. IRQ numbers). Also some of the cores may be responsible
++for extra things, e.g. ChipCommon providing access to the GPIO chip.
++
+ Example:
+ 
+ 	axi at 18000000 {
+@@ -17,4 +22,11 @@ Example:
+ 		ranges = <0x00000000 0x18000000 0x00100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++
++		chipcommon {
++			reg = <0x00000000 0x1000>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
+ 	};
+diff --git a/drivers/bcma/driver_gpio.c b/drivers/bcma/driver_gpio.c
+index 8ea497c..57ce5fe 100644
+--- a/drivers/bcma/driver_gpio.c
++++ b/drivers/bcma/driver_gpio.c
+@@ -218,6 +218,10 @@ int bcma_gpio_init(struct bcma_drv_cc *cc)
+ #if IS_BUILTIN(CONFIG_BCM47XX)
+ 	chip->to_irq		= bcma_gpio_to_irq;
+ #endif
++#if IS_BUILTIN(CONFIG_OF)
++	if (cc->core->bus->hosttype == BCMA_HOSTTYPE_SOC)
++		chip->of_node	= cc->core->dev.of_node;
++#endif
+ 	switch (cc->core->bus->chipinfo.id) {
+ 	case BCMA_CHIP_ID_BCM5357:
+ 	case BCMA_CHIP_ID_BCM53572:
+-- 
+1.8.4.5
