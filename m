@@ -1,33 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 15:43:40 +0200
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140930123933.GA25395@peterchendt>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <3366285.QN2R3CQNzG@wuerfel> <20140930123933.GA25395@peterchendt>
-Message-ID: <10249326.XCThPmSrfL@wuerfel>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 30 Sep 2014 06:46:18 -0700
+Subject: [3/6] stmp3xxx_rtc_wdt: Add suspend/resume PM support
+In-Reply-To: <1411419350-1297-3-git-send-email-j.uzycki@elproma.com.pl>
+References: <1411419350-1297-3-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <20140930134618.GA1591@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 20:39:34 Peter Chen wrote:
-> Thanks, Arnd. I had not thought setting dma mask is so complicated, yes, it
-> should check the return value, two things to confirm:
+On Mon, Sep 22, 2014 at 10:55:47PM +0200, Janusz U?ycki wrote:
+> There is no conflict with rtc/rtc-stmp3xxx.c parent
+> because modified registers in PM functions of stmp3xxx_rtc_wdt
+> are different.
 > 
-> - dma_coerce_mask_and_coherent or dma_set_mask_and_coherent, the only difference
-> of these two API is the first one do "dev->dma_mask = &dev->coherent_dma_mask;"
-> The reason you suggest choosing dma_set_mask_and_coherent is you do not want
-> assign dev->dma_mask?
+> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
 
-No, that is just the current definition on ARM32 with CONFIG_ARCH_MULTIPLATFORM, and
-that is going to change soon to be DT aware.
-dma_set_mask_and_coherent() is supposed to check whether the platform can support
-the respective mask and return an error if it cannot.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-> - The second parameter for dma_set_mask_and_coherent is DMA_BIT_MASK(32), is it
-> ok?
+> ---
+>  drivers/watchdog/stmp3xxx_rtc_wdt.c | 24 +++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 > 
-> I just a little confused of what's the operation is "hardcoding the dma mask"?
-
-dma_coerce_mask_and_coherent() will hardcode the dma mask and override whatever
-the platform says is necessary.
-
-	Arnd
+> diff --git a/drivers/watchdog/stmp3xxx_rtc_wdt.c b/drivers/watchdog/stmp3xxx_rtc_wdt.c
+> index b4d6b34..77936b6 100644
+> --- a/drivers/watchdog/stmp3xxx_rtc_wdt.c
+> +++ b/drivers/watchdog/stmp3xxx_rtc_wdt.c
+> @@ -95,9 +95,33 @@ static int stmp3xxx_wdt_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static int __maybe_unused stmp3xxx_wdt_suspend(struct device *dev)
+> +{
+> +	struct watchdog_device *wdd = &stmp3xxx_wdd;
+> +
+> +	if (watchdog_active(wdd))
+> +		return wdt_stop(wdd);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused stmp3xxx_wdt_resume(struct device *dev)
+> +{
+> +	struct watchdog_device *wdd = &stmp3xxx_wdd;
+> +
+> +	if (watchdog_active(wdd))
+> +		return wdt_start(wdd);
+> +
+> +	return 0;
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(stmp3xxx_wdt_pm_ops,
+> +			 stmp3xxx_wdt_suspend, stmp3xxx_wdt_resume);
+> +
+>  static struct platform_driver stmp3xxx_wdt_driver = {
+>  	.driver = {
+>  		.name = "stmp3xxx_rtc_wdt",
+> +		.pm = &stmp3xxx_wdt_pm_ops,
+>  	},
+>  	.probe = stmp3xxx_wdt_probe,
+>  	.remove = stmp3xxx_wdt_remove,
