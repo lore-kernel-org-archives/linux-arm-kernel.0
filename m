@@ -1,57 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 30 Sep 2014 09:41:27 +0200
-Subject: [PATCH v2 00/11] ARM: shmobile: r8a7740/armadillo800eva legacy PM
- domain support
-In-Reply-To: <CANqRtoS0XgyuMBxU3CcVyQNg=r=MuA_OfJEDJbVsq-m9EHF9UA@mail.gmail.com>
-References: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
- <20140930042047.GA24253@verge.net.au>
- <CAMuHMdUgP6OEt6G4VhHoDncz+17j-bDu7u_pcHM0ETmqsDKOiA@mail.gmail.com>
- <CANqRtoS+bur8DA0+gG0Q0hL9RLsQdOLyfSUbgE_6nZ8mCST0Jg@mail.gmail.com>
- <CAMuHMdXP9tFX9FZnH_dR86DkKbP_YZcWAF-hF48BtVfGYRTsFw@mail.gmail.com>
- <CANqRtoS0XgyuMBxU3CcVyQNg=r=MuA_OfJEDJbVsq-m9EHF9UA@mail.gmail.com>
-Message-ID: <CAMuHMdWzg0bnoT0kURFe8h2aw4CYKoHN1SMYt0S3-Dno-e=8Xw@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 30 Sep 2014 08:44:13 +0100
+Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
+In-Reply-To: <5429DA95.80505@codeaurora.org>
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5429DA95.80505@codeaurora.org>
+Message-ID: <542A5F4D.8070407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
 
-On Tue, Sep 30, 2014 at 9:32 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>> So what is a good way to proceed with this series I wonder?
+
+On 29/09/14 23:17, Stephen Boyd wrote:
+> On 09/29/14 02:14, Srinivas Kandagatla wrote:
+>> @@ -246,6 +247,24 @@
+>>   			#reset-cells = <1>;
+>>   		};
 >>
->> There are two options:
->>   1. Drop the two patches that introduce the D4 and A4MP PM domains,
->>   2. Amend the patches that introduce the D4 and A4MP PM domains to
->>      comment out the entries in the table in pm-r8a7740.c, like was done in
->>      the first submission.
->>
->> Both will cause conflicts when applying the successive patches.
->>
->> If you don't care about bisectability, you can implement option 2 as a
->> separate change, after applying the whole series.
+>> +		apcs: syscon at 2011000 {
+>> +			compatible = "syscon";
+>> +			reg = <0x2011000 0x1000>;
+>> +		};
 >
-> Thanks for leading the way! From my side I don't have any special
-> feeling, so why don't you and Simon decide?
+> This is actually a clock controller block that hw designers decided was
+> good place to shove the ipc bits (because there's room!). Can we call it
+>
+>                  l2cc: clock-controller at 2011000 {
+>                          compatible = "syscon";
+>                          reg = <0x2011000 0x1000>;
+>                  };
+>
+yep, I will rename this in next version.
 
-OK.
+> Eventually I'll add the specific krait compatible when we merge krait
+> clock support:
+sounds good.
 
-> If it was up to me only then I think option #1 that simply reduces the
-> feature set seems rather natural, but perhaps it requires a lot of
-> rework of the patches. If we go with option #1 we can always
-> incrementally add D4 and A4MP later I assume.
-
-Yes we can.
-
-Please wait a bit, I'm looking into the !CONFIG_PM_RUNTIME case.
-Mostly multi-platform, but it may affect legacy too, where there's interaction
-with the drivers/sh/pm_runtime.c hack.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+--srini
+>
+>                  l2cc: clock-controller at 2011000 {
+>                          compatible = "qcom,kpss-gcc", "syscon";
+>                          reg = <0x2011000 0x1000>;
+>                          clock-output-names = "acpu_l2_aux";
+>                  };
+>
+>> +
+>> +		rpm at 108000 {
+>> +			compatible	= "qcom,rpm-apq8064";
+>> +			reg		= <0x108000 0x1000>;
+>> +			qcom,ipc = <&apcs 0x8 2>;
+>
+> There are actually 3 ipc bits. I guess if we ever have to use the other
+> two we'll extend this binding to have the other bits specified some
+> other way?
+>
