@@ -1,77 +1,105 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Tue, 30 Sep 2014 21:41:25 +0530
-Subject: [PATCH 2/2] arch: arm: samsung: Clean-up usage of
- CONFIG_SERIAL_SAMSUNG_UARTS symbol
-In-Reply-To: <2267491.QlLoTEuT3L@wuerfel>
-References: <1412087695-10591-1-git-send-email-a.kesavan@samsung.com>
- <1412087695-10591-2-git-send-email-a.kesavan@samsung.com>
- <2267491.QlLoTEuT3L@wuerfel>
-Message-ID: <CAM4voaknOtrsuUmoTZ9gTa-DbzwLXX_8+hAvkB3Mnfnk+8ULjQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 30 Sep 2014 17:12:41 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <3090148.OUdB0fsdsR@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <8631927.qWHZsjCs8e@wuerfel>
+ <20140930120344.GA14215@e102568-lin.cambridge.arm.com>
+ <3090148.OUdB0fsdsR@wuerfel>
+Message-ID: <20140930161241.GA16583@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Sep 30, 2014 at 01:31:44PM +0100, Arnd Bergmann wrote:
+> On Tuesday 30 September 2014 13:03:44 Lorenzo Pieralisi wrote:
+> > > >  static int gen_pci_probe(struct platform_device *pdev)
+> > > >  {
+> > > > @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > > >         struct device *dev = &pdev->dev;
+> > > >         struct device_node *np = dev->of_node;
+> > > >         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> > > > +#ifndef CONFIG_ARM64
+> > > >         struct hw_pci hw = {
+> > > >                 .nr_controllers = 1,
+> > > >                 .private_data   = (void **)&pci,
+> > > > @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > > >                 .map_irq        = of_irq_parse_and_map_pci,
+> > > >                 .ops            = &gen_pci_ops,
+> > > >         };
+> > > > +#endif
+> > > >  
+> > > 
+> > > Same here, I'd suggest marking this "#ifdef CONFIG_ARM" instead, as hw_pci
+> > > is an arm32 specific data structure.
+> > 
+> > I do not think we need hw struct at all, see below, we can write code so
+> > that we do not rely on ARM32 PCI bios, I will have a stab at that and
+> > post the resulting code.
+> 
+> That would of course be best. I think it needs some rework of the
+> arm32 PCI code though, or you'd still have to create pci_sys_data
+> manually, and that is currently allocated by pcibios_init_hw.
 
-On Tue, Sep 30, 2014 at 8:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 30 September 2014 20:04:55 Abhilash Kesavan wrote:
->> --- a/arch/arm/mach-s3c64xx/irq-pm.c
->> +++ b/arch/arm/mach-s3c64xx/irq-pm.c
->> @@ -55,10 +55,10 @@ static struct irq_grp_save {
->>         u32     mask;
->>  } eint_grp_save[5];
->>
->> -#ifndef CONFIG_SERIAL_SAMSUNG_UARTS
->> -#define SERIAL_SAMSUNG_UARTS 0
->> +#ifndef CONFIG_SERIAL_SAMSUNG
->> +#define SERIAL_SAMSUNG_UARTS   0
->>  #else
->> -#define        SERIAL_SAMSUNG_UARTS CONFIG_SERIAL_SAMSUNG_UARTS
->> +#define SERIAL_SAMSUNG_UARTS   4
->>  #endif
->>
->>  static u32 irq_uart_mask[SERIAL_SAMSUNG_UARTS];
->
-> I think this won't work because now you access invalid registers
-> on machines that have only three uarts.
+Right, as far as I can see, creating a pci_sys_data struct
+that's all we would need. "Problem" is that it does not exist on ARM64
+so to avoid ifdeffery we have to declare a struct with the same
+fields (ie only pci_sys_data.private_data is used by this driver -
+apart from arm32 specific functions usage) that is passed to the PCI layer
+and stored in the bus.sysdata, but that's extremely ugly (and we won't
+need this when the arm32 conversion is completed).
 
-The 6400 and 6410 SoCs both have 4 uarts. Prior to this patch
-CONFIG_SERIAL_SAMSUNG_UARTS would have been 4 for 64xx.
->
->> diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
->> index 11fbbc2..03cafe9 100644
->> --- a/arch/arm/plat-samsung/init.c
->> +++ b/arch/arm/plat-samsung/init.c
->> @@ -93,8 +93,8 @@ void __init s3c24xx_init_clocks(int xtal)
->>  #if IS_ENABLED(CONFIG_SAMSUNG_ATAGS)
->>  static int nr_uarts __initdata = 0;
->>
->> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
->> -static struct s3c2410_uartcfg uart_cfgs[CONFIG_SERIAL_SAMSUNG_UARTS];
->> +#ifdef CONFIG_SERIAL_SAMSUNG
->> +static struct s3c2410_uartcfg uart_cfgs[4];
->>  #endif
->>
->>  /* s3c24xx_init_uartdevs
->> @@ -110,7 +110,7 @@ void __init s3c24xx_init_uartdevs(char *name,
->>                                   struct s3c24xx_uart_resources *res,
->>                                   struct s3c2410_uartcfg *cfg, int no)
->>  {
->> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
->> +#ifdef CONFIG_SERIAL_SAMSUNG
->>         struct platform_device *platdev;
->>         struct s3c2410_uartcfg *cfgptr = uart_cfgs;
->>         struct s3c24xx_uart_resources *resp;
->
-> Since you hardcode the number here now, you can actually drop this #ifdef.
+> > > > +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
+> > > > +                              &gen_pci_ops, pci, &pci->resources)) {
+> > > > +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
+> > > > +               return -ENODEV;
+> > > > +       }
+> > > > +#else
+> > > >         pci_common_init_dev(dev, &hw);
+> > > > +#endif /* CONFIG_ARM64 */
+> > > > 
+> > > 
+> > > Again, just make the pci_common_init_dev() call #ifdef CONFIG_ARM, and move
+> > > the generic case after it, outside of the #ifdef.
+> > 
+> > I went through the code quickly but I think we can (and should) remove
+> > this quite ugly ifdeffery altogether. Most of the functionality in
+> > pci_common_init_dev() can be implemented through the common PCI API (and this
+> > would make this driver arch agnostic as it should be), I will go through ARM32
+> > PCI bios code to check what is executed in detail in pci_common_init_dev() and
+> > make sure that we follow those initialization steps in the resulting probe code
+> > for this PCI generic host controller driver.
+> 
+> These are the functions I found that refer to pci_sys_data on arm32:
+> 
+> pcibios_add_bus
+> pcibios_remove_bus
+> pcibios_align_resource
+> pci_mmap_page_range
+> pci_domain_nr
+> pci_proc_domain
+> 
+> This is not as bad as I had feared, but we still have to ensure that
+> any caller of these functions will work with both the generic PCI support
+> and the arm32 specific drivers that today use hw_pci.
+> 
+> My idea for dealing with this was to convert all host drivers in
+> drivers/pci/host to the generic PCI code and never build the arm32
+> bios32 code when CONFIG_ARCH_MULTIPLATFORM is set. Unfortunately that
+> requires either doing them all at once or coming up with a migration
+> strategy so we don't break things in the process.
 
-Will remove it.
+That makes sense. Related to the migration strategy, thoughts
+appreciated. Declaring a static pci_sys_data (with some ifdef around it)
+seems a horrible hack to me. Calling pci_common_init() only if CONFIG_ARM
+is rather horrible too, but we can probably live with that.
 
-Regards,
-Abhilash
->
->         Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I do not see anything else as possible solution at the moment unless
+we go the whole nine yards and do what you suggest above, might take a
+little while though.
+
+Probably leaving pci_common_init() call (and related hw_pci struct, and
+related ifdeffery to differentiate between different sysdata layouts for ARM
+and ARM64) is the fastest path but I still think it is not nice at all.
+
+Thanks,
+Lorenzo
