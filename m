@@ -1,54 +1,75 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 30 Sep 2014 14:25:59 +0200
-Subject: [PATCH 1/3] irqchip: dw-apb-ictl: always use use
- {readl|writel}_relaxed
-In-Reply-To: <1411454100-6814-2-git-send-email-jszhang@marvell.com>
-References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
- <1411454100-6814-2-git-send-email-jszhang@marvell.com>
-Message-ID: <542AA157.8080908@gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 30 Sep 2014 14:26:24 +0200
+Subject: [PATCH/RFC v2 1/4] ARM: hw_breakpoint: Add arm_dbg_regs_available flag
+In-Reply-To: <1412079987-1827-1-git-send-email-geert+renesas@glider.be>
+References: <1412079987-1827-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1412079987-1827-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2014 08:34 AM, Jisheng Zhang wrote:
-> relaxed version and non-relaxed version are mixed, this patch always
-> use the relaxed version to unify the memory access usage.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+If power area D4, which contains the Coresight-ETM hardware block, is
+powered down on R-Mobile A1 (r8a7740), the kernel crashes when
+suspending from s2ram with:
 
-While I don't agree with the above reason (unification) for this
-change, I agree with the patch because it _can_ be changed, so
+    Internal error: Oops - undefined instruction: 0 [#1] ARM
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This happens because dbg_cpu_pm_notify() calls reset_ctrl_regs(), which
+can't access the debug registers as the debug module is powered down.
 
-> ---
->   drivers/irqchip/irq-dw-apb-ictl.c | 12 ++++++------
->   1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
-> index 31e231e..fcc3385 100644
-> --- a/drivers/irqchip/irq-dw-apb-ictl.c
-> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
-> @@ -94,16 +94,16 @@ static int __init dw_apb_ictl_init(struct device_node *np,
->   	 */
->
->   	/* mask and enable all interrupts */
-> -	writel(~0, iobase + APB_INT_MASK_L);
-> -	writel(~0, iobase + APB_INT_MASK_H);
-> -	writel(~0, iobase + APB_INT_ENABLE_L);
-> -	writel(~0, iobase + APB_INT_ENABLE_H);
-> +	writel_relaxed(~0, iobase + APB_INT_MASK_L);
-> +	writel_relaxed(~0, iobase + APB_INT_MASK_H);
-> +	writel_relaxed(~0, iobase + APB_INT_ENABLE_L);
-> +	writel_relaxed(~0, iobase + APB_INT_ENABLE_H);
->
-> -	reg = readl(iobase + APB_INT_ENABLE_H);
-> +	reg = readl_relaxed(iobase + APB_INT_ENABLE_H);
->   	if (reg)
->   		nrirqs = 32 + fls(reg);
->   	else
-> -		nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
-> +		nrirqs = fls(readl_relaxed(iobase + APB_INT_ENABLE_L));
->
->   	domain = irq_domain_add_linear(np, nrirqs,
->   				       &irq_generic_chip_ops, NULL);
->
+As suggested by Russell King, track whether the ETM block is powered down
+to fix this.
+
+The availability of the debug registers depends on the platform and its
+state.  Hence provide a mechanism for platform code to indicate that the
+debug registers are available or not, using a boolean flag that defaults
+to true.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - New
+
+ arch/arm/include/asm/hw_breakpoint.h | 2 ++
+ arch/arm/kernel/hw_breakpoint.c      | 7 +++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
+index 8e427c7b44257d2d..51ffdae41bfe3754 100644
+--- a/arch/arm/include/asm/hw_breakpoint.h
++++ b/arch/arm/include/asm/hw_breakpoint.h
+@@ -110,6 +110,8 @@ static inline void decode_ctrl_reg(u32 reg,
+ 	asm volatile("mcr p14, 0, %0, " #N "," #M ", " #OP2 : : "r" (VAL));\
+ } while (0)
+ 
++extern bool arm_dbg_regs_available;
++
+ struct notifier_block;
+ struct perf_event;
+ struct pmu;
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index b5b452f90f761bd2..96193c0165fbe5ca 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -38,6 +38,8 @@
+ #include <asm/traps.h>
+ #include <asm/hardware/coresight.h>
+ 
++bool arm_dbg_regs_available = true;
++
+ /* Breakpoint currently in use for each BRP. */
+ static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
+ 
+@@ -931,6 +933,11 @@ static void reset_ctrl_regs(void *unused)
+ 	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
+ 	u32 val;
+ 
++	if (!arm_dbg_regs_available) {
++		pr_warn_once("Debug registers are not available\n");
++		return;
++	}
++
+ 	/*
+ 	 * v7 debug contains save and restore registers so that debug state
+ 	 * can be maintained across low-power modes without leaving the debug
+-- 
+1.9.1
