@@ -1,47 +1,33 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 30 Sep 2014 14:19:32 +0200
-Subject: [PATCH] ARM: berlin: sort Kconfig options
-In-Reply-To: <1411712097-700-1-git-send-email-jszhang@marvell.com>
-References: <1411712097-700-1-git-send-email-jszhang@marvell.com>
-Message-ID: <542A9FD4.5090002@gmail.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Tue, 30 Sep 2014 20:20:25 +0800
+Subject: [PATCH v3 0/3] i2c: hix5hd2: add i2c controller driver
+Message-ID: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2014 08:14 AM, Jisheng Zhang wrote:
-> Keep options alphabetically sorted.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+v3:
+Add COMPILE_TEST as dependence to enable compile test
+Remove specific mach info in dts binding to solve the confusion.
 
-Jisheng,
+v2: 
+Modify according to Wolfram's comments 
+including change vector name, coding style, return value etc.
 
-nice to see you are now contributing directly to Berlin, too.
-Anyway, I understand that it is nice to have it sorted alphabetically
-but as long as there is no direct need or relation with any other
-changes, let's keep it that way.
+Wei Yan (2):
+  i2c: hix5hd2: add devicetree documentation
+  i2c: hix5hd2: add i2c controller driver
 
-As soon as there are any other patches touching Kconfig, I'll request
-to squash it in. Is that okay for you?
+Zhangfei Gao (1):
+  ARM: dts: hix5hd2: add i2c node
 
-Thanks,
-   Sebastian
+ .../devicetree/bindings/i2c/i2c-hix5hd2.txt        |   25 +
+ arch/arm/boot/dts/hisi-x5hd2.dtsi                  |   60 +++
+ drivers/i2c/busses/Kconfig                         |   10 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-hix5hd2.c                   |  554 ++++++++++++++++++++
+ 5 files changed, 650 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-hix5hd2.txt
+ create mode 100644 drivers/i2c/busses/i2c-hix5hd2.c
 
-> ---
->   arch/arm/mach-berlin/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
-> index 5803f77..84d34e0 100644
-> --- a/arch/arm/mach-berlin/Kconfig
-> +++ b/arch/arm/mach-berlin/Kconfig
-> @@ -3,9 +3,9 @@ menuconfig ARCH_BERLIN
->   	select ARCH_HAS_RESET_CONTROLLER
->   	select ARCH_REQUIRE_GPIOLIB
->   	select ARM_GIC
-> -	select GENERIC_IRQ_CHIP
->   	select DW_APB_ICTL
->   	select DW_APB_TIMER_OF
-> +	select GENERIC_IRQ_CHIP
->   	select PINCTRL
->   	select RESET_CONTROLLER
->
->
+-- 
+1.7.9.5
