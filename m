@@ -1,25 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 12:22:21 +0200
-Subject: [PATCH 0/3] ARM: Meson6: enable SMP
-In-Reply-To: <20140930084646.GA31027@carlo-MacBookPro>
-References: <1412066635-5298-1-git-send-email-carlo@caione.org>
- <20140930084646.GA31027@carlo-MacBookPro>
-Message-ID: <2970330.BJMVixgoJ1@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 30 Sep 2014 12:22:26 +0200
+Subject: [PATCH V3] bcma: use device from DT (brcm,
+ bus-chipcommon) for SoC GPIO chip
+In-Reply-To: <1411892641-5662-1-git-send-email-zajec5@gmail.com>
+References: <1411892641-5662-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1412072546-3529-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
-> On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
-> > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
-> > pieces to boot the secondary CPU.
-> 
-> Sorry for the double sending.
-> Forgot to CC LAKML.
+This will allow us to define GPIO-attached devices (LEDs, buttons) in
+the the device tree.
 
-Looks good to me in principle, but I wonder about the CPU enable method.
-Are you able to implement PSCI in u-boot like it was done for allwinner?
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+This is based on top of
+[PATCH v6] bcma: register bcma as device tree driver
+that I hope will reach wireless-next git tree.
 
-This is mostly a question of whether the system comes up in secure mode
-or non-secure mode.
+V2: Describe axi chilren and make gpio a child of chipcommon core.
+V3: Make chipcommon a GPIO controller (avoid extra sub-child)
+    Speed up finding OF node in driver_gpio.c
+---
+ Documentation/devicetree/bindings/bus/bcma.txt | 13 +++++++++++++
+ drivers/bcma/driver_gpio.c                     |  6 ++++++
+ 2 files changed, 19 insertions(+)
 
-	Arnd
+diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
+index e9070c1..0538692 100644
+--- a/Documentation/devicetree/bindings/bus/bcma.txt
++++ b/Documentation/devicetree/bindings/bus/bcma.txt
+@@ -9,6 +9,11 @@ Required properties:
+ The cores on the AXI bus are automatically detected by bcma with the
+ memory ranges they are using and they get registered afterwards.
+ 
++The top-level axi bus may contain children representing attached cores
++(devices). This is needed since some hardware details can't be auto
++detected (e.g. IRQ numbers). Also some of the cores may be responsible
++for extra things, e.g. ChipCommon providing access to the GPIO chip.
++
+ Example:
+ 
+ 	axi at 18000000 {
+@@ -17,4 +22,12 @@ Example:
+ 		ranges = <0x00000000 0x18000000 0x00100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++
++		chipcommon {
++			compatible = "brcm,bus-chipcommon";
++			reg = <0x00000000 0x1000>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
+ 	};
+diff --git a/drivers/bcma/driver_gpio.c b/drivers/bcma/driver_gpio.c
+index 8ea497c..28bdbe5 100644
+--- a/drivers/bcma/driver_gpio.c
++++ b/drivers/bcma/driver_gpio.c
+@@ -218,6 +218,12 @@ int bcma_gpio_init(struct bcma_drv_cc *cc)
+ #if IS_BUILTIN(CONFIG_BCM47XX)
+ 	chip->to_irq		= bcma_gpio_to_irq;
+ #endif
++#if IS_BUILTIN(CONFIG_OF)
++	if (cc->core->bus->hosttype == BCMA_HOSTTYPE_SOC)
++		chip->of_node	= of_find_compatible_node(
++					bus->host_pdev->dev.of_node, NULL,
++					"brcm,bus-chipcommon");
++#endif
+ 	switch (cc->core->bus->chipinfo.id) {
+ 	case BCMA_CHIP_ID_BCM5357:
+ 	case BCMA_CHIP_ID_BCM53572:
+-- 
+1.8.4.5
