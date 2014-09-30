@@ -1,38 +1,25 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 30 Sep 2014 12:17:59 +0200
-Subject: [PATCH] ARM: rockchip: honor renaming of cpufreq-cpu0 to cpufreq-dt
-In-Reply-To: <1712743.HcKV7iIeyP@phil>
-References: <7172632.O1FfdvXn6k@phil> <201717175.L17Ccvmpek@phil>
- <1712743.HcKV7iIeyP@phil>
-Message-ID: <3994184.eAcGc0TxgK@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 12:22:21 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <20140930084646.GA31027@carlo-MacBookPro>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <20140930084646.GA31027@carlo-MacBookPro>
+Message-ID: <2970330.BJMVixgoJ1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpufreq-cpu0 got renamed to a more generic name cpufreq-dt, so
-adapt the created platform-device to this.
+On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+> On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+> > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> > pieces to boot the secondary CPU.
+> 
+> Sorry for the double sending.
+> Forgot to CC LAKML.
 
-Reported-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-This is for completenes sake, the patch I added to the cpufreqdev branch
-as part of the pull request, handling the renamed cpufreq-cpu0 driver.
+Looks good to me in principle, but I wonder about the CPU enable method.
+Are you able to implement PSCI in u-boot like it was done for allwinner?
 
+This is mostly a question of whether the system comes up in secure mode
+or non-secure mode.
 
- arch/arm/mach-rockchip/rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index eea1f06..d226b71 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -27,7 +27,7 @@
- static void __init rockchip_dt_init(void)
- {
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	platform_device_register_simple("cpufreq-cpu0", 0, NULL, 0);
-+	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
- }
- 
- static const char * const rockchip_board_dt_compat[] = {
--- 
-2.1.0
+	Arnd
