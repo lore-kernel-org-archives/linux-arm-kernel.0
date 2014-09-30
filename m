@@ -1,32 +1,75 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 30 Sep 2014 11:24:28 -0700
-Subject: [PATCH v7 3/5] ARM: dts: add RK3xxx CPU Thermal data
-In-Reply-To: <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
-References: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
- <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <CAD=FV=WRYeW4giA+yRWmXGxAvdG38GcW-7tA39SZDH1GPamf6A@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 30 Sep 2014 11:27:10 -0700
+Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
+In-Reply-To: <20140930050203.GG28481@sonymobile.com>
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5429DA95.80505@codeaurora.org> <20140930050203.GG28481@sonymobile.com>
+Message-ID: <542AF5FE.1000006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
-
-On Sun, Sep 28, 2014 at 3:38 AM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
-> This patch changes a dtsi file to contain the thermal data
-> on RK3288 and later SoCs. This data will
-> enable a thermal shutdown over 125C.
+On 09/29/14 22:02, Bjorn Andersson wrote:
+> On Mon 29 Sep 15:17 PDT 2014, Stephen Boyd wrote:
 >
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> ---
->  arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi | 32 +++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
+>> On 09/29/14 02:14, Srinivas Kandagatla wrote:
+>>> @@ -246,6 +247,24 @@
+>>>  			#reset-cells = <1>;
+>>>  		};
+>>>  
+>>> +		apcs: syscon at 2011000 {
+>>> +			compatible = "syscon";
+>>> +			reg = <0x2011000 0x1000>;
+>>> +		};
+>> This is actually a clock controller block that hw designers decided was
+>> good place to shove the ipc bits (because there's room!). Can we call it
+>>
+>>                 l2cc: clock-controller at 2011000 {
+>>                         compatible = "syscon";
+>>                         reg = <0x2011000 0x1000>;
+>>                 };
+>>
+>> Eventually I'll add the specific krait compatible when we merge krait
+>> clock support:
+>>
+>>                 l2cc: clock-controller at 2011000 {
+>>                         compatible = "qcom,kpss-gcc", "syscon";
+>>                         reg = <0x2011000 0x1000>;
+>>                         clock-output-names = "acpu_l2_aux";
+>>                 };
+>>
+> As long as we can get hold of the regmap that would be fine. I pressume the
+> idea is to have the kpss-gcc using syscon, just like the rpm. But hopefully the
+> syscon patches that are floating around (merged?) will allow any driver to
+> expose a "syscon regmap".
 
-I haven't done lots of review of this series, but I did notice that
-this file has bad spacing.  It's fairly obvious in your gerrit patch
-<https://chromium-review.googlesource.com/#/c/220270/1/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi>
-because gerrit (by default) shows you "tab" characters...
+Agreed. I'm not sure if kpss-gcc will use syscon. With the floating
+patches I don't see a reason why we need to use it.
 
-In general you should use tab for indentation, not spaces.  You seem
-to use a mix of the two.
+>
+>>> +
+>>> +		rpm at 108000 {
+>>> +			compatible	= "qcom,rpm-apq8064";
+>>> +			reg		= <0x108000 0x1000>;
+>>> +			qcom,ipc = <&apcs 0x8 2>;
+>> There are actually 3 ipc bits. I guess if we ever have to use the other
+>> two we'll extend this binding to have the other bits specified some
+>> other way?
+> I haven't seen any indications of us using more than this bit. If we want to do
+> that, we could simply make it <&apcs 8 2 &apcs 8 3 &apcs 8 4> (or whatever
+> those indices are). That way this should be easy it keep compatible.
+>
 
--Doug
+Good to hear we're not forced to use a new property. The indices have
+always been 2, 1, and 0 as far as I know.
+
+We use bit 1 to ack the RPM if it ever crashes. We know that it crashes
+because we receive the error interrupt. Instead of calling panic like we
+do downstream we can gracefully fail any new rpm requests. There really
+isn't any way to recover from this scenario though besides rebooting.
+Looking at the code I see this is all wrong and we use bit 2 to ack the
+error.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
