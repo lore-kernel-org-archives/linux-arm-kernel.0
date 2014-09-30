@@ -1,95 +1,75 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 30 Sep 2014 07:09:38 +0200
-Subject: [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-In-Reply-To: <1412042858.9388.79.camel@decadent.org.uk>
-References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714670.3040.39.camel@decadent.org.uk>
- <20140928222150.GC3248@norris-Latitude-E6410>
- <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
- <1412042858.9388.79.camel@decadent.org.uk>
-Message-ID: <CACna6rxBFNvF5bouv9KkS-3=TxcXVMrs30KMTS0mCjDAva4jiA@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 29 Sep 2014 22:17:29 -0700
+Subject: [PATCH 2/4] ARM: DT: apq8064: Add usb host support.
+In-Reply-To: <1411982100-7964-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1411982100-7964-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20140930051728.GI28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2014 04:07, Ben Hutchings <ben@decadent.org.uk> wrote:
-> On Mon, 2014-09-29 at 08:36 +0200, Rafa? Mi?ecki wrote:
->> On 29 September 2014 00:21, Brian Norris <computersforpeace@gmail.com> wrote:
->> > + Rafal
->> >
->> > Rafal has been looking at the same area of code. I'd really like to get
->> > this patch into 3.18 if possible, so the more eyes the better.
->>
->> Thanks Brian.
->>
->> I took me a while to follow this issue, too bad I wasn't subscribed to
->> the ML earlier. Let me try to sum it up.
->>
->>
->>
->> 1) The main urgent issue: broken auto-loading
->> Tracked in the thread: http://www.spinics.net/lists/linux-spi/msg01726.html
->> Problem: m25p80.c references spi_nor_ids (from external file)
->> Short-term solution: duplicate IDs in the m25p80.c
->>
->> Ben: just like Brian, I think the patch like this one (
->> [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
->> ) is the way to go. However few comments:
->>
->> a) I don't see why you modify m25p_probe in it.
->
-> Because spi_nor_scan() requires a struct spi_device_id with the
-> driver_data field pointing to a struct flash_info.
+On Mon 29 Sep 02:15 PDT 2014, Srinivas Kandagatla wrote:
 
-More friendly explanation: because spi_get_device_id uses driver's
-id_table (that was now changes to pure strings).
-I see the point.
+> This patch adds device tree nodes to support two usb hosts on APQ8064
+> SOC.
+> 
 
+Sorry for not looking at the entire series before answering patch 1.
+I still think you should add all the regulators in the first patch anyways.
 
->> b) I don't think the described clean solution (you described it in the
->> commit message):
->> > A clean solution to this will involve defining the list of device
->> > IDs in spi-nor.h and removing struct spi_device_id from the spi-nor
->> > API, but this is quite a large change.
->> is the correct one. I think there should be a single string to trigger
->> m25p80 load and the rest should be handled using JEDEC, with some
->> workarounds for incompatible devices only.
->
-> That certainly makes sense for Linux-specific platform data, but I don't
-> think it works for Device Tree "compatible" strings (see
-> <http://mid.gmane.org/1410660009.3040.29.camel@decadent.org.uk>).
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -263,6 +263,91 @@
+>  			#address-cells	= <1>;
+>  			#size-cells	= <0>;
+>  
+> +			pm8921_s3: pm8921-s3 {
+> +				compatible	= "qcom,rpm-pm8921-smps";
+> +				reg		= <QCOM_RPM_PM8921_SMPS3>;
+> +
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1400000>;
+> +				qcom,boot-load 		= <49360>;
 
-We could simply follow the way Linux-specific platform data works. We
-could always use
-compatible = "m25p80";
-and then for some rare cases (where JEDEC fails) add something like
-model = "at25df321a";
+As it was unclear how to handle load in the driver I dropped boot-load for now.
+Please leave it out until someone have added it to the driver.
 
+> +				qcom,switch-mode-frequency = <3200000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			pm8921_l3: pm8921-l3 {
+> +				compatible	= "qcom,rpm-pm8921-pldo";
+> +				reg		= <QCOM_RPM_PM8921_LDO3>;
+> +
+> +				regulator-min-microvolt = <3050000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +				qcom,boot-load = <50000>;
 
->> b) Removing spi_nor::read_id
->> https://patchwork.ozlabs.org/patch/389073/
->> Ben: I think this one has a NACK from me, because I'm going to use
->> custom read_id in the bcm53xxspiflash driver.
->> See following thread for bcm53xxspiflash description:
->> http://comments.gmane.org/gmane.linux.drivers.mtd/54578
->> Initial commit (it uses read_id): https://patchwork.ozlabs.org/patch/381902/
-> [...]
->
-> But it has to use spi_nor_match_id() because of the driver_data
-> requirement.  This just illustrates that the read_id operation doesn't
-> make sense as currently defined.
+Dito
 
-I agree, however there is already a patch in progress handling that:
-https://patchwork.ozlabs.org/patch/377917/
+> +			};
+> +
+> +			pm8921_l23: pm8921-l23 {
+> +				compatible	= "qcom,rpm-pm8921-pldo";
+> +				reg		= <QCOM_RPM_PM8921_LDO23>;
+> +
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				qcom,boot-load = <50000>;
 
+Dito
 
-> I accept that there will be a need for a read_id operation, but I think
-> it should fill in a struct flash_info rather than requiring every chip
-> to be described and named in spi-nor.c.
+> +				regulator-always-on;
 
-Flashes not supporting JEDEC are usually some weird versions of normal
-flashes with JEDEC support. So I think we could still have them in the
-spi-nor database and let users provide the name instead of filling the
-whole struct flash_info.
+Why are all these "always-on"?
 
--- 
-Rafa?
+> +			};
+> +
+> +		};
+> +
+>  
+>  		/* Temporary fixed regulator */
+> -- 
+> 1.9.1
+> 
