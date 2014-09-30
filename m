@@ -1,133 +1,68 @@
-From: wuyun.wu@huawei.com (Abel)
-Date: Tue, 30 Sep 2014 18:56:30 +0800
-Subject: [RFT v2 01/24] irqdomain: Introduce new interfaces to support
- hierarchy irqdomains
-In-Reply-To: <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
-References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
- <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
- <54294F1C.30606@huawei.com>
- <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
-Message-ID: <542A8C5E.3040901@huawei.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 30 Sep 2014 13:02:19 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140930080354.GI4081@lukather>
+References: <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
+ <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo> <20140929162814.GE4081@lukather>
+ <20140929165842.GC5599@skynet.be> <20140929220250.GD5599@skynet.be>
+ <20140930053900.GD29874@ulmo> <20140930080354.GI4081@lukather>
+Message-ID: <20140930110218.GB27560@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-On 2014/9/29 23:53, Thomas Gleixner wrote:
+On Tue, Sep 30, 2014 at 10:03:54AM +0200, Maxime Ripard wrote:
+> On Tue, Sep 30, 2014 at 07:39:02AM +0200, Thierry Reding wrote:
+> > You keep bringing up the Raspberry Pi for some reason and suggest that
+> > it is somehow inferior to sunxi. What makes you think it's less entitled
+> > to be supported on Linux than sunxi? I don't care about the Raspberry Pi
+> > and I equally don't care about sunxi. I don't own a Raspberry Pi and I
+> > don't own any Allwinner hardware. What I do care about is Linux and I
+> > want it to work well for all SoCs equally.
+> > 
+> > Perhaps if you could put aside your crusade against the Raspberry Pi for
+> > just a second you'll realize that we're all on the same team. This isn't
+> > a competition and I'm not trying to put a spoke in your wheel. On the
+> > contrary, I'm actually trying to help you.
+> 
+> We've been over this already, and I'll tell you again that you're
+> getting this wrong.
+> 
+> No platform is more entitled to get merged than another one. I do care
+> about the Allwinner SoCs, and I care just as much about the broader
+> Linux support for all the other SoCs, be it from nvidia, samsung or
+> whatever vendor you can come up with.
 
-> On Mon, 29 Sep 2014, Abel wrote:
->> I've been through your patches and noticed that the only domain
->> which does not call irq_domain_alloc_irqs_parent() is
->> x86_vector_domain. And this makes sense *if* we already knew which
->> domain is the nearest one to the CPU.
-> 
-> Right, and in case of x86 the vector domain _IS_ the one which is
-> always the nearest one to the cpu.
+Okay, I'm glad our goals aren't that far apart then. It would be helpful
+to stop dragging the Raspberry Pi into this, though, since it isn't at
+all relevant.
 
-Yes, I know that. :)
-What I meant is... (please see below)
+> But you can't hide the fact that the bcm2835 still has a very limited
+> clock support, and I really don't know about its clock tree, but I
+> guess that if the times come when they add a more complete clock
+> support, they will face the same issue.
 
-> 
->> But I don't think a well implemented device driver should assume
->> itself be in a particular position of the interrupt delivery path.
-> 
-> The device driver has no knowledge of this. The irq domain driver
-> definitely has to know to some extent.
-> 
->> Actually it should be guaranteed by the core infrastructure that all
->> the domains in the interrupt delivery path should allocate a
->> hardware interrupt for the interrupt source.
-> 
-> Well, that's what we do. We allocate down the irq domain hierarchy. If
-> one level fails the whole operation fails.
+This isn't at all relevant. And that's exactly why I think it's good to
+hide all the resource management behind firmware. That way it becomes
+easy to support any SoC with any firmware.
 
-Actually the core infrastructure just calls domain->ops->alloc() which is
-the one who really guarantees it by calling irq_domain_alloc_irqs_parent().
-I think it's enough for a particular domain to pick a hwirq from itself for
-that linux irq, and need not to care about its parent.
-What I suggest is something like:
+> If the driver would have been developped initially to create a
+> framebuffer on the Allwinner SoCs, at a time when we didn't have any
+> clock support too, calling it only usable on sunxi wouldn't have
+> shocked me tbh.
 
-for (iter = domain; iter; iter = iter->parent) {
-	ret = iter->ops->alloc(iter, virq, nr_irqs, arg);
-	if (ret < 0) {
-		mutex_unlock(&irq_domain_mutex);
-		goto out_free_irq_data;
-	}
-}
+The functionality that it provides is still very generic. And the
+firmware interface is generic too. It is this abstraction that allows
+it to be generic. You on the other hand seem to be arguing that by
+making it abstract we've made it less generic.
 
-in this way, the core infrastructure guarantees allocating down the irqdomain
-hierarchy, and the implementers of domain_ops->alloc() need not to call
-irq_domain_alloc_irqs_parent() any longer, just do the things they have to.
+Abstraction is about hiding details to capture commonality.
 
-> 
->> And besides the comments/questions I mentioned above, I am also curious about
->> how the chained interrupts been processed.
->>
->> Let's take a 3-level-chained-domains for example.
->> Given 3 interrupt controllers A, B and C, and the interrupt delivery path is:
->>
->> DEV -> A -> B -> C -> CPU
->>
->> After the hierarchy irqdomains are established, the unique linux interrupt of
->> DEV will be mapped with a hardware interrupt in each domain:
->>
->> DomainA: HWIRQ_A => VIRQ_DEV
->> DomainB: HWIRQ_B => VIRQ_DEV
->> DomainC: HWIRQ_C => VIRQ_DEV
->>
->> When the DEV triggered an interrupt signal, the CPU will acknowledge HWIRQ_C,
-> 
-> Not necessarily. The CPU will process HWIRQ_C. The acknowledge
-> mechanism depends on the implementation details of the hierarchy.
-
-Yes, you are right. Thanks for pointing out.
-
-> 
->> and then irq_find_mapping(DomainC, HWIRQ_C) will be called to get the linux
->> interrupt VIRQ_DEV, and after the handler of the VIRQ_DEV has been processed,
->> the interrupt will end with the level (if have) uncleared on B, which will
->> result in the interrupt of DEV cannot be processed again.
->>
->> Or is there anything I misunderstand?
-> 
-> This heavily depends on the properties of the stacked domains.
-> 
-> It depends on the hardware requirements and the implementation of
-> domain A and B how this is handled.
-> 
-> It might be sufficient to have the following code in the irq_ack()
-> callback of domain A:
-> 
-> irq_ack_A(struct irq_data *d)
-> {
-> 	ack_hw_A();
-> }
-> 
-> Another HW or stacking scenario requires
-> 
-> irq_ack_A(struct irq_data *d)
-> {
-> 	ack_hw_A();
-> 	ack_parent();
-> }
-> 
-> where ack_parent() does:
-> 
->       if (d->parent_data)
->       	 d->parent_data->chip->ack(d->parent_data);
-> 
-> and ack_hw_A() can be anything from a nop to some more or less complex
-> hw access.
-> 
-> So we cannot define upfront how deep an ack/mask/unmask/... has to be
-> propagated down the chain. This needs a careful consideration in terms
-> of functionality and we want to be able to do performance shortcuts as
-> well.
-> 
-
-Yes, I got it. And one more thing I concerned is that when hierarchy
-irqdomains is enabled, shouldn't the ack_parent() be called by default
-by the irqchip->irq_ack() of each domain to ensure all the domains in
-the delivery path ack this interrupt?
-
-Thanks,
-	Abel.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/f91b4889/attachment-0001.sig>
