@@ -1,76 +1,56 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 30 Sep 2014 09:45:49 +0800
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <20140930101200.1239cd52@canb.auug.org.au>
-References: <20140926115539.6873630b@canb.auug.org.au>
- <20140930101200.1239cd52@canb.auug.org.au>
-Message-ID: <542A0B4D.5060209@hisilicon.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Tue, 30 Sep 2014 02:47:53 +0100
+Subject: [PATCH 0/5] m25p80,spi-nor: Fix module aliases for m25p80;
+ clean up chip identification
+In-Reply-To: <20140928220300.GB3248@norris-Latitude-E6410>
+References: <1410714624.3040.38.camel@decadent.org.uk>
+ <1410714795.3040.45.camel@decadent.org.uk>
+ <20140928220300.GB3248@norris-Latitude-E6410>
+Message-ID: <1412041673.9388.75.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, 2014-09-28 at 15:03 -0700, Brian Norris wrote:
+> On Sun, Sep 14, 2014 at 06:13:15PM +0100, Ben Hutchings wrote:
+> > On Sun, 2014-09-14 at 18:10 +0100, Ben Hutchings wrote:
+> > > The first patch in the series restores the module aliases to m25p80, but
+> > > it does so by duplicating the list of names.  This should be suitable
+> > > for stable, but it isn't viable in the longer term.
+> > > 
+> > > The following patches change the spi-nor interface so that this
+> > > duplication is no longer necessary.  This includes removing
+> > > spi_nor::read_id, but it could be re-added after this with a different
+> > > interface, e.g. returning a flash_info structure (which would need to be
+> > > defined in spi_nor.h).
+> > 
+> > Note that these patch are:
+> > - Based on your 'testing' branch
+> 
+> Which testing branch? These two are the only official
+> repos for MTD:
+> 
+>     git git://git.infradead.org/linux-mtd.git
+>     git git://git.infradead.org/l2-mtd.git
 
+You had a testing branch in
+git://git.infradead.org/users/norris/linux-mtd.git, and that included
+commit af249c3a0ca8 ('mtd: spi-nor: remove duplicated w25q128 entry')
+which this patch series depended on.
 
-On 2014/9/30 8:12, Stephen Rothwell wrote:
-> Hi all,
-> 
-> On Fri, 26 Sep 2014 11:55:39 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>
->> After merging the arm-soc tree, today's linux-next build (arm
->> multi_v7_defconfig) failed like this:
->>
->> Error: arch/arm/boot/dts/hisi-x5hd2.dtsi:374.22-23 syntax error
->> FATAL ERROR: Unable to parse input tree 
-> OK, now I get:
-> 
-> Error: /scratch/sfr/next/arch/arm/boot/dts/hisi-x5hd2.dtsi:417.21-22 syntax error
-> FATAL ERROR: Unable to parse input tree
-> Are you guys really testing this stuff? :-(
+Ben.
 
-Hi Stephen, Olof, Arnd,
+> > - Untested by me, aside from compiling and checking that m25p80 has the
+> >   expected module aliases
+> 
+> Brian
 
-Sorry for my fault and bring so much trouble to all of you.
-I sent this pull request before the clock patch set being accepted.
-And I did forget to compile the dtb. 
-But I will make sure it will *not* happen next time.
-Arnd has already helped to revert the series of this patch set in arm-soc.git:next/dt.
-
-Hi Arnd, Olof,
-
-Could you please help to revert this series of patch set in arm-soc.git:for-next?
-Thanks!
-
-Best Regards,
-Wei
- 
->> There are a series of new commits to this file today and I have no idea
->> which one caused the problem.
->>
->> I reverted:
->>
->> 610bd8722ef4	"ARM: dts: hix5hd2: add wdg node"
-> 
-> Reverted in the arm-soc tree.
-> 
->> 6868feb6dd97	"ARM: dts: hix5hd2: add gpio node"
-> 
-> Error is now:
-> 
-> Error: /scratch/sfr/next/arch/arm/boot/dts/hisi-x5hd2.dtsi:183.21-22 syntax error
-> 
->> 420a2d55f046	"ARM: dts: hix5hd2: add sata node"
-> 
-> Error: /scratch/sfr/next/arch/arm/boot/dts/hisi-x5hd2.dtsi:183.21-22 syntax error
-> 
-> 
->> f16c7fb2f3ff	"ARM: dts: hix5hd2: add usb node"
-> 
-> Error: /scratch/sfr/next/arch/arm/boot/dts/hisi-x5hd2.dtsi:183.21-22 syntax error
-> 
->> b196e1ca400d	"ARM: dts: hix5hd2: add mmc node"
-> 
-> Error: /scratch/sfr/next/arch/arm/boot/dts/hisi-x5hd2.dtsi:174.21-22 syntax error
-> 
->> de8b6054780e	"ARM: dts: hix5hd2: add gmac node"
-> 
-> no more errors.
-> 
+-- 
+Ben Hutchings
+The two most common things in the universe are hydrogen and stupidity.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/d7e348b5/attachment.sig>
