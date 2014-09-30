@@ -1,68 +1,81 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 30 Sep 2014 13:02:19 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140930080354.GI4081@lukather>
-References: <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
- <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
- <20140929134708.GB30998@ulmo> <20140929162814.GE4081@lukather>
- <20140929165842.GC5599@skynet.be> <20140929220250.GD5599@skynet.be>
- <20140930053900.GD29874@ulmo> <20140930080354.GI4081@lukather>
-Message-ID: <20140930110218.GB27560@ulmo>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Tue, 30 Sep 2014 16:47:47 +0545
+Subject: [PATCH v8 0/2] Adds PMU and S2R support for exynos5420
+Message-ID: <1412074969-12704-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 10:03:54AM +0200, Maxime Ripard wrote:
-> On Tue, Sep 30, 2014 at 07:39:02AM +0200, Thierry Reding wrote:
-> > You keep bringing up the Raspberry Pi for some reason and suggest that
-> > it is somehow inferior to sunxi. What makes you think it's less entitled
-> > to be supported on Linux than sunxi? I don't care about the Raspberry Pi
-> > and I equally don't care about sunxi. I don't own a Raspberry Pi and I
-> > don't own any Allwinner hardware. What I do care about is Linux and I
-> > want it to work well for all SoCs equally.
-> > 
-> > Perhaps if you could put aside your crusade against the Raspberry Pi for
-> > just a second you'll realize that we're all on the same team. This isn't
-> > a competition and I'm not trying to put a spoke in your wheel. On the
-> > contrary, I'm actually trying to help you.
-> 
-> We've been over this already, and I'll tell you again that you're
-> getting this wrong.
-> 
-> No platform is more entitled to get merged than another one. I do care
-> about the Allwinner SoCs, and I care just as much about the broader
-> Linux support for all the other SoCs, be it from nvidia, samsung or
-> whatever vendor you can come up with.
+Rebased on
+1] Kukjin Kim's tree, for-next branch
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+2] Pankaj Dubey's v8 PMU patchset
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg37236.html
 
-Okay, I'm glad our goals aren't that far apart then. It would be helpful
-to stop dragging the Raspberry Pi into this, though, since it isn't at
-all relevant.
+changes since v7:
+	- rebased on pankaj's latest patchset.
 
-> But you can't hide the fact that the bcm2835 still has a very limited
-> clock support, and I really don't know about its clock tree, but I
-> guess that if the times come when they add a more complete clock
-> support, they will face the same issue.
+changes since v6:
+	- rebased on 3.17.rc1.
 
-This isn't at all relevant. And that's exactly why I think it's good to
-hide all the resource management behind firmware. That way it becomes
-easy to support any SoC with any firmware.
+changes since v5:
+	- Refactored pm.c to use DT based lookup as suggested by Tomasz Figa.
 
-> If the driver would have been developped initially to create a
-> framebuffer on the Allwinner SoCs, at a time when we didn't have any
-> clock support too, calling it only usable on sunxi wouldn't have
-> shocked me tbh.
+changes since v4:
+	- Adressed comments from Tomasz figa and rebased on Pankaj Dubey's v5 PMU patchset
 
-The functionality that it provides is still very generic. And the
-firmware interface is generic too. It is this abstraction that allows
-it to be generic. You on the other hand seem to be arguing that by
-making it abstract we've made it less generic.
+changes since v3:
+Addressed the following comments from Pankaj Dubey, Bartlomiej Zolnierkiewicz,
+Tomasz Figa and Alim Akhtar:
+        - Moved EXYNOS5420_USE_STANDBY_WFI_ALL define to regs-pmu.h.
+        - Merged exynos5420_set_core_flag function into powerdown_conf.
+        - Removed XXTI_DURATION3 register setting.
+        - Updated the commit message and ordered the clock registers in clock
+          patch.
+        - Removed the code for SYS_DISP1_BLK_CFG handling.
+        - Modified SoC checks to A9 specific checks in PM code.
+        - Updated some comments in the code and added macros for register offsets.
+        - Fixed code which was changing pad retention code for older SoCs.
 
-Abstraction is about hiding details to capture commonality.
+changes since v2:
+        - Addressed comments from Tomasz figa
+        - rebased on Pankaj's V3 patchset https://lkml.org/lkml/2014/5/2/612
+        - dropped patch "ARM: dts: Add node for GPIO keys on SMDK5420",
+          will be sent separately.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/f91b4889/attachment-0001.sig>
+changes since v1:
+        - Addressed comments from Tomasz figa.
+        - restructured/consolidated as per Tomasz figa's PM consolidations for exynos
+
+Tested on Kukjin Kim's tree, for-next branch + 
+1] http://www.spinics.net/lists/linux-samsung-soc/msg33750.html
+2] https://lkml.org/lkml/2014/9/30/156
+
+on Exynos5420 based chromebook (peach-pit board)
+
+Below procedures were followed to test S2R:
+Procedure A:
+	1. make multi_v7_defconfig 
+	2  enable MCPM for 5420
+	3. enable S3C RTC
+	4. pass "no_console_suspend" in bootargs
+	5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+Procedure B:
+	1. make exynos_defconfig 
+	2  disable BL_SWITCHER
+	3. pass "no_console_suspend" in bootargs
+	4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+
+
+Abhilash Kesavan (1):
+  ARM: exynos5: Add PMU support for 5420
+
+Vikas Sajjan (1):
+  ARM: exynos5: Add Suspend-to-RAM support for 5420
+
+ arch/arm/mach-exynos/pmu.c      |  287 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/regs-pmu.h |  227 +++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/suspend.c  |  156 ++++++++++++++++++++-
+ 3 files changed, 668 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
