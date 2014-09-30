@@ -1,10 +1,10 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 30 Sep 2014 11:00:52 -0700
-Subject: [RFC PATCH 12/16] unicore32: support poweroff through poweroff
- handler call chain
+Date: Tue, 30 Sep 2014 11:00:53 -0700
+Subject: [RFC PATCH 13/16] x86: support poweroff through poweroff handler call
+ chain
 In-Reply-To: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
 References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412100056-15517-13-git-send-email-linux@roeck-us.net>
+Message-ID: <1412100056-15517-14-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,24 +12,28 @@ The kernel core now supports a poweroff handler call chain
 to remove power from the system. Call it if pm_power_off
 is set to NULL.
 
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/unicore32/kernel/process.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/x86/kernel/reboot.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
-index b008e99..421fde6 100644
---- a/arch/unicore32/kernel/process.c
-+++ b/arch/unicore32/kernel/process.c
-@@ -66,6 +66,8 @@ void machine_power_off(void)
- {
- 	if (pm_power_off)
+diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
+index 17962e6..c5514aa 100644
+--- a/arch/x86/kernel/reboot.c
++++ b/arch/x86/kernel/reboot.c
+@@ -651,6 +651,10 @@ static void native_machine_power_off(void)
+ 		if (!reboot_force)
+ 			machine_shutdown();
  		pm_power_off();
-+	else
++	} else {
++		if (!reboot_force)
++			machine_shutdown();
 +		do_kernel_poweroff();
- 	machine_halt();
- }
- 
+ 	}
+ 	/* A fallback in case there is no PM info available */
+ 	tboot_shutdown(TB_SHUTDOWN_HALT);
 -- 
 1.9.1
