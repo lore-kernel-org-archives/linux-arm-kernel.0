@@ -1,181 +1,81 @@
-From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
-Date: Tue, 30 Sep 2014 12:22:41 +0200
-Subject: [PATCH 1/6] watchdog: watchdog_dev: WATCHDOG_KEEP_ON feature
-In-Reply-To: <542A3392.8020903@roeck-us.net>
-References: <1411419350-1297-1-git-send-email-j.uzycki@elproma.com.pl>
- <5424E535.7060009@roeck-us.net> <542987F9.2080907@elproma.com.pl>
- <542A3392.8020903@roeck-us.net>
-Message-ID: <542A8471.8060401@elproma.com.pl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Sep 2014 11:23:34 +0100
+Subject: [PATCH v3 2/2] iommu/arm-smmu: add support for iova_to_phys
+ through ATS1PR
+In-Reply-To: <1411874849-343-3-git-send-email-mitchelh@codeaurora.org>
+References: <1411874849-343-1-git-send-email-mitchelh@codeaurora.org>
+ <1411874849-343-3-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140930102334.GH8075@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mitch,
 
-W dniu 2014-09-30 06:37, Guenter Roeck pisze:
-> On 09/29/2014 09:25 AM, Janusz U?ycki wrote:
->>
->>> This patch set is trying to solve four problems at once:
->>>
->>> 1) Auto-start watchdog when its driver registers
->>> 2) Keep watchdog running when its driver registers until userspace 
->>> opens it
->>> 3) Handle watchdogs which can not be stopped after being started
->>> 4) Keep watchdog running with kernel timer after it has been closed,
->>>    even if it can be stopped.
->>>
->>> The next time adds 'boot time protection', which is really another term
->>> for an initial timeout, and case 5).
->>>
->>> That is a bit too much for a single patch and, even more so, a 
->>> single flag.
->>
->> OK, but I think [PATCH 3/6] could be applied.
->> Do you agree? Should I resent it separately?
->
-> Yes, it looks ok.
+On Sun, Sep 28, 2014 at 04:27:29AM +0100, Mitchel Humpherys wrote:
+> Currently, we provide the iommu_ops.iova_to_phys service by doing a
+> table walk in software to translate IO virtual addresses to physical
+> addresses. On SMMUs that support it, it can be useful to ask the SMMU
+> itself to do the translation. This can be used to warm the TLBs for an
+> SMMU. It can also be useful for testing and hardware validation.
+> 
+> Since the address translation registers are optional on SMMUv2, only
+> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
+> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
 
-Can you apply it?
+[...]
 
->
->> I omited in the comment
->> "The patch adds suspend/resume PM support to stmp3xxx_rtc_wdt
->> watchdog driver" because the subject is almost the same.
->>
->>> Let's look at one case after another.
->>>
->>> Auto-start watchdog when its driver registers - this makes sense as a
->>> feature just by itself. A good name for its flag might be something 
->>> like
->>> WDT_AUTOSTART. A matching module parameter might also make sense.
->>>
->>> autostart:
->>>     Set to 0 to disable, -1 to enable with unlimited timeout,
->>>     or <n> for an initial timeout of <n> seconds.
->>
->> Current start(1) + keep-on(2,3,4) + boottime(5) combined. It looks OK.
->>
-> Maybe for you. For me they are different cases.
+> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+> +					dma_addr_t iova)
+> +{
+> +	struct arm_smmu_domain *smmu_domain = domain->priv;
+> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
+> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+> +	struct device *dev = smmu->dev;
+> +	void __iomem *cb_base;
+> +	u32 tmp;
+> +	u64 phys;
+> +
+> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+> +
+> +	if (smmu->version == 1) {
+> +		u32 reg = iova & ~0xFFF;
 
-They are different. I missed some words in the first sentence :)
-However autostart automatically combine them together again :)
-The problem is common timer so the patches are dependent.
-There is no reason to use more timers.
+Cosmetic comment, but hex constants are lowercase everywhere else in the
+file.
 
->
->>>
->>> This could be accompanied by a variable in watchdog_device:
->>>     int init_timeout;    /* initial timeout in seconds */
->>
->> As the module parameter, instead of "boottime" in watchdog_core?
->>
->>>
->>> An API function such as watchdog_set_autostart() with the initial 
->>> timeout
->>> as parameter would also be helpful. This function could then be used to
->>> implement 2).
->>>
->>>     if (autostart || (keep_running && this_watchdog_is_running())
->>>         watchdog_set_autostart(&wdd, autostart ? : keep_running);
->>>
->> I don't understand the difference exactly and why to check the watchdog
->> is running? This means watchdog is active or something new?
->>
->>> keep_running could then be a another module parameter with the same 
->>> meaning
->>> as autostart.
->> But autostart and keep_running aren't in conflict.
->> So I don't understand also "autostart ? : keep_running".
->>
->
-> The functionality is distinctively different.
->
-> autostart: start watchdog on module load
-> keep_running: If the watchdog is already running, keep it running. 
-> Otherwise do nothing.
->
-> Both have different use cases which should not be combined.
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+> +	} else {
+> +		u32 reg = iova & ~0xFFF;
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+> +		reg = (iova & ~0xFFF) >> 32;
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
+> +	}
+> +
+> +	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
+> +				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
+> +		dev_err(dev,
+> +			"iova to phys timed out on 0x%pa. Falling back to software table walk.\n",
+> +			&iova);
+> +		return arm_smmu_iova_to_phys_soft(domain, iova);
+> +	}
+> +
+> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
+> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
 
-according to autostart value:
--1: current "keep-on" feature
- > 0: current "boottime" feature
+The absence of locking in this function concerns me a bit. For the software
+implementation, we're just reading page tables, but here we're writing ATS
+registers and I think we need to ensure serialisation against another
+iova_to_phys on the same domain.
 
-Does watchdog_set_autostart() start/activate watchog?
-Does keep_running differ from autostart=-1 "this_watchdog_is_running()" 
-only?
-How/where is this_watchdog_is_running() implemented?
+> +	if (phys & CB_PAR_F) {
+> +		dev_err(dev, "translation fault!\n");
+> +		dev_err(dev, "PAR = 0x%llx\n", phys);
+> +	}
+> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
+> +
+> +	return phys;
 
-What type is keep_running?
-* bool
-* 0/1
-* -1/0 for watchdog_set_autostart()?
+You can return phys == 0 on failure (at least, the callers in kvm and vfio
+treat this as an error).
 
->
->>>
->>> Together this would also solve problem 5) while at the same time 
->>> keeping
->>> the use cases separate.
->>
->> It is solved by current code.
->>
->>>
->>> For 3) we really need another flag. Actually, it might be sufficient 
->>> to have
->>> watchdog drivers with this condition simply not provide a 'stop' 
->>> function.
->> or use "NOT SUPPORTED" error code in stop,
->> Stop could be called on register and new flag is set.
->>
->
-> Seems to add complexity for no real benefit. Please explain why you think
-> it is a good idea to have multiple drivers implement the same function
-> just to return an error and do nothing else,
-
-Specific driver knows if the watchdog is stoppable.
-wddev->ops->stop() is called from watchdog_dev and if the stop() returns 
-an error
-watchdog_dev prints warning. It assumes wddev->ops->stop() is always 
-implemented
-even if not supported, ie. there is no condition. So either ENOSUP can 
-be used
-or the condition for optional (not mandatory) wddev->ops->stop().
-Today a lot of drivers returns 0 only instead of ENOSUP.
-So stop() could be called before autostart() to set the flag (code 
-complexity)
-or as you wrote just use the flag directly. The last one is indeed better.
-
->
->>> If we use a flag, something like WDOG_HW_NO_WAY_OUT with matching
->>> WATCHDOG_HW_NOWAYOUT might make sense. Its functionality is slightly
->>
->> What is difference between WDOG_HW_NO_WAY_OUT
->> and WATCHDOG_HW_NOWAYOUT?
->>
-> Similar to other flags
->
-> #define WDOG_HW_NO_WAY_OUT    5
-> #define WATCHDOG_HW_NOWAYOUT    (1 << WDOG_HW_NO_WAY_OUT)
-
-oh, right
-
->
->>> different to the other conditions: It would not auto-start a watchdog,
->>> but keep it running with the internal timer when the watchdog file 
->>> is closed.
->>>
->>> As for 4), I don't really know if it makes sense to have this 
->>> functionality.
->>
->> Yes, it is rootfs specific need. Script based code runs watchdog before
->> critical function and after exit the watchdog using magic char.
->> Critical section has timeout equal watchdog timeout value.
->> The feature allow to avoid userland application for watchdog
->> and does not cost much in the kernel.
->>
-> Sorry, I can not follow your logic here. A basic userland implementation
-> doesn't cost much either, is much safer, and even init systems such as
-> systemd implement it nowadays.
-
-True but not always for embedded systems where systemd is overweight today.
-Let's notice that 4) works only if magic char is sent on exit.
-Thanks to 4) magic char works also for non-stoppable watchdogs.
-
-Janusz
+Will
