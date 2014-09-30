@@ -1,91 +1,39 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Tue, 30 Sep 2014 11:11:12 +0100
-Subject: [RFC PATCH 00/10] drivers: PL011: add SBSA subset support
-In-Reply-To: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
-References: <1411129283-17219-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20140930101112.GH3293@xora-haswell.xora.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 30 Sep 2014 12:15:59 +0200
+Subject: [GIT PULL v2 2/2] ARM: rockchip: cpufreq-cpu0 device
+In-Reply-To: <201717175.L17Ccvmpek@phil>
+References: <7172632.O1FfdvXn6k@phil> <201717175.L17Ccvmpek@phil>
+Message-ID: <1712743.HcKV7iIeyP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 01:21:13PM +0100, Andre Przywara wrote:
-> (This version has still issues, but I'd like to have feedback on
-> the general feasibility of this approach before wasting even more
-> time on debugging).
-> 
-> The ARM Server Base System Architecture[1] document describes a
-> generic UART which is a subset of the PL011 UART.
-> It lacks DMA support, baud rate control and modem status line
-> control, among other things.
-> The idea is to move the UART initialization and setup into the
-> firmware (which does this job today already) and let the kernel just
-> use the UART for sending and receiving characters.
-> 
-> This patchset is an attempt to integrate support for this UART subset
-> into the existing PL011 driver - basically by refactoring some
-> functions and providing a new uart_ops structure for it. It also has
-> a separate probe function to be not dependent on AMBA/PrimeCell.
-> Beside the obvious effect of code sharing it has the advantage of not
-> introducing another serial device prefix, so it can go with ttyAMA,
-> which seems to be pretty common.
-> 
-> There is still one issue in bringing up the UART. On the PL011 we
-> send a dummy character via the loopback facility with the FIFOs
-> disabled to get things going, but both FIFO control and loopback are
-> outside of the SBSA spec. I consider this loopback approach a kludge
-> anyway, but am struggling to find a better way of fixing this due to
-> my lack of understanding of the TTY/serial layer.
-> If someone with more wisdom could enlighten me, I would be grateful.
-> 
-This is the killer issue at the moment it seems, once we get to usespace
-the tty does not work.
+Hi Arnd, Olof,
 
-> 
-> Patch 1/10 contains a bug fix which applies to the PL011 part also,
-> it should be considered regardless of the rest of the series.
-> Patch 2-7 refactor some PL011 functions by splitting them up into
-> smaller pieces, so that most the code can be reused later by the SBSA
-> part.
-> Patch 8 and 9 introduce two new properties for the vendor structure,
-> this is for SBSA functionality which cannot be controlled by
-> separate uart_ops members only.
-> Patch 10 then finally drops in the SBSA specific code, by providing
-> a new uart_ops, vendor struct and probe function for it.
-> 
-> Please have a look and tell me whether this SBSA driver approach has
-> any future.
-> 
+this is a version 2 of the cpufreq platform-device addition, as cpufreq-cpu0
+was meanwhile renamed to cpufreq-dt, as reported by Viresh Kumar.
 
-The patch series looks reasonable to me based on my very limited
-knowledge of the tty layer and the pl011 UART.
-
-Graeme
+So please pull
 
 
-> Regards,
-> Andre
-> 
-> Andre Przywara (10):
->   drivers: PL011: avoid potential unregister_driver call
->   drivers: PL011: refactor pl011_startup()
->   drivers: PL011: refactor pl011_shutdown()
->   drivers: PL011: refactor pl011_set_termios()
->   drivers: PL011: refactor pl011_probe()
->   drivers: PL011: replace UART_MIS reading with _RIS & _IMSC
->   drivers: PL011: move cts_event workaround into separate function
->   drivers: PL011: allow avoiding UART enabling/disabling
->   drivers: PL011: allow to supply fixed option string
->   drivers: PL011: add support for the ARM SBSA generic UART
-> 
->  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    9 +
->  drivers/tty/serial/amba-pl011.c                    |  509 ++++++++++++++------
->  2 files changed, 380 insertions(+), 138 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-cpufreqdev-v2
+
+for you to fetch changes up to 3eb79a5a9d46b32f63f6b9cd86f9b2bba43e127a:
+
+  ARM: rockchip: honor renaming of cpufreq-cpu0 to cpufreq-dt (2014-09-30 10:33:27 +0200)
+
+----------------------------------------------------------------
+Add cpufreq-dt platform device for cpu frequency scaling.
+
+----------------------------------------------------------------
+Heiko Stuebner (2):
+      ARM: rockchip: add a cpufreq-cpu0 device
+      ARM: rockchip: honor renaming of cpufreq-cpu0 to cpufreq-dt
+
+ arch/arm/mach-rockchip/rockchip.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
