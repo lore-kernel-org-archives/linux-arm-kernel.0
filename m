@@ -1,34 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 13:43:41 +0200
-Subject: [PATCH] ASoC: fsl: fix dependencies for wm8962
-Message-ID: <1950588.ErdGoiHh8p@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 30 Sep 2014 13:43:45 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140930045957.GA29874@ulmo>
+References: <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
+ <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
+ <20140929135358.GC30998@ulmo> <20140929155718.GD4081@lukather>
+ <20140930045957.GA29874@ulmo>
+Message-ID: <542A9771.2030401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wm8962 driver uses the input subsystem, but is selected by
-SND_SOC_FSL_ASOC_CARD, which can be built with CONFIG_INPUT disabled,
-resulting in this link error:
+Hi,
 
-ERROR: "input_event" [sound/soc/codecs/snd-soc-wm8962.ko] undefined!
-ERROR: "input_register_device" [sound/soc/codecs/snd-soc-wm8962.ko] undefined!
-ERROR: "devm_input_allocate_device" [sound/soc/codecs/snd-soc-wm8962.ko] undefined!
+On 09/30/2014 06:59 AM, Thierry Reding wrote:
+> On Mon, Sep 29, 2014 at 05:57:18PM +0200, Maxime Ripard wrote:
 
-This adds an explicit Kconfig dependency to prevent this configuration
-from being used.
+<snip>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 708b4351f08 ("ASoC: fsl: Add Freescale Generic ASoC Sound Card with ASRC support")
+>> But sure, you can still try to point new issues, get an obvious and
+>> robust solution, and then discard the issue when the solution doesn't
+>> go your way...
+> 
+> And you've already proven that you're completely unwilling to even
+> consider any other solution than what was originally proposed, so I
+> really don't see how discussing this further with you is going to be
+> productive.
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index 6164e78b466a..99e9386f7956 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -282,7 +282,7 @@ config SND_SOC_IMX_MC13783
- 
- config SND_SOC_FSL_ASOC_CARD
- 	tristate "Generic ASoC Sound Card with ASRC support"
--	depends on OF && I2C
-+	depends on OF && I2C && INPUT
- 	select SND_SOC_IMX_AUDMUX
- 	select SND_SOC_IMX_PCM_DMA
- 	select SND_SOC_FSL_ESAI
+That is not true, we have seriously considered various other alternatives,
+as you know since you've participated in the discussion about them.
+
+And we've found them all lacking, mostly because they are 10 times as
+complicated.
+
+You've made your point that you don't like this solution quite loudly
+already, and we've all heard you. However you seem to be mostly alone in
+this. Even the clk maintainer has said that what we want to do is
+exactly how clocks are supposed to be used in dt.
+
+If you don't like this no-one is forcing you to use the clocks property
+in your own code. If it is not there, simplefb will behave exactly as
+before.
+
+Now since you're the only one very vocally against this, and a lot
+of people are in favor of this and have a need for this, can we
+please just get this merged and get this over with ?
+
+Regards,
+
+Hans
