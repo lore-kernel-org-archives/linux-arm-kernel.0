@@ -1,185 +1,132 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 30 Sep 2014 16:48:56 +0100
-Subject: [PATCH v2 1/4] ARM: dts: apq8064: add RPM regulators support
-In-Reply-To: <20140930151437.GM28481@sonymobile.com>
-References: <1412086159-20894-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1412086188-20940-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20140930151437.GM28481@sonymobile.com>
-Message-ID: <542AD0E8.5030605@linaro.org>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 30 Sep 2014 09:41:42 -0600
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <5429E8D6.6080101@codeaurora.org>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <5429E8D6.6080101@codeaurora.org>
+Message-ID: <20140930154142.GA528@ilina-mac.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 29 2014 at 17:18 -0600, Stephen Boyd wrote:
+>On 09/26/14 17:58, Lina Iyer wrote:
+>> diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
+>> new file mode 100644
+>> index 0000000..2fcf79a
+>> --- /dev/null
+>> +++ b/drivers/cpuidle/cpuidle-qcom.c
+>> @@ -0,0 +1,89 @@
+>> +/*
+>> + * Copyright (c) 2014, Linaro Limited.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + */
+>> +
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#include <soc/qcom/pm.h>
+>> +#include "dt_idle_states.h"
+>> +
+>> +static void (*qcom_idle_enter)(enum pm_sleep_mode);
+>> +
+>> +static int qcom_lpm_enter_wfi(struct cpuidle_device *dev,
+>> +				struct cpuidle_driver *drv, int index)
+>> +{
+>> +	qcom_idle_enter(PM_SLEEP_MODE_WFI);
+>
+>Why can't we just pass index here? It would be nice to not need to
+>include soc/qcom/pm.h in this file.
+>
 
+This is the right place, the translation of QCOM's idle states is done
+while registering and needs to be translated back to QCOM's idle states.
+The interpretation of idle state bindings to the QCOM is hence
+contained in one place.
 
-On 30/09/14 16:14, Bjorn Andersson wrote:
-> On Tue 30 Sep 07:09 PDT 2014, Srinivas Kandagatla wrote:
+>> +
+>> +	return index;
+>> +}
+>> +
+>> +static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
+>> +				struct cpuidle_driver *drv, int index)
+>> +{
+>> +	cpu_pm_enter();
+>> +	qcom_idle_enter(PM_SLEEP_MODE_SPC);
+>> +	cpu_pm_exit();
+>> +
+>> +	return index;
+>> +}
+>> +
+>> +static struct cpuidle_driver qcom_cpuidle_driver = {
+>> +	.name	= "qcom_cpuidle",
+>> +	.owner	= THIS_MODULE,
+>> +};
+>> +
+>> +static const struct of_device_id qcom_idle_state_match[] __initconst = {
+>> +	{ .compatible = "qcom,idle-state-wfi", .data = qcom_lpm_enter_wfi },
+>> +	{ .compatible = "qcom,idle-state-spc", .data = qcom_lpm_enter_spc },
+>> +	{ },
+>> +};
+>> +
+>> +static int qcom_cpuidle_probe(struct platform_device *pdev)
+>> +{
+>> +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+>> +	int ret;
+>> +
+>> +	qcom_idle_enter = (void *)(pdev->dev.platform_data);
+>> +	if (!qcom_idle_enter)
+>> +		return -EFAULT;
 >
->> This patch adds rpm node to apq8064 dt as rpm would be used by other
->> devices for regulator support. Also adds all the regulators in the rpm.
->>
+>Error code looks a little wrong. -ENODEV?
 >
-> Some comments on the compatibles, based on rpm-regulator-8960 msm-3.4.
->
-Thanks for the review. I kind of grabbed a table from datasheet, 
-obviously my interpretation of some of them are wrong. I should have 
-looked at rpm-regulator-8960.c.
+The dev is there, not just the expected platform data.
+I can change.
 
-I will fix them in next version.
+>> +
+>> +	 /* Probe for other states including platform WFI */
+>> +	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
+>> +	if (ret <= 0) {
+>> +		pr_err("%s: No cpuidle state found.\n", __func__);
+>
+>This would be true if ret == 0, but if it's < 0 that isn't true. Drop
+>the print?
+>
+Okay
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = cpuidle_register(drv, NULL);
+>> +	if (ret) {
+>> +		pr_err("%s: failed to register cpuidle driver\n", __func__);
+>
+>This seems redundant given that cpuidle_register() already prints an
+>error when it fails.
+>
 
-> After giving this some more thought I think it would be good to defer the
-> voltage definition to the dts files, at least for the ldos (as these are being
-> re-purposed).
+>> +		return ret;
+>> +	}
+>> +
+>> +	return 0;
 >
-I agree with you.
-> That way the dts implementor will be the one frying their components and not us
-> because some default value kicking in because someone miss-spelled or forgot to
-> override a certain voltage.
+>Could just be return cpuidle_register(drv, NULL);
 >
-Yes.. I had the same feeling when I started adding this.. But I wanted 
-to send it for review and see.
+Sure.
 
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   arch/arm/boot/dts/qcom-apq8064.dtsi | 297 ++++++++++++++++++++++++++++++++++++
->>   1 file changed, 297 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>-- 
+>Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>hosted by The Linux Foundation
 >
-> [..]
->
->> +			pm8921_s5: pm8921-s5 {
->> +				compatible		= "qcom,rpm-pm8921-smps";
->
-> qcom,rpm-pm8921-ftsmps
->
->> +				reg			= <QCOM_RPM_PM8921_SMPS5>;
->> +				regulator-min-microvolt	= < 850000>;
->> +				regulator-max-microvolt	= <1300000>;
->> +			};
->> +
->> +			pm8921_s6: pm8921-s6 {
->> +				compatible		= "qcom,rpm-pm8921-smps";
->
-> qcom,rpm-pm8921-ftsmps
->
->> +				reg			= <QCOM_RPM_PM8921_SMPS6>;
->> +				regulator-min-microvolt	= < 850000>;
->> +				regulator-max-microvolt	= <1300000>;
->> +			};
->> +
->> +			pm8921_s7: pm8921-s7 {
->> +				compatible		= "qcom,rpm-pm8921-smps";
->> +				reg			= <QCOM_RPM_PM8921_SMPS7>;
->> +				regulator-min-microvolt	= < 500000>;
->> +				regulator-max-microvolt	= <1350000>;
->> +			};
->> +
->> +			pm8921_s8: pm8921-s8 {
->> +				compatible		= "qcom,rpm-pm8921-smps";
->> +				reg			= <QCOM_RPM_PM8921_SMPS8>;
->> +				regulator-min-microvolt	= <1500000>;
->> +				regulator-max-microvolt	= <2350000>;
->> +			};
->> +
->> +			/* PMOS LDO */
->> +			pm8921_l1: pm8921-l1 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo
->
->> +				reg			= <QCOM_RPM_PM8921_LDO1>;
->> +				regulator-min-microvolt	= <1000000>;
->> +				regulator-max-microvolt	= <1450000>;
->> +			};
->> +
->> +			pm8921_l2: pm8921-l2 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo
->
->> +				reg			= <QCOM_RPM_PM8921_LDO2>;
->> +				regulator-min-microvolt	= <1200000>;
->> +				regulator-max-microvolt	= <1200000>;
->> +			};
->> +
->
-> [..]
->
->> +
->> +			pm8921_l24: pm8921-l24 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo1200
->
->> +				reg			= <QCOM_RPM_PM8921_LDO24>;
->> +				regulator-min-microvolt = <0750000>;
->> +				regulator-max-microvolt = <1250000>;
->> +			};
->> +
->> +			pm8921_l25: pm8921-l25 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo1200
->
->> +				reg			= <QCOM_RPM_PM8921_LDO25>;
->> +				regulator-min-microvolt = <0750000>;
->> +				regulator-max-microvolt = <1250000>;
->> +			};
->> +
->> +			pm8921_l26: pm8921-l26 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo1200
->
->> +				reg			= <QCOM_RPM_PM8921_LDO26>;
->> +				regulator-min-microvolt = <0750000>;
->> +				regulator-max-microvolt = <1250000>;
->> +			};
->> +
->> +			pm8921_l27: pm8921-l27 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo1200
->
->> +				reg			= <QCOM_RPM_PM8921_LDO27>;
->> +				regulator-min-microvolt = <0750000>;
->> +				regulator-max-microvolt = <1250000>;
->> +			};
->> +
->> +			pm8921_l28: pm8921-l28 {
->> +				compatible		= "qcom,rpm-pm8921-pldo";
->
-> qcom,rpm-pm8921-nldo1200
->
->> +				reg			= <QCOM_RPM_PM8921_LDO28>;
->> +				regulator-min-microvolt = <0750000>;
->> +				regulator-max-microvolt = <1500000>;
->> +			};
->> +
->
-> [..]
->
->> +
->
-> 			pm8921_usb_switch: pm8921-usb-switch {
-> 				compatible = "qcom,rpm-pm8921-switch";
-> 				reg = <QCOM_RPM_USB_OTG_SWITCH>;
-> 			};
->
-> 			pm8921_hdmi_switch: pm8921-hdmi-switch {
-> 				compatible = "qcom,rpm-pm8921-switch";
-> 				reg = <QCOM_RPM_HDMI_SWITCH>;
-> 			};
->
-> 			pm8921_ncp: pm8921-ncp {
-> 				compatible = "qcom,rpm-pm8921-ncp";
-> 				reg = <QCOM_RPM_PM8921_NCP>;
-> 			};
->> +		};
->> +
->>   		/* Temporary fixed regulator */
->>   		vsdcc_fixed: vsdcc-regulator {
->>   			compatible = "regulator-fixed";
->> --
->> 1.9.1
->>
