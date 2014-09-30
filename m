@@ -1,7 +1,7 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Sep 2014 09:15:05 +0200
+Date: Tue, 30 Sep 2014 09:15:28 +0200
 Subject: [PATCH] pinctrl: alter device tree bindings for functions
-Message-ID: <1412061305-20902-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1412061328-20966-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
