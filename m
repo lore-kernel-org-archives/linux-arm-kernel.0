@@ -1,83 +1,49 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 30 Sep 2014 16:55:48 -0500
-Subject: [RFC 1/7] soc: qcom: Add device tree binding for SMEM
-In-Reply-To: <1412037291-16880-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1412037291-16880-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <542B26E4.2000708@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Sep 2014 15:10:07 -0700
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <87iok4bwcj.fsf@free.fr>
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <1465795.XsPpj3dZHX@wuerfel> <87d2bq43pc.fsf@free.fr>
+ <201408241408.19861.arnd@arndb.de>
+ <20140903184956.11368.47800@quantum> <874mw2xoau.fsf@free.fr>
+ <20140930195257.19023.57219@quantum> <87iok4bwcj.fsf@free.fr>
+Message-ID: <CAPtuhTjai9=jXCu_b6PPPxzDBuv07qNuVoW_iiP_o8f=LPyiMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Tue, Sep 30, 2014 at 3:02 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Mike Turquette <mturquette@linaro.org> writes:
+>
+>> Quoting Robert Jarzmik (2014-09-20 09:13:45)
+>> Hi Robert,
+>>
+>> Tomeu's stuff won't go into 3.18. I should have circled back to these
+>> patches when that become apparent, but it got lost in the paperwork.
+>>
+>> I can take these patches without you rebasing onto his work. Since we
+>> have -rc7 I think there is time and these patches shouldn't wait for
+>> another merge window. I've applied them to clk-next from a stable branch
+>> with these six patches based on -rc1.
+>
+> Thanks Mike, that's perfect. These patches are my corner stone to unblock the
+> pxa device-tree port (at least on pxa27x).
+>
+> There will be at least 1 corrective patch for init ordering (clocks must be
+> initialized before the clocksource). But I believe it will go during the
+> 3.18-rcs. I'll post the patch tomorrow for it to gather enough acks.
+>
+> And I have also a patch for Tomeu's change. It's really small, so I'll post it
+> too, but not for submission, just to have it reviewed when the API change will
+> be ready.
 
-On 09/29/2014 07:34 PM, Bjorn Andersson wrote:
-> Add device tree binding documentation for the Qualcom Shared Memory
-> manager.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
-> 
-> Exposed by this node is a set of items of different sizes. For many things a
-> standard of_xlate method of referencing the individual nodes would be
-> preferable, so a #something-cells would make sense. We do however also needs
-> access to these items without explicitly stating the references in devicetree
-> (e.g. SMD references 257 of these). I haven't found any good example of how to
-> implement this, so suggestions are welcome.
-> 
-> Note that the hwspinlock reference is not yet supported in the mainline, but
-> this will likely need a few iterations so I wanted to get this out.
-> 
->  .../devicetree/bindings/soc/qcom/qcom,smem.txt     |   34 ++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
-> new file mode 100644
-> index 0000000..ddd58c7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
-> @@ -0,0 +1,34 @@
-> +Qualcomm Shared Memory binding
-> +
-> +This binding describes the Qualcomm Shared Memory, used to share data between
-> +various subsystems and OSes in Qualcomm platforms.
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be:
-> +		    "qcom,smem"
-> +
-> +- reg:
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: base address and size pair for each area representing the
-> +		    shared memory. The first pair will must represent the "main"
-> +		    area, where the shared memory header and table-of-content
-> +		    can be found.
-> +
-> +- hwspinlocks:
+OK, that sounds great. Please note that the 01.org builder found a
+problem with the Kconfig bits. Can you look into it?
 
-The property name to use should be "hwlocks" and not "hwspinlocks". This
-is what the hwspinlock driver core expects from client users.
+Thanks,
+Mike
 
-regards
-Suman
-
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: reference to a hwspinlock used to protect allocations from
-> +		    the shared memory
-> +
-> += EXAMPLE
-> +
-> +        smem: smem at fa00000 {
-> +                compatible = "qcom,smem";
-> +                reg = <0x0fa00000 0x200000>,
-> +                      <0xfc428000 0x4000>;
-> +
-> +                hwspinlocks = <&tcsr_mutex 3>;
-
-
-> +        };
-> 
+>
+> Thanks.
+>
+> --
+> Robert
