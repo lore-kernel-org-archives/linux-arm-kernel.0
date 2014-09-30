@@ -1,34 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 Sep 2014 20:37:31 +0200
-Subject: Differences between tlv320aic3x and tlv320aic31xx
-Message-ID: <20140930183731.GC3907@piout.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 30 Sep 2014 11:41:19 -0700
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <alpine.LFD.2.11.1409301428020.5311@knanqh.ubzr> (Nicolas Pitre's
+ message of "Tue, 30 Sep 2014 14:30:07 -0400 (EDT)")
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
+ <7hmw9hypj9.fsf@deeprootsystems.com>
+ <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
+ <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
+ <alpine.LFD.2.11.1409301428020.5311@knanqh.ubzr>
+Message-ID: <7h8ul1x86o.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Nicolas Pitre <nicolas.pitre@linaro.org> writes:
 
-I'm trying to add support for the tlv320aic3104a present on a
-custom board using an am335x.
+> On Tue, 30 Sep 2014, Kevin Hilman wrote:
+>
+>> On Tue, Sep 30, 2014 at 10:51 AM, Nicolas Pitre
+>> <nicolas.pitre@linaro.org> wrote:
+>> > On Tue, 30 Sep 2014, Kevin Hilman wrote:
+>> >
+>> >> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-I see that Benoit seemed to have been successful when using the
-tlv320aic3x driver with minor modifications.
-http://mailman.alsa-project.org/pipermail/alsa-devel/2013-January/058966.html
+[...]
 
-On the other hand, in the past, I've used a tlv320aic3100 with the
-tlv320aic31xx driver.
+>> >> > This may be misleading. Call it PlatformWFI or something like that, not WFI if
+>> >> > that's not what it is.
+>> >>
+>> >> This gets at a little pet peeve of mine:
+>> >>
+>> >> IMO, naming any state with "WFI" is a bit confusing, because typically
+>> >> *every* idle state is entered by one (or more) CPU executing WFI, no?
+>> >
+>> > Agreed.
+>> >
+>> > The only state called "WFI" should be the one that only executes the WFI
+>> > instruction without any other hardware setup around it.
+>> 
+>> Well, I would go even further in that none of the states should be
+>> called WFI, because WFI is used to enter all of them.
+>
+> Fair enough.
+>
+> So let's fix this by finding a name for that state that consists of only 
+> executing WFI and that every SOC has.
+>
+> Suggestions?
 
-My plan for now is to use the tlv320aic3x driver with snd-soc-evm as
-this is the one it is using (it is using .codec_dai_name =
-"tlv320aic3x-hifi").
+The DT idle-states binding doc (though seemingly written more with
+arm64 and SBSA in mind) uses "standby" for the shallowest idle.
 
-I had no luck until now but I still have to review my pinmuxing. But
-before I investigate to much, can you confirm what codecs are supported
-by which driver? I'm pretty sure that would be a nice addition to the
-documentation too.
-
-Thanks,
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kevin
