@@ -1,70 +1,95 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 30 Sep 2014 14:44:04 +0530
-Subject: [PATCH 1/6] pci,
- thunder: Add support for Thunder PCIe host controller
-In-Reply-To: <20140924164946.GI16244@arm.com>
-References: <1411573068-12952-1-git-send-email-rric@kernel.org>
- <1411573068-12952-2-git-send-email-rric@kernel.org>
- <27476217.5ToIFGoMDz@wuerfel> <20140924164946.GI16244@arm.com>
-Message-ID: <CA+sq2CdUW2qr1wD2aF4QU+R0-V_A5+aMHPT+Opo0hA4D5a_QtA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 11:18:30 +0200
+Subject: [PATCH v4] PCI: Layerscape: Add Layerscape PCIe driver
+In-Reply-To: <1411888107-27640-1-git-send-email-Minghuan.Lian@freescale.com>
+References: <1411888107-27640-1-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <8584310.bgN0fYJaqP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will/Arnd
+On Sunday 28 September 2014 15:08:27 Minghuan Lian wrote:
+> Add support for Freescale Layerscape PCIe controller. This driver
+> re-uses the designware core code.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
 
-Thanks for the comments.
-There is another patch submitted for adding MSI controller to Generic driver.
-https://lkml.org/lkml/2014/9/28/150
+I'm still not too happy about the MSI handling here. I think you
+really need to have a separate driver for the msi controller.
 
-Will go through these and comeback.
+> +/* SCFG MSI register */
+> +#define SCFG_SPIMSICR		0x40
+> +#define SCFG_SPIMSICLRCR	0x90
+> +
+> +#define MSI_LS1021A_ADDR		0x1570040
+> +#define MSI_LS1021A_DATA(pex_idx)	(0xb3 + pex_idx)
 
-On Wed, Sep 24, 2014 at 10:19 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 24, 2014 at 05:12:26PM +0100, Arnd Bergmann wrote:
->> On Wednesday 24 September 2014 17:37:43 Robert Richter wrote:
->> > From: Sunil Goutham <sgoutham@cavium.com>
->> >
->> > This patch adds support for PCI host controller of Cavium Thunder
->> > SoCs.
->>
->> I had expected this hardware to be SBSA compliant. Why do you need
->> a hardware specific driver, is this a workaround for buggy hardware
->> or just noncompliant?
->
-> Patches welcome to pci-host-generic.c :) Lorenzo already has code to port
-> it to Liviu's new API, so do shout if it's not suitable for your needs.
->
->> > +static int thunder_pcie_msi_enable(struct thunder_pcie *pcie,
->> > +                                   struct pci_bus *bus)
->> > +{
->> > +   struct device_node *msi_node;
->> > +
->> > +   msi_node = of_parse_phandle(pcie->node, "msi-parent", 0);
->> > +   if (!msi_node)
->> > +           return -ENODEV;
->> > +
->> > +   pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
->> > +   if (!pcie->msi)
->> > +           return -ENODEV;
->> > +
->> > +   pcie->msi->dev = pcie->dev;
->> > +   bus->msi = pcie->msi;
->> > +
->> > +   return 0;
->> > +}
->>
->> This is probably something we should add to the generic host driver as well,
->> so it can work with SBSA compliant implementations that come with an MSI
->> controller. Maybe move it into common code so it can be shared with that
->> driver.
->
-> Agreed. I've been carrying something similar [1] (based on a hacked-up version
-> of bios32, so not bothered to post it) whilst I've been waiting for the
-> arm64 core PCI code to get merged.
->
-> Will
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/drivers/pci/host/pci-host-generic.c?h=iommu/pci&id=b719acf062ceccfbd79ee7b1ae0b7904ea4da27e
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>From what I can tell, the 'scfg' registers are mostly for MSI, and
+the MSI_LS1021A_ADDR that you have hardcoded here is actually part of
+the scfg area itself. You should never hardwire that in a PCI host
+driver.
+
+Please make a separate MSI driver instead and use the 'msi-parent'
+property.
+
+> +static u32 ls_pcie_get_msi_addr(struct pcie_port *pp)
+> +{
+> +	return MSI_LS1021A_ADDR;
+> +}
+> +
+> +static u32 ls_pcie_get_msi_data(struct pcie_port *pp, int pos)
+> +{
+> +	struct ls_pcie *pcie = to_ls_pcie(pp);
+> +
+> +	return MSI_LS1021A_DATA(pcie->index);
+> +}
+
+Does this mean you can have only one device on this PCI host that
+uses MSI?
+
+> +static irqreturn_t ls_pcie_msi_irq_handler(int irq, void *data)
+> +{
+> +	struct pcie_port *pp = data;
+> +	struct ls_pcie *pcie = to_ls_pcie(pp);
+> +	unsigned int msi_irq;
+> +
+> +	/* clear the interrupt */
+> +	regmap_write(pcie->scfg, SCFG_SPIMSICLRCR,
+> +		     MSI_LS1021A_DATA(pcie->index));
+> +
+> +	msi_irq = irq_find_mapping(pp->irq_domain, 0);
+> +	if (!msi_irq) {
+> +		/*
+> +		 * that's weird who triggered this?
+> +		 * just clear it
+> +		 */
+> +		dev_err(pcie->dev, "unexpected MSI\n");
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	generic_handle_irq(msi_irq);
+> +	return IRQ_HANDLED;
+> +}
+
+Since you have only one addr/data value per host controller, does that mean
+that you can have only one device on this host that uses one interrupt?
+
+How do you ensure that the second user that tries to call pci_enable_msi
+gets an error? Is there only one internal device attached to the host?
+
+> +	if (of_device_is_compatible(pcie->dev->of_node, "fsl,ls1021a-pcie")) {
+> +		/*
+> +		 * LS1021A Workaround for internal TKT228622
+> +		 * to fix the INTx hang issue
+> +		 */
+> +		val = ioread32(pcie->dbi + PCIE_STRFMR1);
+> +		val &= 0xffff;
+> +		iowrite32(val, pcie->dbi + PCIE_STRFMR1);
+> +
+> +		ls1021a_pcie_msi_fixup(pp);
+> +	}
+> +}
+
+"fsl,ls1021a-pcie" is the only one supported by this driver, so the
+check is useless.
+
+	Arnd
