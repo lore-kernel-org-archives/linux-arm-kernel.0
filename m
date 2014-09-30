@@ -1,45 +1,35 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 30 Sep 2014 16:42:02 +0100
-Subject: [PATCH] of/pci: add pci_pio_to_address dummy for !CONFIG_OF
-In-Reply-To: <2033939.5UfzeSiRKs@wuerfel>
-References: <706416181.hbVGLDA3o6@wuerfel>
- <20140930144506.GQ841@e106497-lin.cambridge.arm.com>
- <2033939.5UfzeSiRKs@wuerfel>
-Message-ID: <20140930154201.GR841@e106497-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Sep 2014 17:40:43 +0200
+Subject: [PATCH v2 1/7] clk: sunxi: Specify number of child clocks for
+ divs clocks
+In-Reply-To: <1411807795-6575-2-git-send-email-wens@csie.org>
+References: <1411807795-6575-1-git-send-email-wens@csie.org>
+ <1411807795-6575-2-git-send-email-wens@csie.org>
+Message-ID: <20140930154043.GN4081@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 04:15:19PM +0100, Arnd Bergmann wrote:
-> On Tuesday 30 September 2014 15:45:06 Liviu Dudau wrote:
-> > 
-> > Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > Is that triggered by shmobile_defconfig?
-> > 
-> > 
+On Sat, Sep 27, 2014 at 04:49:49PM +0800, Chen-Yu Tsai wrote:
+> Currently sunxi_divs_clk_setup assumes the number of child clocks
+> to be the same as the number of clock-output-names, and a maximum
+> of SUNXI_DIVS_MAX_QTY child clocks.
 > 
-> No, I only found it using randconfig testing, shmobile enables CONFIG_OF by
-> default.
+> On sun6i, PLL6 only has 1 child clock, but the parent would be used
+> as well, thereby also having it's own clock-output-names entry. This
+> results in an extra bogus clock being registered.
 
-Hmm, I was looking at who defines CONFIG_PCI_RCAR_GEN2_PCIE and it's only
-present in shmobile_defconfig, but that one does not select any OF options (other
-than CONFIG_ARM_APPENDED_DTB). So there is no way of triggering this other
-than by randconfig?
+Isn't PLL6 having two childs as well?
 
-Best regards,
-Liviu
-
-> 
-> 	Arnd
-> 
-> 
+Maxime
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/54912c5c/attachment.sig>
