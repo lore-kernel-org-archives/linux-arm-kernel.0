@@ -1,55 +1,37 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 30 Sep 2014 11:41:19 -0700
-Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <alpine.LFD.2.11.1409301428020.5311@knanqh.ubzr> (Nicolas Pitre's
- message of "Tue, 30 Sep 2014 14:30:07 -0400 (EDT)")
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
- <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
- <7hmw9hypj9.fsf@deeprootsystems.com>
- <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
- <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
- <alpine.LFD.2.11.1409301428020.5311@knanqh.ubzr>
-Message-ID: <7h8ul1x86o.fsf@deeprootsystems.com>
+Date: Tue, 30 Sep 2014 11:45:52 -0700
+Subject: [PATCH v2 0/4] ARM: dts: apq8064 DT patches
+In-Reply-To: <1412086159-20894-1-git-send-email-srinivas.kandagatla@linaro.org>
+ (Srinivas Kandagatla's message of "Tue, 30 Sep 2014 15:09:19 +0100")
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1412086159-20894-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <7hvbo5vten.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nicolas.pitre@linaro.org> writes:
+Srinivas Kandagatla <srinivas.kandagatla@linaro.org> writes:
 
-> On Tue, 30 Sep 2014, Kevin Hilman wrote:
+> These patches adds dt nodes for RPM, USB and SATA IPs found in APQ8064.
+> All the driver support for these IPs are already available in v3.17, except
+> the RPM driver which is now accepted by Lee and Mark.
 >
->> On Tue, Sep 30, 2014 at 10:51 AM, Nicolas Pitre
->> <nicolas.pitre@linaro.org> wrote:
->> > On Tue, 30 Sep 2014, Kevin Hilman wrote:
->> >
->> >> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> These patches depend on the header file from 
+> http://www.spinics.net/lists/arm-kernel/msg364310.html
+> for regulators.
+>
+> Now that the RPM patch is accepted, should RPM patch go via arm-soc tree?
+> so that we can get more functionality on IFC6410 board in v3.18 mainline.
+>
+> All these patches are tested on IFC6410 board.
+> Am hoping to get these patches for v3.18, as these patches were sitting in
+> my dev tree since last 3 merge windows.
 
-[...]
+A nit on process, for future reference:
 
->> >> > This may be misleading. Call it PlatformWFI or something like that, not WFI if
->> >> > that's not what it is.
->> >>
->> >> This gets at a little pet peeve of mine:
->> >>
->> >> IMO, naming any state with "WFI" is a bit confusing, because typically
->> >> *every* idle state is entered by one (or more) CPU executing WFI, no?
->> >
->> > Agreed.
->> >
->> > The only state called "WFI" should be the one that only executes the WFI
->> > instruction without any other hardware setup around it.
->> 
->> Well, I would go even further in that none of the states should be
->> called WFI, because WFI is used to enter all of them.
->
-> Fair enough.
->
-> So let's fix this by finding a name for that state that consists of only 
-> executing WFI and that every SOC has.
->
-> Suggestions?
+You only need to send to arm at kernel.org if you're expecting the arm-soc
+maintainers to directly apply the patches or pull request.
 
-The DT idle-states binding doc (though seemingly written more with
-arm64 and SBSA in mind) uses "standby" for the shallowest idle.
+In this case, it seems like stuff that the qcom maintainers will queue
+up in their DT branch, and then submit to arm-soc maintainers.
 
 Kevin
