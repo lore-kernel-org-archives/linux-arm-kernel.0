@@ -1,39 +1,44 @@
 From: ben@decadent.org.uk (Ben Hutchings)
-Date: Tue, 30 Sep 2014 12:36:03 +0100
-Subject: [PATCH v2 5/5] m25p80,spi-nor: Share the list of supported chip
- type names again
-In-Reply-To: <CACna6ry3=+1GLRCvd_xOGBHjQmEGdYT-eM4YFfzO2Fkw9BHSTA@mail.gmail.com>
+Date: Tue, 30 Sep 2014 12:38:08 +0100
+Subject: [PATCH v2 3/5] spi-nor: Make spi_nor_scan() take a chip type
+ name, not an spi_device_id
+In-Reply-To: <CACna6ryNp7+4y7oSs60atDZhUwFhiAyV4Oq5ELi1gyen45zhVw@mail.gmail.com>
 References: <1412043222.9388.81.camel@decadent.org.uk>
- <1412043352.9388.86.camel@decadent.org.uk>
- <CACna6ry3=+1GLRCvd_xOGBHjQmEGdYT-eM4YFfzO2Fkw9BHSTA@mail.gmail.com>
-Message-ID: <1412076963.9388.96.camel@decadent.org.uk>
+ <1412043317.9388.84.camel@decadent.org.uk>
+ <CACna6ryNp7+4y7oSs60atDZhUwFhiAyV4Oq5ELi1gyen45zhVw@mail.gmail.com>
+Message-ID: <1412077088.9388.98.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-09-30 at 10:02 +0200, Rafa? Mi?ecki wrote:
+On Tue, 2014-09-30 at 07:14 +0200, Rafa? Mi?ecki wrote:
 > On 30 September 2014 04:15, Ben Hutchings <ben@decadent.org.uk> wrote:
-> > Move the list of chip type information to a macro in spi-nor.h, but
-> > leave the definitions of INFO and CAT25_INFO in spi-nor.
+> > @@ -236,16 +236,13 @@ static int m25p_probe(struct spi_device *spi)
+> >          * If that's the case, respect "type" and ignore a "name".
+> >          */
+> >         if (data && data->type)
+> > -               id = spi_nor_match_id(data->type);
+> > +               name = data->type;
 > >
-> > In m25p80, define the INFO and CAT25_INFO macros to initialise a
-> > struct spi_device_id with the name, ignoring the remaining parameters.
+> >         /* If we didn't get name from platform, simply use "modalias". */
+> > -       if (!id) {
+> > -               id = spi_nor_match_id(spi_get_device_id(spi)->name);
+> > -               if (WARN_ON(!id))
+> > -                       return -ENODEV;
+> > -       }
+> > +       if (!name)
+> > +               name = spi_get_device_id(spi)->name;
 > 
-> Anyone would consider my idea proposed in 1/5 thread?
-> 
-> We could simply follow the way Linux-specific platform data works. We
-> could always use
-> compatible = "m25p80";
-> and then for some rare cases (where JEDEC fails) add something like
-> model = "at25df321a";
-> 
-> Using above way we could use a one single "compatible" in m25p80.c and
-> avoid this messy share of id_table.
+> Huh? Iterating the whole id_table, checking the entries (looking for
+> one with name equal to the spi->modalias) and then... getting that
+> name?
 
-You *cannot* define a DT compatible string by reference to out-of-band
-information about all the chips that has to be updated for each new
-chip.
+Ah, I didn't realise what spi_get_device_id() was doing.
 
-That is not 'compatible'.
+> Did it hurt to use the patch I've sent
+> mtd: m25p80: get rid of spi_get_device_id
+> https://patchwork.ozlabs.org/patch/394328/
+
+It would make sense to insert that before this.
 
 Ben.
 
@@ -46,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 811 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/63ecbf08/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/a819adbf/attachment.sig>
