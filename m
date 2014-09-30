@@ -1,86 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 14:31:44 +0200
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20140930120344.GA14215@e102568-lin.cambridge.arm.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <8631927.qWHZsjCs8e@wuerfel>
- <20140930120344.GA14215@e102568-lin.cambridge.arm.com>
-Message-ID: <3090148.OUdB0fsdsR@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 30 Sep 2014 14:33:58 +0200
+Subject: [PATCH 3/3] irqchip: dw-apb-ictl: add PM support
+In-Reply-To: <1411454100-6814-4-git-send-email-jszhang@marvell.com>
+References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
+ <1411454100-6814-4-git-send-email-jszhang@marvell.com>
+Message-ID: <542AA336.6070206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 13:03:44 Lorenzo Pieralisi wrote:
-> > >  static int gen_pci_probe(struct platform_device *pdev)
-> > >  {
-> > > @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> > >         struct device *dev = &pdev->dev;
-> > >         struct device_node *np = dev->of_node;
-> > >         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > > +#ifndef CONFIG_ARM64
-> > >         struct hw_pci hw = {
-> > >                 .nr_controllers = 1,
-> > >                 .private_data   = (void **)&pci,
-> > > @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> > >                 .map_irq        = of_irq_parse_and_map_pci,
-> > >                 .ops            = &gen_pci_ops,
-> > >         };
-> > > +#endif
-> > >  
-> > 
-> > Same here, I'd suggest marking this "#ifdef CONFIG_ARM" instead, as hw_pci
-> > is an arm32 specific data structure.
-> 
-> I do not think we need hw struct at all, see below, we can write code so
-> that we do not rely on ARM32 PCI bios, I will have a stab at that and
-> post the resulting code.
+On 09/23/2014 08:35 AM, Jisheng Zhang wrote:
+> This patch adds in support for S2R for dw-apb-ictl irqchip driver.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   drivers/irqchip/irq-dw-apb-ictl.c | 19 +++++++++++++++++++
+>   1 file changed, 19 insertions(+)
+>
+> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
+> index c136b67..53bb732 100644
+> --- a/drivers/irqchip/irq-dw-apb-ictl.c
+> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
+> @@ -50,6 +50,21 @@ static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
+>   	chained_irq_exit(chip, desc);
+>   }
+>
+> +#ifdef CONFIG_PM
+> +static void dw_apb_ictl_resume(struct irq_data *d)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	struct irq_chip_type *ct = irq_data_get_chip_type(d);
+> +
+> +	irq_gc_lock(gc);
+> +	writel_relaxed(~0, gc->reg_base + ct->regs.enable);
+> +	writel_relaxed(*ct->mask_cache, gc->reg_base + ct->regs.mask);
+> +	irq_gc_unlock(gc);
+> +}
 
-That would of course be best. I think it needs some rework of the
-arm32 PCI code though, or you'd still have to create pci_sys_data
-manually, and that is currently allocated by pcibios_init_hw.
+I agree with the overall change, but may this also be suited for a
+generic irq_chip helper instead of being a driver specific one?
 
-> > > +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
-> > > +                              &gen_pci_ops, pci, &pci->resources)) {
-> > > +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
-> > > +               return -ENODEV;
-> > > +       }
-> > > +#else
-> > >         pci_common_init_dev(dev, &hw);
-> > > +#endif /* CONFIG_ARM64 */
-> > > 
-> > 
-> > Again, just make the pci_common_init_dev() call #ifdef CONFIG_ARM, and move
-> > the generic case after it, outside of the #ifdef.
-> 
-> I went through the code quickly but I think we can (and should) remove
-> this quite ugly ifdeffery altogether. Most of the functionality in
-> pci_common_init_dev() can be implemented through the common PCI API (and this
-> would make this driver arch agnostic as it should be), I will go through ARM32
-> PCI bios code to check what is executed in detail in pci_common_init_dev() and
-> make sure that we follow those initialization steps in the resulting probe code
-> for this PCI generic host controller driver.
+Maybe Thomas or Jason can comment on this.
 
-These are the functions I found that refer to pci_sys_data on arm32:
+Also, now that you are using writel_relaxed, I understand that both
+writes above can happen in any order? Are there any implication we
+have to consider, i.e. do we require any of the registers above to
+be written first?
 
-pcibios_add_bus
-pcibios_remove_bus
-pcibios_align_resource
-pci_mmap_page_range
-pci_domain_nr
-pci_proc_domain
+Sebastian
 
-This is not as bad as I had feared, but we still have to ensure that
-any caller of these functions will work with both the generic PCI support
-and the arm32 specific drivers that today use hw_pci.
-
-My idea for dealing with this was to convert all host drivers in
-drivers/pci/host to the generic PCI code and never build the arm32
-bios32 code when CONFIG_ARCH_MULTIPLATFORM is set. Unfortunately that
-requires either doing them all at once or coming up with a migration
-strategy so we don't break things in the process.
-
-Note that arch/arm/mach-cns3xxx/pcie.c also belongs in the drivers/pci/host
-category and should probably be moved there. The integrator and versatile
-PCI drivers are currently not used with MULTIPLATFORM but will at some point
-and we can convert them as we get there.
-
-	Arnd
+> +#else
+> +#define dw_apb_ictl_resume	NULL
+> +#endif /* CONFIG_PM */
+> +
+>   static int __init dw_apb_ictl_init(struct device_node *np,
+>   				   struct device_node *parent)
+>   {
+> @@ -127,13 +142,17 @@ static int __init dw_apb_ictl_init(struct device_node *np,
+>   	gc->reg_base = iobase;
+>
+>   	gc->chip_types[0].regs.mask = APB_INT_MASK_L;
+> +	gc->chip_types[0].regs.enable = APB_INT_ENABLE_L;
+>   	gc->chip_types[0].chip.irq_mask = irq_gc_mask_set_bit;
+>   	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_clr_bit;
+> +	gc->chip_types[0].chip.irq_resume = dw_apb_ictl_resume;
+>
+>   	if (nrirqs > 32) {
+>   		gc->chip_types[1].regs.mask = APB_INT_MASK_H;
+> +		gc->chip_types[1].regs.enable = APB_INT_ENABLE_H;
+>   		gc->chip_types[1].chip.irq_mask = irq_gc_mask_set_bit;
+>   		gc->chip_types[1].chip.irq_unmask = irq_gc_mask_clr_bit;
+> +		gc->chip_types[1].chip.irq_resume = dw_apb_ictl_resume;
+>   	}
+>
+>   	irq_set_handler_data(irq, gc);
+>
