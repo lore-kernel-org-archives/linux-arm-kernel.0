@@ -1,75 +1,87 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 30 Sep 2014 11:27:10 -0700
-Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
-In-Reply-To: <20140930050203.GG28481@sonymobile.com>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5429DA95.80505@codeaurora.org> <20140930050203.GG28481@sonymobile.com>
-Message-ID: <542AF5FE.1000006@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 30 Sep 2014 14:30:07 -0400 (EDT)
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
+ <7hmw9hypj9.fsf@deeprootsystems.com>
+ <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
+ <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1409301428020.5311@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/14 22:02, Bjorn Andersson wrote:
-> On Mon 29 Sep 15:17 PDT 2014, Stephen Boyd wrote:
->
->> On 09/29/14 02:14, Srinivas Kandagatla wrote:
->>> @@ -246,6 +247,24 @@
->>>  			#reset-cells = <1>;
->>>  		};
->>>  
->>> +		apcs: syscon at 2011000 {
->>> +			compatible = "syscon";
->>> +			reg = <0x2011000 0x1000>;
->>> +		};
->> This is actually a clock controller block that hw designers decided was
->> good place to shove the ipc bits (because there's room!). Can we call it
->>
->>                 l2cc: clock-controller at 2011000 {
->>                         compatible = "syscon";
->>                         reg = <0x2011000 0x1000>;
->>                 };
->>
->> Eventually I'll add the specific krait compatible when we merge krait
->> clock support:
->>
->>                 l2cc: clock-controller at 2011000 {
->>                         compatible = "qcom,kpss-gcc", "syscon";
->>                         reg = <0x2011000 0x1000>;
->>                         clock-output-names = "acpu_l2_aux";
->>                 };
->>
-> As long as we can get hold of the regmap that would be fine. I pressume the
-> idea is to have the kpss-gcc using syscon, just like the rpm. But hopefully the
-> syscon patches that are floating around (merged?) will allow any driver to
-> expose a "syscon regmap".
+On Tue, 30 Sep 2014, Kevin Hilman wrote:
 
-Agreed. I'm not sure if kpss-gcc will use syscon. With the floating
-patches I don't see a reason why we need to use it.
+> On Tue, Sep 30, 2014 at 10:51 AM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> > On Tue, 30 Sep 2014, Kevin Hilman wrote:
+> >
+> >> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> >>
+> >> > Hi Lina,
+> >> >
+> >> > On Sat, Sep 27, 2014 at 01:58:13AM +0100, Lina Iyer wrote:
+> >> >> Add cpuidle driver interface to allow cpus to go into C-States. Use the
+> >> >> cpuidle DT interface common across ARM architectures to provide the
+> >> >> C-State information to the cpuidle framework.
+> >> >>
+> >> >> Supported modes at this time are clock gating (wfi) and cpu power down
+> >> >> (Standalone PC or spc).
+> >> >>
+> >> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> >> >> ---
+> >> >>  .../bindings/arm/msm/qcom,idle-state.txt           | 72 +++++++++++++++++
+> >> >>  drivers/cpuidle/Kconfig.arm                        |  7 ++
+> >> >>  drivers/cpuidle/Makefile                           |  1 +
+> >> >>  drivers/cpuidle/cpuidle-qcom.c                     | 89 ++++++++++++++++++++++
+> >> >>  4 files changed, 169 insertions(+)
+> >> >>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+> >> >>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+> >> >>
+> >> >> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+> >> >> new file mode 100644
+> >> >> index 0000000..47095b9
+> >> >> --- /dev/null
+> >> >> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+> >> >> @@ -0,0 +1,72 @@
+> >> >> +QCOM Idle States for cpuidle driver
+> >> >> +
+> >> >> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
+> >> >> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
+> >> >> +states. Idle states have different enter/exit latency and residency values.
+> >> >> +The idle states supported by the QCOM SoC are defined as -
+> >> >> +
+> >> >> +    * WFI
+> >> >> +    * Retention
+> >> >> +    * Standalone Power Collapse (Standalone PC or SPC)
+> >> >> +    * Power Collapse (PC)
+> >> >> +
+> >> >> +WFI: WFI does a little more in addition to architectural clock gating.  ARM
+> >> >
+> >> > This may be misleading. Call it PlatformWFI or something like that, not WFI if
+> >> > that's not what it is.
+> >>
+> >> This gets at a little pet peeve of mine:
+> >>
+> >> IMO, naming any state with "WFI" is a bit confusing, because typically
+> >> *every* idle state is entered by one (or more) CPU executing WFI, no?
+> >
+> > Agreed.
+> >
+> > The only state called "WFI" should be the one that only executes the WFI
+> > instruction without any other hardware setup around it.
+> 
+> Well, I would go even further in that none of the states should be
+> called WFI, because WFI is used to enter all of them.
 
->
->>> +
->>> +		rpm at 108000 {
->>> +			compatible	= "qcom,rpm-apq8064";
->>> +			reg		= <0x108000 0x1000>;
->>> +			qcom,ipc = <&apcs 0x8 2>;
->> There are actually 3 ipc bits. I guess if we ever have to use the other
->> two we'll extend this binding to have the other bits specified some
->> other way?
-> I haven't seen any indications of us using more than this bit. If we want to do
-> that, we could simply make it <&apcs 8 2 &apcs 8 3 &apcs 8 4> (or whatever
-> those indices are). That way this should be easy it keep compatible.
->
+Fair enough.
 
-Good to hear we're not forced to use a new property. The indices have
-always been 2, 1, and 0 as far as I know.
+So let's fix this by finding a name for that state that consists of only 
+executing WFI and that every SOC has.
 
-We use bit 1 to ack the RPM if it ever crashes. We know that it crashes
-because we receive the error interrupt. Instead of calling panic like we
-do downstream we can gracefully fail any new rpm requests. There really
-isn't any way to recover from this scenario though besides rebooting.
-Looking at the code I see this is all wrong and we use bit 2 to ack the
-error.
+Suggestions?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+
+Nicolas
