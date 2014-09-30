@@ -1,30 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 11:02:34 +0200
-Subject: [PATCH v2 3/3] ARM: dts: hix5hd2: add i2c node
-In-Reply-To: <1411878129-19743-4-git-send-email-zhangfei.gao@linaro.org>
-References: <1411878129-19743-1-git-send-email-zhangfei.gao@linaro.org>
- <1411878129-19743-4-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <2637538.ufF2KQPbi9@wuerfel>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 30 Sep 2014 14:41:35 +0530
+Subject: [PATCH 3/6] pci,
+ thunder: Add PCIe host controller devicetree bindings
+In-Reply-To: <CAL_JsqK2bqsbjEf2OngL2=Xr8t0AUobb_bd43BV4t9iXY-n6KQ@mail.gmail.com>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-4-git-send-email-rric@kernel.org>
+ <3082935.e3X4GsVUDn@wuerfel>
+ <CAL_JsqK2bqsbjEf2OngL2=Xr8t0AUobb_bd43BV4t9iXY-n6KQ@mail.gmail.com>
+Message-ID: <CA+sq2Cc3isZThykhCU=nzFx0BYFvmv+qCTHTuE48bjN+FdVjfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 September 2014 12:22:09 Zhangfei Gao wrote:
-> +
-> +               i2c0: i2c at b10000 {
-> +                       compatible = "hisilicon,hix5hd2-i2c";
-> +                       reg = <0xb10000 0x1000>;
-> +                       interrupts = <0 38 4>;
-> +                       clocks = <&clock HIX5HD2_I2C0_RST>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       status = "disabled";
-> +               };
-> 
+Thanks for pointing correction ROB.
+Will fix it.
 
-HIX5HD2_I2C0_RST is not defined anywhere, so this will result in the
-same build error that has required reverting a lot of patches for the
-3.18 merge window.
-
-How do you plan to deal with the dependency in the future?
-
-	Arnd
+On Fri, Sep 26, 2014 at 11:56 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Wed, Sep 24, 2014 at 11:06 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wednesday 24 September 2014 17:37:45 Robert Richter wrote:
+>>>
+>>> +       pcie0 at 0x8480,00000000 {
+>>
+>> The name should be pci, not pci0.
+>
+> And the address should be "@848000000000". There was some confusion
+> about when the comma should be used and it is only if you have things
+> like PCI bus, device, function for the addressing.
+>
+>
+>>
+>>> +               compatible = "cavium,thunder-pcie";
+>
+> A bit too generic as many of the Cavium bindings have been.
+>
+> Rob
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
