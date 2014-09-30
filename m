@@ -1,43 +1,199 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 30 Sep 2014 08:50:40 -0400
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140930124140.GC4273@sirena.org.uk>
-References: <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
- <20140929162814.GE4081@lukather> <20140929165842.GC5599@skynet.be>
- <20140929220250.GD5599@skynet.be>
- <20140930124140.GC4273@sirena.org.uk>
-Message-ID: <CAKON4Oz9ONdtMmoHfUXnm3mgKLKm1Ez7n78UWZZFBX__TR78HA@mail.gmail.com>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Tue, 30 Sep 2014 14:58:15 +0200
+Subject: [PATCH 1/6] watchdog: watchdog_dev: WATCHDOG_KEEP_ON feature
+In-Reply-To: <1412081190-30699-2-git-send-email-j.uzycki@elproma.com.pl>
+References: <542A3392.8020903@roeck-us.net>
+ <1412081190-30699-1-git-send-email-j.uzycki@elproma.com.pl>
+ <1412081190-30699-2-git-send-email-j.uzycki@elproma.com.pl>
+Message-ID: <542AA8E7.3030804@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 8:41 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Sep 30, 2014 at 12:02:50AM +0200, Luc Verhaegen wrote:
+I sent also the changelog:
+[PATCH 1/6] watchdog: watchdog_dev: WATCHDOG_KEEP_ON feature
+* clean up old comments
+* watchdog_keepon_start() renamed to watchdog_timer_start()
+* watchdog_keepon_stop() renamed to watchdog_timer_stop()
+* watchdog_timer_register() added
+* watchdog_timer_unregister() added
+* watchdog_timer_register() is the last action
+   in watchdog_dev_register().
+   FIXME: Really should be in probe()?
+* TODO: should watchdog_timer_start() call watchdog_start()?
+* watchdog_release() uses watchdog_timer_restart() helper function
+
+* TODO: change WDOG_KEEP_ON to autostart module parameter
+Here I am still not sure about module parameters.
+ > autostart:
+ >     Set to 0 to disable, -1 to enable with unlimited timeout,
+ >     or <n> for an initial timeout of <n> seconds.
+[1/6]: support of 0 and -1, where -1 is instead of WDOG_KEEP_ON?
+[2/6]: support of <n> instead of boottime
+
+what about:
+* int init_timeout;    /* initial timeout in seconds */
+   It looks as <n> so why duplicate the autostart parameter?
+* keep_running
+   It looks like -1 without watchdog_start()
+* this_watchdog_is_running()
+  Where defined?
+* watchdog_set_autostart()
+How to split new patches?
+
+Janusz
+
+W dniu 2014-09-30 14:46, Janusz Uzycki pisze:
+> Some applications require to start watchdog before userspace software.
+> This patch enables such feature. Only the flag is necessary
+> to enable it.
+> Moreover kernel's ping is re-enabled when userspace software closed
+> watchdog using the magic character. The features improves kernel's
+> reliability if hardware watchdog is available.
 >
->> 2) Simplefb will only have a single user: the rpi. As the only other
->> users i can think of, which does not have a full driver and which does
->> not have clocks automatically disabled, are discrete cards. And they do
->> not really tend to happen with dt or platform devices.
+> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
+> ---
+>   drivers/watchdog/watchdog_dev.c | 65 ++++++++++++++++++++++++++-
+>   include/linux/watchdog.h        |  4 ++
+>   2 files changed, 68 insertions(+), 1 deletion(-)
 >
-> I thought the goal was for other platforms to use simplefb while waiting
-> for the real drivers to be loaded (so you can get get console output as
-> early as possible from a built in driver for example)?
-
-That is an option that might work. Stop trying to make simplefb work
-after the system is fully booted. Instead just let it run until the
-clocks get shut off. That allows it to go back to being nothing but a
-simple pointer to the video buffer.
-
-Then if you want to keep your display going and don't have a KMS
-driver written, whip together a device specific framebuffer driver for
-your hardware that does the right thing with the clocks, etc. The
-device specific framebuffer driver can load later in the boot process
-so that it doesn't have to be built into the kernel. This device
-specfic driver matches on a compatible string and knows what to do
-with all of the device tree info.
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+> index 6aaefba..afc14f7 100644
+> --- a/drivers/watchdog/watchdog_dev.c
+> +++ b/drivers/watchdog/watchdog_dev.c
+> @@ -41,6 +41,7 @@
+>   #include <linux/miscdevice.h>	/* For handling misc devices */
+>   #include <linux/init.h>		/* For __init/__exit/... */
+>   #include <linux/uaccess.h>	/* For copy_to_user/put_user/... */
+> +#include <linux/jiffies.h>	/* for ping timer */
+>   
+>   #include "watchdog_core.h"
+>   
+> @@ -277,6 +278,60 @@ out_ioctl:
+>   	return err;
+>   }
+>   
+> +static void watchdog_ping_timer_cb(unsigned long data)
+> +{
+> +	struct watchdog_device *wdd = (struct watchdog_device *)data;
+> +	watchdog_ping(wdd);
+> +	/* call next ping half the timeout value */
+> +	mod_timer(&wdd->ping_timer,
+> +			jiffies + msecs_to_jiffies(wdd->timeout * 500));
+> +}
+> +
+> +static void watchdog_timer_start(struct watchdog_device *wdd)
+> +{
+> +	/* TODO: watchdog_start():
+> +	 * it should probably be handled by the caller, to let us separate
+> +	 * cases where the watchdog is already running (for example on close). */
+> +	watchdog_start(wdd);
+> +	watchdog_ping_timer_cb((unsigned long)wdd);
+> +}
+> +
+> +static void watchdog_timer_stop(struct watchdog_device *wdd)
+> +{
+> +	del_timer_sync(&wdd->ping_timer);
+> +}
+> +
+> +static int watchdog_timer_restart(struct watchdog_device *wdd)
+> +{
+> +	if (test_bit(WDOG_KEEP_ON, &wdd->status)) {
+> +		watchdog_timer_start(wdd);
+> +		return 0;
+> +	}
+> +	return watchdog_stop(wdd);
+> +}
+> +
+> +static int watchdog_timer_register(struct watchdog_device *wdd)
+> +{
+> +	if (test_bit(WDOG_KEEP_ON, &wdd->status)) {
+> +		if (!try_module_get(wdd->ops->owner))
+> +			return -ENODEV;
+> +		setup_timer(&wdd->ping_timer, watchdog_ping_timer_cb,
+> +				(unsigned long)wdd);
+> +		watchdog_timer_start(wdd);
+> +	}
+> +	return 0;
+> +}
+> +
+> +static int watchdog_timer_unregister(struct watchdog_device *wdd)
+> +{
+> +	if (test_bit(WDOG_KEEP_ON, &wdd->status)) {
+> +		watchdog_timer_stop(wdd);
+> +		watchdog_stop(wdd);
+> +		module_put(wdd->ops->owner);
+> +	}
+> +	return 0;
+> +}
+> +
+>   /*
+>    *	watchdog_write: writes to the watchdog.
+>    *	@file: file from VFS
+> @@ -430,6 +485,9 @@ static int watchdog_open(struct inode *inode, struct file *file)
+>   	if (!try_module_get(wdd->ops->owner))
+>   		goto out;
+>   
+> +	if (test_bit(WDOG_KEEP_ON, &wdd->status))
+> +		watchdog_timer_stop(wdd);
+> +
+>   	err = watchdog_start(wdd);
+>   	if (err < 0)
+>   		goto out_mod;
+> @@ -473,7 +531,7 @@ static int watchdog_release(struct inode *inode, struct file *file)
+>   		err = 0;
+>   	else if (test_and_clear_bit(WDOG_ALLOW_RELEASE, &wdd->status) ||
+>   		 !(wdd->info->options & WDIOF_MAGICCLOSE))
+> -		err = watchdog_stop(wdd);
+> +		err = watchdog_timer_restart(wdd);
+>   
+>   	/* If the watchdog was not stopped, send a keepalive ping */
+>   	if (err < 0) {
+> @@ -553,7 +611,10 @@ int watchdog_dev_register(struct watchdog_device *watchdog)
+>   			misc_deregister(&watchdog_miscdev);
+>   			old_wdd = NULL;
+>   		}
+> +		return err;
+>   	}
+> +
+> +	err = watchdog_timer_register(watchdog);
+>   	return err;
+>   }
+>   
+> @@ -575,6 +636,8 @@ int watchdog_dev_unregister(struct watchdog_device *watchdog)
+>   		misc_deregister(&watchdog_miscdev);
+>   		old_wdd = NULL;
+>   	}
+> +
+> +	watchdog_timer_unregister(watchdog);
+>   	return 0;
+>   }
+>   
+> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+> index 2a3038e..0afeabd 100644
+> --- a/include/linux/watchdog.h
+> +++ b/include/linux/watchdog.h
+> @@ -12,6 +12,7 @@
+>   #include <linux/bitops.h>
+>   #include <linux/device.h>
+>   #include <linux/cdev.h>
+> +#include <linux/timer.h>		/* for ping timer */
+>   #include <uapi/linux/watchdog.h>
+>   
+>   struct watchdog_ops;
+> @@ -95,6 +96,8 @@ struct watchdog_device {
+>   #define WDOG_ALLOW_RELEASE	2	/* Did we receive the magic char ? */
+>   #define WDOG_NO_WAY_OUT		3	/* Is 'nowayout' feature set ? */
+>   #define WDOG_UNREGISTERED	4	/* Has the device been unregistered */
+> +#define WDOG_KEEP_ON		5	/* Is 'keep on' feature set? */
+> +	struct timer_list ping_timer;	/* timer to keep on hardware ping */
+>   };
+>   
+>   #ifdef CONFIG_WATCHDOG_NOWAYOUT
+> @@ -104,6 +107,7 @@ struct watchdog_device {
+>   #define WATCHDOG_NOWAYOUT		0
+>   #define WATCHDOG_NOWAYOUT_INIT_STATUS	0
+>   #endif
+> +#define WATCHDOG_KEEP_ON		(1 << WDOG_KEEP_ON)
+>   
+>   /* Use the following function to check whether or not the watchdog is active */
+>   static inline bool watchdog_active(struct watchdog_device *wdd)
