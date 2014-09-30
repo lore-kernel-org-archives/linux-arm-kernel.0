@@ -1,49 +1,64 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Tue, 30 Sep 2014 02:50:40 +0100
-Subject: [PATCH 5/5] m25p80,spi-nor: Share the list of supported chip
- type names again
-In-Reply-To: <CAMuHMdVSYvUh3qVRhw15KmOn0MYocbJVQBr9TkHtebM19c8dJA@mail.gmail.com>
-References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714708.3040.43.camel@decadent.org.uk>
- <CAMuHMdUs+7uidcD6tivnq6+TbD4_piixLVqwuSa0Z1u3sF7EoA@mail.gmail.com>
- <1410793627.3040.61.camel@decadent.org.uk>
- <CAMuHMdVSYvUh3qVRhw15KmOn0MYocbJVQBr9TkHtebM19c8dJA@mail.gmail.com>
-Message-ID: <1412041840.9388.77.camel@decadent.org.uk>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 29 Sep 2014 18:53:24 -0700
+Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
+In-Reply-To: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+References: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+Message-ID: <20140930015323.GE28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-09-17 at 10:23 +0200, Geert Uytterhoeven wrote:
-> Hi Ben,
+On Mon 29 Sep 15:00 PDT 2014, Andy Gross wrote:
+
+> The runtime pm calls need to be done before populating the children via the
+> i2c_add_adapter call.  If this is not done, a child can run into issues trying
+> to do i2c read/writes due to the pm_runtime_sync failing.
 > 
-> On Mon, Sep 15, 2014 at 5:07 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
-> >> >
-> >> > +#define __SPI_NOR_ENUM_TYPES(c_id, str_and_c_id)                         \
-> >> > +       c_id(at25fs010)         c_id(at25fs040)         c_id(at25df041a)  \
-> >> > +       c_id(at25df321a)        c_id(at25df641)         c_id(at26f004)    \
-> >>
-> >> Can't you just have the IDs in a header file only, and let the header file
-> >> generate either a struct flash_info or a struct spi_device_id table, using
-> >> a macro defined by the file that includes it?
-> >
-> > How would we match up the rest of the struct flash_info to the name?
+
+May I ask in what case this would fail?  I thought we tested this as we found
+the faulty error check after calling pm_runtime_get_sync().
+
+Nontheless,
+
+Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+
+Regards,
+Bjorn
+
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+>  drivers/i2c/busses/i2c-qup.c |   12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
 > 
-> Ah, you use the enums to match the names to the rest of the flash_info.
-> But you can do it in one-shot, can't you?
-[...]
-
-I know, but I didn't want to expose the data in a header file.  As other
-people consider that a lesser evil than this rather complex approach,
-I'll do it the simple way.
-
-Ben.
-
--- 
-Ben Hutchings
-The two most common things in the universe are hydrogen and stupidity.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 811 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/2e442ad3/attachment.sig>
+> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+> index 3a4d64e..092d89b 100644
+> --- a/drivers/i2c/busses/i2c-qup.c
+> +++ b/drivers/i2c/busses/i2c-qup.c
+> @@ -674,16 +674,20 @@ static int qup_i2c_probe(struct platform_device *pdev)
+>  	qup->adap.dev.of_node = pdev->dev.of_node;
+>  	strlcpy(qup->adap.name, "QUP I2C adapter", sizeof(qup->adap.name));
+>  
+> -	ret = i2c_add_adapter(&qup->adap);
+> -	if (ret)
+> -		goto fail;
+> -
+>  	pm_runtime_set_autosuspend_delay(qup->dev, MSEC_PER_SEC);
+>  	pm_runtime_use_autosuspend(qup->dev);
+>  	pm_runtime_set_active(qup->dev);
+>  	pm_runtime_enable(qup->dev);
+> +
+> +	ret = i2c_add_adapter(&qup->adap);
+> +	if (ret)
+> +		goto fail_runtime;
+> +
+>  	return 0;
+>  
+> +fail_runtime:
+> +	pm_runtime_disable(qup->dev);
+> +	pm_runtime_set_suspended(qup->dev);
+>  fail:
+>  	qup_i2c_disable_clocks(qup);
+>  	return ret;
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
