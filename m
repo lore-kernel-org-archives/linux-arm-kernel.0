@@ -1,45 +1,65 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Tue, 30 Sep 2014 13:54:28 -0700
-Subject: [PATCHv6 0/5] hwspinlock core/omap dt support
-In-Reply-To: <1410553499-55951-1-git-send-email-s-anna@ti.com>
-References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
-Message-ID: <CAJAp7Ogbj5K4N7=TEQQ8HJ0X7hkOqzFwv=1bRicVCNX9cv_jaA@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 30 Sep 2014 15:18:42 -0600
+Subject: [PATCH v7 1/7] qcom: spm: Add Subsystem Power Manager driver
+In-Reply-To: <7hiok510l0.fsf@deeprootsystems.com>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-2-git-send-email-lina.iyer@linaro.org>
+ <7hiok510l0.fsf@deeprootsystems.com>
+Message-ID: <20140930211842.GI528@ilina-mac.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 12, 2014 at 1:24 PM, Suman Anna <s-anna@ti.com> wrote:
-> Hi Ohad,
+On Tue, Sep 30 2014 at 11:26 -0600, Kevin Hilman wrote:
+>Lina Iyer <lina.iyer@linaro.org> writes:
 >
-> This is an update to the hwspinlock dt support series. The series
-> is rebased onto v3.17-rc3, and addresses the review comments on the
-> previous v5 series. I have also split and left out the RFC patches
-> about the support for reserved locks (will post these as a separate
-> series) and return code convention changes in the hwspinlock core
-> (will not be needed anymore). The support for deferred probing of
-> clients is supported in the new of_hwspin_lock_get_id() function
-> itself.
+>> Based on work by many authors, available at codeaurora.org
+>>
+>> SPM is a hardware block that controls the peripheral logic surrounding
+>> the application cores (cpu/l$). When the core executes WFI instruction,
+>> the SPM takes over the putting the core in low power state as
+>> configured. The wake up for the SPM is an interrupt at the GIC, which
+>> then completes the rest of low power mode sequence and brings the core
+>> out of low power mode.
+>>
+>> The SPM has a set of control registers that configure the SPMs
+>> individually based on the type of the core and the runtime conditions.
+>> SPM is a finite state machine block to which a sequence is provided and
+>> it interprets the bytes  and executes them in sequence. Each low power
+>> mode that the core can enter into is provided to the SPM as a sequence.
+>>
+>> Configure the SPM to set the core (cpu or L2) into its low power mode,
+>> the index of the first command in the sequence is set in the SPM_CTL
+>> register. When the core executes ARM wfi instruction, it triggers the
+>> SPM state machine to start executing from that index. The SPM state
+>> machine waits until the interrupt occurs and starts executing the rest
+>> of the sequence until it hits the end of the sequence. The end of the
+>> sequence jumps the core out of its low power mode.
+>>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 >
-
-Thanks for your reply to me, I had missed that you continued this work.
-
-
-I find it somewhat awkward to have to call both of_hwspin_lock_get_id() and
-then hwspin_lock_request_specific(), but I found the request from Ohad, so
-let's stick with it.
-
-
-Am I right that hwlock-num-locks and hwlock-base-id are optional from the
-frameworks perspective and only there to aid the hwspin drivers? If so it is
-strange to have in the common binding and have the helper functions in the core
-for simply reading hwspin device specific properties.
-
-Otherwise I think it looks sane, although I haven't spend that much time
-reviewing it.
-
-I did throw it into my tree and gave it a testrun with the Qualcomm code I've
-been working on. So for the non-omap parts:
-
-Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-
-Regards,
-Bjorn
+>[...]
+>
+>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> index 1505fb8..9a9cc99 100644
+>> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> @@ -14,10 +14,9 @@ PROPERTIES
+>>  	Value type: <string>
+>>  	Definition: shall contain "qcom,saw2". A more specific value should be
+>>  		    one of:
+>> -			 "qcom,saw2-v1"
+>> -			 "qcom,saw2-v1.1"
+>> -			 "qcom,saw2-v2"
+>> -			 "qcom,saw2-v2.1"
+>> +			 "qcom,apq8064-saw2-v1.1-cpu"
+>> +			 "qcom,msm8974-saw2-v2.1-cpu"
+>> +			 "qcom,apq8084-saw2-v2.1-cpu"
+>
+>This looks odd (to me.)  Why are the SoC name and the SAW2 version both
+>needed?
+Even with the same version of SAW2, each SoC would have different
+values for the register information like the delays, sequences etc.
+The capabilities of the SoC dictate many of these values.
+So in mapping the .compatible with a corresponding .data in the match
+table, the cpu and the SAW version combination is necessary to identify
+the set of register values.
