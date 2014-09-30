@@ -1,86 +1,54 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 30 Sep 2014 20:20:28 +0800
-Subject: [PATCH v3 3/3] ARM: dts: hix5hd2: add i2c node
-In-Reply-To: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1412079628-6316-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1412079628-6316-4-git-send-email-zhangfei.gao@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 30 Sep 2014 14:25:59 +0200
+Subject: [PATCH 1/3] irqchip: dw-apb-ictl: always use use
+ {readl|writel}_relaxed
+In-Reply-To: <1411454100-6814-2-git-send-email-jszhang@marvell.com>
+References: <1411454100-6814-1-git-send-email-jszhang@marvell.com>
+ <1411454100-6814-2-git-send-email-jszhang@marvell.com>
+Message-ID: <542AA157.8080908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- arch/arm/boot/dts/hisi-x5hd2.dtsi |   60 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+On 09/23/2014 08:34 AM, Jisheng Zhang wrote:
+> relaxed version and non-relaxed version are mixed, this patch always
+> use the relaxed version to unify the memory access usage.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index d3d99fb..17d0637 100644
---- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-+++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -476,5 +476,65 @@
-                         interrupts = <0 70 4>;
-                         clocks = <&clock HIX5HD2_SATA_CLK>;
- 		};
-+
-+		i2c0: i2c at b10000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb10000 0x1000>;
-+			interrupts = <0 38 4>;
-+			clocks = <&clock HIX5HD2_I2C0_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at b11000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb11000 0x1000>;
-+			interrupts = <0 39 4>;
-+			clocks = <&clock HIX5HD2_I2C1_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at b12000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb12000 0x1000>;
-+			interrupts = <0 40 4>;
-+			clocks = <&clock HIX5HD2_I2C2_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at b13000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb13000 0x1000>;
-+			interrupts = <0 41 4>;
-+			clocks = <&clock HIX5HD2_I2C3_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at b16000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb16000 0x1000>;
-+			interrupts = <0 43 4>;
-+			clocks = <&clock HIX5HD2_I2C4_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c5: i2c at b17000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0xb17000 0x1000>;
-+			interrupts = <0 44 4>;
-+			clocks = <&clock HIX5HD2_I2C5_RST>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.9.5
+While I don't agree with the above reason (unification) for this
+change, I agree with the patch because it _can_ be changed, so
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> ---
+>   drivers/irqchip/irq-dw-apb-ictl.c | 12 ++++++------
+>   1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
+> index 31e231e..fcc3385 100644
+> --- a/drivers/irqchip/irq-dw-apb-ictl.c
+> +++ b/drivers/irqchip/irq-dw-apb-ictl.c
+> @@ -94,16 +94,16 @@ static int __init dw_apb_ictl_init(struct device_node *np,
+>   	 */
+>
+>   	/* mask and enable all interrupts */
+> -	writel(~0, iobase + APB_INT_MASK_L);
+> -	writel(~0, iobase + APB_INT_MASK_H);
+> -	writel(~0, iobase + APB_INT_ENABLE_L);
+> -	writel(~0, iobase + APB_INT_ENABLE_H);
+> +	writel_relaxed(~0, iobase + APB_INT_MASK_L);
+> +	writel_relaxed(~0, iobase + APB_INT_MASK_H);
+> +	writel_relaxed(~0, iobase + APB_INT_ENABLE_L);
+> +	writel_relaxed(~0, iobase + APB_INT_ENABLE_H);
+>
+> -	reg = readl(iobase + APB_INT_ENABLE_H);
+> +	reg = readl_relaxed(iobase + APB_INT_ENABLE_H);
+>   	if (reg)
+>   		nrirqs = 32 + fls(reg);
+>   	else
+> -		nrirqs = fls(readl(iobase + APB_INT_ENABLE_L));
+> +		nrirqs = fls(readl_relaxed(iobase + APB_INT_ENABLE_L));
+>
+>   	domain = irq_domain_add_linear(np, nrirqs,
+>   				       &irq_generic_chip_ops, NULL);
+>
