@@ -1,81 +1,95 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Tue, 30 Sep 2014 22:28:55 +0100
-Subject: [PATCH] of/pci: add pci_pio_to_address dummy for !CONFIG_OF
-In-Reply-To: <CAErSpo61favodLTSwCYzFZq-sB60+ZH6_WvwSGHgRx6cPKtXpA@mail.gmail.com>
-References: <706416181.hbVGLDA3o6@wuerfel> <20140930160139.GA5625@google.com>
- <20140930171002.GB15854@bart.dudau.co.uk>
- <CAErSpo61favodLTSwCYzFZq-sB60+ZH6_WvwSGHgRx6cPKtXpA@mail.gmail.com>
-Message-ID: <20140930212855.GA15713@borg.dudau.co.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Sep 2014 14:37:53 -0700
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140929135358.GC30998@ulmo>
+References: <20140829141244.GH15297@lukather> <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
+ <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
+ <20140929135358.GC30998@ulmo>
+Message-ID: <20140930213753.19023.17605@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 01:53:06PM -0600, Bjorn Helgaas wrote:
-> On Tue, Sep 30, 2014 at 11:10 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> > On Tue, Sep 30, 2014 at 10:01:39AM -0600, Bjorn Helgaas wrote:
-> >> On Tue, Sep 30, 2014 at 03:19:05PM +0200, Arnd Bergmann wrote:
-> >> > The pci_register_io_range() and pci_pio_to_address() were recently
-> >> > introduced to generalize the handling of memory mapped PCI I/O space,
-> >> > but they are only valid when CONFIG_OF is set, leading to a possible
-> >> > build error:
-> >> >
-> >> > drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_setup_window':
-> >> > drivers/pci/host/pcie-rcar.c:340:3: error: implicit declaration of function 'pci_pio_to_address' [-Werror=implicit-function-declaration]
-> >> >    res_start = pci_pio_to_address(res->start);
-> >> >    ^
-> >> > drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_probe':
-> >> > drivers/pci/host/pcie-rcar.c:945:3: error: implicit declaration of function 'of_pci_range_to_resource' [-Werror=implicit-function-declaration]
-> >> >    err = of_pci_range_to_resource(&range, pdev->dev.of_node,
-> >> >    ^
-> >> > cc1: some warnings being treated as errors
-> >> >
-> >> > This provides inline dummy implementations for the case that
-> >> > CONFIG_OF is disabled, to allow better build testing.
-> >> >
-> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> > Fixes: 279c5dd046 ("of/pci: Add pci_register_io_range() and pci_pio_to_address()")
-> >>
-> >> I'm rebuilding the pci/host-generic branch to pick up the other v13 fixes,
-> >> so I folded this fix directly into the "of/pci: Add pci_register_io_range()
-> >> and pci_pio_to_address()" patch.  Thanks for finding this; the config
-> >> dependencies are a bit of a mess.
-> >
-> > Bjorn,
-> >
-> > I suggest splitting this patch into 2 parts, move the one that adds pci_pio_to_address() in patch 2
-> > and the other in patch 5.
+Quoting Thierry Reding (2014-09-29 06:54:00)
+> On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
+> > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
+> > > > >> Plus, speaking more specifically about the clocks, that won't prevent
+> > > > >> your clock to be shut down as a side effect of a later clk_disable
+> > > > >> call from another driver.
+> > > > 
+> > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
+> > > > > preceding clk_enable()? There are patches being worked on that will
+> > > > > enable per-user clocks and as I understand it they will specifically
+> > > > > disallow drivers to disable the hardware clock if other drivers are
+> > > > > still keeping them on via their own referenc.
+> > > > 
+> > > > Calling clk_disable() preceding clk_enable() is a bug.
+> > > > 
+> > > > Calling clk_disable() after clk_enable() will disable the clock (and
+> > > > its parents)
+> > > > if the clock subsystem thinks there are no other users, which is what will
+> > > > happen here.
+> > > 
+> > > Right. I'm not sure this is really applicable to this situation, though.
+> > 
+> > It's actually very easy to do. Have a driver that probes, enables its
+> > clock, fails to probe for any reason, call clk_disable in its exit
+> > path. If there's no other user at that time of this particular clock
+> > tree, it will be shut down. Bam. You just lost your framebuffer.
+> > 
+> > Really, it's just that simple, and relying on the fact that some other
+> > user of the same clock tree will always be their is beyond fragile.
 > 
-> Yeah, I screwed that up.  I had just applied Arnd's patch completely
-> to 279c5dd046, which doesn't quite make sense.
-> 
-> I tried again like this:
-> 
->   - In "of/pci: Add pci_register_io_range() and pci_pio_to_address()",
-> I added the dummy pci_pio_to_address(), so there's an extern and a
-> definition in address.c when CONFIG_OF_ADDRESS=y, and an inline dummy
-> otherwise.
-> 
->   - I dropped "of/pci: Define of_pci_range_to_resource() only when
-> CONFIG_PCI=y".
-> 
->   - In "of/pci: Move of_pci_range_to_resource() to of/address.c", I
-> added the dummy of_pci_range_to_resource(), so there's an extern an a
-> definition in address.c when CONFIG_OF_ADDRESS=y and CONFIG_PCI=y, and
-> an inline dummy otherwise.
-> 
-> I'm not really set up to build test this, and my head is swimming a
-> bit, so I hope this is it.  I pushed the pci/host-generic branch
-> again, so you can look at it yourself.
+> Perhaps the meaning clk_ignore_unused should be revised, then. What you
+> describe isn't at all what I'd expect from such an option. And it does
+> not match the description in Documentation/kernel-parameters.txt either.
 
-Hi Bjorn,
+>From e156ee56cbe26c9e8df6619dac1a993245afc1d5 Mon Sep 17 00:00:00 2001
+From: Mike Turquette <mturquette@linaro.org>
+Date: Tue, 30 Sep 2014 14:24:38 -0700
+Subject: [PATCH] doc/kernel-parameters.txt: clarify clk_ignore_unused
 
-It looks good to me. Functionality-wise I can only test it tomorrow UK time,
-but from the diffs I've done I thinks we're good.
+Refine the definition around clk_ignore_unused, which caused some
+confusion recently on the linux-fbdev and linux-arm-kernel mailing
+lists[0].
 
-Will wait for more reports from the build bot.
+[0] http://lkml.kernel.org/r/<20140929135358.GC30998@ulmo>
 
-Take care,
-Liviu
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+Thierry,
 
-> 
-> Bjorn
-> 
+Please let me know if this wording makes the feature more clear.
+
+ Documentation/kernel-parameters.txt | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 10d51c2..0ce01fb 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -605,11 +605,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			See Documentation/s390/CommonIO for details.
+ 	clk_ignore_unused
+ 			[CLK]
+-			Keep all clocks already enabled by bootloader on,
+-			even if no driver has claimed them. This is useful
+-			for debug and development, but should not be
+-			needed on a platform with proper driver support.
+-			For more information, see Documentation/clk.txt.
++			Prevents the clock framework from automatically gating
++			clocks that have not been explicitly enabled by a Linux
++			device driver but are enabled in hardware at reset or
++			by the bootloader/firmware. Note that this does not
++			force such clocks to be always-on nor does it reserve
++			those clocks in any way. This parameter is useful for
++			debug and development, but should not be needed on a
++			platform with proper driver support.  For more
++			information, see Documentation/clk.txt.
+ 
+ 	clock=		[BUGS=X86-32, HW] gettimeofday clocksource override.
+ 			[Deprecated]
+-- 
+1.8.3.2
