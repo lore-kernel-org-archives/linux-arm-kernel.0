@@ -1,89 +1,121 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Sep 2014 19:00:36 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140930060312.GE29874@ulmo>
-References: <20140827141632.GB32243@ulmo> <53FF1D6C.6090205@redhat.com>
- <20140829070116.GC13106@ulmo> <20140829141244.GH15297@lukather>
- <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929161101.GS16977@sirena.org.uk>
- <20140930060312.GE29874@ulmo>
-Message-ID: <20140930180036.GI4273@sirena.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 30 Sep 2014 11:00:40 -0700
+Subject: [RFC PATCH 00/16] kernel: Add support for poweroff handler call chain
+Message-ID: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 08:03:14AM +0200, Thierry Reding wrote:
-> On Mon, Sep 29, 2014 at 05:11:01PM +0100, Mark Brown wrote:
+Various drivers implement architecture and/or device specific means to
+remove power from the system.  For the most part, those drivers set the
+global variable pm_power_off to point to a function within the driver.
 
-> > Not really thought this through fully yet but would having phandles to
-> > the relevant devices do the job?  Kind of lines up with Grant's idea of
-> > having dummy drivers.
+This mechanism has a number of drawbacks.  Typically only one scheme
+to remove power is supported (at least if pm_power_off is used).
+At least in theory there can be multiple means remove power, some of
+which may be less desirable.  For example, some mechanisms may only
+power off the CPU or the CPU card, while another may power off the
+entire system.  Others may really just execute a restart sequence
+or drop into the ROM monitor.  Using pm_power_off can also be racy
+if the function pointer is set from a driver built as module, as the
+driver may be in the process of being unloaded when pm_power_off is
+called.  If there are multiple poweroff handlers in the system, removing
+a module with such a handler may inadvertently reset the pointer to
+pm_power_off to NULL, leaving the system with no means to remove power.
 
-> One of the arguments that came up during the discussion of the sunxi
-> patches is that simplefb is going to be used precisely because there is
-> no real driver for the display part of the SoC yet and nobody knows what
-> the binding will look like. So there's nothing to point at currently and
-> for the same reason having a dummy driver won't work. There's simply no
-> definition of what resources are needed.
+Introduce a system poweroff handler call chain to solve the described
+problems.  This call chain is expected to be executed from the
+architecture specific machine_power_off() function.  Drivers providing
+system poweroff functionality are expected to register with this call chain.
+By using the priority field in the notifier block, callers can control
+poweroff handler execution sequence and thus ensure that the poweroff
+handler with the optimal capabilities to remove power for a given system
+is called first.
 
-You may well need to extend the binding in future for an actual driver
-but from the point of view of what's going into the block it really
-should just be a case of reading the datasheet and mechanically typing
-that in.  If we can work out how to say where the framebuffer is we
-really ought to be able to work this stuff out.
+The poweroff handler is introduced in multiple steps
 
-> > > There may be also resets involved. Fortunately the reset framework is
-> > > minimalistic enough not to care about asserting all unused resets at
-> > > late_initcall. And other things like power domains may also need to be
-> > > kept on.
+1) Implement poweroff handler API.
+   Patch 01/16.
+2) Ensure that pm_power_off is only called from machine_restart.
+   Patches 02/16 and 03/16.
+3) Implement call to poweroff handler in architecture specific
+   machine_restart code.
+   Patches 03/16 to 13/16.
+4) Convert all drivers to register with poweroff handler
+   instead of setting pm_power_off directly.
+   Patches 15/16 and 16/16 (examples).
+   This can be done in two steps: First convert all drivers which can
+   be built as modules, then convert the remaining drivers (possibly after
+   unexporting pm_powr_off).
+5) Unexport pm_power_off for all architectures,
+   and drop it entirely for architectures where it is not really used.
+6) [optional] Convert machine specific architecture code to register 
+   with poweroff handler instead of setting pm_power_off directly,
+   and remove pm_power_off entirely from the system.
 
-> > We might want to do that in the future, though it's not always the case
-> > that reset is the lowest power state.
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Romain Perier <romain.perier@gmail.com>
+Cc: James E.J. Bottomley <jejb@parisc-linux.org>
+Cc: Helge Deller <deller@gmx.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
+Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Fenghua Yu <fenghua.yu@intel.com>
+Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 
-> That proves my point. If we ever decide to assert resets by default
-> we'll have yet another subsystem that can potentially break existing
-> DTs.
+----------------------------------------------------------------
+Guenter Roeck (16):
+      kernel: Add support for poweroff handler call chain
+      hwmon: (ab8500) Call kernel_power_off instead of pm_power_off
+      parisc: support poweroff through poweroff handler call chain
+      arm: support poweroff through poweroff handler call chain
+      arm64: support poweroff through poweroff handler call chain
+      avr32: support poweroff through poweroff handler call chain
+      c6x: support poweroff through poweroff handler call chain
+      ia64: support poweroff through poweroff handler call chain
+      metag: support poweroff through poweroff handler call chain
+      mips: support poweroff through poweroff handler call chain
+      sh: support poweroff through poweroff handler call chain
+      unicore32: support poweroff through poweroff handler call chain
+      x86: support poweroff through poweroff handler call chain
+      x86/xen: support poweroff through poweroff handler call chain
+      power/reset: restart-poweroff: Register with kernel poweroff handler
+      mfd: palmas: Register with kernel poweroff handler
 
-OTOH given the level of breakage that's like to introduce we might just
-decide not to do that...
-
-> In the end it brings us back to the very fundamental principles of DT
-> that's been causing so much pain. For things to work properly and in a
-> stable way you have to get the bindings right and complete from the
-> start. That is, it needs to describe every aspect of the hardware block
-> and all links to other components.
-
-Or we ned to introduce things in a conservative fashion which does cope
-with backwards compatibility; it's definitely more work but it is
-doable.
-
-> > One thing that makes me a bit nervous about this approach in the context
-> > of the regulator API is the frequency with which one finds shared
-> > supplies.  I'm not sure if it's actually a big problem in practice but
-> > it makes me worry a bit.  We could probably just do something like make
-> > refcounting down to zero not actually disable anything for standard
-> > regulators to deal with it which might be an idea anyway in the context
-> > of this sort of dodge.
-
-> Yes, that's sort of how I expected clk_ignore_unused to work. The way I
-> understood it, it would cause all unused clocks to be ignored (that is
-> stay enabled if they are).
-
-> Of course as Geert pointed out in another subthread, taking this all the
-> way means that we have to disable all power management because the
-> firmware device may be sharing resources with other devices and which
-> therefore are not unused. That's a pretty strong argument and I don't
-> have a solution for that. It is only really a problem for cases where
-> the firmware virtual device isn't taken over by a proper driver at some
-> point, though.
-
-Indeed, and we also run into trouble for things where we actually need
-to really turn off the resource for some reason (MMC has some needs here
-for example).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/004a1194/attachment-0001.sig>
+ arch/arm/kernel/process.c              |  2 +
+ arch/arm64/kernel/process.c            |  2 +
+ arch/avr32/kernel/process.c            |  2 +
+ arch/c6x/kernel/process.c              |  2 +
+ arch/ia64/kernel/process.c             |  2 +
+ arch/metag/kernel/process.c            |  2 +
+ arch/mips/kernel/reset.c               |  2 +
+ arch/parisc/kernel/process.c           |  7 ++-
+ arch/sh/kernel/reboot.c                |  2 +
+ arch/unicore32/kernel/process.c        |  2 +
+ arch/x86/kernel/reboot.c               |  4 ++
+ arch/x86/xen/enlighten.c               |  2 +
+ drivers/hwmon/ab8500.c                 |  5 ++-
+ drivers/mfd/palmas.c                   | 30 +++++++------
+ drivers/parisc/power.c                 |  3 +-
+ drivers/power/reset/restart-poweroff.c | 24 +++++-----
+ include/linux/mfd/palmas.h             |  3 ++
+ include/linux/reboot.h                 |  4 ++
+ kernel/reboot.c                        | 81 ++++++++++++++++++++++++++++++++++
+ 19 files changed, 149 insertions(+), 32 deletions(-)
