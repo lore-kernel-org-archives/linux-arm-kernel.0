@@ -1,100 +1,149 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 30 Sep 2014 12:00:24 -0700
-Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
-In-Reply-To: <542AF5FE.1000006@codeaurora.org>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5429DA95.80505@codeaurora.org>
- <20140930050203.GG28481@sonymobile.com>
- <542AF5FE.1000006@codeaurora.org>
-Message-ID: <20140930190023.GS28481@sonymobile.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Sep 2014 12:03:01 -0700
+Subject: [PATCH] clk: prevent erronous parsing of children during rate
+ change
+In-Reply-To: <542A6E71.10703@ti.com>
+References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
+ <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
+ <5424C2FA.4000508@codeaurora.org> <5425135F.2070809@ti.com>
+ <20140926232453.19023.25483@quantum> <542913B4.2020808@ti.com>
+ <20140930070732.19023.37829@quantum> <542A6E71.10703@ti.com>
+Message-ID: <20140930190301.19023.5135@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30 Sep 11:27 PDT 2014, Stephen Boyd wrote:
-
-> On 09/29/14 22:02, Bjorn Andersson wrote:
-> > On Mon 29 Sep 15:17 PDT 2014, Stephen Boyd wrote:
+Quoting Tero Kristo (2014-09-30 01:48:49)
+> On 09/30/2014 10:07 AM, Mike Turquette wrote:
+> > Quoting Tero Kristo (2014-09-29 01:09:24)
+> >> On 09/27/2014 02:24 AM, Mike Turquette wrote:
+> >>> Quoting Tero Kristo (2014-09-26 00:18:55)
+> >>>> On 09/26/2014 04:35 AM, Stephen Boyd wrote:
+> >>>>> On 09/23/14 06:38, Tero Kristo wrote:
+> >>>>>> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
+> >>>>>>> On 08/21, Tero Kristo wrote:
+> >>>>>>>>              /* Skip children who will be reparented to another clock */
+> >>>>>>>>              if (child->new_parent && child->new_parent != clk)
+> >>>>>>>>                  continue;
+> >>>>>>>
+> >>>>>>> Are we not hitting the new_parent check here? I don't understand
+> >>>>>>> how we can be changing parents here unless the check is being
+> >>>>>>> avoided, in which case I wonder why determine_rate isn't being
+> >>>>>>> used.
+> >>>>>>>
+> >>>>>>
+> >>>>>> It depends how the clock underneath handles the situation. The error I
+> >>>>>> am seeing actually happens with a SoC specific compound clock (DPLL)
+> >>>>>> which integrates set_rate + mux functionality into a single clock
+> >>>>>> node. A call to the clk_set_rate changes the parent of this clock
+> >>>>>> (from bypass clock to reference clock), in addition to changing the
+> >>>>>> rate (tune the mul+div.) I looked at using the determine rate call
+> >>>>>> with this type but it breaks everything up... the parent gets changed
+> >>>>>> but not the clock rate, in addition to some other issues.
+> >>>>>
+> >>>>> Ok. Is this omap3_noncore_dpll_set_rate()?
+> >>>>
+> >>>> Yes.
+> >>>>
+> >>>>    > Can we use determine_rate +
+> >>>>> clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
+> >>>>> allow us to do the mult+div and the parent in the same op call, although
+> >>>>> I don't understand why setting the parent and then setting the rate is
+> >>>>> not going to work.
+> >>>>
+> >>>> Well, setting parent first, then rate later causes problems with the
+> >>>> DPLL ending up running with illegal (non-specified) rate, the M+N values
+> >>>> are most likely wrong if you just switch from bypass clock to reference
+> >>>> clock first without programming the M+N first.
+> >>>
+> >>> I took a quick look and it still seems to me that the OMAP DPLLs are
+> >>> still not modeled properly as mux clocks. Is this correct?
+> >>
+> >> Yeah, they are not mux clocks, but rather a compound of mux + DPLL
+> >> multiplier/divider logic. Changing the DPLL to be a separate mux + DPLL
+> >> div/mult clock will still have overlapping usage of the DPLL_EN field,
 > >
-> >> On 09/29/14 02:14, Srinivas Kandagatla wrote:
-> >>> @@ -246,6 +247,24 @@
-> >>>  			#reset-cells = <1>;
-> >>>  		};
-> >>>  
-> >>> +		apcs: syscon at 2011000 {
-> >>> +			compatible = "syscon";
-> >>> +			reg = <0x2011000 0x1000>;
-> >>> +		};
-> >> This is actually a clock controller block that hw designers decided was
-> >> good place to shove the ipc bits (because there's room!). Can we call it
-> >>
-> >>                 l2cc: clock-controller at 2011000 {
-> >>                         compatible = "syscon";
-> >>                         reg = <0x2011000 0x1000>;
-> >>                 };
-> >>
-> >> Eventually I'll add the specific krait compatible when we merge krait
-> >> clock support:
-> >>
-> >>                 l2cc: clock-controller at 2011000 {
-> >>                         compatible = "qcom,kpss-gcc", "syscon";
-> >>                         reg = <0x2011000 0x1000>;
-> >>                         clock-output-names = "acpu_l2_aux";
-> >>                 };
-> >>
-> > As long as we can get hold of the regmap that would be fine. I pressume the
-> > idea is to have the kpss-gcc using syscon, just like the rpm. But hopefully the
-> > syscon patches that are floating around (merged?) will allow any driver to
-> > expose a "syscon regmap".
-> 
-> Agreed. I'm not sure if kpss-gcc will use syscon. With the floating
-> patches I don't see a reason why we need to use it.
-> 
-
-
-All we need is a regmap for the kpss-gcc, but the restriction that it has to be 
-a syscon is more of a implementation detail. But you probably don't want to 
-implement the phandle->regmap lookup code in kpss-gcc (and all the other
-places) and if I understand the syscon improvements being suggested they are
-supposed to help with exactly that (help any device expose regmaps).
-
-Need to look into that again though.
-
+> > I'm not talking about splitting up the clock into two separate clocks.
+> > If memory serves the DPLL clock implementation "cheats" and hides the
+> > bypass_clk info from the clock framework. To be explicit, from the
+> > perspective of Linux clock framework DPLL clocks only have one parent.
 > >
-> >>> +
-> >>> +		rpm at 108000 {
-> >>> +			compatible	= "qcom,rpm-apq8064";
-> >>> +			reg		= <0x108000 0x1000>;
-> >>> +			qcom,ipc = <&apcs 0x8 2>;
-> >> There are actually 3 ipc bits. I guess if we ever have to use the other
-> >> two we'll extend this binding to have the other bits specified some
-> >> other way?
-> > I haven't seen any indications of us using more than this bit. If we want to do
-> > that, we could simply make it <&apcs 8 2 &apcs 8 3 &apcs 8 4> (or whatever
-> > those indices are). That way this should be easy it keep compatible.
+> > In reality a typical DPLL should have at least 2 parents (and in some
+> > cases starting with OMAP4, some of the DPLL output clocks should have a
+> > second HSD parent). But the implementation does not reflect this.
+> 
+> No, this is not the DPLLs are modelled. Each DPLL has currently two 
+> parents, ref-clk and bypass-clk, which are both modelled as separate 
+> clock nodes, and the DPLL switches parents based on bypass/lock mode. 
+> The bypass clock is also usually a mux clock, which further selects 
+> separate bypass parent, resulting in 3 or more parents for a certain DPLL.
+
+I stand corrected. I thought it was still done the old way where the
+machine-specific clock struct was holding the pointer to the ref_clk and
+bypass_clk. I'm glad that is not the case any more.
+
+> 
 > >
+> >> as the DPLL must be in bypass mode during M+N change. Or, should the
+> >> DPLL rate change only be allowed if the mux is in bypass setting?
+> >> Several drivers still depend on direct dpll clk_set_rate working
+> >> 'properly' (there are some other issues currently present also which
+> >> have nothing to do with the mux behavior.)
+> >>
+> >>> This issue has been lingering for a long time and we can't use
+> >>> determine_rate unless that clock has multiple parents. Simply hacking
+> >>> knowledge of the parent bypass clock into the .set_rate callback is not
+> >>> enough.
+> >>
+> >> If you believe this _must_ be changed, I can take a look at this for
+> >> next merge window, but this will cause a DT data compatibility break if
+> >> nothing else (personally I don't care about this as I always rebuild DT
+> >> blob with kernel, but lots of other people seem to do.)
+> >
+> > Well I guess the question is how long will we put up with the many small
+> > headaches caused by incorrectly modeling the clock?
 > 
-> Good to hear we're not forced to use a new property. The indices have
-> always been 2, 1, and 0 as far as I know.
+> Well, its not kind of incorrectly modelled, it is just modelled in such 
+> way that clk_set_rate doesn't cope too well with it.
 > 
-> We use bit 1 to ack the RPM if it ever crashes. We know that it crashes
-> because we receive the error interrupt. Instead of calling panic like we
-> do downstream we can gracefully fail any new rpm requests. There really
-> isn't any way to recover from this scenario though besides rebooting.
-> Looking at the code I see this is all wrong and we use bit 2 to ack the
-> error.
+> > determine_rate and clk_set_parent_and_rate should be sufficient for the
+> > OMAP DPLLs but only if they are correctly modeled in the framework.
 > 
+> Do we have implementation for clk_set_parent_and_rate someplace? I 
+> looked at rc7 and didn't find this. I think this would fix the issues I 
+> am seeing combined with determine_rate, if clk_set_rate would internally 
+> handle changing both rate + parent.
 
-Hmm, seems I got that wrong, sorry about that.
+I made it hard for you to find it because I typo'd. It's not a clk api
+but a clk_op:
 
-But do you mean "all wrong" as in that I use the wrong bit or to some greater
-extent? Currently all following requests should timeout, but maybe we should
-have a faster fail-path when we've hit this point?
-
-
->From a practical pov I guess that once the rpm starts returning errors on
-updates to regulators, root clocks and bus scaling then most of the system is
-becoming useless.
+int (*set_rate_and_parent)(struct clk_hw *hw, unsigned long rate,
+                           unsigned long parent_rate, u8 index);
 
 Regards,
-Bjorn
+Mike
+
+> 
+> -Tero
+> 
+> >
+> > Regards,
+> > Mike
+> >
+> >>
+> >> -Tero
+> >>
+> >>>
+> >>> Regards,
+> >>> Mike
+> >>>
+> >>>>
+> >>>>     I'm interested in the other issues that you mentioned
+> >>>>> too.
+> >>>>
+> >>>> Mostly these were side-effects from the illegal DPLL setup I guess, like
+> >>>> boot hang, failed drivers etc. I didn't really investigate this that
+> >>>> much as it is much more simpler just to use safe list iteration here.
+> >>>>
+> >>>> -Tero
+> >>
+> 
