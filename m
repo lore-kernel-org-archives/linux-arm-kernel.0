@@ -1,116 +1,37 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 30 Sep 2014 14:06:38 +0200
-Subject: [PATCH] USB: host: st: fix ehci/ohci driver selection
-In-Reply-To: <2536929.C0XC0THfdJ@wuerfel>
-References: <2536929.C0XC0THfdJ@wuerfel>
-Message-ID: <1412078798.21730.6.camel@x220>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 14:09:46 +0200
+Subject: [PATCH] spi: bcm53xx: add BCMA dependency
+Message-ID: <3256402.M8e92DFkbg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-29 at 14:54 +0200, Arnd Bergmann wrote:
-> The newly added sti ehci and ohci drivers come with a single
-> Kconfig entry that does not depend on either of the base drivers,
-> which leads to a link error when they are disabled:
-> 
-> drivers/built-in.o: In function `ohci_platform_init':
-> :(.init.text+0x14788): undefined reference to `ohci_init_driver'
-> 
-> To fix that, this patch introduces two separate Kconfig options
-> with proper dependencies, which avoids the problem and is also
-> more consistent with the other glue drivers.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: d115837259ada ("usb: host: ohci-st: Add OHCI driver support for ST STB devices")
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Peter Griffin <peter.griffin@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: linux-usb at vger.kernel.org
+The BCMA bus framework can be disabled on bcm53xx, which leads to a link
+error when building the SPI driver:
 
-This became commit 905e300e1043 ("USB: host: st: fix ehci/ohci driver
-selection") in next-20140930.
+drivers/built-in.o: In function `bcm53xxspi_module_init':
+:(.init.text+0x76d4): undefined reference to `__bcma_driver_register'
+drivers/built-in.o: In function `bcm53xxspi_module_exit':
+:(.exit.text+0x10fe): undefined reference to `bcma_driver_unregister'
 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index b943545f862c..002ba1d5bcf5 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -174,6 +174,15 @@ config USB_EHCI_HCD_SPEAR
->            Enables support for the on-chip EHCI controller on
->            ST SPEAr chips.
->  
-> +config USB_EHCI_HCD_STI
-> +	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
-> +	depends on ARCH_STI && OF
-> +	select GENERIC_PHY
-> +	select USB_EHCI_HCD_PLATFORM
-> +	help
-> +	  Enable support for the on-chip EHCI controller found on
-> +	  STMicroelectronics consumer electronics SoC's.
-> +
->  config USB_EHCI_HCD_AT91
->          tristate  "Support for Atmel on-chip EHCI USB controller"
->          depends on USB_EHCI_HCD && ARCH_AT91
-> @@ -402,6 +411,15 @@ config USB_OHCI_HCD_SPEAR
->            Enables support for the on-chip OHCI controller on
->            ST SPEAr chips.
->  
-> +config USB_OHCI_HCD_STI
-> +	tristate "Support for ST STiHxxx on-chip OHCI USB controller"
-> +	depends on ARCH_STI && OF
-> +	select GENERIC_PHY
-> +	select USB_OHCI_HCD_PLATFORM
-> +	help
-> +	  Enable support for the on-chip OHCI controller found on
-> +	  STMicroelectronics consumer electronics SoC's.
-> +
->  config USB_OHCI_HCD_S3C2410
->          tristate "OHCI support for Samsung S3C24xx/S3C64xx SoC series"
->          depends on USB_OHCI_HCD && (ARCH_S3C24XX || ARCH_S3C64XX)
-> @@ -761,14 +779,6 @@ config USB_HCD_SSB
->  
->  	  If unsure, say N.
->  
-> -config USB_HCD_ST
-> -	tristate "ST USB driver for ST SoC Series"
-> -	depends on ARCH_STI && OF
-> -	select GENERIC_PHY
-> -	help
-> -	  Enable support for the on-chip OHCI & EHCI controller found on
-> -	  STMicroelectronics consumer electronics SoC's.
-> -
->  config USB_HCD_TEST_MODE
->  	bool "HCD test mode support"
->  	---help---
-> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> index ae2db0b87993..0336bb2c0e6f 100644
-> --- a/drivers/usb/host/Makefile
-> +++ b/drivers/usb/host/Makefile
-> @@ -38,6 +38,7 @@ obj-$(CONFIG_USB_EHCI_MXC)	+= ehci-mxc.o
->  obj-$(CONFIG_USB_EHCI_HCD_OMAP)	+= ehci-omap.o
->  obj-$(CONFIG_USB_EHCI_HCD_ORION)	+= ehci-orion.o
->  obj-$(CONFIG_USB_EHCI_HCD_SPEAR)	+= ehci-spear.o
-> +obj-$(CONFIG_USB_EHCI_HCD_ST)	+= ehci-st.o
+To avoid that, this adds an explicit dependency on BCMA. While we're
+changing the dependencies, let's also add a COMPILE_TEST option, which
+will of course not have any effect unless building on another machine
+that has BCMA enabled.
 
-This should have been
-    CONFIG_USB_EHCI_HCD_STI
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0fc6a323e19 ("spi: bcm53xx: driver for SPI controller on Broadcom bcma SoC")
 
-(A rather subtle typo, easy to make given the rest of the patch.)
-
->  obj-$(CONFIG_USB_EHCI_EXYNOS)	+= ehci-exynos.o
->  obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
->  obj-$(CONFIG_USB_EHCI_MSM)	+= ehci-msm.o
-> @@ -55,6 +56,7 @@ obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
->  obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
->  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
->  obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
-> +obj-$(CONFIG_USB_OHCI_HCD_STI)	+= ohci-st.o
->  obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
->  obj-$(CONFIG_USB_OHCI_HCD_S3C2410)	+= ohci-s3c2410.o
->  obj-$(CONFIG_USB_OHCI_HCD_LPC32XX)	+= ohci-nxp.o
-> @@ -77,4 +79,3 @@ obj-$(CONFIG_USB_HCD_SSB)	+= ssb-hcd.o
->  obj-$(CONFIG_USB_FUSBH200_HCD)	+= fusbh200-hcd.o
->  obj-$(CONFIG_USB_FOTG210_HCD)	+= fotg210-hcd.o
->  obj-$(CONFIG_USB_MAX3421_HCD)	+= max3421-hcd.o
-> -obj-$(CONFIG_USB_HCD_ST)	+= ehci-st.o ohci-st.o
-
-
-Paul Bolle
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index bb7b5ec000d9..ababd27a4211 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -115,7 +115,8 @@ config SPI_AU1550
+ 
+ config SPI_BCM53XX
+ 	tristate "Broadcom BCM53xx SPI controller"
+-	depends on ARCH_BCM_5301X
++	depends on ARCH_BCM_5301X || COMPILE_TEST
++	depends on BCMA
+ 	help
+           Enable support for the SPI controller on Broadcom BCM53xx ARM SoCs.
+ 
