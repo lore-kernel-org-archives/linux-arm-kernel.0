@@ -1,10 +1,10 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 30 Sep 2014 11:00:53 -0700
-Subject: [RFC PATCH 13/16] x86: support poweroff through poweroff handler call
- chain
+Date: Tue, 30 Sep 2014 11:00:54 -0700
+Subject: [RFC PATCH 14/16] x86/xen: support poweroff through poweroff handler
+ call chain
 In-Reply-To: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
 References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412100056-15517-14-git-send-email-linux@roeck-us.net>
+Message-ID: <1412100056-15517-15-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,28 @@ The kernel core now supports a poweroff handler call chain
 to remove power from the system. Call it if pm_power_off
 is set to NULL.
 
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Ingo Molnar <mingo@redhat.com>
 Cc: H. Peter Anvin <hpa@zytor.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/x86/kernel/reboot.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/x86/xen/enlighten.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
-index 17962e6..c5514aa 100644
---- a/arch/x86/kernel/reboot.c
-+++ b/arch/x86/kernel/reboot.c
-@@ -651,6 +651,10 @@ static void native_machine_power_off(void)
- 		if (!reboot_force)
- 			machine_shutdown();
+diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
+index c0cb11f..645d00f 100644
+--- a/arch/x86/xen/enlighten.c
++++ b/arch/x86/xen/enlighten.c
+@@ -1322,6 +1322,8 @@ static void xen_machine_power_off(void)
+ {
+ 	if (pm_power_off)
  		pm_power_off();
-+	} else {
-+		if (!reboot_force)
-+			machine_shutdown();
++	else
 +		do_kernel_poweroff();
- 	}
- 	/* A fallback in case there is no PM info available */
- 	tboot_shutdown(TB_SHUTDOWN_HALT);
+ 	xen_reboot(SHUTDOWN_poweroff);
+ }
+ 
 -- 
 1.9.1
