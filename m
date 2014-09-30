@@ -1,80 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 30 Sep 2014 13:20:48 +0900
-Subject: [PATCH v2 00/11] ARM: shmobile: r8a7740/armadillo800eva legacy
- PM domain support
-In-Reply-To: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
-References: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20140930042047.GA24253@verge.net.au>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 30 Sep 2014 00:30:06 -0400 (EDT)
+Subject: [PATCH 0/5] ARM: move #include <asm/cp15.h> into cacheflush.h
+In-Reply-To: <1412040930-16864-1-git-send-email-computersforpeace@gmail.com>
+References: <1412040930-16864-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <alpine.LFD.2.11.1409300016060.5311@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 06:15:31PM +0200, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> This series improves PM domain support for r8a7740/armadillo800eva legacy,
-> mimicking (parts of) the existing PM domain support for sh7372/mackerel.
-> 
-> More specifically, they
->   - Add missing devices to existing PM domains,
->   - Add missing PM domains, hooking up devices and subdomains,
-> 
-> Changes in v2:
->   - Dropped FIXMes on behavior that turned out to be expected,
->   - Hook up the HDMI-Link hardware block,
->   - Really add the A4MP and D4 PM domains, as fixes are available (see
->     dependencies below),
->   - Move special CPU domain handling from A4S to A3SM,
-> 
-> There are a few dependencies to make resume from s2ram work:
->   - "[PATCH/RFC] fbdev: sh_mobile_hdmi: Re-init regs before irq re-enable on
->     resume",
->   - "[PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on wake-up",
->     or an alternative solution.
-> 
-> Apart from that, I'm not aware of any regressions (except perhaps for USB,
-> which I was unable to get working anyway).
+On Mon, 29 Sep 2014, Brian Norris wrote:
 
-Hi Geert,
+> There are several places where an explicit include of <asm/cp15.h> is needed
+> just because cacheflush.h uses one of its macros in v7_exit_coherency_flush().
+> Let's put the include in the proper header.
+> 
+> These obviously have some dependencies, so I'd focus on:
+>   (1) Is patch 1 acceptable? If so, then:
 
-what is your feeling about (me) queueing up part of all of this series now?
+Well, I'm wondering if it is really a gain to force a dependency for 
+cp15.h on every user of cacheflush.h just because of the seldomly used 
+v7_exit_coherency_flush(). But I don't mind either ways.
 
-> 
-> Please note that DT/multi-platform PM domain support is added in an (almost)
-> independent series.
-> 
-> Thanks!
-> 
-> Geert Uytterhoeven (11):
->   ARM: shmobile: r8a7740: Add missing A3SP pm domain devices
->   ARM: shmobile: r8a7740: Add missing A4S pm domain devices
->   ARM: shmobile: armadillo800eva legacy: Add missing A3SP pm domain
->     devices
->   ARM: shmobile: armadillo800eva legacy: Add missing A4S pm domain
->     devices
->   ARM: shmobile: r8a7740: Add A3RV pm domain support
->   ARM: shmobile: r8a7740: Add A3SG pm domain support
->   ARM: shmobile: r8a7740/armadillo legacy: Add A4MP pm domain support
->   ARM: shmobile: r8a7740: Add D4 pm domain support
->   ARM: shmobile: r8a7740/armadillo legacy: Add A4R pm domain support
->   ARM: shmobile: r8a7740: Add A4SU pm domain support
->   ARM: shmobile: r8a7740: Add A3SM pm domain support
-> 
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 12 +++++++++-
->  arch/arm/mach-shmobile/pm-r8a7740.c            | 32 ++++++++++++++++++++++----
->  arch/arm/mach-shmobile/setup-r8a7740.c         | 11 +++++++++
->  3 files changed, 50 insertions(+), 5 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> 
+
+Nicolas
