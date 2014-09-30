@@ -1,38 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 17:18:35 +0200
-Subject: [PATCH] gpiolib: fix callers of gpiochip_remove
-In-Reply-To: <CACRpkdYdwhujkP_66GCNktcvXFOzmGW=3t6BvCSXXMnHu03eEg@mail.gmail.com>
-References: <2923496.zl6JUbOQrZ@wuerfel>
- <CACRpkdYdwhujkP_66GCNktcvXFOzmGW=3t6BvCSXXMnHu03eEg@mail.gmail.com>
-Message-ID: <2272579.vn7eKdEJtW@wuerfel>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 30 Sep 2014 08:28:39 -0700
+Subject: [PATCH v7 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <334C6A04-9607-4E97-A7A7-2FEED5986E57@codeaurora.org>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <334C6A04-9607-4E97-A7A7-2FEED5986E57@codeaurora.org>
+Message-ID: <20140930152838.GN28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 16:11:28 Linus Walleij wrote:
-> On Tue, Sep 30, 2014 at 3:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed 24 Sep 09:39 PDT 2014, Kumar Gala wrote:
+
 > 
-> > A recent API change made gpiochip_remove return void instead of an
-> > error value, which broke drivers that use this return value:
-> >
-> > gpio/gpio-sch311x.c: In function 'sch311x_gpio_probe':
-> > gpio/gpio-sch311x.c:286:7: error: void value not ignored as it ought to be
-> >    if (gpiochip_remove(&priv->blocks[i].chip))
-> >        ^
-> >
-> > This changes the callers that I have found during randconfig testing
-> > so they no longer depend on the error code.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: e1db1706c86e ("gpio: gpiolib: set gpiochip_remove retval to void")
-> 
-> Hm AFAICT these are already fixes in my GPIO tree
-> and linux-next...
-> 
-> Am I looking in the wrong place?
-> 
+> On Sep 22, 2014, at 6:25 PM, Bjorn Andersson <Bjorn.Andersson@sonymobile.com> wrote:
 > 
 
-No, it's my fault, I seem to have a patch in my tree that reverts those
-changes.
+[..]
 
-	Arnd
+> > diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+
+[..]
+
+> > +- qcom,ipc:
+> > +     Usage: required
+> > +     Value type: <prop-encoded-array>
+> > +
+> > +     Definition: three entries specifying the outgoing ipc bit used for
+> > +                 signaling the RPM:
+> > +                 - phandle to a syscon node representing the apcs registers
+> > +                 - u32 representing offset to the register within the syscon
+> > +                 - u32 representing the ipc bit within the register
+> > +
+> 
+> Does this really ever differ for the SoCs, and even if it does why do we need
+> to encode it in DT.  Can?t we determine it via the compatible setting?
+> 
+
+The two offsets could be hard coded, especially based on the compatible.
+
+But I don't know if it's worth respinning this just to get those two number out
+of here. Also this is now "symmetric" with the smd use cases, where it
+shouldn't be hard coded.
+
+Regards,
+Bjorn
