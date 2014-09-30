@@ -1,42 +1,107 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Sep 2014 18:39:28 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140930050923.GB29874@ulmo>
-References: <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
- <20140929155517.GR16977@sirena.org.uk>
- <20140930050923.GB29874@ulmo>
-Message-ID: <20140930173928.GH4273@sirena.org.uk>
+From: riel@redhat.com (Rik van Riel)
+Date: Tue, 30 Sep 2014 13:40:11 -0400
+Subject: [PATCH] sched, time: fix build error with 64 bit cputime_t on 32
+ bit systems
+In-Reply-To: <2547036.UshV4pXvhf@wuerfel>
+References: <2547036.UshV4pXvhf@wuerfel>
+Message-ID: <20140930134011.232bc7bf@annuminas.surriel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 07:09:24AM +0200, Thierry Reding wrote:
-> On Mon, Sep 29, 2014 at 04:55:17PM +0100, Mark Brown wrote:
+On Tue, 30 Sep 2014 13:56:37 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-> > So long as we're ensuring that when we don't start supporting resources
-> > without DT additions or at least require DT additions to actively manage
-> > them (which can then include simplefb hookup) we should be fine.
+> A recent change to update the stime/utime members of task_struct
+> using atomic cmpxchg broke configurations on 32-bit machines with
+> CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that uses 64-bit
+> nanoseconds, leading to a link-time error:
+> 
+> kernel/built-in.o: In function `cputime_adjust':
+> :(.text+0x25234): undefined reference to `__bad_cmpxchg'
 
-> I'm not sure I understand what you mean. If we add a driver for the PMIC
-> that exposes these regulators and then add a DT node for the PMIC, we'd
-> still need to fix the firmware to generate the appropriate DT properties
-> to allow simplefb to enable the regulators.
+Arnd, this should fix your problem, while still ensuring that
+the cpu time counters only ever go forward.
 
-No, you don't.  It's only if you start describing the regulators in the
-PMIC in DT that you run into problems.  Unconfigured regulators won't be
-touched.
+I do not have cross compiling toolchains set up here, but I assume
+this fixes your bug.
 
-> So unless firmware is updated at the same time, regulators will get
-> disabled because they are unused.
+Ingo & Peter, if this patch fixes the bug for Arnd, could you please
+merge it into -tip?
 
-That won't happen unless the regulators are explicitly described, if
-they are described as unused then this will of course happen.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/a8cd1e73/attachment.sig>
+Linus, the changeset causing the problem is only in -tip right now,
+and this patch will not apply to your tree.
+
+---8<---
+
+Subject: sched,time: fix build error with 64 bit cputime_t on 32 bit systems
+
+On 32 bit systems cmpxchg cannot handle 64 bit values, and
+cmpxchg64 needs to be used when full dynticks CPU accounting
+is enabled, since that turns cputime_t into a u64.
+
+With jiffies based CPU accounting, cputime_t is an unsigned
+long. On 64 bit systems, cputime_t is always the size of a
+long.
+
+Luckily the compiler can figure out whether we need to call
+cmpxchg or cmpxchg64.
+
+Signed-off-by: Rik van Riel <riel@redhat.com>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+---
+ kernel/sched/cputime.c | 35 +++++++++++++++++++++++++----------
+ 1 file changed, 25 insertions(+), 10 deletions(-)
+
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index 64492df..db239c9 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -555,6 +555,29 @@ static cputime_t scale_stime(u64 stime, u64 rtime, u64 total)
+ }
+ 
+ /*
++ * Atomically advance counter to the new value. Interrupts, vcpu
++ * scheduling, and scaling inaccuracies can cause cputime_advance
++ * to be occasionally called with a new value smaller than counter.
++ * Let's enforce atomicity.
++ *
++ * Normally a caller will only go through this loop once, or not
++ * at all in case a previous caller updated counter the same jiffy.
++ */
++static void cputime_advance(cputime_t *counter, cputime_t new)
++{
++	cputime_t old;
++
++	while (new > (old = ACCESS_ONCE(*counter))) {
++		/* The compiler will optimize away this branch.  */
++		if (sizeof(cputime_t) == sizeof(long))
++			cmpxchg(counter, old, new);
++		else
++			/* 64 bit cputime_t on a 32 bit system... */
++			cmpxchg64(counter, old, new);
++	}
++}
++
++/*
+  * Adjust tick based cputime random precision against scheduler
+  * runtime accounting.
+  */
+@@ -599,16 +622,8 @@ static void cputime_adjust(struct task_cputime *curr,
+ 		utime = rtime - stime;
+ 	}
+ 
+-	/*
+-	 * If the tick based count grows faster than the scheduler one,
+-	 * the result of the scaling may go backward.
+-	 * Let's enforce monotonicity.
+-	 * Atomic exchange protects against concurrent cputime_adjust().
+-	 */
+-	while (stime > (rtime = ACCESS_ONCE(prev->stime)))
+-		cmpxchg(&prev->stime, rtime, stime);
+-	while (utime > (rtime = ACCESS_ONCE(prev->utime)))
+-		cmpxchg(&prev->utime, rtime, utime);
++	cputime_advance(&prev->stime, stime);
++	cputime_advance(&prev->utime, utime);
+ 
+ out:
+ 	*ut = prev->utime;
