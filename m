@@ -1,27 +1,40 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Tue, 30 Sep 2014 19:35:37 +0200
-Subject: [PATCH 4/6] hwrng: atmel: Add TRNG DT binding doc
-In-Reply-To: <20140930192149.464ac50f@bbrezillon> (Boris Brezillon's message
- of "Tue, 30 Sep 2014 19:21:49 +0200")
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412093987-30241-5-git-send-email-boris.brezillon@free-electrons.com>
- <87bnpxoww9.fsf@dell.be.48ers.dk> <20140930192149.464ac50f@bbrezillon>
-Message-ID: <877g0lovti.fsf@dell.be.48ers.dk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 30 Sep 2014 10:35:45 -0700
+Subject: [PATCH v7 4/7] qcom: pm: Add cpu low power mode functions
+In-Reply-To: <20140930160310.GC528@ilina-mac.local> (Lina Iyer's message of
+ "Tue, 30 Sep 2014 10:03:10 -0600")
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-5-git-send-email-lina.iyer@linaro.org>
+ <5429ED1D.5060809@codeaurora.org>
+ <20140930160310.GC528@ilina-mac.local>
+Message-ID: <7h4mvp105q.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Boris" == Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-Hi,
+> On Mon, Sep 29 2014 at 17:37 -0600, Stephen Boyd wrote:
+>>On 09/26/14 17:58, Lina Iyer wrote:
+>>> Based on work by many authors, available at codeaurora.org
+>>>
+>>
+>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>> [lina: simplify the driver for an initial submission, add commit text
+>>> description of idle states]
+>>
+>>Maintainer tags don't really make sense unless there is another author.
+>>
+> Hmm.. Since this patch is a derivative work, I wanted to clarify, what
+> changed seems important. The work was done by many authors. Adding
+> signed-off from everybody who could have contributed to the patch
+> downstream is confusing.
+> I would be okay removing it.
 
- >> The interrupt isn't strictly speaking required as it isn't used by the
- >> driver, but as 9G45 has the signal wired up I guess it makes sense.
+Yes, you should remove it, but move the "Based on work by many authors"
+part to just before your signoff.  Also, it's considered good manners to
+name any significant contributors if there are a few standouts.  Also,
+the "available at codeaurora.org" is wanting a link, ideally to a
+specific commit, or a branch so original code can easily be found.
 
- > This irq might be used in a near future (in order to wait for data as
- > requested by hwrng code when the wait argument is true).
- > Thus I prefer to keep it as required.
-
-Ok, fine by me.
-
--- 
-Bye, Peter Korsgaard
+Kevin
+ 
