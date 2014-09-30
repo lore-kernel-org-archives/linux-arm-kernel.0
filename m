@@ -1,39 +1,75 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 30 Sep 2014 11:00:54 -0700
-Subject: [RFC PATCH 14/16] x86/xen: support poweroff through poweroff handler
- call chain
+Date: Tue, 30 Sep 2014 11:00:55 -0700
+Subject: [RFC PATCH 15/16] power/reset: restart-poweroff: Register with kernel
+ poweroff handler
 In-Reply-To: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
 References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412100056-15517-15-git-send-email-linux@roeck-us.net>
+Message-ID: <1412100056-15517-16-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel core now supports a poweroff handler call chain
-to remove power from the system. Call it if pm_power_off
-is set to NULL.
+Register with kernel poweroff handler instead of seting pm_power_off
+directly.  Register as poweroff handler of last resort since the driver
+does not really power off the system but executes a restart.
 
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Sebastian Reichel <sre@kernel.org>
+Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/x86/xen/enlighten.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/power/reset/restart-poweroff.c | 24 +++++++++++-------------
+ 1 file changed, 11 insertions(+), 13 deletions(-)
 
-diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
-index c0cb11f..645d00f 100644
---- a/arch/x86/xen/enlighten.c
-+++ b/arch/x86/xen/enlighten.c
-@@ -1322,6 +1322,8 @@ static void xen_machine_power_off(void)
+diff --git a/drivers/power/reset/restart-poweroff.c b/drivers/power/reset/restart-poweroff.c
+index edd707e..82d058f 100644
+--- a/drivers/power/reset/restart-poweroff.c
++++ b/drivers/power/reset/restart-poweroff.c
+@@ -12,35 +12,33 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/notifier.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_platform.h>
+ #include <linux/module.h>
+ #include <linux/reboot.h>
+-#include <asm/system_misc.h>
+ 
+-static void restart_poweroff_do_poweroff(void)
++static int restart_poweroff_do_poweroff(struct notifier_block *this,
++					unsigned long unused1, void *unused2)
  {
- 	if (pm_power_off)
- 		pm_power_off();
-+	else
-+		do_kernel_poweroff();
- 	xen_reboot(SHUTDOWN_poweroff);
+ 	reboot_mode = REBOOT_HARD;
+ 	machine_restart(NULL);
++
++	return NOTIFY_DONE;
  }
  
++static struct notifier_block restart_poweroff_handler = {
++	.notifier_call = restart_poweroff_do_poweroff,
++};
++
+ static int restart_poweroff_probe(struct platform_device *pdev)
+ {
+-	/* If a pm_power_off function has already been added, leave it alone */
+-	if (pm_power_off != NULL) {
+-		dev_err(&pdev->dev,
+-			"pm_power_off function already registered");
+-		return -EBUSY;
+-	}
+-
+-	pm_power_off = &restart_poweroff_do_poweroff;
+-	return 0;
++	return register_restart_handler(&restart_poweroff_handler);
+ }
+ 
+ static int restart_poweroff_remove(struct platform_device *pdev)
+ {
+-	if (pm_power_off == &restart_poweroff_do_poweroff)
+-		pm_power_off = NULL;
++	unregister_restart_handler(&restart_poweroff_handler);
+ 
+ 	return 0;
+ }
 -- 
 1.9.1
