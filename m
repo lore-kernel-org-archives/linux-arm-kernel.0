@@ -1,46 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Sep 2014 12:27:12 +0100
-Subject: [PATCH v2] perf tools: fix build breakage on arm64 targets
-Message-ID: <1412076432-22045-1-git-send-email-will.deacon@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 13:27:50 +0200
+Subject: [PATCH] netfilter: fix nf_conn_nat->masq_index visibility
+Message-ID: <2670668.vq09CjLWH3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempting to build the perf tool for an arm64 target results in the
-following failure:
+A recent change introduced the NF_NAT_MASQUERADE_IPV4/6 symbols and now
+builds the masquerading code based on this symbol rather than the
+IP_NF_TARGET_MASQUERADE symbol, however the nf_nat.h header file
+still uses the old symbol, which leads to a build error when that
+is disabled:
 
-arch/arm64/util/unwind-libunwind.c: In function 'libunwind__arch_reg_id':
-arch/arm64/util/unwind-libunwind.c:77:3: error: implicit declaration of function 'pr_err'
-   pr_err("unwind: invalid reg id %d\n", regnum);
-   ^
-arch/arm64/util/unwind-libunwind.c:77:3: error: nested extern declaration of 'pr_err'
+nf_nat_masquerade_ipv4.c: In function 'nf_nat_masquerade_ipv4':
+nf_nat_masquerade_ipv4.c:59:5: error: 'struct nf_conn_nat' has no member named 'masq_index'
 
-This is due to commit 84f5d36f4866 ("perf tools: Move pr_* debug macros
-into debug object") moving the pr_* macros into a new header file, but
-failing to update architectures other than x86.
+This changes the header file to do the respective change, and move
+to using the IS_ENABLED() macro in the process, to improve readability
+of the check
 
-This patch adds the missing include, and fixes the build again.
-
-Cc: Jiri Olsa <jolsa@kernel.org>
-Cc: Jean Pihet <jean.pihet@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 8dd33cc93ec92 ("netfilter: nf_nat: generalize IPv4 masquerading support for nf_tables")
 ---
+found while doing ARM randconfig tests
 
-v1->v2: Rebased onto tip tree, which removed the need for the arch/arm/ hunks.
-
- tools/perf/arch/arm64/util/unwind-libunwind.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/tools/perf/arch/arm64/util/unwind-libunwind.c b/tools/perf/arch/arm64/util/unwind-libunwind.c
-index 436ee43859dc..a87afa91a99e 100644
---- a/tools/perf/arch/arm64/util/unwind-libunwind.c
-+++ b/tools/perf/arch/arm64/util/unwind-libunwind.c
-@@ -3,6 +3,7 @@
- #include <libunwind.h>
- #include "perf_regs.h"
- #include "../../util/unwind.h"
-+#include "../../util/debug.h"
+diff --git a/include/net/netfilter/nf_nat.h b/include/net/netfilter/nf_nat.h
+index a71dd333ac68..68f0953c86c3 100644
+--- a/include/net/netfilter/nf_nat.h
++++ b/include/net/netfilter/nf_nat.h
+@@ -32,10 +32,8 @@ struct nf_conn_nat {
+ 	struct hlist_node bysource;
+ 	struct nf_conn *ct;
+ 	union nf_conntrack_nat_help help;
+-#if defined(CONFIG_IP_NF_TARGET_MASQUERADE) || \
+-    defined(CONFIG_IP_NF_TARGET_MASQUERADE_MODULE) || \
+-    defined(CONFIG_IP6_NF_TARGET_MASQUERADE) || \
+-    defined(CONFIG_IP6_NF_TARGET_MASQUERADE_MODULE)
++#if IS_ENABLED(CONFIG_NF_NAT_MASQUERADE_IPV4) || \
++    IS_ENABLED(CONFIG_NF_NAT_MASQUERADE_IPV6)
+ 	int masq_index;
+ #endif
+ };
+@@ -56,7 +54,7 @@ int nf_nat_used_tuple(const struct nf_conntrack_tuple *tuple,
  
- int libunwind__arch_reg_id(int regnum)
+ static inline struct nf_conn_nat *nfct_nat(const struct nf_conn *ct)
  {
--- 
-2.1.0
+-#if defined(CONFIG_NF_NAT) || defined(CONFIG_NF_NAT_MODULE)
++#if IS_ENABLED(CONFIG_NF_NAT)
+ 	return nf_ct_ext_find(ct, NF_CT_EXT_NAT);
+ #else
+ 	return NULL;
+@@ -68,8 +66,8 @@ static inline bool nf_nat_oif_changed(unsigned int hooknum,
+ 				      struct nf_conn_nat *nat,
+ 				      const struct net_device *out)
+ {
+-#if IS_ENABLED(CONFIG_IP_NF_TARGET_MASQUERADE) || \
+-    IS_ENABLED(CONFIG_IP6_NF_TARGET_MASQUERADE)
++#if IS_ENABLED(CONFIG_NF_NAT_MASQUERADE_IPV4) || \
++    IS_ENABLED(CONFIG_NF_NAT_MASQUERADE_IPV6)
+ 	return nat->masq_index && hooknum == NF_INET_POST_ROUTING &&
+ 	       CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL &&
+ 	       nat->masq_index != out->ifindex;
