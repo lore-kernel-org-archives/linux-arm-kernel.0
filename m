@@ -1,27 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 13:08:07 +0200
-Subject: [PATCH V4] bcma: use chipcommon node from DT for SoC GPIO chip
-In-Reply-To: <1412074548-14614-1-git-send-email-zajec5@gmail.com>
-References: <1412072546-3529-1-git-send-email-zajec5@gmail.com>
- <1412074548-14614-1-git-send-email-zajec5@gmail.com>
-Message-ID: <2792546.1ci4Y7Hkk3@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Sep 2014 12:27:12 +0100
+Subject: [PATCH v2] perf tools: fix build breakage on arm64 targets
+Message-ID: <1412076432-22045-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 12:55:48 Rafa? Mi?ecki wrote:
-> This will allow us to define GPIO-attached devices (LEDs, buttons) in
-> the the device tree.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
-> This is based on top of
-> [PATCH v6] bcma: register bcma as device tree driver
-> that I hope will reach wireless-next git tree.
-> 
-> V2: Describe axi chilren and make gpio a child of chipcommon core.
-> V3: Make chipcommon a GPIO controller (avoid extra sub-child)
->     Speed up finding OF node in driver_gpio.c
-> V4: Simplify setting of_node in driver_gpio.c
-> 
+Attempting to build the perf tool for an arm64 target results in the
+following failure:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+arch/arm64/util/unwind-libunwind.c: In function 'libunwind__arch_reg_id':
+arch/arm64/util/unwind-libunwind.c:77:3: error: implicit declaration of function 'pr_err'
+   pr_err("unwind: invalid reg id %d\n", regnum);
+   ^
+arch/arm64/util/unwind-libunwind.c:77:3: error: nested extern declaration of 'pr_err'
+
+This is due to commit 84f5d36f4866 ("perf tools: Move pr_* debug macros
+into debug object") moving the pr_* macros into a new header file, but
+failing to update architectures other than x86.
+
+This patch adds the missing include, and fixes the build again.
+
+Cc: Jiri Olsa <jolsa@kernel.org>
+Cc: Jean Pihet <jean.pihet@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+v1->v2: Rebased onto tip tree, which removed the need for the arch/arm/ hunks.
+
+ tools/perf/arch/arm64/util/unwind-libunwind.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tools/perf/arch/arm64/util/unwind-libunwind.c b/tools/perf/arch/arm64/util/unwind-libunwind.c
+index 436ee43859dc..a87afa91a99e 100644
+--- a/tools/perf/arch/arm64/util/unwind-libunwind.c
++++ b/tools/perf/arch/arm64/util/unwind-libunwind.c
+@@ -3,6 +3,7 @@
+ #include <libunwind.h>
+ #include "perf_regs.h"
+ #include "../../util/unwind.h"
++#include "../../util/debug.h"
+ 
+ int libunwind__arch_reg_id(int regnum)
+ {
+-- 
+2.1.0
