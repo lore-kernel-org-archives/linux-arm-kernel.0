@@ -1,50 +1,40 @@
-From: heyunlei@huawei.com (Yunlei He)
-Date: Tue, 30 Sep 2014 09:29:50 +0800
-Subject: [PATCH] pinctrl: pinctrl-single.c: init pinctrl single at
- arch_initcall time
-Message-ID: <1412040590-10764-1-git-send-email-heyunlei@huawei.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 29 Sep 2014 18:35:25 -0700
+Subject: [PATCH 0/5] ARM: move #include <asm/cp15.h> into cacheflush.h
+Message-ID: <1412040930-16864-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: heyunlei <heyunlei@huawei.com>
+There are several places where an explicit include of <asm/cp15.h> is needed
+just because cacheflush.h uses one of its macros in v7_exit_coherency_flush().
+Let's put the include in the proper header.
 
-On our arm platform, some modules (e.g. I2C bus driver) use the
-pinctrl-single driver to configure the SoC pin, but pinctrl-single
-driver uses module_init time, that makes some modules initialize ahead
-the pinctrl-single and fail to register.
+These obviously have some dependencies, so I'd focus on:
+  (1) Is patch 1 acceptable? If so, then:
+  (2) Make sure patch 1 is serialized before the rest
 
-This patch changes the initialization priority of pinctrl-single from
-module_init time to arch_initcall time.
+I did a cursory scan of every file that includes cp15.h, and these are the only
+ones I found that only needed it for the sake of v7_exit_coherency_flush().
 
-Signed-off-by: Yunlei He <heyunlei@huawei.com>
-Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
----
- drivers/pinctrl/pinctrl-single.c |   13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+These are barely compile tested.
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 95dd9cf..4b9e5b9 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -2012,7 +2012,18 @@ static struct platform_driver pcs_driver = {
- #endif
- };
- 
--module_platform_driver(pcs_driver);
-+static int __init pinctrl_single_init(void)
-+{
-+		return platform_driver_register(&pcs_driver);
-+}
-+
-+static void __exit pinctrl_single_exit(void)
-+{
-+		platform_driver_unregister(&pcs_driver);
-+}
-+
-+arch_initcall(pinctrl_single_init);
-+module_exit(pinctrl_single_exit);
- 
- MODULE_AUTHOR("Tony Lindgren <tony@atomide.com>");
- MODULE_DESCRIPTION("One-register-per-pin type device tree based pinctrl driver");
+Thanks,
+Brian
+
+Brian Norris (5):
+  ARM: include missing cp15.h header
+  ARM: mvebu: drop unnecessary include
+  ARM: rockchip: drop unnecessary include
+  ARM: vexpress: drop unnecessary include
+  ARM: brcmstb: drop unnecessary include
+
+ arch/arm/include/asm/cacheflush.h   | 1 +
+ arch/arm/mach-bcm/platsmp-brcmstb.c | 1 -
+ arch/arm/mach-mvebu/pmsu.c          | 1 -
+ arch/arm/mach-rockchip/platsmp.c    | 1 -
+ arch/arm/mach-vexpress/dcscb.c      | 1 -
+ arch/arm/mach-vexpress/tc2_pm.c     | 1 -
+ 6 files changed, 1 insertion(+), 5 deletions(-)
+
 -- 
-1.7.9.5
+1.9.1
