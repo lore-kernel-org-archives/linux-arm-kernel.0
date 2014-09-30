@@ -1,60 +1,176 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 30 Sep 2014 06:46:18 -0700
-Subject: [3/6] stmp3xxx_rtc_wdt: Add suspend/resume PM support
-In-Reply-To: <1411419350-1297-3-git-send-email-j.uzycki@elproma.com.pl>
-References: <1411419350-1297-3-git-send-email-j.uzycki@elproma.com.pl>
-Message-ID: <20140930134618.GA1591@roeck-us.net>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 30 Sep 2014 08:46:29 -0500
+Subject: [RFC 3/7] mfd: devicetree: bindings: Add Qualcomm SMD based RPM
+ DT binding
+In-Reply-To: <1412037291-16880-4-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1412037291-16880-4-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <85C5C172-D309-41B4-B511-7820BAFDA017@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 22, 2014 at 10:55:47PM +0200, Janusz U?ycki wrote:
-> There is no conflict with rtc/rtc-stmp3xxx.c parent
-> because modified registers in PM functions of stmp3xxx_rtc_wdt
-> are different.
+
+On Sep 29, 2014, at 7:34 PM, Bjorn Andersson <Bjorn.Andersson@sonymobile.com> wrote:
+
+> Add binding documentation for the Qualcomm Resource Power Manager (RPM)
+> using shared memory (Qualcomm SMD) as transport mechanism. This is found
+> in 8974 and newer based devices.
 > 
-> Signed-off-by: Janusz Uzycki <j.uzycki@elproma.com.pl>
-
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-
+> The binding currently describes the rpm itself and the regulator
+> subnodes.
+> 
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > ---
->  drivers/watchdog/stmp3xxx_rtc_wdt.c | 24 +++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
 > 
-> diff --git a/drivers/watchdog/stmp3xxx_rtc_wdt.c b/drivers/watchdog/stmp3xxx_rtc_wdt.c
-> index b4d6b34..77936b6 100644
-> --- a/drivers/watchdog/stmp3xxx_rtc_wdt.c
-> +++ b/drivers/watchdog/stmp3xxx_rtc_wdt.c
-> @@ -95,9 +95,33 @@ static int stmp3xxx_wdt_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int __maybe_unused stmp3xxx_wdt_suspend(struct device *dev)
-> +{
-> +	struct watchdog_device *wdd = &stmp3xxx_wdd;
+> Note that this patch extends the rpm dt-bindings header from [1].
+> 
+> [1] https://lkml.org/lkml/2014/9/22/733
+> 
+> .../devicetree/bindings/mfd/qcom-rpm-smd.txt       |  122 ++++++++++++++++++++
+> include/dt-bindings/mfd/qcom-rpm.h                 |   36 ++++++
+> 2 files changed, 158 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
+> new file mode 100644
+> index 0000000..a846101
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
+> @@ -0,0 +1,122 @@
+> +Qualcomm Resource Power Manager (RPM) over SMD
 > +
-> +	if (watchdog_active(wdd))
-> +		return wdt_stop(wdd);
+> +This driver is used to interface with the Resource Power Manager (RPM) found in
+> +various Qualcomm platforms. The RPM allows each component in the system to vote
+> +for state of the system resources, such as clocks, regulators and bus
+> +frequencies.
 > +
-> +	return 0;
-> +}
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be one of:
+> +		    "qcom,rpm-msm8974?
+
+Why not ?qcom,rpm-smd?.  I?d like to get Jeff H?s input on how what we do here for compat and distinguish the A-family RPM support vs B-family/RPM-SMD support.
+
 > +
-> +static int __maybe_unused stmp3xxx_wdt_resume(struct device *dev)
-> +{
-> +	struct watchdog_device *wdd = &stmp3xxx_wdd;
+> +- qcom,smd-channels:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: Shared Memory Channel used for communication with the RPM
 > +
-> +	if (watchdog_active(wdd))
-> +		return wdt_start(wdd);
+
+This needs more details.
+
+> +- #address-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: must be 1
 > +
-> +	return 0;
-> +}
+> +- #size-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: must be 0
 > +
-> +static SIMPLE_DEV_PM_OPS(stmp3xxx_wdt_pm_ops,
-> +			 stmp3xxx_wdt_suspend, stmp3xxx_wdt_resume);
+> += SUBDEVICES
+
+As I mentioned for the the RPM binding on a-family, we should split out the devices into their own binding specs.
+
 > +
->  static struct platform_driver stmp3xxx_wdt_driver = {
->  	.driver = {
->  		.name = "stmp3xxx_rtc_wdt",
-> +		.pm = &stmp3xxx_wdt_pm_ops,
->  	},
->  	.probe = stmp3xxx_wdt_probe,
->  	.remove = stmp3xxx_wdt_remove,
+> +The RPM exposes resources to its subnodes. The below bindings specify the set
+> +of valid subnodes that can operate on these resources.
+> +
+> +== Switch-mode Power Supply regulator
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be one of:
+> +		    "qcom,rpm-pm8841-smps"
+> +		    "qcom,rpm-pm8941-smps"
+> +
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: resource as defined in <dt-bindings/mfd/qcom-rpm.h>
+> +		    must be one of:
+> +		    QCOM_RPM_PM8841_SMPS1 - QCOM_RPM_PM8841_SMPS4,
+> +		    QCOM_RPM_PM8941_SMPS1 - QCOM_RPM_PM8941_SMPS3
+> +
+> +Standard regulator bindings are used inside switch mode power supply subnodes.
+> +Check Documentation/devicetree/bindings/regulator/regulator.txt for more
+> +details.
+> +
+> +== Low-dropout regulator
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be one of:
+> +		    "qcom,rpm-pm8941-ldo"
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: resource as defined in <dt-bindings/mfd/qcom-rpm.h>
+> +		    must be one of:
+> +		    QCOM_RPM_PM8941_LDO1 - QCOM_RPM_PM8941_LDO24
+> +
+> +Standard regulator bindings are used inside switch low-dropout regulator
+> +subnodes.  Check Documentation/devicetree/bindings/regulator/regulator.txt for
+> +more details.
+> +
+> +== Switch
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be one of:
+> +		    "qcom,rpm-pm8941-switch"
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: resource as defined in <dt-bindings/mfd/qcom/qcom-rpm.h>
+> +		    must be one of:
+> +		    QCOM_RPM_PM8941_LVS1 - QCOM_RPM_PM8941_LVS3,
+> +		    QCOM_RPM_PM8941_MVS1 - QCOM_RPM_PM8941_MVS2
+> +
+> +Standard regulator bindings are used inside switch regulator subnodes.  Check
+> +Documentation/devicetree/bindings/regulator/regulator.txt for more details.
+> +
+> += EXAMPLE
+> +
+> +	#include <dt-bindings/mfd/qcom-rpm.h>
+> +
+> +	rpm at 108000 {
+> +		compatible = "qcom,rpm-msm8960";
+> +		qcom,smd-channels = "rpm_requests";
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pm8941_s1: regulator-s1 {
+> +			compatible = "qcom,rpm-pm8941-smps";
+> +			reg = <QCOM_RPM_PM8941_SMPS1>;
+> +
+> +			regulator-min-microvolt = <1300000>;
+> +			regulator-max-microvolt = <1300000>;
+> +		};
+> +
+> +		pm8941_l3: pm8941-l3 {
+> +			compatible = "qcom,rpm-pm8941-ldo";
+> +			reg = <QCOM_RPM_PM8941_LDO3>;
+> +
+> +			regulator-min-microvolt = <1200000>;
+> +			regulator-max-microvolt = <1200000>;
+> +		};
+> +
+> +	};
+> +
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
