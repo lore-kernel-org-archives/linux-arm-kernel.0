@@ -1,32 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 20:36:26 +0200
-Subject: [PATCH 2/2] arch: arm: samsung: Clean-up usage of
- CONFIG_SERIAL_SAMSUNG_UARTS symbol
-In-Reply-To: <542AD5E6.9050503@gmail.com>
-References: <1412087695-10591-1-git-send-email-a.kesavan@samsung.com>
- <2267491.QlLoTEuT3L@wuerfel> <542AD5E6.9050503@gmail.com>
-Message-ID: <78824730.2ZeRMh8EV2@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 30 Sep 2014 20:37:31 +0200
+Subject: Differences between tlv320aic3x and tlv320aic31xx
+Message-ID: <20140930183731.GC3907@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 18:10:14 Tomasz Figa wrote:
-> >> @@ -110,7 +110,7 @@ void __init s3c24xx_init_uartdevs(char *name,
-> >>                                   struct s3c24xx_uart_resources *res,
-> >>                                   struct s3c2410_uartcfg *cfg, int no)
-> >>  {
-> >> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
-> >> +#ifdef CONFIG_SERIAL_SAMSUNG
-> >>         struct platform_device *platdev;
-> >>         struct s3c2410_uartcfg *cfgptr = uart_cfgs;
-> >>         struct s3c24xx_uart_resources *resp;
-> > 
-> > Since you hardcode the number here now, you can actually drop this #ifdef.
-> 
-> I believe what Abhilash did is correct, because this code is not needed
-> when there is no serial support enabled.
-> 
+Hi,
 
-I only added the #ifdef here because it was broken when
-CONFIG_SERIAL_SAMSUNG_UARTS was undefined.
+I'm trying to add support for the tlv320aic3104a present on a
+custom board using an am335x.
 
-	Arnd
+I see that Benoit seemed to have been successful when using the
+tlv320aic3x driver with minor modifications.
+http://mailman.alsa-project.org/pipermail/alsa-devel/2013-January/058966.html
+
+On the other hand, in the past, I've used a tlv320aic3100 with the
+tlv320aic31xx driver.
+
+My plan for now is to use the tlv320aic3x driver with snd-soc-evm as
+this is the one it is using (it is using .codec_dai_name =
+"tlv320aic3x-hifi").
+
+I had no luck until now but I still have to review my pinmuxing. But
+before I investigate to much, can you confirm what codecs are supported
+by which driver? I'm pretty sure that would be a nice addition to the
+documentation too.
+
+Thanks,
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
