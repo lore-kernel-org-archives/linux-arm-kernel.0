@@ -1,39 +1,67 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 30 Sep 2014 18:19:46 +0200
-Subject: [PATCH 5/6] ARM: at91/dt: add trng node
-In-Reply-To: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1412093987-30241-6-git-send-email-boris.brezillon@free-electrons.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 30 Sep 2014 09:25:42 -0700
+Subject: [PATCH v7 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
+ binding
+In-Reply-To: <2FC56515-E6AF-4A4D-9B04-70B4A8B2C4C7@codeaurora.org>
+References: <1411428329-23172-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1411428329-23172-2-git-send-email-bjorn.andersson@sonymobile.com>
+ <334C6A04-9607-4E97-A7A7-2FEED5986E57@codeaurora.org>
+ <20140930152838.GN28481@sonymobile.com>
+ <2FC56515-E6AF-4A4D-9B04-70B4A8B2C4C7@codeaurora.org>
+Message-ID: <20140930162541.GQ28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT node for the TRNG (True Random Number Generator) block.
+On Tue 30 Sep 09:02 PDT 2014, Kumar Gala wrote:
 
-Keep this block enabled as it does not depend on any external connection,
-and thus should be available on all boards.
+> 
+> On Sep 30, 2014, at 10:28 AM, Bjorn Andersson <Bjorn.Andersson@sonymobile.com> wrote:
+> 
+> > On Wed 24 Sep 09:39 PDT 2014, Kumar Gala wrote:
+> > 
+> >> 
+> >> On Sep 22, 2014, at 6:25 PM, Bjorn Andersson <Bjorn.Andersson@sonymobile.com> wrote:
+> >> 
+> > 
+> > [..]
+> > 
+> >>> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> > 
+> > [..]
+> > 
+> >>> +- qcom,ipc:
+> >>> +     Usage: required
+> >>> +     Value type: <prop-encoded-array>
+> >>> +
+> >>> +     Definition: three entries specifying the outgoing ipc bit used for
+> >>> +                 signaling the RPM:
+> >>> +                 - phandle to a syscon node representing the apcs registers
+> >>> +                 - u32 representing offset to the register within the syscon
+> >>> +                 - u32 representing the ipc bit within the register
+> >>> +
+> >> 
+> >> Does this really ever differ for the SoCs, and even if it does why do we need
+> >> to encode it in DT.  Can?t we determine it via the compatible setting?
+> >> 
+> > 
+> > The two offsets could be hard coded, especially based on the compatible.
+> > 
+> > But I don't know if it's worth respinning this just to get those two number out
+> > of here. Also this is now "symmetric" with the smd use cases, where it
+> > shouldn't be hard coded.
+> 
+> I do think its worth respinning until the DT is agreed to as we shouldn?t
+> be changing the binding.
+> 
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Correct, if there's valid reason for it.
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 932a669..790c890 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -934,6 +934,13 @@
- 				status = "disabled";
- 			};
- 
-+			trng at fffcc000 {
-+				compatible = "atmel,at91sam9g45-trng";
-+				reg = <0xfffcc000 0x4000>;
-+				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&trng_clk>;
-+			};
-+
- 			i2c0: i2c at fff84000 {
- 				compatible = "atmel,at91sam9g10-i2c";
- 				reg = <0xfff84000 0x100>;
--- 
-1.9.1
+> I?m not sure how being ?symmetric? with the smd use case maters if
+> we are treating this RPM support vs RPM-SMD as two different things.
+> 
+
+Not rpm-smd but smd. Which is also used on family a and uses the same kpss-gcc
+(or apcs) node as rpm for outgoing ipc on those platforms.
+
+Regards,
+Bjorn
