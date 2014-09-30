@@ -1,19 +1,34 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 30 Sep 2014 21:08:59 +0200
-Subject: [PATCH] sched, time: fix build error with 64 bit cputime_t on 32
- bit systems
-In-Reply-To: <20140930190611.GA5702@lerouge>
-References: <2547036.UshV4pXvhf@wuerfel>
- <20140930134011.232bc7bf@annuminas.surriel.com>
- <20140930190611.GA5702@lerouge>
-Message-ID: <20140930190859.GO4241@worktop.programming.kicks-ass.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 30 Sep 2014 12:13:05 -0700
+Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
+In-Reply-To: <20140930190023.GS28481@sonymobile.com>
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5429DA95.80505@codeaurora.org> <20140930050203.GG28481@sonymobile.com>
+ <542AF5FE.1000006@codeaurora.org> <20140930190023.GS28481@sonymobile.com>
+Message-ID: <542B00C1.3010702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 09:06:13PM +0200, Frederic Weisbecker wrote:
-> Maybe cmpxchg() should itself be a wrapper that does this build time choice
-> between cmpxchg32() and cmpxchg64().
-> 
-> And if it looks too dangerous to convert all users, this could be cmpxchg_t().
+On 09/30/14 12:00, Bjorn Andersson wrote:
+>
+> Hmm, seems I got that wrong, sorry about that.
+>
+> But do you mean "all wrong" as in that I use the wrong bit or to some greater
+> extent? Currently all following requests should timeout, but maybe we should
+> have a faster fail-path when we've hit this point?
 
-It cannot, not all 32bit archs can do a 64bit cmpxchg.
+Yes. We just ack the interrupt and go on happy to keep allowing clients
+to request things. I'd rather see us blow up or start failing requests,
+or maybe both.
+
+>
+> From a practical pov I guess that once the rpm starts returning errors on
+> updates to regulators, root clocks and bus scaling then most of the system is
+> becoming useless.
+
+Right. Rebooting will be required fairly soon.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
