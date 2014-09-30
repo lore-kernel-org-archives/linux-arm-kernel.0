@@ -1,94 +1,112 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 30 Sep 2014 15:03:01 +0800
-Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: enable more USB functions
-Message-ID: <1412060581-13963-1-git-send-email-peter.chen@freescale.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Sep 2014 00:07:32 -0700
+Subject: [PATCH] clk: prevent erronous parsing of children during rate
+ change
+In-Reply-To: <542913B4.2020808@ti.com>
+References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
+ <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
+ <5424C2FA.4000508@codeaurora.org> <5425135F.2070809@ti.com>
+ <20140926232453.19023.25483@quantum> <542913B4.2020808@ti.com>
+Message-ID: <20140930070732.19023.37829@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB Ethernet function at host mode
-USB Media function(webcam) at host mode
-USB Audio function at host mode
-USB Serial function at host mode
-USB EHSET driver at host mode (for OTG & EH Certification test)
-Several USB Gadget functions:
-	- Configfs
-	- NCM
-	- Zero (used for test)
-	- Gadgetfs
-	- Serial
+Quoting Tero Kristo (2014-09-29 01:09:24)
+> On 09/27/2014 02:24 AM, Mike Turquette wrote:
+> > Quoting Tero Kristo (2014-09-26 00:18:55)
+> >> On 09/26/2014 04:35 AM, Stephen Boyd wrote:
+> >>> On 09/23/14 06:38, Tero Kristo wrote:
+> >>>> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
+> >>>>> On 08/21, Tero Kristo wrote:
+> >>>>>>             /* Skip children who will be reparented to another clock */
+> >>>>>>             if (child->new_parent && child->new_parent != clk)
+> >>>>>>                 continue;
+> >>>>>
+> >>>>> Are we not hitting the new_parent check here? I don't understand
+> >>>>> how we can be changing parents here unless the check is being
+> >>>>> avoided, in which case I wonder why determine_rate isn't being
+> >>>>> used.
+> >>>>>
+> >>>>
+> >>>> It depends how the clock underneath handles the situation. The error I
+> >>>> am seeing actually happens with a SoC specific compound clock (DPLL)
+> >>>> which integrates set_rate + mux functionality into a single clock
+> >>>> node. A call to the clk_set_rate changes the parent of this clock
+> >>>> (from bypass clock to reference clock), in addition to changing the
+> >>>> rate (tune the mul+div.) I looked at using the determine rate call
+> >>>> with this type but it breaks everything up... the parent gets changed
+> >>>> but not the clock rate, in addition to some other issues.
+> >>>
+> >>> Ok. Is this omap3_noncore_dpll_set_rate()?
+> >>
+> >> Yes.
+> >>
+> >>   > Can we use determine_rate +
+> >>> clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
+> >>> allow us to do the mult+div and the parent in the same op call, although
+> >>> I don't understand why setting the parent and then setting the rate is
+> >>> not going to work.
+> >>
+> >> Well, setting parent first, then rate later causes problems with the
+> >> DPLL ending up running with illegal (non-specified) rate, the M+N values
+> >> are most likely wrong if you just switch from bypass clock to reference
+> >> clock first without programming the M+N first.
+> >
+> > I took a quick look and it still seems to me that the OMAP DPLLs are
+> > still not modeled properly as mux clocks. Is this correct?
+> 
+> Yeah, they are not mux clocks, but rather a compound of mux + DPLL 
+> multiplier/divider logic. Changing the DPLL to be a separate mux + DPLL 
+> div/mult clock will still have overlapping usage of the DPLL_EN field, 
 
-Above functions are built as module.
+I'm not talking about splitting up the clock into two separate clocks.
+If memory serves the DPLL clock implementation "cheats" and hides the
+bypass_clk info from the clock framework. To be explicit, from the
+perspective of Linux clock framework DPLL clocks only have one parent.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+In reality a typical DPLL should have at least 2 parents (and in some
+cases starting with OMAP4, some of the DPLL output clocks should have a
+second HSD parent). But the implementation does not reflect this.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 16cfec4..72ac582 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -130,6 +130,11 @@ CONFIG_SMC911X=y
- CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- CONFIG_AT803X_PHY=y
-+CONFIG_USB_PEGASUS=m
-+CONFIG_USB_RTL8150=m
-+CONFIG_USB_RTL8152=m
-+CONFIG_USB_USBNET=m
-+CONFIG_USB_NET_CDC_EEM=m
- CONFIG_BRCMFMAC=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
-@@ -185,6 +190,8 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_RC_SUPPORT=y
- CONFIG_RC_DEVICES=y
- CONFIG_IR_GPIO_CIR=y
-+CONFIG_MEDIA_USB_SUPPORT=y
-+CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_VIDEO_MX3=y
-@@ -205,6 +212,7 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-+CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=y
- CONFIG_SND_IMX_SOC=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
-@@ -220,11 +228,32 @@ CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_UDC=y
- CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_SERIAL=m
-+CONFIG_USB_SERIAL_GENERIC=y
-+CONFIG_USB_SERIAL_FTDI_SIO=m
-+CONFIG_USB_SERIAL_OPTION=m
-+CONFIG_USB_EHSET_TEST_FIXTURE=m
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_MXS_PHY=y
- CONFIG_USB_GADGET=y
-+CONFIG_USB_CONFIGFS=m
-+CONFIG_USB_CONFIGFS_SERIAL=y
-+CONFIG_USB_CONFIGFS_ACM=y
-+CONFIG_USB_CONFIGFS_OBEX=y
-+CONFIG_USB_CONFIGFS_NCM=y
-+CONFIG_USB_CONFIGFS_ECM=y
-+CONFIG_USB_CONFIGFS_ECM_SUBSET=y
-+CONFIG_USB_CONFIGFS_RNDIS=y
-+CONFIG_USB_CONFIGFS_EEM=y
-+CONFIG_USB_CONFIGFS_MASS_STORAGE=y
-+CONFIG_USB_CONFIGFS_F_LB_SS=y
-+CONFIG_USB_CONFIGFS_F_FS=y
-+CONFIG_USB_ZERO=m
- CONFIG_USB_ETH=m
-+CONFIG_USB_G_NCM=m
-+CONFIG_USB_GADGETFS=m
- CONFIG_USB_MASS_STORAGE=m
-+CONFIG_USB_G_SERIAL=m
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
--- 
-1.7.9.5
+> as the DPLL must be in bypass mode during M+N change. Or, should the 
+> DPLL rate change only be allowed if the mux is in bypass setting? 
+> Several drivers still depend on direct dpll clk_set_rate working 
+> 'properly' (there are some other issues currently present also which 
+> have nothing to do with the mux behavior.)
+> 
+> > This issue has been lingering for a long time and we can't use
+> > determine_rate unless that clock has multiple parents. Simply hacking
+> > knowledge of the parent bypass clock into the .set_rate callback is not
+> > enough.
+> 
+> If you believe this _must_ be changed, I can take a look at this for 
+> next merge window, but this will cause a DT data compatibility break if 
+> nothing else (personally I don't care about this as I always rebuild DT 
+> blob with kernel, but lots of other people seem to do.)
+
+Well I guess the question is how long will we put up with the many small
+headaches caused by incorrectly modeling the clock?
+
+determine_rate and clk_set_parent_and_rate should be sufficient for the
+OMAP DPLLs but only if they are correctly modeled in the framework.
+
+Regards,
+Mike
+
+> 
+> -Tero
+> 
+> >
+> > Regards,
+> > Mike
+> >
+> >>
+> >>    I'm interested in the other issues that you mentioned
+> >>> too.
+> >>
+> >> Mostly these were side-effects from the illegal DPLL setup I guess, like
+> >> boot hang, failed drivers etc. I didn't really investigate this that
+> >> much as it is much more simpler just to use safe list iteration here.
+> >>
+> >> -Tero
+> 
