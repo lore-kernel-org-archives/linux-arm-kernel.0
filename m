@@ -1,60 +1,45 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 30 Sep 2014 18:19:44 +0200
-Subject: [PATCH 3/6] hwrng: atmel: add DT support
-In-Reply-To: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1412093987-30241-4-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 30 Sep 2014 18:19:41 +0200
+Subject: [PATCH 0/6] ARM: at91: remove at91sam9g45/9m10 legacy board support
+Message-ID: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support.
+Hello,
 
-Make the driver depend on CONFIG_OF as at91sam9g45 was the only SoC making
-use of the TRNG block and this SoC is now fully migrated to DT.
+This patch removes legacy board support for at91sam9g45/9m10 SoCs whose
+boards have already migrated to DT.
+Along with this removal this series adds DT support for the TRNG (True
+Random Generator Block) and adds missing trng and isi nodes to the dtsi.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/char/hw_random/Kconfig     | 2 +-
- drivers/char/hw_random/atmel-rng.c | 7 +++++++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+There's still one missing piece to provide the exact same set of
+functionalities: AC97 controller support which has not been moved to DT yet.
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 836b061..a0f5500 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -64,7 +64,7 @@ config HW_RANDOM_AMD
- 
- config HW_RANDOM_ATMEL
- 	tristate "Atmel Random Number Generator support"
--	depends on ARCH_AT91 && HAVE_CLK
-+	depends on ARCH_AT91 && HAVE_CLK && OF
- 	default HW_RANDOM
- 	---help---
- 	  This driver provides kernel-side support for the Random Number
-diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
-index 644ec48..0bb0b21 100644
---- a/drivers/char/hw_random/atmel-rng.c
-+++ b/drivers/char/hw_random/atmel-rng.c
-@@ -123,6 +123,12 @@ static const struct dev_pm_ops atmel_trng_pm_ops = {
- };
- #endif /* CONFIG_PM */
- 
-+static const struct of_device_id atmel_trng_dt_ids[] = {
-+	{ .compatible = "atmel,at91sam9g45-trng" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_trng_dt_ids);
-+
- static struct platform_driver atmel_trng_driver = {
- 	.probe		= atmel_trng_probe,
- 	.remove		= atmel_trng_remove,
-@@ -132,6 +138,7 @@ static struct platform_driver atmel_trng_driver = {
- #ifdef CONFIG_PM
- 		.pm	= &atmel_trng_pm_ops,
- #endif /* CONFIG_PM */
-+		.of_match_table = atmel_trng_dt_ids,
- 	},
- };
- 
+Best Regards,
+
+Boris
+
+Boris Brezillon (6):
+  ARM: at91: remove at91sam9g45/9m10 legacy board support
+  hwrng: atmel: use clk_prepapre_enable/_disable_unprepare
+  hwrng: atmel: add DT support
+  hwrng: atmel: Add TRNG DT binding doc
+  ARM: at91/dt: add trng node
+  ARM: at91/dt: add ISI node
+
+ .../devicetree/bindings/hwrng/atmel-trng.txt       |   16 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   39 +
+ arch/arm/mach-at91/Kconfig.non_dt                  |   21 -
+ arch/arm/mach-at91/Makefile                        |    4 -
+ arch/arm/mach-at91/at91sam9g45.c                   |  403 ----
+ arch/arm/mach-at91/at91sam9g45_devices.c           | 1915 --------------------
+ arch/arm/mach-at91/board-sam9m10g45ek.c            |  526 ------
+ drivers/char/hw_random/Kconfig                     |    2 +-
+ drivers/char/hw_random/atmel-rng.c                 |   15 +-
+ 9 files changed, 67 insertions(+), 2874 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/hwrng/atmel-trng.txt
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
+
 -- 
 1.9.1
