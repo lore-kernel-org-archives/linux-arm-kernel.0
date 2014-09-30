@@ -1,95 +1,61 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 30 Sep 2014 14:37:53 -0700
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140929135358.GC30998@ulmo>
-References: <20140829141244.GH15297@lukather> <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
- <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
- <20140929135358.GC30998@ulmo>
-Message-ID: <20140930213753.19023.17605@quantum>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 30 Sep 2014 23:49:15 +0200 (CEST)
+Subject: [RFT v2 01/24] irqdomain: Introduce new interfaces to support
+ hierarchy irqdomains
+In-Reply-To: <542A8C5E.3040901@huawei.com>
+References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+ <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
+ <54294F1C.30606@huawei.com>
+ <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
+ <542A8C5E.3040901@huawei.com>
+Message-ID: <alpine.DEB.2.11.1409302337130.4455@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Thierry Reding (2014-09-29 06:54:00)
-> On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
-> > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
-> > > > >> Plus, speaking more specifically about the clocks, that won't prevent
-> > > > >> your clock to be shut down as a side effect of a later clk_disable
-> > > > >> call from another driver.
-> > > > 
-> > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
-> > > > > preceding clk_enable()? There are patches being worked on that will
-> > > > > enable per-user clocks and as I understand it they will specifically
-> > > > > disallow drivers to disable the hardware clock if other drivers are
-> > > > > still keeping them on via their own referenc.
-> > > > 
-> > > > Calling clk_disable() preceding clk_enable() is a bug.
-> > > > 
-> > > > Calling clk_disable() after clk_enable() will disable the clock (and
-> > > > its parents)
-> > > > if the clock subsystem thinks there are no other users, which is what will
-> > > > happen here.
-> > > 
-> > > Right. I'm not sure this is really applicable to this situation, though.
-> > 
-> > It's actually very easy to do. Have a driver that probes, enables its
-> > clock, fails to probe for any reason, call clk_disable in its exit
-> > path. If there's no other user at that time of this particular clock
-> > tree, it will be shut down. Bam. You just lost your framebuffer.
-> > 
-> > Really, it's just that simple, and relying on the fact that some other
-> > user of the same clock tree will always be their is beyond fragile.
+On Tue, 30 Sep 2014, Abel wrote:
+> On 2014/9/29 23:53, Thomas Gleixner wrote:
+> What I suggest is something like:
 > 
-> Perhaps the meaning clk_ignore_unused should be revised, then. What you
-> describe isn't at all what I'd expect from such an option. And it does
-> not match the description in Documentation/kernel-parameters.txt either.
+> for (iter = domain; iter; iter = iter->parent) {
+> 	ret = iter->ops->alloc(iter, virq, nr_irqs, arg);
+> 	if (ret < 0) {
+> 		mutex_unlock(&irq_domain_mutex);
+> 		goto out_free_irq_data;
+> 	}
+> }
+> 
+> in this way, the core infrastructure guarantees allocating down the
+> irqdomain hierarchy, and the implementers of domain_ops->alloc()
+> need not to call irq_domain_alloc_irqs_parent() any longer, just do
+> the things they have to.
 
->From e156ee56cbe26c9e8df6619dac1a993245afc1d5 Mon Sep 17 00:00:00 2001
-From: Mike Turquette <mturquette@linaro.org>
-Date: Tue, 30 Sep 2014 14:24:38 -0700
-Subject: [PATCH] doc/kernel-parameters.txt: clarify clk_ignore_unused
+That makes sense. I misunderstood you then.
 
-Refine the definition around clk_ignore_unused, which caused some
-confusion recently on the linux-fbdev and linux-arm-kernel mailing
-lists[0].
+> > So we cannot define upfront how deep an ack/mask/unmask/... has to be
+> > propagated down the chain. This needs a careful consideration in terms
+> > of functionality and we want to be able to do performance shortcuts as
+> > well.
+> > 
+> 
+> Yes, I got it. And one more thing I concerned is that when hierarchy
+> irqdomains is enabled, shouldn't the ack_parent() be called by default
+> by the irqchip->irq_ack() of each domain to ensure all the domains in
+> the delivery path ack this interrupt?
 
-[0] http://lkml.kernel.org/r/<20140929135358.GC30998@ulmo>
+In the pure theory of design, yes. But that will cause pointless
+overhead on particular systems.
 
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
-Thierry,
+On a particular system the ack of the top level domain C, i.e. the one
+which is facing the device and is handled by the core irq flow
+handler, might be enough because B does not require an ack and A is
+implicitely acked by iret or some other magic instruction in the low
+level entry path. And because we know that C can only be on top of B
+and B is on top of A we want the flexibility to avoid going down the
+full chain for nothing in the interrupt hot path.
 
-Please let me know if this wording makes the feature more clear.
+So yes, in theory it should go down all levels, but in practice we
+dont want to enforce it :)
 
- Documentation/kernel-parameters.txt | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+Thanks,
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 10d51c2..0ce01fb 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -605,11 +605,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			See Documentation/s390/CommonIO for details.
- 	clk_ignore_unused
- 			[CLK]
--			Keep all clocks already enabled by bootloader on,
--			even if no driver has claimed them. This is useful
--			for debug and development, but should not be
--			needed on a platform with proper driver support.
--			For more information, see Documentation/clk.txt.
-+			Prevents the clock framework from automatically gating
-+			clocks that have not been explicitly enabled by a Linux
-+			device driver but are enabled in hardware at reset or
-+			by the bootloader/firmware. Note that this does not
-+			force such clocks to be always-on nor does it reserve
-+			those clocks in any way. This parameter is useful for
-+			debug and development, but should not be needed on a
-+			platform with proper driver support.  For more
-+			information, see Documentation/clk.txt.
- 
- 	clock=		[BUGS=X86-32, HW] gettimeofday clocksource override.
- 			[Deprecated]
--- 
-1.8.3.2
+	tglx
