@@ -1,93 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 30 Sep 2014 13:03:44 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <8631927.qWHZsjCs8e@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1411937610-22125-3-git-send-email-suravee.suthikulpanit@amd.com>
- <8631927.qWHZsjCs8e@wuerfel>
-Message-ID: <20140930120344.GA14215@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 14:04:17 +0200
+Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
+Message-ID: <1811108.CcWEs0vKNL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 03:36:30PM +0100, Arnd Bergmann wrote:
-> On Sunday 28 September 2014 15:53:28 suravee.suthikulpanit at amd.com wrote:
-> > +
-> > +#ifdef CONFIG_ARM64
-> > +struct pci_bus *gen_scan_root_bus(struct device *parent, int bus,
-> > +                                      struct pci_ops *ops, void *sysdata,
-> > +                                      struct list_head *resources)
-> > +{
-> 
-> I don't see anything ARM64 specific in this, the function only uses
-> the newly added generic helpers.
+If the OMAP nand driver is built-in but the BCH driver is a module,
+we get a link-time error:
 
-I do not see it either, it is just a copy'n'paste of common PCI code,
-plus msi management.
+drivers/built-in.o: In function `omap_elm_correct_data':
+:(.text+0x174e88): undefined reference to `elm_decode_bch_error_page'
+drivers/built-in.o: In function `omap_nand_probe':
+:(.text+0x175b48): undefined reference to `elm_config'
 
-> >  static int gen_pci_probe(struct platform_device *pdev)
-> >  {
-> > @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >         struct device *dev = &pdev->dev;
-> >         struct device_node *np = dev->of_node;
-> >         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> > +#ifndef CONFIG_ARM64
-> >         struct hw_pci hw = {
-> >                 .nr_controllers = 1,
-> >                 .private_data   = (void **)&pci,
-> > @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >                 .map_irq        = of_irq_parse_and_map_pci,
-> >                 .ops            = &gen_pci_ops,
-> >         };
-> > +#endif
-> >  
-> 
-> Same here, I'd suggest marking this "#ifdef CONFIG_ARM" instead, as hw_pci
-> is an arm32 specific data structure.
+There are two possible ways to deal with this, either prevent that
+configuration in Kconfig or make sure we don't reference the ELM
+driver in this case.
 
-I do not think we need hw struct at all, see below, we can write code so
-that we do not rely on ARM32 PCI bios, I will have a stab at that and
-post the resulting code.
+This patch picks the second approach, which makes it possible to
+use the ELM driver in other modules while still having the OMAP
+NAND driver built-in.
 
-> >         if (!pci)
-> >                 return -ENOMEM;
-> > @@ -368,8 +429,24 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >                 gen_pci_release_of_pci_ranges(pci);
-> >                 return err;
-> >         }
-> > +#ifdef CONFIG_ARM64
-> >  
-> > +#ifdef CONFIG_PCI_MSI
-> > +       pci->msi_parent = of_parse_phandle(np, "msi-parent", 0);
-> > +       if (!pci->msi_parent) {
-> > +               dev_err(&pdev->dev, "Failed to allocate msi-parent.\n");
-> > +               return -EINVAL;
-> > +       }
-> > +#endif
-> 
-> We probably want to enable MSI unconditionally on ARM64, so the #ifdef is
-> not necessary here. However, I don't think that a missing msi-parent should
-> be a fatal error here: we can still continue without MSI support if this
-> case.
-> 
-> > +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
-> > +                              &gen_pci_ops, pci, &pci->resources)) {
-> > +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
-> > +               return -ENODEV;
-> > +       }
-> > +#else
-> >         pci_common_init_dev(dev, &hw);
-> > +#endif /* CONFIG_ARM64 */
-> > 
-> 
-> Again, just make the pci_common_init_dev() call #ifdef CONFIG_ARM, and move
-> the generic case after it, outside of the #ifdef.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 93af53b8633c ("nand: omap2: Remove horrible ifdefs to fix module probe")
 
-I went through the code quickly but I think we can (and should) remove
-this quite ugly ifdeffery altogether. Most of the functionality in
-pci_common_init_dev() can be implemented through the common PCI API (and this
-would make this driver arch agnostic as it should be), I will go through ARM32
-PCI bios code to check what is executed in detail in pci_common_init_dev() and
-make sure that we follow those initialization steps in the resulting probe code
-for this PCI generic host controller driver.
-
-Lorenzo
+diff --git a/include/linux/platform_data/elm.h b/include/linux/platform_data/elm.h
+index b8686c00f15f..cbca66ce7c10 100644
+--- a/include/linux/platform_data/elm.h
++++ b/include/linux/platform_data/elm.h
+@@ -42,7 +42,7 @@ struct elm_errorvec {
+ 	int error_loc[16];
+ };
+ 
+-#if IS_ENABLED(CONFIG_MTD_NAND_OMAP_BCH)
++#if defined(CONFIG_MTD_NAND_OMAP_BCH) || (defined(CONFIG_MTD_NAND_OMAP_BCH_MODULE) && defined(MODULE))
+ void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
+ 		struct elm_errorvec *err_vec);
+ int elm_config(struct device *dev, enum bch_ecc bch_type,
