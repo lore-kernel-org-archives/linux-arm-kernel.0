@@ -1,57 +1,107 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Sep 2014 09:14:26 +0200
-Subject: [PATCH 2/3] pinctrl: nomadik: use utils map free function
-Message-ID: <1412061266-20790-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 30 Sep 2014 09:14:35 +0200
+Subject: [PATCH 3/3] pinctrl: nomadik: refactor DT parser to take two paths
+Message-ID: <1412061275-20829-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stop brewing our own map free function and rely on the pinctrl
-utils helpers.
+We refactor the DT parser to look for either a config or a
+function and then look for further nodes and reserve maps,
+not the two things mixed up like prior to this patch.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pinctrl/nomadik/pinctrl-nomadik.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 62 ++++++++++++++++---------------
+ 1 file changed, 33 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index 9fe31daf9230..6c9667a44b7b 100644
+index 6c9667a44b7b..09efb8c1a2eb 100644
 --- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
 +++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -1339,17 +1339,6 @@ static void nmk_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s,
- 	nmk_gpio_dbg_show_one(s, pctldev, chip, offset - chip->base, offset);
- }
+@@ -1505,51 +1505,55 @@ static int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 	const char *function = NULL;
+ 	unsigned long configs = 0;
+ 	bool has_config = 0;
+-	unsigned reserve = 0;
+ 	struct property *prop;
+ 	const char *group, *gpio_name;
+ 	struct device_node *np_config;
  
--static void nmk_pinctrl_dt_free_map(struct pinctrl_dev *pctldev,
--		struct pinctrl_map *map, unsigned num_maps)
--{
--	int i;
+ 	ret = of_property_read_string(np, "ste,function", &function);
+-	if (ret >= 0)
+-		reserve = 1;
 -
--	for (i = 0; i < num_maps; i++)
--		if (map[i].type == PIN_MAP_TYPE_CONFIGS_PIN)
--			kfree(map[i].data.configs.configs);
--	kfree(map);
--}
+-	has_config = nmk_pinctrl_dt_get_config(np, &configs);
 -
- static int nmk_dt_add_map_mux(struct pinctrl_map **map, unsigned *reserved_maps,
- 		unsigned *num_maps, const char *group,
- 		const char *function)
-@@ -1581,7 +1570,7 @@ static int nmk_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 		ret = nmk_pinctrl_dt_subnode_to_map(pctldev, np, map,
- 				&reserved_maps, num_maps);
- 		if (ret < 0) {
--			nmk_pinctrl_dt_free_map(pctldev, *map, *num_maps);
-+			pinctrl_utils_dt_free_map(pctldev, *map, *num_maps);
- 			return ret;
+-	np_config = of_parse_phandle(np, "ste,config", 0);
+-	if (np_config)
+-		has_config |= nmk_pinctrl_dt_get_config(np_config, &configs);
+-
+-	ret = of_property_count_strings(np, "ste,pins");
+-	if (ret < 0)
+-		goto exit;
+-
+-	if (has_config)
+-		reserve++;
+-
+-	reserve *= ret;
+-
+-	ret = pinctrl_utils_reserve_map(pctldev, map, reserved_maps, num_maps, reserve);
+-	if (ret < 0)
+-		goto exit;
+-
+-	of_property_for_each_string(np, "ste,pins", prop, group) {
+-		if (function) {
++	if (ret >= 0) {
++		ret = of_property_count_strings(np, "ste,pins");
++		if (ret < 0)
++			goto exit;
++
++		ret = pinctrl_utils_reserve_map(pctldev, map,
++						reserved_maps,
++						num_maps, ret);
++		if (ret < 0)
++			goto exit;
++
++		of_property_for_each_string(np, "ste,pins", prop, group) {
+ 			ret = nmk_dt_add_map_mux(map, reserved_maps, num_maps,
+ 					  group, function);
+ 			if (ret < 0)
+ 				goto exit;
  		}
- 	}
-@@ -1595,7 +1584,7 @@ static const struct pinctrl_ops nmk_pinctrl_ops = {
- 	.get_group_pins = nmk_get_group_pins,
- 	.pin_dbg_show = nmk_pin_dbg_show,
- 	.dt_node_to_map = nmk_pinctrl_dt_node_to_map,
--	.dt_free_map = nmk_pinctrl_dt_free_map,
-+	.dt_free_map = pinctrl_utils_dt_free_map,
- };
+-		if (has_config) {
++	}
++
++	has_config = nmk_pinctrl_dt_get_config(np, &configs);
++	np_config = of_parse_phandle(np, "ste,config", 0);
++	if (np_config)
++		has_config |= nmk_pinctrl_dt_get_config(np_config, &configs);
++	if (has_config) {
++		ret = of_property_count_strings(np, "ste,pins");
++		if (ret < 0)
++			goto exit;
++		ret = pinctrl_utils_reserve_map(pctldev, map,
++						reserved_maps,
++						num_maps, ret);
++		if (ret < 0)
++			goto exit;
++
++		of_property_for_each_string(np, "ste,pins", prop, group) {
+ 			gpio_name = nmk_find_pin_name(pctldev, group);
  
- static int nmk_pmx_get_funcs_cnt(struct pinctrl_dev *pctldev)
+-			ret = nmk_dt_add_map_configs(map, reserved_maps, num_maps,
+-					      gpio_name, &configs, 1);
++			ret = nmk_dt_add_map_configs(map, reserved_maps,
++						     num_maps,
++						     gpio_name, &configs, 1);
+ 			if (ret < 0)
+ 				goto exit;
+ 		}
+-
+ 	}
++
+ exit:
+ 	return ret;
+ }
 -- 
 1.9.3
