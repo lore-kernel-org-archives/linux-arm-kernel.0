@@ -1,38 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Sep 2014 11:03:55 +0100
-Subject: [PATCH 0/5] ARM: move #include <asm/cp15.h> into cacheflush.h
-In-Reply-To: <alpine.LFD.2.11.1409300016060.5311@knanqh.ubzr>
-References: <1412040930-16864-1-git-send-email-computersforpeace@gmail.com>
- <alpine.LFD.2.11.1409300016060.5311@knanqh.ubzr>
-Message-ID: <20140930100355.GM5182@n2100.arm.linux.org.uk>
+From: zhang.lyra@gmail.com (Lyra Zhang)
+Date: Tue, 30 Sep 2014 18:08:44 +0800
+Subject: [PATCH 6/6] Documentation: Add entry for Spreadtrum's Shark64 SoC
+In-Reply-To: <3268049.TolhrmBCZA@wuerfel>
+References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
+ <1411992293-7729-7-git-send-email-zhang.lyra@gmail.com>
+ <3268049.TolhrmBCZA@wuerfel>
+Message-ID: <CAAfSe-sU0w6XTQ1yJd6v0q1eT5H3wvJXJYVBE8dv--QyZ3wHxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 12:30:06AM -0400, Nicolas Pitre wrote:
-> On Mon, 29 Sep 2014, Brian Norris wrote:
-> 
-> > There are several places where an explicit include of <asm/cp15.h> is needed
-> > just because cacheflush.h uses one of its macros in v7_exit_coherency_flush().
-> > Let's put the include in the proper header.
-> > 
-> > These obviously have some dependencies, so I'd focus on:
-> >   (1) Is patch 1 acceptable? If so, then:
-> 
-> Well, I'm wondering if it is really a gain to force a dependency for 
-> cp15.h on every user of cacheflush.h just because of the seldomly used 
-> v7_exit_coherency_flush(). But I don't mind either ways.
+Hi, Arnd
 
-I don't like unnecessary dependencies.  We have too many of them already,
-and it basically means that touching any header file triggers a full
-kernel rebuild.
+[use plain text pattern to send again]
 
-If we go down the path of adding unnecessary dependencies, we might as
-well do away with make and just script the damn thing, and that'll
-probably be faster since there'll be no dependencies to track.  Just
-throw everything through ccache and let it deal with anything which
-has changed.  Just don't allow your disk to fill up during the build,
-ccache really doesn't like that.
+Thank you very much for your review in detail so carefully. I'll
+address these changes which you mentioned in this patch set in V2, but
+the days from tomorrow to 10.7 are Chinese holidays, I'm going to send
+PATCHv2 a few days later.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+I'm also sorry that make you confused about my name, I'll solve this
+problem in the next submit.
+
+Thanks,
+Chunyan
+
+2014-09-29 21:59 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 29 September 2014 20:04:53 zhang.lyra at gmail.com wrote:
+>> From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
+>>
+>> Adds a devicetree binding documentation for Spreadtrum's Shark64 SoC.
+>>
+>> Signed-off-by: chunyan.zhang <chunyan.zhang@spreadtrum.com>
+>
+> One more thing: The email addresses look wrong, please use the form in
+> which you normally write the names, such as
+>
+> Signed-off-by: Zhang Chunyan <chunyan.zhang@spreadtrum.com>
+>
+> You can set the user name that git will add using the
+> 'git config --global user.name ...'.
+>
+> Also, I notice that the email from which the patch is sent does not
+> match the last 'Signed-off-by' line. If Chunyan and Lyra are both
+> your names, better pick one that you use for both the email and the
+> signoff. If you are Lyra and are posting a patch from Chunyan, please
+> add your own line below hers, like
+>
+> Signed-off-by: Zhang Chunyan <chunyan.zhang@spreadtrum.com>
+> Signed-off-by: Zhang Lyra <zhang.lyra@gmail.com>
+>
+> so that you include everybody who was involved in sending the
+> patch, but have your own list last.
+>
+>         Arnd
