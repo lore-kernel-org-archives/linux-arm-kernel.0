@@ -1,57 +1,126 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 30 Sep 2014 13:00:53 -0700
-Subject: [RFC 1/7] soc: qcom: Add device tree binding for SMEM
-In-Reply-To: <542AFE79.6030304@codeaurora.org>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1412037291-16880-2-git-send-email-bjorn.andersson@sonymobile.com>
- <542AFE79.6030304@codeaurora.org>
-Message-ID: <20140930200052.GU28481@sonymobile.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 22:01:14 +0200
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <3079787.54pZijGjZM@wuerfel>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140930174821.GX841@e106497-lin.cambridge.arm.com>
+ <3079787.54pZijGjZM@wuerfel>
+Message-ID: <2430078.s4snyh5OoF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30 Sep 12:03 PDT 2014, Stephen Boyd wrote:
-
-> On 09/29/14 17:34, Bjorn Andersson wrote:
-> > +
-> > +- reg:
-> > +	Usage: required
-> > +	Value type: <prop-encoded-array>
-> > +	Definition: base address and size pair for each area representing the
-> > +		    shared memory. The first pair will must represent the "main"
-> > +		    area, where the shared memory header and table-of-content
-> > +		    can be found.
-> >
-> > +
-> > += EXAMPLE
-> > +
-> > +        smem: smem at fa00000 {
-> > +                compatible = "qcom,smem";
-> > +                reg = <0x0fa00000 0x200000>,
-> > +                      <0xfc428000 0x4000>;
+On Tuesday 30 September 2014 20:54:41 Arnd Bergmann wrote:
+> On Tuesday 30 September 2014 18:48:21 Liviu Dudau wrote:
+> > > > > > These are the functions I found that refer to pci_sys_data on arm32:
+> > > > > > 
+> > > > > > pcibios_add_bus
+> > > > > > pcibios_remove_bus
+> > 
+> > These are only needed if you want to do per HB processing of the bus
+> > 
+> > > > > > pcibios_align_resource
+> > 
+> > mvebu is the only user of this function.
+> > 
+> > > > > > pci_mmap_page_range
+> > 
+> > This is only needed when mapping a PCI resource to userspace. Is that your case here?
+> > 
+> > > > > > pci_domain_nr
+> > > > > > pci_proc_domain
+> > 
+> > We have equivalent functionality in the generic patches for those.
+> > 
 > 
-> Isn't this second entry rpm message ram? That isn't the same as smem.
-> Plus smem is part of ram (and rpm message ram is not) so we need to do
-> memory reservations or something.
-> 
+> We clearly don't need those functions for the new drivers, but that's not
+> the point. The problem is that when you build a kernel that has both
+> a traditional host bridge driver and a new one in it, you always get those
+> functions and they get called from the PCI core, with incorrect arguments.
 
-Correct they are different, but smem covers both of those and allocations are
-only supposed to be done in the first of these.
+FWIW, the last time we discussed this, I think I had suggested that the
+functions that are currently architecture specific and have a generic
+__weak fallback could become function pointers in a per-host structure
+passed to pci_scan_root_bus, either a new structure or an extended
+struct pci_ops. Something along these lines:
 
-And I forgot to mention that I have the following in my dt:
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 7fc42784becb..3da32fc631d0 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -36,7 +36,6 @@ struct hw_pci {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
+-	void		(*add_bus)(struct pci_bus *bus);
+ 	void		(*remove_bus)(struct pci_bus *bus);
+ };
+ 
+@@ -65,7 +64,6 @@ struct pci_sys_data {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
+-	void		(*add_bus)(struct pci_bus *bus);
+ 	void		(*remove_bus)(struct pci_bus *bus);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c17f7f5..3cbcf8dc41e4 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -360,13 +360,6 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-void pcibios_add_bus(struct pci_bus *bus)
+-{
+-	struct pci_sys_data *sys = bus->sysdata;
+-	if (sys->add_bus)
+-		sys->add_bus(bus);
+-}
+-
+ void pcibios_remove_bus(struct pci_bus *bus)
+ {
+ 	struct pci_sys_data *sys = bus->sysdata;
+@@ -475,7 +468,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+ 		sys->align_resource = hw->align_resource;
+-		sys->add_bus = hw->add_bus;
+ 		sys->remove_bus = hw->remove_bus;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index b1315e197ffb..c9a0ee0429e8 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -716,6 +716,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ static struct pci_ops mvebu_pcie_ops = {
+ 	.read = mvebu_pcie_rd_conf,
+ 	.write = mvebu_pcie_wr_conf,
++	.add_bus = mvebu_pcie_add_bus,
+ };
+ 
+ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+@@ -823,7 +824,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+ 	hw.align_resource = mvebu_pcie_align_resource;
+-	hw.add_bus        = mvebu_pcie_add_bus;
+ 
+ 	pci_common_init(&hw);
+ }
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index a63a47a70846..be6d56358320 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1885,6 +1885,8 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 
+ void __weak pcibios_add_bus(struct pci_bus *bus)
+ {
++	if (bus->ops && bus->ops->add_bus)
++		bus->ops->add_bus(bus);		
+ }
+ 
+ void __weak pcibios_remove_bus(struct pci_bus *bus)
 
-/ {
-        reserved-memory {
-                #address-cells = <1>;
-                #size-cells = <1>;
-                ranges;
-
-                smem at fa00000 {
-                        #memory-region-cells = <0>;
-                        reg = <0x0fa00000 0x200000>;
-                        no-map;
-                };
-        };
-};
-
-Regards,
-Bjorn
+	Arnd
