@@ -1,30 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 12:39:37 +0200
-Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic {read,
- write}s*()
-In-Reply-To: <CAMo8Bf+u8er_KF4nJPSPNf9OmKZHu4y0x3Pcb7DU17y5ocBJqw@mail.gmail.com>
-References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
- <CAMo8BfJ9VJ24zsn_6VwNrAntmDqdJu11O79OyMd8eThv3UaaUw@mail.gmail.com>
- <CAMo8Bf+u8er_KF4nJPSPNf9OmKZHu4y0x3Pcb7DU17y5ocBJqw@mail.gmail.com>
-Message-ID: <1799506.5Clfp6gmMu@wuerfel>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 30 Sep 2014 11:39:42 +0100
+Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <20140929194335.GA13747@google.com>
+References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140929194335.GA13747@google.com>
+Message-ID: <20140930103942.GO841@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 14:26:20 Max Filippov wrote:
-> On Tue, Sep 30, 2014 at 2:22 PM, Max Filippov <jcmvbkbc@gmail.com> wrote:
-> > Hi Thierry,
-> >
-> >> I think this can be fixed by including linux/string.h for memset() and
-> >> memcpy() in include/asm-generic/io.h.
-> >
-> > Will you send that fix or do I need to do it?
+On Mon, Sep 29, 2014 at 08:43:35PM +0100, Bjorn Helgaas wrote:
+> On Mon, Sep 29, 2014 at 03:29:19PM +0100, Liviu Dudau wrote:
+> > This is my version 13 of the attempt at adding support for generic PCI host
+> > bridge controllers. It contains only cleanups to make it play nice with the
+> > linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
+> > asm-generic is going to revert some of its more aggresive patches, he has the
+> > choice of queueing it into linux-next again.
+> > ...
 > 
-> Never mind, found that it's fixed in today's next.
+> These patches above were already on my pci/host-generic branch and in
+> linux-next:
 > 
+>    asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
+This ^ ...
+
+>    of/pci: Add pci_register_io_range() and pci_pio_to_address()
+>    ARM: Define PCI_IOBASE as the base of virtual PCI IO space
+
+and this ^ need to be refreshed from my series otherwise we will get conflicts with
+asm-generic branch (either now or in the future). While the asm-generic/io.h
+cast is arguably superflous, we need to define PCI_IOBASE as a void __iomem* to
+match all other standard declarations of PCI_IOBASE.
+
+>    of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
+>    of/pci: Move of_pci_range_to_resources() to of/address.c
+>    of/pci: Fix the conversion of IO ranges into IO resources
 > 
+> I added these three patches to my pci/host-generic branch:
+> 
+>    PCI: Add generic domain handling
+>    of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
+>    of/pci: Add support for parsing PCI host bridge resources from DT
+
+I can see these patches added to pci/host-generic but not on pci/next.
+
+> 
+> Yinghai pointed out a problem with this one, so I omitted it:
+> 
+>    PCI: Assign unassigned bus resources in pci_scan_root_bus()
+
+Thats fine, host bridge drivers will have to work around pci_scan_root_bus() reduced
+functionality for now.
 
 
-Actually I just backed out the original patches, the problem is still
-there in my tree.
+> 
+> I added this one to my pci/host-generic branch:
+> 
+>    PCI: Add pci_remap_iospace() to map bus I/O resources
+> 
+> I assume this depends on the pci_scan_root_bus() change (if not, let me
+> know), so I omitted this one:
+> 
+>    arm64: Add architectural support for PCI
 
-	Arnd
+No, there is no dependency there on pci_scan_root_bus(), it can go in the series.
+The only thing that depends on a feature rich pci_scan_root_bus() is the host
+bridge driver in order to be able to use only one line to process the root bus.
+
+Thanks for huge support in getting these patches in and I do hope I'm not being
+too much of a burden to you.
+
+Best regards,
+Liviu
+
+> 
+> Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
