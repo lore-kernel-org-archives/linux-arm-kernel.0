@@ -1,252 +1,32 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 30 Sep 2014 14:18:40 -0400
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
-Message-ID: <20140930181840.GA24153@redhat.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 30 Sep 2014 11:24:28 -0700
+Subject: [PATCH v7 3/5] ARM: dts: add RK3xxx CPU Thermal data
+In-Reply-To: <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
+References: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
+ <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <CAD=FV=WRYeW4giA+yRWmXGxAvdG38GcW-7tA39SZDH1GPamf6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 25, 2014 at 12:23:27AM +0000, Geoff Levand wrote:
+Caesar,
 
-[..]
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> new file mode 100644
-> index 0000000..22d185c
-> --- /dev/null
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -0,0 +1,183 @@
-> +/*
-> + * kexec for arm64
-> + *
-> + * Copyright (C) Linaro.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kexec.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/slab.h>
-> +#include <linux/uaccess.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/system_misc.h>
-> +
-> +/* Global variables for the relocate_kernel routine. */
-> +
-> +extern const unsigned char relocate_new_kernel[];
-> +extern const unsigned long relocate_new_kernel_size;
-> +extern unsigned long kexec_dtb_addr;
-> +extern unsigned long kexec_kimage_head;
-> +extern unsigned long kexec_kimage_start;
-> +
-> +/**
-> + * kexec_list_walk - Helper to walk the kimage page list.
-> + */
-> +
-> +static void kexec_list_walk(void *ctx, unsigned long kimage_head,
-> +	void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
-> +{
-> +	void *dest;
-> +	unsigned long *entry;
+On Sun, Sep 28, 2014 at 3:38 AM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+> This patch changes a dtsi file to contain the thermal data
+> on RK3288 and later SoCs. This data will
+> enable a thermal shutdown over 125C.
+>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi | 32 +++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
 
-Hi Geoff,
+I haven't done lots of review of this series, but I did notice that
+this file has bad spacing.  It's fairly obvious in your gerrit patch
+<https://chromium-review.googlesource.com/#/c/220270/1/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi>
+because gerrit (by default) shows you "tab" characters...
 
-I see only one user of this function, kexec_list_flush_cb(). So why
-not directly embed needed logic in kexec_list_flush_cb() instead of
-implementing a generic function. It would be simpler as you seem to
-be flushing dcache only for SOURCE and IND pages and rest you 
-can simply ignore.
+In general you should use tab for indentation, not spaces.  You seem
+to use a mix of the two.
 
-> +
-> +	for (entry = &kimage_head, dest = NULL; ; entry++) {
-> +		unsigned int flag = *entry & 
-> +			(IND_DESTINATION | IND_INDIRECTION | IND_DONE |
-> +			IND_SOURCE);
-> +		void *addr = phys_to_virt(*entry & PAGE_MASK);
-> +
-> +		switch (flag) {
-> +		case IND_INDIRECTION:
-> +			entry = (unsigned long *)addr - 1;
-> +			cb(ctx, flag, addr, NULL);
-> +			break;
-> +		case IND_DESTINATION:
-> +			dest = addr;
-> +			cb(ctx, flag, addr, NULL);
-> +			break;
-> +		case IND_SOURCE:
-> +			cb(ctx, flag, addr, dest);
-> +			dest += PAGE_SIZE;
-> +			break;
-> +		case IND_DONE:
-> +			cb(ctx, flag , NULL, NULL);
-> +			return;
-> +		default:
-> +			break;
-> +		}
-> +	}
-> +}
-> +
-> +/**
-> + * kexec_is_dtb - Helper routine to check the device tree header signature.
-> + */
-> +
-> +static bool kexec_is_dtb(const void *dtb)
-> +{
-> +	__be32 magic;
-> +
-> +	return get_user(magic, (__be32 *)dtb) ? false :
-> +		(be32_to_cpu(magic) == OF_DT_HEADER);
-> +}
-> +
-> +/**
-> + * kexec_find_dtb_seg - Helper routine to find the dtb segment.
-> + */
-> +
-> +static const struct kexec_segment *kexec_find_dtb_seg(
-> +	const struct kimage *image)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < image->nr_segments; i++) {
-> +		if (kexec_is_dtb(image->segment[i].buf))
-> +			return &image->segment[i];
-> +	}
-> +
-> +	return NULL;
-> +}
-
-So this implementation makes passing dtb mandatory. So it will not work
-with ACPI?
-
-Where is dtb present? How is it passed to first kernel? Can it still
-be around in memory and second kernel can access it?
-
-I mean in ACPI world on x86, all the ACPI info is still present and second
-kernel can access it without it being explicitly to second kernel in
-memory. Can something similar happen for dtb?
-
-[..]
-> +/**
-> + * kexec_list_flush_cb - Callback to flush the kimage list to PoC.
-> + */
-> +
-> +static void kexec_list_flush_cb(void *ctx , unsigned int flag,
-> +	void *addr, void *dest)
-			  ^^^
-
-Nobody seems to be making use of dest. So why introduce it?
-
-> +{
-> +	switch (flag) {
-> +	case IND_INDIRECTION:
-> +	case IND_SOURCE:
-> +		__flush_dcache_area(addr, PAGE_SIZE);
-> +		break;
-
-So what does __flush_dcache_area() do? Flush data caches. IIUC, addr
-is virtual address at this point of time. While copying pages and
-walking through the list, I am assuming you have switched off page
-tables and you are in some kind of 1:1 physical mode. So how did
-flushing data caches related to a virtual address help. I guess we
-are not even accessing that virtual address now. 
- 
-[..]
-> --- /dev/null
-> +++ b/arch/arm64/kernel/relocate_kernel.S
-> @@ -0,0 +1,183 @@
-> +/*
-> + * kexec for arm64
-> + *
-> + * Copyright (C) Linaro.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <asm/assembler.h>
-> +#include <asm/kexec.h>
-> +#include <asm/memory.h>
-> +#include <asm/page.h>
-> +#include <asm/proc-macros.S>
-> +
-> +/* The list entry flags. */
-> +
-> +#define IND_DESTINATION_BIT 0
-> +#define IND_INDIRECTION_BIT 1
-> +#define IND_DONE_BIT        2
-> +#define IND_SOURCE_BIT      3
-
-I thought you had some patches to move these into generic header file. You
-got rid of those patches?
-
-> +
-> +/*
-> + * relocate_new_kernel - Put the 2nd stage kernel image in place and boot it.
-> + *
-> + * The memory that the old kernel occupies may be overwritten when coping the
-> + * new kernel to its final location.  To assure that the relocate_new_kernel
-> + * routine which does that copy is not overwritten all code and data needed
-> + * by relocate_new_kernel must be between the symbols relocate_new_kernel and
-> + * relocate_new_kernel_end.  The machine_kexec() routine will copy
-> + * relocate_new_kernel to the kexec control_code_page, a special page which
-> + * has been set up to be preserved during the kernel copy operation.
-> + */
-> +
-> +.globl relocate_new_kernel
-> +relocate_new_kernel:
-> +
-> +	/* Setup the list loop variables. */
-> +
-> +	ldr	x18, kexec_kimage_head		/* x18 = list entry */
-> +	dcache_line_size x17, x0		/* x17 = dcache line size */
-> +	mov	x16, xzr			/* x16 = segment start */
-> +	mov	x15, xzr			/* x15 = entry ptr */
-> +	mov	x14, xzr			/* x14 = copy dest */
-> +
-> +	/* Check if the new kernel needs relocation. */
-
-What's "relocation" in this  context. I guess you are checking if new
-kernel needs to be moved to destination location or not.
-
-[..]
-> +/*
-> + * kexec_dtb_addr - Physical address of the new kernel's device tree.
-> + */
-> +
-> +.globl kexec_dtb_addr
-> +kexec_dtb_addr:
-> +	.quad	0x0
-
-As these gloabls are very arm64 specific, will it make sense to prefix
-arm64_ before these. arm64_kexec_dtb_addr. Or arch_kexec_dtb_addr.
-
-
-> +
-> +/*
-> + * kexec_kimage_head - Copy of image->head, the list of kimage entries.
-> + */
-> +
-> +.globl kexec_kimage_head
-> +kexec_kimage_head:
-> +	.quad	0x0
-
-Same here. How about arch_kexec_kimage_head.
-
-> +
-> +/*
-> + * kexec_kimage_start - Copy of image->start, the entry point of the new kernel.
-> + */
-> +
-> +.globl kexec_kimage_start
-> +kexec_kimage_start:
-> +	.quad	0x0
-
-arch_kexec_kimage_start.
-
-Thanks
-Vivek
+-Doug
