@@ -1,36 +1,76 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 30 Sep 2014 11:00:48 -0700
-Subject: [RFC PATCH 08/16] ia64: support poweroff through poweroff handler
- call chain
-In-Reply-To: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
-References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1412100056-15517-9-git-send-email-linux@roeck-us.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 30 Sep 2014 11:06:15 -0700
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
+ <7hmw9hypj9.fsf@deeprootsystems.com>
+ <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
+Message-ID: <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel core now supports a poweroff handler call chain
-to remove power from the system. Call it if pm_power_off
-is set to NULL.
+On Tue, Sep 30, 2014 at 10:51 AM, Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
+> On Tue, 30 Sep 2014, Kevin Hilman wrote:
+>
+>> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+>>
+>> > Hi Lina,
+>> >
+>> > On Sat, Sep 27, 2014 at 01:58:13AM +0100, Lina Iyer wrote:
+>> >> Add cpuidle driver interface to allow cpus to go into C-States. Use the
+>> >> cpuidle DT interface common across ARM architectures to provide the
+>> >> C-State information to the cpuidle framework.
+>> >>
+>> >> Supported modes at this time are clock gating (wfi) and cpu power down
+>> >> (Standalone PC or spc).
+>> >>
+>> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> >> ---
+>> >>  .../bindings/arm/msm/qcom,idle-state.txt           | 72 +++++++++++++++++
+>> >>  drivers/cpuidle/Kconfig.arm                        |  7 ++
+>> >>  drivers/cpuidle/Makefile                           |  1 +
+>> >>  drivers/cpuidle/cpuidle-qcom.c                     | 89 ++++++++++++++++++++++
+>> >>  4 files changed, 169 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>> >>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>> >> new file mode 100644
+>> >> index 0000000..47095b9
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>> >> @@ -0,0 +1,72 @@
+>> >> +QCOM Idle States for cpuidle driver
+>> >> +
+>> >> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
+>> >> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
+>> >> +states. Idle states have different enter/exit latency and residency values.
+>> >> +The idle states supported by the QCOM SoC are defined as -
+>> >> +
+>> >> +    * WFI
+>> >> +    * Retention
+>> >> +    * Standalone Power Collapse (Standalone PC or SPC)
+>> >> +    * Power Collapse (PC)
+>> >> +
+>> >> +WFI: WFI does a little more in addition to architectural clock gating.  ARM
+>> >
+>> > This may be misleading. Call it PlatformWFI or something like that, not WFI if
+>> > that's not what it is.
+>>
+>> This gets at a little pet peeve of mine:
+>>
+>> IMO, naming any state with "WFI" is a bit confusing, because typically
+>> *every* idle state is entered by one (or more) CPU executing WFI, no?
+>
+> Agreed.
+>
+> The only state called "WFI" should be the one that only executes the WFI
+> instruction without any other hardware setup around it.
 
-Cc: Tony Luck <tony.luck@intel.com>
-Cc: Fenghua Yu <fenghua.yu@intel.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- arch/ia64/kernel/process.c | 2 ++
- 1 file changed, 2 insertions(+)
+Well, I would go even further in that none of the states should be
+called WFI, because WFI is used to enter all of them.
 
-diff --git a/arch/ia64/kernel/process.c b/arch/ia64/kernel/process.c
-index deed6fa..489b0d8 100644
---- a/arch/ia64/kernel/process.c
-+++ b/arch/ia64/kernel/process.c
-@@ -677,6 +677,8 @@ machine_power_off (void)
- {
- 	if (pm_power_off)
- 		pm_power_off();
-+	else
-+		do_kernel_poweroff();
- 	machine_halt();
- }
- 
--- 
-1.9.1
+Kevin
