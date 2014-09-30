@@ -1,174 +1,134 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Tue, 30 Sep 2014 10:40:11 -0600
-Subject: [PATCH] ASoC: samsung: fix CDCLK handling
-Message-ID: <1412095211-4012-1-git-send-email-drake@endlessm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 30 Sep 2014 17:42:56 +0100
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20140930161241.GA16583@e102568-lin.cambridge.arm.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <8631927.qWHZsjCs8e@wuerfel>
+ <20140930120344.GA14215@e102568-lin.cambridge.arm.com>
+ <3090148.OUdB0fsdsR@wuerfel>
+ <20140930161241.GA16583@e102568-lin.cambridge.arm.com>
+Message-ID: <20140930164256.GS841@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ODROID is the only platform that uses CDCLK, and right now,
-CDCLK handling is buggy. If you start pulseaudio on ODROID,
-audio is broken until reboot (even after killing pulse).
+On Tue, Sep 30, 2014 at 05:12:41PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Sep 30, 2014 at 01:31:44PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 30 September 2014 13:03:44 Lorenzo Pieralisi wrote:
+> > > > >  static int gen_pci_probe(struct platform_device *pdev)
+> > > > >  {
+> > > > > @@ -326,6 +385,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > > > >         struct device *dev = &pdev->dev;
+> > > > >         struct device_node *np = dev->of_node;
+> > > > >         struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> > > > > +#ifndef CONFIG_ARM64
+> > > > >         struct hw_pci hw = {
+> > > > >                 .nr_controllers = 1,
+> > > > >                 .private_data   = (void **)&pci,
+> > > > > @@ -333,6 +393,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+> > > > >                 .map_irq        = of_irq_parse_and_map_pci,
+> > > > >                 .ops            = &gen_pci_ops,
+> > > > >         };
+> > > > > +#endif
+> > > > >  
+> > > > 
+> > > > Same here, I'd suggest marking this "#ifdef CONFIG_ARM" instead, as hw_pci
+> > > > is an arm32 specific data structure.
+> > > 
+> > > I do not think we need hw struct at all, see below, we can write code so
+> > > that we do not rely on ARM32 PCI bios, I will have a stab at that and
+> > > post the resulting code.
+> > 
+> > That would of course be best. I think it needs some rework of the
+> > arm32 PCI code though, or you'd still have to create pci_sys_data
+> > manually, and that is currently allocated by pcibios_init_hw.
 
-This happens because CDCLK gets disabled by i2s.c and never enabled again.
+I don't see why we need to involve the arm32 code here at all. A host bridge can
+be fully functional with the generic code without having to use any of the
+arm32 code (unless I'm missing something here).
 
-pulseaudio does:
-1. i2s_startup for playback channel
-2. i2s_startup for capture channel
-3. i2s_shutdown for capture channel
-4. i2s_shutdown for playback channel
+> 
+> Right, as far as I can see, creating a pci_sys_data struct
+> that's all we would need. "Problem" is that it does not exist on ARM64
+> so to avoid ifdeffery we have to declare a struct with the same
+> fields (ie only pci_sys_data.private_data is used by this driver -
+> apart from arm32 specific functions usage) that is passed to the PCI layer
+> and stored in the bus.sysdata, but that's extremely ugly (and we won't
+> need this when the arm32 conversion is completed).
+> 
+> > > > > +       if (!gen_scan_root_bus(&pdev->dev, pci->cfg.bus_range.start,
+> > > > > +                              &gen_pci_ops, pci, &pci->resources)) {
+> > > > > +               dev_err(&pdev->dev, "failed to enable PCIe ports\n");
+> > > > > +               return -ENODEV;
+> > > > > +       }
+> > > > > +#else
+> > > > >         pci_common_init_dev(dev, &hw);
+> > > > > +#endif /* CONFIG_ARM64 */
+> > > > > 
+> > > > 
+> > > > Again, just make the pci_common_init_dev() call #ifdef CONFIG_ARM, and move
+> > > > the generic case after it, outside of the #ifdef.
+> > > 
+> > > I went through the code quickly but I think we can (and should) remove
+> > > this quite ugly ifdeffery altogether. Most of the functionality in
+> > > pci_common_init_dev() can be implemented through the common PCI API (and this
+> > > would make this driver arch agnostic as it should be), I will go through ARM32
+> > > PCI bios code to check what is executed in detail in pci_common_init_dev() and
+> > > make sure that we follow those initialization steps in the resulting probe code
+> > > for this PCI generic host controller driver.
+> > 
+> > These are the functions I found that refer to pci_sys_data on arm32:
+> > 
+> > pcibios_add_bus
+> > pcibios_remove_bus
+> > pcibios_align_resource
+> > pci_mmap_page_range
+> > pci_domain_nr
+> > pci_proc_domain
+> > 
+> > This is not as bad as I had feared, but we still have to ensure that
+> > any caller of these functions will work with both the generic PCI support
+> > and the arm32 specific drivers that today use hw_pci.
+> > 
+> > My idea for dealing with this was to convert all host drivers in
+> > drivers/pci/host to the generic PCI code and never build the arm32
+> > bios32 code when CONFIG_ARCH_MULTIPLATFORM is set. Unfortunately that
+> > requires either doing them all at once or coming up with a migration
+> > strategy so we don't break things in the process.
+> 
+> That makes sense. Related to the migration strategy, thoughts
+> appreciated. Declaring a static pci_sys_data (with some ifdef around it)
+> seems a horrible hack to me. Calling pci_common_init() only if CONFIG_ARM
+> is rather horrible too, but we can probably live with that.
+> 
+> I do not see anything else as possible solution at the moment unless
+> we go the whole nine yards and do what you suggest above, might take a
+> little while though.
+> 
+> Probably leaving pci_common_init() call (and related hw_pci struct, and
+> related ifdeffery to differentiate between different sysdata layouts for ARM
+> and ARM64) is the fastest path but I still think it is not nice at all.
 
-In step 3 we disable CDCLK even though playback should still be active.
+Rob Herring found the conversion of mach-integrator/pci_v3.c to the generic
+framework quite painless. We might have to go through a lot of testing, but I don't
+see the process to be too horrendous.
 
-In step 4 we do this:
-	u32 mod = readl(i2s->addr + I2SMOD);
-	i2s->cdclk_out = !(mod & MOD_CDCLKCON);
+That being said, I think we first need to make sure we have all the features
+needed by the host bridge drivers in place before we start the conversion. MSI
+support is amongst them.
 
-and now cdclk_out is always going to be 0, so we'll never turn it back
-on again.
+Best regards,
+Liviu
 
-Both this bug and the one that b97c60abf9a tries to fix happened
-because of the way that CDCLK handling is painfully split between
-platform and i2s drivers.
+> 
+> Thanks,
+> Lorenzo
 
-Simplify the situation and solve the bug with the following approach:
- - as before, samsung_i2s_dai_probe() gates CDCLK by default
-   (no need for smartq_wm8987 to do this as well)
- - platform drivers can gate/ungate CDCLK as necessary
-   (currently only odroidx2 needs to do this)
- - i2s code has no other interaction with CDCLK
-
-Signed-off-by: Daniel Drake <drake@endlessm.com>
----
- sound/soc/samsung/i2s.c               | 19 ++----------------
- sound/soc/samsung/odroidx2_max98090.c | 36 ++++++++++++++++++++++++++---------
- sound/soc/samsung/smartq_wm8987.c     |  6 ------
- 3 files changed, 29 insertions(+), 32 deletions(-)
-
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 9d51347..6654ce6 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -68,8 +68,6 @@ struct i2s_dai {
- #define DAI_OPENED	(1 << 0) /* Dai is opened */
- #define DAI_MANAGER	(1 << 1) /* Dai is the manager */
- 	unsigned mode;
--	/* CDCLK pin direction: 0  - input, 1 - output */
--	unsigned int cdclk_out:1;
- 	/* Driver for this DAI */
- 	struct snd_soc_dai_driver i2s_dai_drv;
- 	/* DMA parameters */
-@@ -739,9 +737,6 @@ static int i2s_startup(struct snd_pcm_substream *substream,
- 
- 	spin_unlock_irqrestore(&lock, flags);
- 
--	if (!is_opened(other) && i2s->cdclk_out)
--		i2s_set_sysclk(dai, SAMSUNG_I2S_CDCLK,
--				0, SND_SOC_CLOCK_OUT);
- 	return 0;
- }
- 
-@@ -757,24 +752,14 @@ static void i2s_shutdown(struct snd_pcm_substream *substream,
- 	i2s->mode &= ~DAI_OPENED;
- 	i2s->mode &= ~DAI_MANAGER;
- 
--	if (is_opened(other)) {
-+	if (is_opened(other))
- 		other->mode |= DAI_MANAGER;
--	} else {
--		u32 mod = readl(i2s->addr + I2SMOD);
--		i2s->cdclk_out = !(mod & MOD_CDCLKCON);
--		if (other)
--			other->cdclk_out = i2s->cdclk_out;
--	}
-+
- 	/* Reset any constraint on RFS and BFS */
- 	i2s->rfs = 0;
- 	i2s->bfs = 0;
- 
- 	spin_unlock_irqrestore(&lock, flags);
--
--	/* Gate CDCLK by default */
--	if (!is_opened(other))
--		i2s_set_sysclk(dai, SAMSUNG_I2S_CDCLK,
--				0, SND_SOC_CLOCK_IN);
- }
- 
- static int config_setup(struct i2s_dai *i2s)
-diff --git a/sound/soc/samsung/odroidx2_max98090.c b/sound/soc/samsung/odroidx2_max98090.c
-index 278edf9..b700284 100644
---- a/sound/soc/samsung/odroidx2_max98090.c
-+++ b/sound/soc/samsung/odroidx2_max98090.c
-@@ -21,20 +21,37 @@ struct odroidx2_drv_data {
- /* The I2S CDCLK output clock frequency for the MAX98090 codec */
- #define MAX98090_MCLK 19200000
- 
-+static int odroidx2_startup(struct snd_pcm_substream *substream)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+
-+	if (rtd->cpu_dai->active)
-+		return 0;
-+
-+	return snd_soc_dai_set_sysclk(rtd->cpu_dai, SAMSUNG_I2S_CDCLK,
-+				      0, SND_SOC_CLOCK_OUT);
-+}
-+
-+static void odroidx2_shutdown(struct snd_pcm_substream *substream)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+
-+	if (!rtd->cpu_dai->active)
-+		snd_soc_dai_set_sysclk(rtd->cpu_dai, SAMSUNG_I2S_CDCLK,
-+				       0, SND_SOC_CLOCK_IN);
-+}
-+
-+static const struct snd_soc_ops odroidx2_ops = {
-+	.startup = odroidx2_startup,
-+	.shutdown = odroidx2_shutdown,
-+};
-+
- static int odroidx2_late_probe(struct snd_soc_card *card)
- {
- 	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
--	struct snd_soc_dai *cpu_dai = card->rtd[0].cpu_dai;
--	int ret;
- 
--	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
-+	return snd_soc_dai_set_sysclk(codec_dai, 0, MAX98090_MCLK,
- 						SND_SOC_CLOCK_IN);
--	if (ret < 0)
--		return ret;
--
--	/* Set the cpu DAI configuration in order to use CDCLK */
--	return snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
--					0, SND_SOC_CLOCK_OUT);
- }
- 
- static const struct snd_soc_dapm_widget odroidx2_dapm_widgets[] = {
-@@ -55,6 +72,7 @@ static struct snd_soc_dai_link odroidx2_dai[] = {
- 		.codec_dai_name	= "HiFi",
- 		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 				  SND_SOC_DAIFMT_CBM_CFM,
-+		.ops		= &odroidx2_ops,
- 	}
- };
- 
-diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
-index 9b0ffac..2b5e7c5 100644
---- a/sound/soc/samsung/smartq_wm8987.c
-+++ b/sound/soc/samsung/smartq_wm8987.c
-@@ -76,12 +76,6 @@ static int smartq_hifi_hw_params(struct snd_pcm_substream *substream,
- 	if (ret < 0)
- 		return ret;
- 
--	/* Gate the RCLK output on PAD */
--	ret = snd_soc_dai_set_sysclk(cpu_dai, SAMSUNG_I2S_CDCLK,
--					0, SND_SOC_CLOCK_IN);
--	if (ret < 0)
--		return ret;
--
- 	/* set the codec system clock for DAC and ADC */
- 	ret = snd_soc_dai_set_sysclk(codec_dai, WM8750_SYSCLK, clk,
- 				     SND_SOC_CLOCK_IN);
 -- 
-1.9.1
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
