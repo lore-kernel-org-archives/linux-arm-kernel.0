@@ -1,123 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 30 Sep 2014 11:21:07 +0900
-Subject: [PATCH] ARM: don't set unused name in struct flash_platform_data
-In-Reply-To: <1411993853-6309-1-git-send-email-zajec5@gmail.com>
-References: <1411993853-6309-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20140930022107.GG10373@verge.net.au>
+From: jay.xu@rock-chips.com (Jianqun)
+Date: Tue, 30 Sep 2014 11:12:04 +0800
+Subject: [PATCH] clk: rockchip: rk3288: i2s_frac adds flag to set parent's rate
+Message-ID: <1412046724-28069-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 02:30:53PM +0200, Rafa? Mi?ecki wrote:
-> Loading correct SPI driver (m25p80) is handled using modalias from the
-> struct spi_board_info. There is no point of setting name in the
-> platform_data, m25p80 ignores it anyway.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  arch/arm/mach-davinci/board-da830-evm.c    | 1 -
->  arch/arm/mach-davinci/board-da850-evm.c    | 1 -
->  arch/arm/mach-davinci/board-mityomapl138.c | 1 -
->  arch/arm/mach-shmobile/board-bockw.c       | 1 -
->  arch/arm/mach-shmobile/board-koelsch.c     | 1 -
->  arch/arm/mach-shmobile/board-lager.c       | 1 -
->  arch/arm/mach-w90x900/dev.c                | 1 -
->  7 files changed, 7 deletions(-)
+The relation of i2s nodes as follows:
+          i2s_src               0           0            594000000  0
+             i2s_frac           0           0            11289600   0
+                i2s_pre         0           0            11289600   0
+                   sclk_i2s0    0           0            11289600   0
+                   i2s0_clkout  0           0            11289600   0
+                      hclk_i2s0 1           1            99000000   0
 
-Hi,
+sclk_i2s0 is the master clock, when to set rate of sclk_i2s0, should
+allow to set its parent's rate, by add flag CLK_SET_RATE_PARENT for
+"i2s_frac", "i2s_pre", "i2s0_clkout" and "sclk_i2s0".
 
-I am happy to queue up the mach-shmobile portion of this change
-if you break it out into a separate patch, one per board.
+Tested on rk3288 board using max98090, with command "aplay <music.wav>"
 
-> 
-> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-> index 5623131..263004a 100644
-> --- a/arch/arm/mach-davinci/board-da830-evm.c
-> +++ b/arch/arm/mach-davinci/board-da830-evm.c
-> @@ -567,7 +567,6 @@ static struct mtd_partition da830evm_spiflash_part[] = {
->  };
->  
->  static struct flash_platform_data da830evm_spiflash_data = {
-> -	.name		= "m25p80",
->  	.parts		= da830evm_spiflash_part,
->  	.nr_parts	= ARRAY_SIZE(da830evm_spiflash_part),
->  	.type		= "w25x32",
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 234c5bb..721ff2b 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -104,7 +104,6 @@ static struct mtd_partition da850evm_spiflash_part[] = {
->  };
->  
->  static struct flash_platform_data da850evm_spiflash_data = {
-> -	.name		= "m25p80",
->  	.parts		= da850evm_spiflash_part,
->  	.nr_parts	= ARRAY_SIZE(da850evm_spiflash_part),
->  	.type		= "m25p64",
-> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-> index 96fc00a..3c93b65 100644
-> --- a/arch/arm/mach-davinci/board-mityomapl138.c
-> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
-> @@ -350,7 +350,6 @@ static struct mtd_partition spi_flash_partitions[] = {
->  };
->  
->  static struct flash_platform_data mityomapl138_spi_flash_data = {
-> -	.name		= "m25p80",
->  	.parts		= spi_flash_partitions,
->  	.nr_parts	= ARRAY_SIZE(spi_flash_partitions),
->  	.type		= "m24p64",
-> diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-> index 8a83eb3..e25af56 100644
-> --- a/arch/arm/mach-shmobile/board-bockw.c
-> +++ b/arch/arm/mach-shmobile/board-bockw.c
-> @@ -266,7 +266,6 @@ static struct mtd_partition m25p80_spi_flash_partitions[] = {
->  };
->  
->  static struct flash_platform_data spi_flash_data = {
-> -	.name		= "m25p80",
->  	.type		= "s25fl008k",
->  	.parts		= m25p80_spi_flash_partitions,
->  	.nr_parts	= ARRAY_SIZE(m25p80_spi_flash_partitions),
-> diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-> index b7d5bc7..a494a00 100644
-> --- a/arch/arm/mach-shmobile/board-koelsch.c
-> +++ b/arch/arm/mach-shmobile/board-koelsch.c
-> @@ -207,7 +207,6 @@ static struct mtd_partition spi_flash_part[] = {
->  };
->  
->  static const struct flash_platform_data spi_flash_data = {
-> -	.name		= "m25p80",
->  	.parts		= spi_flash_part,
->  	.nr_parts	= ARRAY_SIZE(spi_flash_part),
->  	.type		= "s25fl512s",
-> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> index e1d8215..3575731 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -315,7 +315,6 @@ static struct mtd_partition spi_flash_part[] = {
->  };
->  
->  static const struct flash_platform_data spi_flash_data = {
-> -	.name           = "m25p80",
->  	.parts          = spi_flash_part,
->  	.nr_parts       = ARRAY_SIZE(spi_flash_part),
->  	.type           = "s25fl512s",
-> diff --git a/arch/arm/mach-w90x900/dev.c b/arch/arm/mach-w90x900/dev.c
-> index e65a80a..9745a73 100644
-> --- a/arch/arm/mach-w90x900/dev.c
-> +++ b/arch/arm/mach-w90x900/dev.c
-> @@ -249,7 +249,6 @@ static struct mtd_partition nuc900_spi_flash_partitions[] = {
->  };
->  
->  static struct flash_platform_data nuc900_spi_flash_data = {
-> -	.name = "m25p80",
->  	.parts =  nuc900_spi_flash_partitions,
->  	.nr_parts = ARRAY_SIZE(nuc900_spi_flash_partitions),
->  	.type = "w25x16",
-> -- 
-> 1.8.4.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Change-Id: I12faad082566532b65a7de8c0a6845e1c17870e6
+Signed-off-by: Jianqun <jay.xu@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index c770de0..baf19b4 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -301,15 +301,15 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "i2s_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3288_CLKSEL_CON(4), 15, 1, MFLAGS, 0, 7, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 1, GFLAGS),
+-	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", 0,
++	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(8), 0,
+ 			RK3288_CLKGATE_CON(4), 2, GFLAGS),
+-	MUX(0, "i2s_pre", mux_i2s_pre_p, 0,
++	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(4), 8, 2, MFLAGS),
+-	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, 0,
++	COMPOSITE_NODIV(0, "i2s0_clkout", mux_i2s_clkout_p, CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(4), 12, 1, MFLAGS,
+ 			RK3288_CLKGATE_CON(4), 0, GFLAGS),
+-	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", 0,
++	GATE(SCLK_I2S0, "sclk_i2s0", "i2s_pre", CLK_SET_RATE_PARENT,
+ 			RK3288_CLKGATE_CON(4), 3, GFLAGS),
+ 
+ 	MUX(0, "spdif_src", mux_pll_src_cpll_gpll_p, 0,
+-- 
+1.9.1
