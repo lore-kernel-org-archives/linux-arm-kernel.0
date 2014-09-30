@@ -1,41 +1,32 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 30 Sep 2014 11:35:53 -0700
-Subject: [PATCH v7 3/5] ARM: dts: add RK3xxx CPU Thermal data
-In-Reply-To: <CAD=FV=WRYeW4giA+yRWmXGxAvdG38GcW-7tA39SZDH1GPamf6A@mail.gmail.com>
-References: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
- <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
- <CAD=FV=WRYeW4giA+yRWmXGxAvdG38GcW-7tA39SZDH1GPamf6A@mail.gmail.com>
-Message-ID: <CAD=FV=Wyv9P9cvTFEfD5_0BzgFNC5nyduT0THKKwERkX4-cY0Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 20:36:26 +0200
+Subject: [PATCH 2/2] arch: arm: samsung: Clean-up usage of
+ CONFIG_SERIAL_SAMSUNG_UARTS symbol
+In-Reply-To: <542AD5E6.9050503@gmail.com>
+References: <1412087695-10591-1-git-send-email-a.kesavan@samsung.com>
+ <2267491.QlLoTEuT3L@wuerfel> <542AD5E6.9050503@gmail.com>
+Message-ID: <78824730.2ZeRMh8EV2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 30 September 2014 18:10:14 Tomasz Figa wrote:
+> >> @@ -110,7 +110,7 @@ void __init s3c24xx_init_uartdevs(char *name,
+> >>                                   struct s3c24xx_uart_resources *res,
+> >>                                   struct s3c2410_uartcfg *cfg, int no)
+> >>  {
+> >> -#ifdef CONFIG_SERIAL_SAMSUNG_UARTS
+> >> +#ifdef CONFIG_SERIAL_SAMSUNG
+> >>         struct platform_device *platdev;
+> >>         struct s3c2410_uartcfg *cfgptr = uart_cfgs;
+> >>         struct s3c24xx_uart_resources *resp;
+> > 
+> > Since you hardcode the number here now, you can actually drop this #ifdef.
+> 
+> I believe what Abhilash did is correct, because this code is not needed
+> when there is no serial support enabled.
+> 
 
-On Tue, Sep 30, 2014 at 11:24 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Caesar,
->
-> On Sun, Sep 28, 2014 at 3:38 AM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
->> This patch changes a dtsi file to contain the thermal data
->> on RK3288 and later SoCs. This data will
->> enable a thermal shutdown over 125C.
->>
->> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
->> ---
->>  arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi | 32 +++++++++++++++++++++++++++++++
->>  1 file changed, 32 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
->
-> I haven't done lots of review of this series, but I did notice that
-> this file has bad spacing.  It's fairly obvious in your gerrit patch
-> <https://chromium-review.googlesource.com/#/c/220270/1/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi>
-> because gerrit (by default) shows you "tab" characters...
->
-> In general you should use tab for indentation, not spaces.  You seem
-> to use a mix of the two.
+I only added the #ifdef here because it was broken when
+CONFIG_SERIAL_SAMSUNG_UARTS was undefined.
 
-I suppose I should also point out that it's generally not great to
-name things "rk3xxx" since it makes too many predictions about how
-future products will behave.  It's better to name things after the
-first relevant product.  I'd just name this "rk3288-cpu-thermal.dtsi".
-
--Doug
+	Arnd
