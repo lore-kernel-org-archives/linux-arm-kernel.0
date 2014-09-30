@@ -1,50 +1,80 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 30 Sep 2014 09:38:45 +0530
-Subject: [PATCH v7 0/2] Adds PMU and S2R support for exynos5420
-In-Reply-To: <CABxcv==E9h_V8_YmcvuxRORg7tbnc9uDT-rwqKJeXb_bNr0xXw@mail.gmail.com>
-References: <1408625982-3267-1-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybh-R1GsHF-BRhRYQKkCpQFQSE6Mem=A3kz=H3Bemor9xA@mail.gmail.com>
- <CABxcv=kHwCCYhit20qO1q=Nn3KVj8U=8cpCu=DQRuy+R86N0kQ@mail.gmail.com>
- <CAGm_ybgFfnS=bhz2yWUt_b_95Wg=eDNxadzfy7WF+VNFx+pO6Q@mail.gmail.com>
- <CABxcv==E9h_V8_YmcvuxRORg7tbnc9uDT-rwqKJeXb_bNr0xXw@mail.gmail.com>
-Message-ID: <000e01cfdc64$4181a710$c484f530$@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 30 Sep 2014 13:20:48 +0900
+Subject: [PATCH v2 00/11] ARM: shmobile: r8a7740/armadillo800eva legacy
+ PM domain support
+In-Reply-To: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
+References: <1411661742-4767-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20140930042047.GA24253@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier and Vikas,
+On Thu, Sep 25, 2014 at 06:15:31PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This series improves PM domain support for r8a7740/armadillo800eva legacy,
+> mimicking (parts of) the existing PM domain support for sh7372/mackerel.
+> 
+> More specifically, they
+>   - Add missing devices to existing PM domains,
+>   - Add missing PM domains, hooking up devices and subdomains,
+> 
+> Changes in v2:
+>   - Dropped FIXMes on behavior that turned out to be expected,
+>   - Hook up the HDMI-Link hardware block,
+>   - Really add the A4MP and D4 PM domains, as fixes are available (see
+>     dependencies below),
+>   - Move special CPU domain handling from A4S to A3SM,
+> 
+> There are a few dependencies to make resume from s2ram work:
+>   - "[PATCH/RFC] fbdev: sh_mobile_hdmi: Re-init regs before irq re-enable on
+>     resume",
+>   - "[PATCH] ARM: hw_breakpoint: Trap undef instruction exceptions on wake-up",
+>     or an alternative solution.
+> 
+> Apart from that, I'm not aware of any regressions (except perhaps for USB,
+> which I was unable to get working anyway).
 
-> Hello Vikas,
-> 
-> On Mon, Sep 29, 2014 at 2:59 PM, Vikas Sajjan <vikas.sajjan@samsung.com>
-> wrote:
-> > Hi Javier,
-> >
-> >
-> > On Thu, Sep 25, 2014 at 10:45 PM, Javier Martinez Canillas
-> >>
-> >> The mentioned patches from the PMU series depend on the patch to
-> >> decouple the syscon interface from syscon drivers. The latest version
-> >> of that patch is Pankaj's "[PATCH v5] mfd: syscon: Decouple syscon
-> >> interface from platform devices" [0].
-> >>
-> >
-> >  Since Arnd has given "Reviewed-by" to Pankaj's MFD syscon patch now,
-> > Pankaj can rebase his PMU patchset [1],  so that I can re-spin my 5420
-> > S2R patchset on top his PMU patchset.
-> >
-> 
-> Indeed, that would be great. Thanks a lot!
-> 
+Hi Geert,
 
-I was waiting for syscon patch to be finalized, now I will rebase my the PMU
-patches as almost all issues of syscon has been addressed, and I hope it's now ready
-to be taken in.
+what is your feeling about (me) queueing up part of all of this series now?
 
-Thanks,
-Pankaj Dubey
-> >
-> > Regards
-> > Vikas Sajjan
 > 
-> Best regards,
-> Javier
+> Please note that DT/multi-platform PM domain support is added in an (almost)
+> independent series.
+> 
+> Thanks!
+> 
+> Geert Uytterhoeven (11):
+>   ARM: shmobile: r8a7740: Add missing A3SP pm domain devices
+>   ARM: shmobile: r8a7740: Add missing A4S pm domain devices
+>   ARM: shmobile: armadillo800eva legacy: Add missing A3SP pm domain
+>     devices
+>   ARM: shmobile: armadillo800eva legacy: Add missing A4S pm domain
+>     devices
+>   ARM: shmobile: r8a7740: Add A3RV pm domain support
+>   ARM: shmobile: r8a7740: Add A3SG pm domain support
+>   ARM: shmobile: r8a7740/armadillo legacy: Add A4MP pm domain support
+>   ARM: shmobile: r8a7740: Add D4 pm domain support
+>   ARM: shmobile: r8a7740/armadillo legacy: Add A4R pm domain support
+>   ARM: shmobile: r8a7740: Add A4SU pm domain support
+>   ARM: shmobile: r8a7740: Add A3SM pm domain support
+> 
+>  arch/arm/mach-shmobile/board-armadillo800eva.c | 12 +++++++++-
+>  arch/arm/mach-shmobile/pm-r8a7740.c            | 32 ++++++++++++++++++++++----
+>  arch/arm/mach-shmobile/setup-r8a7740.c         | 11 +++++++++
+>  3 files changed, 50 insertions(+), 5 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
+> 
