@@ -1,71 +1,79 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 29 Sep 2014 17:34:45 -0700
-Subject: [RFC 1/7] soc: qcom: Add device tree binding for SMEM
-In-Reply-To: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1412037291-16880-2-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Mon, 29 Sep 2014 17:34:44 -0700
+Subject: [RFC 0/7] Qualcomm SMEM, SMD, RPM and regulators
+Message-ID: <1412037291-16880-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for the Qualcom Shared Memory
-manager.
+All Qualcomm platforms implements a shared heap among the processors in the
+SoC, used for sharing data with other parts of the system.
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
+One consumer of items from this heap is the "Shared Memory Driver", a ring
+buffer based point-to-point communication mechanism used to send either stream
+or packet based data to remote processors.
 
-Exposed by this node is a set of items of different sizes. For many things a
-standard of_xlate method of referencing the individual nodes would be
-preferable, so a #something-cells would make sense. We do however also needs
-access to these items without explicitly stating the references in devicetree
-(e.g. SMD references 257 of these). I haven't found any good example of how to
-implement this, so suggestions are welcome.
+Starting with 8x74 this system is used to talk to the Resource Power Manager
+(RPM), a power efficient "coprocessor" with responsibility of aggregate votes
+from the various systems in the SoC related to regulators, clocks and bus
+frequencies.
 
-Note that the hwspinlock reference is not yet supported in the mainline, but
-this will likely need a few iterations so I wanted to get this out.
+The PMIC regulators and root clocks in these platforms are only accessible via
+the RPM, so to get access to these we need the full chain of smem, smd, rpm and
+a regulator driver implemented. And that is exactly what this series provides.
 
- .../devicetree/bindings/soc/qcom/qcom,smem.txt     |   34 ++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+
+A key outstanding question is where in the tree we should put the
+implementation, for now I dropped them in drivers/soc/qcom but that's only
+because I don't know where to put it otherwise. I have not found any equivalent
+of the SMEM driver, SMD resembles mailbox and rpmsg - but comments in that
+patch on why it's neither.
+
+RPM is a mfd and regulator is a regulator :)
+
+
+Part from the rpm regulators I've tested this by hacking up a firmware loader
+and making some adoptions to the wcn36xx WiFi driver and I can indeed
+communicate with this system as well. Missing for that part is the coupling
+with remoteproc to reset smd channels when a remote system goes down.  But that
+is indeed a separate set of patches.
+
+Bjorn Andersson (7):
+  soc: qcom: Add device tree binding for SMEM
+  soc: qcom: Add device tree binding for SMD
+  mfd: devicetree: bindings: Add Qualcomm SMD based RPM DT binding
+  soc: qcom: Add Shared Memory Manager driver
+  soc: qcom: Add Shared Memory Driver
+  mfd: qcom-smd-rpm: Driver for the Qualcomm RPM over SMD
+  regulator: qcom-smd-rpm: Regulator driver for the Qualcomm RPM
+
+ .../devicetree/bindings/mfd/qcom-rpm-smd.txt       |  122 +++
+ .../devicetree/bindings/soc/qcom/qcom,smd.txt      |   82 ++
+ .../devicetree/bindings/soc/qcom/qcom,smem.txt     |   34 +
+ drivers/mfd/Kconfig                                |   14 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/qcom-smd-rpm.c                         |  299 ++++++
+ drivers/regulator/Kconfig                          |   12 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/qcom_smd-regulator.c             |  229 +++++
+ drivers/soc/qcom/Kconfig                           |   16 +
+ drivers/soc/qcom/Makefile                          |    2 +
+ drivers/soc/qcom/qcom_smd.c                        | 1043 ++++++++++++++++++++
+ drivers/soc/qcom/qcom_smem.c                       |  328 ++++++
+ include/dt-bindings/mfd/qcom-rpm.h                 |   36 +
+ include/linux/mfd/qcom-smd-rpm.h                   |    9 +
+ include/linux/soc/qcom/qcom_smd.h                  |   47 +
+ include/linux/soc/qcom/qcom_smem.h                 |   14 +
+ 17 files changed, 2289 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/qcom-rpm-smd.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
+ create mode 100644 drivers/mfd/qcom-smd-rpm.c
+ create mode 100644 drivers/regulator/qcom_smd-regulator.c
+ create mode 100644 drivers/soc/qcom/qcom_smd.c
+ create mode 100644 drivers/soc/qcom/qcom_smem.c
+ create mode 100644 include/linux/mfd/qcom-smd-rpm.h
+ create mode 100644 include/linux/soc/qcom/qcom_smd.h
+ create mode 100644 include/linux/soc/qcom/qcom_smem.h
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
-new file mode 100644
-index 0000000..ddd58c7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,smem.txt
-@@ -0,0 +1,34 @@
-+Qualcomm Shared Memory binding
-+
-+This binding describes the Qualcomm Shared Memory, used to share data between
-+various subsystems and OSes in Qualcomm platforms.
-+
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be:
-+		    "qcom,smem"
-+
-+- reg:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: base address and size pair for each area representing the
-+		    shared memory. The first pair will must represent the "main"
-+		    area, where the shared memory header and table-of-content
-+		    can be found.
-+
-+- hwspinlocks:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: reference to a hwspinlock used to protect allocations from
-+		    the shared memory
-+
-+= EXAMPLE
-+
-+        smem: smem at fa00000 {
-+                compatible = "qcom,smem";
-+                reg = <0x0fa00000 0x200000>,
-+                      <0xfc428000 0x4000>;
-+
-+                hwspinlocks = <&tcsr_mutex 3>;
-+        };
 -- 
 1.7.9.5
