@@ -1,81 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Sep 2014 11:23:34 +0100
-Subject: [PATCH v3 2/2] iommu/arm-smmu: add support for iova_to_phys
- through ATS1PR
-In-Reply-To: <1411874849-343-3-git-send-email-mitchelh@codeaurora.org>
-References: <1411874849-343-1-git-send-email-mitchelh@codeaurora.org>
- <1411874849-343-3-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20140930102334.GH8075@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Sep 2014 12:24:59 +0200
+Subject: [PATCH v2 1/3] i2c: hix5hd2: add devicetree documentation
+In-Reply-To: <542A7705.2030404@linaro.org>
+References: <1411878129-19743-1-git-send-email-zhangfei.gao@linaro.org>
+ <2135291.ciFUCkAm4U@wuerfel> <542A7705.2030404@linaro.org>
+Message-ID: <3181910.E4XHspguRh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mitch,
+On Tuesday 30 September 2014 17:25:25 zhangfei wrote:
+> On 09/30/2014 05:01 PM, Arnd Bergmann wrote:
+> > On Sunday 28 September 2014 12:22:07 Zhangfei Gao wrote:
+> >> +
+> >> +Required properties:
+> >> +- compatible: Must be "hisilicon,hix5hd2-i2c"
+> >> +  Specifically, the following versions of the chipset are supported:
+> >> +         Hi3716CV200 (support six I2C module)
+> >> +         Hi3719CV100 (support six I2C module)
+> >> +         Hi3718CV100 (support six I2C module)
+> >> +         Hi3719MV100 (support two I2C module)
+> >> +         Hi3718MV100 (support two I2C module)
+> >>
+> >
+> > How do you detect the specific model? Is there a hardware register that
+> > lets you know the type?
+> > If you have a device specific "compatible" string, you should list all
+> > the known strings.
+> >
+> In fact, no need to distinguish these hardware, the only difference is 
+> i2c module number.
+> The same compatible is used.
 
-On Sun, Sep 28, 2014 at 04:27:29AM +0100, Mitchel Humpherys wrote:
-> Currently, we provide the iommu_ops.iova_to_phys service by doing a
-> table walk in software to translate IO virtual addresses to physical
-> addresses. On SMMUs that support it, it can be useful to ask the SMMU
-> itself to do the translation. This can be used to warm the TLBs for an
-> SMMU. It can also be useful for testing and hardware validation.
-> 
-> Since the address translation registers are optional on SMMUv2, only
-> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
-> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
+Ah, so you have multiple nodes in those cases, not just one node with
+a variable number of I2C hosts. I was a bit confused by the
+description
 
-[...]
+> These info can be removed to remove the confusion.
 
-> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
-> +					dma_addr_t iova)
-> +{
-> +	struct arm_smmu_domain *smmu_domain = domain->priv;
-> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
-> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-> +	struct device *dev = smmu->dev;
-> +	void __iomem *cb_base;
-> +	u32 tmp;
-> +	u64 phys;
-> +
-> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-> +
-> +	if (smmu->version == 1) {
-> +		u32 reg = iova & ~0xFFF;
+Yes, I think that would be better, both because it avoids the confusion,
+and because it means you can use the driver for future machines without
+having to update the binding each time.
 
-Cosmetic comment, but hex constants are lowercase everywhere else in the
-file.
-
-> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-> +	} else {
-> +		u32 reg = iova & ~0xFFF;
-> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
-> +		reg = (iova & ~0xFFF) >> 32;
-> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
-> +	}
-> +
-> +	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
-> +				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
-> +		dev_err(dev,
-> +			"iova to phys timed out on 0x%pa. Falling back to software table walk.\n",
-> +			&iova);
-> +		return arm_smmu_iova_to_phys_soft(domain, iova);
-> +	}
-> +
-> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
-> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
-
-The absence of locking in this function concerns me a bit. For the software
-implementation, we're just reading page tables, but here we're writing ATS
-registers and I think we need to ensure serialisation against another
-iova_to_phys on the same domain.
-
-> +	if (phys & CB_PAR_F) {
-> +		dev_err(dev, "translation fault!\n");
-> +		dev_err(dev, "PAR = 0x%llx\n", phys);
-> +	}
-> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
-> +
-> +	return phys;
-
-You can return phys == 0 on failure (at least, the callers in kvm and vfio
-treat this as an error).
-
-Will
+	Arnd
