@@ -1,126 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 22:01:14 +0200
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <3079787.54pZijGjZM@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140930174821.GX841@e106497-lin.cambridge.arm.com>
- <3079787.54pZijGjZM@wuerfel>
-Message-ID: <2430078.s4snyh5OoF@wuerfel>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 30 Sep 2014 13:03:30 -0700
+Subject: [PATCH] i2c: qup: Fix order of runtime pm initialization
+In-Reply-To: <20140930195923.GB26928@qualcomm.com>
+References: <1412028051-21774-1-git-send-email-agross@codeaurora.org>
+ <20140930015323.GE28481@sonymobile.com>
+ <20140930195923.GB26928@qualcomm.com>
+Message-ID: <20140930200329.GV28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 20:54:41 Arnd Bergmann wrote:
-> On Tuesday 30 September 2014 18:48:21 Liviu Dudau wrote:
-> > > > > > These are the functions I found that refer to pci_sys_data on arm32:
-> > > > > > 
-> > > > > > pcibios_add_bus
-> > > > > > pcibios_remove_bus
+On Tue 30 Sep 12:59 PDT 2014, Andy Gross wrote:
+
+> On Mon, Sep 29, 2014 at 06:53:24PM -0700, Bjorn Andersson wrote:
+> > On Mon 29 Sep 15:00 PDT 2014, Andy Gross wrote:
 > > 
-> > These are only needed if you want to do per HB processing of the bus
+> > > The runtime pm calls need to be done before populating the children via the
+> > > i2c_add_adapter call.  If this is not done, a child can run into issues trying
+> > > to do i2c read/writes due to the pm_runtime_sync failing.
+> > > 
 > > 
-> > > > > > pcibios_align_resource
-> > 
-> > mvebu is the only user of this function.
-> > 
-> > > > > > pci_mmap_page_range
-> > 
-> > This is only needed when mapping a PCI resource to userspace. Is that your case here?
-> > 
-> > > > > > pci_domain_nr
-> > > > > > pci_proc_domain
-> > 
-> > We have equivalent functionality in the generic patches for those.
-> > 
+> > May I ask in what case this would fail?  I thought we tested this as we found
+> > the faulty error check after calling pm_runtime_get_sync().
 > 
-> We clearly don't need those functions for the new drivers, but that's not
-> the point. The problem is that when you build a kernel that has both
-> a traditional host bridge driver and a new one in it, you always get those
-> functions and they get called from the PCI core, with incorrect arguments.
+> This is a different kind of failure.   If during probe, the children do some I2C
+> activity, they will encounter issues with the runtime_sync due to the pm_runtime
+> not being initialized.  However, once the qup probe completes, everything works
+> fine.
+> 
+> The original runtime_sync issue revolved around the runtime_sync return value
+> being misinterpreted due to the incorrect check.
+> 
 
-FWIW, the last time we discussed this, I think I had suggested that the
-functions that are currently architecture specific and have a generic
-__weak fallback could become function pointers in a per-host structure
-passed to pci_scan_root_bus, either a new structure or an extended
-struct pci_ops. Something along these lines:
+Yeah, I just wondered why my testing didn't trigger this. But I suspect that
+the answer is simply that the client I ran with did not do i2c accesses from
+probe.
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 7fc42784becb..3da32fc631d0 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -36,7 +36,6 @@ struct hw_pci {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
--	void		(*add_bus)(struct pci_bus *bus);
- 	void		(*remove_bus)(struct pci_bus *bus);
- };
- 
-@@ -65,7 +64,6 @@ struct pci_sys_data {
- 					  resource_size_t start,
- 					  resource_size_t size,
- 					  resource_size_t align);
--	void		(*add_bus)(struct pci_bus *bus);
- 	void		(*remove_bus)(struct pci_bus *bus);
- 	void		*private_data;	/* platform controller private data	*/
- };
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 17a26c17f7f5..3cbcf8dc41e4 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -360,13 +360,6 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- }
- EXPORT_SYMBOL(pcibios_fixup_bus);
- 
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	struct pci_sys_data *sys = bus->sysdata;
--	if (sys->add_bus)
--		sys->add_bus(bus);
--}
--
- void pcibios_remove_bus(struct pci_bus *bus)
- {
- 	struct pci_sys_data *sys = bus->sysdata;
-@@ -475,7 +468,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
- 		sys->align_resource = hw->align_resource;
--		sys->add_bus = hw->add_bus;
- 		sys->remove_bus = hw->remove_bus;
- 		INIT_LIST_HEAD(&sys->resources);
- 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index b1315e197ffb..c9a0ee0429e8 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -716,6 +716,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
- static struct pci_ops mvebu_pcie_ops = {
- 	.read = mvebu_pcie_rd_conf,
- 	.write = mvebu_pcie_wr_conf,
-+	.add_bus = mvebu_pcie_add_bus,
- };
- 
- static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
-@@ -823,7 +824,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
- 	hw.align_resource = mvebu_pcie_align_resource;
--	hw.add_bus        = mvebu_pcie_add_bus;
- 
- 	pci_common_init(&hw);
- }
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index a63a47a70846..be6d56358320 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1885,6 +1885,8 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
- 
- void __weak pcibios_add_bus(struct pci_bus *bus)
- {
-+	if (bus->ops && bus->ops->add_bus)
-+		bus->ops->add_bus(bus);		
- }
- 
- void __weak pcibios_remove_bus(struct pci_bus *bus)
-
-	Arnd
+Regards,
+Bjorn
