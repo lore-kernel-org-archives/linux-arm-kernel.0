@@ -1,71 +1,89 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 30 Sep 2014 13:51:41 -0400 (EDT)
-Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <7hmw9hypj9.fsf@deeprootsystems.com>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
- <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
- <7hmw9hypj9.fsf@deeprootsystems.com>
-Message-ID: <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 30 Sep 2014 19:00:36 +0100
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140930060312.GE29874@ulmo>
+References: <20140827141632.GB32243@ulmo> <53FF1D6C.6090205@redhat.com>
+ <20140829070116.GC13106@ulmo> <20140829141244.GH15297@lukather>
+ <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929161101.GS16977@sirena.org.uk>
+ <20140930060312.GE29874@ulmo>
+Message-ID: <20140930180036.GI4273@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Sep 2014, Kevin Hilman wrote:
+On Tue, Sep 30, 2014 at 08:03:14AM +0200, Thierry Reding wrote:
+> On Mon, Sep 29, 2014 at 05:11:01PM +0100, Mark Brown wrote:
 
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> 
-> > Hi Lina,
-> >
-> > On Sat, Sep 27, 2014 at 01:58:13AM +0100, Lina Iyer wrote:
-> >> Add cpuidle driver interface to allow cpus to go into C-States. Use the
-> >> cpuidle DT interface common across ARM architectures to provide the
-> >> C-State information to the cpuidle framework.
-> >> 
-> >> Supported modes at this time are clock gating (wfi) and cpu power down
-> >> (Standalone PC or spc).
-> >> 
-> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> >> ---
-> >>  .../bindings/arm/msm/qcom,idle-state.txt           | 72 +++++++++++++++++
-> >>  drivers/cpuidle/Kconfig.arm                        |  7 ++
-> >>  drivers/cpuidle/Makefile                           |  1 +
-> >>  drivers/cpuidle/cpuidle-qcom.c                     | 89 ++++++++++++++++++++++
-> >>  4 files changed, 169 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> >>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> >> new file mode 100644
-> >> index 0000000..47095b9
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> >> @@ -0,0 +1,72 @@
-> >> +QCOM Idle States for cpuidle driver
-> >> +
-> >> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
-> >> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
-> >> +states. Idle states have different enter/exit latency and residency values.
-> >> +The idle states supported by the QCOM SoC are defined as -
-> >> +
-> >> +    * WFI
-> >> +    * Retention
-> >> +    * Standalone Power Collapse (Standalone PC or SPC)
-> >> +    * Power Collapse (PC)
-> >> +
-> >> +WFI: WFI does a little more in addition to architectural clock gating.  ARM
-> >
-> > This may be misleading. Call it PlatformWFI or something like that, not WFI if
-> > that's not what it is.
-> 
-> This gets at a little pet peeve of mine: 
-> 
-> IMO, naming any state with "WFI" is a bit confusing, because typically
-> *every* idle state is entered by one (or more) CPU executing WFI, no?
+> > Not really thought this through fully yet but would having phandles to
+> > the relevant devices do the job?  Kind of lines up with Grant's idea of
+> > having dummy drivers.
 
-Agreed.
+> One of the arguments that came up during the discussion of the sunxi
+> patches is that simplefb is going to be used precisely because there is
+> no real driver for the display part of the SoC yet and nobody knows what
+> the binding will look like. So there's nothing to point at currently and
+> for the same reason having a dummy driver won't work. There's simply no
+> definition of what resources are needed.
 
-The only state called "WFI" should be the one that only executes the WFI 
-instruction without any other hardware setup around it.
+You may well need to extend the binding in future for an actual driver
+but from the point of view of what's going into the block it really
+should just be a case of reading the datasheet and mechanically typing
+that in.  If we can work out how to say where the framebuffer is we
+really ought to be able to work this stuff out.
 
+> > > There may be also resets involved. Fortunately the reset framework is
+> > > minimalistic enough not to care about asserting all unused resets at
+> > > late_initcall. And other things like power domains may also need to be
+> > > kept on.
 
-Nicolas
+> > We might want to do that in the future, though it's not always the case
+> > that reset is the lowest power state.
+
+> That proves my point. If we ever decide to assert resets by default
+> we'll have yet another subsystem that can potentially break existing
+> DTs.
+
+OTOH given the level of breakage that's like to introduce we might just
+decide not to do that...
+
+> In the end it brings us back to the very fundamental principles of DT
+> that's been causing so much pain. For things to work properly and in a
+> stable way you have to get the bindings right and complete from the
+> start. That is, it needs to describe every aspect of the hardware block
+> and all links to other components.
+
+Or we ned to introduce things in a conservative fashion which does cope
+with backwards compatibility; it's definitely more work but it is
+doable.
+
+> > One thing that makes me a bit nervous about this approach in the context
+> > of the regulator API is the frequency with which one finds shared
+> > supplies.  I'm not sure if it's actually a big problem in practice but
+> > it makes me worry a bit.  We could probably just do something like make
+> > refcounting down to zero not actually disable anything for standard
+> > regulators to deal with it which might be an idea anyway in the context
+> > of this sort of dodge.
+
+> Yes, that's sort of how I expected clk_ignore_unused to work. The way I
+> understood it, it would cause all unused clocks to be ignored (that is
+> stay enabled if they are).
+
+> Of course as Geert pointed out in another subthread, taking this all the
+> way means that we have to disable all power management because the
+> firmware device may be sharing resources with other devices and which
+> therefore are not unused. That's a pretty strong argument and I don't
+> have a solution for that. It is only really a problem for cases where
+> the firmware virtual device isn't taken over by a proper driver at some
+> point, though.
+
+Indeed, and we also run into trouble for things where we actually need
+to really turn off the resource for some reason (MMC has some needs here
+for example).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/004a1194/attachment-0001.sig>
