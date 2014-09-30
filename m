@@ -1,77 +1,49 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Tue, 30 Sep 2014 08:34:06 -0400
-Subject: [PATCH] sched, time: cmpxchg does not work on 64-bit variable
-In-Reply-To: <2547036.UshV4pXvhf@wuerfel>
-References: <2547036.UshV4pXvhf@wuerfel>
-Message-ID: <542AA33E.2050008@redhat.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Tue, 30 Sep 2014 20:39:34 +0800
+Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
+In-Reply-To: <3366285.QN2R3CQNzG@wuerfel>
+References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
+ <20140930001206.GA11657@peterchendt> <3366285.QN2R3CQNzG@wuerfel>
+Message-ID: <20140930123933.GA25395@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-On 09/30/2014 07:56 AM, Arnd Bergmann wrote:
-> A recent change to update the stime/utime members of task_struct 
-> using atomic cmpxchg broke configurations on 32-bit machines with 
-> CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that uses 64-bit 
-> nanoseconds, leading to a link-time error:
+On Tue, Sep 30, 2014 at 12:03:42PM +0200, Arnd Bergmann wrote:
+> On Tuesday 30 September 2014 08:12:07 Peter Chen wrote:
+> > > +
+> > > +     if (dev->of_node) {
+> > > +             ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
+> > > +             if (ret)
+> > > +                     goto clk_err;
+> > > +     } else {
+> > > +             ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> > > +             if (ret)
+> > > +                     goto clk_err;
+> > > +     }
+> > 
+> > My suggestion:
+> > 
+> > - call dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32)) for both 
+> > dt and non-dt
 > 
-> kernel/built-in.o: In function `cputime_adjust': :(.text+0x25234):
-> undefined reference to `__bad_cmpxchg'
-> 
-> This reverts the change that caused the problem, I suspect the real
-> fix is to conditionally use cmpxchg64 instead, but I have not
-> checked if that will work on all architectures.
-
-I see that kernel/sched/clock.c uses cmpxchg64 in a non
-architecture, non 64 bit specific piece of code, and
-nobody complained about that file not building, so I have
-to assume cmpxchg64 works :)
-
-The revert seems like a bad idea, since it will reintroduce
-a race condition with sys_times().
-
-One problem is that include/asm-generic/cputime_nsecs.h
-defines cputime_t as u64, while cputime_jiffies.h defines
-cputime_t as a long...
-
-Will anybody barf at a cmpxchg_cputime, or is the solution
-to fix cmpxchg on architectures where it does not accept a
-64 bit type?  Not quite sure how to do the latter...
-
-Arnd, on which architecture are you seeing a build failure?
-Is it just 32 bit arm?
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de> Fixes: eb1b4af0a64a
-> ("sched, time: Atomically increment stime & utime") --- found in
-> ARM randconfig builds on linux-next
-> 
-> diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c index
-> 64492dff8a81..e99e7e54131c 100644 --- a/kernel/sched/cputime.c +++
-> b/kernel/sched/cputime.c @@ -603,12 +603,9 @@ static void
-> cputime_adjust(struct task_cputime *curr, * If the tick based count
-> grows faster than the scheduler one, * the result of the scaling
-> may go backward. * Let's enforce monotonicity. -	 * Atomic exchange
-> protects against concurrent cputime_adjust(). */ -	while (stime >
-> (rtime = ACCESS_ONCE(prev->stime))) -		cmpxchg(&prev->stime, rtime,
-> stime); -	while (utime > (rtime = ACCESS_ONCE(prev->utime))) -
-> cmpxchg(&prev->utime, rtime, utime); +	prev->stime =
-> max(prev->stime, stime); +	prev->utime = max(prev->utime, utime);
-> 
-> out: *ut = prev->utime;
+> No, as I explained before, hardcoding the dma mask is always wrong, don't
+> do that. Call dma_set_mask_and_coherent and check the return value.
+> It's not wrong to do that for both DT and ATAGS.
 > 
 
+Thanks, Arnd. I had not thought setting dma mask is so complicated, yes, it
+should check the return value, two things to confirm:
 
-- -- 
-All rights reversed
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
+- dma_coerce_mask_and_coherent or dma_set_mask_and_coherent, the only difference
+of these two API is the first one do "dev->dma_mask = &dev->coherent_dma_mask;"
+The reason you suggest choosing dma_set_mask_and_coherent is you do not want
+assign dev->dma_mask?
+- The second parameter for dma_set_mask_and_coherent is DMA_BIT_MASK(32), is it
+ok?
 
-iQEcBAEBAgAGBQJUKqM+AAoJEM553pKExN6Dc8EH/3BuP9ZSvWTXpFI070Wy0uuo
-/gqpFqdyLLtJ+i850HW4356ew5SeIYjzKHxDcWFJDYYUBI2/LuUjyaOo02KK/AjX
-0G0Qblli94dYB9B1eiMqQc9pU9VLjGHD1Gh5T0IjahTpmxKUCTNw4tv80ykdIDEe
-JVrZGNAxFUQXJ+3S2RwhRHRLHGVN3/EGPvhkibPK+xvth17isasv/AdIFkgdDYPY
-6UtDuKPtLAilmIEXit82z/OOqInSYPrMzvcB+psnY3NlqHwTWW8IuI5zZmEh2h+a
-aQhA/D+4he49Xc2O+7eIFwzLJbBnv0+4mlUQwiw9v2bBXHg1MepqUT8hwveggxE=
-=SPyM
------END PGP SIGNATURE-----
+I just a little confused of what's the operation is "hardcoding the dma mask"?
+
+-- 
+Best Regards,
+Peter Chen
