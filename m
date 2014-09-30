@@ -1,29 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 12:38:58 +0200
-Subject: [PATCH v8 2/2] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <1412072481-22370-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1412072481-22370-1-git-send-email-pankaj.dubey@samsung.com>
- <1412072481-22370-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <11948982.c37J1JPj8N@wuerfel>
+Date: Tue, 30 Sep 2014 12:39:37 +0200
+Subject: [PATCH v4 6/8] asm-generic/io.h: Implement generic {read,
+ write}s*()
+In-Reply-To: <CAMo8Bf+u8er_KF4nJPSPNf9OmKZHu4y0x3Pcb7DU17y5ocBJqw@mail.gmail.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+ <CAMo8BfJ9VJ24zsn_6VwNrAntmDqdJu11O79OyMd8eThv3UaaUw@mail.gmail.com>
+ <CAMo8Bf+u8er_KF4nJPSPNf9OmKZHu4y0x3Pcb7DU17y5ocBJqw@mail.gmail.com>
+Message-ID: <1799506.5Clfp6gmMu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 15:51:21 Pankaj Dubey wrote:
+On Tuesday 30 September 2014 14:26:20 Max Filippov wrote:
+> On Tue, Sep 30, 2014 at 2:22 PM, Max Filippov <jcmvbkbc@gmail.com> wrote:
+> > Hi Thierry,
+> >
+> >> I think this can be fixed by including linux/string.h for memset() and
+> >> memcpy() in include/asm-generic/io.h.
+> >
+> > Will you send that fix or do I need to do it?
 > 
-> +static inline void pmu_raw_writel(u32 val, u32 offset)
-> +{
-> +       __raw_writel(val, pmu_base_addr + offset);
-> +}
-> +
-> +static inline u32 pmu_raw_readl(u32 offset)
-> +{
-> +       return __raw_readl(pmu_base_addr + offset);
-> +}
-> +
+> Never mind, found that it's fixed in today's next.
+> 
 > 
 
-While you're at it, please convert these to use readl_relaxed() instead,
-which is safe to use in drivers and works independent of CPU endianess.
+
+Actually I just backed out the original patches, the problem is still
+there in my tree.
 
 	Arnd
