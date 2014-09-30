@@ -1,87 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 30 Sep 2014 14:30:07 -0400 (EDT)
-Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
-In-Reply-To: <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
- <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
- <7hmw9hypj9.fsf@deeprootsystems.com>
- <alpine.LFD.2.11.1409301349260.5311@knanqh.ubzr>
- <CAMAWPa_ZGxOA3KfAPWhfRhJ8KcYYQvgXM9JwzmNwHKPTbchWSA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1409301428020.5311@knanqh.ubzr>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 30 Sep 2014 11:35:53 -0700
+Subject: [PATCH v7 3/5] ARM: dts: add RK3xxx CPU Thermal data
+In-Reply-To: <CAD=FV=WRYeW4giA+yRWmXGxAvdG38GcW-7tA39SZDH1GPamf6A@mail.gmail.com>
+References: <1411900693-30484-1-git-send-email-caesar.wang@rock-chips.com>
+ <1411900693-30484-4-git-send-email-caesar.wang@rock-chips.com>
+ <CAD=FV=WRYeW4giA+yRWmXGxAvdG38GcW-7tA39SZDH1GPamf6A@mail.gmail.com>
+Message-ID: <CAD=FV=Wyv9P9cvTFEfD5_0BzgFNC5nyduT0THKKwERkX4-cY0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Sep 2014, Kevin Hilman wrote:
+Hi,
 
-> On Tue, Sep 30, 2014 at 10:51 AM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 30 Sep 2014, Kevin Hilman wrote:
-> >
-> >> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> >>
-> >> > Hi Lina,
-> >> >
-> >> > On Sat, Sep 27, 2014 at 01:58:13AM +0100, Lina Iyer wrote:
-> >> >> Add cpuidle driver interface to allow cpus to go into C-States. Use the
-> >> >> cpuidle DT interface common across ARM architectures to provide the
-> >> >> C-State information to the cpuidle framework.
-> >> >>
-> >> >> Supported modes at this time are clock gating (wfi) and cpu power down
-> >> >> (Standalone PC or spc).
-> >> >>
-> >> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> >> >> ---
-> >> >>  .../bindings/arm/msm/qcom,idle-state.txt           | 72 +++++++++++++++++
-> >> >>  drivers/cpuidle/Kconfig.arm                        |  7 ++
-> >> >>  drivers/cpuidle/Makefile                           |  1 +
-> >> >>  drivers/cpuidle/cpuidle-qcom.c                     | 89 ++++++++++++++++++++++
-> >> >>  4 files changed, 169 insertions(+)
-> >> >>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> >> >>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> >> >> new file mode 100644
-> >> >> index 0000000..47095b9
-> >> >> --- /dev/null
-> >> >> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
-> >> >> @@ -0,0 +1,72 @@
-> >> >> +QCOM Idle States for cpuidle driver
-> >> >> +
-> >> >> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
-> >> >> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
-> >> >> +states. Idle states have different enter/exit latency and residency values.
-> >> >> +The idle states supported by the QCOM SoC are defined as -
-> >> >> +
-> >> >> +    * WFI
-> >> >> +    * Retention
-> >> >> +    * Standalone Power Collapse (Standalone PC or SPC)
-> >> >> +    * Power Collapse (PC)
-> >> >> +
-> >> >> +WFI: WFI does a little more in addition to architectural clock gating.  ARM
-> >> >
-> >> > This may be misleading. Call it PlatformWFI or something like that, not WFI if
-> >> > that's not what it is.
-> >>
-> >> This gets at a little pet peeve of mine:
-> >>
-> >> IMO, naming any state with "WFI" is a bit confusing, because typically
-> >> *every* idle state is entered by one (or more) CPU executing WFI, no?
-> >
-> > Agreed.
-> >
-> > The only state called "WFI" should be the one that only executes the WFI
-> > instruction without any other hardware setup around it.
-> 
-> Well, I would go even further in that none of the states should be
-> called WFI, because WFI is used to enter all of them.
+On Tue, Sep 30, 2014 at 11:24 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Caesar,
+>
+> On Sun, Sep 28, 2014 at 3:38 AM, Caesar Wang <caesar.wang@rock-chips.com> wrote:
+>> This patch changes a dtsi file to contain the thermal data
+>> on RK3288 and later SoCs. This data will
+>> enable a thermal shutdown over 125C.
+>>
+>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>> ---
+>>  arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi | 32 +++++++++++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi
+>
+> I haven't done lots of review of this series, but I did notice that
+> this file has bad spacing.  It's fairly obvious in your gerrit patch
+> <https://chromium-review.googlesource.com/#/c/220270/1/arch/arm/boot/dts/rk3xxx-cpu-thermal.dtsi>
+> because gerrit (by default) shows you "tab" characters...
+>
+> In general you should use tab for indentation, not spaces.  You seem
+> to use a mix of the two.
 
-Fair enough.
+I suppose I should also point out that it's generally not great to
+name things "rk3xxx" since it makes too many predictions about how
+future products will behave.  It's better to name things after the
+first relevant product.  I'd just name this "rk3288-cpu-thermal.dtsi".
 
-So let's fix this by finding a name for that state that consists of only 
-executing WFI and that every SOC has.
-
-Suggestions?
-
-
-Nicolas
+-Doug
