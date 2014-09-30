@@ -1,92 +1,43 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 30 Sep 2014 11:39:42 +0100
-Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <20140929194335.GA13747@google.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
- <20140929194335.GA13747@google.com>
-Message-ID: <20140930103942.GO841@e106497-lin.cambridge.arm.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 30 Sep 2014 12:41:53 +0200
+Subject: [PATCH V3] bcma: use device from DT (brcm, bus-chipcommon) for
+ SoC GPIO chip
+In-Reply-To: <3484902.1UVy7lmJAD@wuerfel>
+References: <1411892641-5662-1-git-send-email-zajec5@gmail.com>
+ <1412072546-3529-1-git-send-email-zajec5@gmail.com>
+ <3484902.1UVy7lmJAD@wuerfel>
+Message-ID: <CACna6rx8vm3cqws7hqH0yGZnJiteVy9hsCgi8hXZD5oFdyp_FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 08:43:35PM +0100, Bjorn Helgaas wrote:
-> On Mon, Sep 29, 2014 at 03:29:19PM +0100, Liviu Dudau wrote:
-> > This is my version 13 of the attempt at adding support for generic PCI host
-> > bridge controllers. It contains only cleanups to make it play nice with the
-> > linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
-> > asm-generic is going to revert some of its more aggresive patches, he has the
-> > choice of queueing it into linux-next again.
-> > ...
-> 
-> These patches above were already on my pci/host-generic branch and in
-> linux-next:
-> 
->    asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
-This ^ ...
+On 30 September 2014 12:36, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 30 September 2014 12:22:26 Rafa? Mi?ecki wrote:
+>> @@ -218,6 +218,12 @@ int bcma_gpio_init(struct bcma_drv_cc *cc)
+>>  #if IS_BUILTIN(CONFIG_BCM47XX)
+>>         chip->to_irq            = bcma_gpio_to_irq;
+>>  #endif
+>> +#if IS_BUILTIN(CONFIG_OF)
+>> +       if (cc->core->bus->hosttype == BCMA_HOSTTYPE_SOC)
+>> +               chip->of_node   = of_find_compatible_node(
+>> +                                       bus->host_pdev->dev.of_node, NULL,
+>> +                                       "brcm,bus-chipcommon");
+>> +#endif
+>>         switch (cc->core->bus->chipinfo.id) {
+>
+> This doesn't: you are now searching through all nodes starting at the
+> axi node rather than searching just through the children.
+>
+> I think it would be better with the first change in place to set
+> chip->of_node to cc->core->dev.of_node, and set that pointer in
+> bcma_bus_scan by matching the 'reg' number. I think that is what
+> an earlier version of the bcma DT support did in order to find the
+> IRQs. We no longer need it for that purpose, but it seems like a
+> good idea anyway, as I expect other bcma_devices to have similar
+> requirements to add additional properties.
 
->    of/pci: Add pci_register_io_range() and pci_pio_to_address()
->    ARM: Define PCI_IOBASE as the base of virtual PCI IO space
-
-and this ^ need to be refreshed from my series otherwise we will get conflicts with
-asm-generic branch (either now or in the future). While the asm-generic/io.h
-cast is arguably superflous, we need to define PCI_IOBASE as a void __iomem* to
-match all other standard declarations of PCI_IOBASE.
-
->    of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
->    of/pci: Move of_pci_range_to_resources() to of/address.c
->    of/pci: Fix the conversion of IO ranges into IO resources
-> 
-> I added these three patches to my pci/host-generic branch:
-> 
->    PCI: Add generic domain handling
->    of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
->    of/pci: Add support for parsing PCI host bridge resources from DT
-
-I can see these patches added to pci/host-generic but not on pci/next.
-
-> 
-> Yinghai pointed out a problem with this one, so I omitted it:
-> 
->    PCI: Assign unassigned bus resources in pci_scan_root_bus()
-
-Thats fine, host bridge drivers will have to work around pci_scan_root_bus() reduced
-functionality for now.
-
-
-> 
-> I added this one to my pci/host-generic branch:
-> 
->    PCI: Add pci_remap_iospace() to map bus I/O resources
-> 
-> I assume this depends on the pci_scan_root_bus() change (if not, let me
-> know), so I omitted this one:
-> 
->    arm64: Add architectural support for PCI
-
-No, there is no dependency there on pci_scan_root_bus(), it can go in the series.
-The only thing that depends on a feature rich pci_scan_root_bus() is the host
-bridge driver in order to be able to use only one line to process the root bus.
-
-Thanks for huge support in getting these patches in and I do hope I'm not being
-too much of a burden to you.
-
-Best regards,
-Liviu
-
-> 
-> Bjorn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Ohh, of course, I didn't notice that
+[PATCH v6] bcma: register bcma as device tree driver
+already contains bcma_of_fill_device. This will simplify my search a lot!
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Rafa?
