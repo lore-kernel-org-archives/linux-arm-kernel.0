@@ -1,85 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Sep 2014 15:06:57 +0200
-Subject: [PATCH] pinctrl: nomadik: improve GPIO debug prints
-Message-ID: <1412082417-10178-1-git-send-email-linus.walleij@linaro.org>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 30 Sep 2014 13:09:34 +0000
+Subject: [PATCH v5 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <20140929.155200.2231132602322345812.davem@davemloft.net>
+References: <1411667317-1163-1-git-send-email-santosh.shilimkar@ti.com>
+ <1411667317-1163-3-git-send-email-santosh.shilimkar@ti.com>
+ <20140929.155200.2231132602322345812.davem@davemloft.net>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D174A1012@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debugfs file would only define if the line was "pulled" and
-not which direction (pull up or pull down). Improve this by
-taking two print paths depending on whether the pin is set as
-input or output and use the data register directly to figure
-out whether the pin is set for pull up or pull down.
+From: David Miller
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Date: Thu, 25 Sep 2014 13:48:36 -0400
+> 
+> > +static inline int gbe_phy_link_status(struct gbe_slave *slave)
+> > +{
+> > +	if (!slave->phy)
+> > +		return 1;
+> > +
+> > +	if (slave->phy->link)
+> > +		return 1;
+> > +
+> > +	return 0;
+> > +}
+> 
+> Please use 'bool' as the return type and return 'true' or 'false'.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/nomadik/pinctrl-nomadik.c | 36 +++++++++++++++++++++----------
- 1 file changed, 25 insertions(+), 11 deletions(-)
+That function body could also be just:
+	return !slave->phy && slave->phy->link;
+which might be more readable if directly coded.
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index c4d9c5daa21b..3b7c733de489 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -986,6 +986,7 @@ static void nmk_gpio_dbg_show_one(struct seq_file *s,
- 		container_of(chip, struct nmk_gpio_chip, chip);
- 	int mode;
- 	bool is_out;
-+	bool data_out;
- 	bool pull;
- 	u32 bit = 1 << offset;
- 	const char *modes[] = {
-@@ -998,28 +999,41 @@ static void nmk_gpio_dbg_show_one(struct seq_file *s,
- 		[NMK_GPIO_ALT_C+3]	= "altC3",
- 		[NMK_GPIO_ALT_C+4]	= "altC4",
- 	};
-+	const char *pulls[] = {
-+		"none     ",
-+		"pull down",
-+		"pull up  ",
-+	};
- 
- 	clk_enable(nmk_chip->clk);
- 	is_out = !!(readl(nmk_chip->addr + NMK_GPIO_DIR) & bit);
- 	pull = !(readl(nmk_chip->addr + NMK_GPIO_PDIS) & bit);
-+	data_out = !!(readl(nmk_chip->addr + NMK_GPIO_DAT) & bit);
- 	mode = nmk_gpio_get_mode(gpio);
- 	if ((mode == NMK_GPIO_ALT_C) && pctldev)
- 		mode = nmk_prcm_gpiocr_get_mode(pctldev, gpio);
- 
--	seq_printf(s, " gpio-%-3d (%-20.20s) %s %s %s %s",
--		   gpio, label ?: "(none)",
--		   is_out ? "out" : "in ",
--		   chip->get
--		   ? (chip->get(chip, offset) ? "hi" : "lo")
--		   : "?  ",
--		   (mode < 0) ? "unknown" : modes[mode],
--		   pull ? "pull" : "none");
--
--	if (!is_out) {
-+	if (is_out) {
-+		seq_printf(s, " gpio-%-3d (%-20.20s) out %s        %s",
-+			   gpio,
-+			   label ?: "(none)",
-+			   data_out ? "hi" : "lo",
-+			   (mode < 0) ? "unknown" : modes[mode]);
-+	} else {
- 		int irq = gpio_to_irq(gpio);
- 		struct irq_desc	*desc = irq_to_desc(irq);
-+		int pullidx = 0;
- 
--		/* This races with request_irq(), set_irq_type(),
-+		if (pull)
-+			pullidx = data_out ? 1 : 2;
-+
-+		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s",
-+			   gpio,
-+			   label ?: "(none)",
-+			   pulls[pullidx],
-+			   (mode < 0) ? "unknown" : modes[mode]);
-+		/*
-+		 * This races with request_irq(), set_irq_type(),
- 		 * and set_irq_wake() ... but those are "rare".
- 		 */
- 		if (irq > 0 && desc && desc->action) {
--- 
-1.9.3
+I also wonder if slave>phy can actually be NULL?
+If it can be under unusual circumstances it might be worth
+assigning the address of a dummy 'phy' structure so that the
+tests can all be removed.
+
+	David
