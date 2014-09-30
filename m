@@ -1,102 +1,23 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 30 Sep 2014 17:45:04 +0100
-Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <20140930161805.GB5625@google.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
- <20140929194335.GA13747@google.com>
- <20140930103942.GO841@e106497-lin.cambridge.arm.com>
- <20140930161805.GB5625@google.com>
-Message-ID: <20140930164504.GT841@e106497-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 30 Sep 2014 17:45:10 +0100
+Subject: [PATCH] ASoC: fsl: fix dependencies for wm8962
+In-Reply-To: <1950588.ErdGoiHh8p@wuerfel>
+References: <1950588.ErdGoiHh8p@wuerfel>
+Message-ID: <20140930164510.GF4273@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 05:18:05PM +0100, Bjorn Helgaas wrote:
-> On Tue, Sep 30, 2014 at 11:39:42AM +0100, Liviu Dudau wrote:
-> > On Mon, Sep 29, 2014 at 08:43:35PM +0100, Bjorn Helgaas wrote:
-> > > On Mon, Sep 29, 2014 at 03:29:19PM +0100, Liviu Dudau wrote:
-> > > > This is my version 13 of the attempt at adding support for generic PCI host
-> > > > bridge controllers. It contains only cleanups to make it play nice with the
-> > > > linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
-> > > > asm-generic is going to revert some of its more aggresive patches, he has the
-> > > > choice of queueing it into linux-next again.
-> > > > ...
-> > > 
-> > > These patches above were already on my pci/host-generic branch and in
-> > > linux-next:
-> > > 
-> > >    asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
-> > This ^ ...
-> > 
-> > >    of/pci: Add pci_register_io_range() and pci_pio_to_address()
-> > >    ARM: Define PCI_IOBASE as the base of virtual PCI IO space
-> > 
-> > and this ^ need to be refreshed from my series otherwise we will get conflicts with
-> > asm-generic branch (either now or in the future). While the asm-generic/io.h
-> > cast is arguably superflous, we need to define PCI_IOBASE as a void __iomem* to
-> > match all other standard declarations of PCI_IOBASE.
-> > 
-> > >    of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
-> > >    of/pci: Move of_pci_range_to_resources() to of/address.c
-> > >    of/pci: Fix the conversion of IO ranges into IO resources
-> > > 
-> > > I added these three patches to my pci/host-generic branch:
-> > > 
-> > >    PCI: Add generic domain handling
-> > >    of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
-> > >    of/pci: Add support for parsing PCI host bridge resources from DT
-> > 
-> > I can see these patches added to pci/host-generic but not on pci/next.
-> 
-> Right.  I leave things on topic branches for a day or two to give a chance
-> for Fengguang's auto-builder to find problems before I merge them into the
-> more public "next" or "for-linus" branches.
-> 
-> > > Yinghai pointed out a problem with this one, so I omitted it:
-> > > 
-> > >    PCI: Assign unassigned bus resources in pci_scan_root_bus()
-> > 
-> > Thats fine, host bridge drivers will have to work around pci_scan_root_bus() reduced
-> > functionality for now.
-> 
-> Well, it's not really "reduced functionality."  It is unchanged by this
-> series and host bridge drivers can continue using it the same way they have
-> in the past.  It's just that we'd like to make it smarter someday.
-> 
-> > > I added this one to my pci/host-generic branch:
-> > > 
-> > >    PCI: Add pci_remap_iospace() to map bus I/O resources
-> > > 
-> > > I assume this depends on the pci_scan_root_bus() change (if not, let me
-> > > know), so I omitted this one:
-> > > 
-> > >    arm64: Add architectural support for PCI
-> > 
-> > No, there is no dependency there on pci_scan_root_bus(), it can go in the series.
-> > The only thing that depends on a feature rich pci_scan_root_bus() is the host
-> > bridge driver in order to be able to use only one line to process the root bus.
-> 
-> OK, I rebuilt pci/host-generic from scratch.  It consists of your v13
-> patches + Arnd's build fix for pci_pio_to_address() in !CONFIG_OF configs.
+On Tue, Sep 30, 2014 at 01:43:41PM +0200, Arnd Bergmann wrote:
+> The wm8962 driver uses the input subsystem, but is selected by
+> SND_SOC_FSL_ASOC_CARD, which can be built with CONFIG_INPUT disabled,
+> resulting in this link error:
 
-A big gesture of gratitude towards you!!
-
-I'm hoping the rest of the preparations for v3.18 will go smoothly without having
-to take any more of your time.
-
-Best regards,
-Liviu
-
-> 
-> Bjorn
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+That select shouldn't be there in the first place, I asked Nicolin to
+fix this when I applied the driver but he's not got round to it yet.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/e13a18ea/attachment.sig>
