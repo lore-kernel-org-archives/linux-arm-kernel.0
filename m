@@ -1,48 +1,85 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 30 Sep 2014 07:09:24 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140929155517.GR16977@sirena.org.uk>
-References: <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
- <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
- <20140929155517.GR16977@sirena.org.uk>
-Message-ID: <20140930050923.GB29874@ulmo>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 29 Sep 2014 22:11:39 -0700
+Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
+In-Reply-To: <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20140930051138.GH28481@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 04:55:17PM +0100, Mark Brown wrote:
-> On Mon, Sep 29, 2014 at 03:47:15PM +0200, Thierry Reding wrote:
-[...]
-> > The same thing is going to happen with simplefb for your device. If you
-> > later realize that you need a regulator to keep the panel going, you'll
-> > have to add code to your firmware to populate the corresponding
-> > properties, otherwise the regulator will end up unused and will be
-> > automatically disabled. At the same time you're going to break upstream
-> > for all users of your old firmware because it doesn't add that property
-> > yet.
+On Mon 29 Sep 02:14 PDT 2014, Srinivas Kandagatla wrote:
+
+> This patch adds rpm node to apq8064 dt as rpm would be used by other
+> devices for regulator support.
 > 
-> > And the same will continue to happen for every new type of resource
-> > you're going to add.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
-> So long as we're ensuring that when we don't start supporting resources
-> without DT additions or at least require DT additions to actively manage
-> them (which can then include simplefb hookup) we should be fine.
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index b3154c0..9c2c8e6 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -3,6 +3,7 @@
+>  #include "skeleton.dtsi"
+>  #include <dt-bindings/clock/qcom,gcc-msm8960.h>
+>  #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
+> +#include <dt-bindings/mfd/qcom-rpm.h>
+>  #include <dt-bindings/soc/qcom,gsbi.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  
+> @@ -246,6 +247,24 @@
+>  			#reset-cells = <1>;
+>  		};
+>  
+> +		apcs: syscon at 2011000 {
+> +			compatible = "syscon";
+> +			reg = <0x2011000 0x1000>;
+> +		};
+> +
+> +		rpm at 108000 {
+> +			compatible	= "qcom,rpm-apq8064";
+> +			reg		= <0x108000 0x1000>;
+> +			qcom,ipc = <&apcs 0x8 2>;
 
-I'm not sure I understand what you mean. If we add a driver for the PMIC
-that exposes these regulators and then add a DT node for the PMIC, we'd
-still need to fix the firmware to generate the appropriate DT properties
-to allow simplefb to enable the regulators.
+I don't like your indentation, but please stick with one way of doing it :)
 
-So unless firmware is updated at the same time, regulators will get
-disabled because they are unused.
+> +
+> +			interrupts	= <0 19 0>, <0 21 0>, <0 22 0>;
+> +			interrupt-names = "ack", "err", "wakeup";
+> +
+> +			#address-cells	= <1>;
+> +			#size-cells	= <0>;
+> +
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/4f9e4be0/attachment.sig>
+This part looks good.
+
+But how about adding all the regulators here as well?
+Like:
+
+                        pm8921_l5: pm8921-l5 {
+				compatible = "qcom,rpm-pm8921-pldo";
+				reg = <QCOM_RPM_PM8921_LDO5>;
+			};
+
+			...
+
+That way we can update the references from this file (while still allowing the
+dts to override it if needed). I'm not sure if we should add some sane defaults
+or just completely deferr specifying the voltage ranges to the dts. The benefit
+of the latter is that the regulators not configured by the dts author will not
+be accessible.
+
+But simply listing all the nodes here would be nice and I dont see much reason
+to postpone this work.
+
+> +		};
+> +
+>  		/* Temporary fixed regulator */
+>  		vsdcc_fixed: vsdcc-regulator {
+>  			compatible = "regulator-fixed";
+
+Regards,
+Bjorn
