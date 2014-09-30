@@ -1,51 +1,68 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 30 Sep 2014 09:16:55 +0100
-Subject: [PATCH 2/4] ARM: DT: apq8064: Add usb host support.
-In-Reply-To: <20140930051728.GI28481@sonymobile.com>
+Date: Tue, 30 Sep 2014 09:18:22 +0100
+Subject: [PATCH 4/4] ARM: DT: apq8064: Add SATA controller support.
+In-Reply-To: <5429DB3D.5080701@codeaurora.org>
 References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982100-7964-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20140930051728.GI28481@sonymobile.com>
-Message-ID: <542A66F7.2000607@linaro.org>
+ <1411982134-8090-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5429DB3D.5080701@codeaurora.org>
+Message-ID: <542A674E.8040901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-On 30/09/14 06:17, Bjorn Andersson wrote:
-> On Mon 29 Sep 02:15 PDT 2014, Srinivas Kandagatla wrote:
+On 29/09/14 23:20, Stephen Boyd wrote:
+> On 09/29/14 02:15, Srinivas Kandagatla wrote:
+>> @@ -396,6 +407,35 @@
+>>   			usb-phy		= <&usb4_phy>;
+>>   		};
+>>
+>> +		sata_phy0:sata-phy at 1b400000{
 >
->> This patch adds device tree nodes to support two usb hosts on APQ8064
->> SOC.
-
->> +				compatible	= "qcom,rpm-pm8921-smps";
->> +				reg		= <QCOM_RPM_PM8921_SMPS3>;
+> add some spaces here?
+Will fix this in next version.
+>
+>> +			compatible	= "qcom,apq8064-sata-phy";
+>> +			reg		= <0x1b400000 0x200>;
+>> +			reg-names	= "phy_mem";
+>> +			clocks		= <&gcc SATA_PHY_CFG_CLK>;
+>> +			clock-names = "cfg";
+>> +			#phy-cells = <0>;
+>
+> These two lost the pretty tabs.
+>
+Will fix this in next version.
+>> +		};
 >> +
->> +				regulator-min-microvolt = <1000000>;
->> +				regulator-max-microvolt = <1400000>;
->> +				qcom,boot-load 		= <49360>;
+>> +		sata0: sata at 29000000 {
+>> +			compatible	= "generic-ahci";
+>> +			reg		= <0x29000000 0x180>;
+>> +			interrupts	= <0 209 0>;
 >
-> As it was unclear how to handle load in the driver I dropped boot-load for now.
-> Please leave it out until someone have added it to the driver.
-
-Ok, will drop this in next version.
-
->
->> +				regulator-always-on;
->
-> Why are all these "always-on"?
-I added this for a regulator which was shared between hdmi and sata, I 
-think for other regualtors this was just a copy paste error. I will 
-recheck it once again and send a new version.
+> Sorry I'm nitpicking but it annoys me. Either align it all or don't
+> align it.
+I Will fix this in next version.
 
 thanks,
 srini
 >
->> +			};
+>> +			clocks = <&gcc SFAB_SATA_S_H_CLK>, <&gcc SATA_H_CLK>,
+>> +				 <&gcc SATA_A_CLK>, <&gcc SATA_RXOOB_CLK>,
+>> +				 <&gcc SATA_PMALIVE_CLK>;
 >> +
+>> +			clock-names = "slave_iface", "iface",
+>> +				      "bus", "rxoob",
+>> +				      "core_pmalive";
+>> +			assigned-clocks = <&gcc SATA_RXOOB_CLK>,
+>> +						<&gcc SATA_PMALIVE_CLK>;
+>> +			assigned-clock-rates = <100000000>, <100000000>;
+>> +
+>> +			phys  = <&sata_phy0>;
+>> +			phy-names = "sata-phy";
+>> +			target-supply = <&pm8921_s4>;
 >> +		};
 >> +
->>
 >>   		/* Temporary fixed regulator */
->> --
->> 1.9.1
->>
+>>   		vsdcc_fixed: vsdcc-regulator {
+>>   			compatible = "regulator-fixed";
+>
+>
