@@ -1,117 +1,38 @@
-From: ben@datarespons.no (=?utf-8?B?QmrDuHJuIEVyaWsgTmlsc2Vu?=)
-Date: Tue, 30 Sep 2014 10:12:18 +0000
-Subject: [PATCH] ARM: mx6: Fix suspend/resume with PCI
-In-Reply-To: <1407371998-11437-1-git-send-email-festevam@gmail.com>
-References: <1407371998-11437-1-git-send-email-festevam@gmail.com>
-Message-ID: <mailman.6.1412072301.22887.linux-arm-kernel@lists.infradead.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 30 Sep 2014 12:17:59 +0200
+Subject: [PATCH] ARM: rockchip: honor renaming of cpufreq-cpu0 to cpufreq-dt
+In-Reply-To: <1712743.HcKV7iIeyP@phil>
+References: <7172632.O1FfdvXn6k@phil> <201717175.L17Ccvmpek@phil>
+ <1712743.HcKV7iIeyP@phil>
+Message-ID: <3994184.eAcGc0TxgK@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+cpufreq-cpu0 got renamed to a more generic name cpufreq-dt, so
+adapt the created platform-device to this.
 
-On Wed, 2014-08-06 at 21:39 -0300, an unknown sender wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> When PCI is used and a suspend/resume sequence is done we see the following
-> kernel hang:
-> 
-> root at freescale /$ echo mem > /sys/power/state 
-> [   16.099018] PM: Syncing filesystems ... done.
-> [   16.141010] Freezing user space processes ... (elapsed 0.002 seconds) done.
-> [   16.150840] Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
-> [   16.199438] random: nonblocking pool is initialized
-> [   16.229639] PM: suspend of devices complete after 64.793 msecs
-> [   16.235488] PM: suspend devices took 0.070 seconds
-> [   16.245301] PM: late suspend of devices complete after 4.968 msecs
-> [   16.257063] PM: noirq suspend of devices complete after 5.538 msecs
-> [   16.263425] Disabling non-boot CPUs ...
-> [   16.274666] CPU1: shutdown
-> [   16.286351] CPU2: shutdown
-> [   16.294169] CPU3: shutdown
-> [   16.299551] Enabling non-boot CPUs ...
-> [   16.304155] CPU1: Booted secondary processor
-> [   16.305717] CPU1 is up
-> [   16.313078] CPU2: Booted secondary processor
-> [   16.313456] CPU2 is up
-> [   16.320778] CPU3: Booted secondary processor
-> [   16.321174] CPU3 is up
-> 	(hangs here)
-> 
-> Implement a workaround for the erratum ERR005723: "PCIe does not support L2
-> Power Down", which consists in toggling bit 18 (TEST_POWERDOWN) of GPR1 register.
-> 
-> Tested on a mx6qsabresd TO1.2 revC2.
-> 
-> Reported-by: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Tested-by: Bj?rn Erik Nilsen <ben@datarespons.no>
-
-I encountered exactly the same problem and can confirm your patch works.
-
-Thank you!
-
-I hope this patch (or one that is considered a proper solution) will
-make it to the mainline kernel any time soon.
+Reported-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+This is for completenes sake, the patch I added to the cpufreqdev branch
+as part of the pull request, handling the renamed cpufreq-cpu0 driver.
 
 
-Best regards,
-Bj?rn Erik Nilsen
+ arch/arm/mach-rockchip/rockchip.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> ---
-> Richard,
-> 
-> Is there any better method to fix this issue? Or should we do the same
-> as in the FSL kernel?
-> 
-> I also tried to add pm ops into the imx6 pci driver and did the toggle there,
-> but I still got the kernel hang.
-> 
->  arch/arm/mach-imx/pm-imx6.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index 5c3af8f..92511cf 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -341,6 +341,23 @@ static int imx6q_suspend_finish(unsigned long val)
->  
->  static int imx6q_pm_enter(suspend_state_t state)
->  {
-> +	struct regmap *gpr;
-> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> +	if (IS_ERR(gpr)) {
-> +		pr_err("failed to find fsl,imx6q-iomux-gpr regmap\n");
-> +		return PTR_ERR(gpr);
-> +	}
-> +
-> +	/*
-> +	 * L2 can exit by 'reset' or Inband beacon (from remote EP)
-> +	 * toggling phy_powerdown has same effect as 'inband beacon'
-> +	 * So, toggle bit18 of GPR1 as a workaround of erratum
-> +	 * ERR005723 - "PCIe does not support L2 Power Down"
-> +	 */
-> +	if (IS_ENABLED(CONFIG_PCI_IMX6) && !cpu_is_imx6sx())
-> +		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
-> +				   IMX6Q_GPR1_PCIE_TEST_PD);
-> +
->  	switch (state) {
->  	case PM_SUSPEND_STANDBY:
->  		imx6q_set_lpm(STOP_POWER_ON);
-> @@ -383,6 +400,16 @@ static int imx6q_pm_enter(suspend_state_t state)
->  		return -EINVAL;
->  	}
->  
-> +	/*
-> +	 * L2 can exit by 'reset' or Inband beacon (from remote EP)
-> +	 * toggling phy_powerdown has same effect as 'inband beacon'
-> +	 * So, toggle bit18 of GPR1 as a workaround of erratum
-> +	 * ERR005723 - "PCIe does not support L2 Power Down"
-> +	 */
-> +	if (IS_ENABLED(CONFIG_PCI_IMX6) && !cpu_is_imx6sx())
-> +		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6Q_GPR1_PCIE_TEST_PD,
-> +				   !IMX6Q_GPR1_PCIE_TEST_PD);
-> +
->  	return 0;
->  }
->  
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index eea1f06..d226b71 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -27,7 +27,7 @@
+ static void __init rockchip_dt_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	platform_device_register_simple("cpufreq-cpu0", 0, NULL, 0);
++	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
+ }
+ 
+ static const char * const rockchip_board_dt_compat[] = {
+-- 
+2.1.0
