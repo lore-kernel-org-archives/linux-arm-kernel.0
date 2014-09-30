@@ -1,56 +1,50 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 30 Sep 2014 09:25:37 +0800
-Subject: [PATCH] ARM: hisi: depend on ARCH_MULTI_V7
-In-Reply-To: <7470114.dOWIKLTLOQ@wuerfel>
-References: <7470114.dOWIKLTLOQ@wuerfel>
-Message-ID: <542A0691.8030505@hisilicon.com>
+From: heyunlei@huawei.com (Yunlei He)
+Date: Tue, 30 Sep 2014 09:29:50 +0800
+Subject: [PATCH] pinctrl: pinctrl-single.c: init pinctrl single at
+ arch_initcall time
+Message-ID: <1412040590-10764-1-git-send-email-heyunlei@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: heyunlei <heyunlei@huawei.com>
 
+On our arm platform, some modules (e.g. I2C bus driver) use the
+pinctrl-single driver to configure the SoC pin, but pinctrl-single
+driver uses module_init time, that makes some modules initialize ahead
+the pinctrl-single and fail to register.
 
-On 2014/9/29 23:46, Arnd Bergmann wrote:
-> hisi has a general dependency on ARCH_MULTIPLATFORM, which is
-> problematic when building a kernel for non-V7 platforms but selecting
-> drivers that might conflict with other architecture levels.
-> 
-> In this case, it broke my (still out of tree) patch set that
-> enables V7M multiplatform support, since that does not enable
-> MULTI_IRQ support:
-> 
-> arch/arm/kernel/built-in.o: In function `set_handle_irq':
-> arch/arm/kernel/irq.c:125: undefined reference to `handle_arch_irq'
-> arch/arm/kernel/built-in.o: In function `setup_arch':
-> arch/arm/kernel/setup.c:965: undefined reference to `handle_arch_irq'
-> 
-> Since all hisilicon platforms are ARMv7 based, we can avoid this
-> problem by just making the dependency more specific.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+This patch changes the initialization priority of pinctrl-single from
+module_init time to arch_initcall time.
 
-Hi Arnd,
+Signed-off-by: Yunlei He <heyunlei@huawei.com>
+Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+---
+ drivers/pinctrl/pinctrl-single.c |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-> I'd like to apply this patch directly to the arm-soc tree
-
-Thanks!
-
-Best Regards,
-Wei
-
-> 
-> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-> index 075772b34e80..cd19433f76d3 100644
-> --- a/arch/arm/mach-hisi/Kconfig
-> +++ b/arch/arm/mach-hisi/Kconfig
-> @@ -1,6 +1,6 @@
->  config ARCH_HISI
->  	bool "Hisilicon SoC Support"
-> -	depends on ARCH_MULTIPLATFORM
-> +	depends on ARCH_MULTI_V7
->  	select ARM_AMBA
->  	select ARM_GIC
->  	select ARM_TIMER_SP804
-> 
-> 
-> 
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 95dd9cf..4b9e5b9 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -2012,7 +2012,18 @@ static struct platform_driver pcs_driver = {
+ #endif
+ };
+ 
+-module_platform_driver(pcs_driver);
++static int __init pinctrl_single_init(void)
++{
++		return platform_driver_register(&pcs_driver);
++}
++
++static void __exit pinctrl_single_exit(void)
++{
++		platform_driver_unregister(&pcs_driver);
++}
++
++arch_initcall(pinctrl_single_init);
++module_exit(pinctrl_single_exit);
+ 
+ MODULE_AUTHOR("Tony Lindgren <tony@atomide.com>");
+ MODULE_DESCRIPTION("One-register-per-pin type device tree based pinctrl driver");
+-- 
+1.7.9.5
