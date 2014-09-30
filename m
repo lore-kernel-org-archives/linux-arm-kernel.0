@@ -1,44 +1,61 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 30 Sep 2014 14:27:56 -0700
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <20140930202904.GB24153@redhat.com>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20140930202904.GB24153@redhat.com>
-Message-ID: <1412112476.6630.56.camel@smoke>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 30 Sep 2014 16:27:41 -0500
+Subject: [PATCHv6 0/5] hwspinlock core/omap dt support
+In-Reply-To: <CAJAp7Ogbj5K4N7=TEQQ8HJ0X7hkOqzFwv=1bRicVCNX9cv_jaA@mail.gmail.com>
+References: <1410553499-55951-1-git-send-email-s-anna@ti.com>
+ <CAJAp7Ogbj5K4N7=TEQQ8HJ0X7hkOqzFwv=1bRicVCNX9cv_jaA@mail.gmail.com>
+Message-ID: <542B204D.7050105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+Hi Bjorn,
 
-On Tue, 2014-09-30 at 16:29 -0400, Vivek Goyal wrote:
-> On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
+On 09/30/2014 03:54 PM, Bjorn Andersson wrote:
+> On Fri, Sep 12, 2014 at 1:24 PM, Suman Anna <s-anna@ti.com> wrote:
+>> Hi Ohad,
+>>
+>> This is an update to the hwspinlock dt support series. The series
+>> is rebased onto v3.17-rc3, and addresses the review comments on the
+>> previous v5 series. I have also split and left out the RFC patches
+>> about the support for reserved locks (will post these as a separate
+>> series) and return code convention changes in the hwspinlock core
+>> (will not be needed anymore). The support for deferred probing of
+>> clients is supported in the new of_hwspin_lock_get_id() function
+>> itself.
+>>
 > 
-> [..]
-> > To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
-> > kexec-tools [2], which have not yet been merged upstream, are needed.
-> > 
-> > This series does not include some re-work of the spin-table CPU enable method
-> > that is needed to support it,
+> Thanks for your reply to me, I had missed that you continued this work.
 > 
-> How do I figure out if my system has spin table enable method or psci
-> enable method. Can one change it. I wanted to test your patches.
+> 
+> I find it somewhat awkward to have to call both of_hwspin_lock_get_id() and
+> then hwspin_lock_request_specific(), but I found the request from Ohad, so
+> let's stick with it.
+> 
+> Am I right that hwlock-num-locks and hwlock-base-id are optional from the
+> frameworks perspective and only there to aid the hwspin drivers? If so it is
+> strange to have in the common binding and have the helper functions in the core
+> for simply reading hwspin device specific properties.
 
-The enable method is a function the firmware/bootloader provides.
-Multiple methods may be supported.  The boot-wrapper-aarch64
-build defaults to spin-table, but has the configure option --enable-psci.
+The hwlock-num-locks and hwlock-base-id would be common features to all
+the hwspinlock drivers, so they are added as common bindings which the
+individual implementations should use instead of defining their own
+properties. These are added based on discussion way back on v1. You
+ought to replace the "qcom,num-locks" with the first one.
 
-For a running system you can check the device tree:
+I will respond to your v4 with a few comments so that we don't loose the
+context in that thread.
 
-  cat /proc/device-tree/cpus/cpu\@0/enable-method | hexdump -C
+> 
+> Otherwise I think it looks sane, although I haven't spend that much time
+> reviewing it.
+> 
+> I did throw it into my tree and gave it a testrun with the Qualcomm code I've
+> been working on. So for the non-omap parts:
+> 
+> Tested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> 
 
-Or the dmsg:
+Thanks for testing this with the new Qualcomm driver.
 
-  dmesg | egrep -i 'psci'
-
-Or use the --debug option to kexec:
-
-  kexec --debug --load /boot/vmlinux.strip ...
-
-read_cpu_info:398: cpu-0 (/cpus/cpu at 0): hwid-0, 'psci'
-
--Geoff
+regards
+Suman
