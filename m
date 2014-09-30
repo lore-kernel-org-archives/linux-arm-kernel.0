@@ -1,35 +1,101 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Sep 2014 17:40:43 +0200
-Subject: [PATCH v2 1/7] clk: sunxi: Specify number of child clocks for
- divs clocks
-In-Reply-To: <1411807795-6575-2-git-send-email-wens@csie.org>
-References: <1411807795-6575-1-git-send-email-wens@csie.org>
- <1411807795-6575-2-git-send-email-wens@csie.org>
-Message-ID: <20140930154043.GN4081@lukather>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 30 Sep 2014 09:46:32 -0600
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <20140930085849.GA11393@e102568-lin.cambridge.arm.com>
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <5429E8D6.6080101@codeaurora.org>
+ <20140930085849.GA11393@e102568-lin.cambridge.arm.com>
+Message-ID: <20140930154632.GB528@ilina-mac.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 04:49:49PM +0800, Chen-Yu Tsai wrote:
-> Currently sunxi_divs_clk_setup assumes the number of child clocks
-> to be the same as the number of clock-output-names, and a maximum
-> of SUNXI_DIVS_MAX_QTY child clocks.
-> 
-> On sun6i, PLL6 only has 1 child clock, but the parent would be used
-> as well, thereby also having it's own clock-output-names entry. This
-> results in an extra bogus clock being registered.
+On Tue, Sep 30 2014 at 02:58 -0600, Lorenzo Pieralisi wrote:
+>On Tue, Sep 30, 2014 at 12:18:46AM +0100, Stephen Boyd wrote:
+>> On 09/26/14 17:58, Lina Iyer wrote:
+>> > diff --git a/drivers/cpuidle/cpuidle-qcom.c b/drivers/cpuidle/cpuidle-qcom.c
+[...]
+> > +static int qcom_lpm_enter_wfi(struct cpuidle_device *dev,
+>> > +				struct cpuidle_driver *drv, int index)
+>> > +{
+>> > +	qcom_idle_enter(PM_SLEEP_MODE_WFI);
+>>
+>> Why can't we just pass index here? It would be nice to not need to
+>> include soc/qcom/pm.h in this file.
+>
+>I think this is definitely worth exploring.
+>
+Sorry, I explained in the other thread. I feel that we are dispersing
+the translation information all over the place in doing so. The reason
+being, the compatible flag is not passed over to pm.c and I believe this
+is where it should be.
 
-Isn't PLL6 having two childs as well?
+>> > +	return index;
+>> > +}
+>> > +
+>> > +static int qcom_lpm_enter_spc(struct cpuidle_device *dev,
+>> > +				struct cpuidle_driver *drv, int index)
+>> > +{
+>> > +	cpu_pm_enter();
+>> > +	qcom_idle_enter(PM_SLEEP_MODE_SPC);
+>> > +	cpu_pm_exit();
+>> > +
+>> > +	return index;
+>> > +}
+>> > +
+>> > +static struct cpuidle_driver qcom_cpuidle_driver = {
+>> > +	.name	= "qcom_cpuidle",
+>> > +	.owner	= THIS_MODULE,
+>> > +};
+>> > +
+>> > +static const struct of_device_id qcom_idle_state_match[] __initconst = {
+>> > +	{ .compatible = "qcom,idle-state-wfi", .data = qcom_lpm_enter_wfi },
+>> > +	{ .compatible = "qcom,idle-state-spc", .data = qcom_lpm_enter_spc },
+>> > +	{ },
+>> > +};
+This is the onward translation from QCOM's idle states to cpuidle's
+states and passing cpuidle index value to SoC layer, opens up
+possibility for errors.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/54912c5c/attachment.sig>
+>> > +
+>> > +static int qcom_cpuidle_probe(struct platform_device *pdev)
+>> > +{
+>> > +	struct cpuidle_driver *drv = &qcom_cpuidle_driver;
+>> > +	int ret;
+>> > +
+>> > +	qcom_idle_enter = (void *)(pdev->dev.platform_data);
+>> > +	if (!qcom_idle_enter)
+>> > +		return -EFAULT;
+>>
+>> Error code looks a little wrong. -ENODEV?
+>>
+>> > +
+>> > +	 /* Probe for other states including platform WFI */
+>> > +	ret = dt_init_idle_driver(drv, qcom_idle_state_match, 0);
+>> > +	if (ret <= 0) {
+>> > +		pr_err("%s: No cpuidle state found.\n", __func__);
+>>
+>> This would be true if ret == 0, but if it's < 0 that isn't true. Drop
+>> the print?
+>
+>I think we can safely drop the print, DT parsing code already barfs on
+>error. Maybe you want to keep the (ret == 0) case to signal that driver
+>was probed but no idle states were found.
+>
+OK
+>> > +		return ret;
+>> > +	}
+>> > +
+>> > +	ret = cpuidle_register(drv, NULL);
+>> > +	if (ret) {
+>> > +		pr_err("%s: failed to register cpuidle driver\n", __func__);
+>>
+>> This seems redundant given that cpuidle_register() already prints an
+>> error when it fails.
+>
+>Yes, I will drop it from arm64 driver too as part of a minor clean-up
+>when the merge window closes (also other drivers do that, and as you say
+>it is redundant).
+>
+OK
+>
