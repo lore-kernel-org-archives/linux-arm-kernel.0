@@ -1,57 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 15:19:05 +0200
-Subject: [PATCH] of/pci: add pci_pio_to_address dummy for !CONFIG_OF
-Message-ID: <706416181.hbVGLDA3o6@wuerfel>
+Date: Tue, 30 Sep 2014 15:24:08 +0200
+Subject: [PATCH] gpiolib: fix callers of gpiochip_remove
+Message-ID: <2923496.zl6JUbOQrZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pci_register_io_range() and pci_pio_to_address() were recently
-introduced to generalize the handling of memory mapped PCI I/O space,
-but they are only valid when CONFIG_OF is set, leading to a possible
-build error:
+A recent API change made gpiochip_remove return void instead of an
+error value, which broke drivers that use this return value:
 
-drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_setup_window':
-drivers/pci/host/pcie-rcar.c:340:3: error: implicit declaration of function 'pci_pio_to_address' [-Werror=implicit-function-declaration]
-   res_start = pci_pio_to_address(res->start);
-   ^
-drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_probe':
-drivers/pci/host/pcie-rcar.c:945:3: error: implicit declaration of function 'of_pci_range_to_resource' [-Werror=implicit-function-declaration]
-   err = of_pci_range_to_resource(&range, pdev->dev.of_node,
-   ^
-cc1: some warnings being treated as errors
+gpio/gpio-sch311x.c: In function 'sch311x_gpio_probe':
+gpio/gpio-sch311x.c:286:7: error: void value not ignored as it ought to be
+   if (gpiochip_remove(&priv->blocks[i].chip))
+       ^
 
-This provides inline dummy implementations for the case that
-CONFIG_OF is disabled, to allow better build testing.
+This changes the callers that I have found during randconfig testing
+so they no longer depend on the error code.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 279c5dd046 ("of/pci: Add pci_register_io_range() and pci_pio_to_address()")
+Fixes: e1db1706c86e ("gpio: gpiolib: set gpiochip_remove retval to void")
 
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 7ebb877b07c2..851097aab115 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -71,6 +71,11 @@ static inline const __be32 *of_get_address(struct device_node *dev, int index,
- 	return NULL;
- }
+diff --git a/drivers/gpio/gpio-sch311x.c b/drivers/gpio/gpio-sch311x.c
+index 223830cb95ca..1c8e45b92471 100644
+--- a/drivers/gpio/gpio-sch311x.c
++++ b/drivers/gpio/gpio-sch311x.c
+@@ -283,9 +283,7 @@ exit_err:
+ 	release_region(pdata->runtime_reg + GP1, 6);
+ 	/* release already registered chips */
+ 	for (--i; i >= 0; i--)
+-		if (gpiochip_remove(&priv->blocks[i].chip))
+-			dev_err(&pdev->dev,
+-				"Could not unregister gpiochip, %d\n", err);
++		gpiochip_remove(&priv->blocks[i].chip);
  
-+static inline phys_addr_t pci_pio_to_address(unsigned long pio)
-+{
+ 	return err;
+ }
+diff --git a/drivers/pinctrl/pinctrl-bcm2835.c b/drivers/pinctrl/pinctrl-bcm2835.c
+index 9771bdb7ff38..a12c78206e36 100644
+--- a/drivers/pinctrl/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/pinctrl-bcm2835.c
+@@ -1029,7 +1029,8 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	pc->pctl_dev = pinctrl_register(&bcm2835_pinctrl_desc, dev, pc);
+ 	if (!pc->pctl_dev) {
+-		return gpiochip_remove(&pc->gpio_chip) ? : -EINVAL;
++		gpiochip_remove(&pc->gpio_chip);
++		return -EINVAL;
+ 	}
+ 
+ 	pc->gpio_range = bcm2835_pinctrl_gpio_range;
+@@ -1045,7 +1046,8 @@ static int bcm2835_pinctrl_remove(struct platform_device *pdev)
+ 	struct bcm2835_pinctrl *pc = platform_get_drvdata(pdev);
+ 
+ 	pinctrl_unregister(pc->pctl_dev);
+-	return gpiochip_remove(&pc->gpio_chip);
++	gpiochip_remove(&pc->gpio_chip);
 +	return 0;
-+}
-+
- static inline int of_pci_range_parser_init(struct of_pci_range_parser *parser,
- 			struct device_node *node)
- {
-@@ -144,6 +149,12 @@ static inline const __be32 *of_get_pci_address(struct device_node *dev,
- {
- 	return NULL;
  }
-+static inline int of_pci_range_to_resource(struct of_pci_range *range,
-+					   struct device_node *np,
-+					   struct resource *res)
-+{
-+	return -ENOSYS;
-+}
- #endif /* CONFIG_OF_ADDRESS && CONFIG_PCI */
  
- #endif /* __OF_ADDRESS_H */
+ static struct of_device_id bcm2835_pinctrl_match[] = {
