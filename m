@@ -1,107 +1,63 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Tue, 30 Sep 2014 13:40:11 -0400
-Subject: [PATCH] sched, time: fix build error with 64 bit cputime_t on 32
- bit systems
-In-Reply-To: <2547036.UshV4pXvhf@wuerfel>
-References: <2547036.UshV4pXvhf@wuerfel>
-Message-ID: <20140930134011.232bc7bf@annuminas.surriel.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 30 Sep 2014 10:41:14 -0700
+Subject: [PATCH v7 5/7] qcom: cpuidle: Add cpuidle driver for QCOM cpus
+In-Reply-To: <20140929153154.GF2165@e102568-lin.cambridge.arm.com> (Lorenzo
+ Pieralisi's message of "Mon, 29 Sep 2014 16:31:55 +0100")
+References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
+ <1411779495-39724-6-git-send-email-lina.iyer@linaro.org>
+ <20140929153154.GF2165@e102568-lin.cambridge.arm.com>
+Message-ID: <7hmw9hypj9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Sep 2014 13:56:37 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-> A recent change to update the stime/utime members of task_struct
-> using atomic cmpxchg broke configurations on 32-bit machines with
-> CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that uses 64-bit
-> nanoseconds, leading to a link-time error:
-> 
-> kernel/built-in.o: In function `cputime_adjust':
-> :(.text+0x25234): undefined reference to `__bad_cmpxchg'
+> Hi Lina,
+>
+> On Sat, Sep 27, 2014 at 01:58:13AM +0100, Lina Iyer wrote:
+>> Add cpuidle driver interface to allow cpus to go into C-States. Use the
+>> cpuidle DT interface common across ARM architectures to provide the
+>> C-State information to the cpuidle framework.
+>> 
+>> Supported modes at this time are clock gating (wfi) and cpu power down
+>> (Standalone PC or spc).
+>> 
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  .../bindings/arm/msm/qcom,idle-state.txt           | 72 +++++++++++++++++
+>>  drivers/cpuidle/Kconfig.arm                        |  7 ++
+>>  drivers/cpuidle/Makefile                           |  1 +
+>>  drivers/cpuidle/cpuidle-qcom.c                     | 89 ++++++++++++++++++++++
+>>  4 files changed, 169 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>>  create mode 100644 drivers/cpuidle/cpuidle-qcom.c
+>> 
+>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>> new file mode 100644
+>> index 0000000..47095b9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+>> @@ -0,0 +1,72 @@
+>> +QCOM Idle States for cpuidle driver
+>> +
+>> +ARM provides idle-state node to define the cpuidle states, as defined in [1].
+>> +cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
+>> +states. Idle states have different enter/exit latency and residency values.
+>> +The idle states supported by the QCOM SoC are defined as -
+>> +
+>> +    * WFI
+>> +    * Retention
+>> +    * Standalone Power Collapse (Standalone PC or SPC)
+>> +    * Power Collapse (PC)
+>> +
+>> +WFI: WFI does a little more in addition to architectural clock gating.  ARM
+>
+> This may be misleading. Call it PlatformWFI or something like that, not WFI if
+> that's not what it is.
 
-Arnd, this should fix your problem, while still ensuring that
-the cpu time counters only ever go forward.
+This gets at a little pet peeve of mine: 
 
-I do not have cross compiling toolchains set up here, but I assume
-this fixes your bug.
+IMO, naming any state with "WFI" is a bit confusing, because typically
+*every* idle state is entered by one (or more) CPU executing WFI, no?
 
-Ingo & Peter, if this patch fixes the bug for Arnd, could you please
-merge it into -tip?
-
-Linus, the changeset causing the problem is only in -tip right now,
-and this patch will not apply to your tree.
-
----8<---
-
-Subject: sched,time: fix build error with 64 bit cputime_t on 32 bit systems
-
-On 32 bit systems cmpxchg cannot handle 64 bit values, and
-cmpxchg64 needs to be used when full dynticks CPU accounting
-is enabled, since that turns cputime_t into a u64.
-
-With jiffies based CPU accounting, cputime_t is an unsigned
-long. On 64 bit systems, cputime_t is always the size of a
-long.
-
-Luckily the compiler can figure out whether we need to call
-cmpxchg or cmpxchg64.
-
-Signed-off-by: Rik van Riel <riel@redhat.com>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
----
- kernel/sched/cputime.c | 35 +++++++++++++++++++++++++----------
- 1 file changed, 25 insertions(+), 10 deletions(-)
-
-diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
-index 64492df..db239c9 100644
---- a/kernel/sched/cputime.c
-+++ b/kernel/sched/cputime.c
-@@ -555,6 +555,29 @@ static cputime_t scale_stime(u64 stime, u64 rtime, u64 total)
- }
- 
- /*
-+ * Atomically advance counter to the new value. Interrupts, vcpu
-+ * scheduling, and scaling inaccuracies can cause cputime_advance
-+ * to be occasionally called with a new value smaller than counter.
-+ * Let's enforce atomicity.
-+ *
-+ * Normally a caller will only go through this loop once, or not
-+ * at all in case a previous caller updated counter the same jiffy.
-+ */
-+static void cputime_advance(cputime_t *counter, cputime_t new)
-+{
-+	cputime_t old;
-+
-+	while (new > (old = ACCESS_ONCE(*counter))) {
-+		/* The compiler will optimize away this branch.  */
-+		if (sizeof(cputime_t) == sizeof(long))
-+			cmpxchg(counter, old, new);
-+		else
-+			/* 64 bit cputime_t on a 32 bit system... */
-+			cmpxchg64(counter, old, new);
-+	}
-+}
-+
-+/*
-  * Adjust tick based cputime random precision against scheduler
-  * runtime accounting.
-  */
-@@ -599,16 +622,8 @@ static void cputime_adjust(struct task_cputime *curr,
- 		utime = rtime - stime;
- 	}
- 
--	/*
--	 * If the tick based count grows faster than the scheduler one,
--	 * the result of the scaling may go backward.
--	 * Let's enforce monotonicity.
--	 * Atomic exchange protects against concurrent cputime_adjust().
--	 */
--	while (stime > (rtime = ACCESS_ONCE(prev->stime)))
--		cmpxchg(&prev->stime, rtime, stime);
--	while (utime > (rtime = ACCESS_ONCE(prev->utime)))
--		cmpxchg(&prev->utime, rtime, utime);
-+	cputime_advance(&prev->stime, stime);
-+	cputime_advance(&prev->utime, utime);
- 
- out:
- 	*ut = prev->utime;
+Kevin
