@@ -1,24 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 30 Sep 2014 00:30:06 -0400 (EDT)
-Subject: [PATCH 0/5] ARM: move #include <asm/cp15.h> into cacheflush.h
-In-Reply-To: <1412040930-16864-1-git-send-email-computersforpeace@gmail.com>
-References: <1412040930-16864-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <alpine.LFD.2.11.1409300016060.5311@knanqh.ubzr>
+From: ankit.jindal@linaro.org (Ankit Jindal)
+Date: Tue, 30 Sep 2014 09:56:03 +0530
+Subject: [PATCH v2 0/6] UIO driver for APM X-Gene QMTM
+Message-ID: <1412051169-9142-1-git-send-email-ankit.jindal@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Sep 2014, Brian Norris wrote:
+This patchset enables user space access to APM X-Gene QMTM
+using UIO framework.
 
-> There are several places where an explicit include of <asm/cp15.h> is needed
-> just because cacheflush.h uses one of its macros in v7_exit_coherency_flush().
-> Let's put the include in the proper header.
-> 
-> These obviously have some dependencies, so I'd focus on:
->   (1) Is patch 1 acceptable? If so, then:
+The patchset also introduces new type UIO_MEM_PHYS_CACHE
+for mem regions because APM X-Gene QMTM device supports
+cache coherency with CPU caches.
 
-Well, I'm wondering if it is really a gain to force a dependency for 
-cp15.h on every user of cacheflush.h just because of the seldomly used 
-v7_exit_coherency_flush(). But I don't mind either ways.
+Changes since v1:
+ - Factor-out formating related change in uio/uio.c as separate patch.
+ - Use devm_xxx() APIs where appilicable.
+ - Some cleanups and buggy loop fixed in qmtm_reset().
+ - Removed open and release functions.
+ - Use phandle for specifying QMTM qpool resource.
+ - Removed "uio" from the compatible string.
+ - Added more information about QMTM in binding documentation.
 
+Ankit Jindal (6):
+  uio: code style cleanup
+  uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+  Documentation: Update documentation for UIO_MEM_PHYS_CACHE
+  drivers: uio: Add X-Gene QMTM UIO driver
+  Documentation: dt-bindings: Add binding info for X-Gene QMTM UIO
+    driver
+  MAINTAINERS: Add entry for APM X-Gene QMTM UIO driver
 
-Nicolas
+ Documentation/DocBook/uio-howto.tmpl               |    5 +-
+ .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   53 ++++
+ MAINTAINERS                                        |    7 +
+ drivers/uio/Kconfig                                |    8 +
+ drivers/uio/Makefile                               |    1 +
+ drivers/uio/uio.c                                  |   23 +-
+ drivers/uio/uio_xgene_qmtm.c                       |  278 ++++++++++++++++++++
+ include/linux/uio_driver.h                         |    1 +
+ 8 files changed, 365 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+ create mode 100644 drivers/uio/uio_xgene_qmtm.c
+
+-- 
+1.7.9.5
