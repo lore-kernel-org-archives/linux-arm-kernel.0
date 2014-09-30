@@ -1,53 +1,93 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 30 Sep 2014 19:21:49 +0200
-Subject: [PATCH 4/6] hwrng: atmel: Add TRNG DT binding doc
-In-Reply-To: <87bnpxoww9.fsf@dell.be.48ers.dk>
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412093987-30241-5-git-send-email-boris.brezillon@free-electrons.com>
- <87bnpxoww9.fsf@dell.be.48ers.dk>
-Message-ID: <20140930192149.464ac50f@bbrezillon>
+From: dianders@google.com (Doug Anderson)
+Date: Tue, 30 Sep 2014 10:22:34 -0700
+Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
+ handle regulators
+In-Reply-To: <28242432.noIRZ0lve1@amdc1032>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-2-git-send-email-yuvaraj.cd@samsung.com>
+ <CAPDyKFqiv+eGQ_kRpXjRY207PN4J3DGcZU1n5UU0evp_5Dn_Pg@mail.gmail.com>
+ <28242432.noIRZ0lve1@amdc1032>
+Message-ID: <CAD=FV=W_KiXUU7SmGxTu-JzagW-zEs6AYAbrRMFU3KvppVk_BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Bartlomiej
 
-On Tue, 30 Sep 2014 19:12:22 +0200
-Peter Korsgaard <peter@korsgaard.com> wrote:
+On Mon, Sep 29, 2014 at 5:31 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Friday, August 29, 2014 01:34:44 PM Ulf Hansson wrote:
+>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>> > This patch makes use of mmc_regulator_get_supply() to handle
+>> > the vmmc and vqmmc regulators.Also it moves the code handling
+>> > the these regulators to dw_mci_set_ios().It turned on the vmmc
+>> > and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+>> > during MMC_POWER_OFF.
+>> >
+>> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>>
+>> Thanks! Applied for next.
+>
+> Unfortunately this patch breaks mmc1 card (Kingston 32GB micro SDHC)
+> detection on Exynos5420 Arndale Octa for me:
+>
+> [   10.797979] dwmmc_exynos 12220000.mmc: no support for card's volts
+> [   10.797998] mmc1: error -22 whilst initialising SD card
+>
+> Without the patch:
+>
+> [   10.866926] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
+> [   10.866977] mmc1: new high speed SDHC card at address 1234
+> [   10.868730] mmcblk1: mmc1:1234 SA32G 29.3 GiB
+> [   10.915054]  mmcblk1: p1 p2 p3
+>
+> The config is attached (exynos_defconfig doesn't work correctly for
+> this board yet).
 
-> >>>>> "Boris" == Boris Brezillon <boris.brezillon@free-electrons.com> writes:
-> 
->  > Document DT bindings of Atmel's TRNG (True Random Number Generator) IP.
->  > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->  > ---
->  >  Documentation/devicetree/bindings/hwrng/atmel-trng.txt | 16 ++++++++++++++++
->  >  1 file changed, 16 insertions(+)
->  >  create mode 100644 Documentation/devicetree/bindings/hwrng/atmel-trng.txt
-> 
->  > diff --git a/Documentation/devicetree/bindings/hwrng/atmel-trng.txt b/Documentation/devicetree/bindings/hwrng/atmel-trng.txt
->  > new file mode 100644
->  > index 0000000..4ac5aaa
->  > --- /dev/null
->  > +++ b/Documentation/devicetree/bindings/hwrng/atmel-trng.txt
->  > @@ -0,0 +1,16 @@
->  > +Atmel TRNG (True Random Number Generator) block
->  > +
->  > +Required properties:
->  > +- compatible : Should be "atmel,at91sam9g45-trng"
->  > +- reg : Offset and length of the register set of this block
->  > +- interrupts : the interrupt number for the TRNG block
-> 
-> The interrupt isn't strictly speaking required as it isn't used by the
-> driver, but as 9G45 has the signal wired up I guess it makes sense.
+Yup, this is an expected behavior, unfortunately.  This was talked
+about extensively during the review of this patch series.
 
-This irq might be used in a near future (in order to wait for data as
-requested by hwrng code when the wait argument is true).
-Thus I prefer to keep it as required.
+I believe that patch #3 in Yuvaraj's series would fix your problem.
+Specifically <https://patchwork.kernel.org/patch/4763891/>.
 
-Best Regards,
 
-Boris
+The current summary of this issue is (Ulf, please correct me if I got
+anything wrong):
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1. If nothing else, Yuvaraj's patch should probably be split in two.
+One half should be the MMC core half that I originally sent Yuvaraj.
+I just rebased and re-uploaed it at
+<https://chromium-review.googlesource.com/220560> in case you're
+curious.  The second half should be the dw_mmc piece that Yuvaraj
+wrote.
+
+2. Ulf has indicated that he thinks that the MMC core change (and thus
+Yuvaraj's patch) is ugly and not necessary.  He advocates instead
+using the MMC_CAP_NEEDS_POLL on all affected platforms.  That means
+we'll turn on the power every second, check for the card, then turn
+off power.
+
+3. I'm still of the opinion that the MMC core change isn't _that_
+ugly.  Given that there are a large number of systems affected (across
+at least two SoC vendors) and that it would be nice if those systems
+didn't have to poll, I'd still be happy if the MMC core change could
+go in.  ...but I'm a pragmatist and know that the polling isn't
+_terrible_, so if that's the way we need to go then so be it.
+
+--
+
+My understanding was that Yuvaraj was going to spin his patch to use a
+similar type of scheme to autodetect affected SoCs (looking for SoCs
+known to have this problem where the platform data shows them using
+the built-in card detect) and then enable MMC_CAP_NEEDS_POLL.  I
+haven't seen a patch from him, so maybe you could post this up?
+
+Note: the reason why exynos5250-snow and some other boards aren't
+affected yet is that the regulator is simply not specified in the
+device tree (it's just left always on).
+
+---
+
+-Doug
