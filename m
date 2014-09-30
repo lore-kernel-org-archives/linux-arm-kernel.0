@@ -1,34 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 22:07:03 +0200
-Subject: [PATCH v2] sched,
- time: fix build error with 64 bit cputime_t on 32 bit systems
-In-Reply-To: <20140930155947.070cdb1f@annuminas.surriel.com>
-References: <2547036.UshV4pXvhf@wuerfel>
- <20140930133749.GD4241@worktop.programming.kicks-ass.net>
- <20140930155947.070cdb1f@annuminas.surriel.com>
-Message-ID: <56858913.p3zUxZnKZn@wuerfel>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 30 Sep 2014 16:15:21 -0400
+Subject: [PATCH] arm64: Use and error-check DMA_ERROR_CODE
+Message-ID: <1412108121-19262-1-git-send-email-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 15:59:47 Rik van Riel wrote:
-> Subject: sched,time: fix build error with 64 bit cputime_t on 32 bit systems
-> 
-> On 32 bit systems cmpxchg cannot handle 64 bit values, so
-> some additional magic is required to allow a 32 bit system
-> with CONFIG_VIRT_CPU_ACCOUNTING_GEN enabled to build.
-> 
-> Make sure the correct cmpxchg function is used when doing
-> an atomic swap of a cputime_t.
-> 
-> Signed-off-by: Rik van Riel <riel@redhat.com>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> 
+This patch replaces the static assignment of ~0 to dma_handle with
+DMA_ERROR_CODE to be consistent with other platforms.
 
-Now builds without warnings on both 32-bit and 64-bit cputime_t configurations
-on arm32.
+In addition to that, it also adds a check for DMA_ERROR_CODE before
+calling __dma_free_coherent with an invalid dma_handle.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+---
+ arch/arm64/mm/dma-mapping.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Thanks!
-
-	Arnd
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 4164c5a..69fd2c4 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -125,7 +125,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
+ no_map:
+ 	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
+ no_mem:
+-	*dma_handle = ~0;
++	*dma_handle = DMA_ERROR_CODE;
+ 	return NULL;
+ }
+ 
+@@ -136,7 +136,9 @@ static void __dma_free_noncoherent(struct device *dev, size_t size,
+ 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+ 
+ 	vunmap(vaddr);
+-	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
++
++	if (dma_handle != DMA_ERROR_CODE)
++		__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+ }
+ 
+ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
+-- 
+2.1.1
