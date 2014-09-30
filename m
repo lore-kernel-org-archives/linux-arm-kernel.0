@@ -1,31 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 30 Sep 2014 13:41:40 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140929220250.GD5599@skynet.be>
-References: <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
- <20140929162814.GE4081@lukather> <20140929165842.GC5599@skynet.be>
- <20140929220250.GD5599@skynet.be>
-Message-ID: <20140930124140.GC4273@sirena.org.uk>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Tue, 30 Sep 2014 13:43:51 +0100
+Subject: [PATCH] sched, time: cmpxchg does not work on 64-bit variable
+In-Reply-To: <542AA33E.2050008@redhat.com>
+References: <2547036.UshV4pXvhf@wuerfel> <542AA33E.2050008@redhat.com>
+Message-ID: <542AA587.7060407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 12:02:50AM +0200, Luc Verhaegen wrote:
+Hi,
 
-> 2) Simplefb will only have a single user: the rpi. As the only other 
-> users i can think of, which does not have a full driver and which does 
-> not have clocks automatically disabled, are discrete cards. And they do 
-> not really tend to happen with dt or platform devices.
+On 30/09/14 13:34, Rik van Riel wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+> 
+> On 09/30/2014 07:56 AM, Arnd Bergmann wrote:
+>> A recent change to update the stime/utime members of task_struct 
+>> using atomic cmpxchg broke configurations on 32-bit machines with 
+>> CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that uses 64-bit 
+>> nanoseconds, leading to a link-time error:
+>>
+>> kernel/built-in.o: In function `cputime_adjust': :(.text+0x25234):
+>> undefined reference to `__bad_cmpxchg'
+>>
+>> This reverts the change that caused the problem, I suspect the real
+>> fix is to conditionally use cmpxchg64 instead, but I have not
+>> checked if that will work on all architectures.
+> 
+> I see that kernel/sched/clock.c uses cmpxchg64 in a non
+> architecture, non 64 bit specific piece of code, and
+> nobody complained about that file not building, so I have
+> to assume cmpxchg64 works :)
+> 
+> The revert seems like a bad idea, since it will reintroduce
+> a race condition with sys_times().
+> 
+> One problem is that include/asm-generic/cputime_nsecs.h
+> defines cputime_t as u64, while cputime_jiffies.h defines
+> cputime_t as a long...
+> 
+> Will anybody barf at a cmpxchg_cputime, or is the solution
+> to fix cmpxchg on architectures where it does not accept a
+> 64 bit type?  Not quite sure how to do the latter...
+> 
+> Arnd, on which architecture are you seeing a build failure?
+> Is it just 32 bit arm?
 
-I thought the goal was for other platforms to use simplefb while waiting
-for the real drivers to be loaded (so you can get get console output as
-early as possible from a built in driver for example)?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/0e1ccc26/attachment.sig>
+I'm seeing it on ARMv7 build too in case I enable 'Full dynticks CPU
+time accounting'.
+
+-- Dietmar
+
+> 
+[...]
