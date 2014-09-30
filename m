@@ -1,34 +1,94 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 30 Sep 2014 12:13:05 -0700
-Subject: [PATCH 1/4] ARM: DT: apq8064: add rpm support
-In-Reply-To: <20140930190023.GS28481@sonymobile.com>
-References: <1411982044-7873-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1411982092-7922-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5429DA95.80505@codeaurora.org> <20140930050203.GG28481@sonymobile.com>
- <542AF5FE.1000006@codeaurora.org> <20140930190023.GS28481@sonymobile.com>
-Message-ID: <542B00C1.3010702@codeaurora.org>
+From: riel@redhat.com (Rik van Riel)
+Date: Tue, 30 Sep 2014 15:19:19 -0400
+Subject: [PATCH] sched, time: fix build error with 64 bit cputime_t on
+ 32 bit systems
+In-Reply-To: <6735433.ACfjMtVDYF@wuerfel>
+References: <2547036.UshV4pXvhf@wuerfel>
+ <20140930134011.232bc7bf@annuminas.surriel.com> <6735433.ACfjMtVDYF@wuerfel>
+Message-ID: <542B0237.6020601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/14 12:00, Bjorn Andersson wrote:
->
-> Hmm, seems I got that wrong, sorry about that.
->
-> But do you mean "all wrong" as in that I use the wrong bit or to some greater
-> extent? Currently all following requests should timeout, but maybe we should
-> have a faster fail-path when we've hit this point?
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Yes. We just ack the interrupt and go on happy to keep allowing clients
-to request things. I'd rather see us blow up or start failing requests,
-or maybe both.
+On 09/30/2014 02:49 PM, Arnd Bergmann wrote:
+> On Tuesday 30 September 2014 13:40:11 Rik van Riel wrote:
+>> On Tue, 30 Sep 2014 13:56:37 +0200 Arnd Bergmann <arnd@arndb.de>
+>> wrote:
+>> 
+>>> A recent change to update the stime/utime members of
+>>> task_struct using atomic cmpxchg broke configurations on 32-bit
+>>> machines with CONFIG_VIRT_CPU_ACCOUNTING_GEN set, because that
+>>> uses 64-bit nanoseconds, leading to a link-time error:
+>>> 
+>>> kernel/built-in.o: In function `cputime_adjust': 
+>>> :(.text+0x25234): undefined reference to `__bad_cmpxchg'
+>> 
+>> Arnd, this should fix your problem, while still ensuring that the
+>> cpu time counters only ever go forward.
+>> 
+>> I do not have cross compiling toolchains set up here, but I
+>> assume this fixes your bug.
+>> 
+>> Ingo & Peter, if this patch fixes the bug for Arnd, could you
+>> please merge it into -tip?
+>> 
+>> Linus, the changeset causing the problem is only in -tip right
+>> now, and this patch will not apply to your tree.
+> 
+> It compiles and links on arm32 with both 32-bit and 64-bit
+> cputime_t, but I now get a new warning for the former case:
+> 
+> kernel/sched/cputime.c: In function 'cputime_advance': 
+> kernel/sched/cputime.c:576:29: warning: passing argument 1 of
+> '__cmpxchg64_mb' from incompatible pointer type cmpxchg64(counter,
+> old, new); ^ In file included from
+> /git/arm-soc/arch/arm/include/asm/atomic.h:19:0, from
+> /git/arm-soc/include/linux/atomic.h:4, from
+> /git/arm-soc/include/linux/debug_locks.h:5, from
+> /git/arm-soc/include/linux/lockdep.h:23, from
+> /git/arm-soc/include/linux/spinlock_types.h:18, from
+> /git/arm-soc/include/linux/spinlock.h:81, from
+> /git/arm-soc/include/linux/seqlock.h:35, from
+> /git/arm-soc/include/linux/time.h:5, from
+> /git/arm-soc/include/uapi/linux/timex.h:56, from
+> /git/arm-soc/include/linux/timex.h:56, from
+> /git/arm-soc/include/linux/sched.h:19, from
+> /git/arm-soc/kernel/sched/cputime.c:2: 
+> /git/arm-soc/arch/arm/include/asm/cmpxchg.h:255:105: note: expected
+> 'long long unsigned int *' but argument is of type 'cputime_t *' 
+> static inline unsigned long long __cmpxchg64_mb(unsigned long long
+> *ptr, kernel/sched/cputime.c:576:5: warning: value computed is not
+> used [-Wunused-value] cmpxchg64(counter, old, new); ^
 
->
-> From a practical pov I guess that once the rpm starts returning errors on
-> updates to regulators, root clocks and bus scaling then most of the system is
-> becoming useless.
+Is u64 on arm defined to "long long unsigned int", and is the compiler
+really blowing up over the difference between that and "unsigned long
+long"?
 
-Right. Rebooting will be required fairly soon.
+Is u64 on arm really supposed to be "long long unsigned int"?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Am I overlooking something?
+
+> I suspect there is no solution that doesn't involve the
+> preprocessor. How about adding a cputime_cmpxchg() helper next to
+> the cputime_t definition?
+
+I thought of that first, and quickly dismissed it with "yuck" :)
+
+I guess we could cast cputime_t to unsigned long long in the branch
+that calls cmpxchg64.  Is that acceptable/unacceptable to people?
+
+- -- 
+All rights reversed
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQEcBAEBAgAGBQJUKwI2AAoJEM553pKExN6Dr+kIAJMePKlT90h75zAPeVeofpGn
+OPZ/V6N7do+pqZ3u56MdxmbCt1Rmbbp9Ka3tWZIJRS8OvyTQsPImmUiYD4KLiDL0
+fOrADIiEIqj+hzvX9w6iSRTg8HwQSb8lL1jLSklhfE9bayN9/O0Pl4x80sqtfBfW
+LJF+JGzktHQOq+VnfptQuPhCEKXFYgBHcP0JsVadkj/okXYmpQ4Iwk9pVs9WF1AG
++i251YZR0E8H8PEIEY5IPLP/xM64SwyxS6NUSJx4J8mMarIg2onXJuSabisOLARI
+2bATM0UYPNLMJfSIO0E0dWCgEi/V8TyR7tzRBETFT1JQW6iWnIk4yVgoYMAaFPY=
+=1+D4
+-----END PGP SIGNATURE-----
