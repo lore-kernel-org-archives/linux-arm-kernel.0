@@ -1,64 +1,59 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 30 Sep 2014 16:28:09 +0200
-Subject: [PATCH v6 03/10] Documentation: bindings: net: add the Marvell PXA168
- Ethernet controller
-In-Reply-To: <1412087296-18475-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1412087296-18475-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1412087296-18475-4-git-send-email-antoine.tenart@free-electrons.com>
+Date: Tue, 30 Sep 2014 16:28:06 +0200
+Subject: [PATCH v6 00/10] ARM: Berlin: Ethernet support
+Message-ID: <1412087296-18475-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the binding documentation for the Marvell PXA168 Ethernet
-controller, following its DT support.
+Hi all,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- .../devicetree/bindings/net/marvell-pxa168.txt     | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+This series introduce support for the Ethernet controller on Berlin SoCs,
+using the existing pxa168 Ethernet driver. In order to do this, DT
+support is added to the driver alongside some other modifications and
+fixes.
+
+This has been tested on a Berlin BG2Q DMP board.
+
+Changes since v5:
+	- fixed the build when building the driver as a module
+
+Changes since v4:
+        - removed the phy-addr property and added a phy subnode
+        - added COMPILE_TEST for the pxa168_eth driver
+
+Changes since v3:
+        - moved the addition of pxa168_eth_get_mac_address() to the patch
+          using it first
+
+Changes since v2:
+        - reworked how the MAC address is configured
+        - made the clock anonymous
+
+Changes since v1:
+        - removed custom Berlin Ethernet driver
+        - used the pxa168 Ethernet driver instead
+        - made modifications to the pxa168 driver (DT support, fixes)
+
+Antoine Tenart (10):
+  net: pxa168_eth: clean up
+  net: pxa168_eth: add device tree support
+  Documentation: bindings: net: add the Marvell PXA168 Ethernet
+    controller
+  net: pxa168_eth: fix Ethernet flow control status
+  net: pxa168_eth: set the mac address on the Ethernet controller
+  net: pxa168_eth: rework the MAC address setup
+  net: pxa168_eth: allow Berlin SoCs to use the pxa168_eth driver
+  net: pxa168_eth: allow to compile the pxa168_eth driver for tests
+  ARM: dts: berlin: add the Ethernet node
+  ARM: dts: berlin: enable the Ethernet port on the BG2Q DMP
+
+ .../devicetree/bindings/net/marvell-pxa168.txt     |  36 ++++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   4 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |  17 ++
+ drivers/net/ethernet/marvell/Kconfig               |   2 +-
+ drivers/net/ethernet/marvell/pxa168_eth.c          | 219 +++++++++++++--------
+ 5 files changed, 199 insertions(+), 79 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/net/marvell-pxa168.txt
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-pxa168.txt b/Documentation/devicetree/bindings/net/marvell-pxa168.txt
-new file mode 100644
-index 000000000000..845a148a346e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/marvell-pxa168.txt
-@@ -0,0 +1,36 @@
-+* Marvell PXA168 Ethernet Controller
-+
-+Required properties:
-+- compatible: should be "marvell,pxa168-eth".
-+- reg: address and length of the register set for the device.
-+- interrupts: interrupt for the device.
-+- clocks: pointer to the clock for the device.
-+
-+Optional properties:
-+- port-id: Ethernet port number. Should be '0','1' or '2'.
-+- #address-cells: must be 1 when using sub-nodes.
-+- #size-cells: must be 0 when using sub-nodes.
-+- phy-handle: see ethernet.txt file in the same directory.
-+- local-mac-address: see ethernet.txt file in the same directory.
-+
-+Sub-nodes:
-+Each PHY can be represented as a sub-node. This is not mandatory.
-+
-+Sub-nodes required properties:
-+- reg: the MDIO address of the PHY.
-+
-+Example:
-+
-+	eth0: ethernet at f7b90000 {
-+		compatible = "marvell,pxa168-eth";
-+		reg = <0xf7b90000 0x10000>;
-+		clocks = <&chip CLKID_GETH0>;
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		phy-handle = <&ethphy0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			reg = <0>;
-+		};
-+	};
 -- 
 1.9.1
