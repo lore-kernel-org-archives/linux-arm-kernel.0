@@ -1,22 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Sep 2014 14:15:33 +0200
-Subject: [PATCH] spi: bcm53xx: add BCMA dependency
-In-Reply-To: <CACna6ryoq0A_6745aemJPQTEZxncmDRkCOPB3ZUHtNhXqXf2Fw@mail.gmail.com>
-References: <3256402.M8e92DFkbg@wuerfel>
- <CACna6ryoq0A_6745aemJPQTEZxncmDRkCOPB3ZUHtNhXqXf2Fw@mail.gmail.com>
-Message-ID: <3210109.EFf2P6X6HM@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 30 Sep 2014 14:19:32 +0200
+Subject: [PATCH] ARM: berlin: sort Kconfig options
+In-Reply-To: <1411712097-700-1-git-send-email-jszhang@marvell.com>
+References: <1411712097-700-1-git-send-email-jszhang@marvell.com>
+Message-ID: <542A9FD4.5090002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 September 2014 14:13:35 Rafa? Mi?ecki wrote:
-> On 30 September 2014 14:09, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The BCMA bus framework can be disabled on bcm53xx, which leads to a link
-> > error when building the SPI driver:
-> 
-> You missed this one:
-> https://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/commit/?h=for-next&id=933fc7b06ca62741fd5067edab13068d13b3cb35
-> 
+On 09/26/2014 08:14 AM, Jisheng Zhang wrote:
+> Keep options alphabetically sorted.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-Right, I'm still catching up with last week's build regressions.
+Jisheng,
 
-	Arnd
+nice to see you are now contributing directly to Berlin, too.
+Anyway, I understand that it is nice to have it sorted alphabetically
+but as long as there is no direct need or relation with any other
+changes, let's keep it that way.
+
+As soon as there are any other patches touching Kconfig, I'll request
+to squash it in. Is that okay for you?
+
+Thanks,
+   Sebastian
+
+> ---
+>   arch/arm/mach-berlin/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-berlin/Kconfig b/arch/arm/mach-berlin/Kconfig
+> index 5803f77..84d34e0 100644
+> --- a/arch/arm/mach-berlin/Kconfig
+> +++ b/arch/arm/mach-berlin/Kconfig
+> @@ -3,9 +3,9 @@ menuconfig ARCH_BERLIN
+>   	select ARCH_HAS_RESET_CONTROLLER
+>   	select ARCH_REQUIRE_GPIOLIB
+>   	select ARM_GIC
+> -	select GENERIC_IRQ_CHIP
+>   	select DW_APB_ICTL
+>   	select DW_APB_TIMER_OF
+> +	select GENERIC_IRQ_CHIP
+>   	select PINCTRL
+>   	select RESET_CONTROLLER
+>
+>
