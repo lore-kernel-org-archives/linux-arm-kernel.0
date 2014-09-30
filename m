@@ -1,28 +1,48 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Sep 2014 10:56:21 +0100
-Subject: [PATCH] arm: kprobes-test: Fix compile error "bad immediate
- value for offset"
-In-Reply-To: <1412069601.1466.1.camel@linaro.org>
-References: <1411743864.1529.36.camel@linaro1.home>
- <20140926151947.GV5182@n2100.arm.linux.org.uk>
- <1412069601.1466.1.camel@linaro.org>
-Message-ID: <20140930095621.GK5182@n2100.arm.linux.org.uk>
+Date: Tue, 30 Sep 2014 10:59:46 +0100
+Subject: [PATCH resend] arm:extend the reserved memory for initrd to be
+ page aligned
+In-Reply-To: <15815.1412018518@turing-police.cc.vt.edu>
+References: <35FD53F367049845BC99AC72306C23D103D6DB49161F@CNBJMBX05.corpusers.net>
+ <20140919095959.GA2295@e104818-lin.cambridge.arm.com>
+ <20140925143142.GF5182@n2100.arm.linux.org.uk>
+ <20140925154403.GL10390@e104818-lin.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D103D6DB49163B@CNBJMBX05.corpusers.net>
+ <15815.1412018518@turing-police.cc.vt.edu>
+Message-ID: <20140930095946.GL5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 10:33:21AM +0100, Jon Medhurst (Tixy) wrote:
-> On Fri, 2014-09-26 at 16:19 +0100, Russell King - ARM Linux wrote:
-> > I suspect it should be Olof - I'm just the middle man, spotting errors
-> > in Olof's build results... though it did help that it was my for-next
-> > branch which was being built.
+On Mon, Sep 29, 2014 at 03:21:58PM -0400, Valdis.Kletnieks at vt.edu wrote:
+> On Fri, 26 Sep 2014 10:40:54 +0800, "Wang, Yalin" said:
 > 
-> I've added this patch to the patch tracker as 8179/1
+> > I am really confused,
+> > I read this web:
+> > http://www.arm.linux.org.uk/developer/patches/info.php
+> > it said use diff -urN to generate patch like this:
+> >
+> > diff -Nru linux.orig/lib/string.c linux/lib/string.c
+> >
+> > but I see other developers use git format-patch to generate patch and
+> > submit to the patch system.
+> > Git format-patch format can also be accepted by the patch system correctly ?
+> > If yes, I think this web should update,
+> > Use git format-patch to generate patch is more convenient than use diff -urN
 > 
-> I didn't add a Reported-by as I didn't receive a response from Olof and
-> didn't want to add him without his say so; and I am assuming this matter
-> isn't worth wasting peoples time chasing up...
+> 'diff -urN' has the advantage that it will work against a tree extracted
+> from a release tarball, and doesn't have a requirement that you have git
+> installed.  Having said that, somebody who has access to the website probably
+> should update it to mention that both methods are acceptable....
 
-I concur.  I'll apply it later today, thanks.
+As the website includes *examples* of git formatted patches, no change
+is necessary.
+
+I've learned through writing those instructions that it is a bad idea to
+_add_ additional words, because it gives people _more_ things to argue
+about.  One form of words or examples is fine for one group of people,
+but completely confuses another group of people.  You can't win.
+
+That is one of the biggest reasons I hate writing user documentation.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
