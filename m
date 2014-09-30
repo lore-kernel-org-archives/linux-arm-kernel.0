@@ -1,80 +1,41 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 30 Sep 2014 10:18:05 -0600
-Subject: [PATCH v13 00/12] Support for creating generic PCI host bridges
- from DT
-In-Reply-To: <20140930103942.GO841@e106497-lin.cambridge.arm.com>
-References: <1412000971-9242-1-git-send-email-Liviu.Dudau@arm.com>
- <20140929194335.GA13747@google.com>
- <20140930103942.GO841@e106497-lin.cambridge.arm.com>
-Message-ID: <20140930161805.GB5625@google.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 30 Sep 2014 18:19:45 +0200
+Subject: [PATCH 4/6] hwrng: atmel: Add TRNG DT binding doc
+In-Reply-To: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1412093987-30241-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 11:39:42AM +0100, Liviu Dudau wrote:
-> On Mon, Sep 29, 2014 at 08:43:35PM +0100, Bjorn Helgaas wrote:
-> > On Mon, Sep 29, 2014 at 03:29:19PM +0100, Liviu Dudau wrote:
-> > > This is my version 13 of the attempt at adding support for generic PCI host
-> > > bridge controllers. It contains only cleanups to make it play nice with the
-> > > linux-next tree as of 09/25. If Bjorn deems it safe, now that it looks like
-> > > asm-generic is going to revert some of its more aggresive patches, he has the
-> > > choice of queueing it into linux-next again.
-> > > ...
-> > 
-> > These patches above were already on my pci/host-generic branch and in
-> > linux-next:
-> > 
-> >    asm-generic/io.h: Fix ioport_map() for !CONFIG_GENERIC_IOMAP
-> This ^ ...
-> 
-> >    of/pci: Add pci_register_io_range() and pci_pio_to_address()
-> >    ARM: Define PCI_IOBASE as the base of virtual PCI IO space
-> 
-> and this ^ need to be refreshed from my series otherwise we will get conflicts with
-> asm-generic branch (either now or in the future). While the asm-generic/io.h
-> cast is arguably superflous, we need to define PCI_IOBASE as a void __iomem* to
-> match all other standard declarations of PCI_IOBASE.
-> 
-> >    of/pci: Define of_pci_range_to_resource() only when CONFIG_PCI=y
-> >    of/pci: Move of_pci_range_to_resources() to of/address.c
-> >    of/pci: Fix the conversion of IO ranges into IO resources
-> > 
-> > I added these three patches to my pci/host-generic branch:
-> > 
-> >    PCI: Add generic domain handling
-> >    of/pci: Add pci_get_new_domain_nr() and of_get_pci_domain_nr()
-> >    of/pci: Add support for parsing PCI host bridge resources from DT
-> 
-> I can see these patches added to pci/host-generic but not on pci/next.
+Document DT bindings of Atmel's TRNG (True Random Number Generator) IP.
 
-Right.  I leave things on topic branches for a day or two to give a chance
-for Fengguang's auto-builder to find problems before I merge them into the
-more public "next" or "for-linus" branches.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ Documentation/devicetree/bindings/hwrng/atmel-trng.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwrng/atmel-trng.txt
 
-> > Yinghai pointed out a problem with this one, so I omitted it:
-> > 
-> >    PCI: Assign unassigned bus resources in pci_scan_root_bus()
-> 
-> Thats fine, host bridge drivers will have to work around pci_scan_root_bus() reduced
-> functionality for now.
-
-Well, it's not really "reduced functionality."  It is unchanged by this
-series and host bridge drivers can continue using it the same way they have
-in the past.  It's just that we'd like to make it smarter someday.
-
-> > I added this one to my pci/host-generic branch:
-> > 
-> >    PCI: Add pci_remap_iospace() to map bus I/O resources
-> > 
-> > I assume this depends on the pci_scan_root_bus() change (if not, let me
-> > know), so I omitted this one:
-> > 
-> >    arm64: Add architectural support for PCI
-> 
-> No, there is no dependency there on pci_scan_root_bus(), it can go in the series.
-> The only thing that depends on a feature rich pci_scan_root_bus() is the host
-> bridge driver in order to be able to use only one line to process the root bus.
-
-OK, I rebuilt pci/host-generic from scratch.  It consists of your v13
-patches + Arnd's build fix for pci_pio_to_address() in !CONFIG_OF configs.
-
-Bjorn
+diff --git a/Documentation/devicetree/bindings/hwrng/atmel-trng.txt b/Documentation/devicetree/bindings/hwrng/atmel-trng.txt
+new file mode 100644
+index 0000000..4ac5aaa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwrng/atmel-trng.txt
+@@ -0,0 +1,16 @@
++Atmel TRNG (True Random Number Generator) block
++
++Required properties:
++- compatible : Should be "atmel,at91sam9g45-trng"
++- reg : Offset and length of the register set of this block
++- interrupts : the interrupt number for the TRNG block
++- clocks: should contain the TRNG clk source
++
++Example:
++
++trng at fffcc000 {
++	compatible = "atmel,at91sam9g45-trng";
++	reg = <0xfffcc000 0x4000>;
++	interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
++	clocks = <&trng_clk>;
++};
+-- 
+1.9.1
