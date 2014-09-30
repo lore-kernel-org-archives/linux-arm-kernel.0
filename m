@@ -1,75 +1,44 @@
 From: ben@decadent.org.uk (Ben Hutchings)
-Date: Tue, 30 Sep 2014 03:07:38 +0100
-Subject: [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-In-Reply-To: <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
-References: <1410714624.3040.38.camel@decadent.org.uk>
- <1410714670.3040.39.camel@decadent.org.uk>
- <20140928222150.GC3248@norris-Latitude-E6410>
- <CACna6rx=GyZ-4JpDix==WKszABseQXK6qCCkfiKCm9-WzBmM3A@mail.gmail.com>
-Message-ID: <1412042858.9388.79.camel@decadent.org.uk>
+Date: Tue, 30 Sep 2014 03:13:42 +0100
+Subject: [PATCH v2 0/5] m25p80,spi-nor: Fix module aliases for m25p80; clean
+ up chip identification
+Message-ID: <1412043222.9388.81.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-29 at 08:36 +0200, Rafa? Mi?ecki wrote:
-> On 29 September 2014 00:21, Brian Norris <computersforpeace@gmail.com> wrote:
-> > + Rafal
-> >
-> > Rafal has been looking at the same area of code. I'd really like to get
-> > this patch into 3.18 if possible, so the more eyes the better.
-> 
-> Thanks Brian.
-> 
-> I took me a while to follow this issue, too bad I wasn't subscribed to
-> the ML earlier. Let me try to sum it up.
-> 
-> 
-> 
-> 1) The main urgent issue: broken auto-loading
-> Tracked in the thread: http://www.spinics.net/lists/linux-spi/msg01726.html
-> Problem: m25p80.c references spi_nor_ids (from external file)
-> Short-term solution: duplicate IDs in the m25p80.c
-> 
-> Ben: just like Brian, I think the patch like this one (
-> [PATCH 1/5] m25p80,spi-nor: Fix module aliases for m25p80
-> ) is the way to go. However few comments:
-> 
-> a) I don't see why you modify m25p_probe in it.
+The first patch in the series restores the module aliases to m25p80, but
+it does so by duplicating the list of names.  This should be suitable
+for stable, but it isn't viable in the longer term.
 
-Because spi_nor_scan() requires a struct spi_device_id with the
-driver_data field pointing to a struct flash_info.
+The following patches change the spi-nor interface so that this
+duplication is no longer necessary.  This includes removing
+spi_nor::read_id, but it could be re-added after this with a different
+interface, e.g. returning a flash_info structure (which would need to be
+defined in spi_nor.h).
 
-> b) I don't think the described clean solution (you described it in the
-> commit message):
-> > A clean solution to this will involve defining the list of device
-> > IDs in spi-nor.h and removing struct spi_device_id from the spi-nor
-> > API, but this is quite a large change.
-> is the correct one. I think there should be a single string to trigger
-> m25p80 load and the rest should be handled using JEDEC, with some
-> workarounds for incompatible devices only.
+v2: Rebase onto l2-mtd/master.
+    Put all the flash information into spi-nor.h rather than using an
+    elaborate set of macros to validate names in spi-nor.c.
 
-That certainly makes sense for Linux-specific platform data, but I don't
-think it works for Device Tree "compatible" strings (see
-<http://mid.gmane.org/1410660009.3040.29.camel@decadent.org.uk>).
-
-[...]
-> b) Removing spi_nor::read_id
-> https://patchwork.ozlabs.org/patch/389073/
-> Ben: I think this one has a NACK from me, because I'm going to use
-> custom read_id in the bcm53xxspiflash driver.
-> See following thread for bcm53xxspiflash description:
-> http://comments.gmane.org/gmane.linux.drivers.mtd/54578
-> Initial commit (it uses read_id): https://patchwork.ozlabs.org/patch/381902/
-[...]
-
-But it has to use spi_nor_match_id() because of the driver_data
-requirement.  This just illustrates that the read_id operation doesn't
-make sense as currently defined.
-
-I accept that there will be a need for a read_id operation, but I think
-it should fill in a struct flash_info rather than requiring every chip
-to be described and named in spi-nor.c.
+These patches are still untested by me, aside from compiling and
+checking that m25p80 has the expected module aliases.
 
 Ben.
+
+Ben Hutchings (5):
+  m25p80,spi-nor: Fix module aliases for m25p80
+  spi-nor: Remove spi_nor::read_id operation
+  spi-nor: Make spi_nor_scan() take a chip type name, not an
+    spi_device_id
+  spi-nor: Replace struct spi_device_id with struct flash_info
+  m25p80,spi-nor: Share the list of supported chip type names again
+
+ drivers/mtd/devices/m25p80.c      |  21 +++-
+ drivers/mtd/spi-nor/fsl-quadspi.c |   7 +-
+ drivers/mtd/spi-nor/spi-nor.c     | 251 +++++++-------------------------------
+ include/linux/mtd/spi-nor.h       | 191 ++++++++++++++++++++++++++---
+ 4 files changed, 232 insertions(+), 238 deletions(-)
+
 
 -- 
 Ben Hutchings
@@ -80,4 +49,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 811 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/da598f26/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140930/1934326d/attachment.sig>
