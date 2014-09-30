@@ -1,72 +1,133 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 30 Sep 2014 12:55:48 +0200
-Subject: [PATCH V4] bcma: use chipcommon node from DT for SoC GPIO chip
-In-Reply-To: <1412072546-3529-1-git-send-email-zajec5@gmail.com>
-References: <1412072546-3529-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1412074548-14614-1-git-send-email-zajec5@gmail.com>
+From: wuyun.wu@huawei.com (Abel)
+Date: Tue, 30 Sep 2014 18:56:30 +0800
+Subject: [RFT v2 01/24] irqdomain: Introduce new interfaces to support
+ hierarchy irqdomains
+In-Reply-To: <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
+References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+ <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
+ <54294F1C.30606@huawei.com>
+ <alpine.DEB.2.02.1409291707410.22082@ionos.tec.linutronix.de>
+Message-ID: <542A8C5E.3040901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow us to define GPIO-attached devices (LEDs, buttons) in
-the the device tree.
+Hi Thomas,
+On 2014/9/29 23:53, Thomas Gleixner wrote:
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-This is based on top of
-[PATCH v6] bcma: register bcma as device tree driver
-that I hope will reach wireless-next git tree.
+> On Mon, 29 Sep 2014, Abel wrote:
+>> I've been through your patches and noticed that the only domain
+>> which does not call irq_domain_alloc_irqs_parent() is
+>> x86_vector_domain. And this makes sense *if* we already knew which
+>> domain is the nearest one to the CPU.
+> 
+> Right, and in case of x86 the vector domain _IS_ the one which is
+> always the nearest one to the cpu.
 
-V2: Describe axi chilren and make gpio a child of chipcommon core.
-V3: Make chipcommon a GPIO controller (avoid extra sub-child)
-    Speed up finding OF node in driver_gpio.c
-V4: Simplify setting of_node in driver_gpio.c
----
- Documentation/devicetree/bindings/bus/bcma.txt | 12 ++++++++++++
- drivers/bcma/driver_gpio.c                     |  4 ++++
- 2 files changed, 16 insertions(+)
+Yes, I know that. :)
+What I meant is... (please see below)
 
-diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
-index e9070c1..62a4834 100644
---- a/Documentation/devicetree/bindings/bus/bcma.txt
-+++ b/Documentation/devicetree/bindings/bus/bcma.txt
-@@ -9,6 +9,11 @@ Required properties:
- The cores on the AXI bus are automatically detected by bcma with the
- memory ranges they are using and they get registered afterwards.
- 
-+The top-level axi bus may contain children representing attached cores
-+(devices). This is needed since some hardware details can't be auto
-+detected (e.g. IRQ numbers). Also some of the cores may be responsible
-+for extra things, e.g. ChipCommon providing access to the GPIO chip.
-+
- Example:
- 
- 	axi at 18000000 {
-@@ -17,4 +22,11 @@ Example:
- 		ranges = <0x00000000 0x18000000 0x00100000>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+
-+		chipcommon {
-+			reg = <0x00000000 0x1000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
- 	};
-diff --git a/drivers/bcma/driver_gpio.c b/drivers/bcma/driver_gpio.c
-index 8ea497c..57ce5fe 100644
---- a/drivers/bcma/driver_gpio.c
-+++ b/drivers/bcma/driver_gpio.c
-@@ -218,6 +218,10 @@ int bcma_gpio_init(struct bcma_drv_cc *cc)
- #if IS_BUILTIN(CONFIG_BCM47XX)
- 	chip->to_irq		= bcma_gpio_to_irq;
- #endif
-+#if IS_BUILTIN(CONFIG_OF)
-+	if (cc->core->bus->hosttype == BCMA_HOSTTYPE_SOC)
-+		chip->of_node	= cc->core->dev.of_node;
-+#endif
- 	switch (cc->core->bus->chipinfo.id) {
- 	case BCMA_CHIP_ID_BCM5357:
- 	case BCMA_CHIP_ID_BCM53572:
--- 
-1.8.4.5
+> 
+>> But I don't think a well implemented device driver should assume
+>> itself be in a particular position of the interrupt delivery path.
+> 
+> The device driver has no knowledge of this. The irq domain driver
+> definitely has to know to some extent.
+> 
+>> Actually it should be guaranteed by the core infrastructure that all
+>> the domains in the interrupt delivery path should allocate a
+>> hardware interrupt for the interrupt source.
+> 
+> Well, that's what we do. We allocate down the irq domain hierarchy. If
+> one level fails the whole operation fails.
+
+Actually the core infrastructure just calls domain->ops->alloc() which is
+the one who really guarantees it by calling irq_domain_alloc_irqs_parent().
+I think it's enough for a particular domain to pick a hwirq from itself for
+that linux irq, and need not to care about its parent.
+What I suggest is something like:
+
+for (iter = domain; iter; iter = iter->parent) {
+	ret = iter->ops->alloc(iter, virq, nr_irqs, arg);
+	if (ret < 0) {
+		mutex_unlock(&irq_domain_mutex);
+		goto out_free_irq_data;
+	}
+}
+
+in this way, the core infrastructure guarantees allocating down the irqdomain
+hierarchy, and the implementers of domain_ops->alloc() need not to call
+irq_domain_alloc_irqs_parent() any longer, just do the things they have to.
+
+> 
+>> And besides the comments/questions I mentioned above, I am also curious about
+>> how the chained interrupts been processed.
+>>
+>> Let's take a 3-level-chained-domains for example.
+>> Given 3 interrupt controllers A, B and C, and the interrupt delivery path is:
+>>
+>> DEV -> A -> B -> C -> CPU
+>>
+>> After the hierarchy irqdomains are established, the unique linux interrupt of
+>> DEV will be mapped with a hardware interrupt in each domain:
+>>
+>> DomainA: HWIRQ_A => VIRQ_DEV
+>> DomainB: HWIRQ_B => VIRQ_DEV
+>> DomainC: HWIRQ_C => VIRQ_DEV
+>>
+>> When the DEV triggered an interrupt signal, the CPU will acknowledge HWIRQ_C,
+> 
+> Not necessarily. The CPU will process HWIRQ_C. The acknowledge
+> mechanism depends on the implementation details of the hierarchy.
+
+Yes, you are right. Thanks for pointing out.
+
+> 
+>> and then irq_find_mapping(DomainC, HWIRQ_C) will be called to get the linux
+>> interrupt VIRQ_DEV, and after the handler of the VIRQ_DEV has been processed,
+>> the interrupt will end with the level (if have) uncleared on B, which will
+>> result in the interrupt of DEV cannot be processed again.
+>>
+>> Or is there anything I misunderstand?
+> 
+> This heavily depends on the properties of the stacked domains.
+> 
+> It depends on the hardware requirements and the implementation of
+> domain A and B how this is handled.
+> 
+> It might be sufficient to have the following code in the irq_ack()
+> callback of domain A:
+> 
+> irq_ack_A(struct irq_data *d)
+> {
+> 	ack_hw_A();
+> }
+> 
+> Another HW or stacking scenario requires
+> 
+> irq_ack_A(struct irq_data *d)
+> {
+> 	ack_hw_A();
+> 	ack_parent();
+> }
+> 
+> where ack_parent() does:
+> 
+>       if (d->parent_data)
+>       	 d->parent_data->chip->ack(d->parent_data);
+> 
+> and ack_hw_A() can be anything from a nop to some more or less complex
+> hw access.
+> 
+> So we cannot define upfront how deep an ack/mask/unmask/... has to be
+> propagated down the chain. This needs a careful consideration in terms
+> of functionality and we want to be able to do performance shortcuts as
+> well.
+> 
+
+Yes, I got it. And one more thing I concerned is that when hierarchy
+irqdomains is enabled, shouldn't the ack_parent() be called by default
+by the irqchip->irq_ack() of each domain to ensure all the domains in
+the delivery path ack this interrupt?
+
+Thanks,
+	Abel.
