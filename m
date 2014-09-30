@@ -1,42 +1,31 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 01 Oct 2014 00:02:36 +0200
-Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
-In-Reply-To: <20140930195257.19023.57219@quantum> (Mike Turquette's message of
- "Tue, 30 Sep 2014 12:52:57 -0700")
-References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
- <1465795.XsPpj3dZHX@wuerfel> <87d2bq43pc.fsf@free.fr>
- <201408241408.19861.arnd@arndb.de>
- <20140903184956.11368.47800@quantum> <874mw2xoau.fsf@free.fr>
- <20140930195257.19023.57219@quantum>
-Message-ID: <87iok4bwcj.fsf@free.fr>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Oct 2014 00:09:06 +0100
+Subject: [PATCH] ASoC: fsl: fix dependencies for wm8962
+In-Reply-To: <20140930174241.GA1296@Asurada>
+References: <1950588.ErdGoiHh8p@wuerfel> <20140930164510.GF4273@sirena.org.uk>
+ <20140930174241.GA1296@Asurada>
+Message-ID: <20140930230906.GQ4273@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike Turquette <mturquette@linaro.org> writes:
+On Tue, Sep 30, 2014 at 10:42:42AM -0700, Nicolin Chen wrote:
+> On Tue, Sep 30, 2014 at 05:45:10PM +0100, Mark Brown wrote:
 
-> Quoting Robert Jarzmik (2014-09-20 09:13:45)
-> Hi Robert,
->
-> Tomeu's stuff won't go into 3.18. I should have circled back to these
-> patches when that become apparent, but it got lost in the paperwork.
->
-> I can take these patches without you rebasing onto his work. Since we
-> have -rc7 I think there is time and these patches shouldn't wait for
-> another merge window. I've applied them to clk-next from a stable branch
-> with these six patches based on -rc1.
+> > That select shouldn't be there in the first place, I asked Nicolin to
+> > fix this when I applied the driver but he's not got round to it yet.
 
-Thanks Mike, that's perfect. These patches are my corner stone to unblock the
-pxa device-tree port (at least on pxa27x).
+> I think I might have missed something around those days, even though
+> the 'Applied' mail seemly doesn't have any comment against this part:
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-August/080083.html
 
-There will be at least 1 corrective patch for init ordering (clocks must be
-initialized before the clocksource). But I believe it will go during the
-3.18-rcs. I'll post the patch tomorrow for it to gather enough acks.
+> Is that possible for you to copy and paste the comments again?
 
-And I have also a patch for Tomeu's change. It's really small, so I'll post it
-too, but not for submission, just to have it reviewed when the API change will
-be ready.
-
-Thanks.
-
--- 
-Robert
+I suspect it was on an earlier version of the patch or a cover letter;
+IIRC you were resending while I was reviewing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/04bf7c83/attachment.sig>
