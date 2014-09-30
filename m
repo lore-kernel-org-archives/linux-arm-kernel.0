@@ -1,96 +1,252 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 30 Sep 2014 20:17:38 +0200
-Subject: exynos5420/arndale-octa: imprecise external aborts on
- exynos_defconfig
-In-Reply-To: <7hk351ep8e.fsf@deeprootsystems.com>
-References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
- <CAJuA9ahkpZ4EJQz4DoAjYzo0OQw5zXLavAVoXRBdgPcm9EUQYA@mail.gmail.com>
- <7hk351ep8e.fsf@deeprootsystems.com>
-Message-ID: <11034593.CCZ1LqhX6D@amdc1032>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 30 Sep 2014 14:18:40 -0400
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+Message-ID: <20140930181840.GA24153@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 25, 2014 at 12:23:27AM +0000, Geoff Levand wrote:
 
-Hi,
+[..]
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> new file mode 100644
+> index 0000000..22d185c
+> --- /dev/null
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -0,0 +1,183 @@
+> +/*
+> + * kexec for arm64
+> + *
+> + * Copyright (C) Linaro.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kexec.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/slab.h>
+> +#include <linux/uaccess.h>
+> +
+> +#include <asm/cacheflush.h>
+> +#include <asm/system_misc.h>
+> +
+> +/* Global variables for the relocate_kernel routine. */
+> +
+> +extern const unsigned char relocate_new_kernel[];
+> +extern const unsigned long relocate_new_kernel_size;
+> +extern unsigned long kexec_dtb_addr;
+> +extern unsigned long kexec_kimage_head;
+> +extern unsigned long kexec_kimage_start;
+> +
+> +/**
+> + * kexec_list_walk - Helper to walk the kimage page list.
+> + */
+> +
+> +static void kexec_list_walk(void *ctx, unsigned long kimage_head,
+> +	void (*cb)(void *ctx, unsigned int flag, void *addr, void *dest))
+> +{
+> +	void *dest;
+> +	unsigned long *entry;
 
-On Wednesday, September 17, 2014 05:39:29 PM Kevin Hilman wrote:
-> Thomas Abraham <ta.omasab@gmail.com> writes:
-> 
-> > On Thu, Sep 11, 2014 at 12:16 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> >> Tyler Baker <tyler.baker@linaro.org> writes:
-> >>
-> >>> Exynos5420-based Arndale octa boards have recently started failing boot
-> >>> tests due to imprecise external aborts.  This only appears to happen
-> >>> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
-> >>> issue seems to be intermittent, so is not reliably reproducable and
-> >>> difficult to bisect.  Here are a few boot logs from recent
-> >>> mainline/linux-next kernels that are failing:
-> >>
-> >> FYI, I'm seeing the same periodic aborts.  For example, here's my boot
-> >> of next-20140910:
-> >> http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
-> >>
-> >> However, my userspace is much simpler and doesn't seem to cause a panic,
-> >> so my boot tests report passing. (I should fixup my scripts so these
-> >> imprecise aborts are reported as a FAIL.)
-> >>
-> >> I'm glad you pointed out that it happens only with exynos_defconfig and
-> >> not multi_v7_defconfig because I noticed that too.  I haven't had the
-> >> time to track it any further than that, so maybe the exynos folks can
-> >> help track it down from here.
-> >>
-> >> Thanks for reporting this,
-> >>
-> >> Kevin
-> >
-> > Hi Tyler, Kevin,
-> >
-> > From the bootlog you have shared,
-> >
-> > [    1.060016] CPU4: failed to come online
-> > [    2.070031] CPU5: failed to come online
-> > [    3.080049] CPU6: failed to come online
-> > [    4.090066] CPU7: failed to come online
-> > [    4.090099] Brought up 4 CPUs
-> > [    4.090109] SMP: Total of 4 processors activated.
-> > [    4.090119] CPU: WARNING: CPU(s) started in wrong/inconsistent
-> > modes (primary CPU mode 0x13)
-> > [    4.090128] CPU: This may indicate a broken bootloader or firmware.
-> >
-> > Would it be possible to set max cpus to 1, disable switcher and try
+Hi Geoff,
 
-Which "max cpus" do you mean?  For NR_CPUS the lower limit is 2.
+I see only one user of this function, kexec_list_flush_cb(). So why
+not directly embed needed logic in kexec_list_flush_cb() instead of
+implementing a generic function. It would be simpler as you seem to
+be flushing dcache only for SOURCE and IND pages and rest you 
+can simply ignore.
 
-> > again. I don't have a arndale octa board but I have tested mainline
-> > kernel with smdk5420 board. It boots all eight CPUs, switcher works
-> > fine and there are no imprecise aborts seen.
-> 
-> Sorry for the delay, I'm travelling this week.
-> 
-> FWIW, the same CPU boot failures you hilight above are happening on
-> multi_v7_defconfig[1] which is not getting the imprecise abort.  This is
-> only happening on exynos_defconfig[2], so I'm curious why you think the
-> switcher or NR_CPUS might be the issues.
-> 
-> Anyways, I narrowed this down a bit and discovered it's
-> CONFIG_EXYNOS5420_MCPM=y that's the root cause.  If I use
-> exynos_defconfig and then disable that option, I don't get any more
-> imprecise aborts.
+> +
+> +	for (entry = &kimage_head, dest = NULL; ; entry++) {
+> +		unsigned int flag = *entry & 
+> +			(IND_DESTINATION | IND_INDIRECTION | IND_DONE |
+> +			IND_SOURCE);
+> +		void *addr = phys_to_virt(*entry & PAGE_MASK);
+> +
+> +		switch (flag) {
+> +		case IND_INDIRECTION:
+> +			entry = (unsigned long *)addr - 1;
+> +			cb(ctx, flag, addr, NULL);
+> +			break;
+> +		case IND_DESTINATION:
+> +			dest = addr;
+> +			cb(ctx, flag, addr, NULL);
+> +			break;
+> +		case IND_SOURCE:
+> +			cb(ctx, flag, addr, dest);
+> +			dest += PAGE_SIZE;
+> +			break;
+> +		case IND_DONE:
+> +			cb(ctx, flag , NULL, NULL);
+> +			return;
+> +		default:
+> +			break;
+> +		}
+> +	}
+> +}
+> +
+> +/**
+> + * kexec_is_dtb - Helper routine to check the device tree header signature.
+> + */
+> +
+> +static bool kexec_is_dtb(const void *dtb)
+> +{
+> +	__be32 magic;
+> +
+> +	return get_user(magic, (__be32 *)dtb) ? false :
+> +		(be32_to_cpu(magic) == OF_DT_HEADER);
+> +}
+> +
+> +/**
+> + * kexec_find_dtb_seg - Helper routine to find the dtb segment.
+> + */
+> +
+> +static const struct kexec_segment *kexec_find_dtb_seg(
+> +	const struct kimage *image)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < image->nr_segments; i++) {
+> +		if (kexec_is_dtb(image->segment[i].buf))
+> +			return &image->segment[i];
+> +	}
+> +
+> +	return NULL;
+> +}
 
-I have exactly the same issue with Exynos5420 Arndale Octa.
+So this implementation makes passing dtb mandatory. So it will not work
+with ACPI?
 
-CONFIG_EXYNOS5420_MCPM was enabled by commit fc3791f3a95d
-("ARM: exynos_defconfig: Update exynos_defconfig") which
-get merged into v3.17-rc1.  It seems that this part of
-the patch should be reverted for the final v3.17 kernel.
+Where is dtb present? How is it passed to first kernel? Can it still
+be around in memory and second kernel can access it?
 
-> Kevin
-> 
-> [1] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-multi_v7_defconfig/boot-exynos5420-arndale-octa.html
-> [2] http://images.armcloud.us/kernel-ci/mainline/v3.17-rc5-25-g8ba4caf/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+I mean in ACPI world on x86, all the ACPI info is still present and second
+kernel can access it without it being explicitly to second kernel in
+memory. Can something similar happen for dtb?
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+[..]
+> +/**
+> + * kexec_list_flush_cb - Callback to flush the kimage list to PoC.
+> + */
+> +
+> +static void kexec_list_flush_cb(void *ctx , unsigned int flag,
+> +	void *addr, void *dest)
+			  ^^^
+
+Nobody seems to be making use of dest. So why introduce it?
+
+> +{
+> +	switch (flag) {
+> +	case IND_INDIRECTION:
+> +	case IND_SOURCE:
+> +		__flush_dcache_area(addr, PAGE_SIZE);
+> +		break;
+
+So what does __flush_dcache_area() do? Flush data caches. IIUC, addr
+is virtual address at this point of time. While copying pages and
+walking through the list, I am assuming you have switched off page
+tables and you are in some kind of 1:1 physical mode. So how did
+flushing data caches related to a virtual address help. I guess we
+are not even accessing that virtual address now. 
+ 
+[..]
+> --- /dev/null
+> +++ b/arch/arm64/kernel/relocate_kernel.S
+> @@ -0,0 +1,183 @@
+> +/*
+> + * kexec for arm64
+> + *
+> + * Copyright (C) Linaro.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <asm/assembler.h>
+> +#include <asm/kexec.h>
+> +#include <asm/memory.h>
+> +#include <asm/page.h>
+> +#include <asm/proc-macros.S>
+> +
+> +/* The list entry flags. */
+> +
+> +#define IND_DESTINATION_BIT 0
+> +#define IND_INDIRECTION_BIT 1
+> +#define IND_DONE_BIT        2
+> +#define IND_SOURCE_BIT      3
+
+I thought you had some patches to move these into generic header file. You
+got rid of those patches?
+
+> +
+> +/*
+> + * relocate_new_kernel - Put the 2nd stage kernel image in place and boot it.
+> + *
+> + * The memory that the old kernel occupies may be overwritten when coping the
+> + * new kernel to its final location.  To assure that the relocate_new_kernel
+> + * routine which does that copy is not overwritten all code and data needed
+> + * by relocate_new_kernel must be between the symbols relocate_new_kernel and
+> + * relocate_new_kernel_end.  The machine_kexec() routine will copy
+> + * relocate_new_kernel to the kexec control_code_page, a special page which
+> + * has been set up to be preserved during the kernel copy operation.
+> + */
+> +
+> +.globl relocate_new_kernel
+> +relocate_new_kernel:
+> +
+> +	/* Setup the list loop variables. */
+> +
+> +	ldr	x18, kexec_kimage_head		/* x18 = list entry */
+> +	dcache_line_size x17, x0		/* x17 = dcache line size */
+> +	mov	x16, xzr			/* x16 = segment start */
+> +	mov	x15, xzr			/* x15 = entry ptr */
+> +	mov	x14, xzr			/* x14 = copy dest */
+> +
+> +	/* Check if the new kernel needs relocation. */
+
+What's "relocation" in this  context. I guess you are checking if new
+kernel needs to be moved to destination location or not.
+
+[..]
+> +/*
+> + * kexec_dtb_addr - Physical address of the new kernel's device tree.
+> + */
+> +
+> +.globl kexec_dtb_addr
+> +kexec_dtb_addr:
+> +	.quad	0x0
+
+As these gloabls are very arm64 specific, will it make sense to prefix
+arm64_ before these. arm64_kexec_dtb_addr. Or arch_kexec_dtb_addr.
+
+
+> +
+> +/*
+> + * kexec_kimage_head - Copy of image->head, the list of kimage entries.
+> + */
+> +
+> +.globl kexec_kimage_head
+> +kexec_kimage_head:
+> +	.quad	0x0
+
+Same here. How about arch_kexec_kimage_head.
+
+> +
+> +/*
+> + * kexec_kimage_start - Copy of image->start, the entry point of the new kernel.
+> + */
+> +
+> +.globl kexec_kimage_start
+> +kexec_kimage_start:
+> +	.quad	0x0
+
+arch_kexec_kimage_start.
+
+Thanks
+Vivek
