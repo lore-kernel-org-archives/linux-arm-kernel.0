@@ -1,41 +1,31 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 30 Sep 2014 17:56:30 +0200
-Subject: [PATCH v5 0/8] arch: arm64: Enable support for Samsung Exynos7 SoC
-In-Reply-To: <CAM4voa=Hsux0+rccSvDJsNTFakZwuwYwjkDkkNFfndFm03Pn3g@mail.gmail.com>
-References: <1411361228-18279-1-git-send-email-a.kesavan@samsung.com>	<541FE357.5090000@gmail.com>
- <CAM4voa=Hsux0+rccSvDJsNTFakZwuwYwjkDkkNFfndFm03Pn3g@mail.gmail.com>
-Message-ID: <542AD2AE.6060109@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 30 Sep 2014 23:56:24 +0800
+Subject: [PATCH v2 1/7] clk: sunxi: Specify number of child clocks for
+ divs clocks
+In-Reply-To: <20140930154043.GN4081@lukather>
+References: <1411807795-6575-1-git-send-email-wens@csie.org>
+ <1411807795-6575-2-git-send-email-wens@csie.org>
+ <20140930154043.GN4081@lukather>
+Message-ID: <CAGb2v64RPi2J4gpWu7X15xSx89guPSoEs2_7Bxs9ywj023fabA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.09.2014 17:12, Abhilash Kesavan wrote:
-> Hi Tomasz,
-> 
-> On Mon, Sep 22, 2014 at 2:22 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Hi Abhilash,
+On Tue, Sep 30, 2014 at 11:40 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sat, Sep 27, 2014 at 04:49:49PM +0800, Chen-Yu Tsai wrote:
+>> Currently sunxi_divs_clk_setup assumes the number of child clocks
+>> to be the same as the number of clock-output-names, and a maximum
+>> of SUNXI_DIVS_MAX_QTY child clocks.
 >>
->> On 22.09.2014 06:47, Abhilash Kesavan wrote:
->>> Changes since v4:
->>> - Fixed comments from Tomasz Figa:
->>>       - Changed the namespace prefix from exynos to samsung
->>>       - Defined bindings to take all input clocks
->>>       - Sorted the Kconfig entries alphabetically in clock Makefile
->>>       - Used consistent 1 tab line breaks across the clock file
->>>       - Statically initialized the samsung_cmu_info struct
->>> - Enabled exynos7 in the arm64 defconfig as per Catalin Marinas' comment.
->>> - Added Kukjin Kim's ack along with Thomas Abraham's tested and reviewed tags.
->>>
->>
->> The clock patches look good to me, but since they are doing quite a lot
->> of code moving I'd prefer to take them through clk tree. Based on the
->> fact that there are no code dependencies between clock patches and
->> remaining ones and Exynos7 is a new material for 3.18, I'm inclined to
->> apply them to my tree if nobody minds.
-> 
-> Will you be picking up the clock changes soon ?
+>> On sun6i, PLL6 only has 1 child clock, but the parent would be used
+>> as well, thereby also having it's own clock-output-names entry. This
+>> results in an extra bogus clock being registered.
+>
+> Isn't PLL6 having two childs as well?
 
-I'd like to do so. Kukjin, since clock changes are a part of this
-series, might I have your Ack for them to be applied separately?
+No. It has one child, the normal PLL6 output clock.
 
-Best regards,
-Tomasz
+The last "clock-output-names" entry refers to the factors clock itself,
+in this case, the 2x clock output.
+
+ChenYu
