@@ -1,57 +1,102 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 1 Oct 2014 11:07:18 -0500
-Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
-In-Reply-To: <20141001150418.GA14609@amd>
-References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
- <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
- <20141001133527.GA12750@amd> <alpine.DEB.2.10.1410010915440.2332@shineypoop>
- <20141001150418.GA14609@amd>
-Message-ID: <542C26B6.7010302@opensource.altera.com>
+From: mike.rapoport@gmail.com (Mike Rapoport)
+Date: Wed,  1 Oct 2014 19:09:11 +0300
+Subject: [PATCH v4] ARM: dts: qcom: add CM-QS600 board
+Message-ID: <1412179751-5859-1-git-send-email-mike.rapoport@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+CM-QS600 is a APQ8064 based computer on module.
+The details are available at
+http://compulab.co.il/products/computer-on-modules/cm-qs600/
 
+Signed-off-by: Mike Rapoport <mike.rapoport@gmail.com>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+v2 changes: duplicate the settings for the cm-qs600 board in its .dts file as Kumar suggested
+v3 changes: add board details and keep dts Makefile sorted alphabetically
+v4 changes: fix eeprom defintion and update subject as per Igor's comments
 
-On 10/1/14, 10:04 AM, Pavel Machek wrote:
-> Hi!
-> 
->>>> +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
->>>> +			     rst_manager_base_addr + 0x10);
->>>
->>> Would it be possible to copy reset manager description struct from
->>> u-boot and use it here, instead of raw offset?
->>
->> I will replace this 0x10 with a macro that reflects how the register is 
->> named in the register map.
-> 
-> That would be better than 0x10, but even better would be just copying
-> 
-> struct socfpga_reset_manager {
->         u32     status;
->         u32     ctrl;
->         u32     counts;
->         u32     padding1;
->         u32     mpu_mod_reset;
->         u32     per_mod_reset;
->         u32     per2_mod_reset;
->         u32     brg_mod_reset;
-> };
-> 
-> from u-boot. Unlike macros, structs have advantages that typos lead to
-> easier-to-see failure modes... (And they are easier to read/parse,
-> too).
-> 
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 59 +++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
 
-Copying from uboot sounds good, but I already know that the CPU reset
-offset is different for our next SOC, Arria 10. The Arria 10 SOC should
-still be able to use the same MSL as Cyclone5 and Arria5, but with a few
-differences. One of them being, the CPU1 reset offset is at 0x20 instead
-of 0x10. So I think having a macro for this one register is a bit
-cleaner than having to define a whole new struct for Arria10.
-
-if (of_machine_is_compatible("altr,socfpga-arria10"))
-	__raw_writel(0, rst_manager_base_addr + 0x20);
-else
-	__raw_writel(0, rst_manager_base_addr + 0x10);
-
-Dinh
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index aaa1a68..3243722 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -339,6 +339,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-d2-network.dtb \
+ 	orion5x-rd88f5182-nas.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
++	qcom-apq8064-cm-qs600.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+ 	qcom-apq8074-dragonboard.dtb \
+ 	qcom-apq8084-ifc6540.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+new file mode 100644
+index 0000000..5d75666
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+@@ -0,0 +1,59 @@
++#include "qcom-apq8064-v2.0.dtsi"
++
++/ {
++	model = "CompuLab CM-QS600";
++	compatible = "qcom,apq8064-cm-qs600", "qcom,apq8064";
++
++	soc {
++		pinctrl at 800000 {
++			i2c1_pins: i2c1 {
++				mux {
++					pins = "gpio20", "gpio21";
++					function = "gsbi1";
++				};
++			};
++		};
++
++		gsbi at 12440000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C>;
++
++			i2c at 12460000 {
++				status = "okay";
++				clock-frequency = <200000>;
++				pinctrl-0 = <&i2c1_pins>;
++				pinctrl-names = "default";
++
++				eeprom: eeprom at 50 {
++					compatible = "24c02";
++					reg = <0x50>;
++					pagesize = <32>;
++				};
++			};
++		};
++
++		gsbi at 16600000 {
++			status = "ok";
++			qcom,mode = <GSBI_PROT_I2C_UART>;
++			serial at 16640000 {
++				status = "ok";
++			};
++		};
++
++		amba {
++			/* eMMC */
++			sdcc1: sdcc at 12400000 {
++				status = "okay";
++			};
++
++			/* External micro SD card */
++			sdcc3: sdcc at 12180000 {
++				status = "okay";
++			};
++			/* WLAN */
++			sdcc4: sdcc at 121c0000 {
++				status = "okay";
++			};
++		};
++	};
++};
+-- 
+1.9.1
