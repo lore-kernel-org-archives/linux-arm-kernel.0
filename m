@@ -1,57 +1,28 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Wed, 1 Oct 2014 09:12:38 -0600
-Subject: 3.17-rc6 on ODROID: ERROR: Bad of_node_put() on
- /ehci@12580000/port@1
-In-Reply-To: <CAFp+6iGwB3XuzSuYPzO=5MacPO2LGFDnh9oS5rAL3Ne26wb9Dg@mail.gmail.com>
-References: <CAD8Lp45qyHpHqRnUy4T9Sm8zV4XJBDp=cLYXjtcxmVrS8GSjbg@mail.gmail.com>
- <CAFp+6iGwB3XuzSuYPzO=5MacPO2LGFDnh9oS5rAL3Ne26wb9Dg@mail.gmail.com>
-Message-ID: <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Oct 2014 17:18:11 +0200
+Subject: [GIT PULL] arm: mediatek: Add support for mt8127 and mt8135 SoCs
+In-Reply-To: <CABuKBeL9vy6fZVsDuuiWyhDvCJrFXAUUMBc12SxJODaTx8H1vA@mail.gmail.com>
+References: <CABuKBeK6iUdRqTuOZyTHW-Xt3O4giXoQTJ76vkh4Mv4cA52THQ@mail.gmail.com>
+ <CABuKBeL9vy6fZVsDuuiWyhDvCJrFXAUUMBc12SxJODaTx8H1vA@mail.gmail.com>
+Message-ID: <2257511.iB6BnmDxPp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 12:36 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> One reason i doubt why it could be coming is because we are
-> specifically putting the
-> child after doing everything with it.
->
-> When we are getting the child node using for_each_available_child_of_node(),
-> which calls for of_get_next_available_child(). So of_get_next_available_child()
-> does a of_node_put() on the "prev" node, in case we have siblings to the child.
->
-> Can you see if the below change helps ?
->
-> ------------------------------------------------------------------------------------------------------------
-> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-> index 7189f2e..1b726bf 100644
-> --- a/drivers/usb/host/ehci-exynos.c
-> +++ b/drivers/usb/host/ehci-exynos.c
-> @@ -74,7 +74,6 @@ static int exynos_ehci_get_phy(struct device *dev,
->
->                 phy = devm_of_phy_get(dev, child, NULL);
->                 exynos_ehci->phy[phy_number] = phy;
-> -               of_node_put(child);
->                 if (IS_ERR(phy)) {
->                         ret = PTR_ERR(phy);
->                         if (ret == -EPROBE_DEFER) {
-> ------------------------------------------------------------------------------------------------------------
->
->
-> This is on top of usb-next.
-> If you are testing on rc6 only, then probably you will have to cherrypick two
-> patches each for ehci-exynos and ohci-exynos:
-> usb: host: ehci-exynos: Remove unnecessary usb-phy support
-> usb: host: ohci-exynos: Remove unnecessary usb-phy support
+On Monday 29 September 2014 12:28:32 Matthias Brugger wrote:
+> Any comments on this pull request?
+> Do you want me to split the pull request in two, as there are three
+> patches for next/soc and the
+> remaining four for next/dt?
+> 
+> Please give me some feedback on this.
+> 
 
-I made the equivalent change to 3.17-rc7 (right now 3.17 is my main
-interest), i.e. removed all of_node_put calls from
-exynos_ehci_get_phy(). Same change is needed in exynos_ohci_get_phy().
-Now the warnings are gone.
-BTW, I think the warning only appeared when CONFIG_OF_SELFTEST=y
+Yes and no. In the future, I'd prefer to see split pull requests.
 
-I didn't check the implementation details like you did, but I looked
-at a few other users of for_each_available_child_of_node and it looks
-like indeed you do not need to call of_node_put() on the children in
-the normal case, or at least, nobody else does.
+This time around, the pull request was late already, and I decided to
+do a 'next/late' branch, which aggregates everything together, so it
+does not matter. However, you should not assume that we do a branch
+like this, or that Linus ends up pulling it. In case it doesn't make it
+into 3.18-rc1, please send separate requests for 3.19.
 
-Thanks,
-Daniel
+	Arnd
