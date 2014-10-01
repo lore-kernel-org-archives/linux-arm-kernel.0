@@ -1,43 +1,135 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  1 Oct 2014 13:07:56 +0100
-Subject: [PATCHv2 2/5] arm64: Add AArch32 instruction set condition code checks
+Date: Wed,  1 Oct 2014 13:07:55 +0100
+Subject: [PATCHv2 1/5] arm64: Add support for hooks to handle undefined
+ instructions
 In-Reply-To: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
 References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1412165279-8709-3-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1412165279-8709-2-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Port support for AArch32 instruction condition code checking from arm
-to arm64.
+Add support to register hooks for undefined instructions. The handlers
+will be called when the undefined instruction and the processor state
+(as contained in pstate) match criteria used at registration.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- arch/arm64/include/asm/opcodes.h |    1 +
- arch/arm64/kernel/Makefile       |    4 +++-
- 2 files changed, 4 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/opcodes.h
+ arch/arm64/include/asm/traps.h |   16 ++++++++++
+ arch/arm64/kernel/traps.c      |   68 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
 
-diff --git a/arch/arm64/include/asm/opcodes.h b/arch/arm64/include/asm/opcodes.h
-new file mode 100644
-index 0000000..4e603ea
---- /dev/null
-+++ b/arch/arm64/include/asm/opcodes.h
-@@ -0,0 +1 @@
-+#include <../../arm/include/asm/opcodes.h>
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index df7ef87..e77dd61 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -18,7 +18,9 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   cpuinfo.o
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 10ca8ff..4faaf03 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -18,6 +18,22 @@
+ #ifndef __ASM_TRAP_H
+ #define __ASM_TRAP_H
  
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
--					   sys_compat.o
-+					   sys_compat.o 			\
-+					   $(addprefix ../../arm/kernel/,	\
-+						opcodes.o)
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
++#include <linux/list.h>
++
++struct pt_regs;
++
++struct undef_hook {
++	struct list_head node;
++	u32 instr_mask;
++	u32 instr_val;
++	u64 pstate_mask;
++	u64 pstate_val;
++	int (*fn)(struct pt_regs *regs, u32 instr);
++};
++
++int register_undef_hook(struct undef_hook *hook);
++void unregister_undef_hook(struct undef_hook *hook);
++
+ static inline int in_exception_text(unsigned long ptr)
+ {
+ 	extern char __exception_text_start[];
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 02cd3f0..bcde9de 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -260,6 +260,71 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+ 	}
+ }
+ 
++static LIST_HEAD(undef_hook);
++static DEFINE_RAW_SPINLOCK(undef_lock);
++
++int register_undef_hook(struct undef_hook *hook)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&undef_lock, flags);
++	list_add(&hook->node, &undef_hook);
++	raw_spin_unlock_irqrestore(&undef_lock, flags);
++
++	return 0;
++}
++
++void unregister_undef_hook(struct undef_hook *hook)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&undef_lock, flags);
++	list_del(&hook->node);
++	raw_spin_unlock_irqrestore(&undef_lock, flags);
++}
++
++static int call_undef_hook(struct pt_regs *regs)
++{
++	struct undef_hook *hook;
++	unsigned long flags;
++	u32 instr;
++	int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
++	void __user *pc = (void __user *)instruction_pointer(regs);
++
++	if (!user_mode(regs))
++		return 1;
++
++	if (compat_thumb_mode(regs)) {
++		/* 16-bit Thumb instruction */
++		if (get_user(instr, (u16 __user *)pc))
++			goto exit;
++		instr = le16_to_cpu(instr);
++		if (aarch32_insn_is_wide_instruction(instr)) {
++			u32 instr2;
++
++			if (get_user(instr2, (u16 __user *)(pc + 2)))
++				goto exit;
++			instr2 = le16_to_cpu(instr2);
++			instr = (instr << 16) | instr2;
++		}
++	} else {
++		/* 32-bit ARM instruction */
++		if (get_user(instr, (u32 __user *)pc))
++			goto exit;
++		instr = le32_to_cpu(instr);
++	}
++
++	raw_spin_lock_irqsave(&undef_lock, flags);
++	list_for_each_entry(hook, &undef_hook, node)
++		if ((instr & hook->instr_mask) == hook->instr_val &&
++			(regs->pstate & hook->pstate_mask) == hook->pstate_val)
++			fn = hook->fn;
++
++	raw_spin_unlock_irqrestore(&undef_lock, flags);
++exit:
++	return fn ? fn(regs, instr) : 1;
++}
++
+ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+@@ -269,6 +334,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 	if (!aarch32_break_handler(regs))
+ 		return;
+ 
++	if (call_undef_hook(regs) == 0)
++		return;
++
+ 	if (show_unhandled_signals && unhandled_signal(current, SIGILL) &&
+ 	    printk_ratelimit()) {
+ 		pr_info("%s[%d]: undefined instruction: pc=%p\n",
 -- 
 1.7.10.4
