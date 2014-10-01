@@ -1,30 +1,30 @@
 From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Wed,  1 Oct 2014 23:29:42 +0200
-Subject: [PATCH 2/6] ARM: dts: add dtsi for Amlogic Meson8 SoCs
+Date: Wed,  1 Oct 2014 23:29:43 +0200
+Subject: [PATCH 3/6] ARM: dts: add dts for Tronsmart S89 Elite TV box
 In-Reply-To: <1412198986-26534-1-git-send-email-b.galvani@gmail.com>
 References: <1412198986-26534-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1412198986-26534-3-git-send-email-b.galvani@gmail.com>
+Message-ID: <1412198986-26534-4-git-send-email-b.galvani@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dtsi for the Amlogic Meson8 SoCs. It differs from the Meson6
-dtsi for the number of Cortex-A9 cores (4 vs 2) and for the
-frequency of clk81.
+This adds a dts for the Tronsmart S89 Elite, a set-top box based on
+the Amlogic S802 SoC with a 8GiB NAND flash, USB ports, 10/100 Mbps
+Ethernet adapter, WiFi, HDMI and a micro SD slot.
 
 Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 ---
- arch/arm/boot/dts/meson8.dtsi | 90 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 90 insertions(+)
- create mode 100644 arch/arm/boot/dts/meson8.dtsi
+ arch/arm/boot/dts/meson8-vega-s89e.dts | 65 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 arch/arm/boot/dts/meson8-vega-s89e.dts
 
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+diff --git a/arch/arm/boot/dts/meson8-vega-s89e.dts b/arch/arm/boot/dts/meson8-vega-s89e.dts
 new file mode 100644
-index 0000000..7b3fc1e
+index 0000000..93c3dfd
 --- /dev/null
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -0,0 +1,90 @@
++++ b/arch/arm/boot/dts/meson8-vega-s89e.dts
+@@ -0,0 +1,65 @@
 +/*
-+ * Copyright 2014 Carlo Caione <carlo@caione.org>
++ * Copyright 2014 Beniamino Galvani <b.galvani@gmail.com>
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -41,10 +41,8 @@ index 0000000..7b3fc1e
 + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + *     GNU General Public License for more details.
 + *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
++ *     You should have received a copy of the GNU General Public License
++ *     along with this program. If not, see <http://www.gnu.org/licenses/>.   
 + *
 + * Or, alternatively,
 + *
@@ -70,48 +68,25 @@ index 0000000..7b3fc1e
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+/include/ "meson.dtsi"
++
++/dts-v1/;
++/include/ "meson8.dtsi"
 +
 +/ {
-+	model = "Amlogic Meson8 SoC";
-+	compatible = "amlogic,meson8";
++	model = "Tronsmart Vega S89 Elite";
++	compatible = "tronsmart,vega-s89e", "amlogic,meson8";
 +
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x200>;
-+		};
-+
-+		cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x201>;
-+		};
-+
-+		cpu at 202 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x202>;
-+		};
-+
-+		cpu at 203 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x203>;
-+		};
++	aliases {
++		serial0 = &uart_AO;
 +	};
 +
-+	clk81: clk at 0 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <141666666>;
++	memory {
++		reg = <0x40000000 0x80000000>;
 +	};
-+}; /* end of / */
++};
++
++&uart_AO {
++	status = "okay";
++};
 -- 
 1.9.1
