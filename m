@@ -1,59 +1,52 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed,  1 Oct 2014 15:45:29 +0200
-Subject: [PATCH 2/2] ARM: BCM5301X: Add LEDs for Netgear R6250 V1
-In-Reply-To: <1412171129-31482-1-git-send-email-zajec5@gmail.com>
-References: <1412171129-31482-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1412171129-31482-2-git-send-email-zajec5@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 1 Oct 2014 09:48:31 -0400
+Subject: soc: ti: add Keystone Navigator DMA support
+In-Reply-To: <20141001080549.GA12488@mwanda>
+References: <20141001080549.GA12488@mwanda>
+Message-ID: <542C062F.5070900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts | 34 +++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+On Wednesday 01 October 2014 04:05 AM, Dan Carpenter wrote:
+> Hello Santosh Shilimkar,
+> 
+> The patch 88139ed03058: "soc: ti: add Keystone Navigator DMA support"
+> from Mar 30, 2014, leads to the following static checker warning:
+> 
+> 	drivers/soc/ti/knav_dma.c:402 of_channel_match_helper()
+> 	warn: unsigned 'args.args[0]' is never less than zero.
+> 
+> drivers/soc/ti/knav_dma.c
+>    378  static int of_channel_match_helper(struct device_node *np, const char *name,
+>    379                                          const char **dma_instance)
+>    380  {
+>    381          struct of_phandle_args args;
+>    382          struct device_node *dma_node;
+>    383          int index;
+>    384  
+>    385          dma_node = of_parse_phandle(np, "ti,navigator-dmas", 0);
+>    386          if (!dma_node)
+>    387                  return -ENODEV;
+>    388  
+>    389          *dma_instance = dma_node->name;
+>    390          index = of_property_match_string(np, "ti,navigator-dma-names", name);
+>    391          if (index < 0) {
+>    392                  dev_err(kdev->dev, "No 'ti,navigator-dma-names' propery\n");
+>    393                  return -ENODEV;
+>    394          }
+>    395  
+>    396          if (of_parse_phandle_with_fixed_args(np, "ti,navigator-dmas",
+>    397                                          1, index, &args)) {
+>    398                  dev_err(kdev->dev, "Missing the pahndle args name %s\n", name);
+>    399                  return -ENODEV;
+>    400          }
+>    401  
+>    402          if (args.args[0] < 0) {
+>                     ^^^^^^^^^^^^^^^^
+> I don't know what was intended here.
+> 
+The check was to avoid missing phandle parameters. I will fix it up.
+Thanks for reporting.
 
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index 3b5259d..58d999d 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -32,4 +32,38 @@
- 			status = "okay";
- 		};
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		logo {
-+			label = "bcm53xx:white:logo";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		power0 {
-+			label = "bcm53xx:green:power";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		power1 {
-+			label = "bcm53xx:amber:power";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		usb {
-+			label = "bcm53xx:blue:usb";
-+			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wireless {
-+			label = "bcm53xx:blue:wireless";
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
- };
--- 
-1.8.4.5
+Regards,
+Santosh
