@@ -1,167 +1,54 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 30 Sep 2014 20:11:16 -0700
-Subject: [PATCH RESEND V9 1/6] power: reset: Add generic SYSCON register
- mapped reset
-In-Reply-To: <1412119508-22864-2-git-send-email-fkan@apm.com>
-References: <1412119508-22864-1-git-send-email-fkan@apm.com>
- <1412119508-22864-2-git-send-email-fkan@apm.com>
-Message-ID: <542B70D4.8040001@roeck-us.net>
+Date: Tue, 30 Sep 2014 20:28:53 -0700
+Subject: [PATCH v7 00/11] kernel: Add support for restart handler call
+ chain
+In-Reply-To: <20141001094001.2b85f54c@canb.auug.org.au>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>	<20140930142002.e09ef32392a2b5a7c81e5e57@linux-foundation.org>	<20140930223000.GA20946@roeck-us.net>
+ <20141001094001.2b85f54c@canb.auug.org.au>
+Message-ID: <542B74F5.1080102@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2014 04:25 PM, Feng Kan wrote:
-> Add a generic SYSCON register mapped reset mechanism.
+On 09/30/2014 04:40 PM, Stephen Rothwell wrote:
+> Hi Guenter,
 >
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->   drivers/power/reset/Kconfig         |  5 ++
->   drivers/power/reset/Makefile        |  1 +
->   drivers/power/reset/syscon-reboot.c | 96 +++++++++++++++++++++++++++++++++++++
->   3 files changed, 102 insertions(+)
->   create mode 100644 drivers/power/reset/syscon-reboot.c
+> On Tue, 30 Sep 2014 15:30:00 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+>>
+>> On Tue, Sep 30, 2014 at 02:20:02PM -0700, Andrew Morton wrote:
+>>> On Tue, 19 Aug 2014 17:45:27 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
+>>>
+>>>> Introduce a system restart handler call chain to solve the described problems.
+>>>
+>>> So someone has merged eight of these patches into linux-next but these
+>>> three:
+>>>
+>>> watchdog-s3c2410-add-restart-handler.patch
+>>> clk-samsung-register-restart-handlers-for-s3c2412-and-s3c2443.patch
+>>> clk-rockchip-add-restart-handler.patch
+>>>
+>>> were omitted.  What's up?
+>>
+>> Most likely PBKC on my side; Looks like I forgot to add those when I created
+>> the immutable branch for others to merge. Sorry for that :-(.
+>>
+>> Having said that, I somehow thought that the clock patches would go in through
+>> the clock tree. Heiko, did I get that wrong ? Separately, I sent a pull request
+>> that includes the watchdog patch to Wim.
 >
-> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> index 1915dde..a863fa1 100644
-> --- a/drivers/power/reset/Kconfig
-> +++ b/drivers/power/reset/Kconfig
-> @@ -143,4 +143,9 @@ config POWER_RESET_KEYSTONE
->   	help
->   	  Reboot support for the KEYSTONE SoCs.
+> So far, that immutable branch has been merged into the battery tree
+> (and thus into linux-next) by Sebastian in order to add (I assume):
 >
-> +config POWER_RESET_SYSCON
-> +	bool "Generic SYSCON regmap reset driver"
-> +	depends on POWER_RESET && MFD_SYSCON && OF
-
-Other drivers have
-	select MFD_SYSCON
-
-> +	help
-> +	  Reboot support for generic SYSCON mapped register reset.
->   endif
-> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> index 01e401d..76ce1c5 100644
-> --- a/drivers/power/reset/Makefile
-> +++ b/drivers/power/reset/Makefile
-> @@ -16,3 +16,4 @@ obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
->   obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
->   obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
->   obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
-> +obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
-> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
-> new file mode 100644
-> index 0000000..948e0ee
-> --- /dev/null
-> +++ b/drivers/power/reset/syscon-reboot.c
-> @@ -0,0 +1,96 @@
-> +/*
-> + * Generic Syscon Reboot Driver
-> + *
-> + * Copyright (c) 2013, Applied Micro Circuits Corporation
-> + * Author: Feng Kan <fkan@apm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/io.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/notifier.h>
-
-alphabetic order of include files ?
-
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
-> +#include <linux/reboot.h>
-> +
-> +struct syscon_reboot_context {
-> +	struct regmap *map;
-> +	u32 offset;
-> +	u32 mask;
-> +	struct notifier_block restart_handler;
-> +};
-> +
-> +static struct syscon_reboot_context *syscon_reboot_ctx;
-> +
-> +static int syscon_restart_handle(struct notifier_block *this,
-> +					unsigned long mode, void *cmd)
-> +{
-> +	struct syscon_reboot_context *ctx = syscon_reboot_ctx;
-
-Since restart_handler is part of syscon_reboot_context, you
-do not need a static variable. You can use
-	struct syscon_reboot_context *ctx = container_of(ctx, struct syscon_reboot_context, restart_handler);
-instead.
-
-> +	unsigned long timeout;
-> +
-> +	/* Issue the reboot */
-> +	if (ctx->map)
-> +		regmap_write(ctx->map, ctx->offset, ctx->mask);
-> +
-The check for ctx->map is not needed. If the restart handler is installed,
-it will always be valid.
-
-> +	timeout = jiffies + HZ;
-> +	while (time_before(jiffies, timeout))
-> +		cpu_relax();
-> +
-jiffies won't work here, and nothing else is expected to happen.
-Just use mdelay(1000);
-
-> +	pr_emerg("Unable to restart system\n");
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static int syscon_reboot_probe(struct platform_device *pdev)
-> +{
-> +	struct syscon_reboot_context *ctx;
-> +	struct device *dev = &pdev->dev;
-> +	int err;
-> +
-> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
-> +	if (!ctx)
-> +		return -ENOMEM;
-> +
-> +	ctx->map = syscon_regmap_lookup_by_phandle(dev->of_node, "regmap");
-> +	if (IS_ERR(ctx->map))
-> +		return PTR_ERR(ctx->map);
-> +
-> +	if (of_property_read_u32(pdev->dev.of_node, "offset", &ctx->offset))
-> +		return -EINVAL;
-> +
-> +	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
-> +		return -EINVAL;
-> +
-> +	ctx->restart_handler.notifier_call = syscon_restart_handle;
-> +	ctx->restart_handler.priority = 128;
-> +	err = register_restart_handler(&ctx->restart_handler);
-> +	if (err)
-> +		dev_err(dev, "can't register restart notifier (err=%d)\n", err);
-> +
-> +	syscon_reboot_ctx = ctx;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct of_device_id syscon_reboot_of_match[] = {
-> +	{ .compatible = "syscon-reboot" },
-> +	{}
-> +};
-> +
-> +static struct platform_driver syscon_reboot_driver = {
-> +	.probe = syscon_reboot_probe,
-> +	.driver = {
-> +		.name = "syscon-reboot",
-> +		.of_match_table = syscon_reboot_of_match,
-> +	},
-> +};
-> +module_platform_driver(syscon_reboot_driver);
+> 18a702e0de98 power: reset: use restart_notifier mechanism for msm-poweroff
+> 371bb20d6927 power: Add simple gpio-restart driver
 >
+> on top of it.
+>
+> So, I guess the watchdog and clk trees also need to merge that
+> immutable branch and then add their respective patches from the mmotm
+> series to their trees.
+>
+Yes, and now I remember why I did not include those patches: They are not
+authored by myself. I thought it was not appropriate for me to include them
+in the branch I created. Maybe flawed thinking, but that was my reasoning.
+
+Guenter
