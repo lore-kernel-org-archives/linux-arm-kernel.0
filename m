@@ -1,62 +1,24 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 1 Oct 2014 16:38:59 +0100
-Subject: 3.17-rc6 on ODROID: ERROR: Bad of_node_put() on
- /ehci@12580000/port@1
-In-Reply-To: <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
-References: <CAD8Lp45qyHpHqRnUy4T9Sm8zV4XJBDp=cLYXjtcxmVrS8GSjbg@mail.gmail.com>
- <CAFp+6iGwB3XuzSuYPzO=5MacPO2LGFDnh9oS5rAL3Ne26wb9Dg@mail.gmail.com>
- <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
-Message-ID: <CACxGe6v84netFeUdc3MwGeJzV-2r6rUAOpG5s9Lu9x=9TM9E_A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 1 Oct 2014 17:42:57 +0200
+Subject: [GIT PULL 1/2] Second Samsung DT updates for v3.18
+In-Reply-To: <54227E25.2060903@samsung.com>
+References: <54227E25.2060903@samsung.com>
+Message-ID: <201410011742.57200.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 4:12 PM, Daniel Drake <drake@endlessm.com> wrote:
-> On Wed, Oct 1, 2014 at 12:36 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> One reason i doubt why it could be coming is because we are
->> specifically putting the
->> child after doing everything with it.
->>
->> When we are getting the child node using for_each_available_child_of_node(),
->> which calls for of_get_next_available_child(). So of_get_next_available_child()
->> does a of_node_put() on the "prev" node, in case we have siblings to the child.
->>
->> Can you see if the below change helps ?
->>
->> ------------------------------------------------------------------------------------------------------------
->> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
->> index 7189f2e..1b726bf 100644
->> --- a/drivers/usb/host/ehci-exynos.c
->> +++ b/drivers/usb/host/ehci-exynos.c
->> @@ -74,7 +74,6 @@ static int exynos_ehci_get_phy(struct device *dev,
->>
->>                 phy = devm_of_phy_get(dev, child, NULL);
->>                 exynos_ehci->phy[phy_number] = phy;
->> -               of_node_put(child);
->>                 if (IS_ERR(phy)) {
->>                         ret = PTR_ERR(phy);
->>                         if (ret == -EPROBE_DEFER) {
->> ------------------------------------------------------------------------------------------------------------
->>
->>
->> This is on top of usb-next.
->> If you are testing on rc6 only, then probably you will have to cherrypick two
->> patches each for ehci-exynos and ohci-exynos:
->> usb: host: ehci-exynos: Remove unnecessary usb-phy support
->> usb: host: ohci-exynos: Remove unnecessary usb-phy support
->
-> I made the equivalent change to 3.17-rc7 (right now 3.17 is my main
-> interest), i.e. removed all of_node_put calls from
-> exynos_ehci_get_phy(). Same change is needed in exynos_ohci_get_phy().
-> Now the warnings are gone.
-> BTW, I think the warning only appeared when CONFIG_OF_SELFTEST=y
->
-> I didn't check the implementation details like you did, but I looked
-> at a few other users of for_each_available_child_of_node and it looks
-> like indeed you do not need to call of_node_put() on the children in
-> the normal case, or at least, nobody else does.
+On Wednesday 24 September 2014, Kukjin Kim wrote:
+> Hi Arnd, Olof and Kevin
+> 
+> Here is second bunch of Samsung DT updates for v3.18.
+> 
+> This is based on previous pull-request for tags/samsung-dt but not yet 
+> pulled into arm-soc.
+> 
+> Please pull and if any problems, kindly let me know.
+> 
 
-CONFIG_OF_SELFTEST enables CONFIG_OF_DYNAMIC, and reference counting
-is only implemented when OF_DYNAMIC is enabled. That's probably why
-selftest exposes the problem.
+Pulled into next/late for now, I didn't pull it last week as the merge
+window seemed imminent, but it may still have a chance now.
 
-g.
+	Arnd
