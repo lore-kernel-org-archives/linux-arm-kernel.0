@@ -1,51 +1,32 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Wed, 1 Oct 2014 15:22:45 -0400
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <20141001180304.GC5788@leverpostej>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com>
- <1412106877.6630.45.camel@smoke>
- <20141001161621.GA28440@leverpostej>
- <20141001174714.GD14991@redhat.com>
- <20141001180304.GC5788@leverpostej>
-Message-ID: <20141001192245.GG14991@redhat.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 1 Oct 2014 21:24:44 +0200
+Subject: [PATCH 1/2] mtd: m25p80: get rid of spi_get_device_id
+In-Reply-To: <20141001184303.GX1193@ld-irv-0074>
+References: <1411984074-3850-1-git-send-email-zajec5@gmail.com>
+ <20141001182003.GB17974@sirena.org.uk>
+ <20141001184303.GX1193@ld-irv-0074>
+Message-ID: <CACna6ry0TWgjfjDbAxVndrJFUu3HJe-U_HtayPruqDF6b51UGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 07:03:04PM +0100, Mark Rutland wrote:
+On 1 October 2014 20:43, Brian Norris <computersforpeace@gmail.com> wrote:
+> On Wed, Oct 01, 2014 at 07:20:03PM +0100, Mark Brown wrote:
+>> On Mon, Sep 29, 2014 at 11:47:53AM +0200, Rafa? Mi?ecki wrote:
+>> > This simplifies the way we use spi_nor framework and will allow us to
+>> > drop spi_nor_match_id.
+>>
+>> Please don't CC linux-spi on spi-nor patches that don't have SPI level
+>> changes, it just clogs up patchwork.
+>
+> +1 from me. I appreciate the converse, as I don't need unrelated noise
+> on linux-mtd.
+>
+> (I feel sorry for people over at linux-arm-kernel and devicetree, since
+> they get CC'd on a large variety of unrelated things, it seems. I'm sure
+> the firehose gets to be almost as bad as LKML sometimes.)
 
-[..]
-> I assume we'd have the first kernel perform the required cache maintenance.
-> 
+Sorry, I usually don't. AFAIR this time I copied receivers list from
+the original Ben patch / discussion about auto loading.
 
-Hi Mark,
-
-I am wondering, what kind of cache management is required here? What kind of
-dcaches are present on arm64. I see that Geoff's patches flush dcaches for 
-certain kexec stored pages using __flush_dcache_area()
-(in kexec_list_flush_cb()).
-
-arch/arm64/include/asm/cacheflush.h says following.
-
- *      __flush_dcache_area(kaddr, size)
- *
- *              Ensure that the data held in page is written back.
- *              - kaddr  - page address
- *              - size   - region size
-
-So looks like we are trying to write back anything which we will access
-after switching off MMU. If that's the case, I have two questions.
-
-- Why do we need to writeback that cacheline. After switching off MMU,
-  will we not access same cacheline. I thought caches are VIPT and tag
-  will still remain the same (but I might easily be wrong here).
-
-- Even if we have to flush that cacheline, for kexec pages, I guess it
-  should be done at kernel load time and not at the time of transition
-  into new kernel. That seems too late. Once the kernel has been loaded,
-  we don't overwrite these pages anymore. So a dcache flush at that
-  time should be good.
-
-Thanks
-Vivek
+-- 
+Rafa?
