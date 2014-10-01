@@ -1,26 +1,43 @@
-From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Wed, 1 Oct 2014 16:52:29 +0300
-Subject: [PATCH v3 2/4] ARM: dts: pbab01: enable I2S audio on phyFLEX-i.MX6
- boards
-In-Reply-To: <CAOMZO5BS6X2NTY4q7RKoKdhJNbEANSa2wXur3_Hyxp8nQn5Avw@mail.gmail.com>
-References: <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>	<1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>	<1410854903-26419-3-git-send-email-d.lavnikevich@sam-solutions.com>	<CAOMZO5CgrQ6Wf6kStga40TUKx9dARygCNB4OYSUoG3c8eUYbrA@mail.gmail.com>	<542C0441.5080508@sam-solutions.com>
- <CAOMZO5BS6X2NTY4q7RKoKdhJNbEANSa2wXur3_Hyxp8nQn5Avw@mail.gmail.com>
-Message-ID: <542C071D.1030507@sam-solutions.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Oct 2014 14:52:48 +0100
+Subject: [PATCH] arm64: Use and error-check DMA_ERROR_CODE
+In-Reply-To: <20141001101323.GB2587@arm.com>
+References: <1412108121-19262-1-git-send-email-seanpaul@chromium.org>
+ <20141001101323.GB2587@arm.com>
+Message-ID: <20141001135248.GQ5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/14 16:45, Fabio Estevam wrote:
-> On Wed, Oct 1, 2014 at 10:40 AM, Dmitry Lavnikevich
-> <d.lavnikevich@sam-solutions.com> wrote:
->
->>> No need to have this 'regulator-always-on'
->>>
->>
->> why is there no need for 'regulator-alweys-on'? I see it in
->
-> For a regulator that is not GPIO controlled you don't need to pass
-> 'regulator-always-on'.
+On Wed, Oct 01, 2014 at 11:13:23AM +0100, Will Deacon wrote:
+> Hi Sean,
+> 
+> On Tue, Sep 30, 2014 at 09:15:21PM +0100, Sean Paul wrote:
+> > +
+> > +	if (dma_handle != DMA_ERROR_CODE)
+> > +		__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+> 
+> Is it legal to try and free a DMA buffer after a failed allocation? If so, I
+> think we need something similar for arch/arm/.
 
-Ok, I will remove it also.
+No.
 
-I will wait some time for other notes on patches and resend patchset.
+	void
+	dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
+	                           dma_addr_t dma_handle)
+
+	Free a region of consistent memory you previously allocated.  dev,
+	                                       ^^^^^^^^^^^^^^^^^^^^^
+This implies that the allocation was successful.
+
+	size and dma_handle must all be the same as those passed into
+	dma_alloc_coherent().  cpu_addr must be the virtual address returned by
+	                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you want this behaviour, the proper way to do it would be to check
+for a NULL cpu_addr, just like kfree() etc.
+
+	the dma_alloc_coherent().
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
