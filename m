@@ -1,48 +1,49 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 01 Oct 2014 12:11:10 +0200
-Subject: [PATCH 2/2] ARM: i.MX53: dts: add sahara module
-In-Reply-To: <1412157931-32752-2-git-send-email-s.trumtrar@pengutronix.de>
-References: <1412157931-32752-1-git-send-email-s.trumtrar@pengutronix.de>
- <1412157931-32752-2-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1412158270.3432.2.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Oct 2014 11:13:23 +0100
+Subject: [PATCH] arm64: Use and error-check DMA_ERROR_CODE
+In-Reply-To: <1412108121-19262-1-git-send-email-seanpaul@chromium.org>
+References: <1412108121-19262-1-git-send-email-seanpaul@chromium.org>
+Message-ID: <20141001101323.GB2587@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-10-01 at 12:05 +0200, Steffen Trumtrar wrote:
-> The i.MX53 has a SAHARA v4 core. Add it to the dtsi.
+Hi Sean,
+
+On Tue, Sep 30, 2014 at 09:15:21PM +0100, Sean Paul wrote:
+> This patch replaces the static assignment of ~0 to dma_handle with
+> DMA_ERROR_CODE to be consistent with other platforms.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> In addition to that, it also adds a check for DMA_ERROR_CODE before
+> calling __dma_free_coherent with an invalid dma_handle.
+> 
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
 > ---
->  arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  arch/arm64/mm/dma-mapping.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 76948d79f707..a4890c10465a 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -765,6 +765,16 @@
->  				resets = <&src 1>;
->  				iram = <&ocram>;
->  			};
-> +
-> +			sahara: crypto at 63ff8000 {
-> +				compatible = "fsl,imx53-sahara";
-> +				reg = <0x63ff8000 0x4000>;
-> +				interrupts = <19 20>;
-> +				clocks = <&clks IMX5_CLK_SAHARA_IPG_GATE>,
-> +				         <&clks IMX5_CLK_SAHARA_IPG_GATE>;
-> +				clock-names = "ipg", "ahb";
-> +				status = "disabled";
-
-Uhm why is this node disabled? I thought the sahara block is fully
-self-contained and has no external dependencies. In that case it should
-be always enabled, right?
-
-> +			};
->  		};
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 4164c5a..69fd2c4 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -125,7 +125,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
+>  no_map:
+>  	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
+>  no_mem:
+> -	*dma_handle = ~0;
+> +	*dma_handle = DMA_ERROR_CODE;
+>  	return NULL;
+>  }
 >  
->  		ocram: sram at f8000000 {
+> @@ -136,7 +136,9 @@ static void __dma_free_noncoherent(struct device *dev, size_t size,
+>  	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+>  
+>  	vunmap(vaddr);
+> -	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+> +
+> +	if (dma_handle != DMA_ERROR_CODE)
+> +		__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Is it legal to try and free a DMA buffer after a failed allocation? If so, I
+think we need something similar for arch/arm/.
+
+Will
