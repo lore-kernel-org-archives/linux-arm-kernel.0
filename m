@@ -1,84 +1,94 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Oct 2014 22:26:25 +0200
-Subject: [PATCH/RFC v2 1/4] ARM: hw_breakpoint: Add arm_dbg_regs_available
- flag
-In-Reply-To: <CANLsYkycNPFafpet+qGv7LhCVN1qj+GfhVuNyW=1WpOc07S7ng@mail.gmail.com>
-References: <1412079987-1827-1-git-send-email-geert+renesas@glider.be>
- <1412079987-1827-2-git-send-email-geert+renesas@glider.be>
- <20140930160331.GN2548@arm.com>
- <CAMuHMdWA8zhBdT3QO9E8YinCFu3m943LenvYAO9A3F5y8RoSQQ@mail.gmail.com>
- <CANLsYkycNPFafpet+qGv7LhCVN1qj+GfhVuNyW=1WpOc07S7ng@mail.gmail.com>
-Message-ID: <CAMuHMdUhCtJPyz=Chv+cowmBsZq1cdcwLnYCLWHmECo_cE1+eQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 01 Oct 2014 13:42:46 -0700
+Subject: [GIT PULL] some more Rockchip clock changes for 3.18
+In-Reply-To: <4728187.K4l757xGSs@phil>
+References: <4728187.K4l757xGSs@phil>
+Message-ID: <20141001204246.4379.47841@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+Quoting Heiko St?bner (2014-10-01 06:11:14)
+> Hi Mike,
+> 
+> here is a second pull request for clock changes.
+> 
+> For the reset handling there was a sort of change in plans. Instead of the
+> whole thing going through the -mm tree, there is now an immutable branch at
+> 
+>         git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git tags/restart-handler-for-v3.18
+> 
+> providing the core restart changes for trees using it. So this pull includes
+> this branch from Guenter as well as the rockchip restart support.
+> 
+> After confering with Tomasz, we agreed that for simplicity I'll also take
+> the s3c24xx reset change with this, which doesn't produce any conflicts.
+> 
+> Apart from the restart handling, only a small patch enabling parent-rate
+> setting for i2s clocks on rk3288 is added.
+> 
+> 
+> The pull request is based on the previous one for the cpuclk handling, so
+> should apply cleanly to your clk-next.
+> 
+> So please pull
+> 
+> 
+> The following changes since commit 0e5bdb3f9fa5c2bd4452c258de78122ef15f62d6:
+> 
+>   clk: rockchip: switch to using the new cpuclk type for armclk (2014-09-27 17:57:46 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-clk2
 
-On Wed, Oct 1, 2014 at 4:38 PM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 1 October 2014 01:41, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Tue, Sep 30, 2014 at 6:03 PM, Will Deacon <will.deacon@arm.com> wrote:
->>> On Tue, Sep 30, 2014 at 01:26:24PM +0100, Geert Uytterhoeven wrote:
->>>> If power area D4, which contains the Coresight-ETM hardware block, is
->>>> powered down on R-Mobile A1 (r8a7740), the kernel crashes when
->>>> suspending from s2ram with:
->>>>
->>>>     Internal error: Oops - undefined instruction: 0 [#1] ARM
->>>>
->>>> This happens because dbg_cpu_pm_notify() calls reset_ctrl_regs(), which
->>>> can't access the debug registers as the debug module is powered down.
->>>>
->>>> As suggested by Russell King, track whether the ETM block is powered down
->>>> to fix this.
->>>>
->>>> The availability of the debug registers depends on the platform and its
->>>> state.  Hence provide a mechanism for platform code to indicate that the
->>>> debug registers are available or not, using a boolean flag that defaults
->>>> to true.
->
-> I'm afraid the usage of the handle "arm,coresight-etm3x" is arbitrary
-> here as what the code isn't related to an embedded trace module, but
-> rather to the power domain that trace module happens to be in.  If we
-> are to take that solution a handle name relate to the debug power
-> domain is likely to be more appropriate.
+Pulled!
 
-W.r.t. PM domains, the datasheet only mentions "Coresight-ETM" being
-in the D4 power area. That's why I used the "arm,coresight-etm3x" handle.
-It's still to be discovered what else is hidden there...
+Regards,
+Mike
 
->>> Whilst I guess this solves your problem, it doesn't feel like a scalable fix
->>> for something that can/will assumedly happen elsewhere in an SoC (e.g. PMU
->>> registers in perf). I'd much rather have a generic abstraction for power
->>> domains, which subsystems such as hw_breakpoint can attempt to take a
->>> reference on when they want to access registers in that domain.
->>
->> I agree this is a bit hackish, and not a long-term solution.
->>
->> As soon as the ARM debug/perf subsystem starts using devices instantiated
->> from DT, implementing PM runtime support, this will work out-of-the-box.
->> Until then, we cannot have proper support for the D4 PM domain on R-Mobile
->> SoCs, without hacks like this (or like never powering down the D4 PM domain
->> --- perhaps that's the way to go).
->>
->> I believe Mathieu is working on the former, but so far without converting
->> hw_breakpoint.c nor adding PM runtime support?
->
-> Humm... At this time the coresight framework doesn't deal with PM
-> runtime support.  It is something that's been on the list of things to
-> do for a while now but I never had the time to get to it.  On the flip
-> side I currently have two boards on my desk that need to interact with
-> different debug domains to work properly and as such, the feature is
-> bound to appear at some point.
-
-OK. We'll see...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> for you to fetch changes up to e317c19470f6d690122519bf9ed1c9f21ea11906:
+> 
+>   clk: samsung: register restart handlers for s3c2412 and s3c2443 (2014-10-01 14:14:46 +0200)
+> 
+> ----------------------------------------------------------------
+> Allow parent rate changes for i2s on rk3288
+> and rockchip as well as s3c24xx restart handlers.
+> 
+> ----------------------------------------------------------------
+> Guenter Roeck (8):
+>       kernel: add support for kernel restart handler call chain
+>       power/restart: call machine_restart instead of arm_pm_restart
+>       arm64: support restart through restart handler call chain
+>       arm: support restart through restart handler call chain
+>       watchdog: moxart: register restart handler with kernel restart handler
+>       watchdog: alim7101: register restart handler with kernel restart handler
+>       watchdog: sunxi: register restart handler with kernel restart handler
+>       arm/arm64: unexport restart handlers
+> 
+> Heiko Stuebner (1):
+>       Merge tag 'tags/restart-handler-for-v3.18' into v3.18-next/cpuclk
+> 
+> Heiko St?bner (2):
+>       clk: rockchip: add restart handler
+>       clk: samsung: register restart handlers for s3c2412 and s3c2443
+> 
+> Jianqun (1):
+>       clk: rockchip: rk3288: i2s_frac adds flag to set parent's rate
+> 
+>  arch/arm/kernel/process.c              | 12 +++--
+>  arch/arm64/kernel/process.c            |  3 +-
+>  drivers/clk/rockchip/clk-rk3188.c      |  2 +
+>  drivers/clk/rockchip/clk-rk3288.c      | 10 +++--
+>  drivers/clk/rockchip/clk.c             | 25 +++++++++++
+>  drivers/clk/rockchip/clk.h             |  1 +
+>  drivers/clk/samsung/clk-s3c2412.c      | 29 ++++++++++++
+>  drivers/clk/samsung/clk-s3c2443.c      | 19 ++++++++
+>  drivers/power/reset/restart-poweroff.c |  3 +-
+>  drivers/watchdog/alim7101_wdt.c        | 42 +++++++++++++-----
+>  drivers/watchdog/moxart_wdt.c          | 32 +++++++++-----
+>  drivers/watchdog/sunxi_wdt.c           | 31 ++++++++-----
+>  include/linux/reboot.h                 |  3 ++
+>  kernel/reboot.c                        | 81 ++++++++++++++++++++++++++++++++++
+>  14 files changed, 247 insertions(+), 46 deletions(-)
+> 
