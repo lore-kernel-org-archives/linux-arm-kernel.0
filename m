@@ -1,72 +1,72 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 01 Oct 2014 10:25:37 +0200
-Subject: [PATCH] net: xilinx: Remove unnecessary ether_setup after
- alloc_etherdev
-In-Reply-To: <d43b465eca3e2a53c930f6e02dc4ac8b3c084693.1412143216.git.michal.simek@xilinx.com>
-References: <d43b465eca3e2a53c930f6e02dc4ac8b3c084693.1412143216.git.michal.simek@xilinx.com>
-Message-ID: <542BBA81.2000406@monstr.eu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Oct 2014 10:25:33 +0200
+Subject: [PATCH v4 1/2] iopoll: Introduce memory-mapped IO polling macros
+In-Reply-To: <1412126893-15796-2-git-send-email-mitchelh@codeaurora.org>
+References: <1412126893-15796-1-git-send-email-mitchelh@codeaurora.org>
+ <1412126893-15796-2-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <23910474.oJQUXZsx4W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2014 08:00 AM, Michal Simek wrote:
-> From: Subbaraya Sundeep Bhatta <subbaraya.sundeep.bhatta@xilinx.com>
-> 
-> Calling ether_setup is redundant since alloc_etherdev calls it.
-> 
-> Signed-off-by: Subbaraya Sundeep Bhatta <sbhatta@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-> 
->  drivers/net/ethernet/xilinx/ll_temac_main.c       | 1 -
->  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 1 -
->  2 files changed, 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-> index fda5891835d4..629077050fce 100644
-> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-> @@ -1012,7 +1012,6 @@ static int temac_of_probe(struct platform_device *op)
->  	if (!ndev)
->  		return -ENOMEM;
-> 
-> -	ether_setup(ndev);
->  	platform_set_drvdata(op, ndev);
->  	SET_NETDEV_DEV(ndev, &op->dev);
->  	ndev->flags &= ~IFF_MULTICAST;  /* clear multicast */
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> index c8fd94133ecd..4ea2d4e6f1d1 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> @@ -1485,7 +1485,6 @@ static int axienet_of_probe(struct platform_device *op)
->  	if (!ndev)
->  		return -ENOMEM;
-> 
-> -	ether_setup(ndev);
->  	platform_set_drvdata(op, ndev);
-> 
->  	SET_NETDEV_DEV(ndev, &op->dev);
-> --
-> 1.8.2.3
-> 
+On Tuesday 30 September 2014 18:28:12 Mitchel Humpherys wrote:
+> + */
+> +#define readl_poll_timeout(addr, val, cond, sleep_us, timeout_us) \
+> +({ \
+> +       ktime_t timeout = ktime_add_us(ktime_get(), timeout_us); \
+> +       might_sleep_if(timeout_us); \
 
-Please ignore this one it is already applied for axienet.
-Will send v2 just for ll_temac.
+Does it make sense to call this with timeout_us = 0?
 
-Thanks,
-Michal
+> +       for (;;) { \
+> +               (val) = readl(addr); \
+> +               if (cond) \
+> +                       break; \
+> +               if (timeout_us && ktime_compare(ktime_get(), timeout) > 0) { \
+> +                       (val) = readl(addr); \
+> +                       break; \
+> +               } \
+> +               if (sleep_us) \
+> +                       usleep_range(DIV_ROUND_UP(sleep_us, 4), sleep_us); \
+> +       } \
+> +       (cond) ? 0 : -ETIMEDOUT; \
+> +})
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+I think it would be better to tie the 'range' argument to the timeout. Also
+doing a division seems expensive here.
 
+> +/**
+> + * readl_poll_timeout_atomic - Periodically poll an address until a condition is met or a timeout occurs
+> + * @addr: Address to poll
+> + * @val: Variable to read the value into
+> + * @cond: Break condition (usually involving @val)
+> + * @max_reads: Maximum number of reads before giving up
+> + * @time_between_us: Time to udelay() between successive reads
+> + *
+> + * Returns 0 on success and -ETIMEDOUT upon a timeout.
+> + */
+> +#define readl_poll_timeout_atomic(addr, val, cond, max_reads, time_between_us) \
+> +({ \
+> +       int count; \
+> +       for (count = (max_reads); count > 0; count--) { \
+> +               (val) = readl(addr); \
+> +               if (cond) \
+> +                       break; \
+> +               udelay(time_between_us); \
+> +       } \
+> +       (cond) ? 0 : -ETIMEDOUT; \
+> +})
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/355efe0e/attachment.sig>
+udelay has a large variability, I think it would be better to also use
+ktime_compare here and make the interface the same as the other one.
+You might want to add a warning if someone tries to pass more than a few
+microseconds as the timeout.
+
+More generally speaking, using 'readl' seems fairly specific. I suspect
+that we'd have to add the entire range of accessors over time if this
+catches on: readb, readw, readq, readb_relaxed, readw_relaxed, readl_relaxed,
+readq_relaxed, ioread8, ioread16, ioread16be, ioread32, ioread32be,
+inb, inb_p, inw, inw_p, inw, inl, inl_p, and possibly more of those.
+
+Would it make sense to pass that operation as an argument?
+
+	Arnd
