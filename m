@@ -1,26 +1,54 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed,  1 Oct 2014 12:03:13 -0500
-Subject: [PATCH 0/4] Add KPSS watchdog driver to relevant device trees
-Message-ID: <cover.1412182773.git.joshc@codeaurora.org>
+Date: Wed,  1 Oct 2014 12:03:16 -0500
+Subject: [PATCH 3/4] ARM: qcom: add description of KPSS WDT for APQ8064
+In-Reply-To: <cover.1412182773.git.joshc@codeaurora.org>
+References: <cover.1412182773.git.joshc@codeaurora.org>
+Message-ID: <7f7b45ebf488b96c893ed05df57af43d5232798d.1412182773.git.joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the Krait Processor Sub-system (KPSS) Watchdog driver has been pulled
-into Wim's tree destined for 3.18, add descriptions of the WDT in the relevant
-device trees, and include the driver in qcom_defconfig.
+Describe the Krait Processor Sub-system (KPSS) Watchdog timer in the
+APQ8064 device tree.  Also, add a fixed-clock description of SLEEP_CLK,
+which will do for now.
 
-Josh Cartwright (4):
-  ARM: qcom: add QCOM_WDT driver to qcom_defconfig
-  ARM: qcom: add description of KPSS WDT for IPQ8064
-  ARM: qcom: add description of KPSS WDT for APQ8064
-  ARM: qcom: add description of KPSS WDT for MSM8960
-
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
  arch/arm/boot/dts/qcom-apq8064.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/qcom-ipq8064.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/qcom-msm8960.dtsi | 15 +++++++++++++++
- arch/arm/configs/qcom_defconfig     |  2 ++
- 4 files changed, 47 insertions(+)
+ 1 file changed, 15 insertions(+)
 
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index b3154c0..8439afa 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -66,6 +66,14 @@
+ 		interrupts = <1 10 0x304>;
+ 	};
+ 
++	clocks {
++		sleep_clk: sleep_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			#clock-cells = <0>;
++		};
++	};
++
+ 	soc: soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -119,6 +127,13 @@
+ 			cpu-offset = <0x80000>;
+ 		};
+ 
++		watchdog at 208a038 {
++			compatible = "qcom,kpss-wdt-apq8064";
++			reg = <0x0208a038 0x40>;
++			clocks = <&sleep_clk>;
++			timeout-sec = <10>;
++		};
++
+ 		acc0: clock-controller at 2088000 {
+ 			compatible = "qcom,kpss-acc-v1";
+ 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
