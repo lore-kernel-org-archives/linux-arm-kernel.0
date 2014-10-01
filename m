@@ -1,60 +1,67 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 1 Oct 2014 17:59:17 +0200
-Subject: [PATCH 1/6] ARM: at91: remove at91sam9g45/9m10 legacy board
- support
-In-Reply-To: <1412093987-30241-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1412093987-30241-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20141001155917.GE3907@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 1 Oct 2014 18:01:29 +0200
+Subject: [GIT PULL 3/3] 3rd Round of Exynos-PM-2 Updates for v3.18
+In-Reply-To: <54244973.7090204@samsung.com>
+References: <54244973.7090204@samsung.com>
+Message-ID: <201410011801.29389.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/2014 at 18:19:42 +0200, Boris Brezillon wrote :
-> Remove legacy support for at91sam9g45/9m10 boards.
-> This include board files removal plus all legacy code for non DT boards
-> support (i.e. at91sam9g45.c and at91sam9g45_devices.c).
+On Thursday 25 September 2014, Kukjin Kim wrote:
+> Exynos 2nd PM related updates for v3.18
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-A tiny nitpick, else
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-
-> ---
->  arch/arm/mach-at91/Kconfig.non_dt        |   21 -
->  arch/arm/mach-at91/Makefile              |    4 -
->  arch/arm/mach-at91/at91sam9g45.c         |  403 -------
->  arch/arm/mach-at91/at91sam9g45_devices.c | 1915 ------------------------------
->  arch/arm/mach-at91/board-sam9m10g45ek.c  |  526 --------
->  5 files changed, 2869 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
->  delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
+> - Firmware supporting suspend and resume to excute of low
+>    level operations to enter and leave power mode for exynos
+>    : introduce suspend() and resume() firmware operations
 > 
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index 9d45496..f658b69 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -10,355 +10,13 @@
->   *
->   */
->  
-> -#include <linux/module.h>
-> -#include <linux/dma-mapping.h>
-> -#include <linux/clk/at91_pmc.h>
-> -
-> -#include <asm/irq.h>
-> -#include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
+> - Fix AFTR mode on boards with secure firmware enabled and
+>    allows exynos cpuidle driver usage on exynos4x12 SoCs
+> 
+> - Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
+> 
+> - SWRESET is needed to boot secondary CPU on exynos3250
+> 
 
-That include is not needed.
+I needed another fixup to make this build, but I'm not sure about
+whether this is the right solution.
 
->  #include <asm/system_misc.h>
-> -#include <mach/at91sam9g45.h>
->  #include <mach/cpu.h>
->  #include <mach/hardware.h>
->  
+I decided not to pull this one, please test again with and without
+my patch for the case that ARM_CPU_SUSPEND is disabled.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
+
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 64324bf5edb4..aaab67d84bf6 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -14,9 +14,9 @@ obj-				:=
+ 
+ # Core
+ 
+-obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o sleep.o
++obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o
+ 
+-obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o
++obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
+ obj-$(CONFIG_PM_SLEEP)		+= suspend.o
+ obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
+ 
+diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+index 2c5bc6bfcbdf..b7ff8f25bf4a 100644
+--- a/arch/arm/mach-exynos/firmware.c
++++ b/arch/arm/mach-exynos/firmware.c
+@@ -129,11 +129,11 @@ static int exynos_resume(void)
+ }
+ 
+ static const struct firmware_ops exynos_firmware_ops = {
+-	.do_idle		= exynos_do_idle,
++	.do_idle		= IS_ENABLED(CONFIG_EXYNOS_CPU_SUSPEND) ? exynos_do_idle : NULL,
+ 	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
+ 	.cpu_boot		= exynos_cpu_boot,
+-	.suspend		= exynos_suspend,
+-	.resume			= exynos_resume,
++	.suspend		= IS_ENABLED(CONFIG_PM_SLEEP) ? exynos_suspend : NULL,
++	.resume			= IS_ENABLED(CONFIG_PM_SLEEP) ? exynos_resume : NULL,
+ };
+ 
+ void __init exynos_firmware_init(void)
