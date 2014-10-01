@@ -1,110 +1,84 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 01 Oct 2014 15:06:41 +0200
-Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
- regulators
-In-Reply-To: <CAD=FV=W_KiXUU7SmGxTu-JzagW-zEs6AYAbrRMFU3KvppVk_BA@mail.gmail.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <28242432.noIRZ0lve1@amdc1032>
- <CAD=FV=W_KiXUU7SmGxTu-JzagW-zEs6AYAbrRMFU3KvppVk_BA@mail.gmail.com>
-Message-ID: <15187164.uVE1eDb0Di@amdc1032>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 01 Oct 2014 15:11:14 +0200
+Subject: [GIT PULL] some more Rockchip clock changes for 3.18
+Message-ID: <4728187.K4l757xGSs@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike,
 
-Hi,
+here is a second pull request for clock changes.
 
-On Tuesday, September 30, 2014 10:22:34 AM Doug Anderson wrote:
-> Bartlomiej
-> 
-> On Mon, Sep 29, 2014 at 5:31 AM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> >
-> > Hi,
-> >
-> > On Friday, August 29, 2014 01:34:44 PM Ulf Hansson wrote:
-> >> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
-> >> > This patch makes use of mmc_regulator_get_supply() to handle
-> >> > the vmmc and vqmmc regulators.Also it moves the code handling
-> >> > the these regulators to dw_mci_set_ios().It turned on the vmmc
-> >> > and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
-> >> > during MMC_POWER_OFF.
-> >> >
-> >> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-> >>
-> >> Thanks! Applied for next.
-> >
-> > Unfortunately this patch breaks mmc1 card (Kingston 32GB micro SDHC)
-> > detection on Exynos5420 Arndale Octa for me:
-> >
-> > [   10.797979] dwmmc_exynos 12220000.mmc: no support for card's volts
-> > [   10.797998] mmc1: error -22 whilst initialising SD card
-> >
-> > Without the patch:
-> >
-> > [   10.866926] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
-> > [   10.866977] mmc1: new high speed SDHC card at address 1234
-> > [   10.868730] mmcblk1: mmc1:1234 SA32G 29.3 GiB
-> > [   10.915054]  mmcblk1: p1 p2 p3
-> >
-> > The config is attached (exynos_defconfig doesn't work correctly for
-> > this board yet).
-> 
-> Yup, this is an expected behavior, unfortunately.  This was talked
-> about extensively during the review of this patch series.
+For the reset handling there was a sort of change in plans. Instead of the
+whole thing going through the -mm tree, there is now an immutable branch at
 
-Do you mean that a patch with a known regression has been merged
-into next branch of mmc tree?  It would be quite sad if it would be
-true.
+	git://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git tags/restart-handler-for-v3.18
 
-> I believe that patch #3 in Yuvaraj's series would fix your problem.
-> Specifically <https://patchwork.kernel.org/patch/4763891/>.
+providing the core restart changes for trees using it. So this pull includes
+this branch from Guenter as well as the rockchip restart support.
 
-Unfortunately this patch doesn't fix the problem (there is no longer
-a lockup on regulators initialization but -22 error is still present).
+After confering with Tomasz, we agreed that for simplicity I'll also take
+the s3c24xx reset change with this, which doesn't produce any conflicts.
 
-> The current summary of this issue is (Ulf, please correct me if I got
-> anything wrong):
-> 
-> 1. If nothing else, Yuvaraj's patch should probably be split in two.
-> One half should be the MMC core half that I originally sent Yuvaraj.
-> I just rebased and re-uploaed it at
-> <https://chromium-review.googlesource.com/220560> in case you're
-> curious.  The second half should be the dw_mmc piece that Yuvaraj
-> wrote.
-> 
-> 2. Ulf has indicated that he thinks that the MMC core change (and thus
-> Yuvaraj's patch) is ugly and not necessary.  He advocates instead
-> using the MMC_CAP_NEEDS_POLL on all affected platforms.  That means
-> we'll turn on the power every second, check for the card, then turn
-> off power.
-> 
-> 3. I'm still of the opinion that the MMC core change isn't _that_
-> ugly.  Given that there are a large number of systems affected (across
+Apart from the restart handling, only a small patch enabling parent-rate
+setting for i2s clocks on rk3288 is added.
 
-It also doesn't look that bad for me and well, when the hardware is
-quirky then the resulting code can't be esthetically perfect..
 
-> at least two SoC vendors) and that it would be nice if those systems
-> didn't have to poll, I'd still be happy if the MMC core change could
-> go in.  ...but I'm a pragmatist and know that the polling isn't
-> _terrible_, so if that's the way we need to go then so be it.
-> 
-> --
-> 
-> My understanding was that Yuvaraj was going to spin his patch to use a
-> similar type of scheme to autodetect affected SoCs (looking for SoCs
-> known to have this problem where the platform data shows them using
-> the built-in card detect) and then enable MMC_CAP_NEEDS_POLL.  I
-> haven't seen a patch from him, so maybe you could post this up?
+The pull request is based on the previous one for the cpuclk handling, so
+should apply cleanly to your clk-next.
 
-I worry that I have too little time and MMC code expertise to do this.
+So please pull
 
-> Note: the reason why exynos5250-snow and some other boards aren't
-> affected yet is that the regulator is simply not specified in the
-> device tree (it's just left always on).
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+The following changes since commit 0e5bdb3f9fa5c2bd4452c258de78122ef15f62d6:
+
+  clk: rockchip: switch to using the new cpuclk type for armclk (2014-09-27 17:57:46 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-clk2
+
+for you to fetch changes up to e317c19470f6d690122519bf9ed1c9f21ea11906:
+
+  clk: samsung: register restart handlers for s3c2412 and s3c2443 (2014-10-01 14:14:46 +0200)
+
+----------------------------------------------------------------
+Allow parent rate changes for i2s on rk3288
+and rockchip as well as s3c24xx restart handlers.
+
+----------------------------------------------------------------
+Guenter Roeck (8):
+      kernel: add support for kernel restart handler call chain
+      power/restart: call machine_restart instead of arm_pm_restart
+      arm64: support restart through restart handler call chain
+      arm: support restart through restart handler call chain
+      watchdog: moxart: register restart handler with kernel restart handler
+      watchdog: alim7101: register restart handler with kernel restart handler
+      watchdog: sunxi: register restart handler with kernel restart handler
+      arm/arm64: unexport restart handlers
+
+Heiko Stuebner (1):
+      Merge tag 'tags/restart-handler-for-v3.18' into v3.18-next/cpuclk
+
+Heiko St?bner (2):
+      clk: rockchip: add restart handler
+      clk: samsung: register restart handlers for s3c2412 and s3c2443
+
+Jianqun (1):
+      clk: rockchip: rk3288: i2s_frac adds flag to set parent's rate
+
+ arch/arm/kernel/process.c              | 12 +++--
+ arch/arm64/kernel/process.c            |  3 +-
+ drivers/clk/rockchip/clk-rk3188.c      |  2 +
+ drivers/clk/rockchip/clk-rk3288.c      | 10 +++--
+ drivers/clk/rockchip/clk.c             | 25 +++++++++++
+ drivers/clk/rockchip/clk.h             |  1 +
+ drivers/clk/samsung/clk-s3c2412.c      | 29 ++++++++++++
+ drivers/clk/samsung/clk-s3c2443.c      | 19 ++++++++
+ drivers/power/reset/restart-poweroff.c |  3 +-
+ drivers/watchdog/alim7101_wdt.c        | 42 +++++++++++++-----
+ drivers/watchdog/moxart_wdt.c          | 32 +++++++++-----
+ drivers/watchdog/sunxi_wdt.c           | 31 ++++++++-----
+ include/linux/reboot.h                 |  3 ++
+ kernel/reboot.c                        | 81 ++++++++++++++++++++++++++++++++++
+ 14 files changed, 247 insertions(+), 46 deletions(-)
