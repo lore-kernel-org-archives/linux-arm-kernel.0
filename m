@@ -1,45 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 1 Sep 2014 08:32:40 +0200
-Subject: [PATCH v2] arm64: fix bug for reloading FPSIMD state after cpu
- power off
-In-Reply-To: <1409540991-7573-1-git-send-email-leoy@marvell.com>
-References: <1409540991-7573-1-git-send-email-leoy@marvell.com>
-Message-ID: <CAKv+Gu998+fVe3=ufC-37LXke3brG12k1=1vGxiSfkcWrHhv6g@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  1 Oct 2014 09:13:59 +0200
+Subject: [PATCH v2 2/6] hwrng: atmel: use
+ clk_prepapre_enable/_disable_unprepare
+In-Reply-To: <1412093987-30241-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412093987-30241-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1412147639-4796-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2014 05:09, Leo Yan <leoy@marvell.com> wrote:
-> Now arm64 defers reloading FPSIMD state, but this optimization also
-> introduces the bug after cpu resume back from low power mode.
->
-> The reason is after the cpu has been powered off, s/w need set the
-> cpu's fpsimd_last_state to NULL so that it will force to reload
-> FPSIMD state for the thread, otherwise there has the chance to meet
-> the condition for both the task's fpsimd_state.cpu field contains the
-> id of the current cpu, and the cpu's fpsimd_last_state per-cpu variable
-> points to the task's fpsimd_state, so finally kernel will skip to reload
-> the context during it return back to userland.
->
-> Signed-off-by: Leo Yan <leoy@marvell.com>
+Use clk_prepare_enable/_disable_unprepare instead of clk_enable/disable
+to work properly with the CCF.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Peter Korsgaard <peter@korsgaard.com>
+---
+Changes since v1:
+- fix typo in commit message
 
-> ---
->  arch/arm64/kernel/fpsimd.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index ad8aebb..3dca156 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -270,6 +270,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
->         case CPU_PM_ENTER:
->                 if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
->                         fpsimd_save_state(&current->thread.fpsimd_state);
-> +               this_cpu_write(fpsimd_last_state, NULL);
->                 break;
->         case CPU_PM_EXIT:
->                 if (current->mm)
-> --
-> 1.9.1
->
+ drivers/char/hw_random/atmel-rng.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
+index 851bc7e..644ec48 100644
+--- a/drivers/char/hw_random/atmel-rng.c
++++ b/drivers/char/hw_random/atmel-rng.c
+@@ -67,7 +67,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
+ 	if (IS_ERR(trng->clk))
+ 		return PTR_ERR(trng->clk);
+ 
+-	ret = clk_enable(trng->clk);
++	ret = clk_prepare_enable(trng->clk);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -95,7 +95,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
+ 	hwrng_unregister(&trng->rng);
+ 
+ 	writel(TRNG_KEY, trng->base + TRNG_CR);
+-	clk_disable(trng->clk);
++	clk_disable_unprepare(trng->clk);
+ 
+ 	return 0;
+ }
+@@ -105,7 +105,7 @@ static int atmel_trng_suspend(struct device *dev)
+ {
+ 	struct atmel_trng *trng = dev_get_drvdata(dev);
+ 
+-	clk_disable(trng->clk);
++	clk_disable_unprepare(trng->clk);
+ 
+ 	return 0;
+ }
+@@ -114,7 +114,7 @@ static int atmel_trng_resume(struct device *dev)
+ {
+ 	struct atmel_trng *trng = dev_get_drvdata(dev);
+ 
+-	return clk_enable(trng->clk);
++	return clk_prepare_enable(trng->clk);
+ }
+ 
+ static const struct dev_pm_ops atmel_trng_pm_ops = {
+-- 
+1.9.1
