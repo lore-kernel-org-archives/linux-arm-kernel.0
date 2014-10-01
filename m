@@ -1,108 +1,26 @@
-From: dianders@google.com (Doug Anderson)
-Date: Wed, 1 Oct 2014 09:04:09 -0700
-Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
- handle regulators
-In-Reply-To: <1831792.g28ajrp9B5@amdc1032>
-References: <01.09.14890.83F4B245@epcpsbge5.samsung.com>
- <1831792.g28ajrp9B5@amdc1032>
-Message-ID: <CAD=FV=Xcv6E57u=kUj4QSWOpxCwOuJ4UyrFhSg1z0O1zx8nCag@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 1 Oct 2014 18:04:57 +0200
+Subject: [GIT PULL] ARM: brcmstb: SMP, earlyprintk and Kconfig cleanups
+In-Reply-To: <1411689248-14074-1-git-send-email-f.fainelli@gmail.com>
+References: <1411689248-14074-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <201410011804.57926.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 26 September 2014, Florian Fainelli wrote:
+> This pull request contains 3 changes for the brcmstb platform
+> 
+> - first patch re-introduces SMP support after fixing the problems we had in
+>   the initial implementation, for this patch to apply cleanly, I had to advance
+>   up to "ARM: brcmstb: revert SMP support"
+> 
+> - second patch is dropping unused Kconfig dependencies
+> 
+> - third patch adds earlyprintk to brcmstb platforms using the existing 8250
+>   infrastructure
 
-On Wed, Oct 1, 2014 at 7:00 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Wednesday, October 01, 2014 12:47:52 AM YUVARAJ CD wrote:
->
->> Since I am out of station, i dont have an access to my work set up.
->> Can you send me the dts entries of sd crad and their corresponding regulator entries?
->
-> From arch/arm/boot/dts/exynos5420-arndale-octa.dts:
->
-> ...
->         mmc at 12200000 {
->                 status = "okay";
->                 broken-cd;
->                 supports-highspeed;
->                 card-detect-delay = <200>;
->                 samsung,dw-mshc-ciu-div = <3>;
->                 samsung,dw-mshc-sdr-timing = <0 4>;
->                 samsung,dw-mshc-ddr-timing = <0 2>;
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
->                 vmmc-supply = <&ldo10_reg>;
->
->                 slot at 0 {
->                         reg = <0>;
->                         bus-width = <8>;
->                 };
->         };
->
->         mmc at 12220000 {
->                 status = "okay";
->                 supports-highspeed;
->                 card-detect-delay = <200>;
->                 samsung,dw-mshc-ciu-div = <3>;
->                 samsung,dw-mshc-sdr-timing = <2 3>;
->                 samsung,dw-mshc-ddr-timing = <1 2>;
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->                 vmmc-supply = <&ldo10_reg>;
->
->                 slot at 0 {
->                         reg = <0>;
->                         bus-width = <4>;
->                 };
->         };
-> ...
->                                 ldo10_reg: LDO10 {
->                                         regulator-name = "PVDD_PRE_1V8";
->                                         regulator-min-microvolt = <1800000>;
->                                         regulator-max-microvolt = <1800000>;
->                                         regulator-always-on;
->                                 };
+Pulled into next/late since this was really too late for 3.18.
 
-I don't have schematics for Arndale Octa, but the above is really
-fishy.  "vmmc" shouldn't be 1.8V.  That's the general power signal to
-MMC and should be 2.7V - 3.6V.  "vqmmc" could be 1.8V in certain
-situations, but my understanding is that for maximum compatibility it
-should at least start out identical to "vmmc" (and later go down to
-1.7V - 1.95V).
+There is still a chance that it could make it, but don't rely on that.
 
-My first thought would be to just remove the "vmmc-supply" from your
-DTS.  I think we could land that and pick it back easily.  That will
-get you something working and won't introduce any regressions because:
-1. MMC core will give you a dummy regulator
-2. The code will default to assuming that vmmc is 3.3V, which is what
-it used to do anyway.
-3. The only referenced regulator is always on anyway.
-
-Separately you could specify a proper vmmc and maybe even a vqmmc.
-
-On SMDK5420 I see this for the SD card (mmc2):
-* vmmc should be "VDD_SD_2V8".  From LDO19.
-* vqmmc should be "VDDQ_MMC2_AP".  From LDO13.
-
-OK, I dug up the Arndale schematics.  For mmc2:
-* vmmc should be PVDD_TFLASH_2V8.  That's LDO19.
-* vqmmc (hooked up to VDDQ_MMC2): PVDD_APIO_MMCOFF_2V8.  LDO13 just like SMDK.
-
-...sadly it looks like Anrdale has a schematics problem that prevents
-you from doing UHS.  I see that the data lines are pulled up to
-PVDD_TFLASH_2V8 (vmmc), not pulled up to PVDD_APIO_MMCOFF_2V8 (vqmmc).
-I think that means that if you ever lower vqmmc to 1.8V (as needed for
-UHS) then you'll still be pulling up to 2.8V.  That's not good.  You
-should probably make sure that both LDO13 and LDO19 are listed as
-being exactly 2.8V.
-
-
-Anyway, the above has (obviously) not been tested and is just based on
-a casual browsing of schematics.  Please let me know how it goes.
-
-
-
--Doug
+	Arnd
