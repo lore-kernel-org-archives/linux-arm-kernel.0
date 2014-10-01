@@ -1,99 +1,167 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 30 Sep 2014 18:28:30 -0700
-Subject: [PATCH v3 2/2] iommu/arm-smmu: add support for iova_to_phys
- through ATS1PR
-In-Reply-To: <20140930102334.GH8075@arm.com> (Will Deacon's message of "Tue,
- 30 Sep 2014 11:23:34 +0100")
-References: <1411874849-343-1-git-send-email-mitchelh@codeaurora.org>
- <1411874849-343-3-git-send-email-mitchelh@codeaurora.org>
- <20140930102334.GH8075@arm.com>
-Message-ID: <vnkwppec8toh.fsf@mitchelh-linux.qualcomm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 30 Sep 2014 20:11:16 -0700
+Subject: [PATCH RESEND V9 1/6] power: reset: Add generic SYSCON register
+ mapped reset
+In-Reply-To: <1412119508-22864-2-git-send-email-fkan@apm.com>
+References: <1412119508-22864-1-git-send-email-fkan@apm.com>
+ <1412119508-22864-2-git-send-email-fkan@apm.com>
+Message-ID: <542B70D4.8040001@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30 2014 at 03:23:34 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Mitch,
+On 09/30/2014 04:25 PM, Feng Kan wrote:
+> Add a generic SYSCON register mapped reset mechanism.
 >
-> On Sun, Sep 28, 2014 at 04:27:29AM +0100, Mitchel Humpherys wrote:
->> Currently, we provide the iommu_ops.iova_to_phys service by doing a
->> table walk in software to translate IO virtual addresses to physical
->> addresses. On SMMUs that support it, it can be useful to ask the SMMU
->> itself to do the translation. This can be used to warm the TLBs for an
->> SMMU. It can also be useful for testing and hardware validation.
->> 
->> Since the address translation registers are optional on SMMUv2, only
->> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
->> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>   drivers/power/reset/Kconfig         |  5 ++
+>   drivers/power/reset/Makefile        |  1 +
+>   drivers/power/reset/syscon-reboot.c | 96 +++++++++++++++++++++++++++++++++++++
+>   3 files changed, 102 insertions(+)
+>   create mode 100644 drivers/power/reset/syscon-reboot.c
 >
-> [...]
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index 1915dde..a863fa1 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -143,4 +143,9 @@ config POWER_RESET_KEYSTONE
+>   	help
+>   	  Reboot support for the KEYSTONE SoCs.
 >
->> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
->> +					dma_addr_t iova)
->> +{
->> +	struct arm_smmu_domain *smmu_domain = domain->priv;
->> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
->> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->> +	struct device *dev = smmu->dev;
->> +	void __iomem *cb_base;
->> +	u32 tmp;
->> +	u64 phys;
->> +
->> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
->> +
->> +	if (smmu->version == 1) {
->> +		u32 reg = iova & ~0xFFF;
+> +config POWER_RESET_SYSCON
+> +	bool "Generic SYSCON regmap reset driver"
+> +	depends on POWER_RESET && MFD_SYSCON && OF
+
+Other drivers have
+	select MFD_SYSCON
+
+> +	help
+> +	  Reboot support for generic SYSCON mapped register reset.
+>   endif
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index 01e401d..76ce1c5 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_POWER_RESET_VERSATILE) += arm-versatile-reboot.o
+>   obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
+>   obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
+>   obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
+> +obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
+> diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+> new file mode 100644
+> index 0000000..948e0ee
+> --- /dev/null
+> +++ b/drivers/power/reset/syscon-reboot.c
+> @@ -0,0 +1,96 @@
+> +/*
+> + * Generic Syscon Reboot Driver
+> + *
+> + * Copyright (c) 2013, Applied Micro Circuits Corporation
+> + * Author: Feng Kan <fkan@apm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/io.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/notifier.h>
+
+alphabetic order of include files ?
+
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reboot.h>
+> +
+> +struct syscon_reboot_context {
+> +	struct regmap *map;
+> +	u32 offset;
+> +	u32 mask;
+> +	struct notifier_block restart_handler;
+> +};
+> +
+> +static struct syscon_reboot_context *syscon_reboot_ctx;
+> +
+> +static int syscon_restart_handle(struct notifier_block *this,
+> +					unsigned long mode, void *cmd)
+> +{
+> +	struct syscon_reboot_context *ctx = syscon_reboot_ctx;
+
+Since restart_handler is part of syscon_reboot_context, you
+do not need a static variable. You can use
+	struct syscon_reboot_context *ctx = container_of(ctx, struct syscon_reboot_context, restart_handler);
+instead.
+
+> +	unsigned long timeout;
+> +
+> +	/* Issue the reboot */
+> +	if (ctx->map)
+> +		regmap_write(ctx->map, ctx->offset, ctx->mask);
+> +
+The check for ctx->map is not needed. If the restart handler is installed,
+it will always be valid.
+
+> +	timeout = jiffies + HZ;
+> +	while (time_before(jiffies, timeout))
+> +		cpu_relax();
+> +
+jiffies won't work here, and nothing else is expected to happen.
+Just use mdelay(1000);
+
+> +	pr_emerg("Unable to restart system\n");
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static int syscon_reboot_probe(struct platform_device *pdev)
+> +{
+> +	struct syscon_reboot_context *ctx;
+> +	struct device *dev = &pdev->dev;
+> +	int err;
+> +
+> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx)
+> +		return -ENOMEM;
+> +
+> +	ctx->map = syscon_regmap_lookup_by_phandle(dev->of_node, "regmap");
+> +	if (IS_ERR(ctx->map))
+> +		return PTR_ERR(ctx->map);
+> +
+> +	if (of_property_read_u32(pdev->dev.of_node, "offset", &ctx->offset))
+> +		return -EINVAL;
+> +
+> +	if (of_property_read_u32(pdev->dev.of_node, "mask", &ctx->mask))
+> +		return -EINVAL;
+> +
+> +	ctx->restart_handler.notifier_call = syscon_restart_handle;
+> +	ctx->restart_handler.priority = 128;
+> +	err = register_restart_handler(&ctx->restart_handler);
+> +	if (err)
+> +		dev_err(dev, "can't register restart notifier (err=%d)\n", err);
+> +
+> +	syscon_reboot_ctx = ctx;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id syscon_reboot_of_match[] = {
+> +	{ .compatible = "syscon-reboot" },
+> +	{}
+> +};
+> +
+> +static struct platform_driver syscon_reboot_driver = {
+> +	.probe = syscon_reboot_probe,
+> +	.driver = {
+> +		.name = "syscon-reboot",
+> +		.of_match_table = syscon_reboot_of_match,
+> +	},
+> +};
+> +module_platform_driver(syscon_reboot_driver);
 >
-> Cosmetic comment, but hex constants are lowercase everywhere else in the
-> file.
-
-Ah, woops.  Let me fix that.
-
->
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->> +	} else {
->> +		u32 reg = iova & ~0xFFF;
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->> +		reg = (iova & ~0xFFF) >> 32;
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
->> +	}
->> +
->> +	if (readl_poll_timeout(cb_base + ARM_SMMU_CB_ATSR, tmp,
->> +				!(tmp & ATSR_ACTIVE), 10, ATSR_LOOP_TIMEOUT)) {
->> +		dev_err(dev,
->> +			"iova to phys timed out on 0x%pa. Falling back to software table walk.\n",
->> +			&iova);
->> +		return arm_smmu_iova_to_phys_soft(domain, iova);
->> +	}
->> +
->> +	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
->> +	phys |= ((u64) readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
->
-> The absence of locking in this function concerns me a bit. For the software
-> implementation, we're just reading page tables, but here we're writing ATS
-> registers and I think we need to ensure serialisation against another
-> iova_to_phys on the same domain.
-
-Good catch, let me take the domain lock here.  I'll also have to move to
-readl_poll_timeout_atomic since the domain lock is a spinlock.
-
->
->> +	if (phys & CB_PAR_F) {
->> +		dev_err(dev, "translation fault!\n");
->> +		dev_err(dev, "PAR = 0x%llx\n", phys);
->> +	}
->> +	phys = (phys & 0xFFFFFFF000ULL) | (iova & 0x00000FFF);
->> +
->> +	return phys;
->
-> You can return phys == 0 on failure (at least, the callers in kvm and vfio
-> treat this as an error).
-
-Ah yes, I agree that a 0 return value from iommu_iova_to_phys appears to
-be treated as an error.  Let me fix that.
-
-
--Mitch
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
