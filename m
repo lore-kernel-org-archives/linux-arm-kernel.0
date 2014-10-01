@@ -1,43 +1,62 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 01 Oct 2014 15:32:41 +0200
-Subject: [PATCH v7 00/11] kernel: Add support for restart handler call
- chain
-In-Reply-To: <20140930223000.GA20946@roeck-us.net>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
- <20140930142002.e09ef32392a2b5a7c81e5e57@linux-foundation.org>
- <20140930223000.GA20946@roeck-us.net>
-Message-ID: <17880788.QtjeWKsOjD@phil>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 1 Oct 2014 15:35:27 +0200
+Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
+In-Reply-To: <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
+Message-ID: <20141001133527.GA12750@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 30. September 2014, 15:30:00 schrieb Guenter Roeck:
-> On Tue, Sep 30, 2014 at 02:20:02PM -0700, Andrew Morton wrote:
-> > On Tue, 19 Aug 2014 17:45:27 -0700 Guenter Roeck <linux@roeck-us.net> 
-wrote:
-> > > Introduce a system restart handler call chain to solve the described
-> > > problems.> 
-> > So someone has merged eight of these patches into linux-next but these
-> > three:
-> > 
-> > watchdog-s3c2410-add-restart-handler.patch
-> > clk-samsung-register-restart-handlers-for-s3c2412-and-s3c2443.patch
-> > clk-rockchip-add-restart-handler.patch
-> > 
-> > were omitted.  What's up?
+Hi!
+
+> From: Alan Tull <atull@opensource.altera.com>
 > 
-> Most likely PBKC on my side; Looks like I forgot to add those when I created
-> the immutable branch for others to merge. Sorry for that :-(.
+> Use WFI when putting CPU1 to sleep.  Don't hold CPU1 in reset
+> since that results in increased power consumption.
 > 
-> Having said that, I somehow thought that the clock patches would go in
-> through the clock tree. Heiko, did I get that wrong ? Separately, I sent a
-> pull request that includes the watchdog patch to Wim.
+> Reset CPU1 briefly during CPU1 bootup.
+> 
+> This has been tested for hotplug and suspend/resume and results
+> in no increased power consumption.
+> 
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> ---
+>  arch/arm/mach-socfpga/core.h    |    2 ++
+>  arch/arm/mach-socfpga/platsmp.c |   12 +++++++++---
+>  2 files changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+> index 572b8f7..c4a0929 100644
+> --- a/arch/arm/mach-socfpga/core.h
+> +++ b/arch/arm/mach-socfpga/core.h
+> @@ -28,6 +28,8 @@
+>  #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
+>  #define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
+>  
+> +#define RSTMGR_MPUMODRST_CPU1		0x2     /*CPU1 Reset*/
+> +
 
-I didn't realise that the patches would get dropped from -mm until I the 
-removal notices this morning. So meanwhile I've send a pull to Mike for the 
-Rockchip and S3C2412/2416/2443 restart handling.
+It would be nice to have space after /* and before */.
 
-So, as your pull includes the samsung watchdog restart, we should be hopefully 
-all set again :-) .
+> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+> index 5356a72..1d5f8ad 100644
+> --- a/arch/arm/mach-socfpga/platsmp.c
+> +++ b/arch/arm/mach-socfpga/platsmp.c
+> @@ -34,6 +34,10 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+>  
+>  	if (cpu1start_addr) {
+> +		/* This will put CPU #1 into reset.*/
 
+Same here.
 
-Heiko
+> +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
+> +			     rst_manager_base_addr + 0x10);
+
+Would it be possible to copy reset manager description struct from
+u-boot and use it here, instead of raw offset?
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
