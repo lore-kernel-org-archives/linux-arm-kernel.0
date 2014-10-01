@@ -1,27 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Oct 2014 17:56:11 +0200
-Subject: [GIT PULL 2/3] 3rd Round of Samsung-DT-3 updates for v3.18
-In-Reply-To: <54244910.3050609@samsung.com>
-References: <54244910.3050609@samsung.com>
-Message-ID: <201410011756.11635.arnd@arndb.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 1 Oct 2014 17:59:17 +0200
+Subject: [PATCH 1/6] ARM: at91: remove at91sam9g45/9m10 legacy board
+ support
+In-Reply-To: <1412093987-30241-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412093987-30241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1412093987-30241-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141001155917.GE3907@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014, Kukjin Kim wrote:
-> Samsung 3rd DT updates for v3.18
+On 30/09/2014 at 18:19:42 +0200, Boris Brezillon wrote :
+> Remove legacy support for at91sam9g45/9m10 boards.
+> This include board files removal plus all legacy code for non DT boards
+> support (i.e. at91sam9g45.c and at91sam9g45_devices.c).
 > 
-> - Fix rebase conflcits in previous tags/samsung-dt-2
->    : Fix chip select GPIO for exynos5250-smdk5250
->    : Remove display timings node for exynos5250-snow
-> 
-> - Fix Exynos USB on kernels with USB Gadget support
->    : Explicitly set dr_mode for the dwc3 controller
->    for exynos5420-arndale-octa, exynos5420-peach-pit
->    and exynos5800-peach-pi boards
-> 
-> - add CPU nodes for exynos4210, exynos4212, exynos4412
-> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Pulled into next/late, thanks
+A tiny nitpick, else
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-	Arnd
+
+> ---
+>  arch/arm/mach-at91/Kconfig.non_dt        |   21 -
+>  arch/arm/mach-at91/Makefile              |    4 -
+>  arch/arm/mach-at91/at91sam9g45.c         |  403 -------
+>  arch/arm/mach-at91/at91sam9g45_devices.c | 1915 ------------------------------
+>  arch/arm/mach-at91/board-sam9m10g45ek.c  |  526 --------
+>  5 files changed, 2869 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
+>  delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 9d45496..f658b69 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -10,355 +10,13 @@
+>   *
+>   */
+>  
+> -#include <linux/module.h>
+> -#include <linux/dma-mapping.h>
+> -#include <linux/clk/at91_pmc.h>
+> -
+> -#include <asm/irq.h>
+> -#include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+
+That include is not needed.
+
+>  #include <asm/system_misc.h>
+> -#include <mach/at91sam9g45.h>
+>  #include <mach/cpu.h>
+>  #include <mach/hardware.h>
+>  
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
