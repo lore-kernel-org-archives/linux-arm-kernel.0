@@ -1,117 +1,65 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 1 Oct 2014 19:45:52 +0200
-Subject: [RFC PATCH] arm/arm64: KVM: Fix BE accesses to GICv2 EISR and
- ELRSR regs
-In-Reply-To: <542C31FE.9080609@arm.com>
-References: <1411913066-3787-1-git-send-email-christoffer.dall@linaro.org>
- <542C31FE.9080609@arm.com>
-Message-ID: <20141001174552.GA12519@cbox>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 01 Oct 2014 10:54:18 -0700
+Subject: [PATCH 2/3] ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp
+ implementations
+In-Reply-To: <541C74C1.9060504@codeaurora.org>
+References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
+ <1411076592-6157-3-git-send-email-sboyd@codeaurora.org>
+ <20140918224625.GF5182@n2100.arm.linux.org.uk>
+ <541C74C1.9060504@codeaurora.org>
+Message-ID: <542C3FCA.2010006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On 09/19/14 11:24, Stephen Boyd wrote:
+> On 09/18/14 15:46, Russell King - ARM Linux wrote:
+>> On Thu, Sep 18, 2014 at 02:43:11PM -0700, Stephen Boyd wrote:
+>>> diff --git a/arch/arm/include/asm/vfp.h b/arch/arm/include/asm/vfp.h
+>>> index f4ab34fd4f72..76d3f6907cce 100644
+>>> --- a/arch/arm/include/asm/vfp.h
+>>> +++ b/arch/arm/include/asm/vfp.h
+>>> @@ -21,7 +21,7 @@
+>>>  #define FPSID_FORMAT_MASK	(0x3  << FPSID_FORMAT_BIT)
+>>>  #define FPSID_NODOUBLE		(1<<20)
+>>>  #define FPSID_ARCH_BIT		(16)
+>>> -#define FPSID_ARCH_MASK		(0xF  << FPSID_ARCH_BIT)
+>>> +#define FPSID_ARCH_MASK		(0x7F  << FPSID_ARCH_BIT)
+>> This is incorrect.  On VFPv2, the architecture field is four bits long.
+>> As you can see from the above, bit 20 indicates that there are no
+>> double operations provided, and the next two bits indicate the FSTMX/
+>> FLDMX format.
+>>
+>> I know that you're changing this to conform with the ARM ARM, but we
+>> have to consider that before VFP was subsumed into the ARM ARM, this
+>> register had the format described as per this file, and these other
+>> bits may be set for an ARM part.  Including these bits in the mask
+>> means that we will mis-identify these older parts as VFPv3.
+>>
+>> Welcome to the lack of standardisation!
+>>
+> Thank you for the warm welcome! I looked at the TRMs for ARM11 and ARM9.
+> I can't find anywhere where VFPv2 is supported and these bits are set.
+>
+> Bits 22-16 of FPSID:
+>
+> ARM1136r1p5:     0x01
+> ARM1136r1p3:     0x01
+> ARM1176:         0x01
+> ARM11MPCorer2p0: 0x01
+> ARM11MPCorer1p0: 0x01
+> ARM1156:         0x01
+> ARM9:            0x01
+>
+>
+> Do you, or anyone else, know of other implementations? I *hope* that
+> this same exercise was done by the VFP architects before they
+> re-purposed bits but who knows. If nobody is actually setting these
+> higher bits then is there any problem widening the mask (besides it
+> being slightly confusing)?
+>
 
-On Wed, Oct 01, 2014 at 05:55:26PM +0100, Andre Przywara wrote:
-> Hi Christoffer,
-> 
-> On 28/09/14 15:04, Christoffer Dall wrote:
-> > The EIRSR and ELRSR registers are 32-bit registers on GICv2, and we
-> > store these as an array of two such registers on the vgic vcpu struct.
-> > However, we access them as a single 64-bit value or as a bitmap pointer
-> > in the generic vgic code, which breaks BE support.
-> > 
-> > Instead, store them as u64 values on the vgic structure and do the
-> > word-swapping in the assembly code, which already handles the byte order
-> > for BE systems.
-> 
-> I am wondering if that approach isn't too involved.
-> EISR and ELRSR are 32-bit registers, and AFAIK the GIC is always LE on
-> the hardware side. So by claiming we have a 64bit register we introduce
-> too much hassle, right?
+Any thoughts?
 
-You have to deal with this mess somehow, the question is just where.
-
-> Wouldn't it be better to just fix the registers shortly before we
-> actually use them?
-
-if you're looking at it isolated, I agree completely, having those two
-32-bit registers in the struct would be 'nicer'.  However, we already
-jump through a lot of hoops here to store things in a way that makes it
-possible for us to share code between 32-bit and 64-bit and between
-gicv2 and gicv3, so it's not completely out of line.
-
-> With my limited endianess experience: Wouldn't this patch solve the EISR
-> part (copy & pasted, so "for eyes only" ;-)
-> 
-> @@ -92,13 +89,10 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
->  {
->  	u64 val;
-> 
-> -#if BITS_PER_LONG == 64
-> -	val  = vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[1];
-> +       val  = le32_to_cpu(vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[1]);
-
-don't do this - the reverse instructions for dealing with the inner-word
-endianness already takes place in the assembly code, so that's not the
-problem.
-
->         val <<= 32;
-> -       val |= vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[0];
-> -#else
-> -       val = *(u64 *)vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
-> -#endif
-> +       val |= le32_to_cpu(vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr[0]);
-
-what that whole block above does, is that when an unsigned long is 64
-bits, if you just convert the &eisr[0] pointer to an unsigned long *,
-you'll get this on a LE system:
-
- | 63 .................. 32 | 31 .................. 0 |
- |          eisr[1]         |        eisr[0]          |
-
-which is what you want, but on a BE system, you'll get:
-
- | 63 .................. 32 | 31 .................. 0 |
- |          eisr[0]         |        eisr[1]          |
-
-which is obviously not what the caller expects.  The current code block
-(before my patch) always gives you the first one, which is what you'd
-want.
-
-
-> +
->         return val;
->  }
-> 
-> (BTW: Wasn't that 64 bit optimization path the wrong way round here?)
-
-Not sure I understand your question?
-
-> 
-> Please bear with me if this is complete nonsense, could well twisted my
-> mind once too much ;-)
-> 
-> Still thinking about a clever solution for that strange sync_elrsr()
-> thing ...
-> 
-
-You have to factor that into the equation and not split up the things,
-that's where I think you go wrong.
-
-I tried to do what you asked before, but it becomes a bloody mess, with
-a more convoluted patch and resulting code path than what I suggest,
-IMHO.
-
-Try to write out the whole thing yourself and be very careful that
-you're getting it right.
-
-If you can come up with a way that works with the callers using
-for_each_set_bit()  (open-coding that one doesn't exactly make that
-twited vgic code any more pretty), then I'll be very happy to throw this
-away and take yours.
-
-Happy brain twisting :)
-
-Thanks for looking at this stuff.
-
--Christoffer
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
