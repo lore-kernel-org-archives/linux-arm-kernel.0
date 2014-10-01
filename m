@@ -1,34 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Oct 2014 12:17:17 +0100
-Subject: [PATCH 2/6] arm64: Add DTS support for Spreadtrum's Shark64 SoC
-In-Reply-To: <4004425.NZAxCnE0qr@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Oct 2014 12:21:50 +0100
+Subject: [PATCH 1/6] Documentation: DT: Add bindings for Spreadtrum serial
+In-Reply-To: <1411992293-7729-2-git-send-email-zhang.lyra@gmail.com>
 References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <1411992293-7729-3-git-send-email-zhang.lyra@gmail.com>
- <4004425.NZAxCnE0qr@wuerfel>
-Message-ID: <20141001111717.GH12702@e104818-lin.cambridge.arm.com>
+ <1411992293-7729-2-git-send-email-zhang.lyra@gmail.com>
+Message-ID: <20141001112149.GA13759@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 02:47:47PM +0100, Arnd Bergmann wrote:
-> On Monday 29 September 2014 20:04:49 zhang.lyra at gmail.com wrote:
-> > +	cpus {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,armv8";
-> > +			reg = <0x0 0x0>;
-> > +			enable-method = "spin-table";
-> > +			cpu-release-addr = <0x0 0x8000fff8>;
-> > +		};
+On Mon, Sep 29, 2014 at 01:04:48PM +0100, zhang.lyra at gmail.com wrote:
+> From: "chunyan.zhang" <chunyan.zhang@spreadtrum.com>
 > 
-> New platforms should avoid using "spin-table" method. Please
-> change the boot loader to implement PSCI if you can.
+> Adds the device-tree documentation for Spreadtrum's serial.
+> 
+> Signed-off-by: chunyan.zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  .../devicetree/bindings/serial/of-serial.txt       |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
+> index 7705477..a0bb1d1 100644
+> --- a/Documentation/devicetree/bindings/serial/of-serial.txt
+> +++ b/Documentation/devicetree/bindings/serial/of-serial.txt
+> @@ -14,6 +14,7 @@ Required properties:
+>  	- "altr,16550-FIFO32"
+>  	- "altr,16550-FIFO64"
+>  	- "altr,16550-FIFO128"
+> +	- "sprd,serial"
 
-As usual, I strongly recommend PSCI here if the CPU supports EL3. It
-would solve the cpuidle kernel support as well with the generic cpuidle
-driver and the PSCI back-end.
+Is there not a more specific name? I'd imagine you might build a
+different uart in future.
 
--- 
-Catalin
+I didn't spot "sprd" in vendor-prefixes.txt in mainline. Is there a
+patch adding that?
+
+Mark.
+
+>  	- "serial" if the port type is unknown.
+>  - reg : offset and length of the register set for the device.
+>  - interrupts : should contain uart interrupt.
+> -- 
+> 1.7.9.5
+> 
+> 
