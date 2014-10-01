@@ -1,42 +1,91 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 1 Oct 2014 06:02:14 -0500
-Subject: [PATCH] arm: socfpga: fix fetching cpu1start_addr for system with >
- 2GB of ram
-Message-ID: <1412161334-12359-1-git-send-email-dinguyen@opensource.altera.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 01 Oct 2014 20:08:05 +0900
+Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20140826175128.GD23445@arm.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
+ <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
+Message-ID: <542BE095.3010107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+Will,
 
-When CPU1 is brought out of reset, it's MMU is not turned yet, so it will only
-be able to use physical addresses. For systems with 1GB or less, clearing
-0x40000000 will work just fine. However for systems with 2GB or more, we
-need to clear at least 0x80000000.
+When I was looking into syscall_trace_exit() more closely, I found
+another (big) problem.
+There are two system calls, execve() and rt_sigreturn(), which change
+'syscallno' in pt_regs to -1 in start_thread() and restore_sigframe(),
+respectively.
 
-Essentially, the bic instruction is converting the cpu1start_addr from a
-virtual to a physical address. We should be using bic 0xf0000000 for all
-systems.
+Since syscallno is not valid anymore in syscall_trace_exit() for these
+system calls, we cannot create a correct syscall exit record for tracepoint
+in trace_sys_exit() (=> ftrace_syscall_exit()) and for audit in audit_syscall_exit().
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/mach-socfpga/headsmp.S | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+This does not happen on arm because syscall numbers are kept in
+thread_info on arm.
 
-diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-index 95c115d..d686f99 100644
---- a/arch/arm/mach-socfpga/headsmp.S
-+++ b/arch/arm/mach-socfpga/headsmp.S
-@@ -16,9 +16,8 @@ ENTRY(secondary_trampoline)
- 	movw	r2, #:lower16:cpu1start_addr
- 	movt  r2, #:upper16:cpu1start_addr
- 
--	/* The socfpga VT cannot handle a 0xC0000000 page offset when loading
--		the cpu1start_addr, we bit clear it. Tested on HW and VT. */
--	bic	r2, r2, #0x40000000
-+	/* convert cpu1start_addr to a physical address */
-+	bic	r2, r2, #0xf0000000
- 
- 	ldr	r0, [r2]
- 	ldr	r1, [r0]
--- 
-2.0.3
+How can we deal with this issue?
+
+-Takahiro AKASHI
+
+
+On 08/27/2014 02:51 AM, Will Deacon wrote:
+> On Fri, Aug 22, 2014 at 01:35:17AM +0100, AKASHI Takahiro wrote:
+>> On 08/22/2014 02:08 AM, Kees Cook wrote:
+>>> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
+>>> <takahiro.akashi@linaro.org> wrote:
+>>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>>>> index 8876049..c54dbcc 100644
+>>>> --- a/arch/arm64/kernel/ptrace.c
+>>>> +++ b/arch/arm64/kernel/ptrace.c
+>>>> @@ -1121,9 +1121,29 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>>>>
+>>>>    asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>>>>    {
+>>>> +       unsigned int saved_syscallno = regs->syscallno;
+>>>> +
+>>>>           if (test_thread_flag(TIF_SYSCALL_TRACE))
+>>>>                   tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>>>>
+>>>> +       if (IS_SKIP_SYSCALL(regs->syscallno)) {
+>>>> +               /*
+>>>> +                * RESTRICTION: we can't modify a return value of user
+>>>> +                * issued syscall(-1) here. In order to ease this flavor,
+>>>> +                * we need to treat whatever value in x0 as a return value,
+>>>> +                * but this might result in a bogus value being returned.
+>>>> +                */
+>>>> +               /*
+>>>> +                * NOTE: syscallno may also be set to -1 if fatal signal is
+>>>> +                * detected in tracehook_report_syscall_entry(), but since
+>>>> +                * a value set to x0 here is not used in this case, we may
+>>>> +                * neglect the case.
+>>>> +                */
+>>>> +               if (!test_thread_flag(TIF_SYSCALL_TRACE) ||
+>>>> +                               (IS_SKIP_SYSCALL(saved_syscallno)))
+>>>> +                       regs->regs[0] = -ENOSYS;
+>>>> +       }
+>>>> +
+>>>
+>>> I don't have a runtime environment yet for arm64, so I can't test this
+>>> directly myself, so I'm just trying to eyeball this. :)
+>>>
+>>> Once the seccomp logic is added here, I don't think using -2 as a
+>>> special value will work. Doesn't this mean the Oops is possible by the
+>>> user issuing a "-2" syscall? As in, if TIF_SYSCALL_WORK is set, and
+>>> the user passed -2 as the syscall, audit will be called only on entry,
+>>> and then skipped on exit?
+>>
+>> Oops, you're absolutely right. I didn't think of this case.
+>> syscall_trace_enter() should not return a syscallno directly, but always
+>> return -1 if syscallno < 0. (except when secure_computing() returns with -1)
+>> This also implies that tracehook_report_syscall() should also have a return value.
+>>
+>> Will, is this fine with you?
+>
+> Well, the first thing that jumps out at me is why this is being done
+> completely differently for arm64 and arm. I thought adding the new ptrace
+> requests would reconcile the differences?
+>
+> Will
+>
