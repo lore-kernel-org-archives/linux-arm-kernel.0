@@ -1,99 +1,67 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  1 Oct 2014 10:06:56 +0100
-Subject: [PATCH v3 4/4] ARM: dts: apq8064: Add SATA controller support.
-In-Reply-To: <1412154355-2639-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1412154355-2639-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1412154416-2870-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 1 Oct 2014 12:32:09 +0300
+Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
+In-Reply-To: <1811108.CcWEs0vKNL@wuerfel>
+References: <1811108.CcWEs0vKNL@wuerfel>
+Message-ID: <542BCA19.8050603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds AHCI based SATA controller support to APQ8064.
-Tested on IFC6410 board.
+Hi Arnd & Brian,
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 15 +++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        | 35 ++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
+On 09/30/2014 03:04 PM, Arnd Bergmann wrote:
+> If the OMAP nand driver is built-in but the BCH driver is a module,
+> we get a link-time error:
+> 
+> drivers/built-in.o: In function `omap_elm_correct_data':
+> :(.text+0x174e88): undefined reference to `elm_decode_bch_error_page'
+> drivers/built-in.o: In function `omap_nand_probe':
+> :(.text+0x175b48): undefined reference to `elm_config'
+> 
+> There are two possible ways to deal with this, either prevent that
+> configuration in Kconfig or make sure we don't reference the ELM
+> driver in this case.
+> 
+> This patch picks the second approach, which makes it possible to
+> use the ELM driver in other modules while still having the OMAP
+> NAND driver built-in.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 3e2c777..6856c9d 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -47,6 +47,12 @@
- 				qcom,switch-mode-frequency	= <4800000>;
- 			};
- 
-+			pm8921_s4: pm8921-s4 {
-+				regulator-min-microvolt		= <1800000>;
-+				regulator-max-microvolt		= <1800000>;
-+				qcom,switch-mode-frequency	= <3200000>;
-+			};
-+
- 			pm8921_l3: pm8921-l3 {
- 				regulator-min-microvolt = <3050000>;
- 				regulator-max-microvolt = <3300000>;
-@@ -63,6 +69,15 @@
- 			};
- 		};
- 
-+		sata_phy0: sata-phy at 1b400000{
-+			status = "okay";
-+		};
-+
-+		sata0: sata at 29000000 {
-+			status		= "okay";
-+			target-supply	= <&pm8921_s4>;
-+		};
-+
- 		/* OTG */
- 		usb1_phy: phy at 12500000 {
- 			status		= "okay";
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index c251c72..e65aff0 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -566,6 +566,41 @@
- 			usb-phy		= <&usb4_phy>;
- 		};
- 
-+		sata_phy0: sata-phy at 1b400000{
-+			compatible	= "qcom,apq8064-sata-phy";
-+			status		= "disabled";
-+			reg		= <0x1b400000 0x200>;
-+			reg-names	= "phy_mem";
-+			clocks		= <&gcc SATA_PHY_CFG_CLK>;
-+			clock-names	= "cfg";
-+			#phy-cells	= <0>;
-+		};
-+
-+		sata0: sata at 29000000 {
-+			compatible		= "generic-ahci";
-+			status			= "disabled";
-+			reg			= <0x29000000 0x180>;
-+			interrupts		= <0 209 0>;
-+
-+			clocks			= <&gcc SFAB_SATA_S_H_CLK>,
-+						<&gcc SATA_H_CLK>,
-+						<&gcc SATA_A_CLK>,
-+						<&gcc SATA_RXOOB_CLK>,
-+						<&gcc SATA_PMALIVE_CLK>;
-+			clock-names		= "slave_iface",
-+						"iface",
-+						"bus",
-+						"rxoob",
-+						"core_pmalive";
-+
-+			assigned-clocks		= <&gcc SATA_RXOOB_CLK>,
-+						<&gcc SATA_PMALIVE_CLK>;
-+			assigned-clock-rates	= <100000000>, <100000000>;
-+
-+			phys			= <&sata_phy0>;
-+			phy-names		= "sata-phy";
-+		};
-+
- 		/* Temporary fixed regulator */
- 		vsdcc_fixed: vsdcc-regulator {
- 			compatible = "regulator-fixed";
--- 
-1.9.1
+With this patch NAND probe on DRA7xx fails like so
+
+[    2.077313] omap-gpmc 50000000.gpmc: GPMC revision 6.0
+[    2.083842] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
+[    2.090524] nand: Micron MT29F2G16ABAEAWP
+[    2.094728] nand: 256MiB, SLC, page size: 2048, OOB size: 64
+[    2.100745] nand: using OMAP_ECC_BCH8_CODE_HW ECC scheme
+[    2.109764] omap2-nand: probe of omap2-nand.0 failed with error -38
+
+OMAP NAND driver is the only user of the ELM module and we want it
+to be usable in all possible configurations when enabled.
+
+Let's pick either one of the below patches instead
+
+http://article.gmane.org/gmane.linux.ports.arm.omap/118488
+OR
+http://article.gmane.org/gmane.linux.ports.arm.omap/118847
+
+cheers,
+-roger
+
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 93af53b8633c ("nand: omap2: Remove horrible ifdefs to fix module probe")
+> 
+> diff --git a/include/linux/platform_data/elm.h b/include/linux/platform_data/elm.h
+> index b8686c00f15f..cbca66ce7c10 100644
+> --- a/include/linux/platform_data/elm.h
+> +++ b/include/linux/platform_data/elm.h
+> @@ -42,7 +42,7 @@ struct elm_errorvec {
+>  	int error_loc[16];
+>  };
+>  
+> -#if IS_ENABLED(CONFIG_MTD_NAND_OMAP_BCH)
+> +#if defined(CONFIG_MTD_NAND_OMAP_BCH) || (defined(CONFIG_MTD_NAND_OMAP_BCH_MODULE) && defined(MODULE))
+>  void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
+>  		struct elm_errorvec *err_vec);
+>  int elm_config(struct device *dev, enum bch_ecc bch_type,
+> 
