@@ -1,74 +1,126 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Oct 2014 11:33:14 +0200
-Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
-In-Reply-To: <CAGb2v64LwgEZkiuej2KKi+CUU3OkUZaBKJ3ZZn_Y64tDD+LRwg@mail.gmail.com>
-References: <1411570141-29960-1-git-send-email-wens@csie.org>
- <1411570141-29960-2-git-send-email-wens@csie.org>
- <20140925132527.GF15315@lukather>
- <CAGb2v64LwgEZkiuej2KKi+CUU3OkUZaBKJ3ZZn_Y64tDD+LRwg@mail.gmail.com>
-Message-ID: <20141001093314.GI6884@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Oct 2014 11:38:45 +0200
+Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
+In-Reply-To: <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <2430078.s4snyh5OoF@wuerfel>
+ <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
+Message-ID: <3256560.C0cZnIlnAv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 27, 2014 at 09:16:02PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Sep 25, 2014 at 9:25 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Wed, Sep 24, 2014 at 10:48:55PM +0800, Chen-Yu Tsai wrote:
-> >> The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
-> >> While it's processor cores and interconnecting bus are new, it
-> >> re-uses many peripherals found in earlier Allwinner SoCs.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  arch/arm/mach-sunxi/Kconfig | 5 +++++
-> >>  arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
-> >>  2 files changed, 14 insertions(+)
-> >>
-> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> >> index 1aaa1e1..72f222b 100644
-> >> --- a/arch/arm/mach-sunxi/Kconfig
-> >> +++ b/arch/arm/mach-sunxi/Kconfig
-> >> @@ -42,4 +42,9 @@ config MACH_SUN8I
-> >>       select MFD_SUN6I_PRCM
-> >>       select RESET_CONTROLLER
-> >>
-> >> +config MACH_SUN9I
-> >> +     bool "Allwinner A80 (sun9i) SoCs support"
-> >
-> > With the new naming scheme, I wonder wether it makes sense to have the
-> > A80 displayed here and in the machine definition.
+On Wednesday 01 October 2014 09:46:26 Liviu Dudau wrote:
+> On Tue, Sep 30, 2014 at 09:01:14PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 30 September 2014 20:54:41 Arnd Bergmann wrote:
+> > > On Tuesday 30 September 2014 18:48:21 Liviu Dudau wrote:
+> > > > > > > > These are the functions I found that refer to pci_sys_data on arm32:
+> > > > > > > > 
+> > > > > > > > pcibios_add_bus
+> > > > > > > > pcibios_remove_bus
+> > > > 
+> > > > These are only needed if you want to do per HB processing of the bus
+> > > > 
+> > > > > > > > pcibios_align_resource
+> > > > 
+> > > > mvebu is the only user of this function.
+> > > > 
+> > > > > > > > pci_mmap_page_range
+> > > > 
+> > > > This is only needed when mapping a PCI resource to userspace. Is that your case here?
+> > > > 
+> > > > > > > > pci_domain_nr
+> > > > > > > > pci_proc_domain
+> > > > 
+> > > > We have equivalent functionality in the generic patches for those.
+> > > > 
+> > > 
+> > > We clearly don't need those functions for the new drivers, but that's not
+> > > the point. The problem is that when you build a kernel that has both
+> > > a traditional host bridge driver and a new one in it, you always get those
+> > > functions and they get called from the PCI core, with incorrect arguments.
+> > 
+> > FWIW, the last time we discussed this, I think I had suggested that the
+> > functions that are currently architecture specific and have a generic
+> > __weak fallback could become function pointers in a per-host structure
+> > passed to pci_scan_root_bus, either a new structure or an extended
+> > struct pci_ops. Something along these lines:
 > 
-> I expect anything that falls under sun9i to be compatible, or a trimmed
-> down version. But that's just me.
+> Agree to the general idea. But have a look why host drivers need the add_bus ops:
+> to add MSI information into the bus!! If we take care of the MSI in the generic
+> code there is less of a need for this function at all.
 
-Well, compatible is a rather vague notion. They will be different for
-sure. Maybe not that different, but still.
 
-> We know that Allwinner has released the A33, which should be compatible
-> with the A23, sun8i.
+Right, if we can eliminate the need for some or all of the functions above,
+we don't have to abstract them any more.
 
-Except that it would not be straight forward for an A33 user for
-example that he needs to enable the A23 support.
+pcibios_remove_bus can just go away entirely, we don't have a single driver
+on ARM that implements it. pcibios_add_bus as you say is just used for MSI
+at the moment, and we could get rid of it by just moving the msi_chip
+reference from pci_bus into pci_host_bridge. 
 
-> And the A83 has been announced, which looks like a trimmed down
-> version of the A80. The next SoC should be arm64, and would not
-> matter here.
-> 
-> Kevin, Shuge, could you provide us with the codenames for the A33 and
-> A83, and what earlier SoC they are based on?
+The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
+removed if we change the arm32 pcibios_init_hw function to call the new
+interfaces that set the domain number.
 
-Even though it would be nice to know, it's not really the issue here.
+pci_mmap_page_range could either get generalized some more in an attempt
+to have a __weak default implementation that works on ARM, or it could
+be changed to lose the dependency on pci_sys_data instead. In either
+case, the change would involve using the generic pci_host_bridge_window
+list.
 
-Maxime
+pcibios_align_resource should probably be per host, and we could move
+that into a pointer in pci_host_bridge, something like this:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/0767e0c3/attachment.sig>
+diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
+index b7c3a5ea1fca..d9cb6c916d54 100644
+--- a/drivers/pci/setup-res.c
++++ b/drivers/pci/setup-res.c
+@@ -200,11 +200,15 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
+ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 		int resno, resource_size_t size, resource_size_t align)
+ {
++	struct pci_host_bridge *host = find_pci_host_bridge(bus);
++	resource_size_t (*alignf)(void *, const struct resource *,
++				  resource_size_t, resource_size_t),
+ 	struct resource *res = dev->resource + resno;
+ 	resource_size_t min;
+ 	int ret;
+ 
+ 	min = (res->flags & IORESOURCE_IO) ? PCIBIOS_MIN_IO : PCIBIOS_MIN_MEM;
++	alignf = host->align_resource ?: pcibios_align_resource;
+ 
+ 	/*
+ 	 * First, try exact prefetching match.  Even if a 64-bit
+@@ -215,7 +219,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	 */
+ 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
+ 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
+-				     pcibios_align_resource, dev);
++				     alignf, dev);
+ 	if (ret == 0)
+ 		return 0;
+ 
+@@ -227,7 +231,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
+ 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
+ 					     IORESOURCE_PREFETCH,
+-					     pcibios_align_resource, dev);
++					     alignf, dev);
+ 		if (ret == 0)
+ 			return 0;
+ 	}
+@@ -240,7 +244,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	 */
+ 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
+ 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
+-					     pcibios_align_resource, dev);
++					     alignf, dev);
+ 
+ 	return ret;
+ }
+
+
+If we decide constantly calling find_pci_host_bridge() is too expensive, we can
+be more clever about it.
+
+	Arnd
