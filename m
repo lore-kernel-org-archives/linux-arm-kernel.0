@@ -1,39 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Oct 2014 12:46:39 +0200
-Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
-In-Reply-To: <20141001102419.GA2085@arch.hh.imgtec.org>
-References: <1811108.CcWEs0vKNL@wuerfel> <1943672.dOtqDNIvT0@wuerfel>
- <20141001102419.GA2085@arch.hh.imgtec.org>
-Message-ID: <2061777.ebdfGlRHlL@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Oct 2014 11:56:59 +0100
+Subject: [PATCH] arm64: Use and error-check DMA_ERROR_CODE
+In-Reply-To: <20141001101323.GB2587@arm.com>
+References: <1412108121-19262-1-git-send-email-seanpaul@chromium.org>
+ <20141001101323.GB2587@arm.com>
+Message-ID: <20141001105659.GF12702@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 07:24:19 Ezequiel Garcia wrote:
+On Wed, Oct 01, 2014 at 11:13:23AM +0100, Will Deacon wrote:
+> On Tue, Sep 30, 2014 at 09:15:21PM +0100, Sean Paul wrote:
+> > This patch replaces the static assignment of ~0 to dma_handle with
+> > DMA_ERROR_CODE to be consistent with other platforms.
 > > 
-> > config MTD_NAND_OMAP_BCH_BUILD
-> >       def_tristate MTD_NAND_OMAP2 && MTD_NAND_OMAP_BCH
+> > In addition to that, it also adds a check for DMA_ERROR_CODE before
+> > calling __dma_free_coherent with an invalid dma_handle.
 > > 
-> > which makes it 'm' if MTD_NAND_OMAP_BCH is set to m.
+> > Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> > ---
+> >  arch/arm64/mm/dma-mapping.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
 > > 
+> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> > index 4164c5a..69fd2c4 100644
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -125,7 +125,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
+> >  no_map:
+> >  	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
+> >  no_mem:
+> > -	*dma_handle = ~0;
+> > +	*dma_handle = DMA_ERROR_CODE;
+> >  	return NULL;
+> >  }
+> >  
+> > @@ -136,7 +136,9 @@ static void __dma_free_noncoherent(struct device *dev, size_t size,
+> >  	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
+> >  
+> >  	vunmap(vaddr);
+> > -	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
+> > +
+> > +	if (dma_handle != DMA_ERROR_CODE)
+> > +		__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
 > 
-> Just to clarify, you are talking about this one being the correct one,
-> right?
-> 
-> http://article.gmane.org/gmane.linux.ports.arm.omap/118488
-> "[PATCH 3/3] mtd: nand: Force omap_elm to be built as a module if omap2_nand is a module"
-> 
-> 
+> Is it legal to try and free a DMA buffer after a failed allocation? If so, I
+> think we need something similar for arch/arm/.
 
-Yes. The four lines you have in there
+If the allocation failed, we don't even have a vaddr to unmap, so I
+don't see the reason for the additional check.
 
-+config MTD_NAND_OMAP_BCH_BUILD
-+	tristate
-+	depends on MTD_NAND_OMAP2
-+	default m if MTD_NAND_OMAP2=m && MTD_NAND_OMAP_BCH
-+	default y if MTD_NAND_OMAP2=y && MTD_NAND_OMAP_BCH
-
-should be entirely equivalent to the two lines I wrote above, so my version
-is just a readability change, functionally they both are correct as far as
-I can tell.
-
-	Arnd
+-- 
+Catalin
