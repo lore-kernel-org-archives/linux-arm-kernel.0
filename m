@@ -1,67 +1,74 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 1 Oct 2014 12:32:09 +0300
-Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
-In-Reply-To: <1811108.CcWEs0vKNL@wuerfel>
-References: <1811108.CcWEs0vKNL@wuerfel>
-Message-ID: <542BCA19.8050603@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 1 Oct 2014 11:33:14 +0200
+Subject: [PATCH v2 1/7] ARM: sunxi: Introduce Allwinner A80 support
+In-Reply-To: <CAGb2v64LwgEZkiuej2KKi+CUU3OkUZaBKJ3ZZn_Y64tDD+LRwg@mail.gmail.com>
+References: <1411570141-29960-1-git-send-email-wens@csie.org>
+ <1411570141-29960-2-git-send-email-wens@csie.org>
+ <20140925132527.GF15315@lukather>
+ <CAGb2v64LwgEZkiuej2KKi+CUU3OkUZaBKJ3ZZn_Y64tDD+LRwg@mail.gmail.com>
+Message-ID: <20141001093314.GI6884@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Brian,
-
-On 09/30/2014 03:04 PM, Arnd Bergmann wrote:
-> If the OMAP nand driver is built-in but the BCH driver is a module,
-> we get a link-time error:
+On Sat, Sep 27, 2014 at 09:16:02PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Sep 25, 2014 at 9:25 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Wed, Sep 24, 2014 at 10:48:55PM +0800, Chen-Yu Tsai wrote:
+> >> The Allwinner A80 is a new Cortex octo-core A7/A15 big.LITTLE SoC.
+> >> While it's processor cores and interconnecting bus are new, it
+> >> re-uses many peripherals found in earlier Allwinner SoCs.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/mach-sunxi/Kconfig | 5 +++++
+> >>  arch/arm/mach-sunxi/sunxi.c | 9 +++++++++
+> >>  2 files changed, 14 insertions(+)
+> >>
+> >> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> >> index 1aaa1e1..72f222b 100644
+> >> --- a/arch/arm/mach-sunxi/Kconfig
+> >> +++ b/arch/arm/mach-sunxi/Kconfig
+> >> @@ -42,4 +42,9 @@ config MACH_SUN8I
+> >>       select MFD_SUN6I_PRCM
+> >>       select RESET_CONTROLLER
+> >>
+> >> +config MACH_SUN9I
+> >> +     bool "Allwinner A80 (sun9i) SoCs support"
+> >
+> > With the new naming scheme, I wonder wether it makes sense to have the
+> > A80 displayed here and in the machine definition.
 > 
-> drivers/built-in.o: In function `omap_elm_correct_data':
-> :(.text+0x174e88): undefined reference to `elm_decode_bch_error_page'
-> drivers/built-in.o: In function `omap_nand_probe':
-> :(.text+0x175b48): undefined reference to `elm_config'
+> I expect anything that falls under sun9i to be compatible, or a trimmed
+> down version. But that's just me.
+
+Well, compatible is a rather vague notion. They will be different for
+sure. Maybe not that different, but still.
+
+> We know that Allwinner has released the A33, which should be compatible
+> with the A23, sun8i.
+
+Except that it would not be straight forward for an A33 user for
+example that he needs to enable the A23 support.
+
+> And the A83 has been announced, which looks like a trimmed down
+> version of the A80. The next SoC should be arm64, and would not
+> matter here.
 > 
-> There are two possible ways to deal with this, either prevent that
-> configuration in Kconfig or make sure we don't reference the ELM
-> driver in this case.
-> 
-> This patch picks the second approach, which makes it possible to
-> use the ELM driver in other modules while still having the OMAP
-> NAND driver built-in.
+> Kevin, Shuge, could you provide us with the codenames for the A33 and
+> A83, and what earlier SoC they are based on?
 
-With this patch NAND probe on DRA7xx fails like so
+Even though it would be nice to know, it's not really the issue here.
 
-[    2.077313] omap-gpmc 50000000.gpmc: GPMC revision 6.0
-[    2.083842] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
-[    2.090524] nand: Micron MT29F2G16ABAEAWP
-[    2.094728] nand: 256MiB, SLC, page size: 2048, OOB size: 64
-[    2.100745] nand: using OMAP_ECC_BCH8_CODE_HW ECC scheme
-[    2.109764] omap2-nand: probe of omap2-nand.0 failed with error -38
+Maxime
 
-OMAP NAND driver is the only user of the ELM module and we want it
-to be usable in all possible configurations when enabled.
-
-Let's pick either one of the below patches instead
-
-http://article.gmane.org/gmane.linux.ports.arm.omap/118488
-OR
-http://article.gmane.org/gmane.linux.ports.arm.omap/118847
-
-cheers,
--roger
-
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 93af53b8633c ("nand: omap2: Remove horrible ifdefs to fix module probe")
-> 
-> diff --git a/include/linux/platform_data/elm.h b/include/linux/platform_data/elm.h
-> index b8686c00f15f..cbca66ce7c10 100644
-> --- a/include/linux/platform_data/elm.h
-> +++ b/include/linux/platform_data/elm.h
-> @@ -42,7 +42,7 @@ struct elm_errorvec {
->  	int error_loc[16];
->  };
->  
-> -#if IS_ENABLED(CONFIG_MTD_NAND_OMAP_BCH)
-> +#if defined(CONFIG_MTD_NAND_OMAP_BCH) || (defined(CONFIG_MTD_NAND_OMAP_BCH_MODULE) && defined(MODULE))
->  void elm_decode_bch_error_page(struct device *dev, u8 *ecc_calc,
->  		struct elm_errorvec *err_vec);
->  int elm_config(struct device *dev, enum bch_ecc bch_type,
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/0767e0c3/attachment.sig>
