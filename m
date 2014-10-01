@@ -1,26 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Oct 2014 16:39:30 +0200
-Subject: [GIT PULL] qcom defconfig changes for v3.18
-In-Reply-To: <676B1050-4098-4E8C-A60D-07D86C3BF289@codeaurora.org>
-References: <676B1050-4098-4E8C-A60D-07D86C3BF289@codeaurora.org>
-Message-ID: <201410011639.31055.arnd@arndb.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 1 Oct 2014 10:40:02 -0400
+Subject: [PATCHv2 5/5] arm64: Trace emulation of AArch32 legacy
+ instructions
+In-Reply-To: <1412165279-8709-6-git-send-email-punit.agrawal@arm.com>
+References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
+ <1412165279-8709-6-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20141001104002.4efbde6f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 September 2014, Kumar Gala wrote:
-> Qualcomm ARM Based defconfig Updates for v3.18
+On Wed,  1 Oct 2014 13:07:59 +0100
+Punit Agrawal <punit.agrawal@arm.com> wrote:
+
+> Introduce an event to trace the usage of emulated instructions. The
+> trace event is intended to help identify and encourage the migration
+> of legacy software using the emulation features.
 > 
-> * General defconfig update to match upstream changes
-> * Enable IPQ806x & APQ8084 clk support
-> * Enable pinctrl on MSM8960 & APQ8084
-> * Enable CPU_IDLE to get basic wfi support
-> * Enable SPI NOR and MTD M25P80 support (used on AP148 board)
-> * Enable SATA PHY support on IPQ806x and APQ8064
-> * Enable Fixed regulator and ARM MMCI support (mmc support on APQ8064)
+> Use this event to trace usage of swp and CP15 barrier emulation.
 
-This seems harmless, so I've pulled it into next/defconfig now.
-Sorry for the delay, I basically stopped pulling anything that only
-came in last week when it seemed that we'd have merge window opening
-already.
+Do you expect this to be a generic tracepoint? Something any arch can
+use, and more importantly, will use?
 
-	Arnd
+If not, please keep this tracepoint in the arch/arm64 directories. The
+sample code in samples/trace_events/ explains how to do this.
+
+Thanks,
+
+-- Steve
