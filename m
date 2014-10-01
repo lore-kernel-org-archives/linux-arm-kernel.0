@@ -1,54 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Oct 2014 22:50:43 +0100
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 01 Oct 2014 15:09:29 -0700
 Subject: [PATCH 2/3] ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp
  implementations
-In-Reply-To: <541C74C1.9060504@codeaurora.org>
+In-Reply-To: <20141001215043.GS5182@n2100.arm.linux.org.uk>
 References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
  <1411076592-6157-3-git-send-email-sboyd@codeaurora.org>
  <20140918224625.GF5182@n2100.arm.linux.org.uk>
  <541C74C1.9060504@codeaurora.org>
-Message-ID: <20141001215043.GS5182@n2100.arm.linux.org.uk>
+ <20141001215043.GS5182@n2100.arm.linux.org.uk>
+Message-ID: <542C7B99.60500@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 19, 2014 at 11:24:01AM -0700, Stephen Boyd wrote:
-> Thank you for the warm welcome! I looked at the TRMs for ARM11 and ARM9.
-> I can't find anywhere where VFPv2 is supported and these bits are set.
-> 
-> Bits 22-16 of FPSID:
-> 
-> ARM1136r1p5:     0x01
-> ARM1136r1p3:     0x01
-> ARM1176:         0x01
-> ARM11MPCorer2p0: 0x01
-> ARM11MPCorer1p0: 0x01
-> ARM1156:         0x01
-> ARM9:            0x01
-> 
-> 
-> Do you, or anyone else, know of other implementations? I *hope* that
-> this same exercise was done by the VFP architects before they
-> re-purposed bits but who knows. If nobody is actually setting these
-> higher bits then is there any problem widening the mask (besides it
-> being slightly confusing)?
+On 10/01/14 14:50, Russell King - ARM Linux wrote:
+> On Fri, Sep 19, 2014 at 11:24:01AM -0700, Stephen Boyd wrote:
+>>
+>> Do you, or anyone else, know of other implementations? I *hope* that
+>> this same exercise was done by the VFP architects before they
+>> re-purposed bits but who knows. If nobody is actually setting these
+>> higher bits then is there any problem widening the mask (besides it
+>> being slightly confusing)?
+> There are certainly non-ARM implementations around, eg:
+>
+> VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 5
 
-There are certainly non-ARM implementations around, eg:
+Can you provide the raw value of the id register or at least bits 22:16?
+This print is currently masking off the bits so we don't know what's
+there. All we know is that bit 20 is not set because it doesn't fail to
+initialize vfp.
 
-VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 5
+>
+> which is from Marvell Dove.  I don't know how the other Marvell offerings
+> identify.  I wouldn't be surprised if there were other implementations
+> from other vendors too.
+>
+> However, if we do have any implementation which indicates that it does
+> not support both single and double precision ops (bit 20), then today
+> the VFP support code refuses to initialise, and the system will behave
+> as if there is no VFP present.
+>
+> So, the problem case is whether we do have non-ARM produced implementations
+> where the VFP code refuses to init, which would then be misidentified as
+> some insane architecture version.
+>
 
-which is from Marvell Dove.  I don't know how the other Marvell offerings
-identify.  I wouldn't be surprised if there were other implementations
-from other vendors too.
+I'm not aware of anything. You would know better than I though.
 
-However, if we do have any implementation which indicates that it does
-not support both single and double precision ops (bit 20), then today
-the VFP support code refuses to initialise, and the system will behave
-as if there is no VFP present.
+That check assumes a v2. We should update that check to only look for v2
+or less (this isn't based on the current patch but can be squashed in).
 
-So, the problem case is whether we do have non-ARM produced implementations
-where the VFP code refuses to init, which would then be misidentified as
-some insane architecture version.
+---8<---
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 2f37e1d6cb45..22d6a1171a4e 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -738,14 +738,18 @@ static int __init vfp_init(void)
+ 	vfp_vector = vfp_null_entry;
+ 
+ 	pr_info("VFP support v0.3: ");
+-	if (VFP_arch)
++	if (VFP_arch) {
+ 		pr_cont("not present\n");
+-	else if (vfpsid & FPSID_NODOUBLE) {
+-		pr_cont("no double precision support\n");
+ 	} else {
+ 		hotcpu_notifier(vfp_hotplug, 0);
+ 
+ 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
++
++		if (VFP_arch < 2 && (vfpsid & FPSID_NODOUBLE)) {
++			pr_cont("no double precision support\n");
++			return 0;
++		}
++
+ 		pr_cont("implementor %02x architecture %d part %02x variant %x rev %x\n",
+ 			(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
+ 			(vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT,
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
