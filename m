@@ -1,40 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 1 Oct 2014 10:45:48 -0300
-Subject: [PATCH v3 2/4] ARM: dts: pbab01: enable I2S audio on
- phyFLEX-i.MX6 boards
-In-Reply-To: <542C0441.5080508@sam-solutions.com>
-References: <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410854903-26419-3-git-send-email-d.lavnikevich@sam-solutions.com>
- <CAOMZO5CgrQ6Wf6kStga40TUKx9dARygCNB4OYSUoG3c8eUYbrA@mail.gmail.com>
- <542C0441.5080508@sam-solutions.com>
-Message-ID: <CAOMZO5BS6X2NTY4q7RKoKdhJNbEANSa2wXur3_Hyxp8nQn5Avw@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed,  1 Oct 2014 15:45:29 +0200
+Subject: [PATCH 2/2] ARM: BCM5301X: Add LEDs for Netgear R6250 V1
+In-Reply-To: <1412171129-31482-1-git-send-email-zajec5@gmail.com>
+References: <1412171129-31482-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1412171129-31482-2-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 10:40 AM, Dmitry Lavnikevich
-<d.lavnikevich@sam-solutions.com> wrote:
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts | 34 +++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
->> No need to have this 'regulator-always-on'
->>
->
-> why is there no need for 'regulator-alweys-on'? I see it in
-
-For a regulator that is not GPIO controlled you don't need to pass
-'regulator-always-on'.
-
->
->>> +&ssi2 {
->>> +       fsl,mode = "i2s-slave";
->>
->>
->> Please remove this 'fsl,mode' property. It is ignored by the fsl_ssi
->> driver.
->
->
-> yes, thanks. It is present in Documentation but now I see that it
-> was actually removed not that long ago. I will remove this
-> property with next patchset.
-
-Correct, I recently sent a patch removing it and it is in Mark's tree now:
-https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/commit/?h=topic/fsl-ssi&id=b93427b1c057841602e0fe2005153a6e82f2e658
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+index 3b5259d..58d999d 100644
+--- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+@@ -32,4 +32,38 @@
+ 			status = "okay";
+ 		};
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		logo {
++			label = "bcm53xx:white:logo";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		power0 {
++			label = "bcm53xx:green:power";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		power1 {
++			label = "bcm53xx:amber:power";
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		usb {
++			label = "bcm53xx:blue:usb";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		wireless {
++			label = "bcm53xx:blue:wireless";
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++	};
+ };
+-- 
+1.8.4.5
