@@ -1,126 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Oct 2014 11:38:45 +0200
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <2430078.s4snyh5OoF@wuerfel>
- <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
-Message-ID: <3256560.C0cZnIlnAv@wuerfel>
+Date: Wed, 01 Oct 2014 11:56:07 +0200
+Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
+In-Reply-To: <542BCA19.8050603@ti.com>
+References: <1811108.CcWEs0vKNL@wuerfel> <542BCA19.8050603@ti.com>
+Message-ID: <1943672.dOtqDNIvT0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 09:46:26 Liviu Dudau wrote:
-> On Tue, Sep 30, 2014 at 09:01:14PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 30 September 2014 20:54:41 Arnd Bergmann wrote:
-> > > On Tuesday 30 September 2014 18:48:21 Liviu Dudau wrote:
-> > > > > > > > These are the functions I found that refer to pci_sys_data on arm32:
-> > > > > > > > 
-> > > > > > > > pcibios_add_bus
-> > > > > > > > pcibios_remove_bus
-> > > > 
-> > > > These are only needed if you want to do per HB processing of the bus
-> > > > 
-> > > > > > > > pcibios_align_resource
-> > > > 
-> > > > mvebu is the only user of this function.
-> > > > 
-> > > > > > > > pci_mmap_page_range
-> > > > 
-> > > > This is only needed when mapping a PCI resource to userspace. Is that your case here?
-> > > > 
-> > > > > > > > pci_domain_nr
-> > > > > > > > pci_proc_domain
-> > > > 
-> > > > We have equivalent functionality in the generic patches for those.
-> > > > 
-> > > 
-> > > We clearly don't need those functions for the new drivers, but that's not
-> > > the point. The problem is that when you build a kernel that has both
-> > > a traditional host bridge driver and a new one in it, you always get those
-> > > functions and they get called from the PCI core, with incorrect arguments.
-> > 
-> > FWIW, the last time we discussed this, I think I had suggested that the
-> > functions that are currently architecture specific and have a generic
-> > __weak fallback could become function pointers in a per-host structure
-> > passed to pci_scan_root_bus, either a new structure or an extended
-> > struct pci_ops. Something along these lines:
+On Wednesday 01 October 2014 12:32:09 Roger Quadros wrote:
 > 
-> Agree to the general idea. But have a look why host drivers need the add_bus ops:
-> to add MSI information into the bus!! If we take care of the MSI in the generic
-> code there is less of a need for this function at all.
+> With this patch NAND probe on DRA7xx fails like so
+> 
+> [    2.077313] omap-gpmc 50000000.gpmc: GPMC revision 6.0
+> [    2.083842] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
+> [    2.090524] nand: Micron MT29F2G16ABAEAWP
+> [    2.094728] nand: 256MiB, SLC, page size: 2048, OOB size: 64
+> [    2.100745] nand: using OMAP_ECC_BCH8_CODE_HW ECC scheme
+> [    2.109764] omap2-nand: probe of omap2-nand.0 failed with error -38
+> 
+> OMAP NAND driver is the only user of the ELM module and we want it
+> to be usable in all possible configurations when enabled.
 
+I don't understand. Is the BCH driver optional or not?
 
-Right, if we can eliminate the need for some or all of the functions above,
-we don't have to abstract them any more.
+The help text says:
 
-pcibios_remove_bus can just go away entirely, we don't have a single driver
-on ARM that implements it. pcibios_add_bus as you say is just used for MSI
-at the moment, and we could get rid of it by just moving the msi_chip
-reference from pci_bus into pci_host_bridge. 
+          This config enables the ELM hardware engine, which can be used to
+          locate and correct errors when using BCH ECC scheme. This offloads
+          the cpu from doing ECC error searching and correction. However some
+          legacy OMAP families like OMAP2xxx, OMAP3xxx do not have ELM engine
+          so they should not enable this config symbol.
 
-The arm32 implementations of pci_domain_nr/pci_proc_domain can probably be
-removed if we change the arm32 pcibios_init_hw function to call the new
-interfaces that set the domain number.
+which adds more to the confusion. The help text sounds like everything should
+work even if ELM is disabled (which contradicts your finding above) but you
+must not enable the driver if you are on an older machine (which would
+break multiplatform builds).
 
-pci_mmap_page_range could either get generalized some more in an attempt
-to have a __weak default implementation that works on ARM, or it could
-be changed to lose the dependency on pci_sys_data instead. In either
-case, the change would involve using the generic pci_host_bridge_window
-list.
+> Let's pick either one of the below patches instead
+> 
+> http://article.gmane.org/gmane.linux.ports.arm.omap/118488
 
-pcibios_align_resource should probably be per host, and we could move
-that into a pointer in pci_host_bridge, something like this:
+This doesn't let you have the BCH driver as a module, which seems
+wrong.
 
-diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
-index b7c3a5ea1fca..d9cb6c916d54 100644
---- a/drivers/pci/setup-res.c
-+++ b/drivers/pci/setup-res.c
-@@ -200,11 +200,15 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
- static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 		int resno, resource_size_t size, resource_size_t align)
- {
-+	struct pci_host_bridge *host = find_pci_host_bridge(bus);
-+	resource_size_t (*alignf)(void *, const struct resource *,
-+				  resource_size_t, resource_size_t),
- 	struct resource *res = dev->resource + resno;
- 	resource_size_t min;
- 	int ret;
- 
- 	min = (res->flags & IORESOURCE_IO) ? PCIBIOS_MIN_IO : PCIBIOS_MIN_MEM;
-+	alignf = host->align_resource ?: pcibios_align_resource;
- 
- 	/*
- 	 * First, try exact prefetching match.  Even if a 64-bit
-@@ -215,7 +219,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
--				     pcibios_align_resource, dev);
-+				     alignf, dev);
- 	if (ret == 0)
- 		return 0;
- 
-@@ -227,7 +231,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 					     IORESOURCE_PREFETCH,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 		if (ret == 0)
- 			return 0;
- 	}
-@@ -240,7 +244,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 
- 	return ret;
- }
+> http://article.gmane.org/gmane.linux.ports.arm.omap/118847
 
+Looks good, although I think you can simplify this to
 
-If we decide constantly calling find_pci_host_bridge() is too expensive, we can
-be more clever about it.
+config MTD_NAND_OMAP_BCH_BUILD
+	def_tristate MTD_NAND_OMAP2 && MTD_NAND_OMAP_BCH
+
+which makes it 'm' if MTD_NAND_OMAP_BCH is set to m.
 
 	Arnd
