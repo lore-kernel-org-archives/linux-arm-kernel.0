@@ -1,99 +1,70 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 1 Oct 2014 11:17:23 -0700
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20141001073043.GA18463@ulmo>
-References: <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum>
- <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
- <20140929101805.GB26008@ulmo>
- <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
- <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
- <20140929135358.GC30998@ulmo> <20140930213753.19023.17605@quantum>
- <20141001073043.GA18463@ulmo>
-Message-ID: <CAPtuhTgJ7TLg8CKe3pQiBeEw9s33UrYEXPj6SDCga2yAh7WfEA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Oct 2014 19:19:59 +0100
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <20141001180909.GE14991@redhat.com>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com>
+ <1412106877.6630.45.camel@smoke>
+ <20141001161621.GA28440@leverpostej>
+ <20141001174714.GD14991@redhat.com>
+ <20141001180304.GC5788@leverpostej>
+ <20141001180909.GE14991@redhat.com>
+Message-ID: <20141001181959.GD5788@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 12:30 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Tue, Sep 30, 2014 at 02:37:53PM -0700, Mike Turquette wrote:
->> Quoting Thierry Reding (2014-09-29 06:54:00)
->> > On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
->> > > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
->> > > > > >> Plus, speaking more specifically about the clocks, that won't prevent
->> > > > > >> your clock to be shut down as a side effect of a later clk_disable
->> > > > > >> call from another driver.
->> > > > >
->> > > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
->> > > > > > preceding clk_enable()? There are patches being worked on that will
->> > > > > > enable per-user clocks and as I understand it they will specifically
->> > > > > > disallow drivers to disable the hardware clock if other drivers are
->> > > > > > still keeping them on via their own referenc.
->> > > > >
->> > > > > Calling clk_disable() preceding clk_enable() is a bug.
->> > > > >
->> > > > > Calling clk_disable() after clk_enable() will disable the clock (and
->> > > > > its parents)
->> > > > > if the clock subsystem thinks there are no other users, which is what will
->> > > > > happen here.
->> > > >
->> > > > Right. I'm not sure this is really applicable to this situation, though.
->> > >
->> > > It's actually very easy to do. Have a driver that probes, enables its
->> > > clock, fails to probe for any reason, call clk_disable in its exit
->> > > path. If there's no other user at that time of this particular clock
->> > > tree, it will be shut down. Bam. You just lost your framebuffer.
->> > >
->> > > Really, it's just that simple, and relying on the fact that some other
->> > > user of the same clock tree will always be their is beyond fragile.
->> >
->> > Perhaps the meaning clk_ignore_unused should be revised, then. What you
->> > describe isn't at all what I'd expect from such an option. And it does
->> > not match the description in Documentation/kernel-parameters.txt either.
->>
->> From e156ee56cbe26c9e8df6619dac1a993245afc1d5 Mon Sep 17 00:00:00 2001
->> From: Mike Turquette <mturquette@linaro.org>
->> Date: Tue, 30 Sep 2014 14:24:38 -0700
->> Subject: [PATCH] doc/kernel-parameters.txt: clarify clk_ignore_unused
->>
->> Refine the definition around clk_ignore_unused, which caused some
->> confusion recently on the linux-fbdev and linux-arm-kernel mailing
->> lists[0].
->>
->> [0] http://lkml.kernel.org/r/<20140929135358.GC30998@ulmo>
->>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
->> ---
->> Thierry,
->>
->> Please let me know if this wording makes the feature more clear.
->
-> I think that's better than before, but I don't think it's accurate yet.
-> As pointed out by Maxime unused clock may still be disabled if it's part
-> of a tree and that tree is being disabled because there are no users
-> left.
+On Wed, Oct 01, 2014 at 07:09:09PM +0100, Vivek Goyal wrote:
+> On Wed, Oct 01, 2014 at 07:03:04PM +0100, Mark Rutland wrote:
+> > On Wed, Oct 01, 2014 at 06:47:14PM +0100, Vivek Goyal wrote:
+> > > On Wed, Oct 01, 2014 at 05:16:21PM +0100, Mark Rutland wrote:
+> > > 
+> > > [..]
+> > > > I'm still rather unhappy about the mechanism by which the DTB is passed
+> > > > by userspace and detected by the kernel, as I'd prefer that the user
+> > > > explictly stated which segment they wanted to pass to the (Linux)
+> > > > kernel, but that would require reworking the kexec syscall to allow
+> > > > per-segment info/flags.
+> > > 
+> > > Why does the running kernel need to know about dtb segment.  I see following.
+> > > 
+> > > ldr     x0, kexec_dtb_addr
+> > > 
+> > > IIUC, we are loading this address in x0. Can't we do something similar
+> > > in user space with purgatory. I mean first jump to purgatory (code
+> > > compiled in user space but runs prviliged) and that code takes care
+> > > of loading x0 with right dtb addr and then jump to final kernel.
+> > 
+> > I believe the fundamental issue here is a lack of a userspace-provided
+> > purgatory.
+> > 
+> > I agree that userspace purgatory code could set this up. That would
+> > address my concerns w.r.t. detecting the DTB kernel-side, as there would
+> > be no need. It would also address my concerns with booting OSs other
+> > than Linux, as the purgatory code could do whatever was appropriate for
+> > whatever OS image was loaded.
+> > 
+> > So in my view, a userspace-provided purgatory that set up the state the
+> > next kernel expected would be preferable. That could be as simple as
+> > setting up the registers and branching -- I assume we'd have the first
+> > kernel perform the required cache maintenance.
+> 
+> Apart from setting various registers, we also verify the sha256 checksums
+> of loaded segments in purgatory to make sure segments are not corrupted.
+> On x86, we also take care of backing up first 640KB of memory in reserved
+> area in kdump case. 
 
-It is entirely accurate. This feature does in fact "prevent the clock
-framework from *automatically* gating clock ...".
+I was under the (possibly mistaken) impression that for kdump the second
+kernel lived and ran at a high address so as to preserve memory in use
+by the first kernel. Is the first 640KiB is special on x86, or is does
+it have some kdump-specific use?
 
-And it was merged by Olof so that he could use simplefb with the Chromebook!
+> So other arches are already doing all this in purgatory. It would be nice
+> if arm64 sticks to that convention too.
+> 
+> First kernel --> purgatory ----> second kernel.
 
->
-> What I had argued is that it's unexpected behavior, because the clock
-> is still unused (or becomes unused again), therefore shouldn't be
-> disabled at that point either.
+That would also be my preference, especially given the flexibility this
+would leave.
 
-Leaving clocks enabled because nobody claimed them is not an option.
-
->
-> So if you want to keep the current behaviour where an unused clock can
-> still be disabled depending on what other users do, then I think it'd be
-> good to mention that as a potential caveat.
-
-Do you have a suggestion on the wording?
-
-Thanks,
-Mike
-
->
-> Thierry
+Mark.
