@@ -1,87 +1,124 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 1 Oct 2014 09:30:47 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140930213753.19023.17605@quantum>
-References: <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
- <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
- <20140929135358.GC30998@ulmo> <20140930213753.19023.17605@quantum>
-Message-ID: <20141001073043.GA18463@ulmo>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  1 Oct 2014 09:32:05 +0200
+Subject: [PATCH 1/2] ARM: realview: basic device tree implementation
+Message-ID: <1412148725-24519-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 02:37:53PM -0700, Mike Turquette wrote:
-> Quoting Thierry Reding (2014-09-29 06:54:00)
-> > On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
-> > > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
-> > > > > >> Plus, speaking more specifically about the clocks, that won't prevent
-> > > > > >> your clock to be shut down as a side effect of a later clk_disable
-> > > > > >> call from another driver.
-> > > > > 
-> > > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
-> > > > > > preceding clk_enable()? There are patches being worked on that will
-> > > > > > enable per-user clocks and as I understand it they will specifically
-> > > > > > disallow drivers to disable the hardware clock if other drivers are
-> > > > > > still keeping them on via their own referenc.
-> > > > > 
-> > > > > Calling clk_disable() preceding clk_enable() is a bug.
-> > > > > 
-> > > > > Calling clk_disable() after clk_enable() will disable the clock (and
-> > > > > its parents)
-> > > > > if the clock subsystem thinks there are no other users, which is what will
-> > > > > happen here.
-> > > > 
-> > > > Right. I'm not sure this is really applicable to this situation, though.
-> > > 
-> > > It's actually very easy to do. Have a driver that probes, enables its
-> > > clock, fails to probe for any reason, call clk_disable in its exit
-> > > path. If there's no other user at that time of this particular clock
-> > > tree, it will be shut down. Bam. You just lost your framebuffer.
-> > > 
-> > > Really, it's just that simple, and relying on the fact that some other
-> > > user of the same clock tree will always be their is beyond fragile.
-> > 
-> > Perhaps the meaning clk_ignore_unused should be revised, then. What you
-> > describe isn't at all what I'd expect from such an option. And it does
-> > not match the description in Documentation/kernel-parameters.txt either.
-> 
-> From e156ee56cbe26c9e8df6619dac1a993245afc1d5 Mon Sep 17 00:00:00 2001
-> From: Mike Turquette <mturquette@linaro.org>
-> Date: Tue, 30 Sep 2014 14:24:38 -0700
-> Subject: [PATCH] doc/kernel-parameters.txt: clarify clk_ignore_unused
-> 
-> Refine the definition around clk_ignore_unused, which caused some
-> confusion recently on the linux-fbdev and linux-arm-kernel mailing
-> lists[0].
-> 
-> [0] http://lkml.kernel.org/r/<20140929135358.GC30998@ulmo>
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
-> Thierry,
-> 
-> Please let me know if this wording makes the feature more clear.
+This implements basic device tree boot support for the RealView
+platforms, with a basic device tree for ARM PB1176 as an example.
 
-I think that's better than before, but I don't think it's accurate yet.
-As pointed out by Maxime unused clock may still be disabled if it's part
-of a tree and that tree is being disabled because there are no users
-left.
+The implementation is done with a new DT-specific board file
+using only pre-existing bindings for the basic IRQ, timer and
+serial port drivers. A new compatible type is added to the GIC
+for the ARM1176.
 
-What I had argued is that it's unexpected behaviour, because the clock
-is still unused (or becomes unused again), therefore shouldn't be
-disabled at that point either.
+This implementation uses the MFD syscon handle from day one to
+access the system controller registers, and register the devices
+using the SoC bus.
 
-So if you want to keep the current behaviour where an unused clock can
-still be disabled depending on what other users do, then I think it'd be
-good to mention that as a potential caveat.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Herring <robh@kernel.org>
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v6->v7:
+- Split in two patches, one with the machine changes, one with
+  the device tree and binding portions.
+---
+ arch/arm/mach-realview/Kconfig       | 13 +++++++++++++
+ arch/arm/mach-realview/Makefile      |  1 +
+ arch/arm/mach-realview/realview-dt.c | 32 ++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c            |  2 ++
+ 4 files changed, 48 insertions(+)
+ create mode 100644 arch/arm/mach-realview/realview-dt.c
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/0e90b079/attachment.sig>
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index 9db2029aa632..565925f37dc5 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -1,6 +1,19 @@
+ menu "RealView platform type"
+ 	depends on ARCH_REALVIEW
+ 
++config REALVIEW_DT
++	bool "Support RealView(R) Device Tree based boot"
++	select ARM_GIC
++	select MFD_SYSCON
++	select POWER_RESET
++	select POWER_RESET_VERSATILE
++	select POWER_SUPPLY
++	select SOC_REALVIEW
++	select USE_OF
++	help
++	  Include support for booting the ARM(R) RealView(R) evaluation
++	  boards using a device tree machine description.
++
+ config MACH_REALVIEW_EB
+ 	bool "Support RealView(R) Emulation Baseboard"
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-realview/Makefile b/arch/arm/mach-realview/Makefile
+index 541fa4c109ef..e07fdf7ae8a7 100644
+--- a/arch/arm/mach-realview/Makefile
++++ b/arch/arm/mach-realview/Makefile
+@@ -3,6 +3,7 @@
+ #
+ 
+ obj-y					:= core.o
++obj-$(CONFIG_REALVIEW_DT)		+= realview-dt.o
+ obj-$(CONFIG_MACH_REALVIEW_EB)		+= realview_eb.o
+ obj-$(CONFIG_MACH_REALVIEW_PB11MP)	+= realview_pb11mp.o
+ obj-$(CONFIG_MACH_REALVIEW_PB1176)	+= realview_pb1176.o
+diff --git a/arch/arm/mach-realview/realview-dt.c b/arch/arm/mach-realview/realview-dt.c
+new file mode 100644
+index 000000000000..cc28b89dd48f
+--- /dev/null
++++ b/arch/arm/mach-realview/realview-dt.c
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (C) 2014 Linaro Ltd.
++ *
++ * Author: Linus Walleij <linus.walleij@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2, as
++ * published by the Free Software Foundation.
++ *
++ */
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/hardware/cache-l2x0.h>
++#include "core.h"
++
++static const char *realview_dt_platform_compat[] __initconst = {
++	"arm,realview-eb",
++	"arm,realview-pb1176",
++	"arm,realview-pb11mp",
++	"arm,realview-pba8",
++	"arm,realview-pbx",
++	NULL,
++};
++
++DT_MACHINE_START(REALVIEW_DT, "ARM RealView Machine (Device Tree Support)")
++#ifdef CONFIG_ZONE_DMA
++	.dma_zone_size	= SZ_256M,
++#endif
++	.dt_compat	= realview_dt_platform_compat,
++	.l2c_aux_val = 0x0,
++	.l2c_aux_mask = ~0x0,
++MACHINE_END
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4b959e606fe8..4e75e3f24a97 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1022,6 +1022,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ 	return 0;
+ }
+ IRQCHIP_DECLARE(gic_400, "arm,gic-400", gic_of_init);
++IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", gic_of_init);
++IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", gic_of_init);
+ IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
+ IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+ IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", gic_of_init);
+-- 
+1.9.3
