@@ -1,37 +1,72 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed,  1 Oct 2014 11:31:50 -0400
-Subject: [PATCH v2] arm64: Use DMA_ERROR_CODE to denote failed allocation
-In-Reply-To: <20141001135248.GQ5182@n2100.arm.linux.org.uk>
-References: <20141001135248.GQ5182@n2100.arm.linux.org.uk>
-Message-ID: <1412177510-26310-1-git-send-email-seanpaul@chromium.org>
+From: dianders@google.com (Doug Anderson)
+Date: Wed, 1 Oct 2014 08:38:19 -0700
+Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
+ handle regulators
+In-Reply-To: <15187164.uVE1eDb0Di@amdc1032>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <28242432.noIRZ0lve1@amdc1032>
+ <CAD=FV=W_KiXUU7SmGxTu-JzagW-zEs6AYAbrRMFU3KvppVk_BA@mail.gmail.com>
+ <15187164.uVE1eDb0Di@amdc1032>
+Message-ID: <CAD=FV=WHMDABaLA-3+PXX6r5hY=Yfq3XgDz6Mhg7b2aaKnPt7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the static assignment of ~0 to dma_handle with
-DMA_ERROR_CODE to be consistent with other platforms.
+Hi,
 
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
----
+On Wed, Oct 1, 2014 at 6:06 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Tuesday, September 30, 2014 10:22:34 AM Doug Anderson wrote:
+>> Bartlomiej
+>>
+>> On Mon, Sep 29, 2014 at 5:31 AM, Bartlomiej Zolnierkiewicz
+>> <b.zolnierkie@samsung.com> wrote:
+>> >
+>> > Hi,
+>> >
+>> > On Friday, August 29, 2014 01:34:44 PM Ulf Hansson wrote:
+>> >> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>> >> > This patch makes use of mmc_regulator_get_supply() to handle
+>> >> > the vmmc and vqmmc regulators.Also it moves the code handling
+>> >> > the these regulators to dw_mci_set_ios().It turned on the vmmc
+>> >> > and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+>> >> > during MMC_POWER_OFF.
+>> >> >
+>> >> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>> >>
+>> >> Thanks! Applied for next.
+>> >
+>> > Unfortunately this patch breaks mmc1 card (Kingston 32GB micro SDHC)
+>> > detection on Exynos5420 Arndale Octa for me:
+>> >
+>> > [   10.797979] dwmmc_exynos 12220000.mmc: no support for card's volts
+>> > [   10.797998] mmc1: error -22 whilst initialising SD card
+>> >
+>> > Without the patch:
+>> >
+>> > [   10.866926] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
+>> > [   10.866977] mmc1: new high speed SDHC card at address 1234
+>> > [   10.868730] mmcblk1: mmc1:1234 SA32G 29.3 GiB
+>> > [   10.915054]  mmcblk1: p1 p2 p3
+>> >
+>> > The config is attached (exynos_defconfig doesn't work correctly for
+>> > this board yet).
+>>
+>> Yup, this is an expected behavior, unfortunately.  This was talked
+>> about extensively during the review of this patch series.
+>
+> Do you mean that a patch with a known regression has been merged
+> into next branch of mmc tree?  It would be quite sad if it would be
+> true.
 
-Changes in v2:
-	- Removed the check for DMA_ERROR_CODE in __dma_free_noncoherent
-	  the function shouldn't be called after failed allocation
+...so looking at your "dts" file, it looks like this _isn't_ your
+problem.  Your "vmmc" regulator is listed as "always on", so I believe
+that you're OK.  Your regulator probably _shouldn't_ be "always on"
+(it prevents power cycling the SD card) but right now it's good that
+it is...
 
- arch/arm64/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 4164c5a..5687dd4 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -125,7 +125,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
- no_map:
- 	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
- no_mem:
--	*dma_handle = ~0;
-+	*dma_handle = DMA_ERROR_CODE;
- 	return NULL;
- }
- 
--- 
-2.1.1
+If any board has a "vmmc" that is not listed as always on then it
+would regress with the first two patches applied (and without the
+3rd), but there are none that I personally know of that do.
