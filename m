@@ -1,62 +1,95 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 1 Oct 2014 15:35:27 +0200
-Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
-In-Reply-To: <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
-References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
- <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
-Message-ID: <20141001133527.GA12750@amd>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed,  1 Oct 2014 14:37:05 +0100
+Subject: [PATCHv2 0/5] Legacy instruction emulation for arm64
+In-Reply-To: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
+References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1412170630-18408-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+[ Correcting Arnd's email. Apologies for the extra copy ]
 
-> From: Alan Tull <atull@opensource.altera.com>
-> 
-> Use WFI when putting CPU1 to sleep.  Don't hold CPU1 in reset
-> since that results in increased power consumption.
-> 
-> Reset CPU1 briefly during CPU1 bootup.
-> 
-> This has been tested for hotplug and suspend/resume and results
-> in no increased power consumption.
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> ---
->  arch/arm/mach-socfpga/core.h    |    2 ++
->  arch/arm/mach-socfpga/platsmp.c |   12 +++++++++---
->  2 files changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-> index 572b8f7..c4a0929 100644
-> --- a/arch/arm/mach-socfpga/core.h
-> +++ b/arch/arm/mach-socfpga/core.h
-> @@ -28,6 +28,8 @@
->  #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
->  #define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
->  
-> +#define RSTMGR_MPUMODRST_CPU1		0x2     /*CPU1 Reset*/
-> +
+Hi,
 
-It would be nice to have space after /* and before */.
+This is the second posting of the legacy instruction support for
+arm64. The previous posting can be found at [1].
 
-> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-> index 5356a72..1d5f8ad 100644
-> --- a/arch/arm/mach-socfpga/platsmp.c
-> +++ b/arch/arm/mach-socfpga/platsmp.c
-> @@ -34,6 +34,10 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
->  
->  	if (cpu1start_addr) {
-> +		/* This will put CPU #1 into reset.*/
+The patchset ports the infrastructure to register hooks for undefined
+instruction abort and uses this to adds support for the emulation of
+SWP{B} and CP15 Barrier instructions from ARMv7 to the v8 port of
+Linux.
 
-Same here.
+Via sysctl, it is possible to control the runtime state of emulation
+* Off
+  sysctl value: 0
+  Generates undefined instruction abort. Default for instructions that
+  have been obsoleted in the architecture, e.g., SWP
 
-> +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
-> +			     rst_manager_base_addr + 0x10);
+* Emulate
+  sysctl value: 1
+  Uses software emulation. To aid migration of software, in this mode
+  usage of emulated instruction is traced as well as rate limited
+  warnings are issued. This is the default for deprecated
+  instructions, .e.g., CP15 barriers
 
-Would it be possible to copy reset manager description struct from
-u-boot and use it here, instead of raw offset?
-								Pavel
+* Enable
+  sysctl value: 2
+  Although marked as deprecated, some implementations may support the
+  enabling/disabling of hardware support for the execution of these
+  instructions. Using hardware execution generally provides better
+  performance, but at the loss of ability to gather runtime statistics
+  about the use of the deprecated instructions.
+
+Patches 1-2/5 add infrastructure code to add support for undefined
+instruction hooks and decoding condition checks.
+
+Patch 3-4/6 adds support for SWP and CP15 barriers respectively. They
+also provide the ability to control the emulation by writing one of
+the above three values to /proc/sys/abi file nodes.
+
+Patch 6/6 introduces a trace point to log instruction emulation and then
+uses this to trace the usage of the above instructions when using
+emulation.
+
+Although not in a merge window, the intention of the posting is to
+allow early access to the code to reduce divergenece in product
+kernels where additional features are being worked on.
+
+Cheers,
+Punit
+
+Changes since [1]:
+* Added support for Thumb instructions when registering undefined
+hooks as well
+* Emulation support is now added to armv8_deprecated.c (was previously
+v7_obsolete.c)
+* Instruction support level - Off, Emulate or Enable (when supported
+in hardware) - is now controlled through sysctl
+* Using trace points instead of debugfs for stats reporting
+
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/351054
+
+Punit Agrawal (5):
+  arm64: Add support for hooks to handle undefined instructions
+  arm64: Add AArch32 instruction set condition code checks
+  arm64: Port SWP/SWPB emulation support from arm
+  arm64: Emulate CP15 Barrier instructions
+  arm64: Trace emulation of AArch32 legacy instructions
+
+ arch/arm64/Kconfig                   |   54 ++++
+ arch/arm64/include/asm/insn.h        |   10 +
+ arch/arm64/include/asm/opcodes.h     |    1 +
+ arch/arm64/include/asm/traps.h       |   16 ++
+ arch/arm64/kernel/Makefile           |    5 +-
+ arch/arm64/kernel/armv8_deprecated.c |  489 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/insn.c             |   26 ++
+ arch/arm64/kernel/traps.c            |   68 +++++
+ include/trace/events/emulation.h     |   35 +++
+ 9 files changed, 703 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/opcodes.h
+ create mode 100644 arch/arm64/kernel/armv8_deprecated.c
+ create mode 100644 include/trace/events/emulation.h
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.10.4
