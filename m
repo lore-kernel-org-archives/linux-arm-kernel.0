@@ -1,26 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Oct 2014 18:04:57 +0200
-Subject: [GIT PULL] ARM: brcmstb: SMP, earlyprintk and Kconfig cleanups
-In-Reply-To: <1411689248-14074-1-git-send-email-f.fainelli@gmail.com>
-References: <1411689248-14074-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <201410011804.57926.arnd@arndb.de>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 1 Oct 2014 11:07:18 -0500
+Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
+In-Reply-To: <20141001150418.GA14609@amd>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
+ <20141001133527.GA12750@amd> <alpine.DEB.2.10.1410010915440.2332@shineypoop>
+ <20141001150418.GA14609@amd>
+Message-ID: <542C26B6.7010302@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 September 2014, Florian Fainelli wrote:
-> This pull request contains 3 changes for the brcmstb platform
-> 
-> - first patch re-introduces SMP support after fixing the problems we had in
->   the initial implementation, for this patch to apply cleanly, I had to advance
->   up to "ARM: brcmstb: revert SMP support"
-> 
-> - second patch is dropping unused Kconfig dependencies
-> 
-> - third patch adds earlyprintk to brcmstb platforms using the existing 8250
->   infrastructure
 
-Pulled into next/late since this was really too late for 3.18.
 
-There is still a chance that it could make it, but don't rely on that.
+On 10/1/14, 10:04 AM, Pavel Machek wrote:
+> Hi!
+> 
+>>>> +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
+>>>> +			     rst_manager_base_addr + 0x10);
+>>>
+>>> Would it be possible to copy reset manager description struct from
+>>> u-boot and use it here, instead of raw offset?
+>>
+>> I will replace this 0x10 with a macro that reflects how the register is 
+>> named in the register map.
+> 
+> That would be better than 0x10, but even better would be just copying
+> 
+> struct socfpga_reset_manager {
+>         u32     status;
+>         u32     ctrl;
+>         u32     counts;
+>         u32     padding1;
+>         u32     mpu_mod_reset;
+>         u32     per_mod_reset;
+>         u32     per2_mod_reset;
+>         u32     brg_mod_reset;
+> };
+> 
+> from u-boot. Unlike macros, structs have advantages that typos lead to
+> easier-to-see failure modes... (And they are easier to read/parse,
+> too).
+> 
 
-	Arnd
+Copying from uboot sounds good, but I already know that the CPU reset
+offset is different for our next SOC, Arria 10. The Arria 10 SOC should
+still be able to use the same MSL as Cyclone5 and Arria5, but with a few
+differences. One of them being, the CPU1 reset offset is at 0x20 instead
+of 0x10. So I think having a macro for this one register is a bit
+cleaner than having to define a whole new struct for Arria10.
+
+if (of_machine_is_compatible("altr,socfpga-arria10"))
+	__raw_writel(0, rst_manager_base_addr + 0x20);
+else
+	__raw_writel(0, rst_manager_base_addr + 0x10);
+
+Dinh
