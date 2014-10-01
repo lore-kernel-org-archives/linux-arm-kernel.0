@@ -1,41 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Oct 2014 14:20:57 +0100
-Subject: [PATCH] arm: socfpga: fix fetching cpu1start_addr for system
- with  > 2GB of ram
-In-Reply-To: <1412161334-12359-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1412161334-12359-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20141001132057.GO5182@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 01 Oct 2014 15:32:41 +0200
+Subject: [PATCH v7 00/11] kernel: Add support for restart handler call
+ chain
+In-Reply-To: <20140930223000.GA20946@roeck-us.net>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <20140930142002.e09ef32392a2b5a7c81e5e57@linux-foundation.org>
+ <20140930223000.GA20946@roeck-us.net>
+Message-ID: <17880788.QtjeWKsOjD@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 06:02:14AM -0500, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+Am Dienstag, 30. September 2014, 15:30:00 schrieb Guenter Roeck:
+> On Tue, Sep 30, 2014 at 02:20:02PM -0700, Andrew Morton wrote:
+> > On Tue, 19 Aug 2014 17:45:27 -0700 Guenter Roeck <linux@roeck-us.net> 
+wrote:
+> > > Introduce a system restart handler call chain to solve the described
+> > > problems.> 
+> > So someone has merged eight of these patches into linux-next but these
+> > three:
+> > 
+> > watchdog-s3c2410-add-restart-handler.patch
+> > clk-samsung-register-restart-handlers-for-s3c2412-and-s3c2443.patch
+> > clk-rockchip-add-restart-handler.patch
+> > 
+> > were omitted.  What's up?
 > 
-> When CPU1 is brought out of reset, it's MMU is not turned yet, so it will only
-> be able to use physical addresses. For systems with 1GB or less, clearing
-> 0x40000000 will work just fine. However for systems with 2GB or more, we
-> need to clear at least 0x80000000.
+> Most likely PBKC on my side; Looks like I forgot to add those when I created
+> the immutable branch for others to merge. Sorry for that :-(.
 > 
-> Essentially, the bic instruction is converting the cpu1start_addr from a
-> virtual to a physical address. We should be using bic 0xf0000000 for all
-> systems.
+> Having said that, I somehow thought that the clock patches would go in
+> through the clock tree. Heiko, did I get that wrong ? Separately, I sent a
+> pull request that includes the watchdog patch to Wim.
 
-Err.  Why not do the job properly rather than create this type of hack?
-This is not a fast path, so it's really not required to code it for an
-absolute minimum number of cycles.  So...
+I didn't realise that the patches would get dropped from -mm until I the 
+removal notices this morning. So meanwhile I've send a pull to Mike for the 
+Rockchip and S3C2412/2416/2443 restart handling.
 
-	adr	r0, 1f		@ physical address of '1'
-	ldmia	r0, {r1, r2}	@ load virtual address of '1' and 'cpu1start_addr'
-	sub	r0, r0, r1	@ offset between virtual and physical
-	ldr	r2, [r2, r0]	@ load *cpu1start_addr
-	bx	r2
-...
-	.align
-1:	.long	.
-	.long	cpu1start_addr
+So, as your pull includes the samsung watchdog restart, we should be hopefully 
+all set again :-) .
 
-will fix it properly.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Heiko
