@@ -1,133 +1,265 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 01 Oct 2014 06:53:02 -0700
-Subject: [PATCH v2 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
-In-Reply-To: <1412163368-13496-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1412163368-13496-1-git-send-email-pankaj.dubey@samsung.com>
- <1412163368-13496-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <542C073E.9090106@roeck-us.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 01 Oct 2014 16:14:32 +0200
+Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
+ regulators
+In-Reply-To: <3515419.FCCWMziJlh@amdc1032>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <542A3E60.1000401@samsung.com> <3515419.FCCWMziJlh@amdc1032>
+Message-ID: <3871520.cBV7rop9YT@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2014 04:36 AM, Pankaj Dubey wrote:
-> Let's register reboot_notifier from PMU driver for reboot
-> functionality. So that we can remove restart hooks from
-> machine specific file, and thus moving ahead when PMU moved
-> to driver folder, this functionality can be reused for ARM64
-> based Exynos SoC's.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   arch/arm/mach-exynos/common.h |    1 -
->   arch/arm/mach-exynos/exynos.c |    6 ------
->   arch/arm/mach-exynos/pmu.c    |   25 +++++++++++++++++++++++++
->   3 files changed, 25 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 431be1b..865f878 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -12,7 +12,6 @@
->   #ifndef __ARCH_ARM_MACH_EXYNOS_COMMON_H
->   #define __ARCH_ARM_MACH_EXYNOS_COMMON_H
->
-> -#include <linux/reboot.h>
->   #include <linux/of.h>
->
->   #define EXYNOS3250_SOC_ID	0xE3472000
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index aa394cb..3aa75b8e 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -137,11 +137,6 @@ static struct map_desc exynos5_iodesc[] __initdata = {
->   	},
->   };
->
-> -static void exynos_restart(enum reboot_mode mode, const char *cmd)
-> -{
-> -	__raw_writel(0x1, pmu_base_addr + EXYNOS_SWRESET);
-> -}
-> -
->   static struct platform_device exynos_cpuidle = {
->   	.name              = "exynos_cpuidle",
->   #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
-> @@ -365,7 +360,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
->   	.init_machine	= exynos_dt_machine_init,
->   	.init_late	= exynos_init_late,
->   	.dt_compat	= exynos_dt_compat,
-> -	.restart	= exynos_restart,
->   	.reserve	= exynos_reserve,
->   	.dt_fixup	= exynos_dt_fixup,
->   MACHINE_END
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index 1993e08..c0855a5 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -11,7 +11,10 @@
->
->   #include <linux/io.h>
->   #include <linux/of.h>
-> +#include <linux/of_address.h>
->   #include <linux/platform_device.h>
-> +#include <linux/notifier.h>
-> +#include <linux/reboot.h>
->
->   #include "exynos-pmu.h"
->   #include "regs-pmu.h"
-> @@ -439,6 +442,15 @@ static void exynos5250_pmu_init(void)
->   	pmu_raw_writel(value, EXYNOS5_MASK_WDTRESET_REQUEST);
->   }
->
-> +static int pmu_reboot_notify_handler(struct notifier_block *this,
-> +		unsigned long code, void *unused)
-> +{
-> +	if (code == SYS_RESTART)
-> +		pmu_raw_writel(0x1, EXYNOS_SWRESET);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
->   static const struct exynos_pmu_data exynos4210_pmu_data = {
->   	.pmu_config	= exynos4210_pmu_config,
->   };
-> @@ -478,11 +490,20 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
->   	{ /*sentinel*/ },
->   };
->
-> +/*
-> + * Exynos PMU reboot notifier, handles reboot functionality
-> + */
-> +static struct notifier_block pmu_reboot_notifier = {
-> +	.notifier_call = pmu_reboot_notify_handler,
-> +	.priority = 128,
-> +};
-> +
->   static int exynos_pmu_probe(struct platform_device *pdev)
->   {
->   	const struct of_device_id *match;
->   	struct device *dev = &pdev->dev;
->   	struct resource *res;
-> +	int ret;
->
->   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->   	pmu_base_addr = devm_ioremap_resource(dev, res);
-> @@ -507,6 +528,10 @@ static int exynos_pmu_probe(struct platform_device *pdev)
->
->   	platform_set_drvdata(pdev, pmu_context);
->
-> +	ret = register_reboot_notifier(&pmu_reboot_notifier);
-> +	if (ret)
-> +		dev_err(dev, "can't register reboot notifier err=%d\n", ret);
-> +
->   	dev_dbg(dev, "Exynos PMU Driver probe done\n");
->   	return 0;
->   }
->
+On Wednesday, October 01, 2014 03:57:54 PM Bartlomiej Zolnierkiewicz wrote:
+> 
+> Hi,
+> 
+> On Tuesday, September 30, 2014 02:23:44 PM Jaehoon Chung wrote:
+> > Hi
+> > 
+> > On 09/29/2014 09:31 PM, Bartlomiej Zolnierkiewicz wrote:
+> > > 
+> > > Hi,
+> > > 
+> > > On Friday, August 29, 2014 01:34:44 PM Ulf Hansson wrote:
+> > >> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+> > >>> This patch makes use of mmc_regulator_get_supply() to handle
+> > >>> the vmmc and vqmmc regulators.Also it moves the code handling
+> > >>> the these regulators to dw_mci_set_ios().It turned on the vmmc
+> > >>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+> > >>> during MMC_POWER_OFF.
+> > >>>
+> > >>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> > >>
+> > >> Thanks! Applied for next.
+> > > 
+> > > Unfortunately this patch breaks mmc1 card (Kingston 32GB micro SDHC)
+> > > detection on Exynos5420 Arndale Octa for me:
+> > > 
+> > > [   10.797979] dwmmc_exynos 12220000.mmc: no support for card's volts
+> > > [   10.797998] mmc1: error -22 whilst initialising SD card
+> > 
+> > OCR value is not matched. Which values are supported about the mmc_host's value and card's value?
+> > Could you share the value?
+> 
+> Sure.  I've added dev_info()s at the beginning of mmc_select_voltage():
+> 
+> +	dev_warn(mmc_dev(host), "card's volts: 0x%0x\n", ocr);
+> +	dev_warn(mmc_dev(host), "host's volts: 0x%0x\n", host->ocr_avail);
+> 
+> and got following results:
+> 
+> [   10.851678] dwmmc_exynos 12220000.mmc: card's volts: 0xff8000
+> [   10.851691] dwmmc_exynos 12220000.mmc: host's volts: 0x80
 
-Something went wrong here.
+Data for the working kernel:
 
-You don't want to register with reboot_notifier, but with restart_notifier.
-The code is not SYS_RESTART, but the value of reboot_mode.
+[   10.856214] dwmmc_exynos 12220000.mmc: card's volts: 0xff8000
+[   10.856227] dwmmc_exynos 12220000.mmc: host's volts: 0x300000
 
-The same applies to the other patch as well.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Guenter
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
+> 
+> > Best Regards,
+> > Jaehoon Chung
+> > 
+> > > 
+> > > Without the patch:
+> > > 
+> > > [   10.866926] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
+> > > [   10.866977] mmc1: new high speed SDHC card at address 1234
+> > > [   10.868730] mmcblk1: mmc1:1234 SA32G 29.3 GiB 
+> > > [   10.915054]  mmcblk1: p1 p2 p3
+> > > 
+> > > The config is attached (exynos_defconfig doesn't work correctly for
+> > > this board yet).
+> > > 
+> > > Best regards,
+> > > --
+> > > Bartlomiej Zolnierkiewicz
+> > > Samsung R&D Institute Poland
+> > > Samsung Electronics
+> > > 
+> > >> Kind regards
+> > >> Uffe
+> > >>
+> > >>> ---
+> > >>> changes from v1:
+> > >>>         1.Used mmc_regulator_set_ocr() instead of regulator_enable() for vmmc.
+> > >>>         2.Turned on vmmc and vqmmc during MMC_POWER_UP.
+> > >>>         3. Removed the flags DW_MMC_CARD_POWERED and DW_MMC_IO_POWERED which
+> > >>>            added during the initial version of this patch.
+> > >>>         4. Added error message, if it failed to turn on regulator's.
+> > >>>
+> > >>>  drivers/mmc/host/dw_mmc.c  |   72 +++++++++++++++++++++-----------------------
+> > >>>  include/linux/mmc/dw_mmc.h |    2 +-
+> > >>>  2 files changed, 36 insertions(+), 38 deletions(-)
+> > >>>
+> > >>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> > >>> index 7f227e9..aadb0d6 100644
+> > >>> --- a/drivers/mmc/host/dw_mmc.c
+> > >>> +++ b/drivers/mmc/host/dw_mmc.c
+> > >>> @@ -936,6 +936,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> > >>>         struct dw_mci_slot *slot = mmc_priv(mmc);
+> > >>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+> > >>>         u32 regs;
+> > >>> +       int ret;
+> > >>>
+> > >>>         switch (ios->bus_width) {
+> > >>>         case MMC_BUS_WIDTH_4:
+> > >>> @@ -974,12 +975,38 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> > >>>
+> > >>>         switch (ios->power_mode) {
+> > >>>         case MMC_POWER_UP:
+> > >>> +               if (!IS_ERR(mmc->supply.vmmc)) {
+> > >>> +                       ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+> > >>> +                                       ios->vdd);
+> > >>> +                       if (ret) {
+> > >>> +                               dev_err(slot->host->dev,
+> > >>> +                                       "failed to enable vmmc regulator\n");
+> > >>> +                               /*return, if failed turn on vmmc*/
+> > >>> +                               return;
+> > >>> +                       }
+> > >>> +               }
+> > >>> +               if (!IS_ERR(mmc->supply.vqmmc) && !slot->host->vqmmc_enabled) {
+> > >>> +                       ret = regulator_enable(mmc->supply.vqmmc);
+> > >>> +                       if (ret < 0)
+> > >>> +                               dev_err(slot->host->dev,
+> > >>> +                                       "failed to enable vqmmc regulator\n");
+> > >>> +                       else
+> > >>> +                               slot->host->vqmmc_enabled = true;
+> > >>> +               }
+> > >>>                 set_bit(DW_MMC_CARD_NEED_INIT, &slot->flags);
+> > >>>                 regs = mci_readl(slot->host, PWREN);
+> > >>>                 regs |= (1 << slot->id);
+> > >>>                 mci_writel(slot->host, PWREN, regs);
+> > >>>                 break;
+> > >>>         case MMC_POWER_OFF:
+> > >>> +               if (!IS_ERR(mmc->supply.vmmc))
+> > >>> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> > >>> +
+> > >>> +               if (!IS_ERR(mmc->supply.vqmmc) && slot->host->vqmmc_enabled) {
+> > >>> +                       regulator_disable(mmc->supply.vqmmc);
+> > >>> +                       slot->host->vqmmc_enabled = false;
+> > >>> +               }
+> > >>> +
+> > >>>                 regs = mci_readl(slot->host, PWREN);
+> > >>>                 regs &= ~(1 << slot->id);
+> > >>>                 mci_writel(slot->host, PWREN, regs);
+> > >>> @@ -2110,7 +2137,13 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+> > >>>                 mmc->f_max = freq[1];
+> > >>>         }
+> > >>>
+> > >>> -       mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+> > >>> +       /*if there are external regulators, get them*/
+> > >>> +       ret = mmc_regulator_get_supply(mmc);
+> > >>> +       if (ret == -EPROBE_DEFER)
+> > >>> +               goto err_setup_bus;
+> > >>> +
+> > >>> +       if (!mmc->ocr_avail)
+> > >>> +               mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+> > >>>
+> > >>>         if (host->pdata->caps)
+> > >>>                 mmc->caps = host->pdata->caps;
+> > >>> @@ -2176,7 +2209,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
+> > >>>
+> > >>>  err_setup_bus:
+> > >>>         mmc_free_host(mmc);
+> > >>> -       return -EINVAL;
+> > >>> +       return ret;
+> > >>>  }
+> > >>>
+> > >>>  static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
+> > >>> @@ -2469,24 +2502,6 @@ int dw_mci_probe(struct dw_mci *host)
+> > >>>                 }
+> > >>>         }
+> > >>>
+> > >>> -       host->vmmc = devm_regulator_get_optional(host->dev, "vmmc");
+> > >>> -       if (IS_ERR(host->vmmc)) {
+> > >>> -               ret = PTR_ERR(host->vmmc);
+> > >>> -               if (ret == -EPROBE_DEFER)
+> > >>> -                       goto err_clk_ciu;
+> > >>> -
+> > >>> -               dev_info(host->dev, "no vmmc regulator found: %d\n", ret);
+> > >>> -               host->vmmc = NULL;
+> > >>> -       } else {
+> > >>> -               ret = regulator_enable(host->vmmc);
+> > >>> -               if (ret) {
+> > >>> -                       if (ret != -EPROBE_DEFER)
+> > >>> -                               dev_err(host->dev,
+> > >>> -                                       "regulator_enable fail: %d\n", ret);
+> > >>> -                       goto err_clk_ciu;
+> > >>> -               }
+> > >>> -       }
+> > >>> -
+> > >>>         host->quirks = host->pdata->quirks;
+> > >>>
+> > >>>         spin_lock_init(&host->lock);
+> > >>> @@ -2630,8 +2645,6 @@ err_workqueue:
+> > >>>  err_dmaunmap:
+> > >>>         if (host->use_dma && host->dma_ops->exit)
+> > >>>                 host->dma_ops->exit(host);
+> > >>> -       if (host->vmmc)
+> > >>> -               regulator_disable(host->vmmc);
+> > >>>
+> > >>>  err_clk_ciu:
+> > >>>         if (!IS_ERR(host->ciu_clk))
+> > >>> @@ -2667,9 +2680,6 @@ void dw_mci_remove(struct dw_mci *host)
+> > >>>         if (host->use_dma && host->dma_ops->exit)
+> > >>>                 host->dma_ops->exit(host);
+> > >>>
+> > >>> -       if (host->vmmc)
+> > >>> -               regulator_disable(host->vmmc);
+> > >>> -
+> > >>>         if (!IS_ERR(host->ciu_clk))
+> > >>>                 clk_disable_unprepare(host->ciu_clk);
+> > >>>
+> > >>> @@ -2686,9 +2696,6 @@ EXPORT_SYMBOL(dw_mci_remove);
+> > >>>   */
+> > >>>  int dw_mci_suspend(struct dw_mci *host)
+> > >>>  {
+> > >>> -       if (host->vmmc)
+> > >>> -               regulator_disable(host->vmmc);
+> > >>> -
+> > >>>         return 0;
+> > >>>  }
+> > >>>  EXPORT_SYMBOL(dw_mci_suspend);
+> > >>> @@ -2697,15 +2704,6 @@ int dw_mci_resume(struct dw_mci *host)
+> > >>>  {
+> > >>>         int i, ret;
+> > >>>
+> > >>> -       if (host->vmmc) {
+> > >>> -               ret = regulator_enable(host->vmmc);
+> > >>> -               if (ret) {
+> > >>> -                       dev_err(host->dev,
+> > >>> -                               "failed to enable regulator: %d\n", ret);
+> > >>> -                       return ret;
+> > >>> -               }
+> > >>> -       }
+> > >>> -
+> > >>>         if (!dw_mci_ctrl_reset(host, SDMMC_CTRL_ALL_RESET_FLAGS)) {
+> > >>>                 ret = -ENODEV;
+> > >>>                 return ret;
+> > >>> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> > >>> index 29ce014..84e2827 100644
+> > >>> --- a/include/linux/mmc/dw_mmc.h
+> > >>> +++ b/include/linux/mmc/dw_mmc.h
+> > >>> @@ -188,7 +188,7 @@ struct dw_mci {
+> > >>>         /* Workaround flags */
+> > >>>         u32                     quirks;
+> > >>>
+> > >>> -       struct regulator        *vmmc;  /* Power regulator */
+> > >>> +       bool                    vqmmc_enabled;
+> > >>>         unsigned long           irq_flags; /* IRQ flags */
+> > >>>         int                     irq;
+> > >>>  };
+> > >>> --
+> > >>> 1.7.10.4
