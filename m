@@ -1,39 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Oct 2014 12:11:28 +0100
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
- <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
-Message-ID: <20141001111127.GG12702@e104818-lin.cambridge.arm.com>
+From: j.uzycki@elproma.com.pl (=?UTF-8?B?SmFudXN6IFXFvHlja2k=?=)
+Date: Wed, 01 Oct 2014 13:14:54 +0200
+Subject: clk_set_rate, mux does not switch over, reparenting
+Message-ID: <542BE22E.3060203@elproma.com.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 10:51:25PM +0100, Hugh Dickins wrote:
-> On Fri, 26 Sep 2014, Steve Capper wrote:
-> > This patch provides a general RCU implementation of get_user_pages_fast
-> > that can be used by architectures that perform hardware broadcast of
-> > TLB invalidations.
-> >
-> > It is based heavily on the PowerPC implementation by Nick Piggin.
-> >
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > Tested-by: Dann Frazier <dann.frazier@canonical.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> Acked-by: Hugh Dickins <hughd@google.com>
-> 
-> Thanks for making all those clarifications, Steve: this looks very
-> good to me now.  I'm not sure which tree you're hoping will take this
-> and the arm+arm64 patches 2-6: although this one would normally go
-> through akpm, I expect it's easier for you to synchronize if it goes
-> in along with the arm+arm64 2-6 - would that be okay with you, Andrew?
-> I see no clash with what's currently in mmotm.
+Hi,
 
->From an arm64 perspective, I'm more than happy for Andrew to pick up the
-entire series. I already reviewed the patches.
+I found the thread:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138076.html
 
-Thanks.
+I'm trying to increase peripheral clock rate.
+The case is: XTAL/PLL --> MUX --> DIV --> peripheral clock.
+By default the MUX is set to XTAL=24MHz.
+I can set peripheral clock to 24MHz or less (DIV works).
+However MUX has also PLL=480MHz input.
+Unfortunately clk_set_rate() over 24MHz does not work.
+Exact clock path is: ref_xtal/pll0 - ptp_del(MUX) - ptp(DIV)
+drivers/clk/mxs/clk-imx28.c defines CLK_SET_RATE_PARENT flag
+for the ptp clock using mxs_clk_div().
 
--- 
-Catalin
+I noticed that mxs_clk_mux() calls clk_register_mux()
+with CLK_SET_RATE_NO_REPARENT flag. It looks suspicious
+for ptp_sel (only ptp clock is and can be child of ptp_sel).
+It seems "clk: add CLK_SET_RATE_NO_REPARENT flag"
+patch for drivers/clk/mxs/clk.h was too general.
+"Platform maintainers are encouraged to remove the flag
+if they wish to allow mux reparenting on set_rate. "
+Is defining mxs_clk_mux_reparent() without the flag
+in addition to basic mxs_clk_mux() good idea?
+
+best regards
+Janusz
