@@ -1,75 +1,54 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 1 Oct 2014 16:40:34 +0200
-Subject: [PATCH v6 0/3] new Atmel DMA controller (XDMAC)
-Message-ID: <1412174437-722-1-git-send-email-ludovic.desroches@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed,  1 Oct 2014 16:41:30 +0200
+Subject: [PATCH v2 0/4] PM / Domains: Fix race conditions during boot
+Message-ID: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Changes in v2:
+	-Added some acks.
+	-Updated commit messages.
+	-Included a wider audience of the patchset. V1 was lacking SoC
+	 maintainers.
 
-This set of patches introduces support for the new Atmel DMA controller know as
-XDMAC and available on SAMA5D4.
+Here are link to the first patchset, were some discussion started.
+http://marc.info/?l=linux-pm&m=141208104729597&w=2
 
-Since there were no feedback about v5, could you give your ack if you agree with
-this new version.
 
-Changes from:
-- v5
-  - fix a bug when doing memcpy, condition to set the NDE was inverted
-  - replace irqsave locks by bh variant
-  - unmasked channel errors
-- v4
-  - compile the driver if COMPILE_TEST is selected
-  - merge header file into at_xdmac.c
-  - use write memory barriers before starting the channel
-  - init active_xfer to false when taking a descriptor from the free
-  descriptors list
-  - remove dma capabilities mask
-  - use CONFIG_PM instead of CONFIG_PM_SLEEP for prepare function
-  - style fixes
-  - update documentation to add the <chip> compatible description
-  - add maintener entry
-- v3
-  - use dma_get_any_slave_channel instead of dma_request_channel
-  - fix tx_status behavior for non active transfers
-  - rename at_xdmac_terminate_xfer
-  - replace suspend/resume no irq variants by late/early variants
-  - no more use dev res to request the irq, use the legacy way
-  - add slave capabilities
-- v2
-  - documentation updated
-  - fix locking issues
-- v1
-  - add power management stuff
-  - check maxburst value
-  - revert subsys_initcall remove, EPROBE_DEFER not yet available on the kernel
-  version I use to do the tests, moreover other devices are not ready to use it
-- RFC:
-  - DMA_SUCCESS replaced by DMA_COMPLETE
-  - fix memcpy issue caused by a mistake in interfaces used
-  - add filter function
-  - remove some parameters from device tree since we can get them through the
-  dma slave configuration
-  - use readl/writel relaxed
-  - remove subsys_initcall
-  - synchronize irq before killing tasklets
-  - use BIT macro
-  - misc cleanup
+When there are more than one device in a PM domain these will obviously
+be probed at different times. Depending on timing and the implemented
+support for runtime PM in a driver/subsystem, genpd may be advised to
+power off a PM domain after a successful probe sequence.
 
-Ludovic Desroches (3):
-  dma: at_xdmac: creation of the atmel eXtended DMA Controller driver
-  ARM: dts: at_xdmac: add bindings documentation
-  MAINTAINERS: add entry for Atmel XDMA driver
+Ideally we should have relied on the driver/subsystem, through runtime
+PM, to bring their device's PM domain into powered state prior doing
+probing if such requirement exist.
 
- .../devicetree/bindings/dma/atmel-xdma.txt         |   50 +
- MAINTAINERS                                        |    7 +
- drivers/dma/Kconfig                                |    7 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/at_xdmac.c                             | 1493 ++++++++++++++++++++
- include/dt-bindings/dma/at91.h                     |   25 +
- 6 files changed, 1583 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
- create mode 100644 drivers/dma/at_xdmac.c
+Since this is not a common practice by drivers/subsystems, enforcing
+such a change doesn't seem viable.
+
+Instead, let's improve the situation, by preventing genpd from powering
+off any of the PM domains until late_init. At that point genpd already
+tries to power off unused PM domains, so it seems like a decent match.
+
+Cases which can't be covered within the window of until late_init needs
+to be adressed separately and likely through a more common long term
+solution.
+
+
+Ulf Hansson (4):
+  PM / Domains: Remove pm_genpd_dev_need_restore() API
+  ARM: exynos: Ensure PM domains are powered at initialization
+  PM / Domains: Expect PM domains being powered at initialization
+  PM / Domains: Enforce PM domains to stay powered during boot
+
+ arch/arm/mach-exynos/pm_domains.c   |  7 ++++---
+ arch/arm/mach-s3c64xx/pm.c          |  4 ++--
+ arch/arm/mach-shmobile/pm-r8a7779.c |  2 +-
+ arch/arm/mach-shmobile/pm-rmobile.c |  2 +-
+ drivers/base/power/domain.c         | 42 ++++++++++++++++---------------------
+ include/linux/pm_domain.h           |  7 +++----
+ 6 files changed, 29 insertions(+), 35 deletions(-)
 
 -- 
-2.0.3
+1.9.1
