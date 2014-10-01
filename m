@@ -1,61 +1,44 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Wed, 1 Oct 2014 14:09:09 -0400
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <20141001180304.GC5788@leverpostej>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com>
- <1412106877.6630.45.camel@smoke>
- <20141001161621.GA28440@leverpostej>
- <20141001174714.GD14991@redhat.com>
- <20141001180304.GC5788@leverpostej>
-Message-ID: <20141001180909.GE14991@redhat.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 1 Oct 2014 11:11:05 -0700
+Subject: Tegra baseline test results for v3.17-rc6
+Message-ID: <542C43B9.5070303@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 07:03:04PM +0100, Mark Rutland wrote:
-> On Wed, Oct 01, 2014 at 06:47:14PM +0100, Vivek Goyal wrote:
-> > On Wed, Oct 01, 2014 at 05:16:21PM +0100, Mark Rutland wrote:
-> > 
-> > [..]
-> > > I'm still rather unhappy about the mechanism by which the DTB is passed
-> > > by userspace and detected by the kernel, as I'd prefer that the user
-> > > explictly stated which segment they wanted to pass to the (Linux)
-> > > kernel, but that would require reworking the kexec syscall to allow
-> > > per-segment info/flags.
-> > 
-> > Why does the running kernel need to know about dtb segment.  I see following.
-> > 
-> > ldr     x0, kexec_dtb_addr
-> > 
-> > IIUC, we are loading this address in x0. Can't we do something similar
-> > in user space with purgatory. I mean first jump to purgatory (code
-> > compiled in user space but runs prviliged) and that code takes care
-> > of loading x0 with right dtb addr and then jump to final kernel.
-> 
-> I believe the fundamental issue here is a lack of a userspace-provided
-> purgatory.
-> 
-> I agree that userspace purgatory code could set this up. That would
-> address my concerns w.r.t. detecting the DTB kernel-side, as there would
-> be no need. It would also address my concerns with booting OSs other
-> than Linux, as the purgatory code could do whatever was appropriate for
-> whatever OS image was loaded.
-> 
-> So in my view, a userspace-provided purgatory that set up the state the
-> next kernel expected would be preferable. That could be as simple as
-> setting up the registers and branching -- I assume we'd have the first
-> kernel perform the required cache maintenance.
+Here are some basic Tegra test results for Linux v3.17-rc6.
+Logs and other details at:
 
-Apart from setting various registers, we also verify the sha256 checksums
-of loaded segments in purgatory to make sure segments are not corrupted.
-On x86, we also take care of backing up first 640KB of memory in reserved
-area in kdump case. 
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.17-rc6/20141001103541/
 
-So other arches are already doing all this in purgatory. It would be nice
-if arm64 sticks to that convention too.
 
-First kernel --> purgatory ----> second kernel.
+Test summary
+------------
 
-Thanks
-Vivek
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v3.17-rc5 (9e82bf014195d6f0054982c463575cdce24292be)):
+    text     data      bss    total  kernel
+    +113     +192        0     +305  multi_v7_defconfig
+     +21     +192        0     +213  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v3.17-rc5 (9e82bf014195d6f0054982c463575cdce24292be))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
