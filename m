@@ -1,36 +1,36 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 01 Oct 2014 12:36:56 +0200
-Subject: [PATCH 2/2] ARM: EXYNOS: PMU: move restart code into pmu driver
-In-Reply-To: <1412142540-3667-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1412142540-3667-1-git-send-email-pankaj.dubey@samsung.com>
- <1412142540-3667-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <542BD948.8040600@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 1 Oct 2014 13:37:32 +0300
+Subject: [PATCH 2/4] ARM: dts: keystone-k2e: update usb1 node for dma
+ properties
+In-Reply-To: <1412159854-21143-1-git-send-email-grygorii.strashko@ti.com>
+References: <1412159854-21143-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <1412159854-21143-3-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Keystone supports dma-coherent on USB master and also needs
+dma-ranges to specify the hardware alias memory range in which DMA
+can be operational.
+Such configuration applied for USB0 devices, but It's missed for
+USB1 device which is present only in K2E SoC - hence apply it.
 
-Please see my comments inline.
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/k2e.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-On 01.10.2014 07:49, Pankaj Dubey wrote:
-> Let's register reboot_notifier from PMU driver for reboot
-> functionality. So that we can remove restart hooks from
-> machine specific file, and thus moving ahead when PMU moved
-> to driver folder, this functionality can be reused for ARM64
-> based Exynos SoC's.
-
-[snip]
-
-> +static int pmu_reboot_notify_handler(struct notifier_block *this,
-> +		unsigned long code, void *unused)
-> +{
-> +	if (code == SYS_RESTART) {
-> +		u32 val = 0x1;
-> +
-> +		pmu_raw_writel(val, EXYNOS_SWRESET);
-
-As already mentioned for patch 1, no need for the variable, because this
-is just a constant 1.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+index 03d0190..0e25f79 100644
+--- a/arch/arm/boot/dts/k2e.dtsi
++++ b/arch/arm/boot/dts/k2e.dtsi
+@@ -67,6 +67,8 @@
+ 			clock-names = "usb";
+ 			interrupts = <GIC_SPI 414 IRQ_TYPE_EDGE_RISING>;
+ 			ranges;
++			dma-coherent;
++			dma-ranges;
+ 			status = "disabled";
+ 
+ 			dwc3 at 25010000 {
+-- 
+1.9.1
