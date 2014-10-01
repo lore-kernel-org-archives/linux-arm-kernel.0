@@ -1,84 +1,69 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 1 Oct 2014 19:20:03 +0200
-Subject: [GIT PULL] at91: soc for 3.18 #3
-Message-ID: <1412184003-13568-1-git-send-email-nicolas.ferre@atmel.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 01 Oct 2014 19:26:12 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20141001170517.GF4273@sirena.org.uk>
+References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo> <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk>
+Message-ID: <542C3934.3040409@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi,
 
-Another pull-request for 3.18 if you feel it can be stacked up now. This one is
-*only* about removing code: the old !MMU at91x40 and 2 board files plus the whole
-code in at91sam9g45 & at91sam9rl files for implementing this deprecated method:
-as the EK were the only one to use this code, we remove quite a bunch of lines.
-We can use these boards with DT right now.
-As a matter of fact, the diffstat is pretty nice :-)
+On 10/01/2014 07:05 PM, Mark Brown wrote:
+> On Wed, Oct 01, 2014 at 02:48:02PM +0200, Thierry Reding wrote:
+>> On Wed, Oct 01, 2014 at 01:32:50PM +0100, Mark Brown wrote:
+> 
+>>> So don't do that if you're worried about it then, provide the bits of DT
+>>> that hook everything up from the start or otherwise describe things as
+>>> being in use.
+> 
+>> "Otherwise describe things as being in use" doesn't work for clocks for
+>> example. And Mike already said he wasn't willing to add something like
+>> an always-on DT property for clocks.
+> 
+> That's not the only way of doing things - another way would be to have a
+> stub driver that just holds the resources while working on getting a
+> full one in place for example.
 
-Thanks, best regards,
+That won't work because the real driver which will eventually replace the
+stub one will likely be a module, and then we will loose video output
+between the kernel finalizing the initial boot, and the module actually
+loading.
 
-The following changes since commit 02037a9719fa89b7e5dc25cb22afc06c4eae406e:
+We've been over all this again and again and again.
 
-  ARM: at91: document Atmel SMART compatibles (2014-09-22 14:42:40 +0200)
+AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
 
-are available in the git repository at:
+All solutions provided sofar are both tons more complicated, then the
+simple solution of simply having the simplefb dt node declare which
+clocks it needs. And to make things worse all of them sofar have
+unresolved issues (due to their complexity mostly).
 
-  git://github.com/at91linux/linux-at91.git tags/at91-soc3
+With the clocks in the simplefb node, then all a real driver has to do,
+is claim those same clocks before unregistering the simplefb driver,
+and everything will just work.
 
-for you to fetch changes up to f71529722cf8c209a4e71c1000f0f8b8e74f674f:
+Yet we've been discussing this for months, all because of some
+vague worries from Thierry, and *only* from Thierry that this will
+make simplefb less generic / not abstract enough, while a simple
+generic clocks property is about as generic as things come.
 
-  ARM: at91: remove at91sam9rl legacy board support (2014-10-01 19:00:33 +0200)
+This madness has to end! Thierry can we please have a clear and
+unambiguous NACK from you on having the clocks property in the simplefb
+dt node, and if you do so I expect a proof of concept patch from you
+with an alternative solution within a week, or can you please stop
+blocking this from getting merged?
 
-----------------------------------------------------------------
-Third batch of cleanup/SoC for 3.18:
-- removal of old at91x40 !MMU ARM7TDMI support which was kind of rusty
-- removal of board-sam9m10g45ek.c and board-sam9rlek.c from mach-at91
-  and the code related to these board C files + defconfigs. Use DT for them now!
+And again, if you believe this will cause some sort of dt compat
+issues or whatever, no one is making you use this property for
+your boards!
 
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: at91: remove at91sam9rl legacy board support
+Regards,
 
-Boris Brezillon (1):
-      ARM: at91: remove at91sam9g45/9m10 legacy board support
-
-Nicolas Ferre (1):
-      ARM: at91: remove no-MMU at91x40 support
-
- arch/arm/configs/at91sam9g45_defconfig       |  172 ---
- arch/arm/configs/at91sam9rl_defconfig        |   83 --
- arch/arm/configs/at91x40_defconfig           |   48 -
- arch/arm/mach-at91/Kconfig                   |   25 +-
- arch/arm/mach-at91/Kconfig.non_dt            |   56 -
- arch/arm/mach-at91/Makefile                  |   12 -
- arch/arm/mach-at91/at91sam9g45.c             |  404 ------
- arch/arm/mach-at91/at91sam9g45_devices.c     | 1915 --------------------------
- arch/arm/mach-at91/at91sam9rl.c              |  333 -----
- arch/arm/mach-at91/at91sam9rl_devices.c      | 1260 -----------------
- arch/arm/mach-at91/at91x40.c                 |   93 --
- arch/arm/mach-at91/at91x40_time.c            |   85 --
- arch/arm/mach-at91/board-eb01.c              |   52 -
- arch/arm/mach-at91/board-sam9m10g45ek.c      |  526 -------
- arch/arm/mach-at91/board-sam9rlek.c          |  332 -----
- arch/arm/mach-at91/generic.h                 |    3 -
- arch/arm/mach-at91/include/mach/at91_dbgu.h  |    3 -
- arch/arm/mach-at91/include/mach/at91x40.h    |   60 -
- arch/arm/mach-at91/include/mach/cpu.h        |    1 -
- arch/arm/mach-at91/include/mach/hardware.h   |    4 -
- arch/arm/mach-at91/include/mach/uncompress.h |    7 -
- arch/arm/mach-at91/setup.c                   |    2 +-
- drivers/rtc/Kconfig                          |    2 +-
- 23 files changed, 7 insertions(+), 5471 deletions(-)
- delete mode 100644 arch/arm/configs/at91sam9g45_defconfig
- delete mode 100644 arch/arm/configs/at91sam9rl_defconfig
- delete mode 100644 arch/arm/configs/at91x40_defconfig
- delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
- delete mode 100644 arch/arm/mach-at91/at91sam9rl_devices.c
- delete mode 100644 arch/arm/mach-at91/at91x40.c
- delete mode 100644 arch/arm/mach-at91/at91x40_time.c
- delete mode 100644 arch/arm/mach-at91/board-eb01.c
- delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
- delete mode 100644 arch/arm/mach-at91/board-sam9rlek.c
- delete mode 100644 arch/arm/mach-at91/include/mach/at91x40.h
-
--- 
-Nicolas Ferre
+Hans
