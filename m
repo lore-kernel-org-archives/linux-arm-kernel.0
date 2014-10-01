@@ -1,36 +1,38 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Wed, 1 Oct 2014 13:47:14 -0400
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <20141001161621.GA28440@leverpostej>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com>
- <1412106877.6630.45.camel@smoke>
- <20141001161621.GA28440@leverpostej>
-Message-ID: <20141001174714.GD14991@redhat.com>
+From: nicoleotsuka@gmail.com (Nicolin Chen)
+Date: Wed, 1 Oct 2014 10:51:40 -0700
+Subject: [PATCH] ASoC: fsl: fix dependencies for wm8962
+In-Reply-To: <20141001122234.GX4273@sirena.org.uk>
+References: <1950588.ErdGoiHh8p@wuerfel> <20140930164510.GF4273@sirena.org.uk>
+ <20140930174241.GA1296@Asurada>
+ <20140930230906.GQ4273@sirena.org.uk>
+ <20140930232617.GA1732@Asurada>
+ <20141001122234.GX4273@sirena.org.uk>
+Message-ID: <20141001175139.GA5100@Asurada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 05:16:21PM +0100, Mark Rutland wrote:
+On Wed, Oct 01, 2014 at 01:22:34PM +0100, Mark Brown wrote:
+> On Tue, Sep 30, 2014 at 04:26:18PM -0700, Nicolin Chen wrote:
+> 
+> > I checked the Archive, the patch only got one version without cover
+> > letter. And this version only got one reply which is the Applied mail.
+> > I guess your earlier reply might have been swallowed somehow so I
+> > couldn't read it.
+> 
+> No, there were definitely at least two versions.
 
-[..]
-> I'm still rather unhappy about the mechanism by which the DTB is passed
-> by userspace and detected by the kernel, as I'd prefer that the user
-> explictly stated which segment they wanted to pass to the (Linux)
-> kernel, but that would require reworking the kexec syscall to allow
-> per-segment info/flags.
+Sorry if I've really missed something.
 
-Why does the running kernel need to know about dtb segment.  I see following.
+And I still can't find any other reply. I sent the patch with
+a RFC tag, so I wouldn't ignore any comment to it, especially
+the comment from you sir.
 
-ldr     x0, kexec_dtb_addr
+> 
+> > And I think Fabio's suggestion/patch has no problem right?
+> 
+> That is the fix I was asking for.
 
-IIUC, we are loading this address in x0. Can't we do something similar
-in user space with purgatory. I mean first jump to purgatory (code
-compiled in user space but runs prviliged) and that code takes care
-of loading x0 with right dtb addr and then jump to final kernel.
+Is there any other comment against the driver you can remember?
 
-IOW, I am not able to understand that why kernel implementation needs
-to know which is dtb segment.
-
-Thanks
-Vivek
+Thank you
+Nicolin
