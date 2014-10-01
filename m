@@ -1,44 +1,56 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 01 Oct 2014 08:29:16 +0530
-Subject: [PATCH v8 2/2] ARM: EXYNOS: Move PMU specific definitions from
- common.h
-In-Reply-To: <11948982.c37J1JPj8N@wuerfel>
-References: <1412072481-22370-1-git-send-email-pankaj.dubey@samsung.com>
- <1412072481-22370-3-git-send-email-pankaj.dubey@samsung.com>
- <11948982.c37J1JPj8N@wuerfel>
-Message-ID: <002401cfdd23$b538dbf0$1faa93d0$@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 1 Oct 2014 07:36:35 +0200
+Subject: [PATCH 0/6] KVM: handling of MMIO pass-through regions
+In-Reply-To: <20140929130745.GF3095@cbox>
+References: <1410990981-665-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140929130745.GF3095@cbox>
+Message-ID: <CAKv+Gu_XEfLif1yToGMk+vd2Hv1fD3R31Yg=Qf+MiWsYaYmb+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 29 September 2014 15:07, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Wed, Sep 17, 2014 at 02:56:15PM -0700, Ard Biesheuvel wrote:
+>> This is a followup to the patches 'kvm: define PAGE_S2_DEVICE as
+>> read-only by default' I sent out last week. Essentially build tested
+>> only: while QEMU on KVM still works correctly for my use case with
+>> these patches applied, it does not in fact use passthrough mappings
+>> of device memory.
+>>
+>> Patch #1 is a trivial fix for an issue identified by sparse where we
+>> are calling memset(0) on 2 MB worth of pages.
+>>
+>> Patch #2 fixes a potential NULL dereference in user_mem_abort()
+>>
+>> Patch #3 adds a 'writable' parameter to kmv_phys_addr_ioremap() so that
+>> read-only device regions can be mapped using this function. The existing
+>> callers are updated to pass 'true' for this parameter.
+>>
+>> Patch #4 and #5 were sent out before, and change the value of
+>> PAGE_S2_DEVICE to read-only, so that read-only regions can be
+>> ioremap()'ed
+>>
+>> Patch #6 ensures that VM_PFNMAP linear mappings of non-system RAM host
+>> memory are mapped eagerly rather than faulted in page by page.
+>>
+>>
+>> Ard Biesheuvel (6):
+>>   arm/arm64: KVM: use __GFP_ZERO not memset() to get zeroed pages
+>>   arm/arm64: KVM: fix potential NULL dereference in user_mem_abort()
+>>   arm/arm64: KVM: add 'writable' parameter to kvm_phys_addr_ioremap
+>>   ARM: kvm: define PAGE_S2_DEVICE as read-only by default
+>>   arm64: kvm: define PAGE_S2_DEVICE as read-only by default
+>>   arm/arm64: KVM: map MMIO regions at creation time
+>>
+>
+> So I only had comments on that last one and the others are fairly benign
+> and small patches, so assuming the arch maintainers don't complain about
+> the mm header changes, I can queue the first 5 patches and add the last
+> one when we sort that out.
+>
 
-On Tuesday, September 30, 2014 4:09 PM, Arnd Bergmann wrote,
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Pankaj Dubey; linux-kernel at vger.kernel.org;
-linux-samsung-soc at vger.kernel.org;
-> kgene.kim at samsung.com; linux at arm.linux.org.uk; naushad at samsung.com;
-> tomasz.figa at gmail.com; thomas.ab at samsung.com; vikas.sajjan at samsung.com
-> Subject: Re: [PATCH v8 2/2] ARM: EXYNOS: Move PMU specific definitions
-from
-> common.h
-> 
-> On Tuesday 30 September 2014 15:51:21 Pankaj Dubey wrote:
-> >
-> > +static inline void pmu_raw_writel(u32 val, u32 offset) {
-> > +       __raw_writel(val, pmu_base_addr + offset); }
-> > +
-> > +static inline u32 pmu_raw_readl(u32 offset) {
-> > +       return __raw_readl(pmu_base_addr + offset); }
-> > +
-> >
-> 
-> While you're at it, please convert these to use readl_relaxed() instead,
-which is safe to
-> use in drivers and works independent of CPU endianess.
-> 
+Fine with me. Let's at least wait until we have the userland bits in
+place to test this patch thoroughly.
 
-OK, I will update this. 
-
-Thanks,
-Pankaj Dubey
-> 	Arnd
+-- 
+Ard.
