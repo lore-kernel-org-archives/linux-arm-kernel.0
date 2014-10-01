@@ -1,46 +1,93 @@
 From: atull@opensource.altera.com (atull at opensource.altera.com)
-Date: Wed, 1 Oct 2014 14:38:22 -0500
-Subject: [PATCH v2 0/2] socfpga: fix hotplug/add suspend to ram
-Message-ID: <1412192304-1209-1-git-send-email-atull@opensource.altera.com>
+Date: Wed, 1 Oct 2014 14:38:23 -0500
+Subject: [PATCH v2 1/2] socfpga: hotplug: put cpu1 in wfi
+In-Reply-To: <1412192304-1209-1-git-send-email-atull@opensource.altera.com>
+References: <1412192304-1209-1-git-send-email-atull@opensource.altera.com>
+Message-ID: <1412192304-1209-2-git-send-email-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alan Tull <atull@opensource.altera.com>
 
-Patch 1: socfpga: hotplug: put cpu1 in wfi
-  Fix how cpu1 is hotplugged to prevent increased power
-  consumption.
+Use WFI when putting CPU1 to sleep.  Don't hold CPU1 in reset
+since that results in increased power consumption.
+
+Reset CPU1 briefly during CPU1 bootup.
+
+This has been tested for hotplug and suspend/resume and results
+in no increased power consumption.
+
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
 
 v2: no need to flush the caches
     clean up spacing in comments
     replace a register offset with a macro
+---
+ arch/arm/mach-socfpga/core.h    |    3 +++
+ arch/arm/mach-socfpga/platsmp.c |   16 ++++++++++------
+ 2 files changed, 13 insertions(+), 6 deletions(-)
 
-Patch 2: socfpga: support suspend to ram
-  * allocate space in ocram
-  * Add a function to do suspend to ram and
-    place DDR in self-refresh
-  * This function lives in ocram
-
-v2: use Generic on-chip SRAM driver to allocate ocram
-    rm fncpy_align since generic allocator handles alignment
-    check __arm_ioremap_exec return code
-    check for NULL pointers
-    add a comment regarding sdram controller configuration
-
-Alan Tull (2):
-  socfpga: hotplug: put cpu1 in wfi
-  socfpga: support suspend to ram
-
- arch/arm/mach-socfpga/Kconfig        |    1 +
- arch/arm/mach-socfpga/Makefile       |    1 +
- arch/arm/mach-socfpga/core.h         |    7 ++
- arch/arm/mach-socfpga/platsmp.c      |   16 ++--
- arch/arm/mach-socfpga/pm.c           |  147 +++++++++++++++++++++++++++++++
- arch/arm/mach-socfpga/self-refresh.S |  157 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-socfpga/socfpga.c      |   10 +++
- 7 files changed, 333 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/mach-socfpga/pm.c
- create mode 100644 arch/arm/mach-socfpga/self-refresh.S
-
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 572b8f7..953a9c0 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -21,6 +21,7 @@
+ #define __MACH_CORE_H
+ 
+ #define SOCFPGA_RSTMGR_CTRL	0x04
++#define SOCFPGA_RSTMGR_MODMPURST	0x10
+ #define SOCFPGA_RSTMGR_MODPERRST	0x14
+ #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
+ 
+@@ -28,6 +29,8 @@
+ #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
+ #define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
+ 
++#define RSTMGR_MPUMODRST_CPU1		0x2     /* CPU1 Reset */
++
+ extern void socfpga_secondary_startup(void);
+ extern void __iomem *socfpga_scu_base_addr;
+ 
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+index 5356a72..97907dd 100644
+--- a/arch/arm/mach-socfpga/platsmp.c
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -34,6 +34,10 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+ 
+ 	if (cpu1start_addr) {
++		/* This will put CPU #1 into reset. */
++		__raw_writel(RSTMGR_MPUMODRST_CPU1,
++			     rst_manager_base_addr + SOCFPGA_RSTMGR_MODMPURST);
++
+ 		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+ 
+ 		__raw_writel(virt_to_phys(socfpga_secondary_startup),
+@@ -43,8 +47,9 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		smp_wmb();
+ 		outer_clean_range(0, trampoline_size);
+ 
+-		/* This will release CPU #1 out of reset.*/
+-		__raw_writel(0, rst_manager_base_addr + 0x10);
++		/* This will release CPU #1 out of reset. */
++		__raw_writel(0,
++			     rst_manager_base_addr + SOCFPGA_RSTMGR_MODMPURST);
+ 	}
+ 
+ 	return 0;
+@@ -86,10 +91,9 @@ static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
+  */
+ static void socfpga_cpu_die(unsigned int cpu)
+ {
+-	cpu_do_idle();
+-
+-	/* We should have never returned from idle */
+-	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
++	/* Do WFI. If we wake up early, go back into WFI */
++	while (1)
++		cpu_do_idle();
+ }
+ 
+ struct smp_operations socfpga_smp_ops __initdata = {
 -- 
 1.7.9.5
