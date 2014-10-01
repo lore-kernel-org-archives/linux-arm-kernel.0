@@ -1,31 +1,16 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 1 Oct 2014 13:37:34 +0300
-Subject: [PATCH 4/4] ARM: dts: keystone-k2l: fix mdio io start address
-In-Reply-To: <1412159854-21143-1-git-send-email-grygorii.strashko@ti.com>
-References: <1412159854-21143-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1412159854-21143-5-git-send-email-grygorii.strashko@ti.com>
+From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
+Date: Wed, 1 Oct 2014 13:38:28 +0300
+Subject: [PATCH v3 0/4] Add Phytec pbab01 audio support
+In-Reply-To: 1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com
+Message-ID: <542BD9A4.30109@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The K2L MDIO io space has different start address.
-Hence, fix it to be 0x26200f00 according to TRM.
+Hello,
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2l.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+I have resent my patchset rebased on git 
+git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git couple 
+weeks ago. Was it lost under other mails or should I change something else?
 
-diff --git a/arch/arm/boot/dts/k2l.dtsi b/arch/arm/boot/dts/k2l.dtsi
-index 1f7f479..5e44983 100644
---- a/arch/arm/boot/dts/k2l.dtsi
-+++ b/arch/arm/boot/dts/k2l.dtsi
-@@ -53,3 +53,7 @@
- 		};
- 	};
- };
-+
-+&mdio {
-+	reg = <0x26200f00 0x100>;
-+};
--- 
-1.9.1
+Best regards,
+Lavnikevich Dmitry
