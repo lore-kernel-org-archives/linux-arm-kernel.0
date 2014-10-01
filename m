@@ -1,69 +1,51 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 01 Oct 2014 16:00:34 +0200
-Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
- regulators
-In-Reply-To: <01.09.14890.83F4B245@epcpsbge5.samsung.com>
-References: <01.09.14890.83F4B245@epcpsbge5.samsung.com>
-Message-ID: <1831792.g28ajrp9B5@amdc1032>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Oct 2014 16:00:54 +0200
+Subject: [PATCH 08/24] Allow a 32bit ABI to use the naming of the 64bit
+ ABI syscalls to avoid confusion of not splitting the registers
+In-Reply-To: <20141001124226.GI12702@e104818-lin.cambridge.arm.com>
+References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
+ <3318813.yqP9pCQtAB@wuerfel>
+ <20141001124226.GI12702@e104818-lin.cambridge.arm.com>
+Message-ID: <3372851.lJtjj0EtDO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 01 October 2014 13:42:27 Catalin Marinas wrote:
+> On Thu, Sep 04, 2014 at 11:11:04AM +0100, Arnd Bergmann wrote:
+> > On Wednesday 03 September 2014 14:19:02 Andrew Pinski wrote:
+> > > + * For 32bit abis where 64bit can be passed via one
+> > > + * register, use the same naming as the 64bit ones
+> > > + * as they will only have a 64 bit off_t.
+> > >   */
+> > > -#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
+> > > +#if (__BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)) || \
+> > > +       defined(__ARCH_WANT_64BIT_SYSCALLS)
+> > 
+> > I'm not sure if __ARCH_WANT_64BIT_SYSCALLS is the best name for
+> > this, since it's really only about off_t. It took me a while
+> > to understand what you are doing here.
+> 
+> I'm not sure I fully get it yet. So with this change, we avoid using
+> syscall numbers like __NR_ftruncate64 in favour of __NR_ftruncate. Why?
+> (maybe there's a valid reason, just not getting it).
 
-Hi,
+glibc depends on the name to decide which calling conventions it
+uses. I assume this is the same on IPL32 ARM.
 
-On Wednesday, October 01, 2014 12:47:52 AM YUVARAJ CD wrote:
+The general rule is that on a 32-bit architecture, __NR_ftruncate refers
+to the system call that takes a 32-bit off_t argument, while __NR_ftruncate64
+refers to the syscall that takes a 64-bit loff_t.
 
-> Since I am out of station, i dont have an access to my work set up.
-> Can you send me the dts entries of sd crad and their corresponding regulator entries?
+I would assume that the new ABI does not actually allow using 32-bit off_t
+in applications (that would be silly) and defaults to using 64-bit offsets,
+but it still needs to generate the right system calls.
 
->From arch/arm/boot/dts/exynos5420-arndale-octa.dts:
+> Either way, ILP32 would still end up calling sys_ftruncate64() (rather
+> than the native sys_ftruncate()).
 
-...
-        mmc at 12200000 {
-                status = "okay";
-                broken-cd;
-                supports-highspeed;
-                card-detect-delay = <200>;
-                samsung,dw-mshc-ciu-div = <3>;
-                samsung,dw-mshc-sdr-timing = <0 4>;
-                samsung,dw-mshc-ddr-timing = <0 2>;
-                pinctrl-names = "default";
-                pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-                vmmc-supply = <&ldo10_reg>;
+sys_ftruncate64 does not exist in 64-bit kernels, it can either call
+compat_sys_ftruncate64_wrapper or sys_ftruncate. I'd assume it would
+call the latter and pass a single 64-bit register, but that is another
+matter.
 
-                slot at 0 {
-                        reg = <0>;
-                        bus-width = <8>;
-                };
-        };
-
-        mmc at 12220000 {
-                status = "okay";
-                supports-highspeed;
-                card-detect-delay = <200>;
-                samsung,dw-mshc-ciu-div = <3>;
-                samsung,dw-mshc-sdr-timing = <2 3>;
-                samsung,dw-mshc-ddr-timing = <1 2>;
-                pinctrl-names = "default";
-                pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
-                vmmc-supply = <&ldo10_reg>;
-
-                slot at 0 {
-                        reg = <0>;
-                        bus-width = <4>;
-                };
-        };
-...
-                                ldo10_reg: LDO10 {
-                                        regulator-name = "PVDD_PRE_1V8";
-                                        regulator-min-microvolt = <1800000>;
-                                        regulator-max-microvolt = <1800000>;
-                                        regulator-always-on;
-                                };
-...
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+	Arnd
