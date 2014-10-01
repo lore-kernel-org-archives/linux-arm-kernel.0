@@ -1,56 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Oct 2014 12:13:16 +0200
-Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
-In-Reply-To: <542BD277.6070509@ti.com>
-References: <1811108.CcWEs0vKNL@wuerfel> <1943672.dOtqDNIvT0@wuerfel>
- <542BD277.6070509@ti.com>
-Message-ID: <2306426.hFH1ds3Hiv@wuerfel>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed,  1 Oct 2014 18:20:40 +0800
+Subject: [PATCH 0/3] Rockchip IOMMU driver and devicetree bindings
+Message-ID: <1412158843-8115-1-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 13:07:51 Roger Quadros wrote:
-> On 10/01/2014 12:56 PM, Arnd Bergmann wrote:
-> > On Wednesday 01 October 2014 12:32:09 Roger Quadros wrote:
-> >>
-> >> With this patch NAND probe on DRA7xx fails like so
-> >>
-> >> [    2.077313] omap-gpmc 50000000.gpmc: GPMC revision 6.0
-> >> [    2.083842] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
-> >> [    2.090524] nand: Micron MT29F2G16ABAEAWP
-> >> [    2.094728] nand: 256MiB, SLC, page size: 2048, OOB size: 64
-> >> [    2.100745] nand: using OMAP_ECC_BCH8_CODE_HW ECC scheme
-> >> [    2.109764] omap2-nand: probe of omap2-nand.0 failed with error -38
-> >>
-> >> OMAP NAND driver is the only user of the ELM module and we want it
-> >> to be usable in all possible configurations when enabled.
-> > 
-> > I don't understand. Is the BCH driver optional or not?
-> > 
-> It is optional. If it is disabled we error out on platforms that have
-> the ELM IP. But if it is enabled, we don't want to fail probe on such platforms.
+Add a driver and devicetree bindings for the IOMMU found in Rockchip RK3288
+SoCs.
 
-Wouldn't it be better to treat the absence of the ELM driver the
-same way as the absence of the ELM hardware?
+Daniel Kurtz (3):
+  iommu/rockchip: rk3288 iommu driver
+  dt-bindings: iommu: Add documentation for rockchip iommu
+  ARM: dts: rk3288: add VOP iommu nodes
 
-> >> Let's pick either one of the below patches instead
-> >>
-> >> http://article.gmane.org/gmane.linux.ports.arm.omap/118488
-> > 
-> > This doesn't let you have the BCH driver as a module, which seems
-> > wrong.
-> > 
-> >> http://article.gmane.org/gmane.linux.ports.arm.omap/118847
-> > 
-> > Looks good, although I think you can simplify this to
-> > 
-> > config MTD_NAND_OMAP_BCH_BUILD
-> >       def_tristate MTD_NAND_OMAP2 && MTD_NAND_OMAP_BCH
-> > 
-> > which makes it 'm' if MTD_NAND_OMAP_BCH is set to m.
-> 
-> Right. I will resend this patch with this fixup
-> and update the Kconfig description as well.
+ .../devicetree/bindings/iommu/rockchip,iommu.txt   |  26 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  18 +
+ drivers/iommu/Kconfig                              |  11 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/rockchip-iommu.c                     | 924 +++++++++++++++++++++
+ 5 files changed, 980 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/rockchip,iommu.txt
+ create mode 100644 drivers/iommu/rockchip-iommu.c
 
-Ok, thanks!
-
-	Arnd
+-- 
+2.1.0.rc2.206.gedb03e5
