@@ -1,83 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 01 Oct 2014 15:09:29 -0700
-Subject: [PATCH 2/3] ARM: vfp: fix VFPv3 hwcap detection on non-ARM vfp
- implementations
-In-Reply-To: <20141001215043.GS5182@n2100.arm.linux.org.uk>
-References: <1411076592-6157-1-git-send-email-sboyd@codeaurora.org>
- <1411076592-6157-3-git-send-email-sboyd@codeaurora.org>
- <20140918224625.GF5182@n2100.arm.linux.org.uk>
- <541C74C1.9060504@codeaurora.org>
- <20141001215043.GS5182@n2100.arm.linux.org.uk>
-Message-ID: <542C7B99.60500@codeaurora.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 1 Oct 2014 15:47:06 -0700
+Subject: [PATCH] i2c: rk3x: fix 0 length write transfers
+In-Reply-To: <1412185241-24950-1-git-send-email-amstan@chromium.org>
+References: <1412185241-24950-1-git-send-email-amstan@chromium.org>
+Message-ID: <CAD=FV=VV1U2o41iz_NANvk=EZcMcrurvhN31s--_srU=4yuWcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/14 14:50, Russell King - ARM Linux wrote:
-> On Fri, Sep 19, 2014 at 11:24:01AM -0700, Stephen Boyd wrote:
->>
->> Do you, or anyone else, know of other implementations? I *hope* that
->> this same exercise was done by the VFP architects before they
->> re-purposed bits but who knows. If nobody is actually setting these
->> higher bits then is there any problem widening the mask (besides it
->> being slightly confusing)?
-> There are certainly non-ARM implementations around, eg:
+Alex,
+
+On Wed, Oct 1, 2014 at 10:40 AM, Alexandru M Stan <amstan@chromium.org> wrote:
+> i2cdetect -q was broken (everything was a false positive, and no transfers were
+> actually being sent over i2c). The way it works is by sending a 0 length write
+> request and checking for NACK. This patch fixes the 0 length writes and actually
+> sends them.
 >
-> VFP support v0.3: implementor 56 architecture 2 part 20 variant 9 rev 5
-
-Can you provide the raw value of the id register or at least bits 22:16?
-This print is currently masking off the bits so we don't know what's
-there. All we know is that bit 20 is not set because it doesn't fail to
-initialize vfp.
-
+> Reported-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+> ---
+>  drivers/i2c/busses/i2c-rk3x.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> which is from Marvell Dove.  I don't know how the other Marvell offerings
-> identify.  I wouldn't be surprised if there were other implementations
-> from other vendors too.
->
-> However, if we do have any implementation which indicates that it does
-> not support both single and double precision ops (bit 20), then today
-> the VFP support code refuses to initialise, and the system will behave
-> as if there is no VFP present.
->
-> So, the problem case is whether we do have non-ARM produced implementations
-> where the VFP code refuses to init, which would then be misidentified as
-> some insane architecture version.
->
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index b41d979..f486d0e 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -238,7 +238,7 @@ static void rk3x_i2c_fill_transmit_buf(struct rk3x_i2c *i2c)
+>         for (i = 0; i < 8; ++i) {
+>                 val = 0;
+>                 for (j = 0; j < 4; ++j) {
+> -                       if (i2c->processed == i2c->msg->len)
+> +                       if ((i2c->processed == i2c->msg->len) && (cnt != 0))
 
-I'm not aware of anything. You would know better than I though.
+This looks good to me.  Basically we still need to write the address
+of the device onto the bus even if there's no data.
 
-That check assumes a v2. We should update that check to only look for v2
-or less (this isn't based on the current patch but can be squashed in).
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
 
----8<---
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 2f37e1d6cb45..22d6a1171a4e 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -738,14 +738,18 @@ static int __init vfp_init(void)
- 	vfp_vector = vfp_null_entry;
- 
- 	pr_info("VFP support v0.3: ");
--	if (VFP_arch)
-+	if (VFP_arch) {
- 		pr_cont("not present\n");
--	else if (vfpsid & FPSID_NODOUBLE) {
--		pr_cont("no double precision support\n");
- 	} else {
- 		hotcpu_notifier(vfp_hotplug, 0);
- 
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
-+
-+		if (VFP_arch < 2 && (vfpsid & FPSID_NODOUBLE)) {
-+			pr_cont("no double precision support\n");
-+			return 0;
-+		}
-+
- 		pr_cont("implementor %02x architecture %d part %02x variant %x rev %x\n",
- 			(vfpsid & FPSID_IMPLEMENTER_MASK) >> FPSID_IMPLEMENTER_BIT,
- 			(vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT,
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+-Doug
