@@ -1,55 +1,156 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Oct 2014 11:56:07 +0200
-Subject: [PATCH] nand: omap2: fix building with CONFIG_MTD_NAND_OMAP_BCH=m
-In-Reply-To: <542BCA19.8050603@ti.com>
-References: <1811108.CcWEs0vKNL@wuerfel> <542BCA19.8050603@ti.com>
-Message-ID: <1943672.dOtqDNIvT0@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 1 Oct 2014 12:03:41 +0200
+Subject: [PATCH v2 4/7] ARM: dts: sun9i: Add A80 Optimus Board support
+In-Reply-To: <CAGb2v64-zshYgcPo-WR0TVebUDY3=LKBA9DfTVDKk2PA6VSiUA@mail.gmail.com>
+References: <1411570141-29960-1-git-send-email-wens@csie.org>
+ <1411570141-29960-5-git-send-email-wens@csie.org>
+ <20140925133427.GI15315@lukather>
+ <CAGb2v65Yu=3rgQ+G6USJubKOPzcMJ5bqhe7d9wrYjpT9aFaZuw@mail.gmail.com>
+ <20140929095344.GE4388@lukather>
+ <CAGb2v64-zshYgcPo-WR0TVebUDY3=LKBA9DfTVDKk2PA6VSiUA@mail.gmail.com>
+Message-ID: <20141001100341.GJ6884@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 12:32:09 Roger Quadros wrote:
+On Mon, Sep 29, 2014 at 06:04:50PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Sep 29, 2014 at 5:53 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Sat, Sep 27, 2014 at 09:10:48PM +0800, Chen-Yu Tsai wrote:
+> >> On Thu, Sep 25, 2014 at 9:34 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Wed, Sep 24, 2014 at 10:48:58PM +0800, Chen-Yu Tsai wrote:
+> >> >> The A80 Optimus Board is was launched with the Allwinner A80 SoC.
+> >> >> It was jointly developed by Allwinner and Merrii.
+> >> >>
+> >> >> This board has a UART port, a JTAG connector, USB host ports, a USB
+> >> >> 3.0 OTG connector, an HDMI output, a micro SD slot, 8G NAND flash,
+> >> >> 4G DRAM, a camera sensor interface, a WiFi/BT combo chip, a headphone
+> >> >> jack, IR receiver, and additional GPIO headers.
+> >> >>
+> >> >> This patch adds only basic support.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >> ---
+> >> >>  arch/arm/boot/dts/Makefile              |  2 +
+> >> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 66 +++++++++++++++++++++++++++++++++
+> >> >>  2 files changed, 68 insertions(+)
+> >> >>  create mode 100644 arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> >>
+> >> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> >> index 2f42b18..098f319 100644
+> >> >> --- a/arch/arm/boot/dts/Makefile
+> >> >> +++ b/arch/arm/boot/dts/Makefile
+> >> >> @@ -424,6 +424,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+> >> >>       sun7i-a20-pcduino3.dtb
+> >> >>  dtb-$(CONFIG_MACH_SUN8I) += \
+> >> >>       sun8i-a23-ippo-q8h-v5.dtb
+> >> >> +dtb-$(CONFIG_MACH_SUN9I) += \
+> >> >> +     sun9i-a80-optimus.dtb
+> >> >>  dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+> >> >>       tegra20-iris-512.dtb \
+> >> >>       tegra20-medcom-wide.dtb \
+> >> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> >> new file mode 100644
+> >> >> index 0000000..f83abab
+> >> >> --- /dev/null
+> >> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> >> @@ -0,0 +1,66 @@
+> >> >> +/*
+> >> >> + * Copyright 2014 Chen-Yu Tsai
+> >> >> + *
+> >> >> + * Chen-Yu Tsai <wens@csie.org>
+> >> >> + *
+> >> >> + * This file is dual-licensed: you can use it either under the terms
+> >> >> + * of the GPL or the X11 license, at your option. Note that this dual
+> >> >> + * licensing only applies to this file, and not this project as a
+> >> >> + * whole.
+> >> >> + *
+> >> >> + *  a) This library is free software; you can redistribute it and/or
+> >> >> + *     modify it under the terms of the GNU General Public License as
+> >> >> + *     published by the Free Software Foundation; either version 2 of the
+> >> >> + *     License, or (at your option) any later version.
+> >> >> + *
+> >> >> + *     This library is distributed in the hope that it will be useful,
+> >> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> >> + *     GNU General Public License for more details.
+> >> >> + *
+> >> >> + *     You should have received a copy of the GNU General Public
+> >> >> + *     License along with this library; if not, write to the Free
+> >> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> >> >> + *     MA 02110-1301 USA
+> >> >> + *
+> >> >> + * Or, alternatively,
+> >> >> + *
+> >> >> + *  b) Permission is hereby granted, free of charge, to any person
+> >> >> + *     obtaining a copy of this software and associated documentation
+> >> >> + *     files (the "Software"), to deal in the Software without
+> >> >> + *     restriction, including without limitation the rights to use,
+> >> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >> >> + *     sell copies of the Software, and to permit persons to whom the
+> >> >> + *     Software is furnished to do so, subject to the following
+> >> >> + *     conditions:
+> >> >> + *
+> >> >> + *     The above copyright notice and this permission notice shall be
+> >> >> + *     included in all copies or substantial portions of the Software.
+> >> >> + *
+> >> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >> >> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >> >> + */
+> >> >> +
+> >> >> +/dts-v1/;
+> >> >> +/include/ "sun9i-a80.dtsi"
+> >> >> +
+> >> >> +/ {
+> >> >> +     model = "Merrii A80 Optimus Board";
+> >> >> +     compatible = "merrii,a80-optimus", "allwinner,sun9i-a80";
+> >> >> +
+> >> >> +     chosen {
+> >> >> +             bootargs = "earlyprintk console=ttyS0,115200";
+> >> >> +     };
+> >> >
+> >> > Since you changed the memory node in the DTSI, you should probably add
+> >> > one here too, don't you?
+> >>
+> >> I thought we left fixing that to the bootloader?
+> >> I don't see any memory nodes in our other DTS.
+> >
+> > Yes, but does the A80 bootloader supports DT and actually fixes it? If
+> > not, then you'll still have to have a memory node, just like on the
+> > A31 (and presumably on the A23).
 > 
-> With this patch NAND probe on DRA7xx fails like so
-> 
-> [    2.077313] omap-gpmc 50000000.gpmc: GPMC revision 6.0
-> [    2.083842] nand: device found, Manufacturer ID: 0x2c, Chip ID: 0xca
-> [    2.090524] nand: Micron MT29F2G16ABAEAWP
-> [    2.094728] nand: 256MiB, SLC, page size: 2048, OOB size: 64
-> [    2.100745] nand: using OMAP_ECC_BCH8_CODE_HW ECC scheme
-> [    2.109764] omap2-nand: probe of omap2-nand.0 failed with error -38
-> 
-> OMAP NAND driver is the only user of the ELM module and we want it
-> to be usable in all possible configurations when enabled.
+> Not at the moment no. But last I checked none of our board dts files
+> have separate memory nodes. We only have them in the dtsi, with the
+> largest supported ram size as its value. Also the bootloader
+> (u-boot that is) can pass the memory size via atags I think.
 
-I don't understand. Is the BCH driver optional or not?
+Only if CONFIG_ARM_ATAG_DTB_COMPAT is set.
 
-The help text says:
+> At least I'm only getting 512MB RAM on my Optimus, due to u-boot
+> incorrectly assuming I only have as much. But that's another problem. :(
 
-          This config enables the ELM hardware engine, which can be used to
-          locate and correct errors when using BCH ECC scheme. This offloads
-          the cpu from doing ECC error searching and correction. However some
-          legacy OMAP families like OMAP2xxx, OMAP3xxx do not have ELM engine
-          so they should not enable this config symbol.
+And does it initialize the rest of the memory?
 
-which adds more to the confusion. The help text sounds like everything should
-work even if ELM is disabled (which contradicts your finding above) but you
-must not enable the driver if you are on an older machine (which would
-break multiplatform builds).
+> Would this be a problem when using Android fastboot from the stock
+> u-boot?
 
-> Let's pick either one of the below patches instead
-> 
-> http://article.gmane.org/gmane.linux.ports.arm.omap/118488
+IIRC, fastboot passes ATAGS anyway, so as long as you have the
+configuration option mentionned above, you should be safe.
 
-This doesn't let you have the BCH driver as a module, which seems
-wrong.
-
-> http://article.gmane.org/gmane.linux.ports.arm.omap/118847
-
-Looks good, although I think you can simplify this to
-
-config MTD_NAND_OMAP_BCH_BUILD
-	def_tristate MTD_NAND_OMAP2 && MTD_NAND_OMAP_BCH
-
-which makes it 'm' if MTD_NAND_OMAP_BCH is set to m.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/1be2510f/attachment.sig>
