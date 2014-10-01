@@ -1,53 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Oct 2014 11:56:59 +0100
-Subject: [PATCH] arm64: Use and error-check DMA_ERROR_CODE
-In-Reply-To: <20141001101323.GB2587@arm.com>
-References: <1412108121-19262-1-git-send-email-seanpaul@chromium.org>
- <20141001101323.GB2587@arm.com>
-Message-ID: <20141001105659.GF12702@e104818-lin.cambridge.arm.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 1 Oct 2014 06:02:14 -0500
+Subject: [PATCH] arm: socfpga: fix fetching cpu1start_addr for system with >
+ 2GB of ram
+Message-ID: <1412161334-12359-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 11:13:23AM +0100, Will Deacon wrote:
-> On Tue, Sep 30, 2014 at 09:15:21PM +0100, Sean Paul wrote:
-> > This patch replaces the static assignment of ~0 to dma_handle with
-> > DMA_ERROR_CODE to be consistent with other platforms.
-> > 
-> > In addition to that, it also adds a check for DMA_ERROR_CODE before
-> > calling __dma_free_coherent with an invalid dma_handle.
-> > 
-> > Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> > ---
-> >  arch/arm64/mm/dma-mapping.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> > index 4164c5a..69fd2c4 100644
-> > --- a/arch/arm64/mm/dma-mapping.c
-> > +++ b/arch/arm64/mm/dma-mapping.c
-> > @@ -125,7 +125,7 @@ static void *__dma_alloc_noncoherent(struct device *dev, size_t size,
-> >  no_map:
-> >  	__dma_free_coherent(dev, size, ptr, *dma_handle, attrs);
-> >  no_mem:
-> > -	*dma_handle = ~0;
-> > +	*dma_handle = DMA_ERROR_CODE;
-> >  	return NULL;
-> >  }
-> >  
-> > @@ -136,7 +136,9 @@ static void __dma_free_noncoherent(struct device *dev, size_t size,
-> >  	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
-> >  
-> >  	vunmap(vaddr);
-> > -	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
-> > +
-> > +	if (dma_handle != DMA_ERROR_CODE)
-> > +		__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
-> 
-> Is it legal to try and free a DMA buffer after a failed allocation? If so, I
-> think we need something similar for arch/arm/.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-If the allocation failed, we don't even have a vaddr to unmap, so I
-don't see the reason for the additional check.
+When CPU1 is brought out of reset, it's MMU is not turned yet, so it will only
+be able to use physical addresses. For systems with 1GB or less, clearing
+0x40000000 will work just fine. However for systems with 2GB or more, we
+need to clear at least 0x80000000.
 
+Essentially, the bic instruction is converting the cpu1start_addr from a
+virtual to a physical address. We should be using bic 0xf0000000 for all
+systems.
+
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/mach-socfpga/headsmp.S | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+index 95c115d..d686f99 100644
+--- a/arch/arm/mach-socfpga/headsmp.S
++++ b/arch/arm/mach-socfpga/headsmp.S
+@@ -16,9 +16,8 @@ ENTRY(secondary_trampoline)
+ 	movw	r2, #:lower16:cpu1start_addr
+ 	movt  r2, #:upper16:cpu1start_addr
+ 
+-	/* The socfpga VT cannot handle a 0xC0000000 page offset when loading
+-		the cpu1start_addr, we bit clear it. Tested on HW and VT. */
+-	bic	r2, r2, #0x40000000
++	/* convert cpu1start_addr to a physical address */
++	bic	r2, r2, #0xf0000000
+ 
+ 	ldr	r0, [r2]
+ 	ldr	r1, [r0]
 -- 
-Catalin
+2.0.3
