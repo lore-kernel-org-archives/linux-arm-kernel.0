@@ -1,35 +1,99 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Wed,  1 Oct 2014 23:29:46 +0200
-Subject: [PATCH 6/6] ARM: meson: document meson8 compatible properties
-In-Reply-To: <1412198986-26534-1-git-send-email-b.galvani@gmail.com>
-References: <1412198986-26534-1-git-send-email-b.galvani@gmail.com>
-Message-ID: <1412198986-26534-7-git-send-email-b.galvani@gmail.com>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Wed, 1 Oct 2014 23:29:10 +0200
+Subject: [PATCH] Route keyboard LEDs through the generic LEDs layer.
+In-Reply-To: <20141001114257.f0f6a94508bdd7df83602eda@linux-foundation.org>
+References: <20140331122323.GC6044@type.bordeaux.inria.fr>
+ <20141001114257.f0f6a94508bdd7df83602eda@linux-foundation.org>
+Message-ID: <20141001212910.GE9598@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree bindings documentation for Amlogic Meson8 SoCs.
+Andrew Morton, le Wed 01 Oct 2014 11:42:57 -0700, a ?crit :
+> On Mon, 31 Mar 2014 14:23:23 +0200 Samuel Thibault <samuel.thibault@ens-lyon.org> wrote:
+> > This permits to reassign keyboard LEDs to something else than keyboard "leds"
+> > state, by adding keyboard led and modifier triggers connected to a series
+> > of VT input LEDs, themselves connected to VT input triggers, which
+> > per-input device LEDs use by default.  Userland can thus easily change the LED
+> > behavior of (a priori) all input devices, or of particular input devices.
+> > 
+> > This also permits to fix #7063 from userland by using a modifier to implement
+> > proper CapsLock behavior and have the keyboard caps lock led show that modifier
+> > state.
+> 
+> When this patch is combined with current linux-next I'm getting the
+> below lockdep splat.  Config: http://ozlabs.org/~akpm/config-akpm2.txt
 
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
----
- Documentation/devicetree/bindings/arm/amlogic.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Yes, this was reported and I sent a fix some time ago (Tue, 26 Aug 2014
+11:17:25 +0200), here is the patch again:
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 7eece72..8fe8150 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -2,7 +2,9 @@ Amlogic MesonX device tree bindings
- -------------------------------------------
+Subject: Defer input led work to workqueue
+
+When the kbd changes its led state (e.g. caps lock), this triggers
+(led_trigger_event) the kbd-capsl trigger, which is by default
+used by the vt::capsl LED, which triggers (led_trigger_event) the
+vt-capsl trigger. These two nested led_trigger_event calls take a
+trig->leddev_list_lock lock and thus lockdep complains.
+
+Actually the user can make the vt::capsl LED use its own vt-capsl
+trigger and thus build a loop.  This produces an immediate oops.
+
+This changeset defers the second led_trigger_event call into a
+workqueue, which avoids the nested locking altogether.  This does
+not prevent the user from shooting himself in the foot by creating a
+vt::capsl <-> vt-capsl loop, but the only consequence is the workqueue
+threads eating some CPU until the user breaks the loop, which is not too
+bad.
+
+Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+
+--- a/drivers/input/leds.c
++++ b/drivers/input/leds.c
+@@ -100,13 +100,24 @@ static unsigned long vt_led_registered[B
+ /* Number of input devices having each LED */
+ static int vt_led_references[LED_CNT];
  
- Boards with the Amlogic Meson6 SoC shall have the following properties:
-+  Required root node property:
-+    compatible: "amlogic,meson6"
++static int vt_led_state[LED_CNT];
++static struct work_struct vt_led_work[LED_CNT];
++
++static void vt_led_cb(struct work_struct *work)
++{
++	int led = work - vt_led_work;
++
++	led_trigger_event(&vt_led_triggers[led], vt_led_state[led]);
++}
++
+ /* VT LED state change, tell the VT trigger.  */
+ static void vt_led_set(struct led_classdev *cdev,
+ 			  enum led_brightness brightness)
+ {
+ 	int led = cdev - vt_leds;
  
--Required root node property:
--
--compatible = "amlogic,meson6";
-+Boards with the Amlogic Meson8 SoC shall have the following properties:
-+  Required root node property:
-+    compatible: "amlogic,meson8";
--- 
-1.9.1
+-	led_trigger_event(&vt_led_triggers[led], !!brightness);
++	vt_led_state[led] = !!brightness;
++	schedule_work(&vt_led_work[led]);
+ }
+ 
+ /* LED state change for some keyboard, notify that keyboard.  */
+@@ -244,6 +255,22 @@ void input_led_disconnect(struct input_d
+ 	mutex_unlock(&vt_led_registered_lock);
+ }
+ 
++static int __init input_led_init(void)
++{
++	unsigned i;
++
++	for (i = 0; i < LED_CNT; i++)
++		INIT_WORK(&vt_led_work[i], vt_led_cb);
++
++	return 0;
++}
++
++static void __exit input_led_exit(void)
++{
++}
++
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("User LED support for input layer");
+ MODULE_AUTHOR("Samuel Thibault <samuel.thibault@ens-lyon.org>");
++module_init(input_led_init);
++module_exit(input_led_exit);
