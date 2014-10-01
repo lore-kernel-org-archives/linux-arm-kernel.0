@@ -1,46 +1,127 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 01 Oct 2014 21:50:08 +0200
-Subject: [PATCH v2 2/4] ARM: exynos: Ensure PM domains are powered at
- initialization
-In-Reply-To: <542C2972.9070002@samsung.com>
-References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
- <1412174494-15346-3-git-send-email-ulf.hansson@linaro.org>
- <542C2972.9070002@samsung.com>
-Message-ID: <6158232.Yd6ncToJoF@vostro.rjw.lan>
+From: atull@opensource.altera.com (atull)
+Date: Wed, 1 Oct 2014 14:24:07 -0500
+Subject: [PATCH 2/2] socfpga: support suspend to ram
+In-Reply-To: <20141001134917.GB12750@amd>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
+ <20141001134917.GB12750@amd>
+Message-ID: <alpine.DEB.2.02.1410011420580.31476@atx-linux-37>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 01, 2014 06:18:58 PM Sylwester Nawrocki wrote:
-> On 01/10/14 16:41, Ulf Hansson wrote:
-> > At ->probe() it's common practice for drivers/subsystems to bring their
-> > devices to full power and without depending on CONFIG_PM_RUNTIME.
-> > 
-> > We could also expect that drivers/subsystems requires their device's
-> > corresponding PM domains to be powered, to successfully complete a
-> > ->probe() sequence.
-> > 
-> > Align to the behavior above, by ensuring all PM domains are powered
-> > prior initialization of a generic PM domain.
-> > 
-> > Do note, since the generic PM domain will try to power off unused PM
-> > domains at late_init, there should be no increased power consumption
-> > over time, but potentially during boot.
+On Wed, 1 Oct 2014, Pavel Machek wrote:
+
+> Hi!
 > 
-> Wouldn't it be a better idea to power on the power domains which are
-> turned off only when CONFIG_PM_RUNTIME is not enabled ? I had a plan
-> to submit a patch doing that but unfortunately this has fallen through
-> the cracks. At the moment mach-exynos/pm_domains.c is not even built in
-> when CONFIG_PM_RUNTIME is disabled.
+> > Add code that requests that the sdr controller go into
+> > self-refresh mode.  This code is run from ocram.
+> > 
+> > This patch assumes that u-boot has already configured sdr:
+> >   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+> >   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+> >   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
 > 
-> I don't like the behaviour introduced in this patch to be the default,
-> i.e. turning all possible power domains during boot sequence, even if
-> some are not used and not needed. While we're trying to decrease the
-> power consumption in any possible way this doesn't help at all.
+> I'm not sure if we should make assumptions like that. u-boot is not
+> the only bootloader.
 
-Agreed (as stated before).
+Yes, that's why I wanted to document it.
 
-And I'm wondering why that comment of mine was ignored?
+> 
+> At the very least, it should go to comment in the code, not to changelog.
+> 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+I agree.  I'm about to post the next version.  I will add this in
+the code.
+
+> > +u32 socfpga_sdram_self_refresh(u32 sdr_base, u32 scu_base);
+> > +extern unsigned int socfpga_sdram_self_refresh_sz;
+> 
+> _sz -> size.
+> 
+> Is it ok to just copy code around?
+> 
+
+You have to use fncpy to do it.
+
+> > +/* Round up a pointer address to fix aligment for fncpy() */
+> > +static void *fncpy_align(void *ptr)
+> > +{
+> > +	u32 value = (u32)ptr;
+> > +
+> > +	if ((value & (FNCPY_ALIGN - 1)) != 0)
+> > +		value = ((value & ~(FNCPY_ALIGN - 1)) + FNCPY_ALIGN);
+> > +
+> > +	return (void *)value;
+> > +}
+> 
+> Don't we have a nice macro doing aligning?
+
+Actually the next version is going to fix some of these other comments by 
+using the ocram sram driver to allocate ocram space.  
+
+> 
+> I guess the if() is not neccessary.
+> 
+> > +static int socfpga_pm_suspend(unsigned long arg)
+> > +{
+> > +	u32 ret;
+> > +
+> > +	ret = socfpga_sdram_self_refresh_in_ocram((u32)sdr_ctl_base_addr,
+> > +						  (u32)socfpga_scu_base_addr);
+> > +
+> > +	pr_debug("%s self-refresh loops request=%d exit=%d\n", __func__,
+> > +		 ret & 0xffff, (ret >> 16) & 0xffff);
+> > +
+> > +	return 0;
+> > +}
+> 
+> return ret?
+> 
+> 
+> > +	.arch   armv7-a
+> > +	.text
+> > +	.align 3
+> > +
+> > +	/*
+> > +	 * socfpga_sdram_self_refresh
+> > +	 *
+> > +	 *  r0 : sdr_ctl_base_addr
+> > +	 *  r1 : socfpga_scu_base_addr
+> > +	 *  r2 : temp storage of register values
+> > +	 *  r3 : loop counter
+> > +	 *  r4 : temp storage of return value
+> > +	 *
+> > +	 *  return value: lower 16 bits: loop count going into self refresh
+> > +	 *                upper 16 bits: loop count exiting self refresh
+> > +	 */
+> > +ENTRY(socfpga_sdram_self_refresh)
+> 
+> r0, r1 are the parameters?
+> 
+> > @@ -77,6 +78,15 @@ void __init socfpga_sysmgr_init(void)
+> >  
+> >  	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+> >  	rst_manager_base_addr = of_iomap(np, 0);
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "altr,sdr-ctl");
+> > +	if (!np) {
+> > +		pr_err("SOCFPGA: Unable to find sdr-ctl\n");
+> > +		return;
+> > +	}
+> > +
+> > +	sdr_ctl_base_addr = of_iomap(np, 0);
+> > +	WARN_ON(!sdr_ctl_base_addr);
+> >  }
+> >  
+> >  static void __init socfpga_init_irq(void)
+> 
+> Actually, "sdr-ctl" is quite hard to understand. I guess it means
+> "sdram-control"? Should we do something like altr,sdram-ctrl-1.0, so
+> that we have way forward if hardware changes in future?
+> 
+> 									Pavel
+> 
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
