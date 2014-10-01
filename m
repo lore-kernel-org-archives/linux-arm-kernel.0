@@ -1,84 +1,32 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 1 Oct 2014 09:54:36 +0100
-Subject: [PATCH] of/pci: add pci_pio_to_address dummy for !CONFIG_OF
-In-Reply-To: <706416181.hbVGLDA3o6@wuerfel>
-References: <706416181.hbVGLDA3o6@wuerfel>
-Message-ID: <20141001085436.GA841@e106497-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Oct 2014 09:55:18 +0100
+Subject: [PATCH 7/9] dmaengine: Move slave caps to dma_device
+In-Reply-To: <20141001082705.GF6884@lukather>
+References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1411808085-27792-8-git-send-email-maxime.ripard@free-electrons.com>
+ <20140927092846.GA5182@n2100.arm.linux.org.uk>
+ <20141001082705.GF6884@lukather>
+Message-ID: <20141001085518.GN5182@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 02:19:05PM +0100, Arnd Bergmann wrote:
-> The pci_register_io_range() and pci_pio_to_address() were recently
-> introduced to generalize the handling of memory mapped PCI I/O space,
-> but they are only valid when CONFIG_OF is set, leading to a possible
-> build error:
+On Wed, Oct 01, 2014 at 10:27:05AM +0200, Maxime Ripard wrote:
+> On Sat, Sep 27, 2014 at 10:28:47AM +0100, Russell King - ARM Linux wrote:
+> > The only way to do this is to either have a flag day, fixing all drivers
+> > at once (which isn't going to happen) or leave the caps code as-is, and
+> > provide a library function which drivers can hook into the caps callback
+> > which retrieves the information from dma_device.
+> > 
+> > That way, DMA engine drivers which are using the new method can just
+> > install the new function, and those which haven't been updated with
+> > capabilities can carry on as they are, and are detectable to drivers.
 > 
-> drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_setup_window':
-> drivers/pci/host/pcie-rcar.c:340:3: error: implicit declaration of function 'pci_pio_to_address' [-Werror=implicit-function-declaration]
->    res_start = pci_pio_to_address(res->start);
->    ^
-> drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_probe':
-> drivers/pci/host/pcie-rcar.c:945:3: error: implicit declaration of function 'of_pci_range_to_resource' [-Werror=implicit-function-declaration]
->    err = of_pci_range_to_resource(&range, pdev->dev.of_node,
->    ^
-> cc1: some warnings being treated as errors
-> 
-> This provides inline dummy implementations for the case that
-> CONFIG_OF is disabled, to allow better build testing.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 279c5dd046 ("of/pci: Add pci_register_io_range() and pci_pio_to_address()")
-> 
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index 7ebb877b07c2..851097aab115 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -71,6 +71,11 @@ static inline const __be32 *of_get_address(struct device_node *dev, int index,
->  	return NULL;
->  }
->  
-> +static inline phys_addr_t pci_pio_to_address(unsigned long pio)
-> +{
-> +	return 0;
-> +}
-> +
->  static inline int of_pci_range_parser_init(struct of_pci_range_parser *parser,
->  			struct device_node *node)
->  {
-> @@ -144,6 +149,12 @@ static inline const __be32 *of_get_pci_address(struct device_node *dev,
->  {
->  	return NULL;
->  }
-> +static inline int of_pci_range_to_resource(struct of_pci_range *range,
-> +					   struct device_node *np,
-> +					   struct resource *res)
-> +{
-> +	return -ENOSYS;
-> +}
->  #endif /* CONFIG_OF_ADDRESS && CONFIG_PCI */
->  
->  #endif /* __OF_ADDRESS_H */
-> 
+> Which is pretty much the current behaviour, isn't it?
 
-Arnd,
-
-I have a more general question that is related only vaguely to this patch but it was prompted by it:
-given that this pcie-rcar.c driver is so dependent on the OF functionality, why the fix(es) (in
-general) tend to prefer creating these dummy functions for !CONFIG_OF rather than making
-CONFIG_PCI_RCAR_GEN2_PCIE dependent on CONFIG_OF? We are basically compiling a driver that we can
-guarantee it will fail when used without OF support and contribute to the overall size of the kernel.
-Given the presentation you have done at Linaro Connect last month on this topic, I started to wonder
-if there is a deeper API style agreement that is not apparent to me?
-
-Thanks for your time,
-Liviu
+Yes, because the ASoC code has obviously already thought about this and
+solved the lack-of-caps-function problem in a way that permits existing
+solutions to continue working.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
