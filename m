@@ -1,30 +1,37 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 1 Oct 2014 10:27:20 -0700
-Subject: [PATCH] serial/core: Initialize the console pm state
-In-Reply-To: <1411367422-2095-1-git-send-email-ssreedharan@mvista.com>
-References: <1411367422-2095-1-git-send-email-ssreedharan@mvista.com>
-Message-ID: <CAMAWPa9R5HtGKkV=Ya-ekynY5maespZ0Q6BjwJcX3LN3857ZjQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 1 Oct 2014 10:28:55 -0700
+Subject: [PATCH 2/4] ARM: qcom: add description of KPSS WDT for IPQ8064
+In-Reply-To: <50c0ec1514173ce07641a95839e939dcda41b110.1412182773.git.joshc@codeaurora.org>
+References: <cover.1412182773.git.joshc@codeaurora.org>
+ <50c0ec1514173ce07641a95839e939dcda41b110.1412182773.git.joshc@codeaurora.org>
+Message-ID: <20141001172855.GL10233@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 21, 2014 at 11:30 PM, Sudhir Sreedharan
-<ssreedharan@mvista.com> wrote:
-> For console devices having UART_CAP_SLEEP capability, the uart_pm_state has
-> to be initialized to UART_PM_STATE_ON. Otherwise the LCR regiser values
-> are reinitialized when uart_change_pm is called from uart_configure_port.
->
-> Signed-off-by: Sudhir Sreedharan <ssreedharan@mvista.com>
+On 10/01, Josh Cartwright wrote:
+> @@ -96,6 +104,13 @@
+>  			cpu-offset = <0x80000>;
+>  		};
+>  
+> +		watchdog at 208a038 {
+> +			compatible = "qcom,kpss-wdt-ipq8064";
+> +			reg = <0x0208a038 0x40>;
 
-Multiple boot failures on ARM[1] were bisected down to this patch.
+Not being aligned to 4k or 1k raises red flags.
 
-How was this patch tested, and on which platforms?
+The watchdog is part of the timer block (on this chip it's
+"qcom,kpss-timer"). We should add qcom,kpss-wdt to the compatible
+list in the timer binding and extend that binding to have clocks
+and timeout-sec (watchdog-timeout-sec?). This would follow DT
+best practices of having one node per device. We could also add
+the interrupts too, even if they're not used by the driver right
+now.
 
-Also, the changelog states that this should be done only for
-UART_CAP_SLEEP, but the patch does it for every UART.
+> +			clocks = <&sleep_clk>;
+> +			timeout-sec = <10>;
+> +		};
+> +
 
-Greg, I suggest this patch be dropped from tty-next until it has been
-better described and tested.
-
-Kevin
-
-[1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-October/005550.html
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
