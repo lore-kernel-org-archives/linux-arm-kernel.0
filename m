@@ -1,28 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Oct 2014 18:11:19 +0200
-Subject: [GIT PULL] Add initial support for Broadcom Cygnus SoC
-In-Reply-To: <1411691389-22140-1-git-send-email-f.fainelli@gmail.com>
-References: <1411691389-22140-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <201410011811.19199.arnd@arndb.de>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 1 Oct 2014 18:12:20 +0200
+Subject: [GIT PULL] ARM: STi: DT changes for v3.18
+In-Reply-To: <201410011707.02238.arnd@arndb.de>
+References: <54215982.2040909@st.com> <201410011707.02238.arnd@arndb.de>
+Message-ID: <542C27E4.5070801@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 September 2014, Florian Fainelli wrote:
-> This patchset contains initial support for Broadcom's Cygnus SoC based on our
-> iProc architecture. Initial support is minimal and includes just the mach
-> platform code, clock driver, and a basic device tree configuration. Peripheral
-> drivers will be submitted soon, as will device tree configurations for other
-> Cygnus board variants.
 
-I think this hasn't seen enough review and is too late for 3.18, so not pulled.
 
-Please submit the patches again after the merge window.
+On 10/01/2014 05:07 PM, Arnd Bergmann wrote:
+> On Tuesday 23 September 2014, Maxime Coquelin wrote:
+>> Highlights:
+>> -----------
+>>   - Add SDHCI support for STiH41x B2020 boards
+>>   - Add reset controllers to STiH407 SoC
+>>   - Add MiPHY & SATA support to STiH416
+>>   - Add Thermal supportto STiH416
+>>   - Add Clock support to STiH407 SoC
+>>
+>> Note that this pull request contains merge from Philipp Zabel's reset tree for STiH407 reset DT bindings includes.
+> 
+> 
+> Pulled into the next/late branch. If we end up sending a pull request for the
+> late stuff this time, that also gives Philipp time to go first with his
+> branches.
 
-The clock driver should get merged by the clk maintainer. We can make exceptions
-for merging drivers through arm-soc, but not without an explict request from
-the respective maintainer.
+Ok, Philipp only has the STi patches in his branch for v3.18.
+I think he didn't planned to send a pull request for it, expecting it would go through mine.
 
-I'll have lots of comments about the platform code too, but don't have time
-at the moment to do a thorough review.
+> 
+> Unfortunately, your submission came a bit late, so no guarantee this is going
+> to make it into 3.18. If we see too many regressions with the earlier branches,
+> we'll defer it for 3.19.
+Yes, I have been busy these days with other topics, but I thought it wasn't too late,
+since it was two weeks before the opening of the merge window.
 
-	Arnd
+For next time, could tell me starting which -rc you consider it is too late?
+
+Regards,
+Maxime
+> 
+> 	Arnd
+> 
