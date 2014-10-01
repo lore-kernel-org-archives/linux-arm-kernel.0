@@ -1,53 +1,40 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed,  1 Oct 2014 15:45:28 +0200
-Subject: [PATCH 1/2] ARM: BCM5301X: Add Broadcom's bus-axi to the DTS file
-Message-ID: <1412171129-31482-1-git-send-email-zajec5@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 1 Oct 2014 10:45:48 -0300
+Subject: [PATCH v3 2/4] ARM: dts: pbab01: enable I2S audio on
+ phyFLEX-i.MX6 boards
+In-Reply-To: <542C0441.5080508@sam-solutions.com>
+References: <1410537872-17274-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410854903-26419-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410854903-26419-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <CAOMZO5CgrQ6Wf6kStga40TUKx9dARygCNB4OYSUoG3c8eUYbrA@mail.gmail.com>
+ <542C0441.5080508@sam-solutions.com>
+Message-ID: <CAOMZO5BS6X2NTY4q7RKoKdhJNbEANSa2wXur3_Hyxp8nQn5Avw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This has been successfully tested on Netgear R6250 and two other
-development (unnamed) devices, all of them BCM4708 based.
-We also got a possitive feedback from R7000 (BCM4709) tester.
+On Wed, Oct 1, 2014 at 10:40 AM, Dmitry Lavnikevich
+<d.lavnikevich@sam-solutions.com> wrote:
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-Support for "brcm,bus-axi" has been added in
-bcma: register bcma as device tree driver
----
- arch/arm/boot/dts/bcm5301x.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+>> No need to have this 'regulator-always-on'
+>>
+>
+> why is there no need for 'regulator-alweys-on'? I see it in
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 53c624f..6d80922 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -8,6 +8,7 @@
-  * Licensed under the GNU/GPL. See COPYING for details.
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "skeleton.dtsi"
-@@ -92,4 +93,19 @@
- 			clock-frequency = <400000000>;
- 		};
- 	};
-+
-+	axi at 18000000 {
-+		compatible = "brcm,bus-axi";
-+		reg = <0x18000000 0x1000>;
-+		ranges = <0x00000000 0x18000000 0x00100000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		chipcommon: chipcommon at 0 {
-+			reg = <0x00000000 0x1000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+	};
- };
--- 
-1.8.4.5
+For a regulator that is not GPIO controlled you don't need to pass
+'regulator-always-on'.
+
+>
+>>> +&ssi2 {
+>>> +       fsl,mode = "i2s-slave";
+>>
+>>
+>> Please remove this 'fsl,mode' property. It is ignored by the fsl_ssi
+>> driver.
+>
+>
+> yes, thanks. It is present in Documentation but now I see that it
+> was actually removed not that long ago. I will remove this
+> property with next patchset.
+
+Correct, I recently sent a patch removing it and it is in Mark's tree now:
+https://git.kernel.org/cgit/linux/kernel/git/broonie/sound.git/commit/?h=topic/fsl-ssi&id=b93427b1c057841602e0fe2005153a6e82f2e658
