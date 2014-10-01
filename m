@@ -1,33 +1,36 @@
-From: amstan@chromium.org (Alexandru M Stan)
-Date: Wed,  1 Oct 2014 10:40:41 -0700
-Subject: [PATCH] i2c: rk3x: fix 0 length write transfers
-Message-ID: <1412185241-24950-1-git-send-email-amstan@chromium.org>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Wed, 1 Oct 2014 13:47:14 -0400
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <20141001161621.GA28440@leverpostej>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com>
+ <1412106877.6630.45.camel@smoke>
+ <20141001161621.GA28440@leverpostej>
+Message-ID: <20141001174714.GD14991@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2cdetect -q was broken (everything was a false positive, and no transfers were
-actually being sent over i2c). The way it works is by sending a 0 length write
-request and checking for NACK. This patch fixes the 0 length writes and actually
-sends them.
+On Wed, Oct 01, 2014 at 05:16:21PM +0100, Mark Rutland wrote:
 
-Reported-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Alexandru M Stan <amstan@chromium.org>
----
- drivers/i2c/busses/i2c-rk3x.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+[..]
+> I'm still rather unhappy about the mechanism by which the DTB is passed
+> by userspace and detected by the kernel, as I'd prefer that the user
+> explictly stated which segment they wanted to pass to the (Linux)
+> kernel, but that would require reworking the kexec syscall to allow
+> per-segment info/flags.
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index b41d979..f486d0e 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -238,7 +238,7 @@ static void rk3x_i2c_fill_transmit_buf(struct rk3x_i2c *i2c)
- 	for (i = 0; i < 8; ++i) {
- 		val = 0;
- 		for (j = 0; j < 4; ++j) {
--			if (i2c->processed == i2c->msg->len)
-+			if ((i2c->processed == i2c->msg->len) && (cnt != 0))
- 				break;
- 
- 			if (i2c->processed == 0 && cnt == 0)
--- 
-2.1.0.rc2.206.gedb03e5
+Why does the running kernel need to know about dtb segment.  I see following.
+
+ldr     x0, kexec_dtb_addr
+
+IIUC, we are loading this address in x0. Can't we do something similar
+in user space with purgatory. I mean first jump to purgatory (code
+compiled in user space but runs prviliged) and that code takes care
+of loading x0 with right dtb addr and then jump to final kernel.
+
+IOW, I am not able to understand that why kernel implementation needs
+to know which is dtb segment.
+
+Thanks
+Vivek
