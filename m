@@ -1,35 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Oct 2014 13:42:27 +0100
-Subject: [PATCH 08/24] Allow a 32bit ABI to use the naming of the 64bit
- ABI syscalls to avoid confusion of not splitting the registers
-In-Reply-To: <3318813.yqP9pCQtAB@wuerfel>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <1409779158-30963-9-git-send-email-apinski@cavium.com>
- <3318813.yqP9pCQtAB@wuerfel>
-Message-ID: <20141001124226.GI12702@e104818-lin.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 1 Oct 2014 14:48:02 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20141001123250.GY4273@sirena.org.uk>
+References: <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
+ <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk>
+Message-ID: <20141001124800.GA21733@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 11:11:04AM +0100, Arnd Bergmann wrote:
-> On Wednesday 03 September 2014 14:19:02 Andrew Pinski wrote:
-> > + * For 32bit abis where 64bit can be passed via one
-> > + * register, use the same naming as the 64bit ones
-> > + * as they will only have a 64 bit off_t.
-> >   */
-> > -#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-> > +#if (__BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)) || \
-> > +       defined(__ARCH_WANT_64BIT_SYSCALLS)
+On Wed, Oct 01, 2014 at 01:32:50PM +0100, Mark Brown wrote:
+> On Wed, Oct 01, 2014 at 01:10:46PM +0200, Javier Martinez Canillas wrote:
+[...]
+> > Adding your resources (clock, regulators, etc) incrementally and only
+> > when the driver for the device that use these resources is available,
+> > will only make adding support for a new platform slower IMHO since
+> > there will be more patches to be posted, reviewed and merged.
 > 
-> I'm not sure if __ARCH_WANT_64BIT_SYSCALLS is the best name for
-> this, since it's really only about off_t. It took me a while
-> to understand what you are doing here.
+> So don't do that if you're worried about it then, provide the bits of DT
+> that hook everything up from the start or otherwise describe things as
+> being in use.
 
-I'm not sure I fully get it yet. So with this change, we avoid using
-syscall numbers like __NR_ftruncate64 in favour of __NR_ftruncate. Why?
-(maybe there's a valid reason, just not getting it).
+"Otherwise describe things as being in use" doesn't work for clocks for
+example. And Mike already said he wasn't willing to add something like
+an always-on DT property for clocks.
 
-Either way, ILP32 would still end up calling sys_ftruncate64() (rather
-than the native sys_ftruncate()).
-
--- 
-Catalin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/d3972a47/attachment.sig>
