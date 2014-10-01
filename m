@@ -1,91 +1,139 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 01 Oct 2014 20:08:05 +0900
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20140826175128.GD23445@arm.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
-Message-ID: <542BE095.3010107@linaro.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 1 Oct 2014 13:10:46 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20141001074139.GB18463@ulmo>
+References: <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
+ <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+Message-ID: <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-When I was looking into syscall_trace_exit() more closely, I found
-another (big) problem.
-There are two system calls, execve() and rt_sigreturn(), which change
-'syscallno' in pt_regs to -1 in start_thread() and restore_sigframe(),
-respectively.
-
-Since syscallno is not valid anymore in syscall_trace_exit() for these
-system calls, we cannot create a correct syscall exit record for tracepoint
-in trace_sys_exit() (=> ftrace_syscall_exit()) and for audit in audit_syscall_exit().
-
-This does not happen on arm because syscall numbers are kept in
-thread_info on arm.
-
-How can we deal with this issue?
-
--Takahiro AKASHI
-
-
-On 08/27/2014 02:51 AM, Will Deacon wrote:
-> On Fri, Aug 22, 2014 at 01:35:17AM +0100, AKASHI Takahiro wrote:
->> On 08/22/2014 02:08 AM, Kees Cook wrote:
->>> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
->>> <takahiro.akashi@linaro.org> wrote:
->>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->>>> index 8876049..c54dbcc 100644
->>>> --- a/arch/arm64/kernel/ptrace.c
->>>> +++ b/arch/arm64/kernel/ptrace.c
->>>> @@ -1121,9 +1121,29 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->>>>
->>>>    asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->>>>    {
->>>> +       unsigned int saved_syscallno = regs->syscallno;
->>>> +
->>>>           if (test_thread_flag(TIF_SYSCALL_TRACE))
->>>>                   tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->>>>
->>>> +       if (IS_SKIP_SYSCALL(regs->syscallno)) {
->>>> +               /*
->>>> +                * RESTRICTION: we can't modify a return value of user
->>>> +                * issued syscall(-1) here. In order to ease this flavor,
->>>> +                * we need to treat whatever value in x0 as a return value,
->>>> +                * but this might result in a bogus value being returned.
->>>> +                */
->>>> +               /*
->>>> +                * NOTE: syscallno may also be set to -1 if fatal signal is
->>>> +                * detected in tracehook_report_syscall_entry(), but since
->>>> +                * a value set to x0 here is not used in this case, we may
->>>> +                * neglect the case.
->>>> +                */
->>>> +               if (!test_thread_flag(TIF_SYSCALL_TRACE) ||
->>>> +                               (IS_SKIP_SYSCALL(saved_syscallno)))
->>>> +                       regs->regs[0] = -ENOSYS;
->>>> +       }
->>>> +
->>>
->>> I don't have a runtime environment yet for arm64, so I can't test this
->>> directly myself, so I'm just trying to eyeball this. :)
->>>
->>> Once the seccomp logic is added here, I don't think using -2 as a
->>> special value will work. Doesn't this mean the Oops is possible by the
->>> user issuing a "-2" syscall? As in, if TIF_SYSCALL_WORK is set, and
->>> the user passed -2 as the syscall, audit will be called only on entry,
->>> and then skipped on exit?
+On Wed, Oct 1, 2014 at 9:41 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Tue, Sep 30, 2014 at 06:39:28PM +0100, Mark Brown wrote:
+>> On Tue, Sep 30, 2014 at 07:09:24AM +0200, Thierry Reding wrote:
+>> > On Mon, Sep 29, 2014 at 04:55:17PM +0100, Mark Brown wrote:
 >>
->> Oops, you're absolutely right. I didn't think of this case.
->> syscall_trace_enter() should not return a syscallno directly, but always
->> return -1 if syscallno < 0. (except when secure_computing() returns with -1)
->> This also implies that tracehook_report_syscall() should also have a return value.
+>> > > So long as we're ensuring that when we don't start supporting resources
+>> > > without DT additions or at least require DT additions to actively manage
+>> > > them (which can then include simplefb hookup) we should be fine.
 >>
->> Will, is this fine with you?
+>> > I'm not sure I understand what you mean. If we add a driver for the PMIC
+>> > that exposes these regulators and then add a DT node for the PMIC, we'd
+>> > still need to fix the firmware to generate the appropriate DT properties
+>> > to allow simplefb to enable the regulators.
+>>
+>> No, you don't.  It's only if you start describing the regulators in the
+>> PMIC in DT that you run into problems.  Unconfigured regulators won't be
+>> touched.
 >
-> Well, the first thing that jumps out at me is why this is being done
-> completely differently for arm64 and arm. I thought adding the new ptrace
-> requests would reconcile the differences?
+> Okay, that's what I meant. It seems rather odd to add a PMIC DT node but
+> omit the description of the regulators that it exposes. Unless the
+> regulators are truly unused, as in not connected to any peripherals.
 >
-> Will
+
+Agreed, I added similar PMIC support to other Chromebooks (Peach Pit
+and Pi) DTS and for me it made totally sense to add nodes for all the
+regulators that are connected to peripherals according to the board
+schematic. Specially since the framework is smart enough to disable
+any regulator that is not used.
+
+After all, a DT is meant to describe the hardware, so how can possibly
+be an issue to add more details about the hw in a DTS?
+
+If something is working relying on parts of the hw on not being
+described, then is essentially relying on side-effects and
+implementation details which are bound to be broken anyways.
+
+>> > So unless firmware is updated at the same time, regulators will get
+>> > disabled because they are unused.
+>>
+>> That won't happen unless the regulators are explicitly described, if
+>> they are described as unused then this will of course happen.
 >
+> With described as unused you mean they have a node in DT, so constraints
+> are applied and all that, but no driver actually uses them?
+>
+
+Adding your resources (clock, regulators, etc) incrementally and only
+when the driver for the device that use these resources is available,
+will only make adding support for a new platform slower IMHO since
+there will be more patches to be posted, reviewed and merged.
+
+> The fundamental issue is that if we start describing simplefb nodes with
+> an incomplete set of resources then we're bound to run into problems
+> where it'll break once these new resources are described in the DTS. If
+> the simplefb node was described in the DTS then this would be less of a
+> problem because the resources could be added to the simplefb node at the
+> same time.
+>
+
+Agreed, the assumptions made by simplefb are quite fragile so we
+should either document somewhere that simplefb ignores all the
+resources and that is a best effort so users should not consider the
+display breaking a regression or make it robust enough so users can
+expect that it will always work.
+
+Just adding the clocks is a partial solution which I think will make
+the situation even worst since it will give a false illusion of
+robustness but as you said it will break anyways due other resources.
+
+> However given that simplefb is supposed to be generated by firmware this
+> is no longer possible. It will inevitably break unless you upgrade the
+> DTB and the firmware at the same time. And it was already decided long
+> ago that upgrading the firmware should never be a requirement for
+> keeping things working.
+>
+
+AFAICT in practice most platforms' firmware do not generate the
+simplefb by default. In the case of Chromebooks for example, a custom
+U-boot needs to be flashed in order to have simplefb support. In fact
+most people working on mainline support for Chromebooks do not use
+simplefb and that is why the issue was not spot when adding the
+support for clocks and regulators.
+
+Personally I didn't even know how simplefb worked before Will reported
+that his display used to work on Snow before 3.16. So I assume that
+his reasonable to expect that users using simplefb are able to update
+their bootloader.
+
+Which brings a more general question about DT and backward
+compatibility. Should we have backward compatibility only with the
+official firmware that is ship on a device when is bought or should we
+maintain backward compatibility against any firmware out there that
+someone re-built and added logic to mangle the FDT before is passed to
+the kernel?
+
+Going back to simplefb, I think the fact that the simplefb is not in
+the DTS is the fundamental issue here. For me, the most reasonable
+approach to solve this is the one suggested by Doug Anderson. That is
+to have the simplefb node in the DTS so all the references to the
+resources it uses can be added in the DTS but keep the simplefb node
+as status = "disabled".
+
+The bootloader can find the simplefb node and fill all the information
+about the framebuffer memory region (location and size, width, height,
+format, etc) and also enable the node by setting the status to "okay"
+so the simplefb driver will be probed.
+
+If a FDT does not have a simplefb node then the boot loader can create
+one (like is made for the /choosen node in most bootloaders) and make
+it a best effort in that case, assuming that all the resources enabled
+by the bootloader will remain enabled once the kernel boots.
+
+This of course will require users to update their boot-loaders but as
+stated above I think that is reasonable since anyone using simplefb is
+using a non-official firmware anyways.
+
+> I don't see any way to prevent that other than ignoring the resources in
+> simplefb completely.
+>
+> Thierry
+>
+
+Best regards,
+Javier
