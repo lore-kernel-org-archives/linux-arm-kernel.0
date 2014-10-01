@@ -1,33 +1,50 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 1 Oct 2014 14:33:30 +0300
-Subject: [PATCH 2/2] mtd: nand: omap: Correct CONFIG_MTD_NAND_OMAP_BCH help
- message
-In-Reply-To: <1412163210-12948-1-git-send-email-rogerq@ti.com>
-References: <1412163210-12948-1-git-send-email-rogerq@ti.com>
-Message-ID: <1412163210-12948-3-git-send-email-rogerq@ti.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 01 Oct 2014 17:06:06 +0530
+Subject: [PATCH v2 0/2] Handle reboot for Exynos SoC via reboot_notifier
+Message-ID: <1412163368-13496-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MTD_NAND_OMAP_BCH doesn't harm on legacy OMAP platforms
-so don't state that it should be disabled for them.
+This patch removes restart hook from machine_desc of Exynos, and moves
+respective code into reboot_notifiers.
+Exynos5440 handles reboot via clock register so let's register a
+reboot_notifier in Exynos5440 clock driver.
+For reset Exynos SoC, reboot is handled via PMU SWRESET register so
+let's register a reboot_notifier in PMU driver for handling this.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- drivers/mtd/nand/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch is inspired and dependent on following patch series[1] from
+Geunter Roeck.
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 1cb4b1b..dd10646 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -104,7 +104,7 @@ config MTD_NAND_OMAP_BCH
- 	  locate and correct errors when using BCH ECC scheme. This offloads
- 	  the cpu from doing ECC error searching and correction. However some
- 	  legacy OMAP families like OMAP2xxx, OMAP3xxx do not have ELM engine
--	  so they should not enable this config symbol.
-+	  so this is optional for them.
- 
- config MTD_NAND_OMAP_BCH_BUILD
- 	def_tristate MTD_NAND_OMAP2 && MTD_NAND_OMAP_BCH
+Also this patch is dependent on PMU platform driver patch [2] by me, and
+has been prepared on top of it.
+
+[1]: kernel: Add support for kernel restart handler call chain
+https://lkml.org/lkml/2014/8/19/652
+
+[2]: ARM: Exynos: Convert PMU implementation into a platform driver
+https://lkml.org/lkml/2014/9/30/219
+
+I have tested reboot functionality on Exynos3250 based board, on
+kgene/for-next as well as linux-next's next-20140925 tag.
+
+Patch v1 and related discussion can be found here
+http://www.spinics.net/lists/linux-samsung-soc/msg37445.html
+
+Changes since v1:
+  - Addressed review comments from Tomasz Figa. Removed usage of 
+    local variables where ever unnecessary.
+  - Make reg_base as global in clk-exynos5440.c file, to avoid 
+    iomapping it again in reboot_notifier handler.
+
+Pankaj Dubey (2):
+  clk: samsung: exynos5440: move restart code into clock driver
+  ARM: EXYNOS: PMU: move restart code into pmu driver
+
+ arch/arm/mach-exynos/common.h        |    1 -
+ arch/arm/mach-exynos/exynos.c        |   23 -----------------------
+ arch/arm/mach-exynos/pmu.c           |   25 +++++++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos5440.c |   30 +++++++++++++++++++++++++++++-
+ 4 files changed, 54 insertions(+), 25 deletions(-)
+
 -- 
-1.8.3.2
+1.7.9.5
