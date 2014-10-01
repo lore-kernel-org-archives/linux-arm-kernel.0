@@ -1,256 +1,87 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed,  1 Oct 2014 09:26:06 +0200
-Subject: [PATCH v2 3/3] ARM: dts: sun7i: Add Banana Pi board
-In-Reply-To: <1412148366-18346-1-git-send-email-hdegoede@redhat.com>
-References: <1412148366-18346-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1412148366-18346-4-git-send-email-hdegoede@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 1 Oct 2014 09:30:47 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140930213753.19023.17605@quantum>
+References: <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
+ <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
+ <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
+ <20140929135358.GC30998@ulmo> <20140930213753.19023.17605@quantum>
+Message-ID: <20141001073043.GA18463@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Banana Pi is an A20 based development board using Raspberry Pi compatible
-IO headers. It comes with 1 GB RAM, 1 Gb ethernet, 2x USB host, sata, hdmi
-and stereo audio out + various expenansion headers:
+On Tue, Sep 30, 2014 at 02:37:53PM -0700, Mike Turquette wrote:
+> Quoting Thierry Reding (2014-09-29 06:54:00)
+> > On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
+> > > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
+> > > > > >> Plus, speaking more specifically about the clocks, that won't prevent
+> > > > > >> your clock to be shut down as a side effect of a later clk_disable
+> > > > > >> call from another driver.
+> > > > > 
+> > > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
+> > > > > > preceding clk_enable()? There are patches being worked on that will
+> > > > > > enable per-user clocks and as I understand it they will specifically
+> > > > > > disallow drivers to disable the hardware clock if other drivers are
+> > > > > > still keeping them on via their own referenc.
+> > > > > 
+> > > > > Calling clk_disable() preceding clk_enable() is a bug.
+> > > > > 
+> > > > > Calling clk_disable() after clk_enable() will disable the clock (and
+> > > > > its parents)
+> > > > > if the clock subsystem thinks there are no other users, which is what will
+> > > > > happen here.
+> > > > 
+> > > > Right. I'm not sure this is really applicable to this situation, though.
+> > > 
+> > > It's actually very easy to do. Have a driver that probes, enables its
+> > > clock, fails to probe for any reason, call clk_disable in its exit
+> > > path. If there's no other user at that time of this particular clock
+> > > tree, it will be shut down. Bam. You just lost your framebuffer.
+> > > 
+> > > Really, it's just that simple, and relying on the fact that some other
+> > > user of the same clock tree will always be their is beyond fragile.
+> > 
+> > Perhaps the meaning clk_ignore_unused should be revised, then. What you
+> > describe isn't at all what I'd expect from such an option. And it does
+> > not match the description in Documentation/kernel-parameters.txt either.
+> 
+> From e156ee56cbe26c9e8df6619dac1a993245afc1d5 Mon Sep 17 00:00:00 2001
+> From: Mike Turquette <mturquette@linaro.org>
+> Date: Tue, 30 Sep 2014 14:24:38 -0700
+> Subject: [PATCH] doc/kernel-parameters.txt: clarify clk_ignore_unused
+> 
+> Refine the definition around clk_ignore_unused, which caused some
+> confusion recently on the linux-fbdev and linux-arm-kernel mailing
+> lists[0].
+> 
+> [0] http://lkml.kernel.org/r/<20140929135358.GC30998@ulmo>
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> ---
+> Thierry,
+> 
+> Please let me know if this wording makes the feature more clear.
 
-http://www.lemaker.org/
+I think that's better than before, but I don't think it's accurate yet.
+As pointed out by Maxime unused clock may still be disabled if it's part
+of a tree and that tree is being disabled because there are no users
+left.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/sun7i-a20-bananapi.dts | 214 +++++++++++++++++++++++++++++++
- 2 files changed, 215 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi.dts
+What I had argued is that it's unexpected behaviour, because the clock
+is still unused (or becomes unused again), therefore shouldn't be
+disabled at that point either.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..c3003a4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -414,6 +414,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-hummingbird.dtb \
- 	sun6i-a31-m9.dtb
- dtb-$(CONFIG_MACH_SUN7I) += \
-+	sun7i-a20-bananapi.dtb \
- 	sun7i-a20-cubieboard2.dtb \
- 	sun7i-a20-cubietruck.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-new file mode 100644
-index 0000000..0e7c9f5
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -0,0 +1,214 @@
-+/*
-+ * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this library; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+/include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "LeMaker Banana Pi";
-+	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
-+
-+	soc at 01c00000 {
-+		spi0: spi at 01c05000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bananapi>;
-+			vmmc-supply = <&reg_vcc3v3>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 7 10 0>; /* PH10 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus>;
-+			usb2_vbus-supply = <&reg_usb2_vbus>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		ahci: sata at 01c18000 {
-+			status = "okay";
-+		};
-+
-+		ehci1: usb at 01c1c000 {
-+			status = "okay";
-+		};
-+
-+		ohci1: usb at 01c1c400 {
-+			status = "okay";
-+		};
-+
-+		pinctrl at 01c20800 {
-+			mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PH10";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
-+			gmac_power_pin_bananapi: gmac_power_pin at 0 {
-+				allwinner,pins = "PH23";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			led_pins_bananapi: led_pins at 0 {
-+				allwinner,pins = "PH24";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart3: serial at 01c28c00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart3_pins_b>;
-+			status = "okay";
-+		};
-+
-+		uart7: serial at 01c29c00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart7_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_rgmii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "rgmii";
-+			phy-supply = <&reg_gmac_3v3>;
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_bananapi>;
-+
-+		green {
-+			label = "bananapi:green:usr";
-+			gpios = <&pio 7 24 0>;
-+		};
-+	};
-+
-+	reg_usb1_vbus: usb1-vbus {
-+		status = "okay";
-+	};
-+
-+	reg_usb2_vbus: usb2-vbus {
-+		status = "okay";
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_power_pin_bananapi>;
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <50000>;
-+		enable-active-high;
-+		gpio = <&pio 7 23 0>;
-+	};
-+};
--- 
-2.1.0
+So if you want to keep the current behaviour where an unused clock can
+still be disabled depending on what other users do, then I think it'd be
+good to mention that as a potential caveat.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/0e90b079/attachment.sig>
