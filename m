@@ -1,140 +1,77 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 1 Oct 2014 09:46:26 +0100
-Subject: [RFC 2/4] PCI: generic: Add support for ARM64 and MSI(x)
-In-Reply-To: <2430078.s4snyh5OoF@wuerfel>
-References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140930174821.GX841@e106497-lin.cambridge.arm.com>
- <3079787.54pZijGjZM@wuerfel> <2430078.s4snyh5OoF@wuerfel>
-Message-ID: <20141001084626.GZ841@e106497-lin.cambridge.arm.com>
+Date: Wed, 1 Oct 2014 09:54:36 +0100
+Subject: [PATCH] of/pci: add pci_pio_to_address dummy for !CONFIG_OF
+In-Reply-To: <706416181.hbVGLDA3o6@wuerfel>
+References: <706416181.hbVGLDA3o6@wuerfel>
+Message-ID: <20141001085436.GA841@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 09:01:14PM +0100, Arnd Bergmann wrote:
-> On Tuesday 30 September 2014 20:54:41 Arnd Bergmann wrote:
-> > On Tuesday 30 September 2014 18:48:21 Liviu Dudau wrote:
-> > > > > > > These are the functions I found that refer to pci_sys_data on arm32:
-> > > > > > > 
-> > > > > > > pcibios_add_bus
-> > > > > > > pcibios_remove_bus
-> > > 
-> > > These are only needed if you want to do per HB processing of the bus
-> > > 
-> > > > > > > pcibios_align_resource
-> > > 
-> > > mvebu is the only user of this function.
-> > > 
-> > > > > > > pci_mmap_page_range
-> > > 
-> > > This is only needed when mapping a PCI resource to userspace. Is that your case here?
-> > > 
-> > > > > > > pci_domain_nr
-> > > > > > > pci_proc_domain
-> > > 
-> > > We have equivalent functionality in the generic patches for those.
-> > > 
-> > 
-> > We clearly don't need those functions for the new drivers, but that's not
-> > the point. The problem is that when you build a kernel that has both
-> > a traditional host bridge driver and a new one in it, you always get those
-> > functions and they get called from the PCI core, with incorrect arguments.
+On Tue, Sep 30, 2014 at 02:19:05PM +0100, Arnd Bergmann wrote:
+> The pci_register_io_range() and pci_pio_to_address() were recently
+> introduced to generalize the handling of memory mapped PCI I/O space,
+> but they are only valid when CONFIG_OF is set, leading to a possible
+> build error:
 > 
-> FWIW, the last time we discussed this, I think I had suggested that the
-> functions that are currently architecture specific and have a generic
-> __weak fallback could become function pointers in a per-host structure
-> passed to pci_scan_root_bus, either a new structure or an extended
-> struct pci_ops. Something along these lines:
+> drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_setup_window':
+> drivers/pci/host/pcie-rcar.c:340:3: error: implicit declaration of function 'pci_pio_to_address' [-Werror=implicit-function-declaration]
+>    res_start = pci_pio_to_address(res->start);
+>    ^
+> drivers/pci/host/pcie-rcar.c: In function 'rcar_pcie_probe':
+> drivers/pci/host/pcie-rcar.c:945:3: error: implicit declaration of function 'of_pci_range_to_resource' [-Werror=implicit-function-declaration]
+>    err = of_pci_range_to_resource(&range, pdev->dev.of_node,
+>    ^
+> cc1: some warnings being treated as errors
+> 
+> This provides inline dummy implementations for the case that
+> CONFIG_OF is disabled, to allow better build testing.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 279c5dd046 ("of/pci: Add pci_register_io_range() and pci_pio_to_address()")
+> 
+> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> index 7ebb877b07c2..851097aab115 100644
+> --- a/include/linux/of_address.h
+> +++ b/include/linux/of_address.h
+> @@ -71,6 +71,11 @@ static inline const __be32 *of_get_address(struct device_node *dev, int index,
+>  	return NULL;
+>  }
+>  
+> +static inline phys_addr_t pci_pio_to_address(unsigned long pio)
+> +{
+> +	return 0;
+> +}
+> +
+>  static inline int of_pci_range_parser_init(struct of_pci_range_parser *parser,
+>  			struct device_node *node)
+>  {
+> @@ -144,6 +149,12 @@ static inline const __be32 *of_get_pci_address(struct device_node *dev,
+>  {
+>  	return NULL;
+>  }
+> +static inline int of_pci_range_to_resource(struct of_pci_range *range,
+> +					   struct device_node *np,
+> +					   struct resource *res)
+> +{
+> +	return -ENOSYS;
+> +}
+>  #endif /* CONFIG_OF_ADDRESS && CONFIG_PCI */
+>  
+>  #endif /* __OF_ADDRESS_H */
+> 
 
-Agree to the general idea. But have a look why host drivers need the add_bus ops:
-to add MSI information into the bus!! If we take care of the MSI in the generic
-code there is less of a need for this function at all.
+Arnd,
 
-Best regards,
+I have a more general question that is related only vaguely to this patch but it was prompted by it:
+given that this pcie-rcar.c driver is so dependent on the OF functionality, why the fix(es) (in
+general) tend to prefer creating these dummy functions for !CONFIG_OF rather than making
+CONFIG_PCI_RCAR_GEN2_PCIE dependent on CONFIG_OF? We are basically compiling a driver that we can
+guarantee it will fail when used without OF support and contribute to the overall size of the kernel.
+Given the presentation you have done at Linaro Connect last month on this topic, I started to wonder
+if there is a deeper API style agreement that is not apparent to me?
+
+Thanks for your time,
 Liviu
-
-> 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index 7fc42784becb..3da32fc631d0 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -36,7 +36,6 @@ struct hw_pci {
->  					  resource_size_t start,
->  					  resource_size_t size,
->  					  resource_size_t align);
-> -	void		(*add_bus)(struct pci_bus *bus);
->  	void		(*remove_bus)(struct pci_bus *bus);
->  };
->  
-> @@ -65,7 +64,6 @@ struct pci_sys_data {
->  					  resource_size_t start,
->  					  resource_size_t size,
->  					  resource_size_t align);
-> -	void		(*add_bus)(struct pci_bus *bus);
->  	void		(*remove_bus)(struct pci_bus *bus);
->  	void		*private_data;	/* platform controller private data	*/
->  };
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 17a26c17f7f5..3cbcf8dc41e4 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -360,13 +360,6 @@ void pcibios_fixup_bus(struct pci_bus *bus)
->  }
->  EXPORT_SYMBOL(pcibios_fixup_bus);
->  
-> -void pcibios_add_bus(struct pci_bus *bus)
-> -{
-> -	struct pci_sys_data *sys = bus->sysdata;
-> -	if (sys->add_bus)
-> -		sys->add_bus(bus);
-> -}
-> -
->  void pcibios_remove_bus(struct pci_bus *bus)
->  {
->  	struct pci_sys_data *sys = bus->sysdata;
-> @@ -475,7 +468,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
->  		sys->align_resource = hw->align_resource;
-> -		sys->add_bus = hw->add_bus;
->  		sys->remove_bus = hw->remove_bus;
->  		INIT_LIST_HEAD(&sys->resources);
->  
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index b1315e197ffb..c9a0ee0429e8 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -716,6 +716,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
->  static struct pci_ops mvebu_pcie_ops = {
->  	.read = mvebu_pcie_rd_conf,
->  	.write = mvebu_pcie_wr_conf,
-> +	.add_bus = mvebu_pcie_add_bus,
->  };
->  
->  static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
-> @@ -823,7 +824,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
->  	hw.map_irq        = of_irq_parse_and_map_pci;
->  	hw.ops            = &mvebu_pcie_ops;
->  	hw.align_resource = mvebu_pcie_align_resource;
-> -	hw.add_bus        = mvebu_pcie_add_bus;
->  
->  	pci_common_init(&hw);
->  }
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index a63a47a70846..be6d56358320 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1885,6 +1885,8 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
->  
->  void __weak pcibios_add_bus(struct pci_bus *bus)
->  {
-> +	if (bus->ops && bus->ops->add_bus)
-> +		bus->ops->add_bus(bus);		
->  }
->  
->  void __weak pcibios_remove_bus(struct pci_bus *bus)
-> 
-> 	Arnd
-> 
-> 
 
 -- 
 ====================
