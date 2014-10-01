@@ -1,72 +1,62 @@
-From: dianders@google.com (Doug Anderson)
-Date: Wed, 1 Oct 2014 08:38:19 -0700
-Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
- handle regulators
-In-Reply-To: <15187164.uVE1eDb0Di@amdc1032>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <28242432.noIRZ0lve1@amdc1032>
- <CAD=FV=W_KiXUU7SmGxTu-JzagW-zEs6AYAbrRMFU3KvppVk_BA@mail.gmail.com>
- <15187164.uVE1eDb0Di@amdc1032>
-Message-ID: <CAD=FV=WHMDABaLA-3+PXX6r5hY=Yfq3XgDz6Mhg7b2aaKnPt7g@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 1 Oct 2014 16:38:59 +0100
+Subject: 3.17-rc6 on ODROID: ERROR: Bad of_node_put() on
+ /ehci@12580000/port@1
+In-Reply-To: <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
+References: <CAD8Lp45qyHpHqRnUy4T9Sm8zV4XJBDp=cLYXjtcxmVrS8GSjbg@mail.gmail.com>
+ <CAFp+6iGwB3XuzSuYPzO=5MacPO2LGFDnh9oS5rAL3Ne26wb9Dg@mail.gmail.com>
+ <CAD8Lp46UxTd04fczjm9c1597SBnvR--PUasjBqZwvWU8MKtj8Q@mail.gmail.com>
+Message-ID: <CACxGe6v84netFeUdc3MwGeJzV-2r6rUAOpG5s9Lu9x=9TM9E_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Oct 1, 2014 at 6:06 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Tuesday, September 30, 2014 10:22:34 AM Doug Anderson wrote:
->> Bartlomiej
+On Wed, Oct 1, 2014 at 4:12 PM, Daniel Drake <drake@endlessm.com> wrote:
+> On Wed, Oct 1, 2014 at 12:36 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> One reason i doubt why it could be coming is because we are
+>> specifically putting the
+>> child after doing everything with it.
 >>
->> On Mon, Sep 29, 2014 at 5:31 AM, Bartlomiej Zolnierkiewicz
->> <b.zolnierkie@samsung.com> wrote:
->> >
->> > Hi,
->> >
->> > On Friday, August 29, 2014 01:34:44 PM Ulf Hansson wrote:
->> >> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->> >> > This patch makes use of mmc_regulator_get_supply() to handle
->> >> > the vmmc and vqmmc regulators.Also it moves the code handling
->> >> > the these regulators to dw_mci_set_ios().It turned on the vmmc
->> >> > and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
->> >> > during MMC_POWER_OFF.
->> >> >
->> >> > Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->> >>
->> >> Thanks! Applied for next.
->> >
->> > Unfortunately this patch breaks mmc1 card (Kingston 32GB micro SDHC)
->> > detection on Exynos5420 Arndale Octa for me:
->> >
->> > [   10.797979] dwmmc_exynos 12220000.mmc: no support for card's volts
->> > [   10.797998] mmc1: error -22 whilst initialising SD card
->> >
->> > Without the patch:
->> >
->> > [   10.866926] mmc_host mmc1: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
->> > [   10.866977] mmc1: new high speed SDHC card at address 1234
->> > [   10.868730] mmcblk1: mmc1:1234 SA32G 29.3 GiB
->> > [   10.915054]  mmcblk1: p1 p2 p3
->> >
->> > The config is attached (exynos_defconfig doesn't work correctly for
->> > this board yet).
+>> When we are getting the child node using for_each_available_child_of_node(),
+>> which calls for of_get_next_available_child(). So of_get_next_available_child()
+>> does a of_node_put() on the "prev" node, in case we have siblings to the child.
 >>
->> Yup, this is an expected behavior, unfortunately.  This was talked
->> about extensively during the review of this patch series.
+>> Can you see if the below change helps ?
+>>
+>> ------------------------------------------------------------------------------------------------------------
+>> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+>> index 7189f2e..1b726bf 100644
+>> --- a/drivers/usb/host/ehci-exynos.c
+>> +++ b/drivers/usb/host/ehci-exynos.c
+>> @@ -74,7 +74,6 @@ static int exynos_ehci_get_phy(struct device *dev,
+>>
+>>                 phy = devm_of_phy_get(dev, child, NULL);
+>>                 exynos_ehci->phy[phy_number] = phy;
+>> -               of_node_put(child);
+>>                 if (IS_ERR(phy)) {
+>>                         ret = PTR_ERR(phy);
+>>                         if (ret == -EPROBE_DEFER) {
+>> ------------------------------------------------------------------------------------------------------------
+>>
+>>
+>> This is on top of usb-next.
+>> If you are testing on rc6 only, then probably you will have to cherrypick two
+>> patches each for ehci-exynos and ohci-exynos:
+>> usb: host: ehci-exynos: Remove unnecessary usb-phy support
+>> usb: host: ohci-exynos: Remove unnecessary usb-phy support
 >
-> Do you mean that a patch with a known regression has been merged
-> into next branch of mmc tree?  It would be quite sad if it would be
-> true.
+> I made the equivalent change to 3.17-rc7 (right now 3.17 is my main
+> interest), i.e. removed all of_node_put calls from
+> exynos_ehci_get_phy(). Same change is needed in exynos_ohci_get_phy().
+> Now the warnings are gone.
+> BTW, I think the warning only appeared when CONFIG_OF_SELFTEST=y
+>
+> I didn't check the implementation details like you did, but I looked
+> at a few other users of for_each_available_child_of_node and it looks
+> like indeed you do not need to call of_node_put() on the children in
+> the normal case, or at least, nobody else does.
 
-...so looking at your "dts" file, it looks like this _isn't_ your
-problem.  Your "vmmc" regulator is listed as "always on", so I believe
-that you're OK.  Your regulator probably _shouldn't_ be "always on"
-(it prevents power cycling the SD card) but right now it's good that
-it is...
+CONFIG_OF_SELFTEST enables CONFIG_OF_DYNAMIC, and reference counting
+is only implemented when OF_DYNAMIC is enabled. That's probably why
+selftest exposes the problem.
 
-If any board has a "vmmc" that is not listed as always on then it
-would regress with the first two patches applied (and without the
-3rd), but there are none that I personally know of that do.
+g.
