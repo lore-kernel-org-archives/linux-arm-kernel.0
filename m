@@ -1,50 +1,39 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  1 Oct 2014 16:50:42 -0300
-Subject: [PATCH 7/8] perf tools: Fix build breakage on arm64 targets
-In-Reply-To: <1412193043-15493-1-git-send-email-acme@kernel.org>
-References: <1412193043-15493-1-git-send-email-acme@kernel.org>
-Message-ID: <1412193043-15493-8-git-send-email-acme@kernel.org>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 01 Oct 2014 12:52:04 -0700
+Subject: [PATCH v4 2/2] iommu/arm-smmu: add support for iova_to_phys
+ through ATS1PR
+In-Reply-To: <61772524.IxG1939KJq@wuerfel> (Arnd Bergmann's message of "Wed,
+ 01 Oct 2014 10:27:27 +0200")
+References: <1412126893-15796-1-git-send-email-mitchelh@codeaurora.org>
+ <1412126893-15796-3-git-send-email-mitchelh@codeaurora.org>
+ <61772524.IxG1939KJq@wuerfel>
+Message-ID: <vnkwoatv600r.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+On Wed, Oct 01 2014 at 01:27:27 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 30 September 2014 18:28:13 Mitchel Humpherys wrote:
+>> +       if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
+>> +                               !(tmp & ATSR_ACTIVE), 50, 100)) {
+>> 
+>
+> This looks really bad.
+>
+> You are doing up to 50 100us delays, each of which can be much longer,
+> so you can do up to 10ms total delay with interrupts disabled.
+>
+> Don't do that.
 
-Attempting to build the perf tool for an arm64 target results in the
-following failure:
+Oh wow somehow I forgot I was in atomic context even though I was
+explicitly moving to the `_atomic' polling function in this version.
+Don't ask.
 
-  arch/arm64/util/unwind-libunwind.c: In function 'libunwind__arch_reg_id':
-  arch/arm64/util/unwind-libunwind.c:77:3: error: implicit declaration of function 'pr_err'
-     pr_err("unwind: invalid reg id %d\n", regnum);
-     ^
-  arch/arm64/util/unwind-libunwind.c:77:3: error: nested extern declaration of 'pr_err'
+Let me ratchet that down to a maximum of 10 delays of 5 microseconds
+each for v5.
 
-This is due to commit 84f5d36f4866 ("perf tools: Move pr_* debug macros
-into debug object") moving the pr_* macros into a new header file, but
-failing to update architectures other than x86.
 
-This patch adds the missing include, and fixes the build again.
+-Mitch
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Cc: Jean Pihet <jean.pihet@linaro.org>
-Cc: Jiri Olsa <jolsa@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1412076432-22045-1-git-send-email-will.deacon at arm.com
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/arch/arm64/util/unwind-libunwind.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/tools/perf/arch/arm64/util/unwind-libunwind.c b/tools/perf/arch/arm64/util/unwind-libunwind.c
-index 436ee43859dc..a87afa91a99e 100644
---- a/tools/perf/arch/arm64/util/unwind-libunwind.c
-+++ b/tools/perf/arch/arm64/util/unwind-libunwind.c
-@@ -3,6 +3,7 @@
- #include <libunwind.h>
- #include "perf_regs.h"
- #include "../../util/unwind.h"
-+#include "../../util/debug.h"
- 
- int libunwind__arch_reg_id(int regnum)
- {
 -- 
-1.9.3
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
