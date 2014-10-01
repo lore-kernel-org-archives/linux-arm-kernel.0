@@ -1,224 +1,155 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 2 Oct 2014 07:40:32 +0800
-Subject: [PATCH v6 07/12] usb: chipidea: add a usb2 driver for ci13xxx
-In-Reply-To: <20140930001206.GA11657@peterchendt>
-References: <1411468088-5702-1-git-send-email-antoine.tenart@free-electrons.com>
- <1411468088-5702-8-git-send-email-antoine.tenart@free-electrons.com>
- <20140930001206.GA11657@peterchendt>
-Message-ID: <20141001234031.GA2757@peterchendt>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 2 Oct 2014 08:50:19 +0900
+Subject: [PATCH v2 3/4] PM / Domains: Expect PM domains being powered at
+ initialization
+In-Reply-To: <1412174494-15346-4-git-send-email-ulf.hansson@linaro.org>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <1412174494-15346-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20141001235019.GC15551@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 08:12:07AM +0800, Peter Chen wrote:
-> On Tue, Sep 23, 2014 at 12:28:03PM +0200, Antoine Tenart wrote:
-> > Add a USB2 ChipIdea driver for ci13xxx, with optional PHY, clock
-> > and DMA mask, to support USB2 ChipIdea controllers that don't need
-> > specific functions.
-> > 
-> > Tested on the Marvell Berlin SoCs USB controllers.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > ---
-> >  drivers/usb/chipidea/Makefile       |   1 +
-> >  drivers/usb/chipidea/ci_hdrc_usb2.c | 138 ++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 139 insertions(+)
-> >  create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
-> > 
-> > diff --git a/drivers/usb/chipidea/Makefile b/drivers/usb/chipidea/Makefile
-> > index 2f099c7df7b5..1fc86a2ca22d 100644
-> > --- a/drivers/usb/chipidea/Makefile
-> > +++ b/drivers/usb/chipidea/Makefile
-> > @@ -10,6 +10,7 @@ ci_hdrc-$(CONFIG_USB_OTG_FSM)		+= otg_fsm.o
-> >  
-> >  # Glue/Bridge layers go here
-> >  
-> > +obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_usb2.o
-> >  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
-> >  obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_zevio.o
-> >  
-> > diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
-> > new file mode 100644
-> > index 000000000000..6eae1de587f2
-> > --- /dev/null
-> > +++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
-> > @@ -0,0 +1,138 @@
-> > +/*
-> > + * Copyright (C) 2014 Marvell Technology Group Ltd.
-> > + *
-> > + * Antoine Tenart <antoine.tenart@free-electrons.com>
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2. This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/phy/phy.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/usb/chipidea.h>
-> > +#include <linux/usb/hcd.h>
-> > +#include <linux/usb/ulpi.h>
-> > +
-> > +#include "ci.h"
-> > +
-> > +struct ci_hdrc_usb2_priv {
-> > +	struct platform_device	*ci_pdev;
-> > +	struct clk		*clk;
-> > +};
-> > +
-> > +static int ci_hdrc_usb2_dt_probe(struct device *dev,
-> > +				 struct ci_hdrc_platform_data *ci_pdata)
-> > +{
-> > +	ci_pdata->phy = of_phy_get(dev->of_node, 0);
-> > +	if (IS_ERR(ci_pdata->phy)) {
-> > +		if (PTR_ERR(ci_pdata->phy) == -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +
-> > +		/* PHY is optional */
-> > +		ci_pdata->phy = NULL;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct ci_hdrc_platform_data ci_default_pdata = {
-> > +	.capoffset	= DEF_CAPOFFSET,
-> > +	.flags		= CI_HDRC_REQUIRE_TRANSCEIVER |
-> > +			  CI_HDRC_DISABLE_STREAMING,
-> > +};
-> > +
-> > +static int ci_hdrc_usb2_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct ci_hdrc_usb2_priv *priv;
-> > +	struct ci_hdrc_platform_data *ci_pdata = dev_get_platdata(&pdev->dev);
-> > +	int ret;
-> > +
-> > +	if (!ci_pdata)
-> > +		ci_pdata = &ci_default_pdata;
-> > +
-> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	priv->clk = devm_clk_get(dev, NULL);
-> > +	if (!IS_ERR(priv->clk)) {
-> > +		ret = clk_prepare_enable(priv->clk);
-> > +		if (ret) {
-> > +			dev_err(dev, "failed to enable the clock: %d\n", ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	if (dev->of_node) {
-> > +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-> > +		if (ret)
-> > +			goto clk_err;
-> > +	} else {
-> > +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> > +		if (ret)
-> > +			goto clk_err;
-> > +	}
->
-	
-Hi Antoine, if you pay attention the discussion for this patch, you should
-know to do change for your next revision
-
-- Call below unconditionally:
-> > +		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> > +		if (ret)
-> > +			goto clk_err;
-
--Do not need function ci_hdrc_usb2_dt_probe, we need to cover
-both dt and non-dt, but there is nothing we can to differentiate now,
-The phy handle should be moved to core driver, since your generic phy
-driver are still not accepted, I can't do it by myself. Either you or
-I can do it after your generic phy support series has been accepted.
-
-> > +		ret = ci_hdrc_usb2_dt_probe(dev, ci_pdata);
-
-- Others are ok
-
-- The sequence of patch sets:
-1. The generic PHY support for chipidea idea
-2. Move getting PHY from individual glue layer to core driver
-3. The generic chipidea driver 
-
-Peter
-
-> > +
-> > +	ci_pdata->name = dev_name(&pdev->dev);
-> > +
-> > +	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
-> > +					   pdev->num_resources, ci_pdata);
-> > +	if (IS_ERR(priv->ci_pdev)) {
-> > +		ret = PTR_ERR(priv->ci_pdev);
-> > +		if (ret != -EPROBE_DEFER)
-> > +			dev_err(dev,
-> > +				"failed to register ci_hdrc platform device: %d\n",
-> > +				ret);
-> > +		goto clk_err;
-> > +	}
-> > +
-> > +	platform_set_drvdata(pdev, priv);
-> > +
-> > +	pm_runtime_no_callbacks(dev);
-> > +	pm_runtime_enable(dev);
-> > +
-> > +	return 0;
-> > +
-> > +clk_err:
-> > +	if (!IS_ERR(priv->clk))
-> > +		clk_disable_unprepare(priv->clk);
-> > +	return ret;
-> > +}
-> > +
-> > +static int ci_hdrc_usb2_remove(struct platform_device *pdev)
-> > +{
-> > +	struct ci_hdrc_usb2_priv *priv = platform_get_drvdata(pdev);
-> > +
-> > +	pm_runtime_disable(&pdev->dev);
-> > +	ci_hdrc_remove_device(priv->ci_pdev);
-> > +	clk_disable_unprepare(priv->clk);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id ci_hdrc_usb2_of_match[] = {
-> > +	{ .compatible = "chipidea,usb2" },
-> > +	{ }
-> > +};
-> > +MODULE_DEVICE_TABLE(of, ci_hdrc_usb2_of_match);
-> > +
-> > +static struct platform_driver ci_hdrc_usb2_driver = {
-> > +	.probe	= ci_hdrc_usb2_probe,
-> > +	.remove	= ci_hdrc_usb2_remove,
-> > +	.driver	= {
-> > +		.name		= "chipidea-usb2",
-> > +		.owner		= THIS_MODULE,
-> > +		.of_match_table	= of_match_ptr(ci_hdrc_usb2_of_match),
-> > +	},
-> > +};
-> > +module_platform_driver(ci_hdrc_usb2_driver);
-> > +
-> > +MODULE_DESCRIPTION("ChipIdea HDRC USB2 binding for ci13xxx");
-> > +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
-> > +MODULE_LICENSE("GPL");
-> > -- 
-> > 1.9.1
-> > 
+On Wed, Oct 01, 2014 at 04:41:33PM +0200, Ulf Hansson wrote:
+> At ->probe() it's common practice for drivers/subsystems to bring their
+> devices to full power and without depending on CONFIG_PM_RUNTIME.
 > 
-> -- 
-> Best Regards,
-> Peter Chen
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> We could also expect that drivers/subsystems requires their device's
+> corresponding PM domains to be powered, to successfully complete a
+> ->probe() sequence.
+> 
+> Align the generic PM domain to the behavior above, by enforcing a PM
+> domain to be powered at initialization.
+> 
+> Previous patch changed the only call of pm_genpd_init() with "true" for
+> the "is_off" parameter into "false". Thus all calls of pm_genpd_init()
+> now uses "false" as the value for "is_off".
+> 
+> To make it clear that genpd currently only supports powered PM domains
+> at init, let's also remove the "is_off" parameter from the API.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  arch/arm/mach-exynos/pm_domains.c   | 2 +-
+>  arch/arm/mach-s3c64xx/pm.c          | 4 ++--
+>  arch/arm/mach-shmobile/pm-r8a7779.c | 2 +-
+>  arch/arm/mach-shmobile/pm-rmobile.c | 2 +-
+>  drivers/base/power/domain.c         | 5 ++---
+>  include/linux/pm_domain.h           | 4 ++--
+>  6 files changed, 9 insertions(+), 10 deletions(-)
 
--- 
-Best Regards,
-Peter Chen
+I am mildly concerned about the potential for conflicts in
+arch/arm/mach-shmobile/. But I think that taking this through Rafael's tree
+is consistent with how we have handled things before.
+
+So, providing it can appear in v3.18-rc1, in which case I can
+rebase anything in my tree to avoid conflicts bubling up:
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+> index 58e18e9..f2e5096 100644
+> --- a/arch/arm/mach-exynos/pm_domains.c
+> +++ b/arch/arm/mach-exynos/pm_domains.c
+> @@ -158,7 +158,7 @@ no_clk:
+>  		if (!(__raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN))
+>  			exynos_pd_power_on(&pd->pd);
+>  
+> -		pm_genpd_init(&pd->pd, NULL, false);
+> +		pm_genpd_init(&pd->pd, NULL);
+>  		of_genpd_add_provider_simple(np, &pd->pd);
+>  	}
+>  
+> diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+> index aaf7bea..42dead0 100644
+> --- a/arch/arm/mach-s3c64xx/pm.c
+> +++ b/arch/arm/mach-s3c64xx/pm.c
+> @@ -315,10 +315,10 @@ int __init s3c64xx_pm_init(void)
+>  
+>  	for (i = 0; i < ARRAY_SIZE(s3c64xx_always_on_pm_domains); i++)
+>  		pm_genpd_init(&s3c64xx_always_on_pm_domains[i]->pd,
+> -			      &pm_domain_always_on_gov, false);
+> +			      &pm_domain_always_on_gov);
+>  
+>  	for (i = 0; i < ARRAY_SIZE(s3c64xx_pm_domains); i++)
+> -		pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL, false);
+> +		pm_genpd_init(&s3c64xx_pm_domains[i]->pd, NULL);
+>  
+>  #ifdef CONFIG_S3C_DEV_FB
+>  	if (dev_get_platdata(&s3c_device_fb.dev))
+> diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
+> index 82fe3d7..c20ef44 100644
+> --- a/arch/arm/mach-shmobile/pm-r8a7779.c
+> +++ b/arch/arm/mach-shmobile/pm-r8a7779.c
+> @@ -83,7 +83,7 @@ static void r8a7779_init_pm_domain(struct r8a7779_pm_domain *r8a7779_pd)
+>  {
+>  	struct generic_pm_domain *genpd = &r8a7779_pd->genpd;
+>  
+> -	pm_genpd_init(genpd, NULL, false);
+> +	pm_genpd_init(genpd, NULL);
+>  	genpd->dev_ops.stop = pm_clk_suspend;
+>  	genpd->dev_ops.start = pm_clk_resume;
+>  	genpd->dev_ops.active_wakeup = pd_active_wakeup;
+> diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+> index 818de2f..e6a0490 100644
+> --- a/arch/arm/mach-shmobile/pm-rmobile.c
+> +++ b/arch/arm/mach-shmobile/pm-rmobile.c
+> @@ -107,7 +107,7 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+>  	struct generic_pm_domain *genpd = &rmobile_pd->genpd;
+>  	struct dev_power_governor *gov = rmobile_pd->gov;
+>  
+> -	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
+> +	pm_genpd_init(genpd, gov ? : &simple_qos_governor);
+>  	genpd->dev_ops.stop		= pm_clk_suspend;
+>  	genpd->dev_ops.start		= pm_clk_resume;
+>  	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 36871b3..cfb76e8 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1836,10 +1836,9 @@ static int pm_genpd_default_restore_state(struct device *dev)
+>   * pm_genpd_init - Initialize a generic I/O PM domain object.
+>   * @genpd: PM domain object to initialize.
+>   * @gov: PM domain governor to associate with the domain (may be NULL).
+> - * @is_off: Initial value of the domain's power_is_off field.
+>   */
+>  void pm_genpd_init(struct generic_pm_domain *genpd,
+> -		   struct dev_power_governor *gov, bool is_off)
+> +		   struct dev_power_governor *gov)
+>  {
+>  	if (IS_ERR_OR_NULL(genpd))
+>  		return;
+> @@ -1852,7 +1851,7 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>  	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
+>  	genpd->in_progress = 0;
+>  	atomic_set(&genpd->sd_count, 0);
+> -	genpd->status = is_off ? GPD_STATE_POWER_OFF : GPD_STATE_ACTIVE;
+> +	genpd->status = GPD_STATE_ACTIVE;
+>  	init_waitqueue_head(&genpd->status_wait_queue);
+>  	genpd->poweroff_task = NULL;
+>  	genpd->resume_count = 0;
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index a21dfa9..ad4aa87 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -140,7 +140,7 @@ extern int pm_genpd_name_attach_cpuidle(const char *name, int state);
+>  extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
+>  extern int pm_genpd_name_detach_cpuidle(const char *name);
+>  extern void pm_genpd_init(struct generic_pm_domain *genpd,
+> -			  struct dev_power_governor *gov, bool is_off);
+> +			  struct dev_power_governor *gov);
+>  
+>  extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
+>  extern int pm_genpd_name_poweron(const char *domain_name);
+> @@ -206,7 +206,7 @@ static inline int pm_genpd_name_detach_cpuidle(const char *name)
+>  	return -ENOSYS;
+>  }
+>  static inline void pm_genpd_init(struct generic_pm_domain *genpd,
+> -				 struct dev_power_governor *gov, bool is_off)
+> +				 struct dev_power_governor *gov)
+>  {
+>  }
+>  static inline int pm_genpd_poweron(struct generic_pm_domain *genpd)
+> -- 
+> 1.9.1
+> 
