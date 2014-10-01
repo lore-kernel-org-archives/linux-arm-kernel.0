@@ -1,67 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Oct 2014 18:01:29 +0200
-Subject: [GIT PULL 3/3] 3rd Round of Exynos-PM-2 Updates for v3.18
-In-Reply-To: <54244973.7090204@samsung.com>
-References: <54244973.7090204@samsung.com>
-Message-ID: <201410011801.29389.arnd@arndb.de>
+From: dianders@google.com (Doug Anderson)
+Date: Wed, 1 Oct 2014 09:04:09 -0700
+Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
+ handle regulators
+In-Reply-To: <1831792.g28ajrp9B5@amdc1032>
+References: <01.09.14890.83F4B245@epcpsbge5.samsung.com>
+ <1831792.g28ajrp9B5@amdc1032>
+Message-ID: <CAD=FV=Xcv6E57u=kUj4QSWOpxCwOuJ4UyrFhSg1z0O1zx8nCag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 September 2014, Kukjin Kim wrote:
-> Exynos 2nd PM related updates for v3.18
-> 
-> - Firmware supporting suspend and resume to excute of low
->    level operations to enter and leave power mode for exynos
->    : introduce suspend() and resume() firmware operations
-> 
-> - Fix AFTR mode on boards with secure firmware enabled and
->    allows exynos cpuidle driver usage on exynos4x12 SoCs
-> 
-> - Fix build with PM_SLEEP=n and ARM_EXYNOS_CPUIDLE=y
-> 
-> - SWRESET is needed to boot secondary CPU on exynos3250
-> 
+Hi,
 
-I needed another fixup to make this build, but I'm not sure about
-whether this is the right solution.
+On Wed, Oct 1, 2014 at 7:00 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> Hi,
+>
+> On Wednesday, October 01, 2014 12:47:52 AM YUVARAJ CD wrote:
+>
+>> Since I am out of station, i dont have an access to my work set up.
+>> Can you send me the dts entries of sd crad and their corresponding regulator entries?
+>
+> From arch/arm/boot/dts/exynos5420-arndale-octa.dts:
+>
+> ...
+>         mmc at 12200000 {
+>                 status = "okay";
+>                 broken-cd;
+>                 supports-highspeed;
+>                 card-detect-delay = <200>;
+>                 samsung,dw-mshc-ciu-div = <3>;
+>                 samsung,dw-mshc-sdr-timing = <0 4>;
+>                 samsung,dw-mshc-ddr-timing = <0 2>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>                 vmmc-supply = <&ldo10_reg>;
+>
+>                 slot at 0 {
+>                         reg = <0>;
+>                         bus-width = <8>;
+>                 };
+>         };
+>
+>         mmc at 12220000 {
+>                 status = "okay";
+>                 supports-highspeed;
+>                 card-detect-delay = <200>;
+>                 samsung,dw-mshc-ciu-div = <3>;
+>                 samsung,dw-mshc-sdr-timing = <2 3>;
+>                 samsung,dw-mshc-ddr-timing = <1 2>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>                 vmmc-supply = <&ldo10_reg>;
+>
+>                 slot at 0 {
+>                         reg = <0>;
+>                         bus-width = <4>;
+>                 };
+>         };
+> ...
+>                                 ldo10_reg: LDO10 {
+>                                         regulator-name = "PVDD_PRE_1V8";
+>                                         regulator-min-microvolt = <1800000>;
+>                                         regulator-max-microvolt = <1800000>;
+>                                         regulator-always-on;
+>                                 };
 
-I decided not to pull this one, please test again with and without
-my patch for the case that ARM_CPU_SUSPEND is disabled.
+I don't have schematics for Arndale Octa, but the above is really
+fishy.  "vmmc" shouldn't be 1.8V.  That's the general power signal to
+MMC and should be 2.7V - 3.6V.  "vqmmc" could be 1.8V in certain
+situations, but my understanding is that for maximum compatibility it
+should at least start out identical to "vmmc" (and later go down to
+1.7V - 1.95V).
 
-	Arnd
+My first thought would be to just remove the "vmmc-supply" from your
+DTS.  I think we could land that and pick it back easily.  That will
+get you something working and won't introduce any regressions because:
+1. MMC core will give you a dummy regulator
+2. The code will default to assuming that vmmc is 3.3V, which is what
+it used to do anyway.
+3. The only referenced regulator is always on anyway.
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 64324bf5edb4..aaab67d84bf6 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -14,9 +14,9 @@ obj-				:=
- 
- # Core
- 
--obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o sleep.o
-+obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o
- 
--obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o
-+obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_PM_SLEEP)		+= suspend.o
- obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
- 
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index 2c5bc6bfcbdf..b7ff8f25bf4a 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -129,11 +129,11 @@ static int exynos_resume(void)
- }
- 
- static const struct firmware_ops exynos_firmware_ops = {
--	.do_idle		= exynos_do_idle,
-+	.do_idle		= IS_ENABLED(CONFIG_EXYNOS_CPU_SUSPEND) ? exynos_do_idle : NULL,
- 	.set_cpu_boot_addr	= exynos_set_cpu_boot_addr,
- 	.cpu_boot		= exynos_cpu_boot,
--	.suspend		= exynos_suspend,
--	.resume			= exynos_resume,
-+	.suspend		= IS_ENABLED(CONFIG_PM_SLEEP) ? exynos_suspend : NULL,
-+	.resume			= IS_ENABLED(CONFIG_PM_SLEEP) ? exynos_resume : NULL,
- };
- 
- void __init exynos_firmware_init(void)
+Separately you could specify a proper vmmc and maybe even a vqmmc.
+
+On SMDK5420 I see this for the SD card (mmc2):
+* vmmc should be "VDD_SD_2V8".  From LDO19.
+* vqmmc should be "VDDQ_MMC2_AP".  From LDO13.
+
+OK, I dug up the Arndale schematics.  For mmc2:
+* vmmc should be PVDD_TFLASH_2V8.  That's LDO19.
+* vqmmc (hooked up to VDDQ_MMC2): PVDD_APIO_MMCOFF_2V8.  LDO13 just like SMDK.
+
+...sadly it looks like Anrdale has a schematics problem that prevents
+you from doing UHS.  I see that the data lines are pulled up to
+PVDD_TFLASH_2V8 (vmmc), not pulled up to PVDD_APIO_MMCOFF_2V8 (vqmmc).
+I think that means that if you ever lower vqmmc to 1.8V (as needed for
+UHS) then you'll still be pulling up to 2.8V.  That's not good.  You
+should probably make sure that both LDO13 and LDO19 are listed as
+being exactly 2.8V.
+
+
+Anyway, the above has (obviously) not been tested and is just based on
+a casual browsing of schematics.  Please let me know how it goes.
+
+
+
+-Doug
