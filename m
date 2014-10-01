@@ -1,105 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Oct 2014 10:21:57 +0200
-Subject: [PATCH 6/9] dmaengine: Create a generic dma_slave_caps callback
-In-Reply-To: <20140927092536.GZ5182@n2100.arm.linux.org.uk>
-References: <1411808085-27792-1-git-send-email-maxime.ripard@free-electrons.com>
- <1411808085-27792-7-git-send-email-maxime.ripard@free-electrons.com>
- <20140927092536.GZ5182@n2100.arm.linux.org.uk>
-Message-ID: <20141001082157.GE6884@lukather>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 01 Oct 2014 10:25:37 +0200
+Subject: [PATCH] net: xilinx: Remove unnecessary ether_setup after
+ alloc_etherdev
+In-Reply-To: <d43b465eca3e2a53c930f6e02dc4ac8b3c084693.1412143216.git.michal.simek@xilinx.com>
+References: <d43b465eca3e2a53c930f6e02dc4ac8b3c084693.1412143216.git.michal.simek@xilinx.com>
+Message-ID: <542BBA81.2000406@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 10/01/2014 08:00 AM, Michal Simek wrote:
+> From: Subbaraya Sundeep Bhatta <subbaraya.sundeep.bhatta@xilinx.com>
+> 
+> Calling ether_setup is redundant since alloc_etherdev calls it.
+> 
+> Signed-off-by: Subbaraya Sundeep Bhatta <sbhatta@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  drivers/net/ethernet/xilinx/ll_temac_main.c       | 1 -
+>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 1 -
+>  2 files changed, 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+> index fda5891835d4..629077050fce 100644
+> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
+> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+> @@ -1012,7 +1012,6 @@ static int temac_of_probe(struct platform_device *op)
+>  	if (!ndev)
+>  		return -ENOMEM;
+> 
+> -	ether_setup(ndev);
+>  	platform_set_drvdata(op, ndev);
+>  	SET_NETDEV_DEV(ndev, &op->dev);
+>  	ndev->flags &= ~IFF_MULTICAST;  /* clear multicast */
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> index c8fd94133ecd..4ea2d4e6f1d1 100644
+> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> @@ -1485,7 +1485,6 @@ static int axienet_of_probe(struct platform_device *op)
+>  	if (!ndev)
+>  		return -ENOMEM;
+> 
+> -	ether_setup(ndev);
+>  	platform_set_drvdata(op, ndev);
+> 
+>  	SET_NETDEV_DEV(ndev, &op->dev);
+> --
+> 1.8.2.3
+> 
 
-On Sat, Sep 27, 2014 at 10:25:36AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Sep 27, 2014 at 10:54:42AM +0200, Maxime Ripard wrote:
-> > dma_slave_caps is very important to the generic layers that might interact with
-> > dmaengine, such as ASoC. Unfortunately, it has been added as yet another
-> > dma_device callback, and most of the existing drivers haven't implemented it,
-> > reducing its reliability.
-> 
-> Many haven't implemented it probably because either (a) they don't get used
-> with ASoC, or (b) they aren't aware of the new interface, or (c) can't be
-> bothered with the churn.
+Please ignore this one it is already applied for axienet.
+Will send v2 just for ll_temac.
 
-For a), I really see this as a chicken-egg issue. ASoC is the only
-user of it because it's the only framework that has a generic layer on
-top, and it's the only framework that has a generic layer because most
-drivers don't implement it.
-
-Now, there seems to be a trend to actually use a generic DMA layer in
-other frameworks. SPI gained one recently, I think I saw something
-about some discussions for IIO and I2C too. And in order for this to
-work, we have to make it reliable, and as such, implemented on most
-drivers.
-
-> However, trying to return something introduces a bug:
-> 
-> >  static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
-> >  {
-> > +	struct dma_device *device;
-> > +
-> >  	if (!chan || !caps)
-> >  		return -EINVAL;
-> >  
-> > +	device = chan->device;
-> > +
-> >  	/* check if the channel supports slave transactions */
-> > -	if (!test_bit(DMA_SLAVE, chan->device->cap_mask.bits))
-> > +	if (!test_bit(DMA_SLAVE, device->cap_mask.bits))
-> >  		return -ENXIO;
-> >  
-> > -	if (chan->device->device_slave_caps)
-> > -		return chan->device->device_slave_caps(chan, caps);
-> > +	caps->cmd_pause = !!device->device_pause;
-> > +	caps->cmd_terminate = !!device->device_terminate_all;
-> > +
-> > +	if (device->device_slave_caps)
-> > +		return device->device_slave_caps(chan, caps);
-> >  
-> > -	return -ENXIO;
-> > +	return 0;
-> 
-> So this now returns success if the driver doesn't implement device_slave_caps(),
-> but with most of the structure zero.
-> 
-> Now, consider what effect this has with:
-> 
-> 
->         ret = dma_get_slave_caps(chan, &dma_caps);
->         if (ret == 0) {
->                 if (dma_caps.cmd_pause)
->                         hw.info |= SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_RESUME;
->                 if (dma_caps.residue_granularity <= DMA_RESIDUE_GRANULARITY_SEGMENT)
->                         hw.info |= SNDRV_PCM_INFO_BATCH;
-> 
->                 if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
->                         addr_widths = dma_caps.dstn_addr_widths;
->                 else
->                         addr_widths = dma_caps.src_addr_widths;
->         }
-> 
-> addr_widths becomes zero, and we also get SNDRV_PCM_INFO_BATCH turned
-> on for _all_ DMA engine drivers.  The first renders ASoC useless with
-> DMA engine.
-> 
-> It may be a good way to get people to implement it, but this will cause
-> regressions.
-
-Hmmm, nasty indeed. Maybe we could add a test to see if any of the
-field we're going to use are filled, and if not, return an error?
-
-Thanks!
-Maxime
+Thanks,
+Michal
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/262b71c3/attachment.sig>
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/355efe0e/attachment.sig>
