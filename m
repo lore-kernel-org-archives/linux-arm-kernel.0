@@ -1,139 +1,39 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 1 Oct 2014 13:10:46 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20141001074139.GB18463@ulmo>
-References: <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929092301.GC4388@lukather> <20140929101805.GB26008@ulmo>
- <20140929114643.GB4081@lukather> <20140929134708.GB30998@ulmo>
- <20140929155517.GR16977@sirena.org.uk>
- <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
- <20141001074139.GB18463@ulmo>
-Message-ID: <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Oct 2014 12:11:28 +0100
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+ <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
+Message-ID: <20141001111127.GG12702@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 1, 2014 at 9:41 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Tue, Sep 30, 2014 at 06:39:28PM +0100, Mark Brown wrote:
->> On Tue, Sep 30, 2014 at 07:09:24AM +0200, Thierry Reding wrote:
->> > On Mon, Sep 29, 2014 at 04:55:17PM +0100, Mark Brown wrote:
->>
->> > > So long as we're ensuring that when we don't start supporting resources
->> > > without DT additions or at least require DT additions to actively manage
->> > > them (which can then include simplefb hookup) we should be fine.
->>
->> > I'm not sure I understand what you mean. If we add a driver for the PMIC
->> > that exposes these regulators and then add a DT node for the PMIC, we'd
->> > still need to fix the firmware to generate the appropriate DT properties
->> > to allow simplefb to enable the regulators.
->>
->> No, you don't.  It's only if you start describing the regulators in the
->> PMIC in DT that you run into problems.  Unconfigured regulators won't be
->> touched.
->
-> Okay, that's what I meant. It seems rather odd to add a PMIC DT node but
-> omit the description of the regulators that it exposes. Unless the
-> regulators are truly unused, as in not connected to any peripherals.
->
+On Mon, Sep 29, 2014 at 10:51:25PM +0100, Hugh Dickins wrote:
+> On Fri, 26 Sep 2014, Steve Capper wrote:
+> > This patch provides a general RCU implementation of get_user_pages_fast
+> > that can be used by architectures that perform hardware broadcast of
+> > TLB invalidations.
+> >
+> > It is based heavily on the PowerPC implementation by Nick Piggin.
+> >
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > Tested-by: Dann Frazier <dann.frazier@canonical.com>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Acked-by: Hugh Dickins <hughd@google.com>
+> 
+> Thanks for making all those clarifications, Steve: this looks very
+> good to me now.  I'm not sure which tree you're hoping will take this
+> and the arm+arm64 patches 2-6: although this one would normally go
+> through akpm, I expect it's easier for you to synchronize if it goes
+> in along with the arm+arm64 2-6 - would that be okay with you, Andrew?
+> I see no clash with what's currently in mmotm.
 
-Agreed, I added similar PMIC support to other Chromebooks (Peach Pit
-and Pi) DTS and for me it made totally sense to add nodes for all the
-regulators that are connected to peripherals according to the board
-schematic. Specially since the framework is smart enough to disable
-any regulator that is not used.
+>From an arm64 perspective, I'm more than happy for Andrew to pick up the
+entire series. I already reviewed the patches.
 
-After all, a DT is meant to describe the hardware, so how can possibly
-be an issue to add more details about the hw in a DTS?
+Thanks.
 
-If something is working relying on parts of the hw on not being
-described, then is essentially relying on side-effects and
-implementation details which are bound to be broken anyways.
-
->> > So unless firmware is updated at the same time, regulators will get
->> > disabled because they are unused.
->>
->> That won't happen unless the regulators are explicitly described, if
->> they are described as unused then this will of course happen.
->
-> With described as unused you mean they have a node in DT, so constraints
-> are applied and all that, but no driver actually uses them?
->
-
-Adding your resources (clock, regulators, etc) incrementally and only
-when the driver for the device that use these resources is available,
-will only make adding support for a new platform slower IMHO since
-there will be more patches to be posted, reviewed and merged.
-
-> The fundamental issue is that if we start describing simplefb nodes with
-> an incomplete set of resources then we're bound to run into problems
-> where it'll break once these new resources are described in the DTS. If
-> the simplefb node was described in the DTS then this would be less of a
-> problem because the resources could be added to the simplefb node at the
-> same time.
->
-
-Agreed, the assumptions made by simplefb are quite fragile so we
-should either document somewhere that simplefb ignores all the
-resources and that is a best effort so users should not consider the
-display breaking a regression or make it robust enough so users can
-expect that it will always work.
-
-Just adding the clocks is a partial solution which I think will make
-the situation even worst since it will give a false illusion of
-robustness but as you said it will break anyways due other resources.
-
-> However given that simplefb is supposed to be generated by firmware this
-> is no longer possible. It will inevitably break unless you upgrade the
-> DTB and the firmware at the same time. And it was already decided long
-> ago that upgrading the firmware should never be a requirement for
-> keeping things working.
->
-
-AFAICT in practice most platforms' firmware do not generate the
-simplefb by default. In the case of Chromebooks for example, a custom
-U-boot needs to be flashed in order to have simplefb support. In fact
-most people working on mainline support for Chromebooks do not use
-simplefb and that is why the issue was not spot when adding the
-support for clocks and regulators.
-
-Personally I didn't even know how simplefb worked before Will reported
-that his display used to work on Snow before 3.16. So I assume that
-his reasonable to expect that users using simplefb are able to update
-their bootloader.
-
-Which brings a more general question about DT and backward
-compatibility. Should we have backward compatibility only with the
-official firmware that is ship on a device when is bought or should we
-maintain backward compatibility against any firmware out there that
-someone re-built and added logic to mangle the FDT before is passed to
-the kernel?
-
-Going back to simplefb, I think the fact that the simplefb is not in
-the DTS is the fundamental issue here. For me, the most reasonable
-approach to solve this is the one suggested by Doug Anderson. That is
-to have the simplefb node in the DTS so all the references to the
-resources it uses can be added in the DTS but keep the simplefb node
-as status = "disabled".
-
-The bootloader can find the simplefb node and fill all the information
-about the framebuffer memory region (location and size, width, height,
-format, etc) and also enable the node by setting the status to "okay"
-so the simplefb driver will be probed.
-
-If a FDT does not have a simplefb node then the boot loader can create
-one (like is made for the /choosen node in most bootloaders) and make
-it a best effort in that case, assuming that all the resources enabled
-by the bootloader will remain enabled once the kernel boots.
-
-This of course will require users to update their boot-loaders but as
-stated above I think that is reasonable since anyone using simplefb is
-using a non-official firmware anyways.
-
-> I don't see any way to prevent that other than ignoring the resources in
-> simplefb completely.
->
-> Thierry
->
-
-Best regards,
-Javier
+-- 
+Catalin
