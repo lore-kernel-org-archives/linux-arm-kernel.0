@@ -1,62 +1,87 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  1 Oct 2014 16:53:06 +0200
-Subject: [PATCH v7 09/11] ARM: at91/dt: define the HLCDC node available on
- sama5d3 SoCs
+Date: Wed,  1 Oct 2014 16:53:01 +0200
+Subject: [PATCH v7 04/11] pwm: add DT bindings documentation for
+ atmel-hlcdc-pwm driver
 In-Reply-To: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1412175188-28278-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1412175188-28278-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-Define the HLCDC (HLCD Controller) IP available on some sama5d3 SoCs
-(i.e. sama5d31, sama5d33, sama5d34 and sama5d36) in sama5d3 dtsi file.
+The HLCDC IP available in some Atmel SoCs (i.e. sam9x5i.e. at91sam9n12,
+at91sam9x5 family or sama5d3 family) provide a PWM device.
+
+The DT bindings used for this PWM device is following the default 3 cells
+bindings described in Documentation/devicetree/bindings/pwm/pwm.txt.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Tested-by: Anthony Harivel <anthony.harivel@emtrion.de>
 ---
- arch/arm/boot/dts/sama5d3_lcd.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    | 55 ++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
 
-diff --git a/arch/arm/boot/dts/sama5d3_lcd.dtsi b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-index e7581f6..611ff8a 100644
---- a/arch/arm/boot/dts/sama5d3_lcd.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_lcd.dtsi
-@@ -166,6 +166,34 @@
- 				};
- 			};
- 
-+			hlcdc: hlcdc at f0030000 {
-+				compatible = "atmel,sama5d3-hlcdc";
-+				reg = <0xf0030000 0x2000>;
-+				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
-+				clock-names = "periph_clk","sys_clk", "slow_clk";
-+				status = "disabled";
+diff --git a/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+new file mode 100644
+index 0000000..86ad3e2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
+@@ -0,0 +1,55 @@
++Device-Tree bindings for Atmel's HLCDC (High LCD Controller) PWM driver
 +
-+				hlcdc-display-controller {
-+					compatible = "atmel,hlcdc-display-controller";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++The Atmel HLCDC PWM is subdevice of the HLCDC MFD device.
++See ../mfd/atmel-hlcdc.txt for more details.
 +
-+					port at 0 {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+						reg = <0>;
-+					};
-+				};
++Required properties:
++ - compatible: value should be one of the following:
++   "atmel,hlcdc-pwm"
++ - pinctr-names: the pin control state names. Should contain "default".
++ - pinctrl-0: should contain the pinctrl states described by pinctrl
++   default.
++ - #pwm-cells: should be set to 3. This PWM chip use the default 3 cells
++   bindings defined in Documentation/devicetree/bindings/pwm/pwm.txt.
++   The first cell encodes the PWM id (0 is the only acceptable value here,
++   because the chip only provide one PWM).
++   The second cell encodes the PWM period in nanoseconds.
++   The third cell encodes the PWM flags (the only supported flag is
++   PWM_POLARITY_INVERTED)
 +
-+				hlcdc_pwm: hlcdc-pwm {
-+					compatible = "atmel,hlcdc-pwm";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_lcd_pwm>;
-+					#pwm-cells = <3>;
++Example:
++
++	hlcdc: hlcdc at f0030000 {
++		compatible = "atmel,sama5d3-hlcdc";
++		reg = <0xf0030000 0x2000>;
++		clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
++		clock-names = "periph_clk","sys_clk", "slow_clk";
++		status = "disabled";
++
++		hlcdc-display-controller {
++			compatible = "atmel,hlcdc-display-controller";
++			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				hlcdc_panel_output: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&panel_input>;
 +				};
 +			};
++		};
 +
- 			pmc: pmc at fffffc00 {
- 				periphck {
- 					lcdc_clk: lcdc_clk {
++		hlcdc_pwm: hlcdc-pwm {
++			compatible = "atmel,hlcdc-pwm";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_lcd_pwm>;
++			#pwm-cells = <3>;
++		};
++	};
 -- 
 1.9.1
