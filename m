@@ -1,58 +1,44 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 1 Oct 2014 09:40:01 +1000
-Subject: [PATCH v7 00/11] kernel: Add support for restart handler call
- chain
-In-Reply-To: <20140930223000.GA20946@roeck-us.net>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
- <20140930142002.e09ef32392a2b5a7c81e5e57@linux-foundation.org>
- <20140930223000.GA20946@roeck-us.net>
-Message-ID: <20141001094001.2b85f54c@canb.auug.org.au>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 01 Oct 2014 08:29:16 +0530
+Subject: [PATCH v8 2/2] ARM: EXYNOS: Move PMU specific definitions from
+ common.h
+In-Reply-To: <11948982.c37J1JPj8N@wuerfel>
+References: <1412072481-22370-1-git-send-email-pankaj.dubey@samsung.com>
+ <1412072481-22370-3-git-send-email-pankaj.dubey@samsung.com>
+ <11948982.c37J1JPj8N@wuerfel>
+Message-ID: <002401cfdd23$b538dbf0$1faa93d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Arnd,
 
-On Tue, 30 Sep 2014 15:30:00 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
->
-> On Tue, Sep 30, 2014 at 02:20:02PM -0700, Andrew Morton wrote:
-> > On Tue, 19 Aug 2014 17:45:27 -0700 Guenter Roeck <linux@roeck-us.net> wrote:
-> > 
-> > > Introduce a system restart handler call chain to solve the described problems.
-> > 
-> > So someone has merged eight of these patches into linux-next but these
-> > three:
-> > 
-> > watchdog-s3c2410-add-restart-handler.patch
-> > clk-samsung-register-restart-handlers-for-s3c2412-and-s3c2443.patch
-> > clk-rockchip-add-restart-handler.patch
-> > 
-> > were omitted.  What's up?
+On Tuesday, September 30, 2014 4:09 PM, Arnd Bergmann wrote,
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Pankaj Dubey; linux-kernel at vger.kernel.org;
+linux-samsung-soc at vger.kernel.org;
+> kgene.kim at samsung.com; linux at arm.linux.org.uk; naushad at samsung.com;
+> tomasz.figa at gmail.com; thomas.ab at samsung.com; vikas.sajjan at samsung.com
+> Subject: Re: [PATCH v8 2/2] ARM: EXYNOS: Move PMU specific definitions
+from
+> common.h
 > 
-> Most likely PBKC on my side; Looks like I forgot to add those when I created
-> the immutable branch for others to merge. Sorry for that :-(.
+> On Tuesday 30 September 2014 15:51:21 Pankaj Dubey wrote:
+> >
+> > +static inline void pmu_raw_writel(u32 val, u32 offset) {
+> > +       __raw_writel(val, pmu_base_addr + offset); }
+> > +
+> > +static inline u32 pmu_raw_readl(u32 offset) {
+> > +       return __raw_readl(pmu_base_addr + offset); }
+> > +
+> >
 > 
-> Having said that, I somehow thought that the clock patches would go in through
-> the clock tree. Heiko, did I get that wrong ? Separately, I sent a pull request
-> that includes the watchdog patch to Wim.
+> While you're at it, please convert these to use readl_relaxed() instead,
+which is safe to
+> use in drivers and works independent of CPU endianess.
+> 
 
-So far, that immutable branch has been merged into the battery tree
-(and thus into linux-next) by Sebastian in order to add (I assume):
+OK, I will update this. 
 
-18a702e0de98 power: reset: use restart_notifier mechanism for msm-poweroff
-371bb20d6927 power: Add simple gpio-restart driver
-
-on top of it.
-
-So, I guess the watchdog and clk trees also need to merge that
-immutable branch and then add their respective patches from the mmotm
-series to their trees.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/874b8c8b/attachment.sig>
+Thanks,
+Pankaj Dubey
+> 	Arnd
