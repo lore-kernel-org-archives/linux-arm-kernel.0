@@ -1,75 +1,41 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 1 Oct 2014 16:59:22 +0200
-Subject: [PATCH v6 0/3] new Atmel DMA controller (XDMAC)
-Message-ID: <1412175565-810-1-git-send-email-ludovic.desroches@atmel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 1 Oct 2014 16:59:27 +0200
+Subject: [PATCH v7 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1412175188-28278-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20141001165927.4fc3ab63@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed,  1 Oct 2014 16:52:57 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-This set of patches introduces support for the new Atmel DMA controller know as
-XDMAC and available on SAMA5D4.
+> Hello,
+> 
+> This series is being sent for several weeks now and I wonder if I shouldn't
+> split it in several pieces:
+> 1) the MFD driver + its DT doc
+> 2) the PWM driver + its DT doc
+> 3) the DRM/KMS driver + its DT doc
+> 4) support for sama5d3 SoCs/boards
+> 
+> The first reason for doing this is that Lee already accepted the MFD part,
+> and I'm pretty sure he'd like me to stop sending him each new version of this
+> series.
+> The second reason being that smaller series are more likely to be reviewed by
+> subsystem maintainers :-).
+> 
+> Lee, if you still agree with this version, could you take the MTD part (other
 
-Since there were no feedback about v5, could you give your ack if you agree with
-this new version.
+                                                     I meant MFD ^
 
-Changes from:
-- v5
-  - fix a bug when doing memcpy, condition to set the NDE was inverted
-  - replace irqsave locks by bh variant
-  - unmasked channel errors
-- v4
-  - compile the driver if COMPILE_TEST is selected
-  - merge header file into at_xdmac.c
-  - use write memory barriers before starting the channel
-  - init active_xfer to false when taking a descriptor from the free
-  descriptors list
-  - remove dma capabilities mask
-  - use CONFIG_PM instead of CONFIG_PM_SLEEP for prepare function
-  - style fixes
-  - update documentation to add the <chip> compatible description
-  - add maintener entry
-- v3
-  - use dma_get_any_slave_channel instead of dma_request_channel
-  - fix tx_status behavior for non active transfers
-  - rename at_xdmac_terminate_xfer
-  - replace suspend/resume no irq variants by late/early variants
-  - no more use dev res to request the irq, use the legacy way
-  - add slave capabilities
-- v2
-  - documentation updated
-  - fix locking issues
-- v1
-  - add power management stuff
-  - check maxburst value
-  - revert subsys_initcall remove, EPROBE_DEFER not yet available on the kernel
-  version I use to do the tests, moreover other devices are not ready to use it
-- RFC:
-  - DMA_SUCCESS replaced by DMA_COMPLETE
-  - fix memcpy issue caused by a mistake in interfaces used
-  - add filter function
-  - remove some parameters from device tree since we can get them through the
-  dma slave configuration
-  - use readl/writel relaxed
-  - remove subsys_initcall
-  - synchronize irq before killing tasklets
-  - use BIT macro
-  - misc cleanup
+> drivers in this series depend on it).
 
-Ludovic Desroches (3):
-  dma: at_xdmac: creation of the atmel eXtended DMA Controller driver
-  ARM: dts: at_xdmac: add bindings documentation
-  MAINTAINERS: add entry for Atmel XDMA driver
 
- .../devicetree/bindings/dma/atmel-xdma.txt         |   50 +
- MAINTAINERS                                        |    7 +
- drivers/dma/Kconfig                                |    7 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/at_xdmac.c                             | 1493 ++++++++++++++++++++
- include/dt-bindings/dma/at91.h                     |   25 +
- 6 files changed, 1583 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/atmel-xdma.txt
- create mode 100644 drivers/dma/at_xdmac.c
+
 
 -- 
-2.0.3
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
