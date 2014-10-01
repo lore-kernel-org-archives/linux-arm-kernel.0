@@ -1,26 +1,43 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 1 Oct 2014 11:43:03 -0700
-Subject: [PATCH 1/2] mtd: m25p80: get rid of spi_get_device_id
-In-Reply-To: <20141001182003.GB17974@sirena.org.uk>
-References: <1411984074-3850-1-git-send-email-zajec5@gmail.com>
- <20141001182003.GB17974@sirena.org.uk>
-Message-ID: <20141001184303.GX1193@ld-irv-0074>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 1 Oct 2014 20:43:27 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20141001171704.GG4273@sirena.org.uk>
+References: <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929161101.GS16977@sirena.org.uk>
+ <20140930060312.GE29874@ulmo> <20140930180036.GI4273@sirena.org.uk>
+ <20141001081443.GC18463@ulmo> <20141001122008.GW4273@sirena.org.uk>
+ <20141001124852.GB21733@ulmo> <20141001171704.GG4273@sirena.org.uk>
+Message-ID: <CAMuHMdXQ8bWCyaLiyOBKQNhB4rJDHBUzHnNMCf7_sPBtR1AKVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 07:20:03PM +0100, Mark Brown wrote:
-> On Mon, Sep 29, 2014 at 11:47:53AM +0200, Rafa? Mi?ecki wrote:
-> > This simplifies the way we use spi_nor framework and will allow us to
-> > drop spi_nor_match_id.
-> 
-> Please don't CC linux-spi on spi-nor patches that don't have SPI level
-> changes, it just clogs up patchwork.
+On Wed, Oct 1, 2014 at 7:17 PM, Mark Brown <broonie@kernel.org> wrote:
+>> Well, I don't think it should because it describes the same resources
+>> that the device tree node for the real device already describes. But
+>> perhaps this is one of the cases where duplication isn't all that bad?
+>
+> If we were worried about this wecould also do it by referring to
+> those nodes and saying "get all the resources these things need" rather
+> than duplicating the references (this might make it easier to work out
+> when the system is ready to hand off to the real drivers).
 
-+1 from me. I appreciate the converse, as I don't need unrelated noise
-on linux-mtd.
+You can have a single node for both simplefb and the later "real" driver.
+DT describes the hardware, not the software ecosystem running on the
+hardware. Clock, regulators, etc. don't change from a hardware point of
+view.
 
-(I feel sorry for people over at linux-arm-kernel and devicetree, since
-they get CC'd on a large variety of unrelated things, it seems. I'm sure
-the firehose gets to be almost as bad as LKML sometimes.)
+If the firmware initialized a suitable graphics mode, it just has to add
+"linux,simplefb" to the compatible property (and perhaps a few other
+simplefb-specific properties).
 
-Brian
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
