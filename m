@@ -1,52 +1,109 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 1 Oct 2014 09:48:31 -0400
-Subject: soc: ti: add Keystone Navigator DMA support
-In-Reply-To: <20141001080549.GA12488@mwanda>
-References: <20141001080549.GA12488@mwanda>
-Message-ID: <542C062F.5070900@ti.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 1 Oct 2014 15:49:17 +0200
+Subject: [PATCH 2/2] socfpga: support suspend to ram
+In-Reply-To: <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-3-git-send-email-atull@opensource.altera.com>
+Message-ID: <20141001134917.GB12750@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 04:05 AM, Dan Carpenter wrote:
-> Hello Santosh Shilimkar,
-> 
-> The patch 88139ed03058: "soc: ti: add Keystone Navigator DMA support"
-> from Mar 30, 2014, leads to the following static checker warning:
-> 
-> 	drivers/soc/ti/knav_dma.c:402 of_channel_match_helper()
-> 	warn: unsigned 'args.args[0]' is never less than zero.
-> 
-> drivers/soc/ti/knav_dma.c
->    378  static int of_channel_match_helper(struct device_node *np, const char *name,
->    379                                          const char **dma_instance)
->    380  {
->    381          struct of_phandle_args args;
->    382          struct device_node *dma_node;
->    383          int index;
->    384  
->    385          dma_node = of_parse_phandle(np, "ti,navigator-dmas", 0);
->    386          if (!dma_node)
->    387                  return -ENODEV;
->    388  
->    389          *dma_instance = dma_node->name;
->    390          index = of_property_match_string(np, "ti,navigator-dma-names", name);
->    391          if (index < 0) {
->    392                  dev_err(kdev->dev, "No 'ti,navigator-dma-names' propery\n");
->    393                  return -ENODEV;
->    394          }
->    395  
->    396          if (of_parse_phandle_with_fixed_args(np, "ti,navigator-dmas",
->    397                                          1, index, &args)) {
->    398                  dev_err(kdev->dev, "Missing the pahndle args name %s\n", name);
->    399                  return -ENODEV;
->    400          }
->    401  
->    402          if (args.args[0] < 0) {
->                     ^^^^^^^^^^^^^^^^
-> I don't know what was intended here.
-> 
-The check was to avoid missing phandle parameters. I will fix it up.
-Thanks for reporting.
+Hi!
 
-Regards,
-Santosh
+> Add code that requests that the sdr controller go into
+> self-refresh mode.  This code is run from ocram.
+> 
+> This patch assumes that u-boot has already configured sdr:
+>   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+>   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+>   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
+
+I'm not sure if we should make assumptions like that. u-boot is not
+the only bootloader.
+
+At the very least, it should go to comment in the code, not to changelog.
+
+> +u32 socfpga_sdram_self_refresh(u32 sdr_base, u32 scu_base);
+> +extern unsigned int socfpga_sdram_self_refresh_sz;
+
+_sz -> size.
+
+Is it ok to just copy code around?
+
+> +/* Round up a pointer address to fix aligment for fncpy() */
+> +static void *fncpy_align(void *ptr)
+> +{
+> +	u32 value = (u32)ptr;
+> +
+> +	if ((value & (FNCPY_ALIGN - 1)) != 0)
+> +		value = ((value & ~(FNCPY_ALIGN - 1)) + FNCPY_ALIGN);
+> +
+> +	return (void *)value;
+> +}
+
+Don't we have a nice macro doing aligning?
+
+I guess the if() is not neccessary.
+
+> +static int socfpga_pm_suspend(unsigned long arg)
+> +{
+> +	u32 ret;
+> +
+> +	ret = socfpga_sdram_self_refresh_in_ocram((u32)sdr_ctl_base_addr,
+> +						  (u32)socfpga_scu_base_addr);
+> +
+> +	pr_debug("%s self-refresh loops request=%d exit=%d\n", __func__,
+> +		 ret & 0xffff, (ret >> 16) & 0xffff);
+> +
+> +	return 0;
+> +}
+
+return ret?
+
+
+> +	.arch   armv7-a
+> +	.text
+> +	.align 3
+> +
+> +	/*
+> +	 * socfpga_sdram_self_refresh
+> +	 *
+> +	 *  r0 : sdr_ctl_base_addr
+> +	 *  r1 : socfpga_scu_base_addr
+> +	 *  r2 : temp storage of register values
+> +	 *  r3 : loop counter
+> +	 *  r4 : temp storage of return value
+> +	 *
+> +	 *  return value: lower 16 bits: loop count going into self refresh
+> +	 *                upper 16 bits: loop count exiting self refresh
+> +	 */
+> +ENTRY(socfpga_sdram_self_refresh)
+
+r0, r1 are the parameters?
+
+> @@ -77,6 +78,15 @@ void __init socfpga_sysmgr_init(void)
+>  
+>  	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+>  	rst_manager_base_addr = of_iomap(np, 0);
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "altr,sdr-ctl");
+> +	if (!np) {
+> +		pr_err("SOCFPGA: Unable to find sdr-ctl\n");
+> +		return;
+> +	}
+> +
+> +	sdr_ctl_base_addr = of_iomap(np, 0);
+> +	WARN_ON(!sdr_ctl_base_addr);
+>  }
+>  
+>  static void __init socfpga_init_irq(void)
+
+Actually, "sdr-ctl" is quite hard to understand. I guess it means
+"sdram-control"? Should we do something like altr,sdram-ctrl-1.0, so
+that we have way forward if hardware changes in future?
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
