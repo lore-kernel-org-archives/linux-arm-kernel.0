@@ -1,135 +1,429 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  1 Oct 2014 13:07:55 +0100
-Subject: [PATCHv2 1/5] arm64: Add support for hooks to handle undefined
- instructions
+Date: Wed,  1 Oct 2014 13:07:57 +0100
+Subject: [PATCHv2 3/5] arm64: Port SWP/SWPB emulation support from arm
 In-Reply-To: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
 References: <1412165279-8709-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1412165279-8709-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1412165279-8709-4-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to register hooks for undefined instructions. The handlers
-will be called when the undefined instruction and the processor state
-(as contained in pstate) match criteria used at registration.
+The SWP instruction was deprecated in the ARMv6 architecture,
+superseded by the LDREX/STREX family of instructions for
+load-linked/store-conditional operations. The ARMv7 multiprocessing
+extensions mandate that SWP/SWPB instructions are treated as undefined
+from reset, with the ability to enable them through the System Control
+Register SW bit. With ARMv8, the option to enable these instructions
+through System Control Register was dropped as well.
+
+This patch ports the alternate solution to emulate the SWP and SWPB
+instructions using LDXR/STXR sequences from the arm port to
+arm64. The emulation is turned off by default and can be enabled at
+runtime using sysctl.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- arch/arm64/include/asm/traps.h |   16 ++++++++++
- arch/arm64/kernel/traps.c      |   68 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 84 insertions(+)
+ arch/arm64/Kconfig                   |   39 +++++
+ arch/arm64/include/asm/insn.h        |    8 +
+ arch/arm64/kernel/Makefile           |    1 +
+ arch/arm64/kernel/armv8_deprecated.c |  287 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/insn.c             |   13 ++
+ 5 files changed, 348 insertions(+)
+ create mode 100644 arch/arm64/kernel/armv8_deprecated.c
 
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 10ca8ff..4faaf03 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -18,6 +18,22 @@
- #ifndef __ASM_TRAP_H
- #define __ASM_TRAP_H
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..89262da 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -149,6 +149,45 @@ config ARCH_XGENE
+ 	help
+ 	  This enables support for AppliedMicro X-Gene SOC Family
  
-+#include <linux/list.h>
++comment "Processor Features"
 +
-+struct pt_regs;
++menuconfig ARMV8_DEPRECATED
++	bool "Emulate deprecated/obsolete ARMv8 instructions"
++	depends on COMPAT
++	help
++	  Legacy software support may require certain instructions
++	  that have been deprecated or obsoleted in the architecture.
 +
-+struct undef_hook {
-+	struct list_head node;
-+	u32 instr_mask;
-+	u32 instr_val;
-+	u64 pstate_mask;
-+	u64 pstate_val;
-+	int (*fn)(struct pt_regs *regs, u32 instr);
-+};
++	  Enable this config to enable selective emulation of these
++	  features.
 +
-+int register_undef_hook(struct undef_hook *hook);
-+void unregister_undef_hook(struct undef_hook *hook);
++	  If unsure, say N
 +
- static inline int in_exception_text(unsigned long ptr)
- {
- 	extern char __exception_text_start[];
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 02cd3f0..bcde9de 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -260,6 +260,71 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
- 	}
- }
++if ARMV8_DEPRECATED
++
++config SWP_EMULATION
++	bool "Emulate SWP/SWPB instructions"
++	help
++	  ARMv8 obsoletes the use of A32 SWP/SWPB instructions such that
++	  they are always undefined. Say Y here to enable software
++	  emulation of these instructions for userspace using LDXR/STXR.
++
++	  In some older versions of glibc [<=2.8] SWP is used during futex
++	  trylock() operations with the assumption that the code will not
++	  be preempted. This invalid assumption may be more likely to fail
++	  with SWP emulation enabled, leading to deadlock of the user
++	  application.
++
++	  NOTE: when accessing uncached shared regions, LDXR/STXR rely
++	  on an external transaction monitoring block called a global
++	  monitor to maintain update atomicity. If your system does not
++	  implement a global monitor, this option can cause programs that
++	  perform SWP operations to uncached memory to deadlock.
++
++	  If unsure, say N
++
++endif
++
+ endmenu
  
-+static LIST_HEAD(undef_hook);
-+static DEFINE_RAW_SPINLOCK(undef_lock);
+ menu "Bus support"
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index dc1f73b..c3b7c2f 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -105,6 +105,14 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
 +
-+int register_undef_hook(struct undef_hook *hook)
++bool aarch32_insn_is_wide_instruction(u32 instr);
++
++#define RN_OFFSET	16
++#define RT_OFFSET	12
++#define RT2_OFFSET	 0
++
++u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_INSN_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index e77dd61..39590f3 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
++arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+new file mode 100644
+index 0000000..23fc6f8
+--- /dev/null
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -0,0 +1,287 @@
++/*
++ *  Copied from arch/arm/kernel/swp_emulate.c and modified for ARMv8
++ *
++ *  Copyright (C) 2009,2012,2014 ARM Limited
++ *  __user_* functions adapted from include/asm/uaccess.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/perf_event.h>
++#include <linux/sched.h>
++#include <linux/sysctl.h>
++
++#include <asm/insn.h>
++#include <asm/opcodes.h>
++#include <asm/system_misc.h>
++#include <asm/traps.h>
++#include <asm/uaccess.h>
++
++/*
++ * The runtime support for deprecated instruction support can be in one of
++ * following two states -
++ *
++ * 0 = undef
++ * 1 = emulate (software emulation)
++ */
++#define INSTR_UNDEF (0)
++#define INSTR_EMULATE (1)
++
++/*
++ *  Implement emulation of the SWP/SWPB instructions using load-exclusive and
++ *  store-exclusive.
++ *
++ *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
++ *  Where: Rt  = destination
++ *	   Rt2 = source
++ *	   Rn  = address
++ */
++
++/*
++ * SWP defaults to undef as it's been obsoleted in the architecture
++ */
++static int swp_enable = 0;
++static int swp_enable_min = INSTR_UNDEF;
++static int swp_enable_max = INSTR_EMULATE;
++
++/*
++ * Error-checking SWP macros implemented using ldxr{b}/stxr{b}
++ */
++#define __user_swpX_asm(data, addr, res, temp, B)		\
++	__asm__ __volatile__(					\
++	"	mov		%w2, %w1\n"			\
++	"0:	ldxr"B"		%w1, [%3]\n"			\
++	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
++	"	cbz		%w0, 2f\n"			\
++	"	mov		%w0, %w4\n"			\
++	"2:\n"							\
++	"	.pushsection	 .fixup,\"ax\"\n"		\
++	"	.align		2\n"				\
++	"3:	mov		%w0, %w5\n"			\
++	"	b		2b\n"				\
++	"	.popsection"					\
++	"	.pushsection	 __ex_table,\"a\"\n"		\
++	"	.align		3\n"				\
++	"	.quad		0b, 3b\n"			\
++	"	.quad		1b, 3b\n"			\
++	"	.popsection"					\
++	: "=&r" (res), "+r" (data), "=&r" (temp)		\
++	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "memory")
++
++#define __user_swp_asm(data, addr, res, temp) \
++	__user_swpX_asm(data, addr, res, temp, "")
++#define __user_swpb_asm(data, addr, res, temp) \
++	__user_swpX_asm(data, addr, res, temp, "b")
++
++/*
++ * Bit 22 of the instruction encoding distinguishes between
++ * the SWP and SWPB variants (bit set means SWPB).
++ */
++#define TYPE_SWPB (1 << 22)
++
++/*
++ * Set up process info to signal segmentation fault - called on access error.
++ */
++static void set_segfault(struct pt_regs *regs, unsigned long addr)
 +{
-+	unsigned long flags;
++	siginfo_t info;
 +
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_add(&hook->node, &undef_hook);
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
++	down_read(&current->mm->mmap_sem);
++	if (find_vma(current->mm, addr) == NULL)
++		info.si_code = SEGV_MAPERR;
++	else
++		info.si_code = SEGV_ACCERR;
++	up_read(&current->mm->mmap_sem);
++
++	info.si_signo = SIGSEGV;
++	info.si_errno = 0;
++	info.si_addr  = (void *) instruction_pointer(regs);
++
++	pr_debug("SWP{B} emulation: access caused memory abort!\n");
++	arm64_notify_die("Illegal memory access", regs, &info, 0);
++}
++
++static int emulate_swpX(unsigned int address, unsigned int *data,
++			unsigned int type)
++{
++	unsigned int res = 0;
++
++	if ((type != TYPE_SWPB) && (address & 0x3)) {
++		/* SWP to unaligned address not permitted */
++		pr_debug("SWP instruction on unaligned pointer!\n");
++		return -EFAULT;
++	}
++
++	while (1) {
++		unsigned long temp;
++
++		if (type == TYPE_SWPB)
++			__user_swpb_asm(*data, address, res, temp);
++		else
++			__user_swp_asm(*data, address, res, temp);
++
++		if (likely(res != -EAGAIN) || signal_pending(current))
++			break;
++
++		cond_resched();
++	}
++
++	return res;
++}
++
++/*
++ * swp_handler logs the id of calling process, dissects the instruction, sanity
++ * checks the memory location, calls emulate_swpX for the actual operation and
++ * deals with fixup/error handling before returning
++ */
++static int swp_handler(struct pt_regs *regs, u32 instr)
++{
++	u32 destreg, data, type, address = 0;
++	int rn, rt2, res = 0;
++
++	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
++
++	type = instr & TYPE_SWPB;
++
++	switch (arm_check_condition(instr, regs->pstate)) {
++	case ARM_OPCODE_CONDTEST_PASS:
++		break;
++	case ARM_OPCODE_CONDTEST_FAIL:
++		/* Condition failed - return to next instruction */
++		goto ret;
++	case ARM_OPCODE_CONDTEST_UNCOND:
++		/* If unconditional encoding - not a SWP, undef */
++		return -EFAULT;
++	default:
++		return -EINVAL;
++	}
++
++	rn = aarch32_insn_extract_reg_num(instr, RN_OFFSET);
++	rt2 = aarch32_insn_extract_reg_num(instr, RT2_OFFSET);
++
++	address = (u32)regs->user_regs.regs[rn];
++	data	= (u32)regs->user_regs.regs[rt2];
++	destreg = aarch32_insn_extract_reg_num(instr, RT_OFFSET);
++
++	pr_debug("addr in r%d->0x%08x, dest is r%d, source in r%d->0x%08x)\n",
++		rn, address, destreg,
++		aarch32_insn_extract_reg_num(instr, RT2_OFFSET), data);
++
++	/* Check access in reasonable access range for both SWP and SWPB */
++	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
++		pr_debug("SWP{B} emulation: access to 0x%08x not allowed!\n",
++			address);
++		goto fault;
++	}
++
++	res = emulate_swpX(address, &data, type);
++	if (res == -EFAULT)
++		goto fault;
++	else if (res == 0)
++		regs->user_regs.regs[destreg] = data;
++
++ret:
++	pr_warn_ratelimited("\"%s\" (%ld) uses obsolete SWP{B} instruction at 0x%llx\n",
++			current->comm, (unsigned long)current->pid, regs->pc);
++
++	regs->pc += 4;
++	return 0;
++
++fault:
++	set_segfault(regs, address);
 +
 +	return 0;
 +}
 +
-+void unregister_undef_hook(struct undef_hook *hook)
-+{
-+	unsigned long flags;
++/*
++ * Only emulate SWP/SWPB executed in ARM state/User mode.
++ * The kernel must be SWP free and SWP{B} does not exist in Thumb.
++ */
++static struct undef_hook swp_hook = {
++	.instr_mask	= 0x0fb00ff0,
++	.instr_val	= 0x01000090,
++	.pstate_mask	= COMPAT_PSR_MODE_MASK,
++	.pstate_val	= COMPAT_PSR_MODE_USR,
++	.fn		= swp_handler
++};
 +
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_del(&hook->node);
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
++static void swp_emulation_init(void)
++{
++	if (register_undef_hook(&swp_hook) == 0)
++		pr_notice("Registered SWP/SWPB emulation handler\n");
 +}
 +
-+static int call_undef_hook(struct pt_regs *regs)
++static void swp_emulation_remove(void)
 +{
-+	struct undef_hook *hook;
-+	unsigned long flags;
-+	u32 instr;
-+	int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
-+	void __user *pc = (void __user *)instruction_pointer(regs);
++	unregister_undef_hook(&swp_hook);
++	pr_notice("Removed SWP/SWPB emulation handler\n");
++}
 +
-+	if (!user_mode(regs))
-+		return 1;
++static void swp_init(void)
++{
++	if (swp_enable)
++		swp_emulation_init();
++}
 +
-+	if (compat_thumb_mode(regs)) {
-+		/* 16-bit Thumb instruction */
-+		if (get_user(instr, (u16 __user *)pc))
-+			goto exit;
-+		instr = le16_to_cpu(instr);
-+		if (aarch32_insn_is_wide_instruction(instr)) {
-+			u32 instr2;
++static int proc_swp_handler(struct ctl_table *table, int write,
++			void __user *buffer, size_t *lenp, loff_t *ppos)
++{
++	u32 prev = swp_enable;
++	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
 +
-+			if (get_user(instr2, (u16 __user *)(pc + 2)))
-+				goto exit;
-+			instr2 = le16_to_cpu(instr2);
-+			instr = (instr << 16) | instr2;
-+		}
-+	} else {
-+		/* 32-bit ARM instruction */
-+		if (get_user(instr, (u32 __user *)pc))
-+			goto exit;
-+		instr = le32_to_cpu(instr);
++	if (ret || !write || prev == swp_enable)
++		return ret;
++
++	switch (swp_enable) {
++	case INSTR_UNDEF: /* Turned off */
++		swp_emulation_remove();
++		break;
++	case INSTR_EMULATE: /* Emulation turned on */
++		swp_emulation_init();
++		break;
 +	}
 +
-+	raw_spin_lock_irqsave(&undef_lock, flags);
-+	list_for_each_entry(hook, &undef_hook, node)
-+		if ((instr & hook->instr_mask) == hook->instr_val &&
-+			(regs->pstate & hook->pstate_mask) == hook->pstate_val)
-+			fn = hook->fn;
-+
-+	raw_spin_unlock_irqrestore(&undef_lock, flags);
-+exit:
-+	return fn ? fn(regs, instr) : 1;
++	return 0;
 +}
 +
- asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- {
- 	siginfo_t info;
-@@ -269,6 +334,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	if (!aarch32_break_handler(regs))
- 		return;
- 
-+	if (call_undef_hook(regs) == 0)
-+		return;
++static struct ctl_table ctl_armv8_deprecated[] = {
++	{
++		.procname = "swp_enable",
++		.data = &swp_enable,
++		.maxlen = sizeof(u32),
++		.mode = 0644,
++		.proc_handler = proc_swp_handler,
++		.extra1 = &swp_enable_min,
++		.extra2 = &swp_enable_max,
++	},
++	{ }
++};
 +
- 	if (show_unhandled_signals && unhandled_signal(current, SIGILL) &&
- 	    printk_ratelimit()) {
- 		pr_info("%s[%d]: undefined instruction: pc=%p\n",
++static struct ctl_table ctl_abi[] = {
++	{
++		.procname = "abi",
++		.mode = 0555,
++		.child = ctl_armv8_deprecated,
++	},
++	{ }
++};
++
++/*
++ * Invoked as late_initcall, since not needed before init spawned.
++ */
++static int __init armv8_deprecated_init(void)
++{
++	if (IS_ENABLED(CONFIG_SWP_EMULATION))
++		swp_init();
++
++	register_sysctl_table(ctl_abi);
++
++	return 0;
++}
++
++late_initcall(armv8_deprecated_init);
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 92f3683..6e77a54 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -302,3 +302,16 @@ u32 __kprobes aarch64_insn_gen_nop(void)
+ {
+ 	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
+ }
++
++bool aarch32_insn_is_wide_instruction(u32 instr)
++{
++	return instr >= 0xe800;
++}
++
++/*
++ * Macros/defines for extracting register numbers from instruction.
++ */
++u32 aarch32_insn_extract_reg_num(u32 insn, int offset)
++{
++	return (insn & (0xf << offset)) >> offset;
++}
 -- 
 1.7.10.4
