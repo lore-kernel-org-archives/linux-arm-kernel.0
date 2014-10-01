@@ -1,79 +1,43 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 1 Oct 2014 09:17:18 -0500
-Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
-In-Reply-To: <20141001133527.GA12750@amd>
-References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
- <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
- <20141001133527.GA12750@amd>
-Message-ID: <alpine.DEB.2.10.1410010915440.2332@shineypoop>
+From: yingjoe.chen@mediatek.com (Joe.C)
+Date: Wed, 1 Oct 2014 22:23:38 +0800
+Subject: [RFT v2 01/24] irqdomain: Introduce new interfaces to support
+ hierarchy irqdomains
+In-Reply-To: <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
+References: <1411740145-30626-1-git-send-email-jiang.liu@linux.intel.com>
+ <1411740145-30626-2-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1412173418.24931.3514.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Oct 2014, Pavel Machek wrote:
+On Fri, 2014-09-26 at 22:02 +0800, Jiang Liu wrote:
+> @@ -480,6 +478,11 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>  		return 0;
+>  	}
+>  
+> +	if (irq_domain_is_hierarchy(domain)) {
+> +		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
+> +		return virq <= 0 ? 0 : virq;
+> +	}
+> +
+>  	/* If domain has no translation, then we assume interrupt line */
+>  	if (domain->ops->xlate == NULL)
+>  		hwirq = irq_data->args[0];
 
-> Hi!
-> 
-> > From: Alan Tull <atull@opensource.altera.com>
-> > 
-> > Use WFI when putting CPU1 to sleep.  Don't hold CPU1 in reset
-> > since that results in increased power consumption.
-> > 
-> > Reset CPU1 briefly during CPU1 bootup.
-> > 
-> > This has been tested for hotplug and suspend/resume and results
-> > in no increased power consumption.
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > ---
-> >  arch/arm/mach-socfpga/core.h    |    2 ++
-> >  arch/arm/mach-socfpga/platsmp.c |   12 +++++++++---
-> >  2 files changed, 11 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-> > index 572b8f7..c4a0929 100644
-> > --- a/arch/arm/mach-socfpga/core.h
-> > +++ b/arch/arm/mach-socfpga/core.h
-> > @@ -28,6 +28,8 @@
-> >  #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
-> >  #define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
-> >  
-> > +#define RSTMGR_MPUMODRST_CPU1		0x2     /*CPU1 Reset*/
-> > +
-> 
-> It would be nice to have space after /* and before */.
+Hi Jiang,
 
-Hi Pavel,
+You'll need this change, otherwise <0 part of the check will always be
+false.
 
-I will fix the comment space here and the other place you pointed out.
+@@ -467,7 +467,7 @@ unsigned int irq_create_of_mapping(struct
+of_phandle_args *irq_data)
+ 	struct irq_domain *domain;
+ 	irq_hw_number_t hwirq;
+ 	unsigned int type = IRQ_TYPE_NONE;
+-	unsigned int virq;
++	int virq;
+ 
+ 	domain = irq_data->np ? irq_find_host(irq_data->np) :
+irq_default_domain;
+ 	if (!domain) {
 
-> 
-> > diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-> > index 5356a72..1d5f8ad 100644
-> > --- a/arch/arm/mach-socfpga/platsmp.c
-> > +++ b/arch/arm/mach-socfpga/platsmp.c
-> > @@ -34,6 +34,10 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> >  	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-> >  
-> >  	if (cpu1start_addr) {
-> > +		/* This will put CPU #1 into reset.*/
-> 
-> Same here.
-> 
-> > +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
-> > +			     rst_manager_base_addr + 0x10);
-> 
-> Would it be possible to copy reset manager description struct from
-> u-boot and use it here, instead of raw offset?
-
-I will replace this 0x10 with a macro that reflects how the register is 
-named in the register map.
-
-Thanks for the review!
-
-Alan
-
-> 								Pavel
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-> 
+Joe.C
