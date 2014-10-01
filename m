@@ -1,32 +1,22 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 1 Oct 2014 17:18:47 +0200
-Subject: [PATCH RESEND V9 1/6] power: reset: Add generic SYSCON register
- mapped reset
-In-Reply-To: <1412119508-22864-2-git-send-email-fkan@apm.com>
-References: <1412119508-22864-1-git-send-email-fkan@apm.com>
- <1412119508-22864-2-git-send-email-fkan@apm.com>
-Message-ID: <20141001151847.GC969@earth.universe>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Wed, 1 Oct 2014 11:19:47 -0400
+Subject: [PATCH 0/7] arm64 kexec kernel patches V3
+In-Reply-To: <cover.1411604443.git.geoff@infradead.org>
+References: <cover.1411604443.git.geoff@infradead.org>
+Message-ID: <20141001151947.GB14991@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Sep 30, 2014 at 04:25:03PM -0700, Feng Kan wrote:
-> Add a generic SYSCON register mapped reset mechanism.
+On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
+> Hi All,
 > 
-> Signed-off-by: Feng Kan <fkan@apm.com>
+> This series adds the core support for kexec re-boots on arm64.  I have tested
+> with the ARM VE fast model using various kernel config options for both the
+> first and second stage kernels.
 
-I have merged the driver and its documentation to battery-2.6.git.
-This should make it possible for the changes in arch/arm to be
-merged via ARM maintainers in 3.19.
+Hi Geoff,
 
-Please fix Guenter's comments in an incremental patch.
+Does this patch series work with kexec on UEFI machines?
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/8c6df568/attachment-0001.sig>
+Thanks
+Vivek
