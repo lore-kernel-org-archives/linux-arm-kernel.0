@@ -1,68 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Oct 2014 18:17:04 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20141001124852.GB21733@ulmo>
-References: <20140829143812.GC31264@ulmo> <20140902092508.GR15297@lukather>
- <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
- <20140929161101.GS16977@sirena.org.uk>
- <20140930060312.GE29874@ulmo> <20140930180036.GI4273@sirena.org.uk>
- <20141001081443.GC18463@ulmo> <20141001122008.GW4273@sirena.org.uk>
- <20141001124852.GB21733@ulmo>
-Message-ID: <20141001171704.GG4273@sirena.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 1 Oct 2014 19:20:03 +0200
+Subject: [GIT PULL] at91: soc for 3.18 #3
+Message-ID: <1412184003-13568-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 02:48:53PM +0200, Thierry Reding wrote:
-> On Wed, Oct 01, 2014 at 01:20:08PM +0100, Mark Brown wrote:
+Arnd, Olof, Kevin,
 
-> > I think you're setting constraints on the implementation you want to see
-> > which make it unworkable but I don't think those constraints are needed.
-> > You're starting from the position that the DT needs to be updated without
-> > the bootloader
+Another pull-request for 3.18 if you feel it can be stacked up now. This one is
+*only* about removing code: the old !MMU at91x40 and 2 board files plus the whole
+code in at91sam9g45 & at91sam9rl files for implementing this deprecated method:
+as the EK were the only one to use this code, we remove quite a bunch of lines.
+We can use these boards with DT right now.
+As a matter of fact, the diffstat is pretty nice :-)
 
-> No, what I'm saying is that what the simplefb driver expects and what
-> the bootloader sets up may diverge as resource drivers are added to the
-> kernel. The DT /could/ be updated without the bootloader. You may only
-> be able to replace the DTB but not the bootloader on a given platform.
+Thanks, best regards,
 
-Sure, but doing that and also having the bootloader write part of the DT
-from scratch with no cooperation from the rest of the DT doesn't seem
-like the way to robustness.
+The following changes since commit 02037a9719fa89b7e5dc25cb22afc06c4eae406e:
 
-> >                and that the DT must not contain any hint of simplefb as
-> > shipped separately.
+  ARM: at91: document Atmel SMART compatibles (2014-09-22 14:42:40 +0200)
 
-> Well, I don't think it should because it describes the same resources
-> that the device tree node for the real device already describes. But
-> perhaps this is one of the cases where duplication isn't all that bad?
+are available in the git repository at:
 
-If we were worried about this wecould also do it by referring to
-those nodes and saying "get all the resources these things need" rather
-than duplicating the references (this might make it easier to work out
-when the system is ready to hand off to the real drivers).
+  git://github.com/at91linux/linux-at91.git tags/at91-soc3
 
-> >                     That's never going to work well as far as I can see
-> > but doesn't seem like an ABI stability issue, or at least not a
-> > reasonable one.
+for you to fetch changes up to f71529722cf8c209a4e71c1000f0f8b8e74f674f:
 
-> It would work well under the assumption that the kernel wouldn't be
-> touching any of the resources that simplefb depends on. If that's not a
-> reasonable assumption then I think we can't make simplefb work the way
-> it's currently written.
+  ARM: at91: remove at91sam9rl legacy board support (2014-10-01 19:00:33 +0200)
 
-I can't see how that's reasonable unless the kernel has some way of
-figuring out what it shouldn't be touching.
+----------------------------------------------------------------
+Third batch of cleanup/SoC for 3.18:
+- removal of old at91x40 !MMU ARM7TDMI support which was kind of rusty
+- removal of board-sam9m10g45ek.c and board-sam9rlek.c from mach-at91
+  and the code related to these board C files + defconfigs. Use DT for them now!
 
-> > Either the bootloader needs to be updated along with the DT
+----------------------------------------------------------------
+Alexandre Belloni (1):
+      ARM: at91: remove at91sam9rl legacy board support
 
-> I thought we had decided that this was one of the big no-nos. But
-> perhaps I'm misremembering.
+Boris Brezillon (1):
+      ARM: at91: remove at91sam9g45/9m10 legacy board support
 
-It makes things more fragile so it's not desirable, no.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141001/f3dc3840/attachment.sig>
+Nicolas Ferre (1):
+      ARM: at91: remove no-MMU at91x40 support
+
+ arch/arm/configs/at91sam9g45_defconfig       |  172 ---
+ arch/arm/configs/at91sam9rl_defconfig        |   83 --
+ arch/arm/configs/at91x40_defconfig           |   48 -
+ arch/arm/mach-at91/Kconfig                   |   25 +-
+ arch/arm/mach-at91/Kconfig.non_dt            |   56 -
+ arch/arm/mach-at91/Makefile                  |   12 -
+ arch/arm/mach-at91/at91sam9g45.c             |  404 ------
+ arch/arm/mach-at91/at91sam9g45_devices.c     | 1915 --------------------------
+ arch/arm/mach-at91/at91sam9rl.c              |  333 -----
+ arch/arm/mach-at91/at91sam9rl_devices.c      | 1260 -----------------
+ arch/arm/mach-at91/at91x40.c                 |   93 --
+ arch/arm/mach-at91/at91x40_time.c            |   85 --
+ arch/arm/mach-at91/board-eb01.c              |   52 -
+ arch/arm/mach-at91/board-sam9m10g45ek.c      |  526 -------
+ arch/arm/mach-at91/board-sam9rlek.c          |  332 -----
+ arch/arm/mach-at91/generic.h                 |    3 -
+ arch/arm/mach-at91/include/mach/at91_dbgu.h  |    3 -
+ arch/arm/mach-at91/include/mach/at91x40.h    |   60 -
+ arch/arm/mach-at91/include/mach/cpu.h        |    1 -
+ arch/arm/mach-at91/include/mach/hardware.h   |    4 -
+ arch/arm/mach-at91/include/mach/uncompress.h |    7 -
+ arch/arm/mach-at91/setup.c                   |    2 +-
+ drivers/rtc/Kconfig                          |    2 +-
+ 23 files changed, 7 insertions(+), 5471 deletions(-)
+ delete mode 100644 arch/arm/configs/at91sam9g45_defconfig
+ delete mode 100644 arch/arm/configs/at91sam9rl_defconfig
+ delete mode 100644 arch/arm/configs/at91x40_defconfig
+ delete mode 100644 arch/arm/mach-at91/at91sam9g45_devices.c
+ delete mode 100644 arch/arm/mach-at91/at91sam9rl_devices.c
+ delete mode 100644 arch/arm/mach-at91/at91x40.c
+ delete mode 100644 arch/arm/mach-at91/at91x40_time.c
+ delete mode 100644 arch/arm/mach-at91/board-eb01.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9m10g45ek.c
+ delete mode 100644 arch/arm/mach-at91/board-sam9rlek.c
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91x40.h
+
+-- 
+Nicolas Ferre
