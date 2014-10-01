@@ -1,41 +1,81 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 1 Oct 2014 15:47:06 -0700
-Subject: [PATCH] i2c: rk3x: fix 0 length write transfers
-In-Reply-To: <1412185241-24950-1-git-send-email-amstan@chromium.org>
-References: <1412185241-24950-1-git-send-email-amstan@chromium.org>
-Message-ID: <CAD=FV=VV1U2o41iz_NANvk=EZcMcrurvhN31s--_srU=4yuWcA@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Thu, 2 Oct 2014 01:16:46 +0200
+Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
+In-Reply-To: <542C26B6.7010302@opensource.altera.com>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <1411590449-9794-2-git-send-email-atull@opensource.altera.com>
+ <20141001133527.GA12750@amd>
+ <alpine.DEB.2.10.1410010915440.2332@shineypoop>
+ <20141001150418.GA14609@amd>
+ <542C26B6.7010302@opensource.altera.com>
+Message-ID: <20141001231646.GB1529@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alex,
+On Wed 2014-10-01 11:07:18, Dinh Nguyen wrote:
+> 
+> 
+> On 10/1/14, 10:04 AM, Pavel Machek wrote:
+> > Hi!
+> > 
+> >>>> +		__raw_writel(RSTMGR_MPUMODRST_CPU1,
+> >>>> +			     rst_manager_base_addr + 0x10);
+> >>>
+> >>> Would it be possible to copy reset manager description struct from
+> >>> u-boot and use it here, instead of raw offset?
+> >>
+> >> I will replace this 0x10 with a macro that reflects how the register is 
+> >> named in the register map.
+> > 
+> > That would be better than 0x10, but even better would be just copying
+> > 
+> > struct socfpga_reset_manager {
+> >         u32     status;
+> >         u32     ctrl;
+> >         u32     counts;
+> >         u32     padding1;
+> >         u32     mpu_mod_reset;
+> >         u32     per_mod_reset;
+> >         u32     per2_mod_reset;
+> >         u32     brg_mod_reset;
+> > };
+> > 
+> > from u-boot. Unlike macros, structs have advantages that typos lead to
+> > easier-to-see failure modes... (And they are easier to read/parse,
+> > too).
+> > 
+> 
+> Copying from uboot sounds good, but I already know that the CPU reset
+> offset is different for our next SOC, Arria 10. The Arria 10 SOC should
+> still be able to use the same MSL as Cyclone5 and Arria5, but with a few
+> differences. One of them being, the CPU1 reset offset is at 0x20 instead
+> of 0x10. So I think having a macro for this one register is a bit
+> cleaner than having to define a whole new struct for Arria10.
 
-On Wed, Oct 1, 2014 at 10:40 AM, Alexandru M Stan <amstan@chromium.org> wrote:
-> i2cdetect -q was broken (everything was a false positive, and no transfers were
-> actually being sent over i2c). The way it works is by sending a 0 length write
-> request and checking for NACK. This patch fixes the 0 length writes and actually
-> sends them.
->
-> Reported-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
-> ---
->  drivers/i2c/busses/i2c-rk3x.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index b41d979..f486d0e 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -238,7 +238,7 @@ static void rk3x_i2c_fill_transmit_buf(struct rk3x_i2c *i2c)
->         for (i = 0; i < 8; ++i) {
->                 val = 0;
->                 for (j = 0; j < 4; ++j) {
-> -                       if (i2c->processed == i2c->msg->len)
-> +                       if ((i2c->processed == i2c->msg->len) && (cnt != 0))
+I don't think "whole new struct" is a problem. At least it will be
+plain to see what changed (which will get easily lost in ifdefs.
 
-This looks good to me.  Basically we still need to write the address
-of the device onto the bus even if there's no data.
+struct cyclone5_reset_manager {
+	struct socfpga_reset_manager common;
+	u32 brg_mod_reset;
+}
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+struct aria10_reset_manager {
+	struct socfpga_reset_manager common;
+	char filler[0x10];
+	u32 brg_mod_reset;
+}
 
--Doug
+if (of_machine_is_compatible("altr,socfpga-arria10"))
+	__raw_writel(0, (struct cyclone5_reset_manager *) rst_manager_base_addr->brg_mod_reset));
+else
+	__raw_writel(0, (struct aria10_reset_manager *) rst_manager_base_addr->brg_mod_reset));
+
+...does not sound that bad. (And you'll need some nice solution for
+u-boot, anyway...)
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
