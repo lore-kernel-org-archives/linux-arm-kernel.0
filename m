@@ -1,29 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Oct 2014 09:17:15 -0700
-Subject: OMAP baseline test results for v3.17-rc7
-In-Reply-To: <alpine.DEB.2.02.1410021447590.31530@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1409291709020.7233@utopia.booyaka.com>
- <20140929172049.GD3122@atomide.com>
- <alpine.DEB.2.02.1410021447590.31530@utopia.booyaka.com>
-Message-ID: <20141002161714.GI3122@atomide.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 2 Oct 2014 23:18:00 +0700
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <20141002121902.GA2342@redhat.com>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+ <20141002121902.GA2342@redhat.com>
+Message-ID: <CAPvkgC3VkmctmD9dROqkAEwi-Njm9zQqVx1=Byttr5_n-J7wYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [141002 08:11]:
-> 
-> Maybe you have some ideas for how this can be communicated better in the 
-> test results?  One thing that would probably help is if the board was 
-> renamed to "3730es10beaglexm" or something like that.  Also maybe 
-> mentioning the fact that the test is only needed due to errata, like:
-> 
-> -----------
-> PM: chip off (except CORE, due to errata) via dynamic idle:
->     Pass ( 1/ 1): 3730es10beaglexm
-> -----------
+On 2 October 2014 19:19, Andrea Arcangeli <aarcange@redhat.com> wrote:
+> Hi Steve,
+>
 
-Oh OK, yeah I did not read the actual test :) The above description
-makes it clear at least for me.
+Hi Andrea,
 
-Regards,
+> On Fri, Sep 26, 2014 at 03:03:48PM +0100, Steve Capper wrote:
+>> This patch provides a general RCU implementation of get_user_pages_fast
+>> that can be used by architectures that perform hardware broadcast of
+>> TLB invalidations.
+>>
+>> It is based heavily on the PowerPC implementation by Nick Piggin.
+>
+> It'd be nice if you could also at the same time apply it to sparc and
+> powerpc in this same patchset to show the effectiveness of having a
+> generic version. Because if it's not a trivial drop-in replacement,
+> then this should go in arch/arm* instead of mm/gup.c...
 
-Tony 
+I think it should be adapted (if need be) and adopted for sparc, power
+and others, especially as it will result in a reduction in code size
+and make future alterations to gup easier.
+I would prefer to get this in iteratively; and have people who are
+knowledgeable of those architectures and have a means of testing the
+code thoroughly to help out. (it will be very hard for me to implement
+this on my own, but likely trivial for people who know and can test
+those architectures).
+
+>
+> Also I wonder if it wouldn't be better to add it to mm/util.c along
+> with the __weak gup_fast but then this is ok too. I'm just saying
+> because we never had sings of gup_fast code in mm/gup.c so far but
+> then this isn't exactly a __weak version of it... so I don't mind
+> either ways.
+
+mm/gup.c was recently created?
+It may even make sense to move the weak version in a future patch?
+
+>
+>> +             down_read(&mm->mmap_sem);
+>> +             ret = get_user_pages(current, mm, start,
+>> +                                  nr_pages - nr, write, 0, pages, NULL);
+>> +             up_read(&mm->mmap_sem);
+>
+> This has a collision with a patchset I posted, but it's trivial to
+> solve, the above three lines need to be replaced with:
+>
+> +               ret = get_user_pages_unlocked(current, mm, start,
+> +                                    nr_pages - nr, write, 0, pages);
+>
+> And then arm gup_fast will also page fault with FOLL_FAULT_ALLOW_RETRY
+> the first time to release the mmap_sem before I/O.
+>
+
+Ahh thanks.
+I'm currently on holiday and have very limited access to email, I'd
+appreciate it if someone can keep an eye out for this during the merge
+window if this conflict arises?
+
+> Thanks,
+> Andrea
+
+Cheers,
+--
+Steve
