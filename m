@@ -1,53 +1,103 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 2 Oct 2014 09:59:26 -0400
-Subject: [GIT PULL] ARM: mvebu: Last DT changes for v3.18
-Message-ID: <20141002135926.GC27230@titan.lakedaemon.net>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 2 Oct 2014 15:59:08 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo> <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+ <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+ <542D476D.50004@redhat.com>
+ <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
+ <542D4FB9.6090805@redhat.com>
+ <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+Message-ID: <CAOMqctSjSJTBVvc11tvmKPz=JwWBoNJMFjtZW-COGxSSojJLQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On 2 October 2014 15:27, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Thu, Oct 2, 2014 at 9:14 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 10/02/2014 02:56 PM, jonsmirl at gmail.com wrote:
+>>> On Thu, Oct 2, 2014 at 8:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On 10/02/2014 02:22 PM, jonsmirl at gmail.com wrote:
+>>>>> On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>
+>>>>> You need both.
+>>>>>
+>>>>> 1) temporary early boot console -- this is nothing but an address in
+>>>>> RAM and the x/y layout. The character set from framebuffer is built
+>>>>> into the kernel.  The parallel to this is early-printk and how it uses
+>>>>> the UARTs without interrupts. This console vaporizes late in the boot
+>>>>> process -- the same thing happens with the early printk UART driver.
+>>>>> EARLYPRINTK on the command line enables this.
+>>>>>
+>>>>> 2) a device specific driver -- this sits on initrd and it loaded as
+>>>>> soon as possible. The same thing happens with the real UART driver for
+>>>>> the console. CONSOLE= on the command line causes the transition. There
+>>>>> is an API in the kernel to do this transition, I believe it is called
+>>>>> set_console() but it's been a while.
+>>>>
+>>>> Eventually we need both, yes. But 1) should stay working until 2) loads,
+>>>> not until some phase of the bootup is completed, but simply until 2) loads.
+>>>
+>>> No, that is where you get into trouble. The device specific driver has
+>>> to go onto initrd where it can be loaded as early in the boot process
+>>> as possible.
+>>
+>> This is an argument in the "you cannot do that" / "your use case is not valid"
+>> category, IOW this is not a technical argument. You say I cannot do that I
+>> say I can, deadlock.
+>
+> It is certainly possible to extend an earlyframebuffer to be able to
+> run as a user space console. It is just going to turn into a
+> Frankenmonster driver with piles of device specific, special case code
+> in it.
 
-I know this is way late, but the changes a fairly small, and have been
-in linux-next for at least 9 of Stephen's 'next-YYYYMMDD' tags.
-Hopefully the merge window opening a week late will make it possible for
-you guys to take this.
+What is device specific about code that reads a list of clocks and
+just asks tells kernel it uses them all?
 
-This is an incremental pull request from tags/mvebu-dt-3.18 up to
-tags/mvebu-dt-3.18-2 on the mvebu/dt branch.
+That's been discussed to death in this thread already.
 
-Please pull.
+>
+> I think that device specific code belongs in a device specific driver
+> and earlyframebuffer should handoff to it as soon as possible.
 
-thx,
+Even it that case it needs to tell the kernel it needs the clocks so
+that they are not shut of until that handoff happens.
 
-Jason.
+>
+>>
+>> I've already explained that we not only can do that (we already have working
+>> code proving that), but also that this is something which we absolutely need:
+>>
+>>>> One example why this is necessary is e.g. to debug things where the problem
+>>>> is that the right module is not included in the initrd.
+>
+> A generic earlyframebuffer would show this error.
+>
+> Just use earlyprintk as a guideline, if earlyprintk shows the error
+> earlyframebuffer would also show it.
+>
 
+It does not. It hands off to an uart driver built into the kernel. The
+handoff is broken on sunxi and the earlyprintk continues to work
+indefinitely replicating all kernel messages twice on the serial
+console unless something happens to reconfigure the uart used for
+earlyprink later on. When that does happen the early console can fail
+very early, even way before the time you would load an initrd. It just
+happens to work most of the time because when you use earlyprintk most
+of the time you also use serial console with the same parameters on
+the same pins.
 
-The following changes since commit 5b1e9e80c044442cc80eb6bb03b11165515eedb8:
+Thanks
 
-  ARM: mvebu: add user LED support of Armada 370 RD (2014-09-13 21:13:42 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.18-2
-
-for you to fetch changes up to 32c741d07f7fdb1974eb07420fc143d479bfe19f:
-
-  ARM: mvebu: switch the Armada 370 RD board to internal registers at 0xf1000000 (2014-09-17 15:00:59 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.18 (round 2)
-
- - Armada XP
-    - Add HW datasheet references to docs
-
- - Armada 370
-    - Change internal registers to 0xf1000000 for Armada 370 RD board
-
-----------------------------------------------------------------
-Thomas Petazzoni (2):
-      Documentation: arm: add hardware datasheet reference for Marvell Armada XP
-      ARM: mvebu: switch the Armada 370 RD board to internal registers at 0xf1000000
-
- Documentation/arm/Marvell/README    |  4 ++++
- arch/arm/boot/dts/armada-370-rd.dts | 11 ++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+Michal
