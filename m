@@ -1,34 +1,74 @@
-From: orsonzhai@gmail.com (Orson Zhai)
-Date: Thu, 02 Oct 2014 23:08:35 +0800
-Subject: [PATCH 1/6] Documentation: DT: Add bindings for Spreadtrum serial
-In-Reply-To: <20141001112149.GA13759@leverpostej>
-References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
- <1411992293-7729-2-git-send-email-zhang.lyra@gmail.com>
- <20141001112149.GA13759@leverpostej>
-Message-ID: <542D6A73.9020505@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 2 Oct 2014 15:10:25 +0000 (UTC)
+Subject: OMAP baseline test results for v3.17-rc7
+In-Reply-To: <20140929172049.GD3122@atomide.com>
+References: <alpine.DEB.2.02.1409291709020.7233@utopia.booyaka.com>
+ <20140929172049.GD3122@atomide.com>
+Message-ID: <alpine.DEB.2.02.1410021447590.31530@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-On 2014?10?01? 19:21, Mark Rutland wrote:
->> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
->> >index 7705477..a0bb1d1 100644
->> >--- a/Documentation/devicetree/bindings/serial/of-serial.txt
->> >+++ b/Documentation/devicetree/bindings/serial/of-serial.txt
->> >@@ -14,6 +14,7 @@ Required properties:
->> >  	- "altr,16550-FIFO32"
->> >  	- "altr,16550-FIFO64"
->> >  	- "altr,16550-FIFO128"
->> >+	- "sprd,serial"
-> Is there not a more specific name? I'd imagine you might build a
-> different uart in future.
-AFAIK, sprd's uart is re-used the same ip core in ARM 32bit chip.
-so it is neither 16550 or pl011 compatible.
->
-> I didn't spot "sprd" in vendor-prefixes.txt in mainline. Is there a
-> patch adding that?
-sorry for missing it. we'll add it at patch V2.
-thanks for reviewing! :)
->
-> Mark.
->
+On Mon, 29 Sep 2014, Tony Lindgren wrote:
+
+> * Paul Walmsley <paul@pwsan.com> [140929 10:14]:
+> >
+> > PM: chip off except CORE via suspend:
+> >     Pass ( 1/ 1): 3730beaglexm
+> > 
+> > PM: chip off except CORE via dynamic idle:
+> >     Pass ( 1/ 1): 3730beaglexm
+> 
+> Most likely the two tests above should now also work also for 37xxevm,
+> 3530es3beagle and 3530es31beagle in case you want to enable that.
+
+I think this might be an issue of my own inability to communicate clearly 
+what's being tested here and why :-)
+
+That "chip off except CORE" PM validation test is only needed due to the 
+3630/37xx ES1.0 errata that forces us to disable CORE off-mode on that 
+revision:
+
+----------
+echo 1 > /debug/pm_debug/enable_off_mode
+[   60.351837] omap3_pm_off_mode_enable: Core OFF disabled due to errata i583
+----------
+
+(from 
+http://www.pwsan.com/omap/testlogs/test_v3.17-rc6/20140921213558/pm/3730beaglexm/3730beaglexm_log.txt)
+
+If we were to enable that test for the other four OMAP3 boards, they would 
+probably all show up as failing, since they are all able to enter core-off 
+mode successfully :-)
+
+Maybe you have some ideas for how this can be communicated better in the 
+test results?  One thing that would probably help is if the board was 
+renamed to "3730es10beaglexm" or something like that.  Also maybe 
+mentioning the fact that the test is only needed due to errata, like:
+
+-----------
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730es10beaglexm
+-----------
+
+At some point, will probably also generate an HTML version of the summary, 
+where the test name and board names can link to some explanatory 
+information about what is being tested, and why.
+
+Anyway, any thoughts are welcome.
+
+> > PM: chip off via suspend:
+> >     Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+> > 		  3730es12beaglexm
+> > 
+> > PM: chip off via dynamic idle:
+> >     Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+> > 		  3730es12beaglexm
+> 
+> Since looks like these are working finally :)
+
+Thanks largely to your hard work!  Hooray!
+
+
+- Paul
