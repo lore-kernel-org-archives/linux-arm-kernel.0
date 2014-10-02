@@ -1,111 +1,34 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 2 Oct 2014 12:47:07 +0300
-Subject: [PATCH v2 0/3] ARM: rk3288 : Add PM Domain support
-In-Reply-To: <7h38b7v8pp.fsf@deeprootsystems.com>
-References: <1411899774-8484-1-git-send-email-jinkun.hong@rock-chips.com>
- <7hoatvvimd.fsf@deeprootsystems.com>
- <CAD=FV=VPT5qiyY==nJbb4DqKMBnj0i-_MhLRVG0ikar2qtP4=A@mail.gmail.com>
- <7h38b7v8pp.fsf@deeprootsystems.com>
-Message-ID: <542D1F1B.8040501@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Oct 2014 11:46:37 +0200
+Subject: [PATCH v2 0/3] ARM: dts: sun7i: Add Banana Pi board
+In-Reply-To: <1412148366-18346-1-git-send-email-hdegoede@redhat.com>
+References: <1412148366-18346-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141002094637.GL6884@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 10/01/2014 11:25 PM, Kevin Hilman wrote:
-> Doug Anderson <dianders@chromium.org> writes:
+On Wed, Oct 01, 2014 at 09:26:03AM +0200, Hans de Goede wrote:
+> Hi Maxime,
 > 
->>
->> On Wed, Oct 1, 2014 at 9:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> +Geert, Ulf
->>>
->>> "jinkun.hong" <jinkun.hong@rock-chips.com> writes:
->>>
->>>> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
->>>>
->>>> Use PM Domain framework to manage the clock.
->>>
->>> Which clock?  This changelog needs a more thorough description.
->>
->>
->> I think what he meant was:
->>
->> Use the generic PM Domain framework for Rockchip
->>
->> ...but I agree that he could describe it more.
->>
->>
->>> Also,
->>> with this series alone, it's not clear how the power-domain transitions
->>> ever happen, since I don't see any devices hooked up to your power
->>> domains, or do I see your platform using runtime PM.  In order for this
->>> to be reviewed properely, it's important for reviewers to be able to see
->>> how this PM domain support will be used.
->>
->> I noticed that too.  As the patchset currently stands it only ever disables...
->>
->>
->>> Also, remember that the DT is supposed to reflect the hardware, not the
->>> design choices of linux drivers.  Because of that, it's a little
->>> surprising to see clocks as properties of a power domain because clocks
->>> are usually properties of devices.
->>
->> I haven't dug all the way into the hardware to figure out why (or if
->> this is really necessary), but right now the rockchip power domain
->> driver only leaves these clocks on during the powering on and powering
->> off of the power domain.  In other words to turn on the power domain:
->>
->> 1. Turn on all clocks
->> 2. Flip the bit that sets the power domain on
->> 3. Wait until hardware says power domain is on.
->> 4. Turn off all the clocks.
->>
->> ...and to turn off:
->>
->> 1. Turn on all clocks
->> 2. Flip the bit that sets the power domain off
->> 3. Wait until hardware says power domain is off.
->> 2. Turn off all the clocks.
->>
->> ...if the above is actually necessary when turning on and off power
->> domains then it seems like it is actually describing the hardware.
+> Here is v2 of the Bananapi board addition. Sorry for taking so long.
 > 
-> Yes, I understand. The need to have some *device* clocks enabled when
-> powering on/off the power-domain itself is quite common across many
-> SoCs.
-> 
-> My point is that these clocks are actually properties of *devices*, not
-> the power-domain itself.  In the shmobile example I pointed to, the
-> clocks are properties of the devices in DT, and the devices are attached
-> to the powerdomain.  When the devices are connected to the power-domain,
-> the custom attach function looks up all the *device* clocks and and
-> addes them to the power-domain using pm_clk_add.
+> Changes from v2:
+> -Move uart3_pins definition from a20-sun7i-bananapi.dts to a20-sun7i.dtsi,
+>  the addition of the pinctrl node is done in a separate patch
+> -Use the new dual license header as license header
 
-Sorry, but this is not quite right :(
-Patches from Geert will add only first clock for device and not all
-of them. The right way to add all clocks for device from DT using 
-generic PM domain represented in my series:
- 
- ARM: keystone: pm: switch to use generic pm domains
- http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735601.html
+Merged all three for 3.19. Thanks!
 
-> 
-> Since the clocks are properties of devices, then the pm_clk
-> infrastructure can be used (as the shmobile example shows) so that the
-> SoC specific pm-domain doesn't have to manually walk all the clocks, but
-> instead can just use pm_clk_suspend/pm_clk_resume.
+Maxime
 
-This might not work if more then one device connected to PM domain.
-Then some clocks might be part of GPD if they needed to power on/off it.
-But Kevin is right and even in this case, pm_clk infrastructure can still be used,
-because RK PM domain is Platform device and clocks can be attached to it
-using pm_clk API. I did it in my RFC series https://lkml.org/lkml/2014/9/25/365
-- all clacks attached to PM domain in .probe
-- then pm_clk_suspend/pm_clk_resume used in .power_off/.power_on callbacks
-
-Benefits: there is no need to implement custom lists of clocks
-struct rockchip_pm_domain {
-	struct clk			**clks;
-
-Regards,
--grygorii
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/8fbdda27/attachment.sig>
