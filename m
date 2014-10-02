@@ -1,76 +1,122 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 02 Oct 2014 16:23:15 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20141002141849.GD4039@lukather>
-References: <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
- <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
- <542D476D.50004@redhat.com>
- <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
- <542D4FB9.6090805@redhat.com>
- <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
- <542D5444.8090903@redhat.com>
- <CAKON4OxTmNRxSJum17RZGLLku5dAFPauzqyP0BOF-VC=bD=Hng@mail.gmail.com>
- <542D5C74.4050602@redhat.com> <20141002141849.GD4039@lukather>
-Message-ID: <542D5FD3.9090501@redhat.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Thu, 2 Oct 2014 19:54:03 +0530
+Subject: [PATCH v8 0/2] Adds PMU and S2R support for exynos5420
+In-Reply-To: <CABxcv==aA1Ogi_gQfYXxCg2ApFWQdXJLnqne2K=18nx6Oq_jCw@mail.gmail.com>
+References: <1412074969-12704-1-git-send-email-vikas.sajjan@samsung.com>
+ <CABxcv=kEVma+Ho6PPy+4t+zYH67sAWbbvJvrviPop-MBqktbjw@mail.gmail.com>
+ <CAGm_ybhD0N0r5gj=xAp+ERPq7CjO2d6bDLcPHAoZk1_8+t2Fvw@mail.gmail.com>
+ <CABxcv==aA1Ogi_gQfYXxCg2ApFWQdXJLnqne2K=18nx6Oq_jCw@mail.gmail.com>
+Message-ID: <CAGm_ybhtzubG8PoynhM14DWa8EaPj9ZVvNAbL_rysWGfAn94VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Javier,
 
-On 10/02/2014 04:18 PM, Maxime Ripard wrote:
-> On Thu, Oct 02, 2014 at 04:08:52PM +0200, Hans de Goede wrote:
->>> 2) delay the clock/regulator cleanup until after there is a fixed
->>> window for device specific drivers to load in. Loading from initrd is
->>> a fixed window.
+On Wed, Oct 1, 2014 at 7:20 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Vikas,
+>
+> On Wed, Oct 1, 2014 at 12:23 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
 >>
->> As I already explained by example in another mail, this won't work:
+>> My git log looks like below on top of Kukjin's for-next branch,
 >>
->> "delaying over the initrd is not helpful. Not having the real driver
->> load for whatever reasons, is not necessarily a boot blocking event,
->> and if it us just missing will not lead to any error messages.
+>> d861ddd clk: exynos: Add CLK_IGNORE_UNUSED to aclk200_disp1 and aclk300_disp1
+>> adc14dc POSTED: ARM: EXYNOS: Use MCPM call-backs to support S2R on Exynos5420
+>> d61fc43 ARM: exynos5: Add Suspend-to-RAM support for 5420
+>> 3d1d7bd ARM: exynos5: Add PMU support for 5420
+>> a8887b3 mfd: syscon: Decouple syscon interface from platform devices
+>> 072e2bc ARM: EXYNOS: Move PMU specific definitions from common.h
+>> ec2f950 ARM: EXYNOS: Add platform driver support for Exynos PMU
 >>
->> So the boot will continue normally with a black screen, and things are
->> still impossible to debug."
-> 
-> Plus:
-> 
-> 1) you might not have an initrd, which doesn't change a thing: your
-> clock get disabled before you can load your driver
-> 
-> 2) you might not have a rootfs, and no driver to load, which would
-> leave the clock enabled forever.
-> 
->> We've been down the whole delay till $random point in time thing in the
->> past with storage enumeration, where you need to wait for say all members
->> of a raid set to show up. The lesson learned from that is that you should
->> not wait $random time / event, but wait for the actual storage device to
->> show up.
->>
->> And this is just like that, we need to wait for the actual display driver
->> to have loaded and taken over before "cleaning up" the clocks used by
->> the display engine.
->>
->> I guess we could just delay all clock cleanup until then, not really
->> pretty, and I still prefer to just list the clocks in the simplefb
->> dtnode, but if this version would be acceptable to all involved, I can
->> live with it.
->>
->> Mike, would a patch adding 2 calls like these to the clock core be
->> acceptable ?  :
->>
->> clk_block_disable_unused()
->> clk_unblock_disable_unused()
-> 
-> Thierry actually already made such a patch somewhere in this
-> thread. The thing is that it should also block clk_disable (and all
-> the potential users of clk_disable: clk_set_rate, clk_set_parent,
-> etc.) from actually disabling them. Otherwise, you might still end up
-> with your clock disabled.
+>
+> I tested Kukjin's for-next branch (HEAD in commit a84aaa7) + the
+> patches you mentioned and the system enters in suspend mode but the
+> RTC alarm IRQ does not make it resume. Is the branch you are using to
+> test public so I can give it a try?
+>
 
-A valid point, which brings us back to simply adding the clocks to the
-dt node really being both the simplest solution, as well as the only
-solution without any pitfalls.
+Not yet, but as I mentioned, I have only above mentioned 7 patches
+atop kukjin's for-next.
+only difference is the patch " ARM: EXYNOS: Use MCPM call-backs to
+support S2R on Exynos5420"
+which I had rebased myself.
 
-Regards,
+I am out of office till 7th October, once I am back, I can send you
+all those 7 patches, config file and S2R log.
 
-Hans
+>> recently I noticed that, without the CLK_IGNORE_UNUSED flag for
+>> aclk200_disp1 and aclk300_disp1 CLK,  the system is NOT suspending,
+>> which was NOT the case when i had posted my previous revisions.
+>>
+>
+> I tried both with and without your patch that adds the
+> CLK_IGNORE_UNUSED to aclk200_disp1 and aclk300_disp1 and in both cases
+> it behaves the same, the system seems to go into suspend mode but
+> never resumes:
+
+Can you confirm that the system has really suspended, I mean can you
+measure VDD_EGL or VDD_KFC and check or by any other method you know
+of.
+
+>
+> # echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+> [  105.376596] PM: Syncing filesystems ... done.
+> [  105.383207] Freezing user space processes ... (elapsed 0.001 seconds) done.
+> [  105.388681] Freezing remaining freezable tasks ... (elapsed 0.001
+> seconds) done.
+> [  105.488589] wake enabled for irq 281
+> [  105.491609] wake enabled for irq 280
+> [  105.498102] wake enabled for irq 284
+> [  105.554736] PM: suspend of devices complete after 155.406 msecs
+> [  105.562572] PM: late suspend of devices complete after 3.361 msecs
+> [  105.570389] PM: noirq suspend of devices complete after 3.102 msecs
+> [  105.575185] Disabling non-boot CPUs ...
+> [  105.579706] IRQ153 no longer affine to CPU1
+> [  105.580008] CPU1: shutdown
+> [  105.587230] IRQ154 no longer affine to CPU2
+> [  105.587472] CPU2: shutdown
+> [  105.594953] IRQ155 no longer affine to CPU3
+> [  105.595190] CPU3: shutdown
+> [  105.602464] IRQ160 no longer affine to CPU4
+> [  105.602979] CPU4: shutdown
+> [  105.609996] IRQ161 no longer affine to CPU5
+> [  105.610424] CPU5: shutdown
+> [  105.617116] IRQ162 no longer affine to CPU6
+> [  105.617557] CPU6: shutdown
+> [  105.625163] IRQ163 no longer affine to CPU7
+> [  105.625596] CPU7: shutdown
+>
+> I'm testing on a Exynos5420 Peach Pit using exynos_defconfig and
+> disabling CONFIG_BL_SWITCHER as you suggested. My bootargs is:
+>
+
+I too tested on 5420 based peach-pit board with exynos_defconfig +
+disabled CONFIG_BL_SWITCHER.
+
+It did suspend and resume gracefully.
+
+> console=ttySAC3,115200 debug earlyprintk root=/dev/mmcblk1p2 rootwait
+> rw no_console_suspend
+>
+
+looks fine.
+
+> And I'm booting using a chained nv-uboot with built version:
+>
+> U-Boot 2013.04-gb98ed09 (Mar 07 2014 - 12:25:37) for Peach
+>
+
+I shall update my U-Boot build version, once I am back at office.
+
+
+> I checked that the s3c2410-rtc alarm IRQ is fired correctly by looking
+> at /sys/class/rtc/rtc0/wakealarm and also /proc/interrupts.
+>
+> Any ideas before I dig into this?
+>
+> Thanks a lot and best regards,
+> Javier
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
