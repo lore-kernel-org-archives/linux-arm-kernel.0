@@ -1,62 +1,81 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 2 Oct 2014 23:00:43 +0700
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
- <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
-Message-ID: <CAPvkgC1RcgeraaUyHLs0qA=G-mMoNFEneypkvUiPWEjZWWExfA@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 2 Oct 2014 18:03:17 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <1867489.B8srtuItsD@wuerfel>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <3274534.jCjlMt5HJV@wuerfel> <20141002153804.GF4039@lukather>
+ <1867489.B8srtuItsD@wuerfel>
+Message-ID: <CAOQ7t2asY3V0C0p3vw5jcbcBfAPZf5=A8WM=F0QzZRkHQtPpmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2014 04:51, Hugh Dickins <hughd@google.com> wrote:
-> On Fri, 26 Sep 2014, Steve Capper wrote:
+On Thu, Oct 2, 2014 at 5:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 02 October 2014 17:38:04 Maxime Ripard wrote:
+>> On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
+>> > On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
+>> > > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
+>> > > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
+>> > > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
+>> > > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+>> > > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+>> > > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+>> > > > > > > > pieces to boot the secondary CPU.
+>> > > > > > >
+>> > > > > > > Sorry for the double sending.
+>> > > > > > > Forgot to CC LAKML.
+>> > > > > >
+>> > > > > > Looks good to me in principle, but I wonder about the CPU enable method.
+>> > > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
+>> > > > > >
+>> > > > > > This is mostly a question of whether the system comes up in secure mode
+>> > > > > > or non-secure mode.
+>> > > > >
+>> > > > > I would be able if I had the u-boot source code or the possibility to
+>> > > > > flash the board I'm using. Unfortunately at this moment I don't have
+>> > > > > either. Probably in the near future I'll be able to implement PSCI in
+>> > > > > u-boot since Amlogic is kindly starting to provide documentation but now
+>> > > > > this is the best I can do.
+>> > > >
+>> > > > Ok, I see. Let's give Amlogic some more time then. I think it's better
+>> > > > to merge other parts of the platform first when we can reasonably assume
+>> > > > that we don't have to change the binding any more.
+>> > > >
+>> > > > It would be a shame to merge this now and then make it obsolete by
+>> > > > implementing PSCI but still having to carry around the original code
+>> > > > for compatibility reasons.
+>> > >
+>> > > More likely, PSCI is not going to be supported by the bootloaders of
+>> > > the devices already in the wild, so we still have to provide them an
+>> > > option. And even when it will, you'll still have to support both the
+>> > > devices with the old bootloaders, and the one with the new.
+>> >
+>> > It depends on how common the old boot loaders are, and whether it's
+>> > possible to upgrade them. If we can get to the point where you can
+>> > boot a kernel with a single CPU and have an easy way to update the
+>> > boot loader, we don't need to support it.
+>>
+>> I thought I heard Olof at some point ranting about this kind of
+>> requirements, but ok
+>>
+>> Still, holding off until something that hypothetical happens looks a
+>> bit odd, doesn't it?
 >
->> get_user_pages_fast attempts to pin user pages by walking the page
->> tables directly and avoids taking locks. Thus the walker needs to be
->> protected from page table pages being freed from under it, and needs
->> to block any THP splits.
->>
->> One way to achieve this is to have the walker disable interrupts, and
->> rely on IPIs from the TLB flushing code blocking before the page table
->> pages are freed.
->>
->> On some platforms we have hardware broadcast of TLB invalidations, thus
->> the TLB flushing code doesn't necessarily need to broadcast IPIs; and
->> spuriously broadcasting IPIs can hurt system performance if done too
->> often.
->>
->> This problem has been solved on PowerPC and Sparc by batching up page
->> table pages belonging to more than one mm_user, then scheduling an
->> rcu_sched callback to free the pages. This RCU page table free logic
->> has been promoted to core code and is activated when one enables
->> HAVE_RCU_TABLE_FREE. Unfortunately, these architectures implement
->> their own get_user_pages_fast routines.
->>
->> The RCU page table free logic coupled with a an IPI broadcast on THP
->> split (which is a rare event), allows one to protect a page table
->> walker by merely disabling the interrupts during the walk.
->>
->> This patch provides a general RCU implementation of get_user_pages_fast
->> that can be used by architectures that perform hardware broadcast of
->> TLB invalidations.
->>
->> It is based heavily on the PowerPC implementation by Nick Piggin.
->>
->> Signed-off-by: Steve Capper <steve.capper@linaro.org>
->> Tested-by: Dann Frazier <dann.frazier@canonical.com>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> I was mainly trying to follow what you are doing in mach-sunxi, but maybe
+> I misunderstood what your plans are for PSCI support there.
 >
-> Acked-by: Hugh Dickins <hughd@google.com>
->
+> mach-meson is still in a very early stage, and it's not like SMP support
+> is the most important feature missing from it. If there are good reasons
+> to include the current patches in 3.19, we can do that.
 
-Thanks Hugh!
+I agree with Maxime. The problem is that I have no idea whether in the
+future we will have access to all the pieces of information to replace
+the bootloader to upgrade it. Realistically it's not the most
+important feature but I don't think things are going to change anytime
+soon. Moreover I highly doubt that people are willing to upgrade the
+bootloader on their devices just to boot the mainline kernel with full
+SMP support and the better we can do is to give people the chance to
+use a mainline kernel on their device at full speed without risking to
+throw the device away.
 
-> Thanks for making all those clarifications, Steve: this looks very
-> good to me now.  I'm not sure which tree you're hoping will take this
-> and the arm+arm64 patches 2-6: although this one would normally go
-> through akpm, I expect it's easier for you to synchronize if it goes
-> in along with the arm+arm64 2-6 - would that be okay with you, Andrew?
-> I see no clash with what's currently in mmotm.
-
-I see it's gone into mmotm.
+-- 
+Carlo Caione
