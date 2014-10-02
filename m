@@ -1,43 +1,177 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 Oct 2014 21:15:06 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
-References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
- <20140929134708.GB30998@ulmo>
- <20140929155517.GR16977@sirena.org.uk>
- <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
- <20141001074139.GB18463@ulmo>
- <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
- <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
- <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
- <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
- <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
- <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
-Message-ID: <CAMuHMdXDp8oE0XR6VWKw+S3C=p+3c79SoQUweZWL6UF=UyooTg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 2 Oct 2014 15:17:40 -0400
+Subject: [PATCH v1 2/4] ARM: keystone: pm: switch to use generic pm domains
+In-Reply-To: <1412001499-19369-3-git-send-email-grygorii.strashko@ti.com>
+References: <1412001499-19369-1-git-send-email-grygorii.strashko@ti.com>
+ <1412001499-19369-3-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <542DA4D4.4070202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 2, 2014 at 2:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> 1) temporary early boot console -- this is nothing but an address in
-> RAM and the x/y layout. The character set from framebuffer is built
-> into the kernel.  The parallel to this is early-printk and how it uses
-> the UARTs without interrupts. This console vaporizes late in the boot
-> process -- the same thing happens with the early printk UART driver.
-> EARLYPRINTK on the command line enables this.
+On Monday 29 September 2014 10:38 AM, Grygorii Strashko wrote:
+> This patch switches Keystone 2 PM code to use Generic PM domains
+> instead of PM clock domains because of the lack of DT support
+> for the last.
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  .../devicetree/bindings/power/ti,keystone-gpc.txt  |  31 ++++++
+>  arch/arm/mach-keystone/Kconfig                     |   1 +
+>  arch/arm/mach-keystone/pm_domain.c                 | 115 ++++++++++++++-------
+>  3 files changed, 110 insertions(+), 37 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/ti,keystone-gpc.txt b/Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
+> new file mode 100644
+> index 0000000..43af1fc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/ti,keystone-gpc.txt
+> @@ -0,0 +1,31 @@
+> +* TI Keystone 2 Generic PM Controller
+> +
+> +The TI Keystone 2 Generic PM Controller is responsible for Clock gating
+> +for each controlled IP module.
+> +
+> +Required properties:
+> +- compatible: Should be "ti,keystone-gpc"
+> +- #power-domain-cells: Should be 0, see below:
+> +
+> +The gpc node is a power-controller as documented by the generic power domain
+> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+> +
+> +Example:
+> +
+> +	pm_controller: pm-controller {
+> +		compatible = "ti,keystone-gpc";
+'gpc' doesn't make it clear. May be 'keystone-powerdomain' ?
+> +		#power-domain-cells = <0>;
+> +	};
+> +
+> +	netcp: netcp at 2090000 {
+> +		reg = <0x2620110 0x8>;
+> +		reg-names = "efuse";
+> +		...
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		power-domains = <&pm_controller>;
+> +
+> +		clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
+> +		dma-coherent;
+> +	}
+> diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+> index e571084..0132bde 100644
+> --- a/arch/arm/mach-keystone/Kconfig
+> +++ b/arch/arm/mach-keystone/Kconfig
+> @@ -9,6 +9,7 @@ config ARCH_KEYSTONE
+>  	select COMMON_CLK_KEYSTONE
+>  	select ARCH_SUPPORTS_BIG_ENDIAN
+>  	select ZONE_DMA if ARM_LPAE
+> +	select PM_GENERIC_DOMAINS if PM
+>  	help
+>  	  Support for boards based on the Texas Instruments Keystone family of
+>  	  SoCs.
+> diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
+> index ca79dda..3eb5257 100644
+> --- a/arch/arm/mach-keystone/pm_domain.c
+> +++ b/arch/arm/mach-keystone/pm_domain.c
+> @@ -12,69 +12,110 @@
+>   * version 2, as published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/init.h>
+> -#include <linux/pm_runtime.h>
+>  #include <linux/pm_clock.h>
+> +#include <linux/pm_domain.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/clk-provider.h>
+>  #include <linux/of.h>
+>  
+> -#ifdef CONFIG_PM_RUNTIME
+> -static int keystone_pm_runtime_suspend(struct device *dev)
+> +#ifdef CONFIG_PM_GENERIC_DOMAINS
+> +
+> +struct keystone_domain {
+> +	struct generic_pm_domain base;
+> +	struct device	*dev;
+> +};
+> +
+> +void keystone_pm_domain_attach_dev(struct device *dev)
+>  {
+> +	struct clk *clk;
+>  	int ret;
+> +	int i = 0;
+>  
+>  	dev_dbg(dev, "%s\n", __func__);
+>  
+> -	ret = pm_generic_runtime_suspend(dev);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = pm_clk_suspend(dev);
+> +	ret = pm_clk_create(dev);
+>  	if (ret) {
+> -		pm_generic_runtime_resume(dev);
+> -		return ret;
+> +		dev_err(dev, "pm_clk_create failed %d\n", ret);
+> +		return;
+> +	};
+> +
+> +	while ((clk = of_clk_get(dev->of_node, i++)) && !IS_ERR(clk)) {
+> +		ret = pm_clk_add_clk(dev, clk);
+> +		if (ret) {
+> +			dev_err(dev, "pm_clk_add_clk failed %d\n", ret);
+> +			goto clk_err;
+> +		};
+>  	}
+>  
+> -	return 0;
+> +	if (!IS_ENABLED(CONFIG_PM_RUNTIME)) {
+> +		ret = pm_clk_resume(dev);
+> +		if (ret) {
+> +			dev_err(dev, "pm_clk_resume failed %d\n", ret);
+> +			goto clk_err;
+> +		};
+> +	}
+> +	return;
+> +
+> +clk_err:
+> +	pm_clk_destroy(dev);
+>  }
+>  
+> -static int keystone_pm_runtime_resume(struct device *dev)
+> +void keystone_pm_domain_detach_dev(struct device *dev)
+>  {
+>  	dev_dbg(dev, "%s\n", __func__);
+> -
+> -	pm_clk_resume(dev);
+> -
+> -	return pm_generic_runtime_resume(dev);
+> +	pm_clk_destroy(dev);
+>  }
+> -#endif
+>  
+> -static struct dev_pm_domain keystone_pm_domain = {
+> -	.ops = {
+> -		SET_RUNTIME_PM_OPS(keystone_pm_runtime_suspend,
+> -				   keystone_pm_runtime_resume, NULL)
+> -		USE_PLATFORM_PM_SLEEP_OPS
+> +static const struct keystone_domain keystone_domain = {
+> +	.base = {
+> +		.name = "keystone",
+> +		.attach_dev = keystone_pm_domain_attach_dev,
+> +		.detach_dev = keystone_pm_domain_detach_dev,
+> +		.dev_ops = {
+> +			.stop = pm_clk_suspend,
+> +			.start = pm_clk_resume,
+> +		},
+> +		.power_off_latency_ns = 25000,
+> +		.power_on_latency_ns = 2000000,
+Did you cook up these numbers ?
 
-JFYI, the early serial console can also vanish, even very early in the boot
-process, before the unused clocks are disabled.
-Cfr. http://marc.info/?l=linux-sh&m=141227657322649&w=2
+Other than that patch looks fine to me. If Kevin is happy
+with overall approach then we can proceed with this.
 
-So there's no safety in this world without calling clk_prepare_enable().
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Santosh
