@@ -1,63 +1,43 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Thu, 02 Oct 2014 16:44:32 +0300
-Subject: [Patch v3] spi: qup: Fix incorrect block transfers
-In-Reply-To: <1412112088-25928-1-git-send-email-agross@codeaurora.org>
-References: <1412112088-25928-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1412257472.1027.37.camel@iivanov-dev>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 2 Oct 2014 15:46:02 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4Ow4WU8yhy+LKGgKfvS8E15MU=gfRoZXNW6AWGOBVPG8SQ@mail.gmail.com>
+References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo>
+ <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+ <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+ <542D476D.50004@redhat.com>
+ <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
+ <CAOMqctSnmN3YScH8+hCkmEVB076u=VsCAJVTz5=NEYzQJpYR6A@mail.gmail.com>
+ <CAKON4Ow4WU8yhy+LKGgKfvS8E15MU=gfRoZXNW6AWGOBVPG8SQ@mail.gmail.com>
+Message-ID: <CAMuHMdXLf3iVFOxFa__xf17tFGD_tFFr0FLnEgJeQP4xz17YCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 2, 2014 at 3:34 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> Does the clock and regulator cleanup happen before drivers can load
+> off from initrd? I didn't think it did but I might be wrong.
 
-Hi Andy,
+Yes
 
-I am trying to understand why we need extra functions for block 
-read and write.
+drivers/base/power/domain.c:late_initcall(genpd_poweroff_unused);
+drivers/clk/clk.c:late_initcall_sync(clk_disable_unused);
+drivers/regulator/core.c:late_initcall_sync(regulator_init_complete);
 
-Essentially fifo and block read/write function are looking
-the same for me. Except that block functions have one extra write
-in QUP_OPERATIONAL register.
+Gr{oetje,eeting}s,
 
-On Tue, 2014-09-30 at 16:21 -0500, Andy Gross wrote:
-> This patch fixes a number of errors with the QUP block transfer mode.  Errors
-> manifested themselves as input underruns, output overruns, and timed out
-> transactions.
-> 
-> The block mode does not require the priming that occurs in FIFO mode.  At the
-> moment that the QUP is placed into the RUN state, the QUP will immediately raise
-> an interrupt if the request is a write.  Therefore, there is no need to prime
-> the pump.
+                        Geert
 
-But does this hurt in some way? I mean fist FIFO fill happens when
-controller is in PAUSED state. Once enabled it can start transfer 
-immediately. 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> 
-> In addition, the block transfers require that whole blocks of data are
-> read/written at a time.  
-
-Thats fine, but I can not see why this will not happen with existing
-fill functions. Fifo's are drained until there is data and filled
-until there is a space. And because we are not using pack/unpack mode, 
-every SPI word occupy one cell in fifo (32 bits), this means that 
-existing read/write functions are working in "block" mode.
-
-> The last block of data that completes a transaction may
-> contain less than a full blocks worth of data.
-> 
-> Each block of data results in an input/output service interrupt accompanied with
-> a input/output block flag set.  Additional block reads/writes require clearing
-> of the service flag.  It is ok to check for additional blocks of data in the
-> ISR, but you have to ack every block you transfer.  Imbalanced acks result in
-> early return from complete transactions with pending interrupts that still have
-> to be ack'd.  The next transaction can be affected by these interrupts.
-> Transactions are deemed complete when the MAX_INPUT or MAX_OUTPUT flag are set.
-
-And this is the thing that can cause errors that you see, I suppose.
-We are getting extra interrupts, which are not cleared, even if we have
-drained fifo completely. 
-
-Regards,
-Ivan
-
-P.S. They are still several coding style issues :-). The same as those that 
-I have already pointed to you.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
