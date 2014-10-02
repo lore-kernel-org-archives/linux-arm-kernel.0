@@ -1,81 +1,169 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Oct 2014 11:26:25 +0100
-Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
-In-Reply-To: <20141001192245.GG14991@redhat.com>
-References: <cover.1411604443.git.geoff@infradead.org>
- <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
- <20140930181840.GA24153@redhat.com>
- <1412106877.6630.45.camel@smoke>
- <20141001161621.GA28440@leverpostej>
- <20141001174714.GD14991@redhat.com>
- <20141001180304.GC5788@leverpostej>
- <20141001192245.GG14991@redhat.com>
-Message-ID: <20141002102625.GE5788@leverpostej>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 2 Oct 2014 12:27:23 +0200
+Subject: [PATCH 09/16] tty: serial: 8250_dma: Add a TX trigger workaround
+ for AM33xx
+In-Reply-To: <20140930084416.GB31111@ci00147.xsens-tech.local>
+References: <20140912102816.GF28458@ci00147.xsens-tech.local>
+ <541716DC.9020904@linutronix.de>
+ <20140917102812.GA20438@ci00147.xsens-tech.local>
+ <20140921204100.GA10111@linutronix.de>
+ <20140922092853.GH20438@ci00147.xsens-tech.local>
+ <20140925151403.GH19396@linutronix.de>
+ <20140929085042.GA13952@ci00147.xsens-tech.local>
+ <20140929095440.GB13142@linutronix.de>
+ <20140929103042.GA31111@ci00147.xsens-tech.local>
+ <20140930084416.GB31111@ci00147.xsens-tech.local>
+Message-ID: <20141002102723.GB23661@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 08:22:45PM +0100, Vivek Goyal wrote:
-> On Wed, Oct 01, 2014 at 07:03:04PM +0100, Mark Rutland wrote:
-> 
-> [..]
-> > I assume we'd have the first kernel perform the required cache maintenance.
-> > 
-> 
-> Hi Mark,
-> 
-> I am wondering, what kind of cache management is required here? What kind of
-> dcaches are present on arm64.
+* Frans Klaver | 2014-09-30 10:44:16 [+0200]:
 
-In ARMv8 there's a hierarchy of quasi-PIPT D-caches; they generally
-behave like (and can be maintained as if) they are PIPT but might not
-actually be PIPT. There may be a system level cache between the
-architected cache hierarchy and memory (that should respect cache
-maintenance by VA).
+>On Mon, Sep 29, 2014 at 12:30:43PM +0200, Frans Klaver wrote:
+>> On Mon, Sep 29, 2014 at 11:54:40AM +0200, Sebastian Andrzej Siewior wrote:
+>> > For your "too much work for irq" problem: Could you add trace_printk()
+>> > in tx/rx dma start/complete, and irq routine? The interresting part is
+>> > what is the irq routine doing once entered. It might be a condition that
+>> > is ignored at first and "acked" later while serving another event. Or it
+>> > is really doing something and this is more or less "legal".
+>> 
+>
+>Here's some trace output I get. I hope branches become clear by the
+>calls they do.
+>
+>       uart_test-482   [000] .ns.    17.860139: __dma_rx_do_complete: error: 0, uart_bug_dma: 32
+>       uart_test-482   [000] .ns.    17.860141: __dma_rx_do_complete: rx_dma(p, 0)
 
-The MT_NORMAL attributes are such that most memory the kernel maps will
-have write-back read/write allocate attributes. So cache maintenance is
-required to ensure that data is cleaned from the D-caches out to the PoC
-(the point in the memory system at which non-cacheable accesses can see
-the same data), such that the CPU can see the images rather than stale
-data once translation is disabled.
+these two happen outside the IRQ routine for every 48 bytes.
+?
+>       uart_test-483   [000] dnh.    17.861018: serial8250_interrupt: irq 89
+>       uart_test-483   [000] dnh.    17.861026: serial8250_interrupt: 89 e
+e? Did was the routine invoked 0xe times or this a register?
 
-> I see that Geoff's patches flush dcaches for 
-> certain kexec stored pages using __flush_dcache_area()
-> (in kexec_list_flush_cb()).
-> 
-> arch/arm64/include/asm/cacheflush.h says following.
-> 
->  *      __flush_dcache_area(kaddr, size)
->  *
->  *              Ensure that the data held in page is written back.
->  *              - kaddr  - page address
->  *              - size   - region size
-> 
-> So looks like we are trying to write back anything which we will access
-> after switching off MMU. If that's the case, I have two questions.
-> 
-> - Why do we need to writeback that cacheline. After switching off MMU,
->   will we not access same cacheline. I thought caches are VIPT and tag
->   will still remain the same (but I might easily be wrong here).
+>       uart_test-483   [000] .ns.    17.861045: __dma_rx_do_complete: error: 0, uart_bug_dma: 32
+>       uart_test-483   [000] .ns.    17.861047: __dma_rx_do_complete: rx_dma(p, 0)
+another 48bytes
 
-As I mention above, the initial cache flush by VA is to ensure that the
-data is visible to the CPU once translation is disabled. I'm not sure I
-follow your reasoning.
+>       uart_test-479   [000] d.H.    17.861124: serial8250_interrupt: irq 89
+>       uart_test-479   [000] d.H.    17.861133: serial8250_handle_irq: l1 IIR cc LSR 61
+>       uart_test-479   [000] d.H.    17.861135: serial8250_handle_irq: rx_dma(up, iir)
+>       uart_test-479   [000] d.H.    17.861139: serial8250_rx_dma: l1, UART_IIR_RX_TIMEOUT
+>       uart_test-479   [000] d.H.    17.861147: __dma_rx_do_complete: error: 1, uart_bug_dma: 32
+>       uart_test-479   [000] d.H.    17.861150: serial8250_handle_irq: rx_chars(up, status)
+>       uart_test-479   [000] d.H.    17.861190: serial8250_handle_irq: rx_dma(up, 0)
+timeout, manual purge. Do you have an idea how many bytes were manually
+received?
 
-> - Even if we have to flush that cacheline, for kexec pages, I guess it
->   should be done at kernel load time and not at the time of transition
->   into new kernel. That seems too late. Once the kernel has been loaded,
->   we don't overwrite these pages anymore. So a dcache flush at that
->   time should be good.
+>       uart_test-479   [000] d.H.    17.861205: serial8250_interrupt: 89 e
+>     kworker/0:1-10    [000] dnH.    17.864949: serial8250_interrupt: irq 89
+>
+>So far so good. We're just entered interrupt where stuff goes awry. The
+>following pattern repeats over 600 times:
+>
+>     kworker/0:1-10    [000] dnH.    17.865198: serial8250_handle_irq: l1 IIR cc LSR 61
+>     kworker/0:1-10    [000] dnH.    17.865254: serial8250_handle_irq: rx_dma(up, iir)
+>     kworker/0:1-10    [000] dnH.    17.865333: serial8250_rx_dma: l1, UART_IIR_RX_TIMEOUT
+>     kworker/0:1-10    [000] dnH.    17.865626: __dma_rx_do_complete: error: 1, uart_bug_dma: 32
+>     kworker/0:1-10    [000] dnH.    17.865747: serial8250_handle_irq: rx_chars(up, status)
+>     kworker/0:1-10    [000] dnH.    17.868797: serial8250_handle_irq: rx_dma(up, 0)
+>
+>ending with:
+>
+>     kworker/0:1-10    [000] dnH.    20.027093: serial8250_interrupt: serial8250: too much work for irq89
+>     kworker/0:1-10    [000] dnH.    20.027181: serial8250_interrupt: 89 e
+>
+>This clogs the entire system until I disconnect the communication lines.
+>
+>So we get an RX timeout. The receiver fifo trigger level was not reached
+>and 8250_core is left to copy the remaining data. I would expect that if
+>the trigger level wasn't reached, we wouldn't need to be doing this that
+>often. On the other hand, could we be trapped reading data from rx
+>without dma helping us? And how could we resolve this?
 
-Given the current assumption at boot is that the kernel image should be
-clean in the D-cache hierarchy (but not necessarily anything else), that
-should be fine. However, we may need to nuke the I-cache when branching
-to the purgatory code as the I-cache could be PIPT, VIPT, or ASID-tagged
-VIVT.
+So if I understand you correct, then you enter serial8250_interrupt()
+and then you enter multiple times omap_8250_dma_handle_irq() and
+you always get a TIMEOUT event and fetch byte(s) manualy via
+serial8250_rx_chars(). And after one iteration UART_IIR_NO_INT is not
+set and you do it again, right?
 
-If the purgatory code moves anything around it will need to perform
-maintenance by VA to ensure stale dirty lines don't overwrite anything,
-and stale clean lines don't shadow anything.
+I have no idea when exactly the timeout-interrupt fires. The manual
+says: "? the count is reset when there is activity on uarti_rx ?" but it
+does not say how often it increments before the level is reached.
+It also might be that you have a small gap between two bytes and this
+high baud rate the gap is considered as a timeout event.
 
-Mark.
+Another thing could be that if the we enqueue a RX transfer from the
+dma_completion callback then we have too many bytes in the FIFO already
+becahse the callback is invoked from softirq. What happens if we cut the
+middle man via
+
+
+diff --git a/drivers/dma/virt-dma.c b/drivers/dma/virt-dma.c
+index 6f80432..21b04bd 100644
+--- a/drivers/dma/virt-dma.c
++++ b/drivers/dma/virt-dma.c
+@@ -63,8 +63,9 @@ static void vchan_complete(unsigned long arg)
+ 	dma_async_tx_callback cb = NULL;
+ 	void *cb_data = NULL;
+ 	LIST_HEAD(head);
++	unsigned long flags;
+ 
+-	spin_lock_irq(&vc->lock);
++	spin_lock_irqsave(&vc->lock, flags);
+ 	list_splice_tail_init(&vc->desc_completed, &head);
+ 	vd = vc->cyclic;
+ 	if (vd) {
+@@ -72,7 +73,7 @@ static void vchan_complete(unsigned long arg)
+ 		cb = vd->tx.callback;
+ 		cb_data = vd->tx.callback_param;
+ 	}
+-	spin_unlock_irq(&vc->lock);
++	spin_unlock_irqrestore(&vc->lock, flags);
+ 
+ 	if (cb)
+ 		cb(cb_data);
+diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
+index 181b952..7632338 100644
+--- a/drivers/dma/virt-dma.h
++++ b/drivers/dma/virt-dma.h
+@@ -92,7 +92,10 @@ static inline void vchan_cookie_complete(struct virt_dma_desc *vd)
+ 		 vd, cookie);
+ 	list_add_tail(&vd->node, &vc->desc_completed);
+ 
+-	tasklet_schedule(&vc->task);
++	if (vd->tx.my_uart)
++		vc->task.func(vc);
++	else
++		tasklet_schedule(&vc->task);
+ }
+ 
+ /**
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index 57a8b12..5d7ee92 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -728,6 +728,7 @@ static int omap_8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
+ 	dma->rx_running = 1;
+ 	desc->callback = __dma_rx_complete;
+ 	desc->callback_param = p;
++	desc->my_uart = 1;
+ 
+ 	dma->rx_cookie = dmaengine_submit(desc);
+ 
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 1f9e642..0f5fbe1 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -459,6 +459,7 @@ struct dmaengine_unmap_data {
+ struct dma_async_tx_descriptor {
+ 	dma_cookie_t cookie;
+ 	enum dma_ctrl_flags flags; /* not a 'long' to pack with cookie */
++	u32 my_uart;
+ 	dma_addr_t phys;
+ 	struct dma_chan *chan;
+ 	dma_cookie_t (*tx_submit)(struct dma_async_tx_descriptor *tx);
+
+>
+>Frans
+
+Sebastian
