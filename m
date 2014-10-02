@@ -1,42 +1,101 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 02 Oct 2014 17:53:37 +0200
-Subject: [PATCH 1/2] ARM: dts: vf500/vf610: support VF500 SoC
-In-Reply-To: <8882221.sfQOLcQs3p@wuerfel>
-References: <1412261724-11073-1-git-send-email-stefan@agner.ch>
- <8882221.sfQOLcQs3p@wuerfel>
-Message-ID: <20f4e3a1932756c92443d380a7f42f56@agner.ch>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 02 Oct 2014 17:54:13 +0200
+Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
+ API
+In-Reply-To: <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
+ <542C2D9F.8060005@samsung.com>
+ <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
+ <542D3E45.5020908@samsung.com>
+ <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
+Message-ID: <542D7525.8000804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 2014-10-02 17:28, schrieb Arnd Bergmann:
-> On Thursday 02 October 2014 16:55:23 Stefan Agner wrote:
->> The VF500 is essentially the same SoC, but with only one core and
->> without L1 cache. The VF610 is therefore a superset of the VF500.
->> Move allmost all periperals to vf500.dtsi which is then included
->> and enhanced by vf610.dtsi.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> Somehow using -M -B switches create a unapplyable patch, hence I
->> generated one without those options. Sorry about that.
->>
->>  arch/arm/boot/dts/vf500.dtsi | 498 ++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/vf610.dtsi | 507 +------------------------------------------
->>  2 files changed, 510 insertions(+), 495 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/vf500.dtsi
+On 02/10/14 15:30, Ulf Hansson wrote:
+[...]
+> Correct me if I am wrong, but I think in principle these exynos
+> drivers don't use pm_runtime_set_active() during ->probe() and are
+> instead relying on CONFIG_PM_RUNTIME to be enabled.
+
+Yes, pm_runtime_set_active() is not used in probe(), I believe this
+is not required. In case of those IP blocks there is no use of activating
+them during probe(). Instead we check if PM_RUNTIME is enabled through
+pm_runtime_enabled() helper and enable the device clock(s) if not.
+I agree it all doesn't quite work in current mainline for !PM_RUNTIME,
+since there is nothing ensuring that the power domains are enabled
+in such kernel configuration.
+
+> That's not a good behaviour. If these drivers are build without
+> CONFIG_PM_RUNTIME - they won't work.
+
+They wouldn't similarly work with pm_runtime_set_active() call in probe()
+with CONFIG_PM_RUNTIME disabled, would they ?
+
+> I guess I have pointed out this in earlier discussions around runtime
+> PM, I have seen quite some driver's getting their support for runtime
+> PM wrong.
 > 
-> I think it would be better to create one extra file that contains the common
-> parts and is included by both vf500 and vf610.
+>>> Why would runtime PM callbacks be invoked when the device are runtime
+>>> PM active? That's prevented by the runtime PM core and is the expected
+>>> behaviour.
+>>>
+>>> pm_genpd_dev_need_restore() is not the solution, besides that it gives
+>>> you the option to lie about device's runtime PM state to genpd. Thus,
+>>> if you are really lucky, that might workaround your issues. :-)
+>>
+>> Might be, nevertheless so far it more or less worked for us. At least
+>> I'm sure without it everything breaks right away.
 > 
+> I see. Obviously we must not break exynos, let's try to figure out the
+> best way forward.
+> 
+>>
+>>> I will happily help out in fixing drivers for exynos. Would be nice if
+>>> you could provide me with a list of which driver/subsystems that seems
+>>> broken. HW, wise I have a exynos 5250 and exynos 5422 on my desk, so
+>>> those I can test.
+>>
+>> For exynos5 I would check exynos-gsc and s5p-mfc (see kernel logs below).
+> 
+> Thanks, I will have look and run some tests on exynos 5. Let you know soon.
 
-I also thought about that. But when looking at the product variants, its
-clear that VF500 really contains only features, which are part of all
-other Vybrids (VF3xx series excluded, but these series is not really
-suitable for Linux due to lack of external memory). So vf500.dtsi would
-always be a oneliner (#include <vf.dtsi>).
+Especially it might be interesting look at gscaler, where there are 
+multiple instances of same device handled by one driver.
 
-Also I disliked this idea because of the somewhat unclear naming
-(vf.dtsi? vfxxx.dtsi?)
+[...]
+>> Sure, is there a git tree I could fetch all the relevant patches from ?
+>> I'm not sure what the base tree for this series, I could only apply
+>> first 2 patches from this thread, on top of the generic OF PM domain
+>> patches. And that didn't solve issues which are seen in the logs below.
+> 
+> You have two options:
+> 
+> 1) Use/build Rafaels tree. Apply my patches on the bleeding edge
+> branch.That's also what I use a work base.
+> http://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
+> 
+> 2) Use/build Stephen Rothwell's linux-next tree. I can confirm the
+> patches applies on the master branch as of today.
+> http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
 
---
-Stefan
+Thanks, I will be able to take a look at this the earliest on Monday. 
+
+> I really appreciate your help here, thanks!
+> 
+>> Nevertheless, as Rafael pointed out, enabling all power domains
+>> unconditionally seems a step backwards. It would be nice to have
+>> resolved the race in a away the power domains remain in state left
+>> by the firmware and are being enabled only before any client device
+>> actually needs it.
+> 
+> You are right, but I am not sure we can do this in one go - since it
+> depends on if we can fix this on PM core of if we need need
+> adaptations in drivers/subsystems.
+
+I see, fortunately the genpd API appears not to be wildly used yet.
+
+-- 
+Regards,
+Sylwester
