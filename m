@@ -1,35 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 02 Oct 2014 09:49:09 -0600
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <542CF3C3.2050708@redhat.com>
-References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>
- <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
- <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
-Message-ID: <542D73F5.9040605@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 17:50:35 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <20141002153804.GF4039@lukather>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <3274534.jCjlMt5HJV@wuerfel> <20141002153804.GF4039@lukather>
+Message-ID: <1867489.B8srtuItsD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2014 12:42 AM, Hans de Goede wrote:
-...
-> The whole reason why we want to use simplefb is not just to get things
-> running until HW specific driver is in place, but also to have early console
-> output (to help debugging boot problems on devices without a serial console),
-> in a world where most video drivers are build as loadable modules, so we
-> won't have video output until quite late into the boot process.
+On Thursday 02 October 2014 17:38:04 Maxime Ripard wrote:
+> On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
+> > On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
+> > > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
+> > > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
+> > > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+> > > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+> > > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> > > > > > > > pieces to boot the secondary CPU.
+> > > > > > > 
+> > > > > > > Sorry for the double sending.
+> > > > > > > Forgot to CC LAKML.
+> > > > > > 
+> > > > > > Looks good to me in principle, but I wonder about the CPU enable method.
+> > > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
+> > > > > > 
+> > > > > > This is mostly a question of whether the system comes up in secure mode
+> > > > > > or non-secure mode.
+> > > > > 
+> > > > > I would be able if I had the u-boot source code or the possibility to
+> > > > > flash the board I'm using. Unfortunately at this moment I don't have
+> > > > > either. Probably in the near future I'll be able to implement PSCI in
+> > > > > u-boot since Amlogic is kindly starting to provide documentation but now
+> > > > > this is the best I can do.
+> > > > 
+> > > > Ok, I see. Let's give Amlogic some more time then. I think it's better
+> > > > to merge other parts of the platform first when we can reasonably assume
+> > > > that we don't have to change the binding any more.
+> > > > 
+> > > > It would be a shame to merge this now and then make it obsolete by
+> > > > implementing PSCI but still having to carry around the original code
+> > > > for compatibility reasons.
+> > > 
+> > > More likely, PSCI is not going to be supported by the bootloaders of
+> > > the devices already in the wild, so we still have to provide them an
+> > > option. And even when it will, you'll still have to support both the
+> > > devices with the old bootloaders, and the one with the new.
+> > 
+> > It depends on how common the old boot loaders are, and whether it's
+> > possible to upgrade them. If we can get to the point where you can
+> > boot a kernel with a single CPU and have an easy way to update the
+> > boot loader, we don't need to support it.
+> 
+> I thought I heard Olof at some point ranting about this kind of
+> requirements, but ok 
+> 
+> Still, holding off until something that hypothetical happens looks a
+> bit odd, doesn't it?
 
-That's a very different use-case than what was originally envisaged.
+I was mainly trying to follow what you are doing in mach-sunxi, but maybe
+I misunderstood what your plans are for PSCI support there.
 
-...
-> You indicate that you don't have the time for this discussion, and I note that
-> there is no MAINTAINERS entry for drivers/video/fbdev/simplefb.c . So how about
-> the following, I pick up drivers/video/fbdev/simplefb.c maintainership, adding
-> MAINTAINERS entry for it with my name in it. Then as the maintainer it will be
-> my responsibility (and in my own benefit) to stop this from growing into
-> a monster ?
+mach-meson is still in a very early stage, and it's not like SMP support
+is the most important feature missing from it. If there are good reasons
+to include the current patches in 3.19, we can do that.
 
-I have no issue with you being the maintainer.
-
-I would suggest you track down whoever it was that was involved in the 
-original discussion and objected to simplefb performing resource 
-management, and get their explicit ack for the addition of 
-clocks/regulators/... to it. But, that's just a suggestion.
+	Arnd
