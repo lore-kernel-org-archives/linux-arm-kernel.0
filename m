@@ -1,51 +1,24 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 1 Oct 2014 17:27:05 -0700
-Subject: [PATCH v5 07/11] mmc: sdio: Convert to
- dev_pm_domain_attach|detach()
-In-Reply-To: <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
-References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
- <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20141002002705.GA29177@dtor-ws>
+From: anton@enomsg.org (Anton Vorontsov)
+Date: Wed, 1 Oct 2014 17:32:43 -0700
+Subject: [PATCH] MAINTAINERS: CNS3xxx and IXP4xx update.
+In-Reply-To: <m3tx3pa4p1.fsf@t19.piap.pl>
+References: <m3tx3pa4p1.fsf@t19.piap.pl>
+Message-ID: <20141002003143.GA19564@d1stkfactory>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On Fri, Sep 19, 2014 at 08:27:40PM +0200, Ulf Hansson wrote:
-> Previously only the ACPI PM domain was supported by the sdio bus.
+On Tue, Sep 30, 2014 at 10:32:58AM +0200, Krzysztof Ha?asa wrote:
+> I'm told Anton Vorontsov can't maintain Cavium Econa CNS3xxx support
+> anymore. Perhaps I can.
 > 
-> Let's convert to the common attach/detach functions for PM domains,
-> which currently means we are extending the support to include the
-> generic PM domain as well.
+> Also changing my email contact address for IXP4xx.
 > 
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> ---
->  drivers/mmc/core/sdio_bus.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
-> index 4fa8fef9..1df0fc6 100644
-> --- a/drivers/mmc/core/sdio_bus.c
-> +++ b/drivers/mmc/core/sdio_bus.c
-> @@ -315,7 +315,7 @@ int sdio_add_func(struct sdio_func *func)
->  	ret = device_add(&func->dev);
->  	if (ret == 0) {
->  		sdio_func_set_present(func);
-> -		acpi_dev_pm_attach(&func->dev, false);
-> +		dev_pm_domain_attach(&func->dev, false);
+> Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
 
-Admittedly it is not brought in by your change, but I am a bit worried
-about this code. In all other busses we attach power domain to a device
-before probing it (and detach if probe fails). Why here we only attach
-it to power domain after adding the device to the bus? If driver for the
-function has already been loaded the probe() would run without device
-being attached to a power domain...
+Acked-by: Anton Vorontsov <anton@enomsg.org>
 
-Adding Aaron as he's the author of the original change.
+Thanks a lot for taking care of it. :)
 
-Thanks.
+Cheers,
 
--- 
-Dmitry
+Anton
