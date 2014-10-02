@@ -1,61 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Oct 2014 10:39:18 +0200
-Subject: [PATCH 1/4] ata: ahci_platform: Add ACPI support for AMD Seattle
- SATA controller
-In-Reply-To: <542C6FE9.10903@amd.com>
-References: <1410828446-28502-1-git-send-email-suravee.suthikulpanit@amd.com>
- <20140917012614.GA31214@srcf.ucam.org> <542C6FE9.10903@amd.com>
-Message-ID: <4872185.h11DQxW6kP@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  2 Oct 2014 10:40:13 +0200
+Subject: [PATCH 0/7] pinctrl: force-convert to generic DT bindings
+Message-ID: <1412239220-22495-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 16:19:37 Suravee Suthikulanit wrote:
-> On 9/16/2014 8:26 PM, Matthew Garrett wrote:
-> > On Mon, Sep 15, 2014 at 07:47:23PM -0500, suravee.suthikulpanit at amd.com wrote:
-> >> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >>
-> >> This patch adds ACPI match table in ahci_platform. The table includes
-> >> the acpi_device_id to match AMD Seattle SATA controller with following
-> >> asl structure in DSDT:
-> >>
-> >>      Device (SATA0)
-> >>      {
-> >>        Name(_HID, "AMDI0600")        // Seattle AHSATA
-> >
-> > There really ought to be a well-defined PNPID for AHCI, so you can _HID
-> > to AMD and _CID to something generic. That way we won't have:
-> >
-> >> +#ifdef CONFIG_ATA_ACPI
-> >> +static const struct acpi_device_id ahci_acpi_match[] = {
-> >> +    { "AMDI0600", 0 }, /* AMD Seattle AHCI */
-> >> +    { },
-> >> +};
-> >
-> > utter sadness here. Really, please don't end up in a situation where we
-> > need to add device-specific IDs to a generic driver.
-> >
-> Matthew,
-> 
-> Currently, there is no _CID defined for generic AHCI. We will work on 
-> proposing one, and provide update patches for including the new ID.
-> 
+I've had it with custom "foo,function" and "foo,groups", "foo,pins"
+etc custom bindings for pin control.
 
-I think part of the problem is that there is no specification for what
-an AHCI device should look like when it's not connected to a PCI
-bus, the AHCI document published by Intel just states:
+Yes, I know we could not agree in the past on some generic bindings
+and no, the older systems will not be converted if they are in
+deployment.
 
-"AHCI is a PCI class device that acts as a data movement engine
-between system memory and Serial ATA devices."
+But I *know* the nomadik pin controllers does not have deployed
+device trees in the wild, so I will just convert them to use the
+standard bindings I just posted in other patches, using simple names
+like "function", "groups", "pins" etc.
 
-It also requires the PCI config space to have the PM capability
-registers and (optionally) the MSI capability registers.
-There are lots of chips we support in Linux with the ahci-platform
-driver, but they are not actually compliant because they cannot
-use the pmcap registers but instead typically rely on setting
-external clock/phy/regulator/pinctrl registers.
+After this atleast the abx500 pin controller is phased over to
+use the generic bindings and can be held up as an example. I will
+also move the code parsing the bindings into the core, so that any
+pin controller using this can rely on that code and we do not
+need to invent more crazy parsers all over the place.
 
-The ARM SBSA document just requires any SATA controller to be AHCI
-compliant but does not explain what that means in the case where
-it's not a PCI device.
+Linus Walleij (7):
+  pinctrl: nomadik: force-convert to generic mux bindings
+  pinctrl: abx500: force-convert to generic mux bindings
+  pinctrl: nomadik: force-convert to generic config bindings
+  pinctrl: abx500: force-convert to generic config bindings
+  pinctrl: abx500: retire phandle config mechanism
+  pinctrl: abx500: update device tree bindings
+  pinctrl: abx500: mark pin config as generic
 
-	Arnd
+ .../devicetree/bindings/pinctrl/ste,abx500.txt     | 184 +++++++----------
+ arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi         |  64 +++---
+ arch/arm/boot/dts/ste-href-ab8500.dtsi             | 162 +++++++--------
+ arch/arm/boot/dts/ste-href-ab8505.dtsi             |  90 ++++----
+ arch/arm/boot/dts/ste-href-family-pinctrl.dtsi     | 230 ++++++++++-----------
+ arch/arm/boot/dts/ste-href-stuib.dtsi              |   4 +-
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi         |  12 +-
+ arch/arm/boot/dts/ste-hrefprev60.dtsi              |  20 +-
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi             |  42 ++--
+ arch/arm/boot/dts/ste-nomadik-s8815.dts            |   8 +-
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         |  32 +--
+ arch/arm/boot/dts/ste-snowball.dts                 |  36 ++--
+ drivers/pinctrl/nomadik/pinctrl-abx500.c           |  33 ++-
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c          |  18 +-
+ 14 files changed, 449 insertions(+), 486 deletions(-)
+
+-- 
+1.9.3
