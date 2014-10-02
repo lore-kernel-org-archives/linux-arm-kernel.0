@@ -1,395 +1,195 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu,  2 Oct 2014 20:52:11 +0200
-Subject: [PATCH v2 5/5] pinctrl: samsung: Separate per-bank init and runtime
- data
-In-Reply-To: <1412275931-10807-1-git-send-email-tomasz.figa@gmail.com>
-References: <1412275931-10807-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1412275931-10807-6-git-send-email-tomasz.figa@gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  2 Oct 2014 21:02:43 +0200
+Subject: [PATCH] [RFC] ARM: shmobile: Add early debugging support using SCIF(A)
+Message-ID: <1412276563-21473-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the driver mixes constant init data with runtime data, which
-is far from being elegant and can invite potential hard to track issues.
-This patch intends to solve this by introducing a new
-samsung_pin_bank_data structure to hold only constant data known at
-compile time, which can be copied to main samsung_pin_bank struct used
-at runtime.
+Add serial port debug macros for the SCIF(A) serial ports.
+This includes all shmobile SoCs, except for EMEV2.
 
-In addition, thanks to this change, all per-bank initdata can be marked
-with const and __initconst keywords and dropped after init completes.
+On SoCs using the legacy machine_desc.map_io(), an identity mapping of
+the SCIF(A) registers must be set up in .map_io(). On all but r8a7779
+this was already done.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On other SoCs, debug_ll_io_init() maps the SCIF(A) registers to a fixed
+virtual address. 0xfdxxxxxx was chosen, as it should lie below
+VMALLOC_END = 0xff000000, and must not conflict with the 2 MiB reserved
+region at PCI_IO_VIRT_BASE = 0xfee00000.
+
+This was derived from the r8a7790 version by Laurent Pinchart.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c  | 44 +++++++++++++++----------------
- drivers/pinctrl/samsung/pinctrl-s3c24xx.c |  8 +++---
- drivers/pinctrl/samsung/pinctrl-s3c64xx.c |  2 +-
- drivers/pinctrl/samsung/pinctrl-samsung.c | 18 +++++++++++--
- drivers/pinctrl/samsung/pinctrl-samsung.h | 33 ++++++++++++++++++++---
- 5 files changed, 72 insertions(+), 33 deletions(-)
+Tested on r8a7791/koelsch and r8a7740/armadillo.
+Testing on other platforms would be highly appreciated.
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 4659a1abc862..19497b4261ce 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -576,7 +576,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- }
+Notes:
+  - On armadillo-multiplatform there may be a period while garbage data
+    is output.
+    This happens because sh_mobile_i2c_init() enables and disables its
+    clock during probing. As iic0 and scifa1 share the same parent
+    clock, this causes the scifa1 clock to no longer receive clock
+    ticks.
+    On armadillo-legacy, this is mitigated by the pre-CCF clock driver,
+    which never really disables clocks during boot-up for exactly this
+    reason. Cfr. "One example of this is the handling of the Mackerel
+    serial console output that shares clock with the I2C controller.",
+    in commit 794d78fea51504ba ("drivers: sh: late disabling of clocks
+    V2").
+    I'm wondering whether this can be fixed in the i2c driver? Does it
+    really have to enable and disable the clock?
+
+  - While the serial console on r8a7790 was switched from SCIF0 to
+    SCIFA0 recently, I believe r8a7990 still needs to use SCIF0 instead
+    of SCIFA0, as that's what the bootloader has configured.
+---
+ arch/arm/Kconfig.debug                 | 20 +++++++++++-
+ arch/arm/include/debug/scif.S          | 60 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7779.c |  7 ++++
+ 3 files changed, 86 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/debug/scif.S
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54f8d17fa6b..58ace40b30938e58 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -699,6 +699,14 @@ choice
+ 		  their output to UART 2. The port must have been initialised
+ 		  by the boot-loader before use.
  
- /* pin banks of s5pv210 pin-controller */
--static struct samsung_pin_bank s5pv210_pin_bank[] = {
-+static const struct samsung_pin_bank_data s5pv210_pin_bank[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
-@@ -626,7 +626,7 @@ const struct samsung_pin_ctrl s5pv210_pin_ctrl[] __initconst = {
- };
- 
- /* pin banks of exynos3250 pin-controller 0 */
--static struct samsung_pin_bank exynos3250_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos3250_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb",  0x08),
-@@ -637,7 +637,7 @@ static struct samsung_pin_bank exynos3250_pin_banks0[] = {
- };
- 
- /* pin banks of exynos3250 pin-controller 1 */
--static struct samsung_pin_bank exynos3250_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos3250_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTN(8, 0x120, "gpe0"),
- 	EXYNOS_PIN_BANK_EINTN(8, 0x140, "gpe1"),
- 	EXYNOS_PIN_BANK_EINTN(3, 0x180, "gpe2"),
-@@ -680,7 +680,7 @@ const struct samsung_pin_ctrl exynos3250_pin_ctrl[] __initconst = {
- };
- 
- /* pin banks of exynos4210 pin-controller 0 */
--static struct samsung_pin_bank exynos4210_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos4210_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
-@@ -700,7 +700,7 @@ static struct samsung_pin_bank exynos4210_pin_banks0[] = {
- };
- 
- /* pin banks of exynos4210 pin-controller 1 */
--static struct samsung_pin_bank exynos4210_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos4210_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpj0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpj1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpk0", 0x08),
-@@ -724,7 +724,7 @@ static struct samsung_pin_bank exynos4210_pin_banks1[] = {
- };
- 
- /* pin banks of exynos4210 pin-controller 2 */
--static struct samsung_pin_bank exynos4210_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos4210_pin_banks2[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTN(7, 0x000, "gpz"),
- };
- 
-@@ -756,7 +756,7 @@ const struct samsung_pin_ctrl exynos4210_pin_ctrl[] __initconst = {
- };
- 
- /* pin banks of exynos4x12 pin-controller 0 */
--static struct samsung_pin_bank exynos4x12_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos4x12_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
-@@ -773,7 +773,7 @@ static struct samsung_pin_bank exynos4x12_pin_banks0[] = {
- };
- 
- /* pin banks of exynos4x12 pin-controller 1 */
--static struct samsung_pin_bank exynos4x12_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos4x12_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpk0", 0x08),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x060, "gpk1", 0x0c),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x080, "gpk2", 0x10),
-@@ -800,12 +800,12 @@ static struct samsung_pin_bank exynos4x12_pin_banks1[] = {
- };
- 
- /* pin banks of exynos4x12 pin-controller 2 */
--static struct samsung_pin_bank exynos4x12_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos4x12_pin_banks2[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz", 0x00),
- };
- 
- /* pin banks of exynos4x12 pin-controller 3 */
--static struct samsung_pin_bank exynos4x12_pin_banks3[] = {
-+static const struct samsung_pin_bank_data exynos4x12_pin_banks3[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpv0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpv1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpv2", 0x08),
-@@ -851,7 +851,7 @@ const struct samsung_pin_ctrl exynos4x12_pin_ctrl[] __initconst = {
- };
- 
- /* pin banks of exynos5250 pin-controller 0 */
--static struct samsung_pin_bank exynos5250_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos5250_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
-@@ -880,7 +880,7 @@ static struct samsung_pin_bank exynos5250_pin_banks0[] = {
- };
- 
- /* pin banks of exynos5250 pin-controller 1 */
--static struct samsung_pin_bank exynos5250_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos5250_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpe0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(2, 0x020, "gpe1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(4, 0x040, "gpf0", 0x08),
-@@ -893,7 +893,7 @@ static struct samsung_pin_bank exynos5250_pin_banks1[] = {
- };
- 
- /* pin banks of exynos5250 pin-controller 2 */
--static struct samsung_pin_bank exynos5250_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos5250_pin_banks2[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpv0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpv1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpv2", 0x08),
-@@ -902,7 +902,7 @@ static struct samsung_pin_bank exynos5250_pin_banks2[] = {
- };
- 
- /* pin banks of exynos5250 pin-controller 3 */
--static struct samsung_pin_bank exynos5250_pin_banks3[] = {
-+static const struct samsung_pin_bank_data exynos5250_pin_banks3[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz", 0x00),
- };
- 
-@@ -944,7 +944,7 @@ const struct samsung_pin_ctrl exynos5250_pin_ctrl[] __initconst = {
- };
- 
- /* pin banks of exynos5260 pin-controller 0 */
--static struct samsung_pin_bank exynos5260_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos5260_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
-@@ -969,7 +969,7 @@ static struct samsung_pin_bank exynos5260_pin_banks0[] = {
- };
- 
- /* pin banks of exynos5260 pin-controller 1 */
--static struct samsung_pin_bank exynos5260_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos5260_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpc0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpc1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpc2", 0x08),
-@@ -978,7 +978,7 @@ static struct samsung_pin_bank exynos5260_pin_banks1[] = {
- };
- 
- /* pin banks of exynos5260 pin-controller 2 */
--static struct samsung_pin_bank exynos5260_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos5260_pin_banks2[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
- };
-@@ -1008,7 +1008,7 @@ const struct samsung_pin_ctrl exynos5260_pin_ctrl[] __initconst = {
- };
- 
- /* pin banks of exynos5420 pin-controller 0 */
--static struct samsung_pin_bank exynos5420_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos5420_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpy7", 0x00),
- 	EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gpx0", 0x00),
- 	EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gpx1", 0x04),
-@@ -1017,7 +1017,7 @@ static struct samsung_pin_bank exynos5420_pin_banks0[] = {
- };
- 
- /* pin banks of exynos5420 pin-controller 1 */
--static struct samsung_pin_bank exynos5420_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos5420_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpc0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpc1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpc2", 0x08),
-@@ -1034,7 +1034,7 @@ static struct samsung_pin_bank exynos5420_pin_banks1[] = {
- };
- 
- /* pin banks of exynos5420 pin-controller 2 */
--static struct samsung_pin_bank exynos5420_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos5420_pin_banks2[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpe0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(2, 0x020, "gpe1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x040, "gpf0", 0x08),
-@@ -1046,7 +1046,7 @@ static struct samsung_pin_bank exynos5420_pin_banks2[] = {
- };
- 
- /* pin banks of exynos5420 pin-controller 3 */
--static struct samsung_pin_bank exynos5420_pin_banks3[] = {
-+static const struct samsung_pin_bank_data exynos5420_pin_banks3[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpa2", 0x08),
-@@ -1059,7 +1059,7 @@ static struct samsung_pin_bank exynos5420_pin_banks3[] = {
- };
- 
- /* pin banks of exynos5420 pin-controller 4 */
--static struct samsung_pin_bank exynos5420_pin_banks4[] = {
-+static const struct samsung_pin_bank_data exynos5420_pin_banks4[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz", 0x00),
- };
- 
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-index c0c7924657e6..f1993f42114c 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-@@ -561,7 +561,7 @@ static int s3c24xx_eint_init(struct samsung_pinctrl_drv_data *d)
- 	return 0;
- }
- 
--static struct samsung_pin_bank s3c2412_pin_banks[] = {
-+static const struct samsung_pin_bank_data s3c2412_pin_banks[] __initconst = {
- 	PIN_BANK_A(23, 0x000, "gpa"),
- 	PIN_BANK_2BIT(11, 0x010, "gpb"),
- 	PIN_BANK_2BIT(16, 0x020, "gpc"),
-@@ -581,7 +581,7 @@ const struct samsung_pin_ctrl s3c2412_pin_ctrl[] __initconst = {
- 	},
- };
- 
--static struct samsung_pin_bank s3c2416_pin_banks[] = {
-+static const struct samsung_pin_bank_data s3c2416_pin_banks[] __initconst = {
- 	PIN_BANK_A(27, 0x000, "gpa"),
- 	PIN_BANK_2BIT(11, 0x010, "gpb"),
- 	PIN_BANK_2BIT(16, 0x020, "gpc"),
-@@ -603,7 +603,7 @@ const struct samsung_pin_ctrl s3c2416_pin_ctrl[] __initconst = {
- 	},
- };
- 
--static struct samsung_pin_bank s3c2440_pin_banks[] = {
-+static const struct samsung_pin_bank_data s3c2440_pin_banks[] __initconst = {
- 	PIN_BANK_A(25, 0x000, "gpa"),
- 	PIN_BANK_2BIT(11, 0x010, "gpb"),
- 	PIN_BANK_2BIT(16, 0x020, "gpc"),
-@@ -623,7 +623,7 @@ const struct samsung_pin_ctrl s3c2440_pin_ctrl[] __initconst = {
- 	},
- };
- 
--static struct samsung_pin_bank s3c2450_pin_banks[] = {
-+static const struct samsung_pin_bank_data s3c2450_pin_banks[] __initconst = {
- 	PIN_BANK_A(28, 0x000, "gpa"),
- 	PIN_BANK_2BIT(11, 0x010, "gpb"),
- 	PIN_BANK_2BIT(16, 0x020, "gpc"),
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-index 14c3f9823cc5..7756c1e9e763 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-@@ -780,7 +780,7 @@ static int s3c64xx_eint_eint0_init(struct samsung_pinctrl_drv_data *d)
- }
- 
- /* pin banks of s3c64xx pin-controller 0 */
--static struct samsung_pin_bank s3c64xx_pin_banks0[] = {
-+static const struct samsung_pin_bank_data s3c64xx_pin_banks0[] __initconst = {
- 	PIN_BANK_4BIT_EINTG(8, 0x000, "gpa", 0),
- 	PIN_BANK_4BIT_EINTG(7, 0x020, "gpb", 8),
- 	PIN_BANK_4BIT_EINTG(8, 0x040, "gpc", 16),
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index e46fd0a25de7..04fabbd6c58a 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -979,6 +979,7 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
- 	const struct of_device_id *match;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct device_node *np;
-+	const struct samsung_pin_bank_data *bdata;
- 	const struct samsung_pin_ctrl *ctrl;
- 	struct samsung_pin_bank *bank;
- 	int i;
-@@ -993,11 +994,24 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
- 
- 	d->suspend = ctrl->suspend;
- 	d->resume = ctrl->resume;
--	d->pin_banks = ctrl->pin_banks;
- 	d->nr_banks = ctrl->nr_banks;
-+	d->pin_banks = devm_kcalloc(&pdev->dev, d->nr_banks,
-+					sizeof(*d->pin_banks), GFP_KERNEL);
-+	if (!d->pin_banks)
-+		return ERR_PTR(-ENOMEM);
- 
- 	bank = d->pin_banks;
--	for (i = 0; i < d->nr_banks; ++i, ++bank) {
-+	bdata = ctrl->pin_banks;
-+	for (i = 0; i < ctrl->nr_banks; ++i, ++bdata, ++bank) {
-+		bank->type = bdata->type;
-+		bank->pctl_offset = bdata->pctl_offset;
-+		bank->nr_pins = bdata->nr_pins;
-+		bank->eint_func = bdata->eint_func;
-+		bank->eint_type = bdata->eint_type;
-+		bank->eint_mask = bdata->eint_mask;
-+		bank->eint_offset = bdata->eint_offset;
-+		bank->name = bdata->name;
++	config DEBUG_SCIF
++		bool "Kernel low-level debugging messages via SCIF(A) on Renesas ARM SoCs"
++		depends on ARCH_R7S72100 || ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || ARCH_RMOBILE
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Renesas ARM based platforms using SCIF(A) serial ports
++		  (SH-Mobile, R-Mobile, RZ/A1H, R-Car Gen1, R-Car Gen2).
 +
- 		spin_lock_init(&bank->slock);
- 		bank->drvdata = d;
- 		bank->pin_base = d->nr_pins;
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 1288d7acb2df..b7d2f5e5d4b0 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -112,15 +112,39 @@ struct samsung_pin_bank_type {
- };
+ 	config DEBUG_SOCFPGA_UART
+ 		depends on ARCH_SOCFPGA
+ 		bool "Use SOCFPGA UART for low-level debug"
+@@ -1028,6 +1036,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX6SX_UART
+ 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
++	default "debug/scif.S" if DEBUG_SCIF
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+ 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+ 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
+@@ -1109,6 +1118,12 @@ config DEBUG_UART_PHYS
+ 	default 0xd4017000 if DEBUG_MMP_UART2
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
++	default 0xe6c40000 if DEBUG_SCIF && (ARCH_R8A73A4 || ARCH_SH7372)
++	default 0xe6c50000 if DEBUG_SCIF && ARCH_R8A7740
++	default 0xe6c80000 if DEBUG_SCIF && ARCH_SH73A0
++	default 0xe6e58000 if DEBUG_SCIF && ARCH_R8A7794
++	default 0xe6e60000 if DEBUG_SCIF && (ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7793)
++	default 0xe8008000 if DEBUG_SCIF && ARCH_R7S72100
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_MV78XX0 || \
+@@ -1121,12 +1136,15 @@ config DEBUG_UART_PHYS
+ 	default 0xff690000 if DEBUG_RK32_UART2
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+ 	default 0xffd82340 if ARCH_IOP13XX
++	default 0xffe40000 if DEBUG_SCIF && ARCH_R8A7778
++	default 0xffe42000 if DEBUG_SCIF && ARCH_R8A7779
+ 	default 0xfff36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
++		DEBUG_SCIF
  
- /**
-+ * struct samsung_pin_bank_data: represent a controller pin-bank (init data).
-+ * @type: type of the bank (register offsets and bitfield widths)
-+ * @pctl_offset: starting offset of the pin-bank registers.
-+ * @nr_pins: number of pins included in this bank.
-+ * @eint_func: function to set in CON register to configure pin as EINT.
-+ * @eint_type: type of the external interrupt supported by the bank.
-+ * @eint_mask: bit mask of pins which support EINT function.
-+ * @eint_offset: SoC-specific EINT register or interrupt offset of bank.
-+ * @name: name to be prefixed for each pin in this pin bank.
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+diff --git a/arch/arm/include/debug/scif.S b/arch/arm/include/debug/scif.S
+new file mode 100644
+index 0000000000000000..9c9b9b2c17f97b4a
+--- /dev/null
++++ b/arch/arm/include/debug/scif.S
+@@ -0,0 +1,60 @@
++/*
++ * Renesas SCIF(A) debugging macro include header
++ *
++ * Based on r8a7790.S
++ *
++ * Copyright (C) 2012-2013 Renesas Electronics Corporation
++ * Copyright (C) 1994-1999 Russell King
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+struct samsung_pin_bank_data {
-+	const struct samsung_pin_bank_type *type;
-+	u32		pctl_offset;
-+	u8		nr_pins;
-+	u8		eint_func;
-+	enum eint_type	eint_type;
-+	u32		eint_mask;
-+	u32		eint_offset;
-+	const char	*name;
-+};
 +
-+/**
-  * struct samsung_pin_bank: represent a controller pin-bank.
-  * @type: type of the bank (register offsets and bitfield widths)
-  * @pctl_offset: starting offset of the pin-bank registers.
-- * @pin_base: starting pin number of the bank.
-  * @nr_pins: number of pins included in this bank.
-  * @eint_func: function to set in CON register to configure pin as EINT.
-  * @eint_type: type of the external interrupt supported by the bank.
-  * @eint_mask: bit mask of pins which support EINT function.
-+ * @eint_offset: SoC-specific EINT register or interrupt offset of bank.
-  * @name: name to be prefixed for each pin in this pin bank.
-+ * @pin_base: starting pin number of the bank.
-+ * @soc_priv: per-bank private data for SoC-specific code.
-  * @of_node: OF node of the bank.
-  * @drvdata: link to controller driver data
-  * @irq_domain: IRQ domain of the bank.
-@@ -132,13 +156,14 @@ struct samsung_pin_bank_type {
- struct samsung_pin_bank {
- 	const struct samsung_pin_bank_type *type;
- 	u32		pctl_offset;
--	u32		pin_base;
- 	u8		nr_pins;
- 	u8		eint_func;
- 	enum eint_type	eint_type;
- 	u32		eint_mask;
- 	u32		eint_offset;
--	char		*name;
-+	const char	*name;
++#if CONFIG_DEBUG_UART_PHYS < 0xe6e00000
++/* SCIFA */
++#define FTDR		0x20
++#define FSR		0x14
++#else
++/* SCIF */
++#define FTDR		0x0c
++#define FSR		0x10
++#endif
 +
-+	u32		pin_base;
- 	void		*soc_priv;
- 	struct device_node *of_node;
- 	struct samsung_pinctrl_drv_data *drvdata;
-@@ -160,7 +185,7 @@ struct samsung_pin_bank {
-  *	interrupts for the controller.
-  */
- struct samsung_pin_ctrl {
--	struct samsung_pin_bank	*pin_banks;
-+	const struct samsung_pin_bank_data *pin_banks;
- 	u32		nr_banks;
++#define SCIF_PHYS	CONFIG_DEBUG_UART_PHYS
++
++#if defined(CONFIG_ARCH_R8A7740) || defined(CONFIG_ARCH_R8A7779) || \
++    defined(CONFIG_ARCH_SH7372) || defined(CONFIG_ARCH_SH73A0)
++/* Legacy machine_desc.map_io() sets up an identity mapping for us */
++#define SCIF_VIRT	SCIF_PHYS
++#else
++/* Relying on debug_ll_io_init(), so we have to select a free gap ourselves */
++#define SCIF_VIRT	((SCIF_PHYS & 0x00ffffff) | 0xfd000000)
++#endif
++
++#define TDFE	(1 << 5)
++#define TEND	(1 << 6)
++
++	.macro	addruart, rp, rv, tmp
++	ldr	\rp, =SCIF_PHYS
++	ldr	\rv, =SCIF_VIRT
++	.endm
++
++	.macro	waituart, rd, rx
++1001:	ldrh	\rd, [\rx, #FSR]
++	tst	\rd, #TDFE
++	beq	1001b
++	.endm
++
++	.macro	senduart, rd, rx
++	strb	\rd, [\rx, #FTDR]
++	ldrh	\rd, [\rx, #FSR]
++	bic	\rd, \rd, #TEND
++	strh	\rd, [\rx, #FSR]
++	.endm
++
++	.macro	busyuart, rd, rx
++1001:	ldrh	\rd, [\rx, #FSR]
++	tst	\rd, #TEND
++	beq	1001b
++	.endm
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 136078ab9407cc2d..24c49f7121d69d28 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -66,6 +66,13 @@ static struct map_desc r8a7779_io_desc[] __initdata = {
+ 		.length		= SZ_16M,
+ 		.type		= MT_DEVICE_NONSHARED
+ 	},
++	/* 64K entity map for 0xffe40000 (SCIF0/1) */
++	{
++		.virtual	= 0xffe40000,
++		.pfn		= __phys_to_pfn(0xffe40000),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE_NONSHARED
++	},
+ };
  
- 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
+ void __init r8a7779_map_io(void)
 -- 
-2.1.1
+1.9.1
