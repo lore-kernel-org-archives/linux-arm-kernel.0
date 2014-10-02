@@ -1,78 +1,90 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 02 Oct 2014 14:39:09 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
-References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>	<CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>	<542C4404.8040501@wwwdotorg.org>	<542CF3C3.2050708@redhat.com>
- <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
-Message-ID: <542D476D.50004@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Oct 2014 14:48:07 +0200
+Subject: [PATCH] ARM: sun7i: add support for A20-OLinuXino-Lime2
+In-Reply-To: <54296D8B.3080304@gmail.com>
+References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
+ <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
+ <54296D8B.3080304@gmail.com>
+Message-ID: <20141002124807.GC4039@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 10/02/2014 02:22 PM, jonsmirl at gmail.com wrote:
-> On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 10/01/2014 08:12 PM, Stephen Warren wrote:
->>> On 10/01/2014 11:54 AM, jonsmirl at gmail.com wrote:
->>>> On Wed, Oct 1, 2014 at 1:26 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> ...
->>>>> We've been over all this again and again and again.
->>>>>
->>>>> AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
->>>>>
->>>>> All solutions provided sofar are both tons more complicated, then the
->>>>> simple solution of simply having the simplefb dt node declare which
->>>>> clocks it needs. And to make things worse all of them sofar have
->>>>> unresolved issues (due to their complexity mostly).
->>>>>
->>>>> With the clocks in the simplefb node, then all a real driver has to do,
->>>>> is claim those same clocks before unregistering the simplefb driver,
->>>>> and everything will just work.
->>>>>
->>>>> Yet we've been discussing this for months, all because of some
->>>>> vague worries from Thierry, and *only* from Thierry that this will
->>>>> make simplefb less generic / not abstract enough, while a simple
->>>>> generic clocks property is about as generic as things come.
->>>
->>> Note: I haven't been following this thread, and really don't have the time to get involved, but I did want to point out one thing:
->>>
->>> As I think I mentioned very early on in this thread, one of the big concerns when simplefb was merged was that it would slowly grow and become a monster. As such, a condition of merging it was that it would not grow features like resource management at all. That means no clock/regulator/... support. It's intended as a simple stop-gap between early platform bringup and whenever a real driver exists for the HW. If you need resource management, write a HW-specific driver. The list archives presumably have a record of the discussion, but I don't know the links off the top of my head. If nobody
->>> other than Thierry is objecting, presumably the people who originally objected simply haven't noticed this patch/thread. I suppose it's possible they changed their mind.
->>>
->>> BTW, there's no reason that the simplefb code couldn't be refactored out into a support library that's used by both the simplefb we currently have and any new HW-specific driver. It's just that the simplefb binding and driver shouldn't grow.
->>
->> The whole reason why we want to use simplefb is not just to get things
->> running until HW specific driver is in place, but also to have early console
->> output (to help debugging boot problems on devices without a serial console),
->> in a world where most video drivers are build as loadable modules, so we
->> won't have video output until quite late into the boot process.
+On Mon, Sep 29, 2014 at 03:32:43PM +0100, Iain Paton wrote:
+> On 29/09/14 14:25, Maxime Ripard wrote:
+> > On Mon, Sep 29, 2014 at 01:56:49PM +0100, Iain Paton wrote:
 > 
-> You need both.
+> >> What additional patches are we talking about?  The following:
+> >> regulator: axp20x: Use parent device as regulator configuration device
+> >> i2c: mv64xxx: continue probe when clock-frequency is missing
+> >> or are there others I'd need to pick out of linux-next?
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288901.html
 > 
-> 1) temporary early boot console -- this is nothing but an address in
-> RAM and the x/y layout. The character set from framebuffer is built
-> into the kernel.  The parallel to this is early-printk and how it uses
-> the UARTs without interrupts. This console vaporizes late in the boot
-> process -- the same thing happens with the early printk UART driver.
-> EARLYPRINTK on the command line enables this.
+> Ok, I'll pull those on top of something not quite as bleeding edge as linux-next
 > 
-> 2) a device specific driver -- this sits on initrd and it loaded as
-> soon as possible. The same thing happens with the real UART driver for
-> the console. CONSOLE= on the command line causes the transition. There
-> is an API in the kernel to do this transition, I believe it is called
-> set_console() but it's been a while.
+> > Leave it out then. If you have no way to test it, it's going to be
+> > very bug prone, and we can always add it later.
+> 
+> I moved my root disk to a SATA drive, so only a minor inconvenience.
+> 
+> dmesg shows the following with the regulators node as in the v2 patch, 
+> the bottom half being mostly what I'd expect
+> 
+> [    0.868607] sunxi-rtc 1c20d00.rtc: RTC enabled
+> [    0.877062] Adding alias for supply acin,(null) -> acin,0-0034
+> [    0.882948] Adding alias for supply vin2,(null) -> vin2,0-0034
+> [    0.888775] Adding alias for supply vin3,(null) -> vin3,0-0034
+> [    0.894612] Adding alias for supply ldo24in,(null) -> ldo24in,0-0034
+> [    0.900956] Adding alias for supply ldo3in,(null) -> ldo3in,0-0034
+> [    0.907160] Adding alias for supply ldo5in,(null) -> ldo5in,0-0034
+> [    0.914029] LDO1: 1300 mV 
+> [    0.917428] LDO2: 1800 <--> 3300 mV at 3000 mV 
+> [    0.922483] LDO3: 700 <--> 3500 mV at 2275 mV 
+> [    0.927136] LDO4: 1250 <--> 3300 mV at 2800 mV 
+> [    0.932334] LDO5: 1800 <--> 3300 mV at 2800 mV 
+> [    0.937308] DCDC2: 1400 mV 
+> [    0.940552] DCDC3: 1250 mV 
+> [    0.943474] axp20x 0-0034: AXP20X driver loaded
 
-Eventually we need both, yes. But 1) should stay working until 2) loads,
-not until some phase of the bootup is completed, but simply until 2) loads.
+No, it's not. You don't have the parenting relationship between the
+regulators, and you shouldn't use the aliases anymore.
 
-Which means we must reserve necessary resources so that they don't get
-disabled until 2 loads.
+Like I said, you'd better drop that part until things settle down.
 
-One example why this is necessary is e.g. to debug things where the problem
-is that the right module is not included in the initrd.
+> > The SD card issue is more troublesome. We'll have to look into it.
+> 
+> dmesg shows the mmc driver loading:
+> 
+> [    0.957716] sdhci: Secure Digital Host Controller Interface driver
+> [    0.963963] sdhci: Copyright(c) Pierre Ossman
+> [    0.968843] sunxi-mmc 1c0f000.mmc: No vqmmc regulator found
+> [    0.974918] sunxi-mmc 1c0f000.mmc: Got CD GPIO
+> [    1.012036] sunxi-mmc 1c0f000.mmc: base:0xf00ac000 irq:64
+> [    1.017623] sdhci-pltfm: SDHCI platform and OF driver helper
+> 
+> however on an older, working, kernel I get a number on the end of 
+> the 'Got CD GPIO' line like this:
+> 
+> [    0.896271] sunxi-mmc 1c0f000.mmc: Got CD GPIO #225.
 
-Regards,
+That's interesting. It seems like it might be related to the recent
+breakages in the boot farm on the A31. These breakages were not
+happening on the arm-soc branch, but on linux-next only, so it must be
+coming from somewhere else, which is not that great, but rules out the
+DTS.
 
-Hans
+I'll bisect it this weekend, but don't worry too much about it.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/8ef224cc/attachment.sig>
