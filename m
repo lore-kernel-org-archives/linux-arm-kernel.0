@@ -1,75 +1,54 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 2 Oct 2014 23:18:00 +0700
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <20141002121902.GA2342@redhat.com>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
- <20141002121902.GA2342@redhat.com>
-Message-ID: <CAPvkgC3VkmctmD9dROqkAEwi-Njm9zQqVx1=Byttr5_n-J7wYw@mail.gmail.com>
+From: dianders@google.com (Doug Anderson)
+Date: Thu, 2 Oct 2014 09:19:08 -0700
+Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
+ board
+In-Reply-To: <2750153.I3nVqzmXTP@amdc1032>
+References: <2750153.I3nVqzmXTP@amdc1032>
+Message-ID: <CAD=FV=XtJVWkUwWK8=E+mvSdvBn1MuS9c+_91VPhbOSQ3kF_kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2014 19:19, Andrea Arcangeli <aarcange@redhat.com> wrote:
-> Hi Steve,
+Bartiomiej,
+
+On Thu, Oct 2, 2014 at 9:10 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
+> and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
+> tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
+> not specified.  Fix it.
 >
-
-Hi Andrea,
-
-> On Fri, Sep 26, 2014 at 03:03:48PM +0100, Steve Capper wrote:
->> This patch provides a general RCU implementation of get_user_pages_fast
->> that can be used by architectures that perform hardware broadcast of
->> TLB invalidations.
->>
->> It is based heavily on the PowerPC implementation by Nick Piggin.
+> Without this patch:
+> - "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
+>   patch causes a SD card detection to fail
+> - "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
 >
-> It'd be nice if you could also at the same time apply it to sparc and
-> powerpc in this same patchset to show the effectiveness of having a
-> generic version. Because if it's not a trivial drop-in replacement,
-> then this should go in arch/arm* instead of mm/gup.c...
-
-I think it should be adapted (if need be) and adopted for sparc, power
-and others, especially as it will result in a reduction in code size
-and make future alterations to gup easier.
-I would prefer to get this in iteratively; and have people who are
-knowledgeable of those architectures and have a means of testing the
-code thoroughly to help out. (it will be very hard for me to implement
-this on my own, but likely trivial for people who know and can test
-those architectures).
-
+> This patch fixes both above problems.
 >
-> Also I wonder if it wouldn't be better to add it to mm/util.c along
-> with the __weak gup_fast but then this is ok too. I'm just saying
-> because we never had sings of gup_fast code in mm/gup.c so far but
-> then this isn't exactly a __weak version of it... so I don't mind
-> either ways.
-
-mm/gup.c was recently created?
-It may even make sense to move the weak version in a future patch?
-
+> Suggested-by: Doug Anderson <dianders@google.com>
+> Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420-arndale-octa.dts |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
->> +             down_read(&mm->mmap_sem);
->> +             ret = get_user_pages(current, mm, start,
->> +                                  nr_pages - nr, write, 0, pages, NULL);
->> +             up_read(&mm->mmap_sem);
->
-> This has a collision with a patchset I posted, but it's trivial to
-> solve, the above three lines need to be replaced with:
->
-> +               ret = get_user_pages_unlocked(current, mm, start,
-> +                                    nr_pages - nr, write, 0, pages);
->
-> And then arm gup_fast will also page fault with FOLL_FAULT_ALLOW_RETRY
-> the first time to release the mmap_sem before I/O.
->
+> Index: b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+> ===================================================================
+> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts     2014-10-02 15:44:53.014826886 +0200
+> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts     2014-10-02 17:35:24.110600398 +0200
+> @@ -74,7 +74,8 @@
+>                 samsung,dw-mshc-ddr-timing = <1 2>;
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> -               vmmc-supply = <&ldo10_reg>;
+> +               vmmc-supply = <&ldo19_reg>;
+> +               vqmmc-supply = <&ldo13_reg>;
 
-Ahh thanks.
-I'm currently on holiday and have very limited access to email, I'd
-appreciate it if someone can keep an eye out for this during the merge
-window if this conflict arises?
+This looks right to me.  ...but I notice that ldo13 and ldo19 are not
+"always-on" in the DTS.  Are you sure card detect works for you if you
+eject your card and try to put it back in?
 
-> Thanks,
-> Andrea
+...eventually the "always-on" won't be needed, but for now I think it is...
 
-Cheers,
---
-Steve
+-Doug
