@@ -1,92 +1,71 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Thu,  2 Oct 2014 12:38:14 +0200
-Subject: [PATCH 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-Message-ID: <1412246294-27370-1-git-send-email-alexander.stein@systec-electronic.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 2 Oct 2014 11:41:06 +0100
+Subject: [PATCH 2/2] xen/arm: introduce XENMEM_cache_flush
+In-Reply-To: <1412244417-12251-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1410021102480.17038@kaball.uk.xensource.com>
+ <1412244417-12251-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <542D2BC2.2040505@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing CAN devices node including their pin muxing and clocks.
+On 02/10/14 11:06, Stefano Stabellini wrote:
+> Introduce support for new hypercall XENMEM_cache_flush.
+> Use it to perform cache flashing on pages used for dma when necessary.
+[...]
+> --- a/arch/arm/xen/mm32.c
+> +++ b/arch/arm/xen/mm32.c
+[...]
+> @@ -24,7 +27,21 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+>  	
+>  		if (!pfn_valid(pfn))
+>  		{
+> -			/* TODO: cache flush */
+> +			struct xen_cache_flush cflush;
+> +
+> +			cflush.op = 0;
+> +			cflush.addr = handle + offset;
+> +			cflush.size = size;
+> +
+> +			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
+> +				cflush.op = XENMEM_CACHE_INVAL;
+> +			if (op == dmac_map_area) {
+> +				cflush.op = XENMEM_CACHE_CLEAN;
+> +				if (dir == DMA_FROM_DEVICE)
+> +					cflush.op |= XENMEM_CACHE_INVAL;
+> +			}
+> +			if (cflush.op)
+> +				HYPERVISOR_memory_op(XENMEM_cache_flush, &cflush);
+>  		} else {
+>  			struct page *page = pfn_to_page(pfn);
+>  
+[...]
+> --- a/include/xen/interface/memory.h
+> +++ b/include/xen/interface/memory.h
+> @@ -263,4 +263,20 @@ struct xen_remove_from_physmap {
+>  };
+>  DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
+>  
+> +/*
+> + * Issue one or more cache maintenance operations on a memory range
+> + * owned by the calling domain or granted to the calling domain by a
+> + * foreign domain.
+> + */
+> +#define XENMEM_cache_flush                 27
+> +struct xen_cache_flush {
+> +/* addr is the machine address at the start of the memory range */
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
----
-I could actually only test CAN1 due to the hardware I had available. Also
-CAN0 conflicts with DBGU pins, which I had to use.
+You say machine address here but call it with a bus address.  With no
+IOMMU these are equivalent but what's correct if an IOMMU is used?
 
- arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+David
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index e1a5c70..0a2164e 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -363,6 +363,16 @@
- 						#clock-cells = <0>;
- 						reg = <28>;
- 					};
-+
-+					can0_clk: can0_clk {
-+						#clock-cells = <0>;
-+						reg = <29>;
-+					};
-+
-+					can1_clk: can1_clk {
-+						#clock-cells = <0>;
-+						reg = <30>;
-+					};
- 				};
- 			};
- 
-@@ -407,6 +417,28 @@
- 				};
- 			};
- 
-+			can0: can at f8000000 {
-+				compatible = "atmel,at91sam9x5-can";
-+				reg = <0xf8000000 0x300>;
-+				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can0_rx_tx>;
-+				clocks = <&can0_clk>;
-+				clock-names = "can_clk";
-+				status = "disabled";
-+			};
-+
-+			can1: can at f8004000 {
-+				compatible = "atmel,at91sam9x5-can";
-+				reg = <0xf8004000 0x300>;
-+				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can1_rx_tx>;
-+				clocks = <&can1_clk>;
-+				clock-names = "can_clk";
-+				status = "disabled";
-+			};
-+
- 			tcb0: timer at f8008000 {
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8008000 0x100>;
-@@ -763,6 +795,22 @@
- 					};
- 				};
- 
-+				can0 {
-+					pinctrl_can0_rx_tx: can0_rx_tx {
-+						atmel,pins =
-+							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA9 periph B RX */
-+							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA10 periph B TX */
-+					};
-+				};
-+
-+				can1 {
-+					pinctrl_can1_rx_tx: can1_rx_tx {
-+						atmel,pins =
-+							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA6 periph B RX */
-+							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA5 periph B TX */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
--- 
-2.0.4
+> +uint64_t addr;
+> +uint64_t size;
+> +#define XENMEM_CACHE_CLEAN      (1<<0)
+> +#define XENMEM_CACHE_INVAL      (1<<1)
+> +uint32_t op;
+> +};
+> +DEFINE_GUEST_HANDLE_STRUCT(xen_cache_flush);
+> +
+>  #endif /* __XEN_PUBLIC_MEMORY_H__ */
+> 
