@@ -1,74 +1,28 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 2 Oct 2014 15:10:25 +0000 (UTC)
-Subject: OMAP baseline test results for v3.17-rc7
-In-Reply-To: <20140929172049.GD3122@atomide.com>
-References: <alpine.DEB.2.02.1409291709020.7233@utopia.booyaka.com>
- <20140929172049.GD3122@atomide.com>
-Message-ID: <alpine.DEB.2.02.1410021447590.31530@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 17:20:53 +0200
+Subject: [GIT PULL] ARM: mvebu: Last DT changes for v3.18
+In-Reply-To: <20141002135926.GC27230@titan.lakedaemon.net>
+References: <20141002135926.GC27230@titan.lakedaemon.net>
+Message-ID: <1850328.rMhfjqiuR3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Mon, 29 Sep 2014, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [140929 10:14]:
-> >
-> > PM: chip off except CORE via suspend:
-> >     Pass ( 1/ 1): 3730beaglexm
-> > 
-> > PM: chip off except CORE via dynamic idle:
-> >     Pass ( 1/ 1): 3730beaglexm
+On Thursday 02 October 2014 09:59:26 Jason Cooper wrote:
 > 
-> Most likely the two tests above should now also work also for 37xxevm,
-> 3530es3beagle and 3530es31beagle in case you want to enable that.
-
-I think this might be an issue of my own inability to communicate clearly 
-what's being tested here and why :-)
-
-That "chip off except CORE" PM validation test is only needed due to the 
-3630/37xx ES1.0 errata that forces us to disable CORE off-mode on that 
-revision:
-
-----------
-echo 1 > /debug/pm_debug/enable_off_mode
-[   60.351837] omap3_pm_off_mode_enable: Core OFF disabled due to errata i583
-----------
-
-(from 
-http://www.pwsan.com/omap/testlogs/test_v3.17-rc6/20140921213558/pm/3730beaglexm/3730beaglexm_log.txt)
-
-If we were to enable that test for the other four OMAP3 boards, they would 
-probably all show up as failing, since they are all able to enter core-off 
-mode successfully :-)
-
-Maybe you have some ideas for how this can be communicated better in the 
-test results?  One thing that would probably help is if the board was 
-renamed to "3730es10beaglexm" or something like that.  Also maybe 
-mentioning the fact that the test is only needed due to errata, like:
-
------------
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730es10beaglexm
------------
-
-At some point, will probably also generate an HTML version of the summary, 
-where the test name and board names can link to some explanatory 
-information about what is being tested, and why.
-
-Anyway, any thoughts are welcome.
-
-> > PM: chip off via suspend:
-> >     Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-> > 		  3730es12beaglexm
-> > 
-> > PM: chip off via dynamic idle:
-> >     Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-> > 		  3730es12beaglexm
+> I know this is way late, but the changes a fairly small, and have been
+> in linux-next for at least 9 of Stephen's 'next-YYYYMMDD' tags.
+> Hopefully the merge window opening a week late will make it possible for
+> you guys to take this.
 > 
-> Since looks like these are working finally :)
+> This is an incremental pull request from tags/mvebu-dt-3.18 up to
+> tags/mvebu-dt-3.18-2 on the mvebu/dt branch.
 
-Thanks largely to your hard work!  Hooray!
+The one patch is a bug fix, so it's exempt from the deadline, the other
+one is obviously harmless, so I'm pulling it into next/dt.
 
+Regarding the DT change: Seriously? They made the same mistake
+*AGAIN*? I hope that whoever at Marvell decided to change the
+register location for a shipping product in a boot loader update
+will lose their commit access.
 
-- Paul
+	Arnd
