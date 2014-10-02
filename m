@@ -1,42 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Oct 2014 16:46:01 +0100
-Subject: [PATCH 21/24] ARM64:ILP32: Use a seperate syscall table as a few
- syscalls need to be using the compat syscalls
-In-Reply-To: <1409779158-30963-22-git-send-email-apinski@cavium.com>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <1409779158-30963-22-git-send-email-apinski@cavium.com>
-Message-ID: <20141002154600.GG32147@e104818-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 02 Oct 2014 09:49:09 -0600
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <542CF3C3.2050708@redhat.com>
+References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+Message-ID: <542D73F5.9040605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 10:19:15PM +0100, Andrew Pinski wrote:
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 9314352..dbedecf 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -643,9 +643,14 @@ ENDPROC(ret_from_fork)
->   */
->         .align  6
->  el0_svc:
-> -       adrp    stbl, sys_call_table            // load syscall table pointer
->         uxtw    scno, w8                        // syscall number in w8
->         mov     sc_nr, #__NR_syscalls
-> +#ifdef CONFIG_ARM64_ILP32
-> +       get_thread_info tsk
-> +       ldr     x16, [tsk, #TI_FLAGS]
-> +       tbnz    x16, #TIF_32BIT, el0_ilp32_svc  // We are using ILP32
-> +#endif
-> +       adrp    stbl, sys_call_table            // load syscall table pointer
->  el0_svc_naked:                                 // compat entry point
->         stp     x0, scno, [sp, #S_ORIG_X0]      // save the original x0 and syscall number
->         enable_dbg_and_irq
+On 10/02/2014 12:42 AM, Hans de Goede wrote:
+...
+> The whole reason why we want to use simplefb is not just to get things
+> running until HW specific driver is in place, but also to have early console
+> output (to help debugging boot problems on devices without a serial console),
+> in a world where most video drivers are build as loadable modules, so we
+> won't have video output until quite late into the boot process.
 
-The kernel_entry macro already sets tsk to the current thread_info, so
-no need to re-read it.
+That's a very different use-case than what was originally envisaged.
 
-You could also move the TI_FLAGS reading unconditionally in el0_svc and
-el0_svc_compat and we only have a tbnz here without the subsequent
-TI_FLAGS read in el0_svc_naked.
+...
+> You indicate that you don't have the time for this discussion, and I note that
+> there is no MAINTAINERS entry for drivers/video/fbdev/simplefb.c . So how about
+> the following, I pick up drivers/video/fbdev/simplefb.c maintainership, adding
+> MAINTAINERS entry for it with my name in it. Then as the maintainer it will be
+> my responsibility (and in my own benefit) to stop this from growing into
+> a monster ?
 
--- 
-Catalin
+I have no issue with you being the maintainer.
+
+I would suggest you track down whoever it was that was involved in the 
+original discussion and objected to simplefb performing resource 
+management, and get their explicit ack for the addition of 
+clocks/regulators/... to it. But, that's just a suggestion.
