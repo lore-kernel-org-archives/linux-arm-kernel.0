@@ -1,26 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Oct 2014 16:46:39 +0200
-Subject: [GIT PULL] RealView device tree support
-In-Reply-To: <CACRpkdbVtkme_CYrmF7ymsMGP3OO9mr_DPALRUeWGQh35-Uf=g@mail.gmail.com>
-References: <CACRpkdbVtkme_CYrmF7ymsMGP3OO9mr_DPALRUeWGQh35-Uf=g@mail.gmail.com>
-Message-ID: <3204791.dOjkWKTCre@wuerfel>
+Date: Thu, 02 Oct 2014 16:49:43 +0200
+Subject: [GIT PULL] ARM: dts: Keystone DTS fixes updates for 3.18
+In-Reply-To: <1412174054-25042-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1412174054-25042-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <10608387.uhvzSybtM3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 09:38:17 Linus Walleij wrote:
-> A bit late maybe, so no biggie if this does not hit the merge
-> window.
+On Wednesday 01 October 2014 10:34:14 Santosh Shilimkar wrote:
+> Few keystone DTS fixes for 3.18
 > 
-> However the dependent driver changes are already pending,
-> and this is pretty isolated. Now the device tree support is
-> split in two patches as requested.
+>         - IO range fix for USB phy device
+>         - Add missing dma-coherent property for K2E USB node
+>         - Fix K2L MDIO start address
+>         - Fix K2E MDIO start address
 
-You know I was really looking forward to this one, but I find
-it hard to justify merging it now and not merging some of the
-other parts I've started rejecting.
-
-I've also twice been bitten now by 'just DT changes' that ended
-up breaking the build, so I'd rather err on the side of being too
-cautious now until the merge window.
+Pulled into next/dt. I've stopped taking non-bugfix patches for 3.18,
+but these all look like we need them.
 
 	Arnd
