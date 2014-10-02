@@ -1,63 +1,35 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  2 Oct 2014 13:20:59 -0600
-Subject: [PATCH 2/2] MAINTAINERS: condense some Tegra related entries
-In-Reply-To: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
-References: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1412277659-1940-2-git-send-email-swarren@wwwdotorg.org>
+Date: Thu,  2 Oct 2014 13:20:58 -0600
+Subject: [PATCH 1/2] MAINTAINERS: add Alex Courbot for Tegra
+Message-ID: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-There's little point having specific entries in MAINTAINERS for Tegra
-drivers that are already covered by the top-level Tegra architecture
-support entry, and maintained by people listed there. Remove the
-duplicates.
+I'd like to propose Alex Courbot as an additional Tegra maintainer.
+He's been working on a variety of Tegra-related code for a while, and
+is now officially tasked with working on upstream support.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- MAINTAINERS | 15 ---------------
- 1 file changed, 15 deletions(-)
+Alex, I assume this is the email address you'd like to use? If not, let
+me know and I'll respin.
+
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index f3ab9f1eaf86..1fa5b07cd749 100644
+index 37054306dc9f..f3ab9f1eaf86 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -9015,11 +9015,6 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
- S:	Supported
- N:	[^a-z]tegra
- 
--TEGRA ASOC DRIVER
--M:	Stephen Warren <swarren@wwwdotorg.org>
--S:	Supported
--F:	sound/soc/tegra/
--
- TEGRA CLOCK DRIVER
- M:	Peter De Schrijver <pdeschrijver@nvidia.com>
- M:	Prashant Gaikwad <pgaikwad@nvidia.com>
-@@ -9031,11 +9026,6 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
- S:	Supported
- F:	drivers/dma/tegra20-apb-dma.c
- 
--TEGRA GPIO DRIVER
--M:	Stephen Warren <swarren@wwwdotorg.org>
--S:	Supported
--F:	drivers/gpio/gpio-tegra.c
--
- TEGRA I2C DRIVER
- M:	Laxman Dewangan <ldewangan@nvidia.com>
- S:	Supported
-@@ -9052,11 +9042,6 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
- S:	Supported
- F:	drivers/input/keyboard/tegra-kbc.c
- 
--TEGRA PINCTRL DRIVER
--M:	Stephen Warren <swarren@wwwdotorg.org>
--S:	Supported
--F:	drivers/pinctrl/pinctrl-tegra*
--
- TEGRA PWM DRIVER
+@@ -9008,6 +9008,7 @@ F:	drivers/media/rc/ttusbir.c
+ TEGRA ARCHITECTURE SUPPORT
+ M:	Stephen Warren <swarren@wwwdotorg.org>
  M:	Thierry Reding <thierry.reding@gmail.com>
- S:	Supported
++M:	Alex Courbot <acourbot@nvidia.com>
+ L:	linux-tegra at vger.kernel.org
+ Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
 -- 
 1.9.1
