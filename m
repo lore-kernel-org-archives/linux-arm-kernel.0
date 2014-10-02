@@ -1,25 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Oct 2014 14:23:53 +0200
-Subject: [GIT PULL] at91: soc for 3.18 #3
-In-Reply-To: <1412184003-13568-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1412184003-13568-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <2674694.XlUc134s25@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Oct 2014 14:25:49 +0200
+Subject: [PATCH 2/2] ARM: dts: sun7i: Add Mele M3 board
+In-Reply-To: <1412173537-8538-2-git-send-email-hdegoede@redhat.com>
+References: <1412173537-8538-1-git-send-email-hdegoede@redhat.com>
+ <1412173537-8538-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20141002122549.GB4039@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 October 2014 19:20:03 Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
+On Wed, Oct 01, 2014 at 04:25:37PM +0200, Hans de Goede wrote:
+> The Mele M3 is yet another Allwinnner based Android top set box from Mele.
 > 
-> Another pull-request for 3.18 if you feel it can be stacked up now. This one is
-> *only* about removing code: the old !MMU at91x40 and 2 board files plus the whole
-> code in at91sam9g45 & at91sam9rl files for implementing this deprecated method:
-> as the EK were the only one to use this code, we remove quite a bunch of lines.
-> We can use these boards with DT right now.
-> As a matter of fact, the diffstat is pretty nice 
+> It uses a housing similar to the A2000, but without the USM sata storage slot
+> at the top.
 > 
+> It features an A20 SoC, 1G RAM, 4G eMMC (unique for Allwinner devices),
+> 100Mbit ethernet, HDMI out, 3 USB A receptacles, VGA, and A/V OUT connections.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-I love the changes, but I've pretty much decided to put a hard stop
-on all new pull request after introducing a few regressions with
-late submissions.
+Queued for 3.19, thanks!
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/8b22c5c8/attachment.sig>
