@@ -1,33 +1,57 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  2 Oct 2014 18:46:14 +0900
-Subject: [PATCH v7 4/6] arm64: add seccomp syscall for compat task
+Date: Thu,  2 Oct 2014 18:46:15 +0900
+Subject: [PATCH v7 5/6] arm64: add SIGSYS siginfo for compat task
 In-Reply-To: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1412243176-16192-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1412243176-16192-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1412243176-16192-6-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows compat task to issue seccomp() system call.
+SIGSYS is primarily used in secure computing to notify tracer.
+This patch allows signal handler on compat task to get correct information
+with SA_SIGINFO specified when this signal is delivered.
 
 Reviewed-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/unistd32.h |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/compat.h |    7 +++++++
+ arch/arm64/kernel/signal32.c    |    6 ++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index da1f06b..812f192 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -787,7 +787,8 @@ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
- __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
- #define __NR_renameat2 382
- __SYSCALL(__NR_renameat2, sys_renameat2)
--			/* 383 for seccomp */
-+#define __NR_seccomp 383
-+__SYSCALL(__NR_seccomp, sys_seccomp)
- #define __NR_getrandom 384
- __SYSCALL(__NR_getrandom, sys_getrandom)
- #define __NR_memfd_create 385
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 253e33b..c877915 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -205,6 +205,13 @@ typedef struct compat_siginfo {
+ 			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+ 			int _fd;
+ 		} _sigpoll;
++
++		/* SIGSYS */
++		struct {
++			compat_uptr_t _call_addr; /* calling user insn */
++			int _syscall;	/* triggering system call number */
++			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
++		} _sigsys;
+ 	} _sifields;
+ } compat_siginfo_t;
+ 
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 1b9ad02..5a1ba6e 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -186,6 +186,12 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+ 		err |= __put_user(from->si_uid, &to->si_uid);
+ 		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
+ 		break;
++	case __SI_SYS:
++		err |= __put_user((compat_uptr_t)(unsigned long)
++				from->si_call_addr, &to->si_call_addr);
++		err |= __put_user(from->si_syscall, &to->si_syscall);
++		err |= __put_user(from->si_arch, &to->si_arch);
++		break;
+ 	default: /* this is just in case for now ... */
+ 		err |= __put_user(from->si_pid, &to->si_pid);
+ 		err |= __put_user(from->si_uid, &to->si_uid);
 -- 
 1.7.9.5
