@@ -1,485 +1,500 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  2 Oct 2014 10:40:14 +0200
-Subject: [PATCH 1/7] pinctrl: nomadik: force-convert to generic mux bindings
+Date: Thu,  2 Oct 2014 10:40:15 +0200
+Subject: [PATCH 2/7] pinctrl: abx500: force-convert to generic mux bindings
 In-Reply-To: <1412239220-22495-1-git-send-email-linus.walleij@linaro.org>
 References: <1412239220-22495-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1412239220-22495-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1412239220-22495-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This converts the Nomadik pin controller and all associated device
+This converts the ABx500 pin controller and all associated device
 trees to use the standard, generic mux bindings for pin controllers.
 There are no such device trees deployed in the wild so this is
 safe to do to set a good example.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi     | 28 ++++-----
- arch/arm/boot/dts/ste-href-family-pinctrl.dtsi | 80 +++++++++++++-------------
- arch/arm/boot/dts/ste-hrefprev60.dtsi          | 12 ++--
- arch/arm/boot/dts/ste-hrefv60plus.dtsi         |  4 +-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi     | 20 +++----
- arch/arm/boot/dts/ste-snowball.dts             | 12 ++--
- drivers/pinctrl/nomadik/pinctrl-nomadik.c      | 16 ++++--
- 7 files changed, 88 insertions(+), 84 deletions(-)
+ arch/arm/boot/dts/ste-href-ab8500.dtsi   | 108 +++++++++++++++----------------
+ arch/arm/boot/dts/ste-href-ab8505.dtsi   |  60 ++++++++---------
+ drivers/pinctrl/nomadik/pinctrl-abx500.c |  16 +++--
+ 3 files changed, 94 insertions(+), 90 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi b/arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
-index e0799966bc25..08a7365cb929 100644
---- a/arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/ste-ccu8540-pinctrl.dtsi
-@@ -16,8 +16,8 @@
- 			uart0 {
- 				uart0_default_mux: uart0_mux {
- 					default_mux {
--						ste,function = "u0";
--						ste,pins = "u0_a_1";
-+						function = "u0";
-+						groups = "u0_a_1";
- 					};
- 				};
- 
-@@ -49,8 +49,8 @@
- 			uart2 {
- 				uart2_default_mode: uart2_default {
- 					default_mux {
--						ste,function = "u2";
--						ste,pins = "u2txrx_a_1";
-+						function = "u2";
-+						groups = "u2txrx_a_1";
- 					};
- 
- 					default_cfg1 {
-@@ -80,8 +80,8 @@
- 			i2c0 {
- 				i2c0_default_mux: i2c_mux {
- 					default_mux {
--						ste,function = "i2c0";
--						ste,pins = "i2c0_a_1";
-+						function = "i2c0";
-+						groups = "i2c0_a_1";
- 					};
- 				};
- 
-@@ -103,8 +103,8 @@
- 			i2c1 {
- 				i2c1_default_mux: i2c_mux {
- 					default_mux {
--						ste,function = "i2c1";
--						ste,pins = "i2c1_b_2";
-+						function = "i2c1";
-+						groups = "i2c1_b_2";
- 					};
- 				};
- 
-@@ -126,8 +126,8 @@
- 			i2c2 {
- 				i2c2_default_mux: i2c_mux {
- 					default_mux {
--						ste,function = "i2c2";
--						ste,pins = "i2c2_b_2";
-+						function = "i2c2";
-+						groups = "i2c2_b_2";
- 					};
- 				};
- 
-@@ -149,8 +149,8 @@
- 			i2c4 {
- 				i2c4_default_mux: i2c_mux {
- 					default_mux {
--						ste,function = "i2c4";
--						ste,pins = "i2c4_b_2";
-+						function = "i2c4";
-+						groups = "i2c4_b_2";
- 					};
- 				};
- 
+diff --git a/arch/arm/boot/dts/ste-href-ab8500.dtsi b/arch/arm/boot/dts/ste-href-ab8500.dtsi
+index 30f8601da323..8be3c471d097 100644
+--- a/arch/arm/boot/dts/ste-href-ab8500.dtsi
++++ b/arch/arm/boot/dts/ste-href-ab8500.dtsi
+@@ -47,8 +47,8 @@
+ 					gpio2 {
+ 						gpio2_default_mode: gpio2_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio2_a_1";
++								function = "gpio";
++								groups = "gpio2_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO2_T9";
+@@ -60,8 +60,8 @@
+ 					gpio4 {
+ 						gpio4_default_mode: gpio4_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio4_a_1";
++								function = "gpio";
++								groups = "gpio4_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO4_W2";
+@@ -73,8 +73,8 @@
+ 					gpio10 {
+ 						gpio10_default_mode: gpio10_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio10_d_1";
++								function = "gpio";
++								groups = "gpio10_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO10_U17";
+@@ -86,8 +86,8 @@
+ 					gpio11 {
+ 						gpio11_default_mode: gpio11_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio11_d_1";
++								function = "gpio";
++								groups = "gpio11_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO11_AA18";
+@@ -99,8 +99,8 @@
+ 					gpio12 {
+ 						gpio12_default_mode: gpio12_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio12_d_1";
++								function = "gpio";
++								groups = "gpio12_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO12_U16";
+@@ -112,8 +112,8 @@
+ 					gpio13 {
+ 						gpio13_default_mode: gpio13_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio13_d_1";
++								function = "gpio";
++								groups = "gpio13_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO13_W17";
+@@ -125,8 +125,8 @@
+ 					gpio16 {
+ 						gpio16_default_mode: gpio16_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio16_a_1";
++								function = "gpio";
++								groups = "gpio16_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO16_F15";
+@@ -138,8 +138,8 @@
+ 					gpio24 {
+ 						gpio24_default_mode: gpio24_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio24_a_1";
++								function = "gpio";
++								groups = "gpio24_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO24_T14";
+@@ -151,8 +151,8 @@
+ 					gpio25 {
+ 						gpio25_default_mode: gpio25_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio25_a_1";
++								function = "gpio";
++								groups = "gpio25_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO25_R16";
+@@ -164,8 +164,8 @@
+ 					gpio36 {
+ 						gpio36_default_mode: gpio36_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio36_a_1";
++								function = "gpio";
++								groups = "gpio36_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO36_A17";
+@@ -177,8 +177,8 @@
+ 					gpio37 {
+ 						gpio37_default_mode: gpio37_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio37_a_1";
++								function = "gpio";
++								groups = "gpio37_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO37_E15";
+@@ -190,8 +190,8 @@
+ 					gpio38 {
+ 						gpio38_default_mode: gpio38_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio38_a_1";
++								function = "gpio";
++								groups = "gpio38_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO38_C17";
+@@ -203,8 +203,8 @@
+ 					gpio39 {
+ 						gpio39_default_mode: gpio39_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio39_a_1";
++								function = "gpio";
++								groups = "gpio39_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO39_E16";
+@@ -216,8 +216,8 @@
+ 					gpio42 {
+ 						gpio42_default_mode: gpio42_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio42_a_1";
++								function = "gpio";
++								groups = "gpio42_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO42_U2";
+@@ -232,8 +232,8 @@
+ 					gpio26 {
+ 						gpio26_default_mode: gpio26_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio26_d_1";
++								function = "gpio";
++								groups = "gpio26_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO26_M16";
+@@ -244,8 +244,8 @@
+ 					gpio35 {
+ 						gpio35_default_mode: gpio35_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio35_d_1";
++								function = "gpio";
++								groups = "gpio35_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO35_W15";
+@@ -260,8 +260,8 @@
+ 					ycbcr {
+ 						ycbcr_default_mode: ycbcr_default {
+ 							default_mux {
+-								ste,function = "ycbcr";
+-								ste,pins = "ycbcr0123_d_1";
++								function = "ycbcr";
++								groups = "ycbcr0123_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO6_Y18",
+@@ -277,8 +277,8 @@
+ 					pwm {
+ 						pwm_default_mode: pwm_default {
+ 							default_mux {
+-								ste,function = "pwmout";
+-								ste,pins = "pwmout1_d_1", "pwmout2_d_1";
++								function = "pwmout";
++								groups = "pwmout1_d_1", "pwmout2_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO14_F14",
+@@ -292,8 +292,8 @@
+ 					adi1 {
+ 						adi1_default_mode: adi1_default {
+ 							default_mux {
+-								ste,function = "adi1";
+-								ste,pins = "adi1_d_1";
++								function = "adi1";
++								groups = "adi1_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO17_P5",
+@@ -309,8 +309,8 @@
+ 					usbuicc {
+ 						usbuicc_default_mode: usbuicc_default {
+ 							default_mux {
+-								ste,function = "usbuicc";
+-								ste,pins = "usbuicc_d_1";
++								function = "usbuicc";
++								groups = "usbuicc_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO21_H19",
+@@ -325,8 +325,8 @@
+ 					dmic {
+ 						dmic_default_mode: dmic_default {
+ 							default_mux {
+-								ste,function = "dmic";
+-								ste,pins = "dmic12_d_1",
++								function = "dmic";
++								groups = "dmic12_d_1",
+ 									 "dmic34_d_1",
+ 									 "dmic56_d_1";
+ 							};
+@@ -345,8 +345,8 @@
+ 					extcpena {
+ 						extcpena_default_mode: extcpena_default {
+ 							default_mux {
+-								ste,function = "extcpena";
+-								ste,pins = "extcpena_d_1";
++								function = "extcpena";
++								groups = "extcpena_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO34_R17";
+@@ -359,8 +359,8 @@
+ 					modsclsda {
+ 						modsclsda_default_mode: modsclsda_default {
+ 							default_mux {
+-								ste,function = "modsclsda";
+-								ste,pins = "modsclsda_d_1";
++								function = "modsclsda";
++								groups = "modsclsda_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO40_T19",
+@@ -376,8 +376,8 @@
+ 					sysclkreq2 {
+ 						sysclkreq2_default_mode: sysclkreq2_default {
+ 							default_mux {
+-								ste,function = "sysclkreq";
+-								ste,pins = "sysclkreq2_d_1";
++								function = "sysclkreq";
++								groups = "sysclkreq2_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO1_T10";
+@@ -387,8 +387,8 @@
+ 						};
+ 						sysclkreq2_sleep_mode: sysclkreq2_sleep {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio1_a_1";
++								function = "gpio";
++								groups = "gpio1_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO1_T10";
+@@ -400,8 +400,8 @@
+ 					sysclkreq4 {
+ 						sysclkreq4_default_mode: sysclkreq4_default {
+ 							default_mux {
+-								ste,function = "sysclkreq";
+-								ste,pins = "sysclkreq4_d_1";
++								function = "sysclkreq";
++								groups = "sysclkreq4_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO3_U9";
+@@ -411,8 +411,8 @@
+ 						};
+ 						sysclkreq4_sleep_mode: sysclkreq4_sleep {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio3_a_1";
++								function = "gpio";
++								groups = "gpio3_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO3_U9";
+diff --git a/arch/arm/boot/dts/ste-href-ab8505.dtsi b/arch/arm/boot/dts/ste-href-ab8505.dtsi
+index 6006d62086a2..112053c7aa51 100644
+--- a/arch/arm/boot/dts/ste-href-ab8505.dtsi
++++ b/arch/arm/boot/dts/ste-href-ab8505.dtsi
+@@ -35,8 +35,8 @@
+ 					gpio2 {
+ 						gpio2_default_mode: gpio2_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio2_a_1";
++								function = "gpio";
++								groups = "gpio2_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO2_R5";
+@@ -48,8 +48,8 @@
+ 					gpio10 {
+ 						gpio10_default_mode: gpio10_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio10_d_1";
++								function = "gpio";
++								groups = "gpio10_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO10_B16";
+@@ -61,8 +61,8 @@
+ 					gpio11 {
+ 						gpio11_default_mode: gpio11_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio11_d_1";
++								function = "gpio";
++								groups = "gpio11_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO11_B17";
+@@ -74,8 +74,8 @@
+ 					gpio13 {
+ 						gpio13_default_mode: gpio13_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio13_d_1";
++								function = "gpio";
++								groups = "gpio13_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO13_D17";
+@@ -87,8 +87,8 @@
+ 					gpio34 {
+ 						gpio34_default_mode: gpio34_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio34_a_1";
++								function = "gpio";
++								groups = "gpio34_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO34_H14";
+@@ -100,8 +100,8 @@
+ 					gpio50 {
+ 						gpio50_default_mode: gpio50_default {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio50_d_1";
++								function = "gpio";
++								groups = "gpio50_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO50_L4";
+@@ -114,8 +114,8 @@
+ 					pwm {
+ 						pwm_default_mode: pwm_default {
+ 							default_mux {
+-								ste,function = "pwmout";
+-								ste,pins = "pwmout1_d_1";
++								function = "pwmout";
++								groups = "pwmout1_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO14_C16";
+@@ -128,8 +128,8 @@
+ 					adi2 {
+ 						adi2_default_mode: adi2_default {
+ 							default_mux {
+-								ste,function = "adi2";
+-								ste,pins = "adi2_d_1";
++								function = "adi2";
++								groups = "adi2_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO17_P2",
+@@ -145,8 +145,8 @@
+ 					modsclsda {
+ 						modsclsda_default_mode: modsclsda_default {
+ 							default_mux {
+-								ste,function = "modsclsda";
+-								ste,pins = "modsclsda_d_1";
++								function = "modsclsda";
++								groups = "modsclsda_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO40_J15",
+@@ -159,8 +159,8 @@
+ 					resethw {
+ 						resethw_default_mode: resethw_default {
+ 							default_mux {
+-								ste,function = "resethw";
+-								ste,pins = "resethw_d_1";
++								function = "resethw";
++								groups = "resethw_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO52_D16";
 @@ -172,8 +172,8 @@
- 			i2c5 {
- 				i2c5_default_mux: i2c_mux {
- 					default_mux {
--						ste,function = "i2c5";
--						ste,pins = "i2c5_c_2";
-+						function = "i2c5";
-+						groups = "i2c5_c_2";
- 					};
- 				};
- 
-diff --git a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-index addfcc7c2750..61aa87138927 100644
---- a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-@@ -18,8 +18,8 @@
- 			uart0 {
- 				uart0_default_mode: uart0_default {
- 					default_mux {
--						ste,function = "u0";
--						ste,pins = "u0_a_1";
-+						function = "u0";
-+						groups = "u0_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO0_AJ5", "GPIO2_AH4"; /* CTS+RXD */
-@@ -53,8 +53,8 @@
- 			uart1 {
- 				uart1_default_mode: uart1_default {
- 					default_mux {
--						ste,function = "u1";
--						ste,pins = "u1rxtx_a_1";
-+						function = "u1";
-+						groups = "u1rxtx_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO4_AH6"; /* RXD */
-@@ -83,8 +83,8 @@
- 			uart2 {
- 				uart2_default_mode: uart2_default {
- 					default_mux {
--						ste,function = "u2";
--						ste,pins = "u2rxtx_c_1";
-+						function = "u2";
-+						groups = "u2rxtx_c_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO29_W2"; /* RXD */
-@@ -114,8 +114,8 @@
- 			i2c0 {
- 				i2c0_default_mode: i2c_default {
- 					default_mux {
--						ste,function = "i2c0";
--						ste,pins = "i2c0_a_1";
-+						function = "i2c0";
-+						groups = "i2c0_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO147_C15", "GPIO148_B16"; /* SDA/SCL */
-@@ -134,8 +134,8 @@
- 			i2c1 {
- 				i2c1_default_mode: i2c_default {
- 					default_mux {
--						ste,function = "i2c1";
--						ste,pins = "i2c1_b_2";
-+						function = "i2c1";
-+						groups = "i2c1_b_2";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO16_AD3", "GPIO17_AD4"; /* SDA/SCL */
-@@ -154,8 +154,8 @@
- 			i2c2 {
- 				i2c2_default_mode: i2c_default {
- 					default_mux {
--						ste,function = "i2c2";
--						ste,pins = "i2c2_b_2";
-+						function = "i2c2";
-+						groups = "i2c2_b_2";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO10_AF5", "GPIO11_AG4"; /* SDA/SCL */
-@@ -174,8 +174,8 @@
- 			i2c3 {
- 				i2c3_default_mode: i2c_default {
- 					default_mux {
--						ste,function = "i2c3";
--						ste,pins = "i2c3_c_2";
-+						function = "i2c3";
-+						groups = "i2c3_c_2";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO229_AG7", "GPIO230_AF7"; /* SDA/SCL */
-@@ -198,8 +198,8 @@
- 			i2c4 {
- 				i2c4_default_mode: i2c_default {
- 					default_mux {
--						ste,function = "i2c4";
--						ste,pins = "i2c4_b_1";
-+						function = "i2c4";
-+						groups = "i2c4_b_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO4_AH6", "GPIO5_AG6"; /* SDA/SCL */
-@@ -219,8 +219,8 @@
- 			spi2 {
- 				spi2_default_mode: spi_default {
- 					default_mux {
--						ste,function = "spi2";
--						ste,pins = "spi2_oc1_2";
-+						function = "spi2";
-+						groups = "spi2_oc1_2";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO216_AG12"; /* FRM */
-@@ -281,8 +281,8 @@
- 				/* This is the external SD card slot, 4 bits wide */
- 				sdi0_default_mode: sdi0_default {
- 					default_mux {
--						ste,function = "mc0";
--						ste,pins = "mc0_a_1";
-+						function = "mc0";
-+						groups = "mc0_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins =
-@@ -339,8 +339,8 @@
- 				/* This is the WLAN SDIO 4 bits wide */
- 				sdi1_default_mode: sdi1_default {
- 					default_mux {
--						ste,function = "mc1";
--						ste,pins = "mc1_a_1";
-+						function = "mc1";
-+						groups = "mc1_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO208_AH16"; /* CLK */
-@@ -383,8 +383,8 @@
- 				/* This is the eMMC 8 bits wide, usually PoP eMMC */
- 				sdi2_default_mode: sdi2_default {
- 					default_mux {
--						ste,function = "mc2";
--						ste,pins = "mc2_a_1";
-+						function = "mc2";
-+						groups = "mc2_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO128_A5"; /* CLK */
-@@ -439,8 +439,8 @@
- 				/* This is the eMMC 8 bits wide, usually PCB-mounted eMMC */
- 				sdi4_default_mode: sdi4_default {
- 					default_mux {
--						ste,function = "mc4";
--						ste,pins = "mc4_a_1";
-+						function = "mc4";
-+						groups = "mc4_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO203_AE23"; /* CLK */
-@@ -494,8 +494,8 @@
- 			msp0 {
- 				msp0_default_mode: msp0_default {
- 					default_msp0_mux {
--						ste,function = "msp0";
--						ste,pins = "msp0txrx_a_1", "msp0tfstck_a_1";
-+						function = "msp0";
-+						groups = "msp0txrx_a_1", "msp0tfstck_a_1";
- 					};
- 					default_msp0_cfg {
- 						ste,pins =
-@@ -511,8 +511,8 @@
- 			msp1 {
- 				msp1_default_mode: msp1_default {
- 					default_mux {
--						ste,function = "msp1";
--						ste,pins = "msp1txrx_a_1", "msp1_a_1";
-+						function = "msp1";
-+						groups = "msp1txrx_a_1", "msp1_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins = "GPIO33_AF2";
-@@ -533,8 +533,8 @@
- 				msp2_default_mode: msp2_default {
- 					/* MSP2 usually used for HDMI audio */
- 					default_mux {
--						ste,function = "msp2";
--						ste,pins = "msp2_a_1";
-+						function = "msp2";
-+						groups = "msp2_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins =
-@@ -554,8 +554,8 @@
- 			musb {
- 				musb_default_mode: musb_default {
- 					default_mux {
--						ste,function = "usb";
--						ste,pins = "usb_a_1";
-+						function = "usb";
-+						groups = "usb_a_1";
- 					};
- 					default_cfg1 {
- 						ste,pins =
-@@ -609,8 +609,8 @@
- 				lcd_default_mode: lcd_default {
- 					default_mux {
- 						/* Mux in VSI0 and all the data lines */
--						ste,function = "lcd";
--						ste,pins =
-+						function = "lcd";
-+						groups =
- 						"lcdvsi0_a_1", /* VSI0 for LCD */
- 						"lcd_d0_d7_a_1", /* Data lines */
- 						"lcd_d8_d11_a_1", /* TV-out */
-@@ -636,8 +636,8 @@
- 				/* SKE keys on position 2 in an 8x8 matrix */
- 				ske_kpa2_default_mode: ske_kpa2_default {
- 					default_mux {
--						ste,function = "kp";
--						ste,pins = "kp_a_2";
-+						function = "kp";
-+						groups = "kp_a_2";
- 					};
- 					default_cfg1 {
- 						ste,pins =
-@@ -696,8 +696,8 @@
- 				 */
- 				ske_kpaoc1_default_mode: ske_kpaoc1_default {
- 					default_mux {
--						ste,function = "kp";
--						ste,pins = "kp_a_1", "kp_oc1_1";
-+						function = "kp";
-+						groups = "kp_a_1", "kp_oc1_1";
- 					};
- 					default_cfg1 {
- 						ste,pins =
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index abc762e24fcb..5d8b7f8ced1b 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -79,8 +79,8 @@
- 			ssp0 {
- 				ssp0_hrefprev60_mode: ssp0_hrefprev60_default {
- 					hrefprev60_mux {
--						ste,function = "ssp0";
--						ste,pins = "ssp0_a_1";
-+						function = "ssp0";
-+						groups = "ssp0_a_1";
- 					};
- 					hrefprev60_cfg1 {
- 						ste,pins = "GPIO145_C13"; /* RXD */
-@@ -93,8 +93,8 @@
- 				/* This additional pin needed on early MOP500 and HREFs previous to v60 */
- 				sdi0_default_mode: sdi0_default {
- 					hrefprev60_mux {
--						ste,function = "mc0";
--						ste,pins = "mc0dat31dir_a_1";
-+						function = "mc0";
-+						groups = "mc0dat31dir_a_1";
- 					};
- 					hrefprev60_cfg1 {
- 						ste,pins = "GPIO21_AB3"; /* DAT31DIR */
-@@ -114,8 +114,8 @@
- 			ipgpio {
- 				 ipgpio_hrefprev60_mode: ipgpio_hrefprev60 {
- 					hrefprev60_mux {
--						ste,function = "ipgpio";
--						ste,pins = "ipgpio0_c_1", "ipgpio1_c_1";
-+						function = "ipgpio";
-+						groups = "ipgpio0_c_1", "ipgpio1_c_1";
- 					};
- 					hrefprev60_cfg1 {
- 						ste,pins = "GPIO6_AF6", "GPIO7_AG5";
-diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-index bcc1f0c37f49..2b4104ef07de 100644
---- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-@@ -64,8 +64,8 @@
- 				 */
- 				ipgpio_hrefv60_mode: ipgpio_hrefv60 {
- 					hrefv60_mux {
--						ste,function = "ipgpio";
--						ste,pins = "ipgpio0_c_1", "ipgpio1_c_1", "ipgpio4_c_1";
-+						function = "ipgpio";
-+						groups = "ipgpio0_c_1", "ipgpio1_c_1", "ipgpio4_c_1";
- 					};
- 					hrefv60_cfg1 {
- 						ste,pins = "GPIO6_AF6", "GPIO7_AG5";
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index dbcf521b017f..7cedb5aba9a9 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -100,24 +100,24 @@
- 		uart0 {
- 			uart0_default_mux: uart0_mux {
- 				u0_default_mux {
--					ste,function = "u0";
--					ste,pins = "u0_a_1";
-+					function = "u0";
-+					groups = "u0_a_1";
- 				};
- 			};
- 		};
- 		uart1 {
- 			uart1_default_mux: uart1_mux {
- 				u1_default_mux {
--					ste,function = "u1";
--					ste,pins = "u1_a_1";
-+					function = "u1";
-+					groups = "u1_a_1";
- 				};
- 			};
- 		};
- 		mmcsd {
- 			mmcsd_default_mux: mmcsd_mux {
- 				mmcsd_default_mux {
--					ste,function = "mmcsd";
--					ste,pins = "mmcsd_a_1";
-+					function = "mmcsd";
-+					groups = "mmcsd_a_1";
- 				};
- 			};
- 			mmcsd_default_mode: mmcsd_default {
-@@ -144,8 +144,8 @@
- 		i2c0 {
- 			i2c0_default_mux: i2c0_mux {
- 				i2c0_default_mux {
--					ste,function = "i2c0";
--					ste,pins = "i2c0_a_1";
-+					function = "i2c0";
-+					groups = "i2c0_a_1";
- 				};
- 			};
- 			i2c0_default_mode: i2c0_default {
-@@ -158,8 +158,8 @@
- 		i2c1 {
- 			i2c1_default_mux: i2c1_mux {
- 				i2c1_default_mux {
--					ste,function = "i2c1";
--					ste,pins = "i2c1_a_1";
-+					function = "i2c1";
-+					groups = "i2c1_a_1";
- 				};
- 			};
- 			i2c1_default_mode: i2c1_default {
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index 4a2000c620ad..e628258c6b1a 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -405,8 +405,8 @@
- 				 */
- 				eth_snowball_mode: eth_snowball {
- 					snowball_mux {
--						ste,function = "sm";
--						ste,pins = "sm_b_1";
-+						function = "sm";
-+						groups = "sm_b_1";
- 					};
- 					/* LAN IRQ pin */
- 					snowball_cfg1 {
-@@ -424,8 +424,8 @@
- 			sdi0 {
- 				sdi0_default_mode: sdi0_default {
- 					snowball_mux {
--						ste,function = "mc0";
--						ste,pins = "mc0dat31dir_a_1";
-+						function = "mc0";
-+						groups = "mc0dat31dir_a_1";
- 					};
- 					snowball_cfg1 {
- 						ste,pins = "GPIO21_AB3"; /* DAT31DIR */
-@@ -437,8 +437,8 @@
- 			ssp0 {
- 				ssp0_snowball_mode: ssp0_snowball_default {
- 					snowball_mux {
--						ste,function = "ssp0";
--						ste,pins = "ssp0_a_1";
-+						function = "ssp0";
-+						groups = "ssp0_a_1";
- 					};
- 					snowball_cfg1 {
- 						ste,pins = "GPIO144_B13"; /* FRM */
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index 3c29d9187146..f7f29bd6c0ce 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -1520,12 +1520,13 @@ static int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 	unsigned long configs = 0;
+ 					service {
+ 						service_default_mode: service_default {
+ 							default_mux {
+-								ste,function = "service";
+-								ste,pins = "service_d_1";
++								function = "service";
++								groups = "service_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO53_D15";
+@@ -188,8 +188,8 @@
+ 					sysclkreq2 {
+ 						sysclkreq2_default_mode: sysclkreq2_default {
+ 							default_mux {
+-								ste,function = "sysclkreq";
+-								ste,pins = "sysclkreq2_d_1";
++								function = "sysclkreq";
++								groups = "sysclkreq2_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO1_N4";
+@@ -199,8 +199,8 @@
+ 						};
+ 						sysclkreq2_sleep_mode: sysclkreq2_sleep {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio1_a_1";
++								function = "gpio";
++								groups = "gpio1_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO1_N4";
+@@ -212,8 +212,8 @@
+ 					sysclkreq4 {
+ 						sysclkreq4_default_mode: sysclkreq4_default {
+ 							default_mux {
+-								ste,function = "sysclkreq";
+-								ste,pins = "sysclkreq4_d_1";
++								function = "sysclkreq";
++								groups = "sysclkreq4_d_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO3_P5";
+@@ -223,8 +223,8 @@
+ 						};
+ 						sysclkreq4_sleep_mode: sysclkreq4_sleep {
+ 							default_mux {
+-								ste,function = "gpio";
+-								ste,pins = "gpio3_a_1";
++								function = "gpio";
++								groups = "gpio3_a_1";
+ 							};
+ 							default_cfg {
+ 								ste,pins = "GPIO3_P5";
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index af0d417fe3fb..debeffcc2134 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -894,12 +894,13 @@ static int abx500_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 	unsigned int nconfigs = 0;
  	bool has_config = 0;
  	struct property *prop;
 -	const char *group, *gpio_name;
@@ -495,18 +510,18 @@ index 3c29d9187146..f7f29bd6c0ce 100644
  		if (ret < 0)
  			goto exit;
  
-@@ -1535,7 +1536,7 @@ static int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+@@ -908,7 +909,7 @@ static int abx500_dt_subnode_to_map(struct pinctrl_dev *pctldev,
  		if (ret < 0)
  			goto exit;
  
 -		of_property_for_each_string(np, "ste,pins", prop, group) {
 +		of_property_for_each_string(np, "groups", prop, group) {
- 			ret = nmk_dt_add_map_mux(map, reserved_maps, num_maps,
- 					  group, function);
+ 			ret = abx500_dt_add_map_mux(map, reserved_maps,
+ 					num_maps, group, function);
  			if (ret < 0)
-@@ -1548,6 +1549,9 @@ static int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 	if (np_config)
- 		has_config |= nmk_pinctrl_dt_get_config(np_config, &configs);
+@@ -928,6 +929,9 @@ static int abx500_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 		has_config |= nconfigs;
+ 	}
  	if (has_config) {
 +		const char *gpio_name;
 +		const char *pin;
@@ -514,16 +529,16 @@ index 3c29d9187146..f7f29bd6c0ce 100644
  		ret = of_property_count_strings(np, "ste,pins");
  		if (ret < 0)
  			goto exit;
-@@ -1557,8 +1561,8 @@ static int nmk_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+@@ -938,8 +942,8 @@ static int abx500_dt_subnode_to_map(struct pinctrl_dev *pctldev,
  		if (ret < 0)
  			goto exit;
  
 -		of_property_for_each_string(np, "ste,pins", prop, group) {
--			gpio_name = nmk_find_pin_name(pctldev, group);
+-			gpio_name = abx500_find_pin_name(pctldev, group);
 +		of_property_for_each_string(np, "ste,pins", prop, pin) {
-+			gpio_name = nmk_find_pin_name(pctldev, pin);
++			gpio_name = abx500_find_pin_name(pctldev, pin);
  
- 			ret = nmk_dt_add_map_configs(map, reserved_maps,
- 						     num_maps,
+ 			ret = abx500_dt_add_map_configs(map, reserved_maps,
+ 					num_maps, gpio_name, configs, 1);
 -- 
 1.9.3
