@@ -1,46 +1,42 @@
-From: aarcange@redhat.com (Andrea Arcangeli)
-Date: Thu, 2 Oct 2014 14:19:03 +0200
-Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
-References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
- <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
-Message-ID: <20141002121902.GA2342@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 14:20:49 +0200
+Subject: [PATCH v10 0/4] APM X-Gene PCIe host controller
+In-Reply-To: <20141001191403.GC22713@google.com>
+References: <1411765707-28822-1-git-send-email-tinamdar@apm.com>
+ <20141001191403.GC22713@google.com>
+Message-ID: <2135522.DVGa59N1mx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On Fri, Sep 26, 2014 at 03:03:48PM +0100, Steve Capper wrote:
-> This patch provides a general RCU implementation of get_user_pages_fast
-> that can be used by architectures that perform hardware broadcast of
-> TLB invalidations.
+On Wednesday 01 October 2014 13:14:03 Bjorn Helgaas wrote:
+> On Fri, Sep 26, 2014 at 02:08:23PM -0700, Tanmay Inamdar wrote:
+> > This patch adds support for AppliedMicro X-Gene PCIe host controller. The
+> > driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
+> > cards.
+> > 
+> > X-Gene PCIe controller driver has depedency on the pcie arm64 arch support.
+> > Liviu Dudau from ARM has sent a patch set for pcie arm64 arch support and
+> > support for creating generic pcie bridge from device tree. Liviu's patches
+> > are available here
+> > https://lkml.org/lkml/2014/9/23/852
+> > 
+> > If someone wishes to test PCIe on X-Gene with this patch set, above mentioned
+> > patches from Liviu must be applied before the patches in this patch set. Also
+> > please use latest xgene u-boot firmware.
 > 
-> It is based heavily on the PowerPC implementation by Nick Piggin.
+> I applied these on pci/host-xgene (based on pci/host-generic).  I hope to
+> merge these for v3.18.  It'd be nice to have a device tree person like Arnd
+> or Rob take a look at the arch/arm64/boot/dts/ bits.
 
-It'd be nice if you could also at the same time apply it to sparc and
-powerpc in this same patchset to show the effectiveness of having a
-generic version. Because if it's not a trivial drop-in replacement,
-then this should go in arch/arm* instead of mm/gup.c...
+Those changes should normally go through the arm-soc tree, but we
+have not done that so far for arm64 stuff, so I'm not blaming anybody.
 
-Also I wonder if it wouldn't be better to add it to mm/util.c along
-with the __weak gup_fast but then this is ok too. I'm just saying
-because we never had sings of gup_fast code in mm/gup.c so far but
-then this isn't exactly a __weak version of it... so I don't mind
-either ways.
+The dts changes all look good to me, and I think it's ok to have them
+go through your tree this time.
 
-> +		down_read(&mm->mmap_sem);
-> +		ret = get_user_pages(current, mm, start,
-> +				     nr_pages - nr, write, 0, pages, NULL);
-> +		up_read(&mm->mmap_sem);
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-This has a collision with a patchset I posted, but it's trivial to
-solve, the above three lines need to be replaced with:
+In the future, we should all have an eye on this more to ensure that
+the .dts changes all go through arm-soc.
 
-+		ret = get_user_pages_unlocked(current, mm, start,
-+				     nr_pages - nr, write, 0, pages);
-
-And then arm gup_fast will also page fault with FOLL_FAULT_ALLOW_RETRY
-the first time to release the mmap_sem before I/O.
-
-Thanks,
-Andrea
+	Arnd
