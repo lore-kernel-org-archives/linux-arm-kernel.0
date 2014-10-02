@@ -1,73 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Oct 2014 17:38:04 +0200
-Subject: [PATCH 0/3] ARM: Meson6: enable SMP
-In-Reply-To: <3274534.jCjlMt5HJV@wuerfel>
-References: <1412066635-5298-1-git-send-email-carlo@caione.org>
- <3418275.THTV4FmaIz@wuerfel> <20141002145426.GE4039@lukather>
- <3274534.jCjlMt5HJV@wuerfel>
-Message-ID: <20141002153804.GF4039@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 17:44:48 +0200
+Subject: [GIT PULL] arm64, thunder: Enable Cavium Thunder SoC Family
+In-Reply-To: <20141002144452.GO20170@rric.localhost>
+References: <1410544187-15876-1-git-send-email-rric@kernel.org>
+ <20141002072938.GM20170@rric.localhost>
+ <20141002144452.GO20170@rric.localhost>
+Message-ID: <10758908.VF9CYFtfmA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
-> On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
-> > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
-> > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
-> > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
-> > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
-> > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
-> > > > > > > pieces to boot the secondary CPU.
-> > > > > > 
-> > > > > > Sorry for the double sending.
-> > > > > > Forgot to CC LAKML.
-> > > > > 
-> > > > > Looks good to me in principle, but I wonder about the CPU enable method.
-> > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
-> > > > > 
-> > > > > This is mostly a question of whether the system comes up in secure mode
-> > > > > or non-secure mode.
-> > > > 
-> > > > I would be able if I had the u-boot source code or the possibility to
-> > > > flash the board I'm using. Unfortunately at this moment I don't have
-> > > > either. Probably in the near future I'll be able to implement PSCI in
-> > > > u-boot since Amlogic is kindly starting to provide documentation but now
-> > > > this is the best I can do.
-> > > 
-> > > Ok, I see. Let's give Amlogic some more time then. I think it's better
-> > > to merge other parts of the platform first when we can reasonably assume
-> > > that we don't have to change the binding any more.
-> > > 
-> > > It would be a shame to merge this now and then make it obsolete by
-> > > implementing PSCI but still having to carry around the original code
-> > > for compatibility reasons.
-> > 
-> > More likely, PSCI is not going to be supported by the bootloaders of
-> > the devices already in the wild, so we still have to provide them an
-> > option. And even when it will, you'll still have to support both the
-> > devices with the old bootloaders, and the one with the new.
+On Thursday 02 October 2014 16:44:52 Robert Richter wrote:
+> The following changes since commit 9e82bf014195d6f0054982c463575cdce24292be:
 > 
-> It depends on how common the old boot loaders are, and whether it's
-> possible to upgrade them. If we can get to the point where you can
-> boot a kernel with a single CPU and have an easy way to update the
-> boot loader, we don't need to support it.
+>   Linux 3.17-rc5 (2014-09-14 17:50:12 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git tags/for-arm-soc-v3.18
+> 
+> for you to fetch changes up to 1200e87a26b6b4fe1f473267c83515117e08ee39:
+> 
+>   arm64, defconfig: Enable Cavium Thunder SoC in defconfig (2014-09-23 15:10:55 +0200)
+> 
+> ----------------------------------------------------------------
+> Enablement patches for Cavium Thunder SoC Family. The patches add
+> devicetree and Kconfig support and then add Thunder to the defconfig.
 
-I thought I heard Olof at some point ranting about this kind of
-requirements, but ok :)
+I've pulled them into a new next/arm64 branch in the arm-soc tree,
+but noticed that you had based them on top of -rc5. If you have no
+strong reasons to pick a newer -rc, it's better to base on top of
+-rc1, to save us trouble with backmerges.
 
-Still, holding off until something that hypothetical happens looks a
-bit odd, doesn't it?
+I ended up rebasing to -rc1, since you gave the option to apply the
+patches directly.
 
-Maxime
+I originally missed the patches because they were not sent to
+arm at kernel.org but only to our personal addresses. Please include
+the arm at kernel.org address whenever you want patches or pull requests
+to get applied (as opposed to reviewed). We are not really taking
+new code for arm-soc any more, but this one was first submitted
+for inclusion a while back, so I'm making an exception.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/eaad49c4/attachment.sig>
+Finally, I also wanted to pull your "dts, kbuild: Implement support
+for dtb vendor subdirs", but that clearly conflicts with this series,
+and I decided not to pull that and take this one instead.
+
+I'm guessing we'd see conflicts with other patches in linux-next,
+so I'd rather not do the merge any more now, we can take that one
+for 3.19.
+
+	Arnd
