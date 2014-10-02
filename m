@@ -1,127 +1,62 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 2 Oct 2014 10:12:38 +0200
+Date: Thu, 2 Oct 2014 10:27:58 +0200
 Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAPtuhTgJ7TLg8CKe3pQiBeEw9s33UrYEXPj6SDCga2yAh7WfEA@mail.gmail.com>
-References: <20140929080637.GB12506@ulmo> <20140929092301.GC4388@lukather>
- <20140929101805.GB26008@ulmo>
- <CAMuHMdU4u7K5NUk+p2iT-Sc_PuOjOT2FpFBj6TQMm2ThOuVVqQ@mail.gmail.com>
- <20140929104454.GD26008@ulmo> <20140929113436.GA4081@lukather>
- <20140929135358.GC30998@ulmo> <20140930213753.19023.17605@quantum>
- <20141001073043.GA18463@ulmo>
- <CAPtuhTgJ7TLg8CKe3pQiBeEw9s33UrYEXPj6SDCga2yAh7WfEA@mail.gmail.com>
-Message-ID: <20141002081236.GA30167@ulmo>
+In-Reply-To: <20141001171704.GG4273@sirena.org.uk>
+References: <20140902092508.GR15297@lukather>
+ <20140927235601.19023.31593@quantum> <20140929080637.GB12506@ulmo>
+ <20140929161101.GS16977@sirena.org.uk>
+ <20140930060312.GE29874@ulmo> <20140930180036.GI4273@sirena.org.uk>
+ <20141001081443.GC18463@ulmo> <20141001122008.GW4273@sirena.org.uk>
+ <20141001124852.GB21733@ulmo> <20141001171704.GG4273@sirena.org.uk>
+Message-ID: <20141002082757.GB30167@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 11:17:23AM -0700, Mike Turquette wrote:
-> On Wed, Oct 1, 2014 at 12:30 AM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> > On Tue, Sep 30, 2014 at 02:37:53PM -0700, Mike Turquette wrote:
-> >> Quoting Thierry Reding (2014-09-29 06:54:00)
-> >> > On Mon, Sep 29, 2014 at 01:34:36PM +0200, Maxime Ripard wrote:
-> >> > > On Mon, Sep 29, 2014 at 12:44:57PM +0200, Thierry Reding wrote:
-> >> > > > > >> Plus, speaking more specifically about the clocks, that won't prevent
-> >> > > > > >> your clock to be shut down as a side effect of a later clk_disable
-> >> > > > > >> call from another driver.
-> >> > > > >
-> >> > > > > > Furthermore isn't it a bug for a driver to call clk_disable() before a
-> >> > > > > > preceding clk_enable()? There are patches being worked on that will
-> >> > > > > > enable per-user clocks and as I understand it they will specifically
-> >> > > > > > disallow drivers to disable the hardware clock if other drivers are
-> >> > > > > > still keeping them on via their own referenc.
-> >> > > > >
-> >> > > > > Calling clk_disable() preceding clk_enable() is a bug.
-> >> > > > >
-> >> > > > > Calling clk_disable() after clk_enable() will disable the clock (and
-> >> > > > > its parents)
-> >> > > > > if the clock subsystem thinks there are no other users, which is what will
-> >> > > > > happen here.
-> >> > > >
-> >> > > > Right. I'm not sure this is really applicable to this situation, though.
-> >> > >
-> >> > > It's actually very easy to do. Have a driver that probes, enables its
-> >> > > clock, fails to probe for any reason, call clk_disable in its exit
-> >> > > path. If there's no other user at that time of this particular clock
-> >> > > tree, it will be shut down. Bam. You just lost your framebuffer.
-> >> > >
-> >> > > Really, it's just that simple, and relying on the fact that some other
-> >> > > user of the same clock tree will always be their is beyond fragile.
-> >> >
-> >> > Perhaps the meaning clk_ignore_unused should be revised, then. What you
-> >> > describe isn't at all what I'd expect from such an option. And it does
-> >> > not match the description in Documentation/kernel-parameters.txt either.
-> >>
-> >> From e156ee56cbe26c9e8df6619dac1a993245afc1d5 Mon Sep 17 00:00:00 2001
-> >> From: Mike Turquette <mturquette@linaro.org>
-> >> Date: Tue, 30 Sep 2014 14:24:38 -0700
-> >> Subject: [PATCH] doc/kernel-parameters.txt: clarify clk_ignore_unused
-> >>
-> >> Refine the definition around clk_ignore_unused, which caused some
-> >> confusion recently on the linux-fbdev and linux-arm-kernel mailing
-> >> lists[0].
-> >>
-> >> [0] http://lkml.kernel.org/r/<20140929135358.GC30998@ulmo>
-> >>
-> >> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> >> ---
-> >> Thierry,
-> >>
-> >> Please let me know if this wording makes the feature more clear.
-> >
-> > I think that's better than before, but I don't think it's accurate yet.
-> > As pointed out by Maxime unused clock may still be disabled if it's part
-> > of a tree and that tree is being disabled because there are no users
-> > left.
+On Wed, Oct 01, 2014 at 06:17:04PM +0100, Mark Brown wrote:
+> On Wed, Oct 01, 2014 at 02:48:53PM +0200, Thierry Reding wrote:
+> > On Wed, Oct 01, 2014 at 01:20:08PM +0100, Mark Brown wrote:
+[...]
+> > >                and that the DT must not contain any hint of simplefb as
+> > > shipped separately.
 > 
-> It is entirely accurate. This feature does in fact "prevent the clock
-> framework from *automatically* gating clock ...".
-
-According to what Maxime said if an unused clock is a sibling (has the
-same parent) of a clock that is used and then gets disabled, then if the
-parent has no other clocks that are enabled, the unused clock will still
-be disabled.
-
-That's still counts as "automatically" to me. Not automatically would
-mean that the clock needs to be disabled explicitly for it to become
-disabled. Disabling it as a side-effect of its parent getting disabled
-is still automatic.
-
-> And it was merged by Olof so that he could use simplefb with the
-> Chromebook!
-
-And presumably it does work for that specific Chromebook. It seems,
-though that for hardware with a somewhat whackier clock tree it doesn't
-work so well. As far as I can tell that's the reason for this patch and
-the ensuing discussion in the first place.
-
-Although, perhaps nobody ever really tested whether or not the above
-scenario was actually a problem for sunxi and maybe clk_ignore_unused
-would work for them. But as I understand they don't want to use it, so
-this whole debate about this kernel parameter is a bit moot.
-
-> > What I had argued is that it's unexpected behavior, because the clock
-> > is still unused (or becomes unused again), therefore shouldn't be
-> > disabled at that point either.
+> > Well, I don't think it should because it describes the same resources
+> > that the device tree node for the real device already describes. But
+> > perhaps this is one of the cases where duplication isn't all that bad?
 > 
-> Leaving clocks enabled because nobody claimed them is not an option.
+> If we were worried about this wecould also do it by referring to
+> those nodes and saying "get all the resources these things need" rather
+> than duplicating the references (this might make it easier to work out
+> when the system is ready to hand off to the real drivers).
 
-But that's exactly what clk_ignore_unused is, isn't it? I'm now totally
-confused.
+That's problematic to some degree because not all resource types may
+have a binding that allows them to be automatically probed, so it could
+be difficult to implement "get all the resources this thing needs". But
+perhaps we can come up with good enough heuristics to make that work
+reliably.
 
-> > So if you want to keep the current behaviour where an unused clock can
-> > still be disabled depending on what other users do, then I think it'd be
-> > good to mention that as a potential caveat.
+One downside of that is that there may be a lot of components involved
+in getting display to work and not all resources may be needed to keep
+the current state running, so we may be claiming too many. But given
+that we'd eventually release all of them anyway this shouldn't be too
+much of an issue.
+
+> > >                     That's never going to work well as far as I can see
+> > > but doesn't seem like an ABI stability issue, or at least not a
+> > > reasonable one.
 > 
-> Do you have a suggestion on the wording?
+> > It would work well under the assumption that the kernel wouldn't be
+> > touching any of the resources that simplefb depends on. If that's not a
+> > reasonable assumption then I think we can't make simplefb work the way
+> > it's currently written.
+> 
+> I can't see how that's reasonable unless the kernel has some way of
+> figuring out what it shouldn't be touching.
 
-Perhaps something like this:
-
-	Note that if an unused clock shares a parent with clocks that
-	are used, the unused clock may still become disabled as a side-
-	effect of the parent clock being disabled when none of the
-	children that are used remain enabled.
-
-?
+Agreed. It's become clear in this discussion that we can't do this in
+the way x86 and other more firmware-oriented architectures do it. They
+get away with it because they in fact hide all of this in the firmware
+or don't provide a way to control the resources in such a fine-grained
+manner to begin with.
 
 Thierry
 -------------- next part --------------
@@ -130,4 +65,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/d26295c7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/24e38157/attachment.sig>
