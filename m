@@ -1,90 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Oct 2014 14:48:07 +0200
-Subject: [PATCH] ARM: sun7i: add support for A20-OLinuXino-Lime2
-In-Reply-To: <54296D8B.3080304@gmail.com>
-References: <54280AA7.1090401@gmail.com> <20140928164337.GB15315@lukather>
- <54295711.9010901@gmail.com> <20140929132543.GC4081@lukather>
- <54296D8B.3080304@gmail.com>
-Message-ID: <20141002124807.GC4039@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 2 Oct 2014 14:54:51 +0200
+Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
+In-Reply-To: <20141002110805.GT5182@n2100.arm.linux.org.uk>
+References: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
+ <53D7C9EE.60503@wwwdotorg.org> <53FB7288.9050002@wwwdotorg.org>
+ <5408BF77.1020007@wwwdotorg.org> <20141002105103.GA13906@ulmo>
+ <20141002110805.GT5182@n2100.arm.linux.org.uk>
+Message-ID: <20141002125450.GA9916@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 29, 2014 at 03:32:43PM +0100, Iain Paton wrote:
-> On 29/09/14 14:25, Maxime Ripard wrote:
-> > On Mon, Sep 29, 2014 at 01:56:49PM +0100, Iain Paton wrote:
-> 
-> >> What additional patches are we talking about?  The following:
-> >> regulator: axp20x: Use parent device as regulator configuration device
-> >> i2c: mv64xxx: continue probe when clock-frequency is missing
-> >> or are there others I'd need to pick out of linux-next?
+On Thu, Oct 02, 2014 at 12:08:05PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 02, 2014 at 12:51:04PM +0200, Thierry Reding wrote:
+> > On Thu, Sep 04, 2014 at 01:37:27PM -0600, Stephen Warren wrote:
+> > > On 08/25/2014 11:29 AM, Stephen Warren wrote:
+> > > >On 07/29/2014 10:21 AM, Stephen Warren wrote:
+> > > >>On 07/29/2014 08:25 AM, Thierry Reding wrote:
+> > > >>>From: Thierry Reding <treding@nvidia.com>
+> > > >>>
+> > > >>>This will allow the Kconfig option to be shared among 32-bit and 64-bit
+> > > >>>ARM.
+> > > >>
+> > > >>This seems fine to me. I'd expect to apply it for 3.18, provided I get
+> > > >>an ack from Russell as drivers/amba maintainer (hence CCing him without
+> > > >>trimming the quote).
+> > > >
+> > > >Russell,
+> > > >
+> > > >Are you OK with this patch? If so, if you could ack it so I can apply
+> > > >it, that would be great.
+> > > 
+> > > Russell?
 > > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288901.html
+> > Russell,
+> > 
+> > Can I have your Acked-by on this or would you prefer it to be submitted
+> > to the patch tracker? Would the patch tracker be the correct place also
+> > for non-ARM core patches?
 > 
-> Ok, I'll pull those on top of something not quite as bleeding edge as linux-next
+> I just had to go digging for the original patch, as I've been missing
+> this.
 > 
-> > Leave it out then. If you have no way to test it, it's going to be
-> > very bug prone, and we can always add it later.
-> 
-> I moved my root disk to a SATA drive, so only a minor inconvenience.
-> 
-> dmesg shows the following with the regulators node as in the v2 patch, 
-> the bottom half being mostly what I'd expect
-> 
-> [    0.868607] sunxi-rtc 1c20d00.rtc: RTC enabled
-> [    0.877062] Adding alias for supply acin,(null) -> acin,0-0034
-> [    0.882948] Adding alias for supply vin2,(null) -> vin2,0-0034
-> [    0.888775] Adding alias for supply vin3,(null) -> vin3,0-0034
-> [    0.894612] Adding alias for supply ldo24in,(null) -> ldo24in,0-0034
-> [    0.900956] Adding alias for supply ldo3in,(null) -> ldo3in,0-0034
-> [    0.907160] Adding alias for supply ldo5in,(null) -> ldo5in,0-0034
-> [    0.914029] LDO1: 1300 mV 
-> [    0.917428] LDO2: 1800 <--> 3300 mV at 3000 mV 
-> [    0.922483] LDO3: 700 <--> 3500 mV at 2275 mV 
-> [    0.927136] LDO4: 1250 <--> 3300 mV at 2800 mV 
-> [    0.932334] LDO5: 1800 <--> 3300 mV at 2800 mV 
-> [    0.937308] DCDC2: 1400 mV 
-> [    0.940552] DCDC3: 1250 mV 
-> [    0.943474] axp20x 0-0034: AXP20X driver loaded
+> I think this is fine, though if we're going to have drivers/amba/Kconfig,
+> we should also move the ARM_AMBA Kconfig option there too.  Note that it
+> currently appears in both arch/arm/Kconfig and arch/arm64/Kconfig.
 
-No, it's not. You don't have the parenting relationship between the
-regulators, and you shouldn't use the aliases anymore.
+Okay, let me turn that into a prequel patch for this one.
 
-Like I said, you'd better drop that part until things settle down.
-
-> > The SD card issue is more troublesome. We'll have to look into it.
-> 
-> dmesg shows the mmc driver loading:
-> 
-> [    0.957716] sdhci: Secure Digital Host Controller Interface driver
-> [    0.963963] sdhci: Copyright(c) Pierre Ossman
-> [    0.968843] sunxi-mmc 1c0f000.mmc: No vqmmc regulator found
-> [    0.974918] sunxi-mmc 1c0f000.mmc: Got CD GPIO
-> [    1.012036] sunxi-mmc 1c0f000.mmc: base:0xf00ac000 irq:64
-> [    1.017623] sdhci-pltfm: SDHCI platform and OF driver helper
-> 
-> however on an older, working, kernel I get a number on the end of 
-> the 'Got CD GPIO' line like this:
-> 
-> [    0.896271] sunxi-mmc 1c0f000.mmc: Got CD GPIO #225.
-
-That's interesting. It seems like it might be related to the recent
-breakages in the boot farm on the A31. These breakages were not
-happening on the arm-soc branch, but on linux-next only, so it must be
-coming from somewhere else, which is not that great, but rules out the
-DTS.
-
-I'll bisect it this weekend, but don't worry too much about it.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/8ef224cc/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/5d9c96bd/attachment.sig>
