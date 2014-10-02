@@ -1,134 +1,128 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 2 Oct 2014 09:27:41 -0400
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <542D4FB9.6090805@redhat.com>
-References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
- <20140929134708.GB30998@ulmo>
- <20140929155517.GR16977@sirena.org.uk>
- <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
- <20141001074139.GB18463@ulmo>
- <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
- <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
- <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
- <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
- <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
- <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
- <542D476D.50004@redhat.com>
- <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
- <542D4FB9.6090805@redhat.com>
-Message-ID: <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 2 Oct 2014 15:30:40 +0200
+Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
+ API
+In-Reply-To: <542D3E45.5020908@samsung.com>
+References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
+ <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
+ <542C2D9F.8060005@samsung.com>
+ <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
+ <542D3E45.5020908@samsung.com>
+Message-ID: <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 2, 2014 at 9:14 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
+On 2 October 2014 14:00, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> Hello Ulf,
 >
-> On 10/02/2014 02:56 PM, jonsmirl at gmail.com wrote:
->> On Thu, Oct 2, 2014 at 8:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi,
->>>
->>> On 10/02/2014 02:22 PM, jonsmirl at gmail.com wrote:
->>>> On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>> Hi,
->>>>>
->>>>> On 10/01/2014 08:12 PM, Stephen Warren wrote:
->>>>>> On 10/01/2014 11:54 AM, jonsmirl at gmail.com wrote:
->>>>>>> On Wed, Oct 1, 2014 at 1:26 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>>> ...
->>>>>>>> We've been over all this again and again and again.
->>>>>>>>
->>>>>>>> AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
->>>>>>>>
->>>>>>>> All solutions provided sofar are both tons more complicated, then the
->>>>>>>> simple solution of simply having the simplefb dt node declare which
->>>>>>>> clocks it needs. And to make things worse all of them sofar have
->>>>>>>> unresolved issues (due to their complexity mostly).
->>>>>>>>
->>>>>>>> With the clocks in the simplefb node, then all a real driver has to do,
->>>>>>>> is claim those same clocks before unregistering the simplefb driver,
->>>>>>>> and everything will just work.
->>>>>>>>
->>>>>>>> Yet we've been discussing this for months, all because of some
->>>>>>>> vague worries from Thierry, and *only* from Thierry that this will
->>>>>>>> make simplefb less generic / not abstract enough, while a simple
->>>>>>>> generic clocks property is about as generic as things come.
->>>>>>
->>>>>> Note: I haven't been following this thread, and really don't have the time to get involved, but I did want to point out one thing:
->>>>>>
->>>>>> As I think I mentioned very early on in this thread, one of the big concerns when simplefb was merged was that it would slowly grow and become a monster. As such, a condition of merging it was that it would not grow features like resource management at all. That means no clock/regulator/... support. It's intended as a simple stop-gap between early platform bringup and whenever a real driver exists for the HW. If you need resource management, write a HW-specific driver. The list archives presumably have a record of the discussion, but I don't know the links off the top of my head. If nobody
->>>>>> other than Thierry is objecting, presumably the people who originally objected simply haven't noticed this patch/thread. I suppose it's possible they changed their mind.
->>>>>>
->>>>>> BTW, there's no reason that the simplefb code couldn't be refactored out into a support library that's used by both the simplefb we currently have and any new HW-specific driver. It's just that the simplefb binding and driver shouldn't grow.
->>>>>
->>>>> The whole reason why we want to use simplefb is not just to get things
->>>>> running until HW specific driver is in place, but also to have early console
->>>>> output (to help debugging boot problems on devices without a serial console),
->>>>> in a world where most video drivers are build as loadable modules, so we
->>>>> won't have video output until quite late into the boot process.
->>>>
->>>> You need both.
->>>>
->>>> 1) temporary early boot console -- this is nothing but an address in
->>>> RAM and the x/y layout. The character set from framebuffer is built
->>>> into the kernel.  The parallel to this is early-printk and how it uses
->>>> the UARTs without interrupts. This console vaporizes late in the boot
->>>> process -- the same thing happens with the early printk UART driver.
->>>> EARLYPRINTK on the command line enables this.
->>>>
->>>> 2) a device specific driver -- this sits on initrd and it loaded as
->>>> soon as possible. The same thing happens with the real UART driver for
->>>> the console. CONSOLE= on the command line causes the transition. There
->>>> is an API in the kernel to do this transition, I believe it is called
->>>> set_console() but it's been a while.
->>>
->>> Eventually we need both, yes. But 1) should stay working until 2) loads,
->>> not until some phase of the bootup is completed, but simply until 2) loads.
+> On 02/10/14 11:09, Ulf Hansson wrote:
+>> On 1 October 2014 18:36, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>>> On 01/10/14 16:41, Ulf Hansson wrote:
+>>>> There are currently no users of this API, let's remove it.
 >>
->> No, that is where you get into trouble. The device specific driver has
->> to go onto initrd where it can be loaded as early in the boot process
->> as possible.
+>> Hi Sylwester,
+>>
+>> Thanks for your reply!
+>>
+>>> The sad fact is that removal of pm_genpd_dev_need_restore() calls
+>>> from arch/arm/mach-exynos/pm_domains.c introduces regressions in
+>>> multiple exynos drivers (I'm sure it breaks media drivers).
+>>
+>> The fact that you need pm_genpd_dev_need_restore() is really worrying.
+>> That indicates that exynos are suffering from this race condition I am
+>> trying to fix in this patchset.
+>>
+>>> I think before doing such changes all relevant drivers should be
+>>> updated first. I need to take a closer look again, but it seems
+>>> after dropping the pm_genpd_dev_need_restore() calls, client
+>>> driver's runtime_resume() callback is not being called in response
+>>> to first pm_runtime_get(_sync) call, even if a device is runtime
+>>> pm active.
 >
-> This is an argument in the "you cannot do that" / "your use case is not valid"
-> category, IOW this is not a technical argument. You say I cannot do that I
-> say I can, deadlock.
+> Sorry, I meant to say "inactive" here.
 
-It is certainly possible to extend an earlyframebuffer to be able to
-run as a user space console. It is just going to turn into a
-Frankenmonster driver with piles of device specific, special case code
-in it.
+Ahh, now I see the approach.
 
-I think that device specific code belongs in a device specific driver
-and earlyframebuffer should handoff to it as soon as possible.
+Correct me if I am wrong, but I think in principle these exynos
+drivers don't use pm_runtime_set_active() during ->probe() and are
+instead relying on CONFIG_PM_RUNTIME to be enabled.
 
->
-> I've already explained that we not only can do that (we already have working
-> code proving that), but also that this is something which we absolutely need:
->
->>> One example why this is necessary is e.g. to debug things where the problem
->>> is that the right module is not included in the initrd.
+That's not a good behaviour. If these drivers are build without
+CONFIG_PM_RUNTIME - they won't work.
 
-A generic earlyframebuffer would show this error.
-
-Just use earlyprintk as a guideline, if earlyprintk shows the error
-earlyframebuffer would also show it.
-
+I guess I have pointed out this in earlier discussions around runtime
+PM, I have seen quite some driver's getting their support for runtime
+PM wrong.
 
 >
-> If we ever want ARM support to stop being about cute embedded non-sense hacks,
-> we must be able to have users get some meaningful output in failure cases like
-> this without needing to first solder a serial console to some test pads.
+>> Why would runtime PM callbacks be invoked when the device are runtime
+>> PM active? That's prevented by the runtime PM core and is the expected
+>> behaviour.
+>>
+>> pm_genpd_dev_need_restore() is not the solution, besides that it gives
+>> you the option to lie about device's runtime PM state to genpd. Thus,
+>> if you are really lucky, that might workaround your issues. :-)
 >
-> Regards,
+> Might be, nevertheless so far it more or less worked for us. At least
+> I'm sure without it everything breaks right away.
+
+I see. Obviously we must not break exynos, let's try to figure out the
+best way forward.
+
 >
-> Hans
+>> I will happily help out in fixing drivers for exynos. Would be nice if
+>> you could provide me with a list of which driver/subsystems that seems
+>> broken. HW, wise I have a exynos 5250 and exynos 5422 on my desk, so
+>> those I can test.
 >
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> For exynos5 I would check exynos-gsc and s5p-mfc (see kernel logs below).
 
+Thanks, I will have look and run some tests on exynos 5. Let you know soon.
 
+> I could take care of other, exynos4 drivers. But I believe the fix
+> belongs in the PM core, I doubt we can solve in the driver a problem
+> which only occurs to one instance (first probed) of a device from a set
+> of devices in the power domain.
+>
+>>> More details can be found in commit ebc35c726298ba3fdebba316a
+>>> 'ARM: EXYNOS: register devices in 'need_restore' state for pm_domains'.
+>>>
+>>> The above only happens when devices are added to an inactive power
+>>> domain, then I guess patch 2/4 is also an attempt to address this
+>>> issue ?
+>>
+>> Yes.
+>>
+>> I would really appreciate if you could run a test with the complete
+>> patchset and see if that resolves the issues.
+>
+> Sure, is there a git tree I could fetch all the relevant patches from ?
+> I'm not sure what the base tree for this series, I could only apply
+> first 2 patches from this thread, on top of the generic OF PM domain
+> patches. And that didn't solve issues which are seen in the logs below.
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+You have two options:
+
+1) Use/build Rafaels tree. Apply my patches on the bleeding edge
+branch.That's also what I use a work base.
+http://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
+
+2) Use/build Stephen Rothwell's linux-next tree. I can confirm the
+patches applies on the master branch as of today.
+http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+
+I really appreciate your help here, thanks!
+
+>
+> Nevertheless, as Rafael pointed out, enabling all power domains
+> unconditionally seems a step backwards. It would be nice to have
+> resolved the race in a away the power domains remain in state left
+> by the firmware and are being enabled only before any client device
+> actually needs it.
+
+You are right, but I am not sure we can do this in one go - since it
+depends on if we can fix this on PM core of if we need need
+adaptations in drivers/subsystems.
+
+Kind regards
+Uffe
