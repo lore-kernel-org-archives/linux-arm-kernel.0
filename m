@@ -1,69 +1,63 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 2 Oct 2014 15:18:14 -0400
-Subject: [PATCH v1 4/4] ARM: dts: k2hk-evm: attach net, qmss and knav_dmas
- to keystone-gpc
-In-Reply-To: <1412001499-19369-5-git-send-email-grygorii.strashko@ti.com>
-References: <1412001499-19369-1-git-send-email-grygorii.strashko@ti.com>
- <1412001499-19369-5-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <542DA4F6.2020009@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  2 Oct 2014 13:20:59 -0600
+Subject: [PATCH 2/2] MAINTAINERS: condense some Tegra related entries
+In-Reply-To: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
+References: <1412277659-1940-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1412277659-1940-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 September 2014 10:38 AM, Grygorii Strashko wrote:
-> Attach Keystone 2s nodes for NetCP, NetCPx, QMSS, KNAV-DMA devices
-> to the TI Keystone 2 Generic PM Controller.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  arch/arm/boot/dts/k2hk-evm.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
-> index 91371f7..c1ceaa2 100644
-> --- a/arch/arm/boot/dts/k2hk-evm.dts
-> +++ b/arch/arm/boot/dts/k2hk-evm.dts
-> @@ -58,6 +58,7 @@
->  				clock-output-names = "refclk-ddr3b";
->  			};
->  		};
-> +
-Stray change ?
+From: Stephen Warren <swarren@nvidia.com>
 
->  		qmss: qmss at 2a40000 {
->  			compatible = "ti,keystone-navigator-qmss";
->  			dma-coherent;
-> @@ -65,6 +66,8 @@
->  			#size-cells = <1>;
->  			clocks = <&chipclk13>;
->  			ranges;
-> +			power-domains = <&pm_controller>;
-> +
->  			queue-range	= <0 0x4000>;
->  			linkram0	= <0x100000 0x8000>;
->  			linkram1	= <0x0 0x10000>;
-> @@ -198,6 +201,8 @@
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges;
-> +			power-domains = <&pm_controller>;
-> +
->  			ti,navigator-cloud-address = <0x23a80000 0x23a90000
->  						   0x23aa0000 0x23ab0000>;
->  
-> @@ -229,6 +234,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges;
-> +			power-domains = <&pm_controller>;
->  
->  			clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
->  			dma-coherent;
-> @@ -307,6 +313,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges;
-> +			power-domains = <&pm_controller>;
->  
->  			clocks = <&clkxge>;
->  			clock-names = "clk_xge";
-> 
+There's little point having specific entries in MAINTAINERS for Tegra
+drivers that are already covered by the top-level Tegra architecture
+support entry, and maintained by people listed there. Remove the
+duplicates.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ MAINTAINERS | 15 ---------------
+ 1 file changed, 15 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f3ab9f1eaf86..1fa5b07cd749 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9015,11 +9015,6 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
+ S:	Supported
+ N:	[^a-z]tegra
+ 
+-TEGRA ASOC DRIVER
+-M:	Stephen Warren <swarren@wwwdotorg.org>
+-S:	Supported
+-F:	sound/soc/tegra/
+-
+ TEGRA CLOCK DRIVER
+ M:	Peter De Schrijver <pdeschrijver@nvidia.com>
+ M:	Prashant Gaikwad <pgaikwad@nvidia.com>
+@@ -9031,11 +9026,6 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
+ S:	Supported
+ F:	drivers/dma/tegra20-apb-dma.c
+ 
+-TEGRA GPIO DRIVER
+-M:	Stephen Warren <swarren@wwwdotorg.org>
+-S:	Supported
+-F:	drivers/gpio/gpio-tegra.c
+-
+ TEGRA I2C DRIVER
+ M:	Laxman Dewangan <ldewangan@nvidia.com>
+ S:	Supported
+@@ -9052,11 +9042,6 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
+ S:	Supported
+ F:	drivers/input/keyboard/tegra-kbc.c
+ 
+-TEGRA PINCTRL DRIVER
+-M:	Stephen Warren <swarren@wwwdotorg.org>
+-S:	Supported
+-F:	drivers/pinctrl/pinctrl-tegra*
+-
+ TEGRA PWM DRIVER
+ M:	Thierry Reding <thierry.reding@gmail.com>
+ S:	Supported
+-- 
+1.9.1
