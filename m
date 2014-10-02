@@ -1,54 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Oct 2014 16:23:13 +0100
-Subject: [PATCH 21/24] ARM64:ILP32: Use a seperate syscall table as a few
- syscalls need to be using the compat syscalls
-In-Reply-To: <1409779158-30963-22-git-send-email-apinski@cavium.com>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <1409779158-30963-22-git-send-email-apinski@cavium.com>
-Message-ID: <20141002152312.GF32147@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 17:26:53 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <20141002145426.GE4039@lukather>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <3418275.THTV4FmaIz@wuerfel> <20141002145426.GE4039@lukather>
+Message-ID: <3274534.jCjlMt5HJV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 10:19:15PM +0100, Andrew Pinski wrote:
-> +/*
-> + * sigaltstack needs some special handling as the
-> + * padding for stack_t might not be non-zero.
-> + */
-> +long ilp32_sys_sigaltstack(const stack_t __user *uss_ptr,
-> +                          stack_t __user *uoss_ptr)
-> +{
-> +       stack_t uss, uoss;
-> +       int ret;
-> +       mm_segment_t seg;
-> +
-> +       if (uss_ptr) {
-> +               if (!access_ok(VERIFY_READ, uss_ptr, sizeof(*uss_ptr)))
-> +                       return -EFAULT;
-> +               if (__get_user(uss.ss_sp, &uss_ptr->ss_sp) |
-> +                       __get_user(uss.ss_flags, &uss_ptr->ss_flags) |
-> +                       __get_user(uss.ss_size, &uss_ptr->ss_size))
-> +                       return -EFAULT;
-> +               /* Zero extend the sp address and the size. */
-> +               uss.ss_sp = (void *)(uintptr_t)(unsigned int)(uintptr_t)uss.ss_sp;
+On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
+> On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
+> > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+> > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+> > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> > > > > > pieces to boot the secondary CPU.
+> > > > > 
+> > > > > Sorry for the double sending.
+> > > > > Forgot to CC LAKML.
+> > > > 
+> > > > Looks good to me in principle, but I wonder about the CPU enable method.
+> > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
+> > > > 
+> > > > This is mostly a question of whether the system comes up in secure mode
+> > > > or non-secure mode.
+> > > 
+> > > I would be able if I had the u-boot source code or the possibility to
+> > > flash the board I'm using. Unfortunately at this moment I don't have
+> > > either. Probably in the near future I'll be able to implement PSCI in
+> > > u-boot since Amlogic is kindly starting to provide documentation but now
+> > > this is the best I can do.
+> > 
+> > Ok, I see. Let's give Amlogic some more time then. I think it's better
+> > to merge other parts of the platform first when we can reasonably assume
+> > that we don't have to change the binding any more.
+> > 
+> > It would be a shame to merge this now and then make it obsolete by
+> > implementing PSCI but still having to carry around the original code
+> > for compatibility reasons.
+> 
+> More likely, PSCI is not going to be supported by the bootloaders of
+> the devices already in the wild, so we still have to provide them an
+> option. And even when it will, you'll still have to support both the
+> devices with the old bootloaders, and the one with the new.
 
-Do you need the first (uintptr_t) cast here?
+It depends on how common the old boot loaders are, and whether it's
+possible to upgrade them. If we can get to the point where you can
+boot a kernel with a single CPU and have an easy way to update the
+boot loader, we don't need to support it.
 
-> +               uss.ss_size = (size_t)(unsigned int)uss.ss_size;
-> +       }
-> +       seg = get_fs();
-> +       set_fs(KERNEL_DS);
-> +       /*
-> +        * Note we need to use uoss as we have changed the segment to the
-> +        * kernel one so passing an user one around is wrong.
-> +        */
-
-I wonder whether it would be safe to just zero the top 32 bits of ss_sp
-on the user stack directly. Would we ever expect this to be read-only?
-
-> +       ret = sys_sigaltstack((stack_t __force __user *) (uss_ptr ? &uss : NULL),
-> +                             (stack_t __force __user *) &uoss);
-
-Nitpick: there shouldn't be any space after the type cast.
-
--- 
-Catalin
+	Arnd
