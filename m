@@ -1,115 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 01 Oct 2014 17:10:12 -0700
-Subject: [PATCH v7 4/7] qcom: pm: Add cpu low power mode functions
-In-Reply-To: <20140930160310.GC528@ilina-mac.local>
-References: <1411779495-39724-1-git-send-email-lina.iyer@linaro.org>
- <1411779495-39724-5-git-send-email-lina.iyer@linaro.org>
- <5429ED1D.5060809@codeaurora.org> <20140930160310.GC528@ilina-mac.local>
-Message-ID: <542C97E4.9000801@codeaurora.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 1 Oct 2014 17:27:05 -0700
+Subject: [PATCH v5 07/11] mmc: sdio: Convert to
+ dev_pm_domain_attach|detach()
+In-Reply-To: <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
+References: <1411151264-16245-1-git-send-email-ulf.hansson@linaro.org>
+ <1411151264-16245-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20141002002705.GA29177@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/14 09:03, Lina Iyer wrote:
-> On Mon, Sep 29 2014 at 17:37 -0600, Stephen Boyd wrote:
->> On 09/26/14 17:58, Lina Iyer wrote:
->>> Based on work by many authors, available at codeaurora.org
->>>
->>
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>> [lina: simplify the driver for an initial submission, add commit text
->>> description of idle states]
->>
->> Maintainer tags don't really make sense unless there is another author.
->>
-> Hmm.. Since this patch is a derivative work, I wanted to clarify, what
-> changed seems important. The work was done by many authors. Adding
-> signed-off from everybody who could have contributed to the patch
-> downstream is confusing.
-> I would be okay removing it.
->
+Hi Ulf,
 
-Kevin's suggestion is good.
+On Fri, Sep 19, 2014 at 08:27:40PM +0200, Ulf Hansson wrote:
+> Previously only the ACPI PM domain was supported by the sdio bus.
+> 
+> Let's convert to the common attach/detach functions for PM domains,
+> which currently means we are extending the support to include the
+> generic PM domain as well.
+> 
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> ---
+>  drivers/mmc/core/sdio_bus.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
+> index 4fa8fef9..1df0fc6 100644
+> --- a/drivers/mmc/core/sdio_bus.c
+> +++ b/drivers/mmc/core/sdio_bus.c
+> @@ -315,7 +315,7 @@ int sdio_add_func(struct sdio_func *func)
+>  	ret = device_add(&func->dev);
+>  	if (ret == 0) {
+>  		sdio_func_set_present(func);
+> -		acpi_dev_pm_attach(&func->dev, false);
+> +		dev_pm_domain_attach(&func->dev, false);
 
->> +
-> [...]
->>> +static int qcom_pm_collapse(unsigned long int unused)
->>> +{
->>> +    int ret;
->>> +    u32 flag;
->>> +
->>> +    ret = set_up_boot_address(cpu_resume, raw_smp_processor_id());
->>
->> Preemption better be off here, so why are we using
->> raw_smp_processor_id()?
->>
-> True, so raw_ returns without premeption disable, no?
->
->
+Admittedly it is not brought in by your change, but I am a bit worried
+about this code. In all other busses we attach power domain to a device
+before probing it (and detach if probe fails). Why here we only attach
+it to power domain after adding the device to the bus? If driver for the
+function has already been loaded the probe() would run without device
+being attached to a power domain...
 
-No. raw_ just means "I know what I'm doing, go away preemption checks"
-which usually is not the right thing if you actually care about the CPU
-this code is running on staying the same after you call the function.
+Adding Aaron as he's the author of the original change.
 
->>> +        return ret;
->>> +    }
->>> +
->>> +    flag = SCM_L2_ON & SCM_FLUSH_FLAG_MASK;
->>> +    scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +/**
->>> + * qcom_cpu_pm_enter_sleep(): Enter a low power mode on current cpu
->>> + *
->>> + * @mode - sleep mode to enter
->>> + *
->>> + * The code should be called with interrupts disabled and on the
->>> core on
->>> + * which the low power mode is to be executed.
->>> + *
->>> + */
->>> +static int qcom_cpu_pm_enter_sleep(enum pm_sleep_mode mode)
->>> +{
->>> +    int ret;
->>> +
->>> +    switch (mode) {
->>> +    case PM_SLEEP_MODE_SPC:
->>> +        qcom_spm_set_low_power_mode(SPM_MODE_POWER_COLLAPSE);
->>
->> Isn't it a one-to-one between PM_SLEEP_MODE_SPC and
->> SPM_MODE_POWER_COLLAPSE? The enum to enum map seems overly complicated.
->>
-> Not really. SPM modes, differ when the idle state has to notify RPM. It
-> does not have 2 enums for those modes, but uses an overloaded enum with
-> an additional flag.
->
-
-I imagine that the RPM notification will go into power domains? From the
-cpuidle perspective we're putting the CPU into wfi, retention, gdhs,
-power collapse and those correspond exactly to a flat mapping of the cpu
-idle indices. Those idle states will tell the power domain "I have this
-much time to sleep" and the power domain path will determine if we can
-go notify the RPM or not based on the time and the state of the other
-CPUs. At least this is my understanding of what Daniel was saying about
-how power domains could be used to overcome the "hierarchical" idle states.
-
->>> +
->>> +static int __init qcom_pm_device_init(void)
->>> +{
->>> +    platform_device_register(&qcom_cpuidle_device);
->>> +
->>> +    return 0;
->>> +}
->>> +device_initcall(qcom_pm_device_init);
->>
->> modules?
->>
-> Why? An earlier initialization helps with power saving
-
-If that was true the bootloader should do it. The goal is to move away
-from initcall ordering and use probe defer for these things.
+Thanks.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Dmitry
