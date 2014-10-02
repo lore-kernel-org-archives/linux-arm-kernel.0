@@ -1,160 +1,115 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 2 Oct 2014 16:31:53 +0300
-Subject: [PATCH] clk: prevent erronous parsing of children during rate
- change
-In-Reply-To: <20140930190301.19023.5135@quantum>
-References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
- <20140922191816.GF10233@codeaurora.org> <542177E5.9060606@ti.com>
- <5424C2FA.4000508@codeaurora.org> <5425135F.2070809@ti.com>
- <20140926232453.19023.25483@quantum> <542913B4.2020808@ti.com>
- <20140930070732.19023.37829@quantum> <542A6E71.10703@ti.com>
- <20140930190301.19023.5135@quantum>
-Message-ID: <542D53C9.1090305@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 02 Oct 2014 15:33:56 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>	<CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>	<542C4404.8040501@wwwdotorg.org>	<542CF3C3.2050708@redhat.com>	<CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>	<542D476D.50004@redhat.com>	<CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>	<542D4FB9.6090805@redhat.com>
+ <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+Message-ID: <542D5444.8090903@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2014 10:03 PM, Mike Turquette wrote:
-> Quoting Tero Kristo (2014-09-30 01:48:49)
->> On 09/30/2014 10:07 AM, Mike Turquette wrote:
->>> Quoting Tero Kristo (2014-09-29 01:09:24)
->>>> On 09/27/2014 02:24 AM, Mike Turquette wrote:
->>>>> Quoting Tero Kristo (2014-09-26 00:18:55)
->>>>>> On 09/26/2014 04:35 AM, Stephen Boyd wrote:
->>>>>>> On 09/23/14 06:38, Tero Kristo wrote:
->>>>>>>> On 09/22/2014 10:18 PM, Stephen Boyd wrote:
->>>>>>>>> On 08/21, Tero Kristo wrote:
->>>>>>>>>>               /* Skip children who will be reparented to another clock */
->>>>>>>>>>               if (child->new_parent && child->new_parent != clk)
->>>>>>>>>>                   continue;
+Hi,
+
+On 10/02/2014 03:27 PM, jonsmirl at gmail.com wrote:
+> On Thu, Oct 2, 2014 at 9:14 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 10/02/2014 02:56 PM, jonsmirl at gmail.com wrote:
+>>> On Thu, Oct 2, 2014 at 8:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On 10/02/2014 02:22 PM, jonsmirl at gmail.com wrote:
+>>>>> On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 10/01/2014 08:12 PM, Stephen Warren wrote:
+>>>>>>> On 10/01/2014 11:54 AM, jonsmirl at gmail.com wrote:
+>>>>>>>> On Wed, Oct 1, 2014 at 1:26 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>>> ...
+>>>>>>>>> We've been over all this again and again and again.
 >>>>>>>>>
->>>>>>>>> Are we not hitting the new_parent check here? I don't understand
->>>>>>>>> how we can be changing parents here unless the check is being
->>>>>>>>> avoided, in which case I wonder why determine_rate isn't being
->>>>>>>>> used.
+>>>>>>>>> AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
 >>>>>>>>>
->>>>>>>>
->>>>>>>> It depends how the clock underneath handles the situation. The error I
->>>>>>>> am seeing actually happens with a SoC specific compound clock (DPLL)
->>>>>>>> which integrates set_rate + mux functionality into a single clock
->>>>>>>> node. A call to the clk_set_rate changes the parent of this clock
->>>>>>>> (from bypass clock to reference clock), in addition to changing the
->>>>>>>> rate (tune the mul+div.) I looked at using the determine rate call
->>>>>>>> with this type but it breaks everything up... the parent gets changed
->>>>>>>> but not the clock rate, in addition to some other issues.
+>>>>>>>>> All solutions provided sofar are both tons more complicated, then the
+>>>>>>>>> simple solution of simply having the simplefb dt node declare which
+>>>>>>>>> clocks it needs. And to make things worse all of them sofar have
+>>>>>>>>> unresolved issues (due to their complexity mostly).
+>>>>>>>>>
+>>>>>>>>> With the clocks in the simplefb node, then all a real driver has to do,
+>>>>>>>>> is claim those same clocks before unregistering the simplefb driver,
+>>>>>>>>> and everything will just work.
+>>>>>>>>>
+>>>>>>>>> Yet we've been discussing this for months, all because of some
+>>>>>>>>> vague worries from Thierry, and *only* from Thierry that this will
+>>>>>>>>> make simplefb less generic / not abstract enough, while a simple
+>>>>>>>>> generic clocks property is about as generic as things come.
 >>>>>>>
->>>>>>> Ok. Is this omap3_noncore_dpll_set_rate()?
+>>>>>>> Note: I haven't been following this thread, and really don't have the time to get involved, but I did want to point out one thing:
+>>>>>>>
+>>>>>>> As I think I mentioned very early on in this thread, one of the big concerns when simplefb was merged was that it would slowly grow and become a monster. As such, a condition of merging it was that it would not grow features like resource management at all. That means no clock/regulator/... support. It's intended as a simple stop-gap between early platform bringup and whenever a real driver exists for the HW. If you need resource management, write a HW-specific driver. The list archives presumably have a record of the discussion, but I don't know the links off the top of my head. If nobody
+>>>>>>> other than Thierry is objecting, presumably the people who originally objected simply haven't noticed this patch/thread. I suppose it's possible they changed their mind.
+>>>>>>>
+>>>>>>> BTW, there's no reason that the simplefb code couldn't be refactored out into a support library that's used by both the simplefb we currently have and any new HW-specific driver. It's just that the simplefb binding and driver shouldn't grow.
 >>>>>>
->>>>>> Yes.
->>>>>>
->>>>>>     > Can we use determine_rate +
->>>>>>> clk_set_parent_and_rate()? At least clk_set_parent_and_rate() would
->>>>>>> allow us to do the mult+div and the parent in the same op call, although
->>>>>>> I don't understand why setting the parent and then setting the rate is
->>>>>>> not going to work.
->>>>>>
->>>>>> Well, setting parent first, then rate later causes problems with the
->>>>>> DPLL ending up running with illegal (non-specified) rate, the M+N values
->>>>>> are most likely wrong if you just switch from bypass clock to reference
->>>>>> clock first without programming the M+N first.
+>>>>>> The whole reason why we want to use simplefb is not just to get things
+>>>>>> running until HW specific driver is in place, but also to have early console
+>>>>>> output (to help debugging boot problems on devices without a serial console),
+>>>>>> in a world where most video drivers are build as loadable modules, so we
+>>>>>> won't have video output until quite late into the boot process.
 >>>>>
->>>>> I took a quick look and it still seems to me that the OMAP DPLLs are
->>>>> still not modeled properly as mux clocks. Is this correct?
->>>>
->>>> Yeah, they are not mux clocks, but rather a compound of mux + DPLL
->>>> multiplier/divider logic. Changing the DPLL to be a separate mux + DPLL
->>>> div/mult clock will still have overlapping usage of the DPLL_EN field,
->>>
->>> I'm not talking about splitting up the clock into two separate clocks.
->>> If memory serves the DPLL clock implementation "cheats" and hides the
->>> bypass_clk info from the clock framework. To be explicit, from the
->>> perspective of Linux clock framework DPLL clocks only have one parent.
->>>
->>> In reality a typical DPLL should have at least 2 parents (and in some
->>> cases starting with OMAP4, some of the DPLL output clocks should have a
->>> second HSD parent). But the implementation does not reflect this.
->>
->> No, this is not the DPLLs are modelled. Each DPLL has currently two
->> parents, ref-clk and bypass-clk, which are both modelled as separate
->> clock nodes, and the DPLL switches parents based on bypass/lock mode.
->> The bypass clock is also usually a mux clock, which further selects
->> separate bypass parent, resulting in 3 or more parents for a certain DPLL.
->
-> I stand corrected. I thought it was still done the old way where the
-> machine-specific clock struct was holding the pointer to the ref_clk and
-> bypass_clk. I'm glad that is not the case any more.
->
->>
->>>
->>>> as the DPLL must be in bypass mode during M+N change. Or, should the
->>>> DPLL rate change only be allowed if the mux is in bypass setting?
->>>> Several drivers still depend on direct dpll clk_set_rate working
->>>> 'properly' (there are some other issues currently present also which
->>>> have nothing to do with the mux behavior.)
->>>>
->>>>> This issue has been lingering for a long time and we can't use
->>>>> determine_rate unless that clock has multiple parents. Simply hacking
->>>>> knowledge of the parent bypass clock into the .set_rate callback is not
->>>>> enough.
->>>>
->>>> If you believe this _must_ be changed, I can take a look at this for
->>>> next merge window, but this will cause a DT data compatibility break if
->>>> nothing else (personally I don't care about this as I always rebuild DT
->>>> blob with kernel, but lots of other people seem to do.)
->>>
->>> Well I guess the question is how long will we put up with the many small
->>> headaches caused by incorrectly modeling the clock?
->>
->> Well, its not kind of incorrectly modelled, it is just modelled in such
->> way that clk_set_rate doesn't cope too well with it.
->>
->>> determine_rate and clk_set_parent_and_rate should be sufficient for the
->>> OMAP DPLLs but only if they are correctly modeled in the framework.
->>
->> Do we have implementation for clk_set_parent_and_rate someplace? I
->> looked at rc7 and didn't find this. I think this would fix the issues I
->> am seeing combined with determine_rate, if clk_set_rate would internally
->> handle changing both rate + parent.
->
-> I made it hard for you to find it because I typo'd. It's not a clk api
-> but a clk_op:
->
-> int (*set_rate_and_parent)(struct clk_hw *hw, unsigned long rate,
->                             unsigned long parent_rate, u8 index);
-
-Oh I see. I have been experimenting with this last couple of days and it 
-looks like I got a working solution with determine_rate / 
-set_rate_and_parent for the DPLLs now. Need to do some cleanup for the 
-patches and will hopefully post those tomorrow, but I guess this will 
-probably miss the next merge window seeing we are pretty late in -rc.
-
--Tero
-
->
-> Regards,
-> Mike
->
->>
->> -Tero
->>
->>>
->>> Regards,
->>> Mike
->>>
->>>>
->>>> -Tero
->>>>
+>>>>> You need both.
 >>>>>
->>>>> Regards,
->>>>> Mike
+>>>>> 1) temporary early boot console -- this is nothing but an address in
+>>>>> RAM and the x/y layout. The character set from framebuffer is built
+>>>>> into the kernel.  The parallel to this is early-printk and how it uses
+>>>>> the UARTs without interrupts. This console vaporizes late in the boot
+>>>>> process -- the same thing happens with the early printk UART driver.
+>>>>> EARLYPRINTK on the command line enables this.
 >>>>>
->>>>>>
->>>>>>      I'm interested in the other issues that you mentioned
->>>>>>> too.
->>>>>>
->>>>>> Mostly these were side-effects from the illegal DPLL setup I guess, like
->>>>>> boot hang, failed drivers etc. I didn't really investigate this that
->>>>>> much as it is much more simpler just to use safe list iteration here.
->>>>>>
->>>>>> -Tero
+>>>>> 2) a device specific driver -- this sits on initrd and it loaded as
+>>>>> soon as possible. The same thing happens with the real UART driver for
+>>>>> the console. CONSOLE= on the command line causes the transition. There
+>>>>> is an API in the kernel to do this transition, I believe it is called
+>>>>> set_console() but it's been a while.
 >>>>
+>>>> Eventually we need both, yes. But 1) should stay working until 2) loads,
+>>>> not until some phase of the bootup is completed, but simply until 2) loads.
+>>>
+>>> No, that is where you get into trouble. The device specific driver has
+>>> to go onto initrd where it can be loaded as early in the boot process
+>>> as possible.
 >>
+>> This is an argument in the "you cannot do that" / "your use case is not valid"
+>> category, IOW this is not a technical argument. You say I cannot do that I
+>> say I can, deadlock.
+> 
+> It is certainly possible to extend an earlyframebuffer to be able to
+> run as a user space console. It is just going to turn into a
+> Frankenmonster driver with piles of device specific, special case code
+> in it.
+
+There is nothing hardware specific about a framebuffer needing some
+clocks to not be disabled. Tons of SoC's will have this. Which clocks,
+that is hardware specific, but the framebuffer driver does not need to
+worry about that, it just sees a clocks property with some random clocks
+in there, and that is as generic as it gets.
+
+> I think that device specific code belongs in a device specific driver
+> and earlyframebuffer should handoff to it as soon as possible.
+> 
+>>
+>> I've already explained that we not only can do that (we already have working
+>> code proving that), but also that this is something which we absolutely need:
+>>
+>>>> One example why this is necessary is e.g. to debug things where the problem
+>>>> is that the right module is not included in the initrd.
+> 
+> A generic earlyframebuffer would show this error.
+
+If it reserves the clocks it needs, yes. If it does not then the clocks will
+be disabled before the initrd starts, and the screen will be black from then
+on.
+
+Regards,
+
+Hans
