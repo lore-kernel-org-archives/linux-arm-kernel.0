@@ -1,101 +1,62 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 02 Oct 2014 17:54:13 +0200
-Subject: [PATCH v2 1/4] PM / Domains: Remove pm_genpd_dev_need_restore()
- API
-In-Reply-To: <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
-References: <1412174494-15346-1-git-send-email-ulf.hansson@linaro.org>
- <1412174494-15346-2-git-send-email-ulf.hansson@linaro.org>
- <542C2D9F.8060005@samsung.com>
- <CAPDyKFq+9G+n3qaj+Ls9i4sOi_BdOGzk5SypDzEMZJwAJMa97Q@mail.gmail.com>
- <542D3E45.5020908@samsung.com>
- <CAPDyKFozS+J_sTZykF=9tVJsCByby_BDuQmGiMt-Uw-qC4Tzuw@mail.gmail.com>
-Message-ID: <542D7525.8000804@samsung.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 2 Oct 2014 23:00:43 +0700
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+ <alpine.LSU.2.11.1409291443210.2800@eggly.anvils>
+Message-ID: <CAPvkgC1RcgeraaUyHLs0qA=G-mMoNFEneypkvUiPWEjZWWExfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/14 15:30, Ulf Hansson wrote:
-[...]
-> Correct me if I am wrong, but I think in principle these exynos
-> drivers don't use pm_runtime_set_active() during ->probe() and are
-> instead relying on CONFIG_PM_RUNTIME to be enabled.
-
-Yes, pm_runtime_set_active() is not used in probe(), I believe this
-is not required. In case of those IP blocks there is no use of activating
-them during probe(). Instead we check if PM_RUNTIME is enabled through
-pm_runtime_enabled() helper and enable the device clock(s) if not.
-I agree it all doesn't quite work in current mainline for !PM_RUNTIME,
-since there is nothing ensuring that the power domains are enabled
-in such kernel configuration.
-
-> That's not a good behaviour. If these drivers are build without
-> CONFIG_PM_RUNTIME - they won't work.
-
-They wouldn't similarly work with pm_runtime_set_active() call in probe()
-with CONFIG_PM_RUNTIME disabled, would they ?
-
-> I guess I have pointed out this in earlier discussions around runtime
-> PM, I have seen quite some driver's getting their support for runtime
-> PM wrong.
-> 
->>> Why would runtime PM callbacks be invoked when the device are runtime
->>> PM active? That's prevented by the runtime PM core and is the expected
->>> behaviour.
->>>
->>> pm_genpd_dev_need_restore() is not the solution, besides that it gives
->>> you the option to lie about device's runtime PM state to genpd. Thus,
->>> if you are really lucky, that might workaround your issues. :-)
+On 30 September 2014 04:51, Hugh Dickins <hughd@google.com> wrote:
+> On Fri, 26 Sep 2014, Steve Capper wrote:
+>
+>> get_user_pages_fast attempts to pin user pages by walking the page
+>> tables directly and avoids taking locks. Thus the walker needs to be
+>> protected from page table pages being freed from under it, and needs
+>> to block any THP splits.
 >>
->> Might be, nevertheless so far it more or less worked for us. At least
->> I'm sure without it everything breaks right away.
-> 
-> I see. Obviously we must not break exynos, let's try to figure out the
-> best way forward.
-> 
+>> One way to achieve this is to have the walker disable interrupts, and
+>> rely on IPIs from the TLB flushing code blocking before the page table
+>> pages are freed.
 >>
->>> I will happily help out in fixing drivers for exynos. Would be nice if
->>> you could provide me with a list of which driver/subsystems that seems
->>> broken. HW, wise I have a exynos 5250 and exynos 5422 on my desk, so
->>> those I can test.
+>> On some platforms we have hardware broadcast of TLB invalidations, thus
+>> the TLB flushing code doesn't necessarily need to broadcast IPIs; and
+>> spuriously broadcasting IPIs can hurt system performance if done too
+>> often.
 >>
->> For exynos5 I would check exynos-gsc and s5p-mfc (see kernel logs below).
-> 
-> Thanks, I will have look and run some tests on exynos 5. Let you know soon.
+>> This problem has been solved on PowerPC and Sparc by batching up page
+>> table pages belonging to more than one mm_user, then scheduling an
+>> rcu_sched callback to free the pages. This RCU page table free logic
+>> has been promoted to core code and is activated when one enables
+>> HAVE_RCU_TABLE_FREE. Unfortunately, these architectures implement
+>> their own get_user_pages_fast routines.
+>>
+>> The RCU page table free logic coupled with a an IPI broadcast on THP
+>> split (which is a rare event), allows one to protect a page table
+>> walker by merely disabling the interrupts during the walk.
+>>
+>> This patch provides a general RCU implementation of get_user_pages_fast
+>> that can be used by architectures that perform hardware broadcast of
+>> TLB invalidations.
+>>
+>> It is based heavily on the PowerPC implementation by Nick Piggin.
+>>
+>> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+>> Tested-by: Dann Frazier <dann.frazier@canonical.com>
+>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Acked-by: Hugh Dickins <hughd@google.com>
+>
 
-Especially it might be interesting look at gscaler, where there are 
-multiple instances of same device handled by one driver.
+Thanks Hugh!
 
-[...]
->> Sure, is there a git tree I could fetch all the relevant patches from ?
->> I'm not sure what the base tree for this series, I could only apply
->> first 2 patches from this thread, on top of the generic OF PM domain
->> patches. And that didn't solve issues which are seen in the logs below.
-> 
-> You have two options:
-> 
-> 1) Use/build Rafaels tree. Apply my patches on the bleeding edge
-> branch.That's also what I use a work base.
-> http://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
-> 
-> 2) Use/build Stephen Rothwell's linux-next tree. I can confirm the
-> patches applies on the master branch as of today.
-> http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+> Thanks for making all those clarifications, Steve: this looks very
+> good to me now.  I'm not sure which tree you're hoping will take this
+> and the arm+arm64 patches 2-6: although this one would normally go
+> through akpm, I expect it's easier for you to synchronize if it goes
+> in along with the arm+arm64 2-6 - would that be okay with you, Andrew?
+> I see no clash with what's currently in mmotm.
 
-Thanks, I will be able to take a look at this the earliest on Monday. 
-
-> I really appreciate your help here, thanks!
-> 
->> Nevertheless, as Rafael pointed out, enabling all power domains
->> unconditionally seems a step backwards. It would be nice to have
->> resolved the race in a away the power domains remain in state left
->> by the firmware and are being enabled only before any client device
->> actually needs it.
-> 
-> You are right, but I am not sure we can do this in one go - since it
-> depends on if we can fix this on PM core of if we need need
-> adaptations in drivers/subsystems.
-
-I see, fortunately the genpd API appears not to be wildly used yet.
-
--- 
-Regards,
-Sylwester
+I see it's gone into mmotm.
