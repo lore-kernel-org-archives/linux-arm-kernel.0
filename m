@@ -1,45 +1,65 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 2 Oct 2014 20:29:57 +0200
-Subject: [PATCH 1/6] ARM: meson: add meson8 machine definition
-In-Reply-To: <20141002170519.GA29052@gmail.com>
-References: <1412198986-26534-1-git-send-email-b.galvani@gmail.com>
- <1412198986-26534-2-git-send-email-b.galvani@gmail.com>
- <11073411.IcmTkIICYA@wuerfel> <20141002170519.GA29052@gmail.com>
-Message-ID: <20141002182957.GA15355@nuc>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu,  2 Oct 2014 20:52:06 +0200
+Subject: [PATCH v2 0/5] pinctrl: samsung: Data structure clean-up
+Message-ID: <1412275931-10807-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On gio, ott 02, 2014 at 07:05:19 +0200, Beniamino Galvani wrote:
-> On Thu, Oct 02, 2014 at 11:24:54AM +0200, Arnd Bergmann wrote:
-> > On Wednesday 01 October 2014 23:29:41 Beniamino Galvani wrote:
-> > > 
-> > > +static const char * const m8_common_board_compat[] = {
-> > > +       "amlogic,meson8",
-> > > +       NULL,
-> > > +};
-> > > +
-> > >  DT_MACHINE_START(AML8726_MX, "Amlogic Meson6 platform")
-> > >         .dt_compat      = m6_common_board_compat,
-> > >  MACHINE_END
-> > >  
-> > > +DT_MACHINE_START(MESON8, "Amlogic Meson8 platform")
-> > > +       .dt_compat      = m8_common_board_compat,
-> > > +MACHINE_END
-> > > 
-> > 
-> > I'd just add the meson8 string to the m6_common_board_compat list and
-> > rename it.
-> 
-> From what I've seen so far the two families are very similar and share
-> most of the IP cores, so a unique DT machine is a good idea.
-> 
-> Does the MACH_MESON8 Kconfig symbol still make sense or can I drop it
-> and rename MACH_MESON6 to MACH_MESON?
+This series intends to clean up data structures used by pinctrl-samsung driver.
+More specifically, it separates initial compile time constants from data used
+at runtime, allowing unused variant data to be dropped and selected structures
+constified to improve safety.
 
-I would still leave two different MACH_ for meson6 and meson8 since the
-two architectures aren't _so_ similar.
+As a side effect, size of vmlinux built from multi_v7_defconfig was reduced
+from:
 
-thanks,
+ text     data    bss    dec      hex    filename
+ 10296708 1227100 313544 11837352 b49fa8 vmlinux
+
+to:
+
+ text     data    bss    dec      hex    filename
+ 10296740 1176860 313544 11787144 b3db88 vmlinux
+
+and quite a bit of data were moved from normal data sections to .init.data:
+
+pre:
+
+Idx Name          Size      VMA       LMA       File off  Algn
+  3 .rodata       0026c080  c0881000  c0881000  00681000  2**6
+ 23 .init.data    0003ff7c  c0bdb830  c0bdb830  009e3830  2**3
+ 24 .data..percpu 00002100  c0c1c000  c0c1c000  00a24000  2**6
+ 25 .data         000e98e0  c0c20000  c0c20000  00a28000  2**6
+
+post:
+
+Idx Name          Size      VMA       LMA       File off  Algn
+  3 .rodata       0026bf20  c0881000  c0881000  00681000  2**6
+ 23 .init.data    00041bbc  c0bdb830  c0bdb830  009e3830  2**3
+ 24 .data..percpu 00002100  c0c1e000  c0c1e000  00a26000  2**6
+ 25 .data         000db860  c0c22000  c0c22000  00a2a000  2**6
+
+This series should not introduce any functional changes.
+
+Tested on S3C6410-based Mini6410 board booted using device tree, with GPIO
+leds and GPIO keyboard. Compile tested for s3c24xx, exynos, s5pv210.
+
+Changes since v1:
+ - rebased on current devel branch of pinctrl tree.
+
+Tomasz Figa (5):
+  pinctrl: samsung: Make samsung_pinctrl_get_soc_data use ERR_PTR()
+  pinctrl: samsung: Drop unused label field in samsung_pin_ctrl struct
+  pinctrl: samsung: Constify samsung_pin_bank_type struct
+  pinctrl: samsung: Constify samsung_pin_ctrl struct
+  pinctrl: samsung: Separate per-bank init and runtime data
+
+ drivers/pinctrl/samsung/pinctrl-exynos.c  | 111 ++++++++++----------------
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c |  30 +++----
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c |  31 ++++----
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 126 ++++++++++++++++--------------
+ drivers/pinctrl/samsung/pinctrl-samsung.h |  78 ++++++++++++------
+ 5 files changed, 192 insertions(+), 184 deletions(-)
 
 -- 
-Carlo Caione
+2.1.1
