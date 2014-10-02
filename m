@@ -1,29 +1,27 @@
-From: qca_vkondrat@qca.qualcomm.com (Vladimir Kondratiev)
-Date: Thu, 2 Oct 2014 14:29:06 +0300
-Subject: [PATCH] wil6210: remove obsolete msm platform code
-In-Reply-To: <3995357.SmO1fZQuHn@wuerfel>
-References: <3995357.SmO1fZQuHn@wuerfel>
-Message-ID: <1572828.LhiMXjHRdV@lx-wigig-72>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 2 Oct 2014 12:31:55 +0100
+Subject: [Xen-devel] [PATCH 1/2] xen/arm: remove handling of
+ XENFEAT_grant_map_identity
+In-Reply-To: <542D2A97.3040901@citrix.com>
+References: <alpine.DEB.2.02.1410021102480.17038@kaball.uk.xensource.com>
+ <1412244417-12251-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <542D2A97.3040901@citrix.com>
+Message-ID: <alpine.DEB.2.02.1410021230410.17038@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 30, 2014 05:48:20 PM Arnd Bergmann wrote:
-> The wil6210 driver has a glue layer for the Qualcomm MSM platform
-> code, which apparently could never build and is unlikely to
-> ever be able to in the future, as the MSM platform is being phased
-> out in favor of the new QCOM platform, and the driver relies
-> on out-of-tree infrastructure. Trying to build it currently
-> results in this error:
+On Thu, 2 Oct 2014, David Vrabel wrote:
+> On 02/10/14 11:06, Stefano Stabellini wrote:
+> > Keep the definition of the flag.
 > 
-> drivers/net/wireless/ath/wil6210/wil_platform_msm.c:19:27: fatal error: linux/msm-bus.h: No such file or directory
+> If this is going away in Xen, you can get rid of the flag as well.
 > 
-> Removing the driver fixes the build and makes it possible to
-> build an allmodconfig kernel for MSM.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
+> I think you should explain why it's being removed as well.
 
-We are investigating this, looking for the appropriate solution.
-Thanks for pointing to this.
+I want to keep the definition of the flag in Xen to avoid the number
+being reused. I guess there is no need to keep it in Linux though.
 
-Thanks, Vladimir
+
+> Should this be tagged for stable as well?
+
+Yep
