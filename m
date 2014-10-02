@@ -1,37 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 2 Oct 2014 16:50:08 -0400
-Subject: [GIT PULL] ARM: mvebu: Last DT changes for v3.18
-In-Reply-To: <1850328.rMhfjqiuR3@wuerfel>
-References: <20141002135926.GC27230@titan.lakedaemon.net>
- <1850328.rMhfjqiuR3@wuerfel>
-Message-ID: <20141002205008.GA3895@titan.lakedaemon.net>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 2 Oct 2014 22:51:00 +0200
+Subject: [GIT PULL] ARM: meson: last DTS change for 3.18
+Message-ID: <20141002205100.GA19646@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 02, 2014 at 05:20:53PM +0200, Arnd Bergmann wrote:
-> On Thursday 02 October 2014 09:59:26 Jason Cooper wrote:
-> > 
-> > I know this is way late, but the changes a fairly small, and have been
-> > in linux-next for at least 9 of Stephen's 'next-YYYYMMDD' tags.
-> > Hopefully the merge window opening a week late will make it possible for
-> > you guys to take this.
-> > 
-> > This is an incremental pull request from tags/mvebu-dt-3.18 up to
-> > tags/mvebu-dt-3.18-2 on the mvebu/dt branch.
-> 
-> The one patch is a bug fix, so it's exempt from the deadline, the other
-> one is obviously harmless, so I'm pulling it into next/dt.
+Hi Arnd,
+this patch from the patchset
+http://www.spinics.net/lists/arm-kernel/msg363927.html is not in the
+arm-soc tree. The other patches from the patchset have been already
+taken by Guenter http://server.roeck-us.net/patch/1926/
+Hopefully you can pull it in.
 
-Thanks!
+Thank you.
 
-> Regarding the DT change: Seriously? They made the same mistake
-> *AGAIN*? I hope that whoever at Marvell decided to change the
-> register location for a shipping product in a boot loader update
-> will lose their commit access.
+The following changes since commit 4394a0014597bd53e2d9bbc69d091e3fbde7d00c:
 
-You're assuming they use version control.  I wouldn't give them that
-much credit.  ;-)
+  Merge tag 'mvebu-dt-3.18-2' of git://git.infradead.org/linux-mvebu into next/dt (2014-10-02 17:08:24 +0200)
 
-thx,
+are available in the git repository at:
 
-Jason.
+
+  https://github.com/carlocaione/linux-meson.git tags/meson-wdt-dt-3.18
+
+for you to fetch changes up to d4ac2cfea724d3874ce3f1f624bcd40e78b1a9d4:
+
+  ARM: DTS: meson: update DTSI to add watchdog node (2014-10-02 22:27:42 +0200)
+
+----------------------------------------------------------------
+This patch adds the support for the Meson6 watchdog in the DTSI
+
+----------------------------------------------------------------
+Carlo Caione (1):
+      ARM: DTS: meson: update DTSI to add watchdog node
+
+ arch/arm/boot/dts/meson.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+-- 
+Carlo Caione
