@@ -1,86 +1,63 @@
-From: dianders@google.com (Doug Anderson)
-Date: Thu, 2 Oct 2014 09:45:41 -0700
-Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
- board
-In-Reply-To: <2384118.ElmRrZpdEv@amdc1032>
-References: <2750153.I3nVqzmXTP@amdc1032>
- <CAD=FV=XtJVWkUwWK8=E+mvSdvBn1MuS9c+_91VPhbOSQ3kF_kA@mail.gmail.com>
- <2384118.ElmRrZpdEv@amdc1032>
-Message-ID: <CAD=FV=X7hStwYj2tOCBKH0ncUmhTeUi8qWZjFGjFaMO8rxiZCA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Oct 2014 17:53:50 +0100
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <20141002135436.GB8645@redhat.com>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com>
+ <1412106877.6630.45.camel@smoke>
+ <20141001161621.GA28440@leverpostej>
+ <20141001174714.GD14991@redhat.com>
+ <20141001180304.GC5788@leverpostej>
+ <20141001192245.GG14991@redhat.com>
+ <20141002102625.GE5788@leverpostej>
+ <20141002135436.GB8645@redhat.com>
+Message-ID: <20141002165350.GC18660@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartiomiej
+> > > I see that Geoff's patches flush dcaches for 
+> > > certain kexec stored pages using __flush_dcache_area()
+> > > (in kexec_list_flush_cb()).
+> > > 
+> > > arch/arm64/include/asm/cacheflush.h says following.
+> > > 
+> > >  *      __flush_dcache_area(kaddr, size)
+> > >  *
+> > >  *              Ensure that the data held in page is written back.
+> > >  *              - kaddr  - page address
+> > >  *              - size   - region size
+> > > 
+> > > So looks like we are trying to write back anything which we will access
+> > > after switching off MMU. If that's the case, I have two questions.
+> > > 
+> > > - Why do we need to writeback that cacheline. After switching off MMU,
+> > >   will we not access same cacheline. I thought caches are VIPT and tag
+> > >   will still remain the same (but I might easily be wrong here).
+> > 
+> > As I mention above, the initial cache flush by VA is to ensure that the
+> > data is visible to the CPU once translation is disabled. I'm not sure I
+> > follow your reasoning.
+> 
+> I was assuming that even after we disable translations, cpu will still
+> read data from dcache if it is available there. Looks like you are
+> saying that once translation is disabled, data will be read from memory
+> hence it is important to flush out dcache before disabling translation.
+> Did I understand it right?
 
-On Thu, Oct 2, 2014 at 9:39 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> On Thursday, October 02, 2014 09:19:08 AM Doug Anderson wrote:
->> Bartiomiej,
->>
->> On Thu, Oct 2, 2014 at 9:10 AM, Bartlomiej Zolnierkiewicz
->> <b.zolnierkie@samsung.com> wrote:
->> > Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
->> > and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
->> > tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
->> > not specified.  Fix it.
->> >
->> > Without this patch:
->> > - "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
->> >   patch causes a SD card detection to fail
->> > - "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
->> >
->> > This patch fixes both above problems.
->> >
->> > Suggested-by: Doug Anderson <dianders@google.com>
->> > Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> > ---
->> >  arch/arm/boot/dts/exynos5420-arndale-octa.dts |    3 ++-
->> >  1 file changed, 2 insertions(+), 1 deletion(-)
->> >
->> > Index: b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
->> > ===================================================================
->> > --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts     2014-10-02 15:44:53.014826886 +0200
->> > +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts     2014-10-02 17:35:24.110600398 +0200
->> > @@ -74,7 +74,8 @@
->> >                 samsung,dw-mshc-ddr-timing = <1 2>;
->> >                 pinctrl-names = "default";
->> >                 pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->> > -               vmmc-supply = <&ldo10_reg>;
->> > +               vmmc-supply = <&ldo19_reg>;
->> > +               vqmmc-supply = <&ldo13_reg>;
->>
->> This looks right to me.  ...but I notice that ldo13 and ldo19 are not
->> "always-on" in the DTS.  Are you sure card detect works for you if you
->> eject your card and try to put it back in?
->>
->> ...eventually the "always-on" won't be needed, but for now I think it is...
->
-> Card detection works fine without "always-on".
+I believe you did.
 
-That's weird.
+When translation is disabled (i.e. SCTLR_ELx.M == 0), data accesses are
+assigned Device-nGnRnE attributes regardless of whether the caches are
+enabled (i.e. SCTLR_ELx.C == 1), and bypass the cache hierarchy. So
+accesses to memory will go straight to PoC (essentially memory), and
+won't hit in any cache.
 
-1. In the schematics I see XMMC2CDN has an external pullup to PVDD_TFLASH_2V8.
+However, instruction accesses are more complicated. They are always
+assigned Normal memory attributes, and if the I-caches are enabled (i.e.
+SCTLR_ELx.I == 1) they are cacheable regardless of whether translation
+is enabled. So I-cache maintenance may be required when translation is
+disabled.
 
-2. The internal pullup should (I think) be to VDDQ_MMC2 which is
-PVDD_APIO_MMCOFF_2V8.
-
-3. In (51da224 mmc: dw_mmc: use mmc_regulator_get_supply to handle
-regulators) we should be turning off both regulators in
-"MMC_POWER_OFF".
-
-4. If I understand correctly MMC_POWER_OFF is called when the card is
-ejected, which means that both regulators should be off when the card
-is ejected.
-
-5. I don't think card detect can work if neither regulator is powered.
-
-
-One of the above points must be wrong.  Any idea which one?  Can you
-check to see if MMC_POWER_OFF is called for you when the card is
-ejected?  Can you check to see if these regulators are off?
-
-
--Doug
+Thanks,
+Mark.
