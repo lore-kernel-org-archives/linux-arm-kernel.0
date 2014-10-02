@@ -1,94 +1,74 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Thu,  2 Oct 2014 13:19:45 +0200
-Subject: [PATCH v2 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
-In-Reply-To: <20141002105716.GG3907@piout.net>
-References: <20141002105716.GG3907@piout.net>
-Message-ID: <1412248785-28269-1-git-send-email-alexander.stein@systec-electronic.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 Oct 2014 12:19:51 +0100
+Subject: [PATCH 08/24] Allow a 32bit ABI to use the naming of the 64bit
+ ABI syscalls to avoid confusion of not splitting the registers
+In-Reply-To: <3372851.lJtjj0EtDO@wuerfel>
+References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
+ <3318813.yqP9pCQtAB@wuerfel>
+ <20141001124226.GI12702@e104818-lin.cambridge.arm.com>
+ <3372851.lJtjj0EtDO@wuerfel>
+Message-ID: <20141002111949.GC32147@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing CAN devices node including their pin muxing and clocks.
+On Wed, Oct 01, 2014 at 03:00:54PM +0100, Arnd Bergmann wrote:
+> On Wednesday 01 October 2014 13:42:27 Catalin Marinas wrote:
+> > On Thu, Sep 04, 2014 at 11:11:04AM +0100, Arnd Bergmann wrote:
+> > > On Wednesday 03 September 2014 14:19:02 Andrew Pinski wrote:
+> > > > + * For 32bit abis where 64bit can be passed via one
+> > > > + * register, use the same naming as the 64bit ones
+> > > > + * as they will only have a 64 bit off_t.
+> > > >   */
+> > > > -#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
+> > > > +#if (__BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)) || \
+> > > > +       defined(__ARCH_WANT_64BIT_SYSCALLS)
+> > > 
+> > > I'm not sure if __ARCH_WANT_64BIT_SYSCALLS is the best name for
+> > > this, since it's really only about off_t. It took me a while
+> > > to understand what you are doing here.
+> > 
+> > I'm not sure I fully get it yet. So with this change, we avoid using
+> > syscall numbers like __NR_ftruncate64 in favour of __NR_ftruncate. Why?
+> > (maybe there's a valid reason, just not getting it).
+> 
+> glibc depends on the name to decide which calling conventions it
+> uses. I assume this is the same on IPL32 ARM.
+> 
+> The general rule is that on a 32-bit architecture, __NR_ftruncate refers
+> to the system call that takes a 32-bit off_t argument, while __NR_ftruncate64
+> refers to the syscall that takes a 64-bit loff_t.
+> 
+> I would assume that the new ABI does not actually allow using 32-bit off_t
+> in applications (that would be silly) and defaults to using 64-bit offsets,
+> but it still needs to generate the right system calls.
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
----
-Changes in v2:
-* Adjusted pinmux comment
+OK, so since ILP32 would have a 64-bit off_t, we want to use
+__NR_ftruncate and sys_ftruncate with the off_t argument (rather than
+loff_t).
 
- arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+> > Either way, ILP32 would still end up calling sys_ftruncate64() (rather
+> > than the native sys_ftruncate()).
+> 
+> sys_ftruncate64 does not exist in 64-bit kernels, it can either call
+> compat_sys_ftruncate64_wrapper or sys_ftruncate. I'd assume it would
+> call the latter and pass a single 64-bit register, but that is another
+> matter.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index e1a5c70..e3f11f2 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -363,6 +363,16 @@
- 						#clock-cells = <0>;
- 						reg = <28>;
- 					};
-+
-+					can0_clk: can0_clk {
-+						#clock-cells = <0>;
-+						reg = <29>;
-+					};
-+
-+					can1_clk: can1_clk {
-+						#clock-cells = <0>;
-+						reg = <30>;
-+					};
- 				};
- 			};
- 
-@@ -407,6 +417,28 @@
- 				};
- 			};
- 
-+			can0: can at f8000000 {
-+				compatible = "atmel,at91sam9x5-can";
-+				reg = <0xf8000000 0x300>;
-+				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can0_rx_tx>;
-+				clocks = <&can0_clk>;
-+				clock-names = "can_clk";
-+				status = "disabled";
-+			};
-+
-+			can1: can at f8004000 {
-+				compatible = "atmel,at91sam9x5-can";
-+				reg = <0xf8004000 0x300>;
-+				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 3>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can1_rx_tx>;
-+				clocks = <&can1_clk>;
-+				clock-names = "can_clk";
-+				status = "disabled";
-+			};
-+
- 			tcb0: timer at f8008000 {
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8008000 0x100>;
-@@ -763,6 +795,22 @@
- 					};
- 				};
- 
-+				can0 {
-+					pinctrl_can0_rx_tx: can0_rx_tx {
-+						atmel,pins =
-+							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX, conflicts with DRXD */
-+							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX, conflicts with DTXD */
-+					};
-+				};
-+
-+				can1 {
-+					pinctrl_can1_rx_tx: can1_rx_tx {
-+						atmel,pins =
-+							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX, conflicts with RXD1 */
-+							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* CANTX, conflicts with TXD1 */
-+					};
-+				};
-+
- 				pioA: gpio at fffff400 {
- 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
- 					reg = <0xfffff400 0x200>;
+I think I get it now. Just for the record, we define __NR_ftruncate to
+__NR3264_ftruncate. When we build the syscall table as per patch 21/24,
+given that the kernel is built with __LP64__, we get the following
+macros for the syscall function name:
+
+#define __SC_3264(_nr, _32, _64) __SYSCALL(_nr, _64)
+#define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
+...
+__SC_COMP_3264(__NR3264_ftruncate, sys_ftruncate64, sys_ftruncate, \
+	       compat_sys_ftruncate64)
+
+Which would result in using sys_ftruncate rather than sys_ftruncate64.
+
+I agree, maybe the name could be __ARCH_WANT_64BIT_OFF_T as that's the
+only reason for these definitions.
+
 -- 
-2.0.4
+Catalin
