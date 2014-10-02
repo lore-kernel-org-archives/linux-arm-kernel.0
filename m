@@ -1,104 +1,34 @@
-From: rric@kernel.org (Robert Richter)
-Date: Thu, 2 Oct 2014 17:08:04 +0200
-Subject: [GIT PULL] dts, kbuild: Implement support for dtb vendor subdirs
-In-Reply-To: <20140923112619.GG20170@rric.localhost>
-References: <1409899692-1455-1-git-send-email-rric@kernel.org>
- <CAL1qeaGCeRyeKLo70E264bZcamOfBKoN9Y8_NDCjV5j4DoOw1Q@mail.gmail.com>
- <20140919123056.GC20170@rric.localhost>
- <20140919140856.GG2295@e104818-lin.cambridge.arm.com>
- <20140923112619.GG20170@rric.localhost>
-Message-ID: <20141002150804.GP20170@rric.localhost>
+From: orsonzhai@gmail.com (Orson Zhai)
+Date: Thu, 02 Oct 2014 23:08:35 +0800
+Subject: [PATCH 1/6] Documentation: DT: Add bindings for Spreadtrum serial
+In-Reply-To: <20141001112149.GA13759@leverpostej>
+References: <1411992293-7729-1-git-send-email-zhang.lyra@gmail.com>
+ <1411992293-7729-2-git-send-email-zhang.lyra@gmail.com>
+ <20141001112149.GA13759@leverpostej>
+Message-ID: <542D6A73.9020505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.09.14 13:26:19, Robert Richter wrote:
-> On 19.09.14 15:08:56, Catalin Marinas wrote:
-> > On Fri, Sep 19, 2014 at 01:30:56PM +0100, Robert Richter wrote:
-> > > On 16.09.14 20:49:18, Andrew Bresticker wrote:
-> > > > > Robert Richter (6):
-> > > > >   dts, arm64: Add dtbs_install make target
-> > > > >   dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
-> > > > >   dts, arm/arm64: Remove dtbs build rules in sub-makes
-> > > > >   dts, kbuild: Implement support for dtb vendor subdirs
-> > > > >   dts, arm64: Move dts files to vendor subdirs
-> > > > >   dts, arm: Remove $(MACHINE) variable from dtbs make recipes
-> > > > 
-> > > > I've tested this for arm64 and by adding a vendor sub-directory
-> > > > locally for arm.  This series is also the base for my MIPS DT vendor
-> > > > sub-directory series
-> > > > (http://www.linux-mips.org/archives/linux-mips/2014-09/msg00217.html).
-> > > > So, for the entire series,
-> > > > 
-> > > > Tested-by: Andrew Bresticker <abrestic@chromium.org>
-> > > 
-> > > Andrew, thanks for testing and great this also works on mips.
-> > > 
-> > > Anyone willing to take the patches for 3.18? Are any further acks
-> > > needed?
-> > 
-> > For the arm64 bits in this series:
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > I think the patches can be merged via arm-soc.
-> 
-> Olof,
-> 
-> please apply the patches.
 
-Olof, Arnd,
-
-you may want to pull from here alternatively.
-
-Thanks,
-
--Robert
-
-
-The following changes since commit a497c3ba1d97fc69c1e78e7b96435ba8c2cb42ee:
-
-  Linux 3.16-rc2 (2014-06-21 19:02:54 -1000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git tags/dts-subdirs-for-arm-soc-v3.18
-
-for you to fetch changes up to 87bdf4d8625e50d99b56aa2590a2261049a5fd48:
-
-  dts, arm: Remove $(MACHINE) variable from dtbs make recipes (2014-09-03 21:46:49 +0200)
-
-----------------------------------------------------------------
-dts, kbuild: Implement support for dtb vendor subdirs
-
-----------------------------------------------------------------
-Robert Richter (6):
-      dts, arm64: Add dtbs_install make target
-      dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
-      dts, arm/arm64: Remove dtbs build rules in sub-makes
-      dts, kbuild: Implement support for dtb vendor subdirs
-      dts, arm64: Move dts files to vendor subdirs
-      dts, arm: Remove $(MACHINE) variable from dtbs make recipes
-
- arch/arm/Makefile                                  |  8 +++-
- arch/arm/boot/dts/Makefile                         | 12 +-----
- arch/arm64/Makefile                                | 10 ++++-
- arch/arm64/boot/dts/Makefile                       | 13 +++---
- arch/arm64/boot/dts/apm/Makefile                   |  5 +++
- arch/arm64/boot/dts/{ => apm}/apm-mustang.dts      |  0
- arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi       |  0
- arch/arm64/boot/dts/arm/Makefile                   |  6 +++
- arch/arm64/boot/dts/{ => arm}/foundation-v8.dts    |  0
- arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts   |  0
- .../boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi    |  0
- scripts/Kbuild.include                             |  6 +++
- scripts/Makefile.dtbinst                           | 50 ++++++++++++++++++++++
- scripts/Makefile.lib                               | 12 ------
- 14 files changed, 88 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/boot/dts/apm/Makefile
- rename arch/arm64/boot/dts/{ => apm}/apm-mustang.dts (100%)
- rename arch/arm64/boot/dts/{ => apm}/apm-storm.dtsi (100%)
- create mode 100644 arch/arm64/boot/dts/arm/Makefile
- rename arch/arm64/boot/dts/{ => arm}/foundation-v8.dts (100%)
- rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-aemv8a.dts (100%)
- rename arch/arm64/boot/dts/{ => arm}/rtsm_ve-motherboard.dtsi (100%)
- create mode 100644 scripts/Makefile.dtbinst
+On 2014?10?01? 19:21, Mark Rutland wrote:
+>> diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
+>> >index 7705477..a0bb1d1 100644
+>> >--- a/Documentation/devicetree/bindings/serial/of-serial.txt
+>> >+++ b/Documentation/devicetree/bindings/serial/of-serial.txt
+>> >@@ -14,6 +14,7 @@ Required properties:
+>> >  	- "altr,16550-FIFO32"
+>> >  	- "altr,16550-FIFO64"
+>> >  	- "altr,16550-FIFO128"
+>> >+	- "sprd,serial"
+> Is there not a more specific name? I'd imagine you might build a
+> different uart in future.
+AFAIK, sprd's uart is re-used the same ip core in ARM 32bit chip.
+so it is neither 16550 or pl011 compatible.
+>
+> I didn't spot "sprd" in vendor-prefixes.txt in mainline. Is there a
+> patch adding that?
+sorry for missing it. we'll add it at patch V2.
+thanks for reviewing! :)
+>
+> Mark.
+>
