@@ -1,67 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Oct 2014 14:18:09 +0200
-Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
-In-Reply-To: <20141001231646.GB1529@amd>
-References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
- <542C26B6.7010302@opensource.altera.com> <20141001231646.GB1529@amd>
-Message-ID: <3341525.7GDFQS2rGu@wuerfel>
+From: aarcange@redhat.com (Andrea Arcangeli)
+Date: Thu, 2 Oct 2014 14:19:03 +0200
+Subject: [PATCH V4 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+References: <1411740233-28038-1-git-send-email-steve.capper@linaro.org>
+ <1411740233-28038-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20141002121902.GA2342@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 October 2014 01:16:46 Pavel Machek wrote:
-> > > 
-> > > struct socfpga_reset_manager {
-> > >         u32     status;
-> > >         u32     ctrl;
-> > >         u32     counts;
-> > >         u32     padding1;
-> > >         u32     mpu_mod_reset;
-> > >         u32     per_mod_reset;
-> > >         u32     per2_mod_reset;
-> > >         u32     brg_mod_reset;
-> > > };
-> > > 
-> > > from u-boot. Unlike macros, structs have advantages that typos lead to
-> > > easier-to-see failure modes... (And they are easier to read/parse,
-> > > too).
-> > > 
-> > 
-> > Copying from uboot sounds good, but I already know that the CPU reset
-> > offset is different for our next SOC, Arria 10. The Arria 10 SOC should
-> > still be able to use the same MSL as Cyclone5 and Arria5, but with a few
-> > differences. One of them being, the CPU1 reset offset is at 0x20 instead
-> > of 0x10. So I think having a macro for this one register is a bit
-> > cleaner than having to define a whole new struct for Arria10.
-> 
-> I don't think "whole new struct" is a problem. At least it will be
-> plain to see what changed (which will get easily lost in ifdefs.
-> 
-> struct cyclone5_reset_manager {
->         struct socfpga_reset_manager common;
->         u32 brg_mod_reset;
-> }
-> 
-> struct aria10_reset_manager {
->         struct socfpga_reset_manager common;
->         char filler[0x10];
->         u32 brg_mod_reset;
-> }
-> 
-> if (of_machine_is_compatible("altr,socfpga-arria10"))
->         __raw_writel(0, (struct cyclone5_reset_manager *) rst_manager_base_addr->brg_mod_reset));
-> else
->         __raw_writel(0, (struct aria10_reset_manager *) rst_manager_base_addr->brg_mod_reset));
-> 
-> ...does not sound that bad. (And you'll need some nice solution for
-> u-boot, anyway...)
+Hi Steve,
 
-I think it would be better to just add more fields and access a different
-field based on the SoC type than cast the structs around.
+On Fri, Sep 26, 2014 at 03:03:48PM +0100, Steve Capper wrote:
+> This patch provides a general RCU implementation of get_user_pages_fast
+> that can be used by architectures that perform hardware broadcast of
+> TLB invalidations.
+> 
+> It is based heavily on the PowerPC implementation by Nick Piggin.
 
-Also, never use __raw_writel unless you know exactly what you are doing.
-This should use writel, or possibly writel_relaxed.
+It'd be nice if you could also at the same time apply it to sparc and
+powerpc in this same patchset to show the effectiveness of having a
+generic version. Because if it's not a trivial drop-in replacement,
+then this should go in arch/arm* instead of mm/gup.c...
 
-Finally, don't sprinkle of_machine_is_compatible() checks all over the
-place. Make the decision once when you initially probe the machine.
+Also I wonder if it wouldn't be better to add it to mm/util.c along
+with the __weak gup_fast but then this is ok too. I'm just saying
+because we never had sings of gup_fast code in mm/gup.c so far but
+then this isn't exactly a __weak version of it... so I don't mind
+either ways.
 
-	Arnd
+> +		down_read(&mm->mmap_sem);
+> +		ret = get_user_pages(current, mm, start,
+> +				     nr_pages - nr, write, 0, pages, NULL);
+> +		up_read(&mm->mmap_sem);
+
+This has a collision with a patchset I posted, but it's trivial to
+solve, the above three lines need to be replaced with:
+
++		ret = get_user_pages_unlocked(current, mm, start,
++				     nr_pages - nr, write, 0, pages);
+
+And then arm gup_fast will also page fault with FOLL_FAULT_ALLOW_RETRY
+the first time to release the mmap_sem before I/O.
+
+Thanks,
+Andrea
