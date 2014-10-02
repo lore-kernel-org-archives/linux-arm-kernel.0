@@ -1,49 +1,134 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 02 Oct 2014 06:27:08 -0700
-Subject: [Xen-devel] [RFC PATCH 14/16] x86/xen: support poweroff through
- poweroff handler call chain
-In-Reply-To: <542D1EC4.10100@citrix.com>
-References: <1412100056-15517-1-git-send-email-linux@roeck-us.net>
- <1412100056-15517-15-git-send-email-linux@roeck-us.net>
- <542D1EC4.10100@citrix.com>
-Message-ID: <542D52AC.3040009@roeck-us.net>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 2 Oct 2014 09:27:41 -0400
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <542D4FB9.6090805@redhat.com>
+References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo>
+ <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+ <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+ <542D476D.50004@redhat.com>
+ <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
+ <542D4FB9.6090805@redhat.com>
+Message-ID: <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2014 02:45 AM, David Vrabel wrote:
-> On 30/09/14 19:00, Guenter Roeck wrote:
->> The kernel core now supports a poweroff handler call chain
->> to remove power from the system. Call it if pm_power_off
->> is set to NULL.
+On Thu, Oct 2, 2014 at 9:14 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 10/02/2014 02:56 PM, jonsmirl at gmail.com wrote:
+>> On Thu, Oct 2, 2014 at 8:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Hi,
+>>>
+>>> On 10/02/2014 02:22 PM, jonsmirl at gmail.com wrote:
+>>>> On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 10/01/2014 08:12 PM, Stephen Warren wrote:
+>>>>>> On 10/01/2014 11:54 AM, jonsmirl at gmail.com wrote:
+>>>>>>> On Wed, Oct 1, 2014 at 1:26 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>> ...
+>>>>>>>> We've been over all this again and again and again.
+>>>>>>>>
+>>>>>>>> AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
+>>>>>>>>
+>>>>>>>> All solutions provided sofar are both tons more complicated, then the
+>>>>>>>> simple solution of simply having the simplefb dt node declare which
+>>>>>>>> clocks it needs. And to make things worse all of them sofar have
+>>>>>>>> unresolved issues (due to their complexity mostly).
+>>>>>>>>
+>>>>>>>> With the clocks in the simplefb node, then all a real driver has to do,
+>>>>>>>> is claim those same clocks before unregistering the simplefb driver,
+>>>>>>>> and everything will just work.
+>>>>>>>>
+>>>>>>>> Yet we've been discussing this for months, all because of some
+>>>>>>>> vague worries from Thierry, and *only* from Thierry that this will
+>>>>>>>> make simplefb less generic / not abstract enough, while a simple
+>>>>>>>> generic clocks property is about as generic as things come.
+>>>>>>
+>>>>>> Note: I haven't been following this thread, and really don't have the time to get involved, but I did want to point out one thing:
+>>>>>>
+>>>>>> As I think I mentioned very early on in this thread, one of the big concerns when simplefb was merged was that it would slowly grow and become a monster. As such, a condition of merging it was that it would not grow features like resource management at all. That means no clock/regulator/... support. It's intended as a simple stop-gap between early platform bringup and whenever a real driver exists for the HW. If you need resource management, write a HW-specific driver. The list archives presumably have a record of the discussion, but I don't know the links off the top of my head. If nobody
+>>>>>> other than Thierry is objecting, presumably the people who originally objected simply haven't noticed this patch/thread. I suppose it's possible they changed their mind.
+>>>>>>
+>>>>>> BTW, there's no reason that the simplefb code couldn't be refactored out into a support library that's used by both the simplefb we currently have and any new HW-specific driver. It's just that the simplefb binding and driver shouldn't grow.
+>>>>>
+>>>>> The whole reason why we want to use simplefb is not just to get things
+>>>>> running until HW specific driver is in place, but also to have early console
+>>>>> output (to help debugging boot problems on devices without a serial console),
+>>>>> in a world where most video drivers are build as loadable modules, so we
+>>>>> won't have video output until quite late into the boot process.
+>>>>
+>>>> You need both.
+>>>>
+>>>> 1) temporary early boot console -- this is nothing but an address in
+>>>> RAM and the x/y layout. The character set from framebuffer is built
+>>>> into the kernel.  The parallel to this is early-printk and how it uses
+>>>> the UARTs without interrupts. This console vaporizes late in the boot
+>>>> process -- the same thing happens with the early printk UART driver.
+>>>> EARLYPRINTK on the command line enables this.
+>>>>
+>>>> 2) a device specific driver -- this sits on initrd and it loaded as
+>>>> soon as possible. The same thing happens with the real UART driver for
+>>>> the console. CONSOLE= on the command line causes the transition. There
+>>>> is an API in the kernel to do this transition, I believe it is called
+>>>> set_console() but it's been a while.
+>>>
+>>> Eventually we need both, yes. But 1) should stay working until 2) loads,
+>>> not until some phase of the bootup is completed, but simply until 2) loads.
 >>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Ingo Molnar <mingo@redhat.com>
->> Cc: H. Peter Anvin <hpa@zytor.com>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   arch/x86/xen/enlighten.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
->> index c0cb11f..645d00f 100644
->> --- a/arch/x86/xen/enlighten.c
->> +++ b/arch/x86/xen/enlighten.c
->> @@ -1322,6 +1322,8 @@ static void xen_machine_power_off(void)
->>   {
->>   	if (pm_power_off)
->>   		pm_power_off();
->> +	else
->> +		do_kernel_poweroff();
+>> No, that is where you get into trouble. The device specific driver has
+>> to go onto initrd where it can be loaded as early in the boot process
+>> as possible.
 >
-> Why isn't this if (pm_power_off) check in do_kernel_poweroff()?
->
-> That way when you finally remove pm_power_off you need only update one
-> place.  A quick skim of the other archs suggest this would work for them
-> too.
->
+> This is an argument in the "you cannot do that" / "your use case is not valid"
+> category, IOW this is not a technical argument. You say I cannot do that I
+> say I can, deadlock.
 
-Good idea. I'll do that for the next version of the patch set.
+It is certainly possible to extend an earlyframebuffer to be able to
+run as a user space console. It is just going to turn into a
+Frankenmonster driver with piles of device specific, special case code
+in it.
 
-Guenter
+I think that device specific code belongs in a device specific driver
+and earlyframebuffer should handoff to it as soon as possible.
+
+>
+> I've already explained that we not only can do that (we already have working
+> code proving that), but also that this is something which we absolutely need:
+>
+>>> One example why this is necessary is e.g. to debug things where the problem
+>>> is that the right module is not included in the initrd.
+
+A generic earlyframebuffer would show this error.
+
+Just use earlyprintk as a guideline, if earlyprintk shows the error
+earlyframebuffer would also show it.
+
+
+>
+> If we ever want ARM support to stop being about cute embedded non-sense hacks,
+> we must be able to have users get some meaningful output in failure cases like
+> this without needing to first solder a serial console to some test pads.
+>
+> Regards,
+>
+> Hans
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
