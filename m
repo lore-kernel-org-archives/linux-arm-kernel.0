@@ -1,45 +1,72 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 2 Oct 2014 12:51:04 +0200
-Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
-In-Reply-To: <5408BF77.1020007@wwwdotorg.org>
-References: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
- <53D7C9EE.60503@wwwdotorg.org> <53FB7288.9050002@wwwdotorg.org>
- <5408BF77.1020007@wwwdotorg.org>
-Message-ID: <20141002105103.GA13906@ulmo>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 2 Oct 2014 12:57:16 +0200
+Subject: [PATCH 1/1] ARM: at91/dt: sam9x5: Add CAN device nodes
+In-Reply-To: <1412246294-27370-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <1412246294-27370-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <20141002105716.GG3907@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 01:37:27PM -0600, Stephen Warren wrote:
-> On 08/25/2014 11:29 AM, Stephen Warren wrote:
-> >On 07/29/2014 10:21 AM, Stephen Warren wrote:
-> >>On 07/29/2014 08:25 AM, Thierry Reding wrote:
-> >>>From: Thierry Reding <treding@nvidia.com>
-> >>>
-> >>>This will allow the Kconfig option to be shared among 32-bit and 64-bit
-> >>>ARM.
-> >>
-> >>This seems fine to me. I'd expect to apply it for 3.18, provided I get
-> >>an ack from Russell as drivers/amba maintainer (hence CCing him without
-> >>trimming the quote).
-> >
-> >Russell,
-> >
-> >Are you OK with this patch? If so, if you could ack it so I can apply
-> >it, that would be great.
+Hi,
+
+On 02/10/2014 at 12:38:14 +0200, Alexander Stein wrote :
+> Add the missing CAN devices node including their pin muxing and clocks.
 > 
-> Russell?
+> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+> ---
+> I could actually only test CAN1 due to the hardware I had available. Also
+> CAN0 conflicts with DBGU pins, which I had to use.
+> 
+>  arch/arm/boot/dts/at91sam9x5.dtsi | 48 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index e1a5c70..0a2164e 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -763,6 +795,22 @@
+>  					};
+>  				};
+>  
+> +				can0 {
+> +					pinctrl_can0_rx_tx: can0_rx_tx {
+> +						atmel,pins =
+> +							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA9 periph B RX */
+> +							 AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA10 periph B TX */
 
-Russell,
+I would stop adding that comment as this is pretty clear that your are
+setting PA9 and P10 to periph B. A more useful kind of comment is what
+pin it conflicts with. Maybe something like:
 
-Can I have your Acked-by on this or would you prefer it to be submitted
-to the patch tracker? Would the patch tracker be the correct place also
-for non-ARM core patches?
+							<AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE	/* CANRX0, conflicts with DRXD */
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/d52410eb/attachment-0001.sig>
+> +					};
+> +				};
+> +
+> +				can1 {
+> +					pinctrl_can1_rx_tx: can1_rx_tx {
+> +						atmel,pins =
+> +							<AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA6 periph B RX */
+> +							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;	/* PA5 periph B TX */
+
+ditto
+
+> +					};
+> +				};
+> +
+>  				pioA: gpio at fffff400 {
+>  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff400 0x200>;
+> -- 
+> 2.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
