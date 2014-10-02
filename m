@@ -1,65 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Oct 2014 16:00:32 +0200
-Subject: [PATCH v2 3/4] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <1411443545-24951-4-git-send-email-srv_hongzhou.yang@mediatek.com>
+Date: Thu, 2 Oct 2014 16:02:58 +0200
+Subject: [PATCH v2 4/4] ARM: dts: mt8135: Add pinctrl node for mt8135.
+In-Reply-To: <20140924124044.GC4992@pengutronix.de>
 References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411443545-24951-4-git-send-email-srv_hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdbiKSvX2dipnq3oyc6YSGWFgCk69onzF=-B9UWLjAYNWQ@mail.gmail.com>
+ <1411443545-24951-5-git-send-email-srv_hongzhou.yang@mediatek.com>
+ <CACRpkda-K7w-bY0uSdnZvzEKEeQg38oExoHPSW61kEv9Wv20mA@mail.gmail.com>
+ <20140924124044.GC4992@pengutronix.de>
+Message-ID: <CACRpkdbtN-BDEwpJO2swnOjCe3UJhD5WOXXKBV0hPOe2M2=k7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 23, 2014 at 5:39 AM, Hongzhou.Yang
-<srv_hongzhou.yang@mediatek.com> wrote:
+On Wed, Sep 24, 2014 at 2:40 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Sep 24, 2014 at 01:23:09PM +0200, Linus Walleij wrote:
 
-> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>> I haven't got to reviewing the driver, but this looks just wrong.
+>>
+>> Have the magic numbers in the driver.
+>>
+>> Use strings to describe functions, not integers.
 >
-> Add devicetree bindings for Mediatek SoC pinctrl driver.
+> Interrupts, clocks, gpios, dma channels, nearly everything in the device tree is
+> arbitrarily numbered. Instead of "irq-i2c0" we have <0 36 IRQ_TYPE_LEVEL_HIGH>
+> in the device tree. These numbers can be resolved efficiently in the
+> driver by shifting them to get a bitmask or by adding them as offset to
+> a register base.
+> Why do you want to make pinctrl different?
+
+Because pin control is about combining groups of pins with
+certain functions.
+
+> Thanks to the recently
+> introduced defines in the device trees these numbers are not magic at
+> all anymore.
+
+Yeah that is good but not what I'm after here.
+
+>> We need to move toward standardized device tree bindings
+>> for this stuff, and that means using strings, not magic
+>> numbers.
 >
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Agreed for standardized device tree bindings, but not for using strings.
 
-I have worked on generic pin control bindings a bit because it
-is getting out of hand with all these custom bindings.
-
-See:
-http://marc.info/?l=devicetree&m=141223584006648&w=2
-
-Especially.
-
-> +- mediatek,pinfunc: List of gpio number and function to mux.
-
-A "GPIO number" and a "pin number" is not the same thing at all,
-this is very confusing. Those are two separate number spaces.
-This is likely about the pin numbers.
-
-> +The mediatek,pinfunc can use defines directly,
-> +which are already defind in boot/dts/mt8135-pinfunc.h.
-> +
-> +Optional subnode-properties:
-> +- generic pin configuration option to use, bias-disable, bias-pull-down,
-> +  bias-pull,up, output-low and output-high are valid.
-> +  Example :
-> +       i2c0_pins_a {
-> +               mediatek,pinfunc = <MT8135_PIN_195_SDA1__FUNC_SDA1>;
-> +               bias-disable;
-> +       };
-
-I don't like this approach at all.
-
-I prefer that pins are put into groups named by strings, like "i2c0-pos0"
-inside the driver and then connected to function with a certain
-device-related name, such as "i2c0".
-
-Then put the pin configuration (bias etc) in a separate node in the same
-state definition like that:
-
-i2c0_pins_a {
-         function = "i2c0";
-         groups = "i2c0-pos0";
-};
-i2c0_pins_b {
-         bias-disable;
-};
+What is the alternative? Device Tree is very much about strings,
+as is shown by the pin config bindings.
 
 Yours,
 Linus Walleij
