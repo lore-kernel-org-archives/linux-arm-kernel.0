@@ -1,44 +1,43 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Thu, 2 Oct 2014 15:08:36 -0400
-Subject: [PATCH 0/7] arm64 kexec kernel patches V3
-In-Reply-To: <1412112476.6630.56.camel@smoke>
-References: <cover.1411604443.git.geoff@infradead.org>
- <20140930202904.GB24153@redhat.com>
- <1412112476.6630.56.camel@smoke>
-Message-ID: <20141002190836.GA26882@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 2 Oct 2014 21:15:06 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo>
+ <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+ <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+Message-ID: <CAMuHMdXDp8oE0XR6VWKw+S3C=p+3c79SoQUweZWL6UF=UyooTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 30, 2014 at 02:27:56PM -0700, Geoff Levand wrote:
-> Hi Vivek,
-> 
-> On Tue, 2014-09-30 at 16:29 -0400, Vivek Goyal wrote:
-> > On Thu, Sep 25, 2014 at 12:23:26AM +0000, Geoff Levand wrote:
-> > 
-> > [..]
-> > > To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
-> > > kexec-tools [2], which have not yet been merged upstream, are needed.
-> > > 
-> > > This series does not include some re-work of the spin-table CPU enable method
-> > > that is needed to support it,
-> > 
-> > How do I figure out if my system has spin table enable method or psci
-> > enable method. Can one change it. I wanted to test your patches.
-> 
-> The enable method is a function the firmware/bootloader provides.
-> Multiple methods may be supported.  The boot-wrapper-aarch64
-> build defaults to spin-table, but has the configure option --enable-psci.
-> 
-> For a running system you can check the device tree:
-> 
->   cat /proc/device-tree/cpus/cpu\@0/enable-method | hexdump -C
-> 
+On Thu, Oct 2, 2014 at 2:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> 1) temporary early boot console -- this is nothing but an address in
+> RAM and the x/y layout. The character set from framebuffer is built
+> into the kernel.  The parallel to this is early-printk and how it uses
+> the UARTs without interrupts. This console vaporizes late in the boot
+> process -- the same thing happens with the early printk UART driver.
+> EARLYPRINTK on the command line enables this.
 
-Hi Geoff,
+JFYI, the early serial console can also vanish, even very early in the boot
+process, before the unused clocks are disabled.
+Cfr. http://marc.info/?l=linux-sh&m=141227657322649&w=2
 
-So system I have supports spin-table method for cpu bringup. How do I 
-test your patches with that system. Are there any patches on your
-spin-table branch which can make it working?
+So there's no safety in this world without calling clk_prepare_enable().
 
-Thanks
-Vivek
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
