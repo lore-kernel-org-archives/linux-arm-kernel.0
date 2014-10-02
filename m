@@ -1,81 +1,119 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 2 Oct 2014 18:03:17 +0200
-Subject: [PATCH 0/3] ARM: Meson6: enable SMP
-In-Reply-To: <1867489.B8srtuItsD@wuerfel>
-References: <1412066635-5298-1-git-send-email-carlo@caione.org>
- <3274534.jCjlMt5HJV@wuerfel> <20141002153804.GF4039@lukather>
- <1867489.B8srtuItsD@wuerfel>
-Message-ID: <CAOQ7t2asY3V0C0p3vw5jcbcBfAPZf5=A8WM=F0QzZRkHQtPpmw@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 02 Oct 2014 18:06:51 +0200
+Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to handle
+ regulators
+In-Reply-To: <CAD=FV=Xcv6E57u=kUj4QSWOpxCwOuJ4UyrFhSg1z0O1zx8nCag@mail.gmail.com>
+References: <01.09.14890.83F4B245@epcpsbge5.samsung.com>
+ <1831792.g28ajrp9B5@amdc1032>
+ <CAD=FV=Xcv6E57u=kUj4QSWOpxCwOuJ4UyrFhSg1z0O1zx8nCag@mail.gmail.com>
+Message-ID: <1754745.SCGBco8pNI@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 2, 2014 at 5:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 02 October 2014 17:38:04 Maxime Ripard wrote:
->> On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
->> > On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
->> > > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
->> > > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
->> > > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
->> > > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
->> > > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
->> > > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
->> > > > > > > > pieces to boot the secondary CPU.
->> > > > > > >
->> > > > > > > Sorry for the double sending.
->> > > > > > > Forgot to CC LAKML.
->> > > > > >
->> > > > > > Looks good to me in principle, but I wonder about the CPU enable method.
->> > > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
->> > > > > >
->> > > > > > This is mostly a question of whether the system comes up in secure mode
->> > > > > > or non-secure mode.
->> > > > >
->> > > > > I would be able if I had the u-boot source code or the possibility to
->> > > > > flash the board I'm using. Unfortunately at this moment I don't have
->> > > > > either. Probably in the near future I'll be able to implement PSCI in
->> > > > > u-boot since Amlogic is kindly starting to provide documentation but now
->> > > > > this is the best I can do.
->> > > >
->> > > > Ok, I see. Let's give Amlogic some more time then. I think it's better
->> > > > to merge other parts of the platform first when we can reasonably assume
->> > > > that we don't have to change the binding any more.
->> > > >
->> > > > It would be a shame to merge this now and then make it obsolete by
->> > > > implementing PSCI but still having to carry around the original code
->> > > > for compatibility reasons.
->> > >
->> > > More likely, PSCI is not going to be supported by the bootloaders of
->> > > the devices already in the wild, so we still have to provide them an
->> > > option. And even when it will, you'll still have to support both the
->> > > devices with the old bootloaders, and the one with the new.
->> >
->> > It depends on how common the old boot loaders are, and whether it's
->> > possible to upgrade them. If we can get to the point where you can
->> > boot a kernel with a single CPU and have an easy way to update the
->> > boot loader, we don't need to support it.
->>
->> I thought I heard Olof at some point ranting about this kind of
->> requirements, but ok
->>
->> Still, holding off until something that hypothetical happens looks a
->> bit odd, doesn't it?
->
-> I was mainly trying to follow what you are doing in mach-sunxi, but maybe
-> I misunderstood what your plans are for PSCI support there.
->
-> mach-meson is still in a very early stage, and it's not like SMP support
-> is the most important feature missing from it. If there are good reasons
-> to include the current patches in 3.19, we can do that.
 
-I agree with Maxime. The problem is that I have no idea whether in the
-future we will have access to all the pieces of information to replace
-the bootloader to upgrade it. Realistically it's not the most
-important feature but I don't think things are going to change anytime
-soon. Moreover I highly doubt that people are willing to upgrade the
-bootloader on their devices just to boot the mainline kernel with full
-SMP support and the better we can do is to give people the chance to
-use a mainline kernel on their device at full speed without risking to
-throw the device away.
+Hi,
 
--- 
-Carlo Caione
+On Wednesday, October 01, 2014 09:04:09 AM Doug Anderson wrote:
+> Hi,
+> 
+> On Wed, Oct 1, 2014 at 7:00 AM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> >
+> > Hi,
+> >
+> > On Wednesday, October 01, 2014 12:47:52 AM YUVARAJ CD wrote:
+> >
+> >> Since I am out of station, i dont have an access to my work set up.
+> >> Can you send me the dts entries of sd crad and their corresponding regulator entries?
+> >
+> > From arch/arm/boot/dts/exynos5420-arndale-octa.dts:
+> >
+> > ...
+> >         mmc at 12200000 {
+> >                 status = "okay";
+> >                 broken-cd;
+> >                 supports-highspeed;
+> >                 card-detect-delay = <200>;
+> >                 samsung,dw-mshc-ciu-div = <3>;
+> >                 samsung,dw-mshc-sdr-timing = <0 4>;
+> >                 samsung,dw-mshc-ddr-timing = <0 2>;
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+> >                 vmmc-supply = <&ldo10_reg>;
+> >
+> >                 slot at 0 {
+> >                         reg = <0>;
+> >                         bus-width = <8>;
+> >                 };
+> >         };
+> >
+> >         mmc at 12220000 {
+> >                 status = "okay";
+> >                 supports-highspeed;
+> >                 card-detect-delay = <200>;
+> >                 samsung,dw-mshc-ciu-div = <3>;
+> >                 samsung,dw-mshc-sdr-timing = <2 3>;
+> >                 samsung,dw-mshc-ddr-timing = <1 2>;
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+> >                 vmmc-supply = <&ldo10_reg>;
+> >
+> >                 slot at 0 {
+> >                         reg = <0>;
+> >                         bus-width = <4>;
+> >                 };
+> >         };
+> > ...
+> >                                 ldo10_reg: LDO10 {
+> >                                         regulator-name = "PVDD_PRE_1V8";
+> >                                         regulator-min-microvolt = <1800000>;
+> >                                         regulator-max-microvolt = <1800000>;
+> >                                         regulator-always-on;
+> >                                 };
+> 
+> I don't have schematics for Arndale Octa, but the above is really
+> fishy.  "vmmc" shouldn't be 1.8V.  That's the general power signal to
+> MMC and should be 2.7V - 3.6V.  "vqmmc" could be 1.8V in certain
+> situations, but my understanding is that for maximum compatibility it
+> should at least start out identical to "vmmc" (and later go down to
+> 1.7V - 1.95V).
+> 
+> My first thought would be to just remove the "vmmc-supply" from your
+> DTS.  I think we could land that and pick it back easily.  That will
+> get you something working and won't introduce any regressions because:
+> 1. MMC core will give you a dummy regulator
+> 2. The code will default to assuming that vmmc is 3.3V, which is what
+> it used to do anyway.
+> 3. The only referenced regulator is always on anyway.
+> 
+> Separately you could specify a proper vmmc and maybe even a vqmmc.
+> 
+> On SMDK5420 I see this for the SD card (mmc2):
+> * vmmc should be "VDD_SD_2V8".  From LDO19.
+> * vqmmc should be "VDDQ_MMC2_AP".  From LDO13.
+> 
+> OK, I dug up the Arndale schematics.  For mmc2:
+> * vmmc should be PVDD_TFLASH_2V8.  That's LDO19.
+> * vqmmc (hooked up to VDDQ_MMC2): PVDD_APIO_MMCOFF_2V8.  LDO13 just like SMDK.
+> 
+> ...sadly it looks like Anrdale has a schematics problem that prevents
+> you from doing UHS.  I see that the data lines are pulled up to
+> PVDD_TFLASH_2V8 (vmmc), not pulled up to PVDD_APIO_MMCOFF_2V8 (vqmmc).
+> I think that means that if you ever lower vqmmc to 1.8V (as needed for
+> UHS) then you'll still be pulling up to 2.8V.  That's not good.  You
+> should probably make sure that both LDO13 and LDO19 are listed as
+> being exactly 2.8V.
+> 
+> 
+> Anyway, the above has (obviously) not been tested and is just based on
+> a casual browsing of schematics.  Please let me know how it goes.
+
+Removing the "vmmc-supply" entry fixes the problem.  Using LDO13 for vmmc
+and LDO19 for vqmmc also works fine.  I'll post a patch fixing the mmc2 DT
+entry to Kukjin in a few minutes.  Thank you for your help.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
