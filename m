@@ -1,53 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Oct 2014 17:26:53 +0200
-Subject: [PATCH 0/3] ARM: Meson6: enable SMP
-In-Reply-To: <20141002145426.GE4039@lukather>
-References: <1412066635-5298-1-git-send-email-carlo@caione.org>
- <3418275.THTV4FmaIz@wuerfel> <20141002145426.GE4039@lukather>
-Message-ID: <3274534.jCjlMt5HJV@wuerfel>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 2 Oct 2014 10:28:45 -0500
+Subject: [Patch v3] spi: qup: Fix incorrect block transfers
+In-Reply-To: <1412257472.1027.37.camel@iivanov-dev>
+References: <1412112088-25928-1-git-send-email-agross@codeaurora.org>
+ <1412257472.1027.37.camel@iivanov-dev>
+Message-ID: <20141002152845.GB14663@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
-> On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
-> > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
-> > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
-> > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
-> > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
-> > > > > > pieces to boot the secondary CPU.
-> > > > > 
-> > > > > Sorry for the double sending.
-> > > > > Forgot to CC LAKML.
-> > > > 
-> > > > Looks good to me in principle, but I wonder about the CPU enable method.
-> > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
-> > > > 
-> > > > This is mostly a question of whether the system comes up in secure mode
-> > > > or non-secure mode.
-> > > 
-> > > I would be able if I had the u-boot source code or the possibility to
-> > > flash the board I'm using. Unfortunately at this moment I don't have
-> > > either. Probably in the near future I'll be able to implement PSCI in
-> > > u-boot since Amlogic is kindly starting to provide documentation but now
-> > > this is the best I can do.
-> > 
-> > Ok, I see. Let's give Amlogic some more time then. I think it's better
-> > to merge other parts of the platform first when we can reasonably assume
-> > that we don't have to change the binding any more.
-> > 
-> > It would be a shame to merge this now and then make it obsolete by
-> > implementing PSCI but still having to carry around the original code
-> > for compatibility reasons.
+On Thu, Oct 02, 2014 at 04:44:32PM +0300, Ivan T. Ivanov wrote:
 > 
-> More likely, PSCI is not going to be supported by the bootloaders of
-> the devices already in the wild, so we still have to provide them an
-> option. And even when it will, you'll still have to support both the
-> devices with the old bootloaders, and the one with the new.
+> Hi Andy,
+> 
+> I am trying to understand why we need extra functions for block 
+> read and write.
 
-It depends on how common the old boot loaders are, and whether it's
-possible to upgrade them. If we can get to the point where you can
-boot a kernel with a single CPU and have an easy way to update the
-boot loader, we don't need to support it.
+I separated them out because the constraints for doing the allowable
+writes/reads was making the whole thing messy.  I opted for a cleaner
+implementation.
 
-	Arnd
+> 
+> Essentially fifo and block read/write function are looking
+> the same for me. Except that block functions have one extra write
+> in QUP_OPERATIONAL register.
+
+It's not just that, the difference between the fifo and block is that you just
+read/write the fifo until you hit the full or empty.  You can't do that with
+block.  you have to read in block size transfers (4x32B read/writes).
+
+> 
+> On Tue, 2014-09-30 at 16:21 -0500, Andy Gross wrote:
+> > This patch fixes a number of errors with the QUP block transfer mode.  Errors
+> > manifested themselves as input underruns, output overruns, and timed out
+> > transactions.
+> > 
+> > The block mode does not require the priming that occurs in FIFO mode.  At the
+> > moment that the QUP is placed into the RUN state, the QUP will immediately raise
+> > an interrupt if the request is a write.  Therefore, there is no need to prime
+> > the pump.
+> 
+> But does this hurt in some way? I mean fist FIFO fill happens when
+> controller is in PAUSED state. Once enabled it can start transfer 
+> immediately. 
+
+Unfortunately that creates a race in the block mode.  Because we hit run, we are
+telling the controller to do something.  In the block case, it fires off an IRQ
+to request output blocks.  This IRQ is going to hit sometime before, during, or
+after the fifo_write function.  If we are unlucky and we are in the fifo_write
+and somewhere in that loop, the irq is handled and we enter the fifo_write
+function again.  We already did some number of writes/reads that have not been
+recorded.  The IRQ fifo_write rips through and fills the fifo.  Then we return
+from the IRQ and continue to read/write and this causes the overrun/underrun.
+
+Letting the IRQ handle the block transfer start removes this specific issue.
+The cost is one irq overhead and the read/write of 16 words.
+
+> 
+> > 
+> > In addition, the block transfers require that whole blocks of data are
+> > read/written at a time.  
+> 
+> Thats fine, but I can not see why this will not happen with existing
+> fill functions. Fifo's are drained until there is data and filled
+> until there is a space. And because we are not using pack/unpack mode, 
+> every SPI word occupy one cell in fifo (32 bits), this means that 
+> existing read/write functions are working in "block" mode.
+
+Not true.  The block mode is different because the IRQ generation is tied to the
+block size.  You won't get a service interrupt until either the transaction is
+completely done, or a block of data is read/written.  And you get an IRQ for
+each block that has to be ACKd.  That is completely different than the behavior
+than the FIFO mode.  If you are not reading/writing full blocks of data, you are
+doing it wrong.
+
+In FIFO mode, you get a service interrupt when at least 1 word of data is ready
+to be read, or there is space to place at least one word of data for write.
+
+> 
+> > The last block of data that completes a transaction may
+> > contain less than a full blocks worth of data.
+> > 
+> > Each block of data results in an input/output service interrupt accompanied with
+> > a input/output block flag set.  Additional block reads/writes require clearing
+> > of the service flag.  It is ok to check for additional blocks of data in the
+> > ISR, but you have to ack every block you transfer.  Imbalanced acks result in
+> > early return from complete transactions with pending interrupts that still have
+> > to be ack'd.  The next transaction can be affected by these interrupts.
+> > Transactions are deemed complete when the MAX_INPUT or MAX_OUTPUT flag are set.
+> 
+> And this is the thing that can cause errors that you see, I suppose.
+> We are getting extra interrupts, which are not cleared, even if we have
+> drained fifo completely. 
+
+We get errors because
+1) We don't adhere to the programming model for block mode
+2) We return early from transactions that have not been fully ack'd.
+
+> 
+> Regards,
+> Ivan
+> 
+> P.S. They are still several coding style issues :-). The same as those that 
+> I have already pointed to you.
+
+Sigh, I thought i fixed those.  I'll have another look.
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
