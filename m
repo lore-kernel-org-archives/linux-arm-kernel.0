@@ -1,148 +1,82 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 2 Oct 2014 11:06:56 +0100
-Subject: [PATCH 1/2] xen/arm: remove handling of XENFEAT_grant_map_identity
+Date: Thu, 2 Oct 2014 11:06:57 +0100
+Subject: [PATCH 2/2] xen/arm: introduce XENMEM_cache_flush
 In-Reply-To: <alpine.DEB.2.02.1410021102480.17038@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1410021102480.17038@kaball.uk.xensource.com>
-Message-ID: <1412244417-12251-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1412244417-12251-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keep the definition of the flag.
+Introduce support for new hypercall XENMEM_cache_flush.
+Use it to perform cache flashing on pages used for dma when necessary.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c |    5 ---
- arch/arm/xen/mm32.c      |   85 +---------------------------------------------
- 2 files changed, 1 insertion(+), 89 deletions(-)
+ arch/arm/xen/mm32.c            |   19 ++++++++++++++++++-
+ include/xen/interface/memory.h |   16 ++++++++++++++++
+ 2 files changed, 34 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 0e15f01..c7ca936 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -261,11 +261,6 @@ static int __init xen_guest_init(void)
- 
- 	xen_setup_features();
- 
--	if (!xen_feature(XENFEAT_grant_map_identity)) {
--		pr_warn("Please upgrade your Xen.\n"
--				"If your platform has any non-coherent DMA devices, they won't work properly.\n");
--	}
--
- 	if (xen_feature(XENFEAT_dom0))
- 		xen_start_info->flags |= SIF_INITDOMAIN|SIF_PRIVILEGED;
- 	else
 diff --git a/arch/arm/xen/mm32.c b/arch/arm/xen/mm32.c
-index 3b99860..a5a93fc 100644
+index a5a93fc..aa45332 100644
 --- a/arch/arm/xen/mm32.c
 +++ b/arch/arm/xen/mm32.c
-@@ -5,70 +5,6 @@
+@@ -4,6 +4,9 @@
+ #include <linux/highmem.h>
  
  #include <xen/features.h>
++#include <xen/interface/memory.h>
++
++#include <asm/xen/hypercall.h>
  
--static DEFINE_PER_CPU(unsigned long, xen_mm32_scratch_virt);
--static DEFINE_PER_CPU(pte_t *, xen_mm32_scratch_ptep);
--
--static int alloc_xen_mm32_scratch_page(int cpu)
--{
--	struct page *page;
--	unsigned long virt;
--	pmd_t *pmdp;
--	pte_t *ptep;
--
--	if (per_cpu(xen_mm32_scratch_ptep, cpu) != NULL)
--		return 0;
--
--	page = alloc_page(GFP_KERNEL);
--	if (page == NULL) {
--		pr_warn("Failed to allocate xen_mm32_scratch_page for cpu %d\n", cpu);
--		return -ENOMEM;
--	}
--
--	virt = (unsigned long)__va(page_to_phys(page));
--	pmdp = pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
--	ptep = pte_offset_kernel(pmdp, virt);
--
--	per_cpu(xen_mm32_scratch_virt, cpu) = virt;
--	per_cpu(xen_mm32_scratch_ptep, cpu) = ptep;
--
--	return 0;
--}
--
--static int xen_mm32_cpu_notify(struct notifier_block *self,
--				    unsigned long action, void *hcpu)
--{
--	int cpu = (long)hcpu;
--	switch (action) {
--	case CPU_UP_PREPARE:
--		if (alloc_xen_mm32_scratch_page(cpu))
--			return NOTIFY_BAD;
--		break;
--	default:
--		break;
--	}
--	return NOTIFY_OK;
--}
--
--static struct notifier_block xen_mm32_cpu_notifier = {
--	.notifier_call	= xen_mm32_cpu_notify,
--};
--
--static void* xen_mm32_remap_page(dma_addr_t handle)
--{
--	unsigned long virt = get_cpu_var(xen_mm32_scratch_virt);
--	pte_t *ptep = __get_cpu_var(xen_mm32_scratch_ptep);
--
--	*ptep = pfn_pte(handle >> PAGE_SHIFT, PAGE_KERNEL);
--	local_flush_tlb_kernel_page(virt);
--
--	return (void*)virt;
--}
--
--static void xen_mm32_unmap(void *vaddr)
--{
--	put_cpu_var(xen_mm32_scratch_virt);
--}
--
  
  /* functions called by SWIOTLB */
- 
-@@ -88,13 +24,7 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
+@@ -24,7 +27,21 @@ static void dma_cache_maint(dma_addr_t handle, unsigned long offset,
  	
  		if (!pfn_valid(pfn))
  		{
--			/* Cannot map the page, we don't know its physical address.
--			 * Return and hope for the best */
--			if (!xen_feature(XENFEAT_grant_map_identity))
--				return;
--			vaddr = xen_mm32_remap_page(handle) + offset;
--			op(vaddr, len, dir);
--			xen_mm32_unmap(vaddr - offset);
-+			/* TODO: cache flush */
+-			/* TODO: cache flush */
++			struct xen_cache_flush cflush;
++
++			cflush.op = 0;
++			cflush.addr = handle + offset;
++			cflush.size = size;
++
++			if (op == dmac_unmap_area && dir != DMA_TO_DEVICE)
++				cflush.op = XENMEM_CACHE_INVAL;
++			if (op == dmac_map_area) {
++				cflush.op = XENMEM_CACHE_CLEAN;
++				if (dir == DMA_FROM_DEVICE)
++					cflush.op |= XENMEM_CACHE_INVAL;
++			}
++			if (cflush.op)
++				HYPERVISOR_memory_op(XENMEM_cache_flush, &cflush);
  		} else {
  			struct page *page = pfn_to_page(pfn);
  
-@@ -181,22 +111,9 @@ void xen_dma_sync_single_for_device(struct device *hwdev,
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index 2ecfe4f..7d7e039 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -263,4 +263,20 @@ struct xen_remove_from_physmap {
+ };
+ DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
  
- int __init xen_mm32_init(void)
- {
--	int cpu;
--
- 	if (!xen_initial_domain())
- 		return 0;
- 
--	register_cpu_notifier(&xen_mm32_cpu_notifier);
--	get_online_cpus();
--	for_each_online_cpu(cpu) {
--		if (alloc_xen_mm32_scratch_page(cpu)) {
--			put_online_cpus();
--			unregister_cpu_notifier(&xen_mm32_cpu_notifier);
--			return -ENOMEM;
--		}
--	}
--	put_online_cpus();
--
- 	return 0;
- }
- arch_initcall(xen_mm32_init);
++/*
++ * Issue one or more cache maintenance operations on a memory range
++ * owned by the calling domain or granted to the calling domain by a
++ * foreign domain.
++ */
++#define XENMEM_cache_flush                 27
++struct xen_cache_flush {
++/* addr is the machine address at the start of the memory range */
++uint64_t addr;
++uint64_t size;
++#define XENMEM_CACHE_CLEAN      (1<<0)
++#define XENMEM_CACHE_INVAL      (1<<1)
++uint32_t op;
++};
++DEFINE_GUEST_HANDLE_STRUCT(xen_cache_flush);
++
+ #endif /* __XEN_PUBLIC_MEMORY_H__ */
 -- 
 1.7.10.4
