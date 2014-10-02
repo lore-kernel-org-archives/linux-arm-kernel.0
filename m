@@ -1,43 +1,58 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 02 Oct 2014 18:10:06 +0200
-Subject: [PATCH] ARM: dts: fix MMC2 regulators for Exynos5420 Arndale Octa
- board
-Message-ID: <2750153.I3nVqzmXTP@amdc1032>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 02 Oct 2014 18:16:43 +0200
+Subject: [PATCH] ASoC: samsung: fix CDCLK handling
+In-Reply-To: <1412095211-4012-1-git-send-email-drake@endlessm.com>
+References: <1412095211-4012-1-git-send-email-drake@endlessm.com>
+Message-ID: <542D7A6B.7010000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regulators for MMC2 (SD card) are PVDD_TFLASH_2V8 (LDO19) for vmmc
-and PVDD_APIO_MMCOFF_2V8 (LDO13) for vqmmc.  Currently the device
-tree entry for MMC2 uses PVDD_PRE_1V8 (LDO10) for vmmc and vqmmc is
-not specified.  Fix it.
+[dropping unrelated addresses from Cc]
 
-Without this patch:
-- "mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators"
-  patch causes a SD card detection to fail
-- "mmc: dw_mmc: Support voltage changes" patch causes a boot hang
+On 30/09/14 18:40, Daniel Drake wrote:
+> ODROID is the only platform that uses CDCLK, and right now,
+> CDCLK handling is buggy. If you start pulseaudio on ODROID,
+> audio is broken until reboot (even after killing pulse).
+> 
+> This happens because CDCLK gets disabled by i2s.c and never enabled again.
+> 
+> pulseaudio does:
+> 1. i2s_startup for playback channel
+> 2. i2s_startup for capture channel
+> 3. i2s_shutdown for capture channel
+> 4. i2s_shutdown for playback channel
+> 
+> In step 3 we disable CDCLK even though playback should still be active.
+> 
+> In step 4 we do this:
+> 	u32 mod = readl(i2s->addr + I2SMOD);
+> 	i2s->cdclk_out = !(mod & MOD_CDCLKCON);
+> 
+> and now cdclk_out is always going to be 0, so we'll never turn it back
+> on again.
 
-This patch fixes both above problems.
+Sorry for getting back late to this. Indeed we have a mess here.
+I mostly tested interaction between two CPU DAIs - the main and the
+overlay one (which is not supported in mainline yet).
 
-Suggested-by: Doug Anderson <dianders@google.com>
-Cc: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos5420-arndale-octa.dts |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Both this bug and the one that b97c60abf9a tries to fix happened
+> because of the way that CDCLK handling is painfully split between
+> platform and i2s drivers.
+> 
+> Simplify the situation and solve the bug with the following approach:
+>  - as before, samsung_i2s_dai_probe() gates CDCLK by default
+>    (no need for smartq_wm8987 to do this as well)
+>  - platform drivers can gate/ungate CDCLK as necessary
+>    (currently only odroidx2 needs to do this)
+>  - i2s code has no other interaction with CDCLK
 
-Index: b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-===================================================================
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts	2014-10-02 15:44:53.014826886 +0200
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts	2014-10-02 17:35:24.110600398 +0200
-@@ -74,7 +74,8 @@
- 		samsung,dw-mshc-ddr-timing = <1 2>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
--		vmmc-supply = <&ldo10_reg>;
-+		vmmc-supply = <&ldo19_reg>;
-+		vqmmc-supply = <&ldo13_reg>;
- 
- 		slot at 0 {
- 			reg = <0>;
+I'm not an ASoC expert, but I'd say it would be better to modify
+the I2S module so there is no additional callbacks needed in
+the machine driver. This way all machine drivers using the CDCLK
+output could be simplified, not mentioning using simple-card.
+I'm not sure how to do it yet, I'm going to take a look at this
+over the weekend.
+
+--
+Regards,
+Sylwester
