@@ -1,90 +1,41 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 02 Oct 2014 16:41:29 +0200
-Subject: [PATCH v2 3/4] dt-bindings: Add pinctrl bindings for
- mt65xx/mt81xx.
-In-Reply-To: <CACRpkdbiKSvX2dipnq3oyc6YSGWFgCk69onzF=-B9UWLjAYNWQ@mail.gmail.com>
-References: <1411443545-24951-1-git-send-email-srv_hongzhou.yang@mediatek.com>
- <1411443545-24951-4-git-send-email-srv_hongzhou.yang@mediatek.com>
- <CACRpkdbiKSvX2dipnq3oyc6YSGWFgCk69onzF=-B9UWLjAYNWQ@mail.gmail.com>
-Message-ID: <1412260889.4875.11.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Oct 2014 16:44:20 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <20140930204538.GA6985@carlo-MacBookPro>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <2970330.BJMVixgoJ1@wuerfel> <20140930204538.GA6985@carlo-MacBookPro>
+Message-ID: <3418275.THTV4FmaIz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 02.10.2014, 16:00 +0200 schrieb Linus Walleij:
-> On Tue, Sep 23, 2014 at 5:39 AM, Hongzhou.Yang
-> <srv_hongzhou.yang@mediatek.com> wrote:
+On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
+> On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
+> > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+> > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+> > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> > > > pieces to boot the secondary CPU.
+> > > 
+> > > Sorry for the double sending.
+> > > Forgot to CC LAKML.
+> > 
+> > Looks good to me in principle, but I wonder about the CPU enable method.
+> > Are you able to implement PSCI in u-boot like it was done for allwinner?
+> > 
+> > This is mostly a question of whether the system comes up in secure mode
+> > or non-secure mode.
 > 
-> > From: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> >
-> > Add devicetree bindings for Mediatek SoC pinctrl driver.
-> >
-> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> 
-> I have worked on generic pin control bindings a bit because it
-> is getting out of hand with all these custom bindings.
-> 
-> See:
-> http://marc.info/?l=devicetree&m=141223584006648&w=2
-> 
-> Especially.
-> 
-> > +- mediatek,pinfunc: List of gpio number and function to mux.
-> 
-> A "GPIO number" and a "pin number" is not the same thing at all,
-> this is very confusing. Those are two separate number spaces.
-> This is likely about the pin numbers.
-> 
-> > +The mediatek,pinfunc can use defines directly,
-> > +which are already defind in boot/dts/mt8135-pinfunc.h.
-> > +
-> > +Optional subnode-properties:
-> > +- generic pin configuration option to use, bias-disable, bias-pull-down,
-> > +  bias-pull,up, output-low and output-high are valid.
-> > +  Example :
-> > +       i2c0_pins_a {
-> > +               mediatek,pinfunc = <MT8135_PIN_195_SDA1__FUNC_SDA1>;
-> > +               bias-disable;
-> > +       };
-> 
-> I don't like this approach at all.
-> 
-> I prefer that pins are put into groups named by strings, like "i2c0-pos0"
-> inside the driver and then connected to function with a certain
-> device-related name, such as "i2c0".
-> 
-So we should create artificial software groups where there are none in
-hardware? This sounds really backward to me. Almost every new SoC out
-there has the ability to mux every pin on it's own.
+> I would be able if I had the u-boot source code or the possibility to
+> flash the board I'm using. Unfortunately at this moment I don't have
+> either. Probably in the near future I'll be able to implement PSCI in
+> u-boot since Amlogic is kindly starting to provide documentation but now
+> this is the best I can do.
 
-By defining artificial software groups in the driver we are pushing
-constraints in the binding that don't really exist in hardware. So if
-someone comes up with a pin usage that isn't covered by the existing
-groups we need to change the binding. Experience from working with lots
-of hardware engineers tells us that if something can be done (if there
-are no constraints in HW) it will be done sooner or later.
-If the hardware allows this much freedom we should also allow it in the
-pinctrl binding.
+Ok, I see. Let's give Amlogic some more time then. I think it's better
+to merge other parts of the platform first when we can reasonably assume
+that we don't have to change the binding any more.
 
-> Then put the pin configuration (bias etc) in a separate node in the same
-> state definition like that:
-> 
-> i2c0_pins_a {
->          function = "i2c0";
->          groups = "i2c0-pos0";
-> };
-> i2c0_pins_b {
->          bias-disable;
-> };
+It would be a shame to merge this now and then make it obsolete by
+implementing PSCI but still having to carry around the original code
+for compatibility reasons.
 
-The problem with that is that different pins might need different
-configuration for the same muxed function. To properly reflect this we
-would need to duplicate the pin definitions. One popular example is the
-MMC interface where part of the pins need to have a pull-up, while
-others don't. How would you reflect this with the DT description above?
-
-Regards,
-Lucas
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+	Arnd
