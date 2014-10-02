@@ -1,61 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Oct 2014 14:11:22 +0200
-Subject: [PATCH] wil6210: remove obsolete msm platform code
-In-Reply-To: <1572828.LhiMXjHRdV@lx-wigig-72>
-References: <3995357.SmO1fZQuHn@wuerfel> <1572828.LhiMXjHRdV@lx-wigig-72>
-Message-ID: <3354043.ejE77YinPM@wuerfel>
+Date: Thu, 02 Oct 2014 14:18:09 +0200
+Subject: [PATCH 1/2] socfpga: hotplug: put cpu1 in wfi
+In-Reply-To: <20141001231646.GB1529@amd>
+References: <1411590449-9794-1-git-send-email-atull@opensource.altera.com>
+ <542C26B6.7010302@opensource.altera.com> <20141001231646.GB1529@amd>
+Message-ID: <3341525.7GDFQS2rGu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 October 2014 14:29:06 Vladimir Kondratiev wrote:
-> On Tuesday, September 30, 2014 05:48:20 PM Arnd Bergmann wrote:
-> > The wil6210 driver has a glue layer for the Qualcomm MSM platform
-> > code, which apparently could never build and is unlikely to
-> > ever be able to in the future, as the MSM platform is being phased
-> > out in favor of the new QCOM platform, and the driver relies
-> > on out-of-tree infrastructure. Trying to build it currently
-> > results in this error:
+On Thursday 02 October 2014 01:16:46 Pavel Machek wrote:
+> > > 
+> > > struct socfpga_reset_manager {
+> > >         u32     status;
+> > >         u32     ctrl;
+> > >         u32     counts;
+> > >         u32     padding1;
+> > >         u32     mpu_mod_reset;
+> > >         u32     per_mod_reset;
+> > >         u32     per2_mod_reset;
+> > >         u32     brg_mod_reset;
+> > > };
+> > > 
+> > > from u-boot. Unlike macros, structs have advantages that typos lead to
+> > > easier-to-see failure modes... (And they are easier to read/parse,
+> > > too).
+> > > 
 > > 
-> > drivers/net/wireless/ath/wil6210/wil_platform_msm.c:19:27: fatal error: linux/msm-bus.h: No such file or directory
-> > 
-> > Removing the driver fixes the build and makes it possible to
-> > build an allmodconfig kernel for MSM.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
+> > Copying from uboot sounds good, but I already know that the CPU reset
+> > offset is different for our next SOC, Arria 10. The Arria 10 SOC should
+> > still be able to use the same MSL as Cyclone5 and Arria5, but with a few
+> > differences. One of them being, the CPU1 reset offset is at 0x20 instead
+> > of 0x10. So I think having a macro for this one register is a bit
+> > cleaner than having to define a whole new struct for Arria10.
 > 
-> We are investigating this, looking for the appropriate solution.
-> Thanks for pointing to this.
+> I don't think "whole new struct" is a problem. At least it will be
+> plain to see what changed (which will get easily lost in ifdefs.
+> 
+> struct cyclone5_reset_manager {
+>         struct socfpga_reset_manager common;
+>         u32 brg_mod_reset;
+> }
+> 
+> struct aria10_reset_manager {
+>         struct socfpga_reset_manager common;
+>         char filler[0x10];
+>         u32 brg_mod_reset;
+> }
+> 
+> if (of_machine_is_compatible("altr,socfpga-arria10"))
+>         __raw_writel(0, (struct cyclone5_reset_manager *) rst_manager_base_addr->brg_mod_reset));
+> else
+>         __raw_writel(0, (struct aria10_reset_manager *) rst_manager_base_addr->brg_mod_reset));
+> 
+> ...does not sound that bad. (And you'll need some nice solution for
+> u-boot, anyway...)
 
-FWIW, I took a closer look at the actual driver code now. It's
-actually worse than I thought and I don't see any possible way
-out other than removing this driver completely and starting a
-new one, if you want to use it for mach-qcom. I hadn't realized
-before that this is actually new code rather than ancient bitrot
-that suddenly started causing problems.
+I think it would be better to just add more fields and access a different
+field based on the SoC type than cast the structs around.
 
-Some of the worst problems are:
+Also, never use __raw_writel unless you know exactly what you are doing.
+This should use writel, or possibly writel_relaxed.
 
-- the driver scans for DT properties that are completely
-  undocumented and have not been reviewed
-
-- if they had been reviewed, the first comment you would have
-  received is that the binding makes no sense: you scan for
-  another node rather than taking the node you already have for
-  the PCI device, then pass data into a random soc-specific
-  driver API that is not part of the upstream kernel.
-
-- as mentioned in the my patch above, the code has never been
-  compiled on a mainline kernel and now breaks builds.
-
-I think the only way forward is to have the platform support for
-whatever chip this is meant for reviewed and merged first and
-then you can write a new glue driver for the interfaces we end
-up putting into the kernel.
-My guess is that with proper interfaces between the platform
-bus driver and the wil driver glue, there would be very little
-left in terms of interface and you can just call a generic
-interface from the PCI driver, passing the 'struct device'
-for the PCI dev in to an exported interface when provided.
+Finally, don't sprinkle of_machine_is_compatible() checks all over the
+place. Make the decision once when you initially probe the machine.
 
 	Arnd
