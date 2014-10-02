@@ -1,74 +1,153 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Oct 2014 12:19:51 +0100
-Subject: [PATCH 08/24] Allow a 32bit ABI to use the naming of the 64bit
- ABI syscalls to avoid confusion of not splitting the registers
-In-Reply-To: <3372851.lJtjj0EtDO@wuerfel>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <3318813.yqP9pCQtAB@wuerfel>
- <20141001124226.GI12702@e104818-lin.cambridge.arm.com>
- <3372851.lJtjj0EtDO@wuerfel>
-Message-ID: <20141002111949.GC32147@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Oct 2014 12:22:34 +0100
+Subject: [PATCH] ARM: dts: add board dts file for Exynos3250-based Monk
+ board
+In-Reply-To: <1412211025-3459-1-git-send-email-yj44.cho@samsung.com>
+References: <1412211025-3459-1-git-send-email-yj44.cho@samsung.com>
+Message-ID: <20141002112233.GI5788@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 01, 2014 at 03:00:54PM +0100, Arnd Bergmann wrote:
-> On Wednesday 01 October 2014 13:42:27 Catalin Marinas wrote:
-> > On Thu, Sep 04, 2014 at 11:11:04AM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 03 September 2014 14:19:02 Andrew Pinski wrote:
-> > > > + * For 32bit abis where 64bit can be passed via one
-> > > > + * register, use the same naming as the 64bit ones
-> > > > + * as they will only have a 64 bit off_t.
-> > > >   */
-> > > > -#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-> > > > +#if (__BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)) || \
-> > > > +       defined(__ARCH_WANT_64BIT_SYSCALLS)
-> > > 
-> > > I'm not sure if __ARCH_WANT_64BIT_SYSCALLS is the best name for
-> > > this, since it's really only about off_t. It took me a while
-> > > to understand what you are doing here.
-> > 
-> > I'm not sure I fully get it yet. So with this change, we avoid using
-> > syscall numbers like __NR_ftruncate64 in favour of __NR_ftruncate. Why?
-> > (maybe there's a valid reason, just not getting it).
+On Thu, Oct 02, 2014 at 01:50:25AM +0100, YoungJun Cho wrote:
+> From: Youngjun Cho <yj44.cho@samsung.com>
 > 
-> glibc depends on the name to decide which calling conventions it
-> uses. I assume this is the same on IPL32 ARM.
+> This patch adds new board dts file to support Samsung Monk board which is
+> based on Exynos3250 SoC and has different H/W configuration from Rinato.
 > 
-> The general rule is that on a 32-bit architecture, __NR_ftruncate refers
-> to the system call that takes a 32-bit off_t argument, while __NR_ftruncate64
-> refers to the syscall that takes a 64-bit loff_t.
+> This patch is based on linux-samsung.git for-next branch and depends on
+> [PATCH 0/2] ARM: dts: Add new board dts file for Exynos3250-based Rinato board[1]
 > 
-> I would assume that the new ABI does not actually allow using 32-bit off_t
-> in applications (that would be silly) and defaults to using 64-bit offsets,
-> but it still needs to generate the right system calls.
-
-OK, so since ILP32 would have a 64-bit off_t, we want to use
-__NR_ftruncate and sys_ftruncate with the off_t argument (rather than
-loff_t).
-
-> > Either way, ILP32 would still end up calling sys_ftruncate64() (rather
-> > than the native sys_ftruncate()).
+> This dts file support following features:
+> - eMMC
+> - Main PMIC (Samsung S2MPS14)
+> - Interface PMIC (Maxim MAX77836, MUIC, fuel-gauge, charger)
+> - RTC of Exynos3250
+> - ADC of Exynos3250 with NTC thermistor
+> - I2S of Exynos3250
+> - TMU of Exynos3250
+> - Secure firmware for Exynos3250 secondary cpu boot
+> - Serial ports of Exynos3250
+> - gpio-key for power key
 > 
-> sys_ftruncate64 does not exist in 64-bit kernels, it can either call
-> compat_sys_ftruncate64_wrapper or sys_ftruncate. I'd assume it would
-> call the latter and pass a single 64-bit register, but that is another
-> matter.
+> [1] http://www.spinics.net/lists/arm-kernel/msg366849.html
+> 
+> Signed-off-by: Youngjun Cho <yj44.cho@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/Makefile            |   3 +-
+>  arch/arm/boot/dts/exynos3250-monk.dts | 592 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 594 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/exynos3250-monk.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 5728918..0c8ae64 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -64,7 +64,8 @@ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+>         da850-evm.dtb
+>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
+> -dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-rinato.dtb \
+> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos3250-monk.dtb \
+> +       exynos3250-rinato.dtb \
+>         exynos4210-origen.dtb \
+>         exynos4210-smdkv310.dtb \
+>         exynos4210-trats.dtb \
+> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+> new file mode 100644
+> index 0000000..9e94294
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+> @@ -0,0 +1,592 @@
+> +/*
+> + * Samsung's Exynos3250 based Monk board device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *             http://www.samsung.com
+> + *
+> + * Device tree source file for Samsung's Monk board which is based on
+> + * Samsung Exynos3250 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +#include "exynos3250.dtsi"
+> +#include <dt-bindings/input/input.h>
+> +
+> +/ {
+> +       model = "Samsung Monk board";
+> +       compatible = "samsung,monk", "samsung,exynos3250", "samsung,exynos3";
+> +
+> +       aliases {
+> +               i2c7 = &i2c_max77836;
+> +       };
+> +
+> +       memory {
+> +               reg =  <0x40000000 0x08000000
+> +                       0x48000000 0x08000000
+> +                       0x50000000 0x08000000
+> +                       0x58000000 0x07F00000>;
 
-I think I get it now. Just for the record, we define __NR_ftruncate to
-__NR3264_ftruncate. When we build the syscall table as per patch 21/24,
-given that the kernel is built with __LP64__, we get the following
-macros for the syscall function name:
+Nit: please bracket list entries individually.
 
-#define __SC_3264(_nr, _32, _64) __SYSCALL(_nr, _64)
-#define __SC_COMP_3264(_nr, _32, _64, _comp) __SC_3264(_nr, _32, _64)
-...
-__SC_COMP_3264(__NR3264_ftruncate, sys_ftruncate64, sys_ftruncate, \
-	       compat_sys_ftruncate64)
+That said, it looks like this could be coalesced into:
 
-Which would result in using sys_ftruncate rather than sys_ftruncate64.
+memory at 40000000 {
+	reg = <0x40000000 0x1ff00000>;
+};
 
-I agree, maybe the name could be __ARCH_WANT_64BIT_OFF_T as that's the
-only reason for these definitions.
+> +       };
+> +
+> +       chosen {
+> +               bootargs = "console=ttySAC1,115200N8 root=/dev/mmcblk0p15 rootwait earlyprintk panic=5";
+> +       };
+> +
+> +       firmware at 0205F000 {
+> +               compatible = "samsung,secure-firmware";
+> +               reg = <0x0205F000 0x1000>;
+> +       } ;
 
--- 
-Catalin
+Nit: useless space before the ';'.
+
+> +
+> +       gpio_keys {
+> +               compatible = "gpio-keys";
+> +
+> +               power_key {
+> +                       interrupt-parent = <&gpx2>;
+> +                       interrupts = <7 0>;
+> +                       gpios = <&gpx2 7 1>;
+> +                       linux,code = <KEY_POWER>;
+> +                       label = "power key";
+> +                       debounce-interval = <10>;
+> +                       gpio-key,wakeup;
+> +               };
+> +       };
+> +
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               vemmc_reg: voltage-regulator-0 {
+> +                       compatible = "regulator-fixed";
+> +                       regulator-name = "V_EMMC_2.8V-fixed";
+> +                       regulator-min-microvolt = <2800000>;
+> +                       regulator-max-microvolt = <2800000>;
+> +                       gpio = <&gpk0 2 0>;
+> +                       enable-active-high;
+> +               };
+> +       };
+
+Why not put this directly under the root node? There's no reason to
+group regulators simply because they're regulators, and there's only one
+anyhow.
+
+Mark.
