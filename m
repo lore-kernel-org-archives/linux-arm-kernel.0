@@ -1,87 +1,104 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Oct 2014 14:22:04 +0200
-Subject: [PATCH 3/7] devicetree: mfd: max77693: Document new bindings for
- charger
-In-Reply-To: <1412252528-30148-1-git-send-email-k.kozlowski@samsung.com>
-References: <1412252528-30148-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1412252528-30148-4-git-send-email-k.kozlowski@samsung.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 2 Oct 2014 08:22:29 -0400
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <542CF3C3.2050708@redhat.com>
+References: <20140929101805.GB26008@ulmo> <20140929114643.GB4081@lukather>
+ <20140929134708.GB30998@ulmo>
+ <20140929155517.GR16977@sirena.org.uk>
+ <20140930050923.GB29874@ulmo> <20140930173928.GH4273@sirena.org.uk>
+ <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+Message-ID: <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new device tree bindings for for Maxim 77693 charger driver.
+On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 10/01/2014 08:12 PM, Stephen Warren wrote:
+>> On 10/01/2014 11:54 AM, jonsmirl at gmail.com wrote:
+>>> On Wed, Oct 1, 2014 at 1:26 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> ...
+>>>> We've been over all this again and again and again.
+>>>>
+>>>> AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
+>>>>
+>>>> All solutions provided sofar are both tons more complicated, then the
+>>>> simple solution of simply having the simplefb dt node declare which
+>>>> clocks it needs. And to make things worse all of them sofar have
+>>>> unresolved issues (due to their complexity mostly).
+>>>>
+>>>> With the clocks in the simplefb node, then all a real driver has to do,
+>>>> is claim those same clocks before unregistering the simplefb driver,
+>>>> and everything will just work.
+>>>>
+>>>> Yet we've been discussing this for months, all because of some
+>>>> vague worries from Thierry, and *only* from Thierry that this will
+>>>> make simplefb less generic / not abstract enough, while a simple
+>>>> generic clocks property is about as generic as things come.
+>>
+>> Note: I haven't been following this thread, and really don't have the time to get involved, but I did want to point out one thing:
+>>
+>> As I think I mentioned very early on in this thread, one of the big concerns when simplefb was merged was that it would slowly grow and become a monster. As such, a condition of merging it was that it would not grow features like resource management at all. That means no clock/regulator/... support. It's intended as a simple stop-gap between early platform bringup and whenever a real driver exists for the HW. If you need resource management, write a HW-specific driver. The list archives presumably have a record of the discussion, but I don't know the links off the top of my head. If nobody
+>> other than Thierry is objecting, presumably the people who originally objected simply haven't noticed this patch/thread. I suppose it's possible they changed their mind.
+>>
+>> BTW, there's no reason that the simplefb code couldn't be refactored out into a support library that's used by both the simplefb we currently have and any new HW-specific driver. It's just that the simplefb binding and driver shouldn't grow.
+>
+> The whole reason why we want to use simplefb is not just to get things
+> running until HW specific driver is in place, but also to have early console
+> output (to help debugging boot problems on devices without a serial console),
+> in a world where most video drivers are build as loadable modules, so we
+> won't have video output until quite late into the boot process.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: devicetree at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
----
- Documentation/devicetree/bindings/mfd/max77693.txt | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+You need both.
 
-diff --git a/Documentation/devicetree/bindings/mfd/max77693.txt b/Documentation/devicetree/bindings/mfd/max77693.txt
-index 11921cc417bf..d0c3d787df12 100644
---- a/Documentation/devicetree/bindings/mfd/max77693.txt
-+++ b/Documentation/devicetree/bindings/mfd/max77693.txt
-@@ -27,6 +27,42 @@ Optional properties:
- 
- 	[*] refer Documentation/devicetree/bindings/regulator/regulator.txt
- 
-+- charger : Node configuring the charger driver.
-+  If present, required properties:
-+  - compatible : Must be "maxim,max77693-charger".
-+
-+  Optional properties (if not set, defaults will be used):
-+  - maxim,constant-microvolt : Battery constant voltage in uV. The charger
-+    will operate in fast charge constant current mode till battery voltage
-+    reaches this level. Then the charger will switch to fast charge constant
-+    voltage mode. Also vsys (system voltage) will be set to this value when
-+    DC power is supplied but charger is not enabled.
-+    Valid values: 3650000 - 4400000, step by 25000 (rounded down)
-+    Default: 4200000
-+
-+  - maxim,min-system-microvolt : Minimal system voltage in uV.
-+    Valid values: 3000000 - 3700000, step by 100000 (rounded down)
-+    Default: 3600000
-+
-+  - maxim,thermal-regulation-celsius : Temperature in Celsius for entering
-+    high temperature charging mode. If die temperature exceeds this value
-+    the charging current will be reduced by 105 mA/Celsius.
-+    Valid values: 70, 85, 100, 115
-+    Default: 100
-+
-+  - maxim,battery-overcurrent-microamp : Overcurrent protection threshold
-+    in uA (current from battery to system).
-+    Valid values: 2000000 - 3500000, step by 250000 (rounded down)
-+    Default: 3500000
-+
-+  - maxim,charge-input-threshold-microvolt : Threshold voltage in uV for
-+    triggering input voltage regulation loop. If input voltage decreases
-+    below this value, the input current will be reduced to reach the
-+    threshold voltage.
-+    Valid values: 4300000, 4700000, 4800000, 4900000
-+    Default: 4300000
-+
-+
- Example:
- 	max77693 at 66 {
- 		compatible = "maxim,max77693";
-@@ -52,4 +88,14 @@ Example:
- 					regulator-boot-on;
- 			};
- 		};
-+
-+		charger {
-+			compatible = "maxim,max77693-charger";
-+
-+			maxim,constant-microvolt = <4200000>;
-+			maxim,min-system-microvolt = <3600000>;
-+			maxim,thermal-regulation-celsius = <75>;
-+			maxim,battery-overcurrent-microamp = <3000000>;
-+			maxim,charge-input-threshold-microvolt = <4300000>;
-+		};
- 	};
+1) temporary early boot console -- this is nothing but an address in
+RAM and the x/y layout. The character set from framebuffer is built
+into the kernel.  The parallel to this is early-printk and how it uses
+the UARTs without interrupts. This console vaporizes late in the boot
+process -- the same thing happens with the early printk UART driver.
+EARLYPRINTK on the command line enables this.
+
+2) a device specific driver -- this sits on initrd and it loaded as
+soon as possible. The same thing happens with the real UART driver for
+the console. CONSOLE= on the command line causes the transition. There
+is an API in the kernel to do this transition, I believe it is called
+set_console() but it's been a while.
+
+>
+> This is also the reason why we're working on adding hdmi console support
+> to u-boot in the first place, to debug boot problems.
+>
+> So the whole "write a HW specific driver" answer just does not cut it. Just
+> like we have vgacon / efifb on x86, we need something similar on ARM, and
+> since ARM does not have a generic hw interface like vga, we need a firmware
+> solution like efifb.
+>
+> So as said the whole "write a HW specific driver" just will not work, so
+> that means using something like simplefb. Now I can take simplefb, copy
+> it to rename it to firmwarefb or ubootfb or something, and then add the clocks
+> support, but that is just silly.
+>
+> You indicate that you don't have the time for this discussion, and I note that
+> there is no MAINTAINERS entry for drivers/video/fbdev/simplefb.c . So how about
+> the following, I pick up drivers/video/fbdev/simplefb.c maintainership, adding
+> MAINTAINERS entry for it with my name in it. Then as the maintainer it will be
+> my responsibility (and in my own benefit) to stop this from growing into
+> a monster ?
+>
+> To me that seems better then adding a new drivers/video/fbdev/firmwarefb.c
+> which will be just a copy with the clocks added.
+>
+> Regards,
+>
+> Hans
+
+
+
 -- 
-1.9.1
+Jon Smirl
+jonsmirl at gmail.com
