@@ -1,98 +1,150 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 02 Oct 2014 08:36:16 -0700
-Subject: [PATCH v2 0/3] ARM: rk3288 : Add PM Domain support
-In-Reply-To: <542D1F1B.8040501@ti.com> (Grygorii Strashko's message of "Thu, 2
- Oct 2014 12:47:07 +0300")
-References: <1411899774-8484-1-git-send-email-jinkun.hong@rock-chips.com>
- <7hoatvvimd.fsf@deeprootsystems.com>
- <CAD=FV=VPT5qiyY==nJbb4DqKMBnj0i-_MhLRVG0ikar2qtP4=A@mail.gmail.com>
- <7h38b7v8pp.fsf@deeprootsystems.com> <542D1F1B.8040501@ti.com>
-Message-ID: <7hr3yqtrf3.fsf@deeprootsystems.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 2 Oct 2014 17:36:58 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4OwMf-zXC_B=VqdVNrD_ExC3zGiGUm4j5KKgS-U4cPB2zg@mail.gmail.com>
+References: <20140929101805.GB26008@ulmo> <20141001074139.GB18463@ulmo>
+ <CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>
+ <20141001123250.GY4273@sirena.org.uk> <20141001124800.GA21733@ulmo>
+ <20141001170517.GF4273@sirena.org.uk> <542C3934.3040409@redhat.com>
+ <CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>
+ <542C4404.8040501@wwwdotorg.org> <542CF3C3.2050708@redhat.com>
+ <CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>
+ <542D476D.50004@redhat.com>
+ <CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>
+ <542D4FB9.6090805@redhat.com>
+ <CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>
+ <542D5444.8090903@redhat.com>
+ <CAKON4OxTmNRxSJum17RZGLLku5dAFPauzqyP0BOF-VC=bD=Hng@mail.gmail.com>
+ <542D5C74.4050602@redhat.com>
+ <CAKON4OxHeHszmcbMw_LRJbcaFW5JP7Atsa4RMRwWfqMrCueAnQ@mail.gmail.com>
+ <542D5F62.60907@redhat.com>
+ <CAKON4Oz8mL5jGzBHZeznd5NbPqq93q7PpTDqHHcV_HYSfqBVHA@mail.gmail.com>
+ <542D6633.20907@redhat.com>
+ <CAKON4OwMf-zXC_B=VqdVNrD_ExC3zGiGUm4j5KKgS-U4cPB2zg@mail.gmail.com>
+Message-ID: <CAOMqctS6pLrDbRJdCvC-boQ4AdqCihTdXYbfozJBGJhh2+nhOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
-
-> Hi,
->
-> On 10/01/2014 11:25 PM, Kevin Hilman wrote:
->> Doug Anderson <dianders@chromium.org> writes:
->> 
+On 2 October 2014 17:30, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Thu, Oct 2, 2014 at 11:14 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>> On Thu, Oct 2, 2014 at 10:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>> Hi,
 >>>
->>> On Wed, Oct 1, 2014 at 9:51 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>>> +Geert, Ulf
->>>>
->>>> "jinkun.hong" <jinkun.hong@rock-chips.com> writes:
->>>>
->>>>> From: "jinkun.hong" <jinkun.hong@rock-chips.com>
+>>> On 10/02/2014 04:41 PM, jonsmirl at gmail.com wrote:
+>>>> On Thu, Oct 2, 2014 at 10:21 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>> Hi,
 >>>>>
->>>>> Use PM Domain framework to manage the clock.
+>>>>> On 10/02/2014 04:16 PM, jonsmirl at gmail.com wrote:
+>>>>>> On Thu, Oct 2, 2014 at 10:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>
+>>> <snip>
+>>>
+>>>>>>>> So there are two ways to do this...
+>>>>>>>> 1) modify things like earlyconsole to protect device specific resource
+>>>>>>>> (I think this is a bad idea)
+>>>>>>>
+>>>>>>> Why is this a bad idea? If the bootloader tells us exactly which resources
+>>>>>>> are needed, then earlyconsole can claim them, and release them on
+>>>>>>> handover to the real display driver.
+>>>>>
+>>>>> Jon, can you please answer this ? I really really want to know why people
+>>>>> think this is such a bad idea. Understanding why people think this is a bad
+>>>>> idea is necessary to be able to come up with an alternative solution.
 >>>>
->>>> Which clock?  This changelog needs a more thorough description.
+>>>> The list of resources should not be duplicated in the device tree -
+>>>> once in the simplefb node and again in the real device node.
 >>>
+>>> It is not duplicated, the simplefb node will list the clocks used for the
+>>> mode / output as setup by the firmware, which are often not all clocks
+>>> which the display engine supports. Where as the real device node will list
+>>> all clocks the display engine may use.
 >>>
->>> I think what he meant was:
+>>>> Device
+>>>> tree is a hardware description and it is being twisted to solve a
+>>>> software issue.
 >>>
->>> Use the generic PM Domain framework for Rockchip
+>>> This is not true, various core devicetree developers have already said
+>>> that storing other info in the devicetree is fine, and being able to do so
+>>> is part of the original design.
 >>>
->>> ...but I agree that he could describe it more.
+>>>> This problem is not limited to clocks, same problem
+>>>> exists with regulators. On SGI systems this would exist with entire
+>>>> bus controllers (but they are x86 based, console is not on the root
+>>>> bus). This is a very messy problem and will lead to a Frankenstein
+>>>> sized driver over time.
 >>>
+>>> This is a "what if ..." argument, we can discuss potential hypothetical
+>>> problems all day long, what happens if the sky falls down?
 >>>
->>>> Also,
->>>> with this series alone, it's not clear how the power-domain transitions
->>>> ever happen, since I don't see any devices hooked up to your power
->>>> domains, or do I see your platform using runtime PM.  In order for this
->>>> to be reviewed properely, it's important for reviewers to be able to see
->>>> how this PM domain support will be used.
+>>>> But... I think this is a red herring which is masking the real
+>>>> problem. The real problem seems to be that there is no window for
+>>>> loading device specific drivers before the resource clean up phase
+>>>> happens. That's a real problem -- multi architecture distros are going
+>>>> to have lots of loadable device specific drivers.
 >>>
->>> I noticed that too.  As the patchset currently stands it only ever disables...
+>>> As Maxime pointed out to my alternative solution to fixing the clocks
+>>> problem, this is not strictly a when to do cleanup problem. If another
+>>> driver uses the same clocks, and does a clk_disable call after probing
+>>> (because the device is put in low power mode until used by userspace),
+>>> then the clk will be disabled even without any cleanup running at all.
 >>>
->>>
->>>> Also, remember that the DT is supposed to reflect the hardware, not the
->>>> design choices of linux drivers.  Because of that, it's a little
->>>> surprising to see clocks as properties of a power domain because clocks
->>>> are usually properties of devices.
->>>
->>> I haven't dug all the way into the hardware to figure out why (or if
->>> this is really necessary), but right now the rockchip power domain
->>> driver only leaves these clocks on during the powering on and powering
->>> off of the power domain.  In other words to turn on the power domain:
->>>
->>> 1. Turn on all clocks
->>> 2. Flip the bit that sets the power domain on
->>> 3. Wait until hardware says power domain is on.
->>> 4. Turn off all the clocks.
->>>
->>> ...and to turn off:
->>>
->>> 1. Turn on all clocks
->>> 2. Flip the bit that sets the power domain off
->>> 3. Wait until hardware says power domain is off.
->>> 2. Turn off all the clocks.
->>>
->>> ...if the above is actually necessary when turning on and off power
->>> domains then it seems like it is actually describing the hardware.
->> 
->> Yes, I understand. The need to have some *device* clocks enabled when
->> powering on/off the power-domain itself is quite common across many
->> SoCs.
->> 
->> My point is that these clocks are actually properties of *devices*, not
->> the power-domain itself.  In the shmobile example I pointed to, the
->> clocks are properties of the devices in DT, and the devices are attached
->> to the powerdomain.  When the devices are connected to the power-domain,
->> the custom attach function looks up all the *device* clocks and and
->> addes them to the power-domain using pm_clk_add.
+>>> The real problem here is simply that to work the simplefb needs certain
+>>> resources, just like any other device. And while for any other device
+>>> simply listing the needed resources is an accepted practice, for simplefb
+>>> for some reason (which I still do not understand) people all of a sudden
+>>> see listing resources as a problem.
+>>
+>> Because you are creating two different device tree nodes describing a
+>> single piece of hardware and that's not suppose to happen in a device
+>> tree.  The accurate description of the hardware is being perverted to
+>> solve a software problem.
+>>
+>> One node describes the hardware in a format to make simplefb happy.
+>> Another node describes the same hardware in a format to make the
+>> device specific driver happy.
+
+No.
+
+one node describes the state in which the hardware was left by u-boot
+and other node describes the display hardware in full.
+
+Obviously, this will overlap but is not duplication.
+
+Or as pointed out the simplefb node is not hardware description but
+'other information' which is part of the DT design. If your system
+does not use simplefb it can be ignored with no ill side effect (once
+the part with claiming memory for simplefb cleanly is resolved).
+
+Did we not discuss that several times already?
+
 >
-> Sorry, but this is not quite right :(
-> Patches from Geert will add only first clock for device and not all
-> of them. 
-> The right way to add all clocks for device from DT using 
-> generic PM domain represented in my series:
->  
->  ARM: keystone: pm: switch to use generic pm domains
->  http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg735601.html
+> But... I think all of this device tree stuff is a red herring and not
+> the core problem.
+>
+> Core problem.....
+>
+> Bios sets stuff up
+> Built-in drivers initialize
+> Bios settings get cleaned up (display goes blank)
+> Loadable drivers initialize (display comes back)
+>
+> In multi-architecture kernels almost all of the drivers are loadable.
+> We need to figure out how to change the order....
+>
+> Bios sets stuff up
+> Built-in drivers initialize
+> Loadable drivers initialize
+> Bios settings get cleaned up
+>
+> Maybe the Bios cleanup turns into a small app you place at the end of
+> your init scripts. It's just a power saving cleanup and shouldn't be
+> causing this much trouble.
 
-Thanks for clarifying.
+No. You need to do cleanup during driver loading as well. So not doing
+the cleanup early gives you more bizarre problems.
 
-Kevin
+Did we not discuss that several times as well?
+
+Thanks
+
+Michal
