@@ -1,23 +1,81 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Oct 2014 11:22:16 +0100
-Subject: [PATCH v2 2/2] ASoC: rockchip-max98090: add driver for rockchip
- board using a max98090
-In-Reply-To: <1412238960-4220-1-git-send-email-jay.xu@rock-chips.com>
-References: <1410507807-15795-1-git-send-email-jay.xu@rock-chips.com>
- <1412238960-4220-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <20141002102216.GN4273@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Oct 2014 11:26:25 +0100
+Subject: [PATCH 6/7] arm64/kexec: Add core kexec support
+In-Reply-To: <20141001192245.GG14991@redhat.com>
+References: <cover.1411604443.git.geoff@infradead.org>
+ <471af24b7de659a30a5941e793634bffec380cb9.1411604443.git.geoff@infradead.org>
+ <20140930181840.GA24153@redhat.com>
+ <1412106877.6630.45.camel@smoke>
+ <20141001161621.GA28440@leverpostej>
+ <20141001174714.GD14991@redhat.com>
+ <20141001180304.GC5788@leverpostej>
+ <20141001192245.GG14991@redhat.com>
+Message-ID: <20141002102625.GE5788@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 02, 2014 at 04:36:00PM +0800, Jianqun wrote:
-> The driver is used for rockchip board using a max98090.
-> Test on RK3288 board with max98090.
+On Wed, Oct 01, 2014 at 08:22:45PM +0100, Vivek Goyal wrote:
+> On Wed, Oct 01, 2014 at 07:03:04PM +0100, Mark Rutland wrote:
+> 
+> [..]
+> > I assume we'd have the first kernel perform the required cache maintenance.
+> > 
+> 
+> Hi Mark,
+> 
+> I am wondering, what kind of cache management is required here? What kind of
+> dcaches are present on arm64.
 
-I'm missing patch 1?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/1ef4b051/attachment.sig>
+In ARMv8 there's a hierarchy of quasi-PIPT D-caches; they generally
+behave like (and can be maintained as if) they are PIPT but might not
+actually be PIPT. There may be a system level cache between the
+architected cache hierarchy and memory (that should respect cache
+maintenance by VA).
+
+The MT_NORMAL attributes are such that most memory the kernel maps will
+have write-back read/write allocate attributes. So cache maintenance is
+required to ensure that data is cleaned from the D-caches out to the PoC
+(the point in the memory system at which non-cacheable accesses can see
+the same data), such that the CPU can see the images rather than stale
+data once translation is disabled.
+
+> I see that Geoff's patches flush dcaches for 
+> certain kexec stored pages using __flush_dcache_area()
+> (in kexec_list_flush_cb()).
+> 
+> arch/arm64/include/asm/cacheflush.h says following.
+> 
+>  *      __flush_dcache_area(kaddr, size)
+>  *
+>  *              Ensure that the data held in page is written back.
+>  *              - kaddr  - page address
+>  *              - size   - region size
+> 
+> So looks like we are trying to write back anything which we will access
+> after switching off MMU. If that's the case, I have two questions.
+> 
+> - Why do we need to writeback that cacheline. After switching off MMU,
+>   will we not access same cacheline. I thought caches are VIPT and tag
+>   will still remain the same (but I might easily be wrong here).
+
+As I mention above, the initial cache flush by VA is to ensure that the
+data is visible to the CPU once translation is disabled. I'm not sure I
+follow your reasoning.
+
+> - Even if we have to flush that cacheline, for kexec pages, I guess it
+>   should be done at kernel load time and not at the time of transition
+>   into new kernel. That seems too late. Once the kernel has been loaded,
+>   we don't overwrite these pages anymore. So a dcache flush at that
+>   time should be good.
+
+Given the current assumption at boot is that the kernel image should be
+clean in the D-cache hierarchy (but not necessarily anything else), that
+should be fine. However, we may need to nuke the I-cache when branching
+to the purgatory code as the I-cache could be PIPT, VIPT, or ASID-tagged
+VIVT.
+
+If the purgatory code moves anything around it will need to perform
+maintenance by VA to ensure stale dirty lines don't overwrite anything,
+and stale clean lines don't shadow anything.
+
+Mark.
