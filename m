@@ -1,117 +1,117 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Oct 2014 14:38:57 +0100
-Subject: [PATCH 18/24] ARM64: Add vdso for ILP32 and use it for the
- signal return
-In-Reply-To: <1409779158-30963-19-git-send-email-apinski@cavium.com>
-References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
- <1409779158-30963-19-git-send-email-apinski@cavium.com>
-Message-ID: <20141002133857.GD32147@e104818-lin.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 02 Oct 2014 15:40:16 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4Ow4WU8yhy+LKGgKfvS8E15MU=gfRoZXNW6AWGOBVPG8SQ@mail.gmail.com>
+References: <20140929101805.GB26008@ulmo>	<20140929114643.GB4081@lukather>	<20140929134708.GB30998@ulmo>	<20140929155517.GR16977@sirena.org.uk>	<20140930050923.GB29874@ulmo>	<20140930173928.GH4273@sirena.org.uk>	<20141001074139.GB18463@ulmo>	<CABxcv=nKErHGPRLM5yer2YnOc2VJPWLmeKgwXbXEU3r_XvsCyg@mail.gmail.com>	<20141001123250.GY4273@sirena.org.uk>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>	<CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>	<542C4404.8040501@wwwdotorg.org>	<542CF3C3.2050708@redhat.com>	<CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>	<542D476D.50004@redhat.com>	<CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>	<CAOMqctSnmN3YScH8+hCkmEVB076u=VsCAJVTz5=NEYzQJpYR6A@mail.gmail.com>
+ <CAKON4Ow4WU8yhy+LKGgKfvS8E15MU=gfRoZXNW6AWGOBVPG8SQ@mail.gmail.com>
+Message-ID: <542D55C0.4020306@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 10:19:12PM +0100, Andrew Pinski wrote:
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index f47c064..5311147 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -242,6 +242,10 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+Hi,
+
+On 10/02/2014 03:34 PM, jonsmirl at gmail.com wrote:
+> On Thu, Oct 2, 2014 at 9:23 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>> On 2 October 2014 14:56, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>>> On Thu, Oct 2, 2014 at 8:39 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On 10/02/2014 02:22 PM, jonsmirl at gmail.com wrote:
+>>>>> On Thu, Oct 2, 2014 at 2:42 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 10/01/2014 08:12 PM, Stephen Warren wrote:
+>>>>>>> On 10/01/2014 11:54 AM, jonsmirl at gmail.com wrote:
+>>>>>>>> On Wed, Oct 1, 2014 at 1:26 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>>>>> ...
+>>>>>>>>> We've been over all this again and again and again.
+>>>>>>>>>
+>>>>>>>>> AAAARRRRRGGGGGGGGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH!
+>>>>>>>>>
+>>>>>>>>> All solutions provided sofar are both tons more complicated, then the
+>>>>>>>>> simple solution of simply having the simplefb dt node declare which
+>>>>>>>>> clocks it needs. And to make things worse all of them sofar have
+>>>>>>>>> unresolved issues (due to their complexity mostly).
+>>>>>>>>>
+>>>>>>>>> With the clocks in the simplefb node, then all a real driver has to do,
+>>>>>>>>> is claim those same clocks before unregistering the simplefb driver,
+>>>>>>>>> and everything will just work.
+>>>>>>>>>
+>>>>>>>>> Yet we've been discussing this for months, all because of some
+>>>>>>>>> vague worries from Thierry, and *only* from Thierry that this will
+>>>>>>>>> make simplefb less generic / not abstract enough, while a simple
+>>>>>>>>> generic clocks property is about as generic as things come.
+>>>>>>>
+>>>>>>> Note: I haven't been following this thread, and really don't have the time to get involved, but I did want to point out one thing:
+>>>>>>>
+>>>>>>> As I think I mentioned very early on in this thread, one of the big concerns when simplefb was merged was that it would slowly grow and become a monster. As such, a condition of merging it was that it would not grow features like resource management at all. That means no clock/regulator/... support. It's intended as a simple stop-gap between early platform bringup and whenever a real driver exists for the HW. If you need resource management, write a HW-specific driver. The list archives presumably have a record of the discussion, but I don't know the links off the top of my head. If nobody
+>>>>>>> other than Thierry is objecting, presumably the people who originally objected simply haven't noticed this patch/thread. I suppose it's possible they changed their mind.
+>>>>>>>
+>>>>>>> BTW, there's no reason that the simplefb code couldn't be refactored out into a support library that's used by both the simplefb we currently have and any new HW-specific driver. It's just that the simplefb binding and driver shouldn't grow.
+>>>>>>
+>>>>>> The whole reason why we want to use simplefb is not just to get things
+>>>>>> running until HW specific driver is in place, but also to have early console
+>>>>>> output (to help debugging boot problems on devices without a serial console),
+>>>>>> in a world where most video drivers are build as loadable modules, so we
+>>>>>> won't have video output until quite late into the boot process.
+>>>>>
+>>>>> You need both.
+>>>>>
+>>>>> 1) temporary early boot console -- this is nothing but an address in
+>>>>> RAM and the x/y layout. The character set from framebuffer is built
+>>>>> into the kernel.  The parallel to this is early-printk and how it uses
+>>>>> the UARTs without interrupts. This console vaporizes late in the boot
+>>>>> process -- the same thing happens with the early printk UART driver.
+>>>>> EARLYPRINTK on the command line enables this.
+>>>>>
+>>>>> 2) a device specific driver -- this sits on initrd and it loaded as
+>>>>> soon as possible. The same thing happens with the real UART driver for
+>>>>> the console. CONSOLE= on the command line causes the transition. There
+>>>>> is an API in the kernel to do this transition, I believe it is called
+>>>>> set_console() but it's been a while.
+>>>>
+>>>> Eventually we need both, yes. But 1) should stay working until 2) loads,
+>>>> not until some phase of the bootup is completed, but simply until 2) loads.
+>>>
+>>> No, that is where you get into trouble. The device specific driver has
+>>> to go onto initrd where it can be loaded as early in the boot process
+>>> as possible.
+>>>
+>>> Trying to indefinitely extend the life of the earlyprintk or
+>>> earlyframeuffer is what causes problems.  Doing that forces you to
+>>> basically turn them into device specific drivers which do things like
+>>> claiming device specific resources and gaining device specific
+>>> dependency knowledge, things that shouldn't be in earlyframebuffer.
+>>>
+>>
+>> No. When initrd is running boot has already finished as far as kernel
+>> is concerned.
+>>
+>> And you have to extend the life of the simplefb from the time boot has
+>> finished through the time kernel mounts initrd (or other root) and
+>> hands over to userspace found on the initrd, through the time this
+>> userspace searches for the kms driver and until the time it has
+>> finally loaded if that ever succeeds.
 > 
->         if (ka->sa.sa_flags & SA_RESTORER)
->                 sigtramp = ka->sa.sa_restorer;
-> +#ifdef CONFIG_ARM64_ILP32
-> +       else if (is_ilp32_compat_task())
-> +               sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
-> +#endif
+> Does the clock and regulator cleanup happen before drivers can load
+> off from initrd? I didn't think it did but I might be wrong.
 
-Could we avoid the #ifdef here given that is_ilp32_compat_task() returns
-0 when !CONFIG_ARM64_ILP32? I haven't tried to compile it.
+Yes the cleanup happens before the first userspace process starts, be
+that the fake /sbin/init from the initrd, or the real /sbin/init if
+no initrd is used.
 
-> diff --git a/arch/arm64/kernel/vdso-ilp32/Makefile b/arch/arm64/kernel/vdso-ilp32/Makefile
-> new file mode 100644
-> index 0000000..c8f5472
-> --- /dev/null
-> +++ b/arch/arm64/kernel/vdso-ilp32/Makefile
+> So maybe a solution to this is to delay that cleanup until after
+> initrd drivers have a chance to load. Of course it is not possible to
+> delay it indefinitely (like for disk based loading) but delaying over
+> initrd is a fixed limit.
 
-Do we expect so many ILP32 files as to use a separate vdso-ilp32
-directory? I prefer a single vdso directory.
+And delaying over the initrd is not helpful. Not having the real driver
+load for whatever reasons, is not necessarily a boot blocking event,
+and if it us just missing will not lead to any error messages.
 
-> @@ -0,0 +1,72 @@
-> +#
-> +# Building a vDSO image for AArch64.
-> +#
-> +# Author: Will Deacon <will.deacon@arm.com>
-> +# Heavily based on the vDSO Makefiles for other archs.
-> +#
-> +
-> +obj-ilp32-vdso := gettimeofday-ilp32.o note-ilp32.o sigreturn-ilp32.o
-> +
-> +# Build rules
-> +targets := $(obj-ilp32-vdso) vdso-ilp32.so vdso-ilp32.so.dbg
-> +obj-ilp32-vdso := $(addprefix $(obj)/, $(obj-ilp32-vdso))
-> +
-> +ccflags-y := -shared -fno-common -fno-builtin
-> +ccflags-y += -nostdlib -Wl,-soname=linux-ilp32-vdso.so.1 \
-> +               $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
-> +
-> +obj-y += vdso-ilp32.o
-> +extra-y += vdso-ilp32.lds vdso-ilp32-offsets.h
-> +CPPFLAGS_vdso-ilp32.lds += -P -C -U$(ARCH) -mabi=ilp32
-> +
-> +# Force dependency (incbin is bad)
-> +$(obj)/vdso-ilp32.o : $(obj)/vdso-ilp32.so
-> +
-> +# Link rule for the .so file, .lds has to be first
-> +$(obj)/vdso-ilp32.so.dbg: $(src)/vdso-ilp32.lds $(obj-ilp32-vdso)
-> +       $(call if_changed,vdso-ilp32ld)
-> +
-> +# Strip rule for the .so file
-> +$(obj)/%.so: OBJCOPYFLAGS := -S
-> +$(obj)/%.so: $(obj)/%.so.dbg FORCE
-> +       $(call if_changed,objcopy)
-> +
-> +# Generate VDSO offsets using helper script
-> +gen-vdsosym := $(srctree)/$(src)/../vdso/gen_vdso_offsets.sh
-> +quiet_cmd_vdsosym = VDSOSYM $@
-> +define cmd_vdsosym
-> +       $(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@ && \
-> +       cp $@ include/generated/
-> +endef
-> +
-> +$(obj)/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32.so.dbg FORCE
-> +       $(call if_changed,vdsosym)
-> +
-> +# Assembly rules for the .S files
-> +#$(obj-ilp32-vdso): %.o: $(src)/../vdso/$(subst -ilp32,,%.S)
-> +#      $(call if_changed_dep,vdso-ilp32as)
-> +
-> +$(obj)/gettimeofday-ilp32.o: $(src)/../vdso/gettimeofday.S
-> +       $(call if_changed_dep,vdso-ilp32as)
-> +
-> +$(obj)/note-ilp32.o: $(src)/../vdso/note.S
-> +       $(call if_changed_dep,vdso-ilp32as)
-> +
-> +$(obj)/sigreturn-ilp32.o: $(src)/../vdso/sigreturn.S
-> +       $(call if_changed_dep,vdso-ilp32as)
+So the boot will continue normally with a black screen, and things are
+still impossible to debug.
 
-So we don't even need many new files, just different compiler flags.
+Regards,
 
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index a777ac3..21b3726 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -41,6 +41,12 @@ extern char vdso_start, vdso_end;
->  static unsigned long vdso_pages;
->  static struct page **vdso_pagelist;
-> 
-> +#ifdef CONFIG_ARM64_ILP32
-> +extern char vdso_ilp32_start, vdso_ilp32_end;
-> +static unsigned long vdso_ilp32_pages;
-> +static struct page **vdso_ilp32_pagelist;
-> +#endif
-
-I think the compiler could optimise away some of these and avoid the
-#ifdef (similarly in the code where we check for
-is_ilp32_compat_task()).
-
--- 
-Catalin
+Hans
