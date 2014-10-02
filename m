@@ -1,220 +1,597 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu,  2 Oct 2014 20:52:09 +0200
-Subject: [PATCH v2 3/5] pinctrl: samsung: Constify samsung_pin_bank_type struct
+Date: Thu,  2 Oct 2014 20:52:10 +0200
+Subject: [PATCH v2 4/5] pinctrl: samsung: Constify samsung_pin_ctrl struct
 In-Reply-To: <1412275931-10807-1-git-send-email-tomasz.figa@gmail.com>
 References: <1412275931-10807-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1412275931-10807-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1412275931-10807-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This structure is not intended to be modified at runtime and functions
-as constant data shared between multiple pin banks. This patch makes all
-instances of it constant across the driver.
+In order to separate initialization constants from runtime data, this
+patch modifies the driver to store only constant data in
+samsung_pin_ctrl struct and copy data required at runtime to
+samsung_pinctrl_drv_data struct. This makes it possible to mark all
+existing instances of samsung_pin_ctrl struct as const and __initconst.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Tested by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c  |  6 +++---
- drivers/pinctrl/samsung/pinctrl-s3c24xx.c |  6 +++---
- drivers/pinctrl/samsung/pinctrl-s3c64xx.c | 14 +++++++-------
- drivers/pinctrl/samsung/pinctrl-samsung.c | 20 +++++++++-----------
- drivers/pinctrl/samsung/pinctrl-samsung.h |  2 +-
- 5 files changed, 23 insertions(+), 25 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-exynos.c  | 39 +++++++-------
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 12 ++---
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c | 14 ++---
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 86 +++++++++++++++----------------
+ drivers/pinctrl/samsung/pinctrl-samsung.h | 40 +++++++-------
+ 5 files changed, 96 insertions(+), 95 deletions(-)
 
 diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 67658d6d4b4e..0f46391df3ea 100644
+index 0f46391df3ea..4659a1abc862 100644
 --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
 +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -46,12 +46,12 @@ static inline struct exynos_irq_chip *to_exynos_irq_chip(struct irq_chip *chip)
- 	return container_of(chip, struct exynos_irq_chip, chip);
+@@ -222,8 +222,7 @@ static const struct irq_domain_ops exynos_gpio_irqd_ops = {
+ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
+ {
+ 	struct samsung_pinctrl_drv_data *d = data;
+-	struct samsung_pin_ctrl *ctrl = d->ctrl;
+-	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	struct samsung_pin_bank *bank = d->pin_banks;
+ 	unsigned int svc, group, pin, virq;
+ 
+ 	svc = readl(d->virt_base + EXYNOS_SVC_OFFSET);
+@@ -270,8 +269,8 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
+ 		return -ENXIO;
+ 	}
+ 
+-	bank = d->ctrl->pin_banks;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	bank = d->pin_banks;
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		if (bank->eint_type != EINT_TYPE_GPIO)
+ 			continue;
+ 		bank->irq_domain = irq_domain_add_linear(bank->of_node,
+@@ -441,8 +440,8 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	if (!wkup_np)
+ 		return -ENODEV;
+ 
+-	bank = d->ctrl->pin_banks;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	bank = d->pin_banks;
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		if (bank->eint_type != EINT_TYPE_WKUP)
+ 			continue;
+ 
+@@ -499,9 +498,9 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	irq_set_chained_handler(irq, exynos_irq_demux_eint16_31);
+ 	irq_set_handler_data(irq, muxed_data);
+ 
+-	bank = d->ctrl->pin_banks;
++	bank = d->pin_banks;
+ 	idx = 0;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		if (bank->eint_type != EINT_TYPE_WKUP_MUX)
+ 			continue;
+ 
+@@ -533,11 +532,10 @@ static void exynos_pinctrl_suspend_bank(
+ 
+ static void exynos_pinctrl_suspend(struct samsung_pinctrl_drv_data *drvdata)
+ {
+-	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+-	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	struct samsung_pin_bank *bank = drvdata->pin_banks;
+ 	int i;
+ 
+-	for (i = 0; i < ctrl->nr_banks; ++i, ++bank)
++	for (i = 0; i < drvdata->nr_banks; ++i, ++bank)
+ 		if (bank->eint_type == EINT_TYPE_GPIO)
+ 			exynos_pinctrl_suspend_bank(drvdata, bank);
  }
+@@ -569,11 +567,10 @@ static void exynos_pinctrl_resume_bank(
  
--static struct samsung_pin_bank_type bank_type_off = {
-+static const struct samsung_pin_bank_type bank_type_off = {
- 	.fld_width = { 4, 1, 2, 2, 2, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, },
+ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ {
+-	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+-	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	struct samsung_pin_bank *bank = drvdata->pin_banks;
+ 	int i;
+ 
+-	for (i = 0; i < ctrl->nr_banks; ++i, ++bank)
++	for (i = 0; i < drvdata->nr_banks; ++i, ++bank)
+ 		if (bank->eint_type == EINT_TYPE_GPIO)
+ 			exynos_pinctrl_resume_bank(drvdata, bank);
+ }
+@@ -616,7 +613,7 @@ static struct samsung_pin_bank s5pv210_pin_bank[] = {
+ 	EXYNOS_PIN_BANK_EINTW(8, 0xc60, "gph3", 0x0c),
  };
  
--static struct samsung_pin_bank_type bank_type_alive = {
-+static const struct samsung_pin_bank_type bank_type_alive = {
- 	.fld_width = { 4, 1, 2, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, 0x0c, },
- };
-@@ -127,7 +127,7 @@ static int exynos_irq_set_type(struct irq_data *irqd, unsigned int type)
- 	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
- 	struct exynos_irq_chip *our_chip = to_exynos_irq_chip(chip);
- 	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
--	struct samsung_pin_bank_type *bank_type = bank->type;
-+	const struct samsung_pin_bank_type *bank_type = bank->type;
- 	struct samsung_pinctrl_drv_data *d = bank->drvdata;
- 	unsigned int pin = irqd->hwirq;
- 	unsigned int shift = EXYNOS_EINT_CON_LEN * pin;
+-struct samsung_pin_ctrl s5pv210_pin_ctrl[] = {
++const struct samsung_pin_ctrl s5pv210_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= s5pv210_pin_bank,
+@@ -663,7 +660,7 @@ static struct samsung_pin_bank exynos3250_pin_banks1[] = {
+  * Samsung pinctrl driver data for Exynos3250 SoC. Exynos3250 SoC includes
+  * two gpio/pin-mux/pinconfig controllers.
+  */
+-struct samsung_pin_ctrl exynos3250_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos3250_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos3250_pin_banks0,
+@@ -735,7 +732,7 @@ static struct samsung_pin_bank exynos4210_pin_banks2[] = {
+  * Samsung pinctrl driver data for Exynos4210 SoC. Exynos4210 SoC includes
+  * three gpio/pin-mux/pinconfig controllers.
+  */
+-struct samsung_pin_ctrl exynos4210_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos4210_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos4210_pin_banks0,
+@@ -820,7 +817,7 @@ static struct samsung_pin_bank exynos4x12_pin_banks3[] = {
+  * Samsung pinctrl driver data for Exynos4x12 SoC. Exynos4x12 SoC includes
+  * four gpio/pin-mux/pinconfig controllers.
+  */
+-struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos4x12_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos4x12_pin_banks0,
+@@ -913,7 +910,7 @@ static struct samsung_pin_bank exynos5250_pin_banks3[] = {
+  * Samsung pinctrl driver data for Exynos5250 SoC. Exynos5250 SoC includes
+  * four gpio/pin-mux/pinconfig controllers.
+  */
+-struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos5250_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos5250_pin_banks0,
+@@ -990,7 +987,7 @@ static struct samsung_pin_bank exynos5260_pin_banks2[] = {
+  * Samsung pinctrl driver data for Exynos5260 SoC. Exynos5260 SoC includes
+  * three gpio/pin-mux/pinconfig controllers.
+  */
+-struct samsung_pin_ctrl exynos5260_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos5260_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos5260_pin_banks0,
+@@ -1070,7 +1067,7 @@ static struct samsung_pin_bank exynos5420_pin_banks4[] = {
+  * Samsung pinctrl driver data for Exynos5420 SoC. Exynos5420 SoC includes
+  * four gpio/pin-mux/pinconfig controllers.
+  */
+-struct samsung_pin_ctrl exynos5420_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos5420_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos5420_pin_banks0,
 diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-index e38925906bd3..9db6cf5c8823 100644
+index 9db6cf5c8823..c0c7924657e6 100644
 --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
 +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-@@ -44,12 +44,12 @@
- #define EINT_EDGE_BOTH		6
- #define EINT_MASK		0xf
+@@ -518,8 +518,8 @@ static int s3c24xx_eint_init(struct samsung_pinctrl_drv_data *d)
+ 		irq_set_handler_data(irq, eint_data);
+ 	}
  
--static struct samsung_pin_bank_type bank_type_1bit = {
-+static const struct samsung_pin_bank_type bank_type_1bit = {
- 	.fld_width = { 1, 1, },
- 	.reg_offset = { 0x00, 0x04, },
+-	bank = d->ctrl->pin_banks;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	bank = d->pin_banks;
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		struct s3c24xx_eint_domain_data *ddata;
+ 		unsigned int mask;
+ 		unsigned int irq;
+@@ -573,7 +573,7 @@ static struct samsung_pin_bank s3c2412_pin_banks[] = {
+ 	PIN_BANK_2BIT(13, 0x080, "gpj"),
  };
  
--static struct samsung_pin_bank_type bank_type_2bit = {
-+static const struct samsung_pin_bank_type bank_type_2bit = {
- 	.fld_width = { 2, 1, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, },
+-struct samsung_pin_ctrl s3c2412_pin_ctrl[] = {
++const struct samsung_pin_ctrl s3c2412_pin_ctrl[] __initconst = {
+ 	{
+ 		.pin_banks	= s3c2412_pin_banks,
+ 		.nr_banks	= ARRAY_SIZE(s3c2412_pin_banks),
+@@ -595,7 +595,7 @@ static struct samsung_pin_bank s3c2416_pin_banks[] = {
+ 	PIN_BANK_2BIT(2, 0x100, "gpm"),
  };
-@@ -143,7 +143,7 @@ static void s3c24xx_eint_set_handler(unsigned int irq, unsigned int type)
- static void s3c24xx_eint_set_function(struct samsung_pinctrl_drv_data *d,
- 					struct samsung_pin_bank *bank, int pin)
- {
--	struct samsung_pin_bank_type *bank_type = bank->type;
-+	const struct samsung_pin_bank_type *bank_type = bank->type;
- 	unsigned long flags;
- 	void __iomem *reg;
- 	u8 shift;
+ 
+-struct samsung_pin_ctrl s3c2416_pin_ctrl[] = {
++const struct samsung_pin_ctrl s3c2416_pin_ctrl[] __initconst = {
+ 	{
+ 		.pin_banks	= s3c2416_pin_banks,
+ 		.nr_banks	= ARRAY_SIZE(s3c2416_pin_banks),
+@@ -615,7 +615,7 @@ static struct samsung_pin_bank s3c2440_pin_banks[] = {
+ 	PIN_BANK_2BIT(13, 0x0d0, "gpj"),
+ };
+ 
+-struct samsung_pin_ctrl s3c2440_pin_ctrl[] = {
++const struct samsung_pin_ctrl s3c2440_pin_ctrl[] __initconst = {
+ 	{
+ 		.pin_banks	= s3c2440_pin_banks,
+ 		.nr_banks	= ARRAY_SIZE(s3c2440_pin_banks),
+@@ -638,7 +638,7 @@ static struct samsung_pin_bank s3c2450_pin_banks[] = {
+ 	PIN_BANK_2BIT(2, 0x100, "gpm"),
+ };
+ 
+-struct samsung_pin_ctrl s3c2450_pin_ctrl[] = {
++const struct samsung_pin_ctrl s3c2450_pin_ctrl[] __initconst = {
+ 	{
+ 		.pin_banks	= s3c2450_pin_banks,
+ 		.nr_banks	= ARRAY_SIZE(s3c2450_pin_banks),
 diff --git a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-index fcf8c36e727e..2a14db2826d8 100644
+index 2a14db2826d8..14c3f9823cc5 100644
 --- a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
 +++ b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
-@@ -68,32 +68,32 @@
- #define EINT_CON_MASK		0xF
- #define EINT_CON_LEN		4
+@@ -468,8 +468,8 @@ static int s3c64xx_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
+ 	}
  
--static struct samsung_pin_bank_type bank_type_4bit_off = {
-+static const struct samsung_pin_bank_type bank_type_4bit_off = {
- 	.fld_width = { 4, 1, 2, 0, 2, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, 0, 0x0c, 0x10, },
- };
+ 	nr_domains = 0;
+-	bank = d->ctrl->pin_banks;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	bank = d->pin_banks;
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		unsigned int nr_eints;
+ 		unsigned int mask;
  
--static struct samsung_pin_bank_type bank_type_4bit_alive = {
-+static const struct samsung_pin_bank_type bank_type_4bit_alive = {
- 	.fld_width = { 4, 1, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, },
- };
+@@ -497,9 +497,9 @@ static int s3c64xx_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
+ 	}
+ 	data->drvdata = d;
  
--static struct samsung_pin_bank_type bank_type_4bit2_off = {
-+static const struct samsung_pin_bank_type bank_type_4bit2_off = {
- 	.fld_width = { 4, 1, 2, 0, 2, 2, },
- 	.reg_offset = { 0x00, 0x08, 0x0c, 0, 0x10, 0x14, },
- };
+-	bank = d->ctrl->pin_banks;
++	bank = d->pin_banks;
+ 	nr_domains = 0;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		if (bank->eint_type != EINT_TYPE_GPIO)
+ 			continue;
  
--static struct samsung_pin_bank_type bank_type_4bit2_alive = {
-+static const struct samsung_pin_bank_type bank_type_4bit2_alive = {
- 	.fld_width = { 4, 1, 2, },
- 	.reg_offset = { 0x00, 0x08, 0x0c, },
- };
+@@ -735,8 +735,8 @@ static int s3c64xx_eint_eint0_init(struct samsung_pinctrl_drv_data *d)
+ 		irq_set_handler_data(irq, data);
+ 	}
  
--static struct samsung_pin_bank_type bank_type_2bit_off = {
-+static const struct samsung_pin_bank_type bank_type_2bit_off = {
- 	.fld_width = { 2, 1, 2, 0, 2, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, 0, 0x0c, 0x10, },
- };
- 
--static struct samsung_pin_bank_type bank_type_2bit_alive = {
-+static const struct samsung_pin_bank_type bank_type_2bit_alive = {
- 	.fld_width = { 2, 1, 2, },
- 	.reg_offset = { 0x00, 0x04, 0x08, },
- };
-@@ -272,7 +272,7 @@ static void s3c64xx_irq_set_handler(unsigned int irq, unsigned int type)
- static void s3c64xx_irq_set_function(struct samsung_pinctrl_drv_data *d,
- 					struct samsung_pin_bank *bank, int pin)
- {
--	struct samsung_pin_bank_type *bank_type = bank->type;
-+	const struct samsung_pin_bank_type *bank_type = bank->type;
- 	unsigned long flags;
- 	void __iomem *reg;
- 	u8 shift;
+-	bank = d->ctrl->pin_banks;
+-	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
++	bank = d->pin_banks;
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		struct s3c64xx_eint0_domain_data *ddata;
+ 		unsigned int nr_eints;
+ 		unsigned int mask;
+@@ -804,7 +804,7 @@ static struct samsung_pin_bank s3c64xx_pin_banks0[] = {
+  * Samsung pinctrl driver data for S3C64xx SoC. S3C64xx SoC includes
+  * one gpio/pin-mux/pinconfig controller.
+  */
+-struct samsung_pin_ctrl s3c64xx_pin_ctrl[] = {
++const struct samsung_pin_ctrl s3c64xx_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 1 data */
+ 		.pin_banks	= s3c64xx_pin_banks0,
 diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 0504f0b75de8..b8edc901fe08 100644
+index b8edc901fe08..e46fd0a25de7 100644
 --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
 +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -366,7 +366,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 					unsigned group, bool enable)
+@@ -349,7 +349,7 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
  {
- 	struct samsung_pinctrl_drv_data *drvdata;
--	struct samsung_pin_bank_type *type;
-+	const struct samsung_pin_bank_type *type;
- 	struct samsung_pin_bank *bank;
- 	void __iomem *reg;
- 	u32 mask, shift, data, pin_offset;
-@@ -422,7 +422,7 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
- 				unsigned long *config, bool set)
- {
- 	struct samsung_pinctrl_drv_data *drvdata;
--	struct samsung_pin_bank_type *type;
-+	const struct samsung_pin_bank_type *type;
- 	struct samsung_pin_bank *bank;
- 	void __iomem *reg_base;
- 	enum pincfg_type cfg_type = PINCFG_UNPACK_TYPE(*config);
-@@ -528,7 +528,7 @@ static const struct pinconf_ops samsung_pinconf_ops = {
- static void samsung_gpio_set(struct gpio_chip *gc, unsigned offset, int value)
- {
- 	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
--	struct samsung_pin_bank_type *type = bank->type;
-+	const struct samsung_pin_bank_type *type = bank->type;
+ 	struct samsung_pin_bank *b;
+ 
+-	b = drvdata->ctrl->pin_banks;
++	b = drvdata->pin_banks;
+ 
+ 	while ((pin >= b->pin_base) &&
+ 			((b->pin_base + b->nr_pins - 1) < pin))
+@@ -378,7 +378,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
+ 	func = &drvdata->pmx_functions[selector];
+ 	grp = &drvdata->pin_groups[group];
+ 
+-	pin_to_reg_bank(drvdata, grp->pins[0] - drvdata->ctrl->base,
++	pin_to_reg_bank(drvdata, grp->pins[0] - drvdata->pin_base,
+ 			&reg, &pin_offset, &bank);
+ 	type = bank->type;
+ 	mask = (1 << type->fld_width[PINCFG_TYPE_FUNC]) - 1;
+@@ -431,7 +431,7 @@ static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
  	unsigned long flags;
- 	void __iomem *reg;
- 	u32 data;
-@@ -552,7 +552,7 @@ static int samsung_gpio_get(struct gpio_chip *gc, unsigned offset)
- 	void __iomem *reg;
- 	u32 data;
- 	struct samsung_pin_bank *bank = gc_to_pin_bank(gc);
--	struct samsung_pin_bank_type *type = bank->type;
-+	const struct samsung_pin_bank_type *type = bank->type;
  
- 	reg = bank->drvdata->virt_base + bank->pctl_offset;
+ 	drvdata = pinctrl_dev_get_drvdata(pctldev);
+-	pin_to_reg_bank(drvdata, pin - drvdata->ctrl->base, &reg_base,
++	pin_to_reg_bank(drvdata, pin - drvdata->pin_base, &reg_base,
+ 					&pin_offset, &bank);
+ 	type = bank->type;
  
-@@ -569,7 +569,7 @@ static int samsung_gpio_get(struct gpio_chip *gc, unsigned offset)
- static int samsung_gpio_set_direction(struct gpio_chip *gc,
- 					     unsigned offset, bool input)
+@@ -834,32 +834,32 @@ static int samsung_pinctrl_register(struct platform_device *pdev,
+ 	ctrldesc->confops = &samsung_pinconf_ops;
+ 
+ 	pindesc = devm_kzalloc(&pdev->dev, sizeof(*pindesc) *
+-			drvdata->ctrl->nr_pins, GFP_KERNEL);
++			drvdata->nr_pins, GFP_KERNEL);
+ 	if (!pindesc) {
+ 		dev_err(&pdev->dev, "mem alloc for pin descriptors failed\n");
+ 		return -ENOMEM;
+ 	}
+ 	ctrldesc->pins = pindesc;
+-	ctrldesc->npins = drvdata->ctrl->nr_pins;
++	ctrldesc->npins = drvdata->nr_pins;
+ 
+ 	/* dynamically populate the pin number and pin name for pindesc */
+ 	for (pin = 0, pdesc = pindesc; pin < ctrldesc->npins; pin++, pdesc++)
+-		pdesc->number = pin + drvdata->ctrl->base;
++		pdesc->number = pin + drvdata->pin_base;
+ 
+ 	/*
+ 	 * allocate space for storing the dynamically generated names for all
+ 	 * the pins which belong to this pin-controller.
+ 	 */
+ 	pin_names = devm_kzalloc(&pdev->dev, sizeof(char) * PIN_NAME_LENGTH *
+-					drvdata->ctrl->nr_pins, GFP_KERNEL);
++					drvdata->nr_pins, GFP_KERNEL);
+ 	if (!pin_names) {
+ 		dev_err(&pdev->dev, "mem alloc for pin names failed\n");
+ 		return -ENOMEM;
+ 	}
+ 
+ 	/* for each pin, the name of the pin is pin-bank name + pin number */
+-	for (bank = 0; bank < drvdata->ctrl->nr_banks; bank++) {
+-		pin_bank = &drvdata->ctrl->pin_banks[bank];
++	for (bank = 0; bank < drvdata->nr_banks; bank++) {
++		pin_bank = &drvdata->pin_banks[bank];
+ 		for (pin = 0; pin < pin_bank->nr_pins; pin++) {
+ 			sprintf(pin_names, "%s-%d", pin_bank->name, pin);
+ 			pdesc = pindesc + pin_bank->pin_base + pin;
+@@ -878,11 +878,11 @@ static int samsung_pinctrl_register(struct platform_device *pdev,
+ 		return -EINVAL;
+ 	}
+ 
+-	for (bank = 0; bank < drvdata->ctrl->nr_banks; ++bank) {
+-		pin_bank = &drvdata->ctrl->pin_banks[bank];
++	for (bank = 0; bank < drvdata->nr_banks; ++bank) {
++		pin_bank = &drvdata->pin_banks[bank];
+ 		pin_bank->grange.name = pin_bank->name;
+ 		pin_bank->grange.id = bank;
+-		pin_bank->grange.pin_base = drvdata->ctrl->base
++		pin_bank->grange.pin_base = drvdata->pin_base
+ 						+ pin_bank->pin_base;
+ 		pin_bank->grange.base = pin_bank->gpio_chip.base;
+ 		pin_bank->grange.npins = pin_bank->gpio_chip.ngpio;
+@@ -918,17 +918,16 @@ static const struct gpio_chip samsung_gpiolib_chip = {
+ static int samsung_gpiolib_register(struct platform_device *pdev,
+ 				    struct samsung_pinctrl_drv_data *drvdata)
  {
--	struct samsung_pin_bank_type *type;
-+	const struct samsung_pin_bank_type *type;
+-	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+-	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	struct samsung_pin_bank *bank = drvdata->pin_banks;
+ 	struct gpio_chip *gc;
+ 	int ret;
+ 	int i;
+ 
+-	for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
++	for (i = 0; i < drvdata->nr_banks; ++i, ++bank) {
+ 		bank->gpio_chip = samsung_gpiolib_chip;
+ 
+ 		gc = &bank->gpio_chip;
+-		gc->base = ctrl->base + bank->pin_base;
++		gc->base = drvdata->pin_base + bank->pin_base;
+ 		gc->ngpio = bank->nr_pins;
+ 		gc->dev = &pdev->dev;
+ 		gc->of_node = bank->of_node;
+@@ -956,12 +955,11 @@ fail:
+ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+ 				      struct samsung_pinctrl_drv_data *drvdata)
+ {
+-	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+-	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	struct samsung_pin_bank *bank = drvdata->pin_banks;
+ 	int ret = 0;
+ 	int i;
+ 
+-	for (i = 0; !ret && i < ctrl->nr_banks; ++i, ++bank)
++	for (i = 0; !ret && i < drvdata->nr_banks; ++i, ++bank)
+ 		ret = gpiochip_remove(&bank->gpio_chip);
+ 
+ 	if (ret)
+@@ -973,15 +971,15 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+ static const struct of_device_id samsung_pinctrl_dt_match[];
+ 
+ /* retrieve the soc specific data */
+-static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
+-				struct samsung_pinctrl_drv_data *d,
+-				struct platform_device *pdev)
++static const struct samsung_pin_ctrl *
++samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
++			     struct platform_device *pdev)
+ {
+ 	int id;
+ 	const struct of_device_id *match;
+ 	struct device_node *node = pdev->dev.of_node;
+ 	struct device_node *np;
+-	struct samsung_pin_ctrl *ctrl;
++	const struct samsung_pin_ctrl *ctrl;
  	struct samsung_pin_bank *bank;
+ 	int i;
+ 
+@@ -993,19 +991,24 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
+ 	match = of_match_node(samsung_pinctrl_dt_match, node);
+ 	ctrl = (struct samsung_pin_ctrl *)match->data + id;
+ 
+-	bank = ctrl->pin_banks;
+-	for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
++	d->suspend = ctrl->suspend;
++	d->resume = ctrl->resume;
++	d->pin_banks = ctrl->pin_banks;
++	d->nr_banks = ctrl->nr_banks;
++
++	bank = d->pin_banks;
++	for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 		spin_lock_init(&bank->slock);
+ 		bank->drvdata = d;
+-		bank->pin_base = ctrl->nr_pins;
+-		ctrl->nr_pins += bank->nr_pins;
++		bank->pin_base = d->nr_pins;
++		d->nr_pins += bank->nr_pins;
+ 	}
+ 
+ 	for_each_child_of_node(node, np) {
+ 		if (!of_find_property(np, "gpio-controller", NULL))
+ 			continue;
+-		bank = ctrl->pin_banks;
+-		for (i = 0; i < ctrl->nr_banks; ++i, ++bank) {
++		bank = d->pin_banks;
++		for (i = 0; i < d->nr_banks; ++i, ++bank) {
+ 			if (!strcmp(bank->name, np->name)) {
+ 				bank->of_node = np;
+ 				break;
+@@ -1013,8 +1016,8 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
+ 		}
+ 	}
+ 
+-	ctrl->base = pin_base;
+-	pin_base += ctrl->nr_pins;
++	d->pin_base = pin_base;
++	pin_base += d->nr_pins;
+ 
+ 	return ctrl;
+ }
+@@ -1022,8 +1025,8 @@ static struct samsung_pin_ctrl *samsung_pinctrl_get_soc_data(
+ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ {
  	struct samsung_pinctrl_drv_data *drvdata;
- 	void __iomem *reg;
-@@ -1096,9 +1096,8 @@ static void samsung_pinctrl_suspend_dev(
- 	for (i = 0; i < ctrl->nr_banks; i++) {
- 		struct samsung_pin_bank *bank = &ctrl->pin_banks[i];
- 		void __iomem *reg = virt_base + bank->pctl_offset;
--
--		u8 *offs = bank->type->reg_offset;
--		u8 *widths = bank->type->fld_width;
-+		const u8 *offs = bank->type->reg_offset;
-+		const u8 *widths = bank->type->fld_width;
- 		enum pincfg_type type;
++	const struct samsung_pin_ctrl *ctrl;
+ 	struct device *dev = &pdev->dev;
+-	struct samsung_pin_ctrl *ctrl;
+ 	struct resource *res;
+ 	int ret;
  
- 		/* Registers without a powerdown config aren't lost */
-@@ -1147,9 +1146,8 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
- 	for (i = 0; i < ctrl->nr_banks; i++) {
- 		struct samsung_pin_bank *bank = &ctrl->pin_banks[i];
- 		void __iomem *reg = virt_base + bank->pctl_offset;
--
--		u8 *offs = bank->type->reg_offset;
--		u8 *widths = bank->type->fld_width;
-+		const u8 *offs = bank->type->reg_offset;
-+		const u8 *widths = bank->type->fld_width;
- 		enum pincfg_type type;
+@@ -1044,7 +1047,6 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "driver data not available\n");
+ 		return PTR_ERR(ctrl);
+ 	}
+-	drvdata->ctrl = ctrl;
+ 	drvdata->dev = dev;
  
- 		/* Registers without a powerdown config aren't lost */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -1089,12 +1091,11 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ static void samsung_pinctrl_suspend_dev(
+ 	struct samsung_pinctrl_drv_data *drvdata)
+ {
+-	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+ 	void __iomem *virt_base = drvdata->virt_base;
+ 	int i;
+ 
+-	for (i = 0; i < ctrl->nr_banks; i++) {
+-		struct samsung_pin_bank *bank = &ctrl->pin_banks[i];
++	for (i = 0; i < drvdata->nr_banks; i++) {
++		struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
+ 		void __iomem *reg = virt_base + bank->pctl_offset;
+ 		const u8 *offs = bank->type->reg_offset;
+ 		const u8 *widths = bank->type->fld_width;
+@@ -1122,8 +1123,8 @@ static void samsung_pinctrl_suspend_dev(
+ 		}
+ 	}
+ 
+-	if (ctrl->suspend)
+-		ctrl->suspend(drvdata);
++	if (drvdata->suspend)
++		drvdata->suspend(drvdata);
+ }
+ 
+ /**
+@@ -1136,15 +1137,14 @@ static void samsung_pinctrl_suspend_dev(
+  */
+ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+ {
+-	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+ 	void __iomem *virt_base = drvdata->virt_base;
+ 	int i;
+ 
+-	if (ctrl->resume)
+-		ctrl->resume(drvdata);
++	if (drvdata->resume)
++		drvdata->resume(drvdata);
+ 
+-	for (i = 0; i < ctrl->nr_banks; i++) {
+-		struct samsung_pin_bank *bank = &ctrl->pin_banks[i];
++	for (i = 0; i < drvdata->nr_banks; i++) {
++		struct samsung_pin_bank *bank = &drvdata->pin_banks[i];
+ 		void __iomem *reg = virt_base + bank->pctl_offset;
+ 		const u8 *offs = bank->type->reg_offset;
+ 		const u8 *widths = bank->type->fld_width;
 diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index f26595ee52d3..b4f7a8dd8dcb 100644
+index b4f7a8dd8dcb..1288d7acb2df 100644
 --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
 +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -130,7 +130,7 @@ struct samsung_pin_bank_type {
-  * @pm_save: saved register values during suspend
+@@ -154,8 +154,6 @@ struct samsung_pin_bank {
+  * struct samsung_pin_ctrl: represent a pin controller.
+  * @pin_banks: list of pin banks included in this controller.
+  * @nr_banks: number of pin banks.
+- * @base: starting system wide pin number.
+- * @nr_pins: number of pins supported by the controller.
+  * @eint_gpio_init: platform specific callback to setup the external gpio
+  *	interrupts for the controller.
+  * @eint_wkup_init: platform specific callback to setup the external wakeup
+@@ -165,9 +163,6 @@ struct samsung_pin_ctrl {
+ 	struct samsung_pin_bank	*pin_banks;
+ 	u32		nr_banks;
+ 
+-	u32		base;
+-	u32		nr_pins;
+-
+ 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
+ 	int		(*eint_wkup_init)(struct samsung_pinctrl_drv_data *);
+ 	void		(*suspend)(struct samsung_pinctrl_drv_data *);
+@@ -187,6 +182,8 @@ struct samsung_pin_ctrl {
+  * @nr_groups: number of such pin groups.
+  * @pmx_functions: list of pin functions available to the driver.
+  * @nr_function: number of such pin functions.
++ * @pin_base: starting system wide pin number.
++ * @nr_pins: number of pins supported by the controller.
   */
- struct samsung_pin_bank {
--	struct samsung_pin_bank_type *type;
-+	const struct samsung_pin_bank_type *type;
- 	u32		pctl_offset;
- 	u32		pin_base;
- 	u8		nr_pins;
+ struct samsung_pinctrl_drv_data {
+ 	struct list_head		node;
+@@ -194,7 +191,6 @@ struct samsung_pinctrl_drv_data {
+ 	struct device			*dev;
+ 	int				irq;
+ 
+-	struct samsung_pin_ctrl		*ctrl;
+ 	struct pinctrl_desc		pctl;
+ 	struct pinctrl_dev		*pctl_dev;
+ 
+@@ -202,6 +198,14 @@ struct samsung_pinctrl_drv_data {
+ 	unsigned int			nr_groups;
+ 	const struct samsung_pmx_func	*pmx_functions;
+ 	unsigned int			nr_functions;
++
++	struct samsung_pin_bank		*pin_banks;
++	u32				nr_banks;
++	unsigned int			pin_base;
++	unsigned int			nr_pins;
++
++	void (*suspend)(struct samsung_pinctrl_drv_data *);
++	void (*resume)(struct samsung_pinctrl_drv_data *);
+ };
+ 
+ /**
+@@ -232,17 +236,17 @@ struct samsung_pmx_func {
+ };
+ 
+ /* list of all exported SoC specific data */
+-extern struct samsung_pin_ctrl exynos3250_pin_ctrl[];
+-extern struct samsung_pin_ctrl exynos4210_pin_ctrl[];
+-extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
+-extern struct samsung_pin_ctrl exynos5250_pin_ctrl[];
+-extern struct samsung_pin_ctrl exynos5260_pin_ctrl[];
+-extern struct samsung_pin_ctrl exynos5420_pin_ctrl[];
+-extern struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
+-extern struct samsung_pin_ctrl s3c2412_pin_ctrl[];
+-extern struct samsung_pin_ctrl s3c2416_pin_ctrl[];
+-extern struct samsung_pin_ctrl s3c2440_pin_ctrl[];
+-extern struct samsung_pin_ctrl s3c2450_pin_ctrl[];
+-extern struct samsung_pin_ctrl s5pv210_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos3250_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos4210_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos5250_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos5260_pin_ctrl[];
++extern const struct samsung_pin_ctrl exynos5420_pin_ctrl[];
++extern const struct samsung_pin_ctrl s3c64xx_pin_ctrl[];
++extern const struct samsung_pin_ctrl s3c2412_pin_ctrl[];
++extern const struct samsung_pin_ctrl s3c2416_pin_ctrl[];
++extern const struct samsung_pin_ctrl s3c2440_pin_ctrl[];
++extern const struct samsung_pin_ctrl s3c2450_pin_ctrl[];
++extern const struct samsung_pin_ctrl s5pv210_pin_ctrl[];
+ 
+ #endif /* __PINCTRL_SAMSUNG_H */
 -- 
 2.1.1
