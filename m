@@ -1,128 +1,73 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 02 Oct 2014 17:38:17 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAKON4OyvUeSidyR8OWk9BM4X3BmvzSLyZtbhnMaB75kr-AFuew@mail.gmail.com>
-References: <20140929101805.GB26008@ulmo>	<20141001124800.GA21733@ulmo>	<20141001170517.GF4273@sirena.org.uk>	<542C3934.3040409@redhat.com>	<CAKON4OxzerMyuza-GSfmYiLMqA=Y3HOXko7a8rOcP_8PkHVF3w@mail.gmail.com>	<542C4404.8040501@wwwdotorg.org>	<542CF3C3.2050708@redhat.com>	<CAKON4Oy8sZ-d6JzWLi7pUeNFE5ge0fr5Tgoc_PSpKcOoiN-0yQ@mail.gmail.com>	<542D476D.50004@redhat.com>	<CAKON4OwOFVFZjxN-SJpDJLcyCpNOT4_mjjr9OpgGXmTYvZwT+A@mail.gmail.com>	<542D4FB9.6090805@redhat.com>	<CAKON4Oyb3KBWhGgKfwNop7+cwR=p=ZpVs-jfH0iQwm5scfOJ-A@mail.gmail.com>	<542D5444.8090903@redhat.com>	<CAKON4OxTmNRxSJum17RZGLLku5dAFPauzqyP0BOF-VC=bD=Hng@mail.gmail.com>	<542D5C74.4050602@redhat.com>	<CAKON4OxHeHszmcbMw_LRJbcaFW5JP7Atsa4RMRwWfqMrCueAnQ@mail.gmail.com>	<542D5F62.60907@redhat.com>	<CAKON4Oz8mL5jGzBHZeznd5NbPqq93q7PpTDqHHcV_HYSfqBVHA@mail.gmail.com>	<542D6633.20907@redhat.com>	<CAKON4OwMf-zXC_B=VqdVNrD_ExC3zGiGUm4j5KKgS-U4cPB2zg@mail.gmail.com>
- <CAKON4OyvUeSidyR8OWk9BM4X3BmvzSLyZtbhnMaB75kr-AFuew@mail.gm!
- ail.com>
-Message-ID: <542D7169.8020500@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Oct 2014 17:38:04 +0200
+Subject: [PATCH 0/3] ARM: Meson6: enable SMP
+In-Reply-To: <3274534.jCjlMt5HJV@wuerfel>
+References: <1412066635-5298-1-git-send-email-carlo@caione.org>
+ <3418275.THTV4FmaIz@wuerfel> <20141002145426.GE4039@lukather>
+ <3274534.jCjlMt5HJV@wuerfel>
+Message-ID: <20141002153804.GF4039@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 10/02/2014 05:30 PM, jonsmirl at gmail.com wrote:
-> On Thu, Oct 2, 2014 at 11:14 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Thu, Oct 2, 2014 at 10:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>> Hi,
->>>
->>> On 10/02/2014 04:41 PM, jonsmirl at gmail.com wrote:
->>>> On Thu, Oct 2, 2014 at 10:21 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>>> Hi,
->>>>>
->>>>> On 10/02/2014 04:16 PM, jonsmirl at gmail.com wrote:
->>>>>> On Thu, Oct 2, 2014 at 10:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>
->>> <snip>
->>>
->>>>>>>> So there are two ways to do this...
->>>>>>>> 1) modify things like earlyconsole to protect device specific resource
->>>>>>>> (I think this is a bad idea)
->>>>>>>
->>>>>>> Why is this a bad idea? If the bootloader tells us exactly which resources
->>>>>>> are needed, then earlyconsole can claim them, and release them on
->>>>>>> handover to the real display driver.
->>>>>
->>>>> Jon, can you please answer this ? I really really want to know why people
->>>>> think this is such a bad idea. Understanding why people think this is a bad
->>>>> idea is necessary to be able to come up with an alternative solution.
->>>>
->>>> The list of resources should not be duplicated in the device tree -
->>>> once in the simplefb node and again in the real device node.
->>>
->>> It is not duplicated, the simplefb node will list the clocks used for the
->>> mode / output as setup by the firmware, which are often not all clocks
->>> which the display engine supports. Where as the real device node will list
->>> all clocks the display engine may use.
->>>
->>>> Device
->>>> tree is a hardware description and it is being twisted to solve a
->>>> software issue.
->>>
->>> This is not true, various core devicetree developers have already said
->>> that storing other info in the devicetree is fine, and being able to do so
->>> is part of the original design.
->>>
->>>> This problem is not limited to clocks, same problem
->>>> exists with regulators. On SGI systems this would exist with entire
->>>> bus controllers (but they are x86 based, console is not on the root
->>>> bus). This is a very messy problem and will lead to a Frankenstein
->>>> sized driver over time.
->>>
->>> This is a "what if ..." argument, we can discuss potential hypothetical
->>> problems all day long, what happens if the sky falls down?
->>>
->>>> But... I think this is a red herring which is masking the real
->>>> problem. The real problem seems to be that there is no window for
->>>> loading device specific drivers before the resource clean up phase
->>>> happens. That's a real problem -- multi architecture distros are going
->>>> to have lots of loadable device specific drivers.
->>>
->>> As Maxime pointed out to my alternative solution to fixing the clocks
->>> problem, this is not strictly a when to do cleanup problem. If another
->>> driver uses the same clocks, and does a clk_disable call after probing
->>> (because the device is put in low power mode until used by userspace),
->>> then the clk will be disabled even without any cleanup running at all.
->>>
->>> The real problem here is simply that to work the simplefb needs certain
->>> resources, just like any other device. And while for any other device
->>> simply listing the needed resources is an accepted practice, for simplefb
->>> for some reason (which I still do not understand) people all of a sudden
->>> see listing resources as a problem.
->>
->> Because you are creating two different device tree nodes describing a
->> single piece of hardware and that's not suppose to happen in a device
->> tree.
-
-That again is a very narrow reading of what is a very generic descriptive
-language. Also note that we are already in this situation with simplefb,
-all we're advocating is extending the info which is in the simplefb node
-so that it is actually usable in a much wider range of scenarios.
-
->> The accurate description of the hardware is being perverted to
->> solve a software problem.
-
-Again, devicetree is not strictly a hardware description language.
-
->> One node describes the hardware in a format to make simplefb happy.
->> Another node describes the same hardware in a format to make the
->> device specific driver happy.
+On Thu, Oct 02, 2014 at 05:26:53PM +0200, Arnd Bergmann wrote:
+> On Thursday 02 October 2014 16:54:26 Maxime Ripard wrote:
+> > On Thu, Oct 02, 2014 at 04:44:20PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 30 September 2014 22:45:38 Carlo Caione wrote:
+> > > > On mar, set 30, 2014 at 12:22:21 +0200, Arnd Bergmann wrote:
+> > > > > On Tuesday 30 September 2014 10:46:46 Carlo Caione wrote:
+> > > > > > On mar, set 30, 2014 at 10:43:52 +0200, Carlo Caione wrote:
+> > > > > > > Amlogic Meson6 is a dual-core Cortex-A9. This patchset adds all the necessary
+> > > > > > > pieces to boot the secondary CPU.
+> > > > > > 
+> > > > > > Sorry for the double sending.
+> > > > > > Forgot to CC LAKML.
+> > > > > 
+> > > > > Looks good to me in principle, but I wonder about the CPU enable method.
+> > > > > Are you able to implement PSCI in u-boot like it was done for allwinner?
+> > > > > 
+> > > > > This is mostly a question of whether the system comes up in secure mode
+> > > > > or non-secure mode.
+> > > > 
+> > > > I would be able if I had the u-boot source code or the possibility to
+> > > > flash the board I'm using. Unfortunately at this moment I don't have
+> > > > either. Probably in the near future I'll be able to implement PSCI in
+> > > > u-boot since Amlogic is kindly starting to provide documentation but now
+> > > > this is the best I can do.
+> > > 
+> > > Ok, I see. Let's give Amlogic some more time then. I think it's better
+> > > to merge other parts of the platform first when we can reasonably assume
+> > > that we don't have to change the binding any more.
+> > > 
+> > > It would be a shame to merge this now and then make it obsolete by
+> > > implementing PSCI but still having to carry around the original code
+> > > for compatibility reasons.
+> > 
+> > More likely, PSCI is not going to be supported by the bootloaders of
+> > the devices already in the wild, so we still have to provide them an
+> > option. And even when it will, you'll still have to support both the
+> > devices with the old bootloaders, and the one with the new.
 > 
-> But... I think all of this device tree stuff is a red herring and not
-> the core problem.
+> It depends on how common the old boot loaders are, and whether it's
+> possible to upgrade them. If we can get to the point where you can
+> boot a kernel with a single CPU and have an easy way to update the
+> boot loader, we don't need to support it.
 
-Actually the red herring is people focussing on the init ordering
-solution, which as already explained will simply never work, quoting
-myself (from above):
+I thought I heard Olof at some point ranting about this kind of
+requirements, but ok :)
 
->>> As Maxime pointed out to my alternative solution to fixing the clocks
->>> problem, this is not strictly a when to do cleanup problem. If another
->>> driver uses the same clocks, and does a clk_disable call after probing
->>> (because the device is put in low power mode until used by userspace),
->>> then the clk will be disabled even without any cleanup running at all.
+Still, holding off until something that hypothetical happens looks a
+bit odd, doesn't it?
 
-And to repeat myself yet again:
+Maxime
 
-"The real problem here is simply that to work the simplefb needs certain
-resources, just like any other device."
-
-So the logical thing to do is to just put the clocks in the node. The only
-counter argument I hear you make is "this is not a hardware description,
-so it does not belong in devicetree". An argument which has already
-been discussed earlier in this thread (about a month ago) and one of the
-officialo devicetree maintainers responded to that saying that it is fine
-to have non hardware info in the dt.
-
-Regards,
-
-Hans
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20141002/eaad49c4/attachment.sig>
